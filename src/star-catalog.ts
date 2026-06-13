@@ -1,15 +1,30 @@
-import type { Star, ConstellationLine, ConstellationInfo } from './types';
+import type { Star, ConstellationLine, ConstellationInfo, ConstellationStyle } from './types';
 import { getLang, t } from './i18n';
 
 let stars: Star[] = [];
 let starsByHip = new Map<number, Star>();
-let constellationLines: ConstellationLine[] = [];
 let constellationInfos: ConstellationInfo[] = [];
 
-function normalizeRA(ra: number): number {
+// Constellation lines are stored per style; 'western' is loaded eagerly at startup.
+const constellationLinesByStyle = new Map<ConstellationStyle, ConstellationLine[]>();
+
+export function normalizeRA(ra: number): number {
   while (ra < 0) ra += 360;
   while (ra >= 360) ra -= 360;
   return ra;
+}
+
+export function parseConstellationLines(linesData: any): ConstellationLine[] {
+  const result: ConstellationLine[] = [];
+  for (const f of linesData.features) {
+    result.push({
+      id: f.id,
+      segments: f.geometry.coordinates.map((seg: number[][]) =>
+        seg.map(([ra, dec]: number[]) => [normalizeRA(ra), dec] as [number, number])
+      ),
+    });
+  }
+  return result;
 }
 
 async function fetchJSON(url: string): Promise<any> {
@@ -20,9 +35,24 @@ async function fetchJSON(url: string): Promise<any> {
   return res.json();
 }
 
+async function fetchCatalog(): Promise<any> {
+  // Ask the server which catalog to use (driven by STAR_CATALOG_PATH in .env)
+  try {
+    const config = await fetchJSON('/api/config');
+    const url = config.starCatalog as string;
+    const data = await fetchJSON(url);
+    console.log(`[Catalog] Loaded star catalog from ${url}`);
+    return data;
+  } catch (err) {
+    // Fallback if server config unavailable
+    console.warn('[Catalog] Could not fetch config, falling back to stars.14.json');
+    return fetchJSON('/data/stars.14.json');
+  }
+}
+
 export async function loadCatalog(): Promise<void> {
   const [starsData, linesData, namesData, constData] = await Promise.all([
-    fetchJSON('/data/stars.8.json'),
+    fetchCatalog(),
     fetchJSON('/data/constellations.lines.json'),
     fetchJSON('/data/starnames.json'),
     fetchJSON('/data/constellations.json'),
@@ -52,22 +82,18 @@ export async function loadCatalog(): Promise<void> {
   // Sort by magnitude (brightest first) for rendering priority
   stars.sort((a, b) => a.mag - b.mag);
 
-  // Parse constellation lines
-  for (const f of linesData.features) {
-    constellationLines.push({
-      id: f.id,
-      segments: f.geometry.coordinates.map((seg: number[][]) =>
-        seg.map(([ra, dec]: number[]) => [normalizeRA(ra), dec] as [number, number])
-      ),
-    });
-  }
+  // Parse and cache the default (western) constellation lines
+  constellationLinesByStyle.set('western', parseConstellationLines(linesData));
 
   // Parse constellation info
   const lang = getLang();
   for (const f of constData.features) {
-    const displayName = lang === 'fr'
-      ? (f.properties.fr || f.properties.name)
-      : f.properties.name;
+    const p = f.properties;
+    let displayName: string;
+    if (lang === 'fr') displayName = p.fr || p.name;
+    else if (lang === 'es') displayName = p.es || p.en || p.name;
+    else if (lang === 'de') displayName = p.de || p.name;
+    else displayName = p.en || p.name;
     constellationInfos.push({
       id: f.id,
       name: f.properties.name,
@@ -78,6 +104,12 @@ export async function loadCatalog(): Promise<void> {
   }
 }
 
+export async function loadConstellationStyle(style: ConstellationStyle): Promise<void> {
+  if (constellationLinesByStyle.has(style)) return; // already cached
+  const data = await fetchJSON(`/data/constellations.lines.${style}.json`);
+  constellationLinesByStyle.set(style, parseConstellationLines(data));
+}
+
 export function getStars(): Star[] {
   return stars;
 }
@@ -86,8 +118,8 @@ export function getStarByHip(hip: number): Star | undefined {
   return starsByHip.get(hip);
 }
 
-export function getConstellationLines(): ConstellationLine[] {
-  return constellationLines;
+export function getConstellationLines(style: ConstellationStyle = 'western'): ConstellationLine[] {
+  return constellationLinesByStyle.get(style) ?? [];
 }
 
 export function getConstellationInfos(): ConstellationInfo[] {

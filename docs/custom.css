@@ -1,0 +1,652 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MyAstroSky Docs — Custom Docsify theme
+   Two themes matching the app exactly:
+     default (no data-theme attr) → cold-blue-v2 (modern steel blue)
+     [data-theme="warm"]          → warm (amber / golden)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Outfit:wght@300;400;500;600&family=DM+Mono&display=swap');
+
+/* ── Cold-blue-v2 (default) ─────────────────────────────────────────────── */
+:root {
+  --bg-app:        #0a0e14;
+  --bg-deep:       #0f1419;
+  --bg-modal:      #0c0f16;
+  --bg-panel:      rgba(12, 15, 22, 0.98);
+  --bg-card:       rgba(14, 18, 28, 0.9);
+  --bg-input:      rgba(16, 20, 32, 0.85);
+  --bg-code:       rgba(14, 18, 28, 0.85);
+
+  --text-primary:   #d4e0f0;
+  --text-secondary: #8a9fb0;
+  --text-label:     #6b7d8f;
+  --text-bright:    #e8f0ff;
+
+  --accent-color:   rgba(100, 150, 220, 0.92);
+  --accent-raw:     #6496dc;
+  --accent-hover:   rgba(120, 170, 240, 0.95);
+  --accent-fill-sm: rgba(100, 150, 220, 0.12);
+  --accent-fill-md: rgba(100, 150, 220, 0.22);
+
+  --border-panel:  rgba(255, 255, 255, 0.07);
+  --border-accent: rgba(100, 150, 220, 0.40);
+  --border-focus:  rgba(120, 170, 240, 0.65);
+
+  --scrollbar-track:       rgba(14, 18, 28, 0.5);
+  --scrollbar-thumb:       rgba(100, 150, 220, 0.45);
+  --scrollbar-thumb-hover: rgba(120, 170, 240, 0.7);
+
+  --sky-bg-inner: #0d1a2e;
+
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-ui:      'Outfit', system-ui, sans-serif;
+  --font-mono:    'DM Mono', 'Consolas', 'Monaco', monospace;
+}
+
+/* ── Warm (amber) ────────────────────────────────────────────────────────── */
+[data-theme="warm"] {
+  --bg-app:        #080808;
+  --bg-deep:       #111111;
+  --bg-modal:      #0e0c0a;
+  --bg-panel:      rgba(14, 12, 10, 0.98);
+  --bg-card:       rgba(20, 18, 14, 0.9);
+  --bg-input:      rgba(22, 20, 16, 0.85);
+  --bg-code:       rgba(30, 28, 22, 0.70);
+
+  --text-primary:   #e0d8cf;
+  --text-secondary: #a09080;
+  --text-label:     #7a7068;
+  --text-bright:    #f0e8df;
+
+  --accent-color:   rgba(192, 120, 48, 0.92);
+  --accent-raw:     #c07830;
+  --accent-hover:   rgba(210, 135, 55, 0.95);
+  --accent-fill-sm: rgba(192, 120, 48, 0.12);
+  --accent-fill-md: rgba(192, 120, 48, 0.22);
+
+  --border-panel:  rgba(255, 255, 255, 0.07);
+  --border-accent: rgba(192, 120, 48, 0.40);
+  --border-focus:  rgba(192, 120, 48, 0.65);
+
+  --scrollbar-track:       rgba(20, 18, 14, 0.5);
+  --scrollbar-thumb:       rgba(192, 120, 48, 0.45);
+  --scrollbar-thumb-hover: rgba(210, 135, 55, 0.7);
+
+  --sky-bg-inner: #1e1c2a;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base reset & layout
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+
+.sidebar {
+  background: var(--bg-panel) !important;
+  border-right: 1px solid var(--border-panel) !important;
+  padding: 0 0 0 8px !important;
+}
+
+.sidebar > h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+  border-bottom: 1px solid var(--border-panel) !important;
+  background: var(--bg-modal) !important;
+}
+
+.sidebar > h1 a {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 20px 16px 16px !important;
+  text-decoration: none !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-display) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.sidebar > h1 img {
+  width: calc(100% - 32px) !important;
+  max-width: 200px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  border-radius: 12px !important;
+}
+
+.sidebar-nav {
+  padding: 16px 0 24px !important;
+  overflow-y: auto !important;
+}
+
+/* Section headings ("User Guide" / "Developer Docs"). Docsify renders the
+   bold lines in _sidebar.md as `.sidebar-nav > p > strong` (siblings of the
+   <ul>, not inside an <li>). Colour the <p> AND the inner <strong> directly so
+   vue.css's inherited `.sidebar { color:#364149 }` can't win. */
+.sidebar-nav > p,
+.sidebar-nav > p > strong,
+.sidebar-nav > ul > li > p,
+.sidebar-nav > ul > li > strong {
+  display: block !important;
+  padding: 8px 16px 4px !important;
+  font-family: var(--font-ui) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--heading-h2) !important;
+  margin: 12px 0 0 !important;
+}
+
+/* The inner strong sits inside the already-padded p — no extra padding/margin */
+.sidebar-nav > p > strong {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* First section — no top gap */
+.sidebar-nav > p:first-child,
+.sidebar-nav > ul > li:first-child > p,
+.sidebar-nav > ul > li:first-child > strong {
+  margin-top: 0 !important;
+}
+
+/* Nav links */
+.sidebar-nav a {
+  display: block !important;
+  padding: 5px 16px 5px 24px !important;
+  font-size: 13px !important;
+  color: var(--text-secondary) !important;
+  text-decoration: none !important;
+  border-left: 2px solid transparent !important;
+  transition: color 0.15s, border-color 0.15s, background 0.15s !important;
+  line-height: 1.4 !important;
+}
+
+.sidebar-nav a:hover {
+  color: var(--text-primary) !important;
+  background: var(--accent-fill-sm) !important;
+  border-left-color: var(--border-accent) !important;
+}
+
+.sidebar-nav li.active > a,
+.sidebar-nav a.active {
+  color: var(--accent-raw) !important;
+  border-left-color: var(--accent-raw) !important;
+  background: var(--accent-fill-sm) !important;
+  font-weight: 500 !important;
+}
+
+/* Nested nav (subheadings) */
+.sidebar-nav ul ul {
+  padding-left: 12px !important;
+}
+
+.sidebar-nav ul ul a {
+  font-size: 12px !important;
+  color: var(--text-label) !important;
+  padding: 3px 16px 3px 20px !important;
+}
+
+.sidebar-nav ul ul a:hover {
+  color: var(--text-secondary) !important;
+}
+
+/* Scrollbar in sidebar */
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
+.sidebar-nav::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+.sidebar-nav::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 2px; }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+/* ── Main content area ───────────────────────────────────────────────────── */
+
+.content {
+  background: var(--bg-app) !important;
+}
+
+.markdown-section {
+  max-width: 860px !important;
+  padding: 40px 48px 80px !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+
+/* vue.css wraps every heading's text in <a class="anchor"><span>…</span></a>,
+   colors `.anchor span` dark (#34495e), and the link rule colors the <a> blue.
+   Make BOTH the anchor and its span inherit, so each heading colour set below
+   flows through the chain (h2 → a.anchor → span) to the visible text. */
+.markdown-section .anchor,
+.markdown-section .anchor span {
+  color: inherit !important;
+}
+
+.markdown-section h1,
+.markdown-section h2,
+.markdown-section h3,
+.markdown-section h4 {
+  font-family: var(--font-display) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.2 !important;
+}
+
+/* Per-theme heading colours (the .anchor span inherits these) */
+:root {
+  --heading-h1: #e6f0ff;
+  --heading-h2: #a8d0ff;
+  --heading-h3: #b8c8da;
+}
+[data-theme="warm"] {
+  --heading-h1: #f5e6d2;
+  --heading-h2: #ffd9a0;
+  --heading-h3: #d4c0a8;
+}
+
+.markdown-section h1 {
+  font-size: 2.4em !important;
+  margin: 0 0 32px !important;
+  padding-bottom: 16px !important;
+  border-bottom: 1px solid var(--border-panel) !important;
+  color: var(--heading-h1) !important;
+}
+
+.markdown-section h2 {
+  font-family: var(--font-ui) !important;
+  font-size: 1.4em !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  margin: 40px 0 16px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid var(--border-accent) !important;
+  color: var(--heading-h2) !important;
+}
+
+.markdown-section h3 {
+  font-size: 1.25em !important;
+  margin: 28px 0 10px !important;
+  color: var(--heading-h3) !important;
+  font-family: var(--font-ui) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.markdown-section h4 {
+  margin: 20px 0 8px !important;
+  color: var(--heading-h3) !important;
+  font-family: var(--font-ui) !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  font-size: 0.8em !important;
+}
+
+/* vue.css colours `strong` and `em` dark — re-theme them */
+.markdown-section strong {
+  color: var(--text-bright) !important;
+  font-weight: 600 !important;
+}
+
+.markdown-section em {
+  color: var(--text-secondary) !important;
+}
+
+.markdown-section p {
+  margin: 0 0 16px !important;
+  color: var(--text-primary) !important;
+}
+
+.markdown-section li {
+  color: var(--text-primary) !important;
+  margin-bottom: 4px !important;
+}
+
+.markdown-section a {
+  color: var(--accent-raw) !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid var(--accent-fill-md) !important;
+  transition: border-color 0.15s, color 0.15s !important;
+}
+
+.markdown-section a:hover {
+  color: var(--text-bright) !important;
+  border-bottom-color: var(--accent-color) !important;
+}
+
+/* ── Code ────────────────────────────────────────────────────────────────── */
+
+.markdown-section code {
+  font-family: var(--font-mono) !important;
+  font-size: 0.85em !important;
+  background: var(--bg-code) !important;
+  color: var(--text-secondary) !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  border: 1px solid var(--border-panel) !important;
+}
+
+.markdown-section pre {
+  background: var(--bg-code) !important;
+  border: 1px solid var(--border-accent) !important;
+  border-radius: 8px !important;
+  padding: 16px 20px !important;
+  overflow-x: auto !important;
+  margin: 16px 0 24px !important;
+}
+
+.markdown-section pre code {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  color: var(--text-primary) !important;
+  font-size: 0.88em !important;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+
+.markdown-section table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 16px 0 24px !important;
+  font-size: 0.92em !important;
+}
+
+.markdown-section th {
+  background: var(--bg-code) !important;
+  color: var(--text-bright) !important;
+  font-family: var(--font-ui) !important;
+  font-weight: 600 !important;
+  font-size: 0.78em !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--border-accent) !important;
+  text-align: left !important;
+}
+
+.markdown-section td {
+  padding: 9px 14px !important;
+  border-bottom: 1px solid var(--border-panel) !important;
+  color: var(--text-primary) !important;
+  vertical-align: top !important;
+}
+
+.markdown-section td:first-child,
+.markdown-section td:first-child strong {
+  color: var(--text-bright) !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+
+/* Kill the Docsify Vue theme's white zebra rows */
+.markdown-section tr:nth-child(2n) td,
+.markdown-section tr:nth-child(2n) {
+  background-color: var(--bg-code) !important;
+}
+
+.markdown-section tr:nth-child(2n+1) td,
+.markdown-section tr:nth-child(2n+1) {
+  background-color: transparent !important;
+}
+
+.markdown-section tr:hover td {
+  background: var(--accent-fill-sm) !important;
+}
+
+/* ── Blockquotes ─────────────────────────────────────────────────────────── */
+
+.markdown-section blockquote {
+  border-left: 3px solid var(--accent-raw) !important;
+  background: var(--accent-fill-sm) !important;
+  margin: 16px 0 !important;
+  padding: 12px 16px !important;
+  border-radius: 0 6px 6px 0 !important;
+}
+
+.markdown-section blockquote p {
+  margin: 0 !important;
+  color: var(--text-secondary) !important;
+  font-style: italic !important;
+}
+
+/* ── Horizontal rules ────────────────────────────────────────────────────── */
+
+.markdown-section hr {
+  border: none !important;
+  border-top: 1px solid var(--border-panel) !important;
+  margin: 32px 0 !important;
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+
+.search {
+  padding: 12px 12px 8px !important;
+  border-bottom: 1px solid var(--border-panel) !important;
+  background: var(--bg-modal) !important;
+}
+
+.search input {
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-panel) !important;
+  border-radius: 6px !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 13px !important;
+  padding: 7px 10px !important;
+  width: 100% !important;
+  outline: none !important;
+  transition: border-color 0.15s !important;
+}
+
+.search input:focus {
+  border-color: var(--border-focus) !important;
+}
+
+.search input::placeholder {
+  color: var(--text-label) !important;
+}
+
+.search .results-panel {
+  background: var(--bg-modal) !important;
+  border: 1px solid var(--border-panel) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+}
+
+.search .matching-post {
+  border-bottom: 1px solid var(--border-panel) !important;
+}
+
+.search .matching-post a {
+  color: var(--text-primary) !important;
+  padding: 10px 14px !important;
+}
+
+.search .matching-post a:hover {
+  background: var(--accent-fill-sm) !important;
+}
+
+.search .matching-post p {
+  color: var(--text-secondary) !important;
+  font-size: 0.85em !important;
+}
+
+/* ── Global scrollbar ────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+/* ── Theme toggle button (lives at top of sidebar, above search) ─────────── */
+
+#theme-toggle {
+  display: block !important;
+  width: calc(100% - 24px) !important;
+  margin: 10px 12px 0 !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-accent) !important;
+  color: var(--text-secondary) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.06em !important;
+  padding: 6px 12px !important;
+  border-radius: 20px !important;
+  cursor: pointer !important;
+  transition: color 0.15s, border-color 0.15s, background 0.15s !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+
+#theme-toggle:hover {
+  color: var(--text-primary) !important;
+  border-color: var(--accent-color) !important;
+  background: var(--accent-fill-sm) !important;
+}
+
+/* ── Sidebar collapse / hamburger toggle button ──────────────────────────── */
+
+.sidebar-toggle {
+  background: var(--bg-panel) !important;
+  border: none !important;
+  border-top: 1px solid var(--border-panel) !important;
+}
+
+.sidebar-toggle span {
+  background-color: var(--text-label) !important;
+}
+
+.sidebar-toggle:hover span {
+  background-color: var(--text-secondary) !important;
+}
+
+/* ── Landing page (README.md) special styles ─────────────────────────────── */
+
+.home-hero {
+  text-align: center;
+  padding: 40px 0 32px;
+}
+
+.home-hero img {
+  height: 80px;
+  width: 80px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.home-hero h1 {
+  font-family: var(--font-display) !important;
+  font-size: 3em !important;
+  margin: 0 0 8px !important;
+  border: none !important;
+  padding: 0 !important;
+  letter-spacing: 0.04em !important;
+}
+
+.home-hero p {
+  color: var(--text-secondary) !important;
+  font-size: 1.05em !important;
+  margin: 0 0 32px !important;
+}
+
+.cta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 32px 0 40px;
+}
+
+.cta-card {
+  display: block;
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: 10px;
+  padding: 24px 20px;
+  text-align: center;
+  text-decoration: none !important;
+  border-bottom: none !important;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s !important;
+}
+
+.cta-card:hover {
+  border-color: var(--accent-color) !important;
+  background: var(--accent-fill-sm) !important;
+  transform: translateY(-2px) !important;
+}
+
+.cta-card .cta-icon {
+  font-size: 2em;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.cta-card .cta-title {
+  display: block;
+  font-family: var(--font-display) !important;
+  font-size: 1.4em;
+  font-weight: 600;
+  color: var(--text-bright) !important;
+  margin-bottom: 6px;
+}
+
+.cta-card .cta-desc {
+  display: block;
+  font-size: 0.85em;
+  color: var(--text-secondary) !important;
+  line-height: 1.4;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.feature-chip {
+  background: var(--bg-code);
+  border: 1px solid var(--border-panel);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 0.88em;
+  color: var(--text-secondary);
+}
+
+.feature-chip strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .markdown-section {
+    padding: 24px 20px 60px !important;
+  }
+
+  .cta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #theme-toggle {
+    bottom: 10px !important;
+    left: 10px !important;
+  }
+}

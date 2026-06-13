@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyAstroSky Docs</title>
+  <meta name="description" content="MyAstroSky — documentation for users and developers">
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+  <link rel="stylesheet" href="custom.css">
+
+  <!-- Apply saved theme before first paint to avoid flash -->
+  <script>
+    (function () {
+      var saved = localStorage.getItem('app-theme') || 'cold-blue-v2';
+      // Docs uses '' for warm, cold-blue-v2 for modern cold (same keys as the app)
+      // In the docs we map: 'cold-blue-v2' → no attr (default CSS), '' → data-theme="warm"
+      if (saved === '' || saved === 'warm') {
+        document.documentElement.setAttribute('data-theme', 'warm');
+      }
+      // cold-blue-v2 is default — no attribute needed
+    })();
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    window.$docsify = {
+      name: 'MyAstroSky',
+      logo: 'icon.png',
+      repo: '',
+      loadSidebar: true,
+      subMaxLevel: 2,
+      auto2top: true,
+      homepage: 'README.md',
+      alias: {
+        '/.*/_sidebar.md': '/_sidebar.md',
+      },
+      search: {
+        maxAge: 86400000,
+        paths: 'auto',
+        placeholder: 'Search docs…',
+        noData: 'No results.',
+        depth: 3,
+      },
+      plugins: [
+        function (hook) {
+          // Inject theme toggle button at top of sidebar, above search
+          hook.doneEach(function () {
+            if (document.getElementById('theme-toggle')) return;
+            var btn = document.createElement('button');
+            btn.id = 'theme-toggle';
+            updateLabel(btn);
+            btn.addEventListener('click', function () {
+              var current = document.documentElement.getAttribute('data-theme');
+              var next = (current === 'warm') ? null : 'warm';
+              if (next) {
+                document.documentElement.setAttribute('data-theme', 'warm');
+                localStorage.setItem('app-theme', '');
+              } else {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('app-theme', 'cold-blue-v2');
+              }
+              updateLabel(btn);
+            });
+            // Insert before the search box inside the sidebar
+            var sidebar = document.querySelector('.sidebar');
+            var search = sidebar && sidebar.querySelector('.search');
+            if (search) {
+              sidebar.insertBefore(btn, search);
+            } else {
+              document.body.appendChild(btn);
+            }
+          });
+
+          function updateLabel(btn) {
+            var isWarm = document.documentElement.getAttribute('data-theme') === 'warm';
+            btn.textContent = isWarm ? 'Cold theme' : 'Warm theme';
+            btn.title = isWarm ? 'Switch to cold blue theme' : 'Switch to warm amber theme';
+          }
+        }
+      ]
+    };
+  </script>
+
+  <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-powershell.min.js"></script>
+</body>
+</html>

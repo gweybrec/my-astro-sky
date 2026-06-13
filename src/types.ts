@@ -11,6 +11,14 @@ export interface Star {
   desig?: string;
 }
 
+export type ConstellationStyle = 'western' | 'stellarium' | 'rey' | 'chinese' | 'arabic';
+
+export const IAU_CONSTELLATION_STYLES: ConstellationStyle[] = ['western', 'stellarium', 'rey'];
+
+export function isIAUStyle(style: ConstellationStyle): boolean {
+  return (IAU_CONSTELLATION_STYLES as string[]).includes(style);
+}
+
 export interface ConstellationLine {
   id: string;
   segments: [number, number][][];
@@ -34,6 +42,12 @@ export interface PhotoCorrespondence {
   starDec?: number;  // direct Dec (degrees) when starHip=0
 }
 
+export interface PhotoIntegration {
+  frames: number;
+  seconds: number;
+  filter: string;
+}
+
 export interface Photo {
   id: string;
   filename: string;
@@ -42,6 +56,14 @@ export interface Photo {
   height: number;
   createdAt: string;
   correspondences: PhotoCorrespondence[];
+  manualPlacement?: ManualPlacement; // Store manual placement params to recompute transform with current view
+  dsoIds: string[];
+  labels: string[];
+  integrations?: PhotoIntegration[];
+  observationDate?: string | null; // UTC ISO 8601 observation start (from DATE-OBS or user input)
+  notes: string;
+  fileSize?: number | null; // Server-computed file size in bytes (present when loaded from API)
+  thumbFilename?: string | null; // Low-res thumbnail filename (generated on upload)
 }
 
 export interface AffineMatrix {
@@ -62,6 +84,7 @@ export interface ViewState {
   centerX: number;
   centerY: number;
   scale: number;
+  rotationDeg: number;
   width: number;
   height: number;
 }
@@ -80,10 +103,37 @@ export interface StarDetectionResult {
   scaleFromOriginal: number; // ratio analysed size / original size
 }
 
+export interface WCSDimensionWarning {
+  sourceW: number;
+  sourceH: number;
+  targetW: number;
+  targetH: number;
+  aspectMismatch: boolean;
+}
+
+export interface ApiErrorDetails {
+  httpStatus?: number;
+  httpStatusText?: string;
+  code?: string;
+  method?: string;
+  endpoint?: string;
+  responseBody?: string;
+}
+
 export interface PlateSolveResult {
   success: boolean;
   correspondences?: PhotoCorrespondence[];
   error?: string;
+  code?: string;
+  errorDetails?: ApiErrorDetails;
+  diagnostics?: string; // raw solver output for the collapsible details section
+  sourceWidth?: number;
+  sourceHeight?: number;
+  dimensionWarning?: WCSDimensionWarning;
+  dsoIds?: string[]; // DSOs detected in the field (populated by server-side solvers)
+  dateObs?: string;   // DATE-OBS from WCS header (UTC ISO 8601)
+  expTime?: number;   // EXPTIME from WCS header (seconds)
+  stackCnt?: number;  // STACKCNT from WCS header (frame count)
 }
 
 export interface AstrometrySolveStatus {
@@ -91,12 +141,13 @@ export interface AstrometrySolveStatus {
   status: 'pending' | 'solving' | 'solved' | 'failed' | 'timeout';
   correspondences?: PhotoCorrespondence[];
   error?: string;
+  dsoIds?: string[];
 }
 
-export type DSOType = 'Gx' | 'OC' | 'GC' | 'EN' | 'RN' | 'PN' | 'SNR' | 'DN' | '?';
+export type DSOType = 'GxS' | 'GxE' | 'GxI' | 'Gx' | 'OC' | 'GC' | 'EN' | 'RN' | 'PN' | 'SNR' | 'DN' | '?';
 
 export interface DSO {
-  id: string;           // "M31", "NGC224", "IC1805", "SH2-106"
+  id: string;           // display ID (highest priority: M > NGC > IC > SH2 > LBN > LDN)
   ra: number;           // degrés [0, 360)
   dec: number;          // degrés [-90, 90]
   type: DSOType;
@@ -105,20 +156,17 @@ export interface DSO {
   pa: number;           // angle de position, degrés E du nord
   mag: number | null;
   displayName: string | null;
+  catalogs: string[];   // all catalog IDs: ["M42", "NGC1976", "LBN974"]
+  emissionLines: string | null;  // e.g. "OIII > HD", "mostly NII"
+  constellation: string | null;  // 3-letter IAU abbreviation, e.g. "Lyr"
+  rating: number | null;         // photographic interest 1–5 (null if missing from catalog)
+  difficulty: number | null;     // imaging difficulty 1–5 (null if missing from catalog)
 }
 
 export interface DSOSearchResult {
   dso: DSO;
   label: string;
   score: number;
-}
-
-export interface PhotoSection {
-  id: string;
-  name: string;
-  photoIds: string[];
-  collapsed: boolean;
-  visible: boolean;
 }
 
 export interface ManualPlacement {
@@ -129,3 +177,15 @@ export interface ManualPlacement {
   mirrorX: boolean;
   mirrorY: boolean;
 }
+
+export interface DSOUserOverride {
+  names?: { fr?: string; en?: string; es?: string; de?: string };
+  ra?: number;
+  dec?: number;
+  constellation?: string;
+  rating?: number;
+  difficulty?: number;
+  type?: DSOType;
+}
+
+export type ViewMode = 'skymap' | 'gallery' | 'targets';

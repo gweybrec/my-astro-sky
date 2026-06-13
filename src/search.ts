@@ -5,6 +5,29 @@ import { searchStarsAPI } from './api';
 import type { StarSearchResult } from './api';
 import { t } from './i18n';
 
+// Greek letter mapping for Latin input (alpha -> α, beta -> β, etc.)
+const greekLetterMap: Record<string, string> = {
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
+  zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ',
+  lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', omicron: 'ο',
+  pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ',
+  phi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω'
+};
+
+/**
+ * Normalize a search query by replacing Latin Greek letter names with Greek characters.
+ * E.g., "alpha ori" -> "α ori", "beta per" -> "β per"
+ */
+function normalizeGreekLetters(query: string): string {
+  let normalized = query;
+  for (const [latin, greek] of Object.entries(greekLetterMap)) {
+    // Match whole word boundaries to avoid partial replacements
+    const regex = new RegExp(`\\b${latin}\\b`, 'gi');
+    normalized = normalized.replace(regex, greek);
+  }
+  return normalized;
+}
+
 export interface SearchResult {
   star: Star;
   label: string;
@@ -30,7 +53,8 @@ function starLabel(star: Star): string {
 export function searchStars(query: string, limit = 10): SearchResult[] {
   if (!query || query.length < 1) return [];
 
-  const q = query.toLowerCase().trim();
+  const normalized = normalizeGreekLetters(query);
+  const q = normalized.toLowerCase().trim();
 
   // Direct HIP lookup: "hip 12345" or "HIP12345" or pure number
   const hipMatch = q.match(/^hip\s*(\d+)$/i) || q.match(/^(\d+)$/);
@@ -112,22 +136,34 @@ export function getDSOTypeName(type: string): string {
 
 function dsoLabel(dso: DSO): string {
   const typeName = getDSOTypeName(dso.type);
-  if (dso.displayName) {
-    return `${dso.id} – ${dso.displayName}`;
+  const crossRefs = dso.catalogs.length > 1 ? ` (${dso.catalogs.slice(1).join(' · ')})` : '';
+  if (dso.id.startsWith('LPN-')) {
+    // For LPN objects, show displayName or stripped id (no "LPN-xxx" prefix in label)
+    const name = dso.displayName || dso.id.replace(/^LPN-/, '');
+    return `${name}${crossRefs || ` (${typeName})`}`;
   }
-  return `${dso.id} (${typeName})`;
+  if (dso.displayName) {
+    return `${dso.id} – ${dso.displayName}${crossRefs}`;
+  }
+  return `${dso.id}${crossRefs || ` (${typeName})`}`;
 }
 
 export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
   if (!query || query.length < 1) return [];
 
-  const q = query.toLowerCase().trim();
+  const normalized = normalizeGreekLetters(query);
+  const q = normalized.toLowerCase().trim();
   const results: DSOSearchResult[] = [];
 
   for (const dso of getDSOs()) {
     let score = 0;
     const idLower = dso.id.toLowerCase();
     const nameLower = dso.displayName ? dso.displayName.toLowerCase() : '';
+    // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42)
+    const aliasMatch = dso.catalogs.some(c => {
+      const cl = c.toLowerCase();
+      return cl === q || cl.startsWith(q);
+    });
 
     // 1. Exact ID match
     if (idLower === q) {
@@ -149,7 +185,11 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
     else if (nameLower && nameLower.includes(q)) {
       score = 40;
     }
-    // 6. Partial ID match (e.g. "ngc70" matches "NGC7000")
+    // 6. Alias exact/prefix match (e.g. "ngc1976" or "lbn974")
+    else if (aliasMatch) {
+      score = 50;
+    }
+    // 7. Partial ID match (e.g. "ngc70" matches "NGC7000")
     else if (idLower.includes(q)) {
       score = 25;
     }

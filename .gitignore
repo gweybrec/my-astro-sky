@@ -9,8 +9,24 @@ data.db
 .vite/
 .playwright-mcp/
 server/data/
+.env
+
+# Electron packaging output (binaries, .deb, .zip)
+out/
+
+# Generated icon files (run `npm run generate-icons` to rebuild)
+build/
+
+# Local Claude Code settings (machine-specific paths, not for sharing)
+.claude/settings.local.json
 
 # Debug/test artifacts
 /*.png
 /*.txt
 /test-photos/
+/astro-photos/
+/coverage/
+
+# Release-notes scratch file (generated at release time, never committed)
+/RELEASE_BODY.md
+

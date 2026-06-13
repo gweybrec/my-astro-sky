@@ -4,6 +4,29 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Greek letter mapping for Latin input (alpha -> α, beta -> β, etc.)
+const greekLetterMap: Record<string, string> = {
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
+  zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ',
+  lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', omicron: 'ο',
+  pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ',
+  phi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω'
+};
+
+/**
+ * Normalize a search query by replacing Latin Greek letter names with Greek characters.
+ * E.g., "alpha ori" -> "α ori", "beta per" -> "β per"
+ */
+function normalizeGreekLetters(query: string): string {
+  let normalized = query;
+  for (const [latin, greek] of Object.entries(greekLetterMap)) {
+    // Match whole word boundaries to avoid partial replacements
+    const regex = new RegExp(`\\b${latin}\\b`, 'gi');
+    normalized = normalized.replace(regex, greek);
+  }
+  return normalized;
+}
+
 export interface DeepStar {
   hip: number;
   ra: number;
@@ -44,9 +67,10 @@ function normalizeRA(ra: number): number {
 export function loadDeepCatalog(): void {
   if (deepStars) return;
 
+  const publicDataDir = process.env.PUBLIC_DATA_DIR || path.join(__dirname, '..', 'public', 'data');
   const deepPath = path.join(__dirname, 'data', 'stars.deep.json');
-  const fallbackPath = path.join(__dirname, '..', 'public', 'data', 'stars.8.json');
-  const namesPath = path.join(__dirname, '..', 'public', 'data', 'starnames.json');
+  const fallbackPath = path.join(publicDataDir, 'stars.8.json');
+  const namesPath = path.join(publicDataDir, 'starnames.json');
 
   let catalogPath: string;
   if (fs.existsSync(deepPath)) {
@@ -112,7 +136,8 @@ export function searchDeepStars(query: string, limit = 10): StarSearchResult[] {
   loadDeepCatalog();
   if (!query || query.length < 1) return [];
 
-  const q = query.toLowerCase().trim();
+  const normalized = normalizeGreekLetters(query);
+  const q = normalized.toLowerCase().trim();
 
   // Direct HIP lookup
   const hipMatch = q.match(/^hip\s*(\d+)$/i) || q.match(/^(\d+)$/);
@@ -177,4 +202,65 @@ export function searchDeepStars(query: string, limit = 10): StarSearchResult[] {
 export function getDeepStarByHip(hip: number): DeepStar | undefined {
   loadDeepCatalog();
   return starsByHip!.get(hip);
+}
+
+/**
+ * Search stars by position (RA/Dec) within a given radius
+ * @param ra Right Ascension in degrees
+ * @param dec Declination in degrees
+ * @param radius Search radius in degrees
+ * @param magLimit Maximum magnitude (only return stars brighter than this)
+ * @param limit Maximum number of results
+ * @returns Array of stars within the radius, sorted by magnitude
+ */
+export function searchStarsByPosition(
+  ra: number,
+  dec: number,
+  radius: number,
+  magLimit: number = 10,
+  limit: number = 20
+): StarSearchResult[] {
+  loadDeepCatalog();
+  if (!deepStars) return [];
+
+  const results: StarSearchResult[] = [];
+  const radiusRad = radius * Math.PI / 180;
+  const raRad = ra * Math.PI / 180;
+  const decRad = dec * Math.PI / 180;
+
+  // Calculate angular distance using haversine formula
+  for (const star of deepStars) {
+    if (star.mag > magLimit) continue;
+
+    const starRaRad = star.ra * Math.PI / 180;
+    const starDecRad = star.dec * Math.PI / 180;
+
+    // Haversine formula for angular distance
+    const dRa = starRaRad - raRad;
+    const dDec = starDecRad - decRad;
+    const a = Math.sin(dDec / 2) ** 2 + 
+              Math.cos(decRad) * Math.cos(starDecRad) * Math.sin(dRa / 2) ** 2;
+    const angularDistance = 2 * Math.asin(Math.sqrt(a));
+
+    if (angularDistance <= radiusRad) {
+      results.push({
+        hip: star.hip,
+        ra: star.ra,
+        dec: star.dec,
+        mag: star.mag,
+        bv: star.bv,
+        name: star.name,
+        bayer: star.bayer,
+        flam: star.flam,
+        constellation: star.constellation,
+        desig: star.desig,
+        label: starLabel(star),
+        score: 0
+      });
+    }
+  }
+
+  // Sort by magnitude (brightest first) and limit results
+  results.sort((a, b) => a.mag - b.mag);
+  return results.slice(0, limit);
 }

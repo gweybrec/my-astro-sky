@@ -2,6 +2,19 @@ import type { AffineMatrix, Point } from './types';
 import { t } from './i18n';
 
 /**
+ * Check if three points are collinear (or nearly collinear).
+ * Uses a relative singularity threshold based on input coordinate scale.
+ */
+function isCollinear(det: number, p0: Point, p1: Point, p2: Point): boolean {
+  const scale = Math.max(
+    Math.abs(p0.x), Math.abs(p0.y), Math.abs(p1.x), Math.abs(p1.y),
+    Math.abs(p2.x), Math.abs(p2.y), 1,
+  );
+
+  return Math.abs(det) < 1e-10 * scale * scale;
+}
+
+/**
  * Compute affine transform from 3 point correspondences.
  * Maps photo pixel coords → canvas pixel coords.
  *
@@ -22,12 +35,7 @@ export function computeAffineTransform(
     p0.y * (p1.x - p2.x) +
     (p1.x * p2.y - p2.x * p1.y);
 
-  // Relative singularity threshold based on input coordinate scale
-  const scale = Math.max(
-    Math.abs(p0.x), Math.abs(p0.y), Math.abs(p1.x), Math.abs(p1.y),
-    Math.abs(p2.x), Math.abs(p2.y), 1,
-  );
-  if (Math.abs(det) < 1e-10 * scale * scale) {
+  if (isCollinear(det, p0, p1, p2)) {
     throw new Error(t('errors.collinearPoints'));
   }
 
@@ -160,7 +168,36 @@ export function computeAffineLSQ(
   // Relative singularity threshold based on normal matrix scale
   const mScale = Math.max(Math.abs(m00), Math.abs(m11), m22, 1);
   if (Math.abs(det) < 1e-10 * mScale * mScale * mScale) {
-    throw new Error(t('errors.collinearLSQ'));
+    // Normal matrix is (near-)singular. This happens when the photo points
+    // are collinear or nearly so. Rather than failing outright, fall back
+    // to a similarity transform (scale+rotation+translation) computed from
+    // the most separated pair of points — this is sufficient to place the
+    // image when an affine (6-DOF) fit is underdetermined.
+    let bestI = 0, bestJ = 1;
+    let maxDist2 = 0;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const dx = photoPoints[i].x - photoPoints[j].x;
+        const dy = photoPoints[i].y - photoPoints[j].y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > maxDist2) {
+          maxDist2 = d2;
+          bestI = i;
+          bestJ = j;
+        }
+      }
+    }
+
+    // If all points are coincident (or numerically too close), we cannot
+    // compute a transform.
+    if (maxDist2 < 1e-10) {
+      throw new Error(t('errors.collinearLSQ'));
+    }
+
+    return computeSimilarityTransform(
+      [photoPoints[bestI], photoPoints[bestJ]] as [Point, Point],
+      [canvasPoints[bestI], canvasPoints[bestJ]] as [Point, Point],
+    );
   }
 
   // Solve M·x = rhs via Cramer's rule

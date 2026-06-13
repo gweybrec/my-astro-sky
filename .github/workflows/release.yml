@@ -1,0 +1,215 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g. v1.0.0)'
+        required: false
+        default: ''
+      build_macos_x64:
+        description: 'Also build the macOS Intel (x64) artifact'
+        type: boolean
+        default: false
+
+jobs:
+  # Fail fast before the long build jobs run: a manual dispatch must supply a tag_name,
+  # and the resolved tag must look like a version tag (vX.Y.Z) so we never publish a
+  # release named after a branch (e.g. "master").
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve and validate release tag
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -z "${{ inputs.tag_name }}" ]; then
+            echo "::error::Manual runs must provide a tag_name input (e.g. v1.0.0)."
+            exit 1
+          fi
+          TAG="${{ inputs.tag_name || github.ref_name }}"
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Resolved tag '$TAG' must be a version tag like vX.Y.Z."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing tag: $TAG"
+
+  build-windows:
+    needs: validate
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run generate-icons
+
+      - name: Build Electron app
+        run: npm run electron:make
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: windows-artifacts
+          path: |
+            out/make/squirrel.windows/x64/MyAstroSkySetup.exe
+            out/make/zip/win32/x64/*.zip
+
+  build-linux:
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y build-essential python3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run generate-icons
+
+      - name: Build Electron app
+        run: npm run electron:make
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux-artifacts
+          path: |
+            out/make/deb/x64/*.deb
+            out/make/zip/linux/x64/*.zip
+
+  build-macos:
+    needs: validate
+    # arm64 (Apple Silicon) always builds. The Intel x64 leg (macos-13) often sits queued for a
+    # long time and is rarely needed, so it only runs when the workflow is dispatched manually
+    # with build_macos_x64 checked. On tag pushes inputs.* is falsy -> arm64 only.
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.build_macos_x64 && '[{"runner":"macos-14","arch":"arm64"},{"runner":"macos-13","arch":"x64"}]' || '[{"runner":"macos-14","arch":"arm64"}]') }}
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run generate-icons
+
+      - name: Build Electron app
+        run: npm run electron:make
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: macos-artifacts-${{ matrix.arch }}
+          path: |
+            out/make/zip/darwin/${{ matrix.arch }}/*.zip
+            out/make/**/*.dmg
+
+  release:
+    needs: [validate, build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # Full git history + tags are required for git-cliff to build the changelog.
+      # Check out the default branch (not the detached tag) so the regenerated
+      # CHANGELOG.md can be committed back.
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      # Node + git-cliff (devDependency) drive scripts/generate-changelog.mjs.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Regenerate CHANGELOG.md (current major series) + CHANGELOG.v<n>.md archives
+      # for completed majors, all from Conventional Commits. Committed back below.
+      - name: Generate changelog files
+        run: npm run changelog
+
+      # Extract just the latest version's section for the GitHub Release body
+      # (written to a file used as body_path; not committed).
+      - name: Build release notes
+        run: npx git-cliff --config cliff.toml --latest --strip header --output RELEASE_BODY.md
+
+      # Commit the regenerated changelog file(s) back to the default branch. Lands after
+      # the tag (tags are immutable); [skip ci] avoids re-triggering CI/test workflows.
+      - name: Commit updated changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG*.md
+          if git diff --staged --quiet; then
+            echo "Changelog unchanged — nothing to commit."
+          else
+            git commit -m "chore: update changelog for ${{ needs.validate.outputs.tag }} [skip ci]"
+            git push origin HEAD:${{ github.event.repository.default_branch }}
+          fi
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: windows-artifacts
+          path: artifacts/windows
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: linux-artifacts
+          path: artifacts/linux
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: macos-artifacts-*
+          path: artifacts/macos
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.tag }}
+          body_path: RELEASE_BODY.md
+          files: |
+            artifacts/windows/**
+            artifacts/linux/**
+            artifacts/macos/**

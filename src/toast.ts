@@ -1,4 +1,6 @@
-type ToastType = 'info' | 'error' | 'undo';
+import { reportRendererError } from './error-reporter';
+
+type ToastType = 'info' | 'error' | 'undo' | 'warning';
 
 interface ToastOptions {
   message: string;
@@ -21,6 +23,16 @@ function ensureContainer(): HTMLDivElement {
 }
 
 export function showToast(opts: ToastOptions): () => void {
+  if (opts.type === 'error') {
+    reportRendererError({
+      category: 'ui_error_toast',
+      message: opts.message,
+      context: {
+        duration: opts.duration,
+      },
+    });
+  }
+
   const el = document.createElement('div');
   el.className = `toast toast-${opts.type || 'info'}`;
 

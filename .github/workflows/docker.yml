@@ -1,0 +1,93 @@
+name: Docker
+
+# Guards the Docker image — the recommended self-hosting path (see docs/dev/distribution.md).
+# Build alone catches Dockerfile/build-context regressions; the smoke test additionally
+# proves the container boots and resolves its runtime assets (resources/, star catalog).
+#
+# Path-filtered so doc-only changes don't trigger a (slow) image build.
+#
+# TODO: publish the image to GHCR (ghcr.io/gweybrec/my-astro-sky) on tag/release so users
+#       can `docker pull` instead of `docker compose up --build`. Deferred — see docs/dev/ci.md.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - 'server/**'
+      - 'public/**'
+      - 'resources/**'
+      - 'src/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'uno.config.ts'
+      - 'tsconfig*.json'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - 'server/**'
+      - 'public/**'
+      - 'resources/**'
+      - 'src/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'uno.config.ts'
+      - 'tsconfig*.json'
+      - '.github/workflows/docker.yml'
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build the image into the local Docker daemon (load: true) so the next step can
+      # run it. GitHub Actions layer cache keeps incremental builds fast.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: myastrosky:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Boot the container and verify it actually serves requests. /api/config proves the
+      # server started; /api/telescopes returns the built-in gear catalog read from
+      # resources/*.json at startup, proving the Dockerfile wired those paths up correctly.
+      - name: Smoke test
+        run: |
+          docker run -d --name mas -p 3001:3001 myastrosky:ci
+          ok=
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3001/api/config > /dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::Container did not become healthy in time"
+            docker logs mas
+            exit 1
+          fi
+          curl -sf http://localhost:3001/api/telescopes > /dev/null
+          echo "Container booted and served /api/config + /api/telescopes."
+
+      - name: Container logs
+        if: always()
+        run: docker logs mas || true
+
+      - name: Tear down
+        if: always()
+        run: docker rm -f mas || true

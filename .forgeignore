@@ -1,0 +1,24 @@
+# Exclude user data and large developer files from packaging
+uploads/
+astro-photos/
+
+# Repo metadata and editor dirs
+.git/
+.vscode/
+
+# Build/dev files
+tests/
+scripts/
+*.ts
+*.test.*
+vite.*.config.ts
+forge.config.ts
+tsconfig*.json
+vitest.config.ts
+.env
+
+# Local DB
+data.db
+
+# Optional caches
+node_modules/.cache/

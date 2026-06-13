@@ -1,22 +1,26 @@
 import fr from './fr';
 import en from './en';
+import es from './es';
+import de from './de';
 
-export type Lang = 'fr' | 'en';
+export type Lang = 'fr' | 'en' | 'es' | 'de';
 
-const translations: Record<Lang, typeof fr> = { fr, en };
+const translations: Record<Lang, typeof fr> = { fr, en, es, de };
 
 let currentLang: Lang | null = null;
 
 function detectLang(): Lang {
   // 1. localStorage
   const stored = localStorage.getItem('lang');
-  if (stored === 'fr' || stored === 'en') return stored;
+  if (stored === 'fr' || stored === 'en' || stored === 'es' || stored === 'de') return stored;
 
   // 2. navigator.languages
   for (const lang of navigator.languages) {
     const code = lang.split('-')[0].toLowerCase();
     if (code === 'fr') return 'fr';
     if (code === 'en') return 'en';
+    if (code === 'es') return 'es';
+    if (code === 'de') return 'de';
   }
 
   // 3. fallback
@@ -34,6 +38,7 @@ export function setLang(lang: Lang): void {
   localStorage.setItem('lang', lang);
   location.reload();
 }
+
 
 function getNestedValue(obj: any, path: string): string | undefined {
   const parts = path.split('.');

@@ -1,0 +1,1808 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "My Astro Sky API",
+    "version": "0.1.0",
+    "description": "API documentation generated from Swagger JSDoc annotations"
+  },
+  "paths": {
+    "/api/photos": {
+      "post": {
+        "summary": "Upload a photo with star correspondences",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Photo uploaded and saved successfully"
+          }
+        }
+      },
+      "get": {
+        "summary": "List all uploaded photos",
+        "responses": {
+          "200": {
+            "description": "Photo list returned successfully"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Bulk delete photos by ID",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Array of photo UUIDs to delete"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Photos deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "deleted": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request — ids must be an array",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/version/latest": {
+      "get": {
+        "summary": "Get the latest published GitHub release",
+        "description": "Proxies the latest release of the project's GitHub repository, cached for one hour. Returns null on any upstream failure so the in-app update check fails silently.\n",
+        "responses": {
+          "200": {
+            "description": "Latest release info, or null when unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "description": "Release tag name (e.g. v0.2.0)",
+                      "example": "v0.2.0"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "GitHub release page URL"
+                    },
+                    "publishedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "ISO 8601 publication timestamp"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "summary": "Get frontend configuration values",
+        "responses": {
+          "200": {
+            "description": "Configuration returned successfully"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "summary": "Get current API and solver settings",
+        "responses": {
+          "200": {
+            "description": "Settings returned successfully"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update solver and API settings",
+        "responses": {
+          "200": {
+            "description": "Settings updated successfully"
+          }
+        }
+      }
+    },
+    "/api/settings/astrometry-api-key": {
+      "delete": {
+        "summary": "Delete stored Astrometry API key",
+        "responses": {
+          "200": {
+            "description": "API key deleted successfully"
+          }
+        }
+      }
+    },
+    "/api/settings/probe-astap": {
+      "post": {
+        "summary": "Probe astap_cli binary (run without args, check exit code)",
+        "responses": {
+          "200": {
+            "description": "Probe result returned"
+          }
+        }
+      }
+    },
+    "/api/settings/probe-solve-field": {
+      "post": {
+        "summary": "Probe solve-field binary (run --version, check exit code)",
+        "responses": {
+          "200": {
+            "description": "Probe result returned"
+          }
+        }
+      }
+    },
+    "/api/settings/probe-data-dir": {
+      "post": {
+        "summary": "Probe astrometry index directory (list contents)",
+        "responses": {
+          "200": {
+            "description": "Probe result returned"
+          }
+        }
+      }
+    },
+    "/api/photos/order": {
+      "patch": {
+        "summary": "Persist photo draw order",
+        "responses": {
+          "200": {
+            "description": "Photo order persisted successfully"
+          }
+        }
+      }
+    },
+    "/api/dso-overrides": {
+      "get": {
+        "summary": "Get all DSO overrides",
+        "responses": {
+          "200": {
+            "description": "DSO override list returned successfully"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete all DSO overrides",
+        "description": "Removes all user-defined DSO metadata overrides from the database, reverting all DSOs to default catalog data.",
+        "responses": {
+          "200": {
+            "description": "All DSO overrides deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "deleted": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/dso-overrides/{id}": {
+      "put": {
+        "summary": "Create or update a DSO override",
+        "description": "Create or update metadata overrides for a DSO (name, type, coordinates)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "DSO catalog identifier (e.g. \"M1\", \"NGC253\", \"SH2-15\")"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Override properties (name_fr, name_en, type, ra, dec, etc.)"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DSO override saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid DSO id or override data"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a DSO override",
+        "description": "Remove metadata overrides for a DSO, reverting to default catalog data",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "DSO catalog identifier (e.g. \"M1\", \"NGC253\", \"SH2-15\")"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSO override deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/telescopes": {
+      "get": {
+        "summary": "List all telescopes (built-in + custom)",
+        "description": "Returns the full telescope catalog merged with any user-created custom telescopes.",
+        "responses": {
+          "200": {
+            "description": "Telescope list returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/cameras": {
+      "get": {
+        "summary": "List all cameras (built-in + custom)",
+        "description": "Returns the full camera catalog merged with any user-created custom cameras.",
+        "responses": {
+          "200": {
+            "description": "Camera list returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/accessories": {
+      "get": {
+        "summary": "List all optical accessories (built-in + custom)",
+        "description": "Returns the full accessory catalog merged with any user-created custom accessories.",
+        "responses": {
+          "200": {
+            "description": "Accessory list returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/custom-gear": {
+      "post": {
+        "summary": "Create a custom telescope, camera, or accessory",
+        "description": "Saves a user-defined equipment item to the database. The item becomes available in the corresponding dropdown immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "telescope",
+                      "camera",
+                      "accessory"
+                    ],
+                    "description": "Equipment category"
+                  },
+                  "data": {
+                    "type": "object",
+                    "description": "Equipment fields matching the category schema (brand, model, and math-required fields are mandatory)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Custom gear item created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "custom-3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid type or data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete all custom gear",
+        "description": "Removes all user-created custom gear items (telescopes, cameras, accessories) from the database. Built-in catalog items are unaffected.",
+        "responses": {
+          "200": {
+            "description": "All custom gear deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "deleted": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/custom-gear/{id}": {
+      "delete": {
+        "summary": "Delete a custom gear item",
+        "description": "Permanently removes a user-created equipment item. Built-in catalog items cannot be deleted via this endpoint.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Custom gear item id (must start with \"custom-\")"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Custom gear item deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Attempt to delete a built-in (non-custom) item"
+          },
+          "404": {
+            "description": "Custom gear item not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/gear-setups": {
+      "get": {
+        "summary": "Get all named gear setups",
+        "responses": {
+          "200": {
+            "description": "Array of gear setups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "telescopeId": {
+                        "type": "string"
+                      },
+                      "cameraId": {
+                        "type": "string"
+                      },
+                      "accessoryId": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new named gear setup",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "telescopeId",
+                  "cameraId"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "User-provided setup name"
+                  },
+                  "telescopeId": {
+                    "type": "string"
+                  },
+                  "cameraId": {
+                    "type": "string"
+                  },
+                  "accessoryId": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Whether the FOV frame is drawn on the sky map (defaults to true)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Setup created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete all gear setups",
+        "responses": {
+          "200": {
+            "description": "All setups deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "deleted": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/gear-setups/{id}": {
+      "put": {
+        "summary": "Update a named gear setup (full replace)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Setup ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "telescopeId",
+                  "cameraId"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "telescopeId": {
+                    "type": "string"
+                  },
+                  "cameraId": {
+                    "type": "string"
+                  },
+                  "accessoryId": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Setup updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a named gear setup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Setup ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Setup deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Setup not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/gear-setups/{id}/enabled": {
+      "patch": {
+        "summary": "Toggle enabled state of a gear setup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Setup ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Enabled state updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "enabled must be boolean",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Setup not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/export": {
+      "post": {
+        "summary": "Export photos as ZIP or metadata JSON",
+        "responses": {
+          "200": {
+            "description": "Export generated successfully"
+          }
+        }
+      }
+    },
+    "/api/import/preview": {
+      "post": {
+        "summary": "Preview import bundle without writing data",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Import preview returned successfully"
+          }
+        }
+      }
+    },
+    "/api/import": {
+      "post": {
+        "summary": "Import photos and optional DSO overrides from a bundle",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Import completed successfully"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}": {
+      "delete": {
+        "summary": "Delete an uploaded photo",
+        "description": "Delete a photo from the database and disk storage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID of the photo to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Photo deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Photo introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHOTO_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/photo-metadata": {
+      "delete": {
+        "summary": "Delete all photo metadata from the database",
+        "description": "Removes all photo records and their star correspondences from the database. Image files on disk are NOT deleted.",
+        "responses": {
+          "200": {
+            "description": "All photo metadata deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "deleted": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/manual-placement": {
+      "patch": {
+        "summary": "Update manual placement metadata for a photo",
+        "description": "Update the manual sky map placement coordinates for a photo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID of the photo to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "manualPlacement": {
+                    "type": "object",
+                    "description": "Manual placement object with projPerPx and transformation matrix"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Manual placement updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Photo introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHOTO_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/metadata": {
+      "patch": {
+        "summary": "Update photo metadata including DSO ids, labels, notes, and integrations",
+        "description": "Update photo metadata such as associated DSOs, labels, observation notes, and integration details",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID of the photo to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dsoIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Array of DSO catalog identifiers (e.g. [\"M1\", \"NGC253\"])"
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Custom observation labels"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "description": "Observation notes (max 5000 characters)"
+                  },
+                  "integrations": {
+                    "type": "array",
+                    "description": "Integration details (frames, seconds, filter)"
+                  },
+                  "originalName": {
+                    "type": "string",
+                    "description": "Photo display name (max 255 characters)"
+                  },
+                  "observationDate": {
+                    "type": "string",
+                    "description": "Observation start date/time (UTC ISO 8601, max 50 characters, null to clear)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Photo metadata updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "originalName": {
+                      "type": "string",
+                      "description": "Updated display name (if provided)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Photo introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHOTO_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/solve-wcs": {
+      "post": {
+        "summary": "Solve WCS from FITS/TIFF companion files",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Correspondences returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "correspondences": {
+                      "type": "array"
+                    },
+                    "sourceWidth": {
+                      "type": "number"
+                    },
+                    "sourceHeight": {
+                      "type": "number"
+                    },
+                    "dateObs": {
+                      "type": "string",
+                      "description": "DATE-OBS header value (UTC ISO 8601), present when available"
+                    },
+                    "expTime": {
+                      "type": "number",
+                      "description": "EXPTIME header value in seconds, present when available"
+                    },
+                    "stackCnt": {
+                      "type": "integer",
+                      "description": "STACKCNT header value (frame count), present when available"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing file, unsupported format, or no WCS data found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/solve-astap": {
+      "post": {
+        "summary": "Submit ASTAP plate solve job",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "202": {
+            "description": "Job accepted, poll GET /api/solve-astap/:jobId for result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string",
+                      "description": "Job ID for polling"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (missing file, unsupported format, bad dimensions)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/solve-astap/{jobId}": {
+      "get": {
+        "summary": "Get ASTAP solve job status and result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-astap"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "running",
+                        "success",
+                        "failed",
+                        "canceled"
+                      ]
+                    },
+                    "result": {
+                      "type": "object",
+                      "description": "Plate solve result (present when status is success or failed)"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message when status is failed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel an in-progress ASTAP solve job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-astap"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job canceled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/solve-field": {
+      "post": {
+        "summary": "Submit solve-field plate solve job",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "202": {
+            "description": "Job accepted, poll GET /api/solve-field/:jobId for result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string",
+                      "description": "Job ID for polling"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (missing file, unsupported format, bad dimensions)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/solve-field/{jobId}": {
+      "get": {
+        "summary": "Get solve-field job status and result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "running",
+                        "success",
+                        "failed",
+                        "canceled"
+                      ]
+                    },
+                    "result": {
+                      "type": "object",
+                      "description": "Plate solve result (present when status is success or failed)"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message when status is failed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel an in-progress solve-field job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job canceled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/solve-plate": {
+      "post": {
+        "summary": "Submit a photo to Astrometry.net for plate solving",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Plate solve job submitted successfully"
+          }
+        }
+      }
+    },
+    "/api/solve-plate/{id}": {
+      "get": {
+        "summary": "Get Astrometry.net job status and correspondences",
+        "description": "Retrieve the status and plate solving results for a submitted Astrometry.net job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The job ID returned from /api/solve-plate POST submission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "succeeded",
+                        "failed"
+                      ]
+                    },
+                    "correspondences": {
+                      "type": "array",
+                      "description": "Star correspondences if solve succeeded"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message if solve failed"
+                    },
+                    "dsoIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Job introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/astrometry/submissions": {
+      "get": {
+        "summary": "List user's Astrometry.net submissions",
+        "responses": {
+          "200": {
+            "description": "Submissions returned successfully"
+          }
+        }
+      }
+    },
+    "/api/astrometry/reuse": {
+      "post": {
+        "summary": "Reuse an existing Astrometry.net submission for a new photo",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Submission reused successfully"
+          }
+        }
+      }
+    },
+    "/api/stars/search": {
+      "get": {
+        "summary": "Search stars by name or catalog identifier",
+        "responses": {
+          "200": {
+            "description": "Star search results returned successfully"
+          }
+        }
+      }
+    },
+    "/api/stars/nearby": {
+      "get": {
+        "summary": "Search stars near a given position",
+        "responses": {
+          "200": {
+            "description": "Nearby stars returned successfully"
+          }
+        }
+      }
+    },
+    "/api/stars/{hip}": {
+      "get": {
+        "summary": "Get deep star details by HIP identifier",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hip",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Star details returned successfully"
+          }
+        }
+      }
+    }
+  },
+  "components": {},
+  "tags": []
+}

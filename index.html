@@ -3,22 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Carte du Ciel Étoilé</title>
+    <title>MyAstroSky</title>
+    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="app">
+      <div id="view-tabs">
+        <button id="tab-skymap" class="view-tab active">Sky Map</button>
+        <button id="tab-gallery" class="view-tab">Gallery</button>
+        <button id="tab-targets" class="view-tab">Targets</button>
+      </div>
+
       <div id="map-container">
         <canvas id="sky-canvas"></canvas>
         <div id="photo-layer"></div>
       </div>
 
+      <div id="gallery-container" style="display: none;">
+        <div id="gallery-hero"></div>
+        <div id="gallery-filter-bar"></div>
+        <div id="gallery-grid"></div>
+      </div>
+
+      <div id="targets-container" style="display: none;"></div>
+
       <div id="side-panel">
-        <button id="add-photo-btn" class="btn-primary"></button>
-        <div id="photo-list"></div>
+        <div id="vue-panel-header"></div>
+        <div id="vue-photos-section"></div>
+        <div id="vue-search-section"></div>
+        <div id="vue-display-section"></div>
       </div>
       <button id="toggle-panel" title="">▶</button>
 
-      <div id="tooltip"></div>
+<div id="fullscreen-viewer" style="display: none;">
+        <button id="fullscreen-close">&times;</button>
+        <img id="fullscreen-image" />
+      </div>
+
+      <div id="vue-modal-host"></div>
 
       <div id="loading-overlay">
         <div class="loading-spinner"></div>

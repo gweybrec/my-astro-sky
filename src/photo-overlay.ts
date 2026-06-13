@@ -1,32 +1,120 @@
-import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement } from './types';
-import { project, toCanvas, unproject } from './projection';
+import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement, ApiErrorDetails, PhotoIntegration } from './types';
+import { project, toCanvas, fromCanvas, unproject } from './projection';
+import { reportUnknownRendererError } from './error-reporter';
 import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform, affineToCSS } from './affine';
 import { getStarByHip, getStars } from './star-catalog';
-import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP, searchStarsAPI } from './api';
+import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP, solveWithSolveField, searchStarsAPI, searchStarsByPosition, listAstrometrySubmissions, reuseAstrometrySubmission, updatePhotoMetadata, updatePhotoManualPlacement, loadServerSettings, getSolverAvailability } from './api';
+import { searchUnified, searchDSOs } from './search';
 import { showToast } from './toast';
+import { getDSOById, findDSOsInImage } from './dso-catalog';
+import { renderSharedSolveStatus } from './solve-status-widget';
 import type { SkyMap } from './sky-map';
 import { t } from './i18n';
+import { stripExtension } from './file-utils';
+import type { PhotoCanvasQuad } from './photo-draw-order';
+import { buildIntegrationFilterField } from './chip-utils';
+import trashSvg from './icons/trash.svg?raw';
+import { createImageZoomPan } from './image-zoom';
 
 const MARKER_COLORS = ['#ff4444', '#44cc44', '#4488ff'];
+const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];
+
+function normalizeIntegrationFilterKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function sanitizeIntegrationRows(rows: PhotoIntegration[]): PhotoIntegration[] {
+  return rows.map(row => ({
+    frames: Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
+    seconds: Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
+    filter: row.filter.trim(),
+  }));
+}
+
+const ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS = 2 * 60 * 1000;
+let astrometrySubmissionsCache: { at: number; submissions: any[] } | null = null;
+let astrometrySubmissionsInFlight: Promise<any[]> | null = null;
+
+async function loadAstrometrySubmissionsWithCache(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+
+  // Avoid re-querying astrometry.net if we just fetched submissions.
+  if (!forceRefresh && astrometrySubmissionsCache && (now - astrometrySubmissionsCache.at) < ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS) {
+    return astrometrySubmissionsCache.submissions;
+  }
+
+  if (astrometrySubmissionsInFlight) {
+    return astrometrySubmissionsInFlight;
+  }
+
+  astrometrySubmissionsInFlight = (async () => {
+    try {
+      const submissions = await listAstrometrySubmissions();
+
+      if (submissions.length > 0) {
+        astrometrySubmissionsCache = { at: Date.now(), submissions };
+        return submissions;
+      }
+
+      // If a transient API issue returns an empty list, keep showing the last known list.
+      if (astrometrySubmissionsCache && astrometrySubmissionsCache.submissions.length > 0) {
+        return astrometrySubmissionsCache.submissions;
+      }
+
+      return submissions;
+    } catch (err) {
+      if (astrometrySubmissionsCache && astrometrySubmissionsCache.submissions.length > 0) {
+        return astrometrySubmissionsCache.submissions;
+      }
+      throw err;
+    } finally {
+      astrometrySubmissionsInFlight = null;
+    }
+  })();
+
+  return astrometrySubmissionsInFlight;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 /** Get RA/Dec for a correspondence: use star catalog if starHip > 0, else use stored starRa/starDec */
 function getCorrRaDec(corr: PhotoCorrespondence): { ra: number; dec: number } | null {
+  // Try to use stored RA/Dec first (always available for plate-solved photos).
+  // Match both undefined and null — the upload response serializes missing values as null
+  // (server/index.ts scaledCorrespondences uses `?? null`), while the DB reload path omits
+  // them. Without this, main-point correspondences (starHip>0, no RA/Dec) would resolve to
+  // {ra: null, dec: null} post-upload and collapse the affine fit.
+  if (corr.starRa != null && corr.starDec != null) {
+    return { ra: corr.starRa, dec: corr.starDec };
+  }
+  // Fall back to client catalog lookup (for manually picked stars)
   if (corr.starHip > 0) {
     const star = getStarByHip(corr.starHip);
     return star ? { ra: star.ra, dec: star.dec } : null;
   }
-  if (corr.starRa !== undefined && corr.starDec !== undefined) {
-    return { ra: corr.starRa, dec: corr.starDec };
-  }
   return null;
 }
 
-interface PlacedPhoto {
+export interface PlacedPhoto {
   photo: Photo;
   imgEl: HTMLImageElement;
   visible: boolean;
   opacity: number;
   pendingDelete?: boolean;
+  borderHidden: boolean;
+  /** True when the photo centre is outside the canvas viewport; set by updateTransforms(). */
+  viewportCulled: boolean;
+  /** Projection-space centroid (average of projected correspondence points), null until first render. */
+  projCentroid: { x: number; y: number } | null;
+  /** Max distance from centroid to any correspondence point in projection space; used for cull margin. */
+  projHalfDiag: number;
 }
 
 function starDisplayLabel(star: Star): string {
@@ -45,14 +133,275 @@ function starDisplayLabel(star: Star): string {
   return `HIP ${star.hip} (${star.constellation || '?'}, mag ${star.mag.toFixed(1)})`;
 }
 
+let _currentTooltipAnchor: HTMLElement | null = null;
+
+function _dismissTooltip(anchorElement: HTMLElement): boolean {
+  const existing = document.querySelector('.hints-info-tooltip');
+  if (!existing) return false;
+  existing.remove();
+  const wasSame = _currentTooltipAnchor === anchorElement;
+  _currentTooltipAnchor = null;
+  return wasSame; // true = same icon clicked again (toggle → don't reopen)
+}
+
+/**
+ * Show hints information tooltip near the info icon
+ */
+function showHintsInfoTooltip(anchorElement: HTMLElement) {
+  if (_dismissTooltip(anchorElement)) return; // toggle off
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'hints-info-tooltip';
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'hints-info-close';
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', () => tooltip.remove());
+  tooltip.appendChild(closeBtn);
+
+  // Title
+  const title = document.createElement('h3');
+  title.textContent = t('modal.hintsInfoTitle') || 'Automatic Solving - Help';
+  tooltip.appendChild(title);
+
+  // Intro
+  const intro = document.createElement('p');
+  intro.textContent = t('modal.hintsInfoIntro') || 'Automatic solving identifies stars in your photo to place it on the sky map.';
+  tooltip.appendChild(intro);
+
+  // Options section
+  const optionsTitle = document.createElement('h4');
+  optionsTitle.textContent = t('modal.hintsInfoOptions') || 'Available options';
+  tooltip.appendChild(optionsTitle);
+
+  const optionsList = document.createElement('ul');
+  
+  const solveFieldItem = document.createElement('li');
+  solveFieldItem.innerHTML = t('modal.hintsInfoSolveField') || '<strong>solve-field (local)</strong>: Local astrometry.net solver, accurate and private. Requires index files installation (~2.4GB). Takes 10-30 seconds.';
+  optionsList.appendChild(solveFieldItem);
+  
+  const astapItem = document.createElement('li');
+  astapItem.innerHTML = t('modal.hintsInfoASTAP') || '<strong>ASTAP (local)</strong>: Fast (~3-5 seconds) but requires local installation. Works best with position hints.';
+  optionsList.appendChild(astapItem);
+  
+  const onlineItem = document.createElement('li');
+  onlineItem.innerHTML = t('modal.hintsInfoOnline') || '<strong>Online (astrometry.net)</strong>: Cloud service, accurate but may take 30-60 seconds. Works for most images.';
+  optionsList.appendChild(onlineItem);
+  
+  const wcsItem = document.createElement('li');
+  wcsItem.innerHTML = t('modal.hintsInfoWCS') || '<strong>Metadata (WCS)</strong>: Reads coordinates already present in FITS/TIFF files (instant).';
+  optionsList.appendChild(wcsItem);
+  
+  tooltip.appendChild(optionsList);
+
+  // Recommendations section
+  const recoTitle = document.createElement('h4');
+  recoTitle.textContent = t('modal.hintsInfoRecommendations') || 'Recommendations';
+  tooltip.appendChild(recoTitle);
+
+  const recoList = document.createElement('ul');
+  
+  const hintsItem = document.createElement('li');
+  hintsItem.textContent = t('modal.hintsInfoUseHints') || 'For images with few bright stars (galaxies, nebulae), enter the target object name in the field above.';
+  recoList.appendChild(hintsItem);
+  
+  const fovHintItem = document.createElement('li');
+  fovHintItem.textContent = 'If you know your image field of view (FOV), entering it significantly improves ASTAP solving reliability.';
+  recoList.appendChild(fovHintItem);
+  
+  const minStarsItem = document.createElement('li');
+  minStarsItem.textContent = t('modal.hintsInfoMinStars') || 'ASTAP requires ~100-300 detectable stars in the image (magnitude up to 16).';
+  recoList.appendChild(minStarsItem);
+  
+  const fovItem = document.createElement('li');
+  fovItem.textContent = t('modal.hintsInfoFOV') || 'Works best for fields 0.5° to 10° (most amateur photos).';
+  recoList.appendChild(fovItem);
+  
+  tooltip.appendChild(recoList);
+
+  // Troubleshooting section
+  const troubleTitle = document.createElement('h4');
+  troubleTitle.textContent = t('modal.hintsInfoTroubleshooting') || 'If solving fails';
+  tooltip.appendChild(troubleTitle);
+
+  const troubleList = document.createElement('ul');
+  
+  const tryHintsItem = document.createElement('li');
+  tryHintsItem.textContent = t('modal.hintsInfoTryHints') || 'Try adding a position hint (object name).';
+  troubleList.appendChild(tryHintsItem);
+  
+  const tryOnlineItem = document.createElement('li');
+  tryOnlineItem.textContent = t('modal.hintsInfoTryOnline') || 'Use online solving if ASTAP fails.';
+  troubleList.appendChild(tryOnlineItem);
+  
+  const manualItem = document.createElement('li');
+  manualItem.textContent = t('modal.hintsInfoManual') || 'As a last resort, use manual star identification.';
+  troubleList.appendChild(manualItem);
+  
+  tooltip.appendChild(troubleList);
+
+  // Position near the icon
+  _currentTooltipAnchor = anchorElement;
+  document.body.appendChild(tooltip);
+  
+  const rect = anchorElement.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  
+  // Position to the right of the icon if space, otherwise to the left
+  let left = rect.right + 10;
+  if (left + tooltipRect.width > window.innerWidth - 20) {
+    left = rect.left - tooltipRect.width - 10;
+  }
+  
+  let top = rect.top;
+  if (top + tooltipRect.height > window.innerHeight - 20) {
+    top = window.innerHeight - tooltipRect.height - 20;
+  }
+  
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+
+  // Close on click outside
+  const closeOnClickOutside = (e: MouseEvent) => {
+    if (!tooltip.contains(e.target as Node) && !anchorElement.contains(e.target as Node)) {
+      tooltip.remove();
+      document.removeEventListener('click', closeOnClickOutside);
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('click', closeOnClickOutside);
+  }, 100);
+}
+
+function showManualInfoTooltip(anchorElement: HTMLElement) {
+  if (_dismissTooltip(anchorElement)) return;
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'hints-info-tooltip';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'hints-info-close';
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', () => tooltip.remove());
+  tooltip.appendChild(closeBtn);
+
+  const title = document.createElement('h3');
+  title.textContent = t('modal.manualInfoTitle');
+  tooltip.appendChild(title);
+
+  const intro = document.createElement('p');
+  intro.textContent = t('modal.manualInfoWhen');
+  tooltip.appendChild(intro);
+
+  const methodsTitle = document.createElement('h4');
+  methodsTitle.textContent = t('modal.manualInfoMethodsTitle');
+  tooltip.appendChild(methodsTitle);
+
+  const methodsList = document.createElement('ul');
+  const mapItem = document.createElement('li');
+  mapItem.innerHTML = t('modal.manualInfoMethodMap');
+  methodsList.appendChild(mapItem);
+  const starsItem = document.createElement('li');
+  starsItem.innerHTML = t('modal.manualInfoMethodStars');
+  methodsList.appendChild(starsItem);
+  tooltip.appendChild(methodsList);
+
+  const tipsTitle = document.createElement('h4');
+  tipsTitle.textContent = t('modal.manualInfoTipsTitle');
+  tooltip.appendChild(tipsTitle);
+
+  const tipsList = document.createElement('ul');
+  const suggestItem = document.createElement('li');
+  suggestItem.textContent = t('modal.manualInfoSuggest');
+  tipsList.appendChild(suggestItem);
+  tooltip.appendChild(tipsList);
+
+  _currentTooltipAnchor = anchorElement;
+  document.body.appendChild(tooltip);
+
+  const rect = anchorElement.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let left = rect.right + 10;
+  if (left + tooltipRect.width > window.innerWidth - 20) left = rect.left - tooltipRect.width - 10;
+  let top = rect.top;
+  if (top + tooltipRect.height > window.innerHeight - 20) top = window.innerHeight - tooltipRect.height - 20;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+
+  const closeOnClickOutside = (e: MouseEvent) => {
+    if (!tooltip.contains(e.target as Node) && !anchorElement.contains(e.target as Node)) {
+      tooltip.remove();
+      document.removeEventListener('click', closeOnClickOutside);
+    }
+  };
+  setTimeout(() => { document.addEventListener('click', closeOnClickOutside); }, 100);
+}
+
+function showMetaInfoTooltip(anchorElement: HTMLElement) {
+  if (_dismissTooltip(anchorElement)) return;
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'hints-info-tooltip';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'hints-info-close';
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', () => tooltip.remove());
+  tooltip.appendChild(closeBtn);
+
+  const title = document.createElement('h3');
+  title.textContent = t('modal.metaInfoTitle');
+  tooltip.appendChild(title);
+
+  const intro = document.createElement('p');
+  intro.textContent = t('modal.metaInfoAuto');
+  tooltip.appendChild(intro);
+
+  const fieldsList = document.createElement('ul');
+  for (const key of ['metaInfoDsos', 'metaInfoLabels', 'metaInfoNotes'] as const) {
+    const item = document.createElement('li');
+    item.innerHTML = t(`modal.${key}`);
+    fieldsList.appendChild(item);
+  }
+  tooltip.appendChild(fieldsList);
+
+  const editNote = document.createElement('p');
+  editNote.className = 'photo-form-hint';
+  editNote.textContent = t('modal.metaInfoEdit');
+  tooltip.appendChild(editNote);
+
+  _currentTooltipAnchor = anchorElement;
+  document.body.appendChild(tooltip);
+
+  const rect = anchorElement.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let left = rect.right + 10;
+  if (left + tooltipRect.width > window.innerWidth - 20) left = rect.left - tooltipRect.width - 10;
+  let top = rect.top;
+  if (top + tooltipRect.height > window.innerHeight - 20) top = window.innerHeight - tooltipRect.height - 20;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+
+  const closeOnClickOutside = (e: MouseEvent) => {
+    if (!tooltip.contains(e.target as Node) && !anchorElement.contains(e.target as Node)) {
+      tooltip.remove();
+      document.removeEventListener('click', closeOnClickOutside);
+    }
+  };
+  setTimeout(() => { document.addEventListener('click', closeOnClickOutside); }, 100);
+}
+
 export class PhotoOverlay {
   private container: HTMLDivElement;
   private placedPhotos: PlacedPhoto[] = [];
   private getView: () => ViewState;
   private skyMap: SkyMap | null;
-  private onPhotosChanged: (() => void) | null = null;
   private affineErrorShown = new Set<string>();
   private defaultOpacity = 1.0;
+  private borderRadiusPU = Infinity; // projection-unit radius of the border circle
+  private showPhotos = true; // Global toggle for all photos
+  private visibleLabels: { [label: string]: boolean } = {};
 
   constructor(container: HTMLDivElement, getView: () => ViewState, skyMap?: SkyMap) {
     this.container = container;
@@ -60,12 +409,61 @@ export class PhotoOverlay {
     this.skyMap = skyMap || null;
   }
 
+  /**
+   * Update the border parameters so photos whose centroid falls outside the
+   * border circle are hidden.  Call whenever hemisphere or borderLatDeg changes.
+   */
+  setBorderParams(hemisphere: 'north' | 'south', borderLatDeg: number) {
+    // Same formula for both hemispheres: r = tan((90 + lat) / 2)
+    this.borderRadiusPU = Math.tan((90 + borderLatDeg) / 2 * Math.PI / 180);
+    void hemisphere; // hemisphere affects projection module, not the radius formula
+  }
+
+  private onPhotosChangedCallbacks: Array<() => void> = [];
+
   setOnPhotosChanged(cb: () => void) {
-    this.onPhotosChanged = cb;
+    this.onPhotosChangedCallbacks = [cb];
+  }
+
+  addOnPhotosChanged(cb: () => void) {
+    this.onPhotosChangedCallbacks.push(cb);
   }
 
   setDefaultOpacity(v: number) {
     this.defaultOpacity = v;
+  }
+
+  private fireOnPhotosChanged() {
+    for (const cb of this.onPhotosChangedCallbacks) {
+      cb();
+    }
+  }
+
+  private applyPhotoVisibility() {
+    for (const placed of this.placedPhotos) {
+      // Evaluate label filter: if no label filters set, allow all labels.
+      const filterKeys = Object.keys(this.visibleLabels || {});
+      let labelAllowed = true;
+      if (filterKeys.length > 0) {
+        if (!placed.photo.labels || placed.photo.labels.length === 0) {
+          labelAllowed = this.visibleLabels['(no label)'] !== false;
+        } else {
+          labelAllowed = placed.photo.labels.some(l => this.visibleLabels[l] !== false);
+        }
+      }
+      const shouldDisplay = this.showPhotos && placed.visible && labelAllowed;
+      placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
+    }
+  }
+
+  setVisibleLabels(visibleLabels: { [label: string]: boolean }) {
+    this.visibleLabels = visibleLabels || {};
+    this.applyPhotoVisibility();
+  }
+
+  setShowPhotos(show: boolean) {
+    this.showPhotos = show;
+    this.applyPhotoVisibility();
   }
 
   /** Load photos from server and display them */
@@ -73,7 +471,7 @@ export class PhotoOverlay {
     for (const photo of photos) {
       this.addPhotoToMap(photo);
     }
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
   }
 
   /** Recalculate all photo transforms (call on zoom/pan/resize) */
@@ -81,6 +479,25 @@ export class PhotoOverlay {
     const view = this.getView();
     for (const placed of this.placedPhotos) {
       if (!placed.visible) continue;
+
+      // Fast viewport cull: if we have a cached centroid, check whether the photo
+      // could possibly overlap the canvas before doing the full transform.
+      // Margin = 2× the photo's sky footprint radius in canvas pixels, so a photo
+      // that extends past its correspondence points is never incorrectly hidden.
+      if (placed.projCentroid !== null) {
+        const cc = toCanvas(placed.projCentroid.x, placed.projCentroid.y, view);
+        const margin = placed.projHalfDiag * view.scale * 2;
+        if (
+          cc.x + margin < 0 || cc.x - margin > view.width ||
+          cc.y + margin < 0 || cc.y - margin > view.height
+        ) {
+          placed.viewportCulled = true;
+          placed.imgEl.style.display = 'none';
+          continue;
+        }
+      }
+      placed.viewportCulled = false;
+
       this.applyTransform(placed, view);
     }
   }
@@ -89,12 +506,31 @@ export class PhotoOverlay {
     return this.placedPhotos.filter(p => !p.pendingDelete);
   }
 
-  /** Compute canvas-space outlines (quadrilaterals) for all visible photos */
-  getPhotoCanvasOutlines(view: ViewState): { name: string; corners: Point[] }[] {
-    const results: { name: string; corners: Point[] }[] = [];
+  /**
+   * Place a photo that was uploaded externally (e.g. from the batch modal).
+   * Adds the photo to the map and fires onPhotosChanged so the side panel refreshes.
+   */
+  placeUploadedPhoto(photo: Photo): void {
+    this.addPhotoToMap(photo);
+    this.fireOnPhotosChanged();
+  }
+
+  /** Update in-memory photo data (dsoIds, labels, notes) after a metadata edit */
+  updatePhotoData(updated: Photo): void {
+    const idx = this.placedPhotos.findIndex(p => p.photo.id === updated.id);
+    if (idx >= 0) {
+      // Replace with a new object so Vue's shallowRef detects the change via reference equality
+      this.placedPhotos[idx] = { ...this.placedPhotos[idx], photo: updated };
+      this.fireOnPhotosChanged();
+    }
+  }
+
+  /** Compute canvas-space quadrilaterals for all visible photos */
+  getPhotoCanvasQuads(view: ViewState): PhotoCanvasQuad[] {
+    const results: PhotoCanvasQuad[] = [];
 
     for (const placed of this.placedPhotos) {
-      if (!placed.visible || placed.photo.correspondences.length < 2) continue;
+      if (!placed.visible || placed.borderHidden || placed.viewportCulled || placed.photo.correspondences.length < 2) continue;
 
       const photoPoints: Point[] = [];
       const canvasPoints: Point[] = [];
@@ -120,8 +556,9 @@ export class PhotoOverlay {
           matrix = computeAffineLSQ(photoPoints, canvasPoints);
         }
 
-        const w = placed.imgEl.naturalWidth || placed.photo.width;
-        const h = placed.imgEl.naturalHeight || placed.photo.height;
+        // Always use stored dimensions so outlines are correct even when a thumbnail is loaded
+        const w = placed.photo.width;
+        const h = placed.photo.height;
 
         const photoCorners = [
           { x: 0, y: 0 },
@@ -135,13 +572,18 @@ export class PhotoOverlay {
           y: matrix.b * p.x + matrix.d * p.y + matrix.f,
         }));
 
-        results.push({ name: placed.photo.originalName, corners });
+        results.push({ id: placed.photo.id, name: placed.photo.originalName, corners });
       } catch {
         // colinear points - skip
       }
     }
 
     return results;
+  }
+
+  /** Compute canvas-space outlines for sky-map hit testing. */
+  getPhotoCanvasOutlines(view: ViewState): { name: string; corners: Point[] }[] {
+    return this.getPhotoCanvasQuads(view).map(({ name, corners }) => ({ name, corners }));
   }
 
   /** Compute the center RA/Dec and ideal scale to fit a photo in the viewport */
@@ -172,8 +614,8 @@ export class PhotoOverlay {
         matrix = computeAffineLSQ(photoPoints, projPoints);
       }
 
-      const w = placed.imgEl.naturalWidth || placed.photo.width;
-      const h = placed.imgEl.naturalHeight || placed.photo.height;
+      const w = placed.photo.width;
+      const h = placed.photo.height;
 
       const photoCorners = [
         { x: 0, y: 0 }, { x: w, y: 0 },
@@ -240,8 +682,9 @@ export class PhotoOverlay {
     const placed = this.placedPhotos.find(p => p.photo.id === photoId);
     if (!placed) return;
     placed.visible = !placed.visible;
-    placed.imgEl.style.display = placed.visible ? 'block' : 'none';
-    if (placed.visible) {
+    const shouldDisplay = this.showPhotos && placed.visible;
+    placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
+    if (shouldDisplay) {
       this.applyTransform(placed, this.getView());
     }
   }
@@ -252,12 +695,13 @@ export class PhotoOverlay {
       const placed = this.placedPhotos.find(p => p.photo.id === id);
       if (!placed) continue;
       placed.visible = visible;
-      placed.imgEl.style.display = visible ? 'block' : 'none';
-      if (visible) {
+      const shouldDisplay = this.showPhotos && visible;
+      placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
+      if (shouldDisplay) {
         this.applyTransform(placed, view);
       }
     }
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
   }
 
   movePhotoUp(photoId: string) {
@@ -265,7 +709,7 @@ export class PhotoOverlay {
     if (idx < 0 || idx >= this.placedPhotos.length - 1) return;
     [this.placedPhotos[idx], this.placedPhotos[idx + 1]] = [this.placedPhotos[idx + 1], this.placedPhotos[idx]];
     this.reorderDOM();
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
   }
 
   movePhotoDown(photoId: string) {
@@ -273,7 +717,7 @@ export class PhotoOverlay {
     if (idx <= 0) return;
     [this.placedPhotos[idx], this.placedPhotos[idx - 1]] = [this.placedPhotos[idx - 1], this.placedPhotos[idx]];
     this.reorderDOM();
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
   }
 
   reorderPhoto(photoId: string, newIndex: number) {
@@ -282,7 +726,34 @@ export class PhotoOverlay {
     const [item] = this.placedPhotos.splice(oldIdx, 1);
     this.placedPhotos.splice(newIndex, 0, item);
     this.reorderDOM();
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
+  }
+
+  setPhotoOrder(photoIds: string[]) {
+    if (photoIds.length === 0) return;
+
+    const placedById = new Map(this.placedPhotos.map((placed) => [placed.photo.id, placed]));
+    const reordered: PlacedPhoto[] = [];
+    const seen = new Set<string>();
+
+    for (const photoId of photoIds) {
+      const placed = placedById.get(photoId);
+      if (!placed) continue;
+      reordered.push(placed);
+      seen.add(photoId);
+    }
+
+    for (const placed of this.placedPhotos) {
+      if (!seen.has(placed.photo.id)) {
+        reordered.push(placed);
+      }
+    }
+
+    if (reordered.length !== this.placedPhotos.length) return;
+
+    this.placedPhotos = reordered;
+    this.reorderDOM();
+    this.fireOnPhotosChanged();
   }
 
   private reorderDOM() {
@@ -296,7 +767,7 @@ export class PhotoOverlay {
     if (!placed) return;
     placed.pendingDelete = true;
     placed.imgEl.style.display = 'none';
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
   }
 
   unhidePhoto(photoId: string) {
@@ -307,7 +778,7 @@ export class PhotoOverlay {
     if (placed.visible) {
       this.applyTransform(placed, this.getView());
     }
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
   }
 
   async removePhoto(photoId: string) {
@@ -322,55 +793,134 @@ export class PhotoOverlay {
       this.placedPhotos[idx].imgEl.remove();
       this.placedPhotos.splice(idx, 1);
     }
-    this.onPhotosChanged?.();
+    this.fireOnPhotosChanged();
+  }
+
+  /** Remove specific photos from the in-memory overlay without calling the API (call bulk API first). */
+  removePhotosFromMap(ids: string[]) {
+    const idSet = new Set(ids);
+    const removed = this.placedPhotos.filter(p => idSet.has(p.photo.id));
+    removed.forEach(p => p.imgEl.remove());
+    this.placedPhotos = this.placedPhotos.filter(p => !idSet.has(p.photo.id));
+    if (removed.length > 0) this.fireOnPhotosChanged();
+  }
+
+  /** Remove all photos from the in-memory overlay without calling the API. */
+  clearAllPhotos() {
+    this.placedPhotos.forEach(p => p.imgEl.remove());
+    this.placedPhotos = [];
+    this.fireOnPhotosChanged();
   }
 
   /** Open the registration modal for a new photo */
   openRegistrationModal() {
+    const allowedExt = /\.(jpe?g|png|webp)$/i;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,.tif,.tiff,.fits,.fit';
+    input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
     input.onchange = () => {
       const file = input.files?.[0];
-      if (file) this.showModal(file);
+      if (!file) return;
+      if (!allowedExt.test(file.name)) {
+        showToast({
+          message: t('errors.invalidPhotoFormat'),
+          type: 'error',
+          duration: 3500,
+        });
+        return;
+      }
+      this.showModal(file);
     };
     input.click();
   }
 
   private addPhotoToMap(photo: Photo) {
+    // Check if photo already exists
+    const existing = this.placedPhotos.find(p => p.photo.id === photo.id);
+    if (existing) {
+      console.log(`[addPhotoToMap] Photo ${photo.originalName} already exists, skipping duplicate`);
+      return;
+    }
+
     const img = document.createElement('img');
     img.src = `/uploads/${photo.filename}`;
     img.className = 'photo-overlay-img';
     img.draggable = false;
+    img.style.visibility = 'hidden'; // Hide until loaded
+    // Pin to full-image dims: affine matrix is in full-image pixel space; thumbnail LOD src swaps must not change the coordinate space.
+    img.style.width = `${photo.width}px`;
+    img.style.height = `${photo.height}px`;
     this.container.appendChild(img);
 
     img.style.opacity = String(this.defaultOpacity);
-    const placed: PlacedPhoto = { photo, imgEl: img, visible: true, opacity: this.defaultOpacity };
+    const placed: PlacedPhoto = { photo, imgEl: img, visible: true, opacity: this.defaultOpacity, borderHidden: false, viewportCulled: false, projCentroid: null, projHalfDiag: 0 };
     this.placedPhotos.push(placed);
 
     img.onload = () => {
+      // Only check dimensions for the full-resolution image; thumbnails are intentionally smaller
+      const thumbSrc = photo.thumbFilename ? `/uploads/${photo.thumbFilename}` : null;
+      const isThumb = thumbSrc !== null && img.src.endsWith(thumbSrc);
+      if (!isThumb && (img.naturalWidth !== photo.width || img.naturalHeight !== photo.height)) {
+        reportUnknownRendererError('photo_dimension_mismatch', new Error(`Expected ${photo.width}×${photo.height} but got ${img.naturalWidth}×${img.naturalHeight}`), {
+          photoName: photo.originalName,
+          expected: `${photo.width}×${photo.height}`,
+          actual: `${img.naturalWidth}×${img.naturalHeight}`,
+        });
+      }
+
+      img.style.visibility = 'visible';
       this.applyTransform(placed, this.getView());
     };
   }
 
   private applyTransform(placed: PlacedPhoto, view: ViewState) {
     const { photo, imgEl } = placed;
+
+    // If this photo has manual placement params, use them directly to compute the transform
+    if (photo.manualPlacement) {
+      const cp = project(photo.manualPlacement.centerRa, photo.manualPlacement.centerDec);
+      placed.projCentroid = cp;
+      const halfDiagPx = Math.sqrt((photo.width / 2) ** 2 + (photo.height / 2) ** 2);
+      placed.projHalfDiag = halfDiagPx * photo.manualPlacement.projPerPx;
+      imgEl.style.display = 'block';
+      applyManualTransform(imgEl, photo.manualPlacement, view, photo.width, photo.height);
+      return;
+    }
+    
     if (photo.correspondences.length < 2) return;
 
     const photoPoints: Point[] = [];
     const canvasPoints: Point[] = [];
+    const projPoints: { x: number; y: number }[] = [];
 
     for (const corr of photo.correspondences) {
       const raDec = getCorrRaDec(corr);
       if (!raDec) continue;
 
       const proj = project(raDec.ra, raDec.dec);
+      projPoints.push(proj);
       const canvasPt = toCanvas(proj.x, proj.y, view);
       photoPoints.push({ x: corr.photoX, y: corr.photoY });
       canvasPoints.push(canvasPt);
     }
 
     if (photoPoints.length < 2) return;
+
+    // Compute centroid in projection space and cache it for viewport culling.
+    const cx = projPoints.reduce((s, p) => s + p.x, 0) / projPoints.length;
+    const cy = projPoints.reduce((s, p) => s + p.y, 0) / projPoints.length;
+    placed.projCentroid = { x: cx, y: cy };
+    placed.projHalfDiag = projPoints.reduce((m, p) =>
+      Math.max(m, Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2)), 0);
+
+    // Check if photo centroid is inside the border circle
+    if (Math.sqrt(cx * cx + cy * cy) > this.borderRadiusPU) {
+      placed.borderHidden = true;
+      imgEl.style.display = 'none';
+      return;
+    }
+    placed.borderHidden = false;
+    imgEl.style.display = 'block';
 
     try {
       let matrix;
@@ -382,6 +932,17 @@ export class PhotoOverlay {
         matrix = computeAffineLSQ(photoPoints, canvasPoints);
       }
       imgEl.style.transform = affineToCSS(matrix);
+
+      // LOD: swap to thumbnail when the photo renders small on screen
+      if (photo.thumbFilename) {
+        const renderedWidth = Math.sqrt(matrix.a ** 2 + matrix.b ** 2) * photo.width;
+        const wantThumb = renderedWidth < 300;
+        const thumbSrc = `/uploads/${photo.thumbFilename}`;
+        const fullSrc = `/uploads/${photo.filename}`;
+        const currentSrc = imgEl.src.endsWith(thumbSrc) ? thumbSrc : fullSrc;
+        const desiredSrc = wantThumb ? thumbSrc : fullSrc;
+        if (currentSrc !== desiredSrc) imgEl.src = desiredSrc;
+      }
     } catch {
       imgEl.style.display = 'none';
       if (!this.affineErrorShown.has(photo.id)) {
@@ -391,7 +952,262 @@ export class PhotoOverlay {
     }
   }
 
+  async showSubmissionSelectionDialog(options?: { allowUpload?: boolean }): Promise<{ action: 'upload' | 'reuse' | 'cancel'; jobId?: number }> {
+    return new Promise((resolve) => {
+      const allowUpload = options?.allowUpload ?? true;
+      let currentPage = 0;
+      let allSubmissions: any[] = [];
+      const itemsPerPage = 20;
+      
+      // Create modal backdrop
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      
+      // Create modal
+      const modal = document.createElement('div');
+      modal.className = 'registration-modal submission-selection-modal';
+
+      // Header
+      const header = document.createElement('div');
+      header.className = 'modal-header';
+
+      const titleContainer = document.createElement('div');
+      titleContainer.className = 'modal-title-group';
+
+      const title = document.createElement('h2');
+      title.textContent = t('modal.reuseOrUpload');
+      titleContainer.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'modal-subtitle';
+      subtitle.textContent = t('modal.submissionList');
+      titleContainer.appendChild(subtitle);
+
+      header.appendChild(titleContainer);
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'modal-close';
+      closeBtn.textContent = '×';
+      closeBtn.onclick = () => {
+        document.body.removeChild(backdrop);
+        resolve({ action: 'cancel' });
+      };
+      header.appendChild(closeBtn);
+
+      modal.appendChild(header);
+
+      // Content container (scrollable)
+      const content = document.createElement('div');
+      content.className = 'modal-scroll';
+      
+      // Loading indicator
+      const loading = document.createElement('div');
+      loading.className = 'modal-loading-placeholder';
+      loading.innerHTML = '<div class="auto-solve-spinner"></div><div style="margin-top: 12px;">' + t('modal.loadingSubmissions') + '</div>';
+      content.appendChild(loading);
+      
+      modal.appendChild(content);
+      
+      // Footer with pagination and buttons
+      const footer = document.createElement('div');
+      footer.className = 'astrometry-modal-footer';
+
+      // Pagination controls
+      const paginationContainer = document.createElement('div');
+      paginationContainer.className = 'pagination-bar hidden';
+
+      const pageInfo = document.createElement('div');
+      pageInfo.className = 'pagination-info';
+      paginationContainer.appendChild(pageInfo);
+
+      const pageButtons = document.createElement('div');
+      pageButtons.className = 'pagination-btn-group';
+      
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'btn-secondary';
+      prevBtn.textContent = t('modal.prevPage');
+      prevBtn.disabled = true;
+      pageButtons.appendChild(prevBtn);
+      
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'btn-secondary';
+      nextBtn.textContent = t('modal.nextPage');
+      nextBtn.disabled = true;
+      pageButtons.appendChild(nextBtn);
+
+      const refreshBtn = document.createElement('button');
+      refreshBtn.className = 'btn-secondary';
+      refreshBtn.textContent = t('modal.refreshSubmissions');
+      refreshBtn.title = t('modal.refreshSubmissions');
+      pageButtons.appendChild(refreshBtn);
+      
+      paginationContainer.appendChild(pageButtons);
+      footer.appendChild(paginationContainer);
+      
+      // Action buttons
+      const buttonsContainer = document.createElement('div');
+      buttonsContainer.className = 'modal-action-row';
+      
+      if (allowUpload) {
+        const uploadButton = document.createElement('button');
+        uploadButton.className = 'btn-action';
+        uploadButton.textContent = t('modal.uploadThisImage');
+        uploadButton.onclick = () => {
+          document.body.removeChild(backdrop);
+          resolve({ action: 'upload' });
+        };
+        buttonsContainer.appendChild(uploadButton);
+      }
+      
+      footer.appendChild(buttonsContainer);
+      modal.appendChild(footer);
+      
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+      
+      // Function to render current page
+      function renderPage() {
+        const totalPages = Math.ceil(allSubmissions.length / itemsPerPage);
+        const start = currentPage * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageSubmissions = allSubmissions.slice(start, end);
+        
+        content.innerHTML = '';
+        
+        if (allSubmissions.length === 0) {
+          const noSubmissions = document.createElement('div');
+          noSubmissions.className = 'modal-loading-placeholder';
+          noSubmissions.textContent = t('modal.noSubmissions');
+          content.appendChild(noSubmissions);
+          paginationContainer.classList.add('hidden');
+          return;
+        }
+
+        // Show pagination
+        paginationContainer.classList.remove('hidden');
+        pageInfo.textContent = t('modal.submissionPage', { current: currentPage + 1, total: totalPages }) + ' — ' + 
+                               t('modal.submissionCount', { count: allSubmissions.length });
+        prevBtn.disabled = currentPage === 0;
+        nextBtn.disabled = currentPage >= totalPages - 1;
+        
+        // Render submissions
+        const list = document.createElement('div');
+        list.className = 'submission-list';
+
+        for (const sub of pageSubmissions) {
+          if (!sub.jobId) continue;
+
+          const item = document.createElement('button');
+          item.className = 'submission-item';
+
+          const itemInfo = document.createElement('div');
+          itemInfo.className = 'submission-item-info';
+
+          const itemTitle = document.createElement('div');
+          itemTitle.className = 'submission-item-title';
+          itemTitle.textContent = sub.filename || `Job #${sub.jobId}`;
+          itemInfo.appendChild(itemTitle);
+
+          const itemSubtitle = document.createElement('div');
+          itemSubtitle.className = 'submission-item-subtitle';
+          const dimsText = (typeof sub.width === 'number' && typeof sub.height === 'number')
+            ? ` - ${sub.width}x${sub.height}px`
+            : '';
+          itemSubtitle.textContent = `Job #${sub.jobId}${dimsText}`;
+          itemInfo.appendChild(itemSubtitle);
+
+          item.appendChild(itemInfo);
+
+          const statusBadge = document.createElement('div');
+          statusBadge.className = 'submission-status-badge';
+          if (sub.status === 'success') {
+            statusBadge.classList.add('submission-status-badge--success');
+            statusBadge.textContent = '✓ Success';
+          } else {
+            statusBadge.classList.add('submission-status-badge--pending');
+            statusBadge.textContent = sub.status;
+          }
+          item.appendChild(statusBadge);
+
+          item.onclick = () => {
+            document.body.removeChild(backdrop);
+            resolve({ action: 'reuse', jobId: sub.jobId });
+          };
+          list.appendChild(item);
+        }
+        
+        content.appendChild(list);
+      }
+      
+      // Pagination button handlers
+      prevBtn.onclick = () => {
+        if (currentPage > 0) {
+          currentPage--;
+          renderPage();
+        }
+      };
+      
+      prevBtn.onmouseenter = () => {
+        if (!prevBtn.disabled) {
+          prevBtn.style.background = 'rgba(80, 120, 200, 0.5)';
+        }
+      };
+      prevBtn.onmouseleave = () => {
+        prevBtn.style.background = 'rgba(60, 100, 180, 0.3)';
+      };
+      
+      nextBtn.onclick = () => {
+        const totalPages = Math.ceil(allSubmissions.length / itemsPerPage);
+        if (currentPage < totalPages - 1) {
+          currentPage++;
+          renderPage();
+        }
+      };
+      
+      nextBtn.onmouseenter = () => {
+        if (!nextBtn.disabled) {
+          nextBtn.style.background = 'rgba(80, 120, 200, 0.5)';
+        }
+      };
+      nextBtn.onmouseleave = () => {
+        nextBtn.style.background = 'rgba(60, 100, 180, 0.3)';
+      };
+      
+      function fetchAndRenderSubmissions(forceRefresh = false) {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = forceRefresh ? '…' : t('modal.refreshSubmissions');
+        return loadAstrometrySubmissionsWithCache(forceRefresh)
+        .then(submissions => {
+          allSubmissions = submissions;
+          currentPage = 0;
+          renderPage();
+        })
+        .catch(err => {
+          reportUnknownRendererError('astrometry_list_submissions', err);
+          content.innerHTML = '';
+          
+          const error = document.createElement('div');
+          error.className = 'modal-loading-error';
+          error.innerHTML = `<div style="font-size: 24px; margin-bottom: 8px;">⚠</div><div>${err.message || 'Failed to load submissions'}</div>`;
+          content.appendChild(error);
+        })
+        .finally(() => {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = t('modal.refreshSubmissions');
+        });
+      }
+
+      refreshBtn.onclick = () => {
+        void fetchAndRenderSubmissions(true);
+      };
+
+      // Fetch submissions
+      void fetchAndRenderSubmissions(false);
+    });
+  }
+
   private showModal(file: File) {
+    const self = this;
     // State
     const points: (PhotoCorrespondence | null)[] = [null, null, null];
     let activeIndex = 0;
@@ -399,6 +1215,88 @@ export class PhotoOverlay {
     let naturalHeight = 0;
     // Extra correspondences (pointIndex >= 3) from auto-solve, used for LSQ fit
     let extraAutoCorrespondences: PhotoCorrespondence[] = [];
+
+    // Metadata state
+    let pendingOriginalName = stripExtension(file.name);
+    let pendingDsoIds: string[] = [];
+    let pendingLabels: string[] = [];
+    let pendingIntegrations: PhotoIntegration[] = [];
+    let pendingObsDate = '';
+    let pendingNotes = '';
+
+    function utcToDatetimeLocal(iso: string): string {
+      const d = new Date(iso);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    const knownFilterMap = new Map<string, string>();
+    const rememberFilters = (filters: string[]) => {
+      for (const filter of filters) {
+        const trimmed = filter.trim();
+        if (!trimmed) continue;
+        const key = normalizeIntegrationFilterKey(trimmed);
+        if (!knownFilterMap.has(key)) knownFilterMap.set(key, trimmed);
+      }
+    };
+    rememberFilters(DEFAULT_INTEGRATION_FILTERS);
+    rememberFilters(this.getPlacedPhotos().flatMap(p => (p.photo.integrations ?? []).map(row => row.filter)));
+
+    // Helper: compute photo→projection affine from correspondences
+    function buildPhotoProjectionAffine(corrs: PhotoCorrespondence[]) {
+      const pts = corrs.slice(0, 3);
+      const photoPoints: Point[] = [];
+      const projPoints: Point[] = [];
+      for (const c of pts) {
+        const rd = getCorrRaDec(c);
+        if (!rd) continue;
+        photoPoints.push({ x: c.photoX, y: c.photoY });
+        projPoints.push(project(rd.ra, rd.dec));
+      }
+      if (photoPoints.length < 3) return null;
+      try {
+        return computeAffineTransform(
+          photoPoints as [Point, Point, Point],
+          projPoints as [Point, Point, Point],
+        );
+      } catch { return null; }
+    }
+
+    // Helper: detect DSOs (use server list if available, else geometric)
+    // fallbackW/fallbackH are used when the browser can't render the file (e.g. FITS) and naturalWidth/naturalHeight are 0
+    function detectAndPopulateDSOs(serverDsoIds: string[] | undefined, corrs: PhotoCorrespondence[], imgW: number, imgH: number, fallbackW?: number, fallbackH?: number) {
+      const w = imgW || fallbackW || 0;
+      const h = imgH || fallbackH || 0;
+      if (serverDsoIds && serverDsoIds.length > 0) {
+        pendingDsoIds = [...serverDsoIds];
+      } else {
+        const aff = buildPhotoProjectionAffine(corrs);
+        if (aff) {
+          pendingDsoIds = findDSOsInImage(aff, w, h).map(d => d.id);
+        }
+      }
+      refreshDsoChips();
+      expandMetaIfDSOsDetected();
+    }
+
+    // Helper: build affine from ManualPlacement (photo→projection, no view dependency)
+    function buildAffineFromManualPlacement(p: ManualPlacement, w: number, h: number) {
+      const center = project(p.centerRa, p.centerDec);
+      const rotRad = p.rotationDeg * Math.PI / 180;
+      const mx = p.mirrorX ? -1 : 1;
+      const my = p.mirrorY ? -1 : 1;
+      const cx = w / 2; const cy = h / 2;
+      const cosR = Math.cos(rotRad) * p.projPerPx;
+      const sinR = Math.sin(rotRad) * p.projPerPx;
+      const a = cosR * mx; const b = sinR * mx;
+      const c = -sinR * my; const d = cosR * my;
+      return { a, b, c, d, e: center.x - a * cx - c * cy, f: center.y - b * cx - d * cy };
+    }
+
+    // Will be set after metadata section is built
+    let refreshDsoChips = () => {};
+    let refreshLabelChips = () => {};
+    let refreshIntegrationRows = () => {};
 
     // Create modal backdrop
     const backdrop = document.createElement('div');
@@ -411,14 +1309,28 @@ export class PhotoOverlay {
     const header = document.createElement('div');
     header.className = 'modal-header';
     header.innerHTML = `
-      <h2>${t('modal.title')}</h2>
+      <h2>${t('modal.titleWithFile', { name: stripExtension(file.name) })}</h2>
       <button class="modal-close">&times;</button>
     `;
     modal.appendChild(header);
 
-    header.querySelector('.modal-close')!.addEventListener('click', () => {
+    // Abort controller: cancelled when modal is closed, stops any in-flight polling
+    const modalAbort = new AbortController();
+    let activeLocalSolveAbort: AbortController | null = null;
+
+    let zoom: ReturnType<typeof createImageZoomPan> | null = null;
+
+    function closeModal() {
+      zoom?.destroy();
+      if (activeLocalSolveAbort) {
+        activeLocalSolveAbort.abort();
+        activeLocalSolveAbort = null;
+      }
+      modalAbort.abort();
       backdrop.remove();
-    });
+    }
+
+    header.querySelector('.modal-close')!.addEventListener('click', closeModal);
 
     // Body
     const body = document.createElement('div');
@@ -428,53 +1340,58 @@ export class PhotoOverlay {
     const photoSide = document.createElement('div');
     photoSide.className = 'modal-photo-side';
 
+    const photoWrapper = document.createElement('div');
+    photoWrapper.className = 'modal-photo-wrapper';
+
     const photoContainer = document.createElement('div');
     photoContainer.className = 'modal-photo-container';
 
     const photoImg = document.createElement('img');
     photoImg.className = 'modal-photo';
     photoContainer.appendChild(photoImg);
-    photoSide.appendChild(photoContainer);
+    photoWrapper.appendChild(photoContainer);
+    photoSide.appendChild(photoWrapper);
 
     // Right: form
     const formSide = document.createElement('div');
     formSide.className = 'modal-form-side';
 
-    const instructions = document.createElement('p');
-    instructions.className = 'modal-instructions';
-    instructions.textContent = t('modal.instructions');
-    formSide.appendChild(instructions);
-
-    // --- Auto-solve section ---
+    // --- Plate solving panel (open by default) ---
     const fileExt = file.name.toLowerCase().replace(/^.*(\.[^.]+)$/, '$1');
     const isAstroFile = ['.tif', '.tiff', '.fits', '.fit'].includes(fileExt);
 
-    const autoSection = document.createElement('div');
-    autoSection.className = 'auto-solve-section';
-
-    const autoTitle = document.createElement('div');
-    autoTitle.className = 'auto-solve-title';
-    autoTitle.textContent = t('modal.autoSolve');
-    autoSection.appendChild(autoTitle);
+    const solvePanel = document.createElement('div');
+    solvePanel.className = 'modal-panel';
+    const solvePanelHdr = document.createElement('button');
+    solvePanelHdr.type = 'button';
+    solvePanelHdr.className = 'modal-panel-header open';
+    solvePanelHdr.textContent = t('modal.sectionSolving');
+    const autoInfoIcon = document.createElement('span');
+    autoInfoIcon.className = 'hints-info-icon panel-info-icon';
+    autoInfoIcon.textContent = 'i';
+    autoInfoIcon.title = 'Information';
+    solvePanelHdr.appendChild(autoInfoIcon);
+    const solvePanelBody = document.createElement('div');
+    solvePanelBody.className = 'modal-panel-body';
+    let solvePanelOpen = true;
+    solvePanelHdr.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).classList.contains('hints-info-icon')) return;
+      solvePanelOpen = !solvePanelOpen;
+      solvePanelBody.style.display = solvePanelOpen ? '' : 'none';
+      solvePanelHdr.classList.toggle('open', solvePanelOpen);
+    });
+    solvePanel.appendChild(solvePanelHdr);
+    solvePanel.appendChild(solvePanelBody);
 
     const autoBtns = document.createElement('div');
     autoBtns.className = 'auto-solve-buttons';
 
-    // WCS button (only for TIFF/FITS)
-    const btnWCS = document.createElement('button');
-    btnWCS.type = 'button';
-    btnWCS.className = 'btn-auto-solve';
-    btnWCS.textContent = t('modal.wcsButton');
-    btnWCS.disabled = !isAstroFile;
-    btnWCS.title = isAstroFile ? t('modal.wcsAvailable') : t('modal.wcsUnavailable');
-    autoBtns.appendChild(btnWCS);
-
-    // Online button
-    const btnOnline = document.createElement('button');
-    btnOnline.type = 'button';
-    btnOnline.className = 'btn-auto-solve';
-    btnOnline.textContent = t('modal.onlineButton');
-    autoBtns.appendChild(btnOnline);
+    // solve-field local solve button
+    const btnSolveField = document.createElement('button');
+    btnSolveField.type = 'button';
+    btnSolveField.className = 'btn-auto-solve';
+    btnSolveField.textContent = t('modal.solveFieldButton');
+    autoBtns.appendChild(btnSolveField);
 
     // ASTAP local solve button
     const btnASTAP = document.createElement('button');
@@ -483,59 +1400,466 @@ export class PhotoOverlay {
     btnASTAP.textContent = t('modal.astapButton');
     autoBtns.appendChild(btnASTAP);
 
-    autoSection.appendChild(autoBtns);
+    // Online button
+    const btnOnline = document.createElement('button');
+    btnOnline.type = 'button';
+    btnOnline.className = 'btn-auto-solve';
+    btnOnline.textContent = t('modal.onlineButton');
+    autoBtns.appendChild(btnOnline);
+
+    // WCS companion file button (always enabled — picks a FITS/TIFF companion)
+    const btnWCS = document.createElement('button');
+    btnWCS.type = 'button';
+    btnWCS.className = 'btn-auto-solve';
+    btnWCS.textContent = t('modal.wcsButton');
+    btnWCS.title = t('modal.wcsAvailable');
+    autoBtns.appendChild(btnWCS);
+
+    // Hidden companion FITS/TIFF file input (appended to modal so it's cleaned up automatically)
+    const companionInput = document.createElement('input');
+    companionInput.type = 'file';
+    companionInput.accept = '.fit,.fits,.tif,.tiff';
+    companionInput.style.display = 'none';
+    modal.appendChild(companionInput);
+
+    // WCS companion status row (shown below the buttons after companion is picked)
+    const wcsStatusRow = document.createElement('div');
+    wcsStatusRow.className = 'wcs-companion-status wcs-status hidden';
+
+    solvePanelBody.appendChild(autoBtns);
+    solvePanelBody.appendChild(wcsStatusRow);
+
+    // Hints section - optional location hint to improve solving
+    const hintsSection = document.createElement('div');
+    hintsSection.className = 'solve-hints-section';
+
+    const hintsHeaderRow = document.createElement('div');
+    hintsHeaderRow.className = 'hints-header-row';
+
+    const hintsBulb = document.createElement('span');
+    hintsBulb.className = 'hints-bulb-icon';
+    hintsBulb.textContent = '💡';
+    hintsHeaderRow.appendChild(hintsBulb);
+
+    const hintsLabelText = document.createElement('span');
+    hintsLabelText.className = 'hints-label-text';
+    hintsLabelText.textContent = t('modal.hintsOptional') || 'Optional: Target object (helps with few stars)';
+    hintsHeaderRow.appendChild(hintsLabelText);
+
+    const hintsClearBtn = document.createElement('button');
+    hintsClearBtn.type = 'button';
+    hintsClearBtn.className = 'hints-clear-btn';
+    hintsClearBtn.textContent = '×';
+    hintsClearBtn.title = t('modal.hintsClear') || 'Clear hint';
+    hintsHeaderRow.appendChild(hintsClearBtn);
+
+    hintsSection.appendChild(hintsHeaderRow);
+
+    const hintsInput = document.createElement('input');
+    hintsInput.type = 'text';
+    hintsInput.className = 'star-search-input';
+    hintsInput.placeholder = t('modal.hintsPlaceholder') || 'e.g., NGC2903, M31, Andromeda...';
+    hintsInput.style.width = '100%';
+    hintsInput.style.fontSize = 'var(--font-size-base)';
+    hintsSection.appendChild(hintsInput);
+
+    const hintsDropdown = document.createElement('div');
+    hintsDropdown.className = 'search-results-dropdown';
+    hintsDropdown.style.display = 'none';
+    hintsSection.appendChild(hintsDropdown);
+
+    // FOV input (optional field of view hint)
+    const fovContainer = document.createElement('div');
+    fovContainer.className = 'fov-row';
+
+    const fovLabel = document.createElement('label');
+    fovLabel.className = 'fov-label';
+    fovLabel.textContent = t('modal.fovLabel');
+    fovContainer.appendChild(fovLabel);
+
+    const fovInput = document.createElement('input');
+    fovInput.type = 'number';
+    fovInput.placeholder = 'e.g., 2.5';
+    fovInput.min = '0.1';
+    fovInput.max = '180';
+    fovInput.step = '0.1';
+    fovInput.className = 'fov-input';
+    fovContainer.appendChild(fovInput);
+
+    const fovUnit = document.createElement('span');
+    fovUnit.className = 'fov-unit';
+    fovUnit.textContent = '°';
+    fovContainer.appendChild(fovUnit);
+    
+    hintsSection.appendChild(fovContainer);
+
+    solvePanelBody.appendChild(hintsSection);
+
+    // Info icon click handler - show tooltip
+    autoInfoIcon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showHintsInfoTooltip(autoInfoIcon);
+    });
+
+    // Store selected hint coordinates and target name
+    let hintCoords: { ra: number; dec: number } | null = null;
+    let hintTargetName = '';
+
+    // Hints search handler
+    let hintsTimeout: any;
+    hintsInput.addEventListener('input', () => {
+      clearTimeout(hintsTimeout);
+      const query = hintsInput.value.trim();
+      
+      if (query.length < 2) {
+        hintsDropdown.style.display = 'none';
+        return;
+      }
+
+      hintsTimeout = setTimeout(async () => {
+        try {
+          const results = await searchUnified(query, 5);
+          
+          if (results.length === 0) {
+            hintsDropdown.style.display = 'none';
+            hintCoords = null;
+            return;
+          }
+
+          // Show dropdown with results - no auto-selection
+          hintsDropdown.innerHTML = '';
+          hintsDropdown.style.display = 'block';
+
+          results.forEach((result: any) => {
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            item.style.cursor = 'pointer';
+            
+            const label = document.createElement('div');
+            label.textContent = result.label;
+            item.appendChild(label);
+            
+            const coords = document.createElement('div');
+            coords.className = 'star-coords';
+            coords.textContent = `RA: ${result.ra.toFixed(2)}° Dec: ${result.dec.toFixed(2)}°`;
+            item.appendChild(coords);
+
+            item.addEventListener('click', () => {
+              hintCoords = { ra: result.ra, dec: result.dec };
+              hintTargetName = result.label;
+              hintsInput.value = result.label;
+              hintsDropdown.style.display = 'none';
+              hintsSection.classList.add('has-hint');
+              
+              // Enable suggest button now that we have a hint
+              suggestBtn.disabled = false;
+              suggestBtn.title = ''; // Remove tooltip when enabled
+              suggestList.innerHTML = '';
+              suggestList.style.display = 'none';
+            });
+
+            hintsDropdown.appendChild(item);
+          });
+        } catch (err) {
+          reportUnknownRendererError('hints_search_error', err);
+        }
+      }, 500);
+    });
+
+    // Handle Enter key to select first dropdown item
+    hintsInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && hintsDropdown.style.display === 'block') {
+        e.preventDefault();
+        const firstItem = hintsDropdown.querySelector('div');
+        if (firstItem) {
+          firstItem.click();
+        }
+      }
+    });
+
+    // Clear button resets hint state
+    hintsClearBtn.addEventListener('click', () => {
+      hintCoords = null;
+      hintTargetName = '';
+      hintsInput.value = '';
+      hintsSection.classList.remove('has-hint');
+      suggestBtn.disabled = true;
+      suggestList.innerHTML = '';
+      suggestList.style.display = 'none';
+    });
+
+    // Clear hints dropdown on click outside
+    document.addEventListener('click', (e) => {
+      if (!hintsSection.contains(e.target as Node)) {
+        hintsDropdown.style.display = 'none';
+      }
+    });
 
     // Status area
     const autoStatus = document.createElement('div');
     autoStatus.className = 'auto-solve-status';
-    autoSection.appendChild(autoStatus);
+    solvePanelBody.appendChild(autoStatus);
 
-    formSide.appendChild(autoSection);
+    formSide.appendChild(solvePanel);
 
-    // Manual placement button
-    const manualSection = document.createElement('div');
-    manualSection.className = 'manual-placement-section';
+    // --- Manual identification panel (collapsed by default) ---
+    const manualPanel = document.createElement('div');
+    manualPanel.className = 'modal-panel';
+    const manualPanelHdr = document.createElement('button');
+    manualPanelHdr.type = 'button';
+    manualPanelHdr.className = 'modal-panel-header';
+    manualPanelHdr.textContent = t('modal.sectionManual');
+    const manualInfoIcon = document.createElement('span');
+    manualInfoIcon.className = 'hints-info-icon panel-info-icon';
+    manualInfoIcon.textContent = 'i';
+    manualInfoIcon.title = 'Information';
+    manualPanelHdr.appendChild(manualInfoIcon);
+    const manualPanelBody = document.createElement('div');
+    manualPanelBody.className = 'modal-panel-body';
+    manualPanelBody.style.display = 'none';
+    let manualPanelOpen = false;
+    manualPanelHdr.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).classList.contains('hints-info-icon')) return;
+      manualPanelOpen = !manualPanelOpen;
+      manualPanelBody.style.display = manualPanelOpen ? '' : 'none';
+      manualPanelHdr.classList.toggle('open', manualPanelOpen);
+    });
+    manualInfoIcon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showManualInfoTooltip(manualInfoIcon);
+    });
+    manualPanel.appendChild(manualPanelHdr);
+    manualPanel.appendChild(manualPanelBody);
 
+    const manualInstructions = document.createElement('p');
+    manualInstructions.className = 'modal-instructions';
+    manualInstructions.textContent = t('modal.manualInstructions');
+    manualPanelBody.appendChild(manualInstructions);
+
+    // Direct map placement button
     const manualBtn = document.createElement('button');
     manualBtn.type = 'button';
     manualBtn.className = 'btn-auto-solve full-width';
     manualBtn.textContent = t('modal.manualButton');
     manualBtn.title = t('modal.manualTooltip');
-    manualSection.appendChild(manualBtn);
-    formSide.appendChild(manualSection);
+    manualPanelBody.appendChild(manualBtn);
 
     manualBtn.addEventListener('click', () => {
-      backdrop.remove();
-      this.openManualPlacement(file);
+      const initialMeta = {
+        originalName: pendingOriginalName,
+        dsoIds: [...pendingDsoIds],
+        labels: [...pendingLabels],
+        integrations: sanitizeIntegrationRows(pendingIntegrations),
+        observationDate: pendingObsDate || null,
+        notes: pendingNotes,
+      };
+      closeModal();
+      this.openManualPlacement(file, initialMeta);
     });
 
-    // Separator
-    const separator = document.createElement('div');
-    separator.className = 'auto-solve-separator';
-    separator.textContent = t('modal.orManual');
-    formSide.appendChild(separator);
+    // Divider between map placement and star identification
+    const manualStarDivider = document.createElement('div');
+    manualStarDivider.className = 'modal-panel-divider';
+    manualPanelBody.appendChild(manualStarDivider);
+
+    // Suggest stars section (only relevant when identifying stars manually)
+    const suggestSection = document.createElement('div');
+    suggestSection.className = 'suggest-stars-section';
+
+    const suggestControls = document.createElement('div');
+    suggestControls.className = 'suggest-controls';
+
+    const suggestBtn = document.createElement('button');
+    suggestBtn.type = 'button';
+    suggestBtn.className = 'btn-auto-solve suggest-btn';
+    suggestBtn.textContent = t('lightSolve.suggestButton');
+    suggestBtn.disabled = true;
+    suggestBtn.title = t('lightSolve.requiresHint');
+    suggestControls.appendChild(suggestBtn);
+
+    const radiusLabel = document.createElement('span');
+    radiusLabel.className = 'suggest-radius-label';
+    radiusLabel.textContent = 'within';
+    suggestControls.appendChild(radiusLabel);
+
+    const radiusInput = document.createElement('input');
+    radiusInput.type = 'number';
+    radiusInput.value = '2';
+    radiusInput.min = '0.1';
+    radiusInput.max = '10';
+    radiusInput.step = '0.5';
+    radiusInput.className = 'suggest-radius-input';
+    suggestControls.appendChild(radiusInput);
+
+    const radiusUnit = document.createElement('span');
+    radiusUnit.className = 'suggest-radius-unit';
+    radiusUnit.textContent = '°';
+    suggestControls.appendChild(radiusUnit);
+
+    suggestSection.appendChild(suggestControls);
+
+    const suggestList = document.createElement('div');
+    suggestList.className = 'suggest-stars-list suggest-list hidden';
+    suggestSection.appendChild(suggestList);
+
+    manualPanelBody.appendChild(suggestSection);
+
+    // Suggest stars button handler
+    suggestBtn.addEventListener('click', async () => {
+      if (!hintCoords) return;
+      
+      try {
+        suggestBtn.disabled = true;
+        suggestBtn.textContent = t('lightSolve.searching');
+        suggestList.innerHTML = '';
+        suggestList.classList.add('hidden');
+        
+        // Get radius from input
+        const searchRadius = parseFloat(radiusInput.value) || 2.0;
+        
+        // Search for bright stars within specified radius of hint position
+        const nearbyStars = await searchStarsByPosition({
+          ra: hintCoords.ra,
+          dec: hintCoords.dec,
+          radius: searchRadius,
+          magLimit: 10, // Only stars brighter than magnitude 10
+          limit: 20
+        });
+        
+        suggestBtn.textContent = t('lightSolve.suggestButton');
+        suggestBtn.disabled = false;
+        
+        if (nearbyStars.length === 0) {
+          suggestList.innerHTML = `<div class="suggest-list-header">${t('lightSolve.noStarsNearby', { radius: searchRadius.toFixed(1) })}</div>`;
+          suggestList.classList.remove('hidden');
+          return;
+        }
+        
+        // Calculate distance for each star and sort by distance (closest first)
+        const starsWithDistance = nearbyStars.map(star => {
+          const dRa = (star.ra - hintCoords!.ra) * Math.cos(star.dec * Math.PI / 180);
+          const dDec = star.dec - hintCoords!.dec;
+          const distance = Math.sqrt(dRa * dRa + dDec * dDec);
+          return { star, distance };
+        });
+        starsWithDistance.sort((a, b) => a.distance - b.distance);
+        
+        // Create list header
+        const header = document.createElement('div');
+        header.className = 'suggest-list-header';
+        header.textContent = t('lightSolve.foundNearby', { count: nearbyStars.length, target: hintTargetName, radius: searchRadius.toFixed(1) });
+        suggestList.appendChild(header);
+
+        // Add each star as a list item
+        starsWithDistance.slice(0, 10).forEach(({ star, distance }) => {
+
+          const starItem = document.createElement('div');
+          starItem.className = 'suggest-list-item';
+          starItem.innerHTML = `
+            <div class="suggest-item-name">${star.name || `HIP ${star.hip}`}</div>
+            <div class="suggest-item-meta">
+              mag ${star.mag.toFixed(1)} \u2014 ${distance.toFixed(2)}\u00b0 from target
+            </div>
+          `;
+          
+          // Click to use this star for identification (auto-fill in correspondence)
+          starItem.addEventListener('click', () => {
+            // Find the active correspondence point
+            const activeIdx = points.findIndex(p => p === null);
+            if (activeIdx === -1) return; // All points filled
+            
+            // We can't auto-click on the photo, but we can highlight this star's name
+            // for the user to search manually
+            showToast({ 
+              message: `Look for ${star.name || `HIP ${star.hip}`} (mag ${star.mag.toFixed(1)}) in your photo`,
+              type: 'info',
+              duration: 5000
+            });
+          });
+          
+          suggestList.appendChild(starItem);
+        });
+
+        suggestList.classList.remove('hidden');
+
+      } catch (err: any) {
+        reportUnknownRendererError('suggest_stars_error', err);
+        suggestBtn.textContent = t('lightSolve.suggestButton');
+        suggestBtn.disabled = false;
+        showToast({ message: err.message || 'Failed to search catalog', type: 'error', duration: 3000 });
+      }
+    });
 
     // Helper: set auto-solve status
-    function setAutoStatus(msg: string, state: 'solving' | 'success' | 'failed') {
-      autoStatus.className = `auto-solve-status visible ${state}`;
-      if (state === 'solving') {
-        autoStatus.innerHTML = `<span class="auto-solve-spinner"></span>${msg}`;
-      } else {
-        autoStatus.textContent = msg;
+    function renderErrorDetails(details?: ApiErrorDetails): string {
+      if (!details) return '';
+      const rows: string[] = [];
+      if (details.code) rows.push(`<div><strong>${escapeHtml(t('modal.errorDetailsCode'))}:</strong> ${escapeHtml(details.code)}</div>`);
+      if (details.httpStatus != null) {
+        const statusText = details.httpStatusText ? ` ${details.httpStatusText}` : '';
+        rows.push(`<div><strong>${escapeHtml(t('modal.errorDetailsStatus'))}:</strong> ${escapeHtml(String(details.httpStatus) + statusText)}</div>`);
       }
+      if (details.method || details.endpoint) {
+        rows.push(`<div><strong>Request:</strong> ${escapeHtml(`${details.method ?? ''} ${details.endpoint ?? ''}`.trim())}</div>`);
+      }
+      const body = details.responseBody?.trim();
+      const bodyHtml = body
+        ? `<div style="margin-top:6px;"><strong>${escapeHtml(t('modal.errorDetailsBody'))}:</strong><pre style="margin:4px 0 0; padding:8px; max-height:180px; overflow:auto; border-radius:4px; background: rgba(0,0,0,0.25); color:#f6d5d5; border:1px solid rgba(220,120,120,0.28); white-space: pre-wrap;">${escapeHtml(body)}</pre></div>`
+        : '';
+
+      if (rows.length === 0 && !bodyHtml) {
+        return '';
+      }
+
+      return `<details style="margin-top:8px;"><summary style="cursor:pointer; color:#f4caca;">${escapeHtml(t('modal.errorDetailsSummary'))}</summary><div style="margin-top:6px; font-size:11px; color:#f1c4c4;">${rows.join('')}${bodyHtml}</div></details>`;
+    }
+
+    function setAutoStatus(
+      msg: string,
+      state: 'solving' | 'success' | 'failed' | 'canceled',
+      subMsg?: string,
+      details?: ApiErrorDetails,
+      cancelOptions?: { show: boolean; onCancel?: () => void },
+      diagnostics?: string,
+    ) {
+      renderSharedSolveStatus({
+        container: autoStatus,
+        mode: 'single',
+        state,
+        message: msg,
+        subMessage: subMsg,
+        detailsHtml: state === 'failed' ? renderErrorDetails(details) : undefined,
+        diagnostics: (state === 'failed' || state === 'canceled') ? diagnostics : undefined,
+        showCancel: cancelOptions?.show ?? false,
+        onCancel: cancelOptions?.onCancel,
+      });
     }
 
     function disableAutoButtons() {
       btnWCS.disabled = true;
       btnOnline.disabled = true;
+      btnSolveField.disabled = true;
       btnASTAP.disabled = true;
     }
 
+    // Tracks which buttons are available based on user-configured settings.
+    // All optimistically true until settings load.
+    let solverAvail = { solveField: true, astap: true, astrometry: true };
+
     function enableAutoButtons() {
-      btnWCS.disabled = !isAstroFile;
-      btnOnline.disabled = false;
-      btnASTAP.disabled = false;
+      btnWCS.disabled = false;
+      btnSolveField.disabled = !solverAvail.solveField;
+      btnASTAP.disabled = !solverAvail.astap;
+      btnOnline.disabled = !solverAvail.astrometry;
     }
+
+    // Load settings and apply availability to buttons
+    loadServerSettings().then(s => {
+      solverAvail = getSolverAvailability(s);
+      if (!solverAvail.solveField) { btnSolveField.disabled = true; btnSolveField.title = t('modal.solverNoPath'); }
+      if (!solverAvail.astap)      { btnASTAP.disabled = true;      btnASTAP.title      = t('modal.solverNoPath'); }
+      if (!solverAvail.astrometry) { btnOnline.disabled = true;      btnOnline.title     = t('modal.solverNoApiKey'); }
+    }).catch(() => { /* server unavailable; leave all buttons enabled */ });
 
     // 3 point entries
     const pointEntries: HTMLDivElement[] = [];
@@ -623,22 +1947,104 @@ export class PhotoOverlay {
       const raDecRow = document.createElement('div');
       raDecRow.className = 'search-row radec-row';
       raDecRow.style.display = 'none';
+      raDecRow.style.flexDirection = 'column';
+      raDecRow.style.gap = '8px';
 
-      const raInput = document.createElement('input');
-      raInput.type = 'number';
-      raInput.placeholder = t('modal.raPlaceholder');
-      raInput.className = 'radec-input';
-      raInput.step = 'any';
-      raInput.min = '0';
-      raInput.max = '360';
+      // RA inputs container
+      const raContainer = document.createElement('div');
+      raContainer.style.display = 'flex';
+      raContainer.style.flexDirection = 'column';
+      raContainer.style.gap = '4px';
 
-      const decInput = document.createElement('input');
-      decInput.type = 'number';
-      decInput.placeholder = t('modal.decPlaceholder');
-      decInput.className = 'radec-input';
-      decInput.step = 'any';
-      decInput.min = '-90';
-      decInput.max = '90';
+      const raLabel = document.createElement('label');
+      raLabel.textContent = t('modal.raLabel');
+      raLabel.style.fontSize = '0.9em';
+      raLabel.style.opacity = '0.8';
+      raContainer.appendChild(raLabel);
+
+      const raInputs = document.createElement('div');
+      raInputs.style.display = 'flex';
+      raInputs.style.gap = '4px';
+
+      const raHours = document.createElement('input');
+      raHours.type = 'number';
+      raHours.placeholder = t('modal.raHours');
+      raHours.className = 'radec-input-small';
+      raHours.min = '0';
+      raHours.max = '23';
+      raHours.step = '1';
+
+      const raMinutes = document.createElement('input');
+      raMinutes.type = 'number';
+      raMinutes.placeholder = t('modal.raMinutes');
+      raMinutes.className = 'radec-input-small';
+      raMinutes.min = '0';
+      raMinutes.max = '59';
+      raMinutes.step = '1';
+
+      const raSeconds = document.createElement('input');
+      raSeconds.type = 'number';
+      raSeconds.placeholder = t('modal.raSeconds');
+      raSeconds.className = 'radec-input-small';
+      raSeconds.min = '0';
+      raSeconds.max = '59';
+      raSeconds.step = '0.01';
+
+      raInputs.appendChild(raHours);
+      raInputs.appendChild(raMinutes);
+      raInputs.appendChild(raSeconds);
+      raContainer.appendChild(raInputs);
+
+      // Dec inputs container
+      const decContainer = document.createElement('div');
+      decContainer.style.display = 'flex';
+      decContainer.style.flexDirection = 'column';
+      decContainer.style.gap = '4px';
+
+      const decLabel = document.createElement('label');
+      decLabel.textContent = t('modal.decLabel');
+      decLabel.style.fontSize = '0.9em';
+      decLabel.style.opacity = '0.8';
+      decContainer.appendChild(decLabel);
+
+      const decInputs = document.createElement('div');
+      decInputs.style.display = 'flex';
+      decInputs.style.gap = '4px';
+
+      const decDegrees = document.createElement('input');
+      decDegrees.type = 'number';
+      decDegrees.placeholder = t('modal.decDegrees');
+      decDegrees.className = 'radec-input-small';
+      decDegrees.min = '-89';
+      decDegrees.max = '89';
+      decDegrees.step = '1';
+
+      const decMinutes = document.createElement('input');
+      decMinutes.type = 'number';
+      decMinutes.placeholder = t('modal.decMinutes');
+      decMinutes.className = 'radec-input-small';
+      decMinutes.min = '0';
+      decMinutes.max = '59';
+      decMinutes.step = '1';
+
+      const decSeconds = document.createElement('input');
+      decSeconds.type = 'number';
+      decSeconds.placeholder = t('modal.decSeconds');
+      decSeconds.className = 'radec-input-small';
+      decSeconds.min = '0';
+      decSeconds.max = '59';
+      decSeconds.step = '0.01';
+
+      decInputs.appendChild(decDegrees);
+      decInputs.appendChild(decMinutes);
+      decInputs.appendChild(decSeconds);
+      decContainer.appendChild(decInputs);
+
+      // Buttons container
+      const buttonsContainer = document.createElement('div');
+      buttonsContainer.style.display = 'flex';
+      buttonsContainer.style.gap = '8px';
+      buttonsContainer.style.marginTop = '4px';
 
       const raDecOk = document.createElement('button');
       raDecOk.type = 'button';
@@ -651,16 +2057,18 @@ export class PhotoOverlay {
       starToggle.title = t('modal.starModeTooltip');
       starToggle.textContent = t('modal.starMode');
 
-      raDecRow.appendChild(raInput);
-      raDecRow.appendChild(decInput);
-      raDecRow.appendChild(raDecOk);
-      raDecRow.appendChild(starToggle);
+      buttonsContainer.appendChild(raDecOk);
+      buttonsContainer.appendChild(starToggle);
+
+      raDecRow.appendChild(raContainer);
+      raDecRow.appendChild(decContainer);
+      raDecRow.appendChild(buttonsContainer);
 
       // Toggle between modes
       raDecToggle.addEventListener('click', () => {
         searchRow.style.display = 'none';
-        raDecRow.style.display = '';
-        raInput.focus();
+        raDecRow.style.display = 'flex';
+        raHours.focus();
       });
       starToggle.addEventListener('click', () => {
         raDecRow.style.display = 'none';
@@ -668,12 +2076,43 @@ export class PhotoOverlay {
         searchInput.focus();
       });
 
-      // RA/Dec OK handler
+      // RA/Dec OK handler with HMS/DMS conversion
       raDecOk.addEventListener('click', () => {
-        const ra = parseFloat(raInput.value);
-        const dec = parseFloat(decInput.value);
-        if (isNaN(ra) || isNaN(dec) || ra < 0 || ra >= 360 || dec < -90 || dec > 90) return;
-        selectRaDec(i, ra, dec);
+        const h = parseFloat(raHours.value);
+        const m = parseFloat(raMinutes.value);
+        const s = parseFloat(raSeconds.value);
+        const d = parseFloat(decDegrees.value);
+        const dm = parseFloat(decMinutes.value);
+        const ds = parseFloat(decSeconds.value);
+
+        // Validate inputs
+        if (isNaN(h) || isNaN(m) || isNaN(s) || isNaN(d) || isNaN(dm) || isNaN(ds)) {
+          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+          return;
+        }
+        if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) {
+          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+          return;
+        }
+        if (d < -89 || d > 89 || dm < 0 || dm > 59 || ds < 0 || ds > 59) {
+          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+          return;
+        }
+
+        // Convert HMS to degrees: RA in degrees = (h + m/60 + s/3600) * 15
+        const ra = (h + m / 60 + s / 3600) * 15;
+
+        // Convert DMS to degrees: Dec in degrees = d + sign*(m/60 + s/3600)
+        const sign = d < 0 ? -1 : 1;
+        const dec = Math.abs(d) + dm / 60 + ds / 3600;
+        const decDeg = sign * dec;
+
+        if (ra < 0 || ra >= 360 || decDeg < -90 || decDeg > 90) {
+          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+          return;
+        }
+
+        selectRaDec(i, ra, decDeg);
       });
 
       const dropdown = document.createElement('div');
@@ -689,7 +2128,7 @@ export class PhotoOverlay {
 
       entry.appendChild(markerDot);
       entry.appendChild(info);
-      formSide.appendChild(entry);
+      manualPanelBody.appendChild(entry);
       pointEntries.push(entry);
 
       // Search handler (async with debounce)
@@ -726,7 +2165,9 @@ export class PhotoOverlay {
                 name: result.name, bayer: result.bayer, flam: result.flam,
                 constellation: result.constellation, desig: result.desig,
               };
-              selectStar(i, star, result.label);
+              // Extract just the name part (before the en dash)
+              const displayName = result.label.split(' – ')[0].trim();
+              selectStar(i, star, displayName);
               dropdown.style.display = 'none';
             });
             dropdown.appendChild(item);
@@ -745,6 +2186,373 @@ export class PhotoOverlay {
       });
     }
 
+    formSide.appendChild(manualPanel);
+
+    // --- Metadata section (DSOs / Labels / Notes) ---
+    const metaSection = document.createElement('div');
+    metaSection.className = 'metadata-section';
+
+    const metaToggle = document.createElement('button');
+    metaToggle.type = 'button';
+    metaToggle.className = 'metadata-toggle';
+    metaToggle.textContent = t('modal.metadataToggle');
+    const metaInfoIcon = document.createElement('span');
+    metaInfoIcon.className = 'hints-info-icon panel-info-icon';
+    metaInfoIcon.textContent = 'i';
+    metaInfoIcon.title = 'Information';
+    metaToggle.appendChild(metaInfoIcon);
+    metaSection.appendChild(metaToggle);
+    metaInfoIcon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showMetaInfoTooltip(metaInfoIcon);
+    });
+
+    const metaBody = document.createElement('div');
+    metaBody.className = 'metadata-body';
+
+    // Filename field
+    const nameField = document.createElement('div');
+    nameField.className = 'metadata-field';
+    const nameLbl = document.createElement('label');
+    nameLbl.className = 'metadata-label';
+    nameLbl.textContent = t('modal.metadataFilename');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'tag-input';
+    nameInput.value = pendingOriginalName;
+    nameInput.addEventListener('input', () => { pendingOriginalName = nameInput.value; });
+    nameField.appendChild(nameLbl);
+    nameField.appendChild(nameInput);
+    metaBody.appendChild(nameField);
+
+    // DSOs field
+    const dsoField = document.createElement('div');
+    dsoField.className = 'metadata-field';
+    const dsoLabel = document.createElement('label');
+    dsoLabel.textContent = t('modal.metadataDsos');
+    dsoLabel.className = 'metadata-label';
+    const dsoChipsEl = document.createElement('div');
+    dsoChipsEl.className = 'tag-chips';
+    const dsoInputWrap = document.createElement('div');
+    dsoInputWrap.className = 'tag-input-wrap';
+    const dsoInput = document.createElement('input');
+    dsoInput.type = 'text';
+    dsoInput.className = 'tag-input';
+    dsoInput.placeholder = t('modal.metadataDsosPlaceholder');
+    const dsoSuggestEl = document.createElement('div');
+    dsoSuggestEl.className = 'tag-suggest';
+    dsoInputWrap.appendChild(dsoInput);
+    dsoInputWrap.appendChild(dsoSuggestEl);
+    dsoField.appendChild(dsoLabel);
+    dsoField.appendChild(dsoChipsEl);
+    dsoField.appendChild(dsoInputWrap);
+    metaBody.appendChild(dsoField);
+
+    refreshDsoChips = () => {
+      dsoChipsEl.innerHTML = '';
+      for (const id of pendingDsoIds) {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.textContent = id;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'tag-chip-remove';
+        rm.textContent = '×';
+        rm.addEventListener('click', () => {
+          pendingDsoIds = pendingDsoIds.filter(d => d !== id);
+          refreshDsoChips();
+        });
+        chip.appendChild(rm);
+        dsoChipsEl.appendChild(chip);
+      }
+    };
+
+    let dsoSearchTimer: ReturnType<typeof setTimeout> | null = null;
+    dsoInput.addEventListener('input', () => {
+      if (dsoSearchTimer) clearTimeout(dsoSearchTimer);
+      const q = dsoInput.value.trim();
+      if (!q) { dsoSuggestEl.style.display = 'none'; return; }
+      dsoSearchTimer = setTimeout(() => {
+        const results = searchDSOs(q, 8);
+        dsoSuggestEl.innerHTML = '';
+        if (results.length === 0) { dsoSuggestEl.style.display = 'none'; return; }
+        for (const r of results) {
+          const opt = document.createElement('div');
+          opt.className = 'tag-suggest-item';
+          opt.textContent = r.dso.id + (r.dso.displayName ? ` — ${r.dso.displayName}` : '');
+          opt.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const id = r.dso.id;
+            if (!pendingDsoIds.includes(id)) {
+              pendingDsoIds = [...pendingDsoIds, id];
+              refreshDsoChips();
+            }
+            dsoInput.value = '';
+            dsoSuggestEl.style.display = 'none';
+          });
+          dsoSuggestEl.appendChild(opt);
+        }
+        dsoSuggestEl.style.display = 'block';
+      }, 200);
+    });
+    dsoInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = dsoInput.value.trim().replace(/\s+/g, '');
+        if (val && !pendingDsoIds.includes(val)) {
+          pendingDsoIds = [...pendingDsoIds, val];
+          refreshDsoChips();
+        }
+        dsoInput.value = '';
+        dsoSuggestEl.style.display = 'none';
+      }
+    });
+    dsoInput.addEventListener('blur', () => { setTimeout(() => { dsoSuggestEl.style.display = 'none'; }, 150); });
+
+    // Labels field
+    const labelField = document.createElement('div');
+    labelField.className = 'metadata-field';
+    const labelLabel = document.createElement('label');
+    labelLabel.textContent = t('modal.metadataLabels');
+    labelLabel.className = 'metadata-label';
+    const labelChipsEl = document.createElement('div');
+    labelChipsEl.className = 'tag-chips';
+    const labelInputEl = document.createElement('input');
+    labelInputEl.type = 'text';
+    labelInputEl.className = 'tag-input';
+    labelInputEl.placeholder = t('modal.metadataLabelsPlaceholder');
+    labelField.appendChild(labelLabel);
+    labelField.appendChild(labelChipsEl);
+    labelField.appendChild(labelInputEl);
+    metaBody.appendChild(labelField);
+
+    refreshLabelChips = () => {
+      labelChipsEl.innerHTML = '';
+      for (const lbl of pendingLabels) {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip label-chip';
+        chip.textContent = lbl;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'tag-chip-remove';
+        rm.textContent = '×';
+        rm.addEventListener('click', () => {
+          pendingLabels = pendingLabels.filter(l => l !== lbl);
+          refreshLabelChips();
+        });
+        chip.appendChild(rm);
+        labelChipsEl.appendChild(chip);
+      }
+    };
+
+    labelInputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = labelInputEl.value.trim();
+        if (val && !pendingLabels.includes(val)) {
+          pendingLabels = [...pendingLabels, val];
+          refreshLabelChips();
+        }
+        labelInputEl.value = '';
+      }
+    });
+    labelInputEl.addEventListener('blur', () => {
+      const val = labelInputEl.value.trim();
+      if (val && !pendingLabels.includes(val)) {
+        pendingLabels = [...pendingLabels, val];
+        refreshLabelChips();
+        labelInputEl.value = '';
+      }
+    });
+
+    // Integrations field
+    const integrationField = document.createElement('div');
+    integrationField.className = 'metadata-field';
+    const integrationLabel = document.createElement('label');
+    integrationLabel.textContent = t('modal.metadataIntegrations');
+    integrationLabel.className = 'metadata-label';
+    const integrationRowsEl = document.createElement('div');
+    integrationRowsEl.className = 'integration-rows';
+    const integrationAddBtn = document.createElement('button');
+    integrationAddBtn.type = 'button';
+    integrationAddBtn.className = 'integration-add-btn';
+    integrationAddBtn.textContent = t('modal.metadataIntegrationsAddRow');
+
+    refreshIntegrationRows = () => {
+      integrationRowsEl.innerHTML = '';
+      pendingIntegrations.forEach((row, index) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'integration-row';
+
+        const framesIn = document.createElement('input');
+        framesIn.type = 'number';
+        framesIn.min = '1';
+        framesIn.step = '1';
+        framesIn.className = 'tag-input integration-input integration-frames-input';
+        framesIn.placeholder = t('modal.metadataIntegrationsFramesPlaceholder');
+        framesIn.title = t('modal.metadataIntegrationsFramesTooltip');
+        framesIn.value = row.frames >= 1 ? String(row.frames) : '';
+        framesIn.addEventListener('input', () => {
+          const parsed = Number.parseInt(framesIn.value, 10);
+          pendingIntegrations[index] = {
+            ...pendingIntegrations[index],
+            frames: Number.isInteger(parsed) && parsed >= 1 ? parsed : 0,
+          };
+        });
+
+        const op = document.createElement('span');
+        op.className = 'integration-operator';
+        op.textContent = 'x';
+
+        const secondsIn = document.createElement('input');
+        secondsIn.type = 'number';
+        secondsIn.min = '1';
+        secondsIn.step = '1';
+        secondsIn.className = 'tag-input integration-input integration-seconds-input';
+        secondsIn.placeholder = t('modal.metadataIntegrationsSecondsPlaceholder');
+        secondsIn.title = t('modal.metadataIntegrationsSecondsTooltip');
+        secondsIn.value = row.seconds >= 1 ? String(row.seconds) : '';
+        secondsIn.addEventListener('input', () => {
+          const parsed = Number.parseInt(secondsIn.value, 10);
+          pendingIntegrations[index] = {
+            ...pendingIntegrations[index],
+            seconds: Number.isInteger(parsed) && parsed >= 1 ? parsed : 0,
+          };
+        });
+
+        const unit = document.createElement('span');
+        unit.className = 'integration-unit';
+        unit.textContent = t('modal.metadataIntegrationsSecondsSuffix');
+
+        const { el: filterWrap } = buildIntegrationFilterField({
+          initialValue: row.filter,
+          knownFilterMap,
+          placeholder: t('modal.metadataIntegrationsFilterPlaceholder'),
+          tooltip: t('modal.metadataIntegrationsFilterTooltip'),
+          onSelect: (value) => {
+            pendingIntegrations[index] = { ...pendingIntegrations[index], filter: value };
+          },
+          onCommit: (value) => { if (value) rememberFilters([value]); },
+        });
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'integration-row-trash';
+        removeBtn.title = t('modal.metadataIntegrationsRemoveRow');
+        removeBtn.innerHTML = trashSvg;
+        removeBtn.addEventListener('click', () => {
+          pendingIntegrations = pendingIntegrations.filter((_, i) => i !== index);
+          refreshIntegrationRows();
+        });
+
+        rowEl.appendChild(framesIn);
+        rowEl.appendChild(op);
+        rowEl.appendChild(secondsIn);
+        rowEl.appendChild(unit);
+        rowEl.appendChild(filterWrap);
+        rowEl.appendChild(removeBtn);
+        integrationRowsEl.appendChild(rowEl);
+      });
+    };
+
+    integrationAddBtn.addEventListener('click', () => {
+      pendingIntegrations = [...pendingIntegrations, { frames: 0, seconds: 0, filter: '' }];
+      refreshIntegrationRows();
+    });
+
+    const validateIntegrationInputs = (): boolean => {
+      const numericInputs = integrationRowsEl.querySelectorAll<HTMLInputElement>('.integration-frames-input, .integration-seconds-input');
+      for (const input of numericInputs) {
+        const raw = input.value.trim();
+        if (!raw) continue;
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+          showToast({ message: t('errors.invalidIntegrationNumber'), type: 'error', duration: 4000 });
+          input.focus();
+          return false;
+        }
+      }
+      return true;
+    };
+
+    refreshIntegrationRows();
+    integrationField.appendChild(integrationLabel);
+    integrationField.appendChild(integrationRowsEl);
+    integrationField.appendChild(integrationAddBtn);
+    metaBody.appendChild(integrationField);
+
+    // Observation date field
+    const obsDateField = document.createElement('div');
+    obsDateField.className = 'metadata-field';
+    const obsDateLabel = document.createElement('label');
+    obsDateLabel.textContent = t('modal.metadataObsDate');
+    obsDateLabel.className = 'metadata-label';
+    const obsDateInput = document.createElement('input');
+    obsDateInput.type = 'datetime-local';
+    obsDateInput.className = 'dialog-input';
+    obsDateInput.title = t('modal.metadataObsDatePlaceholder');
+    if (pendingObsDate) obsDateInput.value = utcToDatetimeLocal(pendingObsDate);
+    obsDateInput.addEventListener('input', () => {
+      pendingObsDate = obsDateInput.value ? new Date(obsDateInput.value).toISOString() : '';
+    });
+    obsDateField.appendChild(obsDateLabel);
+    obsDateField.appendChild(obsDateInput);
+    metaBody.appendChild(obsDateField);
+
+    // Notes field
+    const notesField = document.createElement('div');
+    notesField.className = 'metadata-field';
+    const notesLabel = document.createElement('label');
+    notesLabel.textContent = t('modal.metadataNotes');
+    notesLabel.className = 'metadata-label';
+    const notesTextarea = document.createElement('textarea');
+    notesTextarea.className = 'notes-textarea';
+    notesTextarea.placeholder = t('modal.metadataNotesPlaceholder');
+    notesTextarea.rows = 3;
+    notesTextarea.addEventListener('input', () => { pendingNotes = notesTextarea.value; });
+    notesField.appendChild(notesLabel);
+    notesField.appendChild(notesTextarea);
+    metaBody.appendChild(notesField);
+
+    metaSection.appendChild(metaBody);
+
+    // Toggle collapsed state
+    let metaOpen = false;
+    metaBody.style.display = 'none';
+    metaToggle.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).classList.contains('hints-info-icon')) return;
+      metaOpen = !metaOpen;
+      metaBody.style.display = metaOpen ? 'block' : 'none';
+      metaToggle.classList.toggle('open', metaOpen);
+    });
+    // Auto-expand when DSOs are detected
+    function expandMetaIfDSOsDetected() {
+      if (!metaOpen && pendingDsoIds.length > 0) {
+        metaOpen = true;
+        metaBody.style.display = 'block';
+        metaToggle.classList.add('open');
+      }
+    }
+
+    // Pre-fill metadata fields from WCS solve result
+    function prefillWCSMeta(result: { dateObs?: string; expTime?: number; stackCnt?: number }) {
+      if (result.dateObs && !pendingObsDate) {
+        pendingObsDate = result.dateObs;
+        obsDateInput.value = utcToDatetimeLocal(result.dateObs);
+        if (!metaOpen) {
+          metaOpen = true;
+          metaBody.style.display = 'block';
+          metaToggle.classList.add('open');
+        }
+      }
+      if (result.expTime && result.stackCnt && pendingIntegrations.length === 0) {
+        pendingIntegrations = [{ frames: Math.round(result.stackCnt), seconds: Math.round(result.expTime), filter: '' }];
+        refreshIntegrationRows();
+      }
+    }
+
+    formSide.appendChild(metaSection);
+
     // Upload progress bar
     const progressBar = document.createElement('div');
     progressBar.className = 'upload-progress';
@@ -756,16 +2564,16 @@ export class PhotoOverlay {
 
     // Submit button
     const submitBtn = document.createElement('button');
-    submitBtn.className = 'modal-submit';
+    submitBtn.className = 'btn-confirm';
     submitBtn.textContent = t('modal.submit');
     submitBtn.disabled = true;
     formSide.appendChild(submitBtn);
 
     // Cancel button
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'modal-cancel';
+    cancelBtn.className = 'btn-cancel';
     cancelBtn.textContent = t('modal.cancel');
-    cancelBtn.addEventListener('click', () => backdrop.remove());
+    cancelBtn.addEventListener('click', () => closeModal());
     formSide.appendChild(cancelBtn);
 
     body.appendChild(photoSide);
@@ -786,21 +2594,46 @@ export class PhotoOverlay {
     // Markers on photo
     const markers: HTMLDivElement[] = [];
 
+    // ── Zoom / pan ────────────────────────────────────────────────────────────
+    zoom = createImageZoomPan(photoImg, photoContainer, { minScale: 1, maxScale: 5 });
+    photoWrapper.appendChild(zoom.controls);
+
+    function updateMarkerPositions() {
+      markers.forEach((marker, idx) => {
+        if (!marker || !points[idx]) return;
+        const imgRect = photoImg.getBoundingClientRect();
+        const cR = photoContainer.getBoundingClientRect();
+        const displayX = (imgRect.left - cR.left) + (points[idx]!.photoX / naturalWidth)  * imgRect.width;
+        const displayY = (imgRect.top  - cR.top)  + (points[idx]!.photoY / naturalHeight) * imgRect.height;
+        marker.style.left = `${displayX}px`;
+        marker.style.top  = `${displayY}px`;
+      });
+    }
+
+    const updateCursor = () => {
+      photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grab' : 'crosshair';
+    };
+    zoom.onTransformChange(() => { updateCursor(); updateMarkerPositions(); });
+    photoContainer.addEventListener('pointerdown', () => {
+      photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grabbing' : 'crosshair';
+    });
+    photoContainer.addEventListener('pointerup',     updateCursor);
+    photoContainer.addEventListener('pointercancel', updateCursor);
+    updateCursor();
+
     photoContainer.addEventListener('click', (e) => {
+      if (zoom!.wasDrag) return;
       if (activeIndex >= 3) return;
 
-      const rect = photoImg.getBoundingClientRect();
-      const displayX = e.clientX - rect.left;
-      const displayY = e.clientY - rect.top;
+      const imgRect = photoImg.getBoundingClientRect();
+      const relX = (e.clientX - imgRect.left) / imgRect.width;
+      const relY = (e.clientY - imgRect.top)  / imgRect.height;
+      if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
 
-      // Convert to natural image coordinates
-      const scaleX = naturalWidth / photoImg.offsetWidth;
-      const scaleY = naturalHeight / photoImg.offsetHeight;
-      const natX = displayX * scaleX;
-      const natY = displayY * scaleY;
-
-      // Place marker
-      placeMarker(activeIndex, displayX, displayY, natX, natY);
+      const natX = relX * naturalWidth;
+      const natY = relY * naturalHeight;
+      const cR = photoContainer.getBoundingClientRect();
+      placeMarker(activeIndex, e.clientX - cR.left, e.clientY - cR.top, natX, natY);
     });
 
     function placeMarker(idx: number, dispX: number, dispY: number, natX: number, natY: number) {
@@ -956,6 +2789,8 @@ export class PhotoOverlay {
           if (!points[idx]) continue;
           points[idx]!.starHip = corr.starHip;
           points[idx]!.starName = corr.starName;
+          points[idx]!.starRa = corr.starRa;  // Set RA for synthetic stars
+          points[idx]!.starDec = corr.starDec; // Set Dec for synthetic stars
           statusLabels[idx].textContent = corr.starName;
           statusLabels[idx].className = 'point-status point-complete';
           searchInputs[idx].value = corr.starName;
@@ -967,33 +2802,249 @@ export class PhotoOverlay {
           checkComplete();
         }
       }
+      
+      // Auto-zoom to photo field of view if skyMap is available
+      if (self.skyMap && correspondences.length >= 3) {
+        // Calculate center RA/Dec and field of view from correspondences
+        const allCorrs = correspondences.slice(0, 3); // Use first 3 for consistency
+        let sumRa = 0, sumDec = 0, count = 0;
+        let minPhotoX = Infinity, maxPhotoX = -Infinity;
+        let minPhotoY = Infinity, maxPhotoY = -Infinity;
+        
+        for (const corr of allCorrs) {
+          const ra = corr.starRa;
+          const dec = corr.starDec;
+          if (ra !== undefined && dec !== undefined) {
+            sumRa += ra;
+            sumDec += dec;
+            count++;
+            minPhotoX = Math.min(minPhotoX, corr.photoX);
+            maxPhotoX = Math.max(maxPhotoX, corr.photoX);
+            minPhotoY = Math.min(minPhotoY, corr.photoY);
+            maxPhotoY = Math.max(maxPhotoY, corr.photoY);
+          }
+        }
+        
+        if (count >= 3) {
+          const centerRa = sumRa / count;
+          const centerDec = sumDec / count;
+          
+          // Estimate photo field of view in projection units
+          const proj = allCorrs.map(c => project(c.starRa!, c.starDec!));
+          const projWidth = Math.max(...proj.map(p => p.x)) - Math.min(...proj.map(p => p.x));
+          const projHeight = Math.max(...proj.map(p => p.y)) - Math.min(...proj.map(p => p.y));
+          const projFOV = Math.max(projWidth, projHeight);
+          
+          // Calculate scale so photo fits in ~50% of screen (with some padding)
+          const view = self.getView();
+          const screenSize = Math.min(view.width, view.height);
+          const targetScale = screenSize / (projFOV * 2.5); // 2.5x padding
+          
+          // Navigate to center with appropriate zoom
+          self.skyMap.navigateTo(centerRa, centerDec, Math.max(200, Math.min(5000, targetScale)), true);
+        }
+      }
     }
 
-    // --- WCS button handler ---
-    btnWCS.addEventListener('click', async () => {
+    // Helper: show status in WCS companion status row
+    function showWCSStatus(msg: string, state: 'reading' | 'success' | 'error', extraHtml?: string) {
+      wcsStatusRow.className = 'wcs-companion-status wcs-status';
+      if (state === 'reading') {
+        wcsStatusRow.classList.add('wcs-status--info');
+        wcsStatusRow.innerHTML = `<span class="auto-solve-spinner"></span>${msg}`;
+      } else if (state === 'success') {
+        wcsStatusRow.classList.add('wcs-status--success');
+        wcsStatusRow.innerHTML = msg;
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'integration-row-trash';
+        clearBtn.title = t('modal.wcsRemove');
+        clearBtn.innerHTML = trashSvg;
+        clearBtn.addEventListener('click', clearWcsSolution);
+        wcsStatusRow.appendChild(clearBtn);
+      } else {
+        wcsStatusRow.classList.add('wcs-status--error');
+        wcsStatusRow.innerHTML = msg + (extraHtml ? `<div style="margin-top:4px; font-size:11px; color:#c77;">${extraHtml}</div>` : '');
+      }
+    }
+
+    function hideWCSStatus() {
+      wcsStatusRow.className = 'wcs-companion-status wcs-status hidden';
+      wcsStatusRow.innerHTML = '';
+    }
+
+    // Revert the auto-solve placement + WCS-prefilled metadata to the initial modal state.
+    function clearWcsSolution() {
+      for (let idx = 0; idx < 3; idx++) {
+        markers[idx]?.remove();
+        delete markers[idx];
+        points[idx] = null;
+        const searchWrapper = pointEntries[idx].querySelector('.search-wrapper') as HTMLElement | null;
+        if (searchWrapper) searchWrapper.style.display = 'none';
+        searchInputs[idx].value = '';
+        searchInputs[idx].disabled = false;
+        if (pickBtns[idx]) pickBtns[idx].disabled = false;
+        statusLabels[idx].textContent = idx === 0 ? t('modal.clickPhoto') : t('modal.waiting');
+        statusLabels[idx].className = 'point-status';
+        statusLabels[idx].onclick = null;
+        pointEntries[idx].classList.remove('complete');
+      }
+      extraAutoCorrespondences = [];
+      activeIndex = 0;
+      checkComplete();
+
+      // Clear WCS-prefilled metadata
+      pendingDsoIds = [];
+      refreshDsoChips();
+      pendingIntegrations = [];
+      refreshIntegrationRows();
+      pendingObsDate = '';
+      obsDateInput.value = '';
+
+      hideWCSStatus();
+      companionInput.value = '';
+      enableAutoButtons();
+    }
+
+    // --- WCS companion file button handler ---
+    btnWCS.addEventListener('click', () => {
+      companionInput.value = ''; // allow re-picking same file
+      companionInput.click();
+    });
+
+    companionInput.addEventListener('change', async () => {
+      const companionFile = companionInput.files?.[0];
+      if (!companionFile) return;
+
+      // Wait for image to be loaded to get naturalWidth/naturalHeight
+      const imgWidth = naturalWidth || photoImg.naturalWidth;
+      const imgHeight = naturalHeight || photoImg.naturalHeight;
+
       disableAutoButtons();
-      setAutoStatus(t('modal.readingWCS'), 'solving');
+      showWCSStatus(t('modal.wcsCompanionReading', { filename: companionFile.name }), 'reading');
 
       try {
-        const result = await solveWCS(file);
-        if (result.success && result.correspondences) {
-          setAutoStatus(t('modal.wcsFound'), 'success');
+        const result = await solveWCS(companionFile, imgWidth || undefined, imgHeight || undefined);
+
+        if (result.success && result.correspondences && result.correspondences.length >= 1) {
+          const count = result.correspondences.length;
+          const successMsg = t('modal.wcsCompanionSuccess', {
+            filename: companionFile.name,
+            width: String(result.sourceWidth ?? '?'),
+            height: String(result.sourceHeight ?? '?'),
+            count: String(count),
+          });
+
+          // Check for aspect ratio mismatch — confirm before applying
+          if (result.dimensionWarning?.aspectMismatch) {
+            const { sourceW, sourceH, targetW, targetH } = result.dimensionWarning;
+            // Show inline confirm
+            const confirmHtml = `
+              <div style="margin-bottom:6px;">${t('modal.wcsDimensionMismatchBody', { fitsW: String(sourceW), fitsH: String(sourceH), jpegW: String(targetW), jpegH: String(targetH) })}</div>
+              <div style="display:flex; gap:8px; margin-top:4px;">
+                <button id="wcs-continue-btn" style="padding:4px 10px; background:rgba(200,100,30,0.7); border:1px solid rgba(220,130,50,0.5); border-radius:4px; color:#ffd; cursor:pointer; font-size:11px;">${t('modal.wcsContinueAnyway')}</button>
+                <button id="wcs-cancel-btn" style="padding:4px 10px; background:rgba(60,60,100,0.6); border:1px solid rgba(80,80,140,0.4); border-radius:4px; color:#ccd; cursor:pointer; font-size:11px;">${t('modal.cancel')}</button>
+              </div>`;
+            wcsStatusRow.className = 'wcs-companion-status wcs-status wcs-status--warning';
+            wcsStatusRow.innerHTML = `<strong>${t('modal.wcsDimensionMismatchTitle')}</strong>${confirmHtml}`;
+
+            enableAutoButtons();
+
+            return new Promise<void>((resolve) => {
+              const continueBtn = wcsStatusRow.querySelector('#wcs-continue-btn') as HTMLButtonElement;
+              const cancelBtn = wcsStatusRow.querySelector('#wcs-cancel-btn') as HTMLButtonElement;
+              continueBtn?.addEventListener('click', () => {
+                showWCSStatus(successMsg, 'success');
+                detectAndPopulateDSOs(result.dsoIds, result.correspondences!, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
+                prefillWCSMeta(result);
+                expandMetaIfDSOsDetected();
+                applyAutoSolveResult(result.correspondences!);
+                resolve();
+              });
+              cancelBtn?.addEventListener('click', () => {
+                hideWCSStatus();
+                resolve();
+              });
+            });
+          }
+
+          showWCSStatus(successMsg, 'success');
+          detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
+          prefillWCSMeta(result);
+          expandMetaIfDSOsDetected();
           applyAutoSolveResult(result.correspondences);
+          enableAutoButtons();
         } else {
-          setAutoStatus(result.error || t('modal.wcsNotFound'), 'failed');
+          const code = result.code;
+          let msg: string;
+          if (code === 'NO_WCS_DATA') {
+            msg = t('modal.wcsNoMetadata', { filename: companionFile.name });
+          } else if (code === 'UNSUPPORTED_FORMAT') {
+            msg = t('modal.wcsParseError', { filename: companionFile.name, detail: result.error || code });
+          } else {
+            msg = t('modal.wcsParseError', { filename: companionFile.name, detail: result.error || code || 'unknown error' });
+          }
+          showWCSStatus(msg, 'error');
           enableAutoButtons();
         }
       } catch (err: any) {
-        setAutoStatus(err.message, 'failed');
+        showWCSStatus(t('modal.wcsParseError', { filename: companionFile.name, detail: err.message }), 'error');
         enableAutoButtons();
       }
     });
 
     // --- Online solve button handler ---
     btnOnline.addEventListener('click', async () => {
+      // Show submission selection dialog first
+      try {
+        const choice = await this.showSubmissionSelectionDialog();
+        
+        if (choice.action === 'cancel') {
+          return; // User cancelled
+        }
+        
+        if (choice.action === 'reuse' && choice.jobId) {
+          // Reuse existing submission
+          disableAutoButtons();
+          setAutoStatus(t('modal.reusingSubmission', { jobId: choice.jobId }), 'solving');
+          
+          try {
+            const result = await reuseAstrometrySubmission(file, choice.jobId);
+            
+            if (result.success && result.correspondences && result.correspondences.length >= 3) {
+              setAutoStatus(t('modal.reuseSuccess'), 'success');
+              detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
+              expandMetaIfDSOsDetected();
+              applyAutoSolveResult(result.correspondences);
+            } else {
+              setAutoStatus(result.error || t('modal.reuseFailed'), 'failed');
+              enableAutoButtons();
+            }
+          } catch (err: any) {
+            setAutoStatus(err.message, 'failed');
+            enableAutoButtons();
+          }
+          return;
+        }
+        
+        // If action is 'upload', proceed with normal upload flow below
+      } catch (err: any) {
+        reportUnknownRendererError('submission_selection_error', err);
+        // If dialog fails, proceed with upload as fallback
+      }
+      
+      // Normal upload flow
       disableAutoButtons();
       const startTime = Date.now();
       let timerInterval: ReturnType<typeof setInterval> | null = null;
+
+      // Abort-aware sleep: resolves early (returning true) if modal is closed
+      function abortableSleep(ms: number): Promise<boolean> {
+        return new Promise(resolve => {
+          const t = setTimeout(() => resolve(false), ms);
+          modalAbort.signal.addEventListener('abort', () => { clearTimeout(t); resolve(true); }, { once: true });
+        });
+      }
 
       function updateTimer() {
         const elapsed = Math.round((Date.now() - startTime) / 1000);
@@ -1004,15 +3055,16 @@ export class PhotoOverlay {
       timerInterval = setInterval(updateTimer, 1000);
 
       try {
-        const { jobId } = await submitPlateSolve(file);
+        // Use hints if available
+        const hints = hintCoords ? { ra: hintCoords.ra, dec: hintCoords.dec, radius: 2.0 } : undefined;
+        const { jobId } = await submitPlateSolve(file, hints);
 
-        // Poll with backoff
+        // Initial backoff polling: 3s, 5s, 8s, then 13s intervals (~82s total)
         const delays = [3000, 5000, 8000, 13000, 13000, 13000, 13000, 13000];
-        let attempt = 0;
 
-        while (attempt < delays.length) {
-          await new Promise(r => setTimeout(r, delays[attempt]));
-          attempt++;
+        for (const delay of delays) {
+          if (await abortableSleep(delay)) return; // modal closed
+          if (modalAbort.signal.aborted) return;
 
           const status = await pollPlateSolve(jobId);
 
@@ -1020,6 +3072,8 @@ export class PhotoOverlay {
             if (timerInterval) clearInterval(timerInterval);
             const elapsed = Math.round((Date.now() - startTime) / 1000);
             setAutoStatus(t('modal.solvedOnline', { seconds: elapsed }), 'success');
+            detectAndPopulateDSOs(status.dsoIds, status.correspondences, naturalWidth, naturalHeight);
+            expandMetaIfDSOsDetected();
             applyAutoSolveResult(status.correspondences);
             return;
           } else if (status.status === 'failed' || status.status === 'timeout') {
@@ -1030,39 +3084,200 @@ export class PhotoOverlay {
           }
         }
 
-        // Timeout
+        // Show "still working" message and keep polling every 60s indefinitely
         if (timerInterval) clearInterval(timerInterval);
-        setAutoStatus(t('modal.solveTimeout'), 'failed');
-        enableAutoButtons();
+        setAutoStatus(t('modal.solvingOnlineSlow'), 'solving', t('modal.solveTimeoutHint'));
+
+        while (true) {
+          if (await abortableSleep(60_000)) return; // modal closed
+          if (modalAbort.signal.aborted) return;
+
+          const status = await pollPlateSolve(jobId);
+
+          if (status.status === 'solved' && status.correspondences) {
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            setAutoStatus(t('modal.solvedOnline', { seconds: elapsed }), 'success');
+            detectAndPopulateDSOs(status.dsoIds, status.correspondences, naturalWidth, naturalHeight);
+            expandMetaIfDSOsDetected();
+            applyAutoSolveResult(status.correspondences);
+            return;
+          } else if (status.status === 'failed' || status.status === 'timeout') {
+            setAutoStatus(status.error || t('modal.solveFailed'), 'failed');
+            enableAutoButtons();
+            return;
+          }
+          // Still pending — update elapsed time in the main status
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          setAutoStatus(t('modal.solvingOnline', { seconds: elapsed }), 'solving', t('modal.solveTimeoutHint'));
+        }
       } catch (err: any) {
         if (timerInterval) clearInterval(timerInterval);
+        if (modalAbort.signal.aborted) return; // modal closed mid-request, ignore
         setAutoStatus(err.message, 'failed');
         enableAutoButtons();
+      }
+    });
+
+    // --- solve-field button handler ---
+    btnSolveField.addEventListener('click', async () => {
+      disableAutoButtons();
+      const solveAbort = new AbortController();
+      activeLocalSolveAbort = solveAbort;
+      const startAt = Date.now();
+      let showSlowHint = false;
+
+      const cancelSolve = () => {
+        if (solveAbort.signal.aborted) return;
+        solveAbort.abort();
+        setAutoStatus(t('batch.statusCanceled'), 'canceled');
+        enableAutoButtons();
+      };
+
+      const updateStatus = () => {
+        const elapsed = Math.max(0, Math.round((Date.now() - startAt) / 1000));
+        if (elapsed >= 60) showSlowHint = true;
+        setAutoStatus(
+          t('batch.statusSolving', { seconds: String(elapsed) }),
+          'solving',
+          showSlowHint ? t('modal.slowSolveHint') : undefined,
+          undefined,
+          { show: true, onCancel: cancelSolve },
+        );
+      };
+
+      updateStatus();
+      const localTimer = setInterval(updateStatus, 1000);
+
+      try {
+        // Build hints object from available inputs
+        const hints: { ra?: number; dec?: number; fov?: number; radius?: number } = {};
+        
+        if (hintCoords) {
+          hints.ra = hintCoords.ra;
+          hints.dec = hintCoords.dec;
+          // Calculate radius from FOV if available, otherwise use default
+          const fovValue = parseFloat(fovInput.value);
+          hints.radius = (!isNaN(fovValue) && fovValue > 0) ? fovValue * 1.5 : 10;
+        }
+        
+        // Add FOV if provided
+        const fovValue = parseFloat(fovInput.value);
+        if (!isNaN(fovValue) && fovValue > 0) {
+          hints.fov = fovValue;
+        }
+        
+        const result = await solveWithSolveField(file, Object.keys(hints).length > 0 ? hints : undefined, solveAbort.signal);
+
+        if (solveAbort.signal.aborted) return;
+        if (result.success && result.correspondences && result.correspondences.length >= 3) {
+          setAutoStatus(t('batch.statusSuccess'), 'success');
+          detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
+          expandMetaIfDSOsDetected();
+          applyAutoSolveResult(result.correspondences);
+          activeLocalSolveAbort = null;
+        } else {
+          if (result.code === 'SOLVE_CANCELED') {
+            setAutoStatus(t('batch.statusCanceled'), 'canceled');
+          } else {
+            setAutoStatus(result.error ?? t('batch.statusFailed'), 'failed', undefined, result.errorDetails, undefined, result.diagnostics);
+          }
+          enableAutoButtons();
+          activeLocalSolveAbort = null;
+        }
+      } catch (err: any) {
+        const canceled = err?.name === 'AbortError' || err?.code === 'SOLVE_CANCELED';
+        if (canceled) {
+          setAutoStatus(t('batch.statusCanceled'), 'canceled');
+        } else {
+          setAutoStatus(err.message, 'failed');
+        }
+        enableAutoButtons();
+        activeLocalSolveAbort = null;
+      } finally {
+        clearInterval(localTimer);
       }
     });
 
     // --- ASTAP button handler ---
     btnASTAP.addEventListener('click', async () => {
       disableAutoButtons();
-      setAutoStatus(t('modal.solvingASTAP'), 'solving');
+      const solveAbort = new AbortController();
+      activeLocalSolveAbort = solveAbort;
+      const startAt = Date.now();
+      let showSlowHint = false;
+
+      const cancelSolve = () => {
+        if (solveAbort.signal.aborted) return;
+        solveAbort.abort();
+        setAutoStatus(t('batch.statusCanceled'), 'canceled');
+        enableAutoButtons();
+      };
+
+      const updateStatus = () => {
+        const elapsed = Math.max(0, Math.round((Date.now() - startAt) / 1000));
+        if (elapsed >= 60) showSlowHint = true;
+        setAutoStatus(
+          t('batch.statusSolving', { seconds: String(elapsed) }),
+          'solving',
+          showSlowHint ? t('modal.slowSolveHint') : undefined,
+          undefined,
+          { show: true, onCancel: cancelSolve },
+        );
+      };
+
+      updateStatus();
+      const localTimer = setInterval(updateStatus, 1000);
 
       try {
-        const result = await solveWithASTAP(file);
+        // Build hints object from available inputs
+        const hints: { ra?: number; dec?: number; fov?: number; radius?: number } = {};
+        
+        if (hintCoords) {
+          hints.ra = hintCoords.ra;
+          hints.dec = hintCoords.dec;
+          hints.radius = 10;
+        }
+        
+        // Add FOV if provided
+        const fovValue = parseFloat(fovInput.value);
+        if (!isNaN(fovValue) && fovValue > 0) {
+          hints.fov = fovValue;
+        }
+        
+        const result = await solveWithASTAP(file, Object.keys(hints).length > 0 ? hints : undefined, solveAbort.signal);
 
+        if (solveAbort.signal.aborted) return;
         if (result.success && result.correspondences && result.correspondences.length >= 3) {
-          setAutoStatus(t('modal.astapSuccess'), 'success');
+          setAutoStatus(t('batch.statusSuccess'), 'success');
+          detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
+          expandMetaIfDSOsDetected();
           applyAutoSolveResult(result.correspondences);
+          activeLocalSolveAbort = null;
         } else {
-          setAutoStatus(result.error ?? t('modal.astapFailed'), 'failed');
+          if (result.code === 'SOLVE_CANCELED') {
+            setAutoStatus(t('batch.statusCanceled'), 'canceled');
+          } else {
+            setAutoStatus(result.error ?? t('batch.statusFailed'), 'failed', undefined, result.errorDetails, undefined, result.diagnostics);
+          }
           enableAutoButtons();
+          activeLocalSolveAbort = null;
         }
       } catch (err: any) {
-        setAutoStatus(err.message, 'failed');
+        const canceled = err?.name === 'AbortError' || err?.code === 'SOLVE_CANCELED';
+        if (canceled) {
+          setAutoStatus(t('batch.statusCanceled'), 'canceled');
+        } else {
+          setAutoStatus(err.message, 'failed');
+        }
         enableAutoButtons();
+        activeLocalSolveAbort = null;
+      } finally {
+        clearInterval(localTimer);
       }
     });
 
     submitBtn.addEventListener('click', async () => {
+      if (!validateIntegrationInputs()) return;
       submitBtn.disabled = true;
       submitBtn.textContent = t('modal.submitting');
       progressBar.style.display = 'block';
@@ -1073,12 +3288,19 @@ export class PhotoOverlay {
           ...(points.filter(p => isPointComplete(p)) as PhotoCorrespondence[]),
           ...extraAutoCorrespondences,
         ];
-        const photo = await uploadPhoto(file, correspondences, (fraction) => {
+        const photo = await uploadPhoto(file, correspondences, undefined, (fraction: number) => {
           progressFill.style.width = `${Math.round(fraction * 100)}%`;
+        }, {
+          dsoIds: pendingDsoIds,
+          labels: pendingLabels,
+          integrations: sanitizeIntegrationRows(pendingIntegrations),
+          observationDate: pendingObsDate || null,
+          notes: pendingNotes,
+          displayName: pendingOriginalName || stripExtension(file.name),
         });
         this.addPhotoToMap(photo);
-        this.onPhotosChanged?.();
-        backdrop.remove();
+        this.fireOnPhotosChanged();
+        closeModal();
       } catch (err: any) {
         showToast({ message: t('modal.uploadError', { message: err.message }), type: 'error', duration: 5000 });
         submitBtn.disabled = false;
@@ -1089,7 +3311,7 @@ export class PhotoOverlay {
   }
 
   /** Open manual placement mode: semi-transparent photo draggable on the map */
-  openManualPlacement(file: File) {
+  openManualPlacement(file: File, initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string }) {
     const view = this.getView();
 
     // Create preview img element
@@ -1146,8 +3368,8 @@ export class PhotoOverlay {
       <button class="manual-mirror-btn" data-axis="x">${t('manual.mirrorX')}</button>
       <button class="manual-mirror-btn" data-axis="y">${t('manual.mirrorY')}</button>
       <div class="manual-toolbar-buttons">
-        <button class="manual-validate-btn">${t('manual.validate')}</button>
-        <button class="manual-cancel-btn">${t('manual.cancel')}</button>
+        <button class="btn-confirm">${t('manual.validate')}</button>
+        <button class="btn-cancel">${t('manual.cancel')}</button>
       </div>
     `;
     document.body.appendChild(toolbar);
@@ -1155,8 +3377,8 @@ export class PhotoOverlay {
     const rotationRange = toolbar.querySelector('.manual-rotation-range') as HTMLInputElement;
     const rotationVal = toolbar.querySelector('.manual-rotation-val') as HTMLSpanElement;
     const zoomRange = toolbar.querySelector('.manual-zoom-range') as HTMLInputElement;
-    const validateBtn = toolbar.querySelector('.manual-validate-btn') as HTMLButtonElement;
-    const cancelBtn = toolbar.querySelector('.manual-cancel-btn') as HTMLButtonElement;
+    const validateBtn = toolbar.querySelector('.btn-confirm') as HTMLButtonElement;
+    const cancelBtn = toolbar.querySelector('.btn-cancel') as HTMLButtonElement;
 
     const redraw = (v: ViewState) => {
       if (!naturalWidth || !naturalHeight) return;
@@ -1261,19 +3483,407 @@ export class PhotoOverlay {
       validateBtn.textContent = t('manual.processing');
 
       try {
-        const correspondences = buildSyntheticCorrespondences(placement, naturalWidth, naturalHeight);
+        console.log('[Manual Validation] Placement:', placement);
+        console.log('[Manual Validation] Photo dimensions:', naturalWidth, 'x', naturalHeight);
+        
+        const correspondences = buildSyntheticCorrespondences(placement, naturalWidth, naturalHeight, this.getView());
         if (!correspondences) {
           showToast({ message: t('manual.noStarsFound'), type: 'error', duration: 5000 });
           validateBtn.disabled = false;
           validateBtn.textContent = t('manual.validate');
           return;
         }
-        const photo = await uploadPhoto(file, correspondences);
+        
+        console.log('[Manual Validation] Generated correspondences:', correspondences);
+        
+        // Compute DSOs from placement geometry if not already provided
+        let metaToUpload = initialMeta;
+        if (!metaToUpload) {
+          metaToUpload = { dsoIds: [], labels: [], integrations: [], observationDate: null, notes: '' };
+        }
+        if (metaToUpload.dsoIds.length === 0) {
+          const centerProj2 = project(placement.centerRa, placement.centerDec);
+          const rotRad2 = placement.rotationDeg * Math.PI / 180;
+          const mx2 = placement.mirrorX ? -1 : 1; const my2 = placement.mirrorY ? -1 : 1;
+          const cx2 = naturalWidth / 2; const cy2 = naturalHeight / 2;
+          const cosR2 = Math.cos(rotRad2) * placement.projPerPx;
+          const sinR2 = Math.sin(rotRad2) * placement.projPerPx;
+          const a2 = cosR2 * mx2; const b2 = sinR2 * mx2;
+          const c2 = -sinR2 * my2; const d2 = cosR2 * my2;
+          const aff = { a: a2, b: b2, c: c2, d: d2, e: centerProj2.x - a2 * cx2 - c2 * cy2, f: centerProj2.y - b2 * cx2 - d2 * cy2 };
+          metaToUpload = { ...metaToUpload, dsoIds: findDSOsInImage(aff, naturalWidth, naturalHeight).map(d => d.id) };
+        }
+        
+        // Compute the manual CSS matrix for comparison
+        const view = this.getView();
+        const centerProj = project(placement.centerRa, placement.centerDec);
+        const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
+        const pxPerPx = placement.projPerPx * view.scale;
+        const rotRad = placement.rotationDeg * Math.PI / 180;
+        const mx = placement.mirrorX ? -1 : 1;
+        const my = placement.mirrorY ? -1 : 1;
+        const cx = naturalWidth / 2;
+        const cy = naturalHeight / 2;
+        const cosR = Math.cos(rotRad) * pxPerPx;
+        const sinR = Math.sin(rotRad) * pxPerPx;
+        const manualMatrix = {
+          a: cosR * mx,
+          b: sinR * mx,
+          c: -sinR * my,
+          d: cosR * my,
+          e: centerCanvas.x - (cosR * mx) * cx - (-sinR * my) * cy,
+          f: centerCanvas.y - (sinR * mx) * cx - (cosR * my) * cy,
+        };
+        console.log('[Manual Validation] Manual CSS matrix:', manualMatrix, 'at view:', view);
+        (window as any).__manualMatrix = manualMatrix; // Store for comparison
+        
+        const photo = await uploadPhoto(file, correspondences, placement, undefined, { ...metaToUpload, observationDate: metaToUpload.observationDate ?? null, displayName: initialMeta?.originalName || stripExtension(file.name) });
         cleanup();
         this.addPhotoToMap(photo);
-        this.onPhotosChanged?.();
+        this.fireOnPhotosChanged();
       } catch (err: any) {
         showToast({ message: t('modal.uploadError', { message: err.message }), type: 'error', duration: 5000 });
+        validateBtn.disabled = false;
+        validateBtn.textContent = t('manual.validate');
+      }
+    });
+  }
+
+  /** Derive manual placement parameters from photo correspondences */
+  private derivePlacementFromCorrespondences(
+    photo: Photo,
+    view: ViewState,
+    naturalWidth: number,
+    naturalHeight: number
+  ): ManualPlacement {
+    // Default fallback
+    const defaultPlacement: ManualPlacement = {
+      centerRa: 0,
+      centerDec: 60,
+      rotationDeg: 0,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+
+    if (photo.correspondences.length < 3) {
+      return defaultPlacement;
+    }
+
+    try {
+      // Build correspondence arrays in projection space (view-independent)
+      const photoPoints: Point[] = [];
+      const projPoints: Point[] = [];
+
+      for (const corr of photo.correspondences.slice(0, 3)) {
+        const raDec = getCorrRaDec(corr);
+        if (!raDec) continue;
+        const proj = project(raDec.ra, raDec.dec);
+        photoPoints.push({ x: corr.photoX, y: corr.photoY });
+        projPoints.push(proj);
+      }
+
+      if (photoPoints.length < 3) {
+        return defaultPlacement;
+      }
+
+      // Compute affine transform: photo pixels → projection space
+      const matrix = computeAffineTransform(
+        photoPoints as [Point, Point, Point],
+        projPoints as [Point, Point, Point]
+      );
+
+      // Transform photo center to projection space
+      const cx = naturalWidth / 2;
+      const cy = naturalHeight / 2;
+      const centerProjX = matrix.a * cx + matrix.c * cy + matrix.e;
+      const centerProjY = matrix.b * cx + matrix.d * cy + matrix.f;
+
+      // Unproject to RA/Dec
+      const centerSky = unproject(centerProjX, centerProjY);
+
+      // Extract rotation from matrix (atan2 of first column vector)
+      // matrix maps [1,0] to [a,b], so rotation is atan2(b, a)
+      const rotationRad = Math.atan2(matrix.b, matrix.a);
+      const rotationDeg = (rotationRad * 180) / Math.PI;
+
+      // Extract scale: average magnitude of column vectors in projection space
+      const scaleX = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
+      const scaleY = Math.sqrt(matrix.c * matrix.c + matrix.d * matrix.d);
+      const projPerPx = (scaleX + scaleY) / 2;
+
+      return {
+        centerRa: centerSky.ra,
+        centerDec: centerSky.dec,
+        rotationDeg,
+        projPerPx,
+        mirrorX: false,
+        mirrorY: false,
+      };
+    } catch (err) {
+      reportUnknownRendererError('derive_placement_error', err);
+      return defaultPlacement;
+    }
+  }
+
+  /** Extract matrix coefficients from CSS transform string */
+  private extractMatrixFromTransform(transform: string): { a: number; b: number; c: number; d: number; e: number; f: number } | null {
+    if (!transform || transform === 'none') return null;
+    const match = transform.match(/matrix\(([^)]+)\)/);
+    if (!match) return null;
+    const values = match[1].split(',').map(v => parseFloat(v.trim()));
+    if (values.length !== 6) return null;
+    return { a: values[0], b: values[1], c: values[2], d: values[3], e: values[4], f: values[5] };
+  }
+
+  /** Derive ManualPlacement params from a CSS transform matrix */
+  private derivePlacementFromMatrix(
+    matrix: { a: number; b: number; c: number; d: number; e: number; f: number },
+    view: ViewState,
+    photoWidth: number,
+    photoHeight: number
+  ): ManualPlacement {
+    // The matrix maps photo pixel (px, py) to canvas pixel (cx, cy):
+    // cx = a*px + c*py + e
+    // cy = b*px + d*py + f
+
+    // Photo center in photo coordinates
+    const photoCenterX = photoWidth / 2;
+    const photoCenterY = photoHeight / 2;
+
+    // Transform photo center to canvas coords
+    const canvasCenterX = matrix.a * photoCenterX + matrix.c * photoCenterY + matrix.e;
+    const canvasCenterY = matrix.b * photoCenterX + matrix.d * photoCenterY + matrix.f;
+
+    // Convert canvas coords to projection space
+    const projCenter = fromCanvas(canvasCenterX, canvasCenterY, view);
+
+    // Unproject to RA/Dec
+    const centerSky = unproject(projCenter.x, projCenter.y);
+
+    // Extract rotation from matrix
+    // The matrix has the form: a=cos*scale, b=sin*scale, c=-sin*scale, d=cos*scale
+    // So rotation = atan2(b, a)
+    const rotationRad = Math.atan2(matrix.b, matrix.a);
+    const rotationDeg = (rotationRad * 180) / Math.PI;
+
+    // Extract scale: magnitude of first column vector gives pxPerPx (canvas pixels per photo pixel)
+    const pxPerPx = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
+    // Convert to projPerPx: pxPerPx / view.scale
+    const projPerPx = pxPerPx / view.scale;
+
+    // Detect mirrors by checking if determinant is negative
+    const det = matrix.a * matrix.d - matrix.b * matrix.c;
+    // For now, assume no mirrors (detecting mirrors from matrix is complex)
+    const mirrorX = false;
+    const mirrorY = det < 0;
+
+    return {
+      centerRa: centerSky.ra,
+      centerDec: centerSky.dec,
+      rotationDeg,
+      projPerPx,
+      mirrorX,
+      mirrorY,
+    };
+  }
+
+  /** Open repositioning mode for an existing photo */
+  startRepositioning(photoId: string) {
+    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    if (!placed) return;
+
+    const photo = placed.photo;
+    const imgEl = placed.imgEl;
+    const view = this.getView();
+
+    // Hide the original photo during repositioning
+    imgEl.style.display = 'none';
+
+    // Create a preview element  
+    const previewEl = document.createElement('img');
+    previewEl.className = 'photo-overlay-img manual-placement-img';
+    previewEl.style.opacity = '0.5';
+    previewEl.style.pointerEvents = 'auto';
+    previewEl.style.cursor = 'move';
+    previewEl.src = imgEl.src;
+    this.container.appendChild(previewEl);
+
+    const naturalWidth = imgEl.naturalWidth;
+    const naturalHeight = imgEl.naturalHeight;
+
+    // Initialize placement from photo's current state
+    let placement: ManualPlacement;
+    
+    if (photo.manualPlacement) {
+      // Use existing manual placement
+      placement = { ...photo.manualPlacement };
+    } else {
+     // Extract placement from the current CSS transform matrix
+      // This ensures the repositioned photo starts exactly where it currently is
+      const matrix = this.extractMatrixFromTransform(imgEl.style.transform);
+      if (matrix) {
+        placement = this.derivePlacementFromMatrix(matrix, view, naturalWidth, naturalHeight);
+        // Round rotation to nearest degree for cleaner UI
+        placement.rotationDeg = Math.round(placement.rotationDeg);
+      } else {
+        // Fallback: derive from correspondences (shouldn't normally happen)
+        placement = this.derivePlacementFromCorrespondences(photo, view, naturalWidth, naturalHeight);
+        placement.rotationDeg = Math.round(placement.rotationDeg);
+      }
+    }
+
+    // Toolbar
+    const toolbar = document.createElement('div');
+    toolbar.className = 'manual-toolbar';
+    toolbar.innerHTML = `
+      <span class="manual-toolbar-label">${t('manual.modeLabel')}</span>
+      <label class="manual-toolbar-item">
+        ${t('manual.rotation')}&nbsp;
+        <input type="range" min="-180" max="180" value="${placement.rotationDeg}" step="1" class="manual-rotation-range">
+        <span class="manual-rotation-val">${placement.rotationDeg}°</span>
+      </label>
+      <label class="manual-toolbar-item">
+        ${t('manual.photoZoom')}&nbsp;
+        <input type="range" min="-6" max="2" value="0" step="0.1" class="manual-zoom-range">
+      </label>
+      <button class="manual-mirror-btn ${placement.mirrorX ? 'active' : ''}" data-axis="x">${t('manual.mirrorX')}</button>
+      <button class="manual-mirror-btn ${placement.mirrorY ? 'active' : ''}" data-axis="y">${t('manual.mirrorY')}</button>
+      <div class="manual-toolbar-buttons">
+        <button class="btn-confirm">${t('manual.validate')}</button>
+        <button class="btn-cancel">${t('manual.cancel')}</button>
+      </div>
+    `;
+    document.body.appendChild(toolbar);
+
+    const rotationRange = toolbar.querySelector('.manual-rotation-range') as HTMLInputElement;
+    const rotationVal = toolbar.querySelector('.manual-rotation-val') as HTMLSpanElement;
+    const zoomRange = toolbar.querySelector('.manual-zoom-range') as HTMLInputElement;
+    const validateBtn = toolbar.querySelector('.btn-confirm') as HTMLButtonElement;
+    const cancelBtn = toolbar.querySelector('.btn-cancel') as HTMLButtonElement;
+
+    const redraw = (v: ViewState) => {
+      // Use natural dimensions (actual loaded image size) for consistency with extraction
+      applyManualTransform(previewEl, placement, v, naturalWidth, naturalHeight);
+    };
+
+    // Initial draw
+    redraw(view);
+
+    // Hook into view changes
+    if (this.skyMap) {
+      const origOnViewChange = (this.skyMap as any)['onViewChange'] as (() => void) | null;
+      this.skyMap.setOnViewChange(() => {
+        origOnViewChange?.();
+        redraw(this.getView());
+      });
+    }
+
+    // Drag on the image
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragStartRa = placement.centerRa;
+    let dragStartDec = placement.centerDec;
+
+    previewEl.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragStartRa = placement.centerRa;
+      dragStartDec = placement.centerDec;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const v = this.getView();
+      const dx = (e.clientX - dragStartX) / v.scale;
+      const dy = (e.clientY - dragStartY) / v.scale;
+      const startProj = project(dragStartRa, dragStartDec);
+      const newProj = { x: startProj.x + dx, y: startProj.y - dy };
+      const newSky = unproject(newProj.x, newProj.y);
+      placement.centerRa = newSky.ra;
+      placement.centerDec = newSky.dec;
+      redraw(v);
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // Scroll on image → zoom
+    previewEl.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      placement.projPerPx *= factor;
+      redraw(this.getView());
+    }, { passive: false });
+
+    // Rotation slider
+    rotationRange.addEventListener('input', () => {
+      placement.rotationDeg = parseFloat(rotationRange.value);
+      rotationVal.textContent = `${placement.rotationDeg}°`;
+      redraw(this.getView());
+    });
+
+    // Zoom slider (log scale)
+    const baseScale = placement.projPerPx / (1 / view.scale * 0.5);
+    const initialZoomValue = Math.log2(baseScale);
+    zoomRange.value = String(initialZoomValue);
+    zoomRange.addEventListener('input', () => {
+      const baseScale = 1 / this.getView().scale * 0.5;
+      placement.projPerPx = baseScale * Math.pow(2, parseFloat(zoomRange.value));
+      redraw(this.getView());
+    });
+
+    // Mirror buttons
+    const mirrorBtnX = toolbar.querySelector('.manual-mirror-btn[data-axis="x"]') as HTMLButtonElement;
+    const mirrorBtnY = toolbar.querySelector('.manual-mirror-btn[data-axis="y"]') as HTMLButtonElement;
+
+    mirrorBtnX.addEventListener('click', () => {
+      placement.mirrorX = !placement.mirrorX;
+      mirrorBtnX.classList.toggle('active', placement.mirrorX);
+      redraw(this.getView());
+    });
+
+    mirrorBtnY.addEventListener('click', () => {
+      placement.mirrorY = !placement.mirrorY;
+      mirrorBtnY.classList.toggle('active', placement.mirrorY);
+      redraw(this.getView());
+    });
+
+    const cleanup = () => {
+      previewEl.remove();
+      toolbar.remove();
+      imgEl.style.display = '';
+    };
+
+    // Cancel
+    cancelBtn.addEventListener('click', cleanup);
+
+    // Validate
+    validateBtn.addEventListener('click', async () => {
+      if (!naturalWidth || !naturalHeight) return;
+      validateBtn.disabled = true;
+      validateBtn.textContent = t('manual.processing');
+
+      try {
+        await updatePhotoManualPlacement(photoId, placement);
+        
+        // Update local photo object
+        photo.manualPlacement = placement;
+        
+        // Clean up preview
+        cleanup();
+        
+        // Reapply transform with new placement
+        this.applyTransform(placed, this.getView());
+        
+        showToast({ message: t('photos.repositioned', { name: photo.originalName }), type: 'info', duration: 3000 });
+      } catch (err: any) {
+        showToast({ message: t('errors.updatePhoto'), type: 'error', duration: 5000 });
         validateBtn.disabled = false;
         validateBtn.textContent = t('manual.validate');
       }
@@ -1323,78 +3933,71 @@ function applyManualTransform(
   imgEl.style.transform = `matrix(${a}, ${b}, ${c}, ${d}, ${e}, ${f})`;
 }
 
-/** Build 3 synthetic PhotoCorrespondence from manual placement by finding nearest stars to photo corners */
+/** Build 3 synthetic PhotoCorrespondence from manual placement by using the view state */
 function buildSyntheticCorrespondences(
   placement: ManualPlacement,
   natW: number,
   natH: number,
+  view: ViewState,
 ): PhotoCorrespondence[] | null {
-  // Three representative photo points (corners/center arrangement)
+  // Use 3 well-spaced points to capture the full transform including mirrors
   const photoPoints: [number, number][] = [
     [natW * 0.2, natH * 0.2],
     [natW * 0.8, natH * 0.2],
     [natW * 0.5, natH * 0.8],
   ];
 
+  // Build the same CSS matrix that applyManualTransform uses
   const centerProj = project(placement.centerRa, placement.centerDec);
-  const pxPerPx = placement.projPerPx;
+  const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
+  const pxPerPx = placement.projPerPx * view.scale;
   const rotRad = placement.rotationDeg * Math.PI / 180;
-  const cos = Math.cos(rotRad);
-  const sin = Math.sin(rotRad);
   const mx = placement.mirrorX ? -1 : 1;
   const my = placement.mirrorY ? -1 : 1;
   const cx = natW / 2;
   const cy = natH / 2;
 
-  const allStars = getStars().filter(s => s.mag <= 9);
+  const cosR = Math.cos(rotRad) * pxPerPx;
+  const sinR = Math.sin(rotRad) * pxPerPx;
+  const a = cosR * mx;
+  const b = sinR * mx;
+  const c = -sinR * my;
+  const d = cosR * my;
+  const e = centerCanvas.x - a * cx - c * cy;
+  const f = centerCanvas.y - b * cx - d * cy;
 
   const correspondences: PhotoCorrespondence[] = [];
 
-  for (let idx = 0; idx < 3; idx++) {
+  for (let idx = 0; idx < photoPoints.length; idx++) {
     const [px, py] = photoPoints[idx];
-    // Map photo pixel → projection coords (apply mirror then rotation)
-    const dpx = (px - cx) * mx;
-    const dpy = (py - cy) * my;
-    const projX = centerProj.x + (cos * dpx - sin * dpy) * pxPerPx;
-    const projY = centerProj.y - (sin * dpx + cos * dpy) * pxPerPx;
-    const sky = unproject(projX, projY);
+    
+    // Apply the CSS matrix to get canvas coordinates (same as applyManualTransform)
+    const canvasX = a * px + c * py + e;
+    const canvasY = b * px + d * py + f;
+    
+    // Convert canvas → projection → celestial
+    const proj = fromCanvas(canvasX, canvasY, view);
+    const sky = unproject(proj.x, proj.y);
 
-    // Find nearest star
-    let nearest: typeof allStars[0] | null = null;
-    let minDist = Infinity;
-    const toRad = Math.PI / 180;
-    for (const star of allStars) {
-      const d1 = sky.dec * toRad;
-      const d2 = star.dec * toRad;
-      const dra = (star.ra - sky.ra) * toRad;
-      const cos2 = Math.sin(d1) * Math.sin(d2) + Math.cos(d1) * Math.cos(d2) * Math.cos(dra);
-      const dist = Math.acos(Math.max(-1, Math.min(1, cos2)));
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = star;
-      }
-    }
+    console.log(`[buildSyntheticCorrespondences] Sample ${idx}: photo(${px.toFixed(1)}, ${py.toFixed(1)}) → canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → proj(${proj.x.toFixed(4)}, ${proj.y.toFixed(4)}) → sky(${sky.ra.toFixed(3)}, ${sky.dec.toFixed(3)})`);
+    
+    // Verify round-trip: celestial back to canvas should give same result
+    const verifyProj = project(sky.ra, sky.dec);
+    const verifyCanvas = toCanvas(verifyProj.x, verifyProj.y, view);
+    console.log(`[buildSyntheticCorrespondences] Round-trip check: canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → celestial → canvas(${verifyCanvas.x.toFixed(1)}, ${verifyCanvas.y.toFixed(1)}) - diff: (${(verifyCanvas.x - canvasX).toFixed(3)}, ${(verifyCanvas.y - canvasY).toFixed(3)})`);
 
-    if (!nearest) return null;
-
-    // Back-project the star position to photo pixel coords
-    const starProj = project(nearest.ra, nearest.dec);
-    const dsprojX = starProj.x - centerProj.x;
-    const dsprojY = starProj.y - centerProj.y;
-    // Inverse rotation then inverse mirror
-    const dphotoX = (cos * dsprojX - sin * dsprojY) / pxPerPx * mx;
-    const dphotoY = -(sin * dsprojX + cos * dsprojY) / pxPerPx * my;
-    const starPhotoX = cx + dphotoX;
-    const starPhotoY = cy + dphotoY;
-
+    // Use exact celestial coordinates to preserve the manual transform
     correspondences.push({
       pointIndex: idx,
-      photoX: starPhotoX,
-      photoY: starPhotoY,
-      starHip: nearest.hip,
-      starName: nearest.name || nearest.desig || `HIP ${nearest.hip}`,
+      photoX: px,
+      photoY: py,
+      starHip: 0,
+      starRa: sky.ra,
+      starDec: sky.dec,
+      starName: `Manual point ${idx + 1}`,
     });
   }
 
+  console.log('[buildSyntheticCorrespondences] Final correspondences:', correspondences);
   return correspondences;
 }

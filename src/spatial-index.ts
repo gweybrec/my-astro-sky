@@ -65,4 +65,35 @@ export class SpatialIndex<T> {
 
     return best;
   }
+
+  /**
+   * Find all items within `radius` of (qx, qy), sorted by distance ascending.
+   */
+  findAll(qx: number, qy: number, radius: number): T[] {
+    const minCx = this.cellCoord(qx - radius);
+    const maxCx = this.cellCoord(qx + radius);
+    const minCy = this.cellCoord(qy - radius);
+    const maxCy = this.cellCoord(qy + radius);
+
+    const r2 = radius * radius;
+    const results: { item: T; dist2: number }[] = [];
+
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const bucket = this.cells.get(this.key(cx, cy));
+        if (!bucket) continue;
+        for (const entry of bucket) {
+          const dx = entry.x - qx;
+          const dy = entry.y - qy;
+          const d2 = dx * dx + dy * dy;
+          if (d2 <= r2) {
+            results.push({ item: entry.item, dist2: d2 });
+          }
+        }
+      }
+    }
+
+    results.sort((a, b) => a.dist2 - b.dist2);
+    return results.map(r => r.item);
+  }
 }

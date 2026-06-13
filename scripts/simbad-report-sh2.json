@@ -1,0 +1,1938 @@
+[
+  {
+    "id": "SH2-274",
+    "simbadId": "Sh2-274",
+    "simbadMainId": "PN A66   21",
+    "ourCoords": [
+      112.261,
+      13.247
+    ],
+    "simbadCoords": [
+      112.26129027258001,
+      13.24682987644
+    ],
+    "ourNameEn": "Medusa Nebula",
+    "flags": [
+      "catalog_id_missing: we list \"Abell 21\" as an alias, but SIMBAD does not associate it with PN A66   21",
+      "catalog_id_missing: we list \"PK 205+14.1\" as an alias, but SIMBAD does not associate it with PN A66   21"
+    ]
+  },
+  {
+    "id": "SH2-1",
+    "simbadId": "Sh2-1",
+    "simbadMainId": "LBN  1093",
+    "ourCoords": [
+      245.94,
+      -19.55
+    ],
+    "simbadCoords": [
+      239.7,
+      -26.116666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (245.940, -19.550) vs SIMBAD (239.700, -26.117) — sep=8.73°"
+    ]
+  },
+  {
+    "id": "SH2-2",
+    "simbadId": "Sh2-2",
+    "simbadMainId": "SH  2-2",
+    "ourCoords": [
+      249.2,
+      -24.57
+    ],
+    "simbadCoords": [
+      256.025,
+      -38.13333333333333
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (249.200, -24.570) vs SIMBAD (256.025, -38.133) — sep=14.75°"
+    ]
+  },
+  {
+    "id": "SH2-7",
+    "simbadId": "Sh2-7",
+    "simbadMainId": "LBN  1099",
+    "ourCoords": [
+      253.4,
+      -34.4
+    ],
+    "simbadCoords": [
+      240.15000000000003,
+      -22.933333333333334
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (253.400, -34.400) vs SIMBAD (240.150, -22.933) — sep=16.30°"
+    ]
+  },
+  {
+    "id": "SH2-16",
+    "simbadId": "Sh2-16",
+    "simbadMainId": "LBN  1124",
+    "ourCoords": [
+      264.73,
+      -29.76
+    ],
+    "simbadCoords": [
+      266.655,
+      -29.385277777777777
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (264.730, -29.760) vs SIMBAD (266.655, -29.385) — sep=1.72°"
+    ]
+  },
+  {
+    "id": "SH2-25",
+    "simbadId": "Sh2-25",
+    "simbadMainId": "M   8",
+    "ourCoords": [
+      267.59,
+      -28.52
+    ],
+    "simbadCoords": [
+      270.90416666666664,
+      -24.386666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (267.590, -28.520) vs SIMBAD (270.904, -24.387) — sep=5.09°"
+    ]
+  },
+  {
+    "id": "SH2-27",
+    "simbadId": "Sh2-27",
+    "simbadMainId": "LBN 006.00+24.73",
+    "ourCoords": [
+      271.4,
+      -13.24
+    ],
+    "simbadCoords": [
+      248.98666666666665,
+      -12.718055555555555
+    ],
+    "ourNameEn": "Zeta Ophiuchi Nebula",
+    "flags": [
+      "coord_drift: our (271.400, -13.240) vs SIMBAD (248.987, -12.718) — sep=21.84°",
+      "name_mismatch: core name \"zeta ophiuchi nebula\" (from nameEn=\"Zeta Ophiuchi Nebula\") not found in SIMBAD ids for LBN 006.00+24.73"
+    ]
+  },
+  {
+    "id": "SH2-29",
+    "simbadId": "Sh2-29",
+    "simbadMainId": "LBN    29",
+    "ourCoords": [
+      269.81,
+      -19.2
+    ],
+    "simbadCoords": [
+      272.65000000000003,
+      -23.983333333333334
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (269.810, -19.200) vs SIMBAD (272.650, -23.983) — sep=5.46°"
+    ]
+  },
+  {
+    "id": "SH2-30",
+    "simbadId": "Sh2-30",
+    "simbadMainId": "SH  2-30",
+    "ourCoords": [
+      270.86,
+      -17.81
+    ],
+    "simbadCoords": [
+      270.875,
+      -23.01666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (270.860, -17.810) vs SIMBAD (270.875, -23.017) — sep=5.21°"
+    ]
+  },
+  {
+    "id": "SH2-37",
+    "simbadId": "Sh2-37",
+    "simbadMainId": "NGC  6590",
+    "ourCoords": [
+      276.38,
+      -1.73
+    ],
+    "simbadCoords": [
+      274.275,
+      -19.865000000000002
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (276.380, -1.730) vs SIMBAD (274.275, -19.865) — sep=18.25°"
+    ]
+  },
+  {
+    "id": "SH2-45",
+    "simbadId": "Sh2-45",
+    "simbadMainId": "SH  2-45",
+    "ourCoords": [
+      279.96,
+      3.14
+    ],
+    "simbadCoords": [
+      275.08833333333325,
+      -16.22694444444444
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (279.960, 3.140) vs SIMBAD (275.088, -16.227) — sep=19.96°"
+    ]
+  },
+  {
+    "id": "SH2-46",
+    "simbadId": "Sh2-46",
+    "simbadMainId": "LBN 015.14+03.38",
+    "ourCoords": [
+      281.48,
+      3.56
+    ],
+    "simbadCoords": [
+      271.525,
+      -14.149999999999999
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (281.480, 3.560) vs SIMBAD (271.525, -14.150) — sep=20.28°"
+    ]
+  },
+  {
+    "id": "SH2-47",
+    "simbadId": "Sh2-47",
+    "simbadMainId": "SH  2-47",
+    "ourCoords": [
+      281.84,
+      4.12
+    ],
+    "simbadCoords": [
+      274.39161600099305,
+      -15.638994244488282
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (281.840, 4.120) vs SIMBAD (274.392, -15.639) — sep=21.09°",
+      "catalog_id_missing: we list \"LBN59\" as an alias, but SIMBAD does not associate it with SH  2-47"
+    ]
+  },
+  {
+    "id": "SH2-48",
+    "simbadId": "Sh2-48",
+    "simbadMainId": "LBN 016.68-00.47",
+    "ourCoords": [
+      282.42,
+      0.48
+    ],
+    "simbadCoords": [
+      275.59021119549215,
+      -14.534597546543946
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (282.420, 0.480) vs SIMBAD (275.590, -14.535) — sep=16.47°"
+    ]
+  },
+  {
+    "id": "SH2-49",
+    "simbadId": "Sh2-49",
+    "simbadMainId": "SH  2-49",
+    "ourCoords": [
+      282.34,
+      -3.34
+    ],
+    "simbadCoords": [
+      274.75,
+      -13.866666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (282.340, -3.340) vs SIMBAD (274.750, -13.867) — sep=12.92°"
+    ]
+  },
+  {
+    "id": "SH2-54",
+    "simbadId": "Sh2-54",
+    "simbadMainId": "LBN 018.45+01.87",
+    "ourCoords": [
+      278.96,
+      -12.62
+    ],
+    "simbadCoords": [
+      274.4686514044545,
+      -11.682771604945053
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (278.960, -12.620) vs SIMBAD (274.469, -11.683) — sep=4.49°"
+    ]
+  },
+  {
+    "id": "SH2-55",
+    "simbadId": "Sh2-55",
+    "simbadMainId": "LBN    73",
+    "ourCoords": [
+      282.09,
+      -12.48
+    ],
+    "simbadCoords": [
+      278.05,
+      -11.766666666666666
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (282.090, -12.480) vs SIMBAD (278.050, -11.767) — sep=4.01°"
+    ]
+  },
+  {
+    "id": "SH2-57",
+    "simbadId": "Sh2-57",
+    "simbadMainId": "LBN 022.90+00.63",
+    "ourCoords": [
+      282.97,
+      -12.57
+    ],
+    "simbadCoords": [
+      277.625,
+      -8.616666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (282.970, -12.570) vs SIMBAD (277.625, -8.617) — sep=6.57°"
+    ]
+  },
+  {
+    "id": "SH2-61",
+    "simbadId": "Sh2-61",
+    "simbadMainId": "EM* AS  310",
+    "ourCoords": [
+      285.09,
+      2.51
+    ],
+    "simbadCoords": [
+      278.33830848512,
+      -4.96832682161
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (285.090, 2.510) vs SIMBAD (278.338, -4.968) — sep=10.07°"
+    ]
+  },
+  {
+    "id": "SH2-63",
+    "simbadId": "Sh2-63",
+    "simbadMainId": "LBN 027.11-21.06",
+    "ourCoords": [
+      285.23,
+      -4.09
+    ],
+    "simbadCoords": [
+      299.425,
+      -14.116666666666665
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (285.230, -4.090) vs SIMBAD (299.425, -14.117) — sep=17.22°"
+    ]
+  },
+  {
+    "id": "SH2-68",
+    "simbadId": "Sh2-68",
+    "simbadMainId": "SH  2-68",
+    "ourCoords": [
+      286.22,
+      -2.58
+    ],
+    "simbadCoords": [
+      276.24345600621,
+      0.86000590252
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (286.220, -2.580) vs SIMBAD (276.243, 0.860) — sep=10.55°"
+    ]
+  },
+  {
+    "id": "SH2-78",
+    "simbadId": "Sh2-78",
+    "simbadMainId": "SH  2-78",
+    "ourCoords": [
+      285.792,
+      14.116
+    ],
+    "simbadCoords": [
+      285.7919821557,
+      14.116326549410001
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "catalog_id_missing: we list \"CTSS 3\" as an alias, but SIMBAD does not associate it with SH  2-78"
+    ]
+  },
+  {
+    "id": "SH2-86",
+    "simbadId": "Sh2-86",
+    "simbadMainId": "LBN 059.38-00.15",
+    "ourCoords": [
+      295.8,
+      23.25
+    ],
+    "simbadCoords": [
+      295.79999999999995,
+      23.25
+    ],
+    "ourNameEn": "NGC 6820 Nebula",
+    "flags": [
+      "name_mismatch: core name \"ngc 6820 nebula\" (from nameEn=\"NGC 6820 Nebula\") not found in SIMBAD ids for LBN 059.38-00.15"
+    ]
+  },
+  {
+    "id": "SH2-101",
+    "simbadId": "Sh2-101",
+    "simbadMainId": "LBN 071.58+02.86",
+    "ourCoords": [
+      299.979,
+      35.277
+    ],
+    "simbadCoords": [
+      299.9791666666667,
+      35.276666666666664
+    ],
+    "ourNameEn": "Tulip Nebula",
+    "flags": [
+      "name_mismatch: core name \"tulip nebula\" (from nameEn=\"Tulip Nebula\") not found in SIMBAD ids for LBN 071.58+02.86"
+    ]
+  },
+  {
+    "id": "SH2-106",
+    "simbadId": "Sh2-106",
+    "simbadMainId": "SH  2-106",
+    "ourCoords": [
+      306.862,
+      37.38
+    ],
+    "simbadCoords": [
+      306.8618342465726,
+      37.38024558325933
+    ],
+    "ourNameEn": "SH2-106 Nebula",
+    "flags": [
+      "name_mismatch: core name \"sh2-106 nebula\" (from nameEn=\"SH2-106 Nebula\") not found in SIMBAD ids for SH  2-106"
+    ]
+  },
+  {
+    "id": "SH2-108",
+    "simbadId": "Sh2-108",
+    "simbadMainId": "LBN 077.61+01.59",
+    "ourCoords": [
+      305.163,
+      39.631
+    ],
+    "simbadCoords": [
+      305.16354845180024,
+      39.631087556962505
+    ],
+    "ourNameEn": "Crescent Nebula",
+    "flags": [
+      "name_mismatch: core name \"crescent nebula\" (from nameEn=\"Crescent Nebula\") not found in SIMBAD ids for LBN 077.61+01.59"
+    ]
+  },
+  {
+    "id": "SH2-125",
+    "simbadId": "Sh2-125",
+    "simbadMainId": "SH  2-125",
+    "ourCoords": [
+      328.372,
+      47.257
+    ],
+    "simbadCoords": [
+      328.37229,
+      47.256899999999995
+    ],
+    "ourNameEn": "Cocoon Nebula IC 5146",
+    "flags": [
+      "name_mismatch: core name \"cocoon nebula\" (from nameEn=\"Cocoon Nebula IC 5146\") not found in SIMBAD ids for SH  2-125"
+    ]
+  },
+  {
+    "id": "SH2-131",
+    "simbadId": "Sh2-131",
+    "simbadMainId": "SH  2-131",
+    "ourCoords": [
+      324.278,
+      57.515
+    ],
+    "simbadCoords": [
+      324.2778397124964,
+      57.51474006132243
+    ],
+    "ourNameEn": "IC 1396 Nebula",
+    "flags": [
+      "name_mismatch: core name \"ic 1396 nebula\" (from nameEn=\"IC 1396 Nebula\") not found in SIMBAD ids for SH  2-131"
+    ]
+  },
+  {
+    "id": "SH2-142",
+    "simbadId": "Sh2-142",
+    "simbadMainId": "SH  2-142",
+    "ourCoords": [
+      341.883,
+      58.048
+    ],
+    "simbadCoords": [
+      341.8833333333334,
+      58.04833333333333
+    ],
+    "ourNameEn": "Spider Nebula",
+    "flags": [
+      "name_mismatch: core name \"spider nebula\" (from nameEn=\"Spider Nebula\") not found in SIMBAD ids for SH  2-142"
+    ]
+  },
+  {
+    "id": "SH2-155",
+    "simbadId": "Sh2-155",
+    "simbadMainId": "LBN 110.11+02.44",
+    "ourCoords": [
+      344.275,
+      62.636
+    ],
+    "simbadCoords": [
+      344.2746161828758,
+      62.63591585690456
+    ],
+    "ourNameEn": "Cave Nebula",
+    "flags": [
+      "name_mismatch: core name \"cave nebula\" (from nameEn=\"Cave Nebula\") not found in SIMBAD ids for LBN 110.11+02.44"
+    ]
+  },
+  {
+    "id": "SH2-158",
+    "simbadId": "Sh2-158",
+    "simbadMainId": "NGC  7538",
+    "ourCoords": [
+      348.405,
+      61.5
+    ],
+    "simbadCoords": [
+      348.405,
+      61.5
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "catalog_id_missing: we list \"LBN543\" as an alias, but SIMBAD does not associate it with NGC  7538"
+    ]
+  },
+  {
+    "id": "SH2-161",
+    "simbadId": "Sh2-161",
+    "simbadMainId": "SH  2-161",
+    "ourCoords": [
+      348.872,
+      61.862
+    ],
+    "simbadCoords": [
+      348.8720833333333,
+      61.86194444444445
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "catalog_id_missing: we list \"LBN547\" as an alias, but SIMBAD does not associate it with SH  2-161"
+    ]
+  },
+  {
+    "id": "SH2-171",
+    "simbadId": "Sh2-171",
+    "simbadMainId": "NGC  7822",
+    "ourCoords": [
+      353.68,
+      66.56
+    ],
+    "simbadCoords": [
+      0.28575,
+      67.4213888888889
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (353.680, 66.560) vs SIMBAD (0.286, 67.421) — sep=2.72°"
+    ]
+  },
+  {
+    "id": "SH2-174",
+    "simbadId": "Sh2-174",
+    "simbadMainId": "LBN 120.29+18.39",
+    "ourCoords": [
+      12,
+      74.25
+    ],
+    "simbadCoords": [
+      356.25944999999996,
+      80.94989444444444
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (12.000, 74.250) vs SIMBAD (356.259, 80.950) — sep=7.44°"
+    ]
+  },
+  {
+    "id": "SH2-175",
+    "simbadId": "Sh2-175",
+    "simbadMainId": "SH  2-175",
+    "ourCoords": [
+      14.78,
+      62.36
+    ],
+    "simbadCoords": [
+      6.821208333333333,
+      64.70647222222223
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (14.780, 62.360) vs SIMBAD (6.821, 64.706) — sep=4.25°"
+    ]
+  },
+  {
+    "id": "SH2-176",
+    "simbadId": "Sh2-176",
+    "simbadMainId": "SH  2-176",
+    "ourCoords": [
+      20.25,
+      62.04
+    ],
+    "simbadCoords": [
+      7.952499999999998,
+      57.382880555555545
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (20.250, 62.040) vs SIMBAD (7.952, 57.383) — sep=7.74°"
+    ]
+  },
+  {
+    "id": "SH2-177",
+    "simbadId": "Sh2-177",
+    "simbadMainId": "SH  2-177",
+    "ourCoords": [
+      18.5,
+      61.4
+    ],
+    "simbadCoords": [
+      7.8749999999999964,
+      62.46666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (18.500, 61.400) vs SIMBAD (7.875, 62.467) — sep=5.11°"
+    ]
+  },
+  {
+    "id": "SH2-182",
+    "simbadId": "Sh2-182",
+    "simbadMainId": "SH  2-182",
+    "ourCoords": [
+      21.56,
+      66.31
+    ],
+    "simbadCoords": [
+      12.575000000000001,
+      64.73333333333333
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (21.560, 66.310) vs SIMBAD (12.575, 64.733) — sep=4.04°"
+    ]
+  },
+  {
+    "id": "SH2-183",
+    "simbadId": "Sh2-183",
+    "simbadMainId": "SH  2-183",
+    "ourCoords": [
+      21.07,
+      68.08
+    ],
+    "simbadCoords": [
+      13.720314604351195,
+      65.89860132645988
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (21.070, 68.080) vs SIMBAD (13.720, 65.899) — sep=3.60°"
+    ]
+  },
+  {
+    "id": "SH2-185",
+    "simbadId": "Sh2-185",
+    "simbadMainId": "LBN   623",
+    "ourCoords": [
+      14.49,
+      60.78
+    ],
+    "simbadCoords": [
+      14.999999999999996,
+      60.983333333333334
+    ],
+    "ourNameEn": "IC 59/63 Nebula",
+    "flags": [
+      "name_mismatch: core name \"ic 59/63 nebula\" (from nameEn=\"IC 59/63 Nebula\") not found in SIMBAD ids for LBN   623"
+    ]
+  },
+  {
+    "id": "SH2-188",
+    "simbadId": "Sh2-188",
+    "simbadMainId": "SH  2-188",
+    "ourCoords": [
+      22.81,
+      58.85
+    ],
+    "simbadCoords": [
+      22.638241073129997,
+      58.41397930163
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "catalog_id_missing: we list \"Simeis 22\" as an alias, but SIMBAD does not associate it with SH  2-188"
+    ]
+  },
+  {
+    "id": "SH2-190",
+    "simbadId": "Sh2-190",
+    "simbadMainId": "IC 1805",
+    "ourCoords": [
+      23.98,
+      61.87
+    ],
+    "simbadCoords": [
+      38.21,
+      61.47111111111111
+    ],
+    "ourNameEn": "Starfish Nebula",
+    "flags": [
+      "coord_drift: our (23.980, 61.870) vs SIMBAD (38.210, 61.471) — sep=6.75°",
+      "name_mismatch: core name \"starfish nebula\" (from nameEn=\"Starfish Nebula\") not found in SIMBAD ids for IC 1805"
+    ]
+  },
+  {
+    "id": "SH2-198",
+    "simbadId": "Sh2-198",
+    "simbadMainId": "SH  2-198",
+    "ourCoords": [
+      27.61,
+      60.54
+    ],
+    "simbadCoords": [
+      42.50833333333334,
+      59.7
+    ],
+    "ourNameEn": "Heart Nebula IC 1805",
+    "flags": [
+      "coord_drift: our (27.610, 60.540) vs SIMBAD (42.508, 59.700) — sep=7.45°",
+      "name_mismatch: core name \"heart nebula\" (from nameEn=\"Heart Nebula IC 1805\") not found in SIMBAD ids for SH  2-198"
+    ]
+  },
+  {
+    "id": "SH2-199",
+    "simbadId": "Sh2-199",
+    "simbadMainId": "IC 1848",
+    "ourCoords": [
+      34.36,
+      60.58
+    ],
+    "simbadCoords": [
+      42.855000000000004,
+      60.418888888888894
+    ],
+    "ourNameEn": "Soul Nebula IC 1848",
+    "flags": [
+      "coord_drift: our (34.360, 60.580) vs SIMBAD (42.855, 60.419) — sep=4.18°",
+      "name_mismatch: core name \"soul nebula\" (from nameEn=\"Soul Nebula IC 1848\") not found in SIMBAD ids for IC 1848"
+    ]
+  },
+  {
+    "id": "SH2-200",
+    "simbadId": "Sh2-200",
+    "simbadMainId": "PN HDW    2",
+    "ourCoords": [
+      30.46,
+      63.33
+    ],
+    "simbadCoords": [
+      47.74525,
+      62.79858333333333
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (30.460, 63.330) vs SIMBAD (47.745, 62.799) — sep=7.82°",
+      "catalog_id_missing: we list \"HDW 2\" as an alias, but SIMBAD does not associate it with PN HDW    2"
+    ]
+  },
+  {
+    "id": "SH2-201",
+    "simbadId": "Sh2-201",
+    "simbadMainId": "SH  2-201",
+    "ourCoords": [
+      34.59,
+      63.88
+    ],
+    "simbadCoords": [
+      45.82445830237124,
+      60.46455018253654
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (34.590, 63.880) vs SIMBAD (45.824, 60.465) — sep=6.25°"
+    ]
+  },
+  {
+    "id": "SH2-204",
+    "simbadId": "Sh2-204",
+    "simbadMainId": "LBN 145.80+02.83",
+    "ourCoords": [
+      45.21,
+      57.64
+    ],
+    "simbadCoords": [
+      58.925,
+      57.43333333333333
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (45.210, 57.640) vs SIMBAD (58.925, 57.433) — sep=7.35°"
+    ]
+  },
+  {
+    "id": "SH2-205",
+    "simbadId": "Sh2-205",
+    "simbadMainId": "SH  2-205",
+    "ourCoords": [
+      48.57,
+      57.17
+    ],
+    "simbadCoords": [
+      58.05833333333334,
+      53.416666666666664
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (48.570, 57.170) vs SIMBAD (58.058, 53.417) — sep=6.57°"
+    ]
+  },
+  {
+    "id": "SH2-206",
+    "simbadId": "Sh2-206",
+    "simbadMainId": "NGC  1491",
+    "ourCoords": [
+      48.53,
+      49.98
+    ],
+    "simbadCoords": [
+      60.816250000000004,
+      51.315
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (48.530, 49.980) vs SIMBAD (60.816, 51.315) — sep=7.89°"
+    ]
+  },
+  {
+    "id": "SH2-207",
+    "simbadId": "Sh2-207",
+    "simbadMainId": "LBN 151.25+02.12",
+    "ourCoords": [
+      52.79,
+      52.59
+    ],
+    "simbadCoords": [
+      64.92088,
+      53.14204
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (52.790, 52.590) vs SIMBAD (64.921, 53.142) — sep=7.34°"
+    ]
+  },
+  {
+    "id": "SH2-208",
+    "simbadId": "Sh2-208",
+    "simbadMainId": "Cl Waterloo    1",
+    "ourCoords": [
+      53.04,
+      52.8
+    ],
+    "simbadCoords": [
+      64.68208333333334,
+      52.863055555555555
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (53.040, 52.800) vs SIMBAD (64.682, 52.863) — sep=7.03°"
+    ]
+  },
+  {
+    "id": "SH2-209",
+    "simbadId": "Sh2-209",
+    "simbadMainId": "SH  2-209",
+    "ourCoords": [
+      50.98,
+      58.15
+    ],
+    "simbadCoords": [
+      62.77791666666667,
+      51.16222222222222
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (50.980, 58.150) vs SIMBAD (62.778, 51.162) — sep=9.74°"
+    ]
+  },
+  {
+    "id": "SH2-210",
+    "simbadId": "Sh2-210",
+    "simbadMainId": "LBN 152.67+02.84",
+    "ourCoords": [
+      53.72,
+      58.92
+    ],
+    "simbadCoords": [
+      67.78333333333333,
+      52.49
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (53.720, 58.920) vs SIMBAD (67.783, 52.490) — sep=10.17°"
+    ]
+  },
+  {
+    "id": "SH2-211",
+    "simbadId": "Sh2-211",
+    "simbadMainId": "LBN 154.69+02.43",
+    "ourCoords": [
+      54.12,
+      60.11
+    ],
+    "simbadCoords": [
+      69.2375,
+      50.876666666666665
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (54.120, 60.110) vs SIMBAD (69.237, 50.877) — sep=12.54°"
+    ]
+  },
+  {
+    "id": "SH2-212",
+    "simbadId": "Sh2-212",
+    "simbadMainId": "SH  2-212",
+    "ourCoords": [
+      73.86,
+      47.8
+    ],
+    "simbadCoords": [
+      70.15216666666667,
+      50.46230555555556
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (73.860, 47.800) vs SIMBAD (70.152, 50.462) — sep=3.60°"
+    ]
+  },
+  {
+    "id": "SH2-220",
+    "simbadId": "Sh2-220",
+    "simbadMainId": "NGC  1499",
+    "ourCoords": [
+      76.16,
+      46.16
+    ],
+    "simbadCoords": [
+      60.824999999999996,
+      36.42166666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (76.160, 46.160) vs SIMBAD (60.825, 36.422) — sep=15.04°"
+    ]
+  },
+  {
+    "id": "SH2-221",
+    "simbadId": "Sh2-221",
+    "simbadMainId": "LBN 160.09+01.93",
+    "ourCoords": [
+      77,
+      47.4
+    ],
+    "simbadCoords": [
+      75.425,
+      46.333333333333336
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (77.000, 47.400) vs SIMBAD (75.425, 46.333) — sep=1.52°"
+    ]
+  },
+  {
+    "id": "SH2-224",
+    "simbadId": "Sh2-224",
+    "simbadMainId": "LBN 166.16+04.52",
+    "ourCoords": [
+      78.57,
+      37.25
+    ],
+    "simbadCoords": [
+      81.825,
+      42.96666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (78.570, 37.250) vs SIMBAD (81.825, 42.967) — sep=6.23°"
+    ]
+  },
+  {
+    "id": "SH2-228",
+    "simbadId": "Sh2-228",
+    "simbadMainId": "LBN   784",
+    "ourCoords": [
+      83.82,
+      32.9
+    ],
+    "simbadCoords": [
+      78.35625,
+      37.45027777777778
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (83.820, 32.900) vs SIMBAD (78.356, 37.450) — sep=6.37°"
+    ]
+  },
+  {
+    "id": "SH2-230",
+    "simbadId": "Sh2-230",
+    "simbadMainId": "SH  2-230",
+    "ourCoords": [
+      87.93,
+      34.56
+    ],
+    "simbadCoords": [
+      80.625,
+      34.13333333333333
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (87.930, 34.560) vs SIMBAD (80.625, 34.133) — sep=6.05°"
+    ]
+  },
+  {
+    "id": "SH2-231",
+    "simbadId": "Sh2-231",
+    "simbadMainId": "SH  2-231",
+    "ourCoords": [
+      88.37,
+      36.48
+    ],
+    "simbadCoords": [
+      84.805,
+      35.763333333333335
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (88.370, 36.480) vs SIMBAD (84.805, 35.763) — sep=2.97°"
+    ]
+  },
+  {
+    "id": "SH2-232",
+    "simbadId": "Sh2-232",
+    "simbadMainId": "SH  2-232",
+    "ourCoords": [
+      88.53,
+      37.52
+    ],
+    "simbadCoords": [
+      85.61799698336515,
+      36.18986994856576
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (88.530, 37.520) vs SIMBAD (85.618, 36.190) — sep=2.68°"
+    ]
+  },
+  {
+    "id": "SH2-233",
+    "simbadId": "Sh2-233",
+    "simbadMainId": "SH  2-233",
+    "ourCoords": [
+      88.75,
+      37.75
+    ],
+    "simbadCoords": [
+      84.63124999999998,
+      35.85527777777778
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (88.750, 37.750) vs SIMBAD (84.631, 35.855) — sep=3.80°"
+    ]
+  },
+  {
+    "id": "SH2-234",
+    "simbadId": "Sh2-234",
+    "simbadMainId": "IC  417",
+    "ourCoords": [
+      90.82,
+      44.74
+    ],
+    "simbadCoords": [
+      82.0125,
+      34.41166666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (90.820, 44.740) vs SIMBAD (82.013, 34.412) — sep=12.34°"
+    ]
+  },
+  {
+    "id": "SH2-235",
+    "simbadId": "Sh2-235",
+    "simbadMainId": "SH  2-235",
+    "ourCoords": [
+      91.41,
+      35.85
+    ],
+    "simbadCoords": [
+      85.2751816671535,
+      35.839799344896036
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (91.410, 35.850) vs SIMBAD (85.275, 35.840) — sep=4.97°"
+    ]
+  },
+  {
+    "id": "SH2-236",
+    "simbadId": "Sh2-236",
+    "simbadMainId": "SH  2-236",
+    "ourCoords": [
+      91.02,
+      39.16
+    ],
+    "simbadCoords": [
+      80.64999999999999,
+      33.36666666666666
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (91.020, 39.160) vs SIMBAD (80.650, 33.367) — sep=10.16°"
+    ]
+  },
+  {
+    "id": "SH2-237",
+    "simbadId": "Sh2-237",
+    "simbadMainId": "NGC  1931",
+    "ourCoords": [
+      92.75,
+      29.52
+    ],
+    "simbadCoords": [
+      82.845,
+      34.233
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (92.750, 29.520) vs SIMBAD (82.845, 34.233) — sep=9.63°"
+    ]
+  },
+  {
+    "id": "SH2-238",
+    "simbadId": "Sh2-238",
+    "simbadMainId": "NGC  1555",
+    "ourCoords": [
+      93.26,
+      33.64
+    ],
+    "simbadCoords": [
+      65.487826,
+      19.535162000000003
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (93.260, 33.640) vs SIMBAD (65.488, 19.535) — sep=28.42°"
+    ]
+  },
+  {
+    "id": "SH2-239",
+    "simbadId": "Sh2-239",
+    "simbadMainId": "LBN 178.87-20.16",
+    "ourCoords": [
+      92.68,
+      30.78
+    ],
+    "simbadCoords": [
+      67.825,
+      18.100000000000005
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (92.680, 30.780) vs SIMBAD (67.825, 18.100) — sep=25.85°"
+    ]
+  },
+  {
+    "id": "SH2-240",
+    "simbadId": "Sh2-240",
+    "simbadMainId": "LBN 180.05-01.66",
+    "ourCoords": [
+      85.275,
+      28.083
+    ],
+    "simbadCoords": [
+      85.275,
+      28.083333333333332
+    ],
+    "ourNameEn": "Spaghetti Nebula",
+    "flags": [
+      "name_mismatch: core name \"spaghetti nebula\" (from nameEn=\"Spaghetti Nebula\") not found in SIMBAD ids for LBN 180.05-01.66",
+      "catalog_id_missing: we list \"Simeis 147\" as an alias, but SIMBAD does not associate it with LBN 180.05-01.66"
+    ]
+  },
+  {
+    "id": "SH2-241",
+    "simbadId": "Sh2-241",
+    "simbadMainId": "SH  2-241",
+    "ourCoords": [
+      93.36,
+      37.55
+    ],
+    "simbadCoords": [
+      91.025,
+      30.25
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (93.360, 37.550) vs SIMBAD (91.025, 30.250) — sep=7.55°"
+    ]
+  },
+  {
+    "id": "SH2-242",
+    "simbadId": "Sh2-242",
+    "simbadMainId": "SH  2-242",
+    "ourCoords": [
+      95.45,
+      38.57
+    ],
+    "simbadCoords": [
+      87.97833333333332,
+      27.03222222222222
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (95.450, 38.570) vs SIMBAD (87.978, 27.032) — sep=13.12°"
+    ]
+  },
+  {
+    "id": "SH2-243",
+    "simbadId": "Sh2-243",
+    "simbadMainId": "LBN 183.99-04.16",
+    "ourCoords": [
+      95.49,
+      38.37
+    ],
+    "simbadCoords": [
+      84.825,
+      23.283333333333335
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (95.490, 38.370) vs SIMBAD (84.825, 23.283) — sep=17.62°"
+    ]
+  },
+  {
+    "id": "SH2-245",
+    "simbadId": "Sh2-245",
+    "simbadMainId": "LBN 187.35-34.86",
+    "ourCoords": [
+      100.55,
+      13.36
+    ],
+    "simbadCoords": [
+      60.3355560969738,
+      3.2247266156671976
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (100.550, 13.360) vs SIMBAD (60.336, 3.225) — sep=40.99°"
+    ]
+  },
+  {
+    "id": "SH2-247",
+    "simbadId": "Sh2-247",
+    "simbadMainId": "LBN 189.02+00.91",
+    "ourCoords": [
+      96.55,
+      9.93
+    ],
+    "simbadCoords": [
+      92.09583333333335,
+      21.58833333333333
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (96.550, 9.930) vs SIMBAD (92.096, 21.588) — sep=12.42°"
+    ]
+  },
+  {
+    "id": "SH2-249",
+    "simbadId": "Sh2-249",
+    "simbadMainId": "LBN 188.69+04.25",
+    "ourCoords": [
+      97.11,
+      22.73
+    ],
+    "simbadCoords": [
+      95.63333333333333,
+      22.974999999999998
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (97.110, 22.730) vs SIMBAD (95.633, 22.975) — sep=1.38°"
+    ]
+  },
+  {
+    "id": "SH2-252",
+    "simbadId": "Sh2-252",
+    "simbadMainId": "NGC  2175",
+    "ourCoords": [
+      98.53,
+      24.72
+    ],
+    "simbadCoords": [
+      92.41250000000001,
+      20.486666666666668
+    ],
+    "ourNameEn": "Monkey Head Nebula",
+    "flags": [
+      "coord_drift: our (98.530, 24.720) vs SIMBAD (92.413, 20.487) — sep=7.06°",
+      "name_mismatch: core name \"monkey head nebula\" (from nameEn=\"Monkey Head Nebula\") not found in SIMBAD ids for NGC  2175"
+    ]
+  },
+  {
+    "id": "SH2-254",
+    "simbadId": "Sh2-254",
+    "simbadMainId": "LBN 192.48-00.21",
+    "ourCoords": [
+      98.9,
+      17.74
+    ],
+    "simbadCoords": [
+      92.99583333333334,
+      18.055
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (98.900, 17.740) vs SIMBAD (92.996, 18.055) — sep=5.63°"
+    ]
+  },
+  {
+    "id": "SH2-255",
+    "simbadId": "Sh2-255",
+    "simbadMainId": "IC 2162",
+    "ourCoords": [
+      99.07,
+      18
+    ],
+    "simbadCoords": [
+      93.26708333333333,
+      17.978888888888886
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (99.070, 18.000) vs SIMBAD (93.267, 17.979) — sep=5.52°"
+    ]
+  },
+  {
+    "id": "SH2-256",
+    "simbadId": "Sh2-256",
+    "simbadMainId": "SH  2-256",
+    "ourCoords": [
+      99.3,
+      17.92
+    ],
+    "simbadCoords": [
+      93.15,
+      17.948333333333334
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (99.300, 17.920) vs SIMBAD (93.150, 17.948) — sep=5.85°"
+    ]
+  },
+  {
+    "id": "SH2-257",
+    "simbadId": "Sh2-257",
+    "simbadMainId": "SH  2-257",
+    "ourCoords": [
+      99.47,
+      18.15
+    ],
+    "simbadCoords": [
+      93.18156,
+      17.992539999999995
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (99.470, 18.150) vs SIMBAD (93.182, 17.993) — sep=5.98°"
+    ]
+  },
+  {
+    "id": "SH2-258",
+    "simbadId": "Sh2-258",
+    "simbadMainId": "SH  2-258",
+    "ourCoords": [
+      100.27,
+      20.6
+    ],
+    "simbadCoords": [
+      93.36666666666667,
+      17.925
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (100.270, 20.600) vs SIMBAD (93.367, 17.925) — sep=7.04°"
+    ]
+  },
+  {
+    "id": "SH2-261",
+    "simbadId": "Sh2-261",
+    "simbadMainId": "NAME Lower's Nebula",
+    "ourCoords": [
+      103.52,
+      9.71
+    ],
+    "simbadCoords": [
+      92.18333333333334,
+      15.674999999999999
+    ],
+    "ourNameEn": "Octopus Nebula",
+    "flags": [
+      "coord_drift: our (103.520, 9.710) vs SIMBAD (92.183, 15.675) — sep=12.56°",
+      "name_mismatch: core name \"octopus nebula\" (from nameEn=\"Octopus Nebula\") not found in SIMBAD ids for NAME Lower's Nebula"
+    ]
+  },
+  {
+    "id": "SH2-263",
+    "simbadId": "Sh2-263",
+    "simbadMainId": "LBN   867",
+    "ourCoords": [
+      85.71,
+      7
+    ],
+    "simbadCoords": [
+      80.43625,
+      8.399166666666666
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (85.710, 7.000) vs SIMBAD (80.436, 8.399) — sep=5.41°"
+    ]
+  },
+  {
+    "id": "SH2-264",
+    "simbadId": "Sh2-264",
+    "simbadMainId": "NAME lam Ori Molecular Ring",
+    "ourCoords": [
+      85.26,
+      1.02
+    ],
+    "simbadCoords": [
+      83.82499999999999,
+      9.933333333333332
+    ],
+    "ourNameEn": "Lambda Orionis Nebula",
+    "flags": [
+      "coord_drift: our (85.260, 1.020) vs SIMBAD (83.825, 9.933) — sep=9.03°",
+      "name_mismatch: core name \"lambda orionis nebula\" (from nameEn=\"Lambda Orionis Nebula\") not found in SIMBAD ids for NAME lam Ori Molecular Ring"
+    ]
+  },
+  {
+    "id": "SH2-273",
+    "simbadId": "Sh2-273",
+    "simbadMainId": "NGC  2264",
+    "ourCoords": [
+      100,
+      22.5
+    ],
+    "simbadCoords": [
+      100.21708333333333,
+      9.876944444444444
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (100.000, 22.500) vs SIMBAD (100.217, 9.877) — sep=12.62°"
+    ]
+  },
+  {
+    "id": "SH2-275",
+    "simbadId": "Sh2-275",
+    "simbadMainId": "NAME Rosette Nebula",
+    "ourCoords": [
+      98.33,
+      8.79
+    ],
+    "simbadCoords": [
+      98.11149999999999,
+      4.7936388888888875
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (98.330, 8.790) vs SIMBAD (98.111, 4.794) — sep=4.00°"
+    ]
+  },
+  {
+    "id": "SH2-276",
+    "simbadId": "Sh2-276",
+    "simbadMainId": "NAME Barnard's Loop",
+    "ourCoords": [
+      83.78,
+      -5.42
+    ],
+    "simbadCoords": [
+      81.87500000000001,
+      -3.9666666666666677
+    ],
+    "ourNameEn": "Extended Great Orion Nebula",
+    "flags": [
+      "coord_drift: our (83.780, -5.420) vs SIMBAD (81.875, -3.967) — sep=2.39°",
+      "name_mismatch: core name \"extended great orion nebula\" (from nameEn=\"Extended Great Orion Nebula\") not found in SIMBAD ids for NAME Barnard's Loop"
+    ]
+  },
+  {
+    "id": "SH2-277",
+    "simbadId": "Sh2-277",
+    "simbadMainId": "SH  2-277",
+    "ourCoords": [
+      81.76,
+      -5.98
+    ],
+    "simbadCoords": [
+      85.59250000000002,
+      -1.9230555555555555
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (81.760, -5.980) vs SIMBAD (85.593, -1.923) — sep=5.57°"
+    ]
+  },
+  {
+    "id": "SH2-278",
+    "simbadId": "Sh2-278",
+    "simbadMainId": "LBN 207.29-22.66",
+    "ourCoords": [
+      80.89,
+      4.07
+    ],
+    "simbadCoords": [
+      79.975,
+      -5.65
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (80.890, 4.070) vs SIMBAD (79.975, -5.650) — sep=9.76°"
+    ]
+  },
+  {
+    "id": "SH2-279",
+    "simbadId": "Sh2-279",
+    "simbadMainId": "SH  2-279",
+    "ourCoords": [
+      83.73,
+      -5.42
+    ],
+    "simbadCoords": [
+      83.81734523575561,
+      -4.78518207074744
+    ],
+    "ourNameEn": "Running Man Nebula",
+    "flags": [
+      "name_mismatch: core name \"running man nebula\" (from nameEn=\"Running Man Nebula\") not found in SIMBAD ids for SH  2-279"
+    ]
+  },
+  {
+    "id": "SH2-286",
+    "simbadId": "Sh2-286",
+    "simbadMainId": "SH  2-286",
+    "ourCoords": [
+      111.18,
+      1.3
+    ],
+    "simbadCoords": [
+      103.62500000000001,
+      -4.516666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (111.180, 1.300) vs SIMBAD (103.625, -4.517) — sep=9.53°"
+    ]
+  },
+  {
+    "id": "SH2-289",
+    "simbadId": "Sh2-289",
+    "simbadMainId": "LBN  1014",
+    "ourCoords": [
+      112.09,
+      1.6
+    ],
+    "simbadCoords": [
+      101.47500000000001,
+      -7.300000000000001
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (112.090, 1.600) vs SIMBAD (101.475, -7.300) — sep=13.83°"
+    ]
+  },
+  {
+    "id": "SH2-290",
+    "simbadId": "Sh2-290",
+    "simbadMainId": "PN A66   31",
+    "ourCoords": [
+      115.94,
+      19.35
+    ],
+    "simbadCoords": [
+      133.55485047748,
+      8.8980392975
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (115.940, 19.350) vs SIMBAD (133.555, 8.898) — sep=20.00°"
+    ]
+  },
+  {
+    "id": "SH2-292",
+    "simbadId": "Sh2-292",
+    "simbadMainId": "IC 2177",
+    "ourCoords": [
+      111.42,
+      1.48
+    ],
+    "simbadCoords": [
+      106.10416666666667,
+      -10.455
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (111.420, 1.480) vs SIMBAD (106.104, -10.455) — sep=13.05°"
+    ]
+  },
+  {
+    "id": "SH2-294",
+    "simbadId": "Sh2-294",
+    "simbadMainId": "LBN  1032",
+    "ourCoords": [
+      113.56,
+      -18.5
+    ],
+    "simbadCoords": [
+      109.14770320136259,
+      -9.42848379149853
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (113.560, -18.500) vs SIMBAD (109.148, -9.428) — sep=10.03°"
+    ]
+  },
+  {
+    "id": "SH2-295",
+    "simbadId": "Sh2-295",
+    "simbadMainId": "LBN  1035",
+    "ourCoords": [
+      116.07,
+      -12.01
+    ],
+    "simbadCoords": [
+      105.6625,
+      -11.456666666666665
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (116.070, -12.010) vs SIMBAD (105.662, -11.457) — sep=10.20°"
+    ]
+  },
+  {
+    "id": "SH2-296",
+    "simbadId": "Sh2-296",
+    "simbadMainId": "LBN  1033",
+    "ourCoords": [
+      108.5,
+      -12
+    ],
+    "simbadCoords": [
+      106.47500000000001,
+      -11.216666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (108.500, -12.000) vs SIMBAD (106.475, -11.217) — sep=2.13°"
+    ]
+  },
+  {
+    "id": "SH2-297",
+    "simbadId": "Sh2-297",
+    "simbadMainId": "LBN  1039",
+    "ourCoords": [
+      116.36,
+      -11.32
+    ],
+    "simbadCoords": [
+      106.30416666666666,
+      -12.316666666666666
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (116.360, -11.320) vs SIMBAD (106.304, -12.317) — sep=9.89°"
+    ]
+  },
+  {
+    "id": "SH2-298",
+    "simbadId": "Sh2-298",
+    "simbadMainId": "NGC  2359",
+    "ourCoords": [
+      118.15,
+      -17.33
+    ],
+    "simbadCoords": [
+      109.625,
+      -13.226666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (118.150, -17.330) vs SIMBAD (109.625, -13.227) — sep=9.19°"
+    ]
+  },
+  {
+    "id": "SH2-299",
+    "simbadId": "Sh2-299",
+    "simbadMainId": "SH  2-299",
+    "ourCoords": [
+      118.71,
+      -13.87
+    ],
+    "simbadCoords": [
+      112.64958333333334,
+      -15.299722222222222
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (118.710, -13.870) vs SIMBAD (112.650, -15.300) — sep=6.04°"
+    ]
+  },
+  {
+    "id": "SH2-300",
+    "simbadId": "Sh2-300",
+    "simbadMainId": "SH  2-300",
+    "ourCoords": [
+      123.16,
+      -32.71
+    ],
+    "simbadCoords": [
+      112.78666666666666,
+      -15.414444444444445
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (123.160, -32.710) vs SIMBAD (112.787, -15.414) — sep=19.69°"
+    ]
+  },
+  {
+    "id": "SH2-301",
+    "simbadId": "Sh2-301",
+    "simbadMainId": "SH  2-301",
+    "ourCoords": [
+      121.75,
+      -20.68
+    ],
+    "simbadCoords": [
+      107.47625000000002,
+      -18.49805555555556
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (121.750, -20.680) vs SIMBAD (107.476, -18.498) — sep=13.62°"
+    ]
+  },
+  {
+    "id": "SH2-302",
+    "simbadId": "Sh2-302",
+    "simbadMainId": "LBN  1046",
+    "ourCoords": [
+      122.87,
+      -23.35
+    ],
+    "simbadCoords": [
+      112.88333333333333,
+      -16.98611111111111
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (122.870, -23.350) vs SIMBAD (112.883, -16.986) — sep=11.32°"
+    ]
+  },
+  {
+    "id": "SH2-303",
+    "simbadId": "Sh2-303",
+    "simbadMainId": "LBN  1047",
+    "ourCoords": [
+      122.69,
+      -24.68
+    ],
+    "simbadCoords": [
+      103.58083333333333,
+      -22.430833333333336
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (122.690, -24.680) vs SIMBAD (103.581, -22.431) — sep=17.65°"
+    ]
+  },
+  {
+    "id": "SH2-304",
+    "simbadId": "Sh2-304",
+    "simbadMainId": "LBN  1049",
+    "ourCoords": [
+      124.21,
+      -27.54
+    ],
+    "simbadCoords": [
+      100.87500000000003,
+      -24.11666666666667
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (124.210, -27.540) vs SIMBAD (100.875, -24.117) — sep=21.25°"
+    ]
+  },
+  {
+    "id": "SH2-305",
+    "simbadId": "Sh2-305",
+    "simbadMainId": "SH  2-305",
+    "ourCoords": [
+      126.65,
+      -34.58
+    ],
+    "simbadCoords": [
+      112.51708333333333,
+      -18.536944444444448
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (126.650, -34.580) vs SIMBAD (112.517, -18.537) — sep=20.38°"
+    ]
+  },
+  {
+    "id": "SH2-306",
+    "simbadId": "Sh2-306",
+    "simbadMainId": "LBN  1050",
+    "ourCoords": [
+      129.12,
+      -34.67
+    ],
+    "simbadCoords": [
+      112.75999999999999,
+      -19.154722222222222
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (129.120, -34.670) vs SIMBAD (112.760, -19.155) — sep=21.23°"
+    ]
+  },
+  {
+    "id": "SH2-307",
+    "simbadId": "Sh2-307",
+    "simbadMainId": "SH  2-307",
+    "ourCoords": [
+      139.34,
+      -34.87
+    ],
+    "simbadCoords": [
+      113.88712302842906,
+      -18.759177001403152
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (139.340, -34.870) vs SIMBAD (113.887, -18.759) — sep=27.71°"
+    ]
+  },
+  {
+    "id": "SH2-308",
+    "simbadId": "Sh2-308",
+    "simbadMainId": "HD  50896",
+    "ourCoords": [
+      98.49,
+      -14.37
+    ],
+    "simbadCoords": [
+      103.55434983683,
+      -23.928339811070003
+    ],
+    "ourNameEn": "Zeta Puppis Starfish Nebula",
+    "flags": [
+      "coord_drift: our (98.490, -14.370) vs SIMBAD (103.554, -23.928) — sep=10.69°",
+      "name_mismatch: core name \"zeta puppis starfish nebula\" (from nameEn=\"Zeta Puppis Starfish Nebula\") not found in SIMBAD ids for HD  50896"
+    ]
+  },
+  {
+    "id": "SH2-311",
+    "simbadId": "Sh2-311",
+    "simbadMainId": "NGC  2467",
+    "ourCoords": [
+      123.96,
+      -26.68
+    ],
+    "simbadCoords": [
+      118.077,
+      -26.428
+    ],
+    "ourNameEn": "NGC 2467 Nebula",
+    "flags": [
+      "coord_drift: our (123.960, -26.680) vs SIMBAD (118.077, -26.428) — sep=5.27°",
+      "name_mismatch: core name \"ngc 2467 nebula\" (from nameEn=\"NGC 2467 Nebula\") not found in SIMBAD ids for NGC  2467"
+    ]
+  },
+  {
+    "id": "SH2-312",
+    "simbadId": "Sh2-312",
+    "simbadMainId": "LBN  1077",
+    "ourCoords": [
+      131.72,
+      -32.38
+    ],
+    "simbadCoords": [
+      134.79999999999998,
+      -25.68333333333333
+    ],
+    "ourNameEn": null,
+    "flags": [
+      "coord_drift: our (131.720, -32.380) vs SIMBAD (134.800, -25.683) — sep=7.22°"
+    ]
+  },
+  {
+    "id": "SH2-108",
+    "type": "name_wrong_object",
+    "note": "\"Crescent Nebula\" resolves in SIMBAD to HD 192163, but our catalog assigns this name to SH2-108 — possible wrong assignment",
+    "simbadMainId": "HD 192163"
+  },
+  {
+    "id": "SH2-155",
+    "type": "name_wrong_object",
+    "note": "\"Cave Nebula\" resolves in SIMBAD to NAME Cave Nebula, but our catalog assigns this name to SH2-155 — possible wrong assignment",
+    "simbadMainId": "NAME Cave Nebula"
+  },
+  {
+    "id": "SH2-252",
+    "type": "name_wrong_object",
+    "note": "\"Monkey Head Nebula\" resolves in SIMBAD to NGC  2174, but our catalog assigns this name to SH2-252 — possible wrong assignment",
+    "simbadMainId": "NGC  2174"
+  }
+]

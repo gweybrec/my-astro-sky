@@ -1,0 +1,98 @@
+Reading input file 1 of 1: "astro-photos/M1_CCD_siril.fit"...
+Found an existing WCS header, will try to verify it.
+Extracting sources...
+simplexy: found 1449 sources.
+Solving...
+Reading file "/tmp/tmp.hJ5RilSlj4/M1_CCD_siril.axy"...
+Verifying WCS using indices with quads of size [1.21772, 16.9415] arcmin
+Got 0 solutions.
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-11.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-10.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-09.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-08.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-07.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-11.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-10.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-09.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-08.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-07.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 21-30).
+  log-odds ratio 14.3328 (1.67744e+06), 3 match, 0 conflict, 6 distractors, 21 index.
+  RA,Dec = (133.107,-32.2153), pixel scale 11.6995 arcsec/pix.
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-11.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-10.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-09.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-08.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-07.littleendian.fits, field objects 21-30).
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-11.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-10.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-09.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-08.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-07.littleendian.fits, field objects 31-40).
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-11.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-10.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-09.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-08.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-07.littleendian.fits, field objects 41-50).
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 51-60).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 51-60).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 51-60).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 51-60).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 51-60).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 51-60).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 51-60).
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 51-60).
+  log-odds ratio 20.048 (5.09008e+08), 3 match, 0 conflict, 0 distractors, 37 index.
+  RA,Dec = (129.491,44.7256), pixel scale 12.2426 arcsec/pix.
+  log-odds ratio 21.1693 (1.56204e+09), 3 match, 0 conflict, 0 distractors, 24 index.
+  RA,Dec = (18.9093,2.68733), pixel scale 9.4383 arcsec/pix.
+  Hit/miss:   Hit/miss: +++(best)-------------------------------------------------------------------------------------------------
+Field 1: solved with index index-tycho2-11.littleendian.fits.
+Field 1 solved: writing to file /tmp/tmp.hJ5RilSlj4/M1_CCD_siril.solved to indicate this.
+Field: astro-photos/M1_CCD_siril.fit
+Field center: (RA,Dec) = (18.912258, 2.685770) deg.
+Field center: (RA H:M:S, Dec D:M:S) = (01:15:38.942, +02:41:08.771).
+Field size: 2.76539 x 1.9661 degrees
+Field rotation angle: up is -81.2204 degrees E of N
+Field parity: pos
+Creating new FITS file "/tmp/tmp.hJ5RilSlj4/M1_CCD_siril.new"...
+

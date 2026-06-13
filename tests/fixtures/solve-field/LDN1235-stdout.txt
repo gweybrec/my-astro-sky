@@ -1,0 +1,64 @@
+Reading input file 1 of 1: "astro-photos/LDN1235.fit"...
+Found an existing WCS header, will try to verify it.
+Extracting sources...
+This looks like a multi-color image: processing the first image plane only.  (NAXIS=3)
+simplexy: found 23424 sources.
+Solving...
+Reading file "/tmp/tmp.HNIqbBrHZw/LDN1235.axy"...
+Verifying WCS using indices with quads of size [12.8841, 229.121] arcmin
+Verifying WCS with index 7 of 13 (/usr/share/astrometry/index-tycho2-13.littleendian.fits)
+Verifying WCS of field 1.
+ --> log-odds 0
+Verifying WCS with index 8 of 13 (/usr/share/astrometry/index-tycho2-12.littleendian.fits)
+Verifying WCS of field 1.
+ --> log-odds 0
+Verifying WCS with index 9 of 13 (/usr/share/astrometry/index-tycho2-11.littleendian.fits)
+Verifying WCS of field 1.
+ --> log-odds 0
+Verifying WCS with index 10 of 13 (/usr/share/astrometry/index-tycho2-10.littleendian.fits)
+Verifying WCS of field 1.
+ --> log-odds 0
+Verifying WCS with index 11 of 13 (/usr/share/astrometry/index-tycho2-09.littleendian.fits)
+Verifying WCS of field 1.
+ --> log-odds 0
+Verifying WCS with index 12 of 13 (/usr/share/astrometry/index-tycho2-08.littleendian.fits)
+Verifying WCS of field 1.
+ --> log-odds 0
+Verifying WCS with index 13 of 13 (/usr/share/astrometry/index-tycho2-07.littleendian.fits)
+Verifying WCS of field 1.
+ --> log-odds 0
+Got 0 solutions.
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-11.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-10.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-09.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-08.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-07.littleendian.fits, field objects 1-10).
+Field 1 did not solve (index index-tycho2-19.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-18.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-17.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-16.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-15.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-14.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-13.littleendian.fits, field objects 11-20).
+Field 1 did not solve (index index-tycho2-12.littleendian.fits, field objects 11-20).
+  log-odds ratio 266.163 (3.91671e+115), 33 match, 0 conflict, 97 distractors, 36 index.
+  RA,Dec = (333.738,73.4116), pixel scale 2.38457 arcsec/pix.
+  Hit/miss:   Hit/miss: --++-++++--++--+++-++-+-+++++-+---+--+-+--+--+------+-----+-+---+-----------+----+--+---------------
+Field 1: solved with index index-tycho2-11.littleendian.fits.
+Field 1 solved: writing to file /tmp/tmp.HNIqbBrHZw/LDN1235.solved to indicate this.
+Field: astro-photos/LDN1235.fit
+Field center: (RA,Dec) = (333.741859, 73.412155) deg.
+Field center: (RA H:M:S, Dec D:M:S) = (22:14:58.046, +73:24:43.757).
+Field size: 3.81666 x 2.1458 degrees
+Field rotation angle: up is -3.66653 degrees E of N
+Field parity: pos
+Creating new FITS file "/tmp/tmp.HNIqbBrHZw/LDN1235.new"...
+

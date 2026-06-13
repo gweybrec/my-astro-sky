@@ -1,0 +1,76 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem! 🙏
+        Please fill in what you can — even a partial report helps a lot. Don't worry if you're not sure about something.
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: You'll find it in the **About** section of the app (usually in the menu or settings). If you can't find it, just leave it blank.
+      placeholder: "e.g. 0.1.0"
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system
+      description: Which system are you using?
+      placeholder: "e.g. Windows 11, macOS Sonoma"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      description: List the steps that led to the problem, so we can reproduce it on our side.
+      placeholder: |
+        1. I opened the app
+        2. I clicked on …
+        3. Then …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      description: Describe what you thought the app would do.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead?
+      description: Describe what actually happened. If an error message appeared on screen, copy it here (or add a screenshot below).
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log file (optional, but very helpful)
+      description: |
+        The app keeps a log file that often tells us exactly what went wrong.
+        To find it: open **Settings** in the app, then click **Open logs folder**. Your computer's file viewer will open the folder containing the log files.
+        You can drag and drop the most recent log file straight into this issue, or open it and paste its contents here.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: |
+        Screenshots are extremely helpful — feel free to drag and drop images here.
+        You can also tell us about the photo you were working with, the equipment you used, or anything else that might help us understand the problem.
+    validations:
+      required: false

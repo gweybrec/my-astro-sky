@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <g transform="matrix(-1,0,0,1,36,0)">
+    <path d="M 18 4 A 8 8 0 0 1 22 18.9" stroke-linecap="butt"/>
+    <path d="M 22.9,14.7 L 22,18.9 L 26.2,18.4"/>
+  </g>
+  <text x="18" y="33" text-anchor="middle" font-size="9" fill="currentColor" stroke="none" font-family="system-ui,sans-serif">-15°</text>
+</svg>

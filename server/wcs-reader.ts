@@ -15,6 +15,16 @@ export interface WCSData {
   CD2_2: number;
   NAXIS1: number;
   NAXIS2: number;
+  // Optional observation metadata from FITS headers
+  dateObs?: string;  // DATE-OBS, normalised to UTC ISO 8601 (Z suffix)
+  expTime?: number;  // EXPTIME in seconds
+  stackCnt?: number; // STACKCNT, number of stacked frames
+}
+
+/** Append 'Z' to a FITS DATE-OBS value that has no timezone designator. */
+export function normalizeDateObs(raw: string): string {
+  if (/Z|[+-]\d\d:?\d\d$/.test(raw)) return raw;
+  return raw + 'Z';
 }
 
 interface CatalogStar {
@@ -33,6 +43,8 @@ interface Correspondence {
   photoY: number;
   starHip: number;
   starName: string;
+  starRa?: number;
+  starDec?: number;
 }
 
 // Server-side star catalog (loaded lazily)
@@ -47,11 +59,37 @@ function normalizeRA(ra: number): number {
 export function loadServerCatalog(): CatalogStar[] {
   if (serverStars) return serverStars;
 
-  const starsPath = path.join(__dirname, '..', 'public', 'data', 'stars.8.json');
-  const namesPath = path.join(__dirname, '..', 'public', 'data', 'starnames.json');
+  // Check environment variable first, then try common catalog files in order of preference
+  const publicDataDir = process.env.PUBLIC_DATA_DIR || path.join(__dirname, '..', 'public', 'data');
+  const catalogPaths = [
+    process.env.STAR_CATALOG_PATH,
+    path.join(publicDataDir, 'stars.14.json'),
+    path.join(publicDataDir, 'stars.8.json'),
+  ].filter(Boolean) as string[];
+
+  let starsPath: string | null = null;
+  let usedPath = '';
+  
+  for (const p of catalogPaths) {
+    if (fs.existsSync(p)) {
+      starsPath = p;
+      usedPath = p;
+      break;
+    }
+  }
+
+  if (!starsPath) {
+    console.error('[Catalog] No star catalog found. Tried:', catalogPaths);
+    console.error('[Catalog] Run: bash scripts/download-catalog.sh 14');
+    throw new Error('Star catalog not found');
+  }
+
+  const namesPath = path.join(process.env.PUBLIC_DATA_DIR || path.join(__dirname, '..', 'public', 'data'), 'starnames.json');
 
   const starsData = JSON.parse(fs.readFileSync(starsPath, 'utf-8'));
-  const namesData = JSON.parse(fs.readFileSync(namesPath, 'utf-8'));
+  const namesData = fs.existsSync(namesPath) 
+    ? JSON.parse(fs.readFileSync(namesPath, 'utf-8'))
+    : {};
 
   serverStars = [];
   for (const f of starsData.features) {
@@ -70,6 +108,11 @@ export function loadServerCatalog(): CatalogStar[] {
   }
 
   serverStars.sort((a, b) => a.mag - b.mag);
+  
+  const catalogName = path.basename(usedPath);
+  const maxMag = Math.max(...serverStars.map(s => s.mag));
+  console.log(`[Catalog] Loaded ${serverStars.length} stars from ${catalogName} (mag ≤ ${maxMag.toFixed(1)})`);
+  
   return serverStars;
 }
 
@@ -77,15 +120,28 @@ export function loadServerCatalog(): CatalogStar[] {
 
 export function parseFITSHeader(headerStr: string): Record<string, number | string | boolean> {
   const result: Record<string, number | string | boolean> = {};
-  // FITS headers are 80-character records
-  for (let i = 0; i < headerStr.length; i += 80) {
-    const record = headerStr.substring(i, i + 80);
+  
+  // Handle both formats: 80-char fixed-width or newline-delimited
+  let records: string[];
+  if (headerStr.includes('\n')) {
+    // Newline-delimited format (ASTAP text-style WCS)
+    records = headerStr.split('\n').filter(line => line.trim());
+  } else {
+    // Fixed 80-character records (binary FITS)
+    records = [];
+    for (let i = 0; i < headerStr.length; i += 80) {
+      records.push(headerStr.substring(i, i + 80));
+    }
+  }
+  
+  for (const record of records) {
     if (record.startsWith('END')) break;
+    if (record.startsWith('COMMENT')) continue; // Skip comment lines
 
     const keyword = record.substring(0, 8).trim();
-    if (!keyword || record[8] !== '=' || !record[9]) continue;
+    if (!keyword || record[8] !== '=') continue;
 
-    let valueStr = record.substring(10, 80);
+    let valueStr = record.substring(10);
     // Remove inline comment (after /)
     const slashIdx = valueStr.indexOf('/');
     if (slashIdx >= 0) {
@@ -219,11 +275,97 @@ function starDisplayLabel(star: CatalogStar): string {
   return `HIP ${star.hip}`;
 }
 
+// Generate synthetic correspondences from WCS when catalog stars are unavailable
+// This creates reference points by sampling the image and computing their RA/Dec
+function generateSyntheticCorrespondences(
+  wcs: WCSData,
+  imageWidth: number,
+  imageHeight: number,
+  fitsYConvention = false,
+): Correspondence[] {
+  const result: Correspondence[] = [];
+  
+  // Sample points in a grid pattern (corners + center + mid-edges)
+  const samplePoints: [number, number][] = [
+    [imageWidth * 0.25, imageHeight * 0.25],  // Top-left quadrant
+    [imageWidth * 0.75, imageHeight * 0.25],  // Top-right quadrant
+    [imageWidth * 0.5, imageHeight * 0.5],    // Center
+    [imageWidth * 0.25, imageHeight * 0.75],  // Bottom-left quadrant
+    [imageWidth * 0.75, imageHeight * 0.75],  // Bottom-right quadrant
+    [imageWidth * 0.5, imageHeight * 0.25],   // Top-center
+    [imageWidth * 0.5, imageHeight * 0.75],   // Bottom-center
+    [imageWidth * 0.25, imageHeight * 0.5],   // Left-center
+    [imageWidth * 0.75, imageHeight * 0.5],   // Right-center
+  ];
+
+  // Convert each sample point from pixel to RA/Dec using WCS
+  for (let i = 0; i < samplePoints.length; i++) {
+    const [px, py] = samplePoints[i];
+    
+    // Convert display coords (0-indexed, origin top-left) to WCS coords
+    // FITS convention (PixInsight/Siril): Y=1 is the bottom row, Y increases upward
+    // Display convention (solve-field/astrometry.net): Y=1 is the top row, Y increases downward
+    const wcsX = px + 1;
+    const wcsY = fitsYConvention ? imageHeight - py : py + 1;
+    
+    // Compute pixel offset from reference pixel
+    const dx = wcsX - wcs.CRPIX1;
+    const dy = wcsY - wcs.CRPIX2;
+    
+    // Apply CD matrix to get standard coordinates (in degrees)
+    const xi = wcs.CD1_1 * dx + wcs.CD1_2 * dy;
+    const eta = wcs.CD2_1 * dx + wcs.CD2_2 * dy;
+    
+    // Convert standard coordinates to RA/Dec using inverse TAN projection
+    const ra0Rad = wcs.CRVAL1 * DEG2RAD;
+    const dec0Rad = wcs.CRVAL2 * DEG2RAD;
+    const xiRad = xi * DEG2RAD;
+    const etaRad = eta * DEG2RAD;
+    
+    const sinDec0 = Math.sin(dec0Rad);
+    const cosDec0 = Math.cos(dec0Rad);
+    
+    const denom = cosDec0 - etaRad * sinDec0;
+    const raRad = ra0Rad + Math.atan2(xiRad, denom);
+    const decRad = Math.atan2((sinDec0 + etaRad * cosDec0), Math.sqrt(xiRad * xiRad + denom * denom));
+    
+    let ra = raRad * (180 / Math.PI);
+    const dec = decRad * (180 / Math.PI);
+    
+    // Normalize RA to [0, 360)
+    while (ra < 0) ra += 360;
+    while (ra >= 360) ra -= 360;
+    
+    result.push({
+      pointIndex: i,
+      photoX: px,
+      photoY: py,
+      starHip: 0,  // No catalog star
+      starName: `Synthetic ${i + 1}`,
+      starRa: ra,
+      starDec: dec,
+    });
+  }
+  
+  console.log(`[WCS] Generated ${result.length} synthetic correspondences from WCS`);
+  for (let i = 0; i < Math.min(result.length, 3); i++) {
+    const c = result[i];
+    console.log(`  [${i}] ${c.starName} at pixel (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)}) → RA=${c.starRa?.toFixed(4)}°, Dec=${c.starDec?.toFixed(4)}°`);
+  }
+  
+  return result;
+}
+
 export function wcsToCorrespondences(
   wcs: WCSData,
   imageWidth: number,
   imageHeight: number,
+  fitsYConvention = false,
 ): Correspondence[] {
+  console.log('[WCS] Converting WCS to correspondences for image', imageWidth, 'x', imageHeight);
+  console.log('[WCS] CRPIX:', wcs.CRPIX1, ',', wcs.CRPIX2, '(FITS coords)');
+  console.log('[WCS] CRVAL:', wcs.CRVAL1, ',', wcs.CRVAL2, '(RA/Dec degrees)');
+  
   const catalog = loadServerCatalog();
 
   // Compute approximate field of view from CD matrix
@@ -252,6 +394,15 @@ export function wcsToCorrespondences(
 
   // Invert the CD matrix to convert from sky to pixel
   const det = wcs.CD1_1 * wcs.CD2_2 - wcs.CD1_2 * wcs.CD2_1;
+  
+  // Check parity: CD1_1 < 0 typically means RA increases left (astronomical convention)
+  // CD1_1 > 0 means RA increases right (mirrored, needs flip)
+  const needsFlip = wcs.CD1_1 > 0;
+  console.log(`[WCS] CD matrix: CD1_1=${wcs.CD1_1.toExponential(3)}, CD1_2=${wcs.CD1_2.toExponential(3)}, CD2_1=${wcs.CD2_1.toExponential(3)}, CD2_2=${wcs.CD2_2.toExponential(3)}`);
+  console.log(`[WCS] CD matrix determinant: ${det.toExponential(3)}`);
+  console.log(`[WCS] Image orientation: ${needsFlip ? 'MIRRORED (needs X flip)' : 'NORMAL (astronomical standard)'}`);
+  console.log(`[WCS] SIP distortion: ${(wcs as any).AP_ORDER ? `order ${(wcs as any).AP_ORDER}` : 'none'}`);
+  
   if (Math.abs(det) < 1e-20) return [];
 
   const invCD = {
@@ -262,6 +413,7 @@ export function wcsToCorrespondences(
   };
 
   // Convert star RA/Dec to pixel coords using TAN projection
+  console.log(`[WCS] Converting ${starsInField.length} stars in field to image pixels (image: ${imageWidth}x${imageHeight})`);
   const starsWithPixels: { star: CatalogStar; px: number; py: number }[] = [];
 
   for (const star of starsInField) {
@@ -287,21 +439,89 @@ export function wcsToCorrespondences(
     // Pixel coordinates via inverse CD matrix
     const dx = invCD.a * xi + invCD.b * eta;
     const dy = invCD.c * xi + invCD.d * eta;
-    const px = wcs.CRPIX1 + dx;
-    // FITS y convention: y=1 at bottom, increasing upward.
-    // Convert to image/display convention: y=0 at top, increasing downward.
-    const py = imageHeight - (wcs.CRPIX2 + dy);
+    
+    // Apply inverse SIP distortion if present (AP and BP polynomials)
+    // SIP distortion is applied to (dx, dy) before adding to CRPIX
+    const applyInverseSIP = (parsed: any, u: number, v: number): {du: number, dv: number} => {
+      let du = 0, dv = 0;
+      const apOrder = parsed.AP_ORDER || 0;
+      const bpOrder = parsed.BP_ORDER || 0;
+      
+      if (apOrder > 0) {
+        for (let i = 0; i <= apOrder; i++) {
+          for (let j = 0; j <= apOrder; j++) {
+            const coef = parsed[`AP_${i}_${j}`];
+            if (typeof coef === 'number') {
+              du += coef * Math.pow(u, i) * Math.pow(v, j);
+            }
+          }
+        }
+      }
+      
+      if (bpOrder > 0) {
+        for (let i = 0; i <= bpOrder; i++) {
+          for (let j = 0; j <= bpOrder; j++) {
+            const coef = parsed[`BP_${i}_${j}`];
+            if (typeof coef === 'number') {
+              dv += coef * Math.pow(u, i) * Math.pow(v, j);
+            }
+          }
+        }
+      }
+      
+      return {du, dv};
+    };
+    
+    // Apply SIP correction (note: we need the full parsed WCS header for SIP coefficients)
+    // For now, skip SIP if not available in wcs object
+    const sipCorr = (wcs as any).AP_ORDER ? applyInverseSIP(wcs, dx, dy) : {du: 0, dv: 0};
+    const dx_corrected = dx + sipCorr.du;
+    const dy_corrected = dy + sipCorr.dv;
+    
+    // FITS pixel coordinates (1-indexed from bottom-left)
+    const fitsPx = wcs.CRPIX1 + dx_corrected;
+    const fitsPy = wcs.CRPIX2 + dy_corrected;
+    
+    // Convert WCS pixel coords to display coords (0-indexed, origin top-left)
+    // FITS convention (PixInsight/Siril): Y=1 is the bottom row → flip Y
+    // Display convention (solve-field/astrometry.net): Y=1 is the top row → just subtract 1
+    const px = fitsPx - 1;
+    const py = fitsYConvention ? imageHeight - fitsPy : fitsPy - 1;
+    
+    // Debug first few stars
+    if (starsWithPixels.length < 3) {
+      console.log(`[WCS] Star ${star.name || 'HIP '+star.hip}: RA=${star.ra.toFixed(2)}° Dec=${star.dec.toFixed(2)}°`);
+      console.log(`      → WCS pixel (${fitsPx.toFixed(1)}, ${fitsPy.toFixed(1)}) → Display pixel (${px.toFixed(1)}, ${py.toFixed(1)})`);
+    }
 
-    // Check bounds (with margin)
-    if (px >= -50 && px <= imageWidth + 50 && py >= -50 && py <= imageHeight + 50) {
+    // Check bounds - must be strictly within image (no negative margin for star selection)
+    if (px >= 0 && px <= imageWidth && py >= 0 && py <= imageHeight) {
       starsWithPixels.push({ star, px, py });
     }
   }
 
-  if (starsWithPixels.length < 3) return [];
+  console.log(`[WCS] ${starsWithPixels.length} stars within image bounds (out of ${starsInField.length} in field)`);
+  
+  // If we found fewer than 3 catalog stars, generate synthetic correspondences from WCS
+  if (starsWithPixels.length < 3) {
+    console.log(`[WCS] Only ${starsWithPixels.length} catalog stars found, generating synthetic correspondences from WCS`);
+    return generateSyntheticCorrespondences(wcs, imageWidth, imageHeight, fitsYConvention);
+  }
+
+
+  // Filter to stars well within bounds (avoid edges for better accuracy)
+  const margin = Math.min(50, imageWidth * 0.05, imageHeight * 0.05);
+  const interiorStars = starsWithPixels.filter(({ px, py }) =>
+    px >= margin && px <= imageWidth - margin &&
+    py >= margin && py <= imageHeight - margin
+  );
+  
+  // Use interior stars if we have enough, otherwise fall back to all stars
+  const candidates = (interiorStars.length >= 3 ? interiorStars : starsWithPixels).slice(0, 20);
+  
+  console.log(`[WCS] Found ${starsWithPixels.length} stars in bounds, ${interiorStars.length} interior stars, using ${candidates.length} candidates`);
 
   // Choose 3 well-separated bright stars forming the largest triangle
-  const candidates = starsWithPixels.slice(0, 20); // top 20 brightest
   let bestArea = 0;
   let bestTriple: [number, number, number] = [0, 1, 2];
 
@@ -329,23 +549,32 @@ export function wcsToCorrespondences(
       photoY: py,
       starHip: star.hip,
       starName: starDisplayLabel(star),
+      starRa: star.ra,
+      starDec: star.dec,
     };
   });
 
   // Add extra well-spread stars for a least-squares fit in the frontend
   const usedSet = new Set(bestTriple);
-  const margin = Math.min(50, imageWidth * 0.02, imageHeight * 0.02);
-  for (let i = 0; i < candidates.length && result.length < 9; i++) {
+  for (let i = 0; i < candidates.length && result.length < 15; i++) {
     if (usedSet.has(i)) continue;
     const { px, py, star } = candidates[i];
-    if (px < margin || px > imageWidth - margin || py < margin || py > imageHeight - margin) continue;
+    // Candidates are already filtered to be interior stars, so just add them
     result.push({
       pointIndex: result.length,
       photoX: px,
       photoY: py,
       starHip: star.hip,
       starName: starDisplayLabel(star),
+      starRa: star.ra,
+      starDec: star.dec,
     });
+  }
+
+  console.log(`[WCS] Returning ${result.length} correspondences for transform`);
+  for (let i = 0; i < Math.min(result.length, 5); i++) {
+    const c = result[i];
+    console.log(`  [${i}] ${c.starName} at (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)})`);
   }
 
   return result;
@@ -364,22 +593,61 @@ export function extractWCS(buffer: Buffer, ext: string): WCSData | null {
 
   const parsed = parseFITSHeader(headerStr);
 
-  // Check required WCS keywords
-  const required = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'];
-  for (const key of required) {
+  // Check CRPIX/CRVAL as always required
+  const baseRequired = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2'];
+  for (const key of baseRequired) {
     if (typeof parsed[key] !== 'number') return null;
   }
 
-  return {
+  // Determine CD matrix: prefer CD form, fall back to PC+CDELT form
+  let cd1_1: number, cd1_2: number, cd2_1: number, cd2_2: number;
+
+  if (typeof parsed.CD1_1 === 'number' && typeof parsed.CD1_2 === 'number' &&
+      typeof parsed.CD2_1 === 'number' && typeof parsed.CD2_2 === 'number') {
+    // CD matrix form
+    cd1_1 = parsed.CD1_1 as number;
+    cd1_2 = parsed.CD1_2 as number;
+    cd2_1 = parsed.CD2_1 as number;
+    cd2_2 = parsed.CD2_2 as number;
+  } else if (typeof parsed.CDELT1 === 'number' && typeof parsed.CDELT2 === 'number') {
+    // PC matrix + CDELT form (PC defaults to identity if absent)
+    const pc1_1 = typeof parsed.PC1_1 === 'number' ? parsed.PC1_1 as number : 1.0;
+    const pc1_2 = typeof parsed.PC1_2 === 'number' ? parsed.PC1_2 as number : 0.0;
+    const pc2_1 = typeof parsed.PC2_1 === 'number' ? parsed.PC2_1 as number : 0.0;
+    const pc2_2 = typeof parsed.PC2_2 === 'number' ? parsed.PC2_2 as number : 1.0;
+    const cdelt1 = parsed.CDELT1 as number;
+    const cdelt2 = parsed.CDELT2 as number;
+    cd1_1 = cdelt1 * pc1_1;
+    cd1_2 = cdelt1 * pc1_2;
+    cd2_1 = cdelt2 * pc2_1;
+    cd2_2 = cdelt2 * pc2_2;
+  } else {
+    return null; // No usable WCS transformation matrix
+  }
+
+  const wcs: WCSData = {
     CRPIX1: parsed.CRPIX1 as number,
     CRPIX2: parsed.CRPIX2 as number,
     CRVAL1: parsed.CRVAL1 as number,
     CRVAL2: parsed.CRVAL2 as number,
-    CD1_1: parsed.CD1_1 as number,
-    CD1_2: parsed.CD1_2 as number,
-    CD2_1: parsed.CD2_1 as number,
-    CD2_2: parsed.CD2_2 as number,
+    CD1_1: cd1_1,
+    CD1_2: cd1_2,
+    CD2_1: cd2_1,
+    CD2_2: cd2_2,
     NAXIS1: (parsed.NAXIS1 as number) || 0,
     NAXIS2: (parsed.NAXIS2 as number) || 0,
   };
+
+  const rawDateObs = parsed['DATE-OBS'];
+  if (typeof rawDateObs === 'string' && rawDateObs.length > 0) {
+    wcs.dateObs = normalizeDateObs(rawDateObs);
+  }
+  if (typeof parsed.EXPTIME === 'number' && isFinite(parsed.EXPTIME) && parsed.EXPTIME >= 0) {
+    wcs.expTime = parsed.EXPTIME;
+  }
+  if (typeof parsed.STACKCNT === 'number' && isFinite(parsed.STACKCNT)) {
+    wcs.stackCnt = Math.round(parsed.STACKCNT);
+  }
+
+  return wcs;
 }

@@ -1,0 +1,56 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_drag",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_drop",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_navigate_back",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_hover",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_select_option",
+      "mcp__playwright__browser_file_upload",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_resize",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(git stash *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(node scripts/*)",
+      "Bash(npx electron-forge *)",
+      "Bash(npx vite *)",
+      "Bash(npx asar *)",
+      "Bash(node .claude/hooks/*)",
+      "PowerShell(npm run *)",
+      "PowerShell(npx vitest *)"
+    ],
+    "enabledMcpjsonServers": [
+      "playwright"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/vitest-on-ts-edit.js"
+          }
+        ]
+      }
+    ]
+  }
+}

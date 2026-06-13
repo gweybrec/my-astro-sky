@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea to make the app better? We'd love to hear it! 🌟
+        No idea is too small — just describe it in your own words.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem or need?
+      description: What's frustrating, missing, or harder than it should be right now?
+      placeholder: "e.g. I'd like to compare two of my photos side by side, but I can't find a way to do that."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like the app to do?
+      description: Describe the feature or change you'd like to see, as you imagine it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: |
+        Screenshots, sketches, or examples from other apps are very welcome — feel free to drag and drop images here.
+        Anything that helps us picture your idea is useful.
+    validations:
+      required: false

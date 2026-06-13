@@ -1,0 +1,188 @@
+/*
+ * canvas.css — Non-atomic CSS residual.
+ *
+ * Only three categories belong here:
+ *   1. @keyframes animations
+ *   2. ::before / ::after pseudo-elements (content injection, chevrons, separators)
+ *   3. Canvas / photo-layer selectors and browser-level resets (scrollbars, focus-visible)
+ *
+ * Everything expressible as property-value pairs on a single element belongs
+ * in uno.config.ts as a shortcut or atomic utility — NOT here.
+ */
+
+/* ── Scrollbars ────────────────────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar       { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-2h);
+  border: 2px solid var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+*::-webkit-scrollbar-corner      { background: var(--scrollbar-track); }
+
+
+/* ── Sky map / photo layer ─────────────────────────────────────────────────── */
+
+#sky-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: default;
+}
+#sky-canvas:active { cursor: grabbing; }
+
+#photo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.photo-overlay-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  image-rendering: auto;
+}
+
+#photo-layer.photos-frozen .photo-overlay-img { visibility: hidden; }
+
+/* accent-color drives the range input thumb — no UnoCSS equivalent */
+.photo-opacity-slider {
+  width: 100%;
+  height: 4px;
+  margin-top: var(--space-2);
+  accent-color: var(--accent-color);
+}
+
+
+/* ── ::before / ::after pseudo-elements ────────────────────────────────────── */
+
+/* Dropdown chevron ▾ */
+.display-dropdown-btn::after {
+  content: '▾';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--font-size-micro);
+  color: var(--text-label);
+}
+
+/* Separator line — flex children fill remaining space */
+.auto-solve-separator::before,
+.auto-solve-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+/* Collapsible chevron ▶ — modal panel panels */
+.modal-panel-header::before {
+  content: '▶';
+  font-size: var(--font-size-nano);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.modal-panel-header.open::before { transform: rotate(90deg); }
+
+/* Collapsible chevron ▶ — inline metadata editor */
+.metadata-toggle::before {
+  content: '▶';
+  font-size: var(--font-size-micro);
+  transition: transform 0.15s;
+}
+.metadata-toggle.open::before { transform: rotate(90deg); }
+
+/* Collapsible chevron ▶ — batch upload metadata panel */
+.batch-meta-toggle::before {
+  content: '▶';
+  font-size: var(--font-size-nano);
+  transition: transform 0.15s;
+}
+.batch-meta-toggle.open::before { transform: rotate(90deg); }
+
+/* Gallery chip overflow fade */
+.gallery-item-chips--overflows::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg-app));
+  pointer-events: none;
+}
+
+/* Collapsible chevron ▶ — targets form <details> */
+.targets-form-summary::before {
+  content: '▶';
+  font-size: var(--font-size-micro);
+  transition: transform 0.2s;
+  color: var(--text-muted);
+}
+details.targets-form-details[open] .targets-form-summary::before { transform: rotate(90deg); }
+
+/* Collapsible chevron ▶ — target card <details> */
+.target-details > summary::-webkit-details-marker { display: none; }
+.target-details > summary::before {
+  content: '\25B6';
+  font-size: var(--font-size-pico);
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.target-details[open] > summary::before { transform: rotate(90deg); }
+
+
+/* ── @keyframes ────────────────────────────────────────────────────────────── */
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(10px); }
+}
+
+
+/* ── Interactive element cursors ────────────────────────────────────────────── */
+
+/* Browsers don't set pointer on checkboxes/radios/file inputs by default */
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+label[for],
+select {
+  cursor: pointer;
+}
+
+/* ── Focus-visible (compound selector) ─────────────────────────────────────── */
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--spinner-active);
+  outline-offset: 2px;
+}
+
+.star-search-input:focus-visible {
+  outline: 2px solid var(--spinner-active);
+  outline-offset: 0;
+}
