@@ -186,3 +186,21 @@ input:focus-visible {
   outline: 2px solid var(--spinner-active);
   outline-offset: 0;
 }
+
+/* ── Map export floating control (top-right, tracks side-panel collapse) ───── */
+
+.sky-export-control {
+  position: absolute;
+  top: var(--space-8);
+  right: 298px;
+  z-index: var(--z-toggle);
+}
+
+#side-panel.collapsed ~ .sky-export-control {
+  right: 34px;
+}
+
+.sky-export-control .sky-rotation-btn svg {
+  width: 16px;
+  height: 16px;
+}

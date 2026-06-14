@@ -815,6 +815,7 @@ btn.innerHTML = trashSvg;
 | `src/icons/privacy.svg` | Padlock | `.settings-legal-btn` | 16 px |
 | `src/icons/credits.svg` | Database cylinder | `.settings-legal-btn` | 16 px |
 | `src/icons/telescope.svg` | Line-art telescope (tube + eyepiece + finder + tripod) | `.fov-telescope-btn` | `var(--font-size-large)` (set by `.fov-telescope-btn svg`) |
+| `src/icons/export.svg` | Box with outgoing up-right arrow | `.sky-export-control .sky-rotation-btn`, gallery filter-bar button | 16 px |
 
 One additional SVG lives as a `data:image/svg+xml` URI in `src/style.css` on `.targets-sort-select` (dropdown caret). It is a pure CSS concern — no TypeScript import needed.
 
@@ -985,6 +986,63 @@ During pan/zoom interactions, photo overlay images are hidden by toggling `.phot
 |---|---|---|
 | `--fov-frame-stroke` | `rgba(220, 60, 60, 0.85)` | FOV frame outline drawn on the sky map canvas |
 | `--fov-frame-label` | `rgba(220, 90, 90, 0.9)` | FOV frame text label drawn on the sky map canvas |
+
+---
+
+### 2.25 Floating Map Controls
+
+**Purpose:** Small action buttons that float over the sky-map canvas corners (rotation, FOV ribbon,
+view export). They are not part of the side panel — they sit on top of `#map-container` and are only
+shown while the map view is active.
+
+**Shared base class — `.sky-rotation-btn`.** *Every* floating map-overlay button reuses this single
+base: 34 × 34 px, `display: inline-flex`, content centred, `var(--radius-lg)`, `var(--bg-card)`
+fill, `var(--accent-border)` border. **Never create a new button variant for a floating control** —
+the rotation buttons (§2.23), the FOV ribbon/telescope buttons (§2.23/§2.24), and the export button
+all share it. Disabled styling (`opacity: 0.35; cursor: not-allowed`) is built into the base.
+
+**Positioning rules:**
+- Each control (or cluster) is wrapped in its own container positioned `position: absolute` against
+  a map corner, `z-index: var(--z-toggle)`.
+- The horizontal anchor is `right: 298px` — clearing the open side panel. Every right-anchored
+  control **must** track the panel collapse with a sibling-combinator rule that shifts it to
+  `right: 34px`:
+  ```css
+  #side-panel.collapsed ~ .sky-export-control { right: 34px; }
+  ```
+- Because the sibling combinator cannot be expressed as a utility class, these positioning rules
+  live in `src/styles/canvas.css` (per the §CSS-architecture decision tree), **not** in `style.css`
+  or as UnoCSS utilities.
+- Spacing/offsets use tokens (`var(--space-8)`, etc.) — never raw px.
+
+**Container inventory:**
+
+| Container | Corner | Anchor | Holds |
+|---|---|---|---|
+| `.sky-rotation-controls` | bottom-right | `right: 298px; bottom: var(--space-8)` | Rotate ↺ / reset ◎ / ↻ |
+| `.fov-ribbon` | bottom-left | `left: var(--space-8); bottom: var(--space-8)` | Telescope popup + rotation steps (§2.23) |
+| `.sky-export-control` | top-right | `top: var(--space-8); right: 298px` | View export button |
+
+**Icon sizing.** Buttons that render a Unicode glyph size it with `font-size` (the base sets
+`var(--font-size-large)`). Buttons that render an **SVG** (`v-html` / `innerHTML`) must constrain it
+with an `svg` child rule on the container — the SVG file carries no `width`/`height` (§2.19):
+```css
+.sky-export-control .sky-rotation-btn svg { width: 16px; height: 16px; }
+```
+A 16 px icon inside the 34 px button gives the padded, inset look shared by the corner controls.
+
+**Mounting:** floating controls render through `FloatingControls.vue`, which `Teleport`s them to
+`#app` and only mounts the map cluster when `viewMode === 'skymap'`. Teleporting to `#app` is what
+makes them siblings of `#side-panel`, enabling the collapse-tracking combinator above.
+
+**Tooltip suppression:** while hovering/focusing a floating control, call
+`uiStore.setForceSuppressTooltip(true/false)` (mirrors `MapRotationControls.vue`) so the sky tooltip
+does not flicker behind the button.
+
+**Do not:**
+- Introduce a new button class for a floating control — extend `.sky-rotation-btn`.
+- Hardcode a right offset without the matching `#side-panel.collapsed ~ …` rule.
+- Put positioning rules for these controls in `style.css` or inline `style=`.
 
 ---
 

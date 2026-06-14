@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { shallowRef } from 'vue';
 import type { SkyMap, FovFrameSpec } from '../sky-map';
 import type { PhotoOverlay } from '../photo-overlay';
+import type { Photo } from '../types';
 
 /** Minimal interface for objects that can show/hide themselves. */
 export interface ShowHide {
@@ -16,6 +17,7 @@ export interface GalleryInterface extends ShowHide {
   setDSOTypeFilter(types: string[]): void;
   setDSOCatalogFilter(catalogs: string[]): void;
   getAllLabels(): { label: string; count: number }[];
+  getFilteredPhotos(): Photo[];
   onNewLabelsAppeared: ((labels: string[]) => void) | null;
 }
 

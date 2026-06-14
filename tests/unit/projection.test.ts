@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { project, unproject, toCanvas, fromCanvas, setHemisphere, getHemisphere } from '../../src/projection';
+import { project, unproject, toCanvas, fromCanvas, setHemisphere, getHemisphere, borderRadiusPU, fitScaleForBorderCircle } from '../../src/projection';
 
 const EPSILON = 1e-9;
 
@@ -136,5 +136,26 @@ describe('toCanvas / fromCanvas roundtrip', () => {
 
     expect(c1.x).toBeCloseTo(baseline.width / 2, 10);
     expect(c1.y).toBeLessThan(c0.y);
+  });
+});
+
+describe('borderRadiusPU / fitScaleForBorderCircle', () => {
+  it('border radius uses r = tan((90 + lat) / 2)', () => {
+    expect(borderRadiusPU(45)).toBeCloseTo(Math.tan((90 + 45) / 2 * Math.PI / 180), 12);
+    // lat = 0 ⇒ tan(45°) = 1 (the celestial equator circle)
+    expect(borderRadiusPU(0)).toBeCloseTo(1, 12);
+  });
+
+  it('fit scale frames the whole border circle within the smaller dimension', () => {
+    const cssW = 1200, cssH = 800, lat = 45, margin = 0.96;
+    const scale = fitScaleForBorderCircle(cssW, cssH, lat, margin);
+    // The border circle diameter in canvas px must fit the smaller dimension (× margin).
+    const diameterPx = 2 * borderRadiusPU(lat) * scale;
+    expect(diameterPx).toBeCloseTo(Math.min(cssW, cssH) * margin, 9);
+  });
+
+  it('is driven by the smaller dimension (portrait vs landscape)', () => {
+    const lat = 45;
+    expect(fitScaleForBorderCircle(800, 1200, lat)).toBeCloseTo(fitScaleForBorderCircle(1200, 800, lat), 12);
   });
 });

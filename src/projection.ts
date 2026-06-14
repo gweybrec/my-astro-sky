@@ -49,6 +49,25 @@ export function unproject(x: number, y: number): { ra: number; dec: number } {
   return { ra, dec };
 }
 
+/**
+ * Projection-unit radius of the border circle for a given border latitude.
+ * Same formula for both hemispheres: r = tan((90 + lat) / 2).
+ */
+export function borderRadiusPU(borderLatDeg: number): number {
+  return Math.tan((90 + borderLatDeg) / 2 * DEG2RAD);
+}
+
+/**
+ * View scale (canvas px per projection unit) that fits the whole border circle
+ * into a cssW × cssH frame, leaving a small margin. Used by the "full sky map"
+ * export to frame the entire projection regardless of the current zoom.
+ */
+export function fitScaleForBorderCircle(cssW: number, cssH: number, borderLatDeg: number, margin = 0.96): number {
+  const r = borderRadiusPU(borderLatDeg);
+  if (r <= 0 || !isFinite(r)) return 0;
+  return (Math.min(cssW, cssH) / 2 / r) * margin;
+}
+
 /** Projection coordinates → canvas pixel coordinates */
 export function toCanvas(px: number, py: number, view: ViewState): Point {
   const theta = (view.rotationDeg * DEG2RAD);

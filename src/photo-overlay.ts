@@ -1,4 +1,4 @@
-import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement, ApiErrorDetails, PhotoIntegration } from './types';
+import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement, ApiErrorDetails, PhotoIntegration, AffineMatrix } from './types';
 import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { reportUnknownRendererError } from './error-reporter';
 import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform, affineToCSS } from './affine';
@@ -504,6 +504,53 @@ export class PhotoOverlay {
 
   getPlacedPhotos(): PlacedPhoto[] {
     return this.placedPhotos.filter(p => !p.pendingDelete);
+  }
+
+  /**
+   * Compute a placed photo's photo→canvas affine matrix at an arbitrary view,
+   * independent of its current on-screen transform. Returns null when the photo
+   * cannot be placed (too few correspondences) or its centroid falls outside the
+   * border circle. Used by the "full sky map" export to position photos at a view
+   * other than the live one.
+   */
+  computeMatrixForView(placed: PlacedPhoto, view: ViewState): AffineMatrix | null {
+    const { photo } = placed;
+
+    if (photo.manualPlacement) {
+      const cp = project(photo.manualPlacement.centerRa, photo.manualPlacement.centerDec);
+      if (Math.sqrt(cp.x * cp.x + cp.y * cp.y) > this.borderRadiusPU) return null;
+      return computeManualMatrix(photo.manualPlacement, view, photo.width, photo.height);
+    }
+
+    if (photo.correspondences.length < 2) return null;
+
+    const photoPoints: Point[] = [];
+    const canvasPoints: Point[] = [];
+    const projPoints: { x: number; y: number }[] = [];
+    for (const corr of photo.correspondences) {
+      const raDec = getCorrRaDec(corr);
+      if (!raDec) continue;
+      const proj = project(raDec.ra, raDec.dec);
+      projPoints.push(proj);
+      photoPoints.push({ x: corr.photoX, y: corr.photoY });
+      canvasPoints.push(toCanvas(proj.x, proj.y, view));
+    }
+    if (photoPoints.length < 2) return null;
+
+    const cx = projPoints.reduce((s, p) => s + p.x, 0) / projPoints.length;
+    const cy = projPoints.reduce((s, p) => s + p.y, 0) / projPoints.length;
+    if (Math.sqrt(cx * cx + cy * cy) > this.borderRadiusPU) return null;
+
+    try {
+      if (photoPoints.length === 2) {
+        return computeSimilarityTransform(photoPoints as [Point, Point], canvasPoints as [Point, Point]);
+      } else if (photoPoints.length === 3) {
+        return computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point]);
+      }
+      return computeAffineLSQ(photoPoints, canvasPoints);
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -3892,13 +3939,13 @@ export class PhotoOverlay {
 }
 
 /** Apply manual placement CSS transform to imgEl */
-function applyManualTransform(
-  imgEl: HTMLImageElement,
+/** Pure: the photo→canvas affine matrix for a manual placement at the given view. */
+function computeManualMatrix(
   placement: ManualPlacement,
   view: ViewState,
   natW: number,
   natH: number,
-): void {
+): AffineMatrix {
   // Center of photo in canvas coords
   const centerProj = project(placement.centerRa, placement.centerDec);
   const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
@@ -3930,7 +3977,17 @@ function applyManualTransform(
   const e = centerCanvas.x - a * cx - c * cy;
   const f = centerCanvas.y - b * cx - d * cy;
 
-  imgEl.style.transform = `matrix(${a}, ${b}, ${c}, ${d}, ${e}, ${f})`;
+  return { a, b, c, d, e, f };
+}
+
+function applyManualTransform(
+  imgEl: HTMLImageElement,
+  placement: ManualPlacement,
+  view: ViewState,
+  natW: number,
+  natH: number,
+): void {
+  imgEl.style.transform = affineToCSS(computeManualMatrix(placement, view, natW, natH));
 }
 
 /** Build 3 synthetic PhotoCorrespondence from manual placement by using the view state */

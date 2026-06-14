@@ -3,6 +3,7 @@
     <template v-if="viewMode === 'skymap'">
       <MapRotationControls />
       <FOVRibbon />
+      <MapExportButton />
     </template>
   </Teleport>
 </template>
@@ -12,6 +13,7 @@ import { computed } from 'vue';
 import { useUiStore } from '../../stores/ui';
 import MapRotationControls from './MapRotationControls.vue';
 import FOVRibbon from './FOVRibbon.vue';
+import MapExportButton from './MapExportButton.vue';
 
 const uiStore = useUiStore();
 const viewMode = computed(() => uiStore.currentViewMode);

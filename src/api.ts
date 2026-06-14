@@ -1,6 +1,7 @@
 import type { Photo, PhotoCorrespondence, PlateSolveResult, AstrometrySolveStatus, ManualPlacement, ApiErrorDetails, DSOUserOverride, PhotoIntegration } from './types';
 import { t, getLang } from './i18n';
 import { reportRendererError } from './error-reporter';
+import { downloadBlob } from './file-utils';
 
 /** Translate a server error response using the `code` field when available. */
 export function parseServerError(data: { error?: string; code?: string }, fallbackKey: string): string {
@@ -416,17 +417,10 @@ export async function exportData(options: ExportOptions, ids: string[]): Promise
     throw new Error(data.error ?? t('settings.importError'));
   }
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
   // Filename comes from Content-Disposition; fall back to a sensible default
   const disposition = res.headers.get('Content-Disposition') ?? '';
   const match = disposition.match(/filename="?([^"]+)"?/);
-  a.download = match ? match[1] : 'sky-export.zip';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, match ? match[1] : 'sky-export.zip');
 }
 
 export interface ImportPreviewImage {

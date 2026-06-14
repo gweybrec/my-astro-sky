@@ -1,5 +1,5 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
-import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere } from './projection';
+import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle } from './projection';
 import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle } from './star-catalog';
 import { getDSOs, getDSOCatalog } from './dso-catalog';
 import { SpatialIndex } from './spatial-index';
@@ -276,6 +276,11 @@ export class SkyMap {
   getConstellationStyle(): ConstellationStyle {
     return this.constellationStyle;
   }
+
+  /** The underlying canvas element. Backing store is devicePixelRatio-scaled (see resize()). */
+  getCanvas(): HTMLCanvasElement {
+    return this.canvas;
+  }
   setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
   setMaxStarCount(count: number) { this.maxStarCount = count; this.render(); }
   setMaxDSOCount(count: number) { this.maxDSOCount = count; this.render(); }
@@ -420,6 +425,45 @@ export class SkyMap {
 
   getView(): ViewState {
     return { ...this.view };
+  }
+
+  /**
+   * A view that frames the entire border circle into a cssW × cssH frame,
+   * keeping the current rotation. Used by the "full sky map" export.
+   */
+  getFullMapView(cssW: number, cssH: number): ViewState {
+    return {
+      centerX: 0,
+      centerY: 0,
+      scale: fitScaleForBorderCircle(cssW, cssH, this.borderLatDeg),
+      rotationDeg: this.view.rotationDeg,
+      width: cssW,
+      height: cssH,
+    };
+  }
+
+  /**
+   * Render the map at an arbitrary view into a target canvas, without touching
+   * the live canvas/view. The target backing store must be sized
+   * `view.width * pixelScale` × `view.height * pixelScale`. Used by the export
+   * feature to re-render the full sky map off-screen.
+   */
+  renderToCanvas(target: HTMLCanvasElement, view: ViewState, pixelScale: number): void {
+    const tctx = target.getContext('2d');
+    if (!tctx) return;
+    const savedCtx = this.ctx;
+    const savedView = this.view;
+    this.ctx = tctx;
+    this.view = view;
+    tctx.save();
+    tctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+    try {
+      this.render();
+    } finally {
+      tctx.restore();
+      this.ctx = savedCtx;
+      this.view = savedView;
+    }
   }
 
   enterPickingMode(callback: StarPickedCallback) {

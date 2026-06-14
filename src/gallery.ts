@@ -170,6 +170,11 @@ export class Gallery {
     this.applyFilters();
   }
 
+  /** The photos currently passing the active filters, in display (smart-sorted) order. */
+  getFilteredPhotos(): Photo[] {
+    return [...this.filteredPhotos];
+  }
+
   getAllLabels(): { label: string; count: number }[] {
     const counts = new Map<string, number>();
     for (const p of this.photos) {

@@ -119,6 +119,17 @@
         </label>
       </DropdownPanel>
     </div>
+
+    <!-- Export -->
+    <button
+      type="button"
+      class="display-controls-btn ml-auto inline-flex items-center gap-2"
+      :title="t('settings.exportView.galleryPdf')"
+      @click="onExport"
+    >
+      <span v-html="exportSvg" class="inline-flex w-4 h-4" />
+      {{ t('settings.exportView.selection') }}
+    </button>
   </div>
 </template>
 
@@ -130,6 +141,11 @@ import { useI18n } from '../../composables/useI18n';
 import { DSO_TYPES_ALL } from '../../display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import DropdownPanel from '../base/DropdownPanel.vue';
+import { showToast } from '../../toast';
+import { downloadBlob } from '../../file-utils';
+import { renderGalleryPdf } from '../../export-render';
+import { reportUnknownRendererError } from '../../error-reporter';
+import exportSvg from '../../icons/export.svg?raw';
 
 const { t } = useI18n();
 const uiStore = useUiStore();
@@ -148,6 +164,25 @@ function onSearchInput() {
 function clearSearch() {
   searchQuery.value = '';
   canvasStore.gallery?.setSearchQuery('');
+}
+
+// ── Export (gallery contact sheet PDF) ─────────────────────────────────────────
+async function onExport() {
+  const photos = canvasStore.gallery?.getFilteredPhotos() ?? [];
+  if (photos.length === 0) {
+    showToast({ message: t('settings.exportView.empty'), type: 'error', duration: 3000 });
+    return;
+  }
+  showToast({ message: t('settings.exportView.rendering'), type: 'info', duration: 2000 });
+  try {
+    const blob = await renderGalleryPdf(photos);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadBlob(blob, `myastrosky-gallery-${ts}.pdf`);
+    showToast({ message: t('settings.exportView.success'), type: 'info', duration: 2500 });
+  } catch (e) {
+    reportUnknownRendererError('gallery_export_failed', e, { count: photos.length });
+    showToast({ message: t('settings.exportView.error'), type: 'error', duration: 4000 });
+  }
 }
 
 // ── Labels ────────────────────────────────────────────────────────────────────
