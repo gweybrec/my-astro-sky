@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups } from './db.js';
+import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, type PlanEntryRow } from './db.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 const _require = createRequire(import.meta.url);
@@ -1408,6 +1408,465 @@ app.delete('/api/gear-setups', (_req, res) => {
   }
 });
 
+// ─── Night plans ──────────────────────────────────────────────────────────────
+
+function planEntryToApi(e: PlanEntryRow) {
+  return { id: e.id, dsoId: e.dso_id, position: e.position, paDeg: e.pa_deg ?? null, notes: e.notes ?? null };
+}
+
+/**
+ * @swagger
+ * /api/plans:
+ *   get:
+ *     summary: Get all night plans with their entries
+ *     responses:
+ *       200:
+ *         description: Array of plans, each with nested entries
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string }
+ *                   name: { type: string }
+ *                   position: { type: integer }
+ *                   entries:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         dsoId: { type: string }
+ *                         position: { type: integer }
+ *                         paDeg: { type: number, nullable: true }
+ *                         notes: { type: string, nullable: true }
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/plans', (_req, res) => {
+  try {
+    const entries = getAllPlanEntries();
+    const byPlan = new Map<string, PlanEntryRow[]>();
+    for (const e of entries) {
+      const list = byPlan.get(e.plan_id) ?? [];
+      list.push(e);
+      byPlan.set(e.plan_id, list);
+    }
+    res.json(getPlans().map(p => ({
+      id: p.id,
+      name: p.name,
+      position: p.position,
+      nightOf: p.night_of ?? null,
+      setupId: p.setup_id ?? null,
+      entries: (byPlan.get(p.id) ?? []).map(planEntryToApi),
+    })));
+  } catch (err: any) {
+    console.error('[Plans] Failed to list plans', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans:
+ *   post:
+ *     summary: Create a new night plan
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Display name for the plan
+ *     responses:
+ *       200:
+ *         description: Plan created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *       400:
+ *         description: Missing name
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
+ */
+app.post('/api/plans', (req, res) => {
+  try {
+    const { name } = req.body as any;
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      res.status(400).json({ error: 'name is required' }); return;
+    }
+    const id = `plan-${uuidv4()}`;
+    const position = getPlans().length;
+    createPlan({ id, name: name.trim(), position, created_at: new Date().toISOString(), night_of: null, setup_id: null });
+    res.json({ id });
+  } catch (err: any) {
+    console.error('[Plans] Failed to create plan', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/order:
+ *   put:
+ *     summary: Reorder all plans
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Plan IDs in the desired order
+ *     responses:
+ *       200:
+ *         description: Order updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       400:
+ *         description: ids must be an array
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
+ */
+app.put('/api/plans/order', (req, res) => {
+  try {
+    const { ids } = req.body as any;
+    if (!Array.isArray(ids)) { res.status(400).json({ error: 'ids must be an array' }); return; }
+    reorderPlans(ids);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to reorder plans', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}:
+ *   put:
+ *     summary: Rename a night plan
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name: { type: string }
+ *     responses:
+ *       200:
+ *         description: Plan renamed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       400:
+ *         description: Missing name
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       404:
+ *         description: Plan not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
+ */
+app.put('/api/plans/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const body = (req.body ?? {}) as any;
+    const hasName = 'name' in body;
+    const hasSettings = 'nightOf' in body || 'setupId' in body;
+    if (!hasName && !hasSettings) {
+      res.status(400).json({ error: 'name or settings (nightOf/setupId) required' }); return;
+    }
+    const existing = getPlan(id);
+    if (!existing) { res.status(404).json({ error: 'Plan not found' }); return; }
+    if (hasName) {
+      const { name } = body;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        res.status(400).json({ error: 'name is required' }); return;
+      }
+      renamePlan(id, name.trim());
+    }
+    if (hasSettings) {
+      const nightOf = 'nightOf' in body ? (body.nightOf || null) : (existing.night_of ?? null);
+      const setupId = 'setupId' in body ? (body.setupId || null) : (existing.setup_id ?? null);
+      updatePlanSettings(id, nightOf, setupId);
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to update plan', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}:
+ *   delete:
+ *     summary: Delete a night plan and its entries
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *     responses:
+ *       200:
+ *         description: Plan deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       404:
+ *         description: Plan not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
+ */
+app.delete('/api/plans/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!deletePlan(id)) { res.status(404).json({ error: 'Plan not found' }); return; }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to delete plan', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}/entries:
+ *   post:
+ *     summary: Add a DSO target to a plan
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsoId]
+ *             properties:
+ *               dsoId: { type: string, description: DSO catalog id }
+ *     responses:
+ *       200:
+ *         description: Entry added
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *       400:
+ *         description: Missing dsoId
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       404:
+ *         description: Plan not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       409:
+ *         description: Target already in plan
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *                 code: { type: string, enum: [DUPLICATE_ENTRY] }
+ *       500:
+ *         description: Server error
+ */
+app.post('/api/plans/:id/entries', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dsoId } = req.body as any;
+    if (!dsoId || typeof dsoId !== 'string') { res.status(400).json({ error: 'dsoId is required' }); return; }
+    if (!getPlan(id)) { res.status(404).json({ error: 'Plan not found' }); return; }
+    if (planEntryExists(id, dsoId)) {
+      res.status(409).json({ error: 'Target already in plan', code: 'DUPLICATE_ENTRY' }); return;
+    }
+    const entryId = `pe-${uuidv4()}`;
+    addPlanEntry({ id: entryId, plan_id: id, dso_id: dsoId, position: nextPlanEntryPosition(id), pa_deg: null, notes: null });
+    res.json({ id: entryId });
+  } catch (err: any) {
+    console.error('[Plans] Failed to add entry', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}/entries/order:
+ *   put:
+ *     summary: Reorder the entries within a plan
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Entry IDs in the desired order
+ *     responses:
+ *       200:
+ *         description: Order updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       400:
+ *         description: ids must be an array
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
+ */
+app.put('/api/plans/:id/entries/order', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { ids } = req.body as any;
+    if (!Array.isArray(ids)) { res.status(400).json({ error: 'ids must be an array' }); return; }
+    reorderPlanEntries(id, ids);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to reorder entries', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}/entries/{entryId}:
+ *   delete:
+ *     summary: Remove a target from a plan
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *       - in: path
+ *         name: entryId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Entry ID
+ *     responses:
+ *       200:
+ *         description: Entry removed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       404:
+ *         description: Entry not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
+ */
+app.delete('/api/plans/:id/entries/:entryId', (req, res) => {
+  try {
+    const { entryId } = req.params;
+    if (!removePlanEntry(entryId)) { res.status(404).json({ error: 'Entry not found' }); return; }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to remove entry', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /**
  * @swagger
  * /api/export:
@@ -1424,7 +1883,7 @@ app.post('/api/export', (req, res) => {
   try {
     const body = req.body as {
       mode?: string;
-      options?: { includeImages?: boolean; includeMetadata?: boolean; includeDsoOverrides?: boolean; includeCustomGear?: boolean; includeSetups?: boolean };
+      options?: { includeImages?: boolean; includeMetadata?: boolean; includeDsoOverrides?: boolean; includeCustomGear?: boolean; includeSetups?: boolean; includePlans?: boolean };
       ids?: string[];
     };
 
@@ -1436,6 +1895,7 @@ app.post('/api/export', (req, res) => {
     const includeDsoOverrides = options.includeDsoOverrides === true;
     const includeCustomGear = options.includeCustomGear === true;
     const includeSetups = options.includeSetups === true;
+    const includePlans = options.includePlans === true;
 
     const { ids } = body;
     const allPhotos = getAllPhotos();
@@ -1497,6 +1957,25 @@ app.post('/api/export', (req, res) => {
         enabled: r.enabled === 1,
       }));
       archive.append(Buffer.from(JSON.stringify(setups, null, 2)), { name: 'gear-setups.json' });
+    }
+    if (includePlans) {
+      const entriesByPlan = new Map<string, PlanEntryRow[]>();
+      for (const e of getAllPlanEntries()) {
+        const list = entriesByPlan.get(e.plan_id) ?? [];
+        list.push(e);
+        entriesByPlan.set(e.plan_id, list);
+      }
+      const plans = getPlans().map(p => ({
+        id: p.id,
+        name: p.name,
+        position: p.position,
+        nightOf: p.night_of ?? null,
+        setupId: p.setup_id ?? null,
+        entries: (entriesByPlan.get(p.id) ?? []).map(e => ({
+          id: e.id, dsoId: e.dso_id, position: e.position, paDeg: e.pa_deg ?? null, notes: e.notes ?? null,
+        })),
+      }));
+      archive.append(Buffer.from(JSON.stringify(plans, null, 2)), { name: 'plans.json' });
     }
 
     archive.finalize();
@@ -1582,7 +2061,7 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
  *         description: Import completed successfully
  */
 // Import photos from ZIP (full) or JSON (metadata only)
-// Form fields: bundle (file), importMetadata, importDsoOverrides, importCustomGear, importSetups, selectedImages (JSON string[])
+// Form fields: bundle (file), importMetadata, importDsoOverrides, importCustomGear, importSetups, importPlans, selectedImages (JSON string[])
 app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
   try {
     const file = req.file;
@@ -1592,6 +2071,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
     const importDsoOverrides = req.body?.importDsoOverrides === '1';
     const importCustomGear = req.body?.importCustomGear === '1';
     const importSetups = req.body?.importSetups === '1';
+    const importPlans = req.body?.importPlans === '1';
     // null means "no image filter" (metadata-only import); a Set means "import only these filenames"
     const selectedImages: Set<string> | null = req.body?.selectedImages
       ? new Set(JSON.parse(req.body.selectedImages) as string[])
@@ -1618,6 +2098,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
       const dsoOverridesEntry = zipDir.files.find(f => f.path === 'dso-overrides.json');
       const customGearEntry = zipDir.files.find(f => f.path === 'custom-gear.json');
       const gearSetupsEntry = zipDir.files.find(f => f.path === 'gear-setups.json');
+      const plansEntry = zipDir.files.find(f => f.path === 'plans.json');
 
       if (!manifestEntry && !dsoOverridesEntry && !customGearEntry && !gearSetupsEntry) {
         res.status(400).json({ error: 'Aucun contenu reconnu dans le ZIP' }); return;
@@ -1677,6 +2158,41 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
             }
           }
         } catch { /* ignore invalid gear-setups.json */ }
+      }
+
+      // Import night plans. Re-import is idempotent: a plan with the same id is
+      // deleted (with its entries) then re-created.
+      if (plansEntry && importPlans) {
+        try {
+          const rawPlans = JSON.parse((await plansEntry.buffer()).toString('utf8'));
+          if (Array.isArray(rawPlans)) {
+            rawPlans.forEach((p, pi) => {
+              if (typeof p.id !== 'string' || typeof p.name !== 'string') return;
+              deletePlan(p.id);
+              createPlan({
+                id: p.id,
+                name: p.name,
+                position: typeof p.position === 'number' ? p.position : pi,
+                created_at: new Date().toISOString(),
+                night_of: typeof p.nightOf === 'string' ? p.nightOf : null,
+                setup_id: typeof p.setupId === 'string' ? p.setupId : null,
+              });
+              if (Array.isArray(p.entries)) {
+                p.entries.forEach((e: any, ei: number) => {
+                  if (typeof e.id !== 'string' || typeof e.dsoId !== 'string') return;
+                  addPlanEntry({
+                    id: e.id,
+                    plan_id: p.id,
+                    dso_id: e.dsoId,
+                    position: typeof e.position === 'number' ? e.position : ei,
+                    pa_deg: typeof e.paDeg === 'number' ? e.paDeg : null,
+                    notes: typeof e.notes === 'string' ? e.notes : null,
+                  });
+                });
+              }
+            });
+          }
+        } catch { /* ignore invalid plans.json */ }
       }
 
       // Flush libvips handle cache before writing to avoid Windows sharing violations

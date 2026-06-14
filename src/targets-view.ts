@@ -12,9 +12,10 @@ import {
 } from './gear-catalog';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import { formatGearFovLabel, fovDeg, formatFov, pixelScaleArcsec } from './gear-presets';
-import { recommendTargets, type ObserverLocation } from './target-recommender';
+import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
+import type { GearPreset } from './gear-presets';
 import { recommendRecipe } from './imaging-recipe';
-import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, deleteGearSetupAPI, type GearSetupData } from './api';
+import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, deleteGearSetupAPI, type GearSetupData, type Plan } from './api';
 import { showKeyValueTooltip, showTextTooltip } from './tooltip-utils';
 import { showToast } from './toast';
 import type { SkyMap } from './sky-map';
@@ -23,7 +24,18 @@ import type { DSO } from './types';
 import { createTargetsChip, createFilterBadge } from './chip-utils';
 import trashSvg from './icons/trash.svg?raw';
 import penSvg from './icons/pen.svg?raw';
+import mapPinSvg from './icons/map-pin.svg?raw';
+import planListSvg from './icons/plan-list.svg?raw';
 import { openAddSetupModal, openEditSetupModal, buildFovFrameSpecs } from './fov-overlay';
+import { pinia } from './pinia-instance';
+import { usePlansStore } from './stores/plans';
+import { getDSOById } from './dso-catalog';
+import { twilightWindow } from './astro-time';
+import { maxAltDuringWindow, sampleAltCurve, type AltSample } from './sky-geometry';
+import { renderPlanPdf } from './export-render';
+import { downloadBlob } from './file-utils';
+import { reportUnknownRendererError } from './error-reporter';
+import { confirmPlanDelete } from './photo-delete-confirm';
 
 // ─── Persistence key ─────────────────────────────────────────────────────────
 
@@ -859,6 +871,15 @@ export function buildGearSectionContent(
 
 // ─── TargetsView class ────────────────────────────────────────────────────────
 
+/** A plan target resolved + scored for the current observer/night. */
+interface PlanTargetInfo {
+  entryId: string;
+  dso: DSO;
+  maxAltDeg: number;
+  bestTimeUtc: Date;
+  curve: AltSample[];
+}
+
 export class TargetsView {
   private container: HTMLElement;
   private skyMap: SkyMap;
@@ -875,17 +896,34 @@ export class TargetsView {
   private randomBtn: HTMLButtonElement | null = null;
   private dateInput: HTMLInputElement | null = null;
 
+  private planMode: 'recommend' | 'plans' = 'recommend';
+  private plansStore = usePlansStore(pinia);
+  private planBadgeEl: HTMLElement | null = null;
+  private planPickerEl: HTMLElement | null = null;
+  private planPickerOutside: ((ev: MouseEvent) => void) | null = null;
+  private planPickerEsc: ((ev: KeyboardEvent) => void) | null = null;
+  private planPickerReposition: (() => void) | null = null;
+
   constructor(skyMap: SkyMap, onNavigate: (ra: number, dec: number, setupId: string | null) => void) {
     this.skyMap = skyMap;
     this.onNavigate = onNavigate;
     this.prefs = loadPrefs();
     this.container = document.getElementById('targets-container')!;
     this.render();
+    // Load plans in the background; refresh the badge / plans view when ready.
+    this.plansStore.ensureLoaded().then(() => {
+      if (this.planMode === 'plans') this.render();
+      else this.updatePlanBadge();
+    });
   }
 
   show(): void {
     this.container.style.display = 'flex';
     this.render();
+    this.plansStore.ensureLoaded().then(() => {
+      if (this.planMode === 'plans') this.render();
+      else this.updatePlanBadge();
+    });
   }
 
   hide(): void {
@@ -900,11 +938,59 @@ export class TargetsView {
     const inner = document.createElement('div');
     inner.className = 'targets-inner';
     this.container.appendChild(inner);
-    inner.appendChild(this.buildForm());
-    const resultsEl = document.createElement('div');
-    resultsEl.className = 'targets-results';
-    resultsEl.id = 'targets-results';
-    inner.appendChild(resultsEl);
+    inner.appendChild(this.buildModeToggle());
+    if (this.planMode === 'plans') {
+      inner.appendChild(this.buildPlansView());
+    } else {
+      inner.appendChild(this.buildForm());
+      const resultsEl = document.createElement('div');
+      resultsEl.className = 'targets-results';
+      resultsEl.id = 'targets-results';
+      inner.appendChild(resultsEl);
+    }
+  }
+
+  // ─── Recommend / My Plans sub-mode toggle ───────────────────────────────────
+
+  private buildModeToggle(): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'targets-mode-toggle inline-flex gap-1 mb-4 p-1 bg-card border border-subtle rounded-md';
+
+    const SEG_BASE = 'px-5 py-2 rounded-sm text-body font-medium cursor-pointer border-0 transition-colors';
+    const SEG_ACTIVE = ' bg-[var(--accent-bg)] text-bright';
+    const SEG_IDLE = ' bg-transparent text-secondary hover:text-bright';
+
+    const mkSeg = (mode: 'recommend' | 'plans', label: string): HTMLButtonElement => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = SEG_BASE + (this.planMode === mode ? SEG_ACTIVE : SEG_IDLE);
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        if (this.planMode === mode) return;
+        this.planMode = mode;
+        this.render();
+      });
+      return btn;
+    };
+
+    row.appendChild(mkSeg('recommend', t('targets.plan.tabRecommend')));
+
+    const plansBtn = mkSeg('plans', t('targets.plan.tabPlans'));
+    const badge = document.createElement('span');
+    badge.className = 'targets-mode-badge opacity-80';
+    this.planBadgeEl = badge;
+    plansBtn.appendChild(badge);
+    row.appendChild(plansBtn);
+    this.updatePlanBadge();
+
+    return row;
+  }
+
+  private updatePlanBadge(): void {
+    if (this.planBadgeEl) {
+      const n = this.plansStore.planCount;
+      this.planBadgeEl.textContent = n > 0 ? ` (${n})` : '';
+    }
   }
 
   // ─── Form ─────────────────────────────────────────────────────────────────
@@ -1958,21 +2044,41 @@ export class TargetsView {
 
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'target-actions-row';
-    const navBtnEl = document.createElement('button');
-    navBtnEl.className = 'target-nav-btn';
-    navBtnEl.style.flex = '1';
-    navBtnEl.textContent = t('targets.results.openOnMap');
+
+    const navBtnEl = this.iconActionBtn(mapPinSvg, t('targets.results.openOnMap'));
     navBtnEl.addEventListener('click', () => { this.onNavigate(dso.ra, dso.dec, this.prefs.setupId); });
-    const editBtn = document.createElement('button');
-    editBtn.className = 'target-nav-btn';
-    editBtn.style.flex = '1';
-    editBtn.textContent = t('dso.edit');
+
+    const editBtn = this.iconActionBtn(penSvg, t('dso.edit'));
     editBtn.addEventListener('click', () => { this.onEditDSO?.(dso); });
+
+    const planBtn = this.iconActionBtn(planListSvg, t('targets.plan.addToPlan'));
+    planBtn.setAttribute('data-plan-dso', dso.id);
+    this.refreshPlanBtnState(planBtn, dso.id);
+    planBtn.addEventListener('click', () => { this.openPlanPicker(planBtn, dso.id); });
+
     actionsDiv.appendChild(navBtnEl);
     actionsDiv.appendChild(editBtn);
+    actionsDiv.appendChild(planBtn);
     card.appendChild(actionsDiv);
 
     return card;
+  }
+
+  /** A square icon-only action button (`btn-icon`) holding an inline SVG. */
+  private iconActionBtn(svg: string, title: string): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-icon target-icon-btn';
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+    btn.innerHTML = svg;
+    return btn;
+  }
+
+  /** Highlight the plan-list button when the DSO is already in at least one plan. */
+  private refreshPlanBtnState(btn: HTMLButtonElement, dsoId: string): void {
+    const inPlan = this.plansStore.plansContaining(dsoId).length > 0;
+    btn.classList.toggle('bg-[var(--accent-fill-sm)]', inPlan);
   }
 
   private metaItem(label: string, value: string, tooltip?: string): HTMLElement {
@@ -1988,5 +2094,839 @@ export class TargetsView {
     el.appendChild(l);
     el.appendChild(v);
     return el;
+  }
+
+  // ─── My Plans (night plans) ─────────────────────────────────────────────────
+
+  /** Observer for a given observation night ISO date (falls back to the global date / today). */
+  private getPlanObserverFor(dateISO: string | null): { loc: ObserverLocation; dateNight: Date } | null {
+    if (this.prefs.lat == null || this.prefs.lon == null) return null;
+    if (this.prefs.lat < -90 || this.prefs.lat > 90 || this.prefs.lon < -180 || this.prefs.lon > 180) return null;
+    const dateStr = dateISO ?? this.prefs.lastDateISO ?? todayISO();
+    return { loc: { latDeg: this.prefs.lat, lonDeg: this.prefs.lon }, dateNight: new Date(dateStr + 'T12:00:00Z') };
+  }
+
+  /** Resolve a gear setup id to a {@link GearPreset} (telescope+camera+accessory). */
+  private async planPreset(setupId: string | null): Promise<GearPreset | null> {
+    if (!setupId) return null;
+    try {
+      const [setups, telescopes, cameras, accessories] = await Promise.all([
+        getGearSetups(), getTelescopes(), getCameras(), getAccessories(),
+      ]);
+      const setup = setups.find(s => s.id === setupId);
+      if (!setup) return null;
+      const telescope = telescopes.find(tel => tel.id === setup.telescopeId);
+      if (!telescope) return null;
+      const effectiveCameraId = telescope.is_smart_telescope && telescope.integrated_camera_id
+        ? telescope.integrated_camera_id
+        : setup.cameraId;
+      const camera = cameras.find(c => c.id === effectiveCameraId);
+      if (!camera) return null;
+      const accessory = (telescope.is_smart_telescope || !setup.accessoryId)
+        ? null
+        : (accessories.find(a => a.id === setup.accessoryId) ?? null);
+      return buildGearPreset(telescope, camera, accessory);
+    } catch (err) {
+      reportUnknownRendererError('plan_preset_failed', err, { setupId });
+      return null;
+    }
+  }
+
+  /** Dark-sky window for the night (mirrors recommendTargets fallback). */
+  private nightWindow(loc: ObserverLocation, dateNight: Date): { start: Date; end: Date } {
+    const tw = twilightWindow(dateNight, loc.latDeg, loc.lonDeg);
+    if (tw) return { start: tw.start, end: tw.end };
+    return {
+      start: new Date(Date.UTC(dateNight.getUTCFullYear(), dateNight.getUTCMonth(), dateNight.getUTCDate(), 20, 0, 0)),
+      end: new Date(Date.UTC(dateNight.getUTCFullYear(), dateNight.getUTCMonth(), dateNight.getUTCDate() + 1, 6, 0, 0)),
+    };
+  }
+
+  private computePlanTargets(
+    plan: { entries: { id: string; dsoId: string }[] },
+    loc: ObserverLocation,
+    win: { start: Date; end: Date },
+  ): PlanTargetInfo[] {
+    const out: PlanTargetInfo[] = [];
+    for (const e of plan.entries) {
+      const dso = getDSOById(e.dsoId);
+      if (!dso) continue;
+      const { maxAltDeg, atDate } = maxAltDuringWindow(dso.ra, dso.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+      const curve = sampleAltCurve(dso.ra, dso.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+      out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve });
+    }
+    // Transit-ordered: earliest culmination first.
+    out.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
+    return out;
+  }
+
+  private defaultPlanName(): string {
+    const dateStr = this.prefs.lastDateISO ?? todayISO();
+    const nice = new Date(dateStr + 'T12:00:00Z').toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    return t('targets.plan.defaultName', { date: nice });
+  }
+
+  /** Inline-edit a plan name in place (swaps the header label for an input). */
+  private startRenamePlan(plan: { id: string; name: string }, nameEl: HTMLElement): void {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = plan.name;
+    input.className = 'flex-1 min-w-0 bg-[var(--bg-input)] border border-subtle text-bright text-sub font-medium px-2 py-1 rounded-sm focus:outline-none focus:border-focus';
+    input.addEventListener('click', e => e.stopPropagation());
+
+    let done = false;
+    const finish = async (save: boolean) => {
+      if (done) return;
+      done = true;
+      const v = input.value.trim();
+      if (save && v && v !== plan.name) {
+        plan.name = v;
+        nameEl.textContent = v;
+        await this.plansStore.renamePlan(plan.id, v);
+      }
+      input.replaceWith(nameEl);
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  private buildPlansView(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'targets-plans flex flex-col gap-4 p-4';
+
+    // Each plan carries its own observation night and gear setup (controls live
+    // inside the plan section), so there are no shared controls at the top.
+    const plans = this.plansStore.plans;
+
+    if (plans.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'targets-empty';
+      empty.textContent = t('targets.plan.noPlans');
+      wrap.appendChild(empty);
+    } else {
+      const accordion = document.createElement('div');
+      accordion.className = 'targets-plan-accordion flex flex-col gap-2';
+      for (const plan of plans) accordion.appendChild(this.buildPlanSection(plan));
+      wrap.appendChild(accordion);
+    }
+
+    const newBtn = document.createElement('button');
+    newBtn.type = 'button';
+    newBtn.className = 'btn-action self-start';
+    newBtn.textContent = '+ ' + t('targets.plan.newPlan');
+    newBtn.addEventListener('click', async () => {
+      await this.plansStore.createPlan(this.defaultPlanName());
+      this.updatePlanBadge();
+      this.render();
+    });
+    wrap.appendChild(newBtn);
+
+    return wrap;
+  }
+
+  private buildPlanSection(plan: Plan): HTMLElement {
+    const details = document.createElement('details');
+    details.className = 'targets-plan-section border border-solid border-[var(--border-accent)] rounded-md bg-card';
+
+    const summary = document.createElement('summary');
+    summary.className = 'flex items-center gap-2 px-4 py-3 cursor-pointer select-none';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'flex-1 min-w-0 text-bright text-sub font-medium truncate';
+    nameEl.textContent = plan.name;
+
+    const count = document.createElement('span');
+    count.className = 'text-dim text-small shrink-0';
+    const setCount = (n: number) => { count.textContent = `(${n})`; };
+    setCount(plan.entries.length);
+
+    const renameBtn = this.iconActionBtn(penSvg, t('targets.plan.rename'));
+    renameBtn.classList.add('shrink-0');
+    renameBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      this.startRenamePlan(plan, nameEl);
+    });
+    const exportBtn = this.iconActionBtn(planListSvg, t('targets.plan.exportPdf'));
+    exportBtn.classList.add('shrink-0');
+    const deleteBtn = this.iconActionBtn(trashSvg, t('targets.plan.delete'));
+    deleteBtn.classList.add('shrink-0');
+
+    summary.appendChild(nameEl);
+    summary.appendChild(count);
+    summary.appendChild(renameBtn);
+    summary.appendChild(exportBtn);
+    summary.appendChild(deleteBtn);
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'targets-plan-body flex flex-col gap-3 px-4 pb-4';
+
+    // ── Per-plan date + setup controls (each plan has its own night and gear) ──
+    // Compact layout: each input hugs its label, with a wide gap between the two
+    // groups for a clear separation (the shared form-row min-widths are dropped).
+    const controls = document.createElement('div');
+    controls.className = 'flex flex-wrap items-center gap-x-12 gap-y-2';
+
+    const dateRow = document.createElement('div');
+    dateRow.className = 'flex items-center gap-2';
+    const dateLabel = document.createElement('label');
+    dateLabel.className = 'text-base text-dim shrink-0';
+    dateLabel.textContent = t('targets.date.label');
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.className = 'targets-coord-input !min-w-0 !max-w-none !flex-none w-auto';
+    dateInput.value = plan.nightOf ?? this.prefs.lastDateISO ?? todayISO();
+    dateRow.appendChild(dateLabel);
+    dateRow.appendChild(dateInput);
+    controls.appendChild(dateRow);
+
+    const setupRow = document.createElement('div');
+    setupRow.className = 'flex items-center gap-2';
+    const setupLabel = document.createElement('label');
+    setupLabel.className = 'text-base text-dim shrink-0';
+    setupLabel.textContent = t('targets.gear.setup');
+    const setupSelect = document.createElement('select');
+    setupSelect.className = 'targets-select !min-w-0 !flex-none w-auto';
+    setupSelect.disabled = true;
+    setupRow.appendChild(setupLabel);
+    setupRow.appendChild(setupSelect);
+    controls.appendChild(setupRow);
+
+    body.appendChild(controls);
+
+    // Region rebuilt whenever the plan's night or setup changes (keeps the
+    // <details> open and the controls focused — only the trajectories refresh).
+    const trajWrap = document.createElement('div');
+    trajWrap.className = 'flex flex-col gap-3';
+    body.appendChild(trajWrap);
+    details.appendChild(body);
+
+    // The effective setup id (plan's own, else the global recommend default).
+    const effectiveSetupId = (): string | null => plan.setupId ?? this.prefs.setupId ?? null;
+
+    // Latest computed targets/window — read by the PDF export button.
+    let currentInfos: PlanTargetInfo[] = [];
+    let currentWin: { start: Date; end: Date } | null = null;
+
+    const renderTrajectories = (): void => {
+      trajWrap.innerHTML = '';
+      currentInfos = [];
+      currentWin = null;
+      const observer = this.getPlanObserverFor(dateInput.value || null);
+      if (!observer) {
+        trajWrap.innerHTML = `<div class="targets-empty">${t('targets.location.notSet')}</div>`;
+        return;
+      }
+      if (plan.entries.length === 0) {
+        trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
+        return;
+      }
+      const win = this.nightWindow(observer.loc, observer.dateNight);
+      const infos = this.computePlanTargets(plan, observer.loc, win);
+      currentInfos = infos;
+      currentWin = win;
+
+      trajWrap.appendChild(this.buildTimelineHeader(win));
+      const list = document.createElement('div');
+      list.className = 'flex flex-col divide-y divide-[var(--border-input)]';
+      const fillers: Array<(p: GearPreset | null) => void> = [];
+      for (const info of infos) {
+        const { row, applyPreset } = this.buildPlanRow(plan.id, info, win, (rowEl) => {
+          // In-place removal — must NOT collapse or rebuild the whole plan.
+          rowEl.remove();
+          plan.entries = plan.entries.filter(e => e.id !== info.entryId);
+          currentInfos = currentInfos.filter(i => i.entryId !== info.entryId);
+          setCount(plan.entries.length);
+          if (plan.entries.length === 0) {
+            trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
+          }
+        });
+        fillers.push(applyPreset);
+        list.appendChild(row);
+      }
+      trajWrap.appendChild(list);
+
+      // Score / FOV-fit / integration time need a gear preset (resolved async).
+      this.planPreset(effectiveSetupId()).then(preset => {
+        for (const f of fillers) f(preset);
+      });
+    };
+
+    renderTrajectories();
+
+    dateInput.addEventListener('change', () => {
+      plan.nightOf = dateInput.value || null;
+      this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId);
+      renderTrajectories();
+    });
+
+    getGearSetups().then(setups => {
+      if (setups.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = t('targets.gear.noSetup') ?? '—';
+        setupSelect.appendChild(opt);
+        return;
+      }
+      setupSelect.disabled = false;
+      for (const s of setups) {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        setupSelect.appendChild(opt);
+      }
+      const eff = effectiveSetupId();
+      setupSelect.value = (eff && setups.some(s => s.id === eff)) ? eff : setups[0].id;
+      setupSelect.addEventListener('change', () => {
+        plan.setupId = setupSelect.value || null;
+        this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId);
+        renderTrajectories();
+      });
+    }).catch(() => {});
+
+    deleteBtn.addEventListener('click', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const confirmed = await confirmPlanDelete(plan.name);
+      if (!confirmed) return;
+      await this.plansStore.deletePlan(plan.id);
+      this.updatePlanBadge();
+      this.render();
+    });
+
+    exportBtn.addEventListener('click', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!currentWin || currentInfos.length === 0) {
+        showToast({ message: t('targets.plan.empty'), type: 'info', duration: 2000 });
+        return;
+      }
+      const win = currentWin;
+      const infos = currentInfos;
+      showToast({ message: t('settings.exportView.rendering'), type: 'info', duration: 2000 });
+      try {
+        const fovSpecs = await this.getSelectedFovSpecs(effectiveSetupId());
+        const blob = await renderPlanPdf(this.skyMap, {
+          planName: plan.name,
+          targets: infos.map(i => ({ dso: i.dso, bestTimeUtc: i.bestTimeUtc, maxAltDeg: i.maxAltDeg, curve: i.curve, nightWin: win })),
+          fovSpecs,
+        });
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        downloadBlob(blob, `myastrosky-plan-${ts}.pdf`);
+        showToast({ message: t('settings.exportView.success'), type: 'info', duration: 2500 });
+      } catch (err) {
+        reportUnknownRendererError('plan_pdf_failed', err, { planId: plan.id });
+        showToast({ message: t('settings.exportView.error'), type: 'error', duration: 4000 });
+      }
+    });
+
+    return details;
+  }
+
+  /** Width of the plan-row left column (DSO name/chips/details), kept in sync with the header spacer. */
+  private static readonly PLAN_INFO_COL = 'w-52';
+  /** Width of the chart's left axis-label gutter, kept in sync with the header spacer. */
+  private static readonly PLAN_AXIS_GUTTER = 'w-7';
+
+  private buildTimelineHeader(win: { start: Date; end: Date }): HTMLElement {
+    // Mirror the plan-row column layout so the dusk/dawn labels sit exactly
+    // over the start/end of the sparkline (the flex-1 chart column), accounting
+    // for the axis-label gutter to the left of the plot.
+    const header = document.createElement('div');
+    header.className = 'flex items-center gap-3';
+
+    const infoSpacer = document.createElement('span');
+    infoSpacer.className = `${TargetsView.PLAN_INFO_COL} shrink-0`;
+
+    const gutterSpacer = document.createElement('span');
+    gutterSpacer.className = `${TargetsView.PLAN_AXIS_GUTTER} shrink-0`;
+
+    const labels = document.createElement('div');
+    labels.className = 'flex-1 min-w-0 flex justify-between text-micro text-dim';
+    const a = document.createElement('span');
+    a.textContent = formatTime(win.start);
+    const b = document.createElement('span');
+    b.textContent = formatTime(win.end);
+    labels.appendChild(a);
+    labels.appendChild(b);
+
+    // Invisible clone of the row's remove button, to reserve the same width.
+    const removeSpacer = document.createElement('span');
+    removeSpacer.className = 'btn-icon shrink-0 invisible';
+    removeSpacer.textContent = '✕';
+
+    header.appendChild(infoSpacer);
+    header.appendChild(gutterSpacer);
+    header.appendChild(labels);
+    header.appendChild(removeSpacer);
+    return header;
+  }
+
+  /**
+   * One plan target: a left column mirroring the recommend-target card (name,
+   * type/constellation chips, and a collapsible meta section), the altitude
+   * trajectory chart, and a remove button. `applyPreset` fills the gear-dependent
+   * fields (score, FOV-fit, integration time) once the plan's setup resolves.
+   */
+  private buildPlanRow(
+    planId: string,
+    info: PlanTargetInfo,
+    win: { start: Date; end: Date },
+    onRemoved: (rowEl: HTMLElement) => void,
+  ): { row: HTMLElement; applyPreset: (preset: GearPreset | null) => void } {
+    const { dso } = info;
+    // border-0 zeroes every side (no preflight sets border-style/width), and
+    // border-solid lets the list's divide-y add a 1px top divider on non-first
+    // rows — without medium-width borders leaking onto the other sides.
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-3 py-3 border-0 border-solid';
+
+    // ── Left column: name, chips, rating, meta (all shown), + collapsible filters ──
+    const left = document.createElement('div');
+    left.className = `${TargetsView.PLAN_INFO_COL} shrink-0 flex flex-col gap-1`;
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'target-card-title';
+    if (dso.displayName) {
+      titleEl.appendChild(Object.assign(document.createElement('span'), { textContent: dso.displayName }));
+      const idSpan = document.createElement('span');
+      idSpan.className = 'target-card-catalog-id';
+      idSpan.textContent = ' ' + (dso.catalogs[0] || dso.id);
+      titleEl.appendChild(idSpan);
+    } else {
+      titleEl.textContent = dso.catalogs[0] || dso.id;
+    }
+    titleEl.title = dso.catalogs.join(' · ');
+    left.appendChild(titleEl);
+
+    const chips = document.createElement('div');
+    chips.className = 'target-card-chips';
+    const typeEl = document.createElement('div');
+    typeEl.className = 'target-card-type';
+    typeEl.textContent = dsoTypeLabel(dso.type);
+    chips.appendChild(typeEl);
+    if (dso.constellation) {
+      const constEl = document.createElement('div');
+      constEl.className = 'target-card-const';
+      constEl.textContent = dso.constellation.toUpperCase();
+      const constInfo = getConstellationInfos().find(c => c.id === dso.constellation);
+      if (constInfo) constEl.title = constInfo.name;
+      chips.appendChild(constEl);
+    }
+    left.appendChild(chips);
+
+    // Star rating below the chips, like the recommend card.
+    if (dso.rating !== null) {
+      const ratingEl = document.createElement('div');
+      ratingEl.className = 'target-card-rating';
+      ratingEl.title = t('targets.tooltips.rating');
+      ratingEl.textContent = '★'.repeat(dso.rating) + '☆'.repeat(5 - dso.rating);
+      left.appendChild(ratingEl);
+    }
+
+    // Meta — always shown (no collapsible).
+    const meta = document.createElement('div');
+    meta.className = 'target-card-meta';
+    meta.appendChild(this.metaItem(t('targets.results.maxAlt'), formatAlt(info.maxAltDeg), t('targets.tooltips.maxAlt')));
+    if (dso.mag !== null) meta.appendChild(this.metaItem('Mag', dso.mag.toFixed(1), t('targets.tooltips.mag')));
+    if (dso.majAxis) meta.appendChild(this.metaItem(t('targets.results.size'), formatArcmin(dso.majAxis), t('targets.tooltips.size')));
+    left.appendChild(meta);
+
+    const meta2 = document.createElement('div');
+    meta2.className = 'target-card-meta';
+    if (dso.difficulty !== null) {
+      const diffEl = this.metaItem(t('targets.sort.difficulty'), '◆'.repeat(dso.difficulty) + '◇'.repeat(5 - dso.difficulty), t('targets.tooltips.difficulty'));
+      diffEl.querySelector('.target-meta-value')!.className = 'target-meta-value target-card-difficulty';
+      meta2.appendChild(diffEl);
+    }
+    const scoreItem = this.metaItem(t('targets.results.score'), '—', t('targets.tooltips.score'));
+    const fovItem = this.metaItem(t('targets.results.fov'), '—', t('targets.tooltips.fov'));
+    meta2.appendChild(scoreItem);
+    meta2.appendChild(fovItem);
+    left.appendChild(meta2);
+
+    const totalEl = document.createElement('div');
+    totalEl.className = 'target-integration-total';
+    totalEl.textContent = `${t('targets.results.integrationTotal')}: —`;
+    left.appendChild(totalEl);
+
+    // Collapsible: suggested filters (populated once the gear preset resolves).
+    const filtersDetails = document.createElement('details');
+    filtersDetails.className = 'target-details';
+    const filtersSummary = document.createElement('summary');
+    filtersSummary.textContent = t('targets.results.filtersTitle');
+    filtersDetails.appendChild(filtersSummary);
+    const filterList = document.createElement('div');
+    filterList.className = 'target-filter-list';
+    filtersDetails.appendChild(filterList);
+    left.appendChild(filtersDetails);
+
+    // ── Trajectory chart ──
+    // Layout: [axis-label gutter] [plot]. The graduations live in the gutter,
+    // to the left of the axis, so they never overlap the trajectory.
+    const chart = this.buildAltChart(info.curve, win, info.bestTimeUtc);
+    const chartWrap = document.createElement('div');
+    chartWrap.className = 'flex-1 min-w-0 flex';
+
+    const gutter = document.createElement('div');
+    gutter.className = `relative ${TargetsView.PLAN_AXIS_GUTTER} shrink-0`;
+    // Left vertical-axis graduations (20/40/60/80°), centered on their gridlines.
+    for (const tick of chart.ticks) {
+      const tickLab = document.createElement('span');
+      tickLab.className = 'absolute right-1 text-micro text-dim leading-none -translate-y-1/2 pointer-events-none';
+      tickLab.style.top = `${(tick.frac * 100).toFixed(1)}%`;
+      tickLab.textContent = tick.label;
+      gutter.appendChild(tickLab);
+    }
+
+    const chartBox = document.createElement('div');
+    chartBox.className = 'relative flex-1 min-w-0';
+    chartBox.appendChild(chart.svg);
+
+    chartWrap.appendChild(gutter);
+    chartWrap.appendChild(chartBox);
+
+    if (chart.hiFrac !== null) {
+      // Max-altitude label sits just above its reference line.
+      const maxLab = document.createElement('span');
+      maxLab.className = 'absolute right-1 text-micro text-dim leading-none pointer-events-none';
+      maxLab.style.top = `${(chart.hiFrac * 100).toFixed(1)}%`;
+      maxLab.style.transform = 'translateY(calc(-100% - 2px))';
+      maxLab.textContent = formatAlt(chart.hi);
+      chartBox.appendChild(maxLab);
+    }
+    if (chart.loFrac !== null && chart.loFrac !== chart.hiFrac) {
+      // Min-altitude label sits just below its reference line.
+      const minLab = document.createElement('span');
+      minLab.className = 'absolute right-1 text-micro text-dim leading-none pointer-events-none';
+      minLab.style.top = `${(chart.loFrac * 100).toFixed(1)}%`;
+      minLab.style.transform = 'translateY(2px)';
+      minLab.textContent = formatAlt(chart.lo);
+      chartBox.appendChild(minLab);
+    }
+    if (chart.transitFrac !== null) {
+      // HTML overlays (the SVG is non-uniformly scaled, which would distort text):
+      // "Transit" above the line and the transit hour below it.
+      const transitX = `${(chart.transitFrac * 100).toFixed(1)}%`;
+      // Always centred over the transit line — including when it sits on the
+      // start/end axis.
+      const transitShift = 'translateX(-50%)';
+      const tl = document.createElement('span');
+      tl.className = 'absolute top-0 text-micro text-dim leading-none px-0.5 bg-card whitespace-nowrap pointer-events-none';
+      tl.style.left = transitX;
+      tl.style.transform = transitShift;
+      tl.textContent = t('targets.plan.transit');
+      chartBox.appendChild(tl);
+
+      const th = document.createElement('span');
+      th.className = 'absolute bottom-0 text-micro text-dim leading-none px-0.5 bg-card whitespace-nowrap pointer-events-none';
+      th.style.left = transitX;
+      th.style.transform = transitShift;
+      th.textContent = formatTime(info.bestTimeUtc);
+      chartBox.appendChild(th);
+    }
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-icon shrink-0';
+    removeBtn.title = t('targets.plan.remove');
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', async () => {
+      await this.plansStore.removeEntry(planId, info.entryId);
+      this.updatePlanBadge();
+      onRemoved(row);
+    });
+
+    row.appendChild(left);
+    row.appendChild(chartWrap);
+    row.appendChild(removeBtn);
+
+    const applyPreset = (preset: GearPreset | null): void => {
+      if (!preset) return;
+      const { score, fovFitScore } = scoreDso(dso, preset, info.maxAltDeg, {
+        ignoreFovFit: this.prefs.includeOversized ?? false,
+        minAltDeg: this.prefs.minAltDeg ?? 20,
+      });
+      scoreItem.querySelector('.target-meta-value')!.textContent = `${Math.round(score * 100)}%`;
+      fovItem.querySelector('.target-meta-value')!.textContent = `${Math.round(fovFitScore * 100)}%`;
+      const recipe = recommendRecipe(dso, preset);
+      totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
+      filterList.innerHTML = '';
+      for (const f of recipe.filters) {
+        const fr = document.createElement('div');
+        fr.className = 'target-filter-row';
+        const badge = createFilterBadge(f.name);
+        const detail = document.createElement('span');
+        detail.className = 'target-filter-detail';
+        detail.textContent = `${f.count} × ${f.subSeconds}s = ${formatHours(f.hours)}`;
+        fr.appendChild(badge);
+        fr.appendChild(detail);
+        filterList.appendChild(fr);
+      }
+    };
+
+    return { row, applyPreset };
+  }
+
+  /**
+   * Altitude-trajectory chart across the night window. The vertical axis is
+   * fixed at 0–90° so all objects share the same scale. Two dashed reference
+   * lines mark the object's actual min and max altitude for the night, and a
+   * dashed vertical line marks the transit. Returns the object's altitude
+   * extremes and the height/width fractions used to place HTML overlay labels
+   * (the SVG itself is non-uniformly scaled, so text is drawn in HTML instead).
+   */
+  private buildAltChart(
+    curve: AltSample[],
+    win: { start: Date; end: Date },
+    transitTime: Date,
+  ): { svg: SVGSVGElement; lo: number; hi: number; hiFrac: number | null; loFrac: number | null; transitFrac: number | null; ticks: { label: string; frac: number }[] } {
+    const NS = 'http://www.w3.org/2000/svg';
+    const W = 120, H = 53, padY = 7, padX = 2;
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('class', 'block w-full h-[180px]');
+    if (curve.length === 0) return { svg, lo: 0, hi: 0, hiFrac: null, loFrac: null, transitFrac: null, ticks: [] };
+
+    const span = (win.end.getTime() - win.start.getTime()) || 1;
+    // Fixed 0–90° Y scale so all objects are comparable.
+    const lo = 0, hi = 90, range = 90;
+    const usableH = H - 2 * padY;
+
+    // The plot is inset by padX so the left axis (and a transit line at the
+    // window start) sits fully inside the viewBox instead of being clipped.
+    const xAt = (d: Date) => padX + ((d.getTime() - win.start.getTime()) / span) * (W - padX);
+    const yAt = (alt: number) => {
+      const a = Math.max(lo, Math.min(hi, alt));
+      return padY + (1 - (a - lo) / range) * usableH;
+    };
+
+    // Left-axis graduations: faint gridlines at 0/20/40/60/80° (labels drawn in HTML).
+    const TICK_DEGS = [0, 20, 40, 60, 80];
+    for (const deg of TICK_DEGS) {
+      const g = document.createElementNS(NS, 'line');
+      const y = yAt(deg);
+      g.setAttribute('x1', String(padX)); g.setAttribute('x2', String(W));
+      g.setAttribute('y1', String(y)); g.setAttribute('y2', String(y));
+      g.setAttribute('class', 'stroke-[var(--border-input)]');
+      g.setAttribute('stroke-width', '0.5');
+      g.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(g);
+    }
+    const ticks = TICK_DEGS.map(deg => ({ label: formatAlt(deg), frac: yAt(deg) / H }));
+
+    // Left vertical axis — always present, so every chart has a consistent frame.
+    const axis = document.createElementNS(NS, 'line');
+    axis.setAttribute('x1', String(padX)); axis.setAttribute('x2', String(padX));
+    axis.setAttribute('y1', String(padY)); axis.setAttribute('y2', String(H - padY));
+    axis.setAttribute('class', 'stroke-[var(--border-input)]');
+    axis.setAttribute('stroke-width', '1');
+    axis.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(axis);
+
+    // Object's actual altitude extremes (for reference lines and labels).
+    const alts = curve.map(s => s.altDeg);
+    const objLo = Math.max(0, Math.min(...alts));
+    const objHi = Math.max(...alts);
+
+    const mkRefLine = (y: number) => {
+      const l = document.createElementNS(NS, 'line');
+      l.setAttribute('x1', String(padX)); l.setAttribute('x2', String(W));
+      l.setAttribute('y1', String(y)); l.setAttribute('y2', String(y));
+      l.setAttribute('class', 'stroke-[var(--text-dim)]');
+      l.setAttribute('stroke-width', '1');
+      l.setAttribute('stroke-dasharray', '3 3');
+      l.setAttribute('vector-effect', 'non-scaling-stroke');
+      return l;
+    };
+    svg.appendChild(mkRefLine(yAt(objHi)));
+    svg.appendChild(mkRefLine(yAt(objLo)));
+
+    const pts = curve.map(s => `${xAt(s.time).toFixed(1)},${yAt(s.altDeg).toFixed(1)}`);
+
+    // Light fill under the trajectory, down to the object's min-altitude line.
+    const yMinLine = yAt(objLo);
+    const area = document.createElementNS(NS, 'path');
+    area.setAttribute('d', `M${pts[0].split(',')[0]},${yMinLine} L${pts.join(' L')} L${W},${yMinLine} Z`);
+    area.setAttribute('class', 'fill-[var(--accent-fill-sm)] stroke-none');
+    svg.appendChild(area);
+
+    // The trajectory curve itself.
+    const line = document.createElementNS(NS, 'polyline');
+    line.setAttribute('points', pts.join(' '));
+    line.setAttribute('class', 'fill-none stroke-[var(--accent-border)]');
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke-linejoin', 'round');
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(line);
+
+    // Transit vertical dashed line (the "Transit" label is rendered in HTML).
+    let transitFrac: number | null = null;
+    const tFrac = (transitTime.getTime() - win.start.getTime()) / span;
+    if (tFrac >= 0 && tFrac <= 1) {
+      const tx = xAt(transitTime);
+      // Fraction of the SVG width (accounts for the padX inset) so the HTML
+      // overlay labels line up with the drawn line.
+      transitFrac = tx / W;
+      const vLine = document.createElementNS(NS, 'line');
+      vLine.setAttribute('x1', tx.toFixed(1)); vLine.setAttribute('x2', tx.toFixed(1));
+      vLine.setAttribute('y1', String(padY)); vLine.setAttribute('y2', String(H - padY));
+      vLine.setAttribute('class', 'stroke-[var(--text-dim)]');
+      vLine.setAttribute('stroke-width', '1');
+      vLine.setAttribute('stroke-dasharray', '2 2');
+      vLine.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(vLine);
+    }
+
+    return {
+      svg, lo: objLo, hi: objHi,
+      hiFrac: yAt(objHi) / H,
+      loFrac: yAt(objLo) / H,
+      transitFrac,
+      ticks,
+    };
+  }
+
+  /** FOV frame spec for a given gear setup (for the plan PDF). */
+  private async getSelectedFovSpecs(setupId: string | null) {
+    if (!setupId) return [];
+    try {
+      const setups = await getGearSetups();
+      const setup = setups.find(s => s.id === setupId);
+      if (!setup) return [];
+      return await buildFovFrameSpecs([{ ...setup, enabled: true }]);
+    } catch (err) {
+      reportUnknownRendererError('plan_fov_specs_failed', err, { setupId });
+      return [];
+    }
+  }
+
+  /** Imperative "add to plan" popover anchored to a button. */
+  private openPlanPicker(anchorEl: HTMLElement, dsoId: string): void {
+    this.closePlanPicker();
+
+    const picker = document.createElement('div');
+    picker.className = 'plan-picker fixed z-tooltip bg-panel border border-subtle rounded-md shadow-lg py-2 min-w-[220px] max-h-[60vh] overflow-auto';
+    // Position only after the picker is in the DOM so we can measure its real
+    // size; re-run on scroll/resize so the popup keeps tracking the button.
+    const positionPicker = (): void => {
+      const rect = anchorEl.getBoundingClientRect();
+      // Discard the popup once the button is scrolled out of (or off) the viewport.
+      if (rect.bottom <= 0 || rect.top >= window.innerHeight
+          || rect.right <= 0 || rect.left >= window.innerWidth) {
+        this.closePlanPicker();
+        return;
+      }
+      const gap = 4;
+      const w = picker.offsetWidth || 240;
+      const h = picker.offsetHeight || 0;
+      // Horizontal: align the popup's right edge to the button's right edge,
+      // clamped into the viewport so it never overflows either side.
+      const left = Math.max(8, Math.min(rect.right - w, window.innerWidth - w - 8));
+      // Vertical: below the button, or above it if there isn't room below.
+      const below = rect.bottom + gap;
+      const top = (below + h <= window.innerHeight - 8 || rect.top < h)
+        ? below
+        : Math.max(8, rect.top - gap - h);
+      picker.style.left = `${left}px`;
+      picker.style.top = `${top}px`;
+    };
+
+    const title = document.createElement('div');
+    title.className = 'px-3 pb-1 text-micro uppercase text-label';
+    title.textContent = t('targets.plan.pickerTitle');
+    picker.appendChild(title);
+
+    const list = document.createElement('div');
+    picker.appendChild(list);
+
+    const renderList = () => {
+      list.innerHTML = '';
+      for (const plan of this.plansStore.plans) {
+        const rowBtn = document.createElement('button');
+        rowBtn.type = 'button';
+        rowBtn.className = 'flex items-center gap-2 w-full text-left px-3 py-2 bg-transparent border-0 cursor-pointer text-primary hover:bg-[var(--accent-fill-sm)]';
+        const check = document.createElement('span');
+        check.className = 'w-4 shrink-0 text-bright';
+        check.textContent = this.plansStore.isInPlan(dsoId, plan.id) ? '✓' : '';
+        const label = document.createElement('span');
+        label.className = 'flex-1 truncate';
+        label.textContent = plan.name;
+        rowBtn.appendChild(check);
+        rowBtn.appendChild(label);
+        rowBtn.addEventListener('click', async () => {
+          await this.plansStore.toggleEntry(plan.id, dsoId);
+          renderList();
+          this.refreshAllPlanButtons();
+        });
+        list.appendChild(rowBtn);
+      }
+    };
+    renderList();
+
+    const sep = document.createElement('div');
+    sep.className = 'border-t border-subtle my-1';
+    picker.appendChild(sep);
+
+    const newRow = document.createElement('button');
+    newRow.type = 'button';
+    newRow.className = 'flex items-center gap-2 w-full text-left px-3 py-2 bg-transparent border-0 cursor-pointer text-primary hover:bg-[var(--accent-fill-sm)]';
+    newRow.textContent = '+ ' + t('targets.plan.newPlan');
+    newRow.addEventListener('click', async () => {
+      const id = await this.plansStore.createPlan(this.defaultPlanName());
+      if (id) await this.plansStore.addEntry(id, dsoId);
+      this.updatePlanBadge();
+      renderList();
+      this.refreshAllPlanButtons();
+    });
+    picker.appendChild(newRow);
+
+    document.body.appendChild(picker);
+    this.planPickerEl = picker;
+    positionPicker();
+
+    // Keep the popup glued to the button while it's open.
+    this.planPickerReposition = positionPicker;
+    window.addEventListener('scroll', this.planPickerReposition, true);
+    window.addEventListener('resize', this.planPickerReposition);
+
+    // Close on outside click / Escape (deferred so this click doesn't immediately close it).
+    setTimeout(() => {
+      this.planPickerOutside = (ev: MouseEvent) => {
+        if (this.planPickerEl && !this.planPickerEl.contains(ev.target as Node) && ev.target !== anchorEl) {
+          this.closePlanPicker();
+        }
+      };
+      this.planPickerEsc = (ev: KeyboardEvent) => { if (ev.key === 'Escape') this.closePlanPicker(); };
+      document.addEventListener('click', this.planPickerOutside);
+      document.addEventListener('keydown', this.planPickerEsc);
+    }, 0);
+  }
+
+  private closePlanPicker(): void {
+    if (this.planPickerEl) { this.planPickerEl.remove(); this.planPickerEl = null; }
+    if (this.planPickerOutside) { document.removeEventListener('click', this.planPickerOutside); this.planPickerOutside = null; }
+    if (this.planPickerEsc) { document.removeEventListener('keydown', this.planPickerEsc); this.planPickerEsc = null; }
+    if (this.planPickerReposition) {
+      window.removeEventListener('scroll', this.planPickerReposition, true);
+      window.removeEventListener('resize', this.planPickerReposition);
+      this.planPickerReposition = null;
+    }
+  }
+
+  /** Refresh every card's plan-list button highlight + the mode badge. */
+  private refreshAllPlanButtons(): void {
+    this.updatePlanBadge();
+    this.container.querySelectorAll<HTMLButtonElement>('.target-card [data-plan-dso]').forEach(btn => {
+      this.refreshPlanBtnState(btn, btn.getAttribute('data-plan-dso')!);
+    });
   }
 }

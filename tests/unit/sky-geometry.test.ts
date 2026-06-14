@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { altAzFromRaDec, transitLstHours, maxAltDuringWindow, mightBeVisible } from '../../src/sky-geometry';
+import { altAzFromRaDec, transitLstHours, maxAltDuringWindow, mightBeVisible, sampleAltCurve } from '../../src/sky-geometry';
 import { lstHours, dateToJD } from '../../src/astro-time';
 
 describe('altAzFromRaDec', () => {
@@ -87,5 +87,52 @@ describe('maxAltDuringWindow', () => {
     const { atDate } = maxAltDuringWindow(84, -1.2, 48.85, 2.35, windowStart, windowEnd);
     expect(atDate.getTime()).toBeGreaterThanOrEqual(windowStart.getTime());
     expect(atDate.getTime()).toBeLessThanOrEqual(windowEnd.getTime());
+  });
+});
+
+describe('sampleAltCurve', () => {
+  const raDeg = 84, decDeg = -1.2, latDeg = 48.85, lonDeg = 2.35;
+  const start = new Date('2024-01-15T19:00:00Z');
+  const end = new Date('2024-01-16T05:00:00Z'); // 10h window
+
+  it('returns evenly-spaced samples covering the window inclusively', () => {
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 60);
+    // 10h / 60min = 10 steps → 11 inclusive samples.
+    expect(curve.length).toBe(11);
+    expect(curve[0].time.getTime()).toBe(start.getTime());
+    expect(curve[curve.length - 1].time.getTime()).toBe(end.getTime());
+  });
+
+  it('produces monotonically increasing timestamps', () => {
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 30);
+    for (let i = 1; i < curve.length; i++) {
+      expect(curve[i].time.getTime()).toBeGreaterThan(curve[i - 1].time.getTime());
+    }
+  });
+
+  it('appends the exact window end when the step does not divide evenly', () => {
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 70);
+    expect(curve[curve.length - 1].time.getTime()).toBe(end.getTime());
+  });
+
+  it('altitudes match altAzFromRaDec at the sampled times', () => {
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 120);
+    for (const s of curve) {
+      const lst = lstHours(dateToJD(s.time), lonDeg);
+      expect(s.altDeg).toBeCloseTo(altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg, 6);
+    }
+  });
+
+  it('peak sample altitude is close to maxAltDuringWindow', () => {
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 10);
+    const peak = Math.max(...curve.map(s => s.altDeg));
+    const { maxAltDeg } = maxAltDuringWindow(raDeg, decDeg, latDeg, lonDeg, start, end, 10);
+    expect(peak).toBeCloseTo(maxAltDeg, 5);
+  });
+
+  it('degenerate window (end <= start) returns a single sample', () => {
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, start, 10);
+    expect(curve.length).toBe(1);
+    expect(curve[0].time.getTime()).toBe(start.getTime());
   });
 });

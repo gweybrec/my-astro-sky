@@ -69,6 +69,51 @@ export function maxAltDuringWindow(
   return { maxAltDeg: best, atDate: bestDate };
 }
 
+/** One altitude sample along the night. */
+export interface AltSample {
+  time: Date;
+  altDeg: number;
+}
+
+/**
+ * Sample an object's altitude across a window, every `stepMin` minutes.
+ * Returns evenly-spaced `{ time, altDeg }` points (inclusive of both ends),
+ * for drawing an altitude-over-the-night timeline.
+ */
+export function sampleAltCurve(
+  raDeg: number,
+  decDeg: number,
+  latDeg: number,
+  lonDeg: number,
+  windowStart: Date,
+  windowEnd: Date,
+  stepMin = 10,
+): AltSample[] {
+  const startMs = windowStart.getTime();
+  const endMs = windowEnd.getTime();
+  const dtMs = Math.max(1, stepMin) * 60 * 1000;
+  const samples: AltSample[] = [];
+  if (endMs <= startMs) {
+    const jd = dateToJD(windowStart);
+    const lst = lstHours(jd, lonDeg);
+    return [{ time: new Date(startMs), altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg }];
+  }
+  for (let tMs = startMs; tMs <= endMs; tMs += dtMs) {
+    const time = new Date(tMs);
+    const jd = dateToJD(time);
+    const lst = lstHours(jd, lonDeg);
+    samples.push({ time, altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg });
+  }
+  // Ensure the exact window end is represented (loop may stop just short).
+  const last = samples[samples.length - 1];
+  if (last.time.getTime() < endMs) {
+    const jd = dateToJD(windowEnd);
+    const lst = lstHours(jd, lonDeg);
+    samples.push({ time: new Date(endMs), altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg });
+  }
+  return samples;
+}
+
 /**
  * For objects that might be above the horizon during the window,
  * returns true if max altitude ≥ minAltDeg.

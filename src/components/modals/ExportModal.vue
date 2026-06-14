@@ -24,6 +24,10 @@
           <input type="checkbox" v-model="includeSetups" @change="update" />
           {{ t('settings.exportSetups') }}
         </label>
+        <label class="export-checkbox-row">
+          <input type="checkbox" v-model="includePlans" @change="update" />
+          {{ t('settings.exportPlans') }}
+        </label>
 
         <div class="modal-divider"></div>
 
@@ -84,6 +88,7 @@ const includeMeta = ref(true);
 const includeDso = ref(false);
 const includeGear = ref(false);
 const includeSetups = ref(false);
+const includePlans = ref(false);
 const busy = ref(false);
 
 const selected = reactive(new Set<string>());
@@ -106,7 +111,8 @@ const sizeLabel = computed(() => {
 });
 
 const canExport = computed(() =>
-  includeDso.value || includeMeta.value || someChecked.value,
+  includeDso.value || includeMeta.value || includeGear.value ||
+  includeSetups.value || includePlans.value || someChecked.value,
 );
 
 function update() { /* reactivity via v-model */ }
@@ -134,6 +140,7 @@ async function onExport() {
     includeDsoOverrides: includeDso.value,
     includeCustomGear: includeGear.value,
     includeSetups: includeSetups.value,
+    includePlans: includePlans.value,
   };
   busy.value = true;
   try {

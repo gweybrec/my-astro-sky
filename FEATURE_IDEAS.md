@@ -13,12 +13,15 @@ pick from. Each item notes rough **value** and **effort** (S/M/L) and the main f
   separation per target; "moon impact" badge, optional score penalty + min-separation filter
   (narrowband penalized less). Reuses sun/twilight altitude code. → `src/astro-time.ts`,
   `src/sky-geometry.ts`, `src/target-recommender.ts`, `src/targets-view.ts`
-- [ ] **A3 — Framing / rotation assistant** _(value: high, effort: M)_ — interactive, rotatable gear
-  FOV rectangle anchored on a target, showing fit + camera angle. Extends the FOV ribbon. →
-  `src/gear-presets.ts`, `src/projection.ts`, `src/sky-map.ts`
-- [ ] **A2 — Session / night planner** _(value: high, effort: M-L)_ — pick date+site, get a
-  transit-ordered list with an altitude timeline; export to text/CSV. Builds on existing altitude
-  sampling + twilight window. → `src/target-recommender.ts`, new panel
+- [ ] **A2 — Session / "tonight plan" planner** _(value: high, effort: M-L)_ — let the user pick a
+  set of targets (from recommender / search) into a persistent "tonight plan"; show them in a
+  transit-ordered list with an altitude timeline; export to text/CSV. Foundation that A3 builds on.
+  Builds on existing altitude sampling + twilight window. → `src/target-recommender.ts`, new panel
+- [ ] **A3 — Per-target framing & rotation** _(value: high, effort: M, depends on A2)_ — extend the
+  existing FOV frame so each chosen target in the tonight plan spawns its own **anchored** frame
+  (small pin icon to attach/detach a frame from a DSO), each **rotatable individually**, with a
+  **camera position-angle (°E of N) readout** to dial into the rotator/mount. Per-target rotation
+  syncs back into the tonight list. → `src/fov-overlay.ts`, `src/sky-map.ts`, `src/projection.ts`
 - [ ] **A6 — Multi-night projects** _(value: high, effort: M)_ — track active targets with
   integration goals ("M31 — 8h / 20h"), accumulate from linked photos. Overlaps with B1/B2.
 - [ ] **A4 — Mosaic planner** _(value: high, effort: L)_ — N×M panel grid with overlap % for
@@ -103,19 +106,34 @@ a "moon impact" badge on each card, with an optional score penalty and a minimum
 The penalty would be softened for narrowband-suited targets. The math reuses the same altitude/time
 machinery already powering the sun/twilight calculation.
 
-**A3 — Framing / rotation assistant.** Knowing a target is "well placed" doesn't tell you whether it
-*fits your frame* or what camera angle to use. This puts an interactive rectangle on the map sized to
-your selected gear's true field of view, anchored over a target, that you can rotate to see how the
-object composes — e.g. tilting the camera so a galaxy lies along the diagonal. It outputs the
-rotation angle to dial into your rig. The static FOV ribbon already exists; this makes it
-interactive and target-anchored.
+**A3 — Per-target framing & rotation.** _Builds on A2 (the tonight plan) and on the FOV-frame
+feature that already exists._ Today the app can draw a gear FOV rectangle and rotate it, but the
+frame is anchored to the centre of the viewport (you pan a target under it), there's only one global
+rotation shared by all frames, and the rotation shown is screen-relative — not the angle you'd
+actually set at the scope. This item closes those gaps:
 
-**A2 — Session / night planner.** Today you get a flat list of good targets. A planner turns that
-into an actual observing schedule: pick a date and site, and get targets ordered by when they transit
-(cross the meridian, their best moment), with a simple timeline showing when each rises above your
-altitude floor and when it peaks — so you can sequence a night without overlap. Exportable to
-text/CSV to bring to the scope. All the underlying altitude-over-time sampling already exists in the
-recommender; this is a new presentation of it.
+- **Anchoring** — a small **pin icon** on a frame attaches it to a specific DSO so it stays put on
+  that object instead of the viewport centre (and can be un-pinned to free-float again).
+- **Per-target frames** — every target the user adds to the **tonight plan (A2)** spawns its own
+  anchored frame, so you can see how each object composes in one view.
+- **Independent rotation** — each frame rotates on its own (not one global angle), so you can tilt
+  each composition separately. Changing a frame's rotation **writes back into the tonight list** so
+  the plan records the chosen angle per target.
+- **Position-angle readout** — convert the on-screen frame rotation (plus the map rotation) into a
+  true celestial **position angle (°E of N)**, the number you dial into a rotator/mount to reproduce
+  the framing at the telescope. This is the piece that turns the preview into an actionable plan.
+
+A2 is the prerequisite: the set of chosen targets is what drives which anchored frames exist. → `src/fov-overlay.ts`, `src/sky-map.ts`, `src/projection.ts`
+
+**A2 — Session / "tonight plan" planner.** Today you get a flat list of good targets but no way to
+*commit* to a subset for a given night. This adds the notion of a **tonight plan**: the user picks
+targets (from the recommender or search) into a persistent list, ordered by when they transit (cross
+the meridian, their best moment), with a simple timeline showing when each rises above the altitude
+floor and when it peaks — so you can sequence a night without overlap. Exportable to text/CSV to
+bring to the scope. All the underlying altitude-over-time sampling already exists in the recommender;
+this is a new presentation plus a selection/persistence layer. It's also the **foundation for A3** —
+the chosen targets are what spawn the anchored framing rectangles, and per-target camera angles set
+in A3 are recorded back here.
 
 **A6 — Multi-night projects.** Serious targets take many nights to accumulate enough signal. This
 adds the notion of an active "project" with an integration goal (e.g. "M31 — 8 h collected / 20 h

@@ -19,6 +19,7 @@ export interface ZipInspectResult {
   hasDsoOverrides: boolean;
   hasCustomGear: boolean;
   hasSetups: boolean;
+  hasPlans: boolean;
   /** Image files in images/ directory, with thumbnails removed. */
   imageEntries: Array<{ filename: string; size: number }>;
 }
@@ -36,6 +37,7 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
     hasDsoOverrides: false,
     hasCustomGear: false,
     hasSetups: false,
+    hasPlans: false,
     imageEntries: [],
   };
 
@@ -63,6 +65,11 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
       try {
         const setups = JSON.parse((await entry.buffer()).toString('utf8'));
         if (Array.isArray(setups) && setups.length > 0) result.hasSetups = true;
+      } catch { /* ignore */ }
+    } else if (entry.path === 'plans.json') {
+      try {
+        const plans = JSON.parse((await entry.buffer()).toString('utf8'));
+        if (Array.isArray(plans) && plans.length > 0) result.hasPlans = true;
       } catch { /* ignore */ }
     } else if (entry.path.startsWith('images/')) {
       const baseName = path.basename(entry.path);

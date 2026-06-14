@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { scaleMatrixForDpr, computeGalleryLayout } from '../../src/export-render';
+import { scaleMatrixForDpr, computeGalleryLayout, computeFramedViewScale } from '../../src/export-render';
+import { angularSizeToCanvasPxForDSO } from '../../src/dso-highlight';
 
 describe('scaleMatrixForDpr', () => {
   it('multiplies all six coefficients by the device pixel ratio', () => {
@@ -52,5 +53,29 @@ describe('computeGalleryLayout', () => {
 
   it('always reports at least one page, even for zero photos', () => {
     expect(layout(0).pages).toBe(1);
+  });
+});
+
+describe('computeFramedViewScale', () => {
+  it('sizes the binding axis so the FOV occupies the requested fraction', () => {
+    // Square image, wider-than-tall FOV ⇒ width binds.
+    const imgW = 500, imgH = 500, frac = 0.6, dec = 0;
+    const scale = computeFramedViewScale(1, 0.5, dec, imgW, imgH, frac);
+    const frameWidthPx = 2 * angularSizeToCanvasPxForDSO(1 * 30, dec, scale);
+    expect(frameWidthPx).toBeCloseTo(frac * imgW, 3);
+    // The shorter (height) axis stays within the fraction.
+    const frameHeightPx = 2 * angularSizeToCanvasPxForDSO(0.5 * 30, dec, scale);
+    expect(frameHeightPx).toBeLessThanOrEqual(frac * imgH + 1e-6);
+  });
+
+  it('is inversely proportional to FOV size (bigger field ⇒ smaller scale)', () => {
+    const big = computeFramedViewScale(2, 2, 0, 500, 500, 0.6);
+    const small = computeFramedViewScale(1, 1, 0, 500, 500, 0.6);
+    expect(big).toBeLessThan(small);
+    expect(small / big).toBeCloseTo(2, 1);
+  });
+
+  it('returns a positive finite scale for degenerate (zero) dimensions', () => {
+    expect(computeFramedViewScale(0, 0, 0, 500, 500, 0.6)).toBe(1);
   });
 });

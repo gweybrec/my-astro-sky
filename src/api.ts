@@ -399,6 +399,7 @@ export interface ExportOptions {
   includeDsoOverrides?: boolean;
   includeCustomGear?: boolean;
   includeSetups?: boolean;
+  includePlans?: boolean;
 }
 
 /**
@@ -436,6 +437,7 @@ export interface ImportPreviewResult {
   hasDsoOverrides: boolean;
   hasCustomGear: boolean;
   hasSetups: boolean;
+  hasPlans: boolean;
   images: ImportPreviewImage[];
 }
 
@@ -462,6 +464,7 @@ export interface ImportOptions {
   importDsoOverrides: boolean;
   importCustomGear: boolean;
   importSetups: boolean;
+  importPlans: boolean;
   /** null means no image filtering (metadata-only import). */
   selectedImages: string[] | null;
 }
@@ -474,6 +477,7 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
   if (opts.importDsoOverrides) fd.append('importDsoOverrides', '1');
   if (opts.importCustomGear) fd.append('importCustomGear', '1');
   if (opts.importSetups) fd.append('importSetups', '1');
+  if (opts.importPlans) fd.append('importPlans', '1');
   if (opts.selectedImages !== null) fd.append('selectedImages', JSON.stringify(opts.selectedImages));
   const res = await fetch('/api/import', { method: 'POST', body: fd });
   if (!res.ok) {
@@ -703,5 +707,125 @@ export async function deleteAllGearSetupsAPI(): Promise<void> {
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to delete all gear setups');
+  }
+}
+
+// ─── Night plans ───────────────────────────────────────────────────────────
+
+export interface PlanEntry {
+  id: string;
+  dsoId: string;
+  position: number;
+  paDeg: number | null;
+  notes: string | null;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  position: number;
+  /** Observation night (ISO `YYYY-MM-DD`), or null to fall back to the global date. */
+  nightOf: string | null;
+  /** Gear setup id used for this plan's FOV/recipe, or null. */
+  setupId: string | null;
+  entries: PlanEntry[];
+}
+
+export async function getPlans(): Promise<Plan[]> {
+  const res = await fetch('/api/plans');
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to load plans');
+  }
+  return res.json();
+}
+
+export async function createPlanAPI(name: string): Promise<{ id: string }> {
+  const res = await fetch('/api/plans', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to create plan');
+  }
+  return res.json();
+}
+
+export async function renamePlanAPI(id: string, name: string): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to rename plan');
+  }
+}
+
+export async function updatePlanSettingsAPI(id: string, nightOf: string | null, setupId: string | null): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nightOf, setupId }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update plan settings');
+  }
+}
+
+export async function deletePlanAPI(id: string): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to delete plan');
+  }
+}
+
+export async function reorderPlansAPI(ids: string[]): Promise<void> {
+  const res = await fetch('/api/plans/order', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to reorder plans');
+  }
+}
+
+export async function addPlanEntryAPI(planId: string, dsoId: string): Promise<{ id: string }> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dsoId }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to add target to plan');
+  }
+  return res.json();
+}
+
+export async function removePlanEntryAPI(planId: string, entryId: string): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to remove target from plan');
+  }
+}
+
+export async function reorderPlanEntriesAPI(planId: string, ids: string[]): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/order`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to reorder plan entries');
   }
 }

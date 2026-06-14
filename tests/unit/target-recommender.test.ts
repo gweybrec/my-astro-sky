@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { recommendTargets } from '../../src/target-recommender';
+import { recommendTargets, scoreDso } from '../../src/target-recommender';
 import { mightBeVisible, maxAltDuringWindow } from '../../src/sky-geometry';
 import type { DSO } from '../../src/types';
 import type { GearPreset } from '../../src/gear-presets';
@@ -384,5 +384,39 @@ describe('diversity cap with limit=5000', () => {
     const results = recommendTargets([...gcObjects, ocObject], testPreset, june12location, june12night, 3, { minAltDeg: 20, maxAltDeg: 90 });
     const gcCount = results.filter(r => r.dso.type === 'GC').length;
     expect(gcCount).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('scoreDso — standalone single-object scoring (used by plans)', () => {
+  it('scores an object that recommendTargets would filter out (faint, sizeless)', () => {
+    // No majAxis and very faint → recommendTargets skips it entirely, but a
+    // plan can still contain it, so scoreDso must return a finite score.
+    const dso = makeDSO({ id: 'FAINT', majAxis: null as any, mag: 20 });
+    const { score, fovFitScore, altScore, brightnessScore } = scoreDso(dso, testPreset, 60);
+    expect(Number.isFinite(score)).toBe(true);
+    expect(fovFitScore).toBe(0);      // sizeless → 0 FOV fit
+    expect(brightnessScore).toBe(0);  // far below limiting magnitude
+    expect(altScore).toBeGreaterThan(0);
+  });
+
+  it('score equals the weighted sum of its components', () => {
+    const dso = makeDSO({ id: 'M', majAxis: 30, mag: 6 });
+    const r = scoreDso(dso, testPreset, 70);
+    const expected = 0.45 * r.altScore + 0.35 * r.fovFitScore + 0.20 * r.brightnessScore;
+    expect(r.score).toBeCloseTo(expected, 6);
+  });
+
+  it('ignoreFovFit forces a perfect FOV-fit score', () => {
+    const dso = makeDSO({ id: 'BIG', majAxis: 600, mag: 6 }); // huge object: normally penalised
+    const normal = scoreDso(dso, testPreset, 70);
+    const ignored = scoreDso(dso, testPreset, 70, { ignoreFovFit: true });
+    expect(ignored.fovFitScore).toBe(1);
+    expect(ignored.fovFitScore).toBeGreaterThan(normal.fovFitScore);
+  });
+
+  it('altScore is 0 below the minimum altitude and clamps to 1 at high altitude', () => {
+    const dso = makeDSO({ id: 'A', majAxis: 30, mag: 6 });
+    expect(scoreDso(dso, testPreset, 10).altScore).toBe(0);   // below default minAlt (20)
+    expect(scoreDso(dso, testPreset, 85).altScore).toBe(1);   // ≥70 → clamped to 1
   });
 });

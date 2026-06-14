@@ -49,7 +49,15 @@ export function applyMigrations(database: Database): number {
         `);
       },
     },
-    // Future migrations: { version: 2, run(d) { ... } },
+    {
+      version: 2,
+      run(d) {
+        // Per-plan observation night and gear setup.
+        try { d.exec('ALTER TABLE plans ADD COLUMN night_of TEXT'); } catch { /* exists */ }
+        try { d.exec('ALTER TABLE plans ADD COLUMN setup_id TEXT'); } catch { /* exists */ }
+      },
+    },
+    // Future migrations: { version: 3, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

@@ -448,13 +448,37 @@ export class SkyMap {
    * `view.width * pixelScale` × `view.height * pixelScale`. Used by the export
    * feature to re-render the full sky map off-screen.
    */
-  renderToCanvas(target: HTMLCanvasElement, view: ViewState, pixelScale: number): void {
+  renderToCanvas(
+    target: HTMLCanvasElement,
+    view: ViewState,
+    pixelScale: number,
+    layers?: Partial<{
+      showStars: boolean;
+      showDSOs: boolean;
+      showConstellationLines: boolean;
+      showConstellationNames: boolean;
+      showGrid: boolean;
+      showStarLabels: boolean;
+      showDSOLabels: boolean;
+    }>,
+  ): void {
     const tctx = target.getContext('2d');
     if (!tctx) return;
     const savedCtx = this.ctx;
     const savedView = this.view;
+    // Snapshot any layer flags we may override, so we can restore them exactly.
+    const savedLayers = {
+      showStars: this.showStars,
+      showDSOs: this.showDSOs,
+      showConstellationLines: this.showConstellationLines,
+      showConstellationNames: this.showConstellationNames,
+      showGrid: this.showGrid,
+      showStarLabels: this.showStarLabels,
+      showDSOLabels: this.showDSOLabels,
+    };
     this.ctx = tctx;
     this.view = view;
+    if (layers) Object.assign(this, layers);
     tctx.save();
     tctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
     try {
@@ -463,8 +487,15 @@ export class SkyMap {
       tctx.restore();
       this.ctx = savedCtx;
       this.view = savedView;
+      if (layers) Object.assign(this, savedLayers);
     }
   }
+
+  /** Current FOV frame rotation in degrees (screen-relative). */
+  getFovRotationDeg(): number { return this.fovRotationDeg; }
+
+  /** Current FOV frame specs (for save/restore around off-screen renders). */
+  getFovFrames(): FovFrameSpec[] { return this.fovFrameSpecs; }
 
   enterPickingMode(callback: StarPickedCallback) {
     this.pickingMode = true;

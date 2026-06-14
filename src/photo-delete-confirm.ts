@@ -1,6 +1,6 @@
 import { t } from './i18n';
 
-export function confirmPhotoDelete(photoName: string): Promise<boolean> {
+function confirmDeleteDialog(title: string, message: string, actionLabel: string): Promise<boolean> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'dialog-overlay';
@@ -9,12 +9,12 @@ export function confirmPhotoDelete(photoName: string): Promise<boolean> {
     dialog.className = 'dialog';
     dialog.addEventListener('click', (e) => e.stopPropagation());
 
-    const title = document.createElement('h3');
-    title.textContent = t('photos.deleteConfirmTitle');
+    const titleEl = document.createElement('h3');
+    titleEl.textContent = title;
 
-    const message = document.createElement('p');
-    message.className = 'dialog-message';
-    message.textContent = t('photos.deleteConfirmMessage', { name: photoName });
+    const messageEl = document.createElement('p');
+    messageEl.className = 'dialog-message';
+    messageEl.textContent = message;
 
     const buttons = document.createElement('div');
     buttons.className = 'dialog-buttons';
@@ -27,7 +27,7 @@ export function confirmPhotoDelete(photoName: string): Promise<boolean> {
     const confirmBtn = document.createElement('button');
     confirmBtn.type = 'button';
     confirmBtn.className = 'btn-danger';
-    confirmBtn.textContent = t('photos.deleteConfirmAction');
+    confirmBtn.textContent = actionLabel;
 
     const cleanup = () => {
       document.removeEventListener('keydown', onKeyDown);
@@ -52,8 +52,8 @@ export function confirmPhotoDelete(photoName: string): Promise<boolean> {
 
     buttons.appendChild(cancelBtn);
     buttons.appendChild(confirmBtn);
-    dialog.appendChild(title);
-    dialog.appendChild(message);
+    dialog.appendChild(titleEl);
+    dialog.appendChild(messageEl);
     dialog.appendChild(buttons);
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
@@ -61,4 +61,20 @@ export function confirmPhotoDelete(photoName: string): Promise<boolean> {
 
     requestAnimationFrame(() => confirmBtn.focus());
   });
+}
+
+export function confirmPhotoDelete(photoName: string): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('photos.deleteConfirmTitle'),
+    t('photos.deleteConfirmMessage', { name: photoName }),
+    t('photos.deleteConfirmAction'),
+  );
+}
+
+export function confirmPlanDelete(planName: string): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('targets.plan.delete'),
+    t('targets.plan.confirmDelete', { name: planName }),
+    t('targets.plan.delete'),
+  );
 }

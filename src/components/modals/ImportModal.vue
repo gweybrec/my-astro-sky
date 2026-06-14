@@ -30,7 +30,7 @@
         </div>
 
         <!-- Content checkboxes -->
-        <div v-if="preview.hasMetadata || preview.hasDsoOverrides || preview.hasCustomGear || preview.hasSetups">
+        <div v-if="preview.hasMetadata || preview.hasDsoOverrides || preview.hasCustomGear || preview.hasSetups || preview.hasPlans">
           <div class="export-options-label">{{ t('settings.importContent') }}</div>
           <label v-if="preview.hasMetadata" class="export-checkbox-row">
             <input type="checkbox" v-model="importMeta" />
@@ -47,6 +47,10 @@
           <label v-if="preview.hasSetups" class="export-checkbox-row">
             <input type="checkbox" v-model="importSetups" />
             {{ t('settings.importSetupsLabel') }}
+          </label>
+          <label v-if="preview.hasPlans" class="export-checkbox-row">
+            <input type="checkbox" v-model="importPlans" />
+            {{ t('settings.importPlansLabel') }}
           </label>
         </div>
 
@@ -123,6 +127,7 @@ const importMeta = ref(true);
 const importDso = ref(true);
 const importGear = ref(true);
 const importSetups = ref(true);
+const importPlans = ref(true);
 const selectedImages = reactive(new Set<string>());
 
 const allImagesChecked = computed(() =>
@@ -140,7 +145,8 @@ const canImport = computed(() => {
     (preview.value.hasMetadata && importMeta.value) ||
     (preview.value.hasDsoOverrides && importDso.value) ||
     (preview.value.hasCustomGear && importGear.value) ||
-    (preview.value.hasSetups && importSetups.value);
+    (preview.value.hasSetups && importSetups.value) ||
+    (preview.value.hasPlans && importPlans.value);
   const hasImages = someImagesChecked.value;
   return hasContent || hasImages;
 });
@@ -172,6 +178,7 @@ async function onFilePicked(e: Event) {
     importDso.value = true;
     importGear.value = true;
     importSetups.value = true;
+    importPlans.value = true;
     phase.value = 'options';
   } catch (err: any) {
     showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
@@ -216,6 +223,7 @@ async function onImport() {
       importDsoOverrides: preview.value.hasDsoOverrides && importDso.value,
       importCustomGear: preview.value.hasCustomGear && importGear.value,
       importSetups: preview.value.hasSetups && importSetups.value,
+      importPlans: preview.value.hasPlans && importPlans.value,
       selectedImages: hasImages ? Array.from(selectedImages) : null,
     });
     emit('close');

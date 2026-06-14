@@ -895,6 +895,18 @@ describe('inspectZipContents — ZIP content inspection', () => {
     expect(result.hasSetups).toBe(false);
   });
 
+  it('detects plans.json with entries → hasPlans true (independent of hasSetups)', async () => {
+    const plans = JSON.stringify([{ id: 'plan-1', name: 'Night A', position: 0, entries: [] }]);
+    const result = await inspectZipContents([mockEntry('plans.json', plans)]);
+    expect(result.hasPlans).toBe(true);
+    expect(result.hasSetups).toBe(false);
+  });
+
+  it('does NOT set hasPlans for an empty plans array', async () => {
+    const result = await inspectZipContents([mockEntry('plans.json', '[]')]);
+    expect(result.hasPlans).toBe(false);
+  });
+
   it('lists image files from images/ directory', async () => {
     const result = await inspectZipContents([
       mockEntry('images/photo.jpg', 'imgdata', 5000),

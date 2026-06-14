@@ -56,16 +56,16 @@ describe('applyMigrations — fresh database', () => {
     expect(() => db.prepare('SELECT version FROM schema_version').get()).not.toThrow();
   });
 
-  it('returns schema version 1 after first run', () => {
+  it('returns the latest schema version after first run', () => {
     const db = freshBaseDb();
     const version = applyMigrations(db);
-    expect(version).toBe(1);
+    expect(version).toBe(2);
   });
 
-  it('schema_version table contains version 1', () => {
+  it('schema_version table contains the latest version', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    expect(schemaVersion(db)).toBe(1);
+    expect(schemaVersion(db)).toBe(2);
   });
 
   it('adds star_ra and star_dec columns to star_correspondences', () => {
@@ -102,8 +102,32 @@ describe('applyMigrations — idempotency', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     const v = applyMigrations(db);
-    expect(v).toBe(1);
-    expect(schemaVersion(db)).toBe(1);
+    expect(v).toBe(2);
+    expect(schemaVersion(db)).toBe(2);
+  });
+});
+
+describe('applyMigrations — v2 per-plan night/setup', () => {
+  it('adds night_of and setup_id columns to an existing plans table', () => {
+    const db = freshBaseDb();
+    db.exec(`
+      CREATE TABLE plans (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+    applyMigrations(db);
+    const cols = getColumns(db, 'plans');
+    expect(cols).toContain('night_of');
+    expect(cols).toContain('setup_id');
+  });
+
+  it('is a no-op (no throw) when the plans table is absent', () => {
+    const db = freshBaseDb();
+    expect(() => applyMigrations(db)).not.toThrow();
+    expect(schemaVersion(db)).toBe(2);
   });
 });
 
@@ -123,7 +147,7 @@ describe('applyMigrations — existing database (simulates upgrade)', () => {
     db.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
 
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(1);
+    expect(schemaVersion(db)).toBe(2);
   });
 });
 

@@ -136,6 +136,31 @@ export function recommendTargets(
   return diverse.slice(0, limit);
 }
 
+/**
+ * Score a single DSO against a gear preset, given its already-computed max
+ * altitude for the night. Unlike {@link recommendTargets} this never filters
+ * the object out — it is used for objects the user has explicitly added to a
+ * plan, which may be faint or sizeless. Mirrors the scoring weights above.
+ */
+export function scoreDso(
+  dso: DSO,
+  preset: GearPreset,
+  maxAltDeg: number,
+  options: { ignoreFovFit?: boolean; minAltDeg?: number } = {},
+): { score: number; fovFitScore: number; altScore: number; brightnessScore: number } {
+  const fov = fovDeg(preset);
+  const magLimit = limitingMag(preset);
+  const minFovDeg = Math.min(fov.wDeg, fov.hDeg);
+  const minAlt = options.minAltDeg ?? 20;
+
+  const altScore = altitudeScore(maxAltDeg, minAlt);
+  const objDeg = (dso.majAxis ?? 0) / 60;
+  const fovFitScore = options.ignoreFovFit ? 1.0 : (objDeg > 0 ? fovFit(objDeg, minFovDeg) : 0);
+  const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
+  const score = 0.45 * altScore + 0.35 * fovFitScore + 0.20 * brightnessScore;
+  return { score, fovFitScore, altScore, brightnessScore };
+}
+
 // ─── Score helpers ─────────────────────────────────────────────────────────────
 
 function altitudeScore(altDeg: number, minAlt: number): number {

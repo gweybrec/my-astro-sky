@@ -91,6 +91,27 @@ db.exec(`
   );
 `);
 
+// Night plans (named target lists) + their entries (one DSO each).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS plans (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    position   INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    night_of   TEXT,
+    setup_id   TEXT
+  );
+  CREATE TABLE IF NOT EXISTS plan_entries (
+    id       TEXT PRIMARY KEY,
+    plan_id  TEXT NOT NULL,
+    dso_id   TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    pa_deg   REAL,
+    notes    TEXT,
+    UNIQUE(plan_id, dso_id)
+  );
+`);
+
 const insertPhoto = db.prepare(
   `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, notes, integrations, display_order, thumb_filename, observation_date)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`
@@ -566,6 +587,118 @@ export function deleteGearSetup(id: string): boolean {
 
 export function deleteAllGearSetups(): number {
   return deleteAllGearSetupsStmt.run().changes;
+}
+
+// ─── Night plans ────────────────────────────────────────────────────────────
+
+export interface PlanRow {
+  id: string;
+  name: string;
+  position: number;
+  created_at: string;
+  night_of: string | null;
+  setup_id: string | null;
+}
+
+export interface PlanEntryRow {
+  id: string;
+  plan_id: string;
+  dso_id: string;
+  position: number;
+  pa_deg: number | null;
+  notes: string | null;
+}
+
+const getPlansStmt              = db.prepare('SELECT * FROM plans ORDER BY position ASC, rowid ASC');
+const getPlanStmt               = db.prepare('SELECT * FROM plans WHERE id = ?');
+const insertPlanStmt            = db.prepare(
+  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id) VALUES (?, ?, ?, ?, ?, ?)',
+);
+const renamePlanStmt            = db.prepare('UPDATE plans SET name = ? WHERE id = ?');
+const updatePlanSettingsStmt    = db.prepare('UPDATE plans SET night_of = ?, setup_id = ? WHERE id = ?');
+const updatePlanPositionStmt    = db.prepare('UPDATE plans SET position = ? WHERE id = ?');
+const deletePlanStmt            = db.prepare('DELETE FROM plans WHERE id = ?');
+const deleteAllPlansStmt        = db.prepare('DELETE FROM plans');
+
+const getPlanEntriesStmt        = db.prepare('SELECT * FROM plan_entries WHERE plan_id = ? ORDER BY position ASC, rowid ASC');
+const getAllPlanEntriesStmt     = db.prepare('SELECT * FROM plan_entries ORDER BY position ASC, rowid ASC');
+const planEntryExistsStmt       = db.prepare('SELECT 1 FROM plan_entries WHERE plan_id = ? AND dso_id = ?');
+const insertPlanEntryStmt       = db.prepare(
+  'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, notes) VALUES (?, ?, ?, ?, ?, ?)',
+);
+const deletePlanEntryStmt       = db.prepare('DELETE FROM plan_entries WHERE id = ?');
+const deletePlanEntriesStmt     = db.prepare('DELETE FROM plan_entries WHERE plan_id = ?');
+const updatePlanEntryPositionStmt = db.prepare('UPDATE plan_entries SET position = ? WHERE id = ? AND plan_id = ?');
+
+export function getPlans(): PlanRow[] {
+  return getPlansStmt.all() as PlanRow[];
+}
+
+export function getPlan(id: string): PlanRow | undefined {
+  return getPlanStmt.get(id) as PlanRow | undefined;
+}
+
+export function getPlanEntries(planId: string): PlanEntryRow[] {
+  return getPlanEntriesStmt.all(planId) as PlanEntryRow[];
+}
+
+export function getAllPlanEntries(): PlanEntryRow[] {
+  return getAllPlanEntriesStmt.all() as PlanEntryRow[];
+}
+
+export function createPlan(row: PlanRow): void {
+  insertPlanStmt.run(row.id, row.name, row.position, row.created_at, row.night_of ?? null, row.setup_id ?? null);
+}
+
+export function renamePlan(id: string, name: string): boolean {
+  return renamePlanStmt.run(name, id).changes > 0;
+}
+
+export function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null): boolean {
+  return updatePlanSettingsStmt.run(nightOf, setupId, id).changes > 0;
+}
+
+export function deletePlan(id: string): boolean {
+  return db.transaction(() => {
+    deletePlanEntriesStmt.run(id);
+    return deletePlanStmt.run(id).changes > 0;
+  })();
+}
+
+export function deleteAllPlans(): number {
+  return db.transaction(() => {
+    db.prepare('DELETE FROM plan_entries').run();
+    return deleteAllPlansStmt.run().changes;
+  })();
+}
+
+export function reorderPlans(ids: string[]): void {
+  db.transaction(() => {
+    ids.forEach((id, i) => updatePlanPositionStmt.run(i, id));
+  })();
+}
+
+export function planEntryExists(planId: string, dsoId: string): boolean {
+  return planEntryExistsStmt.get(planId, dsoId) !== undefined;
+}
+
+export function addPlanEntry(row: PlanEntryRow): void {
+  insertPlanEntryStmt.run(row.id, row.plan_id, row.dso_id, row.position, row.pa_deg ?? null, row.notes ?? null);
+}
+
+export function nextPlanEntryPosition(planId: string): number {
+  const r = db.prepare('SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM plan_entries WHERE plan_id = ?').get(planId) as { pos: number };
+  return r.pos;
+}
+
+export function removePlanEntry(entryId: string): boolean {
+  return deletePlanEntryStmt.run(entryId).changes > 0;
+}
+
+export function reorderPlanEntries(planId: string, ids: string[]): void {
+  db.transaction(() => {
+    ids.forEach((id, i) => updatePlanEntryPositionStmt.run(i, id, planId));
+  })();
 }
 
 // ─── Bulk-delete helpers (used by "Delete all data" feature) ───────────────────
