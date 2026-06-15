@@ -90,7 +90,15 @@ export const msg = {
 
   // ── ASTAP ────────────────────────────────────────────────────────────────────
   astap: {
-    timeout: () => 'Timeout ASTAP (60 s)',
+    timeout: (lang: ServerLang, secs: number, hinted: boolean) =>
+      m(lang,
+        `Délai ASTAP dépassé (${secs} s).` + (hinted
+          ? ''
+          : " Une résolution à l'aveugle (sans objet cible) balaie tout le ciel et peut être lente — indiquez un objet cible pour accélérer."),
+        `ASTAP timed out (${secs} s).` + (hinted
+          ? ''
+          : ' A blind solve (no target object) searches the whole sky and can be slow — provide a target object to speed it up.'),
+      ),
 
     noDatabase: (lang: ServerLang, dir: string) =>
       m(lang,
@@ -147,6 +155,12 @@ export const msg = {
       m(lang,
         `ASTAP a trouvé une solution incorrecte (${dist}° de la position attendue). Essayez le solveur en ligne (astrometry.net).`,
         `ASTAP found an incorrect solution (${dist}° away from expected position). Try using the online solver (astrometry.net).`,
+      ),
+
+    distortedSolution: (lang: ServerLang, skew: string) =>
+      m(lang,
+        `ASTAP a trouvé une fausse solution déformée (cisaillement de ${skew}° ; une vraie solution astrométrique n'a aucun cisaillement). L'échelle était probablement inconnue. Essayez le solveur en ligne (astrometry.net).`,
+        `ASTAP found a distorted false solution (${skew}° shear; a real astrometric solution has none). The scale was likely unknown. Try using the online solver (astrometry.net).`,
       ),
 
     notEnoughCatalogStars: (lang: ServerLang) =>

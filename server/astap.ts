@@ -12,6 +12,29 @@ import type { ServerLang } from './messages.js';
 
 const execFileAsync = promisify(execFile);
 
+// Max allowed shear (deviation from perpendicular between the two CD-matrix axes,
+// in degrees) for a solution to be accepted. A real TAN-projection solve is
+// conformal (~0° shear); empirically, ASTAP's wrong-scale false matches show
+// 40–130° of shear, so any value well above a genuine solve's sub-degree noise
+// and well below those false matches works as a separator.
+export const MAX_CD_SKEW_DEG = 5;
+
+// Safety-net timeout for the ASTAP process (ms). Not a "too slow" limit — see the
+// usage site. Generous (30 min) so a blind all-sky solve on a slow machine is never
+// killed mid-search; only a truly hung process should ever hit it.
+export const SOLVE_TIMEOUT_MS = 1_800_000;
+
+// Shear of a WCS CD matrix: how far the two column vectors (image X and Y axes,
+// projected onto the sky) deviate from perpendicular, in degrees. 0 = conformal.
+export function cdMatrixSkewDeg(wcs: Pick<WCSData, 'CD1_1' | 'CD1_2' | 'CD2_1' | 'CD2_2'>): number {
+  const len1 = Math.hypot(wcs.CD1_1, wcs.CD2_1);
+  const len2 = Math.hypot(wcs.CD1_2, wcs.CD2_2);
+  if (len1 === 0 || len2 === 0) return 90;
+  const dot = wcs.CD1_1 * wcs.CD1_2 + wcs.CD2_1 * wcs.CD2_2;
+  const cosAngle = Math.max(-1, Math.min(1, dot / (len1 * len2)));
+  return Math.abs(90 - (Math.acos(cosAngle) * 180) / Math.PI);
+}
+
 // Build the raw-output snippet shown in the error-details collapsible: the command
 // that was run (with the user's filename) followed by the last few non-empty lines
 // of solver output. Returns undefined when there is nothing useful.
@@ -109,12 +132,26 @@ export async function solveWithASTAP(
     const searchRadius = hints?.radius || (hints?.ra !== undefined ? 10 : 180);
     args.push('-r', String(searchRadius));
     
-    // Use slow mode with relaxed tolerance for heavily processed images
+    // Use a thorough search (more stars, slow speed) to maximize solve success on
+    // sparse / heavily-processed fields. We deliberately do NOT relax the quad
+    // tolerance (`-t`): a loose tolerance combined with this thorough search makes
+    // ASTAP accept scale-distorted FALSE matches (sheared CD matrix → photo placed
+    // as a skewed parallelogram). The default tolerance solves the same images
+    // cleanly and conformally. Any residual false match is caught by the
+    // conformality guard below.
     args.push('-speed', 'slow');
-    args.push('-t', '0.020'); // Relaxed quad tolerance
     args.push('-s', '800'); // More stars
 
     const exec = wrapExecForWSL(bin, args, useWSL);
+
+    // This timeout is NOT a "too slow" limit — ASTAP terminates on its own when its
+    // search is exhausted (reporting "No solution"), and the user can cancel anytime
+    // via the AbortSignal (the frontend polls indefinitely). It exists only as a
+    // safety net against a process that hangs forever, so it is set very generously
+    // (30 min): a blind all-sky search on a slow machine can take many minutes, and we
+    // must never kill a healthy solve. The old flat 60 s killed valid blind solves.
+    const hinted = hints?.ra !== undefined && hints?.dec !== undefined;
+    const solveTimeoutMs = SOLVE_TIMEOUT_MS;
 
     // Human-readable command for the error-details collapsible: substitute the
     // temp input path with the user's original filename so it's recognizable.
@@ -127,7 +164,7 @@ export async function solveWithASTAP(
     let solveOutput = '';
     try {
       const { stdout, stderr } = await execFileAsync(exec.cmd, exec.args, {
-        timeout: 60_000,
+        timeout: solveTimeoutMs,
         env: { ...process.env, LC_ALL: 'C', LANG: 'C' },
         signal,
       } as any);
@@ -139,7 +176,7 @@ export async function solveWithASTAP(
         throw abortErr;
       }
       if (err.killed || err.signal === 'SIGTERM' || err.code === 'ETIMEDOUT') {
-        return { success: false, error: msg.astap.timeout() };
+        return { success: false, error: msg.astap.timeout(lang, Math.round(solveTimeoutMs / 1000), hinted) };
       }
       // ASTAP may return non-zero even on success; check if .wcs was produced
       if (!existsSync(wcsPath)) {
@@ -239,8 +276,25 @@ export async function solveWithASTAP(
       console.log(`[ASTAP] Solution validated: RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance from hint: ${distance.toFixed(1)}°)`);
     }
 
-    // Try to generate correspondences from catalog stars
-    let correspondences = wcsToCorrespondences(wcs, width, height);
+    // Conformality guard: a genuine TAN-projection plate solution is conformal —
+    // its CD matrix is a scaled rotation (optionally reflected), so the two column
+    // vectors are perpendicular and equal length. When ASTAP solves at the wrong
+    // scale (it cannot determine the FOV) it returns a SHEARED CD matrix: a false
+    // match that would place the photo as a skewed parallelogram. Reject it loudly
+    // instead of silently misplacing the image. Good solves measure < 1° of shear;
+    // false matches here measured 40–130°.
+    const skew = cdMatrixSkewDeg(wcs);
+    if (skew > MAX_CD_SKEW_DEG) {
+      console.log(`[ASTAP] Solution rejected: CD matrix shear ${skew.toFixed(1)}° exceeds ${MAX_CD_SKEW_DEG}° (false match, likely wrong scale).`);
+      return { success: false, error: msg.astap.distortedSolution(lang, skew.toFixed(1)), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+    }
+
+    // Try to generate correspondences from catalog stars.
+    // ASTAP is a FITS-native engine: its -wcs output uses the same pixel convention as
+    // Siril/PixInsight metadata (verified: same CDELT sign for the same image). The
+    // metadata path passes fitsYConvention=true (and places correctly), so ASTAP must
+    // too. (solve-field and astrometry.net emit display-convention WCS and stay false.)
+    let correspondences = wcsToCorrespondences(wcs, width, height, true);
     
     // If not enough catalog stars match (e.g., image has faint stars),
     // generate synthetic correspondences from WCS corners
