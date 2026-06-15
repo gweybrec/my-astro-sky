@@ -360,6 +360,11 @@ Five semantic roles. Map your intent to a role, then use the corresponding class
 > destructive choice in a confirmation dialog. Use `.btn-danger-action` for secondary destructive
 > actions inside a form footer where a confirm button also exists.
 
+> **Trash / delete icons must be red.** Any icon-only button that deletes or removes something
+> uses the trash SVG (`src/icons/trash.svg`) and the danger colour — `.btn-icon--danger` for a
+> `.btn-icon`, or the equivalent `--color-danger` styling. Never use a plain `✕`/`×` cross for a
+> destructive per-item action; that glyph is reserved for non-destructive dismiss/close controls.
+
 > **Migration note:** until the `btn-confirm` / `btn-cancel` / `btn-action` classes are created
 > and the old classes removed, keep using the existing class for the component you are editing.
 > Do **not** introduce new button class variants.

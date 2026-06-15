@@ -788,7 +788,7 @@ const fr = {
   },
   batch: {
     button: '+ Ajouter plusieurs photos',
-    modalTitle: 'Ajout groupé de photos',
+    modalTitle: 'Ajouter des photos',
     closeTitle: 'Fermer (les photos placées restent sur la carte ; les résolutions non sauvegardées seront perdues)',
     startButton: 'Démarrer la résolution',
     startingLabel: 'Démarrage…',

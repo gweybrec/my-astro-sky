@@ -129,9 +129,7 @@ import {
 } from '../../api';
 import type { SolverAvailability } from '../../api';
 import { reportUnknownRendererError } from '../../error-reporter';
-import { project } from '../../projection';
-import { computeAffineTransform } from '../../affine';
-import { findDSOsInImage } from '../../dso-catalog';
+import { findDSOIdsFromCorrespondences } from '../../dso-catalog';
 import { stripExtension } from '../../file-utils';
 import { sanitizeIntegrationRows, DEFAULT_INTEGRATION_FILTERS, normalizeIntegrationFilterKey } from '../../batch-utils';
 import { filterLabelCandidates } from '../../autocomplete-utils';
@@ -354,28 +352,9 @@ async function handleSolveSuccess(item: BatchItem, result: PlateSolveResult) {
   if (result.dsoIds && result.dsoIds.length > 0) {
     item.dsoIds = [...result.dsoIds];
   } else {
-    const pts = correspondences.slice(0, 3);
-    const photoPoints: { x: number; y: number }[] = [];
-    const projPoints: { x: number; y: number }[] = [];
-    for (const c of pts) {
-      const ra = c.starRa ?? null;
-      const dec = c.starDec ?? null;
-      if (ra != null && dec != null) {
-        photoPoints.push({ x: c.photoX, y: c.photoY });
-        projPoints.push(project(ra, dec));
-      }
-    }
-    if (photoPoints.length >= 3) {
-      try {
-        const aff = computeAffineTransform(
-          photoPoints as [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }],
-          projPoints as [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }],
-        );
-        const bm = await createImageBitmap(item.file).catch(() => null);
-        item.dsoIds = findDSOsInImage(aff, bm?.width || 0, bm?.height || 0).map(d => d.id);
-        bm?.close();
-      } catch { /* leave empty */ }
-    }
+    const bm = await createImageBitmap(item.file).catch(() => null);
+    item.dsoIds = findDSOIdsFromCorrespondences(correspondences, bm?.width || 0, bm?.height || 0);
+    bm?.close();
   }
 
   if (cancelled) return;

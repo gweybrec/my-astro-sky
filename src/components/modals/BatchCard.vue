@@ -50,8 +50,14 @@
       </div>
     </div>
 
-    <!-- Solving actions (below the preview): WCS · Manual -->
+    <!-- Solving actions (below the preview): Manual · WCS -->
     <div class="flex gap-1 mt-2">
+      <button
+        type="button"
+        :class="['batch-wcs-btn', { 'wcs-loaded': manualLoaded }]"
+        :disabled="manualBusy || isBusy"
+        @click="openManual"
+      >{{ manualLoaded ? t('batch.manualDone') : t('batch.manualButton') }}</button>
       <button
         type="button"
         :class="['batch-wcs-btn', { 'wcs-loaded': wcsLoaded && !wcsWarning, 'wcs-warning': wcsWarning }]"
@@ -67,12 +73,6 @@
         @click="clearWcs"
       ></button>
       <input ref="wcsInputEl" type="file" accept=".fit,.fits,.tif,.tiff" class="hidden" @change="handleWcsFile" />
-      <button
-        type="button"
-        :class="['batch-wcs-btn', { 'wcs-loaded': manualLoaded }]"
-        :disabled="manualBusy || isBusy"
-        @click="openManual"
-      >{{ manualLoaded ? t('batch.manualDone') : t('batch.manualButton') }}</button>
     </div>
 
     <!-- WCS / manual error message (inline, full single-modal parity) -->
@@ -171,6 +171,7 @@ import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
 import { searchUnified } from '../../search';
 import { solveWCS, reuseAstrometrySubmission, updatePhotoMetadata } from '../../api';
+import { findDSOIdsFromCorrespondences } from '../../dso-catalog';
 import { stripExtension, getFileDimensions } from '../../file-utils';
 import { generateThumbnail } from '../../lazy-image';
 import { showToast } from '../../toast';
@@ -278,7 +279,11 @@ async function handleWcsFile(e: Event) {
       props.item.wcsResult = result;
       props.item.solveCorrespondences = result.correspondences;
       props.item.status = 'success';
-      props.item.dsoIds = result.dsoIds ?? [];
+      // WCS solving doesn't return DSOs from the server; derive them from the
+      // solved correspondences against the local catalog (like the async solvers).
+      props.item.dsoIds = (result.dsoIds && result.dsoIds.length > 0)
+        ? [...result.dsoIds]
+        : findDSOIdsFromCorrespondences(result.correspondences, imgWidth, imgHeight);
       if (result.dateObs && !props.item.observationDate) {
         props.item.observationDate = result.dateObs;
       }

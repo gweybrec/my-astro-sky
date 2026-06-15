@@ -1,7 +1,8 @@
-import type { DSO, DSOType, DSOUserOverride } from './types';
+import type { DSO, DSOType, DSOUserOverride, PhotoCorrespondence } from './types';
 import type { AffineMatrix } from './types';
 import { getLang } from './i18n';
 import { project } from './projection';
+import { computeAffineTransform } from './affine';
 import { getDsoOverrides } from './api';
 
 let dsos: DSO[] = [];
@@ -308,4 +309,37 @@ export function findDSOsInImage(
     }
   }
   return result;
+}
+
+/**
+ * Derive the catalog DSO IDs that fall within an image from plate-solve
+ * correspondences (each carrying a photo pixel + its sky RA/Dec). Used as a
+ * fallback for solvers that don't return DSOs directly (WCS, ASTAP). Returns []
+ * if fewer than 3 correspondences carry RA/Dec, the image size is unknown, or
+ * the affine is degenerate.
+ */
+export function findDSOIdsFromCorrespondences(
+  correspondences: PhotoCorrespondence[],
+  imgWidth: number,
+  imgHeight: number,
+): string[] {
+  if (!imgWidth || !imgHeight) return [];
+  const photoPoints: { x: number; y: number }[] = [];
+  const projPoints: { x: number; y: number }[] = [];
+  for (const c of correspondences) {
+    if (c.starRa == null || c.starDec == null) continue;
+    photoPoints.push({ x: c.photoX, y: c.photoY });
+    projPoints.push(project(c.starRa, c.starDec));
+    if (photoPoints.length >= 3) break;
+  }
+  if (photoPoints.length < 3) return [];
+  try {
+    const aff = computeAffineTransform(
+      photoPoints as [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }],
+      projPoints as [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }],
+    );
+    return findDSOsInImage(aff, imgWidth, imgHeight).map(d => d.id);
+  } catch {
+    return [];
+  }
 }

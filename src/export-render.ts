@@ -5,6 +5,7 @@ import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
 import type { Photo, DSO, ViewState } from './types';
 import { project, toCanvas } from './projection';
 import { angularSizeToCanvasPxForDSO } from './dso-highlight';
+import { getConstellationInfos } from './star-catalog';
 import { t } from './i18n';
 import type { AltSample } from './sky-geometry';
 
@@ -320,6 +321,88 @@ function fmtArcmin(v: number | null): string {
   return v >= 60 ? `${(v / 60).toFixed(1)}°` : `${v.toFixed(1)}'`;
 }
 
+/** Full constellation name from its 3-letter IAU abbreviation (falls back to the abbr). */
+function constellationFullName(abbr: string | null): string {
+  if (!abbr) return '';
+  const info = getConstellationInfos().find(c => c.id === abbr);
+  const name = info?.displayName || abbr.toUpperCase();
+  // The catalog uses wide Unicode spaces (e.g. U+2005 in "Hunting Dogs") which
+  // render with broken spacing in the PDF — normalise them to plain spaces.
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+/** Draw a filled or outlined 5-pointed star centred at (cx, cy) with outer radius r. */
+function drawStarGlyph(doc: jsPDF, cx: number, cy: number, r: number, filled: boolean): void {
+  const pts: [number, number][] = [];
+  for (let i = 0; i < 5; i++) {
+    const oa = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    pts.push([cx + r * Math.cos(oa), cy + r * Math.sin(oa)]);
+    const ia = oa + Math.PI / 5;
+    pts.push([cx + r * 0.42 * Math.cos(ia), cy + r * 0.42 * Math.sin(ia)]);
+  }
+  const rel: [number, number][] = [];
+  for (let i = 1; i < pts.length; i++) rel.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+  (doc as any).lines(rel, pts[0][0], pts[0][1], [1, 1], filled ? 'F' : 'S', true);
+}
+
+/** Draw a filled or outlined diamond centred at (cx, cy) with vertical half-height r. */
+function drawDiamondGlyph(doc: jsPDF, cx: number, cy: number, r: number, filled: boolean): void {
+  const w = r * 0.72;
+  const pts: [number, number][] = [[cx, cy - r], [cx + w, cy], [cx, cy + r], [cx - w, cy]];
+  const rel: [number, number][] = [];
+  for (let i = 1; i < pts.length; i++) rel.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+  (doc as any).lines(rel, pts[0][0], pts[0][1], [1, 1], filled ? 'F' : 'S', true);
+}
+
+/** Draw a rounded "chip" (filled pill + label) and return its width so chips can be laid out in a row. */
+function drawChip(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  h: number,
+  text: string,
+  fill: [number, number, number],
+  textColor: [number, number, number],
+  border: [number, number, number],
+): number {
+  doc.setFont(undefined as any, 'normal');
+  doc.setFontSize(8.5);
+  const padX = 6;
+  const w = doc.getTextWidth(text) + padX * 2;
+  doc.setFillColor(fill[0], fill[1], fill[2]);
+  doc.setDrawColor(border[0], border[1], border[2]);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(x, y, w, h, 3, 3, 'FD');
+  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+  doc.text(text, x + padX, y + h / 2, { baseline: 'middle' });
+  return w;
+}
+
+/** Draw a single micro uppercase label, returning the x cursor advanced past the column. */
+function drawMetaColumn(doc: jsPDF, label: string, valueW: number, x: number, top: number): number {
+  const up = label.toUpperCase();
+  doc.setFont(undefined as any, 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
+  doc.text(up, x, top);
+  const lw = doc.getTextWidth(up);
+  return x + Math.max(lw, valueW) + 24;
+}
+
+/** Draw a row of label/value pairs (micro uppercase label above a bold value), returning the end x cursor. */
+function drawMetaRow(doc: jsPDF, items: { label: string; value: string }[], x: number, top: number): number {
+  let cx = x;
+  for (const it of items) {
+    doc.setFont(undefined as any, 'bold');
+    doc.setFontSize(11);
+    const vw = doc.getTextWidth(it.value);
+    doc.setTextColor(60, 60, 60);
+    doc.text(it.value, cx, top + 13);
+    cx = drawMetaColumn(doc, it.label, vw, cx, top);
+  }
+  return cx;
+}
+
 /**
  * Draw an altitude trajectory chart (fixed 0–90° Y-axis) onto a 2D canvas
  * context at position (offsetX, offsetY), covering (w × h) logical pixels.
@@ -455,45 +538,108 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
   const spec = opts.fovSpecs[0] ?? null;
   const savedFrames = skyMap.getFovFrames();
 
-  const targetName = (d: DSO) => d.displayName || d.catalogs[0] || d.id;
   const fmtTime = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Per-target page vertical layout constants.
-  const infoH = 44;   // DSO info text block height (px)
-  const chartH = 50;  // altitude trajectory chart height (px)
-  const headerH = infoH + chartH + 8;  // total header above sky image
-
+  // Per-target page split into three vertical bands: a compact DSO-info header,
+  // a tall altitude-trajectory chart, and the framed sky view (bottom third).
+  // The info content is short, so the chart absorbs the slack above it instead
+  // of leaving a white gap.
   const contentW = pageW - margin * 2;
-  const availH = pageH - margin * 2 - headerH;
-  const imgW = contentW;
-  const imgH = Math.min(imgW, availH);  // square-ish, never taller than available
+  const availH = pageH - margin * 2;
+  const infoBandH = 112;          // compact header height (px)
+  const frameH = availH / 3;      // bottom third for the framed sky view
+  const imgTop = pageH - margin - frameH;
+  const chartTop = margin + infoBandH;
+  const chartGap = 16;
+  const chartH = imgTop - chartTop - chartGap;  // chart fills the middle band
+
+  // Chip / meta palette (PDF is on a white background, unlike the dark app theme).
+  const typeFill: [number, number, number] = [238, 240, 242];
+  const typeText: [number, number, number] = [90, 96, 104];
+  const typeBorder: [number, number, number] = [210, 214, 220];
+  const constFill: [number, number, number] = [232, 238, 250];
+  const constText: [number, number, number] = [60, 96, 170];
+  const constBorder: [number, number, number] = [200, 214, 240];
 
   try {
     skyMap.setFovFrames(opts.fovSpecs);
 
     for (let i = 0; i < opts.targets.length; i++) {
       const tgt = opts.targets[i];
+      const dso = tgt.dso;
       if (i > 0) doc.addPage();
 
-      // ── DSO info block ──────────────────────────────────────────────────────
-      let iy = margin + 14;
-      doc.setFontSize(14);
+      // ── DSO info band (top third) ────────────────────────────────────────────
+      // Title line: bold display name, dimmer catalog id, rating stars.
+      const displayName = dso.displayName;
+      const primaryId = dso.catalogs[0] || dso.id;
+      const titleBaseline = margin + 16;
       (doc as any).setFont(undefined, 'bold');
-      doc.text(targetName(tgt.dso), margin, iy);
-      iy += 16;
-      (doc as any).setFont(undefined, 'normal');
-      doc.setFontSize(9);
-      const typePart = t(`dso.types.${tgt.dso.type}`) || tgt.dso.type;
-      const constPart = tgt.dso.constellation?.toUpperCase() ?? '';
-      const magPart = tgt.dso.mag !== null ? `Mag ${tgt.dso.mag.toFixed(1)}` : '';
-      const sizePart = fmtArcmin(tgt.dso.majAxis);
-      const transitPart = `${t('targets.plan.transit')} ${fmtTime(tgt.bestTimeUtc)}`;
-      const altPart = `Max ${Math.round(tgt.maxAltDeg)}°`;
-      const details = [typePart, constPart, magPart, sizePart, transitPart, altPart].filter(Boolean).join('  ·  ');
-      doc.text(details, margin, iy);
-      iy += 14;
+      doc.setFontSize(17);
+      doc.setTextColor(34, 34, 34);
+      const titleText = displayName || primaryId;
+      doc.text(titleText, margin, titleBaseline);
+      let titleCursor = margin + doc.getTextWidth(titleText);
+      if (displayName && primaryId) {
+        (doc as any).setFont(undefined, 'normal');
+        doc.setFontSize(12);
+        doc.setTextColor(150, 150, 150);
+        doc.text('  ' + primaryId, titleCursor, titleBaseline);
+        titleCursor += doc.getTextWidth('  ' + primaryId);
+      }
+      // Rating stars next to the name.
+      if (dso.rating !== null) {
+        const starR = 5.5;
+        const starGap = 3;
+        const starCy = titleBaseline - 5;
+        let sx = titleCursor + 16 + starR;
+        for (let s = 0; s < 5; s++) {
+          doc.setDrawColor(212, 160, 23);
+          doc.setFillColor(212, 160, 23);
+          doc.setLineWidth(0.6);
+          drawStarGlyph(doc, sx, starCy, starR, s < dso.rating);
+          sx += starR * 2 + starGap;
+        }
+      }
 
-      // ── Altitude trajectory chart ───────────────────────────────────────────
+      // Chip row: DSO type + full constellation name.
+      const chipY = titleBaseline + 10;
+      const chipH = 16;
+      let chipX = margin;
+      const typeLabel = t(`dso.types.${dso.type}`) || dso.type;
+      chipX += drawChip(doc, chipX, chipY, chipH, typeLabel, typeFill, typeText, typeBorder) + 6;
+      const constName = constellationFullName(dso.constellation);
+      if (constName) {
+        chipX += drawChip(doc, chipX, chipY, chipH, constName, constFill, constText, constBorder) + 6;
+      }
+
+      // Metadata row: label/value pairs.
+      const metaTop = chipY + chipH + 22;
+      const metaItems: { label: string; value: string }[] = [];
+      if (dso.mag !== null) metaItems.push({ label: 'Mag', value: dso.mag.toFixed(1) });
+      if (dso.majAxis) metaItems.push({ label: t('targets.results.size'), value: fmtArcmin(dso.majAxis) });
+      metaItems.push({ label: t('targets.results.bestTime'), value: fmtTime(tgt.bestTimeUtc) });
+      metaItems.push({ label: t('targets.results.maxAlt'), value: `${Math.round(tgt.maxAltDeg)}°` });
+      let metaX = drawMetaRow(doc, metaItems, margin, metaTop);
+      // Difficulty rendered as diamonds (filled = required), drawn as vectors
+      // because jsPDF's standard fonts don't include the ◆/◇ glyphs.
+      if (dso.difficulty !== null) {
+        const diaR = 4.5;
+        const diaGap = 2.5;
+        const diaCy = metaTop + 13 - diaR + 0.5;
+        const diaW = 5 * (diaR * 0.72 * 2 + diaGap);
+        let dx = metaX + diaR * 0.72;
+        for (let s = 0; s < 5; s++) {
+          doc.setDrawColor(110, 130, 165);
+          doc.setFillColor(110, 130, 165);
+          doc.setLineWidth(0.6);
+          drawDiamondGlyph(doc, dx, diaCy, diaR, s < dso.difficulty);
+          dx += diaR * 0.72 * 2 + diaGap;
+        }
+        drawMetaColumn(doc, t('targets.sort.difficulty'), diaW, metaX, metaTop);
+      }
+
+      // ── Altitude trajectory chart (tall — fills the band above the sky view) ──
       const chartOff = document.createElement('canvas');
       chartOff.width = Math.round(contentW * dpr);
       chartOff.height = Math.round(chartH * dpr);
@@ -505,20 +651,21 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
         drawAltChartToCanvas(chartCtx, tgt.curve, tgt.nightWin, tgt.bestTimeUtc,
           0, 0, chartOff.width, chartOff.height, dpr);
       }
-      doc.addImage(chartOff.toDataURL('image/png'), 'PNG', margin, iy, contentW, chartH);
-      iy += chartH + 8;
+      doc.addImage(chartOff.toDataURL('image/png'), 'PNG', margin, chartTop, contentW, chartH);
 
-      // ── Framed sky view ─────────────────────────────────────────────────────
+      // ── Framed sky view (bottom third) ───────────────────────────────────────
+      const imgW = contentW;
+      const imgH = frameH;
       const off = document.createElement('canvas');
       off.width = Math.round(imgW * dpr);
       off.height = Math.round(imgH * dpr);
-      const p = project(tgt.dso.ra, tgt.dso.dec);
+      const p = project(dso.ra, dso.dec);
       const scale = spec
-        ? computeFramedViewScale(spec.wDeg, spec.hDeg, tgt.dso.dec, imgW, imgH, 0.6)
+        ? computeFramedViewScale(spec.wDeg, spec.hDeg, dso.dec, imgW, imgH, 0.55)
         : baseView.scale * 4;
       const view: ViewState = { centerX: p.x, centerY: p.y, scale, rotationDeg: baseView.rotationDeg, width: imgW, height: imgH };
       skyMap.renderToCanvas(off, view, dpr);
-      doc.addImage(off.toDataURL('image/jpeg', 0.95), 'JPEG', margin, iy, imgW, imgH);
+      doc.addImage(off.toDataURL('image/jpeg', 0.95), 'JPEG', margin, imgTop, imgW, imgH);
     }
 
     // Overview page: constellation lines + frame markers per target — no text.

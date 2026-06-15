@@ -5,7 +5,7 @@
 [![CI](https://github.com/gweybrec/my-astro-sky/actions/workflows/ci.yml/badge.svg)](https://github.com/gweybrec/my-astro-sky/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Web application for overlaying astrophotographs onto an interactive sky map with automatic plate solving.
+Web application for overlaying astrophotos onto an interactive sky map with automatic plate solving.
 
 → [User guide](docs/user/user-guide.md) · [Architecture](docs/dev/architecture.md) · [Distribution](docs/dev/distribution.md)
 

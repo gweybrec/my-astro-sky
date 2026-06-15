@@ -23,6 +23,11 @@ vi.mock('../../src/api', () => ({
   updatePhotoMetadata: vi.fn(),
 }));
 
+const mockFindDSOIds = vi.fn();
+vi.mock('../../src/dso-catalog', () => ({
+  findDSOIdsFromCorrespondences: (...args: unknown[]) => mockFindDSOIds(...args),
+}));
+
 vi.mock('../../src/file-utils', () => ({
   stripExtension: (s: string) => s.replace(/\.[^.]+$/, ''),
   getFileDimensions: (...args: unknown[]) => mockGetFileDimensions(...args),
@@ -94,6 +99,8 @@ async function triggerWcsChange(wrapper: ReturnType<typeof mountCard>, wcsFile: 
 beforeEach(() => {
   mockSolveWCS.mockReset();
   mockGetFileDimensions.mockReset();
+  mockFindDSOIds.mockReset();
+  mockFindDSOIds.mockReturnValue([]);
   // Default: photo is 1920×1080
   mockGetFileDimensions.mockResolvedValue({ width: 1920, height: 1080 });
   // Default: successful WCS parse with one correspondence
@@ -167,6 +174,72 @@ describe('BatchCard — open WCS file', () => {
     await triggerWcsChange(wrapper, new File([''], 'M42.fits'));
 
     expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'warning' }));
+    wrapper.unmount();
+  });
+
+  it('derives DSOs from correspondences when the WCS server returns none', async () => {
+    // The /api/solve-wcs route never populates dsoIds, so the card must fall back
+    // to matching the solved correspondences against the local catalog.
+    const correspondences = [
+      { pointIndex: 0, photoX: 100, photoY: 100, starHip: 0, starName: 's0', starRa: 210, starDec: 54 },
+    ];
+    mockSolveWCS.mockResolvedValue({ success: true, correspondences, dsoIds: [] });
+    mockFindDSOIds.mockReturnValue(['M101', 'NGC5474']);
+
+    const item = makeItem();
+    const wrapper = mountCard(item);
+    await triggerWcsChange(wrapper, new File([''], 'M101.fits'));
+
+    expect(mockFindDSOIds).toHaveBeenCalledWith(correspondences, 1920, 1080);
+    expect(item.dsoIds).toEqual(['M101', 'NGC5474']);
+    wrapper.unmount();
+  });
+
+  it('prefers server-provided dsoIds over the correspondence fallback', async () => {
+    mockSolveWCS.mockResolvedValue({
+      success: true,
+      correspondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 }],
+      dsoIds: ['M42'],
+    });
+
+    const item = makeItem();
+    const wrapper = mountCard(item);
+    await triggerWcsChange(wrapper, new File([''], 'M42.fits'));
+
+    expect(item.dsoIds).toEqual(['M42']);
+    expect(mockFindDSOIds).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('pre-fills the observation date from the WCS DATE-OBS', async () => {
+    mockSolveWCS.mockResolvedValue({
+      success: true,
+      correspondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 }],
+      dsoIds: [],
+      dateObs: '2026-01-01T00:00:00Z',
+    });
+
+    const item = makeItem();
+    const wrapper = mountCard(item);
+    await triggerWcsChange(wrapper, new File([''], 'M101.fits'));
+
+    expect(item.observationDate).toBe('2026-01-01T00:00:00Z');
+    wrapper.unmount();
+  });
+
+  it('does not overwrite an observation date the user already set', async () => {
+    mockSolveWCS.mockResolvedValue({
+      success: true,
+      correspondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 }],
+      dsoIds: [],
+      dateObs: '2026-01-01T00:00:00Z',
+    });
+
+    const item = makeItem({ observationDate: '2025-05-05T22:00:00Z' });
+    const wrapper = mountCard(item);
+    await triggerWcsChange(wrapper, new File([''], 'M101.fits'));
+
+    expect(item.observationDate).toBe('2025-05-05T22:00:00Z');
     wrapper.unmount();
   });
 

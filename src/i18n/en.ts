@@ -790,7 +790,7 @@ const en: Translations = {
   },
   batch: {
     button: '+ Add multiple photos',
-    modalTitle: 'Batch photo upload',
+    modalTitle: 'Add photos',
     closeTitle: 'Close (photos you placed remain on the map; unsaved solves will be lost)',
     startButton: 'Start plate solving',
     startingLabel: 'Starting…',

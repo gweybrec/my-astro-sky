@@ -792,7 +792,7 @@ const es: Translations = {
   },
   batch: {
     button: '+ Añadir varias fotos',
-    modalTitle: 'Subida masiva de fotos',
+    modalTitle: 'Añadir fotos',
     closeTitle: 'Cerrar (las fotos colocadas permanecen en el mapa; las soluciones no guardadas se perderán)',
     startButton: 'Iniciar la solución de placa',
     startingLabel: 'Iniciando…',

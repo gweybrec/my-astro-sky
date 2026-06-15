@@ -792,7 +792,7 @@ const de: Translations = {
   },
   batch: {
     button: '+ Mehrere Fotos hinzufügen',
-    modalTitle: 'Stapel-Foto-Upload',
+    modalTitle: 'Fotos hinzufügen',
     closeTitle: 'Schließen (platzierte Fotos bleiben auf der Karte; nicht gespeicherte Lösungen gehen verloren)',
     startButton: 'Plate Solving starten',
     startingLabel: 'Wird gestartet…',

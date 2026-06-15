@@ -2257,7 +2257,7 @@ export class TargetsView {
     const exportBtn = this.iconActionBtn(planListSvg, t('targets.plan.exportPdf'));
     exportBtn.classList.add('shrink-0');
     const deleteBtn = this.iconActionBtn(trashSvg, t('targets.plan.delete'));
-    deleteBtn.classList.add('shrink-0');
+    deleteBtn.classList.add('shrink-0', 'btn-icon--danger');
 
     summary.appendChild(nameEl);
     summary.appendChild(count);
@@ -2459,7 +2459,7 @@ export class TargetsView {
     // Invisible clone of the row's remove button, to reserve the same width.
     const removeSpacer = document.createElement('span');
     removeSpacer.className = 'btn-icon shrink-0 invisible';
-    removeSpacer.textContent = '✕';
+    removeSpacer.innerHTML = trashSvg;
 
     header.appendChild(infoSpacer);
     header.appendChild(gutterSpacer);
@@ -2634,9 +2634,9 @@ export class TargetsView {
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
-    removeBtn.className = 'btn-icon shrink-0';
+    removeBtn.className = 'btn-icon btn-icon--danger shrink-0';
     removeBtn.title = t('targets.plan.remove');
-    removeBtn.textContent = '✕';
+    removeBtn.innerHTML = trashSvg;
     removeBtn.addEventListener('click', async () => {
       await this.plansStore.removeEntry(planId, info.entryId);
       this.updatePlanBadge();

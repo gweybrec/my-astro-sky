@@ -1993,6 +1993,9 @@ html, body {
 .metadata-field { display: flex; flex-direction: column; gap: var(--space-2); }
 .metadata-field + .metadata-field { margin-top: var(--space-6h); }
 .metadata-label { font-size: var(--font-size-small); color: var(--text-label); letter-spacing: 0.02em; }
+/* Observation-date input: match the other metadata field inputs (12px / secondary)
+   instead of the larger, brighter generic .dialog-input default (14px / primary). */
+.metadata-field .dialog-input { font-size: var(--font-size-base); color: var(--text-secondary); }
 
 .tag-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); min-height: 0; }
 
@@ -4286,6 +4289,11 @@ details.targets-form-details[open] .targets-form-summary::before {
 .batch-placed-label {
   font-size: var(--font-size-base);
   color: var(--batch-placed-text);
+}
+
+.batch-placing-label {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
 }
 
 /* Global labels bar between header and card list */

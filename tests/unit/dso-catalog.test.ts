@@ -11,12 +11,14 @@ vi.mock('../../src/projection', () => ({
   project: vi.fn((ra: number, dec: number) => ({ x: ra / 360, y: dec / 90 })),
 }));
 
+import type { PhotoCorrespondence } from '../../src/types';
 import {
   loadDSOCatalog,
   getDSOs,
   getDSOById,
   getDSOsNear,
   findDSOsInImage,
+  findDSOIdsFromCorrespondences,
   getDSOCatalog,
   applyAndStoreSingleOverride,
   resetDsoToBaseValues,
@@ -230,6 +232,52 @@ describe('findDSOsInImage()', () => {
     const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
     const result = findDSOsInImage(affine, 1000, 1000);
     expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── findDSOIdsFromCorrespondences ───────────────────────────────────────────
+
+describe('findDSOIdsFromCorrespondences()', () => {
+  // With project(ra, dec) = {x: ra/360, y: dec/90} and photoX/photoY chosen to
+  // equal the projection of each star, computeAffineTransform yields the identity
+  // photo→projection transform — so this mirrors the findDSOsInImage identity case:
+  // TESTOBJ (ra=0, dec=0) → pixel (0, 0), inside a 10×10 image.
+  const corr = (
+    pointIndex: number, photoX: number, photoY: number, starRa: number, starDec: number,
+  ): PhotoCorrespondence => ({
+    pointIndex, photoX, photoY, starHip: 0, starName: `s${pointIndex}`, starRa, starDec,
+  });
+
+  const identityCorrespondences: PhotoCorrespondence[] = [
+    corr(0, 0, 0, 0, 0),       // → projection (0, 0)
+    corr(1, 0.5, 0, 180, 0),   // → projection (0.5, 0)
+    corr(2, 0, 1, 0, 90),      // → projection (0, 1)
+  ];
+
+  it('derives DSO ids inside the solved field', () => {
+    const ids = findDSOIdsFromCorrespondences(identityCorrespondences, 10, 10);
+    expect(ids).toContain('TESTOBJ');
+    // M42 projects below the image (py < 0) → excluded
+    expect(ids).not.toContain('M42');
+  });
+
+  it('returns [] when fewer than 3 correspondences carry RA/Dec', () => {
+    const partial = [corr(0, 0, 0, 0, 0), corr(1, 0.5, 0, 180, 0)];
+    expect(findDSOIdsFromCorrespondences(partial, 10, 10)).toEqual([]);
+  });
+
+  it('ignores correspondences missing RA/Dec when counting the 3 needed', () => {
+    const withGaps: PhotoCorrespondence[] = [
+      corr(0, 0, 0, 0, 0),
+      { pointIndex: 1, photoX: 5, photoY: 5, starHip: 42, starName: 'noradec' },
+      corr(2, 0.5, 0, 180, 0),
+      corr(3, 0, 1, 0, 90),
+    ];
+    expect(findDSOIdsFromCorrespondences(withGaps, 10, 10)).toContain('TESTOBJ');
+  });
+
+  it('returns [] when image dimensions are unknown', () => {
+    expect(findDSOIdsFromCorrespondences(identityCorrespondences, 0, 0)).toEqual([]);
   });
 });
 
