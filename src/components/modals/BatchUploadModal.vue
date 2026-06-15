@@ -74,7 +74,12 @@
         </div>
         <div class="batch-footer-actions">
           <CheckRow :label="t('batch.autoPlace')" v-model="autoPlace" :disabled="isStarting" />
-          <button class="btn-action" :disabled="isStarting" @click="startSolving">{{ startBtnText }}</button>
+          <button
+            class="btn-action"
+            :disabled="isStarting || allSolversDisabled"
+            :title="allSolversDisabled ? t('batch.noSolverConfigured') : undefined"
+            @click="startSolving"
+          >{{ startBtnText }}</button>
           <button
             class="btn-confirm"
             :disabled="!canPlace || autoPlace"
@@ -153,6 +158,20 @@ function defaultSolver(): SolverType {
   if (avail.solveField) return 'solve-field';
   if (avail.astap) return 'astap';
   return 'astrometry';
+}
+
+// No local solver and no astrometry.net key: nothing can plate-solve, so the
+// Start button is disabled (otherwise it would fall back to astrometry.net).
+const allSolversDisabled = computed(() => {
+  const a = solverAvailability.value;
+  return !a.solveField && !a.astap && !a.astrometry;
+});
+
+function isSolverAvailable(solver: SolverType): boolean {
+  const a = solverAvailability.value;
+  if (solver === 'solve-field') return a.solveField;
+  if (solver === 'astap') return a.astap;
+  return a.astrometry;
 }
 
 onMounted(async () => {
@@ -312,7 +331,10 @@ async function pollUntilLocalDone(
           stopPolling();
           resolve(status.result ?? { success: false, error: t('modal.solveFailed') });
         } else if (status.status === 'failed') {
-          stopPolling(new Error(status.error || t('modal.solveFailed')));
+          // Resolve (don't reject) with the result so its diagnostics survive into
+          // solveItem's failure branch and populate the error-details collapsible.
+          stopPolling();
+          resolve(status.result ?? { success: false, error: status.error || t('modal.solveFailed') });
         } else if (status.status === 'canceled') {
           stopPolling();
           reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
@@ -366,6 +388,15 @@ async function handleSolveSuccess(item: BatchItem, result: PlateSolveResult) {
 async function solveItem(item: BatchItem) {
   if (cancelled) return;
   if (item.status === 'solving') return;
+
+  // Guard against attempting a solver that isn't configured (e.g. the button was
+  // enabled but the item's selected solver has no path/API key available).
+  if (!isSolverAvailable(item.solver)) {
+    item.status = 'failed';
+    item.error = t('batch.noSolverConfigured');
+    item.diagnostics = undefined;
+    return;
+  }
 
   item.status = 'solving';
   item.elapsedSeconds = 0;

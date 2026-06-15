@@ -12,6 +12,22 @@ import type { ServerLang } from './messages.js';
 
 const execFileAsync = promisify(execFile);
 
+// Build the raw-output snippet shown in the error-details collapsible: the command
+// that was run (with the user's filename) followed by the last few non-empty lines
+// of solver output. Returns undefined when there is nothing useful.
+function buildDiagnostics(output: string | undefined, command?: string): string | undefined {
+  const snippet = (output ?? '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(-6)
+    .join('\n');
+  if (command) {
+    return snippet ? `$ ${command}\n\n${snippet}` : `$ ${command}`;
+  }
+  return snippet || undefined;
+}
+
 const loggedVersions = new Set<string>();
 async function logSolverVersion(bin: string, versionArgs: string[], useWSL: boolean): Promise<void> {
   if (loggedVersions.has(bin)) return;
@@ -55,6 +71,7 @@ export async function solveWithASTAP(
   hints?: { ra?: number; dec?: number; fov?: number; radius?: number },
   lang: ServerLang = 'en',
   signal?: AbortSignal,
+  originalName?: string,
 ): Promise<SolveResult> {
   const bin = getASTAPBin();
   const useWSL = useWSLForASTAP();
@@ -68,7 +85,8 @@ export async function solveWithASTAP(
     await fsp.writeFile(imgPath, buffer);
 
     // Build ASTAP command with optional hints
-    const args = ['-f', wslPath(imgPath, useWSL), '-wcs', '-z', '0'];
+    const imgArg = wslPath(imgPath, useWSL);
+    const args = ['-f', imgArg, '-wcs', '-z', '0'];
     
     // Add position hints if provided
     if (hints?.ra !== undefined && hints?.dec !== undefined) {
@@ -98,12 +116,22 @@ export async function solveWithASTAP(
 
     const exec = wrapExecForWSL(bin, args, useWSL);
 
+    // Human-readable command for the error-details collapsible: substitute the
+    // temp input path with the user's original filename so it's recognizable.
+    const solveCommand = `${exec.cmd} ${exec.args.join(' ')}`
+      .split(imgArg).join(originalName || path.basename(imgArg));
+
+    // Combined solver output retained at function scope so any failure return
+    // (including the success-exit path that never enters the catch below) can
+    // surface raw output in the error-details collapsible.
+    let solveOutput = '';
     try {
-      await execFileAsync(exec.cmd, exec.args, {
+      const { stdout, stderr } = await execFileAsync(exec.cmd, exec.args, {
         timeout: 60_000,
         env: { ...process.env, LC_ALL: 'C', LANG: 'C' },
         signal,
       } as any);
+      solveOutput = [String(stdout ?? ''), String(stderr ?? '')].filter(Boolean).join('\n').trim();
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.code === 'ABORT_ERR' || signal?.aborted) {
         const abortErr = new Error('SOLVE_CANCELED');
@@ -118,7 +146,8 @@ export async function solveWithASTAP(
         const stderr = err.stderr?.toString() || '';
         const stdout = err.stdout?.toString() || '';
         const fullOutput = stderr || stdout || err.message || '';
-        
+        solveOutput = fullOutput;
+
         // Log full output for debugging
         console.log('[ASTAP] Full output:', fullOutput);
         
@@ -148,17 +177,11 @@ export async function solveWithASTAP(
         
         // Check if it's likely a missing database issue
         if (fullOutput.includes('h18 not found') || fullOutput.includes('database not found') || (!stderr && !stdout)) {
-          return { success: false, error: msg.astap.noDatabase(lang, path.dirname(bin)) };
+          return { success: false, error: msg.astap.noDatabase(lang, path.dirname(bin)), diagnostics: buildDiagnostics(fullOutput, solveCommand) };
         }
-        
+
         // Provide informative error message with explanations
-        const lastLines = fullOutput
-          .split('\n')
-          .map((s: string) => s.trim())
-          .filter(Boolean)
-          .slice(-6)
-          .join('\n');
-        const diagnostics = lastLines || undefined;
+        const diagnostics = buildDiagnostics(fullOutput, solveCommand);
 
         if (noSolution) {
           let errorMsg = msg.astap.noSolution(lang, starsFound, quadsFound);
@@ -175,7 +198,7 @@ export async function solveWithASTAP(
     }
 
     if (!existsSync(wcsPath)) {
-      return { success: false, error: msg.astap.noWcsFile(lang) };
+      return { success: false, error: msg.astap.noWcsFile(lang), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
     }
 
     const wcsText = await fsp.readFile(wcsPath, 'utf-8');
@@ -184,7 +207,7 @@ export async function solveWithASTAP(
     const required = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'];
     for (const key of required) {
       if (typeof parsed[key] !== 'number') {
-        return { success: false, error: msg.astap.missingWcsKey(lang, key) };
+        return { success: false, error: msg.astap.missingWcsKey(lang, key), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
       }
     }
 
@@ -210,7 +233,7 @@ export async function solveWithASTAP(
       
       if (distance > maxDistance) {
         console.log(`[ASTAP] Solution rejected: too far from hint. Expected RA=${hints.ra}°, Dec=${hints.dec}°, got RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance=${distance.toFixed(1)}° > ${maxDistance}°)`);
-        return { success: false, error: msg.astap.badSolution(lang, distance.toFixed(1)) };
+        return { success: false, error: msg.astap.badSolution(lang, distance.toFixed(1)), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
       }
       
       console.log(`[ASTAP] Solution validated: RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance from hint: ${distance.toFixed(1)}°)`);
@@ -227,7 +250,7 @@ export async function solveWithASTAP(
     }
     
     if (correspondences.length < 3) {
-      return { success: false, error: msg.astap.notEnoughCatalogStars(lang) };
+      return { success: false, error: msg.astap.notEnoughCatalogStars(lang), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
     }
 
     return { success: true, correspondences };

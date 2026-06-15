@@ -16,6 +16,12 @@ import { buildIntegrationFilterField } from './chip-utils';
 import trashSvg from './icons/trash.svg?raw';
 import { createImageZoomPan } from './image-zoom';
 
+/** Result of the manual star-identification sub-modal (see openManualIdentifyModal). */
+export type ManualIdentifyResult =
+  | { action: 'validate'; correspondences: PhotoCorrespondence[] }
+  | { action: 'manual-placement' }
+  | { action: 'cancel' };
+
 const MARKER_COLORS = ['#ff4444', '#44cc44', '#4488ff'];
 const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];
 
@@ -859,28 +865,6 @@ export class PhotoOverlay {
     this.fireOnPhotosChanged();
   }
 
-  /** Open the registration modal for a new photo */
-  openRegistrationModal() {
-    const allowedExt = /\.(jpe?g|png|webp)$/i;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      if (!allowedExt.test(file.name)) {
-        showToast({
-          message: t('errors.invalidPhotoFormat'),
-          type: 'error',
-          duration: 3500,
-        });
-        return;
-      }
-      this.showModal(file);
-    };
-    input.click();
-  }
-
   private addPhotoToMap(photo: Photo) {
     // Check if photo already exists
     const existing = this.placedPhotos.find(p => p.photo.id === photo.id);
@@ -1253,2106 +1237,833 @@ export class PhotoOverlay {
     });
   }
 
-  private showModal(file: File) {
-    const self = this;
-    // State
-    const points: (PhotoCorrespondence | null)[] = [null, null, null];
-    let activeIndex = 0;
-    let naturalWidth = 0;
-    let naturalHeight = 0;
-    // Extra correspondences (pointIndex >= 3) from auto-solve, used for LSQ fit
-    let extraAutoCorrespondences: PhotoCorrespondence[] = [];
+  /**
+   * Open the manual star-identification sub-modal for a single file.
+   *
+   * Shows the photo preview and lets the user click up to 3 points and identify
+   * each via star search / RA-Dec entry / map pick, plus a hint-driven
+   * "suggest stars" helper and a free-drag "place on map" hand-off. There are
+   * no plate-solving buttons and no metadata editor — those live in the batch card.
+   *
+   * Resolves with:
+   *  - `{ action: 'validate', correspondences }` when the user clicks Validate
+   *    (enabled once 2+ points are identified),
+   *  - `{ action: 'manual-placement' }` if they hand off to free-drag placement
+   *    (which self-saves and places the photo), or
+   *  - `{ action: 'cancel' }` otherwise.
+   */
+  openManualIdentifyModal(
+    file: File,
+    opts?: { initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string } },
+  ): Promise<ManualIdentifyResult> {
+    return new Promise<ManualIdentifyResult>((resolve) => {
+      const skyMap = this.skyMap;
 
-    // Metadata state
-    let pendingOriginalName = stripExtension(file.name);
-    let pendingDsoIds: string[] = [];
-    let pendingLabels: string[] = [];
-    let pendingIntegrations: PhotoIntegration[] = [];
-    let pendingObsDate = '';
-    let pendingNotes = '';
+      // State
+      const points: (PhotoCorrespondence | null)[] = [null, null, null];
+      let activeIndex = 0;
+      let naturalWidth = 0;
+      let naturalHeight = 0;
+      let settled = false;
 
-    function utcToDatetimeLocal(iso: string): string {
-      const d = new Date(iso);
-      const pad = (n: number) => n.toString().padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    }
+      // Create modal backdrop
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
 
-    const knownFilterMap = new Map<string, string>();
-    const rememberFilters = (filters: string[]) => {
-      for (const filter of filters) {
-        const trimmed = filter.trim();
-        if (!trimmed) continue;
-        const key = normalizeIntegrationFilterKey(trimmed);
-        if (!knownFilterMap.has(key)) knownFilterMap.set(key, trimmed);
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+
+      // Header
+      const header = document.createElement('div');
+      header.className = 'modal-header';
+      header.innerHTML = `
+        <h2>${t('modal.manualIdentifyTitle', { name: stripExtension(file.name) })}</h2>
+        <button class="modal-close">&times;</button>
+      `;
+      modal.appendChild(header);
+
+      let zoom: ReturnType<typeof createImageZoomPan> | null = null;
+
+      function finish(result: ManualIdentifyResult) {
+        if (settled) return;
+        settled = true;
+        zoom?.destroy();
+        document.removeEventListener('click', onDocClick);
+        backdrop.remove();
+        resolve(result);
       }
-    };
-    rememberFilters(DEFAULT_INTEGRATION_FILTERS);
-    rememberFilters(this.getPlacedPhotos().flatMap(p => (p.photo.integrations ?? []).map(row => row.filter)));
 
-    // Helper: compute photo→projection affine from correspondences
-    function buildPhotoProjectionAffine(corrs: PhotoCorrespondence[]) {
-      const pts = corrs.slice(0, 3);
-      const photoPoints: Point[] = [];
-      const projPoints: Point[] = [];
-      for (const c of pts) {
-        const rd = getCorrRaDec(c);
-        if (!rd) continue;
-        photoPoints.push({ x: c.photoX, y: c.photoY });
-        projPoints.push(project(rd.ra, rd.dec));
+      function closeModal() {
+        finish({ action: 'cancel' });
       }
-      if (photoPoints.length < 3) return null;
-      try {
-        return computeAffineTransform(
-          photoPoints as [Point, Point, Point],
-          projPoints as [Point, Point, Point],
-        );
-      } catch { return null; }
-    }
 
-    // Helper: detect DSOs (use server list if available, else geometric)
-    // fallbackW/fallbackH are used when the browser can't render the file (e.g. FITS) and naturalWidth/naturalHeight are 0
-    function detectAndPopulateDSOs(serverDsoIds: string[] | undefined, corrs: PhotoCorrespondence[], imgW: number, imgH: number, fallbackW?: number, fallbackH?: number) {
-      const w = imgW || fallbackW || 0;
-      const h = imgH || fallbackH || 0;
-      if (serverDsoIds && serverDsoIds.length > 0) {
-        pendingDsoIds = [...serverDsoIds];
-      } else {
-        const aff = buildPhotoProjectionAffine(corrs);
-        if (aff) {
-          pendingDsoIds = findDSOsInImage(aff, w, h).map(d => d.id);
+      header.querySelector('.modal-close')!.addEventListener('click', closeModal);
+
+      // Body
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+
+      // Left: photo
+      const photoSide = document.createElement('div');
+      photoSide.className = 'modal-photo-side';
+
+      const photoWrapper = document.createElement('div');
+      photoWrapper.className = 'modal-photo-wrapper';
+
+      const photoContainer = document.createElement('div');
+      photoContainer.className = 'modal-photo-container';
+
+      const photoImg = document.createElement('img');
+      photoImg.className = 'modal-photo';
+      photoContainer.appendChild(photoImg);
+      photoWrapper.appendChild(photoContainer);
+      photoSide.appendChild(photoWrapper);
+
+      // Right: form
+      const formSide = document.createElement('div');
+      formSide.className = 'modal-form-side';
+
+      // Instructions
+      const manualInstructions = document.createElement('p');
+      manualInstructions.className = 'modal-instructions';
+      manualInstructions.textContent = t('modal.manualInstructions');
+      formSide.appendChild(manualInstructions);
+
+      // Direct map placement button (free-drag, no star matching)
+      const manualBtn = document.createElement('button');
+      manualBtn.type = 'button';
+      manualBtn.className = 'btn-auto-solve full-width';
+      manualBtn.textContent = t('modal.manualButton');
+      manualBtn.title = t('modal.manualTooltip');
+      formSide.appendChild(manualBtn);
+
+      manualBtn.addEventListener('click', () => {
+        const initialMeta = opts?.initialMeta ?? {
+          originalName: stripExtension(file.name),
+          dsoIds: [], labels: [], integrations: [], observationDate: null, notes: '',
+        };
+        // Hand off to the free-drag placement flow (it self-saves & places the photo).
+        finish({ action: 'manual-placement' });
+        this.openManualPlacement(file, initialMeta);
+      });
+
+      // Divider between map placement and star identification
+      const divider = document.createElement('div');
+      divider.className = 'modal-panel-divider';
+      formSide.appendChild(divider);
+
+      // --- Hint + "suggest stars" helper ---
+      const hintsSection = document.createElement('div');
+      hintsSection.className = 'solve-hints-section';
+
+      const hintsHeaderRow = document.createElement('div');
+      hintsHeaderRow.className = 'hints-header-row';
+
+      const hintsBulb = document.createElement('span');
+      hintsBulb.className = 'hints-bulb-icon';
+      hintsBulb.textContent = '💡';
+      hintsHeaderRow.appendChild(hintsBulb);
+
+      const hintsLabelText = document.createElement('span');
+      hintsLabelText.className = 'hints-label-text';
+      hintsLabelText.textContent = t('modal.hintsOptional');
+      hintsHeaderRow.appendChild(hintsLabelText);
+
+      const hintsClearBtn = document.createElement('button');
+      hintsClearBtn.type = 'button';
+      hintsClearBtn.className = 'hints-clear-btn';
+      hintsClearBtn.textContent = '×';
+      hintsClearBtn.title = t('modal.hintsClear');
+      hintsHeaderRow.appendChild(hintsClearBtn);
+
+      hintsSection.appendChild(hintsHeaderRow);
+
+      const hintsInput = document.createElement('input');
+      hintsInput.type = 'text';
+      hintsInput.className = 'star-search-input w-full text-base';
+      hintsInput.placeholder = t('modal.hintsPlaceholder');
+      hintsSection.appendChild(hintsInput);
+
+      const hintsDropdown = document.createElement('div');
+      hintsDropdown.className = 'search-results-dropdown';
+      hintsDropdown.style.display = 'none';
+      hintsSection.appendChild(hintsDropdown);
+
+      formSide.appendChild(hintsSection);
+
+      // Store selected hint coordinates and target name
+      let hintCoords: { ra: number; dec: number } | null = null;
+      let hintTargetName = '';
+
+      // Hints search handler
+      let hintsTimeout: any;
+      hintsInput.addEventListener('input', () => {
+        clearTimeout(hintsTimeout);
+        const query = hintsInput.value.trim();
+        if (query.length < 2) {
+          hintsDropdown.style.display = 'none';
+          return;
         }
-      }
-      refreshDsoChips();
-      expandMetaIfDSOsDetected();
-    }
-
-    // Helper: build affine from ManualPlacement (photo→projection, no view dependency)
-    function buildAffineFromManualPlacement(p: ManualPlacement, w: number, h: number) {
-      const center = project(p.centerRa, p.centerDec);
-      const rotRad = p.rotationDeg * Math.PI / 180;
-      const mx = p.mirrorX ? -1 : 1;
-      const my = p.mirrorY ? -1 : 1;
-      const cx = w / 2; const cy = h / 2;
-      const cosR = Math.cos(rotRad) * p.projPerPx;
-      const sinR = Math.sin(rotRad) * p.projPerPx;
-      const a = cosR * mx; const b = sinR * mx;
-      const c = -sinR * my; const d = cosR * my;
-      return { a, b, c, d, e: center.x - a * cx - c * cy, f: center.y - b * cx - d * cy };
-    }
-
-    // Will be set after metadata section is built
-    let refreshDsoChips = () => {};
-    let refreshLabelChips = () => {};
-    let refreshIntegrationRows = () => {};
-
-    // Create modal backdrop
-    const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'modal-header';
-    header.innerHTML = `
-      <h2>${t('modal.titleWithFile', { name: stripExtension(file.name) })}</h2>
-      <button class="modal-close">&times;</button>
-    `;
-    modal.appendChild(header);
-
-    // Abort controller: cancelled when modal is closed, stops any in-flight polling
-    const modalAbort = new AbortController();
-    let activeLocalSolveAbort: AbortController | null = null;
-
-    let zoom: ReturnType<typeof createImageZoomPan> | null = null;
-
-    function closeModal() {
-      zoom?.destroy();
-      if (activeLocalSolveAbort) {
-        activeLocalSolveAbort.abort();
-        activeLocalSolveAbort = null;
-      }
-      modalAbort.abort();
-      backdrop.remove();
-    }
-
-    header.querySelector('.modal-close')!.addEventListener('click', closeModal);
-
-    // Body
-    const body = document.createElement('div');
-    body.className = 'modal-body';
-
-    // Left: photo
-    const photoSide = document.createElement('div');
-    photoSide.className = 'modal-photo-side';
-
-    const photoWrapper = document.createElement('div');
-    photoWrapper.className = 'modal-photo-wrapper';
-
-    const photoContainer = document.createElement('div');
-    photoContainer.className = 'modal-photo-container';
-
-    const photoImg = document.createElement('img');
-    photoImg.className = 'modal-photo';
-    photoContainer.appendChild(photoImg);
-    photoWrapper.appendChild(photoContainer);
-    photoSide.appendChild(photoWrapper);
-
-    // Right: form
-    const formSide = document.createElement('div');
-    formSide.className = 'modal-form-side';
-
-    // --- Plate solving panel (open by default) ---
-    const fileExt = file.name.toLowerCase().replace(/^.*(\.[^.]+)$/, '$1');
-    const isAstroFile = ['.tif', '.tiff', '.fits', '.fit'].includes(fileExt);
-
-    const solvePanel = document.createElement('div');
-    solvePanel.className = 'modal-panel';
-    const solvePanelHdr = document.createElement('button');
-    solvePanelHdr.type = 'button';
-    solvePanelHdr.className = 'modal-panel-header open';
-    solvePanelHdr.textContent = t('modal.sectionSolving');
-    const autoInfoIcon = document.createElement('span');
-    autoInfoIcon.className = 'hints-info-icon panel-info-icon';
-    autoInfoIcon.textContent = 'i';
-    autoInfoIcon.title = 'Information';
-    solvePanelHdr.appendChild(autoInfoIcon);
-    const solvePanelBody = document.createElement('div');
-    solvePanelBody.className = 'modal-panel-body';
-    let solvePanelOpen = true;
-    solvePanelHdr.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('hints-info-icon')) return;
-      solvePanelOpen = !solvePanelOpen;
-      solvePanelBody.style.display = solvePanelOpen ? '' : 'none';
-      solvePanelHdr.classList.toggle('open', solvePanelOpen);
-    });
-    solvePanel.appendChild(solvePanelHdr);
-    solvePanel.appendChild(solvePanelBody);
-
-    const autoBtns = document.createElement('div');
-    autoBtns.className = 'auto-solve-buttons';
-
-    // solve-field local solve button
-    const btnSolveField = document.createElement('button');
-    btnSolveField.type = 'button';
-    btnSolveField.className = 'btn-auto-solve';
-    btnSolveField.textContent = t('modal.solveFieldButton');
-    autoBtns.appendChild(btnSolveField);
-
-    // ASTAP local solve button
-    const btnASTAP = document.createElement('button');
-    btnASTAP.type = 'button';
-    btnASTAP.className = 'btn-auto-solve';
-    btnASTAP.textContent = t('modal.astapButton');
-    autoBtns.appendChild(btnASTAP);
-
-    // Online button
-    const btnOnline = document.createElement('button');
-    btnOnline.type = 'button';
-    btnOnline.className = 'btn-auto-solve';
-    btnOnline.textContent = t('modal.onlineButton');
-    autoBtns.appendChild(btnOnline);
-
-    // WCS companion file button (always enabled — picks a FITS/TIFF companion)
-    const btnWCS = document.createElement('button');
-    btnWCS.type = 'button';
-    btnWCS.className = 'btn-auto-solve';
-    btnWCS.textContent = t('modal.wcsButton');
-    btnWCS.title = t('modal.wcsAvailable');
-    autoBtns.appendChild(btnWCS);
-
-    // Hidden companion FITS/TIFF file input (appended to modal so it's cleaned up automatically)
-    const companionInput = document.createElement('input');
-    companionInput.type = 'file';
-    companionInput.accept = '.fit,.fits,.tif,.tiff';
-    companionInput.style.display = 'none';
-    modal.appendChild(companionInput);
-
-    // WCS companion status row (shown below the buttons after companion is picked)
-    const wcsStatusRow = document.createElement('div');
-    wcsStatusRow.className = 'wcs-companion-status wcs-status hidden';
-
-    solvePanelBody.appendChild(autoBtns);
-    solvePanelBody.appendChild(wcsStatusRow);
-
-    // Hints section - optional location hint to improve solving
-    const hintsSection = document.createElement('div');
-    hintsSection.className = 'solve-hints-section';
-
-    const hintsHeaderRow = document.createElement('div');
-    hintsHeaderRow.className = 'hints-header-row';
-
-    const hintsBulb = document.createElement('span');
-    hintsBulb.className = 'hints-bulb-icon';
-    hintsBulb.textContent = '💡';
-    hintsHeaderRow.appendChild(hintsBulb);
-
-    const hintsLabelText = document.createElement('span');
-    hintsLabelText.className = 'hints-label-text';
-    hintsLabelText.textContent = t('modal.hintsOptional') || 'Optional: Target object (helps with few stars)';
-    hintsHeaderRow.appendChild(hintsLabelText);
-
-    const hintsClearBtn = document.createElement('button');
-    hintsClearBtn.type = 'button';
-    hintsClearBtn.className = 'hints-clear-btn';
-    hintsClearBtn.textContent = '×';
-    hintsClearBtn.title = t('modal.hintsClear') || 'Clear hint';
-    hintsHeaderRow.appendChild(hintsClearBtn);
-
-    hintsSection.appendChild(hintsHeaderRow);
-
-    const hintsInput = document.createElement('input');
-    hintsInput.type = 'text';
-    hintsInput.className = 'star-search-input';
-    hintsInput.placeholder = t('modal.hintsPlaceholder') || 'e.g., NGC2903, M31, Andromeda...';
-    hintsInput.style.width = '100%';
-    hintsInput.style.fontSize = 'var(--font-size-base)';
-    hintsSection.appendChild(hintsInput);
-
-    const hintsDropdown = document.createElement('div');
-    hintsDropdown.className = 'search-results-dropdown';
-    hintsDropdown.style.display = 'none';
-    hintsSection.appendChild(hintsDropdown);
-
-    // FOV input (optional field of view hint)
-    const fovContainer = document.createElement('div');
-    fovContainer.className = 'fov-row';
-
-    const fovLabel = document.createElement('label');
-    fovLabel.className = 'fov-label';
-    fovLabel.textContent = t('modal.fovLabel');
-    fovContainer.appendChild(fovLabel);
-
-    const fovInput = document.createElement('input');
-    fovInput.type = 'number';
-    fovInput.placeholder = 'e.g., 2.5';
-    fovInput.min = '0.1';
-    fovInput.max = '180';
-    fovInput.step = '0.1';
-    fovInput.className = 'fov-input';
-    fovContainer.appendChild(fovInput);
-
-    const fovUnit = document.createElement('span');
-    fovUnit.className = 'fov-unit';
-    fovUnit.textContent = '°';
-    fovContainer.appendChild(fovUnit);
-    
-    hintsSection.appendChild(fovContainer);
-
-    solvePanelBody.appendChild(hintsSection);
-
-    // Info icon click handler - show tooltip
-    autoInfoIcon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showHintsInfoTooltip(autoInfoIcon);
-    });
-
-    // Store selected hint coordinates and target name
-    let hintCoords: { ra: number; dec: number } | null = null;
-    let hintTargetName = '';
-
-    // Hints search handler
-    let hintsTimeout: any;
-    hintsInput.addEventListener('input', () => {
-      clearTimeout(hintsTimeout);
-      const query = hintsInput.value.trim();
-      
-      if (query.length < 2) {
-        hintsDropdown.style.display = 'none';
-        return;
-      }
-
-      hintsTimeout = setTimeout(async () => {
-        try {
-          const results = await searchUnified(query, 5);
-          
-          if (results.length === 0) {
-            hintsDropdown.style.display = 'none';
-            hintCoords = null;
-            return;
-          }
-
-          // Show dropdown with results - no auto-selection
-          hintsDropdown.innerHTML = '';
-          hintsDropdown.style.display = 'block';
-
-          results.forEach((result: any) => {
-            const item = document.createElement('div');
-            item.className = 'result-item';
-            item.style.cursor = 'pointer';
-            
-            const label = document.createElement('div');
-            label.textContent = result.label;
-            item.appendChild(label);
-            
-            const coords = document.createElement('div');
-            coords.className = 'star-coords';
-            coords.textContent = `RA: ${result.ra.toFixed(2)}° Dec: ${result.dec.toFixed(2)}°`;
-            item.appendChild(coords);
-
-            item.addEventListener('click', () => {
-              hintCoords = { ra: result.ra, dec: result.dec };
-              hintTargetName = result.label;
-              hintsInput.value = result.label;
+        hintsTimeout = setTimeout(async () => {
+          try {
+            const results = await searchUnified(query, 5);
+            if (results.length === 0) {
               hintsDropdown.style.display = 'none';
-              hintsSection.classList.add('has-hint');
-              
-              // Enable suggest button now that we have a hint
-              suggestBtn.disabled = false;
-              suggestBtn.title = ''; // Remove tooltip when enabled
-              suggestList.innerHTML = '';
-              suggestList.style.display = 'none';
+              hintCoords = null;
+              return;
+            }
+            hintsDropdown.innerHTML = '';
+            hintsDropdown.style.display = 'block';
+            results.forEach((result: any) => {
+              const item = document.createElement('div');
+              item.className = 'result-item';
+              item.style.cursor = 'pointer';
+              const label = document.createElement('div');
+              label.textContent = result.label;
+              item.appendChild(label);
+              const coords = document.createElement('div');
+              coords.className = 'star-coords';
+              coords.textContent = `RA: ${result.ra.toFixed(2)}° Dec: ${result.dec.toFixed(2)}°`;
+              item.appendChild(coords);
+              item.addEventListener('click', () => {
+                hintCoords = { ra: result.ra, dec: result.dec };
+                hintTargetName = result.label;
+                hintsInput.value = result.label;
+                hintsDropdown.style.display = 'none';
+                hintsSection.classList.add('has-hint');
+                suggestBtn.disabled = false;
+                suggestBtn.title = '';
+                suggestList.innerHTML = '';
+                suggestList.classList.add('hidden');
+              });
+              hintsDropdown.appendChild(item);
             });
+          } catch (err) {
+            reportUnknownRendererError('hints_search_error', err);
+          }
+        }, 500);
+      });
 
-            hintsDropdown.appendChild(item);
-          });
-        } catch (err) {
-          reportUnknownRendererError('hints_search_error', err);
+      hintsInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && hintsDropdown.style.display === 'block') {
+          e.preventDefault();
+          const firstItem = hintsDropdown.querySelector('div');
+          if (firstItem) firstItem.click();
         }
-      }, 500);
-    });
+      });
 
-    // Handle Enter key to select first dropdown item
-    hintsInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && hintsDropdown.style.display === 'block') {
-        e.preventDefault();
-        const firstItem = hintsDropdown.querySelector('div');
-        if (firstItem) {
-          firstItem.click();
-        }
-      }
-    });
-
-    // Clear button resets hint state
-    hintsClearBtn.addEventListener('click', () => {
-      hintCoords = null;
-      hintTargetName = '';
-      hintsInput.value = '';
-      hintsSection.classList.remove('has-hint');
-      suggestBtn.disabled = true;
-      suggestList.innerHTML = '';
-      suggestList.style.display = 'none';
-    });
-
-    // Clear hints dropdown on click outside
-    document.addEventListener('click', (e) => {
-      if (!hintsSection.contains(e.target as Node)) {
-        hintsDropdown.style.display = 'none';
-      }
-    });
-
-    // Status area
-    const autoStatus = document.createElement('div');
-    autoStatus.className = 'auto-solve-status';
-    solvePanelBody.appendChild(autoStatus);
-
-    formSide.appendChild(solvePanel);
-
-    // --- Manual identification panel (collapsed by default) ---
-    const manualPanel = document.createElement('div');
-    manualPanel.className = 'modal-panel';
-    const manualPanelHdr = document.createElement('button');
-    manualPanelHdr.type = 'button';
-    manualPanelHdr.className = 'modal-panel-header';
-    manualPanelHdr.textContent = t('modal.sectionManual');
-    const manualInfoIcon = document.createElement('span');
-    manualInfoIcon.className = 'hints-info-icon panel-info-icon';
-    manualInfoIcon.textContent = 'i';
-    manualInfoIcon.title = 'Information';
-    manualPanelHdr.appendChild(manualInfoIcon);
-    const manualPanelBody = document.createElement('div');
-    manualPanelBody.className = 'modal-panel-body';
-    manualPanelBody.style.display = 'none';
-    let manualPanelOpen = false;
-    manualPanelHdr.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('hints-info-icon')) return;
-      manualPanelOpen = !manualPanelOpen;
-      manualPanelBody.style.display = manualPanelOpen ? '' : 'none';
-      manualPanelHdr.classList.toggle('open', manualPanelOpen);
-    });
-    manualInfoIcon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showManualInfoTooltip(manualInfoIcon);
-    });
-    manualPanel.appendChild(manualPanelHdr);
-    manualPanel.appendChild(manualPanelBody);
-
-    const manualInstructions = document.createElement('p');
-    manualInstructions.className = 'modal-instructions';
-    manualInstructions.textContent = t('modal.manualInstructions');
-    manualPanelBody.appendChild(manualInstructions);
-
-    // Direct map placement button
-    const manualBtn = document.createElement('button');
-    manualBtn.type = 'button';
-    manualBtn.className = 'btn-auto-solve full-width';
-    manualBtn.textContent = t('modal.manualButton');
-    manualBtn.title = t('modal.manualTooltip');
-    manualPanelBody.appendChild(manualBtn);
-
-    manualBtn.addEventListener('click', () => {
-      const initialMeta = {
-        originalName: pendingOriginalName,
-        dsoIds: [...pendingDsoIds],
-        labels: [...pendingLabels],
-        integrations: sanitizeIntegrationRows(pendingIntegrations),
-        observationDate: pendingObsDate || null,
-        notes: pendingNotes,
-      };
-      closeModal();
-      this.openManualPlacement(file, initialMeta);
-    });
-
-    // Divider between map placement and star identification
-    const manualStarDivider = document.createElement('div');
-    manualStarDivider.className = 'modal-panel-divider';
-    manualPanelBody.appendChild(manualStarDivider);
-
-    // Suggest stars section (only relevant when identifying stars manually)
-    const suggestSection = document.createElement('div');
-    suggestSection.className = 'suggest-stars-section';
-
-    const suggestControls = document.createElement('div');
-    suggestControls.className = 'suggest-controls';
-
-    const suggestBtn = document.createElement('button');
-    suggestBtn.type = 'button';
-    suggestBtn.className = 'btn-auto-solve suggest-btn';
-    suggestBtn.textContent = t('lightSolve.suggestButton');
-    suggestBtn.disabled = true;
-    suggestBtn.title = t('lightSolve.requiresHint');
-    suggestControls.appendChild(suggestBtn);
-
-    const radiusLabel = document.createElement('span');
-    radiusLabel.className = 'suggest-radius-label';
-    radiusLabel.textContent = 'within';
-    suggestControls.appendChild(radiusLabel);
-
-    const radiusInput = document.createElement('input');
-    radiusInput.type = 'number';
-    radiusInput.value = '2';
-    radiusInput.min = '0.1';
-    radiusInput.max = '10';
-    radiusInput.step = '0.5';
-    radiusInput.className = 'suggest-radius-input';
-    suggestControls.appendChild(radiusInput);
-
-    const radiusUnit = document.createElement('span');
-    radiusUnit.className = 'suggest-radius-unit';
-    radiusUnit.textContent = '°';
-    suggestControls.appendChild(radiusUnit);
-
-    suggestSection.appendChild(suggestControls);
-
-    const suggestList = document.createElement('div');
-    suggestList.className = 'suggest-stars-list suggest-list hidden';
-    suggestSection.appendChild(suggestList);
-
-    manualPanelBody.appendChild(suggestSection);
-
-    // Suggest stars button handler
-    suggestBtn.addEventListener('click', async () => {
-      if (!hintCoords) return;
-      
-      try {
+      hintsClearBtn.addEventListener('click', () => {
+        hintCoords = null;
+        hintTargetName = '';
+        hintsInput.value = '';
+        hintsSection.classList.remove('has-hint');
         suggestBtn.disabled = true;
-        suggestBtn.textContent = t('lightSolve.searching');
         suggestList.innerHTML = '';
         suggestList.classList.add('hidden');
-        
-        // Get radius from input
-        const searchRadius = parseFloat(radiusInput.value) || 2.0;
-        
-        // Search for bright stars within specified radius of hint position
-        const nearbyStars = await searchStarsByPosition({
-          ra: hintCoords.ra,
-          dec: hintCoords.dec,
-          radius: searchRadius,
-          magLimit: 10, // Only stars brighter than magnitude 10
-          limit: 20
-        });
-        
-        suggestBtn.textContent = t('lightSolve.suggestButton');
-        suggestBtn.disabled = false;
-        
-        if (nearbyStars.length === 0) {
-          suggestList.innerHTML = `<div class="suggest-list-header">${t('lightSolve.noStarsNearby', { radius: searchRadius.toFixed(1) })}</div>`;
-          suggestList.classList.remove('hidden');
-          return;
-        }
-        
-        // Calculate distance for each star and sort by distance (closest first)
-        const starsWithDistance = nearbyStars.map(star => {
-          const dRa = (star.ra - hintCoords!.ra) * Math.cos(star.dec * Math.PI / 180);
-          const dDec = star.dec - hintCoords!.dec;
-          const distance = Math.sqrt(dRa * dRa + dDec * dDec);
-          return { star, distance };
-        });
-        starsWithDistance.sort((a, b) => a.distance - b.distance);
-        
-        // Create list header
-        const header = document.createElement('div');
-        header.className = 'suggest-list-header';
-        header.textContent = t('lightSolve.foundNearby', { count: nearbyStars.length, target: hintTargetName, radius: searchRadius.toFixed(1) });
-        suggestList.appendChild(header);
-
-        // Add each star as a list item
-        starsWithDistance.slice(0, 10).forEach(({ star, distance }) => {
-
-          const starItem = document.createElement('div');
-          starItem.className = 'suggest-list-item';
-          starItem.innerHTML = `
-            <div class="suggest-item-name">${star.name || `HIP ${star.hip}`}</div>
-            <div class="suggest-item-meta">
-              mag ${star.mag.toFixed(1)} \u2014 ${distance.toFixed(2)}\u00b0 from target
-            </div>
-          `;
-          
-          // Click to use this star for identification (auto-fill in correspondence)
-          starItem.addEventListener('click', () => {
-            // Find the active correspondence point
-            const activeIdx = points.findIndex(p => p === null);
-            if (activeIdx === -1) return; // All points filled
-            
-            // We can't auto-click on the photo, but we can highlight this star's name
-            // for the user to search manually
-            showToast({ 
-              message: `Look for ${star.name || `HIP ${star.hip}`} (mag ${star.mag.toFixed(1)}) in your photo`,
-              type: 'info',
-              duration: 5000
-            });
-          });
-          
-          suggestList.appendChild(starItem);
-        });
-
-        suggestList.classList.remove('hidden');
-
-      } catch (err: any) {
-        reportUnknownRendererError('suggest_stars_error', err);
-        suggestBtn.textContent = t('lightSolve.suggestButton');
-        suggestBtn.disabled = false;
-        showToast({ message: err.message || 'Failed to search catalog', type: 'error', duration: 3000 });
-      }
-    });
-
-    // Helper: set auto-solve status
-    function renderErrorDetails(details?: ApiErrorDetails): string {
-      if (!details) return '';
-      const rows: string[] = [];
-      if (details.code) rows.push(`<div><strong>${escapeHtml(t('modal.errorDetailsCode'))}:</strong> ${escapeHtml(details.code)}</div>`);
-      if (details.httpStatus != null) {
-        const statusText = details.httpStatusText ? ` ${details.httpStatusText}` : '';
-        rows.push(`<div><strong>${escapeHtml(t('modal.errorDetailsStatus'))}:</strong> ${escapeHtml(String(details.httpStatus) + statusText)}</div>`);
-      }
-      if (details.method || details.endpoint) {
-        rows.push(`<div><strong>Request:</strong> ${escapeHtml(`${details.method ?? ''} ${details.endpoint ?? ''}`.trim())}</div>`);
-      }
-      const body = details.responseBody?.trim();
-      const bodyHtml = body
-        ? `<div style="margin-top:6px;"><strong>${escapeHtml(t('modal.errorDetailsBody'))}:</strong><pre style="margin:4px 0 0; padding:8px; max-height:180px; overflow:auto; border-radius:4px; background: rgba(0,0,0,0.25); color:#f6d5d5; border:1px solid rgba(220,120,120,0.28); white-space: pre-wrap;">${escapeHtml(body)}</pre></div>`
-        : '';
-
-      if (rows.length === 0 && !bodyHtml) {
-        return '';
-      }
-
-      return `<details style="margin-top:8px;"><summary style="cursor:pointer; color:#f4caca;">${escapeHtml(t('modal.errorDetailsSummary'))}</summary><div style="margin-top:6px; font-size:11px; color:#f1c4c4;">${rows.join('')}${bodyHtml}</div></details>`;
-    }
-
-    function setAutoStatus(
-      msg: string,
-      state: 'solving' | 'success' | 'failed' | 'canceled',
-      subMsg?: string,
-      details?: ApiErrorDetails,
-      cancelOptions?: { show: boolean; onCancel?: () => void },
-      diagnostics?: string,
-    ) {
-      renderSharedSolveStatus({
-        container: autoStatus,
-        mode: 'single',
-        state,
-        message: msg,
-        subMessage: subMsg,
-        detailsHtml: state === 'failed' ? renderErrorDetails(details) : undefined,
-        diagnostics: (state === 'failed' || state === 'canceled') ? diagnostics : undefined,
-        showCancel: cancelOptions?.show ?? false,
-        onCancel: cancelOptions?.onCancel,
-      });
-    }
-
-    function disableAutoButtons() {
-      btnWCS.disabled = true;
-      btnOnline.disabled = true;
-      btnSolveField.disabled = true;
-      btnASTAP.disabled = true;
-    }
-
-    // Tracks which buttons are available based on user-configured settings.
-    // All optimistically true until settings load.
-    let solverAvail = { solveField: true, astap: true, astrometry: true };
-
-    function enableAutoButtons() {
-      btnWCS.disabled = false;
-      btnSolveField.disabled = !solverAvail.solveField;
-      btnASTAP.disabled = !solverAvail.astap;
-      btnOnline.disabled = !solverAvail.astrometry;
-    }
-
-    // Load settings and apply availability to buttons
-    loadServerSettings().then(s => {
-      solverAvail = getSolverAvailability(s);
-      if (!solverAvail.solveField) { btnSolveField.disabled = true; btnSolveField.title = t('modal.solverNoPath'); }
-      if (!solverAvail.astap)      { btnASTAP.disabled = true;      btnASTAP.title      = t('modal.solverNoPath'); }
-      if (!solverAvail.astrometry) { btnOnline.disabled = true;      btnOnline.title     = t('modal.solverNoApiKey'); }
-    }).catch(() => { /* server unavailable; leave all buttons enabled */ });
-
-    // 3 point entries
-    const pointEntries: HTMLDivElement[] = [];
-    const searchInputs: HTMLInputElement[] = [];
-    const dropdowns: HTMLDivElement[] = [];
-    const statusLabels: HTMLSpanElement[] = [];
-    const pickBtns: HTMLButtonElement[] = [];
-
-    for (let i = 0; i < 3; i++) {
-      const entry = document.createElement('div');
-      entry.className = 'point-entry';
-      entry.dataset.index = String(i);
-
-      const markerDot = document.createElement('span');
-      markerDot.className = 'marker-dot';
-      markerDot.style.backgroundColor = MARKER_COLORS[i];
-      markerDot.textContent = String(i + 1);
-
-      const info = document.createElement('div');
-      info.className = 'point-info';
-
-      const status = document.createElement('span');
-      status.className = 'point-status';
-      status.textContent = i === 0 ? t('modal.clickPhoto') : t('modal.waiting');
-      statusLabels.push(status);
-
-      const searchWrapper = document.createElement('div');
-      searchWrapper.className = 'search-wrapper';
-      searchWrapper.style.display = 'none';
-
-      // --- Star search row ---
-      const searchRow = document.createElement('div');
-      searchRow.className = 'search-row';
-
-      const searchInput = document.createElement('input');
-      searchInput.type = 'text';
-      searchInput.placeholder = t('modal.searchStar');
-      searchInput.className = 'star-search-input';
-      searchInputs.push(searchInput);
-
-      searchRow.appendChild(searchInput);
-
-      // "Carte" pick button (only if skyMap available)
-      if (this.skyMap) {
-        const pickBtn = document.createElement('button');
-        pickBtn.type = 'button';
-        pickBtn.className = 'btn-pick-map';
-        pickBtn.title = t('modal.mapPickTooltip');
-        pickBtn.textContent = t('modal.mapPick');
-        pickBtns.push(pickBtn);
-        searchRow.appendChild(pickBtn);
-
-        const skyMapRef = this.skyMap;
-        pickBtn.addEventListener('click', () => {
-          // Hide modal backdrop to reveal the map
-          backdrop.style.display = 'none';
-
-          skyMapRef.enterPickingMode((star: Star) => {
-            skyMapRef.exitPickingMode();
-            backdrop.style.display = '';
-            selectStar(i, star, starDisplayLabel(star));
-          });
-
-          // Escape handler to cancel and re-show modal
-          const escHandler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-              skyMapRef.exitPickingMode();
-              backdrop.style.display = '';
-              window.removeEventListener('keydown', escHandler);
-            }
-          };
-          window.addEventListener('keydown', escHandler);
-        });
-      }
-
-      // RA/Dec mode toggle button
-      const raDecToggle = document.createElement('button');
-      raDecToggle.type = 'button';
-      raDecToggle.className = 'btn-pick-map';
-      raDecToggle.title = t('modal.raDecTooltip');
-      raDecToggle.textContent = t('modal.raDecMode');
-      searchRow.appendChild(raDecToggle);
-
-      // --- RA/Dec input row (hidden by default) ---
-      const raDecRow = document.createElement('div');
-      raDecRow.className = 'search-row radec-row';
-      raDecRow.style.display = 'none';
-      raDecRow.style.flexDirection = 'column';
-      raDecRow.style.gap = '8px';
-
-      // RA inputs container
-      const raContainer = document.createElement('div');
-      raContainer.style.display = 'flex';
-      raContainer.style.flexDirection = 'column';
-      raContainer.style.gap = '4px';
-
-      const raLabel = document.createElement('label');
-      raLabel.textContent = t('modal.raLabel');
-      raLabel.style.fontSize = '0.9em';
-      raLabel.style.opacity = '0.8';
-      raContainer.appendChild(raLabel);
-
-      const raInputs = document.createElement('div');
-      raInputs.style.display = 'flex';
-      raInputs.style.gap = '4px';
-
-      const raHours = document.createElement('input');
-      raHours.type = 'number';
-      raHours.placeholder = t('modal.raHours');
-      raHours.className = 'radec-input-small';
-      raHours.min = '0';
-      raHours.max = '23';
-      raHours.step = '1';
-
-      const raMinutes = document.createElement('input');
-      raMinutes.type = 'number';
-      raMinutes.placeholder = t('modal.raMinutes');
-      raMinutes.className = 'radec-input-small';
-      raMinutes.min = '0';
-      raMinutes.max = '59';
-      raMinutes.step = '1';
-
-      const raSeconds = document.createElement('input');
-      raSeconds.type = 'number';
-      raSeconds.placeholder = t('modal.raSeconds');
-      raSeconds.className = 'radec-input-small';
-      raSeconds.min = '0';
-      raSeconds.max = '59';
-      raSeconds.step = '0.01';
-
-      raInputs.appendChild(raHours);
-      raInputs.appendChild(raMinutes);
-      raInputs.appendChild(raSeconds);
-      raContainer.appendChild(raInputs);
-
-      // Dec inputs container
-      const decContainer = document.createElement('div');
-      decContainer.style.display = 'flex';
-      decContainer.style.flexDirection = 'column';
-      decContainer.style.gap = '4px';
-
-      const decLabel = document.createElement('label');
-      decLabel.textContent = t('modal.decLabel');
-      decLabel.style.fontSize = '0.9em';
-      decLabel.style.opacity = '0.8';
-      decContainer.appendChild(decLabel);
-
-      const decInputs = document.createElement('div');
-      decInputs.style.display = 'flex';
-      decInputs.style.gap = '4px';
-
-      const decDegrees = document.createElement('input');
-      decDegrees.type = 'number';
-      decDegrees.placeholder = t('modal.decDegrees');
-      decDegrees.className = 'radec-input-small';
-      decDegrees.min = '-89';
-      decDegrees.max = '89';
-      decDegrees.step = '1';
-
-      const decMinutes = document.createElement('input');
-      decMinutes.type = 'number';
-      decMinutes.placeholder = t('modal.decMinutes');
-      decMinutes.className = 'radec-input-small';
-      decMinutes.min = '0';
-      decMinutes.max = '59';
-      decMinutes.step = '1';
-
-      const decSeconds = document.createElement('input');
-      decSeconds.type = 'number';
-      decSeconds.placeholder = t('modal.decSeconds');
-      decSeconds.className = 'radec-input-small';
-      decSeconds.min = '0';
-      decSeconds.max = '59';
-      decSeconds.step = '0.01';
-
-      decInputs.appendChild(decDegrees);
-      decInputs.appendChild(decMinutes);
-      decInputs.appendChild(decSeconds);
-      decContainer.appendChild(decInputs);
-
-      // Buttons container
-      const buttonsContainer = document.createElement('div');
-      buttonsContainer.style.display = 'flex';
-      buttonsContainer.style.gap = '8px';
-      buttonsContainer.style.marginTop = '4px';
-
-      const raDecOk = document.createElement('button');
-      raDecOk.type = 'button';
-      raDecOk.className = 'btn-pick-map';
-      raDecOk.textContent = 'OK';
-
-      const starToggle = document.createElement('button');
-      starToggle.type = 'button';
-      starToggle.className = 'btn-pick-map';
-      starToggle.title = t('modal.starModeTooltip');
-      starToggle.textContent = t('modal.starMode');
-
-      buttonsContainer.appendChild(raDecOk);
-      buttonsContainer.appendChild(starToggle);
-
-      raDecRow.appendChild(raContainer);
-      raDecRow.appendChild(decContainer);
-      raDecRow.appendChild(buttonsContainer);
-
-      // Toggle between modes
-      raDecToggle.addEventListener('click', () => {
-        searchRow.style.display = 'none';
-        raDecRow.style.display = 'flex';
-        raHours.focus();
-      });
-      starToggle.addEventListener('click', () => {
-        raDecRow.style.display = 'none';
-        searchRow.style.display = '';
-        searchInput.focus();
       });
 
-      // RA/Dec OK handler with HMS/DMS conversion
-      raDecOk.addEventListener('click', () => {
-        const h = parseFloat(raHours.value);
-        const m = parseFloat(raMinutes.value);
-        const s = parseFloat(raSeconds.value);
-        const d = parseFloat(decDegrees.value);
-        const dm = parseFloat(decMinutes.value);
-        const ds = parseFloat(decSeconds.value);
-
-        // Validate inputs
-        if (isNaN(h) || isNaN(m) || isNaN(s) || isNaN(d) || isNaN(dm) || isNaN(ds)) {
-          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
-          return;
+      const onDocClick = (e: MouseEvent) => {
+        if (!hintsSection.contains(e.target as Node)) {
+          hintsDropdown.style.display = 'none';
         }
-        if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) {
-          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
-          return;
-        }
-        if (d < -89 || d > 89 || dm < 0 || dm > 59 || ds < 0 || ds > 59) {
-          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
-          return;
-        }
-
-        // Convert HMS to degrees: RA in degrees = (h + m/60 + s/3600) * 15
-        const ra = (h + m / 60 + s / 3600) * 15;
-
-        // Convert DMS to degrees: Dec in degrees = d + sign*(m/60 + s/3600)
-        const sign = d < 0 ? -1 : 1;
-        const dec = Math.abs(d) + dm / 60 + ds / 3600;
-        const decDeg = sign * dec;
-
-        if (ra < 0 || ra >= 360 || decDeg < -90 || decDeg > 90) {
-          showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
-          return;
-        }
-
-        selectRaDec(i, ra, decDeg);
-      });
-
-      const dropdown = document.createElement('div');
-      dropdown.className = 'search-dropdown';
-      dropdowns.push(dropdown);
-
-      searchWrapper.appendChild(searchRow);
-      searchWrapper.appendChild(raDecRow);
-      searchWrapper.appendChild(dropdown);
-
-      info.appendChild(status);
-      info.appendChild(searchWrapper);
-
-      entry.appendChild(markerDot);
-      entry.appendChild(info);
-      manualPanelBody.appendChild(entry);
-      pointEntries.push(entry);
-
-      // Search handler (async with debounce)
-      let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-      searchInput.addEventListener('input', () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-          const query = searchInput.value;
-          if (!query || query.length < 1) {
-            dropdown.innerHTML = '';
-            dropdown.style.display = 'none';
-            return;
-          }
-          const results = await searchStarsAPI(query);
-          // Ignore stale results
-          if (searchInput.value !== query) return;
-          dropdown.innerHTML = '';
-          if (results.length === 0) {
-            dropdown.style.display = 'none';
-            return;
-          }
-          dropdown.style.display = 'block';
-          for (const result of results) {
-            const item = document.createElement('div');
-            item.className = 'search-item';
-            item.innerHTML = `
-              <span class="search-item-name">${result.label}</span>
-              <span class="search-item-mag">mag ${result.mag.toFixed(1)}</span>
-            `;
-            item.addEventListener('click', () => {
-              const star: Star = {
-                hip: result.hip, ra: result.ra, dec: result.dec,
-                mag: result.mag, bv: result.bv,
-                name: result.name, bayer: result.bayer, flam: result.flam,
-                constellation: result.constellation, desig: result.desig,
-              };
-              // Extract just the name part (before the en dash)
-              const displayName = result.label.split(' – ')[0].trim();
-              selectStar(i, star, displayName);
-              dropdown.style.display = 'none';
-            });
-            dropdown.appendChild(item);
-          }
-        }, 250);
-      });
-
-      searchInput.addEventListener('blur', () => {
-        setTimeout(() => { dropdown.style.display = 'none'; }, 200);
-      });
-
-      searchInput.addEventListener('focus', () => {
-        if (searchInput.value.length > 0) {
-          searchInput.dispatchEvent(new Event('input'));
-        }
-      });
-    }
-
-    formSide.appendChild(manualPanel);
-
-    // --- Metadata section (DSOs / Labels / Notes) ---
-    const metaSection = document.createElement('div');
-    metaSection.className = 'metadata-section';
-
-    const metaToggle = document.createElement('button');
-    metaToggle.type = 'button';
-    metaToggle.className = 'metadata-toggle';
-    metaToggle.textContent = t('modal.metadataToggle');
-    const metaInfoIcon = document.createElement('span');
-    metaInfoIcon.className = 'hints-info-icon panel-info-icon';
-    metaInfoIcon.textContent = 'i';
-    metaInfoIcon.title = 'Information';
-    metaToggle.appendChild(metaInfoIcon);
-    metaSection.appendChild(metaToggle);
-    metaInfoIcon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showMetaInfoTooltip(metaInfoIcon);
-    });
-
-    const metaBody = document.createElement('div');
-    metaBody.className = 'metadata-body';
-
-    // Filename field
-    const nameField = document.createElement('div');
-    nameField.className = 'metadata-field';
-    const nameLbl = document.createElement('label');
-    nameLbl.className = 'metadata-label';
-    nameLbl.textContent = t('modal.metadataFilename');
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'tag-input';
-    nameInput.value = pendingOriginalName;
-    nameInput.addEventListener('input', () => { pendingOriginalName = nameInput.value; });
-    nameField.appendChild(nameLbl);
-    nameField.appendChild(nameInput);
-    metaBody.appendChild(nameField);
-
-    // DSOs field
-    const dsoField = document.createElement('div');
-    dsoField.className = 'metadata-field';
-    const dsoLabel = document.createElement('label');
-    dsoLabel.textContent = t('modal.metadataDsos');
-    dsoLabel.className = 'metadata-label';
-    const dsoChipsEl = document.createElement('div');
-    dsoChipsEl.className = 'tag-chips';
-    const dsoInputWrap = document.createElement('div');
-    dsoInputWrap.className = 'tag-input-wrap';
-    const dsoInput = document.createElement('input');
-    dsoInput.type = 'text';
-    dsoInput.className = 'tag-input';
-    dsoInput.placeholder = t('modal.metadataDsosPlaceholder');
-    const dsoSuggestEl = document.createElement('div');
-    dsoSuggestEl.className = 'tag-suggest';
-    dsoInputWrap.appendChild(dsoInput);
-    dsoInputWrap.appendChild(dsoSuggestEl);
-    dsoField.appendChild(dsoLabel);
-    dsoField.appendChild(dsoChipsEl);
-    dsoField.appendChild(dsoInputWrap);
-    metaBody.appendChild(dsoField);
-
-    refreshDsoChips = () => {
-      dsoChipsEl.innerHTML = '';
-      for (const id of pendingDsoIds) {
-        const chip = document.createElement('span');
-        chip.className = 'tag-chip';
-        chip.textContent = id;
-        const rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'tag-chip-remove';
-        rm.textContent = '×';
-        rm.addEventListener('click', () => {
-          pendingDsoIds = pendingDsoIds.filter(d => d !== id);
-          refreshDsoChips();
-        });
-        chip.appendChild(rm);
-        dsoChipsEl.appendChild(chip);
-      }
-    };
-
-    let dsoSearchTimer: ReturnType<typeof setTimeout> | null = null;
-    dsoInput.addEventListener('input', () => {
-      if (dsoSearchTimer) clearTimeout(dsoSearchTimer);
-      const q = dsoInput.value.trim();
-      if (!q) { dsoSuggestEl.style.display = 'none'; return; }
-      dsoSearchTimer = setTimeout(() => {
-        const results = searchDSOs(q, 8);
-        dsoSuggestEl.innerHTML = '';
-        if (results.length === 0) { dsoSuggestEl.style.display = 'none'; return; }
-        for (const r of results) {
-          const opt = document.createElement('div');
-          opt.className = 'tag-suggest-item';
-          opt.textContent = r.dso.id + (r.dso.displayName ? ` — ${r.dso.displayName}` : '');
-          opt.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            const id = r.dso.id;
-            if (!pendingDsoIds.includes(id)) {
-              pendingDsoIds = [...pendingDsoIds, id];
-              refreshDsoChips();
-            }
-            dsoInput.value = '';
-            dsoSuggestEl.style.display = 'none';
-          });
-          dsoSuggestEl.appendChild(opt);
-        }
-        dsoSuggestEl.style.display = 'block';
-      }, 200);
-    });
-    dsoInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const val = dsoInput.value.trim().replace(/\s+/g, '');
-        if (val && !pendingDsoIds.includes(val)) {
-          pendingDsoIds = [...pendingDsoIds, val];
-          refreshDsoChips();
-        }
-        dsoInput.value = '';
-        dsoSuggestEl.style.display = 'none';
-      }
-    });
-    dsoInput.addEventListener('blur', () => { setTimeout(() => { dsoSuggestEl.style.display = 'none'; }, 150); });
-
-    // Labels field
-    const labelField = document.createElement('div');
-    labelField.className = 'metadata-field';
-    const labelLabel = document.createElement('label');
-    labelLabel.textContent = t('modal.metadataLabels');
-    labelLabel.className = 'metadata-label';
-    const labelChipsEl = document.createElement('div');
-    labelChipsEl.className = 'tag-chips';
-    const labelInputEl = document.createElement('input');
-    labelInputEl.type = 'text';
-    labelInputEl.className = 'tag-input';
-    labelInputEl.placeholder = t('modal.metadataLabelsPlaceholder');
-    labelField.appendChild(labelLabel);
-    labelField.appendChild(labelChipsEl);
-    labelField.appendChild(labelInputEl);
-    metaBody.appendChild(labelField);
-
-    refreshLabelChips = () => {
-      labelChipsEl.innerHTML = '';
-      for (const lbl of pendingLabels) {
-        const chip = document.createElement('span');
-        chip.className = 'tag-chip label-chip';
-        chip.textContent = lbl;
-        const rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'tag-chip-remove';
-        rm.textContent = '×';
-        rm.addEventListener('click', () => {
-          pendingLabels = pendingLabels.filter(l => l !== lbl);
-          refreshLabelChips();
-        });
-        chip.appendChild(rm);
-        labelChipsEl.appendChild(chip);
-      }
-    };
-
-    labelInputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ',') {
-        e.preventDefault();
-        const val = labelInputEl.value.trim();
-        if (val && !pendingLabels.includes(val)) {
-          pendingLabels = [...pendingLabels, val];
-          refreshLabelChips();
-        }
-        labelInputEl.value = '';
-      }
-    });
-    labelInputEl.addEventListener('blur', () => {
-      const val = labelInputEl.value.trim();
-      if (val && !pendingLabels.includes(val)) {
-        pendingLabels = [...pendingLabels, val];
-        refreshLabelChips();
-        labelInputEl.value = '';
-      }
-    });
-
-    // Integrations field
-    const integrationField = document.createElement('div');
-    integrationField.className = 'metadata-field';
-    const integrationLabel = document.createElement('label');
-    integrationLabel.textContent = t('modal.metadataIntegrations');
-    integrationLabel.className = 'metadata-label';
-    const integrationRowsEl = document.createElement('div');
-    integrationRowsEl.className = 'integration-rows';
-    const integrationAddBtn = document.createElement('button');
-    integrationAddBtn.type = 'button';
-    integrationAddBtn.className = 'integration-add-btn';
-    integrationAddBtn.textContent = t('modal.metadataIntegrationsAddRow');
-
-    refreshIntegrationRows = () => {
-      integrationRowsEl.innerHTML = '';
-      pendingIntegrations.forEach((row, index) => {
-        const rowEl = document.createElement('div');
-        rowEl.className = 'integration-row';
-
-        const framesIn = document.createElement('input');
-        framesIn.type = 'number';
-        framesIn.min = '1';
-        framesIn.step = '1';
-        framesIn.className = 'tag-input integration-input integration-frames-input';
-        framesIn.placeholder = t('modal.metadataIntegrationsFramesPlaceholder');
-        framesIn.title = t('modal.metadataIntegrationsFramesTooltip');
-        framesIn.value = row.frames >= 1 ? String(row.frames) : '';
-        framesIn.addEventListener('input', () => {
-          const parsed = Number.parseInt(framesIn.value, 10);
-          pendingIntegrations[index] = {
-            ...pendingIntegrations[index],
-            frames: Number.isInteger(parsed) && parsed >= 1 ? parsed : 0,
-          };
-        });
-
-        const op = document.createElement('span');
-        op.className = 'integration-operator';
-        op.textContent = 'x';
-
-        const secondsIn = document.createElement('input');
-        secondsIn.type = 'number';
-        secondsIn.min = '1';
-        secondsIn.step = '1';
-        secondsIn.className = 'tag-input integration-input integration-seconds-input';
-        secondsIn.placeholder = t('modal.metadataIntegrationsSecondsPlaceholder');
-        secondsIn.title = t('modal.metadataIntegrationsSecondsTooltip');
-        secondsIn.value = row.seconds >= 1 ? String(row.seconds) : '';
-        secondsIn.addEventListener('input', () => {
-          const parsed = Number.parseInt(secondsIn.value, 10);
-          pendingIntegrations[index] = {
-            ...pendingIntegrations[index],
-            seconds: Number.isInteger(parsed) && parsed >= 1 ? parsed : 0,
-          };
-        });
-
-        const unit = document.createElement('span');
-        unit.className = 'integration-unit';
-        unit.textContent = t('modal.metadataIntegrationsSecondsSuffix');
-
-        const { el: filterWrap } = buildIntegrationFilterField({
-          initialValue: row.filter,
-          knownFilterMap,
-          placeholder: t('modal.metadataIntegrationsFilterPlaceholder'),
-          tooltip: t('modal.metadataIntegrationsFilterTooltip'),
-          onSelect: (value) => {
-            pendingIntegrations[index] = { ...pendingIntegrations[index], filter: value };
-          },
-          onCommit: (value) => { if (value) rememberFilters([value]); },
-        });
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'integration-row-trash';
-        removeBtn.title = t('modal.metadataIntegrationsRemoveRow');
-        removeBtn.innerHTML = trashSvg;
-        removeBtn.addEventListener('click', () => {
-          pendingIntegrations = pendingIntegrations.filter((_, i) => i !== index);
-          refreshIntegrationRows();
-        });
-
-        rowEl.appendChild(framesIn);
-        rowEl.appendChild(op);
-        rowEl.appendChild(secondsIn);
-        rowEl.appendChild(unit);
-        rowEl.appendChild(filterWrap);
-        rowEl.appendChild(removeBtn);
-        integrationRowsEl.appendChild(rowEl);
-      });
-    };
-
-    integrationAddBtn.addEventListener('click', () => {
-      pendingIntegrations = [...pendingIntegrations, { frames: 0, seconds: 0, filter: '' }];
-      refreshIntegrationRows();
-    });
-
-    const validateIntegrationInputs = (): boolean => {
-      const numericInputs = integrationRowsEl.querySelectorAll<HTMLInputElement>('.integration-frames-input, .integration-seconds-input');
-      for (const input of numericInputs) {
-        const raw = input.value.trim();
-        if (!raw) continue;
-        const parsed = Number(raw);
-        if (!Number.isFinite(parsed)) {
-          showToast({ message: t('errors.invalidIntegrationNumber'), type: 'error', duration: 4000 });
-          input.focus();
-          return false;
-        }
-      }
-      return true;
-    };
-
-    refreshIntegrationRows();
-    integrationField.appendChild(integrationLabel);
-    integrationField.appendChild(integrationRowsEl);
-    integrationField.appendChild(integrationAddBtn);
-    metaBody.appendChild(integrationField);
-
-    // Observation date field
-    const obsDateField = document.createElement('div');
-    obsDateField.className = 'metadata-field';
-    const obsDateLabel = document.createElement('label');
-    obsDateLabel.textContent = t('modal.metadataObsDate');
-    obsDateLabel.className = 'metadata-label';
-    const obsDateInput = document.createElement('input');
-    obsDateInput.type = 'datetime-local';
-    obsDateInput.className = 'dialog-input';
-    obsDateInput.title = t('modal.metadataObsDatePlaceholder');
-    if (pendingObsDate) obsDateInput.value = utcToDatetimeLocal(pendingObsDate);
-    obsDateInput.addEventListener('input', () => {
-      pendingObsDate = obsDateInput.value ? new Date(obsDateInput.value).toISOString() : '';
-    });
-    obsDateField.appendChild(obsDateLabel);
-    obsDateField.appendChild(obsDateInput);
-    metaBody.appendChild(obsDateField);
-
-    // Notes field
-    const notesField = document.createElement('div');
-    notesField.className = 'metadata-field';
-    const notesLabel = document.createElement('label');
-    notesLabel.textContent = t('modal.metadataNotes');
-    notesLabel.className = 'metadata-label';
-    const notesTextarea = document.createElement('textarea');
-    notesTextarea.className = 'notes-textarea';
-    notesTextarea.placeholder = t('modal.metadataNotesPlaceholder');
-    notesTextarea.rows = 3;
-    notesTextarea.addEventListener('input', () => { pendingNotes = notesTextarea.value; });
-    notesField.appendChild(notesLabel);
-    notesField.appendChild(notesTextarea);
-    metaBody.appendChild(notesField);
-
-    metaSection.appendChild(metaBody);
-
-    // Toggle collapsed state
-    let metaOpen = false;
-    metaBody.style.display = 'none';
-    metaToggle.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('hints-info-icon')) return;
-      metaOpen = !metaOpen;
-      metaBody.style.display = metaOpen ? 'block' : 'none';
-      metaToggle.classList.toggle('open', metaOpen);
-    });
-    // Auto-expand when DSOs are detected
-    function expandMetaIfDSOsDetected() {
-      if (!metaOpen && pendingDsoIds.length > 0) {
-        metaOpen = true;
-        metaBody.style.display = 'block';
-        metaToggle.classList.add('open');
-      }
-    }
-
-    // Pre-fill metadata fields from WCS solve result
-    function prefillWCSMeta(result: { dateObs?: string; expTime?: number; stackCnt?: number }) {
-      if (result.dateObs && !pendingObsDate) {
-        pendingObsDate = result.dateObs;
-        obsDateInput.value = utcToDatetimeLocal(result.dateObs);
-        if (!metaOpen) {
-          metaOpen = true;
-          metaBody.style.display = 'block';
-          metaToggle.classList.add('open');
-        }
-      }
-      if (result.expTime && result.stackCnt && pendingIntegrations.length === 0) {
-        pendingIntegrations = [{ frames: Math.round(result.stackCnt), seconds: Math.round(result.expTime), filter: '' }];
-        refreshIntegrationRows();
-      }
-    }
-
-    formSide.appendChild(metaSection);
-
-    // Upload progress bar
-    const progressBar = document.createElement('div');
-    progressBar.className = 'upload-progress';
-    progressBar.style.display = 'none';
-    const progressFill = document.createElement('div');
-    progressFill.className = 'upload-progress-fill';
-    progressBar.appendChild(progressFill);
-    formSide.appendChild(progressBar);
-
-    // Submit button
-    const submitBtn = document.createElement('button');
-    submitBtn.className = 'btn-confirm';
-    submitBtn.textContent = t('modal.submit');
-    submitBtn.disabled = true;
-    formSide.appendChild(submitBtn);
-
-    // Cancel button
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'btn-cancel';
-    cancelBtn.textContent = t('modal.cancel');
-    cancelBtn.addEventListener('click', () => closeModal());
-    formSide.appendChild(cancelBtn);
-
-    body.appendChild(photoSide);
-    body.appendChild(formSide);
-    modal.appendChild(body);
-    backdrop.appendChild(modal);
-    document.body.appendChild(backdrop);
-
-    // Load image
-    const url = URL.createObjectURL(file);
-    photoImg.onload = () => {
-      naturalWidth = photoImg.naturalWidth;
-      naturalHeight = photoImg.naturalHeight;
-      URL.revokeObjectURL(url);
-    };
-    photoImg.src = url;
-
-    // Markers on photo
-    const markers: HTMLDivElement[] = [];
-
-    // ── Zoom / pan ────────────────────────────────────────────────────────────
-    zoom = createImageZoomPan(photoImg, photoContainer, { minScale: 1, maxScale: 5 });
-    photoWrapper.appendChild(zoom.controls);
-
-    function updateMarkerPositions() {
-      markers.forEach((marker, idx) => {
-        if (!marker || !points[idx]) return;
-        const imgRect = photoImg.getBoundingClientRect();
-        const cR = photoContainer.getBoundingClientRect();
-        const displayX = (imgRect.left - cR.left) + (points[idx]!.photoX / naturalWidth)  * imgRect.width;
-        const displayY = (imgRect.top  - cR.top)  + (points[idx]!.photoY / naturalHeight) * imgRect.height;
-        marker.style.left = `${displayX}px`;
-        marker.style.top  = `${displayY}px`;
-      });
-    }
-
-    const updateCursor = () => {
-      photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grab' : 'crosshair';
-    };
-    zoom.onTransformChange(() => { updateCursor(); updateMarkerPositions(); });
-    photoContainer.addEventListener('pointerdown', () => {
-      photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grabbing' : 'crosshair';
-    });
-    photoContainer.addEventListener('pointerup',     updateCursor);
-    photoContainer.addEventListener('pointercancel', updateCursor);
-    updateCursor();
-
-    photoContainer.addEventListener('click', (e) => {
-      if (zoom!.wasDrag) return;
-      if (activeIndex >= 3) return;
-
-      const imgRect = photoImg.getBoundingClientRect();
-      const relX = (e.clientX - imgRect.left) / imgRect.width;
-      const relY = (e.clientY - imgRect.top)  / imgRect.height;
-      if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
-
-      const natX = relX * naturalWidth;
-      const natY = relY * naturalHeight;
-      const cR = photoContainer.getBoundingClientRect();
-      placeMarker(activeIndex, e.clientX - cR.left, e.clientY - cR.top, natX, natY);
-    });
-
-    function placeMarker(idx: number, dispX: number, dispY: number, natX: number, natY: number) {
-      // Remove existing marker for this index
-      if (markers[idx]) markers[idx].remove();
-
-      const marker = document.createElement('div');
-      marker.className = 'photo-marker';
-      marker.style.left = `${dispX}px`;
-      marker.style.top = `${dispY}px`;
-      marker.style.backgroundColor = MARKER_COLORS[idx];
-      marker.textContent = String(idx + 1);
-      photoContainer.appendChild(marker);
-      markers[idx] = marker;
-
-      // Update point
-      points[idx] = {
-        pointIndex: idx,
-        photoX: natX,
-        photoY: natY,
-        starHip: 0,
-        starName: '',
       };
+      document.addEventListener('click', onDocClick);
 
-      // Show search input
-      const searchWrapper = pointEntries[idx].querySelector('.search-wrapper') as HTMLElement;
-      searchWrapper.style.display = 'block';
-      statusLabels[idx].textContent = t('modal.positionSet');
-      searchInputs[idx].focus();
+      // Suggest stars section
+      const suggestSection = document.createElement('div');
+      suggestSection.className = 'suggest-stars-section';
 
-      // Advance active index to next incomplete point
-      updateActiveIndex();
-    }
+      const suggestControls = document.createElement('div');
+      suggestControls.className = 'suggest-controls';
 
-    function resetStarSelection(idx: number) {
-      if (!points[idx]) return;
-      points[idx]!.starHip = 0;
-      points[idx]!.starName = '';
-      points[idx]!.starRa = undefined;
-      points[idx]!.starDec = undefined;
-      searchInputs[idx].disabled = false;
-      searchInputs[idx].value = '';
-      if (pickBtns[idx]) pickBtns[idx].disabled = false;
-      statusLabels[idx].textContent = t('modal.positionSet');
-      statusLabels[idx].className = 'point-status';
-      statusLabels[idx].onclick = null;
-      pointEntries[idx].classList.remove('complete');
-      updateActiveIndex();
-      checkComplete();
-      searchInputs[idx].focus();
-    }
+      const suggestBtn = document.createElement('button');
+      suggestBtn.type = 'button';
+      suggestBtn.className = 'btn-auto-solve suggest-btn';
+      suggestBtn.textContent = t('lightSolve.suggestButton');
+      suggestBtn.disabled = true;
+      suggestBtn.title = t('lightSolve.requiresHint');
+      suggestControls.appendChild(suggestBtn);
 
-    function markStarComplete(idx: number) {
-      statusLabels[idx].onclick = () => resetStarSelection(idx);
-    }
+      const radiusLabel = document.createElement('span');
+      radiusLabel.className = 'suggest-radius-label';
+      radiusLabel.textContent = 'within';
+      suggestControls.appendChild(radiusLabel);
 
-    function selectStar(idx: number, star: Star, label: string) {
-      if (!points[idx]) return;
-      points[idx]!.starHip = star.hip;
-      points[idx]!.starName = label;
-      points[idx]!.starRa = undefined;
-      points[idx]!.starDec = undefined;
-      statusLabels[idx].textContent = label;
-      statusLabels[idx].className = 'point-status point-complete';
-      searchInputs[idx].value = label;
-      searchInputs[idx].disabled = true;
-      pointEntries[idx].classList.add('complete');
+      const radiusInput = document.createElement('input');
+      radiusInput.type = 'number';
+      radiusInput.value = '2';
+      radiusInput.min = '0.1';
+      radiusInput.max = '10';
+      radiusInput.step = '0.5';
+      radiusInput.className = 'suggest-radius-input';
+      suggestControls.appendChild(radiusInput);
 
-      // Disable pick button if exists
-      if (pickBtns[idx]) {
-        pickBtns[idx].disabled = true;
-      }
+      const radiusUnit = document.createElement('span');
+      radiusUnit.className = 'suggest-radius-unit';
+      radiusUnit.textContent = '°';
+      suggestControls.appendChild(radiusUnit);
 
-      markStarComplete(idx);
-      updateActiveIndex();
-      checkComplete();
-    }
+      suggestSection.appendChild(suggestControls);
 
-    function selectRaDec(idx: number, ra: number, dec: number) {
-      if (!points[idx]) return;
-      points[idx]!.starHip = 0;
-      points[idx]!.starRa = ra;
-      points[idx]!.starDec = dec;
-      const label = t('modal.raDecSet', { ra: ra.toFixed(2), dec: dec.toFixed(2) });
-      points[idx]!.starName = label;
-      statusLabels[idx].textContent = label;
-      statusLabels[idx].className = 'point-status point-complete';
-      searchInputs[idx].value = label;
-      searchInputs[idx].disabled = true;
-      pointEntries[idx].classList.add('complete');
+      const suggestList = document.createElement('div');
+      suggestList.className = 'suggest-stars-list suggest-list hidden';
+      suggestSection.appendChild(suggestList);
 
-      if (pickBtns[idx]) {
-        pickBtns[idx].disabled = true;
-      }
+      formSide.appendChild(suggestSection);
 
-      markStarComplete(idx);
-      updateActiveIndex();
-      checkComplete();
-    }
+      suggestBtn.addEventListener('click', async () => {
+        if (!hintCoords) return;
+        try {
+          suggestBtn.disabled = true;
+          suggestBtn.textContent = t('lightSolve.searching');
+          suggestList.innerHTML = '';
+          suggestList.classList.add('hidden');
 
-    function isPointComplete(p: PhotoCorrespondence | null): boolean {
-      if (!p) return false;
-      return p.starHip !== 0 || (p.starRa !== undefined && p.starDec !== undefined);
-    }
+          const searchRadius = parseFloat(radiusInput.value) || 2.0;
+          const nearbyStars = await searchStarsByPosition({
+            ra: hintCoords.ra,
+            dec: hintCoords.dec,
+            radius: searchRadius,
+            magLimit: 10,
+            limit: 20,
+          });
 
-    function updateActiveIndex() {
-      // Find first incomplete point
+          suggestBtn.textContent = t('lightSolve.suggestButton');
+          suggestBtn.disabled = false;
+
+          if (nearbyStars.length === 0) {
+            suggestList.innerHTML = `<div class="suggest-list-header">${t('lightSolve.noStarsNearby', { radius: searchRadius.toFixed(1) })}</div>`;
+            suggestList.classList.remove('hidden');
+            return;
+          }
+
+          const starsWithDistance = nearbyStars.map(star => {
+            const dRa = (star.ra - hintCoords!.ra) * Math.cos(star.dec * Math.PI / 180);
+            const dDec = star.dec - hintCoords!.dec;
+            const distance = Math.sqrt(dRa * dRa + dDec * dDec);
+            return { star, distance };
+          });
+          starsWithDistance.sort((a, b) => a.distance - b.distance);
+
+          const listHeader = document.createElement('div');
+          listHeader.className = 'suggest-list-header';
+          listHeader.textContent = t('lightSolve.foundNearby', { count: nearbyStars.length, target: hintTargetName, radius: searchRadius.toFixed(1) });
+          suggestList.appendChild(listHeader);
+
+          starsWithDistance.slice(0, 10).forEach(({ star, distance }) => {
+            const starItem = document.createElement('div');
+            starItem.className = 'suggest-list-item';
+            starItem.innerHTML = `
+              <div class="suggest-item-name">${star.name || `HIP ${star.hip}`}</div>
+              <div class="suggest-item-meta">
+                mag ${star.mag.toFixed(1)} — ${distance.toFixed(2)}° from target
+              </div>
+            `;
+            starItem.addEventListener('click', () => {
+              const activeIdx = points.findIndex(p => p === null);
+              if (activeIdx === -1) return;
+              showToast({
+                message: t('lightSolve.lookForStar', { name: star.name || `HIP ${star.hip}`, mag: star.mag.toFixed(1) }),
+                type: 'info',
+                duration: 5000,
+              });
+            });
+            suggestList.appendChild(starItem);
+          });
+
+          suggestList.classList.remove('hidden');
+        } catch (err: any) {
+          reportUnknownRendererError('suggest_stars_error', err);
+          suggestBtn.textContent = t('lightSolve.suggestButton');
+          suggestBtn.disabled = false;
+          showToast({ message: err.message || t('lightSolve.searchFailed'), type: 'error', duration: 3000 });
+        }
+      });
+
+      // --- 3 point entries ---
+      const pointEntries: HTMLDivElement[] = [];
+      const searchInputs: HTMLInputElement[] = [];
+      const dropdowns: HTMLDivElement[] = [];
+      const statusLabels: HTMLSpanElement[] = [];
+      const pickBtns: HTMLButtonElement[] = [];
+
       for (let i = 0; i < 3; i++) {
-        if (!isPointComplete(points[i])) {
-          activeIndex = i;
-          // Update instructions
-          for (let j = 0; j < 3; j++) {
-            if (j === i && (!points[j] || points[j]!.photoX === undefined)) {
-              statusLabels[j].textContent = t('modal.clickPhoto');
+        const entry = document.createElement('div');
+        entry.className = 'point-entry';
+        entry.dataset.index = String(i);
+
+        const markerDot = document.createElement('span');
+        markerDot.className = 'marker-dot';
+        markerDot.style.backgroundColor = MARKER_COLORS[i];
+        markerDot.textContent = String(i + 1);
+
+        const info = document.createElement('div');
+        info.className = 'point-info';
+
+        const status = document.createElement('span');
+        status.className = 'point-status';
+        status.textContent = i === 0 ? t('modal.clickPhoto') : t('modal.waiting');
+        statusLabels.push(status);
+
+        const searchWrapper = document.createElement('div');
+        searchWrapper.className = 'search-wrapper';
+        searchWrapper.style.display = 'none';
+
+        // --- Star search row ---
+        const searchRow = document.createElement('div');
+        searchRow.className = 'search-row';
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = t('modal.searchStar');
+        searchInput.className = 'star-search-input';
+        searchInputs.push(searchInput);
+
+        searchRow.appendChild(searchInput);
+
+        // "Map" pick button (only if skyMap available)
+        if (skyMap) {
+          const pickBtn = document.createElement('button');
+          pickBtn.type = 'button';
+          pickBtn.className = 'btn-pick-map';
+          pickBtn.title = t('modal.mapPickTooltip');
+          pickBtn.textContent = t('modal.mapPick');
+          pickBtns.push(pickBtn);
+          searchRow.appendChild(pickBtn);
+
+          pickBtn.addEventListener('click', () => {
+            backdrop.style.display = 'none';
+            skyMap.enterPickingMode((star: Star) => {
+              skyMap.exitPickingMode();
+              backdrop.style.display = '';
+              selectStar(i, star, starDisplayLabel(star));
+            });
+            const escHandler = (e: KeyboardEvent) => {
+              if (e.key === 'Escape') {
+                skyMap.exitPickingMode();
+                backdrop.style.display = '';
+                window.removeEventListener('keydown', escHandler);
+              }
+            };
+            window.addEventListener('keydown', escHandler);
+          });
+        }
+
+        // RA/Dec mode toggle button
+        const raDecToggle = document.createElement('button');
+        raDecToggle.type = 'button';
+        raDecToggle.className = 'btn-pick-map';
+        raDecToggle.title = t('modal.raDecTooltip');
+        raDecToggle.textContent = t('modal.raDecMode');
+        searchRow.appendChild(raDecToggle);
+
+        // --- RA/Dec input row (hidden by default) ---
+        const raDecRow = document.createElement('div');
+        raDecRow.className = 'search-row radec-row';
+        raDecRow.style.display = 'none';
+        raDecRow.style.flexDirection = 'column';
+        raDecRow.style.gap = '8px';
+
+        const raContainer = document.createElement('div');
+        raContainer.style.display = 'flex';
+        raContainer.style.flexDirection = 'column';
+        raContainer.style.gap = '4px';
+
+        const raLabel = document.createElement('label');
+        raLabel.textContent = t('modal.raLabel');
+        raLabel.style.fontSize = '0.9em';
+        raLabel.style.opacity = '0.8';
+        raContainer.appendChild(raLabel);
+
+        const raInputs = document.createElement('div');
+        raInputs.style.display = 'flex';
+        raInputs.style.gap = '4px';
+
+        const raHours = document.createElement('input');
+        raHours.type = 'number';
+        raHours.placeholder = t('modal.raHours');
+        raHours.className = 'radec-input-small';
+        raHours.min = '0'; raHours.max = '23'; raHours.step = '1';
+
+        const raMinutes = document.createElement('input');
+        raMinutes.type = 'number';
+        raMinutes.placeholder = t('modal.raMinutes');
+        raMinutes.className = 'radec-input-small';
+        raMinutes.min = '0'; raMinutes.max = '59'; raMinutes.step = '1';
+
+        const raSeconds = document.createElement('input');
+        raSeconds.type = 'number';
+        raSeconds.placeholder = t('modal.raSeconds');
+        raSeconds.className = 'radec-input-small';
+        raSeconds.min = '0'; raSeconds.max = '59'; raSeconds.step = '0.01';
+
+        raInputs.appendChild(raHours);
+        raInputs.appendChild(raMinutes);
+        raInputs.appendChild(raSeconds);
+        raContainer.appendChild(raInputs);
+
+        const decContainer = document.createElement('div');
+        decContainer.style.display = 'flex';
+        decContainer.style.flexDirection = 'column';
+        decContainer.style.gap = '4px';
+
+        const decLabel = document.createElement('label');
+        decLabel.textContent = t('modal.decLabel');
+        decLabel.style.fontSize = '0.9em';
+        decLabel.style.opacity = '0.8';
+        decContainer.appendChild(decLabel);
+
+        const decInputs = document.createElement('div');
+        decInputs.style.display = 'flex';
+        decInputs.style.gap = '4px';
+
+        const decDegrees = document.createElement('input');
+        decDegrees.type = 'number';
+        decDegrees.placeholder = t('modal.decDegrees');
+        decDegrees.className = 'radec-input-small';
+        decDegrees.min = '-89'; decDegrees.max = '89'; decDegrees.step = '1';
+
+        const decMinutes = document.createElement('input');
+        decMinutes.type = 'number';
+        decMinutes.placeholder = t('modal.decMinutes');
+        decMinutes.className = 'radec-input-small';
+        decMinutes.min = '0'; decMinutes.max = '59'; decMinutes.step = '1';
+
+        const decSeconds = document.createElement('input');
+        decSeconds.type = 'number';
+        decSeconds.placeholder = t('modal.decSeconds');
+        decSeconds.className = 'radec-input-small';
+        decSeconds.min = '0'; decSeconds.max = '59'; decSeconds.step = '0.01';
+
+        decInputs.appendChild(decDegrees);
+        decInputs.appendChild(decMinutes);
+        decInputs.appendChild(decSeconds);
+        decContainer.appendChild(decInputs);
+
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.style.display = 'flex';
+        buttonsContainer.style.gap = '8px';
+        buttonsContainer.style.marginTop = '4px';
+
+        const raDecOk = document.createElement('button');
+        raDecOk.type = 'button';
+        raDecOk.className = 'btn-pick-map';
+        raDecOk.textContent = 'OK';
+
+        const starToggle = document.createElement('button');
+        starToggle.type = 'button';
+        starToggle.className = 'btn-pick-map';
+        starToggle.title = t('modal.starModeTooltip');
+        starToggle.textContent = t('modal.starMode');
+
+        buttonsContainer.appendChild(raDecOk);
+        buttonsContainer.appendChild(starToggle);
+
+        raDecRow.appendChild(raContainer);
+        raDecRow.appendChild(decContainer);
+        raDecRow.appendChild(buttonsContainer);
+
+        raDecToggle.addEventListener('click', () => {
+          searchRow.style.display = 'none';
+          raDecRow.style.display = 'flex';
+          raHours.focus();
+        });
+        starToggle.addEventListener('click', () => {
+          raDecRow.style.display = 'none';
+          searchRow.style.display = '';
+          searchInput.focus();
+        });
+
+        raDecOk.addEventListener('click', () => {
+          const h = parseFloat(raHours.value);
+          const m = parseFloat(raMinutes.value);
+          const s = parseFloat(raSeconds.value);
+          const d = parseFloat(decDegrees.value);
+          const dm = parseFloat(decMinutes.value);
+          const ds = parseFloat(decSeconds.value);
+
+          if (isNaN(h) || isNaN(m) || isNaN(s) || isNaN(d) || isNaN(dm) || isNaN(ds)) {
+            showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+            return;
+          }
+          if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) {
+            showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+            return;
+          }
+          if (d < -89 || d > 89 || dm < 0 || dm > 59 || ds < 0 || ds > 59) {
+            showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+            return;
+          }
+
+          const ra = (h + m / 60 + s / 3600) * 15;
+          const sign = d < 0 ? -1 : 1;
+          const dec = Math.abs(d) + dm / 60 + ds / 3600;
+          const decDeg = sign * dec;
+
+          if (ra < 0 || ra >= 360 || decDeg < -90 || decDeg > 90) {
+            showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
+            return;
+          }
+
+          selectRaDec(i, ra, decDeg);
+        });
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'search-dropdown';
+        dropdowns.push(dropdown);
+
+        searchWrapper.appendChild(searchRow);
+        searchWrapper.appendChild(raDecRow);
+        searchWrapper.appendChild(dropdown);
+
+        info.appendChild(status);
+        info.appendChild(searchWrapper);
+
+        entry.appendChild(markerDot);
+        entry.appendChild(info);
+        formSide.appendChild(entry);
+        pointEntries.push(entry);
+
+        // Search handler (async with debounce)
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+        searchInput.addEventListener('input', () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(async () => {
+            const query = searchInput.value;
+            if (!query || query.length < 1) {
+              dropdown.innerHTML = '';
+              dropdown.style.display = 'none';
+              return;
             }
+            const results = await searchStarsAPI(query);
+            if (searchInput.value !== query) return;
+            dropdown.innerHTML = '';
+            if (results.length === 0) {
+              dropdown.style.display = 'none';
+              return;
+            }
+            dropdown.style.display = 'block';
+            for (const result of results) {
+              const item = document.createElement('div');
+              item.className = 'search-item';
+              item.innerHTML = `
+                <span class="search-item-name">${result.label}</span>
+                <span class="search-item-mag">mag ${result.mag.toFixed(1)}</span>
+              `;
+              item.addEventListener('click', () => {
+                const star: Star = {
+                  hip: result.hip, ra: result.ra, dec: result.dec,
+                  mag: result.mag, bv: result.bv,
+                  name: result.name, bayer: result.bayer, flam: result.flam,
+                  constellation: result.constellation, desig: result.desig,
+                };
+                const displayName = result.label.split(' – ')[0].trim();
+                selectStar(i, star, displayName);
+                dropdown.style.display = 'none';
+              });
+              dropdown.appendChild(item);
+            }
+          }, 250);
+        });
+
+        searchInput.addEventListener('blur', () => {
+          setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+        });
+
+        searchInput.addEventListener('focus', () => {
+          if (searchInput.value.length > 0) {
+            searchInput.dispatchEvent(new Event('input'));
           }
-          return;
-        }
+        });
       }
-      activeIndex = 3; // All done
-    }
 
-    function checkComplete() {
-      // Allow submission with 2+ complete points (2 = similarity transform, 3 = full affine)
-      const completeCount = points.filter(p => isPointComplete(p)).length;
-      submitBtn.disabled = completeCount < 2;
-    }
+      // Footer: Validate (enabled at 2+ points) + Cancel
+      const submitBtn = document.createElement('button');
+      submitBtn.className = 'btn-confirm';
+      submitBtn.textContent = t('modal.validate');
+      submitBtn.disabled = true;
+      formSide.appendChild(submitBtn);
 
-    // --- Auto-solve: apply result ---
-    function applyAutoSolveResult(correspondences: PhotoCorrespondence[]) {
-      if (!naturalWidth || !naturalHeight) return;
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn-cancel';
+      cancelBtn.textContent = t('modal.cancel');
+      cancelBtn.addEventListener('click', () => closeModal());
+      formSide.appendChild(cancelBtn);
 
-      // Save extras (pointIndex >= 3) for LSQ fitting at upload time
-      extraAutoCorrespondences = correspondences.filter(c => c.pointIndex >= 3);
+      submitBtn.addEventListener('click', () => {
+        const correspondences = points.filter(p => isPointComplete(p)) as PhotoCorrespondence[];
+        if (correspondences.length < 2) return;
+        finish({ action: 'validate', correspondences });
+      });
 
-      const scaleX = photoImg.offsetWidth / naturalWidth;
-      const scaleY = photoImg.offsetHeight / naturalHeight;
+      body.appendChild(photoSide);
+      body.appendChild(formSide);
+      modal.appendChild(body);
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
 
-      for (const corr of correspondences) {
-        const idx = corr.pointIndex;
-        if (idx < 0 || idx >= 3) continue;
+      // Load image
+      const url = URL.createObjectURL(file);
+      photoImg.onload = () => {
+        naturalWidth = photoImg.naturalWidth;
+        naturalHeight = photoImg.naturalHeight;
+        URL.revokeObjectURL(url);
+      };
+      photoImg.src = url;
 
-        const dispX = corr.photoX * scaleX;
-        const dispY = corr.photoY * scaleY;
+      // Markers on photo
+      const markers: HTMLDivElement[] = [];
 
-        placeMarker(idx, dispX, dispY, corr.photoX, corr.photoY);
+      // ── Zoom / pan ───────────────────────────────────────────────────────────
+      zoom = createImageZoomPan(photoImg, photoContainer, { minScale: 1, maxScale: 5 });
+      photoWrapper.appendChild(zoom.controls);
 
-        const star = getStarByHip(corr.starHip);
-        if (star) {
-          selectStar(idx, star, corr.starName || starDisplayLabel(star));
-        } else {
-          // Star not in client catalog, use server-provided name
-          if (!points[idx]) continue;
-          points[idx]!.starHip = corr.starHip;
-          points[idx]!.starName = corr.starName;
-          points[idx]!.starRa = corr.starRa;  // Set RA for synthetic stars
-          points[idx]!.starDec = corr.starDec; // Set Dec for synthetic stars
-          statusLabels[idx].textContent = corr.starName;
-          statusLabels[idx].className = 'point-status point-complete';
-          searchInputs[idx].value = corr.starName;
-          searchInputs[idx].disabled = true;
-          pointEntries[idx].classList.add('complete');
-          if (pickBtns[idx]) pickBtns[idx].disabled = true;
-          markStarComplete(idx);
-          updateActiveIndex();
-          checkComplete();
-        }
+      function updateMarkerPositions() {
+        markers.forEach((marker, idx) => {
+          if (!marker || !points[idx]) return;
+          const imgRect = photoImg.getBoundingClientRect();
+          const cR = photoContainer.getBoundingClientRect();
+          const displayX = (imgRect.left - cR.left) + (points[idx]!.photoX / naturalWidth) * imgRect.width;
+          const displayY = (imgRect.top - cR.top) + (points[idx]!.photoY / naturalHeight) * imgRect.height;
+          marker.style.left = `${displayX}px`;
+          marker.style.top = `${displayY}px`;
+        });
       }
-      
-      // Auto-zoom to photo field of view if skyMap is available
-      if (self.skyMap && correspondences.length >= 3) {
-        // Calculate center RA/Dec and field of view from correspondences
-        const allCorrs = correspondences.slice(0, 3); // Use first 3 for consistency
-        let sumRa = 0, sumDec = 0, count = 0;
-        let minPhotoX = Infinity, maxPhotoX = -Infinity;
-        let minPhotoY = Infinity, maxPhotoY = -Infinity;
-        
-        for (const corr of allCorrs) {
-          const ra = corr.starRa;
-          const dec = corr.starDec;
-          if (ra !== undefined && dec !== undefined) {
-            sumRa += ra;
-            sumDec += dec;
-            count++;
-            minPhotoX = Math.min(minPhotoX, corr.photoX);
-            maxPhotoX = Math.max(maxPhotoX, corr.photoX);
-            minPhotoY = Math.min(minPhotoY, corr.photoY);
-            maxPhotoY = Math.max(maxPhotoY, corr.photoY);
-          }
-        }
-        
-        if (count >= 3) {
-          const centerRa = sumRa / count;
-          const centerDec = sumDec / count;
-          
-          // Estimate photo field of view in projection units
-          const proj = allCorrs.map(c => project(c.starRa!, c.starDec!));
-          const projWidth = Math.max(...proj.map(p => p.x)) - Math.min(...proj.map(p => p.x));
-          const projHeight = Math.max(...proj.map(p => p.y)) - Math.min(...proj.map(p => p.y));
-          const projFOV = Math.max(projWidth, projHeight);
-          
-          // Calculate scale so photo fits in ~50% of screen (with some padding)
-          const view = self.getView();
-          const screenSize = Math.min(view.width, view.height);
-          const targetScale = screenSize / (projFOV * 2.5); // 2.5x padding
-          
-          // Navigate to center with appropriate zoom
-          self.skyMap.navigateTo(centerRa, centerDec, Math.max(200, Math.min(5000, targetScale)), true);
-        }
+
+      const updateCursor = () => {
+        photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grab' : 'crosshair';
+      };
+      zoom.onTransformChange(() => { updateCursor(); updateMarkerPositions(); });
+      photoContainer.addEventListener('pointerdown', () => {
+        photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grabbing' : 'crosshair';
+      });
+      photoContainer.addEventListener('pointerup', updateCursor);
+      photoContainer.addEventListener('pointercancel', updateCursor);
+      updateCursor();
+
+      photoContainer.addEventListener('click', (e) => {
+        if (zoom!.wasDrag) return;
+        if (activeIndex >= 3) return;
+
+        const imgRect = photoImg.getBoundingClientRect();
+        const relX = (e.clientX - imgRect.left) / imgRect.width;
+        const relY = (e.clientY - imgRect.top) / imgRect.height;
+        if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
+
+        const natX = relX * naturalWidth;
+        const natY = relY * naturalHeight;
+        const cR = photoContainer.getBoundingClientRect();
+        placeMarker(activeIndex, e.clientX - cR.left, e.clientY - cR.top, natX, natY);
+      });
+
+      function placeMarker(idx: number, dispX: number, dispY: number, natX: number, natY: number) {
+        if (markers[idx]) markers[idx].remove();
+
+        const marker = document.createElement('div');
+        marker.className = 'photo-marker';
+        marker.style.left = `${dispX}px`;
+        marker.style.top = `${dispY}px`;
+        marker.style.backgroundColor = MARKER_COLORS[idx];
+        marker.textContent = String(idx + 1);
+        photoContainer.appendChild(marker);
+        markers[idx] = marker;
+
+        points[idx] = {
+          pointIndex: idx,
+          photoX: natX,
+          photoY: natY,
+          starHip: 0,
+          starName: '',
+        };
+
+        const searchWrapper = pointEntries[idx].querySelector('.search-wrapper') as HTMLElement;
+        searchWrapper.style.display = 'block';
+        statusLabels[idx].textContent = t('modal.positionSet');
+        searchInputs[idx].focus();
+
+        updateActiveIndex();
       }
-    }
 
-    // Helper: show status in WCS companion status row
-    function showWCSStatus(msg: string, state: 'reading' | 'success' | 'error', extraHtml?: string) {
-      wcsStatusRow.className = 'wcs-companion-status wcs-status';
-      if (state === 'reading') {
-        wcsStatusRow.classList.add('wcs-status--info');
-        wcsStatusRow.innerHTML = `<span class="auto-solve-spinner"></span>${msg}`;
-      } else if (state === 'success') {
-        wcsStatusRow.classList.add('wcs-status--success');
-        wcsStatusRow.innerHTML = msg;
-        const clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'integration-row-trash';
-        clearBtn.title = t('modal.wcsRemove');
-        clearBtn.innerHTML = trashSvg;
-        clearBtn.addEventListener('click', clearWcsSolution);
-        wcsStatusRow.appendChild(clearBtn);
-      } else {
-        wcsStatusRow.classList.add('wcs-status--error');
-        wcsStatusRow.innerHTML = msg + (extraHtml ? `<div style="margin-top:4px; font-size:11px; color:#c77;">${extraHtml}</div>` : '');
-      }
-    }
-
-    function hideWCSStatus() {
-      wcsStatusRow.className = 'wcs-companion-status wcs-status hidden';
-      wcsStatusRow.innerHTML = '';
-    }
-
-    // Revert the auto-solve placement + WCS-prefilled metadata to the initial modal state.
-    function clearWcsSolution() {
-      for (let idx = 0; idx < 3; idx++) {
-        markers[idx]?.remove();
-        delete markers[idx];
-        points[idx] = null;
-        const searchWrapper = pointEntries[idx].querySelector('.search-wrapper') as HTMLElement | null;
-        if (searchWrapper) searchWrapper.style.display = 'none';
-        searchInputs[idx].value = '';
+      function resetStarSelection(idx: number) {
+        if (!points[idx]) return;
+        points[idx]!.starHip = 0;
+        points[idx]!.starName = '';
+        points[idx]!.starRa = undefined;
+        points[idx]!.starDec = undefined;
         searchInputs[idx].disabled = false;
+        searchInputs[idx].value = '';
         if (pickBtns[idx]) pickBtns[idx].disabled = false;
-        statusLabels[idx].textContent = idx === 0 ? t('modal.clickPhoto') : t('modal.waiting');
+        statusLabels[idx].textContent = t('modal.positionSet');
         statusLabels[idx].className = 'point-status';
         statusLabels[idx].onclick = null;
         pointEntries[idx].classList.remove('complete');
+        updateActiveIndex();
+        checkComplete();
+        searchInputs[idx].focus();
       }
-      extraAutoCorrespondences = [];
-      activeIndex = 0;
-      checkComplete();
 
-      // Clear WCS-prefilled metadata
-      pendingDsoIds = [];
-      refreshDsoChips();
-      pendingIntegrations = [];
-      refreshIntegrationRows();
-      pendingObsDate = '';
-      obsDateInput.value = '';
-
-      hideWCSStatus();
-      companionInput.value = '';
-      enableAutoButtons();
-    }
-
-    // --- WCS companion file button handler ---
-    btnWCS.addEventListener('click', () => {
-      companionInput.value = ''; // allow re-picking same file
-      companionInput.click();
-    });
-
-    companionInput.addEventListener('change', async () => {
-      const companionFile = companionInput.files?.[0];
-      if (!companionFile) return;
-
-      // Wait for image to be loaded to get naturalWidth/naturalHeight
-      const imgWidth = naturalWidth || photoImg.naturalWidth;
-      const imgHeight = naturalHeight || photoImg.naturalHeight;
-
-      disableAutoButtons();
-      showWCSStatus(t('modal.wcsCompanionReading', { filename: companionFile.name }), 'reading');
-
-      try {
-        const result = await solveWCS(companionFile, imgWidth || undefined, imgHeight || undefined);
-
-        if (result.success && result.correspondences && result.correspondences.length >= 1) {
-          const count = result.correspondences.length;
-          const successMsg = t('modal.wcsCompanionSuccess', {
-            filename: companionFile.name,
-            width: String(result.sourceWidth ?? '?'),
-            height: String(result.sourceHeight ?? '?'),
-            count: String(count),
-          });
-
-          // Check for aspect ratio mismatch — confirm before applying
-          if (result.dimensionWarning?.aspectMismatch) {
-            const { sourceW, sourceH, targetW, targetH } = result.dimensionWarning;
-            // Show inline confirm
-            const confirmHtml = `
-              <div style="margin-bottom:6px;">${t('modal.wcsDimensionMismatchBody', { fitsW: String(sourceW), fitsH: String(sourceH), jpegW: String(targetW), jpegH: String(targetH) })}</div>
-              <div style="display:flex; gap:8px; margin-top:4px;">
-                <button id="wcs-continue-btn" style="padding:4px 10px; background:rgba(200,100,30,0.7); border:1px solid rgba(220,130,50,0.5); border-radius:4px; color:#ffd; cursor:pointer; font-size:11px;">${t('modal.wcsContinueAnyway')}</button>
-                <button id="wcs-cancel-btn" style="padding:4px 10px; background:rgba(60,60,100,0.6); border:1px solid rgba(80,80,140,0.4); border-radius:4px; color:#ccd; cursor:pointer; font-size:11px;">${t('modal.cancel')}</button>
-              </div>`;
-            wcsStatusRow.className = 'wcs-companion-status wcs-status wcs-status--warning';
-            wcsStatusRow.innerHTML = `<strong>${t('modal.wcsDimensionMismatchTitle')}</strong>${confirmHtml}`;
-
-            enableAutoButtons();
-
-            return new Promise<void>((resolve) => {
-              const continueBtn = wcsStatusRow.querySelector('#wcs-continue-btn') as HTMLButtonElement;
-              const cancelBtn = wcsStatusRow.querySelector('#wcs-cancel-btn') as HTMLButtonElement;
-              continueBtn?.addEventListener('click', () => {
-                showWCSStatus(successMsg, 'success');
-                detectAndPopulateDSOs(result.dsoIds, result.correspondences!, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
-                prefillWCSMeta(result);
-                expandMetaIfDSOsDetected();
-                applyAutoSolveResult(result.correspondences!);
-                resolve();
-              });
-              cancelBtn?.addEventListener('click', () => {
-                hideWCSStatus();
-                resolve();
-              });
-            });
-          }
-
-          showWCSStatus(successMsg, 'success');
-          detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
-          prefillWCSMeta(result);
-          expandMetaIfDSOsDetected();
-          applyAutoSolveResult(result.correspondences);
-          enableAutoButtons();
-        } else {
-          const code = result.code;
-          let msg: string;
-          if (code === 'NO_WCS_DATA') {
-            msg = t('modal.wcsNoMetadata', { filename: companionFile.name });
-          } else if (code === 'UNSUPPORTED_FORMAT') {
-            msg = t('modal.wcsParseError', { filename: companionFile.name, detail: result.error || code });
-          } else {
-            msg = t('modal.wcsParseError', { filename: companionFile.name, detail: result.error || code || 'unknown error' });
-          }
-          showWCSStatus(msg, 'error');
-          enableAutoButtons();
-        }
-      } catch (err: any) {
-        showWCSStatus(t('modal.wcsParseError', { filename: companionFile.name, detail: err.message }), 'error');
-        enableAutoButtons();
+      function markStarComplete(idx: number) {
+        statusLabels[idx].onclick = () => resetStarSelection(idx);
       }
-    });
 
-    // --- Online solve button handler ---
-    btnOnline.addEventListener('click', async () => {
-      // Show submission selection dialog first
-      try {
-        const choice = await this.showSubmissionSelectionDialog();
-        
-        if (choice.action === 'cancel') {
-          return; // User cancelled
-        }
-        
-        if (choice.action === 'reuse' && choice.jobId) {
-          // Reuse existing submission
-          disableAutoButtons();
-          setAutoStatus(t('modal.reusingSubmission', { jobId: choice.jobId }), 'solving');
-          
-          try {
-            const result = await reuseAstrometrySubmission(file, choice.jobId);
-            
-            if (result.success && result.correspondences && result.correspondences.length >= 3) {
-              setAutoStatus(t('modal.reuseSuccess'), 'success');
-              detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
-              expandMetaIfDSOsDetected();
-              applyAutoSolveResult(result.correspondences);
-            } else {
-              setAutoStatus(result.error || t('modal.reuseFailed'), 'failed');
-              enableAutoButtons();
+      function selectStar(idx: number, star: Star, label: string) {
+        if (!points[idx]) return;
+        points[idx]!.starHip = star.hip;
+        points[idx]!.starName = label;
+        points[idx]!.starRa = undefined;
+        points[idx]!.starDec = undefined;
+        statusLabels[idx].textContent = label;
+        statusLabels[idx].className = 'point-status point-complete';
+        searchInputs[idx].value = label;
+        searchInputs[idx].disabled = true;
+        pointEntries[idx].classList.add('complete');
+        if (pickBtns[idx]) pickBtns[idx].disabled = true;
+        markStarComplete(idx);
+        updateActiveIndex();
+        checkComplete();
+      }
+
+      function selectRaDec(idx: number, ra: number, dec: number) {
+        if (!points[idx]) return;
+        points[idx]!.starHip = 0;
+        points[idx]!.starRa = ra;
+        points[idx]!.starDec = dec;
+        const label = t('modal.raDecSet', { ra: ra.toFixed(2), dec: dec.toFixed(2) });
+        points[idx]!.starName = label;
+        statusLabels[idx].textContent = label;
+        statusLabels[idx].className = 'point-status point-complete';
+        searchInputs[idx].value = label;
+        searchInputs[idx].disabled = true;
+        pointEntries[idx].classList.add('complete');
+        if (pickBtns[idx]) pickBtns[idx].disabled = true;
+        markStarComplete(idx);
+        updateActiveIndex();
+        checkComplete();
+      }
+
+      function isPointComplete(p: PhotoCorrespondence | null): boolean {
+        if (!p) return false;
+        return p.starHip !== 0 || (p.starRa !== undefined && p.starDec !== undefined);
+      }
+
+      function updateActiveIndex() {
+        for (let i = 0; i < 3; i++) {
+          if (!isPointComplete(points[i])) {
+            activeIndex = i;
+            for (let j = 0; j < 3; j++) {
+              if (j === i && (!points[j] || points[j]!.photoX === undefined)) {
+                statusLabels[j].textContent = t('modal.clickPhoto');
+              }
             }
-          } catch (err: any) {
-            setAutoStatus(err.message, 'failed');
-            enableAutoButtons();
-          }
-          return;
-        }
-        
-        // If action is 'upload', proceed with normal upload flow below
-      } catch (err: any) {
-        reportUnknownRendererError('submission_selection_error', err);
-        // If dialog fails, proceed with upload as fallback
-      }
-      
-      // Normal upload flow
-      disableAutoButtons();
-      const startTime = Date.now();
-      let timerInterval: ReturnType<typeof setInterval> | null = null;
-
-      // Abort-aware sleep: resolves early (returning true) if modal is closed
-      function abortableSleep(ms: number): Promise<boolean> {
-        return new Promise(resolve => {
-          const t = setTimeout(() => resolve(false), ms);
-          modalAbort.signal.addEventListener('abort', () => { clearTimeout(t); resolve(true); }, { once: true });
-        });
-      }
-
-      function updateTimer() {
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
-        setAutoStatus(t('modal.solvingOnline', { seconds: elapsed }), 'solving');
-      }
-
-      updateTimer();
-      timerInterval = setInterval(updateTimer, 1000);
-
-      try {
-        // Use hints if available
-        const hints = hintCoords ? { ra: hintCoords.ra, dec: hintCoords.dec, radius: 2.0 } : undefined;
-        const { jobId } = await submitPlateSolve(file, hints);
-
-        // Initial backoff polling: 3s, 5s, 8s, then 13s intervals (~82s total)
-        const delays = [3000, 5000, 8000, 13000, 13000, 13000, 13000, 13000];
-
-        for (const delay of delays) {
-          if (await abortableSleep(delay)) return; // modal closed
-          if (modalAbort.signal.aborted) return;
-
-          const status = await pollPlateSolve(jobId);
-
-          if (status.status === 'solved' && status.correspondences) {
-            if (timerInterval) clearInterval(timerInterval);
-            const elapsed = Math.round((Date.now() - startTime) / 1000);
-            setAutoStatus(t('modal.solvedOnline', { seconds: elapsed }), 'success');
-            detectAndPopulateDSOs(status.dsoIds, status.correspondences, naturalWidth, naturalHeight);
-            expandMetaIfDSOsDetected();
-            applyAutoSolveResult(status.correspondences);
-            return;
-          } else if (status.status === 'failed' || status.status === 'timeout') {
-            if (timerInterval) clearInterval(timerInterval);
-            setAutoStatus(status.error || t('modal.solveFailed'), 'failed');
-            enableAutoButtons();
             return;
           }
         }
-
-        // Show "still working" message and keep polling every 60s indefinitely
-        if (timerInterval) clearInterval(timerInterval);
-        setAutoStatus(t('modal.solvingOnlineSlow'), 'solving', t('modal.solveTimeoutHint'));
-
-        while (true) {
-          if (await abortableSleep(60_000)) return; // modal closed
-          if (modalAbort.signal.aborted) return;
-
-          const status = await pollPlateSolve(jobId);
-
-          if (status.status === 'solved' && status.correspondences) {
-            const elapsed = Math.round((Date.now() - startTime) / 1000);
-            setAutoStatus(t('modal.solvedOnline', { seconds: elapsed }), 'success');
-            detectAndPopulateDSOs(status.dsoIds, status.correspondences, naturalWidth, naturalHeight);
-            expandMetaIfDSOsDetected();
-            applyAutoSolveResult(status.correspondences);
-            return;
-          } else if (status.status === 'failed' || status.status === 'timeout') {
-            setAutoStatus(status.error || t('modal.solveFailed'), 'failed');
-            enableAutoButtons();
-            return;
-          }
-          // Still pending — update elapsed time in the main status
-          const elapsed = Math.round((Date.now() - startTime) / 1000);
-          setAutoStatus(t('modal.solvingOnline', { seconds: elapsed }), 'solving', t('modal.solveTimeoutHint'));
-        }
-      } catch (err: any) {
-        if (timerInterval) clearInterval(timerInterval);
-        if (modalAbort.signal.aborted) return; // modal closed mid-request, ignore
-        setAutoStatus(err.message, 'failed');
-        enableAutoButtons();
+        activeIndex = 3;
       }
-    });
 
-    // --- solve-field button handler ---
-    btnSolveField.addEventListener('click', async () => {
-      disableAutoButtons();
-      const solveAbort = new AbortController();
-      activeLocalSolveAbort = solveAbort;
-      const startAt = Date.now();
-      let showSlowHint = false;
-
-      const cancelSolve = () => {
-        if (solveAbort.signal.aborted) return;
-        solveAbort.abort();
-        setAutoStatus(t('batch.statusCanceled'), 'canceled');
-        enableAutoButtons();
-      };
-
-      const updateStatus = () => {
-        const elapsed = Math.max(0, Math.round((Date.now() - startAt) / 1000));
-        if (elapsed >= 60) showSlowHint = true;
-        setAutoStatus(
-          t('batch.statusSolving', { seconds: String(elapsed) }),
-          'solving',
-          showSlowHint ? t('modal.slowSolveHint') : undefined,
-          undefined,
-          { show: true, onCancel: cancelSolve },
-        );
-      };
-
-      updateStatus();
-      const localTimer = setInterval(updateStatus, 1000);
-
-      try {
-        // Build hints object from available inputs
-        const hints: { ra?: number; dec?: number; fov?: number; radius?: number } = {};
-        
-        if (hintCoords) {
-          hints.ra = hintCoords.ra;
-          hints.dec = hintCoords.dec;
-          // Calculate radius from FOV if available, otherwise use default
-          const fovValue = parseFloat(fovInput.value);
-          hints.radius = (!isNaN(fovValue) && fovValue > 0) ? fovValue * 1.5 : 10;
-        }
-        
-        // Add FOV if provided
-        const fovValue = parseFloat(fovInput.value);
-        if (!isNaN(fovValue) && fovValue > 0) {
-          hints.fov = fovValue;
-        }
-        
-        const result = await solveWithSolveField(file, Object.keys(hints).length > 0 ? hints : undefined, solveAbort.signal);
-
-        if (solveAbort.signal.aborted) return;
-        if (result.success && result.correspondences && result.correspondences.length >= 3) {
-          setAutoStatus(t('batch.statusSuccess'), 'success');
-          detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
-          expandMetaIfDSOsDetected();
-          applyAutoSolveResult(result.correspondences);
-          activeLocalSolveAbort = null;
-        } else {
-          if (result.code === 'SOLVE_CANCELED') {
-            setAutoStatus(t('batch.statusCanceled'), 'canceled');
-          } else {
-            setAutoStatus(result.error ?? t('batch.statusFailed'), 'failed', undefined, result.errorDetails, undefined, result.diagnostics);
-          }
-          enableAutoButtons();
-          activeLocalSolveAbort = null;
-        }
-      } catch (err: any) {
-        const canceled = err?.name === 'AbortError' || err?.code === 'SOLVE_CANCELED';
-        if (canceled) {
-          setAutoStatus(t('batch.statusCanceled'), 'canceled');
-        } else {
-          setAutoStatus(err.message, 'failed');
-        }
-        enableAutoButtons();
-        activeLocalSolveAbort = null;
-      } finally {
-        clearInterval(localTimer);
-      }
-    });
-
-    // --- ASTAP button handler ---
-    btnASTAP.addEventListener('click', async () => {
-      disableAutoButtons();
-      const solveAbort = new AbortController();
-      activeLocalSolveAbort = solveAbort;
-      const startAt = Date.now();
-      let showSlowHint = false;
-
-      const cancelSolve = () => {
-        if (solveAbort.signal.aborted) return;
-        solveAbort.abort();
-        setAutoStatus(t('batch.statusCanceled'), 'canceled');
-        enableAutoButtons();
-      };
-
-      const updateStatus = () => {
-        const elapsed = Math.max(0, Math.round((Date.now() - startAt) / 1000));
-        if (elapsed >= 60) showSlowHint = true;
-        setAutoStatus(
-          t('batch.statusSolving', { seconds: String(elapsed) }),
-          'solving',
-          showSlowHint ? t('modal.slowSolveHint') : undefined,
-          undefined,
-          { show: true, onCancel: cancelSolve },
-        );
-      };
-
-      updateStatus();
-      const localTimer = setInterval(updateStatus, 1000);
-
-      try {
-        // Build hints object from available inputs
-        const hints: { ra?: number; dec?: number; fov?: number; radius?: number } = {};
-        
-        if (hintCoords) {
-          hints.ra = hintCoords.ra;
-          hints.dec = hintCoords.dec;
-          hints.radius = 10;
-        }
-        
-        // Add FOV if provided
-        const fovValue = parseFloat(fovInput.value);
-        if (!isNaN(fovValue) && fovValue > 0) {
-          hints.fov = fovValue;
-        }
-        
-        const result = await solveWithASTAP(file, Object.keys(hints).length > 0 ? hints : undefined, solveAbort.signal);
-
-        if (solveAbort.signal.aborted) return;
-        if (result.success && result.correspondences && result.correspondences.length >= 3) {
-          setAutoStatus(t('batch.statusSuccess'), 'success');
-          detectAndPopulateDSOs(result.dsoIds, result.correspondences, naturalWidth, naturalHeight, result.sourceWidth, result.sourceHeight);
-          expandMetaIfDSOsDetected();
-          applyAutoSolveResult(result.correspondences);
-          activeLocalSolveAbort = null;
-        } else {
-          if (result.code === 'SOLVE_CANCELED') {
-            setAutoStatus(t('batch.statusCanceled'), 'canceled');
-          } else {
-            setAutoStatus(result.error ?? t('batch.statusFailed'), 'failed', undefined, result.errorDetails, undefined, result.diagnostics);
-          }
-          enableAutoButtons();
-          activeLocalSolveAbort = null;
-        }
-      } catch (err: any) {
-        const canceled = err?.name === 'AbortError' || err?.code === 'SOLVE_CANCELED';
-        if (canceled) {
-          setAutoStatus(t('batch.statusCanceled'), 'canceled');
-        } else {
-          setAutoStatus(err.message, 'failed');
-        }
-        enableAutoButtons();
-        activeLocalSolveAbort = null;
-      } finally {
-        clearInterval(localTimer);
-      }
-    });
-
-    submitBtn.addEventListener('click', async () => {
-      if (!validateIntegrationInputs()) return;
-      submitBtn.disabled = true;
-      submitBtn.textContent = t('modal.submitting');
-      progressBar.style.display = 'block';
-      progressFill.style.width = '0%';
-
-      try {
-        const correspondences = [
-          ...(points.filter(p => isPointComplete(p)) as PhotoCorrespondence[]),
-          ...extraAutoCorrespondences,
-        ];
-        const photo = await uploadPhoto(file, correspondences, undefined, (fraction: number) => {
-          progressFill.style.width = `${Math.round(fraction * 100)}%`;
-        }, {
-          dsoIds: pendingDsoIds,
-          labels: pendingLabels,
-          integrations: sanitizeIntegrationRows(pendingIntegrations),
-          observationDate: pendingObsDate || null,
-          notes: pendingNotes,
-          displayName: pendingOriginalName || stripExtension(file.name),
-        });
-        this.addPhotoToMap(photo);
-        this.fireOnPhotosChanged();
-        closeModal();
-      } catch (err: any) {
-        showToast({ message: t('modal.uploadError', { message: err.message }), type: 'error', duration: 5000 });
-        submitBtn.disabled = false;
-        submitBtn.textContent = t('modal.submit');
-        progressBar.style.display = 'none';
+      function checkComplete() {
+        const completeCount = points.filter(p => isPointComplete(p)).length;
+        submitBtn.disabled = completeCount < 2;
       }
     });
   }

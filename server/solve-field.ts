@@ -14,6 +14,22 @@ import type { ServerLang } from './messages.js';
 
 const execFileAsync = promisify(execFile);
 
+// Build the raw-output snippet shown in the error-details collapsible: the command
+// that was run (with the user's filename) followed by the last few non-empty lines
+// of solver output. Returns undefined when there is nothing useful.
+function buildDiagnostics(output: string | undefined, command?: string): string | undefined {
+  const snippet = (output ?? '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(-6)
+    .join('\n');
+  if (command) {
+    return snippet ? `$ ${command}\n\n${snippet}` : `$ ${command}`;
+  }
+  return snippet || undefined;
+}
+
 const loggedVersions = new Set<string>();
 async function logSolverVersion(bin: string, versionArgs: string[], useWSL: boolean): Promise<void> {
   if (loggedVersions.has(bin)) return;
@@ -61,6 +77,7 @@ export async function solveWithSolveField(
   hints?: { ra?: number; dec?: number; fov?: number; radius?: number },
   lang: ServerLang = 'en',
   signal?: AbortSignal,
+  originalName?: string,
 ): Promise<SolveResult> {
   const bin = getSolveFieldBin();
   const useWSL = useWSLForSolveField();
@@ -78,8 +95,9 @@ export async function solveWithSolveField(
     console.log(`[solve-field] Image dimensions: ${width}×${height}`);
 
     // Build solve-field command
+    const imgArg = wslPath(imgPath, useWSL);
     const args = [
-      wslPath(imgPath, useWSL),
+      imgArg,
       '--overwrite',           // Allow overwriting output files
       '--no-plots',            // Skip visualization generation for speed
       '--crpix-center',        // Use image center as reference pixel
@@ -142,7 +160,16 @@ export async function solveWithSolveField(
     const exec = wrapExecForWSL(bin, args, useWSL);
     console.log(`[solve-field] Running: ${exec.cmd} ${exec.args.join(' ')}`);
 
+    // Human-readable command for the error-details collapsible: substitute the
+    // temp input path with the user's original filename so it's recognizable.
+    const solveCommand = `${exec.cmd} ${exec.args.join(' ')}`
+      .split(imgArg).join(originalName || path.basename(imgArg));
+
     let solveStdout = '';
+    // Combined solver output retained at function scope so any failure return
+    // (including the success-exit path that never enters the catch below) can
+    // surface raw output in the error-details collapsible.
+    let solveOutput = '';
     try {
       // No timeout - let solve-field run until completion or failure
       const { stdout, stderr } = await execFileAsync(exec.cmd, exec.args, {
@@ -151,6 +178,7 @@ export async function solveWithSolveField(
         signal,
       } as any);
       solveStdout = String(stdout ?? '');
+      solveOutput = [solveStdout, String(stderr ?? '')].filter(Boolean).join('\n').trim();
       console.log('[solve-field] stdout:', stdout);
       if (stderr) console.log('[solve-field] stderr:', stderr);
       
@@ -172,7 +200,8 @@ export async function solveWithSolveField(
         // Combine both streams — solve-field splits diagnostics between them
         const fullOutput = [stderr, stdout, err.message || ''].filter(Boolean).join('\n').trim();
         solveStdout = stdout;
-        
+        solveOutput = fullOutput;
+
         console.log('[solve-field] Full output:', fullOutput);
         
         // Parse output for diagnostics
@@ -196,22 +225,17 @@ export async function solveWithSolveField(
         
         // Check for missing index files
         if (fullOutput.includes('no index files') || fullOutput.includes('Could not find index')) {
-          return { success: false, error: msg.solveField.noIndexFiles(lang) };
+          return { success: false, error: msg.solveField.noIndexFiles(lang), diagnostics: buildDiagnostics(fullOutput, solveCommand) };
         }
 
         // Python uniformize dependency missing — this is handled by --uniformize 0 but
         // catch it explicitly in case another Python step fails in the future
         if (fullOutput.includes('NoPyfits') || fullOutput.includes('astrometry.util.uniformize')) {
-          return { success: false, error: msg.solveField.noPyfits(lang) };
+          return { success: false, error: msg.solveField.noPyfits(lang), diagnostics: buildDiagnostics(fullOutput, solveCommand) };
         }
-        
+
         // Collect raw output as diagnostics for the collapsible details section
-        const diagnostics = fullOutput
-          .split('\n')
-          .map((s: string) => s.trim())
-          .filter(Boolean)
-          .slice(-6)
-          .join('\n') || undefined;
+        const diagnostics = buildDiagnostics(fullOutput, solveCommand);
 
         // Provide informative error message
         if (noSolution) {
@@ -238,7 +262,7 @@ export async function solveWithSolveField(
     }
 
     if (!existsSync(wcsPath)) {
-      return { success: false, error: msg.solveField.noWcsFile(lang) };
+      return { success: false, error: msg.solveField.noWcsFile(lang), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
     }
 
     const wcsText = await fsp.readFile(wcsPath, 'utf-8');
@@ -247,7 +271,7 @@ export async function solveWithSolveField(
     const required = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'];
     for (const key of required) {
       if (typeof parsed[key] !== 'number') {
-        return { success: false, error: msg.solveField.missingWcsKey(lang, key) };
+        return { success: false, error: msg.solveField.missingWcsKey(lang, key), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
       }
     }
 
@@ -272,9 +296,10 @@ export async function solveWithSolveField(
     const correspondences = wcsToCorrespondences(wcs, width, height, false);
     
     if (correspondences.length < 3) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: msg.solveField.notEnoughStars(lang, correspondences.length),
+        diagnostics: buildDiagnostics(solveOutput, solveCommand),
       };
     }
 

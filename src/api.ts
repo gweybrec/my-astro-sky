@@ -216,6 +216,9 @@ export async function submitPlateSolve(file: File, hints?: { ra?: number; dec?: 
 
 export async function pollPlateSolve(jobId: string): Promise<AstrometrySolveStatus> {
   const res = await fetch(`/api/solve-plate/${jobId}`);
+  // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
+  // still running server-side, so report it as in-progress and let the caller retry.
+  if (res.status === 429) return { jobId, status: 'solving' };
   if (!res.ok) throw new Error(t('errors.pollFailed'));
   return res.json();
 }
@@ -246,6 +249,9 @@ export async function pollLocalSolveJob(
   jobId: string,
 ): Promise<{ status: string; result?: PlateSolveResult; error?: string }> {
   const res = await fetch(`${endpoint}/${jobId}`);
+  // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
+  // still running server-side, so report it as pending and let the caller retry.
+  if (res.status === 429) return { status: 'pending' };
   if (!res.ok) throw new Error(t('errors.pollFailed'));
   return res.json();
 }

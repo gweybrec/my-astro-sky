@@ -231,6 +231,28 @@ describe('solveWithSolveField()', () => {
     expect(result.error).toContain('did not produce a WCS file');
   });
 
+  it('includes diagnostics with the command (using the user filename) on the WCS-missing success-exit path', async () => {
+    mockExistsSync.mockReturnValue(false);
+    mockExecFileAsync.mockResolvedValue({
+      stdout: 'Reading input file...\nSolving...\nno match found within the search radius\n',
+      stderr: 'warning: low contrast image\n',
+    });
+
+    const result = await solveWithSolveField(
+      Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en', undefined, 'Andromeda.jpg',
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('did not produce a WCS file');
+    // The raw solver output (stdout + stderr) must reach the error-details collapsible.
+    expect(result.diagnostics).toBeDefined();
+    expect(result.diagnostics).toContain('no match found within the search radius');
+    expect(result.diagnostics).toContain('low contrast image');
+    // The command line uses the user's filename, not the backend temp path.
+    expect(result.diagnostics).toContain('$ solve-field Andromeda.jpg');
+    expect(result.diagnostics).not.toContain('input.jpg');
+  });
+
   it('returns error when parsed WCS misses a required key', async () => {
     mockParseFITSHeader.mockReturnValue({
       CRPIX1: 960,
@@ -247,6 +269,7 @@ describe('solveWithSolveField()', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Missing WCS key: CD2_2');
+    expect(result.diagnostics).toContain('Your field contains');
   });
 
   it('always passes --uniformize 0 to skip the pyfits/astropy dependency', async () => {

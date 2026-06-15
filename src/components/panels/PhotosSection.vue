@@ -1,9 +1,8 @@
 <template>
   <CollapsibleSection :title="t('photos.section')" :defaultOpen="true">
-    <!-- Add / batch buttons -->
+    <!-- Add photos button -->
     <div class="flex flex-col gap-2">
       <button class="btn-action" @click="onAddPhoto">{{ t('photos.add') }}</button>
-      <button class="btn-action" @click="onBatchAdd">{{ t('batch.button') }}</button>
     </div>
 
     <!-- Search wrapper -->
@@ -193,10 +192,6 @@ function onDSOChip(dsoId: string) {
 }
 
 function onAddPhoto() {
-  canvasStore.overlay?.openRegistrationModal();
-}
-
-function onBatchAdd() {
   const allowedExt = /\.(jpe?g|png|webp)$/i;
   const input = document.createElement('input');
   input.type = 'file';

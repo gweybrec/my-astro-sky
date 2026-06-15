@@ -188,3 +188,41 @@ describe('BatchCard — open WCS file', () => {
     wrapper.unmount();
   });
 });
+
+describe('BatchCard — controls locked while solving', () => {
+  const allAvailable: SolverAvailability = { solveField: true, astap: true, astrometry: true };
+
+  function mountWithStatus(status: BatchItem['status']) {
+    return mount(BatchCard, {
+      props: { item: makeItem({ status }), solverAvailability: allAvailable, knownFilterMap: new Map() },
+      global: { stubs: { BatchSolveStatus: true, MetadataEditorPanel: true } },
+      attachTo: document.body,
+    });
+  }
+
+  it('disables the solver dropdown and the WCS/manual buttons while solving', () => {
+    const wrapper = mountWithStatus('solving');
+
+    expect(wrapper.find('.batch-solver-select').attributes('disabled')).toBeDefined();
+    // Two .batch-wcs-btn buttons: WCS (first) and Manual (second).
+    const actionBtns = wrapper.findAll('.batch-wcs-btn');
+    expect(actionBtns).toHaveLength(2);
+    expect(actionBtns[0].attributes('disabled')).toBeDefined();
+    expect(actionBtns[1].attributes('disabled')).toBeDefined();
+    // The reuse-online button is locked too.
+    expect(wrapper.find('.batch-reuse-btn').attributes('disabled')).toBeDefined();
+
+    wrapper.unmount();
+  });
+
+  it('leaves the controls enabled when the item is pending', () => {
+    const wrapper = mountWithStatus('pending');
+
+    expect(wrapper.find('.batch-solver-select').attributes('disabled')).toBeUndefined();
+    const actionBtns = wrapper.findAll('.batch-wcs-btn');
+    expect(actionBtns[0].attributes('disabled')).toBeUndefined();
+    expect(actionBtns[1].attributes('disabled')).toBeUndefined();
+
+    wrapper.unmount();
+  });
+});

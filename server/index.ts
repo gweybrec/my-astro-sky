@@ -89,7 +89,7 @@ const isElectron = !!process.versions.electron;
 const rateLimits = new Map<string, number[]>();
 const RATE_WINDOW_MS = 60_000;
 const UPLOAD_LIMIT = 200;  // uploads per minute
-const API_LIMIT = 120;    // API requests per minute
+const API_LIMIT = 300;    // API requests per minute — sized for batch status polling (every 2s per active solve)
 
 function checkRateLimit(ip: string, limit: number): boolean {
   const now = Date.now();
@@ -2856,6 +2856,7 @@ app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
     if (req.body.radius !== undefined) hints.radius = parseFloat(req.body.radius);
 
     const fileBuffer = req.file.buffer;
+    const originalName = req.file.originalname;
     const orientation = meta.orientation;
     const job = createJob();
     res.status(202).json({ jobId: job.id });
@@ -2868,6 +2869,7 @@ app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
           Object.keys(hints).length > 0 ? hints : undefined,
           lang,
           job.abortController.signal,
+          originalName,
         );
         if (job.abortController.signal.aborted) {
           updateJob(job.id, { status: 'canceled' });
@@ -3085,6 +3087,7 @@ app.post('/api/solve-field', upload.single('photo'), async (req, res) => {
     if (req.body.radius !== undefined) hints.radius = parseFloat(req.body.radius);
 
     const fileBuffer = req.file.buffer;
+    const originalName = req.file.originalname;
     const orientation = meta.orientation;
     const job = createJob();
     res.status(202).json({ jobId: job.id });
@@ -3097,6 +3100,7 @@ app.post('/api/solve-field', upload.single('photo'), async (req, res) => {
           Object.keys(hints).length > 0 ? hints : undefined,
           lang,
           job.abortController.signal,
+          originalName,
         );
         if (job.abortController.signal.aborted) {
           updateJob(job.id, { status: 'canceled' });

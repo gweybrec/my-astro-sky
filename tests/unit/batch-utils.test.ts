@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clearWcsSolution, sanitizeIntegrationRows } from '../../src/batch-utils';
+import { clearWcsSolution, sanitizeIntegrationRows, wcsErrorMessage } from '../../src/batch-utils';
 import type { BatchItem } from '../../src/batch-types';
 
 function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
@@ -31,6 +31,34 @@ function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
     ...overrides,
   };
 }
+
+describe('wcsErrorMessage', () => {
+  it('maps NO_WCS_DATA to the full "not plate-solved" message key', () => {
+    const info = wcsErrorMessage({ code: 'NO_WCS_DATA' }, 'M31.fits');
+    expect(info.key).toBe('modal.wcsNoMetadata');
+    expect(info.params).toEqual({ filename: 'M31.fits' });
+  });
+
+  it('maps UNSUPPORTED_FORMAT to a parse error carrying the detail', () => {
+    const info = wcsErrorMessage({ code: 'UNSUPPORTED_FORMAT', error: 'bad header' }, 'shot.tif');
+    expect(info.key).toBe('modal.wcsParseError');
+    expect(info.params).toEqual({ filename: 'shot.tif', detail: 'bad header' });
+  });
+
+  it('falls back to the format code when UNSUPPORTED_FORMAT has no error detail', () => {
+    const info = wcsErrorMessage({ code: 'UNSUPPORTED_FORMAT' }, 'shot.tif');
+    expect(info.key).toBe('modal.wcsParseError');
+    expect(info.params.detail).toBe('UNSUPPORTED_FORMAT');
+  });
+
+  it('maps unknown/missing codes to a generic parse error', () => {
+    expect(wcsErrorMessage({ code: 'WEIRD', error: 'boom' }, 'f.fits').params.detail).toBe('boom');
+    expect(wcsErrorMessage({}, 'f.fits')).toEqual({
+      key: 'modal.wcsParseError',
+      params: { filename: 'f.fits', detail: 'unknown error' },
+    });
+  });
+});
 
 describe('clearWcsSolution', () => {
   it('drops the solution and WCS-prefilled metadata', () => {

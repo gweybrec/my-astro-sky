@@ -6,10 +6,10 @@
 
 - **Canvas layer** (`sky-map.ts`): Renders ~5000 stars with B-V color, 12,000+ DSOs with type-specific styling, constellation lines/names, RA/Dec grid. Handles zoom (wheel) and pan (drag). Fires `onViewChange` callback on every view update for photo transform recomputation.
 - **Photo layer** (`photo-overlay.ts`): Each photo is an `<img>` with absolute positioning and CSS matrix transform. On view change, all photo transforms are recomputed so they track the canvas. LOD: when a photo's rendered pixel width (derived from the affine matrix scale × `photo.width`) is below 300 px and a server thumbnail exists, `img.src` is swapped to `/uploads/{thumbFilename}`; swapped back to the full-res URL when the photo renders larger. `photo.width` (authoritative DB value) is always used for matrix math — never `imgEl.naturalWidth` — so LOD swaps do not disturb hit-testing or transform accuracy. Manages:
-  - Upload modal with 4 auto-solve methods (WCS, astrometry.net online, solve-field local, ASTAP local)
-  - 3-point registration modal (user clicks photo pixel → searches for matching star)
-  - Manual placement mode (drag photo, rotate/zoom sliders, mirror X/Y toggles)
+  - `openManualIdentifyModal()` — the manual star-identification sub-modal launched per-card from the batch upload flow (user clicks photo pixel → searches for matching star / enters RA-Dec / picks on map; "Validate" enabled at 2+ identified points). No solve buttons or metadata — those live in the batch card. Resolves with correspondences, a free-drag hand-off, or cancel.
+  - Manual placement mode (`openManualPlacement()`: drag photo, rotate/zoom sliders, mirror X/Y toggles)
   - Photo repositioning (re-enter manual placement for existing photo, extracts current transform)
+- **Photo upload UI** (`components/modals/BatchUploadModal.vue`, `BatchCard.vue`, `BatchSolveStatus.vue`): The single unified "add photos" entry. Multi-select file picker → one card per photo. Each card offers the 4 auto-solve methods (WCS companion, astrometry.net online, solve-field local, ASTAP local), a per-card **Manual** button (→ `openManualIdentifyModal`), reuse-online, hints, and a metadata editor. Solving runs concurrently with a parallel-slot queue; rich per-card status/error messages mirror the old single modal.
 - **Gallery view** (`gallery.ts`): Grid view of all photos. Click photo → navigate to map location. Smart sorting by catalog name (M1, M31, M100, M101...). Lazy-loads images: grid items are built as shells first; an `IntersectionObserver` sets `img.src` (using `thumbFilename` when available, else full-res `filename`) only when the item enters the scroll container viewport. The observer is recreated on each render; the previous one is always disconnected first.
 - **Targets view** (`targets-view.ts`): Full-screen panel for DSO target recommendations. Features:
   - Gear preset selector (telescope + camera combos defined in `gear-presets.ts`)
@@ -208,10 +208,10 @@ On every upload, `server/index.ts` runs Sharp twice: once to resize the original
 
 ## Data Flow: Photo Upload with Auto-Solve
 
-1. User clicks "Ajouter une photo" → file picker → registration modal opens
-2. User clicks one of 4 auto-solve buttons (WCS / Online / solve-field / ASTAP)
+1. User clicks "Ajouter des photos" → multi-select file picker → batch upload modal opens with one card per photo
+2. On a card, user picks an auto-solve method (WCS / Online / solve-field / ASTAP), or **Manual** to identify stars by hand
 3. For ASTAP/online/solve-field: User can optionally enter target object name (M31, NGC7000, etc.) for position hint → unified search finds RA/Dec
-4. Modal sends file + hints to backend endpoint
+4. Card sends file + hints to backend endpoint (manual identification skips the backend and uses the user-supplied correspondences directly)
 5. Backend routes to appropriate solver:
    - **WCS**: Parse FITS/TIFF headers → extract WCS → transform pixels to RA/Dec → match to catalog → return correspondences
    - **ASTAP**: Write temp file → spawn `astap_cli` with hints → parse .ini solution → generate correspondences from WCS

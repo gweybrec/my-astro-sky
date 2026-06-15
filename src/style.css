@@ -4420,11 +4420,7 @@ details.targets-form-details[open] .targets-form-summary::before {
 }
 .batch-solver-select:focus { outline: none; border-color: var(--border-focus); }
 
-/* WCS row: full-width button below solver */
-.batch-wcs-row {
-  display: flex;
-}
-
+/* Solving action buttons (WCS / Manual): shown in a row below the preview */
 .batch-wcs-btn {
   padding: var(--space-1h) var(--space-4);
   font-size: var(--font-size-small);
@@ -4445,11 +4441,7 @@ details.targets-form-details[open] .targets-form-summary::before {
 .batch-wcs-btn.wcs-warning { color: var(--status-warn-text); border-color: var(--status-warn-border); }
 .batch-wcs-btn:disabled { opacity: 0.5; cursor: default; }
 
-/* Re-use online solution row: full-width button below WCS button */
-.batch-reuse-row {
-  display: flex;
-}
-
+/* Re-use online solution: full-width button below the action row */
 .batch-reuse-btn {
   padding: var(--space-1h) var(--space-4);
   font-size: var(--font-size-small);

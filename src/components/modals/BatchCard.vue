@@ -31,7 +31,7 @@
         <!-- Solver select -->
         <div class="batch-item-controls">
           <span class="batch-solver-label">{{ t('batch.solverLabel') }}</span>
-          <select class="batch-solver-select" v-model="solverModel" :disabled="allSolversDisabled">
+          <select class="batch-solver-select" v-model="solverModel" :disabled="allSolversDisabled || isBusy">
             <option v-if="allSolversDisabled" value="" disabled>{{ t('batch.noSolverConfigured') }}</option>
             <option value="solve-field" :disabled="!solverAvailability.solveField" :title="t('modal.solverNoPath')">{{ t('modal.solveFieldButton') }}</option>
             <option value="astap" :disabled="!solverAvailability.astap" :title="t('modal.solverNoPath')">{{ t('modal.astapButton') }}</option>
@@ -39,36 +39,44 @@
           </select>
         </div>
 
-        <!-- WCS button row -->
-        <div class="batch-wcs-row">
-          <button
-            type="button"
-            :class="['batch-wcs-btn', { 'wcs-loaded': wcsLoaded && !wcsWarning, 'wcs-warning': wcsWarning }]"
-            :disabled="wcsLoading"
-            @click="triggerWcsFile"
-          >{{ wcsLoaded ? `✓ ${wcsFileName}` : (wcsLoading ? '…' : t('modal.wcsButton')) }}</button>
-          <button
-            v-if="wcsLoaded && item.status !== 'solving' && item.status !== 'placing' && item.status !== 'placed'"
-            type="button"
-            class="integration-row-trash"
-            :title="t('modal.wcsRemove')"
-            v-html="trashSvg"
-            @click="clearWcs"
-          ></button>
-          <input ref="wcsInputEl" type="file" accept=".fit,.fits,.tif,.tiff" class="hidden" @change="handleWcsFile" />
-        </div>
-
-        <!-- Reuse online solution row -->
-        <div class="batch-reuse-row">
-          <button
-            type="button"
-            :class="['batch-reuse-btn', { 'wcs-loaded': reuseLoaded }]"
-            :disabled="!solverAvailability.astrometry || reuseLoading"
-            @click="handleReuse"
-          >{{ reuseLoaded ? t('batch.reuseLoaded') : (reuseLoading ? '…' : t('batch.reuseOnline')) }}</button>
-        </div>
+        <!-- Reuse online solution (fills the space below the solver dropdown) -->
+        <button
+          type="button"
+          :class="['batch-reuse-btn', 'mt-1', { 'wcs-loaded': reuseLoaded }]"
+          :disabled="!solverAvailability.astrometry || reuseLoading || isBusy"
+          :title="!solverAvailability.astrometry ? t('modal.solverNoApiKey') : undefined"
+          @click="handleReuse"
+        >{{ reuseLoaded ? t('batch.reuseLoaded') : (reuseLoading ? '…' : t('batch.reuseOnline')) }}</button>
       </div>
     </div>
+
+    <!-- Solving actions (below the preview): WCS · Manual -->
+    <div class="flex gap-1 mt-2">
+      <button
+        type="button"
+        :class="['batch-wcs-btn', { 'wcs-loaded': wcsLoaded && !wcsWarning, 'wcs-warning': wcsWarning }]"
+        :disabled="wcsLoading || isBusy"
+        @click="triggerWcsFile"
+      >{{ wcsLoaded ? `✓ ${wcsFileName}` : (wcsLoading ? '…' : t('modal.wcsButton')) }}</button>
+      <button
+        v-if="wcsLoaded && item.status !== 'solving' && item.status !== 'placing' && item.status !== 'placed'"
+        type="button"
+        class="integration-row-trash"
+        :title="t('modal.wcsRemove')"
+        v-html="trashSvg"
+        @click="clearWcs"
+      ></button>
+      <input ref="wcsInputEl" type="file" accept=".fit,.fits,.tif,.tiff" class="hidden" @change="handleWcsFile" />
+      <button
+        type="button"
+        :class="['batch-wcs-btn', { 'wcs-loaded': manualLoaded }]"
+        :disabled="manualBusy || isBusy"
+        @click="openManual"
+      >{{ manualLoaded ? t('batch.manualDone') : t('batch.manualButton') }}</button>
+    </div>
+
+    <!-- WCS / manual error message (inline, full single-modal parity) -->
+    <div v-if="wcsError" class="batch-status-upload-error">{{ wcsError }}</div>
 
     <!-- Hints section -->
     <div :class="['solve-hints-section', { 'has-hint': item.hintTargetName }]">
@@ -166,7 +174,7 @@ import { solveWCS, reuseAstrometrySubmission, updatePhotoMetadata } from '../../
 import { stripExtension, getFileDimensions } from '../../file-utils';
 import { generateThumbnail } from '../../lazy-image';
 import { showToast } from '../../toast';
-import { sanitizeIntegrationRows, clearWcsSolution } from '../../batch-utils';
+import { sanitizeIntegrationRows, clearWcsSolution, wcsErrorMessage } from '../../batch-utils';
 import BatchSolveStatus from './BatchSolveStatus.vue';
 import MetadataEditorPanel from './MetadataEditorPanel.vue';
 import trashSvg from '../../icons/trash.svg?raw';
@@ -182,6 +190,8 @@ const emit = defineEmits<{
   retry: [];
   'retry-upload': [];
 }>();
+
+const canvasStore = useCanvasStore();
 
 // ─── Thumbnail lazy loading ───────────────────────────────────────────────────
 const cardEl = ref<HTMLElement | null>(null);
@@ -221,6 +231,12 @@ const allSolversDisabled = computed(() =>
   !props.solverAvailability.solveField && !props.solverAvailability.astap && !props.solverAvailability.astrometry,
 );
 
+// Solving/placing in progress — lock the solver choice and solution-input controls
+// so they can't be changed out from under a running solve.
+const isBusy = computed(() =>
+  props.item.status === 'solving' || props.item.status === 'placing' || props.item.status === 'placed',
+);
+
 const solverModel = computed({
   get: () => allSolversDisabled.value ? '' : props.item.solver,
   set: (v: string) => { if (v) props.item.solver = v as SolverType; },
@@ -232,6 +248,7 @@ const wcsLoaded = ref(false);
 const wcsLoading = ref(false);
 const wcsFileName = ref('');
 const wcsWarning = ref(false);
+const wcsError = ref('');
 
 function triggerWcsFile() {
   if (wcsInputEl.value) { wcsInputEl.value.value = ''; wcsInputEl.value.click(); }
@@ -241,6 +258,7 @@ async function handleWcsFile(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0];
   if (!f) return;
   wcsLoading.value = true;
+  wcsError.value = '';
   try {
     const { width: imgWidth, height: imgHeight } = await getFileDimensions(props.item.file);
     const result = await solveWCS(f, imgWidth || undefined, imgHeight || undefined);
@@ -270,10 +288,12 @@ async function handleWcsFile(e: Event) {
       wcsLoaded.value = true;
       wcsFileName.value = f.name;
     } else {
-      showToast({ message: result.error || t('modal.wcsNotFound'), type: 'error', duration: 3000 });
+      // Full single-modal parity: specific message per failure code, shown inline.
+      const info = wcsErrorMessage(result, f.name);
+      wcsError.value = t(info.key, info.params);
     }
   } catch (err: any) {
-    showToast({ message: err.message || t('modal.wcsNotFound'), type: 'error', duration: 3000 });
+    wcsError.value = t('modal.wcsParseError', { filename: f.name, detail: err.message || 'unknown error' });
   } finally {
     wcsLoading.value = false;
   }
@@ -284,14 +304,47 @@ function clearWcs() {
   wcsLoaded.value = false;
   wcsFileName.value = '';
   wcsWarning.value = false;
+  wcsError.value = '';
   reuseLoaded.value = false; // reuse-online writes the same wcsResult/status
+  manualLoaded.value = false; // manual identify writes the same correspondences/status
   if (wcsInputEl.value) wcsInputEl.value.value = '';
+}
+
+// ─── Manual star identification ────────────────────────────────────────────────
+const manualLoaded = ref(false);
+const manualBusy = ref(false);
+
+async function openManual() {
+  manualBusy.value = true;
+  wcsError.value = '';
+  try {
+    const result = await canvasStore.overlay!.openManualIdentifyModal(props.item.file, {
+      initialMeta: {
+        originalName: props.item.customName || undefined,
+        dsoIds: props.item.dsoIds,
+        labels: props.item.labels,
+        integrations: props.item.integrations,
+        observationDate: props.item.observationDate || null,
+        notes: props.item.notes,
+      },
+    });
+    if (result.action === 'validate') {
+      props.item.solveCorrespondences = result.correspondences;
+      props.item.wcsResult = null;
+      props.item.status = 'success';
+      manualLoaded.value = true;
+    } else if (result.action === 'manual-placement') {
+      // The photo was handed off to free-drag placement (it self-saves & places).
+      emit('remove');
+    }
+  } finally {
+    manualBusy.value = false;
+  }
 }
 
 // ─── Reuse online solution ────────────────────────────────────────────────────
 const reuseLoaded = ref(false);
 const reuseLoading = ref(false);
-const canvasStore = useCanvasStore();
 
 async function handleReuse() {
   reuseLoading.value = true;

@@ -198,14 +198,24 @@ describe('batch solve/place split keys', () => {
     }
   });
 
-  it('modal.submit reflects the renamed "save and place" label in all languages', async () => {
+  it('modal.validate (manual-identify sub-modal button) exists in all languages', async () => {
     for (const lang of ['fr', 'en', 'es', 'de'] as const) {
       localStorage.setItem('lang', lang);
       vi.resetModules();
       const { t } = await import('../../src/i18n/index');
-      const result = t('modal.submit');
-      expect(result, `modal.submit missing in ${lang}`).not.toBe('modal.submit');
-      // The new label in every language contains a verb meaning "save" plus "map"
+      const result = t('modal.validate');
+      expect(result, `modal.validate missing in ${lang}`).not.toBe('modal.validate');
+      expect(result.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('batch.manualButton (per-card manual identify) exists in all languages', async () => {
+    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
+      localStorage.setItem('lang', lang);
+      vi.resetModules();
+      const { t } = await import('../../src/i18n/index');
+      const result = t('batch.manualButton');
+      expect(result, `batch.manualButton missing in ${lang}`).not.toBe('batch.manualButton');
       expect(result.length).toBeGreaterThan(0);
     }
   });
