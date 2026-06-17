@@ -165,6 +165,10 @@ export async function renderMapToCanvas(
       const dm = new DOMMatrix(transform);
       await drawPlacedPhoto(ctx, placed, { a: dm.a, b: dm.b, c: dm.c, d: dm.d, e: dm.e, f: dm.f }, dpr);
     }
+
+    // 3. Draw overlay canvas (FOV frames) on top of photos.
+    const overlayCanvas = skyMap.getOverlayCanvas();
+    if (overlayCanvas) ctx.drawImage(overlayCanvas, 0, 0);
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);

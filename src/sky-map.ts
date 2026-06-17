@@ -330,6 +330,12 @@ export class SkyMap {
   private hemisphere: 'north' | 'south' = 'north';
   private borderLatDeg = 45;
 
+  // Overlay canvas — sits above the photo layer in the DOM, used to draw frames on top of photos
+  private overlayCanvas: HTMLCanvasElement | null = null;
+  private overlayCtx: CanvasRenderingContext2D | null = null;
+  // True while renderToCanvas() is active — causes render() to draw frames inline rather than on the overlay
+  private _renderingOffscreen = false;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -372,6 +378,16 @@ export class SkyMap {
   /** The underlying canvas element. Backing store is devicePixelRatio-scaled (see resize()). */
   getCanvas(): HTMLCanvasElement {
     return this.canvas;
+  }
+
+  setOverlayCanvas(canvas: HTMLCanvasElement): void {
+    this.overlayCanvas = canvas;
+    this.overlayCtx = canvas.getContext('2d')!;
+    this.resizeOverlay();
+  }
+
+  getOverlayCanvas(): HTMLCanvasElement | null {
+    return this.overlayCanvas;
   }
   setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
   setMaxStarCount(count: number) { this.maxStarCount = count; this.render(); }
@@ -577,6 +593,7 @@ export class SkyMap {
     };
     this.ctx = tctx;
     this.view = view;
+    this._renderingOffscreen = true;
     if (layers) Object.assign(this, layers);
     tctx.save();
     tctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
@@ -584,6 +601,7 @@ export class SkyMap {
       this.render();
     } finally {
       tctx.restore();
+      this._renderingOffscreen = false;
       this.ctx = savedCtx;
       this.view = savedView;
       if (layers) Object.assign(this, savedLayers);
@@ -622,8 +640,17 @@ export class SkyMap {
       this.view.scale = Math.min(rect.width, rect.height) / 2.2;
     }
 
+    this.resizeOverlay();
     this.onViewChange?.();
     this.render();
+  }
+
+  private resizeOverlay(): void {
+    if (!this.overlayCanvas || !this.overlayCtx) return;
+    this.overlayCanvas.width = this.canvas.width;
+    this.overlayCanvas.height = this.canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   private buildStarIndex(maxMag: number) {
@@ -1149,11 +1176,15 @@ export class SkyMap {
     if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
       this.renderPhotoOutlines();
     }
-    if (this.fovFrameSpecs.length > 0) {
-      this.renderFovFrames();
-    }
-    if (this.fovInstances.length > 0) {
-      this.renderFovInstances();
+    // Frames are drawn on the overlay canvas (above photos) for live renders,
+    // but inline here for offscreen/export renders (see renderOverlay / _renderingOffscreen).
+    if (this._renderingOffscreen) {
+      if (this.fovFrameSpecs.length > 0) {
+        this.renderFovFrames();
+      }
+      if (this.fovInstances.length > 0) {
+        this.renderFovInstances();
+      }
     }
 
     ctx.restore(); // removes clip
@@ -1168,6 +1199,39 @@ export class SkyMap {
     ctx.restore();
 
     ctx.restore(); // outer save
+
+    if (!this._renderingOffscreen) {
+      this.renderOverlay();
+    }
+  }
+
+  private renderOverlay(): void {
+    const oc = this.overlayCtx;
+    if (!oc) return;
+    const { view } = this;
+    const { width, height } = view;
+
+    oc.clearRect(0, 0, width, height);
+
+    if (this.fovFrameSpecs.length === 0 && this.fovInstances.length === 0) return;
+
+    const poleOrigin = toCanvas(0, 0, view);
+    const borderR = Math.tan((90 + this.borderLatDeg) / 2 * DEG2RAD) * view.scale;
+
+    oc.save();
+    oc.beginPath();
+    oc.arc(poleOrigin.x, poleOrigin.y, borderR, 0, Math.PI * 2);
+    oc.clip();
+
+    // Temporarily route ctx to the overlay canvas so renderFovFrames / renderFovInstances
+    // draw there without any other changes to those methods.
+    const mainCtx = this.ctx;
+    this.ctx = oc;
+    if (this.fovFrameSpecs.length > 0) this.renderFovFrames();
+    if (this.fovInstances.length > 0) this.renderFovInstances();
+    this.ctx = mainCtx;
+
+    oc.restore();
   }
 
   private renderPhotoOutlines() {

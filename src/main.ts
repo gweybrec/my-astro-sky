@@ -78,6 +78,8 @@ async function init() {
   // Init sky map
   const canvas = document.getElementById('sky-canvas') as HTMLCanvasElement;
   const skyMap = new SkyMap(canvas);
+  const overlayCanvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
+  skyMap.setOverlayCanvas(overlayCanvas);
   window.addEventListener('app-theme-changed', () => skyMap.render());
 
   // Init photo overlay
