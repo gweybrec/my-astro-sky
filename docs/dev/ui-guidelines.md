@@ -841,6 +841,8 @@ btn.innerHTML = trashSvg;
 | `src/icons/credits.svg` | Database cylinder | `.settings-legal-btn` | 16 px |
 | `src/icons/telescope.svg` | Line-art telescope (tube + eyepiece + finder + tripod) | `.fov-telescope-btn` | `var(--font-size-large)` (set by `.fov-telescope-btn svg`) |
 | `src/icons/export.svg` | Box with outgoing up-right arrow | `.sky-export-control .sky-rotation-btn`, gallery filter-bar button | 16 px |
+| `src/icons/eye.svg` | Eye (shown) | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`) | 16 px / `1em` |
+| `src/icons/eye-off.svg` | Eye with slash (hidden) | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`) | 16 px / `1em` |
 
 One additional SVG lives as a `data:image/svg+xml` URI in `src/style.css` on `.targets-sort-select` (dropdown caret). It is a pure CSS concern — no TypeScript import needed.
 

@@ -53,6 +53,33 @@ describe('fov-frames store', () => {
     expect(JSON.parse(localStorage.getItem('fov-frames-v1')!).length).toBe(1);
   });
 
+  it('addPlanFrame adds a custom-location entry, selects it, and switches to plan mode', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{
+      id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId: 's1', entries: [],
+    }] as any;
+    const spy = vi.spyOn(plans, 'addCustomEntry').mockImplementation(async (planId, ra, dec) => {
+      plans.plans.find(p => p.id === planId)!.entries.push(
+        { id: 'e-new', dsoId: null, position: 0, paDeg: null, ra, dec, notes: null } as any,
+      );
+      return 'e-new';
+    });
+
+    await store.addPlanFrame('p1', 120, 45);
+    expect(spy).toHaveBeenCalledWith('p1', 120, 45);
+    expect(store.selection).toEqual({ kind: 'plan', planId: 'p1' });
+    expect(store.activeId).toBe('plan:p1:e-new');
+
+    const frame = store.renderables.find(f => f.id === 'plan:p1:e-new')!;
+    expect(frame).toBeDefined();
+    expect(frame.anchorKind).toBe('sky');
+    expect(frame.ra).toBe(120);
+    expect(frame.dec).toBe(45);
+    expect(frame.dsoId).toBeNull();
+    expect(frame.active).toBe(true);
+  });
+
   it('keeps only one active frame', async () => {
     const store = await withSpecs();
     store.addAdhocFrame('s1');
@@ -252,6 +279,60 @@ describe('fov-frames store', () => {
     store.setAllAdhocVisible(true);
     expect(store.renderables.every(f => f.visible === true)).toBe(true);
     expect(JSON.parse(localStorage.getItem('fov-frame-hidden-v1')!)[b]).toBeUndefined();
+  });
+
+  it('framesVisible defaults to true, toggles, persists, and reloads', async () => {
+    const store = await withSpecs();
+    expect(store.framesVisible).toBe(true);
+
+    store.toggleFramesVisible();
+    expect(store.framesVisible).toBe(false);
+    expect(localStorage.getItem('fov-frames-visible-v1')).toBe('false');
+
+    store.setFramesVisible(true);
+    expect(store.framesVisible).toBe(true);
+    expect(localStorage.getItem('fov-frames-visible-v1')).toBe('true');
+
+    // A fresh store reads the persisted value back.
+    store.setFramesVisible(false);
+    setActivePinia(createPinia());
+    const reloaded = useFovFramesStore();
+    expect(reloaded.framesVisible).toBe(false);
+  });
+
+  it('framesVisible does not alter the frames themselves (map push is gated elsewhere)', async () => {
+    const store = await withSpecs();
+    store.addAdhocFrame('s1');
+    const before = JSON.parse(localStorage.getItem('fov-frames-v1')!);
+    expect(store.renderables.length).toBe(1);
+    // Hiding via the master toggle leaves the frame data intact — the popup list
+    // still shows them; only the map push is gated by framesVisible.
+    store.setFramesVisible(false);
+    expect(store.renderables.length).toBe(1);
+    expect(JSON.parse(localStorage.getItem('fov-frames-v1')!)).toEqual(before);
+  });
+
+  it('hiding frames clears the active selection so nothing is editable', async () => {
+    const store = await withSpecs();
+    store.addAdhocFrame('s1');
+    expect(store.activeId).not.toBeNull();
+
+    store.setFramesVisible(false);
+    expect(store.activeId).toBeNull();
+    expect(store.renderables.every(f => f.active === false)).toBe(true);
+
+    // Showing again does not re-select anything.
+    store.setFramesVisible(true);
+    expect(store.activeId).toBeNull();
+  });
+
+  it('toggleFramesVisible deselects the active frame when it hides them', async () => {
+    const store = await withSpecs();
+    store.addAdhocFrame('s1');
+    expect(store.activeId).not.toBeNull();
+    store.toggleFramesVisible(); // → hidden
+    expect(store.framesVisible).toBe(false);
+    expect(store.activeId).toBeNull();
   });
 
   it('toggleAnchorSnap flips and persists per-frame anchor state', async () => {

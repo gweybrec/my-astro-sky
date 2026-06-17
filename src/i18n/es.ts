@@ -812,6 +812,8 @@ const es: Translations = {
     anchorOff: 'Anclaje desactivado: fijar en cualquier lugar',
     deleteFrameConfirm: '¿Quitar «{name}» de este plan? También desaparecerá de Objetivos y plan.',
     showOnMap: 'Mostrar en el mapa',
+    showFrames: 'Mostrar marcos',
+    hideFrames: 'Ocultar marcos',
   },
   batch: {
     button: '+ Añadir varias fotos',

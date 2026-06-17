@@ -808,6 +808,8 @@ const fr = {
     anchorOff: "Ancrage désactivé : épingler n'importe où",
     deleteFrameConfirm: "Retirer « {name} » de ce plan ? Il disparaîtra aussi de Cibles & Plan.",
     showOnMap: 'Afficher sur la carte',
+    showFrames: 'Afficher les cadres',
+    hideFrames: 'Masquer les cadres',
   },
   batch: {
     button: '+ Ajouter plusieurs photos',

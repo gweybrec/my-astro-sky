@@ -810,6 +810,8 @@ const en: Translations = {
     anchorOff: 'Anchor off: pin anywhere',
     deleteFrameConfirm: 'Remove “{name}” from this plan? It will also disappear from Targets & Plan.',
     showOnMap: 'Show on map',
+    showFrames: 'Show frames',
+    hideFrames: 'Hide frames',
   },
   batch: {
     button: '+ Add multiple photos',

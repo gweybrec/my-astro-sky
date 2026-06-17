@@ -1457,6 +1457,13 @@ export class SkyMap {
     if (f && f.pinnable) this.toggleFramePin(f);
   }
 
+  /** Sky coordinates (degrees) at the centre of the current viewport — used to
+   * spawn a new frame on the visible sky. */
+  viewCenterSky(): { ra: number; dec: number } {
+    const proj = fromCanvas(this.view.width / 2, this.view.height / 2, this.view);
+    return unproject(proj.x, proj.y);
+  }
+
   /** Pin the currently-active frame if it is still floating (used when the
    * selection changes — only the selected frame stays free to move). */
   pinActiveIfFloating(): void {
@@ -1478,38 +1485,58 @@ export class SkyMap {
    */
   private toggleFramePin(f: RenderableFrame): void {
     if (!f.pinnable) return;
-    const { cx, cy } = this.frameAnchorCanvas(f);
-    // Canvas rotation the frame is currently displayed at (degrees).
-    const canvasRotDeg = this.frameCanvasRotationDeg(f);
     if (f.anchorKind === 'sky') {
+      const { cx, cy } = this.frameAnchorCanvas(f);
+      const canvasRotDeg = this.frameCanvasRotationDeg(f);
       // Pinned → floating: the canvas rotation becomes the screen rotation as-is.
       this.onFovInstanceChange?.(f.id, {
         anchor: { kind: 'screen', nx: cx / this.view.width, ny: cy / this.view.height },
         screenRotationDeg: normalizeRotationDeg(canvasRotDeg),
       });
     } else {
-      // Floating → pinned: convert canvas rotation to PA so the frame stays
-      // visually put, and pick a target.
-      let ra: number, dec: number, dsoId: string | null;
-      // Snap the centre to the nearest DSO when the anchor is on (both free and
-      // plan frames); otherwise pin exactly where the frame currently sits.
-      const near = f.anchorSnap !== false ? this.findClosestDSO(cx, cy) : null;
-      if (near) {
-        // Anchored: the snapped object sits at the centre, so it is the target.
-        ra = near.ra; dec = near.dec; dsoId = near.id;
-      } else {
-        const proj = fromCanvas(cx, cy, this.view);
-        const u = unproject(proj.x, proj.y);
-        ra = u.ra; dec = u.dec; dsoId = null;
-        // A plan frame placed freely takes the DSO nearest its centre that falls
-        // inside it (custom location if none).
-        if (f.derivesTargetFromContent) {
-          const moved: RenderableFrame = { ...f, anchorKind: 'sky', ra, dec };
-          dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
-        }
+      // Floating → pinned: snap to the nearest DSO when the anchor is on.
+      this.pinFloatingFrame(f, f.anchorSnap !== false);
+    }
+  }
+
+  /**
+   * Pin a floating frame to the sky at its current centre, converting its canvas
+   * rotation to a position angle so it stays visually put. When `snap` is true the
+   * centre is anchored to the nearest DSO; when false it is pinned exactly where it
+   * sits (used when freezing frames so nothing moves).
+   */
+  private pinFloatingFrame(f: RenderableFrame, snap: boolean): void {
+    if (!f.pinnable || f.anchorKind !== 'screen') return;
+    const { cx, cy } = this.frameAnchorCanvas(f);
+    const canvasRotDeg = this.frameCanvasRotationDeg(f);
+    let ra: number, dec: number, dsoId: string | null;
+    const near = snap ? this.findClosestDSO(cx, cy) : null;
+    if (near) {
+      // Anchored: the snapped object sits at the centre, so it is the target.
+      ra = near.ra; dec = near.dec; dsoId = near.id;
+    } else {
+      const proj = fromCanvas(cx, cy, this.view);
+      const u = unproject(proj.x, proj.y);
+      ra = u.ra; dec = u.dec; dsoId = null;
+      // A plan frame placed freely takes the DSO nearest its centre that falls
+      // inside it (custom location if none).
+      if (f.derivesTargetFromContent) {
+        const moved: RenderableFrame = { ...f, anchorKind: 'sky', ra, dec };
+        dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
       }
-      const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
-      this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
+    }
+    const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
+    this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
+  }
+
+  /**
+   * Pin every floating frame to its exact current sky position (no DSO snap),
+   * locking them to the sky so a later view change can't drift them. Called when
+   * hiding all frames so nothing moves while the overlay is off.
+   */
+  pinAllFloatingFrames(): void {
+    for (const f of this.fovInstances) {
+      if (f.pinnable && f.anchorKind === 'screen') this.pinFloatingFrame(f, false);
     }
   }
 

@@ -2649,21 +2649,6 @@ input:focus-visible {
 .photo-section-items {
   padding-left: var(--space-6);
 }
-.photo-section-eye {
-  background: none;
-  border: none;
-  color: var(--text-label);
-  cursor: pointer;
-  font-size: var(--font-size-body);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-1h);
-}
-.photo-section-eye:hover {
-  background: var(--bg-hover);
-}
-.photo-section-eye.hidden {
-  opacity: 0.4;
-}
 
 /* ─── Input validation states ─── */
 .input-error {
@@ -4854,6 +4839,9 @@ details.targets-form-details[open] .targets-form-summary::before {
 
 /* Rotation icons fill most of the button; SVG viewBox handles layout */
 .fov-rotate-btn svg { width: 28px; height: 28px; display: block; }
+
+/* Show/hide-frames eye toggle — inset like the corner controls (§2.19) */
+.fov-visibility-btn svg { width: 16px; height: 16px; display: block; }
 
 /* Toggle tab — sticks out to the right of the ribbon like the left-panel toggle */
 .fov-ribbon-toggle {

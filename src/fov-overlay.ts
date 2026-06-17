@@ -382,8 +382,22 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   addBtn.className = 'btn-action';
   addBtn.style.width = '100%';
   addBtn.textContent = t('fovOverlay.addFrame');
-  addBtn.addEventListener('click', () => openSetupPicker());
+  addBtn.addEventListener('click', () => {
+    const sel = fovStore.selection;
+    if (sel.kind === 'plan') addPlanFrameToCenter(sel.planId);
+    else openSetupPicker();
+  });
   footer.appendChild(addBtn);
+
+  // Plan mode: spawn a custom-location frame at the centre of the current view
+  // and add it to the plan. The frame is sized by the plan's gear setup.
+  function addPlanFrameToCenter(planId: string): void {
+    const skyMap = useCanvasStore().skyMap;
+    if (!skyMap) return;
+    skyMap.pinActiveIfFloating();
+    const { ra, dec } = skyMap.viewCenterSky();
+    fovStore.addPlanFrame(planId, ra, dec);
+  }
 
   function defaultPlanName(): string {
     const nice = new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
@@ -409,8 +423,14 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
 
     const sel = fovStore.selection;
     select.value = sel.kind === 'plan' ? `plan:${sel.planId}` : FREE_VALUE;
-    // Footer "Add frame" is for ad-hoc frames only.
-    footer.classList.toggle('hidden', sel.kind !== 'free');
+    // "Add frame" is offered for free frames, and for a plan once it has a gear
+    // setup (without one a plan can't size — and therefore can't render — frames).
+    if (sel.kind === 'free') {
+      footer.classList.remove('hidden');
+    } else {
+      const plan = plansStore.plans.find(p => p.id === sel.planId);
+      footer.classList.toggle('hidden', !plan?.setupId);
+    }
   }
 
   async function onSelectChange() {
@@ -674,6 +694,9 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     renderSelect();
     renderSetupSelect();
     renderBody();
+    // Dim the frame list when the master toggle hides frames from the map.
+    body.classList.toggle('opacity-50', !fovStore.framesVisible);
+    body.classList.toggle('pointer-events-none', !fovStore.framesVisible);
   }
 
   // React to store changes; clean up on close. The dropdowns depend on the plan
@@ -684,11 +707,13 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     () => renderAll(),
     { deep: true },
   );
+  const stopVisible = watch(() => fovStore.framesVisible, () => renderAll());
   renderAll();
 
   popup.__cleanup = () => {
     stopFrames();
     stopSelect();
+    stopVisible();
     uiStore.setForceSuppressTooltip(false);
   };
 

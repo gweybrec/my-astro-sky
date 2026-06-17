@@ -1218,7 +1218,7 @@
     },
     "/api/plans/{id}/entries": {
       "post": {
-        "summary": "Add a DSO target to a plan",
+        "summary": "Add a target to a plan (DSO or custom location)",
         "parameters": [
           {
             "in": "path",
@@ -1232,17 +1232,29 @@
         ],
         "requestBody": {
           "required": true,
+          "description": "Provide `dsoId` for a catalog target, or `ra`/`dec` for a custom-location frame on empty sky.",
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "dsoId"
-                ],
                 "properties": {
                   "dsoId": {
                     "type": "string",
-                    "description": "DSO catalog id"
+                    "description": "DSO catalog id (omit for a custom location)"
+                  },
+                  "ra": {
+                    "type": "number",
+                    "description": "Frame-centre right ascension (deg)",
+                    "required for a custom location": null
+                  },
+                  "dec": {
+                    "type": "number",
+                    "description": "Frame-centre declination (deg)",
+                    "required for a custom location": null
+                  },
+                  "paDeg": {
+                    "type": "number",
+                    "description": "Framing position angle (°E of N)"
                   }
                 }
               }
@@ -1266,7 +1278,7 @@
             }
           },
           "400": {
-            "description": "Missing dsoId",
+            "description": "Missing dsoId or ra/dec",
             "content": {
               "application/json": {
                 "schema": {

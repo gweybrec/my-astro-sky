@@ -12,13 +12,25 @@
       v-html="telescopeSvg"
     ></button>
 
+    <!-- Master show/hide-frames toggle (hides all frames regardless of mode) -->
+    <button
+      type="button"
+      class="sky-rotation-btn fov-visibility-btn"
+      :title="fovStore.framesVisible ? t('fovOverlay.hideFrames') : t('fovOverlay.showFrames')"
+      :aria-label="fovStore.framesVisible ? t('fovOverlay.hideFrames') : t('fovOverlay.showFrames')"
+      @click="toggleFramesVisibility"
+      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
+      @focus="suppress(true)" @blur="suppress(false)"
+      v-html="fovStore.framesVisible ? eyeSvg : eyeOffSvg"
+    ></button>
+
     <!-- Rotation step buttons (act on the active frame) -->
     <button
       v-for="step in ROTATION_STEPS"
       :key="step.deg"
       type="button"
       class="sky-rotation-btn fov-rotate-btn"
-      :class="{ 'opacity-40 pointer-events-none': !hasActive }"
+      :class="{ 'opacity-40 pointer-events-none': !hasActive || !fovStore.framesVisible }"
       :title="step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
       :aria-label="step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
       @click="applyRotation(step.deg)"
@@ -50,6 +62,8 @@ import { loadFovUiState, saveFovUiState, buildFovPopup } from '../../fov-overlay
 import { positionPopup } from '../../ui';
 import { useUiStore } from '../../stores/ui';
 import telescopeSvg from '../../icons/telescope.svg?raw';
+import eyeSvg from '../../icons/eye.svg?raw';
+import eyeOffSvg from '../../icons/eye-off.svg?raw';
 import rotateResetSvg from '../../icons/rotate-reset.svg?raw';
 import rotateM45Svg from '../../icons/rotate-m45.svg?raw';
 import rotateM15Svg from '../../icons/rotate-m15.svg?raw';
@@ -83,6 +97,13 @@ const ROTATION_STEPS = [
 
 let telescopeBtnEl: HTMLElement | null = null;
 let fovPopupEl: HTMLElement | null = null;
+
+function toggleFramesVisibility() {
+  // When hiding, lock any floating (screen-anchored) frames to the sky first so
+  // panning/zooming the bare sky can't drift them — nothing moves while hidden.
+  if (fovStore.framesVisible) canvasStore.skyMap?.pinAllFloatingFrames();
+  fovStore.toggleFramesVisible();
+}
 
 function applyRotation(stepDeg: number) {
   const id = fovStore.activeId;
@@ -141,7 +162,14 @@ onMounted(() => {
   fovStore.loadSpecs();
   // Refresh gear specs when a plan's setup changes (a new setup may need sizing).
   watch(() => plansStore.plans.map(p => p.setupId).join(','), () => fovStore.loadSpecs());
-  watch(() => fovStore.renderables, frames => sm?.setFovInstances(frames), { deep: true, immediate: true });
+  // Push the resolved frames to the map, gated by the master visibility toggle:
+  // when frames are hidden we push an empty set (selection/renderables are kept
+  // intact so the popup list stays editable and toggling back restores them).
+  watch(
+    [() => fovStore.renderables, () => fovStore.framesVisible],
+    () => sm?.setFovInstances(fovStore.framesVisible ? fovStore.renderables : []),
+    { deep: true, immediate: true },
+  );
 });
 
 onUnmounted(() => {

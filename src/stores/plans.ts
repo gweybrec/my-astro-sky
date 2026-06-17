@@ -8,6 +8,7 @@ import {
   deletePlanAPI,
   reorderPlansAPI,
   addPlanEntryAPI,
+  addCustomPlanEntryAPI,
   removePlanEntryAPI,
   reorderPlanEntriesAPI,
   updatePlanEntryPAAPI,
@@ -114,6 +115,21 @@ export const usePlansStore = defineStore('plans', () => {
     }
   }
 
+  /**
+   * Add a custom-location entry (no DSO) framed on empty sky at the given centre.
+   * Returns the new entry id, or null on failure.
+   */
+  async function addCustomEntry(planId: string, ra: number, dec: number): Promise<string | null> {
+    try {
+      const { id } = await addCustomPlanEntryAPI(planId, ra, dec);
+      await load();
+      return id;
+    } catch (err) {
+      reportUnknownRendererError('plan_add_custom_entry_failed', err, { planId });
+      return null;
+    }
+  }
+
   async function removeEntry(planId: string, entryId: string): Promise<void> {
     try {
       await removePlanEntryAPI(planId, entryId);
@@ -206,6 +222,7 @@ export const usePlansStore = defineStore('plans', () => {
     deletePlan,
     reorderPlans,
     addEntry,
+    addCustomEntry,
     removeEntry,
     toggleEntry,
     reorderEntries,

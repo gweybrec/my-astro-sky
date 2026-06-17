@@ -30,6 +30,7 @@ const SELECTION_KEY = 'fov-frame-selection-v1';
 const ANCHOR_SNAP_KEY = 'fov-anchor-snap-v1';
 const PLAN_FLOATING_KEY = 'fov-plan-floating-v1';
 const HIDDEN_KEY = 'fov-frame-hidden-v1';
+const FRAMES_VISIBLE_KEY = 'fov-frames-visible-v1';
 
 /** Transient screen-anchored state for a plan frame that's been unpinned. */
 interface PlanFloating { nx: number; ny: number; rotationDeg: number; }
@@ -96,6 +97,15 @@ function loadHidden(): Record<string, boolean> {
   return {};
 }
 
+/** Global master toggle for drawing frames on the map (defaults to visible). */
+function loadFramesVisible(): boolean {
+  try {
+    return localStorage.getItem(FRAMES_VISIBLE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Source of truth for interactive FOV frames on the sky map. Plan-derived frames
  * are reactive projections of the plans store (one pinned frame per entry of any
@@ -115,6 +125,9 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
   const planFloating = ref<Record<string, PlanFloating>>(loadPlanFloating());
   // Ad-hoc (free) frames hidden from the map (id → true), persisted.
   const adhocHidden = ref<Record<string, boolean>>(loadHidden());
+  // Global master toggle: when false, no frames are drawn on the map (selection
+  // is preserved so toggling back on restores everything). Persisted.
+  const framesVisible = ref<boolean>(loadFramesVisible());
 
   function persist(): void {
     try {
@@ -154,6 +167,26 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     } catch (err) {
       reportUnknownRendererError('fov_frames_persist_hidden', err);
     }
+  }
+
+  function persistFramesVisible(): void {
+    try {
+      localStorage.setItem(FRAMES_VISIBLE_KEY, JSON.stringify(framesVisible.value));
+    } catch (err) {
+      reportUnknownRendererError('fov_frames_persist_visible', err);
+    }
+  }
+
+  /** Show/hide all frames on the map at once (global master toggle). */
+  function setFramesVisible(v: boolean): void {
+    framesVisible.value = v;
+    // Hidden frames can't be selected or edited, so drop the active selection.
+    if (!v) activeId.value = null;
+    persistFramesVisible();
+  }
+
+  function toggleFramesVisible(): void {
+    setFramesVisible(!framesVisible.value);
   }
 
   /** Whether a free frame is shown on the map (defaults to visible). */
@@ -306,6 +339,20 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     persist();
   }
 
+  /**
+   * Create a custom-location frame in the given plan at the supplied sky centre,
+   * select it, and switch to that plan. The new entry has no target DSO, so it
+   * renders (and lists) as a "custom location" until moved onto an object.
+   */
+  async function addPlanFrame(planId: string, ra: number, dec: number): Promise<void> {
+    if (selection.value.kind !== 'plan' || selection.value.planId !== planId) {
+      selection.value = { kind: 'plan', planId };
+      persistSelection();
+    }
+    const entryId = await plansStore.addCustomEntry(planId, ra, dec);
+    if (entryId) activeId.value = `plan:${planId}:${entryId}`;
+  }
+
   /** Remove an ad-hoc frame (plan frames are deleted via deletePlanFrame). */
   function removeFrame(id: string): void {
     const i = adhoc.value.findIndex(f => f.id === id);
@@ -430,7 +477,11 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     isAdhocVisible,
     setAdhocVisible,
     setAllAdhocVisible,
+    framesVisible,
+    setFramesVisible,
+    toggleFramesVisible,
     addAdhocFrame,
+    addPlanFrame,
     removeFrame,
     deletePlanFrame,
     applyChange,

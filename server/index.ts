@@ -1696,7 +1696,7 @@ app.delete('/api/plans/:id', (req, res) => {
  * @swagger
  * /api/plans/{id}/entries:
  *   post:
- *     summary: Add a DSO target to a plan
+ *     summary: Add a target to a plan (DSO or custom location)
  *     parameters:
  *       - in: path
  *         name: id
@@ -1705,13 +1705,16 @@ app.delete('/api/plans/:id', (req, res) => {
  *         description: Plan ID
  *     requestBody:
  *       required: true
+ *       description: Provide `dsoId` for a catalog target, or `ra`/`dec` for a custom-location frame on empty sky.
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [dsoId]
  *             properties:
- *               dsoId: { type: string, description: DSO catalog id }
+ *               dsoId: { type: string, description: DSO catalog id (omit for a custom location) }
+ *               ra: { type: number, description: Frame-centre right ascension (deg), required for a custom location }
+ *               dec: { type: number, description: Frame-centre declination (deg), required for a custom location }
+ *               paDeg: { type: number, description: Framing position angle (°E of N) }
  *     responses:
  *       200:
  *         description: Entry added
@@ -1722,7 +1725,7 @@ app.delete('/api/plans/:id', (req, res) => {
  *               properties:
  *                 id: { type: string }
  *       400:
- *         description: Missing dsoId
+ *         description: Missing dsoId or ra/dec
  *         content:
  *           application/json:
  *             schema:
@@ -1752,14 +1755,25 @@ app.delete('/api/plans/:id', (req, res) => {
 app.post('/api/plans/:id/entries', (req, res) => {
   try {
     const { id } = req.params;
-    const { dsoId } = req.body as any;
-    if (!dsoId || typeof dsoId !== 'string') { res.status(400).json({ error: 'dsoId is required' }); return; }
+    const { dsoId, ra, dec, paDeg } = req.body as any;
     if (!getPlan(id)) { res.status(404).json({ error: 'Plan not found' }); return; }
-    if (planEntryExists(id, dsoId)) {
-      res.status(409).json({ error: 'Target already in plan', code: 'DUPLICATE_ENTRY' }); return;
+    if (dsoId == null) {
+      // Custom-location entry (framed on empty sky): no DSO, ra/dec required.
+      if (typeof ra !== 'number' || typeof dec !== 'number') {
+        res.status(400).json({ error: 'dsoId or ra/dec is required' }); return;
+      }
+    } else {
+      if (typeof dsoId !== 'string') { res.status(400).json({ error: 'dsoId must be a string' }); return; }
+      if (planEntryExists(id, dsoId)) {
+        res.status(409).json({ error: 'Target already in plan', code: 'DUPLICATE_ENTRY' }); return;
+      }
     }
     const entryId = `pe-${uuidv4()}`;
-    addPlanEntry({ id: entryId, plan_id: id, dso_id: dsoId, position: nextPlanEntryPosition(id), pa_deg: null, ra: null, dec: null, notes: null });
+    addPlanEntry({
+      id: entryId, plan_id: id, dso_id: dsoId ?? null, position: nextPlanEntryPosition(id),
+      pa_deg: typeof paDeg === 'number' ? paDeg : null,
+      ra: typeof ra === 'number' ? ra : null, dec: typeof dec === 'number' ? dec : null, notes: null,
+    });
     res.json({ id: entryId });
   } catch (err: any) {
     console.error('[Plans] Failed to add entry', err);

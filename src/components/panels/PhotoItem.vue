@@ -11,7 +11,8 @@
           class="btn-icon"
           :title="placed.visible ? t('photos.hide') : t('photos.show')"
           @click.stop="$emit('toggle')"
-        >{{ placed.visible ? '👁' : '👁‍🗨' }}</button>
+          v-html="placed.visible ? eyeSvg : eyeOffSvg"
+        ></button>
         <button
           class="btn-icon btn-gear"
           :title="t('photos.settings')"
@@ -41,6 +42,8 @@
 <script setup lang="ts">
 import { t } from '../../i18n';
 import PhotoChip from './PhotoChip.vue';
+import eyeSvg from '../../icons/eye.svg?raw';
+import eyeOffSvg from '../../icons/eye-off.svg?raw';
 import type { PlacedPhoto } from '../../photo-overlay';
 
 const props = withDefaults(defineProps<{

@@ -812,6 +812,8 @@ const de: Translations = {
     anchorOff: 'Anker aus: beliebig anheften',
     deleteFrameConfirm: '„{name}“ aus diesem Plan entfernen? Es verschwindet auch aus Ziele & Plan.',
     showOnMap: 'Auf Karte anzeigen',
+    showFrames: 'Rahmen anzeigen',
+    hideFrames: 'Rahmen ausblenden',
   },
   batch: {
     button: '+ Mehrere Fotos hinzufügen',

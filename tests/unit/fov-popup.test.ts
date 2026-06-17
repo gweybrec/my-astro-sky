@@ -29,6 +29,7 @@ import { buildFovPopup } from '../../src/fov-overlay';
 import { useFovFramesStore } from '../../src/stores/fov-frames';
 import { usePlansStore } from '../../src/stores/plans';
 import { useUiStore } from '../../src/stores/ui';
+import { useCanvasStore } from '../../src/stores/canvas';
 
 function seedPlan(setupId: string | null, entries: any[]) {
   const plans = usePlansStore();
@@ -205,6 +206,47 @@ describe('buildFovPopup', () => {
     const popup = buildFovPopup(() => {});
     expect(popup.querySelector('.fov-popup-select-all-row')).toBeNull();
     expect(popup.querySelector('.fov-popup-setup-row input[type="checkbox"]')).toBeNull();
+    popup.__cleanup?.();
+  });
+
+  it('plan mode: shows the "Add a frame" footer once the plan has a gear setup, hidden otherwise', async () => {
+    const store = useFovFramesStore();
+    await store.loadSpecs();
+
+    // No gear setup → footer hidden (a plan can't size/render frames).
+    seedPlan(null, []);
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+    let popup = buildFovPopup(() => {});
+    expect(popup.querySelector('.fov-popup-footer')!.classList.contains('hidden')).toBe(true);
+    popup.__cleanup?.();
+
+    // With a gear setup → footer visible.
+    seedPlan('s1', []);
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+    popup = buildFovPopup(() => {});
+    expect(popup.querySelector('.fov-popup-footer')!.classList.contains('hidden')).toBe(false);
+    popup.__cleanup?.();
+  });
+
+  it('plan mode: clicking "Add a frame" spawns a custom-location frame at the view centre', async () => {
+    seedPlan('s1', []);
+    const store = useFovFramesStore();
+    await store.loadSpecs();
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+
+    // Stub the sky map so the popup can read the view centre.
+    const canvas = useCanvasStore();
+    (canvas as any).skyMap = {
+      pinActiveIfFloating: vi.fn(),
+      viewCenterSky: vi.fn().mockReturnValue({ ra: 200, dec: -10 }),
+    };
+    const spy = vi.spyOn(store, 'addPlanFrame').mockResolvedValue();
+
+    const popup = buildFovPopup(() => {});
+    const addBtn = popup.querySelector('.fov-popup-footer button') as HTMLButtonElement;
+    addBtn.click();
+
+    expect(spy).toHaveBeenCalledWith('p1', 200, -10);
     popup.__cleanup?.();
   });
 

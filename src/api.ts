@@ -820,6 +820,20 @@ export async function addPlanEntryAPI(planId: string, dsoId: string): Promise<{ 
   return res.json();
 }
 
+/** Add a custom-location entry (no DSO) framed on empty sky at the given centre. */
+export async function addCustomPlanEntryAPI(planId: string, ra: number, dec: number): Promise<{ id: string }> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ra, dec }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to add custom frame to plan');
+  }
+  return res.json();
+}
+
 export async function removePlanEntryAPI(planId: string, entryId: string): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' });
   if (!res.ok) {
