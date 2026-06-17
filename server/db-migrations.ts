@@ -88,7 +88,29 @@ export function applyMigrations(database: Database): number {
         `);
       },
     },
-    // Future migrations: { version: 4, run(d) { ... } },
+    {
+      version: 4,
+      run(d) {
+        // Mosaics: a group of tile entries covering one target. Tiles are plan
+        // entries tagged with a mosaic_id; the mosaic row holds the group params.
+        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_id TEXT'); } catch { /* exists */ }
+        d.exec(`
+          CREATE TABLE IF NOT EXISTS plan_mosaics (
+            id          TEXT PRIMARY KEY,
+            plan_id     TEXT NOT NULL,
+            dso_id      TEXT,
+            center_ra   REAL NOT NULL,
+            center_dec  REAL NOT NULL,
+            pa_deg      REAL NOT NULL DEFAULT 0,
+            overlap_pct REAL NOT NULL DEFAULT 20,
+            cols        INTEGER NOT NULL DEFAULT 1,
+            rows        INTEGER NOT NULL DEFAULT 1,
+            position    INTEGER NOT NULL DEFAULT 0
+          );
+        `);
+      },
+    },
+    // Future migrations: { version: 5, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

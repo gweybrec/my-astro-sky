@@ -13,7 +13,11 @@ import {
   reorderPlanEntriesAPI,
   updatePlanEntryPAAPI,
   updatePlanEntryPositionAPI,
+  createPlanMosaicAPI,
+  updatePlanMosaicAPI,
+  deletePlanMosaicAPI,
   type Plan,
+  type MosaicParams,
 } from '../api';
 import { reportUnknownRendererError } from '../error-reporter';
 
@@ -198,6 +202,40 @@ export const usePlansStore = defineStore('plans', () => {
     }, 250));
   }
 
+  /**
+   * Create a mosaic in a plan from client-computed tiles. Returns the new mosaic
+   * id, or null on failure. Refreshes the cache so the tiles appear.
+   */
+  async function createMosaic(planId: string, params: MosaicParams): Promise<string | null> {
+    try {
+      const { id } = await createPlanMosaicAPI(planId, params);
+      await load();
+      return id;
+    } catch (err) {
+      reportUnknownRendererError('plan_create_mosaic_failed', err, { planId });
+      return null;
+    }
+  }
+
+  /** Replace a mosaic's parameters and tile set (used when re-tiling/regenerating). */
+  async function updateMosaic(planId: string, mosaicId: string, params: MosaicParams): Promise<void> {
+    try {
+      await updatePlanMosaicAPI(planId, mosaicId, params);
+      await load();
+    } catch (err) {
+      reportUnknownRendererError('plan_update_mosaic_failed', err, { planId, mosaicId });
+    }
+  }
+
+  async function deleteMosaic(planId: string, mosaicId: string): Promise<void> {
+    try {
+      await deletePlanMosaicAPI(planId, mosaicId);
+      await load();
+    } catch (err) {
+      reportUnknownRendererError('plan_delete_mosaic_failed', err, { planId, mosaicId });
+    }
+  }
+
   async function reorderEntries(planId: string, ids: string[]): Promise<void> {
     try {
       await reorderPlanEntriesAPI(planId, ids);
@@ -228,5 +266,8 @@ export const usePlansStore = defineStore('plans', () => {
     reorderEntries,
     setEntryPA,
     setEntryPosition,
+    createMosaic,
+    updateMosaic,
+    deleteMosaic,
   };
 });

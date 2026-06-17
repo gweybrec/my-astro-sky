@@ -728,6 +728,45 @@ export interface PlanEntry {
   ra: number | null;
   dec: number | null;
   notes: string | null;
+  /** Mosaic this entry is a tile of, or null for a standalone frame. */
+  mosaicId: string | null;
+}
+
+/** A mosaic: a group of tile entries covering one target. Tiles are the plan
+ * entries whose `mosaicId` equals this id; this record holds the group params. */
+export interface PlanMosaic {
+  id: string;
+  dsoId: string | null;
+  /** Mosaic centre (degrees). */
+  centerRa: number;
+  centerDec: number;
+  /** Group position angle (°E of N). */
+  paDeg: number;
+  /** Overlap percentage between adjacent tiles. */
+  overlapPct: number;
+  cols: number;
+  rows: number;
+  position: number;
+}
+
+/** Per-tile sky centre sent to the server when creating/updating a mosaic. */
+export interface MosaicTileInput {
+  ra: number;
+  dec: number;
+  paDeg: number | null;
+}
+
+export interface MosaicParams {
+  dsoId: string | null;
+  centerRa: number;
+  centerDec: number;
+  paDeg: number;
+  overlapPct: number;
+  cols: number;
+  rows: number;
+  tiles: MosaicTileInput[];
+  /** Standalone plan entries this mosaic replaces — deleted when it is created. */
+  replaceEntryIds?: string[];
 }
 
 export interface Plan {
@@ -739,6 +778,7 @@ export interface Plan {
   /** Gear setup id used for this plan's FOV/recipe, or null. */
   setupId: string | null;
   entries: PlanEntry[];
+  mosaics: PlanMosaic[];
 }
 
 export async function getPlans(): Promise<Plan[]> {
@@ -839,6 +879,41 @@ export async function removePlanEntryAPI(planId: string, entryId: string): Promi
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to remove target from plan');
+  }
+}
+
+/** Create a mosaic in a plan from client-computed tiles. Returns the mosaic id. */
+export async function createPlanMosaicAPI(planId: string, params: MosaicParams): Promise<{ id: string }> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to create mosaic');
+  }
+  return res.json();
+}
+
+/** Replace a mosaic's parameters and tile set. */
+export async function updatePlanMosaicAPI(planId: string, mosaicId: string, params: MosaicParams): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update mosaic');
+  }
+}
+
+export async function deletePlanMosaicAPI(planId: string, mosaicId: string): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to delete mosaic');
   }
 }
 

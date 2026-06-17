@@ -270,9 +270,15 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       const spec = specs.value.get(plan.setupId);
       if (!spec) return out;
 
-      // Resolve each entry to a frame centre, then order them exactly like the
-      // "Targets & Plan" tab (transit time, earliest culmination first).
-      const placeable = plan.entries
+      // Standalone frames (one per target) and mosaic tiles render differently:
+      // standalone frames are individually movable; mosaic tiles render as a
+      // read-only group (Phase 1) tagged with their mosaic id.
+      const standalone = plan.entries.filter(e => !e.mosaicId);
+      const tiles = plan.entries.filter(e => e.mosaicId);
+
+      // Resolve each standalone entry to a frame centre, then order them exactly
+      // like the "Targets & Plan" tab (transit time, earliest culmination first).
+      const placeable = standalone
         .map(entry => {
           const dso = entry.dsoId ? getDSOById(entry.dsoId) : undefined;
           const ra = entry.ra ?? dso?.ra;
@@ -299,6 +305,25 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
         } else {
           out.push({ ...base, anchorKind: 'sky', ra, dec, paDeg: entry.paDeg });
         }
+      }
+
+      // Mosaic tiles: sky-anchored, read-only, grouped by their mosaic id. The
+      // tile inherits the mosaic's target name for the group label.
+      const mosaicById = new Map((plan.mosaics ?? []).map(m => [m.id, m]));
+      for (const entry of tiles) {
+        if (entry.ra == null || entry.dec == null) continue;
+        const mosaic = mosaicById.get(entry.mosaicId!);
+        const dso = mosaic?.dsoId ? getDSOById(mosaic.dsoId) : undefined;
+        out.push({
+          id: `plan:${plan.id}:${entry.id}`,
+          name: dso ? (dso.displayName ?? dso.id) : spec.name,
+          label: spec.label, wDeg: spec.wDeg, hDeg: spec.hDeg,
+          active: false, movable: false, pinnable: false, derivesTargetFromContent: false,
+          dsoId: mosaic?.dsoId ?? null,
+          anchorLabel: dso ? (dso.displayName ?? dso.id) : null,
+          anchorKind: 'sky', ra: entry.ra, dec: entry.dec, paDeg: entry.paDeg,
+          mosaicId: entry.mosaicId,
+        });
       }
       return out;
     }

@@ -136,6 +136,12 @@ export interface RenderableFrame {
   paDeg?: number | null;
   /** Screen rotation (deg) for floating frames. */
   screenRotationDeg?: number;
+  /**
+   * Mosaic this frame is a tile of, or null/undefined for a standalone frame.
+   * Tiles of one mosaic render as a group (no per-tile label/handles) with a
+   * single bounding outline; they are not individually selectable in Phase 1.
+   */
+  mosaicId?: string | null;
 }
 
 /** Change emitted when the user moves/rotates/pins an interactive frame. */
@@ -322,6 +328,9 @@ export class SkyMap {
   // DSO click callback
   private hoveredDSO: DSO | null = null;
   private onDSOClick: ((dso: DSO) => void) | null = null;
+  // One-shot DSO picker: armed by a caller that wants the next DSO click (used
+  // to choose a mosaic target). Fires once, alongside the normal click action.
+  private onNextDSOPick: ((dso: DSO) => void) | null = null;
 
   // Interaction control (disabled when another view is active)
   private interactionEnabled = true;
@@ -414,6 +423,14 @@ export class SkyMap {
   setOnFovInstanceChange(cb: (id: string, change: FovFrameChange) => void) { this.onFovInstanceChange = cb; }
   setOnPhotoClick(cb: (photoName: string) => void) { this.onPhotoClick = cb; }
   setOnDSOClick(cb: (dso: DSO) => void) { this.onDSOClick = cb; }
+
+  /** The currently selected/highlighted DSO id on the map, or null. */
+  getHighlightedDSOId(): string | null { return this.highlightedDSO; }
+  /** Arm a one-shot picker: the next DSO the user clicks is passed to `cb` (in
+   * addition to the normal selection action). Used to choose a mosaic target. */
+  armDSOPick(cb: (dso: DSO) => void) { this.onNextDSOPick = cb; }
+  /** Cancel a pending one-shot DSO pick (e.g. the user dismissed the prompt). */
+  cancelDSOPick() { this.onNextDSOPick = null; }
 
   /** Switch hemisphere, reset view to pole origin at fit-equator scale, and redraw. */
   setHemisphere(h: 'north' | 'south', borderLatDeg?: number) {
@@ -819,9 +836,16 @@ export class SkyMap {
           }
         }
 
-        // DSO click: fire alongside photo click if a DSO is under the cursor
-        if (!this.pickingMode && !moved && this.onDSOClick && this.hoveredDSO) {
-          this.onDSOClick(this.hoveredDSO);
+        // DSO click: fire alongside photo click if a DSO is under the cursor.
+        if (!this.pickingMode && !moved && this.hoveredDSO) {
+          this.onDSOClick?.(this.hoveredDSO);
+          // A one-shot picker (e.g. choosing a mosaic target) fires after the
+          // normal selection so the click still selects the DSO as usual.
+          if (this.onNextDSOPick) {
+            const cb = this.onNextDSOPick;
+            this.onNextDSOPick = null;
+            cb(this.hoveredDSO);
+          }
         }
       }
     }) as EventListener);
@@ -1375,21 +1399,40 @@ export class SkyMap {
     const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || 'rgba(220,90,90,0.9)';
     const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
 
+    // Accumulate the bounding corners of each mosaic's tiles so a single group
+    // outline + label can be drawn once after the per-tile pass.
+    const mosaicGroups = new Map<string, { minX: number; minY: number; maxX: number; maxY: number; name: string }>();
+
     for (const f of this.fovInstances) {
       if (f.visible === false) continue; // hidden via the manager checkbox
       const { corners, cx, cy, rotDeg, halfW, halfH } = this.frameGeometry(f);
       const isActive = f.active;
+      const isTile = !!f.mosaicId;
 
       ctx.save();
-      ctx.globalAlpha = isActive ? 1 : 0.5;
-      ctx.strokeStyle = isActive ? activeColor : strokeColor;
-      ctx.lineWidth = isActive ? 2 : 1.5;
+      // Mosaic tiles render fainter than a standalone frame and never carry the
+      // active highlight (they are a read-only group in Phase 1).
+      ctx.globalAlpha = isTile ? 0.4 : isActive ? 1 : 0.5;
+      ctx.strokeStyle = isActive && !isTile ? activeColor : strokeColor;
+      ctx.lineWidth = isActive && !isTile ? 2 : 1.5;
       ctx.setLineDash([8, 4]);
       ctx.beginPath();
       ctx.moveTo(corners[0].x, corners[0].y);
       for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
       ctx.closePath();
       ctx.stroke();
+
+      if (isTile) {
+        // Track the union bounds; skip per-tile label and handles.
+        const g = mosaicGroups.get(f.mosaicId!) ?? { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, name: f.name };
+        for (const c of corners) {
+          g.minX = Math.min(g.minX, c.x); g.minY = Math.min(g.minY, c.y);
+          g.maxX = Math.max(g.maxX, c.x); g.maxY = Math.max(g.maxY, c.y);
+        }
+        mosaicGroups.set(f.mosaicId!, g);
+        ctx.restore();
+        continue;
+      }
 
       // Label (setup name only) along the longest edge — hidden when the frame
       // is too small to read it.
@@ -1436,6 +1479,26 @@ export class SkyMap {
           // Pin toggle glyph: pushpin lifted just above the top-right corner.
           this.drawPinGlyph(this.framePinGlyphPos(corners[1], rotDeg), f.anchorKind === 'sky', activeColor);
         }
+      }
+      ctx.restore();
+    }
+
+    // One bounding outline + label per mosaic, drawn over the faint tiles.
+    for (const g of mosaicGroups.values()) {
+      if (!isFinite(g.minX)) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 3]);
+      ctx.strokeRect(g.minX, g.minY, g.maxX - g.minX, g.maxY - g.minY);
+      ctx.setLineDash([]);
+      // Hide the name once the mosaic is too small to read, mirroring the
+      // per-frame label threshold (longest visible edge ≥ 48px).
+      if (Math.max(g.maxX - g.minX, g.maxY - g.minY) >= 48) {
+        ctx.font = '11px sans-serif';
+        ctx.fillStyle = labelColor;
+        ctx.fillText(g.name, g.minX + 2, g.minY - 5);
       }
       ctx.restore();
     }
@@ -1499,9 +1562,10 @@ export class SkyMap {
     }
 
     // Select another frame by clicking anywhere inside it (topmost first).
+    // Mosaic tiles are a read-only group in Phase 1, so they aren't selectable.
     for (let i = this.fovInstances.length - 1; i >= 0; i--) {
       const f = this.fovInstances[i];
-      if (f.active || f.visible === false) continue;
+      if (f.active || f.visible === false || f.mosaicId) continue;
       const geo = this.frameGeometry(f);
       if (pointInConvexPolygon(mx, my, geo.corners)) {
         this.selectFrame(f.id);
@@ -1643,6 +1707,14 @@ export class SkyMap {
     } else {
       this.onFovInstanceChange?.(f.id, { anchor: { kind: 'screen', nx: 0.5, ny: 0.5 } });
     }
+  }
+
+  /** Pan + zoom so a mosaic of overall size wDeg×hDeg centred at (ra,dec) fits the
+   * view — the same framing the frame manager uses, sized to the whole mosaic. */
+  centerOnMosaic(ra: number, dec: number, wDeg: number, hDeg: number): void {
+    const minDim = Math.min(this.view.width, this.view.height);
+    const scale = computeFovTargetScale(wDeg, hDeg, dec, getHemisphere(), minDim);
+    this.navigateTo(ra, dec, scale, true);
   }
 
   /** Apply a frame move/rotate drag for the current cursor position. */

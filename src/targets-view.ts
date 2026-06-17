@@ -37,7 +37,7 @@ import { maxAltDuringWindow, sampleAltCurve, type AltSample } from './sky-geomet
 import { renderPlanPdf } from './export-render';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
-import { confirmPlanDelete } from './photo-delete-confirm';
+import { confirmPlanDelete, confirmPlanEntryDelete } from './photo-delete-confirm';
 
 // ─── Persistence key ─────────────────────────────────────────────────────────
 
@@ -2156,12 +2156,13 @@ export class TargetsView {
   }
 
   private computePlanTargets(
-    plan: { entries: Array<{ id: string; dsoId: string | null; ra: number | null; dec: number | null }> },
+    plan: { entries: Array<{ id: string; dsoId: string | null; ra: number | null; dec: number | null; mosaicId?: string | null }> },
     loc: ObserverLocation,
     win: { start: Date; end: Date },
   ): PlanTargetInfo[] {
     const out: PlanTargetInfo[] = [];
     for (const e of plan.entries) {
+      if (e.mosaicId) continue; // mosaic tiles are summarised as one mosaic, not per-tile rows
       const realDso = e.dsoId ? getDSOById(e.dsoId) : null;
       // Effective position: explicit frame-centre override, else the DSO centre.
       const ra = e.ra ?? realDso?.ra;
@@ -2275,7 +2276,9 @@ export class TargetsView {
     const count = document.createElement('span');
     count.className = 'text-dim text-small shrink-0';
     const setCount = (n: number) => { count.textContent = `(${n})`; };
-    setCount(plan.entries.length);
+    // A mosaic counts as one item (its tiles aren't listed individually).
+    const itemCount = () => plan.entries.filter(e => !e.mosaicId).length + (plan.mosaics?.length ?? 0);
+    setCount(itemCount());
 
     const renameBtn = this.iconActionBtn(penSvg, t('targets.plan.rename'));
     renameBtn.classList.add('shrink-0');
@@ -2354,7 +2357,8 @@ export class TargetsView {
         trajWrap.innerHTML = `<div class="targets-empty">${t('targets.location.notSet')}</div>`;
         return;
       }
-      if (plan.entries.length === 0) {
+      const hasStandalone = plan.entries.some(e => !e.mosaicId);
+      if (!hasStandalone && (plan.mosaics?.length ?? 0) === 0) {
         trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
         return;
       }
@@ -2367,14 +2371,15 @@ export class TargetsView {
       const list = document.createElement('div');
       list.className = 'flex flex-col divide-y divide-[var(--border-input)]';
       const fillers: Array<(p: GearPreset | null) => void> = [];
+      const mosaicFillers: Array<(p: GearPreset | null) => void> = [];
       for (const info of infos) {
         const { row, applyPreset } = this.buildPlanRow(plan.id, info, win, (rowEl) => {
           // In-place removal — must NOT collapse or rebuild the whole plan.
           rowEl.remove();
           plan.entries = plan.entries.filter(e => e.id !== info.entryId);
           currentInfos = currentInfos.filter(i => i.entryId !== info.entryId);
-          setCount(plan.entries.length);
-          if (plan.entries.length === 0) {
+          setCount(itemCount());
+          if (!plan.entries.some(e => !e.mosaicId) && (plan.mosaics?.length ?? 0) === 0) {
             trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
           }
         });
@@ -2383,9 +2388,62 @@ export class TargetsView {
       }
       trajWrap.appendChild(list);
 
+      // Mosaic summaries: one row per mosaic (target · scale · total integration).
+      // A mosaic counts as N panels, each imaged like the target, so the total
+      // integration is the single-object recipe × the tile count.
+      for (const mosaic of plan.mosaics ?? []) {
+        const tileCount = plan.entries.filter(e => e.mosaicId === mosaic.id).length;
+        const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : null;
+        const name = dso ? (dso.displayName ?? dso.id) : t('fovOverlay.customLocation');
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 py-2 border-t border-[var(--border-input)]';
+        const infoEl = document.createElement('div');
+        infoEl.className = 'flex-1 min-w-0';
+        const title = document.createElement('div');
+        title.className = 'text-sub text-bright truncate';
+        title.textContent = `${name} · ${t('targets.plan.mosaicLabel')}`;
+        const sub = document.createElement('div');
+        sub.className = 'text-small text-dim';
+        sub.textContent = `${tileCount} ${t('fovOverlay.mosaicPanels')}`;
+        infoEl.appendChild(title);
+        infoEl.appendChild(sub);
+
+        const del = this.iconActionBtn(trashSvg, t('fovOverlay.deleteMosaic'));
+        del.classList.add('shrink-0', 'btn-icon--danger');
+        del.addEventListener('click', async (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (!await confirmPlanEntryDelete(name)) return;
+          await this.plansStore.deleteMosaic(plan.id, mosaic.id);
+          plan.mosaics = plan.mosaics.filter(m => m.id !== mosaic.id);
+          plan.entries = plan.entries.filter(en => en.mosaicId !== mosaic.id);
+          setCount(itemCount());
+          renderTrajectories();
+        });
+        row.appendChild(infoEl);
+        row.appendChild(del);
+        trajWrap.appendChild(row);
+
+        // Scale + total integration need the gear preset (resolved async below).
+        mosaicFillers.push((preset) => {
+          if (!preset) return;
+          const { wDeg, hDeg } = fovDeg(preset);
+          const f = 1 - mosaic.overlapPct / 100;
+          const scaleW = (mosaic.cols - 1) * wDeg * f + wDeg;
+          const scaleH = (mosaic.rows - 1) * hDeg * f + hDeg;
+          const parts = [`${tileCount} ${t('fovOverlay.mosaicPanels')}`, formatFov(scaleW, scaleH)];
+          if (dso) {
+            const recipe = recommendRecipe(dso, preset);
+            parts.push(`${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours * tileCount)}`);
+          }
+          sub.textContent = parts.join(' · ');
+        });
+      }
+
       // Score / FOV-fit / integration time need a gear preset (resolved async).
       this.planPreset(effectiveSetupId()).then(preset => {
         for (const f of fillers) f(preset);
+        for (const f of mosaicFillers) f(preset);
       });
     };
 

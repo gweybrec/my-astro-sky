@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, updatePlanEntryFrame, type PlanEntryRow } from './db.js';
+import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, updatePlanEntryFrame, getAllPlanMosaics, createPlanMosaic, updatePlanMosaic, deletePlanMosaic, type PlanEntryRow, type PlanMosaicRow, type MosaicTileInput } from './db.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 const _require = createRequire(import.meta.url);
@@ -1413,7 +1413,14 @@ app.delete('/api/gear-setups', (_req, res) => {
 function planEntryToApi(e: PlanEntryRow) {
   return {
     id: e.id, dsoId: e.dso_id ?? null, position: e.position, paDeg: e.pa_deg ?? null,
-    ra: e.ra ?? null, dec: e.dec ?? null, notes: e.notes ?? null,
+    ra: e.ra ?? null, dec: e.dec ?? null, notes: e.notes ?? null, mosaicId: e.mosaic_id ?? null,
+  };
+}
+
+function planMosaicToApi(m: PlanMosaicRow) {
+  return {
+    id: m.id, dsoId: m.dso_id ?? null, centerRa: m.center_ra, centerDec: m.center_dec,
+    paDeg: m.pa_deg, overlapPct: m.overlap_pct, cols: m.cols, rows: m.rows, position: m.position,
   };
 }
 
@@ -1457,6 +1464,12 @@ app.get('/api/plans', (_req, res) => {
       list.push(e);
       byPlan.set(e.plan_id, list);
     }
+    const mosaicsByPlan = new Map<string, PlanMosaicRow[]>();
+    for (const m of getAllPlanMosaics()) {
+      const list = mosaicsByPlan.get(m.plan_id) ?? [];
+      list.push(m);
+      mosaicsByPlan.set(m.plan_id, list);
+    }
     res.json(getPlans().map(p => ({
       id: p.id,
       name: p.name,
@@ -1464,6 +1477,7 @@ app.get('/api/plans', (_req, res) => {
       nightOf: p.night_of ?? null,
       setupId: p.setup_id ?? null,
       entries: (byPlan.get(p.id) ?? []).map(planEntryToApi),
+      mosaics: (mosaicsByPlan.get(p.id) ?? []).map(planMosaicToApi),
     })));
   } catch (err: any) {
     console.error('[Plans] Failed to list plans', err);
@@ -1772,7 +1786,7 @@ app.post('/api/plans/:id/entries', (req, res) => {
     addPlanEntry({
       id: entryId, plan_id: id, dso_id: dsoId ?? null, position: nextPlanEntryPosition(id),
       pa_deg: typeof paDeg === 'number' ? paDeg : null,
-      ra: typeof ra === 'number' ? ra : null, dec: typeof dec === 'number' ? dec : null, notes: null,
+      ra: typeof ra === 'number' ? ra : null, dec: typeof dec === 'number' ? dec : null, notes: null, mosaic_id: null,
     });
     res.json({ id: entryId });
   } catch (err: any) {
@@ -1993,6 +2007,197 @@ app.patch('/api/plans/:id/entries/:entryId', (req, res) => {
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[Plans] Failed to update entry PA', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Validate and coerce a mosaic request body (shared by POST and PUT). */
+function parseMosaicBody(body: Record<string, unknown>): { error: string } | {
+  dsoId: string | null; centerRa: number; centerDec: number; paDeg: number;
+  overlapPct: number; cols: number; rows: number; tiles: MosaicTileInput[]; replaceEntryIds: string[];
+} {
+  const { dsoId, centerRa, centerDec, paDeg, overlapPct, cols, rows, tiles, replaceEntryIds } = body as any;
+  if (typeof centerRa !== 'number' || typeof centerDec !== 'number') return { error: 'centerRa/centerDec must be numbers' };
+  if (!Array.isArray(tiles) || tiles.length === 0) return { error: 'tiles must be a non-empty array' };
+  const cleanTiles: MosaicTileInput[] = [];
+  for (const t of tiles) {
+    if (typeof t?.ra !== 'number' || typeof t?.dec !== 'number') return { error: 'each tile needs numeric ra/dec' };
+    cleanTiles.push({ ra: t.ra, dec: t.dec, paDeg: typeof t.paDeg === 'number' ? t.paDeg : null });
+  }
+  return {
+    dsoId: typeof dsoId === 'string' ? dsoId : null,
+    centerRa, centerDec,
+    paDeg: typeof paDeg === 'number' ? paDeg : 0,
+    overlapPct: typeof overlapPct === 'number' ? overlapPct : 20,
+    cols: Number.isInteger(cols) ? cols : Math.max(1, cleanTiles.length),
+    rows: Number.isInteger(rows) ? rows : 1,
+    tiles: cleanTiles,
+    replaceEntryIds: Array.isArray(replaceEntryIds) ? replaceEntryIds.filter((x: unknown): x is string => typeof x === 'string') : [],
+  };
+}
+
+/**
+ * @swagger
+ * /api/plans/{id}/mosaics:
+ *   post:
+ *     summary: Create a mosaic (a group of tile frames covering one target)
+ *     description: >
+ *       The client computes the tile centres from the gear FOV, overlap and
+ *       region; the server persists the mosaic and its tiles as plan entries
+ *       tagged with the new mosaic id.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [centerRa, centerDec, tiles]
+ *             properties:
+ *               dsoId: { type: string, nullable: true, description: Target DSO id }
+ *               centerRa: { type: number, description: Mosaic centre RA (deg) }
+ *               centerDec: { type: number, description: Mosaic centre Dec (deg) }
+ *               paDeg: { type: number, description: Mosaic position angle (°E of N) }
+ *               overlapPct: { type: number, description: Overlap percentage between tiles }
+ *               cols: { type: integer, description: Grid columns }
+ *               rows: { type: integer, description: Grid rows }
+ *               tiles:
+ *                 type: array
+ *                 description: Per-tile sky centres
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     ra: { type: number }
+ *                     dec: { type: number }
+ *                     paDeg: { type: number, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Mosaic created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *       400: { description: Invalid body }
+ *       404: { description: Plan not found }
+ *       500: { description: Server error }
+ */
+app.post('/api/plans/:id/mosaics', (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!getPlan(id)) { res.status(404).json({ error: 'Plan not found' }); return; }
+    const parsed = parseMosaicBody(req.body as Record<string, unknown>);
+    if ('error' in parsed) { res.status(400).json({ error: parsed.error }); return; }
+    const mosaicId = `mo-${uuidv4()}`;
+    createPlanMosaic({
+      id: mosaicId, plan_id: id, dso_id: parsed.dsoId, center_ra: parsed.centerRa,
+      center_dec: parsed.centerDec, pa_deg: parsed.paDeg, overlap_pct: parsed.overlapPct,
+      cols: parsed.cols, rows: parsed.rows,
+    }, parsed.tiles, parsed.replaceEntryIds);
+    res.json({ id: mosaicId });
+  } catch (err: any) {
+    console.error('[Plans] Failed to create mosaic', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}/mosaics/{mosaicId}:
+ *   put:
+ *     summary: Replace a mosaic's parameters and tile set
+ *     description: Updates the mosaic row and replaces all of its tile entries with the supplied tiles.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *       - in: path
+ *         name: mosaicId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Mosaic ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [centerRa, centerDec, tiles]
+ *             properties:
+ *               dsoId: { type: string, nullable: true }
+ *               centerRa: { type: number }
+ *               centerDec: { type: number }
+ *               paDeg: { type: number }
+ *               overlapPct: { type: number }
+ *               cols: { type: integer }
+ *               rows: { type: integer }
+ *               tiles:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     ra: { type: number }
+ *                     dec: { type: number }
+ *                     paDeg: { type: number, nullable: true }
+ *     responses:
+ *       200: { description: Mosaic updated }
+ *       400: { description: Invalid body }
+ *       404: { description: Mosaic not found }
+ *       500: { description: Server error }
+ */
+app.put('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
+  try {
+    const { mosaicId } = req.params;
+    const parsed = parseMosaicBody(req.body as Record<string, unknown>);
+    if ('error' in parsed) { res.status(400).json({ error: parsed.error }); return; }
+    const ok = updatePlanMosaic(mosaicId, {
+      dsoId: parsed.dsoId, centerRa: parsed.centerRa, centerDec: parsed.centerDec,
+      paDeg: parsed.paDeg, overlapPct: parsed.overlapPct, cols: parsed.cols, rows: parsed.rows,
+    }, parsed.tiles);
+    if (!ok) { res.status(404).json({ error: 'Mosaic not found' }); return; }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to update mosaic', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}/mosaics/{mosaicId}:
+ *   delete:
+ *     summary: Delete a mosaic and all of its tile frames
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *       - in: path
+ *         name: mosaicId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Mosaic ID
+ *     responses:
+ *       200: { description: Mosaic deleted }
+ *       404: { description: Mosaic not found }
+ *       500: { description: Server error }
+ */
+app.delete('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
+  try {
+    const { mosaicId } = req.params;
+    if (!deletePlanMosaic(mosaicId)) { res.status(404).json({ error: 'Mosaic not found' }); return; }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to delete mosaic', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2324,6 +2529,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
                     ra: hasCoords ? e.ra : null,
                     dec: hasCoords ? e.dec : null,
                     notes: typeof e.notes === 'string' ? e.notes : null,
+                    mosaic_id: null,
                   });
                 });
               }
