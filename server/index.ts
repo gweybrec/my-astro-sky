@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, type PlanEntryRow } from './db.js';
+import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, updatePlanEntryFrame, type PlanEntryRow } from './db.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 const _require = createRequire(import.meta.url);
@@ -1411,7 +1411,10 @@ app.delete('/api/gear-setups', (_req, res) => {
 // ─── Night plans ──────────────────────────────────────────────────────────────
 
 function planEntryToApi(e: PlanEntryRow) {
-  return { id: e.id, dsoId: e.dso_id, position: e.position, paDeg: e.pa_deg ?? null, notes: e.notes ?? null };
+  return {
+    id: e.id, dsoId: e.dso_id ?? null, position: e.position, paDeg: e.pa_deg ?? null,
+    ra: e.ra ?? null, dec: e.dec ?? null, notes: e.notes ?? null,
+  };
 }
 
 /**
@@ -1756,7 +1759,7 @@ app.post('/api/plans/:id/entries', (req, res) => {
       res.status(409).json({ error: 'Target already in plan', code: 'DUPLICATE_ENTRY' }); return;
     }
     const entryId = `pe-${uuidv4()}`;
-    addPlanEntry({ id: entryId, plan_id: id, dso_id: dsoId, position: nextPlanEntryPosition(id), pa_deg: null, notes: null });
+    addPlanEntry({ id: entryId, plan_id: id, dso_id: dsoId, position: nextPlanEntryPosition(id), pa_deg: null, ra: null, dec: null, notes: null });
     res.json({ id: entryId });
   } catch (err: any) {
     console.error('[Plans] Failed to add entry', err);
@@ -1869,6 +1872,119 @@ app.delete('/api/plans/:id/entries/:entryId', (req, res) => {
 
 /**
  * @swagger
+ * /api/plans/{id}/entries/{entryId}:
+ *   patch:
+ *     summary: Update a plan entry's framing (position angle, frame centre, and target DSO)
+ *     description: >
+ *       Updates only the fields present in the body. `paDeg` sets the framing
+ *       rotation. `ra`/`dec` set the frame-centre sky coordinates. `dsoId` sets
+ *       the target DSO (or null for a custom location with no catalogued object).
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *       - in: path
+ *         name: entryId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Entry ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               paDeg:
+ *                 type: number
+ *                 nullable: true
+ *                 description: Framing position angle in degrees east of celestial north (0–360), or null to clear
+ *               ra:
+ *                 type: number
+ *                 nullable: true
+ *                 description: Frame-centre right ascension in degrees, or null to clear (use the DSO position)
+ *               dec:
+ *                 type: number
+ *                 nullable: true
+ *                 description: Frame-centre declination in degrees, or null to clear
+ *               dsoId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Target DSO id, or null for a custom location
+ *     responses:
+ *       200:
+ *         description: Entry updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       400:
+ *         description: A provided field has the wrong type
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       404:
+ *         description: Entry not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
+ */
+app.patch('/api/plans/:id/entries/:entryId', (req, res) => {
+  try {
+    const { entryId } = req.params;
+    const body = req.body as Record<string, unknown>;
+    const fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null } = {};
+
+    if ('paDeg' in body) {
+      if (body.paDeg !== null && typeof body.paDeg !== 'number') {
+        res.status(400).json({ error: 'paDeg must be a number or null' }); return;
+      }
+      fields.paDeg = body.paDeg as number | null;
+    }
+    if ('ra' in body) {
+      if (body.ra !== null && typeof body.ra !== 'number') {
+        res.status(400).json({ error: 'ra must be a number or null' }); return;
+      }
+      fields.ra = body.ra as number | null;
+    }
+    if ('dec' in body) {
+      if (body.dec !== null && typeof body.dec !== 'number') {
+        res.status(400).json({ error: 'dec must be a number or null' }); return;
+      }
+      fields.dec = body.dec as number | null;
+    }
+    if ('dsoId' in body) {
+      if (body.dsoId !== null && typeof body.dsoId !== 'string') {
+        res.status(400).json({ error: 'dsoId must be a string or null' }); return;
+      }
+      fields.dsoId = body.dsoId as string | null;
+    }
+
+    if (Object.keys(fields).length === 0) {
+      res.status(400).json({ error: 'No updatable fields provided' }); return;
+    }
+    if (!updatePlanEntryFrame(entryId, fields)) { res.status(404).json({ error: 'Entry not found' }); return; }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Plans] Failed to update entry PA', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
  * /api/export:
  *   post:
  *     summary: Export photos as ZIP or metadata JSON
@@ -1972,7 +2088,8 @@ app.post('/api/export', (req, res) => {
         nightOf: p.night_of ?? null,
         setupId: p.setup_id ?? null,
         entries: (entriesByPlan.get(p.id) ?? []).map(e => ({
-          id: e.id, dsoId: e.dso_id, position: e.position, paDeg: e.pa_deg ?? null, notes: e.notes ?? null,
+          id: e.id, dsoId: e.dso_id ?? null, position: e.position, paDeg: e.pa_deg ?? null,
+          ra: e.ra ?? null, dec: e.dec ?? null, notes: e.notes ?? null,
         })),
       }));
       archive.append(Buffer.from(JSON.stringify(plans, null, 2)), { name: 'plans.json' });
@@ -2179,13 +2296,19 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
               });
               if (Array.isArray(p.entries)) {
                 p.entries.forEach((e: any, ei: number) => {
-                  if (typeof e.id !== 'string' || typeof e.dsoId !== 'string') return;
+                  if (typeof e.id !== 'string') return;
+                  const hasDso = typeof e.dsoId === 'string';
+                  const hasCoords = typeof e.ra === 'number' && typeof e.dec === 'number';
+                  // An entry needs either a DSO target or explicit frame coords.
+                  if (!hasDso && !hasCoords) return;
                   addPlanEntry({
                     id: e.id,
                     plan_id: p.id,
-                    dso_id: e.dsoId,
+                    dso_id: hasDso ? e.dsoId : null,
                     position: typeof e.position === 'number' ? e.position : ei,
                     pa_deg: typeof e.paDeg === 'number' ? e.paDeg : null,
+                    ra: hasCoords ? e.ra : null,
+                    dec: hasCoords ? e.dec : null,
                     notes: typeof e.notes === 'string' ? e.notes : null,
                   });
                 });

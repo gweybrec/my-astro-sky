@@ -104,11 +104,12 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS plan_entries (
     id       TEXT PRIMARY KEY,
     plan_id  TEXT NOT NULL,
-    dso_id   TEXT NOT NULL,
+    dso_id   TEXT,
     position INTEGER NOT NULL,
     pa_deg   REAL,
-    notes    TEXT,
-    UNIQUE(plan_id, dso_id)
+    ra       REAL,
+    dec      REAL,
+    notes    TEXT
   );
 `);
 
@@ -603,9 +604,11 @@ export interface PlanRow {
 export interface PlanEntryRow {
   id: string;
   plan_id: string;
-  dso_id: string;
+  dso_id: string | null;
   position: number;
   pa_deg: number | null;
+  ra: number | null;
+  dec: number | null;
   notes: string | null;
 }
 
@@ -624,11 +627,12 @@ const getPlanEntriesStmt        = db.prepare('SELECT * FROM plan_entries WHERE p
 const getAllPlanEntriesStmt     = db.prepare('SELECT * FROM plan_entries ORDER BY position ASC, rowid ASC');
 const planEntryExistsStmt       = db.prepare('SELECT 1 FROM plan_entries WHERE plan_id = ? AND dso_id = ?');
 const insertPlanEntryStmt       = db.prepare(
-  'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, notes) VALUES (?, ?, ?, ?, ?, ?)',
+  'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 );
 const deletePlanEntryStmt       = db.prepare('DELETE FROM plan_entries WHERE id = ?');
 const deletePlanEntriesStmt     = db.prepare('DELETE FROM plan_entries WHERE plan_id = ?');
 const updatePlanEntryPositionStmt = db.prepare('UPDATE plan_entries SET position = ? WHERE id = ? AND plan_id = ?');
+const updatePlanEntryPaStmt       = db.prepare('UPDATE plan_entries SET pa_deg = ? WHERE id = ?');
 
 export function getPlans(): PlanRow[] {
   return getPlansStmt.all() as PlanRow[];
@@ -683,7 +687,10 @@ export function planEntryExists(planId: string, dsoId: string): boolean {
 }
 
 export function addPlanEntry(row: PlanEntryRow): void {
-  insertPlanEntryStmt.run(row.id, row.plan_id, row.dso_id, row.position, row.pa_deg ?? null, row.notes ?? null);
+  insertPlanEntryStmt.run(
+    row.id, row.plan_id, row.dso_id ?? null, row.position, row.pa_deg ?? null,
+    row.ra ?? null, row.dec ?? null, row.notes ?? null,
+  );
 }
 
 export function nextPlanEntryPosition(planId: string): number {
@@ -693,6 +700,30 @@ export function nextPlanEntryPosition(planId: string): number {
 
 export function removePlanEntry(entryId: string): boolean {
   return deletePlanEntryStmt.run(entryId).changes > 0;
+}
+
+export function updatePlanEntryPA(entryId: string, paDeg: number | null): boolean {
+  return updatePlanEntryPaStmt.run(paDeg, entryId).changes > 0;
+}
+
+/**
+ * Update any subset of a plan entry's framing fields (position angle, frame
+ * centre ra/dec, and target dso). Only the keys present in `fields` are
+ * written, so a position drag and a rotation can persist independently.
+ */
+export function updatePlanEntryFrame(
+  entryId: string,
+  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+): boolean {
+  const sets: string[] = [];
+  const vals: Array<number | string | null> = [];
+  if ('ra' in fields) { sets.push('ra = ?'); vals.push(fields.ra ?? null); }
+  if ('dec' in fields) { sets.push('dec = ?'); vals.push(fields.dec ?? null); }
+  if ('paDeg' in fields) { sets.push('pa_deg = ?'); vals.push(fields.paDeg ?? null); }
+  if ('dsoId' in fields) { sets.push('dso_id = ?'); vals.push(fields.dsoId ?? null); }
+  if (sets.length === 0) return false;
+  vals.push(entryId);
+  return db.prepare(`UPDATE plan_entries SET ${sets.join(', ')} WHERE id = ?`).run(...vals).changes > 0;
 }
 
 export function reorderPlanEntries(planId: string, ids: string[]): void {

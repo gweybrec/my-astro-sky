@@ -24,6 +24,8 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
     steps:
+      - uses: actions/checkout@v6
+
       - name: Resolve and validate release tag
         id: resolve
         run: |
@@ -36,8 +38,16 @@ jobs:
             echo "::error::Resolved tag '$TAG' must be a version tag like vX.Y.Z."
             exit 1
           fi
+          # The tag carries a leading 'v' that package.json's version does not
+          # (tag v0.2.0-rc <-> package.json 0.2.0-rc). Strip it before comparing.
+          TAG_VERSION="${TAG#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag '$TAG' (version '$TAG_VERSION') does not match package.json version '$PKG_VERSION'. Update package.json or the tag so they agree."
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Releasing tag: $TAG"
+          echo "Releasing tag: $TAG (matches package.json version $PKG_VERSION)"
 
   build-windows:
     needs: validate

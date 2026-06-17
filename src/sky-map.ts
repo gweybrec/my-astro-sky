@@ -2,9 +2,28 @@ import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
 import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle } from './projection';
 import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle } from './star-catalog';
 import { getDSOs, getDSOCatalog } from './dso-catalog';
+import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
+import { paToCanvasRotationDeg, canvasRotationToPaDeg } from './frame-orientation';
+import {
+  isNearPolygonBorder,
+  isNearHandle,
+  rotateHandlePos,
+  canvasRotationDegFromCursor,
+} from './fov-frame-geometry';
+import pinSvgRaw from './icons/pin.svg?raw';
+import { computeFovTargetScale } from './gear-presets';
 
 const DEG2RAD = Math.PI / 180;
+
+/** Pushpin glyph path (24×24 box) extracted from the shared icon asset. */
+const PIN_PATH_D = pinSvgRaw.match(/\bd="([^"]+)"/)?.[1] ?? '';
+/** Lazily-built Path2D for the pushpin glyph. Lazy so module load does not
+ * require a DOM (Path2D is absent in the unit-test environment). */
+let pinPath2D: Path2D | null = null;
+function getPinPath(): Path2D {
+  return (pinPath2D ??= new Path2D(PIN_PATH_D));
+}
 
 /** Returns true if (px, py) is inside the convex polygon defined by pts (winding order irrelevant). */
 function pointInConvexPolygon(px: number, py: number, pts: Point[]): boolean {
@@ -61,6 +80,73 @@ export interface FovFrameSpec {
   label: string;
   wDeg: number;
   hDeg: number;
+}
+
+/**
+ * An independent, interactive FOV frame instance. Unlike {@link FovFrameSpec}
+ * (legacy, viewport-centred, single global rotation), each instance carries its
+ * own anchor and rotation and only the `active` one is manipulable. The anchor
+ * and rotation are resolved to canvas pixels at render time (they depend on the
+ * live view).
+ */
+export interface RenderableFrame {
+  id: string;
+  /** Plain setup name — drawn on the map frame. */
+  name: string;
+  /** Setup name + FOV size — shown in the frame-manager list. */
+  label: string;
+  wDeg: number;
+  hDeg: number;
+  /** Only the active frame shows handles and can be moved/rotated. */
+  active: boolean;
+  /** Free frames can be hidden from the map via the manager checkbox (default visible). */
+  visible?: boolean;
+  /** Whether the frame can be dragged to a new position (ad-hoc + plan frames). */
+  movable: boolean;
+  /**
+   * Whether the frame can be toggled between floating (screen) and pinned (sky)
+   * via the on-canvas pushpin glyph. Ad-hoc frames are pinnable; plan frames are
+   * always sky-anchored and derive their target from content, so they are not.
+   */
+  pinnable?: boolean;
+  /**
+   * When pinning/dragging a pinnable frame, whether to snap to the nearest DSO
+   * (the persistent per-frame "anchor" toggle). Defaults to true (legacy
+   * behaviour); false pins exactly where the frame sits.
+   */
+  anchorSnap?: boolean;
+  /** Target DSO id for a plan frame (may be null for a custom location). */
+  dsoId?: string | null;
+  /**
+   * Plan frames re-derive their target from the DSOs inside the frame on move
+   * (keep original if still framed, else closest-to-centre, else custom); ad-hoc
+   * frames snap to the single nearest DSO instead.
+   */
+  derivesTargetFromContent?: boolean;
+  anchorKind: 'screen' | 'sky';
+  /** Floating anchor: normalised viewport coords [0..1]. */
+  nx?: number;
+  ny?: number;
+  /** Pinned anchor: sky coordinates (degrees). */
+  ra?: number;
+  dec?: number;
+  /** Display name of the pinned DSO (for the frame-manager list), if any. */
+  anchorLabel?: string | null;
+  /** Position angle (°E of N) for pinned frames; null → 0. */
+  paDeg?: number | null;
+  /** Screen rotation (deg) for floating frames. */
+  screenRotationDeg?: number;
+}
+
+/** Change emitted when the user moves/rotates/pins an interactive frame. */
+export interface FovFrameChange {
+  anchor?:
+    | { kind: 'screen'; nx: number; ny: number }
+    | { kind: 'sky'; ra: number; dec: number; dsoId: string | null };
+  /** New position angle (°E of N) — emitted when a pinned frame is rotated. */
+  paDeg?: number;
+  /** New screen rotation (deg) — emitted when a floating frame is rotated. */
+  screenRotationDeg?: number;
 }
 
 /**
@@ -201,6 +287,12 @@ export class SkyMap {
   private fovFrameSpecs: FovFrameSpec[] = [];
   private fovRotationDeg = 0;
 
+  // Interactive frame instances (independent anchor + rotation, single active).
+  private fovInstances: RenderableFrame[] = [];
+  private onFovInstanceSelect: ((id: string | null) => void) | null = null;
+  private onFovInstanceChange: ((id: string, change: FovFrameChange) => void) | null = null;
+  private frameDrag: { id: string; mode: 'move' | 'rotate' } | null = null;
+
   // Spatial indexes for fast hover detection
   private starIndex = new SpatialIndex<Star>(0.02);
   private dsoIndex = new SpatialIndex<DSO>(0.02);
@@ -297,6 +389,13 @@ export class SkyMap {
   setShowPhotoOutlines(show: boolean) { this.showPhotoOutlines = show; this.render(); }
   setFovFrames(frames: FovFrameSpec[]) { this.fovFrameSpecs = frames; this.render(); }
   setFovRotationDeg(deg: number) { this.fovRotationDeg = deg; this.render(); }
+
+  /** Replace the interactive frame instances and re-render. */
+  setFovInstances(frames: RenderableFrame[]) { this.fovInstances = frames; this.render(); }
+  /** Current interactive frame instances (for save/restore around off-screen renders). */
+  getFovInstances(): RenderableFrame[] { return this.fovInstances; }
+  setOnFovInstanceSelect(cb: (id: string | null) => void) { this.onFovInstanceSelect = cb; }
+  setOnFovInstanceChange(cb: (id: string, change: FovFrameChange) => void) { this.onFovInstanceChange = cb; }
   setOnPhotoClick(cb: (photoName: string) => void) { this.onPhotoClick = cb; }
   setOnDSOClick(cb: (dso: DSO) => void) { this.onDSOClick = cb; }
 
@@ -601,6 +700,10 @@ export class SkyMap {
     this.addEvent(this.canvas, 'mousedown', ((e: MouseEvent) => {
       this.cancelAnimation();
       if (e.button === 0) {
+        const rectF = this.canvas.getBoundingClientRect();
+        if (this.handleFrameMouseDown(e.clientX - rectF.left, e.clientY - rectF.top)) {
+          return; // frame interaction consumed the press — no pan
+        }
         this.isPanning = true;
         this.panStartX = e.clientX;
         this.panStartY = e.clientY;
@@ -617,6 +720,11 @@ export class SkyMap {
     }) as EventListener);
 
     this.addEvent(window, 'mousemove', ((e: MouseEvent) => {
+      if (this.frameDrag) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.handleFrameDragMove(e.clientX - rect.left, e.clientY - rect.top);
+        return;
+      }
       if (this.isPanning) {
         const rect = this.canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
@@ -650,6 +758,10 @@ export class SkyMap {
     }) as EventListener);
 
     this.addEvent(window, 'mouseup', ((e: MouseEvent) => {
+      if (this.frameDrag) {
+        this.frameDrag = null;
+        return;
+      }
       if (this.isPanning) {
         const dx = e.clientX - this.panStartX;
         const dy = e.clientY - this.panStartY;
@@ -687,10 +799,13 @@ export class SkyMap {
       }
     }) as EventListener);
 
-    // Escape exits picking mode
+    // Escape exits picking mode, or deselects the active frame.
     this.addEvent(window, 'keydown', ((e: KeyboardEvent) => {
-      if (e.key === 'Escape' && this.pickingMode) {
+      if (e.key !== 'Escape') return;
+      if (this.pickingMode) {
         this.exitPickingMode();
+      } else if (this.fovInstances.some(f => f.active)) {
+        this.selectFrame(null);
       }
     }) as EventListener);
   }
@@ -767,6 +882,37 @@ export class SkyMap {
     }
 
     return null;
+  }
+
+  /**
+   * DSOs whose centre falls inside the given frame's polygon, sorted by distance
+   * to the frame centre (nearest first). Used to derive a plan frame's target
+   * after a move. Mag limit matches {@link findClosestDSO}.
+   */
+  private dsosInFrame(f: RenderableFrame): DSO[] {
+    if (!this.showDSOs) return [];
+    let maxMag: number | null;
+    if (this.maxMagOverride === Infinity) maxMag = null;
+    else if (this.maxMagOverride !== null) maxMag = this.maxMagOverride + 4;
+    else maxMag = computeMaxMag(this.view.scale) + 4;
+    this.buildDSOIndex(maxMag);
+
+    const { corners, cx, cy, halfW, halfH } = this.frameGeometry(f);
+    const projCenter = fromCanvas(cx, cy, this.view);
+    // Collect candidates around the frame centre out to its half-diagonal (+margin).
+    const radiusPx = Math.hypot(halfW, halfH) + 4;
+    const candidates = this.dsoIndex.findAll(projCenter.x, projCenter.y, radiusPx / this.view.scale);
+
+    const inside: Array<{ dso: DSO; dist: number }> = [];
+    for (const dso of candidates) {
+      const p = project(dso.ra, dso.dec);
+      const c = toCanvas(p.x, p.y, this.view);
+      if (pointInConvexPolygon(c.x, c.y, corners)) {
+        inside.push({ dso, dist: Math.hypot(c.x - cx, c.y - cy) });
+      }
+    }
+    inside.sort((a, b) => a.dist - b.dist);
+    return inside.map(e => e.dso);
   }
 
   /**
@@ -1006,6 +1152,9 @@ export class SkyMap {
     if (this.fovFrameSpecs.length > 0) {
       this.renderFovFrames();
     }
+    if (this.fovInstances.length > 0) {
+      this.renderFovInstances();
+    }
 
     ctx.restore(); // removes clip
 
@@ -1102,6 +1251,356 @@ export class SkyMap {
       ctx.restore();
 
       ctx.restore();
+    }
+  }
+
+  // ── Interactive frame instances ────────────────────────────────────────────
+
+  /** Canvas centre for a frame instance (resolved from its anchor + live view). */
+  private frameAnchorCanvas(f: RenderableFrame): { cx: number; cy: number } {
+    if (f.anchorKind === 'sky') {
+      const p = project(f.ra ?? 0, f.dec ?? 0);
+      const c = toCanvas(p.x, p.y, this.view);
+      return { cx: c.x, cy: c.y };
+    }
+    return { cx: (f.nx ?? 0.5) * this.view.width, cy: (f.ny ?? 0.5) * this.view.height };
+  }
+
+  /**
+   * Canvas rotation (deg) of a pinned frame for a given position angle. The
+   * frame's *up* (top edge) must point to celestial north at PA 0°, so we add
+   * 90° to `dsoCanvasAngle` — which orients a DSO's *major axis* (local +x).
+   */
+  private paToCanvasRotDeg(paDeg: number, raDeg: number): number {
+    return paToCanvasRotationDeg(paDeg, raDeg, this.view.rotationDeg);
+  }
+
+  /** Inverse of {@link paToCanvasRotDeg}: recover PA (°E of N) from a canvas rotation. */
+  private canvasRotDegToPa(rotDeg: number, raDeg: number): number {
+    return canvasRotationToPaDeg(rotDeg, raDeg, this.view.rotationDeg);
+  }
+
+  /** Canvas rotation (deg) for a frame instance. */
+  private frameCanvasRotationDeg(f: RenderableFrame): number {
+    if (f.anchorKind === 'sky') {
+      return this.paToCanvasRotDeg(f.paDeg ?? 0, f.ra ?? 0);
+    }
+    return f.screenRotationDeg ?? 0;
+  }
+
+  private frameGeometry(f: RenderableFrame): { corners: Point[]; cx: number; cy: number; rotDeg: number; halfW: number; halfH: number } {
+    const { cx, cy } = this.frameAnchorCanvas(f);
+    const decForSize = f.anchorKind === 'sky' ? (f.dec ?? 0) : unproject(this.view.centerX, this.view.centerY).dec;
+    const halfW = angularSizeToCanvasPx(f.wDeg * 30, decForSize, this.view.scale);
+    const halfH = angularSizeToCanvasPx(f.hDeg * 30, decForSize, this.view.scale);
+    const rotDeg = this.frameCanvasRotationDeg(f);
+    const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rotDeg);
+    return { corners, cx, cy, rotDeg, halfW, halfH };
+  }
+
+  /** Handles (rotation needle, pin, centre dot) are shown only while the frame
+   * is large enough that its centre dot isn't crowding the edges. */
+  private frameHandlesVisible(halfW: number, halfH: number): boolean {
+    return Math.min(halfW, halfH) >= 12;
+  }
+
+  private renderFovInstances() {
+    const { ctx } = this;
+    const cs = getComputedStyle(this.canvas);
+    const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || 'rgba(220,60,60,0.85)';
+    const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || 'rgba(220,90,90,0.9)';
+    const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
+
+    for (const f of this.fovInstances) {
+      if (f.visible === false) continue; // hidden via the manager checkbox
+      const { corners, cx, cy, rotDeg, halfW, halfH } = this.frameGeometry(f);
+      const isActive = f.active;
+
+      ctx.save();
+      ctx.globalAlpha = isActive ? 1 : 0.5;
+      ctx.strokeStyle = isActive ? activeColor : strokeColor;
+      ctx.lineWidth = isActive ? 2 : 1.5;
+      ctx.setLineDash([8, 4]);
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Label (setup name only) along the longest edge — hidden when the frame
+      // is too small to read it.
+      const edgeIdx = photoLabelEdgeIndex(corners);
+      const a = corners[edgeIdx];
+      const b = corners[(edgeIdx + 1) % corners.length];
+      const longEdgePx = Math.hypot(b.x - a.x, b.y - a.y);
+      if (longEdgePx >= 48) {
+        ctx.setLineDash([]);
+        ctx.font = '11px sans-serif';
+        ctx.fillStyle = isActive ? activeColor : labelColor;
+        const lbl = photoLabelTransform(corners, edgeIdx);
+        ctx.save();
+        ctx.translate(lbl.x, lbl.y);
+        ctx.rotate(lbl.angle);
+        ctx.fillText(f.name, 4, -5);
+        ctx.restore();
+      }
+
+      // Handles on the active frame only (so other frames stay locked), and only
+      // while the frame is large enough that the centre dot isn't near the edges.
+      if (isActive && this.frameHandlesVisible(halfW, halfH)) {
+        const ang = rotDeg * DEG2RAD;
+        const topMidX = cx + halfH * Math.sin(ang);
+        const topMidY = cy - halfH * Math.cos(ang);
+        const h = rotateHandlePos(cx, cy, halfH, rotDeg, 24);
+        ctx.strokeStyle = activeColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(topMidX, topMidY);
+        ctx.lineTo(h.x, h.y);
+        ctx.stroke();
+        ctx.fillStyle = activeColor;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        if (f.movable) {
+          // Move handle (centre dot).
+          ctx.beginPath();
+          ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (f.pinnable) {
+          // Pin toggle glyph: pushpin lifted just above the top-right corner.
+          this.drawPinGlyph(this.framePinGlyphPos(corners[1], rotDeg), f.anchorKind === 'sky', activeColor);
+        }
+      }
+      ctx.restore();
+    }
+  }
+
+  /** Pin glyph position: the top-right corner lifted outward (local "up") so the
+   * icon sits just above the frame with a small margin. */
+  private framePinGlyphPos(corner: Point, rotDeg: number): Point {
+    const ang = rotDeg * DEG2RAD;
+    const margin = 14; // half icon (8) + a few px gap
+    return { x: corner.x + Math.sin(ang) * margin, y: corner.y - Math.cos(ang) * margin };
+  }
+
+  /** Draw the pushpin glyph centred at `at`, filled when pinned. Source path is a 24×24 box. */
+  private drawPinGlyph(at: Point, filled: boolean, color: string): void {
+    const { ctx } = this;
+    const size = 16;
+    ctx.save();
+    ctx.translate(at.x - size / 2, at.y - size / 2);
+    ctx.scale(size / 24, size / 24);
+    const path = getPinPath();
+    if (filled) {
+      ctx.fillStyle = color;
+      ctx.fill(path);
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.8 * (24 / size);
+      ctx.stroke(path);
+    }
+    ctx.restore();
+  }
+
+  /** Hit-test the active/instance frames on mousedown. Returns true if the event was consumed (no pan). */
+  private handleFrameMouseDown(mx: number, my: number): boolean {
+    if (!this.interactionEnabled || this.pickingMode || this.fovInstances.length === 0) return false;
+
+    const active = this.fovInstances.find(f => f.active);
+    if (active && active.visible !== false) {
+      const geo = this.frameGeometry(active);
+      const handlesVisible = this.frameHandlesVisible(geo.halfW, geo.halfH);
+      if (handlesVisible) {
+        const rh = rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24);
+        if (isNearHandle(mx, my, rh, 9)) {
+          this.frameDrag = { id: active.id, mode: 'rotate' };
+          return true;
+        }
+        if (active.pinnable) {
+          const pinPos = this.framePinGlyphPos(geo.corners[1], geo.rotDeg);
+          if (isNearHandle(mx, my, pinPos, 10)) { this.toggleFramePin(active); return true; }
+        }
+        if (active.movable && isNearHandle(mx, my, { x: geo.cx, y: geo.cy }, 9)) {
+          this.frameDrag = { id: active.id, mode: 'move' };
+          return true;
+        }
+      }
+      // Dragging the border moves the active frame at any size.
+      if (active.movable && isNearPolygonBorder(mx, my, geo.corners, 6)) {
+        this.frameDrag = { id: active.id, mode: 'move' };
+        return true;
+      }
+    }
+
+    // Select another frame by clicking anywhere inside it (topmost first).
+    for (let i = this.fovInstances.length - 1; i >= 0; i--) {
+      const f = this.fovInstances[i];
+      if (f.active || f.visible === false) continue;
+      const geo = this.frameGeometry(f);
+      if (pointInConvexPolygon(mx, my, geo.corners)) {
+        this.selectFrame(f.id);
+        return true;
+      }
+    }
+
+    // Clicked the interior / empty space: let the map pan. The active frame
+    // stays selected (deselect explicitly via the popup or the Escape key) so
+    // panning the sky under a floating frame never loses the selection.
+    return false;
+  }
+
+  /** Toggle the pin state of a frame by id (used by the frame-manager popup). */
+  toggleFramePinById(id: string): void {
+    const f = this.fovInstances.find(x => x.id === id);
+    if (f && f.pinnable) this.toggleFramePin(f);
+  }
+
+  /** Pin the currently-active frame if it is still floating (used when the
+   * selection changes — only the selected frame stays free to move). */
+  pinActiveIfFloating(): void {
+    const active = this.fovInstances.find(f => f.active);
+    if (active && active.pinnable && active.anchorKind === 'screen') this.toggleFramePin(active);
+  }
+
+  /** Change the active frame, auto-pinning the previously-active floating one. */
+  selectFrame(id: string | null): void {
+    this.pinActiveIfFloating();
+    this.onFovInstanceSelect?.(id);
+  }
+
+  /**
+   * Toggle a movable frame between floating (screen) and pinned (sky) at its
+   * current centre. The on-screen orientation is preserved across the switch by
+   * converting the rotation value (screen rotation ↔ position angle), so pinning
+   * never appears to rotate the frame — it only changes the anchor.
+   */
+  private toggleFramePin(f: RenderableFrame): void {
+    if (!f.pinnable) return;
+    const { cx, cy } = this.frameAnchorCanvas(f);
+    // Canvas rotation the frame is currently displayed at (degrees).
+    const canvasRotDeg = this.frameCanvasRotationDeg(f);
+    if (f.anchorKind === 'sky') {
+      // Pinned → floating: the canvas rotation becomes the screen rotation as-is.
+      this.onFovInstanceChange?.(f.id, {
+        anchor: { kind: 'screen', nx: cx / this.view.width, ny: cy / this.view.height },
+        screenRotationDeg: normalizeRotationDeg(canvasRotDeg),
+      });
+    } else {
+      // Floating → pinned: convert canvas rotation to PA so the frame stays
+      // visually put, and pick a target.
+      let ra: number, dec: number, dsoId: string | null;
+      // Snap the centre to the nearest DSO when the anchor is on (both free and
+      // plan frames); otherwise pin exactly where the frame currently sits.
+      const near = f.anchorSnap !== false ? this.findClosestDSO(cx, cy) : null;
+      if (near) {
+        // Anchored: the snapped object sits at the centre, so it is the target.
+        ra = near.ra; dec = near.dec; dsoId = near.id;
+      } else {
+        const proj = fromCanvas(cx, cy, this.view);
+        const u = unproject(proj.x, proj.y);
+        ra = u.ra; dec = u.dec; dsoId = null;
+        // A plan frame placed freely takes the DSO nearest its centre that falls
+        // inside it (custom location if none).
+        if (f.derivesTargetFromContent) {
+          const moved: RenderableFrame = { ...f, anchorKind: 'sky', ra, dec };
+          dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
+        }
+      }
+      const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
+      this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
+    }
+  }
+
+  /**
+   * Re-run anchor detection on a pinned frame at its current centre and snap it
+   * onto the nearest DSO when one is close enough — the same snap the pin action
+   * applies with the anchor on. Used by the anchor toggle so turning the anchor
+   * on re-anchors an already-pinned frame. No-op for floating frames or when no
+   * DSO is close enough (the frame keeps its current position and target).
+   */
+  resnapFrame(id: string): void {
+    const f = this.fovInstances.find(x => x.id === id);
+    if (!f || !f.pinnable || f.anchorKind !== 'sky') return;
+    const { cx, cy } = this.frameAnchorCanvas(f);
+    const near = this.findClosestDSO(cx, cy);
+    if (!near) return;
+    // Keep the frame's on-screen orientation across the re-anchor by recomputing
+    // the PA at the snapped object's RA.
+    const canvasRotDeg = this.frameCanvasRotationDeg(f);
+    const paDeg = this.canvasRotDegToPa(canvasRotDeg, near.ra);
+    this.onFovInstanceChange?.(f.id, {
+      anchor: { kind: 'sky', ra: near.ra, dec: near.dec, dsoId: near.id },
+      paDeg,
+    });
+  }
+
+  /**
+   * Bring the given frame to the centre of the view (used by the frame manager).
+   * Idempotent: a pinned frame pans the view to its sky anchor; a floating frame
+   * snaps its own screen anchor back to the viewport centre.
+   */
+  centerFrameInView(id: string): void {
+    const f = this.fovInstances.find(x => x.id === id);
+    if (!f) return;
+    if (f.anchorKind === 'sky') {
+      // Same framing zoom the targets "view on map" button uses.
+      const minDim = Math.min(this.view.width, this.view.height);
+      const scale = computeFovTargetScale(f.wDeg, f.hDeg, f.dec ?? 0, getHemisphere(), minDim);
+      this.navigateTo(f.ra ?? 0, f.dec ?? 0, scale, true);
+    } else {
+      this.onFovInstanceChange?.(f.id, { anchor: { kind: 'screen', nx: 0.5, ny: 0.5 } });
+    }
+  }
+
+  /** Apply a frame move/rotate drag for the current cursor position. */
+  private handleFrameDragMove(mx: number, my: number): void {
+    if (!this.frameDrag) return;
+    const f = this.fovInstances.find(x => x.id === this.frameDrag!.id);
+    if (!f) { this.frameDrag = null; return; }
+
+    if (this.frameDrag.mode === 'rotate') {
+      const { cx, cy } = this.frameAnchorCanvas(f);
+      const rotDeg = canvasRotationDegFromCursor(cx, cy, mx, my);
+      if (f.anchorKind === 'sky') {
+        const pa = this.canvasRotDegToPa(rotDeg, f.ra ?? 0);
+        this.onFovInstanceChange?.(f.id, { paDeg: pa });
+      } else {
+        this.onFovInstanceChange?.(f.id, { screenRotationDeg: normalizeRotationDeg(rotDeg) });
+      }
+    } else {
+      if (f.anchorKind === 'sky') {
+        // Hold the frame's on-screen orientation fixed while moving: a pinned
+        // frame's rotation is a position angle relative to celestial north,
+        // whose screen direction changes across the projection — so without
+        // this the frame would spin to stay north-aligned as it's dragged.
+        const canvasRotDeg = this.frameCanvasRotationDeg(f);
+        let ra: number, dec: number, dsoId: string | null = null;
+        // Snap the centre to the nearest DSO when the anchor is on (both free
+        // and plan frames); otherwise the centre follows the cursor exactly.
+        const near = f.anchorSnap !== false ? this.findClosestDSO(mx, my) : null;
+        if (near) {
+          // Anchored: the snapped object sits at the centre, so it is the target.
+          ra = near.ra; dec = near.dec; dsoId = near.id;
+        } else {
+          const proj = fromCanvas(mx, my, this.view);
+          const u = unproject(proj.x, proj.y);
+          ra = u.ra; dec = u.dec;
+        }
+        // Recompute the PA so the frame keeps the same on-screen angle at the
+        // new position.
+        const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
+        // A plan frame placed freely (anchor off) takes the DSO nearest its
+        // centre that falls inside it (custom location if none).
+        if (f.derivesTargetFromContent && !near) {
+          const moved: RenderableFrame = { ...f, ra, dec, paDeg };
+          dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
+        }
+        this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
+      } else {
+        this.onFovInstanceChange?.(f.id, { anchor: { kind: 'screen', nx: mx / this.view.width, ny: my / this.view.height } });
+      }
     }
   }
 

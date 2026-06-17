@@ -57,7 +57,38 @@ export function applyMigrations(database: Database): number {
         try { d.exec('ALTER TABLE plans ADD COLUMN setup_id TEXT'); } catch { /* exists */ }
       },
     },
-    // Future migrations: { version: 3, run(d) { ... } },
+    {
+      version: 3,
+      run(d) {
+        // Plan entries gain a frame position (ra/dec) and allow a null DSO
+        // (custom location). SQLite can't drop NOT NULL / UNIQUE in place, so
+        // rebuild the table. On a fresh DB the table doesn't exist yet (the base
+        // schema, with the new shape, is created after migrations) — skip.
+        const exists = d
+          .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='plan_entries'")
+          .get();
+        if (!exists) return;
+        const cols = d.prepare("PRAGMA table_info('plan_entries')").all() as Array<{ name: string }>;
+        if (cols.some(c => c.name === 'ra')) return; // already migrated
+        d.exec(`
+          CREATE TABLE plan_entries_new (
+            id       TEXT PRIMARY KEY,
+            plan_id  TEXT NOT NULL,
+            dso_id   TEXT,
+            position INTEGER NOT NULL,
+            pa_deg   REAL,
+            ra       REAL,
+            dec      REAL,
+            notes    TEXT
+          );
+          INSERT INTO plan_entries_new (id, plan_id, dso_id, position, pa_deg, notes)
+            SELECT id, plan_id, dso_id, position, pa_deg, notes FROM plan_entries;
+          DROP TABLE plan_entries;
+          ALTER TABLE plan_entries_new RENAME TO plan_entries;
+        `);
+      },
+    },
+    // Future migrations: { version: 4, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

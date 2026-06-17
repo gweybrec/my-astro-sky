@@ -10,7 +10,6 @@ vi.mock('../../src/api', () => ({
 vi.mock('../../src/fov-overlay', () => ({
   loadFovUiState: () => ({ frameRotationDeg: 0, ribbonOpen: true }),
   saveFovUiState: vi.fn(),
-  buildFovFrameSpecs: vi.fn().mockResolvedValue([]),
   buildFovPopup: vi.fn().mockReturnValue(document.createElement('div')),
 }));
 
@@ -24,14 +23,15 @@ vi.mock('../../src/i18n', () => ({
 
 import FOVRibbon from '../../src/components/overlay/FOVRibbon.vue';
 import { useCanvasStore } from '../../src/stores/canvas';
-import * as api from '../../src/api';
-import * as fovOverlay from '../../src/fov-overlay';
 import type { FovFrameSpec } from '../../src/sky-map';
 
 function makeSkyMap() {
   return {
     setFovFrames: vi.fn(),
     setFovRotationDeg: vi.fn(),
+    setFovInstances: vi.fn(),
+    setOnFovInstanceSelect: vi.fn(),
+    setOnFovInstanceChange: vi.fn(),
   };
 }
 
@@ -40,7 +40,7 @@ describe('FOVRibbon — onMounted frame initialisation', () => {
     vi.clearAllMocks();
   });
 
-  it('uses pendingFovOverride and skips DB load', async () => {
+  it('applies a pending legacy centred override to the sky map', async () => {
     const specs: FovFrameSpec[] = [{ label: 'My Setup · 2.0° × 1.5°', wDeg: 2, hDeg: 1.5 }];
     const sm = makeSkyMap();
     const pinia = createTestingPinia({
@@ -51,20 +51,12 @@ describe('FOVRibbon — onMounted frame initialisation', () => {
     mount(FOVRibbon, { global: { plugins: [pinia] } });
     await nextTick();
 
-    // Override is applied to the sky map
     expect(sm.setFovFrames).toHaveBeenCalledWith(specs);
-    // DB is not consulted
-    expect(api.getGearSetups).not.toHaveBeenCalled();
     // Override is cleared so normal map switches don't reuse it
     expect(useCanvasStore(pinia).pendingFovOverride).toBeNull();
   });
 
-  it('loads from DB when no pendingFovOverride', async () => {
-    const dbSetups = [{ id: '1', enabled: true, name: 'Setup B', telescopeId: 't1', cameraId: 'c1', accessoryId: null }];
-    const dbSpecs: FovFrameSpec[] = [{ label: 'Setup B · 3.0° × 2.0°', wDeg: 3, hDeg: 2 }];
-    vi.mocked(api.getGearSetups).mockResolvedValue(dbSetups as any);
-    vi.mocked(fovOverlay.buildFovFrameSpecs).mockResolvedValue(dbSpecs);
-
+  it('wires the interactive frame system to the sky map', async () => {
     const sm = makeSkyMap();
     const pinia = createTestingPinia({
       createSpy: vi.fn,
@@ -72,11 +64,12 @@ describe('FOVRibbon — onMounted frame initialisation', () => {
     });
 
     mount(FOVRibbon, { global: { plugins: [pinia] } });
-    // Wait for the promise chain: getGearSetups → buildFovFrameSpecs → setFovFrames
-    await new Promise(r => setTimeout(r, 0));
+    await nextTick();
 
-    expect(api.getGearSetups).toHaveBeenCalled();
-    expect(fovOverlay.buildFovFrameSpecs).toHaveBeenCalledWith(dbSetups);
-    expect(sm.setFovFrames).toHaveBeenCalledWith(dbSpecs);
+    // Selection + change callbacks are registered on the map.
+    expect(sm.setOnFovInstanceSelect).toHaveBeenCalled();
+    expect(sm.setOnFovInstanceChange).toHaveBeenCalled();
+    // The (empty) resolved frame list is pushed immediately via the watcher.
+    expect(sm.setFovInstances).toHaveBeenCalledWith([]);
   });
 });

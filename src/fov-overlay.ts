@@ -1,6 +1,6 @@
+import { watch } from 'vue';
 import { t } from './i18n';
 import type { FovFrameSpec } from './sky-map';
-import type { SkyMap } from './sky-map';
 import {
   buildGearSectionContent,
   type GearSectionPrefs,
@@ -11,18 +11,22 @@ import {
   getAccessories,
   buildGearPreset,
 } from './gear-catalog';
-import { formatGearFovLabel, formatSetupCanvasLabel, fovDeg } from './gear-presets';
+import { formatSetupCanvasLabel, fovDeg } from './gear-presets';
+import { formatPaDeg } from './frame-orientation';
 import { reportUnknownRendererError } from './error-reporter';
+import { useFovFramesStore } from './stores/fov-frames';
+import { useCanvasStore } from './stores/canvas';
+import { usePlansStore } from './stores/plans';
+import { useUiStore } from './stores/ui';
 import {
   getGearSetups,
   createGearSetup,
   updateGearSetup,
-  patchGearSetupEnabled,
-  deleteGearSetupAPI,
   type GearSetupData,
 } from './api';
 import trashSvg from './icons/trash.svg?raw';
-import penSvg from './icons/pen.svg?raw';
+import anchorSvg from './icons/anchor.svg?raw';
+import { confirmPlanEntryDelete } from './photo-delete-confirm';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -284,41 +288,91 @@ export function openEditSetupModal(setup: FovSetup, onSaved: (updated: FovSetup)
   });
 }
 
-// ─── FOV popup ───────────────────────────────────────────────────────────────
+// ─── FOV frame-manager popup ───────────────────────────────────────────────────
 
-export function buildFovPopup(
-  skyMap: SkyMap,
-  onFramesChanged: (setups: FovSetup[]) => void,
-  onClose: () => void,
-  onReady?: () => void,
-): HTMLElement {
-  const popup = document.createElement('div');
+/**
+ * Frame-manager popup: lists the interactive frame instances (plan-derived +
+ * ad-hoc) with select / reset-rotation / delete actions, plus an "Add frame"
+ * gear picker. Reactive to the fov-frames store; the returned element carries a
+ * `__cleanup` hook the caller must invoke on close to stop the watcher.
+ */
+export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLElement & { __cleanup?: () => void } {
+  const fovStore = useFovFramesStore();
+  const plansStore = usePlansStore();
+  const uiStore = useUiStore();
+
+  // Populate the plan dropdown.
+  plansStore.ensureLoaded();
+
+  const popup = document.createElement('div') as HTMLElement & { __cleanup?: () => void };
   popup.className = 'fov-popup';
+
+  // Suppress the sky tooltip while the cursor is over the popup.
+  popup.addEventListener('mouseenter', () => uiStore.setForceSuppressTooltip(true));
+  popup.addEventListener('mouseleave', () => uiStore.setForceSuppressTooltip(false));
 
   // Header
   const header = document.createElement('div');
   header.className = 'fov-popup-header';
-
   const headerTitle = document.createElement('span');
   headerTitle.textContent = t('fovOverlay.popupTitle');
-
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'modal-close';
   closeBtn.style.fontSize = 'var(--font-size-sub)';
   closeBtn.textContent = '×';
   closeBtn.addEventListener('click', onClose);
-
   header.appendChild(headerTitle);
   header.appendChild(closeBtn);
   popup.appendChild(header);
 
-  // Body
+  // Controls (mode dropdown + plan setup dropdown), padded off the popup edges.
+  const controls = document.createElement('div');
+  controls.style.display = 'flex';
+  controls.style.flexDirection = 'column';
+  controls.style.gap = 'var(--space-2)';
+  controls.style.padding = 'var(--space-4) var(--space-6) 0';
+  popup.appendChild(controls);
+
+  // input-base's px-4 (16px) is larger than the popup's --space-6 (12px) gutter,
+  // so the dropdown's text would sit deeper than the header title and list rows.
+  // Outdent the box and trim its left padding so the text lands on the same
+  // content column, while the right edge stays aligned with the close/action icons.
+  function alignControlSelect(el: HTMLSelectElement): void {
+    el.style.paddingLeft = 'var(--space-3)';
+    el.style.marginLeft = 'calc(-1 * var(--space-3))';
+    el.style.width = 'calc(100% + var(--space-3))';
+  }
+
+  // Mode dropdown: Free frames, each plan, or "+ New plan".
+  const NEW_PLAN_VALUE = '__new_plan__';
+  const FREE_VALUE = '__free__';
+  const select = document.createElement('select');
+  select.className = 'input-base w-full';
+  alignControlSelect(select);
+  select.addEventListener('change', () => onSelectChange());
+  controls.appendChild(select);
+
+  // Plan setup dropdown (plan mode only): choose the gear setup for the plan.
+  // Persisted to the plan, so it reflects in the Targets & Plan tab.
+  const setupSelect = document.createElement('select');
+  setupSelect.className = 'input-base w-full';
+  alignControlSelect(setupSelect);
+  setupSelect.addEventListener('change', () => onSetupChange());
+  controls.appendChild(setupSelect);
+
+  // Gear setups for the setup dropdown (resolved async; labels include FOV).
+  let gearSetups: GearSetupData[] = [];
+  getGearSetups()
+    .then(s => { gearSetups = s; renderAll(); })
+    .catch(err => reportUnknownRendererError('fov_popup_load_setups', err));
+
+  // Body (frame list)
   const body = document.createElement('div');
   body.className = 'fov-popup-body';
   popup.appendChild(body);
 
-  // Footer
+  // Footer (Add frame + picker) — free mode only.
   const footer = document.createElement('div');
   footer.className = 'fov-popup-footer';
   popup.appendChild(footer);
@@ -327,211 +381,319 @@ export function buildFovPopup(
   addBtn.type = 'button';
   addBtn.className = 'btn-action';
   addBtn.style.width = '100%';
-  addBtn.textContent = t('fovOverlay.addSetup');
-  addBtn.addEventListener('click', () => {
-    openAddSetupModal(() => {
-      reload(() => onFramesChanged(setups));
-    });
-  });
+  addBtn.textContent = t('fovOverlay.addFrame');
+  addBtn.addEventListener('click', () => openSetupPicker());
   footer.appendChild(addBtn);
 
-  // Local state
-  let setups: FovSetup[] = [];
-  let gearCatalogs: { tels: any[]; cams: any[]; accs: any[] } | null = null;
+  function defaultPlanName(): string {
+    const nice = new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    return t('targets.plan.defaultName', { date: nice });
+  }
 
-  // Enabled toggle debounce map
-  const toggleTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-  let isFirstRender = true;
-
-  function reload(onComplete?: () => void) {
-    body.innerHTML = '';
-    if (!isFirstRender) {
-      const spinner = document.createElement('div');
-      spinner.className = 'modal-loading-placeholder';
-      spinner.innerHTML = '<div class="auto-solve-spinner"></div>';
-      body.appendChild(spinner);
+  function renderSelect() {
+    select.innerHTML = '';
+    const free = document.createElement('option');
+    free.value = FREE_VALUE;
+    free.textContent = t('fovOverlay.freeFrames');
+    select.appendChild(free);
+    for (const plan of plansStore.plans) {
+      const opt = document.createElement('option');
+      opt.value = `plan:${plan.id}`;
+      opt.textContent = plan.name;
+      select.appendChild(opt);
     }
+    const newOpt = document.createElement('option');
+    newOpt.value = NEW_PLAN_VALUE;
+    newOpt.textContent = t('fovOverlay.newPlan');
+    select.appendChild(newOpt);
 
-    Promise.all([
-      getGearSetups(),
-      gearCatalogs
-        ? Promise.resolve(gearCatalogs)
-        : Promise.all([getTelescopes(), getCameras(), getAccessories()]).then(([tels, cams, accs]) => {
-            gearCatalogs = { tels, cams, accs };
-            return gearCatalogs;
-          }),
-    ]).then(([loaded]) => {
-      setups = loaded;
-      renderBody();
-      onComplete?.();
-      if (isFirstRender) {
-        isFirstRender = false;
-        onReady?.();
-      }
-    }).catch(err => {
-      reportUnknownRendererError('fov_popup_load', err);
-      body.innerHTML = '';
-      const errEl = document.createElement('div');
-      errEl.className = 'modal-loading-error';
-      errEl.textContent = String(err?.message ?? err);
-      body.appendChild(errEl);
-      if (isFirstRender) {
-        isFirstRender = false;
-        onReady?.();
-      }
-    });
+    const sel = fovStore.selection;
+    select.value = sel.kind === 'plan' ? `plan:${sel.planId}` : FREE_VALUE;
+    // Footer "Add frame" is for ad-hoc frames only.
+    footer.classList.toggle('hidden', sel.kind !== 'free');
+  }
+
+  async function onSelectChange() {
+    const v = select.value;
+    if (v === NEW_PLAN_VALUE) {
+      const id = await plansStore.createPlan(defaultPlanName());
+      if (id) fovStore.setSelection({ kind: 'plan', planId: id });
+      else renderSelect(); // creation failed — restore the previous selection
+      return;
+    }
+    if (v === FREE_VALUE) { fovStore.setSelection({ kind: 'free' }); return; }
+    if (v.startsWith('plan:')) fovStore.setSelection({ kind: 'plan', planId: v.slice(5) });
+  }
+
+  function renderSetupSelect() {
+    const sel = fovStore.selection;
+    const plan = sel.kind === 'plan' ? plansStore.plans.find(p => p.id === sel.planId) : undefined;
+    // Setup dropdown is only meaningful for a plan.
+    setupSelect.style.display = plan ? '' : 'none';
+    if (!plan) return;
+
+    setupSelect.innerHTML = '';
+    if (!plan.setupId) {
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = t('fovOverlay.pickSetup');
+      setupSelect.appendChild(ph);
+    }
+    for (const s of gearSetups) {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      // Label includes the FOV when the setup's gear resolves to a size.
+      opt.textContent = fovStore.specs.get(s.id)?.label ?? s.name;
+      setupSelect.appendChild(opt);
+    }
+    setupSelect.value = plan.setupId ?? '';
+  }
+
+  function onSetupChange() {
+    const sel = fovStore.selection;
+    if (sel.kind !== 'plan') return;
+    const plan = plansStore.plans.find(p => p.id === sel.planId);
+    if (!plan) return;
+    const newSetupId = setupSelect.value || null;
+    // Persist on the plan (shared with the Targets & Plan tab) and refresh.
+    plansStore.updatePlanSettings(plan.id, plan.nightOf, newSetupId);
+    fovStore.loadSpecs().then(() => renderAll());
   }
 
   function renderBody() {
     body.innerHTML = '';
+    const frames = fovStore.renderables;
 
-    if (setups.length === 0) {
+    if (fovStore.selection.kind === 'plan' && frames.length === 0) {
+      // A plan with no gear setup can't size its frames.
+      const plan = plansStore.plans.find(p => fovStore.selection.kind === 'plan' && p.id === fovStore.selection.planId);
+      if (plan && !plan.setupId) {
+        const hint = document.createElement('p');
+        hint.style.color = 'var(--text-muted)';
+        hint.style.fontSize = 'var(--font-size-small)';
+        hint.style.margin = '0';
+        hint.textContent = t('fovOverlay.planNeedsSetup');
+        body.appendChild(hint);
+        return;
+      }
+    }
+
+    if (frames.length === 0) {
       const empty = document.createElement('p');
       empty.style.color = 'var(--text-muted)';
       empty.style.fontSize = 'var(--font-size-small)';
       empty.style.margin = '0';
-      empty.textContent = t('fovOverlay.noSetups');
+      empty.textContent = t('fovOverlay.noFrames');
       body.appendChild(empty);
       return;
     }
 
-    // Select-all tristate row
-    const selectAllRow = document.createElement('label');
-    selectAllRow.className = 'fov-popup-select-all-row';
+    const isPlanMode = fovStore.selection.kind === 'plan';
 
-    const selectAllCb = document.createElement('input');
-    selectAllCb.type = 'checkbox';
-    selectAllCb.style.margin = '0';
+    // Free mode: tristate "select all" controlling frame visibility on the map.
+    if (!isPlanMode) {
+      const anyHidden = frames.some(f => f.visible === false);
+      const anyVisible = frames.some(f => f.visible !== false);
+      const allVisible = !anyHidden;
 
-    const selectAllLabel = document.createElement('span');
-    selectAllLabel.textContent = t('fovOverlay.selectAll');
-
-    selectAllRow.appendChild(selectAllCb);
-    selectAllRow.appendChild(selectAllLabel);
-    body.appendChild(selectAllRow);
-
-    function updateSelectAllState() {
-      const total = setups.length;
-      const enabledCount = setups.filter(s => s.enabled).length;
-      selectAllCb.indeterminate = enabledCount > 0 && enabledCount < total;
-      selectAllCb.checked = enabledCount === total;
+      const selectAllRow = document.createElement('label');
+      selectAllRow.className = 'fov-popup-select-all-row';
+      const selectAllBox = document.createElement('input');
+      selectAllBox.type = 'checkbox';
+      selectAllBox.className = 'shrink-0';
+      selectAllBox.checked = allVisible;
+      selectAllBox.indeterminate = anyVisible && anyHidden;
+      selectAllBox.addEventListener('change', () => fovStore.setAllAdhocVisible(selectAllBox.checked));
+      const selectAllLabel = document.createElement('span');
+      selectAllLabel.textContent = t('display.selectAll');
+      selectAllRow.appendChild(selectAllBox);
+      selectAllRow.appendChild(selectAllLabel);
+      body.appendChild(selectAllRow);
     }
 
-    selectAllCb.addEventListener('change', () => {
-      const checked = selectAllCb.checked;
-      const toToggle = setups.filter(s => s.enabled !== checked);
-      setups.forEach(s => { s.enabled = checked; });
-      Promise.all(toToggle.map(s => patchGearSetupEnabled(s.id, checked))).catch(err => {
-        reportUnknownRendererError('fov_toggle_all', err);
-      });
-      renderBody();
-      onFramesChanged(setups);
-    });
-
-    // Per-setup rows
-    for (const setup of setups) {
+    for (const f of frames) {
       const row = document.createElement('div');
       row.className = 'fov-popup-setup-row';
 
-      const labelEl = document.createElement('label');
-      labelEl.style.display = 'flex';
-      labelEl.style.alignItems = 'flex-start';
-      labelEl.style.gap = 'var(--space-3)';
-      labelEl.style.cursor = 'pointer';
-      labelEl.style.fontSize = 'var(--font-size-small)';
-      labelEl.style.color = 'var(--text-primary)';
-      labelEl.style.flex = '1';
+      const isPlan = f.id.startsWith('plan:');
 
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = setup.enabled;
-      cb.style.marginTop = '2px';
-      cb.style.flexShrink = '0';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = setup.name;
-
-      // Compute FOV detail line
-      if (gearCatalogs) {
-        const tel = gearCatalogs.tels.find(t => t.id === setup.telescopeId);
-        const cam = gearCatalogs.cams.find(c => c.id === setup.cameraId);
-        const acc = setup.accessoryId ? gearCatalogs.accs.find(a => a.id === setup.accessoryId) ?? null : null;
-        if (tel && cam) {
-          const preset = buildGearPreset(tel, cam, acc);
-          const fovDetail = `${t('targets.gear.effectiveFocalLength')}: ${formatGearFovLabel(preset)}`;
-          const fovSpan = document.createElement('span');
-          fovSpan.textContent = fovDetail;
-          fovSpan.style.display = 'block';
-          fovSpan.style.fontSize = 'var(--font-size-micro)';
-          fovSpan.style.color = 'var(--text-muted)';
-          fovSpan.style.marginTop = '1px';
-          fovSpan.style.whiteSpace = 'nowrap';
-          nameSpan.appendChild(fovSpan);
-        }
+      // Free frames: a leading checkbox shows/hides the frame on the map.
+      if (!isPlan) {
+        const visBox = document.createElement('input');
+        visBox.type = 'checkbox';
+        visBox.className = 'shrink-0';
+        visBox.checked = f.visible !== false;
+        visBox.title = t('fovOverlay.showOnMap');
+        visBox.addEventListener('click', (e) => e.stopPropagation());
+        visBox.addEventListener('change', () => fovStore.setAdhocVisible(f.id, visBox.checked));
+        row.appendChild(visBox);
       }
 
-      cb.addEventListener('change', () => {
-        setup.enabled = cb.checked;
-        updateSelectAllState();
-        onFramesChanged(setups);  // use in-memory state — no API fetch race
-        // Debounced API call
-        const prev = toggleTimers.get(setup.id);
-        if (prev) clearTimeout(prev);
-        const timer = setTimeout(() => {
-          patchGearSetupEnabled(setup.id, setup.enabled).catch(err => {
-            reportUnknownRendererError('fov_toggle_enabled', err);
-          });
-          toggleTimers.delete(setup.id);
-        }, 150);
-        toggleTimers.set(setup.id, timer);
+      // Clicking the name centres the frame on the map. Selecting/editing a
+      // frame is done by clicking it on the canvas.
+      const labelEl = document.createElement('div');
+      labelEl.className = 'flex-1 cursor-pointer text-small';
+      labelEl.title = t('fovOverlay.centerOnMap');
+      labelEl.addEventListener('click', () => {
+        useCanvasStore().skyMap?.centerFrameInView(f.id);
       });
 
-      labelEl.appendChild(cb);
+      // Plan frames are named by their target DSO (or "custom location"); free
+      // frames keep the gear-setup + FOV label.
+      const nameSpan = document.createElement('span');
+      // Active frame's name is emphasised + accent-coloured to match the canvas.
+      nameSpan.className = f.active ? 'font-semibold text-[var(--accent-color)]' : 'text-primary';
+      nameSpan.textContent = isPlan ? (f.anchorLabel ?? t('fovOverlay.customLocation')) : f.label;
       labelEl.appendChild(nameSpan);
 
-      // Action buttons
+      // Status line: floating/pinned state + PA readout (no gear label in plan
+      // mode — it's shown once above the list).
+      const status = document.createElement('span');
+      status.style.display = 'block';
+      status.style.fontSize = 'var(--font-size-micro)';
+      status.style.color = 'var(--text-muted)';
+      status.style.marginTop = '1px';
+      const parts: string[] = [];
+      if (f.anchorKind === 'screen') {
+        parts.push(t('fovOverlay.floating'));
+      } else if (!isPlan) {
+        parts.push(f.anchorLabel ? `${t('fovOverlay.pinnedTo')} ${f.anchorLabel}` : t('fovOverlay.pinned'));
+      }
+      if (f.anchorKind === 'sky' && f.paDeg != null) {
+        parts.push(`${t('fovOverlay.angleLabel')} ${formatPaDeg(f.paDeg)}`);
+        status.title = t('fovOverlay.angleHelp');
+      }
+      status.textContent = parts.join(' · ');
+      if (status.textContent) labelEl.appendChild(status);
+
+      // Actions: anchor toggle + delete — identical for plan and free frames.
       const actions = document.createElement('div');
       actions.className = 'fov-popup-setup-actions';
 
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'btn-icon';
-      editBtn.innerHTML = penSvg;
-      editBtn.title = t('fovOverlay.editModalTitle');
-      editBtn.addEventListener('click', (e) => {
+      const anchorOn = f.anchorSnap !== false;
+      const anchorBtn = document.createElement('button');
+      anchorBtn.type = 'button';
+      anchorBtn.className = anchorOn ? 'btn-icon btn-icon--active' : 'btn-icon';
+      anchorBtn.setAttribute('aria-pressed', String(anchorOn));
+      anchorBtn.innerHTML = anchorSvg;
+      anchorBtn.title = anchorOn ? t('fovOverlay.anchorOn') : t('fovOverlay.anchorOff');
+      anchorBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        openEditSetupModal(setup, () => {
-          reload(() => onFramesChanged(setups));
-        });
+        const turningOn = !anchorOn;
+        fovStore.toggleAnchorSnap(f.id);
+        // Turning the anchor on re-runs detection and snaps the frame onto a
+        // nearby DSO, exactly as pinning does with the anchor on.
+        if (turningOn) useCanvasStore().skyMap?.resnapFrame(f.id);
       });
+      actions.appendChild(anchorBtn);
 
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'btn-icon btn-icon--danger';
       deleteBtn.innerHTML = trashSvg;
-      deleteBtn.title = t('photos.delete');
-      deleteBtn.addEventListener('click', (e) => {
+      deleteBtn.title = t('fovOverlay.deleteFrame');
+      deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        deleteGearSetupAPI(setup.id).then(() => {
-          reload(() => onFramesChanged(setups));
-        }).catch(err => {
-          reportUnknownRendererError('fov_delete_setup', err);
-        });
+        if (isPlan) {
+          // Plan frames map to plan entries — confirm, then remove from the plan
+          // (reflected in the Targets & Plan tab).
+          const name = f.anchorLabel ?? t('fovOverlay.customLocation');
+          if (await confirmPlanEntryDelete(name)) await fovStore.deletePlanFrame(f.id);
+        } else {
+          fovStore.removeFrame(f.id);
+        }
       });
-
-      actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
 
       row.appendChild(labelEl);
       row.appendChild(actions);
       body.appendChild(row);
     }
-
-    updateSelectAllState();
   }
 
-  reload();
+  // ── "Add frame" gear-setup picker ─────────────────────────────────────────
+  function openSetupPicker() {
+    getGearSetups().then(setups => {
+      const enabledFirst = setups; // order as returned
+      if (enabledFirst.length === 0) {
+        // No gear yet — jump straight to setup creation, then add a frame for it.
+        openAddSetupModal((created) => {
+          useCanvasStore().skyMap?.pinActiveIfFloating();
+          fovStore.loadSpecs().then(() => fovStore.addAdhocFrame(created.id));
+        });
+        return;
+      }
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      const modal = document.createElement('div');
+      modal.className = 'modal settings-modal';
+      const head = document.createElement('div');
+      head.className = 'modal-header';
+      const h2 = document.createElement('h2');
+      h2.textContent = t('fovOverlay.pickSetup');
+      const x = document.createElement('button');
+      x.type = 'button'; x.className = 'modal-close'; x.textContent = '×';
+      x.addEventListener('click', () => backdrop.remove());
+      head.appendChild(h2); head.appendChild(x);
+      const bodyM = document.createElement('div');
+      bodyM.className = 'modal-body modal-form-body';
+      for (const s of enabledFirst) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn-action';
+        b.style.width = '100%';
+        b.textContent = s.name;
+        b.addEventListener('click', () => {
+          useCanvasStore().skyMap?.pinActiveIfFloating();
+          fovStore.addAdhocFrame(s.id);
+          backdrop.remove();
+        });
+        bodyM.appendChild(b);
+      }
+      const foot = document.createElement('div');
+      foot.className = 'modal-footer';
+      const newSetupBtn = document.createElement('button');
+      newSetupBtn.type = 'button';
+      newSetupBtn.className = 'btn-cancel';
+      newSetupBtn.textContent = t('fovOverlay.addSetup');
+      newSetupBtn.addEventListener('click', () => {
+        backdrop.remove();
+        openAddSetupModal((created) => {
+          useCanvasStore().skyMap?.pinActiveIfFloating();
+          fovStore.loadSpecs().then(() => fovStore.addAdhocFrame(created.id));
+        });
+      });
+      foot.appendChild(newSetupBtn);
+      modal.appendChild(head); modal.appendChild(bodyM); modal.appendChild(foot);
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+    }).catch(err => reportUnknownRendererError('fov_pick_setup', err));
+  }
+
+  function renderAll() {
+    renderSelect();
+    renderSetupSelect();
+    renderBody();
+  }
+
+  // React to store changes; clean up on close. The dropdowns depend on the plan
+  // list + selection + each plan's setup; the body depends on the resolved frames.
+  const stopFrames = watch(() => fovStore.renderables, () => renderBody(), { deep: true });
+  const stopSelect = watch(
+    () => [fovStore.selection, plansStore.plans.map(p => `${p.id}:${p.name}:${p.setupId}`).join(',')],
+    () => renderAll(),
+    { deep: true },
+  );
+  renderAll();
+
+  popup.__cleanup = () => {
+    stopFrames();
+    stopSelect();
+    uiStore.setForceSuppressTooltip(false);
+  };
+
+  // Defer onReady so the popup is in the DOM and can be positioned.
+  requestAnimationFrame(() => onReady?.());
 
   return popup;
 }

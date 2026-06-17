@@ -1,6 +1,6 @@
 <template>
   <div :class="['fov-ribbon', { 'fov-ribbon--collapsed': !ribbonOpen }]">
-    <!-- Telescope button (FOV popup trigger) -->
+    <!-- Telescope button (frame manager popup trigger) -->
     <button
       type="button"
       class="sky-rotation-btn fov-telescope-btn"
@@ -12,14 +12,15 @@
       v-html="telescopeSvg"
     ></button>
 
-    <!-- Rotation step buttons -->
+    <!-- Rotation step buttons (act on the active frame) -->
     <button
       v-for="step in ROTATION_STEPS"
       :key="step.deg"
       type="button"
       class="sky-rotation-btn fov-rotate-btn"
-      :title="step.deg === 0 ? t('display.rotateReset') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
-      :aria-label="step.deg === 0 ? t('display.rotateReset') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
+      :class="{ 'opacity-40 pointer-events-none': !hasActive }"
+      :title="step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
+      :aria-label="step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
       @click="applyRotation(step.deg)"
       @mouseenter="suppress(true)" @mouseleave="suppress(false)"
       @focus="suppress(true)" @blur="suppress(false)"
@@ -40,11 +41,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
-import { loadFovUiState, saveFovUiState, buildFovFrameSpecs, buildFovPopup } from '../../fov-overlay';
-import { getGearSetups } from '../../api';
+import { useFovFramesStore } from '../../stores/fov-frames';
+import { usePlansStore } from '../../stores/plans';
+import { loadFovUiState, saveFovUiState, buildFovPopup } from '../../fov-overlay';
 import { positionPopup } from '../../ui';
 import { useUiStore } from '../../stores/ui';
 import telescopeSvg from '../../icons/telescope.svg?raw';
@@ -59,10 +61,13 @@ import rotateP15Svg from '../../icons/rotate-p15.svg?raw';
 import rotateP45Svg from '../../icons/rotate-p45.svg?raw';
 
 const canvasStore = useCanvasStore();
+const fovStore = useFovFramesStore();
+const plansStore = usePlansStore();
 const uiStore = useUiStore();
 
 const fovUiState = loadFovUiState();
 const ribbonOpen = ref(fovUiState.ribbonOpen);
+const hasActive = computed(() => !!fovStore.activeId);
 
 const ROTATION_STEPS = [
   { deg: -45, label: '-45°', svg: rotateM45Svg },
@@ -80,26 +85,21 @@ let telescopeBtnEl: HTMLElement | null = null;
 let fovPopupEl: HTMLElement | null = null;
 
 function applyRotation(stepDeg: number) {
-  let n = stepDeg === 0 ? 0 : fovUiState.frameRotationDeg + stepDeg;
-  n = n % 360;
-  if (n > 180) n -= 360;
-  if (n < -180) n += 360;
-  fovUiState.frameRotationDeg = n;
-  saveFovUiState(fovUiState);
-  canvasStore.skyMap?.setFovRotationDeg(n);
+  const id = fovStore.activeId;
+  if (!id) return;
+  if (stepDeg === 0) fovStore.resetRotation(id);
+  else fovStore.nudgeRotation(id, stepDeg);
 }
 
 function closeFovPopup() {
+  (fovPopupEl as (HTMLElement & { __cleanup?: () => void }) | null)?.__cleanup?.();
   fovPopupEl?.remove();
   fovPopupEl = null;
 }
 
-function togglePopup(e: MouseEvent) {
+function togglePopup() {
   if (fovPopupEl) { closeFovPopup(); return; }
-  const refreshFrames = (setups: Parameters<typeof buildFovFrameSpecs>[0]) => {
-    buildFovFrameSpecs(setups).then(specs => canvasStore.skyMap?.setFovFrames(specs));
-  };
-  fovPopupEl = buildFovPopup(canvasStore.skyMap!, refreshFrames, closeFovPopup, () => {
+  fovPopupEl = buildFovPopup(closeFovPopup, () => {
     if (fovPopupEl && telescopeBtnEl) {
       positionPopup(fovPopupEl, telescopeBtnEl.getBoundingClientRect());
     }
@@ -112,32 +112,39 @@ function toggleRibbon() {
   saveFovUiState(fovUiState);
 }
 
-function onDocClick(e: MouseEvent) {
-  if (fovPopupEl && !fovPopupEl.contains(e.target as Node) && e.target !== telescopeBtnEl) {
-    closeFovPopup();
-  }
-}
-
 function suppress(v: boolean) {
   uiStore.setForceSuppressTooltip(v);
 }
 
 onMounted(() => {
   telescopeBtnEl = document.querySelector('.fov-telescope-btn');
-  document.addEventListener('click', onDocClick);
-  // Initial frame setup
-  canvasStore.skyMap?.setFovRotationDeg(fovUiState.frameRotationDeg);
+  // The frame manager stays open while you select / pin / rotate frames on the
+  // map — it only closes via its × button or the telescope toggle (no
+  // click-outside-to-close, which would dismiss it on every map interaction).
+
+  const sm = canvasStore.skyMap;
+
+  // Legacy one-shot centred preview (e.g. a target opened with a specific setup).
   const override = canvasStore.pendingFovOverride;
   if (override) {
     canvasStore.pendingFovOverride = null;
-    canvasStore.skyMap?.setFovFrames(override);
-  } else {
-    getGearSetups().then(setups => buildFovFrameSpecs(setups)).then(specs => canvasStore.skyMap?.setFovFrames(specs));
+    sm?.setFovFrames(override);
   }
+
+  // Interactive frame system: wire canvas interactions to the store and push
+  // the resolved frames to the map whenever plans / ad-hoc frames change.
+  if (sm) {
+    sm.setOnFovInstanceSelect(id => fovStore.setActive(id));
+    sm.setOnFovInstanceChange((id, change) => fovStore.applyChange(id, change));
+  }
+  plansStore.ensureLoaded();
+  fovStore.loadSpecs();
+  // Refresh gear specs when a plan's setup changes (a new setup may need sizing).
+  watch(() => plansStore.plans.map(p => p.setupId).join(','), () => fovStore.loadSpecs());
+  watch(() => fovStore.renderables, frames => sm?.setFovInstances(frames), { deep: true, immediate: true });
 });
 
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick);
   closeFovPopup();
 });
 </script>

@@ -1453,6 +1453,112 @@
             "description": "Server error"
           }
         }
+      },
+      "patch": {
+        "summary": "Update a plan entry's framing (position angle, frame centre, and target DSO)",
+        "description": "Updates only the fields present in the body. `paDeg` sets the framing rotation. `ra`/`dec` set the frame-centre sky coordinates. `dsoId` sets the target DSO (or null for a custom location with no catalogued object).\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Plan ID"
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Entry ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "paDeg": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Framing position angle in degrees east of celestial north (0–360), or null to clear"
+                  },
+                  "ra": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Frame-centre right ascension in degrees, or null to clear (use the DSO position)"
+                  },
+                  "dec": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Frame-centre declination in degrees, or null to clear"
+                  },
+                  "dsoId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Target DSO id, or null for a custom location"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Entry updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A provided field has the wrong type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entry not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
       }
     },
     "/api/export": {

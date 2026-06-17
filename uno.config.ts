@@ -164,6 +164,19 @@ export default defineConfig({
       'hover:bg-[var(--btn-icon-danger-hover)]',
     ].join(' '),
 
+    // Pressed/on state for an icon toggle button. Off = plain `btn-icon`
+    // (never dim with opacity). On = amber tint fill + accent border + bright
+    // icon — the same active convention used by pagination/language/mirror
+    // buttons. See docs/dev/ui-guidelines.md §2.1.
+    // Overrides are marked important so the active state always wins over the
+    // base `.btn-icon` rule when both classes are applied (`btn-icon
+    // btn-icon--active`), regardless of generated CSS rule order.
+    'btn-icon--active': [
+      'btn-icon',
+      '!bg-[var(--accent-fill-lg)] !border-[var(--border-focus)] !text-bright',
+      'hover:!bg-[var(--accent-fill-xl)]',
+    ].join(' '),
+
     // ── Inputs ───────────────────────────────────────────────────────────────
     // Replaces near-identical rules for star-search-input, tag-input,
     // radec-input, targets-coord-input, targets-date-input.

@@ -369,6 +369,26 @@ Five semantic roles. Map your intent to a role, then use the corresponding class
 > and the old classes removed, keep using the existing class for the component you are editing.
 > Do **not** introduce new button class variants.
 
+#### Icon button active / toggle state
+
+An icon-only button that toggles a persistent state (e.g. the **anchor** button in the
+*Field of View Frames* popup) has an official pressed/on look:
+
+| State | Class | Appearance |
+|---|---|---|
+| **Off** | `btn-icon` | The plain icon button |
+| **On** | `btn-icon btn-icon--active` | Amber tint fill (`--accent-fill-lg`) + accent border (`--border-focus`) + bright icon (`--text-bright`) |
+
+Rules:
+- **Never** dim the off state with `opacity-*` to signal "off" — off is simply the normal
+  button. The on state is what carries the visual cue.
+- The icon SVG must use `currentColor` so `--active` recolors it via `text-bright`.
+- Reflect the state with `aria-pressed="true|false"` on the button.
+
+This reuses the same amber-tint-fill + `--border-focus` active convention already used by the
+`.active` modifiers on pagination, language, hemisphere, and mirror buttons — keeping every
+toggle in the app visually consistent.
+
 ---
 
 ### 2.2 Modals

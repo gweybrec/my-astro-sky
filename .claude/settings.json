@@ -34,7 +34,9 @@
       "Bash(npx asar *)",
       "Bash(node .claude/hooks/*)",
       "PowerShell(npm run *)",
-      "PowerShell(npx vitest *)"
+      "PowerShell(npx vitest *)",
+      "PowerShell(npm test 2>&1)",
+      "PowerShell(npx tsc 2>&1)"
     ],
     "enabledMcpjsonServers": [
       "playwright"

@@ -4,6 +4,7 @@ import {
   angularSizeToCanvasPxForDSO,
   computeDSOHighlightShape,
   dsoCanvasAngleForHighlight,
+  canvasAngleToPADeg,
 } from '../../src/dso-highlight';
 
 describe('dso highlight geometry', () => {
@@ -16,6 +17,26 @@ describe('dso highlight geometry', () => {
 
     const withRotation = dsoCanvasAngleForHighlight(30, 0, 15);
     expect(withRotation).toBeCloseTo(withPa + (15 * Math.PI / 180), 12);
+  });
+
+  it('round-trips canvasAngleToPADeg against dsoCanvasAngleForHighlight', () => {
+    for (const ra of [0, 45, 123, 270, 359]) {
+      for (const rot of [-30, 0, 17, 90]) {
+        for (const pa of [0, 30, 142, 200, 359]) {
+          const canvasAngle = dsoCanvasAngleForHighlight(pa, ra, rot);
+          expect(canvasAngleToPADeg(canvasAngle, ra, rot)).toBeCloseTo(pa, 9);
+        }
+      }
+    }
+  });
+
+  it('normalises recovered position angle to [0, 360)', () => {
+    // An angle that maps back to a negative raw value must wrap into range.
+    const canvasAngle = dsoCanvasAngleForHighlight(-40, 80, 25);
+    const pa = canvasAngleToPADeg(canvasAngle, 80, 25);
+    expect(pa).toBeGreaterThanOrEqual(0);
+    expect(pa).toBeLessThan(360);
+    expect(pa).toBeCloseTo(320, 9); // -40 ≡ 320
   });
 
   it('preserves elongated shape at high zoom when both axes are above floor', () => {

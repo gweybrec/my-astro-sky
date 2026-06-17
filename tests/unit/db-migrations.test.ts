@@ -59,13 +59,13 @@ describe('applyMigrations — fresh database', () => {
   it('returns the latest schema version after first run', () => {
     const db = freshBaseDb();
     const version = applyMigrations(db);
-    expect(version).toBe(2);
+    expect(version).toBe(3);
   });
 
   it('schema_version table contains the latest version', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    expect(schemaVersion(db)).toBe(2);
+    expect(schemaVersion(db)).toBe(3);
   });
 
   it('adds star_ra and star_dec columns to star_correspondences', () => {
@@ -102,8 +102,8 @@ describe('applyMigrations — idempotency', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     const v = applyMigrations(db);
-    expect(v).toBe(2);
-    expect(schemaVersion(db)).toBe(2);
+    expect(v).toBe(3);
+    expect(schemaVersion(db)).toBe(3);
   });
 });
 
@@ -127,7 +127,56 @@ describe('applyMigrations — v2 per-plan night/setup', () => {
   it('is a no-op (no throw) when the plans table is absent', () => {
     const db = freshBaseDb();
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(2);
+    expect(schemaVersion(db)).toBe(3);
+  });
+});
+
+describe('applyMigrations — v3 plan_entries frame position', () => {
+  /** Recreate the pre-v3 plan_entries shape (NOT NULL dso_id, UNIQUE, no ra/dec). */
+  function withOldPlanEntries(db: Database.Database) {
+    db.exec(`
+      CREATE TABLE plan_entries (
+        id       TEXT PRIMARY KEY,
+        plan_id  TEXT NOT NULL,
+        dso_id   TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        pa_deg   REAL,
+        notes    TEXT,
+        UNIQUE(plan_id, dso_id)
+      );
+    `);
+  }
+
+  it('rebuilds plan_entries: dso_id becomes nullable, ra/dec added, rows preserved', () => {
+    const db = freshBaseDb();
+    withOldPlanEntries(db);
+    db.prepare('INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, notes) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('e1', 'p1', 'M42', 0, 142, 'note');
+
+    applyMigrations(db);
+
+    const cols = getColumns(db, 'plan_entries');
+    expect(cols).toContain('ra');
+    expect(cols).toContain('dec');
+    // dso_id is now nullable (was NOT NULL) — a null insert must succeed.
+    expect(() =>
+      db.prepare('INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run('e2', 'p1', null, 1, null, 12.3, 45.6, null),
+    ).not.toThrow();
+
+    const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
+    expect(row.dso_id).toBe('M42');
+    expect(row.pa_deg).toBe(142);
+    expect(schemaVersion(db)).toBe(3);
+  });
+
+  it('is idempotent on an already-migrated plan_entries table', () => {
+    const db = freshBaseDb();
+    withOldPlanEntries(db);
+    applyMigrations(db);
+    expect(() => applyMigrations(db)).not.toThrow();
+    const cols = getColumns(db, 'plan_entries');
+    expect(cols.filter(c => c === 'ra').length).toBe(1);
   });
 });
 
@@ -147,7 +196,7 @@ describe('applyMigrations — existing database (simulates upgrade)', () => {
     db.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
 
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(2);
+    expect(schemaVersion(db)).toBe(3);
   });
 });
 

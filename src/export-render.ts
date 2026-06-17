@@ -537,6 +537,10 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
   const baseView = skyMap.getView();
   const spec = opts.fovSpecs[0] ?? null;
   const savedFrames = skyMap.getFovFrames();
+  // Hide interactive frame instances during export so they don't clutter the
+  // per-target pages (those draw their own centred frame via setFovFrames).
+  const savedInstances = skyMap.getFovInstances();
+  skyMap.setFovInstances([]);
 
   const fmtTime = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -686,6 +690,7 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
     doc.addImage(off.toDataURL('image/jpeg', 0.9), 'JPEG', margin, margin, ovW, ovH);
   } finally {
     skyMap.setFovFrames(savedFrames);
+    skyMap.setFovInstances(savedInstances);
   }
 
   return doc.output('blob');

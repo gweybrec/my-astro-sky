@@ -13,6 +13,7 @@ import {
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import { formatGearFovLabel, fovDeg, formatFov, pixelScaleArcsec } from './gear-presets';
 import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
+import { formatPaDeg } from './frame-orientation';
 import type { GearPreset } from './gear-presets';
 import { recommendRecipe } from './imaging-recipe';
 import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, deleteGearSetupAPI, type GearSetupData, type Plan } from './api';
@@ -29,6 +30,7 @@ import planListSvg from './icons/plan-list.svg?raw';
 import { openAddSetupModal, openEditSetupModal, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
 import { usePlansStore } from './stores/plans';
+import { useFovFramesStore } from './stores/fov-frames';
 import { getDSOById } from './dso-catalog';
 import { twilightWindow } from './astro-time';
 import { maxAltDuringWindow, sampleAltCurve, type AltSample } from './sky-geometry';
@@ -898,6 +900,9 @@ export class TargetsView {
 
   private planMode: 'recommend' | 'plans' = 'recommend';
   private plansStore = usePlansStore(pinia);
+  private fovFramesStore = useFovFramesStore(pinia);
+  /** Live per-entry position-angle value spans, keyed by entryId (rebuilt each render). */
+  private paSpans = new Map<string, HTMLElement>();
   private planBadgeEl: HTMLElement | null = null;
   private planPickerEl: HTMLElement | null = null;
   private planPickerOutside: ((ev: MouseEvent) => void) | null = null;
@@ -910,11 +915,27 @@ export class TargetsView {
     this.prefs = loadPrefs();
     this.container = document.getElementById('targets-container')!;
     this.render();
+    // Keep plan-row PA readouts in sync when a frame is rotated on the map
+    // (frame rotation writes paDeg back through the plans store).
+    this.plansStore.$subscribe(() => this.refreshPaReadouts());
     // Load plans in the background; refresh the badge / plans view when ready.
     this.plansStore.ensureLoaded().then(() => {
       if (this.planMode === 'plans') this.render();
       else this.updatePlanBadge();
     });
+  }
+
+  /** Update the live position-angle spans from current plan-entry values. */
+  private refreshPaReadouts(): void {
+    if (this.paSpans.size === 0) return;
+    for (const [entryId, span] of this.paSpans) {
+      let paDeg: number | null = null;
+      for (const p of this.plansStore.plans) {
+        const e = p.entries.find(en => en.id === entryId);
+        if (e) { paDeg = e.paDeg; break; }
+      }
+      span.textContent = paDeg != null ? formatPaDeg(paDeg) : '—';
+    }
   }
 
   show(): void {
@@ -934,6 +955,7 @@ export class TargetsView {
 
   private render(): void {
     this.container.innerHTML = '';
+    this.paSpans.clear();
     this.container.className = 'targets-view';
     const inner = document.createElement('div');
     inner.className = 'targets-inner';
@@ -1560,10 +1582,7 @@ export class TargetsView {
 
     addSetupBtn.addEventListener('click', () => {
       openAddSetupModal(() => {
-        getGearSetups()
-          .then(setups => buildFovFrameSpecs(setups))
-          .then(specs => this.skyMap.setFovFrames(specs))
-          .catch(() => {});
+        this.fovFramesStore.loadSpecs();
         rebuildSection();
       }, false);
     });
@@ -1663,10 +1682,7 @@ export class TargetsView {
         const setup = selectedSetup();
         if (!setup) return;
         openEditSetupModal(setup, () => {
-          getGearSetups()
-            .then(setups => buildFovFrameSpecs(setups))
-            .then(specs => this.skyMap.setFovFrames(specs))
-            .catch(() => {});
+          this.fovFramesStore.loadSpecs();
           rebuildSection();
         });
       });
@@ -1680,10 +1696,7 @@ export class TargetsView {
             this.prefs.setupId = null;
             savePrefs(this.prefs);
           }
-          getGearSetups()
-            .then(setups => buildFovFrameSpecs(setups))
-            .then(specs => this.skyMap.setFovFrames(specs))
-            .catch(() => {});
+          this.fovFramesStore.loadSpecs();
           rebuildSection();
         }).catch(err => {
           showToast({ message: String(err?.message ?? err), type: 'error', duration: 3500 });
@@ -2143,21 +2156,37 @@ export class TargetsView {
   }
 
   private computePlanTargets(
-    plan: { entries: { id: string; dsoId: string }[] },
+    plan: { entries: Array<{ id: string; dsoId: string | null; ra: number | null; dec: number | null }> },
     loc: ObserverLocation,
     win: { start: Date; end: Date },
   ): PlanTargetInfo[] {
     const out: PlanTargetInfo[] = [];
     for (const e of plan.entries) {
-      const dso = getDSOById(e.dsoId);
-      if (!dso) continue;
-      const { maxAltDeg, atDate } = maxAltDuringWindow(dso.ra, dso.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
-      const curve = sampleAltCurve(dso.ra, dso.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+      const realDso = e.dsoId ? getDSOById(e.dsoId) : null;
+      // Effective position: explicit frame-centre override, else the DSO centre.
+      const ra = e.ra ?? realDso?.ra;
+      const dec = e.dec ?? realDso?.dec;
+      if (ra == null || dec == null) continue; // nothing to place
+      // A frame on empty sky keeps a trajectory but has no catalogue metadata.
+      const dso = realDso ?? this.customLocationDso(e.id, ra, dec);
+      const { maxAltDeg, atDate } = maxAltDuringWindow(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+      const curve = sampleAltCurve(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
       out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve });
     }
     // Transit-ordered: earliest culmination first.
     out.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
     return out;
+  }
+
+  /** Synthetic DSO for a custom-location plan entry (no catalogued object). */
+  private customLocationDso(entryId: string, ra: number, dec: number): DSO {
+    return {
+      id: `custom:${entryId}`,
+      ra, dec, type: '?', majAxis: null, minAxis: null, pa: 0, mag: null,
+      displayName: t('fovOverlay.customLocation'),
+      catalogs: [`${ra.toFixed(1)}°, ${dec.toFixed(1)}°`],
+      emissionLines: null, constellation: null, rating: null, difficulty: null,
+    };
   }
 
   private defaultPlanName(): string {
@@ -2549,6 +2578,11 @@ export class TargetsView {
     const fovItem = this.metaItem(t('targets.results.fov'), '—', t('targets.tooltips.fov'));
     meta2.appendChild(scoreItem);
     meta2.appendChild(fovItem);
+    // Live framing angle (updated when the frame is rotated on the map).
+    const entryPa = this.plansStore.plans.find(p => p.id === planId)?.entries.find(e => e.id === info.entryId)?.paDeg ?? null;
+    const paItem = this.metaItem(t('fovOverlay.angleLabel'), entryPa != null ? formatPaDeg(entryPa) : '—', t('fovOverlay.angleHelp'));
+    meta2.appendChild(paItem);
+    this.paSpans.set(info.entryId, paItem.querySelector('.target-meta-value')!);
     left.appendChild(meta2);
 
     const totalEl = document.createElement('div');

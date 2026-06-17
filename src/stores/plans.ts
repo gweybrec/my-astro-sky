@@ -10,6 +10,8 @@ import {
   addPlanEntryAPI,
   removePlanEntryAPI,
   reorderPlanEntriesAPI,
+  updatePlanEntryPAAPI,
+  updatePlanEntryPositionAPI,
   type Plan,
 } from '../api';
 import { reportUnknownRendererError } from '../error-reporter';
@@ -21,6 +23,8 @@ import { reportUnknownRendererError } from '../error-reporter';
 export const usePlansStore = defineStore('plans', () => {
   const plans = ref<Plan[]>([]);
   const loaded = ref(false);
+  // Per-entry debounce timers for position-angle persistence (drag coalescing).
+  const paWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   const planCount = computed(() => plans.value.length);
   const entryCount = computed(() => plans.value.reduce((n, p) => n + p.entries.length, 0));
@@ -127,6 +131,57 @@ export const usePlansStore = defineStore('plans', () => {
     else await addEntry(planId, dsoId);
   }
 
+  /**
+   * Set a plan entry's framing position angle. Mutates the local cache
+   * immediately (so frame dragging re-renders without a round-trip) and
+   * debounces the background persist so a drag coalesces into one request —
+   * deliberately does NOT call load().
+   */
+  function setEntryPA(planId: string, entryId: string, paDeg: number | null): void {
+    const entry = plans.value.find(p => p.id === planId)?.entries.find(e => e.id === entryId);
+    if (entry) entry.paDeg = paDeg;
+    const prev = paWriteTimers.get(entryId);
+    if (prev) clearTimeout(prev);
+    paWriteTimers.set(entryId, setTimeout(() => {
+      paWriteTimers.delete(entryId);
+      updatePlanEntryPAAPI(planId, entryId, paDeg).catch(err => {
+        reportUnknownRendererError('plan_set_entry_pa_failed', err, { planId, entryId });
+      });
+    }, 250));
+  }
+
+  /**
+   * Update a plan entry's frame position (centre ra/dec) and/or target dso.
+   * Mutates the local cache immediately (so dragging re-renders without a
+   * round-trip) and debounces the background persist so a drag coalesces into
+   * one request — deliberately does NOT call load().
+   */
+  function setEntryPosition(
+    planId: string,
+    entryId: string,
+    fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+  ): void {
+    const entry = plans.value.find(p => p.id === planId)?.entries.find(e => e.id === entryId);
+    if (entry) {
+      if ('ra' in fields) entry.ra = fields.ra ?? null;
+      if ('dec' in fields) entry.dec = fields.dec ?? null;
+      if ('paDeg' in fields) entry.paDeg = fields.paDeg ?? null;
+      if ('dsoId' in fields) entry.dsoId = fields.dsoId ?? null;
+    }
+    const prev = paWriteTimers.get(entryId);
+    if (prev) clearTimeout(prev);
+    // Flush the entry's full framing from the cache so a move and a rotation that
+    // land in the same debounce window can't drop each other's field.
+    paWriteTimers.set(entryId, setTimeout(() => {
+      paWriteTimers.delete(entryId);
+      const e = plans.value.find(p => p.id === planId)?.entries.find(x => x.id === entryId);
+      if (!e) return;
+      updatePlanEntryPositionAPI(planId, entryId, { ra: e.ra, dec: e.dec, paDeg: e.paDeg, dsoId: e.dsoId }).catch(err => {
+        reportUnknownRendererError('plan_set_entry_position_failed', err, { planId, entryId });
+      });
+    }, 250));
+  }
+
   async function reorderEntries(planId: string, ids: string[]): Promise<void> {
     try {
       await reorderPlanEntriesAPI(planId, ids);
@@ -154,5 +209,7 @@ export const usePlansStore = defineStore('plans', () => {
     removeEntry,
     toggleEntry,
     reorderEntries,
+    setEntryPA,
+    setEntryPosition,
   };
 });

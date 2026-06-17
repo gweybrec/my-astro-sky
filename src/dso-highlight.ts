@@ -21,6 +21,19 @@ export function dsoCanvasAngleForHighlight(paDeg: number | null, raDeg: number, 
   return northAngle - (paDeg ?? 0) * DEG2RAD + viewRotationDeg * DEG2RAD;
 }
 
+/**
+ * Inverse of {@link dsoCanvasAngleForHighlight}: given the on-screen (canvas) rotation
+ * angle of a frame anchored at `raDeg` under map rotation `viewRotationDeg`, recover the
+ * celestial position angle in degrees east of north, normalised to [0, 360).
+ */
+export function canvasAngleToPADeg(canvasAngle: number, raDeg: number, viewRotationDeg: number): number {
+  const raRad = raDeg * DEG2RAD;
+  const northAngle = Math.atan2(Math.cos(raRad), -Math.sin(raRad));
+  let pa = (northAngle + viewRotationDeg * DEG2RAD - canvasAngle) / DEG2RAD;
+  pa = ((pa % 360) + 360) % 360;
+  return pa;
+}
+
 export interface DSOHighlightShape {
   rx: number;
   ry: number;

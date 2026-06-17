@@ -78,3 +78,11 @@ export function confirmPlanDelete(planName: string): Promise<boolean> {
     t('targets.plan.delete'),
   );
 }
+
+export function confirmPlanEntryDelete(targetName: string): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('fovOverlay.deleteFrame'),
+    t('fovOverlay.deleteFrameConfirm', { name: targetName }),
+    t('fovOverlay.deleteFrame'),
+  );
+}

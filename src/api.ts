@@ -720,9 +720,13 @@ export async function deleteAllGearSetupsAPI(): Promise<void> {
 
 export interface PlanEntry {
   id: string;
-  dsoId: string;
+  /** Target DSO id, or null for a custom location (framed on empty sky). */
+  dsoId: string | null;
   position: number;
   paDeg: number | null;
+  /** Frame-centre sky coordinates (degrees); null → use the DSO position. */
+  ra: number | null;
+  dec: number | null;
   notes: string | null;
 }
 
@@ -833,5 +837,38 @@ export async function reorderPlanEntriesAPI(planId: string, ids: string[]): Prom
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to reorder plan entries');
+  }
+}
+
+export async function updatePlanEntryPAAPI(planId: string, entryId: string, paDeg: number | null): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paDeg }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update plan entry position angle');
+  }
+}
+
+/**
+ * Update a plan entry's frame position and/or target. Only the provided fields
+ * are sent (the PATCH route applies a partial update), so a position drag and a
+ * rotation persist independently.
+ */
+export async function updatePlanEntryPositionAPI(
+  planId: string,
+  entryId: string,
+  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update plan entry position');
   }
 }
