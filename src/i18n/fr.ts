@@ -271,7 +271,7 @@ const fr = {
     aboutAuthorLabel: 'Auteur',
     aboutLicenseLabel: 'Licence',
     aboutDesc: 'MyAstroSky est une carte du ciel interactive permettant de superposer vos astrophotographies sur une projection stéréographique polaire. Positionnez vos photos manuellement ou via des solveurs astrométriques, puis explorez votre ciel.',
-    aboutFeatures: 'Projection stéréographique · Résolution de plaque (ASTAP, solve-field, astrometry.net) · 12 000+ objets du ciel profond · Recommandation de cibles · Sauvegarde & restauration pour transférer entre appareils et utilisateurs',
+    aboutFeatures: 'Projection stéréographique · Résolution de plaque (ASTAP, solve-field, astrometry.net) · 12 000+ objets du ciel profond · Recommandation de cibles · Plans d\'observation par nuit · Sauvegarde & restauration pour transférer entre appareils et utilisateurs',
     privacyTitle: 'Confidentialité',
     privacyLocal: 'Toutes vos données (photos, métadonnées, paramètres) sont stockées localement sur votre appareil. Les connexions vers des serveurs externes se limitent aux cas décrits ci-dessous.',
     privacyException: 'Exception : solveur astrometry.net',

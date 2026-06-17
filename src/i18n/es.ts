@@ -273,7 +273,7 @@ const es: Translations = {
     aboutAuthorLabel: 'Autor',
     aboutLicenseLabel: 'Licencia',
     aboutDesc: 'MyAstroSky es un mapa del cielo interactivo para astrofotógrafos. Superpone tus astrofotografías sobre una proyección estereográfica polar, posiciónalas manualmente o con solvers astrométricos, y explora tu cielo.',
-    aboutFeatures: 'Proyección estereográfica polar · Solución de placa (ASTAP, solve-field, astrometry.net) · Más de 12 000 objetos de cielo profundo · Recomendación de objetivos · Copia de seguridad y restauración para transferir entre dispositivos y usuarios',
+    aboutFeatures: 'Proyección estereográfica polar · Solución de placa (ASTAP, solve-field, astrometry.net) · Más de 12 000 objetos de cielo profundo · Recomendación de objetivos · Planes de observación por noche · Copia de seguridad y restauración para transferir entre dispositivos y usuarios',
     privacyTitle: 'Privacidad',
     privacyLocal: 'Todos tus datos (fotos, metadatos, ajustes) se almacenan localmente en tu dispositivo. Las conexiones externas se limitan a los casos descritos a continuación.',
     privacyException: 'Excepción: solver astrometry.net',

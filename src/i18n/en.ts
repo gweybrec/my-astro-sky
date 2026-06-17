@@ -271,7 +271,7 @@ const en: Translations = {
     aboutAuthorLabel: 'Author',
     aboutLicenseLabel: 'License',
     aboutDesc: 'MyAstroSky is an interactive sky map for astrophotographers. Overlay your astrophotographs on a stereographic polar projection, position them manually or with plate solvers, and explore your sky.',
-    aboutFeatures: 'Stereographic polar projection · Plate solving (ASTAP, solve-field, astrometry.net) · 12,000+ deep-sky objects · Target recommendations · Backup & restore to transfer between devices and users',
+    aboutFeatures: 'Stereographic polar projection · Plate solving (ASTAP, solve-field, astrometry.net) · 12,000+ deep-sky objects · Target recommendations · Observing plans by night · Backup & restore to transfer between devices and users',
     privacyTitle: 'Privacy',
     privacyLocal: 'All your data (photos, metadata, settings) is stored locally on your device. External network connections are limited to the cases described below.',
     privacyException: 'Exception: astrometry.net solver',

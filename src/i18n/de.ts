@@ -273,7 +273,7 @@ const de: Translations = {
     aboutAuthorLabel: 'Autor',
     aboutLicenseLabel: 'Lizenz',
     aboutDesc: 'MyAstroSky ist eine interaktive Himmelskarte für Astrofotografen. Lege deine Astrofotografien auf einer stereographischen Polarprojektion ab, positioniere sie manuell oder mit Plate-Solvern und erkunde deinen Himmel.',
-    aboutFeatures: 'Stereographische Polarprojektion · Plate Solving (ASTAP, solve-field, astrometry.net) · Über 12.000 Deep-Sky-Objekte · Zielempfehlungen · Sicherung & Wiederherstellung zur Übertragung zwischen Geräten und Nutzern',
+    aboutFeatures: 'Stereographische Polarprojektion · Plate Solving (ASTAP, solve-field, astrometry.net) · Über 12.000 Deep-Sky-Objekte · Zielempfehlungen · Beobachtungspläne nach Nacht · Sicherung & Wiederherstellung zur Übertragung zwischen Geräten und Nutzern',
     privacyTitle: 'Datenschutz',
     privacyLocal: 'Alle deine Daten (Fotos, Metadaten, Einstellungen) werden lokal auf deinem Gerät gespeichert. Externe Netzwerkverbindungen beschränken sich auf die unten beschriebenen Fälle.',
     privacyException: 'Ausnahme: astrometry.net Solver',
