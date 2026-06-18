@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planGrid, tileCenters, mosaicBounds, autoRegionForDso } from '../../src/mosaic';
+import { planGrid, tileCenters, mosaicBounds, autoRegionForDso, framePointToSky } from '../../src/mosaic';
 
 /** Angular separation (deg) between two sky points, via the haversine formula. */
 function sep(a: { ra: number; dec: number }, b: { ra: number; dec: number }): number {
@@ -123,5 +123,49 @@ describe('autoRegionForDso', () => {
     const r = autoRegionForDso({ majAxis: null, minAxis: null, pa: 10 }, 20);
     expect(r).toEqual({ wDeg: 0, hDeg: 0, paDeg: 10 });
     expect(planGrid(1, 1, r.wDeg, r.hDeg, 20)).toEqual({ cols: 1, rows: 1 });
+  });
+});
+
+describe('framePointToSky', () => {
+  const center = { ra: 80, dec: 0 };
+
+  it('returns the centre for a zero offset', () => {
+    const p = framePointToSky(center, 0, 0, 0);
+    expect(p.ra).toBeCloseTo(80, 6);
+    expect(p.dec).toBeCloseTo(0, 6);
+  });
+
+  it('moves "up" (gy) toward the north at PA 0', () => {
+    const p = framePointToSky(center, 0, 0, 1);
+    expect(p.dec).toBeCloseTo(1, 3);          // +1° north
+    expect(p.ra).toBeCloseTo(80, 3);          // RA unchanged on the meridian
+    expect(sep(p, center)).toBeCloseTo(1, 3); // 1° away
+  });
+
+  it('moves "right" (gx) toward the east at PA 0', () => {
+    const p = framePointToSky(center, 0, 1, 0);
+    expect(p.ra).toBeGreaterThan(80);         // toward increasing RA (east)
+    expect(p.dec).toBeCloseTo(0, 3);
+    expect(sep(p, center)).toBeCloseTo(1, 3);
+  });
+
+  it('PA rotates the frame: up at PA 90 goes the same way as right at PA 0', () => {
+    const up90 = framePointToSky(center, 90, 0, 1);
+    const right0 = framePointToSky(center, 0, 1, 0);
+    expect(sep(up90, right0)).toBeLessThan(1e-6);
+  });
+
+  it('matches the layout tileCenters uses (a single tile sits at the centre)', () => {
+    const [tile] = tileCenters(center, 35, 1, 1, 1, 1, 20);
+    const p = framePointToSky(center, 35, 0, 0);
+    expect(sep(p, tile)).toBeLessThan(1e-9);
+  });
+
+  it('places the centre of a tile at its grid offset', () => {
+    // 3×1 grid, 0% overlap, 1° tiles, PA 0: the right tile centre sits +1° east.
+    const tiles = tileCenters(center, 0, 3, 1, 1, 1, 0);
+    const right = tiles.find(t => t.col === 2 && t.row === 0)!;
+    const expected = framePointToSky(center, 0, 1, 0); // col offset = +1 step
+    expect(sep(right, expected)).toBeLessThan(1e-9);
   });
 });

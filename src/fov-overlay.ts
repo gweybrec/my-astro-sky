@@ -578,15 +578,16 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     }
 
     for (const f of frames) {
-      if (f.mosaicId) continue; // mosaic tiles are summarised in one row below
+      if (f.mosaicId && !f.isMosaicOutline) continue; // tiles: the mosaic's outline row stands in for them
 
       const row = document.createElement('div');
       row.className = 'fov-popup-setup-row';
 
       const isPlan = f.id.startsWith('plan:');
+      const isMosaic = !!f.isMosaicOutline;
 
       // Free frames: a leading checkbox shows/hides the frame on the map.
-      if (!isPlan) {
+      if (!isPlan && !isMosaic) {
         const visBox = document.createElement('input');
         visBox.type = 'checkbox';
         visBox.className = 'shrink-0';
@@ -611,7 +612,7 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       const nameSpan = document.createElement('span');
       // Active frame's name is emphasised + accent-coloured to match the canvas.
       nameSpan.className = f.active ? 'font-semibold text-[var(--accent-color)]' : 'text-primary';
-      nameSpan.textContent = isPlan ? (f.anchorLabel ?? t('fovOverlay.customLocation')) : f.label;
+      nameSpan.textContent = (isPlan || isMosaic) ? (f.anchorLabel ?? t('fovOverlay.customLocation')) : f.label;
       labelEl.appendChild(nameSpan);
 
       // Status line: floating/pinned state + PA readout (no gear label in plan
@@ -624,7 +625,7 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       const parts: string[] = [];
       if (f.anchorKind === 'screen') {
         parts.push(t('fovOverlay.floating'));
-      } else if (!isPlan) {
+      } else if (!isPlan && !isMosaic) {
         parts.push(f.anchorLabel ? `${t('fovOverlay.pinnedTo')} ${f.anchorLabel}` : t('fovOverlay.pinned'));
       }
       if (f.anchorKind === 'sky' && f.paDeg != null) {
@@ -662,78 +663,17 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       deleteBtn.title = t('fovOverlay.deleteFrame');
       deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (isPlan) {
+        const name = f.anchorLabel ?? t('fovOverlay.customLocation');
+        if (isMosaic) {
+          const [, planId, mosaicId] = f.id.split(':');
+          if (await confirmPlanEntryDelete(name)) await plansStore.deleteMosaic(planId, mosaicId);
+        } else if (isPlan) {
           // Plan frames map to plan entries — confirm, then remove from the plan
           // (reflected in the Targets & Plan tab).
-          const name = f.anchorLabel ?? t('fovOverlay.customLocation');
           if (await confirmPlanEntryDelete(name)) await fovStore.deletePlanFrame(f.id);
         } else {
           fovStore.removeFrame(f.id);
         }
-      });
-      actions.appendChild(deleteBtn);
-
-      row.appendChild(labelEl);
-      row.appendChild(actions);
-      body.appendChild(row);
-    }
-
-    // Mosaic summary rows (one per mosaic), shown beneath the standalone frames.
-    if (isPlanMode) renderMosaicRows();
-  }
-
-  /** Render one row per mosaic in the selected plan: target, panels, scale, delete. */
-  function renderMosaicRows(): void {
-    const sel = fovStore.selection;
-    if (sel.kind !== 'plan') return;
-    const plan = plansStore.plans.find(p => p.id === sel.planId);
-    if (!plan || !plan.setupId) return;
-    const spec = fovStore.specs.get(plan.setupId);
-    for (const mosaic of plan.mosaics ?? []) {
-      const tileCount = plan.entries.filter(e => e.mosaicId === mosaic.id).length;
-      const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
-      const name = dso ? (dso.displayName ?? dso.id) : t('fovOverlay.customLocation');
-
-      const f = 1 - mosaic.overlapPct / 100 || 1;
-      const wDeg = spec ? (mosaic.cols - 1) * spec.wDeg * f + spec.wDeg : 0;
-      const hDeg = spec ? (mosaic.rows - 1) * spec.hDeg * f + spec.hDeg : 0;
-
-      const row = document.createElement('div');
-      row.className = 'fov-popup-setup-row';
-
-      // Same layout as a standalone frame row: clickable name centres it on the
-      // map, with a status line beneath.
-      const labelEl = document.createElement('div');
-      labelEl.className = 'flex-1 cursor-pointer text-small';
-      labelEl.title = t('fovOverlay.centerOnMap');
-      labelEl.addEventListener('click', () => {
-        useCanvasStore().skyMap?.centerOnMosaic(mosaic.centerRa, mosaic.centerDec, wDeg || 1, hDeg || 1);
-      });
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'text-primary';
-      nameSpan.textContent = name;
-      labelEl.appendChild(nameSpan);
-
-      const status = document.createElement('span');
-      status.style.display = 'block';
-      status.style.fontSize = 'var(--font-size-micro)';
-      status.style.color = 'var(--text-muted)';
-      status.style.marginTop = '1px';
-      const parts = [`${t('targets.plan.mosaicLabel')} · ${tileCount} ${t('fovOverlay.mosaicPanels')}`];
-      if (spec) parts.push(formatFov(wDeg, hDeg));
-      status.textContent = parts.join(' · ');
-      labelEl.appendChild(status);
-
-      const actions = document.createElement('div');
-      actions.className = 'fov-popup-setup-actions';
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.className = 'btn-icon btn-icon--danger';
-      deleteBtn.innerHTML = trashSvg;
-      deleteBtn.title = t('fovOverlay.deleteMosaic');
-      deleteBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (await confirmPlanEntryDelete(name)) await plansStore.deleteMosaic(plan.id, mosaic.id);
       });
       actions.appendChild(deleteBtn);
 

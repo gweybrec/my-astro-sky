@@ -86,6 +86,19 @@ function offsetSky(ra0Deg: number, dec0Deg: number, eastDeg: number, northDeg: n
 }
 
 /**
+ * A frame-local offset (gx along the frame's right, gy along its up, in degrees)
+ * about `center` at position angle `paDeg` → sky coordinates. This is the exact
+ * placement math {@link tileCenters} uses, exposed so the mosaic outline can be
+ * sampled to follow the same tangent-plane geometry as its tiles.
+ */
+export function framePointToSky(center: { ra: number; dec: number }, paDeg: number, gxDeg: number, gyDeg: number): { ra: number; dec: number } {
+  const paRad = paDeg * DEG2RAD;
+  const east = gxDeg * Math.cos(paRad) + gyDeg * Math.sin(paRad);
+  const north = -gxDeg * Math.sin(paRad) + gyDeg * Math.cos(paRad);
+  return offsetSky(center.ra, center.dec, east, north);
+}
+
+/**
  * Grid dimensions (cols × rows) that cover a `regionWDeg × regionHDeg` region
  * with the given single-tile FOV and overlap percentage. Width maps to columns,
  * height to rows. A region smaller than one tile yields a 1×1 grid.

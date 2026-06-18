@@ -71,3 +71,43 @@ export function rotateHandlePos(cx: number, cy: number, halfHPx: number, rotatio
 export function canvasRotationDegFromCursor(cx: number, cy: number, mx: number, my: number): number {
   return Math.atan2(mx - cx, -(my - cy)) * RAD2DEG;
 }
+
+export interface ResizeResult {
+  /** New centre in canvas px. */
+  cx: number;
+  cy: number;
+  /** New half-dimensions in canvas px. */
+  halfW: number;
+  halfH: number;
+}
+
+/**
+ * Resize a rotated frame by dragging one corner to (mx, my) while the **centre
+ * stays fixed** — the frame grows/shrinks symmetrically in all directions.
+ * `corners` are the frame's 4 canvas corners (clockwise from top-left, as
+ * {@link computeFovFrameCorners} returns), `cornerIdx` is the grabbed corner,
+ * `rotationDeg` the frame's canvas rotation.
+ *
+ * The cursor offset from the centre is projected onto the frame's local right
+ * axis (cos, sin) and down axis (−sin, cos); each |projection| is a half-extent
+ * (the dragged corner sits a half-width/height from the centre).
+ */
+export function resizeFromCorner(corners: Pt[], cornerIdx: number, mx: number, my: number, rotationDeg: number): ResizeResult {
+  const opp = corners[(cornerIdx + 2) % 4];
+  const drag = corners[cornerIdx];
+  const cx = (opp.x + drag.x) / 2; // frame centre (unchanged by the resize)
+  const cy = (opp.y + drag.y) / 2;
+  const dx = mx - cx;
+  const dy = my - cy;
+  const a = rotationDeg * DEG2RAD;
+  const cosA = Math.cos(a);
+  const sinA = Math.sin(a);
+  const localW = dx * cosA + dy * sinA;     // along local +x (right)
+  const localH = dx * -sinA + dy * cosA;    // along local +y (down)
+  return {
+    cx,
+    cy,
+    halfW: Math.abs(localW),
+    halfH: Math.abs(localH),
+  };
+}

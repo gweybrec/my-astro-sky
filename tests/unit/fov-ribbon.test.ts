@@ -33,6 +33,7 @@ function makeSkyMap() {
     setFovInstances: vi.fn(),
     setOnFovInstanceSelect: vi.fn(),
     setOnFovInstanceChange: vi.fn(),
+    setOnFovFrameResize: vi.fn(),
     pinAllFloatingFrames: vi.fn(),
   };
 }

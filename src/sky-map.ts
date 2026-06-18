@@ -1,5 +1,6 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
 import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle } from './projection';
+import { framePointToSky } from './mosaic';
 import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle } from './star-catalog';
 import { getDSOs, getDSOCatalog } from './dso-catalog';
 import { frameTargetDso } from './fov-frame-target';
@@ -10,6 +11,7 @@ import {
   isNearHandle,
   rotateHandlePos,
   canvasRotationDegFromCursor,
+  resizeFromCorner,
 } from './fov-frame-geometry';
 import pinSvgRaw from './icons/pin.svg?raw';
 import { computeFovTargetScale } from './gear-presets';
@@ -142,6 +144,24 @@ export interface RenderableFrame {
    * single bounding outline; they are not individually selectable in Phase 1.
    */
   mosaicId?: string | null;
+  /**
+   * Whether the frame shows corner resize handles: dragging a corner extends the
+   * frame into a mosaic that covers the new region. Set for standalone plan
+   * frames (which can become a plan mosaic).
+   */
+  resizable?: boolean;
+  /** True on the single outline frame that represents a whole mosaic (selectable,
+   * movable, rotatable, resizable); its tiles carry `mosaicId` instead. */
+  isMosaicOutline?: boolean;
+}
+
+/** Region (sky terms) produced by a drag-to-extend gesture on a frame. */
+export interface FovFrameResizeRegion {
+  centerRa: number;
+  centerDec: number;
+  wDeg: number;
+  hDeg: number;
+  paDeg: number;
 }
 
 /** Change emitted when the user moves/rotates/pins an interactive frame. */
@@ -297,7 +317,10 @@ export class SkyMap {
   private fovInstances: RenderableFrame[] = [];
   private onFovInstanceSelect: ((id: string | null) => void) | null = null;
   private onFovInstanceChange: ((id: string, change: FovFrameChange) => void) | null = null;
-  private frameDrag: { id: string; mode: 'move' | 'rotate' } | null = null;
+  private frameDrag: { id: string; mode: 'move' | 'rotate' | 'resize'; corner?: number } | null = null;
+  // Transient rubber-band rectangle shown while a resize drag is in progress.
+  private resizeDraft: { cx: number; cy: number; halfW: number; halfH: number; rotDeg: number } | null = null;
+  private onFovFrameResize: ((id: string, region: FovFrameResizeRegion) => void) | null = null;
 
   // Spatial indexes for fast hover detection
   private starIndex = new SpatialIndex<Star>(0.02);
@@ -421,6 +444,7 @@ export class SkyMap {
   getFovInstances(): RenderableFrame[] { return this.fovInstances; }
   setOnFovInstanceSelect(cb: (id: string | null) => void) { this.onFovInstanceSelect = cb; }
   setOnFovInstanceChange(cb: (id: string, change: FovFrameChange) => void) { this.onFovInstanceChange = cb; }
+  setOnFovFrameResize(cb: (id: string, region: FovFrameResizeRegion) => void) { this.onFovFrameResize = cb; }
   setOnPhotoClick(cb: (photoName: string) => void) { this.onPhotoClick = cb; }
   setOnDSOClick(cb: (dso: DSO) => void) { this.onDSOClick = cb; }
 
@@ -803,6 +827,7 @@ export class SkyMap {
 
     this.addEvent(window, 'mouseup', ((e: MouseEvent) => {
       if (this.frameDrag) {
+        if (this.frameDrag.mode === 'resize') this.finalizeResize();
         this.frameDrag = null;
         return;
       }
@@ -1377,6 +1402,14 @@ export class SkyMap {
   }
 
   private frameGeometry(f: RenderableFrame): { corners: Point[]; cx: number; cy: number; rotDeg: number; halfW: number; halfH: number } {
+    // A mosaic outline hugs its tiles exactly via tangent-plane (gnomonic)
+    // geometry. The same geometry is used whether it's pinned or floating (centre
+    // and PA are derived from the anchor either way), so the pin/float toggle is
+    // continuous — no jump — and shares the standard frame code.
+    if (f.isMosaicOutline) {
+      const g = this.mosaicOutlineGeometry(f);
+      if (g) return g;
+    }
     const { cx, cy } = this.frameAnchorCanvas(f);
     const decForSize = f.anchorKind === 'sky' ? (f.dec ?? 0) : unproject(this.view.centerX, this.view.centerY).dec;
     const halfW = angularSizeToCanvasPx(f.wDeg * 30, decForSize, this.view.scale);
@@ -1384,6 +1417,78 @@ export class SkyMap {
     const rotDeg = this.frameCanvasRotationDeg(f);
     const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rotDeg);
     return { corners, cx, cy, rotDeg, halfW, halfH };
+  }
+
+  /**
+   * Sky centre + position angle of a mosaic outline. Pinned: the stored centre
+   * and PA. Floating: the sky point under its screen anchor and the PA that
+   * reproduces its screen rotation there — so the gnomonic geometry is continuous
+   * as the pin toggles between sky and screen.
+   */
+  private mosaicCenterPa(f: RenderableFrame): { center: { ra: number; dec: number }; paDeg: number } | null {
+    if (f.anchorKind === 'sky') {
+      if (f.ra == null || f.dec == null) return null;
+      return { center: { ra: f.ra, dec: f.dec }, paDeg: f.paDeg ?? 0 };
+    }
+    const { cx, cy } = this.frameAnchorCanvas(f);
+    const proj = fromCanvas(cx, cy, this.view);
+    const center = unproject(proj.x, proj.y);
+    return { center, paDeg: this.canvasRotDegToPa(f.screenRotationDeg ?? 0, center.ra) };
+  }
+
+  /**
+   * Handle geometry of a mosaic outline: its four region corners (the exact
+   * tangent-plane corners that {@link mosaicOutlinePath} draws to, so handles sit
+   * on the outline), plus centre, rotation and local half-extents.
+   */
+  private mosaicOutlineGeometry(f: RenderableFrame): { corners: Point[]; cx: number; cy: number; rotDeg: number; halfW: number; halfH: number } | null {
+    const cp = this.mosaicCenterPa(f);
+    if (!cp) return null;
+    const halfW = f.wDeg / 2, halfH = f.hDeg / 2;
+    const corner = (gx: number, gy: number): Point => {
+      const s = framePointToSky(cp.center, cp.paDeg, gx, gy);
+      const p = project(s.ra, s.dec);
+      return toCanvas(p.x, p.y, this.view);
+    };
+    // gy+ is "up" (frame north), which is computeFovFrameCorners' −y, so these map
+    // to its clockwise-from-top-left corner order.
+    const corners = [corner(-halfW, halfH), corner(halfW, halfH), corner(halfW, -halfH), corner(-halfW, -halfH)];
+    const cx = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4;
+    const cy = (corners[0].y + corners[1].y + corners[2].y + corners[3].y) / 4;
+    const rotDeg = this.frameCanvasRotationDeg(f);
+    const a = rotDeg * DEG2RAD, cos = Math.cos(a), sin = Math.sin(a);
+    let minL = Infinity, maxL = -Infinity, minM = Infinity, maxM = -Infinity;
+    for (const p of corners) {
+      const l = p.x * cos + p.y * sin, m = -p.x * sin + p.y * cos;
+      minL = Math.min(minL, l); maxL = Math.max(maxL, l);
+      minM = Math.min(minM, m); maxM = Math.max(maxM, m);
+    }
+    return { corners, cx, cy, rotDeg, halfW: (maxL - minL) / 2, halfH: (maxM - minM) / 2 };
+  }
+
+  /**
+   * Outline polyline of a mosaic: the boundary of its tangent-plane region,
+   * sampled and projected so it follows the exact same geometry as the tiles
+   * (they share the placement math). Curves with the projection just like the
+   * grid does — unlike a straight corner-to-corner rectangle.
+   */
+  private mosaicOutlinePath(f: RenderableFrame): Point[] | null {
+    const cp = this.mosaicCenterPa(f);
+    if (!cp) return null;
+    const { center, paDeg } = cp;
+    const halfW = f.wDeg / 2, halfH = f.hDeg / 2;
+    const N = 16; // samples per edge — enough to render the curvature smoothly
+    const pts: Point[] = [];
+    const add = (gx: number, gy: number) => {
+      const s = framePointToSky(center, paDeg, gx, gy);
+      const p = project(s.ra, s.dec);
+      pts.push(toCanvas(p.x, p.y, this.view));
+    };
+    for (let i = 0; i <= N; i++) add(-halfW + (2 * halfW * i) / N, halfH);   // top
+    for (let i = 1; i <= N; i++) add(halfW, halfH - (2 * halfH * i) / N);    // right
+    for (let i = 1; i <= N; i++) add(halfW - (2 * halfW * i) / N, -halfH);   // bottom
+    for (let i = 1; i < N; i++) add(-halfW, -halfH + (2 * halfH * i) / N);   // left
+    return pts;
   }
 
   /** Handles (rotation needle, pin, centre dot) are shown only while the frame
@@ -1399,40 +1504,27 @@ export class SkyMap {
     const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || 'rgba(220,90,90,0.9)';
     const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
 
-    // Accumulate the bounding corners of each mosaic's tiles so a single group
-    // outline + label can be drawn once after the per-tile pass.
-    const mosaicGroups = new Map<string, { minX: number; minY: number; maxX: number; maxY: number; name: string }>();
-
     for (const f of this.fovInstances) {
       if (f.visible === false) continue; // hidden via the manager checkbox
       const { corners, cx, cy, rotDeg, halfW, halfH } = this.frameGeometry(f);
       const isActive = f.active;
-      const isTile = !!f.mosaicId;
+      const isTile = !!f.mosaicId; // a faint mosaic panel (the outline frame draws the rest)
 
       ctx.save();
-      // Mosaic tiles render fainter than a standalone frame and never carry the
-      // active highlight (they are a read-only group in Phase 1).
       ctx.globalAlpha = isTile ? 0.4 : isActive ? 1 : 0.5;
       ctx.strokeStyle = isActive && !isTile ? activeColor : strokeColor;
       ctx.lineWidth = isActive && !isTile ? 2 : 1.5;
       ctx.setLineDash([8, 4]);
+      // A mosaic outline traces its tile perimeter (follows projection curvature);
+      // every other frame is its 4-corner rectangle.
+      const outline = f.isMosaicOutline ? (this.mosaicOutlinePath(f) ?? corners) : corners;
       ctx.beginPath();
-      ctx.moveTo(corners[0].x, corners[0].y);
-      for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+      ctx.moveTo(outline[0].x, outline[0].y);
+      for (let i = 1; i < outline.length; i++) ctx.lineTo(outline[i].x, outline[i].y);
       ctx.closePath();
       ctx.stroke();
 
-      if (isTile) {
-        // Track the union bounds; skip per-tile label and handles.
-        const g = mosaicGroups.get(f.mosaicId!) ?? { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, name: f.name };
-        for (const c of corners) {
-          g.minX = Math.min(g.minX, c.x); g.minY = Math.min(g.minY, c.y);
-          g.maxX = Math.max(g.maxX, c.x); g.maxY = Math.max(g.maxY, c.y);
-        }
-        mosaicGroups.set(f.mosaicId!, g);
-        ctx.restore();
-        continue;
-      }
+      if (isTile) { ctx.restore(); continue; } // tiles: outline only, no label/handles
 
       // Label (setup name only) along the longest edge — hidden when the frame
       // is too small to read it.
@@ -1479,27 +1571,28 @@ export class SkyMap {
           // Pin toggle glyph: pushpin lifted just above the top-right corner.
           this.drawPinGlyph(this.framePinGlyphPos(corners[1], rotDeg), f.anchorKind === 'sky', activeColor);
         }
+        if (f.resizable) {
+          // Corner resize handles (small squares) — drag to extend into a mosaic.
+          ctx.fillStyle = activeColor;
+          for (const c of corners) ctx.fillRect(c.x - 3, c.y - 3, 6, 6);
+        }
       }
       ctx.restore();
     }
 
-    // One bounding outline + label per mosaic, drawn over the faint tiles.
-    for (const g of mosaicGroups.values()) {
-      if (!isFinite(g.minX)) continue;
+    // Rubber-band preview of a drag-to-extend in progress.
+    if (this.resizeDraft) {
+      const d = this.resizeDraft;
+      const pv = computeFovFrameCorners(d.halfW, d.halfH, d.cx, d.cy, d.rotDeg);
       ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = strokeColor;
+      ctx.strokeStyle = activeColor;
       ctx.lineWidth = 1.5;
-      ctx.setLineDash([2, 3]);
-      ctx.strokeRect(g.minX, g.minY, g.maxX - g.minX, g.maxY - g.minY);
-      ctx.setLineDash([]);
-      // Hide the name once the mosaic is too small to read, mirroring the
-      // per-frame label threshold (longest visible edge ≥ 48px).
-      if (Math.max(g.maxX - g.minX, g.maxY - g.minY) >= 48) {
-        ctx.font = '11px sans-serif';
-        ctx.fillStyle = labelColor;
-        ctx.fillText(g.name, g.minX + 2, g.minY - 5);
-      }
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(pv[0].x, pv[0].y);
+      for (let i = 1; i < pv.length; i++) ctx.lineTo(pv[i].x, pv[i].y);
+      ctx.closePath();
+      ctx.stroke();
       ctx.restore();
     }
   }
@@ -1549,6 +1642,16 @@ export class SkyMap {
           const pinPos = this.framePinGlyphPos(geo.corners[1], geo.rotDeg);
           if (isNearHandle(mx, my, pinPos, 10)) { this.toggleFramePin(active); return true; }
         }
+        // Corner resize handles (drag-to-extend into a mosaic) take priority over
+        // the centre move dot and border move.
+        if (active.resizable) {
+          for (let i = 0; i < geo.corners.length; i++) {
+            if (isNearHandle(mx, my, geo.corners[i], 9)) {
+              this.frameDrag = { id: active.id, mode: 'resize', corner: i };
+              return true;
+            }
+          }
+        }
         if (active.movable && isNearHandle(mx, my, { x: geo.cx, y: geo.cy }, 9)) {
           this.frameDrag = { id: active.id, mode: 'move' };
           return true;
@@ -1561,8 +1664,8 @@ export class SkyMap {
       }
     }
 
-    // Select another frame by clicking anywhere inside it (topmost first).
-    // Mosaic tiles are a read-only group in Phase 1, so they aren't selectable.
+    // Select a frame by clicking anywhere inside it (topmost first). Mosaic tiles
+    // (mosaicId set) aren't selectable — the mosaic's outline frame is.
     for (let i = this.fovInstances.length - 1; i >= 0; i--) {
       const f = this.fovInstances[i];
       if (f.active || f.visible === false || f.mosaicId) continue;
@@ -1709,19 +1812,21 @@ export class SkyMap {
     }
   }
 
-  /** Pan + zoom so a mosaic of overall size wDeg×hDeg centred at (ra,dec) fits the
-   * view — the same framing the frame manager uses, sized to the whole mosaic. */
-  centerOnMosaic(ra: number, dec: number, wDeg: number, hDeg: number): void {
-    const minDim = Math.min(this.view.width, this.view.height);
-    const scale = computeFovTargetScale(wDeg, hDeg, dec, getHemisphere(), minDim);
-    this.navigateTo(ra, dec, scale, true);
-  }
-
   /** Apply a frame move/rotate drag for the current cursor position. */
   private handleFrameDragMove(mx: number, my: number): void {
     if (!this.frameDrag) return;
     const f = this.fovInstances.find(x => x.id === this.frameDrag!.id);
     if (!f) { this.frameDrag = null; return; }
+
+    if (this.frameDrag.mode === 'resize') {
+      // Recompute the rubber-band rectangle from the (unchanged) frame geometry's
+      // fixed corner and the cursor; nothing is committed until mouseup.
+      const geo = this.frameGeometry(f);
+      const r = resizeFromCorner(geo.corners, this.frameDrag.corner ?? 2, mx, my, geo.rotDeg);
+      this.resizeDraft = { cx: r.cx, cy: r.cy, halfW: r.halfW, halfH: r.halfH, rotDeg: geo.rotDeg };
+      this.render();
+      return;
+    }
 
     if (this.frameDrag.mode === 'rotate') {
       const { cx, cy } = this.frameAnchorCanvas(f);
@@ -1765,6 +1870,32 @@ export class SkyMap {
         this.onFovInstanceChange?.(f.id, { anchor: { kind: 'screen', nx: mx / this.view.width, ny: my / this.view.height } });
       }
     }
+  }
+
+  /**
+   * Commit a drag-to-extend: convert the rubber-band rectangle to a sky region
+   * (centre + angular size + PA) and hand it to the resize callback, which builds
+   * the mosaic. The angular size scales the frame's single-tile FOV by the px
+   * ratio (so it stays correct at the frame's location). No-op for a drag that
+   * barely changed the size.
+   */
+  private finalizeResize(): void {
+    const draft = this.resizeDraft;
+    this.resizeDraft = null;
+    if (!draft || !this.frameDrag) { this.render(); return; }
+    const f = this.fovInstances.find(x => x.id === this.frameDrag!.id);
+    if (!f) { this.render(); return; }
+    const geo = this.frameGeometry(f);
+    // Px → degrees via the frame's own tile size (avoids re-inverting the projection).
+    const wDeg = f.wDeg * (draft.halfW / Math.max(1e-6, geo.halfW));
+    const hDeg = f.hDeg * (draft.halfH / Math.max(1e-6, geo.halfH));
+    const proj = fromCanvas(draft.cx, draft.cy, this.view);
+    const { ra, dec } = unproject(proj.x, proj.y);
+    // PA that reproduces the frame's on-screen orientation at the new centre
+    // (works whether the frame was sky- or screen-anchored).
+    const paDeg = this.canvasRotDegToPa(geo.rotDeg, ra);
+    this.render();
+    this.onFovFrameResize?.(f.id, { centerRa: ra, centerDec: dec, wDeg, hDeg, paDeg });
   }
 
   private renderBackground() {

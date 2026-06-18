@@ -5,6 +5,7 @@ vi.mock('../../src/api', () => ({
   getGearSetups: vi.fn().mockResolvedValue([
     { id: 's1', name: 'Setup 1', telescopeId: 't1', cameraId: 'c1', accessoryId: null, enabled: true },
   ]),
+  updatePlanMosaicAPI: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../src/gear-catalog', () => ({
@@ -354,5 +355,94 @@ describe('fov-frames store', () => {
     store.resetRotation(id);
     const f = store.renderables.find(x => x.id === id)!;
     expect(f.screenRotationDeg).toBe(0);
+  });
+
+  // ── Mosaics (a frame backed by a tile grid) ─────────────────────────────────
+  /** A plan with one 2×2 mosaic ('mo1') of M42, plus its four tile entries. */
+  function withMosaicPlan(store: ReturnType<typeof useFovFramesStore>) {
+    const plans = usePlansStore();
+    plans.plans = [{
+      id: 'p1', name: 'T', position: 0, nightOf: null, setupId: 's1',
+      entries: [
+        { id: 't0', dsoId: 'M42', position: 0, paDeg: 0, ra: 83.0, dec: -5.0, notes: null, mosaicId: 'mo1' },
+        { id: 't1', dsoId: 'M42', position: 1, paDeg: 0, ra: 84.0, dec: -5.0, notes: null, mosaicId: 'mo1' },
+        { id: 't2', dsoId: 'M42', position: 2, paDeg: 0, ra: 83.0, dec: -6.0, notes: null, mosaicId: 'mo1' },
+        { id: 't3', dsoId: 'M42', position: 3, paDeg: 0, ra: 84.0, dec: -6.0, notes: null, mosaicId: 'mo1' },
+      ],
+      mosaics: [{ id: 'mo1', dsoId: 'M42', centerRa: 83.8, centerDec: -5.4, paDeg: 0, overlapPct: 20, cols: 2, rows: 2, position: 0 }],
+    }] as any;
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+    return plans;
+  }
+
+  it('renders a mosaic as faint tiles plus one selectable, resizable outline frame', async () => {
+    const store = await withSpecs();
+    withMosaicPlan(store);
+    const tiles = store.renderables.filter(f => f.mosaicId === 'mo1');
+    expect(tiles).toHaveLength(4);
+    const outline = store.renderables.find(f => f.id === 'mosaic:p1:mo1')!;
+    expect(outline.isMosaicOutline).toBe(true);
+    expect(outline.movable).toBe(true);
+    expect(outline.pinnable).toBe(true);   // a mosaic pins/floats like any frame
+    expect(outline.resizable).toBe(true);
+    expect(outline.anchorKind).toBe('sky');
+    expect(outline.ra).toBe(83.8);
+    // Outline size encloses the grid: (cols-1)·tile·(1-overlap) + tile.
+    expect(outline.wDeg).toBeCloseTo(1 * 2.5 * 0.8 + 2.5, 6); // 4.5
+    expect(outline.hDeg).toBeCloseTo(1 * 1.7 * 0.8 + 1.7, 6); // 3.06
+  });
+
+  it('selecting the outline marks the mosaic active (mutually exclusive with a single frame)', async () => {
+    const store = await withSpecs();
+    withMosaicPlan(store);
+    store.setActive('mosaic:p1:mo1');
+    expect(store.activeMosaicId).toBe('mo1');
+    expect(store.activeId).toBeNull();
+    expect(store.renderables.find(f => f.id === 'mosaic:p1:mo1')!.active).toBe(true);
+    // Selecting something else clears the mosaic selection.
+    store.setActive(null);
+    expect(store.activeMosaicId).toBeNull();
+  });
+
+  it('moving the outline re-centres the whole mosaic and re-tiles', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.applyChange('mosaic:p1:mo1', { anchor: { kind: 'sky', ra: 90, dec: 0, dsoId: 'M42' }, paDeg: 10 });
+    const mosaic = plans.plans[0].mosaics[0];
+    expect(mosaic.centerRa).toBe(90);
+    expect(mosaic.centerDec).toBe(0);
+    expect(mosaic.paDeg).toBe(10);
+    // Still a 2×2 grid → four tiles, regenerated at the new centre.
+    expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(4);
+  });
+
+  it('rotating the outline updates only the mosaic PA', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.applyChange('mosaic:p1:mo1', { paDeg: 45 });
+    expect(plans.plans[0].mosaics[0].paDeg).toBe(45);
+    expect(plans.plans[0].mosaics[0].centerRa).toBe(83.8); // unchanged
+  });
+
+  it('unpinning the outline floats it (screen-anchored) and hides the tiles', async () => {
+    const store = await withSpecs();
+    withMosaicPlan(store);
+    store.applyChange('mosaic:p1:mo1', { anchor: { kind: 'screen', nx: 0.4, ny: 0.6 }, screenRotationDeg: 0 });
+    expect(store.renderables.filter(f => f.mosaicId === 'mo1')).toHaveLength(0); // tiles hidden
+    const outline = store.renderables.find(f => f.id === 'mosaic:p1:mo1')!;
+    expect(outline.anchorKind).toBe('screen');
+    expect(outline.nx).toBe(0.4);
+    expect(outline.resizable).toBe(false); // no resize while floating
+  });
+
+  it('resizing the outline re-tiles the mosaic to the new region', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    // A 9°×6° region with 2.5°×1.7° tiles at 20% overlap → 5×5 grid.
+    store.applyResize('mosaic:p1:mo1', { centerRa: 83.8, centerDec: -5.4, wDeg: 9, hDeg: 6, paDeg: 0 });
+    const mosaic = plans.plans[0].mosaics[0];
+    expect(mosaic.cols).toBe(5);
+    expect(mosaic.rows).toBe(5);
+    expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(25);
   });
 });

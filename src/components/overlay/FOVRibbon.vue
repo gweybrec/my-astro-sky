@@ -157,6 +157,7 @@ onMounted(() => {
   if (sm) {
     sm.setOnFovInstanceSelect(id => fovStore.setActive(id));
     sm.setOnFovInstanceChange((id, change) => fovStore.applyChange(id, change));
+    sm.setOnFovFrameResize((id, region) => fovStore.applyResize(id, region));
   }
   plansStore.ensureLoaded();
   fovStore.loadSpecs();
