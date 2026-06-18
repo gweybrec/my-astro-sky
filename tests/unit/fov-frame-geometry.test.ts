@@ -7,6 +7,7 @@ import {
   rotateHandlePos,
   canvasRotationDegFromCursor,
   resizeFromCorner,
+  convexPolygonsOverlap,
 } from '../../src/fov-frame-geometry';
 
 // Axis-aligned square centred at (100,100), half-size 50 → corners.
@@ -111,6 +112,34 @@ describe('fov frame geometry', () => {
       expect(r.cy).toBeCloseTo(100);
       expect(r.halfW).toBeCloseTo(150); // along local-x (screen y): |250-100|
       expect(r.halfH).toBeCloseTo(50);  // along local-y (screen x): |150-100|
+    });
+  });
+
+  describe('convexPolygonsOverlap', () => {
+    const sq = (cx: number, cy: number, h = 50) => [
+      { x: cx - h, y: cy - h }, { x: cx + h, y: cy - h },
+      { x: cx + h, y: cy + h }, { x: cx - h, y: cy + h },
+    ];
+
+    it('detects overlapping squares', () => {
+      expect(convexPolygonsOverlap(sq(100, 100), sq(140, 100))).toBe(true); // overlap by 60
+    });
+
+    it('rejects clearly separated squares', () => {
+      expect(convexPolygonsOverlap(sq(100, 100), sq(300, 100))).toBe(false);
+      expect(convexPolygonsOverlap(sq(100, 100), sq(100, 300))).toBe(false);
+    });
+
+    it('treats a contained square as overlapping', () => {
+      expect(convexPolygonsOverlap(sq(100, 100, 50), sq(100, 100, 10))).toBe(true);
+    });
+
+    it('finds a separating axis for a diagonal gap a bounding box would miss', () => {
+      // Two rotated squares whose AABBs overlap but the shapes don't.
+      const diamond = (cx: number, cy: number, r: number) => [
+        { x: cx, y: cy - r }, { x: cx + r, y: cy }, { x: cx, y: cy + r }, { x: cx - r, y: cy },
+      ];
+      expect(convexPolygonsOverlap(diamond(0, 0, 50), diamond(90, 90, 50))).toBe(false);
     });
   });
 });

@@ -28,6 +28,7 @@ vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn()
 
 import { useFovFramesStore } from '../../src/stores/fov-frames';
 import { usePlansStore } from '../../src/stores/plans';
+import { framePointToSky } from '../../src/mosaic';
 
 describe('fov-frames store', () => {
   beforeEach(() => {
@@ -358,18 +359,19 @@ describe('fov-frames store', () => {
   });
 
   // ── Mosaics (a frame backed by a tile grid) ─────────────────────────────────
-  /** A plan with one 2×2 mosaic ('mo1') of M42, plus its four tile entries. */
+  /** A plan with one 2×2 mosaic ('mo1') of M42, tiles on the true step lattice
+   * (spec 2.5°×1.7°, 20% overlap → step 2.0°×1.36° → tile offsets ±1.0°, ±0.68°). */
   function withMosaicPlan(store: ReturnType<typeof useFovFramesStore>) {
     const plans = usePlansStore();
+    const C = { ra: 83.8, dec: -5.4 };
+    const tile = (id: string, gx: number, gy: number) => {
+      const p = framePointToSky(C, 0, gx, gy);
+      return { id, dsoId: 'M42', position: 0, paDeg: 0, ra: p.ra, dec: p.dec, notes: null, mosaicId: 'mo1' };
+    };
     plans.plans = [{
       id: 'p1', name: 'T', position: 0, nightOf: null, setupId: 's1',
-      entries: [
-        { id: 't0', dsoId: 'M42', position: 0, paDeg: 0, ra: 83.0, dec: -5.0, notes: null, mosaicId: 'mo1' },
-        { id: 't1', dsoId: 'M42', position: 1, paDeg: 0, ra: 84.0, dec: -5.0, notes: null, mosaicId: 'mo1' },
-        { id: 't2', dsoId: 'M42', position: 2, paDeg: 0, ra: 83.0, dec: -6.0, notes: null, mosaicId: 'mo1' },
-        { id: 't3', dsoId: 'M42', position: 3, paDeg: 0, ra: 84.0, dec: -6.0, notes: null, mosaicId: 'mo1' },
-      ],
-      mosaics: [{ id: 'mo1', dsoId: 'M42', centerRa: 83.8, centerDec: -5.4, paDeg: 0, overlapPct: 20, cols: 2, rows: 2, position: 0 }],
+      entries: [tile('t0', -1, 0.68), tile('t1', 1, 0.68), tile('t2', -1, -0.68), tile('t3', 1, -0.68)],
+      mosaics: [{ id: 'mo1', dsoId: 'M42', centerRa: C.ra, centerDec: C.dec, paDeg: 0, overlapPct: 20, cols: 2, rows: 2, position: 0 }],
     }] as any;
     store.setSelection({ kind: 'plan', planId: 'p1' });
     return plans;
@@ -444,5 +446,131 @@ describe('fov-frames store', () => {
     expect(mosaic.cols).toBe(5);
     expect(mosaic.rows).toBe(5);
     expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(25);
+  });
+
+  // ── Phase 3b: per-tile editing → non-rectangular mosaics ────────────────────
+  it('removeMosaicTile drops the clicked tile', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.removeMosaicTile('plan:p1:t0');
+    expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(3);
+  });
+
+  it('a move preserves a trimmed (non-rectangular) tile set instead of regridding', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.removeMosaicTile('plan:p1:t3'); // trim one corner → 3 tiles
+    expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(3);
+    store.transformMosaic('mo1', { centerRa: 90, centerDec: 0 });
+    expect(plans.plans[0].mosaics[0].centerRa).toBe(90);
+    // The trim survived the move — still 3 tiles, not regenerated to a full 2×2.
+    expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(3);
+  });
+
+  it('a resize re-grids to a full rectangle (resets any trimming)', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.removeMosaicTile('plan:p1:t3'); // 3 tiles
+    store.applyResize('mosaic:p1:mo1', { centerRa: 83.8, centerDec: -5.4, wDeg: 4.5, hDeg: 3.06, paDeg: 0 });
+    expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(4);
+  });
+
+  it('recentres the mosaic on its remaining tiles when an edge row is trimmed', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    const C = { ra: 80, dec: 0 };
+    // 1 col × 2 rows: tiles half a step (1.7°·0.8/2 = 0.68°) above/below the centre.
+    const top = framePointToSky(C, 0, 0, 0.68);
+    const bottom = framePointToSky(C, 0, 0, -0.68);
+    plans.plans = [{
+      id: 'p1', name: 'T', position: 0, nightOf: null, setupId: 's1',
+      entries: [
+        { id: 't0', dsoId: 'M42', position: 0, paDeg: 0, ra: top.ra, dec: top.dec, notes: null, mosaicId: 'mo1' },
+        { id: 't1', dsoId: 'M42', position: 1, paDeg: 0, ra: bottom.ra, dec: bottom.dec, notes: null, mosaicId: 'mo1' },
+      ],
+      mosaics: [{ id: 'mo1', dsoId: 'M42', centerRa: 80, centerDec: 0, paDeg: 0, overlapPct: 20, cols: 1, rows: 2, position: 0 }],
+    }] as any;
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+
+    store.removeMosaicTile('plan:p1:t0'); // trim the top row
+    const m = plans.plans[0].mosaics[0];
+    expect(m.rows).toBe(1);
+    expect(m.cols).toBe(1);
+    // The centre must move to the remaining (bottom) tile — not stay at dec 0,
+    // which would leave the shrunken outline shifted off the tiles.
+    expect(m.centerDec).toBeCloseTo(bottom.dec, 6);
+    expect(m.centerRa).toBeCloseTo(bottom.ra, 6);
+  });
+
+  it('offers add-tile candidates around the selected mosaic and adds one', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store); // 2×2 mosaic 'mo1'
+    store.setActiveMosaic('mo1');
+    // A 2×2 block has 8 empty perimeter neighbours.
+    expect(store.activeMosaicAddCandidates).toHaveLength(8);
+    const before = plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1').length;
+    const spot = store.activeMosaicAddCandidates[0];
+    store.addMosaicTile(spot.ra, spot.dec);
+    expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(before + 1);
+  });
+
+  it('add-tile candidates are empty while the mosaic floats', async () => {
+    const store = await withSpecs();
+    withMosaicPlan(store);
+    store.setActiveMosaic('mo1');
+    store.applyChange('mosaic:p1:mo1', { anchor: { kind: 'screen', nx: 0.5, ny: 0.5 }, screenRotationDeg: 0 });
+    expect(store.activeMosaicAddCandidates).toHaveLength(0);
+  });
+
+  it('merges a dropped frame into a mosaic as a snapped tile and deletes the frame', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store); // mo1: 2×2 at (83.8, -5.4)
+    const F = framePointToSky({ ra: 83.8, dec: -5.4 }, 0, 3, 0.68); // one step right of the grid
+    plans.plans[0].entries.push({ id: 'fr', dsoId: null, position: 9, paDeg: 0, ra: F.ra, dec: F.dec, notes: null, mosaicId: null });
+    const spy = vi.spyOn(plans, 'updateMosaic').mockResolvedValue();
+    await store.mergeOnDrop('plan:p1:fr', 'mosaic:p1:mo1');
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [pid, mid, params] = spy.mock.calls[0] as any;
+    expect(pid).toBe('p1');
+    expect(mid).toBe('mo1');
+    expect(params.replaceEntryIds).toEqual(['fr']);
+    expect(params.tiles).toHaveLength(5); // four tiles + the absorbed frame
+  });
+
+  it('merges two overlapping frames into a new two-tile mosaic and deletes both', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    const G = { ra: 80, dec: 0 };
+    const F = framePointToSky(G, 0, 1.5, 0); // dropped to the right of G
+    plans.plans = [{
+      id: 'p1', name: 'T', position: 0, nightOf: null, setupId: 's1',
+      entries: [
+        { id: 'g', dsoId: 'M42', position: 0, paDeg: 0, ra: G.ra, dec: G.dec, notes: null, mosaicId: null },
+        { id: 'f', dsoId: null, position: 1, paDeg: 0, ra: F.ra, dec: F.dec, notes: null, mosaicId: null },
+      ],
+      mosaics: [],
+    }] as any;
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+    const spy = vi.spyOn(plans, 'createMosaic').mockResolvedValue('mo-new');
+    await store.mergeOnDrop('plan:p1:f', 'plan:p1:g');
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [pid, params] = spy.mock.calls[0] as any;
+    expect(pid).toBe('p1');
+    expect(params.tiles).toHaveLength(2);
+    expect([...params.replaceEntryIds].sort()).toEqual(['f', 'g']);
+  });
+
+  it('removing the last tile deletes the whole mosaic', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{
+      id: 'p1', name: 'T', position: 0, nightOf: null, setupId: 's1',
+      entries: [{ id: 't0', dsoId: 'M42', position: 0, paDeg: 0, ra: 83.8, dec: -5.4, notes: null, mosaicId: 'mo1' }],
+      mosaics: [{ id: 'mo1', dsoId: 'M42', centerRa: 83.8, centerDec: -5.4, paDeg: 0, overlapPct: 20, cols: 1, rows: 1, position: 0 }],
+    }] as any;
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+    const spy = vi.spyOn(plans, 'deleteMosaic').mockResolvedValue();
+    store.removeMosaicTile('plan:p1:t0');
+    expect(spy).toHaveBeenCalledWith('p1', 'mo1');
   });
 });

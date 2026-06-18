@@ -158,6 +158,9 @@ onMounted(() => {
     sm.setOnFovInstanceSelect(id => fovStore.setActive(id));
     sm.setOnFovInstanceChange((id, change) => fovStore.applyChange(id, change));
     sm.setOnFovFrameResize((id, region) => fovStore.applyResize(id, region));
+    sm.setOnMosaicTileRemove(tileId => fovStore.removeMosaicTile(tileId));
+    sm.setOnMosaicTileAdd((ra, dec) => fovStore.addMosaicTile(ra, dec));
+    sm.setOnFrameMerge((movedId, targetId) => fovStore.mergeOnDrop(movedId, targetId));
   }
   plansStore.ensureLoaded();
   fovStore.loadSpecs();
@@ -169,6 +172,12 @@ onMounted(() => {
   watch(
     [() => fovStore.renderables, () => fovStore.framesVisible],
     () => sm?.setFovInstances(fovStore.framesVisible ? fovStore.renderables : []),
+    { deep: true, immediate: true },
+  );
+  // Push the selected mosaic's add-tile ("+") candidate positions to the map.
+  watch(
+    () => fovStore.activeMosaicAddCandidates,
+    () => sm?.setMosaicAddCandidates(fovStore.framesVisible ? fovStore.activeMosaicAddCandidates : []),
     { deep: true, immediate: true },
   );
 });

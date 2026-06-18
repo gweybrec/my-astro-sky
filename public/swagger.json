@@ -1756,6 +1756,13 @@
                         }
                       }
                     }
+                  },
+                  "replaceEntryIds": {
+                    "type": "array",
+                    "description": "Standalone plan entries to delete (absorbed into this mosaic by a merge)",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 }
               }

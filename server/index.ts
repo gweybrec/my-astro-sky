@@ -2147,6 +2147,10 @@ app.post('/api/plans/:id/mosaics', (req, res) => {
  *                     ra: { type: number }
  *                     dec: { type: number }
  *                     paDeg: { type: number, nullable: true }
+ *               replaceEntryIds:
+ *                 type: array
+ *                 description: Standalone plan entries to delete (absorbed into this mosaic by a merge)
+ *                 items: { type: string }
  *     responses:
  *       200: { description: Mosaic updated }
  *       400: { description: Invalid body }
@@ -2161,7 +2165,7 @@ app.put('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
     const ok = updatePlanMosaic(mosaicId, {
       dsoId: parsed.dsoId, centerRa: parsed.centerRa, centerDec: parsed.centerDec,
       paDeg: parsed.paDeg, overlapPct: parsed.overlapPct, cols: parsed.cols, rows: parsed.rows,
-    }, parsed.tiles);
+    }, parsed.tiles, parsed.replaceEntryIds);
     if (!ok) { res.status(404).json({ error: 'Mosaic not found' }); return; }
     res.json({ ok: true });
   } catch (err: any) {

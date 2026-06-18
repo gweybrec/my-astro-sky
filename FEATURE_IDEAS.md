@@ -24,8 +24,9 @@ pick from. Each item notes rough **value** and **effort** (S/M/L) and the main f
   syncs back into the tonight list. → `src/fov-overlay.ts`, `src/sky-map.ts`, `src/projection.ts`
 - [ ] **A6 — Multi-night projects** _(value: high, effort: M)_ — track active targets with
   integration goals ("M31 — 8h / 20h"), accumulate from linked photos. Overlaps with B1/B2.
-- [ ] **A4 — Mosaic planner** _(value: high, effort: L)_ — N×M panel grid with overlap % for
-  oversized targets; tiles on map + total integration estimate. Extends A3 + `imaging-recipe.ts`.
+- [x] **A4 — Mosaic planner** _(done)_ — N×M panel grid with overlap % for oversized targets; tiles
+  on map + total integration estimate; full per-tile editing (add/remove), merge of overlapping
+  frames. → `src/mosaic.ts`, `src/sky-map.ts`, `src/stores/fov-frames.ts`, `server/db.ts`
 - [ ] **A5 — Weather / cloud / seeing** _(value: med-high, effort: M)_ — forecast for the site
   (Open-Meteo / 7Timer!), clear-sky outlook for the planned night. New backend proxy route (mirror
   `version/latest` pattern). → `server/index.ts`
@@ -141,11 +142,12 @@ goal"), automatically summing exposure from photos linked to that target via the
 `integrations[]` metadata, and showing progress. It's the bridge between "I planned this" and "I'm
 actively collecting this." Overlaps naturally with the observation log (B1) and stats (B2).
 
-**A4 — Mosaic planner.** Some objects (Andromeda, the Veil, large nebulae) are bigger than any single
-frame at your focal length. This computes a panel grid (e.g. 2×3) with a configurable overlap
-percentage so the tiles stitch cleanly, draws the tiles on the map, and estimates total integration
-time across all panels. It's an extension of the framing assistant (A3) plus the imaging-recipe time
-math.
+**A4 — Mosaic planner.** _(Done.)_ Some objects (Andromeda, the Veil, large nebulae) are bigger than
+any single frame at your focal length. This computes a panel grid (e.g. 2×3) with a configurable
+overlap percentage so the tiles stitch cleanly, draws the tiles on the map, and estimates total
+integration time across all panels. Shipped with full per-tile editing (add/remove tiles → non-
+rectangular mosaics) and implicit merge of overlapping frames. It's an extension of the framing
+assistant (A3) plus the imaging-recipe time math.
 
 **A5 — Weather / cloud / seeing.** Planning is moot if it's cloudy. This pulls an astronomy-oriented
 forecast (services like Open-Meteo or 7Timer! expose cloud cover, seeing, and transparency) for the

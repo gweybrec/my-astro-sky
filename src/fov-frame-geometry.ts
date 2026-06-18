@@ -72,6 +72,28 @@ export function canvasRotationDegFromCursor(cx: number, cy: number, mx: number, 
   return Math.atan2(mx - cx, -(my - cy)) * RAD2DEG;
 }
 
+/**
+ * Whether two convex polygons overlap, via the separating-axis theorem: if any
+ * edge normal of either polygon separates their projections, they don't touch.
+ * Used to detect "I dropped this frame on top of that one" for the merge gesture.
+ */
+export function convexPolygonsOverlap(a: Pt[], b: Pt[]): boolean {
+  for (const poly of [a, b]) {
+    for (let i = 0; i < poly.length; i++) {
+      const p1 = poly[i];
+      const p2 = poly[(i + 1) % poly.length];
+      // Axis = edge normal.
+      const ax = -(p2.y - p1.y);
+      const ay = p2.x - p1.x;
+      let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
+      for (const p of a) { const d = p.x * ax + p.y * ay; minA = Math.min(minA, d); maxA = Math.max(maxA, d); }
+      for (const p of b) { const d = p.x * ax + p.y * ay; minB = Math.min(minB, d); maxB = Math.max(maxB, d); }
+      if (maxA < minB || maxB < minA) return false; // a gap on this axis → no overlap
+    }
+  }
+  return true;
+}
+
 export interface ResizeResult {
   /** New centre in canvas px. */
   cx: number;

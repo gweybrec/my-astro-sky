@@ -785,10 +785,13 @@ export function updatePlanMosaic(
   mosaicId: string,
   fields: { dsoId: string | null; centerRa: number; centerDec: number; paDeg: number; overlapPct: number; cols: number; rows: number },
   tiles: MosaicTileInput[],
+  replaceEntryIds: string[] = [],
 ): boolean {
   return db.transaction(() => {
     const m = db.prepare('SELECT plan_id FROM plan_mosaics WHERE id = ?').get(mosaicId) as { plan_id: string } | undefined;
     if (!m) return false;
+    // Absorb standalone frames merged into this mosaic.
+    for (const id of replaceEntryIds) deletePlanEntryStmt.run(id);
     updatePlanMosaicStmt.run(
       fields.dsoId ?? null, fields.centerRa, fields.centerDec, fields.paDeg,
       fields.overlapPct, fields.cols, fields.rows, mosaicId,

@@ -12,6 +12,7 @@ import {
   rotateHandlePos,
   canvasRotationDegFromCursor,
   resizeFromCorner,
+  convexPolygonsOverlap,
 } from './fov-frame-geometry';
 import pinSvgRaw from './icons/pin.svg?raw';
 import { computeFovTargetScale } from './gear-presets';
@@ -25,6 +26,16 @@ const PIN_PATH_D = pinSvgRaw.match(/\bd="([^"]+)"/)?.[1] ?? '';
 let pinPath2D: Path2D | null = null;
 function getPinPath(): Path2D {
   return (pinPath2D ??= new Path2D(PIN_PATH_D));
+}
+
+/** Trash glyph (24×24 box), built from the shared trash icon's subpaths. Stroked. */
+const TRASH_PATHS_D = ['M3 6L5 6L21 6', 'M19 6l-1 14H6L5 6', 'M10 11v6M14 11v6', 'M9 6V4h6v2'];
+let trashPath2D: Path2D | null = null;
+function getTrashPath(): Path2D {
+  if (trashPath2D) return trashPath2D;
+  const p = new Path2D();
+  for (const d of TRASH_PATHS_D) p.addPath(new Path2D(d));
+  return (trashPath2D = p);
 }
 
 /** Returns true if (px, py) is inside the convex polygon defined by pts (winding order irrelevant). */
@@ -321,6 +332,13 @@ export class SkyMap {
   // Transient rubber-band rectangle shown while a resize drag is in progress.
   private resizeDraft: { cx: number; cy: number; halfW: number; halfH: number; rotDeg: number } | null = null;
   private onFovFrameResize: ((id: string, region: FovFrameResizeRegion) => void) | null = null;
+  // Per-tile delete: clicking a tile's trash button on the selected mosaic.
+  private onMosaicTileRemove: ((tileId: string) => void) | null = null;
+  // Add-tile: sky positions of the "+" spots around the selected mosaic.
+  private mosaicAddCandidates: Array<{ ra: number; dec: number }> = [];
+  private onMosaicTileAdd: ((ra: number, dec: number) => void) | null = null;
+  // Merge: a standalone frame dropped onto another frame/mosaic of the same plan.
+  private onFrameMerge: ((movedId: string, targetId: string) => void) | null = null;
 
   // Spatial indexes for fast hover detection
   private starIndex = new SpatialIndex<Star>(0.02);
@@ -445,6 +463,10 @@ export class SkyMap {
   setOnFovInstanceSelect(cb: (id: string | null) => void) { this.onFovInstanceSelect = cb; }
   setOnFovInstanceChange(cb: (id: string, change: FovFrameChange) => void) { this.onFovInstanceChange = cb; }
   setOnFovFrameResize(cb: (id: string, region: FovFrameResizeRegion) => void) { this.onFovFrameResize = cb; }
+  setOnMosaicTileRemove(cb: (tileId: string) => void) { this.onMosaicTileRemove = cb; }
+  setOnMosaicTileAdd(cb: (ra: number, dec: number) => void) { this.onMosaicTileAdd = cb; }
+  setMosaicAddCandidates(c: Array<{ ra: number; dec: number }>) { this.mosaicAddCandidates = c; this.render(); }
+  setOnFrameMerge(cb: (movedId: string, targetId: string) => void) { this.onFrameMerge = cb; }
   setOnPhotoClick(cb: (photoName: string) => void) { this.onPhotoClick = cb; }
   setOnDSOClick(cb: (dso: DSO) => void) { this.onDSOClick = cb; }
 
@@ -827,8 +849,11 @@ export class SkyMap {
 
     this.addEvent(window, 'mouseup', ((e: MouseEvent) => {
       if (this.frameDrag) {
-        if (this.frameDrag.mode === 'resize') this.finalizeResize();
+        const drag = this.frameDrag;
         this.frameDrag = null;
+        if (drag.mode === 'resize') this.finalizeResize(drag.id);
+        // A standalone frame dropped onto another frame/mosaic of the same plan merges.
+        else if (drag.mode === 'move' && drag.id.startsWith('plan:')) this.checkFrameMerge(drag.id);
         return;
       }
       if (this.isPanning) {
@@ -1503,6 +1528,9 @@ export class SkyMap {
     const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || 'rgba(220,60,60,0.85)';
     const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || 'rgba(220,90,90,0.9)';
     const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
+    const dangerColor = cs.getPropertyValue('--color-danger').trim() || '#cc7777';
+    // The selected mosaic's tiles each get a delete button (per-tile editing).
+    const activeMosaicId = this.fovInstances.find(f => f.active && f.isMosaicOutline)?.id.split(':')[2];
 
     for (const f of this.fovInstances) {
       if (f.visible === false) continue; // hidden via the manager checkbox
@@ -1524,7 +1552,15 @@ export class SkyMap {
       ctx.closePath();
       ctx.stroke();
 
-      if (isTile) { ctx.restore(); continue; } // tiles: outline only, no label/handles
+      if (isTile) {
+        // Tiles of the selected mosaic carry a delete button (large tiles only).
+        if (f.mosaicId === activeMosaicId && this.tileTrashVisible(halfW, halfH)) {
+          ctx.globalAlpha = 1;
+          this.drawTileTrash({ x: cx, y: cy }, dangerColor);
+        }
+        ctx.restore();
+        continue; // tiles: outline only, no label/handles
+      }
 
       // Label (setup name only) along the longest edge — hidden when the frame
       // is too small to read it.
@@ -1595,6 +1631,12 @@ export class SkyMap {
       ctx.stroke();
       ctx.restore();
     }
+
+    // Add ("+") buttons at the empty neighbour cells of the selected mosaic.
+    if (activeMosaicId && this.mosaicAddCandidates.length && this.mosaicEditButtonsVisible(activeMosaicId)) {
+      const avoid = this.activeOutlineRotateAvoid();
+      for (const c of this.mosaicAddCandidates) this.drawTileAdd(this.candidateCanvasPoint(c, avoid), activeColor);
+    }
   }
 
   /** Pin glyph position: the top-right corner lifted outward (local "up") so the
@@ -1622,6 +1664,82 @@ export class SkyMap {
       ctx.stroke(path);
     }
     ctx.restore();
+  }
+
+  /** Radius of a tile's delete button, and whether the tile is large enough to host one. */
+  private static readonly TILE_TRASH_R = 11;
+  private tileTrashVisible(halfW: number, halfH: number): boolean {
+    return Math.min(halfW, halfH) >= 16; // only on tiles big enough that the icon fits
+  }
+
+  /** Draw a delete (trash) button centred at `at`, used per-tile on the selected mosaic. */
+  private drawTileTrash(at: Point, color: string): void {
+    const { ctx } = this;
+    const size = 16;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, SkyMap.TILE_TRASH_R, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15,15,18,0.78)';
+    ctx.fill();
+    ctx.translate(at.x - size / 2, at.y - size / 2);
+    ctx.scale(size / 24, size / 24);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2 * (24 / size);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke(getTrashPath());
+    ctx.restore();
+  }
+
+  /** Draw an add (plus) button centred at `at`, used at the "+" spots around a mosaic. */
+  private drawTileAdd(at: Point, color: string): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, SkyMap.TILE_TRASH_R, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15,15,18,0.78)';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(at.x - 5, at.y); ctx.lineTo(at.x + 5, at.y);
+    ctx.moveTo(at.x, at.y - 5); ctx.lineTo(at.x, at.y + 5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Whether the selected mosaic's tiles are large enough to host their edit
+   * buttons (delete / add), and the canvas point of an add candidate. */
+  private mosaicEditButtonsVisible(mosaicId: string): boolean {
+    const t = this.fovInstances.find(f => f.mosaicId === mosaicId);
+    if (!t) return false;
+    const g = this.frameGeometry(t);
+    return this.tileTrashVisible(g.halfW, g.halfH);
+  }
+
+  /** The selected mosaic outline's rotate-handle position + centre, so add ("+")
+   * buttons can be nudged clear of the rotation needle. Null when not applicable. */
+  private activeOutlineRotateAvoid(): { handle: Point; center: Point } | null {
+    const outline = this.fovInstances.find(f => f.active && f.isMosaicOutline);
+    if (!outline) return null;
+    const geo = this.frameGeometry(outline);
+    if (!this.frameHandlesVisible(geo.halfW, geo.halfH)) return null;
+    return { handle: rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24), center: { x: geo.cx, y: geo.cy } };
+  }
+
+  /** Canvas point of an add candidate. If it would sit on the rotate needle, push
+   * it outward (away from the mosaic centre) past the handle so it stays clickable. */
+  private candidateCanvasPoint(c: { ra: number; dec: number }, avoid?: { handle: Point; center: Point } | null): Point {
+    const p = project(c.ra, c.dec);
+    let pt = toCanvas(p.x, p.y, this.view);
+    if (avoid && Math.hypot(pt.x - avoid.handle.x, pt.y - avoid.handle.y) < SkyMap.TILE_TRASH_R * 2 + 4) {
+      const dx = pt.x - avoid.center.x, dy = pt.y - avoid.center.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const newDist = Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) + SkyMap.TILE_TRASH_R + 14;
+      pt = { x: avoid.center.x + (dx / len) * newDist, y: avoid.center.y + (dy / len) * newDist };
+    }
+    return pt;
   }
 
   /** Hit-test the active/instance frames on mousedown. Returns true if the event was consumed (no pan). */
@@ -1661,6 +1779,28 @@ export class SkyMap {
       if (active.movable && isNearPolygonBorder(mx, my, geo.corners, 6)) {
         this.frameDrag = { id: active.id, mode: 'move' };
         return true;
+      }
+      // Per-tile editing: the selected mosaic shows a delete button on each tile
+      // and an add ("+") button at each empty neighbour cell.
+      if (active.isMosaicOutline) {
+        const mosaicId = active.id.split(':')[2];
+        if (this.mosaicEditButtonsVisible(mosaicId)) {
+          const avoid = this.activeOutlineRotateAvoid();
+          for (const c of this.mosaicAddCandidates) {
+            if (isNearHandle(mx, my, this.candidateCanvasPoint(c, avoid), SkyMap.TILE_TRASH_R)) {
+              this.onMosaicTileAdd?.(c.ra, c.dec);
+              return true;
+            }
+          }
+          for (const t of this.fovInstances) {
+            if (t.mosaicId !== mosaicId) continue;
+            const tg = this.frameGeometry(t);
+            if (isNearHandle(mx, my, { x: tg.cx, y: tg.cy }, SkyMap.TILE_TRASH_R)) {
+              this.onMosaicTileRemove?.(t.id);
+              return true;
+            }
+          }
+        }
       }
     }
 
@@ -1872,6 +2012,25 @@ export class SkyMap {
     }
   }
 
+  /** After moving a standalone plan frame, merge it if it now overlaps another
+   * frame or a mosaic of the same plan (emits the merge for the store to apply). */
+  private checkFrameMerge(movedId: string): void {
+    if (!this.onFrameMerge) return;
+    const moved = this.fovInstances.find(f => f.id === movedId);
+    if (!moved) return;
+    const movedPlan = movedId.split(':')[1];
+    const movedCorners = this.frameGeometry(moved).corners;
+    for (const f of this.fovInstances) {
+      if (f.id === movedId || f.mosaicId || f.visible === false) continue;
+      const isFrameOrMosaic = f.id.startsWith('plan:') || f.id.startsWith('mosaic:');
+      if (!isFrameOrMosaic || f.id.split(':')[1] !== movedPlan) continue;
+      if (convexPolygonsOverlap(movedCorners, this.frameGeometry(f).corners)) {
+        this.onFrameMerge(movedId, f.id);
+        return;
+      }
+    }
+  }
+
   /**
    * Commit a drag-to-extend: convert the rubber-band rectangle to a sky region
    * (centre + angular size + PA) and hand it to the resize callback, which builds
@@ -1879,12 +2038,11 @@ export class SkyMap {
    * ratio (so it stays correct at the frame's location). No-op for a drag that
    * barely changed the size.
    */
-  private finalizeResize(): void {
+  private finalizeResize(frameId: string): void {
     const draft = this.resizeDraft;
     this.resizeDraft = null;
-    if (!draft || !this.frameDrag) { this.render(); return; }
-    const f = this.fovInstances.find(x => x.id === this.frameDrag!.id);
-    if (!f) { this.render(); return; }
+    const f = draft ? this.fovInstances.find(x => x.id === frameId) : undefined;
+    if (!draft || !f) { this.render(); return; }
     const geo = this.frameGeometry(f);
     // Px → degrees via the frame's own tile size (avoids re-inverting the projection).
     const wDeg = f.wDeg * (draft.halfW / Math.max(1e-6, geo.halfW));

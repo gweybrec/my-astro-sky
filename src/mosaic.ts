@@ -99,6 +99,73 @@ export function framePointToSky(center: { ra: number; dec: number }, paDeg: numb
 }
 
 /**
+ * Inverse of {@link framePointToSky}: a sky position → its frame-local offset
+ * (gx right, gy up, in degrees) about `center` at position angle `paDeg`. Used to
+ * recover a tile's place in the mosaic frame so a move/rotate can be applied
+ * while preserving the (possibly non-rectangular) tile set.
+ */
+export function skyToFrameOffset(center: { ra: number; dec: number }, paDeg: number, ra: number, dec: number): { gx: number; gy: number } {
+  // Forward gnomonic: (ra, dec) → standard coordinates (east, north) about centre.
+  const ra0 = center.ra * DEG2RAD, dec0 = center.dec * DEG2RAD;
+  const raR = ra * DEG2RAD, decR = dec * DEG2RAD;
+  const dRa = raR - ra0;
+  const cosc = Math.sin(dec0) * Math.sin(decR) + Math.cos(dec0) * Math.cos(decR) * Math.cos(dRa);
+  const east = (Math.cos(decR) * Math.sin(dRa) / cosc) * RAD2DEG;
+  const north = ((Math.cos(dec0) * Math.sin(decR) - Math.sin(dec0) * Math.cos(decR) * Math.cos(dRa)) / cosc) * RAD2DEG;
+  // Un-rotate by PA (inverse of the rotation in framePointToSky).
+  const paRad = paDeg * DEG2RAD;
+  return {
+    gx: east * Math.cos(paRad) - north * Math.sin(paRad),
+    gy: east * Math.sin(paRad) + north * Math.cos(paRad),
+  };
+}
+
+/**
+ * Candidate positions to add a tile: the empty 4-neighbour cells around the
+ * current tiles (one tile-step out, on the tiles' lattice). De-duplicated. These
+ * are the "+" spots shown around a selected mosaic.
+ */
+export function addCandidateOffsets(offsets: Array<{ gx: number; gy: number }>, stepW: number, stepH: number): Array<{ gx: number; gy: number }> {
+  if (offsets.length === 0 || stepW <= 0 || stepH <= 0) return [];
+  const ref = offsets[0];
+  // Cell key relative to a present tile, so half-step lattices (even grids) key cleanly.
+  const key = (gx: number, gy: number) => `${Math.round((gx - ref.gx) / stepW)}:${Math.round((gy - ref.gy) / stepH)}`;
+  const present = new Set(offsets.map(o => key(o.gx, o.gy)));
+  const out = new Map<string, { gx: number; gy: number }>();
+  for (const o of offsets) {
+    for (const [dx, dy] of [[stepW, 0], [-stepW, 0], [0, stepH], [0, -stepH]]) {
+      const gx = o.gx + dx, gy = o.gy + dy;
+      const k = key(gx, gy);
+      if (!present.has(k) && !out.has(k)) out.set(k, { gx, gy });
+    }
+  }
+  return [...out.values()];
+}
+
+/**
+ * Shape of a mosaic from its tiles' frame-local offsets: the bounding-box centre
+ * (`centerGx`/`centerGy` — the offset the mosaic centre must move to so the
+ * outline stays aligned with the tiles after trimming) and the bounding grid
+ * dimensions (cols × rows in tile-step units, for the displayed scale).
+ */
+export function mosaicShapeFromOffsets(offsets: Array<{ gx: number; gy: number }>, stepW: number, stepH: number): { centerGx: number; centerGy: number; cols: number; rows: number } {
+  if (offsets.length === 0) return { centerGx: 0, centerGy: 0, cols: 0, rows: 0 };
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const o of offsets) {
+    minX = Math.min(minX, o.gx); maxX = Math.max(maxX, o.gx);
+    minY = Math.min(minY, o.gy); maxY = Math.max(maxY, o.gy);
+  }
+  const cols = stepW > 0 ? Math.round((maxX - minX) / stepW) + 1 : 1;
+  const rows = stepH > 0 ? Math.round((maxY - minY) / stepH) + 1 : 1;
+  return {
+    centerGx: (minX + maxX) / 2,
+    centerGy: (minY + maxY) / 2,
+    cols: Math.max(1, cols),
+    rows: Math.max(1, rows),
+  };
+}
+
+/**
  * Grid dimensions (cols × rows) that cover a `regionWDeg × regionHDeg` region
  * with the given single-tile FOV and overlap percentage. Width maps to columns,
  * height to rows. A region smaller than one tile yields a 1×1 grid.

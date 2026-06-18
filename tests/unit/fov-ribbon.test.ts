@@ -34,6 +34,10 @@ function makeSkyMap() {
     setOnFovInstanceSelect: vi.fn(),
     setOnFovInstanceChange: vi.fn(),
     setOnFovFrameResize: vi.fn(),
+    setOnMosaicTileRemove: vi.fn(),
+    setOnMosaicTileAdd: vi.fn(),
+    setMosaicAddCandidates: vi.fn(),
+    setOnFrameMerge: vi.fn(),
     pinAllFloatingFrames: vi.fn(),
   };
 }

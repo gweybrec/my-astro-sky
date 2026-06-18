@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { planGrid, tileCenters, mosaicBounds, autoRegionForDso, framePointToSky } from '../../src/mosaic';
+import { planGrid, tileCenters, mosaicBounds, autoRegionForDso, framePointToSky, skyToFrameOffset, mosaicShapeFromOffsets, addCandidateOffsets } from '../../src/mosaic';
+
+/** True if a list of offsets contains one ≈(gx, gy). */
+function hasOffset(list: Array<{ gx: number; gy: number }>, gx: number, gy: number): boolean {
+  return list.some(o => Math.abs(o.gx - gx) < 1e-9 && Math.abs(o.gy - gy) < 1e-9);
+}
 
 /** Angular separation (deg) between two sky points, via the haversine formula. */
 function sep(a: { ra: number; dec: number }, b: { ra: number; dec: number }): number {
@@ -167,5 +172,102 @@ describe('framePointToSky', () => {
     const right = tiles.find(t => t.col === 2 && t.row === 0)!;
     const expected = framePointToSky(center, 0, 1, 0); // col offset = +1 step
     expect(sep(right, expected)).toBeLessThan(1e-9);
+  });
+});
+
+describe('skyToFrameOffset', () => {
+  it('round-trips with framePointToSky for many offsets, centres and PAs', () => {
+    const centres = [{ ra: 80, dec: 0 }, { ra: 10.68, dec: 41.27 }, { ra: 200, dec: -60 }, { ra: 0, dec: 80 }];
+    for (const center of centres) {
+      for (const paDeg of [0, 35, 90, -120, 200]) {
+        for (const [gx, gy] of [[0, 0], [1, 0], [0, 1.5], [-2, 1], [1.3, -0.7], [-1.8, -2.4]]) {
+          const s = framePointToSky(center, paDeg, gx, gy);
+          const back = skyToFrameOffset(center, paDeg, s.ra, s.dec);
+          expect(back.gx).toBeCloseTo(gx, 6);
+          expect(back.gy).toBeCloseTo(gy, 6);
+        }
+      }
+    }
+  });
+
+  it('a zero offset maps back to (0, 0)', () => {
+    const o = skyToFrameOffset({ ra: 50, dec: 20 }, 35, 50, 20);
+    expect(o.gx).toBeCloseTo(0, 9);
+    expect(o.gy).toBeCloseTo(0, 9);
+  });
+});
+
+describe('mosaicShapeFromOffsets', () => {
+  it('measures the tight grid and centroid of a centred set', () => {
+    // 2 cols × 3 rows on a 0.8 step lattice, centred on the origin.
+    const offs = [
+      { gx: -0.4, gy: -0.8 }, { gx: 0.4, gy: -0.8 },
+      { gx: -0.4, gy: 0 }, { gx: 0.4, gy: 0 },
+      { gx: -0.4, gy: 0.8 }, { gx: 0.4, gy: 0.8 },
+    ];
+    const s = mosaicShapeFromOffsets(offs, 0.8, 0.8);
+    expect(s.cols).toBe(2);
+    expect(s.rows).toBe(3);
+    expect(s.centerGx).toBeCloseTo(0, 9);
+    expect(s.centerGy).toBeCloseTo(0, 9);
+  });
+
+  it('reports the bbox centre off-origin when an edge is trimmed (the recenter shift)', () => {
+    // Drop the top row of the set above → 2×2 remains, its centre shifts down by
+    // half a step (so the mosaic centre must move there to stay aligned).
+    const offs = [
+      { gx: -0.4, gy: 0 }, { gx: 0.4, gy: 0 },
+      { gx: -0.4, gy: 0.8 }, { gx: 0.4, gy: 0.8 },
+    ];
+    const s = mosaicShapeFromOffsets(offs, 0.8, 0.8);
+    expect(s.cols).toBe(2);
+    expect(s.rows).toBe(2);
+    expect(s.centerGx).toBeCloseTo(0, 9);
+    expect(s.centerGy).toBeCloseTo(0.4, 9); // midpoint of 0 and 0.8
+  });
+
+  it('a single remaining tile recentres exactly onto it', () => {
+    const s = mosaicShapeFromOffsets([{ gx: 1.3, gy: -0.7 }], 0.8, 0.8);
+    expect(s).toEqual({ centerGx: 1.3, centerGy: -0.7, cols: 1, rows: 1 });
+  });
+
+  it('returns a zero shape for no offsets', () => {
+    expect(mosaicShapeFromOffsets([], 0.8, 0.8)).toEqual({ centerGx: 0, centerGy: 0, cols: 0, rows: 0 });
+  });
+});
+
+describe('addCandidateOffsets', () => {
+  it('a single tile has four neighbours', () => {
+    const c = addCandidateOffsets([{ gx: 0, gy: 0 }], 0.8, 0.8);
+    expect(c).toHaveLength(4);
+    expect(hasOffset(c, 0.8, 0)).toBe(true);
+    expect(hasOffset(c, -0.8, 0)).toBe(true);
+    expect(hasOffset(c, 0, 0.8)).toBe(true);
+    expect(hasOffset(c, 0, -0.8)).toBe(true);
+  });
+
+  it('a 2×2 block exposes its 8 perimeter neighbours and no interior duplicates', () => {
+    const block = [
+      { gx: 0, gy: 0 }, { gx: 0.8, gy: 0 },
+      { gx: 0, gy: 0.8 }, { gx: 0.8, gy: 0.8 },
+    ];
+    const c = addCandidateOffsets(block, 0.8, 0.8);
+    expect(c).toHaveLength(8);
+    // Existing cells are never candidates.
+    expect(hasOffset(c, 0, 0)).toBe(false);
+    expect(hasOffset(c, 0.8, 0.8)).toBe(false);
+    // A couple of the expected perimeter spots.
+    expect(hasOffset(c, -0.8, 0)).toBe(true);
+    expect(hasOffset(c, 1.6, 0.8)).toBe(true);
+  });
+
+  it('offers the gap of an L-shape (re-fill a removed corner)', () => {
+    // Full 2×2 minus the top-right corner → the gap at (0.8, 0.8) is a candidate.
+    const lshape = [{ gx: 0, gy: 0 }, { gx: 0.8, gy: 0 }, { gx: 0, gy: 0.8 }];
+    expect(hasOffset(addCandidateOffsets(lshape, 0.8, 0.8), 0.8, 0.8)).toBe(true);
+  });
+
+  it('returns nothing for an empty set', () => {
+    expect(addCandidateOffsets([], 0.8, 0.8)).toEqual([]);
   });
 });
