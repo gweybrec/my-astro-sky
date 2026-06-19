@@ -445,19 +445,19 @@ export class PhotoOverlay {
     }
   }
 
+  /** True when the photo passes the current label filter (no filter ⇒ allowed). */
+  private isLabelAllowed(placed: PlacedPhoto): boolean {
+    const filterKeys = Object.keys(this.visibleLabels || {});
+    if (filterKeys.length === 0) return true;
+    if (!placed.photo.labels || placed.photo.labels.length === 0) {
+      return this.visibleLabels['(no label)'] !== false;
+    }
+    return placed.photo.labels.some(l => this.visibleLabels[l] !== false);
+  }
+
   private applyPhotoVisibility() {
     for (const placed of this.placedPhotos) {
-      // Evaluate label filter: if no label filters set, allow all labels.
-      const filterKeys = Object.keys(this.visibleLabels || {});
-      let labelAllowed = true;
-      if (filterKeys.length > 0) {
-        if (!placed.photo.labels || placed.photo.labels.length === 0) {
-          labelAllowed = this.visibleLabels['(no label)'] !== false;
-        } else {
-          labelAllowed = placed.photo.labels.some(l => this.visibleLabels[l] !== false);
-        }
-      }
-      const shouldDisplay = this.showPhotos && placed.visible && labelAllowed;
+      const shouldDisplay = this.showPhotos && placed.visible && this.isLabelAllowed(placed);
       placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
     }
   }
@@ -913,7 +913,7 @@ export class PhotoOverlay {
       placed.projCentroid = cp;
       const halfDiagPx = Math.sqrt((photo.width / 2) ** 2 + (photo.height / 2) ** 2);
       placed.projHalfDiag = halfDiagPx * photo.manualPlacement.projPerPx;
-      imgEl.style.display = 'block';
+      imgEl.style.display = (this.showPhotos && this.isLabelAllowed(placed)) ? 'block' : 'none';
       applyManualTransform(imgEl, photo.manualPlacement, view, photo.width, photo.height);
       return;
     }
@@ -951,7 +951,7 @@ export class PhotoOverlay {
       return;
     }
     placed.borderHidden = false;
-    imgEl.style.display = 'block';
+    imgEl.style.display = (this.showPhotos && this.isLabelAllowed(placed)) ? 'block' : 'none';
 
     try {
       let matrix;
