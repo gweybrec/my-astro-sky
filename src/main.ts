@@ -4,7 +4,7 @@ import { SkyMap } from './sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery } from './gallery';
 import { TargetsView } from './targets-view';
-import { getPhotos, getGearSetups, patchGearSetupEnabled, getLatestVersion } from './api';
+import { getPhotos, getGearSetups, getLatestVersion } from './api';
 import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from './version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
 import { getHemisphere } from './projection';
@@ -15,6 +15,7 @@ import { pinia } from './pinia-instance';
 import { useCanvasStore } from './stores/canvas';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
+import { useFovFramesStore } from './stores/fov-frames';
 import { showToast } from './toast';
 import { getLang, t } from './i18n';
 import { reportRendererError, reportUnknownRendererError } from './error-reporter';
@@ -94,6 +95,7 @@ async function init() {
   const canvasStore = useCanvasStore(pinia);
 
   // Init targets view
+  const fovStore = useFovFramesStore(pinia);
   const targetsView = new TargetsView(skyMap, async (ra, dec, setupId) => {
     if (setupId) {
       try {
@@ -108,13 +110,14 @@ async function init() {
               spec.wDeg, spec.hDeg, dec, getHemisphere(),
               Math.min(view.width, view.height),
             );
-            // Sync DB: enable only the target setup so the FOV popup checkboxes match
-            const needsChange = setups.filter(s => s.enabled !== (s.id === setupId));
-            await Promise.all(needsChange.map(s => patchGearSetupEnabled(s.id, s.id === setupId)));
-            // Set override BEFORE switchView so FOVRibbon.onMounted consumes it
-            canvasStore.pendingFovOverride = specs;
+            // Open the target as a free frame pinned to the sky: switches the FOV
+            // system to free mode (the rest of the sky reflects it), shows the
+            // frame, and opens the frame-manager popup.
+            fovStore.addAdhocFrameAtSky(setupId, ra, dec);
+            fovStore.setFramesVisible(true);
             uiStore.switchView('skymap');
             skyMap.navigateTo(ra, dec, targetScale);
+            fovStore.requestPopupOpen();
             return;
           }
         }

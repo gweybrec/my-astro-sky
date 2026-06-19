@@ -730,6 +730,9 @@ export interface PlanEntry {
   notes: string | null;
   /** Mosaic this entry is a tile of, or null for a standalone frame. */
   mosaicId: string | null;
+  /** Smart-scope single-frame mosaic size (deg); null ⇒ render at native FOV. */
+  mosaicWDeg: number | null;
+  mosaicHDeg: number | null;
 }
 
 /** A mosaic: a group of tile entries covering one target. Tiles are the plan
@@ -737,6 +740,8 @@ export interface PlanEntry {
 export interface PlanMosaic {
   id: string;
   dsoId: string | null;
+  /** User-supplied name; null on legacy mosaics (then derived from the DSO). */
+  name: string | null;
   /** Mosaic centre (degrees). */
   centerRa: number;
   centerDec: number;
@@ -758,6 +763,8 @@ export interface MosaicTileInput {
 
 export interface MosaicParams {
   dsoId: string | null;
+  /** Omit to leave a stored name unchanged (background drags/transforms). */
+  name?: string;
   centerRa: number;
   centerDec: number;
   paDeg: number;
@@ -777,6 +784,10 @@ export interface Plan {
   nightOf: string | null;
   /** Gear setup id used for this plan's FOV/recipe, or null. */
   setupId: string | null;
+  /** Observing latitude (°N), or null to fall back to the global location. */
+  lat: number | null;
+  /** Observing longitude (°E), or null to fall back to the global location. */
+  lon: number | null;
   entries: PlanEntry[];
   mosaics: PlanMosaic[];
 }
@@ -815,11 +826,11 @@ export async function renamePlanAPI(id: string, name: string): Promise<void> {
   }
 }
 
-export async function updatePlanSettingsAPI(id: string, nightOf: string | null, setupId: string | null): Promise<void> {
+export async function updatePlanSettingsAPI(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nightOf, setupId }),
+    body: JSON.stringify({ nightOf, setupId, lat, lon }),
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
@@ -949,7 +960,7 @@ export async function updatePlanEntryPAAPI(planId: string, entryId: string, paDe
 export async function updatePlanEntryPositionAPI(
   planId: string,
   entryId: string,
-  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
 ): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, {
     method: 'PATCH',

@@ -59,13 +59,13 @@ describe('applyMigrations — fresh database', () => {
   it('returns the latest schema version after first run', () => {
     const db = freshBaseDb();
     const version = applyMigrations(db);
-    expect(version).toBe(4);
+    expect(version).toBe(7);
   });
 
   it('schema_version table contains the latest version', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    expect(schemaVersion(db)).toBe(4);
+    expect(schemaVersion(db)).toBe(7);
   });
 
   it('adds star_ra and star_dec columns to star_correspondences', () => {
@@ -102,8 +102,8 @@ describe('applyMigrations — idempotency', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     const v = applyMigrations(db);
-    expect(v).toBe(4);
-    expect(schemaVersion(db)).toBe(4);
+    expect(v).toBe(7);
+    expect(schemaVersion(db)).toBe(7);
   });
 });
 
@@ -127,7 +127,7 @@ describe('applyMigrations — v2 per-plan night/setup', () => {
   it('is a no-op (no throw) when the plans table is absent', () => {
     const db = freshBaseDb();
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(4);
+    expect(schemaVersion(db)).toBe(7);
   });
 });
 
@@ -167,7 +167,7 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
     expect(row.dso_id).toBe('M42');
     expect(row.pa_deg).toBe(142);
-    expect(schemaVersion(db)).toBe(4);
+    expect(schemaVersion(db)).toBe(7);
   });
 
   it('is idempotent on an already-migrated plan_entries table', () => {
@@ -196,7 +196,7 @@ describe('applyMigrations — existing database (simulates upgrade)', () => {
     db.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
 
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(4);
+    expect(schemaVersion(db)).toBe(7);
   });
 });
 
@@ -221,7 +221,7 @@ describe('applyMigrations — v4 mosaics', () => {
     expect(mosaicCols).toContain('center_ra');
     expect(mosaicCols).toContain('overlap_pct');
     expect(mosaicCols).toContain('cols');
-    expect(schemaVersion(db)).toBe(4);
+    expect(schemaVersion(db)).toBe(7);
   });
 
   it('is idempotent — a second run does not duplicate mosaic_id', () => {
@@ -235,6 +235,128 @@ describe('applyMigrations — v4 mosaics', () => {
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
     expect(getColumns(db, 'plan_entries').filter(c => c === 'mosaic_id').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — v5 mosaic name', () => {
+  it('adds the name column to plan_mosaics', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    expect(getColumns(db, 'plan_mosaics')).toContain('name');
+    expect(schemaVersion(db)).toBe(7);
+  });
+
+  it('round-trips a stored mosaic name', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    db.prepare('INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('mo1', 'p1', null, 'Orion region', 83.5, -5);
+    const row = db.prepare('SELECT name FROM plan_mosaics WHERE id = ?').get('mo1') as { name: string };
+    expect(row.name).toBe('Orion region');
+  });
+
+  it('is idempotent — a second run keeps a single name column', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    expect(() => applyMigrations(db)).not.toThrow();
+    expect(getColumns(db, 'plan_mosaics').filter(c => c === 'name').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — v6 smart-scope mosaic size', () => {
+  it('adds the mosaic_w_deg / mosaic_h_deg columns to plan_entries', () => {
+    const db = freshBaseDb();
+    db.exec(`
+      CREATE TABLE plan_entries (
+        id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, dso_id TEXT,
+        position INTEGER NOT NULL, pa_deg REAL, ra REAL, dec REAL, notes TEXT
+      );
+    `);
+    applyMigrations(db);
+    const cols = getColumns(db, 'plan_entries');
+    expect(cols).toContain('mosaic_w_deg');
+    expect(cols).toContain('mosaic_h_deg');
+    expect(schemaVersion(db)).toBe(7);
+  });
+
+  it('round-trips a stored smart mosaic size and preserves existing rows', () => {
+    const db = freshBaseDb();
+    db.exec(`
+      CREATE TABLE plan_entries (
+        id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, dso_id TEXT,
+        position INTEGER NOT NULL, pa_deg REAL, ra REAL, dec REAL, notes TEXT
+      );
+    `);
+    db.prepare('INSERT INTO plan_entries (id, plan_id, dso_id, position) VALUES (?, ?, ?, ?)')
+      .run('e1', 'p1', 'M42', 0);
+    applyMigrations(db);
+    db.prepare('UPDATE plan_entries SET mosaic_w_deg = ?, mosaic_h_deg = ? WHERE id = ?').run(4.33, 2.43, 'e1');
+    const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
+    expect(row.dso_id).toBe('M42');
+    expect(row.mosaic_w_deg).toBeCloseTo(4.33, 6);
+    expect(row.mosaic_h_deg).toBeCloseTo(2.43, 6);
+  });
+
+  it('is idempotent — a second run keeps single mosaic size columns', () => {
+    const db = freshBaseDb();
+    db.exec(`
+      CREATE TABLE plan_entries (
+        id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, dso_id TEXT,
+        position INTEGER NOT NULL, pa_deg REAL, ra REAL, dec REAL, notes TEXT
+      );
+    `);
+    applyMigrations(db);
+    expect(() => applyMigrations(db)).not.toThrow();
+    expect(getColumns(db, 'plan_entries').filter(c => c === 'mosaic_w_deg').length).toBe(1);
+    expect(getColumns(db, 'plan_entries').filter(c => c === 'mosaic_h_deg').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — v7 per-plan observing location', () => {
+  it('adds lat and lon columns to an existing plans table', () => {
+    const db = freshBaseDb();
+    db.exec(`
+      CREATE TABLE plans (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, position INTEGER NOT NULL,
+        created_at TEXT NOT NULL, night_of TEXT, setup_id TEXT
+      );
+    `);
+    applyMigrations(db);
+    const cols = getColumns(db, 'plans');
+    expect(cols).toContain('lat');
+    expect(cols).toContain('lon');
+    expect(schemaVersion(db)).toBe(7);
+  });
+
+  it('round-trips a stored per-plan location', () => {
+    const db = freshBaseDb();
+    db.exec(`
+      CREATE TABLE plans (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, position INTEGER NOT NULL,
+        created_at TEXT NOT NULL, night_of TEXT, setup_id TEXT
+      );
+    `);
+    db.prepare('INSERT INTO plans (id, name, position, created_at) VALUES (?, ?, ?, ?)')
+      .run('p1', 'Tonight', 0, '2026-06-20');
+    applyMigrations(db);
+    db.prepare('UPDATE plans SET lat = ?, lon = ? WHERE id = ?').run(48.85, 2.35, 'p1');
+    const row = db.prepare('SELECT * FROM plans WHERE id = ?').get('p1') as any;
+    expect(row.lat).toBeCloseTo(48.85, 6);
+    expect(row.lon).toBeCloseTo(2.35, 6);
+  });
+
+  it('is idempotent — a second run keeps single lat/lon columns', () => {
+    const db = freshBaseDb();
+    db.exec(`
+      CREATE TABLE plans (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, position INTEGER NOT NULL,
+        created_at TEXT NOT NULL, night_of TEXT, setup_id TEXT
+      );
+    `);
+    applyMigrations(db);
+    expect(() => applyMigrations(db)).not.toThrow();
+    expect(getColumns(db, 'plans').filter(c => c === 'lat').length).toBe(1);
+    expect(getColumns(db, 'plans').filter(c => c === 'lon').length).toBe(1);
   });
 });
 

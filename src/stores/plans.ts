@@ -78,15 +78,15 @@ export const usePlansStore = defineStore('plans', () => {
   }
 
   /**
-   * Update a plan's observation night and/or gear setup. Mutates the local
-   * cache immediately (so the caller can re-render without a round-trip) then
-   * persists in the background.
+   * Update a plan's observation night, gear setup and/or observing location.
+   * Mutates the local cache immediately (so the caller can re-render without a
+   * round-trip) then persists in the background.
    */
-  async function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null): Promise<void> {
+  async function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): Promise<void> {
     const plan = plans.value.find(p => p.id === id);
-    if (plan) { plan.nightOf = nightOf; plan.setupId = setupId; }
+    if (plan) { plan.nightOf = nightOf; plan.setupId = setupId; plan.lat = lat; plan.lon = lon; }
     try {
-      await updatePlanSettingsAPI(id, nightOf, setupId);
+      await updatePlanSettingsAPI(id, nightOf, setupId, lat, lon);
     } catch (err) {
       reportUnknownRendererError('plan_update_settings_failed', err, { id });
     }
@@ -179,7 +179,7 @@ export const usePlansStore = defineStore('plans', () => {
   function setEntryPosition(
     planId: string,
     entryId: string,
-    fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+    fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
   ): void {
     const entry = plans.value.find(p => p.id === planId)?.entries.find(e => e.id === entryId);
     if (entry) {
@@ -187,6 +187,8 @@ export const usePlansStore = defineStore('plans', () => {
       if ('dec' in fields) entry.dec = fields.dec ?? null;
       if ('paDeg' in fields) entry.paDeg = fields.paDeg ?? null;
       if ('dsoId' in fields) entry.dsoId = fields.dsoId ?? null;
+      if ('mosaicWDeg' in fields) entry.mosaicWDeg = fields.mosaicWDeg ?? null;
+      if ('mosaicHDeg' in fields) entry.mosaicHDeg = fields.mosaicHDeg ?? null;
     }
     const prev = paWriteTimers.get(entryId);
     if (prev) clearTimeout(prev);
@@ -196,7 +198,7 @@ export const usePlansStore = defineStore('plans', () => {
       paWriteTimers.delete(entryId);
       const e = plans.value.find(p => p.id === planId)?.entries.find(x => x.id === entryId);
       if (!e) return;
-      updatePlanEntryPositionAPI(planId, entryId, { ra: e.ra, dec: e.dec, paDeg: e.paDeg, dsoId: e.dsoId }).catch(err => {
+      updatePlanEntryPositionAPI(planId, entryId, { ra: e.ra, dec: e.dec, paDeg: e.paDeg, dsoId: e.dsoId, mosaicWDeg: e.mosaicWDeg, mosaicHDeg: e.mosaicHDeg }).catch(err => {
         reportUnknownRendererError('plan_set_entry_position_failed', err, { planId, entryId });
       });
     }, 250));

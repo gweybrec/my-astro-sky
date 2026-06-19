@@ -1,7 +1,8 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
 import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle } from './projection';
-import { framePointToSky } from './mosaic';
-import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle } from './star-catalog';
+import { framePointToSky, clampSmartMosaicSize } from './mosaic';
+import type { SmartMosaicEnvelope } from './mosaic';
+import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
 import { getDSOs, getDSOCatalog } from './dso-catalog';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
@@ -155,12 +156,22 @@ export interface RenderableFrame {
    * single bounding outline; they are not individually selectable in Phase 1.
    */
   mosaicId?: string | null;
+  /** True when this tile has at least one free neighbor (no adjacent tile on that
+   * side). Only border tiles show the delete button; inner tiles surrounded on all
+   * 4 sides cannot be deleted individually. */
+  mosaicIsBorderTile?: boolean;
   /**
    * Whether the frame shows corner resize handles: dragging a corner extends the
    * frame into a mosaic that covers the new region. Set for standalone plan
    * frames (which can become a plan mosaic).
    */
   resizable?: boolean;
+  /**
+   * Set on a smart-telescope frame: a resize enlarges this single frame within
+   * the envelope (rather than tiling a grid). Holds the size limits and the
+   * native FOV so the drag preview can clamp live. Null/absent for normal scopes.
+   */
+  smartMosaic?: { env: SmartMosaicEnvelope; nativeWDeg: number; nativeHDeg: number } | null;
   /** True on the single outline frame that represents a whole mosaic (selectable,
    * movable, rotatable, resizable); its tiles carry `mosaicId` instead. */
   isMosaicOutline?: boolean;
@@ -331,6 +342,10 @@ export class SkyMap {
   private frameDrag: { id: string; mode: 'move' | 'rotate' | 'resize'; corner?: number } | null = null;
   // Transient rubber-band rectangle shown while a resize drag is in progress.
   private resizeDraft: { cx: number; cy: number; halfW: number; halfH: number; rotDeg: number } | null = null;
+  // DSO the active move-drag will snap to on release; drives the elastic overlay.
+  private snapCandidate: { id: string; ra: number; dec: number; majAxis: number } | null = null;
+  // In-flight snap-back animation after a release within range (requestAnimationFrame handle).
+  private snapAnim: { id: string; raf: number } | null = null;
   private onFovFrameResize: ((id: string, region: FovFrameResizeRegion) => void) | null = null;
   // Per-tile delete: clicking a tile's trash button on the selected mosaic.
   private onMosaicTileRemove: ((tileId: string) => void) | null = null;
@@ -851,9 +866,16 @@ export class SkyMap {
       if (this.frameDrag) {
         const drag = this.frameDrag;
         this.frameDrag = null;
+        const snap = this.snapCandidate;
+        this.snapCandidate = null;
         if (drag.mode === 'resize') this.finalizeResize(drag.id);
-        // A standalone frame dropped onto another frame/mosaic of the same plan merges.
-        else if (drag.mode === 'move' && drag.id.startsWith('plan:')) this.checkFrameMerge(drag.id);
+        else if (drag.mode === 'move') {
+          // Release within snap range: spring the frame to the DSO centre.
+          if (snap) this.animateSnapToDso(drag.id, snap);
+          // A standalone frame dropped onto another frame/mosaic of the same plan merges.
+          else if (drag.id.startsWith('plan:')) this.checkFrameMerge(drag.id);
+        }
+        this.render();
         return;
       }
       if (this.isPanning) {
@@ -906,13 +928,20 @@ export class SkyMap {
       if (this.pickingMode) {
         this.exitPickingMode();
       } else if (this.fovInstances.some(f => f.active)) {
+        // Abandon any in-progress snap drag/animation so deselecting can't leave
+        // a dangling elastic overlay or running rAF.
+        this.frameDrag = null;
+        this.snapCandidate = null;
+        this.cancelSnapAnim();
         this.selectFrame(null);
+        this.render();
       }
     }) as EventListener);
   }
 
   destroy() {
     this.cancelAnimation();
+    this.cancelSnapAnim();
     for (const { target, event, handler } of this.boundHandlers) {
       target.removeEventListener(event, handler);
     }
@@ -1553,8 +1582,8 @@ export class SkyMap {
       ctx.stroke();
 
       if (isTile) {
-        // Tiles of the selected mosaic carry a delete button (large tiles only).
-        if (f.mosaicId === activeMosaicId && this.tileTrashVisible(halfW, halfH)) {
+        // Border tiles of the selected mosaic carry a delete button (large tiles only).
+        if (f.mosaicId === activeMosaicId && f.mosaicIsBorderTile && this.tileTrashVisible(halfW, halfH)) {
           ctx.globalAlpha = 1;
           this.drawTileTrash({ x: cx, y: cy }, dangerColor);
         }
@@ -1630,6 +1659,40 @@ export class SkyMap {
       ctx.closePath();
       ctx.stroke();
       ctx.restore();
+    }
+
+    // Elastic line: while moving a frame whose anchor will snap, a taut line runs
+    // from the frame centre (cursor) to the pending DSO's centre. It tightens
+    // (brighter + thicker) as the frame nears the break threshold, signalling the
+    // snap-back that fires on release; it vanishes when the elastic "breaks".
+    if (this.snapCandidate && this.frameDrag?.mode === 'move') {
+      const f = this.fovInstances.find(x => x.id === this.frameDrag!.id);
+      if (f) {
+        const snap = this.snapCandidate;
+        const { cx, cy } = this.frameAnchorCanvas(f);
+        const dp = project(snap.ra, snap.dec);
+        const dc = toCanvas(dp.x, dp.y, this.view);
+        // Break radius mirrors findClosestDSO: the rendered ellipse, floored at 20px.
+        const rx = Math.max(2, angularSizeToCanvasPx(snap.majAxis / 2, snap.dec, this.view.scale));
+        const breakPx = Math.max(rx, 20);
+        const tension = Math.min(1, Math.hypot(cx - dc.x, cy - dc.y) / breakPx);
+        ctx.save();
+        ctx.strokeStyle = activeColor;
+        ctx.fillStyle = activeColor;
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.5 + 0.5 * tension;
+        ctx.lineWidth = 1.5 + 1.5 * tension;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(dc.x, dc.y);
+        ctx.stroke();
+        // Ring marking the snap target at the DSO centre.
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(dc.x, dc.y, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // Add ("+") buttons at the empty neighbour cells of the selected mosaic.
@@ -1793,7 +1856,7 @@ export class SkyMap {
             }
           }
           for (const t of this.fovInstances) {
-            if (t.mosaicId !== mosaicId) continue;
+            if (t.mosaicId !== mosaicId || !t.mosaicIsBorderTile) continue;
             const tg = this.frameGeometry(t);
             if (isNearHandle(mx, my, { x: tg.cx, y: tg.cy }, SkyMap.TILE_TRASH_R)) {
               this.onMosaicTileRemove?.(t.id);
@@ -1934,6 +1997,58 @@ export class SkyMap {
     });
   }
 
+  /** Cancel any in-flight frame snap-back animation. */
+  private cancelSnapAnim(): void {
+    if (this.snapAnim) {
+      cancelAnimationFrame(this.snapAnim.raf);
+      this.snapAnim = null;
+    }
+  }
+
+  /**
+   * Spring a just-dropped frame from its current (cursor) centre to the snap
+   * target's DSO centre over a short ease-out, then commit the anchor with the
+   * DSO as its target. The frame's on-screen orientation is held by recomputing
+   * the PA at each interpolated RA (as the drag does).
+   */
+  private animateSnapToDso(id: string, snap: { id: string; ra: number; dec: number }): void {
+    this.cancelSnapAnim();
+    const f = this.fovInstances.find(x => x.id === id);
+    if (!f || f.anchorKind !== 'sky') return;
+    const startRa = f.ra ?? snap.ra;
+    const startDec = f.dec ?? snap.dec;
+    // Shortest-arc RA delta so a wrap across 0/360 doesn't sweep the long way.
+    let dRa = snap.ra - startRa;
+    if (dRa > 180) dRa -= 360;
+    else if (dRa < -180) dRa += 360;
+    const dDec = snap.dec - startDec;
+    const canvasRotDeg = this.frameCanvasRotationDeg(f);
+    const duration = 150;
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      let t = (now - startTime) / duration;
+      if (t >= 1) t = 1;
+      const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      const ra = normalizeRA(startRa + dRa * ease);
+      const dec = startDec + dDec * ease;
+      const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
+      const done = t >= 1;
+      // Keep the DSO target bound for every frame of the spring (it's known the
+      // whole time); a null mid-flight would flip a mosaic's name to the gear spec.
+      this.onFovInstanceChange?.(id, {
+        anchor: { kind: 'sky', ra: done ? snap.ra : ra, dec: done ? snap.dec : dec, dsoId: snap.id },
+        paDeg,
+      });
+      if (done) {
+        this.snapAnim = null;
+      } else {
+        this.snapAnim = { id, raf: requestAnimationFrame(step) };
+      }
+    };
+    this.snapAnim = { id, raf: requestAnimationFrame(step) };
+  }
+
   /**
    * Bring the given frame to the centre of the view (used by the frame manager).
    * Idempotent: a pinned frame pans the view to its sky anchor; a floating frame
@@ -1963,7 +2078,18 @@ export class SkyMap {
       // fixed corner and the cursor; nothing is committed until mouseup.
       const geo = this.frameGeometry(f);
       const r = resizeFromCorner(geo.corners, this.frameDrag.corner ?? 2, mx, my, geo.rotDeg);
-      this.resizeDraft = { cx: r.cx, cy: r.cy, halfW: r.halfW, halfH: r.halfH, rotDeg: geo.rotDeg };
+      let { halfW, halfH } = r;
+      // Smart-scope frame: clamp the rubber band to the scope's mosaic envelope
+      // live (per-axis cap + area cap). resizeFromCorner keeps the centre fixed,
+      // so clamping the half-extents alone keeps the preview anchored.
+      if (f.smartMosaic) {
+        const reqWDeg = f.wDeg * (r.halfW / Math.max(1e-6, geo.halfW));
+        const reqHDeg = f.hDeg * (r.halfH / Math.max(1e-6, geo.halfH));
+        const c = clampSmartMosaicSize(reqWDeg, reqHDeg, f.smartMosaic.nativeWDeg, f.smartMosaic.nativeHDeg, f.smartMosaic.env);
+        halfW = (c.wDeg / Math.max(1e-6, f.wDeg)) * geo.halfW;
+        halfH = (c.hDeg / Math.max(1e-6, f.hDeg)) * geo.halfH;
+      }
+      this.resizeDraft = { cx: r.cx, cy: r.cy, halfW, halfH, rotDeg: geo.rotDeg };
       this.render();
       return;
     }
@@ -1984,27 +2110,39 @@ export class SkyMap {
         // whose screen direction changes across the projection — so without
         // this the frame would spin to stay north-aligned as it's dragged.
         const canvasRotDeg = this.frameCanvasRotationDeg(f);
-        let ra: number, dec: number, dsoId: string | null = null;
-        // Snap the centre to the nearest DSO when the anchor is on (both free
-        // and plan frames); otherwise the centre follows the cursor exactly.
+        // The centre always follows the cursor exactly — no mid-drag jump. When
+        // the anchor is on and a DSO is within snap range we only *record* it as
+        // the pending snap target (drawn as the elastic line); the actual snap
+        // happens on mouse-up via animateSnapToDso.
+        const proj = fromCanvas(mx, my, this.view);
+        const u = unproject(proj.x, proj.y);
+        const ra = u.ra, dec = u.dec;
+        let dsoId: string | null = null;
         const near = f.anchorSnap !== false ? this.findClosestDSO(mx, my) : null;
-        if (near) {
-          // Anchored: the snapped object sits at the centre, so it is the target.
-          ra = near.ra; dec = near.dec; dsoId = near.id;
-        } else {
-          const proj = fromCanvas(mx, my, this.view);
-          const u = unproject(proj.x, proj.y);
-          ra = u.ra; dec = u.dec;
-        }
         // Recompute the PA so the frame keeps the same on-screen angle at the
         // new position.
         const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
-        // A plan frame placed freely (anchor off) takes the DSO nearest its
-        // centre that falls inside it (custom location if none).
-        if (f.derivesTargetFromContent && !near) {
-          const moved: RenderableFrame = { ...f, ra, dec, paDeg };
-          dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
+        if (near) {
+          this.snapCandidate = { id: near.id, ra: near.ra, dec: near.dec, majAxis: near.majAxis ?? 1 };
+          // Keep the pending target *bound* while the elastic is shown. The centre
+          // still follows the cursor (it springs to the DSO only on release), but
+          // nulling the target here would, for a mosaic, drop its dsoId — flipping
+          // its name to the gear spec and turning anchorSnap off, which then
+          // toggles back on next frame and flickers. Binding it keeps identity stable.
+          dsoId = near.id;
+        } else {
+          this.snapCandidate = null;
+          // A plan/mosaic frame dragged out of snap range takes the DSO nearest
+          // its centre that falls inside it (custom location if none).
+          if (f.derivesTargetFromContent) {
+            const moved: RenderableFrame = { ...f, ra, dec, paDeg };
+            dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
+          }
         }
+        // Emitting the change drives the re-render (via the store watch →
+        // setFovInstances), which redraws the elastic from the frame's updated
+        // centre. No explicit render() here — a synchronous one would paint the
+        // line from the frame's stale (pre-change) position and flicker.
         this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
       } else {
         this.onFovInstanceChange?.(f.id, { anchor: { kind: 'screen', nx: mx / this.view.width, ny: my / this.view.height } });

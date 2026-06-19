@@ -110,7 +110,36 @@ export function applyMigrations(database: Database): number {
         `);
       },
     },
-    // Future migrations: { version: 5, run(d) { ... } },
+    {
+      // v5: mosaics gain an explicit user-supplied name (multi-DSO mosaics can't
+      // be named after a single target). Older mosaics keep NULL → name is still
+      // derived from the DSO at display time.
+      version: 5,
+      run(d) {
+        try { d.exec('ALTER TABLE plan_mosaics ADD COLUMN name TEXT'); } catch { /* exists */ }
+      },
+    },
+    {
+      // v6: plan entries gain an optional smart-scope single-frame mosaic size.
+      // A smart telescope (Seestar, Vespera, DWARF…) enlarges one frame rather
+      // than tiling a grid; these columns hold the chosen FOV (deg). NULL ⇒ the
+      // frame renders at its native FOV.
+      version: 6,
+      run(d) {
+        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_w_deg REAL'); } catch { /* exists */ }
+        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_h_deg REAL'); } catch { /* exists */ }
+      },
+    },
+    {
+      // v7: per-plan observing location (°N / °E). NULL ⇒ fall back to the
+      // global location (same pattern as night_of falling back to the global date).
+      version: 7,
+      run(d) {
+        try { d.exec('ALTER TABLE plans ADD COLUMN lat REAL'); } catch { /* exists */ }
+        try { d.exec('ALTER TABLE plans ADD COLUMN lon REAL'); } catch { /* exists */ }
+      },
+    },
+    // Future migrations: { version: 8, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

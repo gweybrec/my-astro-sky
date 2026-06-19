@@ -264,3 +264,176 @@ export function autoRegionForDso(
   // Major axis runs vertically (height/up); PA already aligns up with it.
   return { wDeg: minDeg * (1 + margin), hDeg: majDeg * (1 + margin), paDeg };
 }
+
+// ─── Smart-telescope (single-frame) mosaics ──────────────────────────────────
+//
+// Smart scopes (Seestar, Vespera, DWARF…) stitch their own mosaic internally:
+// the user only picks the size of the *single* resulting frame, between its
+// native FOV and a per-scope maximum. There is no tiling. Two cap styles:
+//   - per-axis uniform enlargement (`scale`): Seestar/DWARF;
+//   - area-coupled (`max_long_edge_deg` + `max_area_deg2`): Vaonis/CovalENS,
+//     where a square (e.g. 3.25°×3.25°) and a rectangle (4.33°×2.43°) cover the
+//     same area, the rectangle's long edge exceeding the square's side.
+
+/** A telescope's raw mosaic capability, as stored in the catalog. */
+export interface SmartMosaicCapability {
+  scale?: number;
+  max_long_edge_deg?: number;
+  max_area_deg2?: number;
+}
+
+/** Resolved absolute size envelope for a smart-scope frame at a given native FOV. */
+export interface SmartMosaicEnvelope {
+  maxWDeg: number;
+  maxHDeg: number;
+  /** When set, w·h may not exceed this — couples the two axes (Vaonis). */
+  maxAreaDeg2?: number;
+}
+
+/**
+ * Build the absolute size envelope from a telescope's mosaic capability and its
+ * computed native FOV. Returns null when the scope has no usable mosaic mode (so
+ * the frame must not be resizable).
+ */
+export function smartMosaicEnvelope(
+  cap: SmartMosaicCapability | undefined | null,
+  nativeWDeg: number,
+  nativeHDeg: number,
+): SmartMosaicEnvelope | null {
+  if (!cap) return null;
+  if (Number.isFinite(cap.scale) && (cap.scale as number) > 1) {
+    return { maxWDeg: nativeWDeg * (cap.scale as number), maxHDeg: nativeHDeg * (cap.scale as number) };
+  }
+  if (Number.isFinite(cap.max_long_edge_deg) && (cap.max_long_edge_deg as number) > 0) {
+    const longEdge = cap.max_long_edge_deg as number;
+    const env: SmartMosaicEnvelope = { maxWDeg: longEdge, maxHDeg: longEdge };
+    if (Number.isFinite(cap.max_area_deg2) && (cap.max_area_deg2 as number) > 0) {
+      env.maxAreaDeg2 = cap.max_area_deg2 as number;
+    }
+    return env;
+  }
+  return null;
+}
+
+/**
+ * Clamp a requested frame size to a smart-scope envelope:
+ *   1. floor each axis at its native FOV, cap each at the per-axis maximum;
+ *   2. if an area cap binds (w·h > maxArea), keep the axis dragged larger and
+ *      shrink the perpendicular axis to hold the area (then re-floor/cap it).
+ */
+export function clampSmartMosaicSize(
+  reqWDeg: number,
+  reqHDeg: number,
+  nativeWDeg: number,
+  nativeHDeg: number,
+  env: SmartMosaicEnvelope,
+): { wDeg: number; hDeg: number } {
+  let w = clamp(reqWDeg, nativeWDeg, env.maxWDeg);
+  let h = clamp(reqHDeg, nativeHDeg, env.maxHDeg);
+  if (env.maxAreaDeg2 != null && w * h > env.maxAreaDeg2) {
+    if (w >= h) {
+      h = clamp(env.maxAreaDeg2 / w, nativeHDeg, env.maxHDeg);
+    } else {
+      w = clamp(env.maxAreaDeg2 / h, nativeWDeg, env.maxWDeg);
+    }
+  }
+  return { wDeg: w, hDeg: h };
+}
+
+/**
+ * Outer rectangular outline (wDeg × hDeg) of a `cols × rows` tile grid at the
+ * given single-tile FOV and overlap — the inverse of {@link planGrid}. With n
+ * tiles the covered span is (n−1)·step + tile where step = tile·(1−overlap).
+ */
+export function outlineFromGrid(
+  cols: number,
+  rows: number,
+  tileWDeg: number,
+  tileHDeg: number,
+  overlapPct: number,
+): { wDeg: number; hDeg: number } {
+  const f = 1 - overlapFraction(overlapPct);
+  return {
+    wDeg: (Math.max(1, cols) - 1) * tileWDeg * f + tileWDeg,
+    hDeg: (Math.max(1, rows) - 1) * tileHDeg * f + tileHDeg,
+  };
+}
+
+/** The new setup a mosaic is being re-fitted onto: its native single-frame FOV,
+ * its smart-scope enlargement envelope (null ⇒ classical or non-mosaic smart),
+ * and whether it can tile (classical scope) — a smart scope cannot. */
+export interface TargetFov {
+  wDeg: number;
+  hDeg: number;
+  envelope: SmartMosaicEnvelope | null;
+  tileable: boolean;
+}
+
+/** How a source mosaic best maps onto a new setup: a re-gridded tile mosaic, or
+ * a single (possibly enlarged) frame. `wDeg`/`hDeg` are the resulting outline. */
+export type MosaicTransform =
+  | { kind: 'grid'; cols: number; rows: number; wDeg: number; hDeg: number }
+  | { kind: 'single'; wDeg: number; hDeg: number };
+
+/**
+ * Best transformation of a source mosaic's outer outline onto a new setup,
+ * preserving as much of the framed area as the target allows:
+ *  - target is a smart scope with an enlargement envelope → clamp the outline
+ *    into the envelope (keeps most area, floors at native) → a single frame;
+ *  - target is a classical scope → re-grid the outline + overlap to the new tile
+ *    FOV; a grid that collapses to one tile becomes a single native frame;
+ *  - target is a smart scope with no mosaic mode → a single native frame.
+ */
+export function transformMosaicToSetup(
+  outlineWDeg: number,
+  outlineHDeg: number,
+  overlapPct: number,
+  target: TargetFov,
+): MosaicTransform {
+  if (target.envelope) {
+    const { wDeg, hDeg } = clampSmartMosaicSize(outlineWDeg, outlineHDeg, target.wDeg, target.hDeg, target.envelope);
+    return { kind: 'single', wDeg, hDeg };
+  }
+  if (target.tileable) {
+    const { cols, rows } = planGrid(target.wDeg, target.hDeg, outlineWDeg, outlineHDeg, overlapPct);
+    if (cols * rows <= 1) return { kind: 'single', wDeg: target.wDeg, hDeg: target.hDeg };
+    const { wDeg, hDeg } = outlineFromGrid(cols, rows, target.wDeg, target.hDeg, overlapPct);
+    return { kind: 'grid', cols, rows, wDeg, hDeg };
+  }
+  return { kind: 'single', wDeg: target.wDeg, hDeg: target.hDeg };
+}
+
+/**
+ * Centre + region for an "auto" mosaic covering one *or several* DSOs.
+ *
+ * - One DSO reduces exactly to {@link autoRegionForDso} centred on the object
+ *   (keeps its PA-aligned framing, so the mosaic stays anchored to it).
+ * - Several DSOs are projected to a common tangent plane (about the first as
+ *   reference), each padded by its angular radius (majAxis/2); the covering
+ *   bounding box gives a north-up (PA 0) region and its midpoint the centre —
+ *   the mosaic sits between the targets and isn't anchored to any one of them.
+ */
+export function autoRegionForDsos(
+  dsos: Array<Pick<DSO, 'ra' | 'dec' | 'majAxis' | 'minAxis' | 'pa'>>,
+  marginPct = 20,
+): { center: { ra: number; dec: number }; region: MosaicRegion } {
+  if (dsos.length === 0) return { center: { ra: 0, dec: 0 }, region: { wDeg: 0, hDeg: 0, paDeg: 0 } };
+  if (dsos.length === 1) {
+    const d = dsos[0];
+    return { center: { ra: d.ra, dec: d.dec }, region: autoRegionForDso(d, marginPct) };
+  }
+  const margin = Math.max(0, marginPct) / 100;
+  const ref = { ra: dsos[0].ra, dec: dsos[0].dec };
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const d of dsos) {
+    const { gx, gy } = skyToFrameOffset(ref, 0, d.ra, d.dec); // east, north (deg) at PA 0
+    const r = d.majAxis != null ? d.majAxis / 60 / 2 : 0;
+    minX = Math.min(minX, gx - r); maxX = Math.max(maxX, gx + r);
+    minY = Math.min(minY, gy - r); maxY = Math.max(maxY, gy + r);
+  }
+  const center = framePointToSky(ref, 0, (minX + maxX) / 2, (minY + maxY) / 2);
+  return {
+    center,
+    region: { wDeg: (maxX - minX) * (1 + margin), hDeg: (maxY - minY) * (1 + margin), paDeg: 0 },
+  };
+}

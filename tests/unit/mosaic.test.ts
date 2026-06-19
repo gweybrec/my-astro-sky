@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planGrid, tileCenters, mosaicBounds, autoRegionForDso, framePointToSky, skyToFrameOffset, mosaicShapeFromOffsets, addCandidateOffsets } from '../../src/mosaic';
+import { planGrid, tileCenters, mosaicBounds, autoRegionForDso, autoRegionForDsos, framePointToSky, skyToFrameOffset, mosaicShapeFromOffsets, addCandidateOffsets, smartMosaicEnvelope, clampSmartMosaicSize, outlineFromGrid, transformMosaicToSetup } from '../../src/mosaic';
 
 /** True if a list of offsets contains one ≈(gx, gy). */
 function hasOffset(list: Array<{ gx: number; gy: number }>, gx: number, gy: number): boolean {
@@ -128,6 +128,40 @@ describe('autoRegionForDso', () => {
     const r = autoRegionForDso({ majAxis: null, minAxis: null, pa: 10 }, 20);
     expect(r).toEqual({ wDeg: 0, hDeg: 0, paDeg: 10 });
     expect(planGrid(1, 1, r.wDeg, r.hDeg, 20)).toEqual({ cols: 1, rows: 1 });
+  });
+});
+
+describe('autoRegionForDsos', () => {
+  it('reduces to autoRegionForDso centred on the object for a single DSO', () => {
+    const dso = { ra: 83.8, dec: -5.4, majAxis: 60, minAxis: 30, pa: 45 };
+    const out = autoRegionForDsos([dso], 20);
+    expect(out.center).toEqual({ ra: dso.ra, dec: dso.dec });
+    expect(out.region).toEqual(autoRegionForDso(dso, 20));
+  });
+
+  it('places the centre between two targets and un-anchors (PA 0)', () => {
+    const a = { ra: 83.0, dec: 0, majAxis: null, minAxis: null, pa: 0 };
+    const b = { ra: 84.0, dec: 0, majAxis: null, minAxis: null, pa: 0 };
+    const out = autoRegionForDsos([a, b], 20);
+    expect(out.center.ra).toBeCloseTo(83.5, 4);
+    expect(out.center.dec).toBeCloseTo(0, 4);
+    expect(out.region.paDeg).toBe(0);
+    // ~1° apart in RA at dec 0, padded by 20% → region wider than the raw span.
+    expect(out.region.wDeg).toBeGreaterThan(1);
+    // Centre is (near-)equidistant from both targets (gnomonic ⇒ approximate).
+    expect(sep(out.center, a)).toBeCloseTo(sep(out.center, b), 3);
+  });
+
+  it('grows the region to enclose each target plus its angular size', () => {
+    const small = autoRegionForDsos([
+      { ra: 10, dec: 30, majAxis: null, minAxis: null, pa: 0 },
+      { ra: 10.5, dec: 30, majAxis: null, minAxis: null, pa: 0 },
+    ], 0);
+    const big = autoRegionForDsos([
+      { ra: 10, dec: 30, majAxis: 120, minAxis: 120, pa: 0 },
+      { ra: 10.5, dec: 30, majAxis: 120, minAxis: 120, pa: 0 },
+    ], 0);
+    expect(big.region.wDeg).toBeGreaterThan(small.region.wDeg);
   });
 });
 
@@ -269,5 +303,168 @@ describe('addCandidateOffsets', () => {
 
   it('returns nothing for an empty set', () => {
     expect(addCandidateOffsets([], 0.8, 0.8)).toEqual([]);
+  });
+});
+
+describe('smartMosaicEnvelope', () => {
+  it('returns null when the scope has no mosaic capability', () => {
+    expect(smartMosaicEnvelope(undefined, 1, 2)).toBeNull();
+    expect(smartMosaicEnvelope(null, 1, 2)).toBeNull();
+    expect(smartMosaicEnvelope({}, 1, 2)).toBeNull();
+  });
+
+  it('scales the native FOV per axis for a multiplier scope (Seestar 2×)', () => {
+    // Seestar S50 native ≈ 0.73° × 1.28°; 2× per axis.
+    const env = smartMosaicEnvelope({ scale: 2 }, 1.28, 0.73);
+    expect(env).not.toBeNull();
+    expect(env!.maxWDeg).toBeCloseTo(2.56, 6);
+    expect(env!.maxHDeg).toBeCloseTo(1.46, 6);
+    expect(env!.maxAreaDeg2).toBeUndefined(); // no area coupling for multiplier scopes
+  });
+
+  it('uses an equal-axis long edge + area cap for an area-coupled scope (Vespera)', () => {
+    const env = smartMosaicEnvelope({ max_long_edge_deg: 4.33, max_area_deg2: 10.5 }, 2.5, 1.4);
+    expect(env).toEqual({ maxWDeg: 4.33, maxHDeg: 4.33, maxAreaDeg2: 10.5 });
+  });
+
+  it('ignores a scale of 1 or less (no enlargement → no mosaic)', () => {
+    expect(smartMosaicEnvelope({ scale: 1 }, 1, 2)).toBeNull();
+  });
+});
+
+describe('clampSmartMosaicSize', () => {
+  it('floors each axis at the native FOV', () => {
+    const env = smartMosaicEnvelope({ scale: 2 }, 1.28, 0.73)!;
+    const r = clampSmartMosaicSize(0.5, 0.2, 1.28, 0.73, env);
+    expect(r.wDeg).toBeCloseTo(1.28, 6);
+    expect(r.hDeg).toBeCloseTo(0.73, 6);
+  });
+
+  it('caps each axis at its per-axis maximum (multiplier scope)', () => {
+    const env = smartMosaicEnvelope({ scale: 2 }, 1.28, 0.73)!;
+    const r = clampSmartMosaicSize(5, 5, 1.28, 0.73, env);
+    expect(r.wDeg).toBeCloseTo(2.56, 6);
+    expect(r.hDeg).toBeCloseTo(1.46, 6);
+  });
+
+  // Vespera II envelope: square (3.25²) and rectangle (4.33×2.43) both fit.
+  const AREA = 10.56;
+  const vesperaII = () => smartMosaicEnvelope({ max_long_edge_deg: 4.33, max_area_deg2: AREA }, 2.5, 1.4)!;
+
+  it('allows a square mosaic that stays within the area cap', () => {
+    const r = clampSmartMosaicSize(3.0, 3.0, 2.5, 1.4, vesperaII());
+    expect(r.wDeg).toBeCloseTo(3.0, 6);
+    expect(r.hDeg).toBeCloseTo(3.0, 6); // 9 deg² < area cap → untouched
+  });
+
+  it('shrinks the perpendicular axis when one edge is pushed past the square (area cap)', () => {
+    // Drag the width out to the long edge: height collapses to hold the area.
+    const r = clampSmartMosaicSize(4.33, 3.0, 2.5, 1.4, vesperaII());
+    expect(r.wDeg).toBeCloseTo(4.33, 6);          // dragged (larger) axis kept
+    expect(r.hDeg).toBeCloseTo(AREA / 4.33, 6);   // ≈ 2.44° — perpendicular shrunk
+    expect(r.wDeg * r.hDeg).toBeLessThanOrEqual(AREA + 1e-9);
+  });
+
+  it('keeps the dragged axis whichever orientation (tall rectangle)', () => {
+    // Square-ish native so the perpendicular axis can shrink freely (no floor clash).
+    const env = smartMosaicEnvelope({ max_long_edge_deg: 4.33, max_area_deg2: AREA }, 1.5, 1.5)!;
+    const r = clampSmartMosaicSize(3.0, 4.33, 1.5, 1.5, env);
+    expect(r.hDeg).toBeCloseTo(4.33, 6);
+    expect(r.wDeg).toBeCloseTo(AREA / 4.33, 6);
+  });
+
+  it('floors at the native FOV even if it slightly exceeds the area cap', () => {
+    // When the native long axis alone forces the area over the cap, the floor wins.
+    const r = clampSmartMosaicSize(9, 9, 2.5, 1.4, vesperaII());
+    expect(r.wDeg).toBeGreaterThanOrEqual(2.5 - 1e-9);
+    expect(r.hDeg).toBeGreaterThanOrEqual(1.4 - 1e-9);
+  });
+});
+
+describe('outlineFromGrid', () => {
+  it('returns the single-tile FOV for a 1×1 grid', () => {
+    expect(outlineFromGrid(1, 1, 2, 1.5, 20)).toEqual({ wDeg: 2, hDeg: 1.5 });
+  });
+
+  it('spans (n−1)·step + tile across each axis', () => {
+    // 1° tiles, 20% overlap → step 0.8. 3 cols → 2*0.8 + 1 = 2.6; 2 rows → 1*0.8 + 1 = 1.8.
+    const o = outlineFromGrid(3, 2, 1, 1, 20);
+    expect(o.wDeg).toBeCloseTo(2.6, 9);
+    expect(o.hDeg).toBeCloseTo(1.8, 9);
+  });
+
+  it('inverts planGrid up to a one-tile rounding margin (closest whole-tile match)', () => {
+    // Re-gridding an outline onto the same tile size recovers the grid, give or
+    // take a single tile where the span lands exactly on a ceil() boundary (FP).
+    for (const [cols, rows, overlap] of [[3, 2, 20], [4, 4, 0], [2, 5, 50], [1, 3, 30]]) {
+      const o = outlineFromGrid(cols, rows, 1.3, 0.9, overlap);
+      const g = planGrid(1.3, 0.9, o.wDeg, o.hDeg, overlap);
+      expect(g.cols).toBeGreaterThanOrEqual(cols);
+      expect(g.cols).toBeLessThanOrEqual(cols + 1);
+      expect(g.rows).toBeGreaterThanOrEqual(rows);
+      expect(g.rows).toBeLessThanOrEqual(rows + 1);
+    }
+  });
+});
+
+describe('transformMosaicToSetup', () => {
+  const seestar = smartMosaicEnvelope({ scale: 2 }, 1.28, 0.73)!;
+  const classical = (wDeg: number, hDeg: number): Parameters<typeof transformMosaicToSetup>[3] =>
+    ({ wDeg, hDeg, envelope: null, tileable: true });
+  const smart = (wDeg: number, hDeg: number, envelope = seestar): Parameters<typeof transformMosaicToSetup>[3] =>
+    ({ wDeg, hDeg, envelope, tileable: false });
+
+  it('classical → classical: re-grids the outline keeping overlap, outline ≈ preserved', () => {
+    // Source outline of a 3×2 mosaic at 1°/20% overlap = 2.6° × 1.8°.
+    const src = outlineFromGrid(3, 2, 1, 1, 20);
+    // New scope has a smaller 0.7° × 0.5° tile → needs a denser grid.
+    const r = transformMosaicToSetup(src.wDeg, src.hDeg, 20, classical(0.7, 0.5));
+    expect(r.kind).toBe('grid');
+    if (r.kind !== 'grid') return;
+    expect(r.cols).toBeGreaterThan(3);
+    expect(r.rows).toBeGreaterThan(2);
+    // The re-gridded outline covers at least the source (closest whole-tile match).
+    expect(r.wDeg).toBeGreaterThanOrEqual(src.wDeg - 1e-9);
+    expect(r.hDeg).toBeGreaterThanOrEqual(src.hDeg - 1e-9);
+    expect(r.wDeg).toBeLessThan(src.wDeg + 0.7); // within one extra tile
+  });
+
+  it('classical → smart: clamps the outline into the envelope (single, ≥ native, ≤ max)', () => {
+    const src = outlineFromGrid(4, 4, 1, 1, 20); // 3.4° × 3.4°, larger than the envelope
+    const r = transformMosaicToSetup(src.wDeg, src.hDeg, 20, smart(1.28, 0.73));
+    expect(r.kind).toBe('single');
+    if (r.kind !== 'single') return;
+    expect(r.wDeg).toBeCloseTo(2.56, 6); // capped at 2× native
+    expect(r.hDeg).toBeCloseTo(1.46, 6);
+    expect(r.wDeg).toBeGreaterThanOrEqual(1.28);
+    expect(r.hDeg).toBeGreaterThanOrEqual(0.73);
+  });
+
+  it('smart → classical: tiles an enlarged single frame into a multi-tile grid', () => {
+    // Enlarged Seestar frame 2.56° × 1.46° onto a 0.7° × 0.5° classical tile.
+    const r = transformMosaicToSetup(2.56, 1.46, 20, classical(0.7, 0.5));
+    expect(r.kind).toBe('grid');
+    if (r.kind !== 'grid') return;
+    expect(r.cols).toBeGreaterThan(1);
+    expect(r.rows).toBeGreaterThan(1);
+  });
+
+  it('smart → smart: re-clamps the outline into the new envelope', () => {
+    const vespera = smartMosaicEnvelope({ max_long_edge_deg: 4.33, max_area_deg2: 10.56 }, 2.5, 1.4)!;
+    const r = transformMosaicToSetup(2.56, 1.46, 20, smart(2.5, 1.4, vespera));
+    expect(r.kind).toBe('single');
+    if (r.kind !== 'single') return;
+    expect(r.wDeg).toBeGreaterThanOrEqual(2.5 - 1e-9); // floored at the new native
+    expect(r.hDeg).toBeGreaterThanOrEqual(1.4 - 1e-9);
+  });
+
+  it('target smart scope with no mosaic mode → a single native frame', () => {
+    const r = transformMosaicToSetup(3, 3, 20, { wDeg: 1.4, hDeg: 0.8, envelope: null, tileable: false });
+    expect(r).toEqual({ kind: 'single', wDeg: 1.4, hDeg: 0.8 });
+  });
+
+  it('classical target with a sub-native outline collapses to a single native frame', () => {
+    const r = transformMosaicToSetup(0.5, 0.4, 20, classical(2, 1.5));
+    expect(r).toEqual({ kind: 'single', wDeg: 2, hDeg: 1.5 });
   });
 });

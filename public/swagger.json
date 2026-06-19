@@ -1085,7 +1085,7 @@
     },
     "/api/plans/{id}": {
       "put": {
-        "summary": "Rename a night plan",
+        "summary": "Rename a night plan or update its settings (night/setup/location)",
         "parameters": [
           {
             "in": "path",
@@ -1103,12 +1103,25 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "name"
-                ],
                 "properties": {
                   "name": {
                     "type": "string"
+                  },
+                  "nightOf": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "setupId": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "lat": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "lon": {
+                    "type": "number",
+                    "nullable": true
                   }
                 }
               }
@@ -1515,6 +1528,16 @@
                     "type": "string",
                     "nullable": true,
                     "description": "Target DSO id, or null for a custom location"
+                  },
+                  "mosaicWDeg": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Smart-scope single-frame mosaic width in degrees, or null to render at native FOV"
+                  },
+                  "mosaicHDeg": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Smart-scope single-frame mosaic height in degrees, or null to render at native FOV"
                   }
                 }
               }
@@ -1603,7 +1626,11 @@
                   "dsoId": {
                     "type": "string",
                     "nullable": true,
-                    "description": "Target DSO id"
+                    "description": "Target DSO id (null for a multi-DSO/free mosaic)"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "User-supplied mosaic name"
                   },
                   "centerRa": {
                     "type": "number",
@@ -1720,6 +1747,10 @@
                   "dsoId": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "User-supplied mosaic name (omit to leave unchanged)"
                   },
                   "centerRa": {
                     "type": "number"

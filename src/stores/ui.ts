@@ -13,6 +13,10 @@ export const useUiStore = defineStore('ui', () => {
   const currentViewMode = ref<ViewMode>('skymap');
   const pendingBatchFiles = ref<File[] | null>(null);
 
+  // Set before switchView('targets') to make the Targets view open the "My plans"
+  // tab and expand/scroll to this plan. Consumed (and cleared) on render.
+  const pendingPlanFocusId = ref<string | null>(null);
+
   // Update-available info, set by the startup version check and read by UpdateAvailableModal.
   const pendingUpdate = ref<{ latest: string; url: string } | null>(null);
 
@@ -86,7 +90,7 @@ export const useUiStore = defineStore('ui', () => {
   return {
     openModalName, hasOpenModal, registerModal, unregisterModal,
     panelCollapsed, currentViewMode, setPanelCollapsed, switchView,
-    pendingBatchFiles, pendingUpdate,
+    pendingBatchFiles, pendingUpdate, pendingPlanFocusId,
     skyTooltipHtml, skyTooltipX, skyTooltipY, suppressSkyTooltip,
     setSkyTooltip, setForceSuppressTooltip,
   };

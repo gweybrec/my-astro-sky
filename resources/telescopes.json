@@ -1981,6 +1981,7 @@
   },
   {
     "id": "seestar-s30",
+    "mosaic": { "scale": 2.0 },
     "brand": "ZWO",
     "model": "Seestar S30",
     "type": "Smart Telescope",
@@ -2013,6 +2014,7 @@
   },
   {
     "id": "seestar-s50",
+    "mosaic": { "scale": 2.0 },
     "brand": "ZWO",
     "model": "Seestar S50",
     "type": "Smart Telescope",
@@ -2045,6 +2047,7 @@
   },
   {
     "id": "vaonis-vespera",
+    "mosaic": { "max_long_edge_deg": 3.6, "max_area_deg2": 5.76 },
     "brand": "Vaonis",
     "model": "Vespera",
     "type": "Smart Telescope",
@@ -2077,6 +2080,7 @@
   },
   {
     "id": "vaonis-vespera-pro",
+    "mosaic": { "max_long_edge_deg": 4.18, "max_area_deg2": 10.24 },
     "brand": "Vaonis",
     "model": "Vespera Pro",
     "type": "Smart Telescope",
@@ -2205,6 +2209,7 @@
   },
   {
     "id": "vaonis-vespera-2",
+    "mosaic": { "max_long_edge_deg": 4.33, "max_area_deg2": 10.56 },
     "brand": "Vaonis",
     "model": "Vespera II",
     "type": "Smart Telescope",
@@ -2237,6 +2242,7 @@
   },
   {
     "id": "vaonis-vespera-3",
+    "mosaic": { "max_long_edge_deg": 4.33, "max_area_deg2": 10.56 },
     "brand": "Vaonis",
     "model": "Vespera 3",
     "type": "Smart Telescope",
@@ -2269,6 +2275,7 @@
   },
   {
     "id": "vaonis-vespera-pro-2",
+    "mosaic": { "max_long_edge_deg": 4.18, "max_area_deg2": 10.24 },
     "brand": "Vaonis",
     "model": "Vespera Pro 2",
     "type": "Smart Telescope",
@@ -2333,6 +2340,7 @@
   },
     {
     "id": "zwo-seestar-s30-pro",
+    "mosaic": { "scale": 2.0 },
     "brand": "ZWO",
     "model": "Seestar S30 Pro",
     "type": "Smart Telescope",
@@ -2392,6 +2400,7 @@
   },
   {
     "id": "dwarflab-dwarf-3",
+    "mosaic": { "scale": 2.0 },
     "brand": "DwarfLab",
     "model": "DWARF 3",
     "type": "Smart Telescope",
@@ -2451,6 +2460,7 @@
   },
   {
     "id": "dwarflab-dwarf-mini",
+    "mosaic": { "scale": 1.8 },
     "brand": "DwarfLab",
     "model": "DWARF Mini",
     "type": "Smart Telescope",

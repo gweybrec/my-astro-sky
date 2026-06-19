@@ -11,18 +11,23 @@ import {
   telescopeLabel, cameraLabel, accessoryLabel,
 } from './gear-catalog';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
-import { formatGearFovLabel, fovDeg, formatFov, pixelScaleArcsec } from './gear-presets';
+import { formatGearFovLabel, fovDeg, formatFov, computeFovTargetScale } from './gear-presets';
+import { getHemisphere } from './projection';
+import { buildSetupInfoRows } from './setup-info';
 import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
 import { formatPaDeg } from './frame-orientation';
+import { formatRA, formatDec, formatAlt } from './format-utils';
 import type { GearPreset } from './gear-presets';
 import { recommendRecipe } from './imaging-recipe';
-import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, deleteGearSetupAPI, type GearSetupData, type Plan } from './api';
-import { showKeyValueTooltip, showTextTooltip } from './tooltip-utils';
+import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, deleteGearSetupAPI, type GearSetupData, type Plan, type PlanMosaic } from './api';
+import { requestSetupSwitch } from './setup-switch';
+import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
 import { showToast } from './toast';
 import type { SkyMap } from './sky-map';
 import type { TargetSuggestion } from './target-recommender';
 import type { DSO } from './types';
 import { createTargetsChip, createFilterBadge } from './chip-utils';
+import exportSvg from './icons/export.svg?raw';
 import trashSvg from './icons/trash.svg?raw';
 import penSvg from './icons/pen.svg?raw';
 import mapPinSvg from './icons/map-pin.svg?raw';
@@ -31,10 +36,13 @@ import { openAddSetupModal, openEditSetupModal, buildFovFrameSpecs } from './fov
 import { pinia } from './pinia-instance';
 import { usePlansStore } from './stores/plans';
 import { useFovFramesStore } from './stores/fov-frames';
+import { useUiStore } from './stores/ui';
+import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
 import { twilightWindow } from './astro-time';
 import { maxAltDuringWindow, sampleAltCurve, type AltSample } from './sky-geometry';
-import { renderPlanPdf } from './export-render';
+import { outlineFromGrid } from './mosaic';
+import { renderPlanPdf, type PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
 import { confirmPlanDelete, confirmPlanEntryDelete } from './photo-delete-confirm';
@@ -147,10 +155,6 @@ function formatArcmin(arcmin: number | null): string {
   if (arcmin === null) return '—';
   if (arcmin >= 60) return `${(arcmin / 60).toFixed(1)}°`;
   return `${arcmin.toFixed(1)}'`;
-}
-
-function formatAlt(deg: number): string {
-  return `${deg.toFixed(0)}°`;
 }
 
 function formatTime(d: Date): string {
@@ -901,6 +905,7 @@ export class TargetsView {
   private planMode: 'recommend' | 'plans' = 'recommend';
   private plansStore = usePlansStore(pinia);
   private fovFramesStore = useFovFramesStore(pinia);
+  private uiStore = useUiStore(pinia);
   /** Live per-entry position-angle value spans, keyed by entryId (rebuilt each render). */
   private paSpans = new Map<string, HTMLElement>();
   private planBadgeEl: HTMLElement | null = null;
@@ -940,10 +945,18 @@ export class TargetsView {
 
   show(): void {
     this.container.style.display = 'flex';
+    // A focus request (jump from the FOV popup) must survive the async reload
+    // re-render below, which would otherwise rebuild the plan collapsed: the first
+    // render consumes (and clears) the signal, so re-apply it for the second.
+    const focusPlanId = this.uiStore.pendingPlanFocusId;
     this.render();
     this.plansStore.ensureLoaded().then(() => {
-      if (this.planMode === 'plans') this.render();
-      else this.updatePlanBadge();
+      if (this.planMode === 'plans') {
+        if (focusPlanId) this.uiStore.pendingPlanFocusId = focusPlanId;
+        this.render();
+      } else {
+        this.updatePlanBadge();
+      }
     });
   }
 
@@ -954,6 +967,9 @@ export class TargetsView {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   private render(): void {
+    // A pending plan-focus (from the FOV popup) forces the "My plans" tab so the
+    // requested plan is on screen to expand/scroll to.
+    if (this.uiStore.pendingPlanFocusId) this.planMode = 'plans';
     this.container.innerHTML = '';
     this.paSpans.clear();
     this.container.className = 'targets-view';
@@ -1017,29 +1033,19 @@ export class TargetsView {
 
   // ─── Form ─────────────────────────────────────────────────────────────────
 
-  private buildForm(): HTMLElement {
-    const details = document.createElement('details');
-    details.className = 'targets-form-details';
-    details.open = true;
-    const summary = document.createElement('summary');
-    summary.className = 'targets-form-summary';
-    summary.textContent = t('targets.formTitle');
-    details.appendChild(summary);
-
-    const form = document.createElement('div');
-    form.className = 'targets-form';
-
-    // ── Gear section (async: populated after catalogs load) ──────────────────
-    const gearSection = document.createElement('div');
-    form.appendChild(gearSection);
-    this.buildGearSection(gearSection);
-
-    // ── Location ─────────────────────────────────────────────────────────────
-    const locSection = document.createElement('div');
-    locSection.className = 'targets-form-row';
-    const locLabel = document.createElement('div');
-    locLabel.className = 'targets-label';
-    locLabel.textContent = t('targets.location.label');
+  /**
+   * Build the shared "Observing location" widget ("Use my location" button +
+   * Lat/Lon inputs + decimal/DMS toggle). Used both by the recommend form (bound
+   * to the global prefs) and by each plan section (bound to the plan's own
+   * coords). The decimal/DMS format is a global display preference; only the
+   * coordinate values flow through the provided getters/`onChange` callback.
+   */
+  private buildLocationWidget(opts: {
+    getLat: () => number | null;
+    getLon: () => number | null;
+    onChange: (lat: number | null, lon: number | null) => void;
+  }): HTMLElement {
+    const { getLat, getLon, onChange } = opts;
 
     const locControls = document.createElement('div');
     locControls.className = 'targets-loc-controls';
@@ -1085,9 +1091,7 @@ export class TargetsView {
       locBtn.textContent = t('targets.location.locating');
       locBtn.disabled = true;
       const onSuccess = (latitude: number, longitude: number) => {
-        this.prefs.lat = Math.round(latitude * 100) / 100;
-        this.prefs.lon = Math.round(longitude * 100) / 100;
-        savePrefs(this.prefs);
+        onChange(Math.round(latitude * 100) / 100, Math.round(longitude * 100) / 100);
         onDone();
         locBtn.textContent = t('targets.location.useBrowser');
         locBtn.disabled = false;
@@ -1116,21 +1120,21 @@ export class TargetsView {
         const latIn = document.createElement('input');
         latIn.type = 'number'; latIn.className = 'targets-coord-input';
         latIn.placeholder = t('targets.location.lat'); latIn.step = '0.01'; latIn.min = '-90'; latIn.max = '90';
-        if (this.prefs.lat !== null) latIn.value = String(this.prefs.lat);
+        if (getLat() !== null) latIn.value = String(getLat());
         const lonIn = document.createElement('input');
         lonIn.type = 'number'; lonIn.className = 'targets-coord-input';
         lonIn.placeholder = t('targets.location.lon'); lonIn.step = '0.01'; lonIn.min = '-180'; lonIn.max = '180';
-        if (this.prefs.lon !== null) lonIn.value = String(this.prefs.lon);
+        if (getLon() !== null) lonIn.value = String(getLon());
         const sync = (): void => {
-          this.prefs.lat = isNaN(parseFloat(latIn.value)) ? null : parseFloat(latIn.value);
-          this.prefs.lon = isNaN(parseFloat(lonIn.value)) ? null : parseFloat(lonIn.value);
-          savePrefs(this.prefs);
+          const la = isNaN(parseFloat(latIn.value)) ? null : parseFloat(latIn.value);
+          const lo = isNaN(parseFloat(lonIn.value)) ? null : parseFloat(lonIn.value);
+          onChange(la, lo);
         };
         latIn.addEventListener('change', sync);
         lonIn.addEventListener('change', sync);
         locBtn.onclick = () => geoLocate(() => {
-          if (this.prefs.lat !== null) latIn.value = String(this.prefs.lat);
-          if (this.prefs.lon !== null) lonIn.value = String(this.prefs.lon);
+          if (getLat() !== null) latIn.value = String(getLat());
+          if (getLon() !== null) lonIn.value = String(getLon());
         });
         const makeDecimalGroup = (label: string, input: HTMLInputElement): HTMLElement => {
           const wrap = document.createElement('div'); wrap.className = 'targets-dms-group';
@@ -1141,7 +1145,7 @@ export class TargetsView {
         coordEntry.appendChild(makeDecimalGroup('Lon', lonIn));
       } else {
         const makeDMSGroup = (isLat: boolean): { el: HTMLElement; getVal: () => number | null } => {
-          const initial = isLat ? this.prefs.lat : this.prefs.lon;
+          const initial = isLat ? getLat() : getLon();
           let dV = 0, mV = 0, sV = 0;
           if (initial !== null) [dV, mV, sV] = decimalToDMS(initial);
           const wrap = document.createElement('div'); wrap.className = 'targets-dms-group';
@@ -1171,7 +1175,7 @@ export class TargetsView {
         };
         const latGroup = makeDMSGroup(true);
         const lonGroup = makeDMSGroup(false);
-        const sync = (): void => { this.prefs.lat = latGroup.getVal(); this.prefs.lon = lonGroup.getVal(); savePrefs(this.prefs); };
+        const sync = (): void => { onChange(latGroup.getVal(), lonGroup.getVal()); };
         latGroup.el.querySelectorAll('input').forEach(i => i.addEventListener('change', sync));
         lonGroup.el.querySelectorAll('input').forEach(i => i.addEventListener('change', sync));
         locBtn.onclick = () => geoLocate(() => buildCoordEntry('dms'));
@@ -1188,8 +1192,38 @@ export class TargetsView {
     });
     locControls.appendChild(coordEntry);
     locControls.appendChild(fmtToggle);
+    return locControls;
+  }
+
+  private buildForm(): HTMLElement {
+    const details = document.createElement('details');
+    details.className = 'targets-form-details';
+    details.open = true;
+    const summary = document.createElement('summary');
+    summary.className = 'targets-form-summary';
+    summary.textContent = t('targets.formTitle');
+    details.appendChild(summary);
+
+    const form = document.createElement('div');
+    form.className = 'targets-form';
+
+    // ── Gear section (async: populated after catalogs load) ──────────────────
+    const gearSection = document.createElement('div');
+    form.appendChild(gearSection);
+    this.buildGearSection(gearSection);
+
+    // ── Location ─────────────────────────────────────────────────────────────
+    const locSection = document.createElement('div');
+    locSection.className = 'targets-form-row';
+    const locLabel = document.createElement('div');
+    locLabel.className = 'targets-label';
+    locLabel.textContent = t('targets.location.label');
     locSection.appendChild(locLabel);
-    locSection.appendChild(locControls);
+    locSection.appendChild(this.buildLocationWidget({
+      getLat: () => this.prefs.lat,
+      getLon: () => this.prefs.lon,
+      onChange: (la, lo) => { this.prefs.lat = la; this.prefs.lon = lo; savePrefs(this.prefs); },
+    }));
     form.appendChild(locSection);
 
     // ── Date ─────────────────────────────────────────────────────────────────
@@ -1603,16 +1637,7 @@ export class TargetsView {
         if (!tel || !cam) return;
         const preset = buildGearPreset(tel, cam, acc);
         fovHintEl.textContent = `${t('targets.gear.effectiveFocalLength')}: ${formatGearFovLabel(preset)}`;
-        const { wDeg, hDeg } = fovDeg(preset);
-        const scale = pixelScaleArcsec(preset);
-        const tooltipRows: [string, string][] = [
-          [t('targets.gear.telescope'), telescopeLabel(tel)],
-          [t('targets.gear.camera'), cameraLabel(cam)],
-          [t('targets.gear.info.resolution'), `${cam.resolution_x} × ${cam.resolution_y} px`],
-        ];
-        if (acc) tooltipRows.push([t('targets.gear.accessory'), accessoryLabel(acc)]);
-        tooltipRows.push([t('targets.gear.effectiveFocalLength'), `${preset.focalLengthMm.toFixed(0)} mm`]);
-        tooltipRows.push(['FOV', `${formatFov(wDeg, hDeg)} · ${scale.toFixed(1)}″/px`]);
+        const tooltipRows = buildSetupInfoRows(tel, cam, acc);
         infoIcon.onclick = (e) => {
           e.stopPropagation();
           showKeyValueTooltip(infoIcon, tooltipRows);
@@ -2112,11 +2137,38 @@ export class TargetsView {
   // ─── My Plans (night plans) ─────────────────────────────────────────────────
 
   /** Observer for a given observation night ISO date (falls back to the global date / today). */
-  private getPlanObserverFor(dateISO: string | null): { loc: ObserverLocation; dateNight: Date } | null {
-    if (this.prefs.lat == null || this.prefs.lon == null) return null;
-    if (this.prefs.lat < -90 || this.prefs.lat > 90 || this.prefs.lon < -180 || this.prefs.lon > 180) return null;
-    const dateStr = dateISO ?? this.prefs.lastDateISO ?? todayISO();
-    return { loc: { latDeg: this.prefs.lat, lonDeg: this.prefs.lon }, dateNight: new Date(dateStr + 'T12:00:00Z') };
+  private getPlanObserverFor(plan: Plan): { loc: ObserverLocation; dateNight: Date } | null {
+    // Per-plan location, falling back to the global location when unset (mirrors
+    // nightOf falling back to the global date).
+    const lat = plan.lat ?? this.prefs.lat;
+    const lon = plan.lon ?? this.prefs.lon;
+    if (lat == null || lon == null) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    const dateStr = plan.nightOf ?? this.prefs.lastDateISO ?? todayISO();
+    return { loc: { latDeg: lat, lonDeg: lon }, dateNight: new Date(dateStr + 'T12:00:00Z') };
+  }
+
+  /**
+   * Open the sky map zoomed to fit a whole mosaic: selects the mosaic's plan,
+   * shows the frames, and zooms using the mosaic's overall envelope (cols × rows
+   * tiles) as the frame for the scale calculation — so the entire mosaic fits.
+   */
+  private async navigateToMosaic(planId: string, mosaic: PlanMosaic, setupId: string | null): Promise<void> {
+    this.fovFramesStore.setSelection({ kind: 'plan', planId });
+    this.fovFramesStore.setFramesVisible(true);
+    const preset = await this.planPreset(setupId);
+    let scale: number;
+    if (preset) {
+      const { wDeg: tileW, hDeg: tileH } = fovDeg(preset);
+      const env = outlineFromGrid(mosaic.cols, mosaic.rows, tileW, tileH, mosaic.overlapPct);
+      const view = this.skyMap.getView();
+      scale = computeFovTargetScale(env.wDeg, env.hDeg, mosaic.centerDec, getHemisphere(), Math.min(view.width, view.height));
+    } else {
+      scale = Math.max(this.skyMap.getView().scale, 400);
+    }
+    this.uiStore.switchView('skymap');
+    this.skyMap.navigateTo(mosaic.centerRa, mosaic.centerDec, scale);
+    this.fovFramesStore.requestPopupOpen();
   }
 
   /** Resolve a gear setup id to a {@link GearPreset} (telescope+camera+accessory). */
@@ -2141,6 +2193,34 @@ export class TargetsView {
       return buildGearPreset(telescope, camera, accessory);
     } catch (err) {
       reportUnknownRendererError('plan_preset_failed', err, { setupId });
+      return null;
+    }
+  }
+
+  /** Resolve a gear setup id to its name + raw telescope/camera/accessory (for the PDF summary). */
+  private async resolvePlanSetup(
+    setupId: string | null,
+  ): Promise<{ name: string; tel: TelescopeData; cam: CameraData; acc: AccessoryData | null } | null> {
+    if (!setupId) return null;
+    try {
+      const [setups, telescopes, cameras, accessories] = await Promise.all([
+        getGearSetups(), getTelescopes(), getCameras(), getAccessories(),
+      ]);
+      const setup = setups.find(s => s.id === setupId);
+      if (!setup) return null;
+      const tel = telescopes.find(t => t.id === setup.telescopeId);
+      if (!tel) return null;
+      const effectiveCameraId = tel.is_smart_telescope && tel.integrated_camera_id
+        ? tel.integrated_camera_id
+        : setup.cameraId;
+      const cam = cameras.find(c => c.id === effectiveCameraId);
+      if (!cam) return null;
+      const acc = (tel.is_smart_telescope || !setup.accessoryId)
+        ? null
+        : (accessories.find(a => a.id === setup.accessoryId) ?? null);
+      return { name: setup.name, tel, cam, acc };
+    } catch (err) {
+      reportUnknownRendererError('plan_setup_resolve_failed', err, { setupId });
       return null;
     }
   }
@@ -2194,6 +2274,76 @@ export class TargetsView {
     const dateStr = this.prefs.lastDateISO ?? todayISO();
     const nice = new Date(dateStr + 'T12:00:00Z').toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
     return t('targets.plan.defaultName', { date: nice });
+  }
+
+  /**
+   * Toggle a tooltip listing each mosaic panel's computable metadata (max
+   * altitude, angle, centre RA/Dec). The table scrolls when a mosaic has many
+   * panels so the popup never overflows the viewport.
+   */
+  private showMosaicPanelDetails(
+    anchor: HTMLElement,
+    plan: Plan,
+    mosaic: PlanMosaic,
+    loc: ObserverLocation,
+    win: { start: Date; end: Date },
+  ): void {
+    const tiles = plan.entries
+      .filter(e => e.mosaicId === mosaic.id && e.ra != null && e.dec != null)
+      .sort((a, b) => a.position - b.position);
+
+    showCustomTooltip(anchor, (tip) => {
+      const heading = document.createElement('h3');
+      heading.textContent = t('targets.plan.panelDetailsTitle');
+      tip.appendChild(heading);
+
+      // Scroll wrapper — bounded to the viewport so long mosaics stay usable.
+      const scroll = document.createElement('div');
+      scroll.className = 'max-h-[50vh] overflow-y-auto';
+      const table = document.createElement('table');
+      table.className = 'dso-info-table';
+
+      const headers = [
+        t('targets.plan.panelColumn'),
+        t('targets.results.maxAlt'),
+        t('fovOverlay.angleLabel'),
+        'RA',
+        'Dec',
+      ];
+      const thead = document.createElement('thead');
+      const htr = document.createElement('tr');
+      for (const h of headers) {
+        const th = document.createElement('th');
+        th.className = 'text-left text-dim font-medium pr-4 pb-1 whitespace-nowrap';
+        th.textContent = h;
+        htr.appendChild(th);
+      }
+      thead.appendChild(htr);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      tiles.forEach((e, i) => {
+        const { maxAltDeg } = maxAltDuringWindow(e.ra!, e.dec!, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+        const cells = [
+          String(i + 1),
+          formatAlt(maxAltDeg),
+          formatPaDeg(e.paDeg ?? mosaic.paDeg),
+          formatRA(e.ra!),
+          formatDec(e.dec!),
+        ];
+        const tr = document.createElement('tr');
+        for (const c of cells) {
+          const td = document.createElement('td');
+          td.className = 'pr-4 text-secondary whitespace-nowrap';
+          td.textContent = c;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      scroll.appendChild(table);
+      tip.appendChild(scroll);
+    });
   }
 
   /** Inline-edit a plan name in place (swaps the header label for an input). */
@@ -2280,23 +2430,43 @@ export class TargetsView {
     const itemCount = () => plan.entries.filter(e => !e.mosaicId).length + (plan.mosaics?.length ?? 0);
     setCount(itemCount());
 
+    const showOnMapBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
+    showOnMapBtn.classList.add('shrink-0');
+    showOnMapBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      // Select this plan in the FOV system, jump to the sky map, and open the
+      // frame-manager popup on it.
+      this.fovFramesStore.setSelection({ kind: 'plan', planId: plan.id });
+      this.fovFramesStore.setFramesVisible(true);
+      this.uiStore.switchView('skymap');
+      this.fovFramesStore.requestPopupOpen();
+    });
+
     const renameBtn = this.iconActionBtn(penSvg, t('targets.plan.rename'));
     renameBtn.classList.add('shrink-0');
     renameBtn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
       this.startRenamePlan(plan, nameEl);
     });
-    const exportBtn = this.iconActionBtn(planListSvg, t('targets.plan.exportPdf'));
+    const exportBtn = this.iconActionBtn(exportSvg, t('targets.plan.exportPdf'));
     exportBtn.classList.add('shrink-0');
     const deleteBtn = this.iconActionBtn(trashSvg, t('targets.plan.delete'));
     deleteBtn.classList.add('shrink-0', 'btn-icon--danger');
 
     summary.appendChild(nameEl);
     summary.appendChild(count);
+    summary.appendChild(showOnMapBtn);
     summary.appendChild(renameBtn);
     summary.appendChild(exportBtn);
     summary.appendChild(deleteBtn);
     details.appendChild(summary);
+
+    // Focus signal from the FOV popup's "open plan details": expand + scroll here.
+    if (this.uiStore.pendingPlanFocusId === plan.id) {
+      this.uiStore.pendingPlanFocusId = null;
+      details.open = true;
+      requestAnimationFrame(() => details.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    }
 
     const body = document.createElement('div');
     body.className = 'targets-plan-body flex flex-col gap-3 px-4 pb-4';
@@ -2332,6 +2502,27 @@ export class TargetsView {
     setupRow.appendChild(setupSelect);
     controls.appendChild(setupRow);
 
+    // Per-plan observing location (falls back to the global location when unset),
+    // using the same widget as the recommend form. The full widget is wide, so it
+    // wraps onto its own line within the flex-wrap controls.
+    const locRow = document.createElement('div');
+    locRow.className = 'flex items-center gap-2';
+    const locLabel = document.createElement('label');
+    locLabel.className = 'text-base text-dim shrink-0';
+    locLabel.textContent = t('targets.location.label');
+    locRow.appendChild(locLabel);
+    locRow.appendChild(this.buildLocationWidget({
+      getLat: () => plan.lat,
+      getLon: () => plan.lon,
+      onChange: (la, lo) => {
+        plan.lat = la;
+        plan.lon = lo;
+        this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId, plan.lat, plan.lon);
+        renderTrajectories();
+      },
+    }));
+    controls.appendChild(locRow);
+
     body.appendChild(controls);
 
     // Region rebuilt whenever the plan's night or setup changes (keeps the
@@ -2352,7 +2543,7 @@ export class TargetsView {
       trajWrap.innerHTML = '';
       currentInfos = [];
       currentWin = null;
-      const observer = this.getPlanObserverFor(dateInput.value || null);
+      const observer = this.getPlanObserverFor(plan);
       if (!observer) {
         trajWrap.innerHTML = `<div class="targets-empty">${t('targets.location.notSet')}</div>`;
         return;
@@ -2373,15 +2564,25 @@ export class TargetsView {
       const fillers: Array<(p: GearPreset | null) => void> = [];
       const mosaicFillers: Array<(p: GearPreset | null) => void> = [];
       for (const info of infos) {
-        const { row, applyPreset } = this.buildPlanRow(plan.id, info, win, (rowEl) => {
-          // In-place removal — must NOT collapse or rebuild the whole plan.
-          rowEl.remove();
-          plan.entries = plan.entries.filter(e => e.id !== info.entryId);
-          currentInfos = currentInfos.filter(i => i.entryId !== info.entryId);
-          setCount(itemCount());
-          if (!plan.entries.some(e => !e.mosaicId) && (plan.mosaics?.length ?? 0) === 0) {
-            trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
-          }
+        const entryName = info.dso.displayName ?? info.dso.catalogs[0] ?? info.dso.id;
+        const { row, applyPreset } = this.buildPlanRow(plan.id, info, win, effectiveSetupId(), (rowEl) => {
+          // Delete immediately with an undo toast (shared with the FOV popup).
+          deleteFrameWithUndo({ kind: 'plan', planId: plan.id, entryId: info.entryId, name: entryName }, {
+            onRemoved: () => {
+              // In-place removal — must NOT collapse or rebuild the whole plan.
+              rowEl.remove();
+              plan.entries = plan.entries.filter(e => e.id !== info.entryId);
+              currentInfos = currentInfos.filter(i => i.entryId !== info.entryId);
+              setCount(itemCount());
+              this.updatePlanBadge();
+              if (!plan.entries.some(e => !e.mosaicId) && (plan.mosaics?.length ?? 0) === 0) {
+                trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
+              }
+            },
+            // Restore re-creates the entry in the store (fresh objects), so re-render
+            // the whole view, keeping this plan expanded.
+            onRestored: () => { this.uiStore.pendingPlanFocusId = plan.id; this.render(); },
+          });
         });
         fillers.push(applyPreset);
         list.appendChild(row);
@@ -2396,18 +2597,82 @@ export class TargetsView {
         const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : null;
         const name = dso ? (dso.displayName ?? dso.id) : t('fovOverlay.customLocation');
 
+        // Trajectory + altitude metadata are computed from the mosaic centre, so
+        // they need no catalogue object (only computable values are shown).
+        const { maxAltDeg, atDate } = maxAltDuringWindow(
+          mosaic.centerRa, mosaic.centerDec,
+          observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+        const curve = sampleAltCurve(
+          mosaic.centerRa, mosaic.centerDec,
+          observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+
+        // Same three-column layout as a standalone plan row (info · chart · delete).
         const row = document.createElement('div');
-        row.className = 'flex items-center gap-2 py-2 border-t border-[var(--border-input)]';
-        const infoEl = document.createElement('div');
-        infoEl.className = 'flex-1 min-w-0';
+        row.className = 'flex items-start gap-3 py-3 border-0 border-solid border-t border-[var(--border-input)]';
+
+        // Grow the column to fit the (wider) panel summary on one line rather
+        // than the fixed target-row width — the chart simply takes what's left.
+        const left = document.createElement('div');
+        left.className = `min-w-52 w-fit max-w-80 shrink-0 flex flex-col gap-1`;
         const title = document.createElement('div');
-        title.className = 'text-sub text-bright truncate';
+        title.className = 'text-sub text-bright truncate max-w-full';
         title.textContent = `${name} · ${t('targets.plan.mosaicLabel')}`;
+
+        // Computable metadata only — no rating/difficulty/magnitude (catalogue fields).
+        // Two rows (like a standalone target) for breathing room: altitude/angle on
+        // the first, the mosaic centre coordinates on the second.
+        const meta = document.createElement('div');
+        meta.className = 'target-card-meta';
+        meta.appendChild(this.metaItem(t('targets.results.maxAlt'), formatAlt(maxAltDeg), t('targets.tooltips.maxAlt')));
+        meta.appendChild(this.metaItem(t('fovOverlay.angleLabel'), formatPaDeg(mosaic.paDeg), t('fovOverlay.angleHelp')));
+
+        // RA/Dec are the mosaic centre — keep each value on one line so the
+        // seconds never wrap below their label (nowrap, not a fixed width).
+        const meta2 = document.createElement('div');
+        meta2.className = 'target-card-meta';
+        const raItem = this.metaItem('RA', formatRA(mosaic.centerRa), t('dso.raDec'));
+        const decItem = this.metaItem('Dec', formatDec(mosaic.centerDec), t('dso.raDec'));
+        raItem.querySelector('.target-meta-value')!.classList.add('whitespace-nowrap');
+        decItem.querySelector('.target-meta-value')!.classList.add('whitespace-nowrap');
+        meta2.appendChild(raItem);
+        meta2.appendChild(decItem);
+
+        // Mosaic geometry summary: panels × panel size → resulting mosaic size
+        // (filled once the gear preset resolves, as panel size depends on gear).
+        // Sits directly under the name, with an info icon opening per-panel details.
+        const summaryRow = document.createElement('div');
+        summaryRow.className = 'flex items-center gap-2';
         const sub = document.createElement('div');
-        sub.className = 'text-small text-dim';
+        sub.className = 'text-body text-secondary whitespace-nowrap';
         sub.textContent = `${tileCount} ${t('fovOverlay.mosaicPanels')}`;
-        infoEl.appendChild(title);
-        infoEl.appendChild(sub);
+        const infoIcon = document.createElement('span');
+        infoIcon.className = 'hints-info-icon shrink-0';
+        infoIcon.textContent = 'ℹ';
+        infoIcon.title = t('targets.plan.panelDetails');
+        infoIcon.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          this.showMosaicPanelDetails(infoIcon, plan, mosaic, observer.loc, win);
+        });
+        summaryRow.append(sub, infoIcon);
+
+        // Total integration, styled exactly like a standalone target row.
+        const totalEl = document.createElement('div');
+        totalEl.className = 'target-integration-total';
+        totalEl.textContent = `${t('targets.results.integrationTotal')}: —`;
+
+        left.appendChild(title);
+        left.appendChild(summaryRow);
+        left.appendChild(meta);
+        left.appendChild(meta2);
+        left.appendChild(totalEl);
+
+        const chartWrap = this.buildPlanChart(curve, win, atDate);
+
+        // Show-on-map: zoom to fit the whole mosaic (its envelope is the frame
+        // used for the zoom calculation).
+        const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
+        navBtn.classList.add('shrink-0');
+        navBtn.addEventListener('click', () => { void this.navigateToMosaic(plan.id, mosaic, effectiveSetupId()); });
 
         const del = this.iconActionBtn(trashSvg, t('fovOverlay.deleteMosaic'));
         del.classList.add('shrink-0', 'btn-icon--danger');
@@ -2420,23 +2685,27 @@ export class TargetsView {
           setCount(itemCount());
           renderTrajectories();
         });
-        row.appendChild(infoEl);
+        row.appendChild(left);
+        row.appendChild(chartWrap);
+        row.appendChild(navBtn);
         row.appendChild(del);
         trajWrap.appendChild(row);
 
-        // Scale + total integration need the gear preset (resolved async below).
+        // Panel size + resulting mosaic size + total integration need the gear
+        // preset (resolved async below).
         mosaicFillers.push((preset) => {
           if (!preset) return;
           const { wDeg, hDeg } = fovDeg(preset);
           const f = 1 - mosaic.overlapPct / 100;
           const scaleW = (mosaic.cols - 1) * wDeg * f + wDeg;
           const scaleH = (mosaic.rows - 1) * hDeg * f + hDeg;
-          const parts = [`${tileCount} ${t('fovOverlay.mosaicPanels')}`, formatFov(scaleW, scaleH)];
+          // "N panels × <panel size> → <mosaic size>": panel count times the
+          // single-frame FOV, yielding the overall mosaic footprint.
+          sub.textContent = `${tileCount} ${t('fovOverlay.mosaicPanels')} × ${formatFov(wDeg, hDeg)} → ${formatFov(scaleW, scaleH)}`;
           if (dso) {
             const recipe = recommendRecipe(dso, preset);
-            parts.push(`${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours * tileCount)}`);
+            totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours * tileCount)}`;
           }
-          sub.textContent = parts.join(' · ');
         });
       }
 
@@ -2451,7 +2720,7 @@ export class TargetsView {
 
     dateInput.addEventListener('change', () => {
       plan.nightOf = dateInput.value || null;
-      this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId);
+      this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId, plan.lat, plan.lon);
       renderTrajectories();
     });
 
@@ -2472,10 +2741,16 @@ export class TargetsView {
       }
       const eff = effectiveSetupId();
       setupSelect.value = (eff && setups.some(s => s.id === eff)) ? eff : setups[0].id;
+      // Route through the shared setup-switch flow (same as the sky-view FOV
+      // popup) so changing the setup with existing mosaics opens the Apply/Drop
+      // confirmation modal instead of silently breaking them. The modal's apply
+      // path reloads the plans store (replacing `plan`), so re-render the whole
+      // Targets view rather than just the trajectories.
       setupSelect.addEventListener('change', () => {
-        plan.setupId = setupSelect.value || null;
-        this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId);
-        renderTrajectories();
+        requestSetupSwitch(plan, setupSelect.value || null, {
+          onRevert: () => { setupSelect.value = plan.setupId ?? ''; },
+          onApplied: () => this.render(),
+        });
       });
     }).catch(() => {});
 
@@ -2490,19 +2765,57 @@ export class TargetsView {
 
     exportBtn.addEventListener('click', async (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (!currentWin || currentInfos.length === 0) {
+      const hasMosaics = (plan.mosaics?.length ?? 0) > 0;
+      if (!currentWin || (currentInfos.length === 0 && !hasMosaics)) {
         showToast({ message: t('targets.plan.empty'), type: 'info', duration: 2000 });
         return;
       }
       const win = currentWin;
       const infos = currentInfos;
+      const observer = this.getPlanObserverFor(plan);
       showToast({ message: t('settings.exportView.rendering'), type: 'info', duration: 2000 });
       try {
-        const fovSpecs = await this.getSelectedFovSpecs(effectiveSetupId());
+        const setupId = effectiveSetupId();
+        const [fovSpecs, setup, preset] = await Promise.all([
+          this.getSelectedFovSpecs(setupId),
+          this.resolvePlanSetup(setupId),
+          this.planPreset(setupId),
+        ]);
+
+        const targets: PlanPdfTarget[] = infos.map(i => ({
+          dso: i.dso, bestTimeUtc: i.bestTimeUtc, maxAltDeg: i.maxAltDeg, curve: i.curve, nightWin: win, mosaic: null,
+        }));
+
+        // One page per mosaic: trajectory from the centre + framed tile grid.
+        if (observer && preset) {
+          const { wDeg: tileW, hDeg: tileH } = fovDeg(preset);
+          for (const m of plan.mosaics ?? []) {
+            const tiles = plan.entries
+              .filter(en => en.mosaicId === m.id && en.ra != null && en.dec != null)
+              .map(en => ({ ra: en.ra as number, dec: en.dec as number }));
+            const { maxAltDeg, atDate } = maxAltDuringWindow(
+              m.centerRa, m.centerDec, observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+            const curve = sampleAltCurve(
+              m.centerRa, m.centerDec, observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+            const realDso = m.dsoId ? getDSOById(m.dsoId) : null;
+            const dso = realDso ?? this.customLocationDso(`mosaic:${m.id}`, m.centerRa, m.centerDec);
+            if (!realDso && m.name) dso.displayName = m.name;
+            const env = outlineFromGrid(m.cols, m.rows, tileW, tileH, m.overlapPct);
+            targets.push({
+              dso, bestTimeUtc: atDate, maxAltDeg, curve, nightWin: win,
+              mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles },
+            });
+          }
+        }
+        // Transit-ordered like the on-screen list.
+        targets.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
+
         const blob = await renderPlanPdf(this.skyMap, {
           planName: plan.name,
-          targets: infos.map(i => ({ dso: i.dso, bestTimeUtc: i.bestTimeUtc, maxAltDeg: i.maxAltDeg, curve: i.curve, nightWin: win })),
+          targets,
           fovSpecs,
+          header: { nightOf: plan.nightOf, latDeg: plan.lat ?? this.prefs.lat ?? null, lonDeg: plan.lon ?? this.prefs.lon ?? null },
+          setup,
         });
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
         downloadBlob(blob, `myastrosky-plan-${ts}.pdf`);
@@ -2543,7 +2856,11 @@ export class TargetsView {
     labels.appendChild(a);
     labels.appendChild(b);
 
-    // Invisible clone of the row's remove button, to reserve the same width.
+    // Invisible clones of the row's trailing buttons (show-on-map + remove), to
+    // reserve the same width so the dusk/dawn labels line up with the chart ends.
+    const navSpacer = document.createElement('span');
+    navSpacer.className = 'btn-icon shrink-0 invisible';
+    navSpacer.innerHTML = mapPinSvg;
     const removeSpacer = document.createElement('span');
     removeSpacer.className = 'btn-icon shrink-0 invisible';
     removeSpacer.innerHTML = trashSvg;
@@ -2551,6 +2868,7 @@ export class TargetsView {
     header.appendChild(infoSpacer);
     header.appendChild(gutterSpacer);
     header.appendChild(labels);
+    header.appendChild(navSpacer);
     header.appendChild(removeSpacer);
     return header;
   }
@@ -2558,14 +2876,17 @@ export class TargetsView {
   /**
    * One plan target: a left column mirroring the recommend-target card (name,
    * type/constellation chips, and a collapsible meta section), the altitude
-   * trajectory chart, and a remove button. `applyPreset` fills the gear-dependent
-   * fields (score, FOV-fit, integration time) once the plan's setup resolves.
+   * trajectory chart, a show-on-map button and a remove button. `applyPreset`
+   * fills the gear-dependent fields (score, FOV-fit, integration time) once the
+   * plan's setup resolves. `onDelete` is invoked when the remove button is
+   * clicked (the caller owns the undo flow).
    */
   private buildPlanRow(
     planId: string,
     info: PlanTargetInfo,
     win: { start: Date; end: Date },
-    onRemoved: (rowEl: HTMLElement) => void,
+    effectiveSetupId: string | null,
+    onDelete: (rowEl: HTMLElement) => void,
   ): { row: HTMLElement; applyPreset: (preset: GearPreset | null) => void } {
     const { dso } = info;
     // border-0 zeroes every side (no preflight sets border-style/width), and
@@ -2660,9 +2981,66 @@ export class TargetsView {
     left.appendChild(filtersDetails);
 
     // ── Trajectory chart ──
+    const chartWrap = this.buildPlanChart(info.curve, win, info.bestTimeUtc);
+
+    // Show-on-map: same behaviour as the recommend card (free frame on target).
+    const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
+    navBtn.classList.add('shrink-0');
+    navBtn.addEventListener('click', () => { this.onNavigate(dso.ra, dso.dec, effectiveSetupId); });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-icon btn-icon--danger shrink-0';
+    removeBtn.title = t('targets.plan.remove');
+    removeBtn.innerHTML = trashSvg;
+    removeBtn.addEventListener('click', () => { onDelete(row); });
+
+    row.appendChild(left);
+    row.appendChild(chartWrap);
+    row.appendChild(navBtn);
+    row.appendChild(removeBtn);
+
+    const applyPreset = (preset: GearPreset | null): void => {
+      if (!preset) return;
+      const { score, fovFitScore } = scoreDso(dso, preset, info.maxAltDeg, {
+        ignoreFovFit: this.prefs.includeOversized ?? false,
+        minAltDeg: this.prefs.minAltDeg ?? 20,
+      });
+      scoreItem.querySelector('.target-meta-value')!.textContent = `${Math.round(score * 100)}%`;
+      fovItem.querySelector('.target-meta-value')!.textContent = `${Math.round(fovFitScore * 100)}%`;
+      const recipe = recommendRecipe(dso, preset);
+      totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
+      filterList.innerHTML = '';
+      for (const f of recipe.filters) {
+        const fr = document.createElement('div');
+        fr.className = 'target-filter-row';
+        const badge = createFilterBadge(f.name);
+        const detail = document.createElement('span');
+        detail.className = 'target-filter-detail';
+        detail.textContent = `${f.count} × ${f.subSeconds}s = ${formatHours(f.hours)}`;
+        fr.appendChild(badge);
+        fr.appendChild(detail);
+        filterList.appendChild(fr);
+      }
+    };
+
+    return { row, applyPreset };
+  }
+
+  /**
+   * Trajectory chart wrapper for a plan row: the SVG plot plus the gutter
+   * graduations and the HTML overlay labels (max/min altitude, transit). Shared
+   * by standalone-target rows and mosaic rows (the SVG is non-uniformly scaled,
+   * so all text lives in HTML overlays positioned by the chart's fractions).
+   */
+  private buildPlanChart(
+    curve: AltSample[],
+    win: { start: Date; end: Date },
+    bestTimeUtc: Date,
+  ): HTMLElement {
     // Layout: [axis-label gutter] [plot]. The graduations live in the gutter,
     // to the left of the axis, so they never overlap the trajectory.
-    const chart = this.buildAltChart(info.curve, win, info.bestTimeUtc);
+    const chart = this.buildAltChart(curve, win, bestTimeUtc);
     const chartWrap = document.createElement('div');
     chartWrap.className = 'flex-1 min-w-0 flex';
 
@@ -2720,50 +3098,11 @@ export class TargetsView {
       th.className = 'absolute bottom-0 text-micro text-dim leading-none px-0.5 bg-card whitespace-nowrap pointer-events-none';
       th.style.left = transitX;
       th.style.transform = transitShift;
-      th.textContent = formatTime(info.bestTimeUtc);
+      th.textContent = formatTime(bestTimeUtc);
       chartBox.appendChild(th);
     }
 
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn-icon btn-icon--danger shrink-0';
-    removeBtn.title = t('targets.plan.remove');
-    removeBtn.innerHTML = trashSvg;
-    removeBtn.addEventListener('click', async () => {
-      await this.plansStore.removeEntry(planId, info.entryId);
-      this.updatePlanBadge();
-      onRemoved(row);
-    });
-
-    row.appendChild(left);
-    row.appendChild(chartWrap);
-    row.appendChild(removeBtn);
-
-    const applyPreset = (preset: GearPreset | null): void => {
-      if (!preset) return;
-      const { score, fovFitScore } = scoreDso(dso, preset, info.maxAltDeg, {
-        ignoreFovFit: this.prefs.includeOversized ?? false,
-        minAltDeg: this.prefs.minAltDeg ?? 20,
-      });
-      scoreItem.querySelector('.target-meta-value')!.textContent = `${Math.round(score * 100)}%`;
-      fovItem.querySelector('.target-meta-value')!.textContent = `${Math.round(fovFitScore * 100)}%`;
-      const recipe = recommendRecipe(dso, preset);
-      totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
-      filterList.innerHTML = '';
-      for (const f of recipe.filters) {
-        const fr = document.createElement('div');
-        fr.className = 'target-filter-row';
-        const badge = createFilterBadge(f.name);
-        const detail = document.createElement('span');
-        detail.className = 'target-filter-detail';
-        detail.textContent = `${f.count} × ${f.subSeconds}s = ${formatHours(f.hours)}`;
-        fr.appendChild(badge);
-        fr.appendChild(detail);
-        filterList.appendChild(fr);
-      }
-    };
-
-    return { row, applyPreset };
+    return chartWrap;
   }
 
   /**

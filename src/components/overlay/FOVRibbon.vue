@@ -30,9 +30,9 @@
       :key="step.deg"
       type="button"
       class="sky-rotation-btn fov-rotate-btn"
-      :class="{ 'opacity-40 pointer-events-none': !hasActive || !fovStore.framesVisible }"
-      :title="step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
-      :aria-label="step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`"
+      :class="{ 'opacity-40 cursor-not-allowed': rotateDisabled }"
+      :title="rotateTitle(step)"
+      :aria-label="rotateTitle(step)"
       @click="applyRotation(step.deg)"
       @mouseenter="suppress(true)" @mouseleave="suppress(false)"
       @focus="suppress(true)" @blur="suppress(false)"
@@ -82,6 +82,15 @@ const uiStore = useUiStore();
 const fovUiState = loadFovUiState();
 const ribbonOpen = ref(fovUiState.ribbonOpen);
 const hasActive = computed(() => !!fovStore.activeId);
+// Rotation acts on the active frame, so it's disabled with no selection or when
+// all frames are hidden — the title then explains how to re-enable it.
+const rotateDisabled = computed(() => !hasActive.value || !fovStore.framesVisible);
+
+function rotateTitle(step: { deg: number; label: string }): string {
+  if (!fovStore.framesVisible) return t('fovOverlay.framesHiddenHint');
+  if (!hasActive.value) return t('fovOverlay.rotateNeedsSelection');
+  return step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`;
+}
 
 const ROTATION_STEPS = [
   { deg: -45, label: '-45°', svg: rotateM45Svg },
@@ -103,9 +112,14 @@ function toggleFramesVisibility() {
   // panning/zooming the bare sky can't drift them — nothing moves while hidden.
   if (fovStore.framesVisible) canvasStore.skyMap?.pinAllFloatingFrames();
   fovStore.toggleFramesVisible();
+  // The frame manager is only useful alongside visible frames: open it when
+  // showing frames, close it when hiding them.
+  if (fovStore.framesVisible) openFovPopup();
+  else closeFovPopup();
 }
 
 function applyRotation(stepDeg: number) {
+  if (rotateDisabled.value) return;
   const id = fovStore.activeId;
   if (!id) return;
   if (stepDeg === 0) fovStore.resetRotation(id);
@@ -118,13 +132,18 @@ function closeFovPopup() {
   fovPopupEl = null;
 }
 
-function togglePopup() {
-  if (fovPopupEl) { closeFovPopup(); return; }
+function openFovPopup() {
+  if (fovPopupEl) return;
   fovPopupEl = buildFovPopup(closeFovPopup, () => {
     if (fovPopupEl && telescopeBtnEl) {
       positionPopup(fovPopupEl, telescopeBtnEl.getBoundingClientRect());
     }
   });
+}
+
+function togglePopup() {
+  if (fovPopupEl) { closeFovPopup(); return; }
+  openFovPopup();
 }
 
 function toggleRibbon() {
@@ -180,6 +199,18 @@ onMounted(() => {
     () => sm?.setMosaicAddCandidates(fovStore.framesVisible ? fovStore.activeMosaicAddCandidates : []),
     { deep: true, immediate: true },
   );
+  // Open the frame manager on request (e.g. jumping here from a plan's details).
+  // The ribbon is only mounted while the sky map is shown, so the request can
+  // arrive while it's unmounted (set just after switchView('skymap')): consume
+  // the pending flag on mount, and keep a watcher for the already-mounted case.
+  const consumePopupOpen = () => {
+    if (!fovStore.pendingPopupOpen) return;
+    fovStore.pendingPopupOpen = false;
+    fovStore.setFramesVisible(true);
+    openFovPopup();
+  };
+  watch(() => fovStore.pendingPopupOpen, () => consumePopupOpen());
+  consumePopupOpen();
 });
 
 onUnmounted(() => {
