@@ -7,6 +7,7 @@
  */
 
 import type { GearPreset } from './gear-presets';
+import type { SmartMosaicCapability } from './mosaic';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,8 @@ export interface TelescopeData {
   focal_length_mm: number;
   f_ratio: number;
   is_smart_telescope: boolean;
+  /** Smart-scope single-frame mosaic capability (absent ⇒ no mosaic mode). */
+  mosaic?: SmartMosaicCapability;
   max_sub_exposure_sec?: number;
   has_dual_band_filter?: boolean;
   integrated_camera: boolean;

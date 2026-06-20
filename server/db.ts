@@ -99,17 +99,35 @@ db.exec(`
     position   INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     night_of   TEXT,
-    setup_id   TEXT
+    setup_id   TEXT,
+    lat        REAL,
+    lon        REAL
   );
   CREATE TABLE IF NOT EXISTS plan_entries (
-    id       TEXT PRIMARY KEY,
-    plan_id  TEXT NOT NULL,
-    dso_id   TEXT,
-    position INTEGER NOT NULL,
-    pa_deg   REAL,
-    ra       REAL,
-    dec      REAL,
-    notes    TEXT
+    id        TEXT PRIMARY KEY,
+    plan_id   TEXT NOT NULL,
+    dso_id    TEXT,
+    position  INTEGER NOT NULL,
+    pa_deg    REAL,
+    ra        REAL,
+    dec       REAL,
+    notes     TEXT,
+    mosaic_id TEXT,
+    mosaic_w_deg REAL,
+    mosaic_h_deg REAL
+  );
+  CREATE TABLE IF NOT EXISTS plan_mosaics (
+    id          TEXT PRIMARY KEY,
+    plan_id     TEXT NOT NULL,
+    dso_id      TEXT,
+    name        TEXT,
+    center_ra   REAL NOT NULL,
+    center_dec  REAL NOT NULL,
+    pa_deg      REAL NOT NULL DEFAULT 0,
+    overlap_pct REAL NOT NULL DEFAULT 20,
+    cols        INTEGER NOT NULL DEFAULT 1,
+    rows        INTEGER NOT NULL DEFAULT 1,
+    position    INTEGER NOT NULL DEFAULT 0
   );
 `);
 
@@ -599,6 +617,10 @@ export interface PlanRow {
   created_at: string;
   night_of: string | null;
   setup_id: string | null;
+  /** Per-plan observing latitude (°N), or null to fall back to the global location. */
+  lat: number | null;
+  /** Per-plan observing longitude (°E), or null to fall back to the global location. */
+  lon: number | null;
 }
 
 export interface PlanEntryRow {
@@ -610,15 +632,35 @@ export interface PlanEntryRow {
   ra: number | null;
   dec: number | null;
   notes: string | null;
+  /** Mosaic this entry is a tile of, or null for a standalone frame. */
+  mosaic_id: string | null;
+  /** Smart-scope single-frame mosaic size (deg); null ⇒ render at native FOV.
+   * Optional on construction (tile/custom inserts omit it); always present on reads. */
+  mosaic_w_deg?: number | null;
+  mosaic_h_deg?: number | null;
+}
+
+export interface PlanMosaicRow {
+  id: string;
+  plan_id: string;
+  dso_id: string | null;
+  name: string | null;
+  center_ra: number;
+  center_dec: number;
+  pa_deg: number;
+  overlap_pct: number;
+  cols: number;
+  rows: number;
+  position: number;
 }
 
 const getPlansStmt              = db.prepare('SELECT * FROM plans ORDER BY position ASC, rowid ASC');
 const getPlanStmt               = db.prepare('SELECT * FROM plans WHERE id = ?');
 const insertPlanStmt            = db.prepare(
-  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id) VALUES (?, ?, ?, ?, ?, ?)',
+  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 );
 const renamePlanStmt            = db.prepare('UPDATE plans SET name = ? WHERE id = ?');
-const updatePlanSettingsStmt    = db.prepare('UPDATE plans SET night_of = ?, setup_id = ? WHERE id = ?');
+const updatePlanSettingsStmt    = db.prepare('UPDATE plans SET night_of = ?, setup_id = ?, lat = ?, lon = ? WHERE id = ?');
 const updatePlanPositionStmt    = db.prepare('UPDATE plans SET position = ? WHERE id = ?');
 const deletePlanStmt            = db.prepare('DELETE FROM plans WHERE id = ?');
 const deleteAllPlansStmt        = db.prepare('DELETE FROM plans');
@@ -627,10 +669,32 @@ const getPlanEntriesStmt        = db.prepare('SELECT * FROM plan_entries WHERE p
 const getAllPlanEntriesStmt     = db.prepare('SELECT * FROM plan_entries ORDER BY position ASC, rowid ASC');
 const planEntryExistsStmt       = db.prepare('SELECT 1 FROM plan_entries WHERE plan_id = ? AND dso_id = ?');
 const insertPlanEntryStmt       = db.prepare(
-  'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes, mosaic_id, mosaic_w_deg, mosaic_h_deg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 );
 const deletePlanEntryStmt       = db.prepare('DELETE FROM plan_entries WHERE id = ?');
 const deletePlanEntriesStmt     = db.prepare('DELETE FROM plan_entries WHERE plan_id = ?');
+
+const getPlanMosaicStmt         = db.prepare('SELECT * FROM plan_mosaics WHERE id = ?');
+const getPlanMosaicsStmt        = db.prepare('SELECT * FROM plan_mosaics WHERE plan_id = ? ORDER BY position ASC, rowid ASC');
+const getAllPlanMosaicsStmt     = db.prepare('SELECT * FROM plan_mosaics ORDER BY position ASC, rowid ASC');
+const insertPlanMosaicStmt      = db.prepare(
+  'INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec, pa_deg, overlap_pct, cols, rows, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+);
+const updatePlanMosaicStmt      = db.prepare(
+  'UPDATE plan_mosaics SET dso_id = ?, center_ra = ?, center_dec = ?, pa_deg = ?, overlap_pct = ?, cols = ?, rows = ? WHERE id = ?',
+);
+// As the photo-metadata statements do (`updatePhotoMetadataWithNameStmt`), a
+// second variant also updates `name`. Used only when the caller supplies a name
+// (the modal save) so background tile drags/transforms never clobber it.
+const updatePlanMosaicWithNameStmt = db.prepare(
+  'UPDATE plan_mosaics SET dso_id = ?, name = ?, center_ra = ?, center_dec = ?, pa_deg = ?, overlap_pct = ?, cols = ?, rows = ? WHERE id = ?',
+);
+const deletePlanMosaicStmt      = db.prepare('DELETE FROM plan_mosaics WHERE id = ?');
+const deletePlanMosaicsStmt     = db.prepare('DELETE FROM plan_mosaics WHERE plan_id = ?');
+const deleteMosaicTilesStmt     = db.prepare('DELETE FROM plan_entries WHERE mosaic_id = ?');
+// A mosaic represents its whole target, so it replaces any standalone frame for
+// the same DSO (mosaic tiles carry a mosaic_id; standalone entries don't).
+const deleteStandaloneEntryByDsoStmt = db.prepare('DELETE FROM plan_entries WHERE plan_id = ? AND dso_id = ? AND mosaic_id IS NULL');
 const updatePlanEntryPositionStmt = db.prepare('UPDATE plan_entries SET position = ? WHERE id = ? AND plan_id = ?');
 const updatePlanEntryPaStmt       = db.prepare('UPDATE plan_entries SET pa_deg = ? WHERE id = ?');
 
@@ -651,20 +715,21 @@ export function getAllPlanEntries(): PlanEntryRow[] {
 }
 
 export function createPlan(row: PlanRow): void {
-  insertPlanStmt.run(row.id, row.name, row.position, row.created_at, row.night_of ?? null, row.setup_id ?? null);
+  insertPlanStmt.run(row.id, row.name, row.position, row.created_at, row.night_of ?? null, row.setup_id ?? null, row.lat ?? null, row.lon ?? null);
 }
 
 export function renamePlan(id: string, name: string): boolean {
   return renamePlanStmt.run(name, id).changes > 0;
 }
 
-export function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null): boolean {
-  return updatePlanSettingsStmt.run(nightOf, setupId, id).changes > 0;
+export function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): boolean {
+  return updatePlanSettingsStmt.run(nightOf, setupId, lat, lon, id).changes > 0;
 }
 
 export function deletePlan(id: string): boolean {
   return db.transaction(() => {
     deletePlanEntriesStmt.run(id);
+    deletePlanMosaicsStmt.run(id);
     return deletePlanStmt.run(id).changes > 0;
   })();
 }
@@ -672,8 +737,129 @@ export function deletePlan(id: string): boolean {
 export function deleteAllPlans(): number {
   return db.transaction(() => {
     db.prepare('DELETE FROM plan_entries').run();
+    db.prepare('DELETE FROM plan_mosaics').run();
     return deleteAllPlansStmt.run().changes;
   })();
+}
+
+// ─── Mosaics (a group of tile entries covering one target) ─────────────────────
+
+export function getPlanMosaics(planId: string): PlanMosaicRow[] {
+  return getPlanMosaicsStmt.all(planId) as PlanMosaicRow[];
+}
+
+export function getAllPlanMosaics(): PlanMosaicRow[] {
+  return getAllPlanMosaicsStmt.all() as PlanMosaicRow[];
+}
+
+export function getPlanMosaic(mosaicId: string): PlanMosaicRow | undefined {
+  return getPlanMosaicStmt.get(mosaicId) as PlanMosaicRow | undefined;
+}
+
+function nextPlanMosaicPosition(planId: string): number {
+  const r = db.prepare('SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM plan_mosaics WHERE plan_id = ?').get(planId) as { pos: number };
+  return r.pos;
+}
+
+/** A single mosaic tile to persist as a plan entry (target derived from the mosaic). */
+export interface MosaicTileInput {
+  ra: number;
+  dec: number;
+  paDeg: number | null;
+}
+
+/**
+ * Create a mosaic and its tile entries in one transaction. The tiles are
+ * persisted as plan_entries tagged with the new mosaic id, all targeting the
+ * mosaic's DSO. Returns the new mosaic id.
+ */
+export function createPlanMosaic(
+  row: Omit<PlanMosaicRow, 'position'> & { position?: number },
+  tiles: MosaicTileInput[],
+  replaceEntryIds: string[] = [],
+): string {
+  return db.transaction(() => {
+    // The mosaic stands in for the whole target — drop any single frame for the
+    // same DSO, plus the specific standalone frames the client says it replaces
+    // (e.g. a custom-location frame sitting on the target), so none are listed
+    // alongside the mosaic.
+    if (row.dso_id) deleteStandaloneEntryByDsoStmt.run(row.plan_id, row.dso_id);
+    for (const id of replaceEntryIds) deletePlanEntryStmt.run(id);
+    const position = row.position ?? nextPlanMosaicPosition(row.plan_id);
+    insertPlanMosaicStmt.run(
+      row.id, row.plan_id, row.dso_id ?? null, row.name ?? null, row.center_ra, row.center_dec,
+      row.pa_deg, row.overlap_pct, row.cols, row.rows, position,
+    );
+    let pos = nextPlanEntryPosition(row.plan_id);
+    for (const t of tiles) {
+      addPlanEntry({
+        id: `tile-${row.id}-${pos}`, plan_id: row.plan_id, dso_id: row.dso_id ?? null,
+        position: pos++, pa_deg: t.paDeg ?? null, ra: t.ra, dec: t.dec, notes: null, mosaic_id: row.id,
+      });
+    }
+    return row.id;
+  })();
+}
+
+/**
+ * Replace a mosaic's parameters and its tile set. Old tiles (entries with this
+ * mosaic_id) are removed and the supplied tiles inserted. Returns false if the
+ * mosaic doesn't exist.
+ */
+export function updatePlanMosaic(
+  mosaicId: string,
+  fields: { dsoId: string | null; name?: string; centerRa: number; centerDec: number; paDeg: number; overlapPct: number; cols: number; rows: number },
+  tiles: MosaicTileInput[],
+  replaceEntryIds: string[] = [],
+): boolean {
+  return db.transaction(() => {
+    const m = db.prepare('SELECT plan_id FROM plan_mosaics WHERE id = ?').get(mosaicId) as { plan_id: string } | undefined;
+    if (!m) return false;
+    // Absorb standalone frames merged into this mosaic.
+    for (const id of replaceEntryIds) deletePlanEntryStmt.run(id);
+    // Only overwrite the name when the caller provided one (the modal save);
+    // background tile drags / transforms omit it and must not clobber it.
+    if (fields.name !== undefined) {
+      updatePlanMosaicWithNameStmt.run(
+        fields.dsoId ?? null, fields.name, fields.centerRa, fields.centerDec, fields.paDeg,
+        fields.overlapPct, fields.cols, fields.rows, mosaicId,
+      );
+    } else {
+      updatePlanMosaicStmt.run(
+        fields.dsoId ?? null, fields.centerRa, fields.centerDec, fields.paDeg,
+        fields.overlapPct, fields.cols, fields.rows, mosaicId,
+      );
+    }
+    deleteMosaicTilesStmt.run(mosaicId);
+    let pos = nextPlanEntryPosition(m.plan_id);
+    for (const t of tiles) {
+      addPlanEntry({
+        id: `tile-${mosaicId}-${pos}`, plan_id: m.plan_id, dso_id: fields.dsoId ?? null,
+        position: pos++, pa_deg: t.paDeg ?? null, ra: t.ra, dec: t.dec, notes: null, mosaic_id: mosaicId,
+      });
+    }
+    return true;
+  })();
+}
+
+/** Delete a mosaic and all of its tile entries. */
+export function deletePlanMosaic(mosaicId: string): boolean {
+  return db.transaction(() => {
+    deleteMosaicTilesStmt.run(mosaicId);
+    return deletePlanMosaicStmt.run(mosaicId).changes > 0;
+  })();
+}
+
+/**
+ * Insert a mosaic row verbatim. Unlike {@link createPlanMosaic} this does not
+ * generate or replace any tile entries — used by import, where a mosaic's tiles
+ * arrive as their own plan_entries (tagged with this mosaic_id).
+ */
+export function addPlanMosaic(row: PlanMosaicRow): void {
+  insertPlanMosaicStmt.run(
+    row.id, row.plan_id, row.dso_id ?? null, row.name ?? null, row.center_ra, row.center_dec,
+    row.pa_deg, row.overlap_pct, row.cols, row.rows, row.position,
+  );
 }
 
 export function reorderPlans(ids: string[]): void {
@@ -689,7 +875,8 @@ export function planEntryExists(planId: string, dsoId: string): boolean {
 export function addPlanEntry(row: PlanEntryRow): void {
   insertPlanEntryStmt.run(
     row.id, row.plan_id, row.dso_id ?? null, row.position, row.pa_deg ?? null,
-    row.ra ?? null, row.dec ?? null, row.notes ?? null,
+    row.ra ?? null, row.dec ?? null, row.notes ?? null, row.mosaic_id ?? null,
+    row.mosaic_w_deg ?? null, row.mosaic_h_deg ?? null,
   );
 }
 
@@ -713,7 +900,7 @@ export function updatePlanEntryPA(entryId: string, paDeg: number | null): boolea
  */
 export function updatePlanEntryFrame(
   entryId: string,
-  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
 ): boolean {
   const sets: string[] = [];
   const vals: Array<number | string | null> = [];
@@ -721,6 +908,8 @@ export function updatePlanEntryFrame(
   if ('dec' in fields) { sets.push('dec = ?'); vals.push(fields.dec ?? null); }
   if ('paDeg' in fields) { sets.push('pa_deg = ?'); vals.push(fields.paDeg ?? null); }
   if ('dsoId' in fields) { sets.push('dso_id = ?'); vals.push(fields.dsoId ?? null); }
+  if ('mosaicWDeg' in fields) { sets.push('mosaic_w_deg = ?'); vals.push(fields.mosaicWDeg ?? null); }
+  if ('mosaicHDeg' in fields) { sets.push('mosaic_h_deg = ?'); vals.push(fields.mosaicHDeg ?? null); }
   if (sets.length === 0) return false;
   vals.push(entryId);
   return db.prepare(`UPDATE plan_entries SET ${sets.join(', ')} WHERE id = ?`).run(...vals).changes > 0;

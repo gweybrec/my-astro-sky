@@ -729,14 +729,21 @@ html, body {
 }
 .sidebar-section-content > .btn-action:last-of-type { margin-bottom: 0; }
 
-/* Settings modal IO section: stacked full-width buttons */
+/* Settings modal IO section: two buttons side by side */
 .settings-io-btns {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
-.settings-io-btns .btn-action { width: 100%; }
+.settings-io-btns .btn-action { flex: 1; }
+
+/* Settings modal appearance row: language + theme side by side */
+.settings-fields-row {
+  display: flex;
+  gap: var(--space-5);
+}
+.settings-fields-row .settings-field { flex: 1; margin-bottom: 0; }
 
 /* Gallery detail header: show-on-map button spans full width */
 .gallery-detail-header .btn-action { width: 100%; }
@@ -2648,21 +2655,6 @@ input:focus-visible {
 }
 .photo-section-items {
   padding-left: var(--space-6);
-}
-.photo-section-eye {
-  background: none;
-  border: none;
-  color: var(--text-label);
-  cursor: pointer;
-  font-size: var(--font-size-body);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-1h);
-}
-.photo-section-eye:hover {
-  background: var(--bg-hover);
-}
-.photo-section-eye.hidden {
-  opacity: 0.4;
 }
 
 /* ─── Input validation states ─── */
@@ -4644,7 +4636,7 @@ details.targets-form-details[open] .targets-form-summary::before {
 /* ═══ Wave 2: component classes for settings / modals / overlays ═══ */
 
 /* ─── Modal sizing variants ─── */
-.settings-modal         { max-width: 460px; width: 90%; }
+.settings-modal         { max-width: 560px; width: 90%; }
 .settings-modal--flex   { max-width: 460px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; }
 .settings-modal--scroll { max-width: 460px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
 .import-modal           { max-width: 400px; width: 90%; }
@@ -4854,6 +4846,9 @@ details.targets-form-details[open] .targets-form-summary::before {
 
 /* Rotation icons fill most of the button; SVG viewBox handles layout */
 .fov-rotate-btn svg { width: 28px; height: 28px; display: block; }
+
+/* Show/hide-frames eye toggle — inset like the corner controls (§2.19) */
+.fov-visibility-btn svg { width: 16px; height: 16px; display: block; }
 
 /* Toggle tab — sticks out to the right of the ribbon like the left-panel toggle */
 .fov-ribbon-toggle {

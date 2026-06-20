@@ -5,8 +5,12 @@ import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
 import type { Photo, DSO, ViewState } from './types';
 import { project, toCanvas } from './projection';
 import { angularSizeToCanvasPxForDSO } from './dso-highlight';
+import { paToCanvasRotationDeg } from './frame-orientation';
 import { getConstellationInfos } from './star-catalog';
 import { t } from './i18n';
+import { formatAlt } from './format-utils';
+import { buildSetupInfoRows } from './setup-info';
+import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import type { AltSample } from './sky-geometry';
 
 // ─── Affine helpers (pure, unit-tested) ─────────────────────────────────────
@@ -165,6 +169,10 @@ export async function renderMapToCanvas(
       const dm = new DOMMatrix(transform);
       await drawPlacedPhoto(ctx, placed, { a: dm.a, b: dm.b, c: dm.c, d: dm.d, e: dm.e, f: dm.f }, dpr);
     }
+
+    // 3. Draw overlay canvas (FOV frames) on top of photos.
+    const overlayCanvas = skyMap.getOverlayCanvas();
+    if (overlayCanvas) ctx.drawImage(overlayCanvas, 0, 0);
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -243,12 +251,24 @@ export interface PlanPdfTarget {
   maxAltDeg: number;
   curve: AltSample[];
   nightWin: { start: Date; end: Date };
+  /** When set, this entry is a mosaic: the framed view draws the tile grid and
+   *  the overview marks the envelope footprint instead of a single FOV frame. */
+  mosaic?: {
+    wDeg: number;
+    hDeg: number;
+    paDeg: number;
+    tiles: { ra: number; dec: number }[];
+  } | null;
 }
 
 export interface PlanPdfOptions {
   planName: string;
   targets: PlanPdfTarget[];
   fovSpecs: FovFrameSpec[];
+  /** Plan header shown on the summary page. */
+  header: { nightOf: string | null; latDeg: number | null; lonDeg: number | null };
+  /** Resolved gear for the summary page; null when the plan has no setup. */
+  setup?: { name: string; tel: TelescopeData; cam: CameraData; acc: AccessoryData | null } | null;
 }
 
 /**
@@ -296,11 +316,19 @@ function drawOverviewFrames(
     const cy = c.y * dpr;
     let halfW = 4 * dpr;
     let halfH = 4 * dpr;
-    if (spec) {
-      halfW = Math.max(angularSizeToCanvasPxForDSO(spec.wDeg * 30, tgt.dso.dec, view.scale) * dpr, 3 * dpr);
-      halfH = Math.max(angularSizeToCanvasPxForDSO(spec.hDeg * 30, tgt.dso.dec, view.scale) * dpr, 3 * dpr);
+    // Mosaics mark their whole envelope; standalone targets use the FOV frame.
+    const sizeW = tgt.mosaic ? tgt.mosaic.wDeg : spec?.wDeg;
+    const sizeH = tgt.mosaic ? tgt.mosaic.hDeg : spec?.hDeg;
+    if (sizeW != null && sizeH != null) {
+      halfW = Math.max(angularSizeToCanvasPxForDSO(sizeW * 30, tgt.dso.dec, view.scale) * dpr, 3 * dpr);
+      halfH = Math.max(angularSizeToCanvasPxForDSO(sizeH * 30, tgt.dso.dec, view.scale) * dpr, 3 * dpr);
     }
-    const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rotationDeg);
+    // A mosaic envelope is oriented by the mosaic PA (per its RA); standalone
+    // targets use the shared FOV-frame rotation.
+    const rot = tgt.mosaic
+      ? paToCanvasRotationDeg(tgt.mosaic.paDeg, tgt.dso.ra, view.rotationDeg)
+      : rotationDeg;
+    const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rot);
     ctx.setLineDash([6 * dpr, 4 * dpr]);
     ctx.beginPath();
     ctx.moveTo(corners[0].x, corners[0].y);
@@ -427,9 +455,13 @@ function drawAltChartToCanvas(
   const usableH = h - 2 * padY;
   const span = (win.end.getTime() - win.start.getTime()) || 1;
 
-  // Left gutter reserved for the axis-label graduations (outside the plot).
+  // Left gutter reserved for the axis-label graduations (outside the plot);
+  // right gutter reserved for the min/max altitude value labels (mirrors the
+  // on-screen sparkline, which shows them above/below their reference lines).
   const gutter = 18 * dpr;
-  const plotW = w - gutter;
+  const rGutter = 22 * dpr;
+  const plotW = w - gutter - rGutter;
+  const plotR = gutter + plotW;          // right edge of the plot area
 
   const xAt = (d: Date) => gutter + ((d.getTime() - win.start.getTime()) / span) * plotW;
   const yAt = (alt: number) => padY + (1 - Math.max(0, Math.min(90, alt)) / 90) * usableH;
@@ -445,7 +477,7 @@ function drawAltChartToCanvas(
   ctx.lineWidth = Math.max(1, 0.5 * dpr);
   for (const deg of AXIS_TICKS) {
     const gy = yAt(deg);
-    ctx.beginPath(); ctx.moveTo(gutter, gy); ctx.lineTo(w, gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gutter, gy); ctx.lineTo(plotR, gy); ctx.stroke();
   }
 
   // Left vertical axis — always present, for a consistent frame.
@@ -459,7 +491,7 @@ function drawAltChartToCanvas(
   ctx.setLineDash([3 * dpr, 3 * dpr]);
   for (const refAlt of [objLo, objHi]) {
     const ry = yAt(refAlt);
-    ctx.beginPath(); ctx.moveTo(gutter, ry); ctx.lineTo(w, ry); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gutter, ry); ctx.lineTo(plotR, ry); ctx.stroke();
   }
   ctx.setLineDash([]);
 
@@ -470,7 +502,7 @@ function drawAltChartToCanvas(
   ctx.beginPath();
   ctx.moveTo(pts[0].px, yMin);
   for (const p of pts) ctx.lineTo(p.px, p.py);
-  ctx.lineTo(w, yMin);
+  ctx.lineTo(plotR, yMin);
   ctx.closePath();
   ctx.fill();
 
@@ -503,7 +535,7 @@ function drawAltChartToCanvas(
     // the "Transit" label at the top.
     const label = `${t('targets.plan.transit')} ${fmtTime(transitTime)}`;
     const halfW = ctx.measureText(label).width / 2;
-    const lx = Math.max(gutter + halfW, Math.min(w - halfW, tx));
+    const lx = Math.max(gutter + halfW, Math.min(plotR - halfW, tx));
     ctx.fillText(label, lx, padY - 1 * dpr);
   }
 
@@ -516,17 +548,94 @@ function drawAltChartToCanvas(
   for (const deg of AXIS_TICKS) {
     ctx.fillText(`${deg}°`, gutter - 2 * dpr, yAt(deg));
   }
+
+  // Min/max altitude value labels in the right gutter — max above its reference
+  // line, min below — matching the on-screen sparkline (skip min if equal).
+  const labelFont = 7 * dpr;
+  ctx.font = `${labelFont}px sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(80,80,80,0.9)';
+  const labelX = w - 2 * dpr;
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(formatAlt(objHi), labelX, yAt(objHi) - 1 * dpr);
+  if (objLo !== objHi) {
+    ctx.textBaseline = 'top';
+    ctx.fillText(formatAlt(objLo), labelX, yAt(objLo) + 1 * dpr);
+  }
+
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 
   ctx.restore();
 }
 
+/** Draw stacked label→value rows (label left grey, value right bold). Returns the y past the last row. */
+function drawKeyValueTable(
+  doc: jsPDF, rows: [string, string][], x: number, y: number, width: number, rowH: number,
+): number {
+  doc.setFontSize(10.5);
+  for (const [k, v] of rows) {
+    (doc as any).setFont(undefined, 'normal');
+    doc.setTextColor(120, 120, 120);
+    doc.text(k, x, y);
+    (doc as any).setFont(undefined, 'bold');
+    doc.setTextColor(45, 45, 45);
+    doc.text(v, x + width, y, { align: 'right' });
+    y += rowH;
+  }
+  return y;
+}
+
+/** Outline each mosaic tile (faint) on a framed sky-view canvas, conveying the grid. */
+function drawMosaicTiles(
+  canvas: HTMLCanvasElement,
+  view: ViewState,
+  dpr: number,
+  tiles: { ra: number; dec: number }[],
+  tileWDeg: number,
+  tileHDeg: number,
+  paDeg: number,
+  styleEl: HTMLElement,
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const stroke = getComputedStyle(styleEl).getPropertyValue('--fov-frame-stroke').trim() || 'rgba(220,60,60,0.85)';
+  ctx.save();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1.2 * dpr;
+  for (const tile of tiles) {
+    const p = project(tile.ra, tile.dec);
+    const c = toCanvas(p.x, p.y, view);
+    const cx = c.x * dpr, cy = c.y * dpr;
+    const halfW = angularSizeToCanvasPxForDSO(tileWDeg * 30, tile.dec, view.scale) * dpr;
+    const halfH = angularSizeToCanvasPxForDSO(tileHDeg * 30, tile.dec, view.scale) * dpr;
+    // Each tile shares the mosaic PA, but its on-screen rotation depends on where
+    // north points at the tile's RA — mirror the live renderer's per-tile rotation
+    // so the rectangles form the same coherent grid (a single uniform rotation
+    // leaves them pinwheeled when the mosaic PA ≠ 0).
+    const rotationDeg = paToCanvasRotationDeg(paDeg, tile.ra, view.rotationDeg);
+    const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rotationDeg);
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Display title for a plan entry (target proper name / catalog id, or mosaic name). */
+function planEntryTitle(tgt: PlanPdfTarget): string {
+  return tgt.dso.displayName || tgt.dso.catalogs[0] || tgt.dso.id;
+}
+
 /**
- * Render a night plan as a multi-page PDF: one page per target with DSO info,
- * altitude chart, and framed sky view; plus a final constellation-lines-only
- * overview marking each target's FOV footprint (no text on this page).
- * The live map's FOV frames are saved and restored.
+ * Render a night plan as a multi-page PDF: a summary page (plan header + setup
+ * details), a clickable table of contents, then one page per target/mosaic with
+ * DSO info, altitude chart, and framed sky view; plus a final
+ * constellation-lines-only overview marking each entry's FOV footprint.
+ * PDF outline bookmarks are added for chapter navigation. The live map's FOV
+ * frames are saved and restored.
  */
 export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promise<Blob> {
   const dpr = Math.max(2, window.devicePixelRatio || 2);
@@ -565,13 +674,79 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
   const constText: [number, number, number] = [60, 96, 170];
   const constBorder: [number, number, number] = [200, 214, 240];
 
+  // Deterministic page numbering: [1] summary, [2] contents, [3…] entries, [last] overview.
+  const entryPage = (i: number) => 3 + i;
+  const overviewPage = 3 + opts.targets.length;
+
   try {
+    // ── Page 1: summary (plan header + setup details) ────────────────────────
+    {
+      let y = margin + 26;
+      (doc as any).setFont(undefined, 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(34, 34, 34);
+      doc.text(opts.planName, margin, y);
+      y += 24;
+      (doc as any).setFont(undefined, 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(110, 110, 110);
+      const nightLabel = opts.header.nightOf
+        ? new Date(opts.header.nightOf + 'T00:00:00').toLocaleDateString()
+        : '—';
+      doc.text(`${t('targets.plan.pdf.nightOf')}: ${nightLabel}`, margin, y);
+      y += 16;
+      if (opts.header.latDeg != null && opts.header.lonDeg != null) {
+        doc.text(`${t('targets.plan.pdf.location')}: ${opts.header.latDeg.toFixed(3)}°, ${opts.header.lonDeg.toFixed(3)}°`, margin, y);
+        y += 16;
+      }
+      if (opts.setup) {
+        y += 22;
+        (doc as any).setFont(undefined, 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(34, 34, 34);
+        doc.text(`${t('targets.plan.pdf.setup')}: ${opts.setup.name}`, margin, y);
+        y += 20;
+        const rows = buildSetupInfoRows(opts.setup.tel, opts.setup.cam, opts.setup.acc);
+        drawKeyValueTable(doc, rows, margin, y, contentW * 0.7, 18);
+      }
+      doc.outline.add(null, t('targets.plan.pdf.summary'), { pageNumber: 1 });
+    }
+
+    // ── Page 2: table of contents (clickable rows) ───────────────────────────
+    doc.addPage();
+    {
+      (doc as any).setFont(undefined, 'bold');
+      doc.setFontSize(17);
+      doc.setTextColor(34, 34, 34);
+      doc.text(t('targets.plan.pdf.contents'), margin, margin + 18);
+      doc.outline.add(null, t('targets.plan.pdf.contents'), { pageNumber: 2 });
+
+      let ty = margin + 48;
+      const rowH = 20;
+      const tocEntries: { label: string; page: number }[] = [
+        ...opts.targets.map((tgt, i) => ({ label: planEntryTitle(tgt), page: entryPage(i) })),
+        { label: t('targets.plan.pdf.overview'), page: overviewPage },
+      ];
+      doc.setFontSize(11.5);
+      for (const e of tocEntries) {
+        (doc as any).setFont(undefined, 'normal');
+        doc.setTextColor(45, 45, 45);
+        doc.text(e.label, margin, ty);
+        doc.setTextColor(120, 120, 120);
+        doc.text(String(e.page), pageW - margin, ty, { align: 'right' });
+        // Clickable hit area spanning the whole row.
+        doc.link(margin, ty - rowH + 6, contentW, rowH, { pageNumber: e.page });
+        ty += rowH;
+      }
+    }
+
     skyMap.setFovFrames(opts.fovSpecs);
 
     for (let i = 0; i < opts.targets.length; i++) {
       const tgt = opts.targets[i];
       const dso = tgt.dso;
-      if (i > 0) doc.addPage();
+      doc.addPage();
+      doc.outline.add(null, planEntryTitle(tgt), { pageNumber: entryPage(i) });
 
       // ── DSO info band (top third) ────────────────────────────────────────────
       // Title line: bold display name, dimmer catalog id, rating stars.
@@ -644,16 +819,20 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       }
 
       // ── Altitude trajectory chart (tall — fills the band above the sky view) ──
+      // Supersample beyond the page dpr: the chart is pure thin-line/small-text
+      // vector content (unlike the photographic sky view), so extra raster
+      // resolution removes the visible pixelation of its lines and labels.
+      const chartDpr = dpr * 2;
       const chartOff = document.createElement('canvas');
-      chartOff.width = Math.round(contentW * dpr);
-      chartOff.height = Math.round(chartH * dpr);
+      chartOff.width = Math.round(contentW * chartDpr);
+      chartOff.height = Math.round(chartH * chartDpr);
       const chartCtx = chartOff.getContext('2d')!;
       // Light background matching PDF white background.
       chartCtx.fillStyle = '#f8f8f8';
       chartCtx.fillRect(0, 0, chartOff.width, chartOff.height);
       if (tgt.curve.length > 0) {
         drawAltChartToCanvas(chartCtx, tgt.curve, tgt.nightWin, tgt.bestTimeUtc,
-          0, 0, chartOff.width, chartOff.height, dpr);
+          0, 0, chartOff.width, chartOff.height, chartDpr);
       }
       doc.addImage(chartOff.toDataURL('image/png'), 'PNG', margin, chartTop, contentW, chartH);
 
@@ -664,16 +843,26 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       off.width = Math.round(imgW * dpr);
       off.height = Math.round(imgH * dpr);
       const p = project(dso.ra, dso.dec);
-      const scale = spec
-        ? computeFramedViewScale(spec.wDeg, spec.hDeg, dso.dec, imgW, imgH, 0.55)
+      // Mosaics frame their whole envelope and draw the tile grid themselves;
+      // standalone targets frame the native FOV via the live single frame.
+      const viewW = tgt.mosaic ? tgt.mosaic.wDeg : spec?.wDeg;
+      const viewH = tgt.mosaic ? tgt.mosaic.hDeg : spec?.hDeg;
+      const scale = (viewW != null && viewH != null)
+        ? computeFramedViewScale(viewW, viewH, dso.dec, imgW, imgH, 0.55)
         : baseView.scale * 4;
       const view: ViewState = { centerX: p.x, centerY: p.y, scale, rotationDeg: baseView.rotationDeg, width: imgW, height: imgH };
+      skyMap.setFovFrames(tgt.mosaic ? [] : opts.fovSpecs);
       skyMap.renderToCanvas(off, view, dpr);
+      if (tgt.mosaic && spec) {
+        drawMosaicTiles(off, view, dpr, tgt.mosaic.tiles, spec.wDeg, spec.hDeg,
+          tgt.mosaic.paDeg, skyMap.getCanvas());
+      }
       doc.addImage(off.toDataURL('image/jpeg', 0.95), 'JPEG', margin, imgTop, imgW, imgH);
     }
 
     // Overview page: constellation lines + frame markers per target — no text.
     doc.addPage();
+    doc.outline.add(null, t('targets.plan.pdf.overview'), { pageNumber: overviewPage });
     const ovW = pageW - margin * 2;
     const ovH = pageH - margin * 2;
     // Clear FOV frames so the live frame label doesn't appear in the overview.

@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { RenderableFrame, FovFrameChange } from '../sky-map';
-import { getGearSetups } from '../api';
+import type { RenderableFrame, FovFrameChange, FovFrameResizeRegion } from '../sky-map';
+import { planGrid, tileCenters, framePointToSky, skyToFrameOffset, mosaicShapeFromOffsets, addCandidateOffsets, smartMosaicEnvelope, clampSmartMosaicSize } from '../mosaic';
+import type { SmartMosaicEnvelope } from '../mosaic';
+import { getGearSetups, updatePlanMosaicAPI } from '../api';
 import { getTelescopes, getCameras, getAccessories, buildGearPreset } from '../gear-catalog';
 import { fovDeg, formatSetupCanvasLabel } from '../gear-presets';
 import { getDSOById } from '../dso-catalog';
@@ -9,20 +11,26 @@ import { usePlansStore } from './plans';
 import { orderPlanEntryIds } from '../plan-order';
 import { reportUnknownRendererError } from '../error-reporter';
 
-/** Resolved angular size + labels for a gear setup. */
-interface SetupSpec { name: string; label: string; wDeg: number; hDeg: number; }
+/** Resolved angular size + labels for a gear setup. `wDeg`/`hDeg` are the native
+ * (single-frame) FOV. For a smart telescope, `mosaic` holds the single-frame
+ * resize envelope (null when the scope has no mosaic mode); `smart` flags any
+ * smart scope so a non-mosaic one can be made non-resizable. */
+interface SetupSpec { name: string; label: string; wDeg: number; hDeg: number; smart: boolean; mosaic: SmartMosaicEnvelope | null; }
 
 type FrameAnchor =
   | { kind: 'screen'; nx: number; ny: number }
   | { kind: 'sky'; ra: number; dec: number; dsoId: string | null };
 
 /** An ad-hoc (not plan-derived) frame instance, persisted to localStorage. */
-interface AdhocFrame {
+export interface AdhocFrame {
   id: string;
   setupId: string;
   anchor: FrameAnchor;
   /** Meaning depends on anchor: floating → screen rotation (deg); pinned → PA (°E of N). */
   rotationDeg: number;
+  /** Smart-scope single-frame mosaic size (deg); absent ⇒ render at native FOV. */
+  mosaicWDeg?: number | null;
+  mosaicHDeg?: number | null;
 }
 
 const STORE_KEY = 'fov-frames-v1';
@@ -30,6 +38,7 @@ const SELECTION_KEY = 'fov-frame-selection-v1';
 const ANCHOR_SNAP_KEY = 'fov-anchor-snap-v1';
 const PLAN_FLOATING_KEY = 'fov-plan-floating-v1';
 const HIDDEN_KEY = 'fov-frame-hidden-v1';
+const FRAMES_VISIBLE_KEY = 'fov-frames-visible-v1';
 
 /** Transient screen-anchored state for a plan frame that's been unpinned. */
 interface PlanFloating { nx: number; ny: number; rotationDeg: number; }
@@ -39,6 +48,12 @@ export type FovSelection = { kind: 'free' } | { kind: 'plan'; planId: string };
 
 function genId(): string {
   return `adhoc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** A resized smart-scope frame that's shrunk back to (within 1% of) its native
+ * FOV is treated as un-resized, so the stored override is cleared. */
+function isNearNativeFov(wDeg: number, hDeg: number, nativeWDeg: number, nativeHDeg: number): boolean {
+  return wDeg <= nativeWDeg * 1.01 && hDeg <= nativeHDeg * 1.01;
 }
 
 function loadAdhoc(): AdhocFrame[] {
@@ -96,6 +111,15 @@ function loadHidden(): Record<string, boolean> {
   return {};
 }
 
+/** Global master toggle for drawing frames on the map (defaults to visible). */
+function loadFramesVisible(): boolean {
+  try {
+    return localStorage.getItem(FRAMES_VISIBLE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Source of truth for interactive FOV frames on the sky map. Plan-derived frames
  * are reactive projections of the plans store (one pinned frame per entry of any
@@ -107,7 +131,15 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
 
   const adhoc = ref<AdhocFrame[]>(loadAdhoc());
   const activeId = ref<string | null>(null);
+  // The selected mosaic (group), mutually exclusive with a single active frame.
+  const activeMosaicId = ref<string | null>(null);
+  // Mosaics temporarily unpinned to floating (transient screen state, keyed by
+  // mosaic id) — pin/float works just like a single frame. While floating the
+  // outline is screen-anchored and the tiles are hidden until it's re-pinned.
+  const mosaicFloating = ref<Record<string, PlanFloating>>({});
   const specs = ref<Map<string, SetupSpec>>(new Map());
+  // Per-mosaic debounce timers so a group drag coalesces into one persist.
+  const mosaicWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const selection = ref<FovSelection>(loadSelection());
   // Per-frame "snap to nearest DSO when pinning" toggle (id → on/off), persisted.
   const anchorSnap = ref<Record<string, boolean>>(loadAnchorSnap());
@@ -115,6 +147,19 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
   const planFloating = ref<Record<string, PlanFloating>>(loadPlanFloating());
   // Ad-hoc (free) frames hidden from the map (id → true), persisted.
   const adhocHidden = ref<Record<string, boolean>>(loadHidden());
+  // Global master toggle: when false, no frames are drawn on the map (selection
+  // is preserved so toggling back on restores everything). Persisted.
+  const framesVisible = ref<boolean>(loadFramesVisible());
+  // Set to ask the (Vue-owned) frame-manager popup to open — used when jumping to
+  // the sky map from the Targets & Plans tab. FOVRibbon lives only while the sky
+  // map is shown, so it consumes this flag on mount (and via a watcher when it's
+  // already mounted) rather than reacting to a transient event.
+  const pendingPopupOpen = ref(false);
+
+  /** Ask the frame-manager popup to open (consumed by FOVRibbon). */
+  function requestPopupOpen(): void {
+    pendingPopupOpen.value = true;
+  }
 
   function persist(): void {
     try {
@@ -156,6 +201,26 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     }
   }
 
+  function persistFramesVisible(): void {
+    try {
+      localStorage.setItem(FRAMES_VISIBLE_KEY, JSON.stringify(framesVisible.value));
+    } catch (err) {
+      reportUnknownRendererError('fov_frames_persist_visible', err);
+    }
+  }
+
+  /** Show/hide all frames on the map at once (global master toggle). */
+  function setFramesVisible(v: boolean): void {
+    framesVisible.value = v;
+    // Hidden frames can't be selected or edited, so drop the active selection.
+    if (!v) activeId.value = null;
+    persistFramesVisible();
+  }
+
+  function toggleFramesVisible(): void {
+    setFramesVisible(!framesVisible.value);
+  }
+
   /** Whether a free frame is shown on the map (defaults to visible). */
   function isAdhocVisible(id: string): boolean {
     return !adhocHidden.value[id];
@@ -186,6 +251,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
   function setSelection(s: FovSelection): void {
     selection.value = s;
     activeId.value = null;
+    activeMosaicId.value = null;
     persistSelection();
   }
 
@@ -213,7 +279,8 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
         if (!tel || !cam) continue;
         const preset = buildGearPreset(tel, cam, acc);
         const { wDeg, hDeg } = fovDeg(preset);
-        m.set(s.id, { name: s.name, label: formatSetupCanvasLabel(s.name, wDeg, hDeg), wDeg, hDeg });
+        const mosaic = smartMosaicEnvelope(tel.mosaic, wDeg, hDeg);
+        m.set(s.id, { name: s.name, label: formatSetupCanvasLabel(s.name, wDeg, hDeg), wDeg, hDeg, smart: tel.is_smart_telescope, mosaic });
       }
       specs.value = m;
     } catch (err) {
@@ -237,9 +304,59 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       const spec = specs.value.get(plan.setupId);
       if (!spec) return out;
 
-      // Resolve each entry to a frame centre, then order them exactly like the
-      // "Targets & Plan" tab (transit time, earliest culmination first).
-      const placeable = plan.entries
+      // Smart-scope single-frame mosaic context for this plan's setup: the resize
+      // envelope (clamps the drag) and the native FOV (the floor / clear point).
+      const smartMosaic = spec.mosaic ? { env: spec.mosaic, nativeWDeg: spec.wDeg, nativeHDeg: spec.hDeg } : null;
+      // A smart scope with no mosaic mode (Unistellar, Origin) can't be resized;
+      // everything else can (normal scope → tile mosaic, smart scope → enlarge).
+      const frameResizable = spec.mosaic != null ? true : !spec.smart;
+      // A smart-scope frame that's already been enlarged carries an explicit size.
+      const frameSize = (e: { mosaicWDeg: number | null; mosaicHDeg: number | null }) =>
+        e.mosaicWDeg != null && e.mosaicHDeg != null
+          ? { wDeg: e.mosaicWDeg, hDeg: e.mosaicHDeg }
+          : { wDeg: spec.wDeg, hDeg: spec.hDeg };
+
+      // Standalone frames (one per target) and mosaic tiles render differently:
+      // standalone frames are individually movable; mosaic tiles render as a
+      // read-only group (Phase 1) tagged with their mosaic id.
+      const standalone = plan.entries.filter(e => !e.mosaicId);
+      const tiles = plan.entries.filter(e => e.mosaicId);
+
+      // Pre-compute which mosaic tiles are border tiles (have at least one free
+      // cardinal neighbor). Inner tiles surrounded on all 4 sides are not deletable.
+      const borderTileIds = new Set<string>();
+      for (const mosaic of plan.mosaics ?? []) {
+        const { stepW, stepH } = mosaicStep(spec, mosaic.overlapPct);
+        const mosaicEntries = tiles.filter(e => e.mosaicId === mosaic.id && e.ra != null && e.dec != null);
+        const center = { ra: mosaic.centerRa, dec: mosaic.centerDec };
+        // Key grid cells relative to a present tile, not the mosaic centre: an
+        // even-sized grid sits half a step off the centre, so rounding gx/stepW
+        // lands on .5 boundaries where gnomonic distortion flips Math.round
+        // inconsistently and collapses distinct tiles onto the same cell. Inter-
+        // tile offsets are whole-step multiples and round cleanly (same trick as
+        // mosaicShapeFromOffsets / addCandidateOffsets).
+        const offsets = mosaicEntries.map(e => ({ id: e.id, ...skyToFrameOffset(center, mosaic.paDeg, e.ra!, e.dec!) }));
+        if (offsets.length === 0) continue;
+        const ref = offsets[0];
+        const gridPositions = offsets.map(o => ({
+          id: o.id,
+          col: stepW > 0 ? Math.round((o.gx - ref.gx) / stepW) : 0,
+          row: stepH > 0 ? Math.round((ref.gy - o.gy) / stepH) : 0,
+        }));
+        const occupied = new Set(gridPositions.map(p => `${p.col},${p.row}`));
+        for (const p of gridPositions) {
+          const inner =
+            occupied.has(`${p.col - 1},${p.row}`) &&
+            occupied.has(`${p.col + 1},${p.row}`) &&
+            occupied.has(`${p.col},${p.row - 1}`) &&
+            occupied.has(`${p.col},${p.row + 1}`);
+          if (!inner) borderTileIds.add(p.id);
+        }
+      }
+
+      // Resolve each standalone entry to a frame centre, then order them exactly
+      // like the "Targets & Plan" tab (transit time, earliest culmination first).
+      const placeable = standalone
         .map(entry => {
           const dso = entry.dsoId ? getDSOById(entry.dsoId) : undefined;
           const ra = entry.ra ?? dso?.ra;
@@ -253,9 +370,11 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
 
       for (const { entry, dso, ra, dec } of placeable) {
         const id = `plan:${plan.id}:${entry.id}`;
+        const size = frameSize(entry);
         const base = {
-          id, name: spec.name, label: spec.label, wDeg: spec.wDeg, hDeg: spec.hDeg,
-          active: id === activeId.value, movable: true, pinnable: true,
+          id, name: spec.name, label: formatSetupCanvasLabel(spec.name, size.wDeg, size.hDeg), wDeg: size.wDeg, hDeg: size.hDeg,
+          active: id === activeId.value, movable: true, pinnable: true, resizable: frameResizable,
+          smartMosaic,
           derivesTargetFromContent: true, dsoId: entry.dsoId ?? null,
           anchorLabel: dso ? (dso.displayName ?? dso.id) : null,
           anchorSnap: isAnchorSnapOn(id),
@@ -267,15 +386,67 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
           out.push({ ...base, anchorKind: 'sky', ra, dec, paDeg: entry.paDeg });
         }
       }
+
+      // Each mosaic renders as faint read-only tiles plus one selectable,
+      // movable/rotatable/resizable outline frame (sized to enclose the grid) —
+      // so a mosaic behaves like a single frame. Interactions on the outline are
+      // routed to mosaic ops by its `mosaic:` id.
+      for (const entry of tiles) {
+        if (entry.ra == null || entry.dec == null) continue;
+        if (mosaicFloating.value[entry.mosaicId!]) continue; // hidden while its mosaic floats
+        out.push({
+          id: `plan:${plan.id}:${entry.id}`,
+          name: spec.name, label: spec.label, wDeg: spec.wDeg, hDeg: spec.hDeg,
+          active: false, movable: false, pinnable: false, derivesTargetFromContent: false,
+          anchorKind: 'sky', ra: entry.ra, dec: entry.dec, paDeg: entry.paDeg,
+          mosaicId: entry.mosaicId,
+          mosaicIsBorderTile: borderTileIds.has(entry.id),
+        });
+      }
+      for (const mosaic of plan.mosaics ?? []) {
+        const id = `mosaic:${plan.id}:${mosaic.id}`;
+        const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
+        const f = 1 - mosaic.overlapPct / 100;
+        const wDeg = (mosaic.cols - 1) * spec.wDeg * f + spec.wDeg;
+        const hDeg = (mosaic.rows - 1) * spec.hDeg * f + spec.hDeg;
+        // A mosaic is a frame: movable, pinnable, rotatable, resizable. Its outline
+        // encloses the grid; interactions route to mosaic ops by id.
+        // A user-supplied name wins (multi-DSO mosaics have no single DSO to name
+        // them); otherwise fall back to the DSO's name, then the gear spec.
+        const mosaicName = mosaic.name ?? (dso ? (dso.displayName ?? dso.id) : null);
+        const base = {
+          id, name: mosaicName ?? spec.name,
+          label: spec.label, wDeg, hDeg,
+          active: mosaic.id === activeMosaicId.value,
+          movable: true, pinnable: true, isMosaicOutline: true,
+          // A multi-DSO/free mosaic (no single dsoId) has nothing to snap to, so
+          // the anchor reads as off; a single-target mosaic keeps the toggle.
+          derivesTargetFromContent: true, anchorSnap: !!mosaic.dsoId && isAnchorSnapOn(id),
+          dsoId: mosaic.dsoId, anchorLabel: mosaicName,
+        };
+        const floating = mosaicFloating.value[mosaic.id];
+        if (floating) {
+          out.push({ ...base, resizable: false, anchorKind: 'screen', nx: floating.nx, ny: floating.ny, screenRotationDeg: floating.rotationDeg });
+        } else {
+          out.push({ ...base, resizable: true, anchorKind: 'sky', ra: mosaic.centerRa, dec: mosaic.centerDec, paDeg: mosaic.paDeg });
+        }
+      }
       return out;
     }
 
     for (const f of adhoc.value) {
       const spec = specs.value.get(f.setupId);
       if (!spec) continue;
+      // Free frames don't tile, so only a smart scope with a mosaic envelope is
+      // resizable (the single frame enlarges within its bounds).
+      const smartMosaic = spec.mosaic ? { env: spec.mosaic, nativeWDeg: spec.wDeg, nativeHDeg: spec.hDeg } : null;
+      const size = f.mosaicWDeg != null && f.mosaicHDeg != null
+        ? { wDeg: f.mosaicWDeg, hDeg: f.mosaicHDeg }
+        : { wDeg: spec.wDeg, hDeg: spec.hDeg };
       const base = {
-        id: f.id, name: spec.name, label: spec.label, wDeg: spec.wDeg, hDeg: spec.hDeg,
+        id: f.id, name: spec.name, label: formatSetupCanvasLabel(spec.name, size.wDeg, size.hDeg), wDeg: size.wDeg, hDeg: size.hDeg,
         active: f.id === activeId.value, movable: true, pinnable: true,
+        resizable: spec.mosaic != null, smartMosaic,
         anchorSnap: isAnchorSnapOn(f.id), visible: isAdhocVisible(f.id),
       };
       if (f.anchor.kind === 'sky') {
@@ -293,7 +464,304 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
   });
 
   function setActive(id: string | null): void {
+    // A mosaic outline frame routes selection to the mosaic, not a single frame.
+    if (id && id.startsWith('mosaic:')) { setActiveMosaic(id.split(':')[2] ?? null); return; }
     activeId.value = id;
+    activeMosaicId.value = null; // a single frame and a mosaic can't both be selected
+  }
+
+  /** Select a mosaic (or clear with null). Deselects any single frame. */
+  function setActiveMosaic(id: string | null): void {
+    activeMosaicId.value = id;
+    if (id) activeId.value = null;
+  }
+
+  /**
+   * Set a mosaic's tile list: optimistic local update (so the map follows a drag
+   * live) + debounce-persist of the explicit tiles, mirroring the per-entry drag
+   * coalescing. Callers compute the desired tiles (full grid, moved set, trimmed
+   * set, …) — this is the single write path so non-rectangular sets are supported.
+   */
+  function persistMosaicTiles(planId: string, mosaicId: string, tiles: Array<{ ra: number; dec: number; paDeg: number | null }>): void {
+    const plan = plansStore.plans.find(p => p.id === planId);
+    const mosaic = plan?.mosaics.find(m => m.id === mosaicId);
+    if (!plan || !mosaic) return;
+    const others = plan.entries.filter(e => e.mosaicId !== mosaicId);
+    plan.entries = [
+      ...others,
+      ...tiles.map((t, i) => ({
+        id: `tile-${mosaicId}-l${i}`, dsoId: mosaic.dsoId, position: i,
+        paDeg: t.paDeg, ra: t.ra, dec: t.dec, notes: null, mosaicId,
+        mosaicWDeg: null, mosaicHDeg: null,
+      })),
+    ];
+    const prev = mosaicWriteTimers.get(mosaicId);
+    if (prev) clearTimeout(prev);
+    mosaicWriteTimers.set(mosaicId, setTimeout(() => {
+      mosaicWriteTimers.delete(mosaicId);
+      updatePlanMosaicAPI(planId, mosaicId, {
+        dsoId: mosaic.dsoId, centerRa: mosaic.centerRa, centerDec: mosaic.centerDec,
+        paDeg: mosaic.paDeg, overlapPct: mosaic.overlapPct, cols: mosaic.cols, rows: mosaic.rows,
+        tiles: tiles.map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg })),
+      }).catch(err => reportUnknownRendererError('plan_transform_mosaic_failed', err, { mosaicId }));
+    }, 250));
+  }
+
+  /** Frame-local offset of each current tile of a mosaic (about its centre/PA). */
+  function mosaicTileOffsets(plan: { entries: Array<{ mosaicId?: string | null; ra: number | null; dec: number | null }> }, mosaic: { id: string; centerRa: number; centerDec: number; paDeg: number }): Array<{ gx: number; gy: number }> {
+    return plan.entries
+      .filter(e => e.mosaicId === mosaic.id && e.ra != null && e.dec != null)
+      .map(e => skyToFrameOffset({ ra: mosaic.centerRa, dec: mosaic.centerDec }, mosaic.paDeg, e.ra!, e.dec!));
+  }
+
+  /**
+   * Move/rotate/retarget a whole mosaic (the outline frame drag routes here).
+   * Preserves the existing tile *set* (each tile keeps its frame-local offset, so
+   * a trimmed/non-rectangular mosaic survives a move or rotation) — unlike a
+   * resize, which regrids to a full rectangle.
+   */
+  function transformMosaic(mosaicId: string, fields: { centerRa?: number; centerDec?: number; paDeg?: number; dsoId?: string | null }): void {
+    const plan = plansStore.plans.find(p => p.mosaics?.some(m => m.id === mosaicId));
+    const mosaic = plan?.mosaics.find(m => m.id === mosaicId);
+    if (!plan || !mosaic) return;
+    const offsets = mosaicTileOffsets(plan, mosaic); // derived from the *old* centre/PA
+    if (fields.centerRa != null) mosaic.centerRa = fields.centerRa;
+    if (fields.centerDec != null) mosaic.centerDec = fields.centerDec;
+    if (fields.paDeg != null) mosaic.paDeg = fields.paDeg;
+    if (fields.dsoId !== undefined) mosaic.dsoId = fields.dsoId;
+    const center = { ra: mosaic.centerRa, dec: mosaic.centerDec };
+    const tiles = offsets.map(o => {
+      const p = framePointToSky(center, mosaic.paDeg, o.gx, o.gy);
+      return { ra: p.ra, dec: p.dec, paDeg: mosaic.paDeg };
+    });
+    persistMosaicTiles(plan.id, mosaicId, tiles);
+  }
+
+  /** Re-tile a mosaic to a new region (the outline frame's corner-resize drag).
+   * This regrids to a full rectangle (resets any per-tile trimming). */
+  function resizeMosaic(mosaicId: string, region: FovFrameResizeRegion): void {
+    const plan = plansStore.plans.find(p => p.mosaics?.some(m => m.id === mosaicId));
+    const mosaic = plan?.mosaics.find(m => m.id === mosaicId);
+    const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
+    if (!plan || !mosaic || !spec) return;
+    const { cols, rows } = planGrid(spec.wDeg, spec.hDeg, region.wDeg, region.hDeg, mosaic.overlapPct);
+    mosaic.cols = Math.max(1, cols);
+    mosaic.rows = Math.max(1, rows);
+    mosaic.centerRa = region.centerRa;
+    mosaic.centerDec = region.centerDec;
+    mosaic.paDeg = region.paDeg;
+    const tiles = tileCenters(
+      { ra: mosaic.centerRa, dec: mosaic.centerDec }, mosaic.paDeg,
+      mosaic.cols, mosaic.rows, spec.wDeg, spec.hDeg, mosaic.overlapPct,
+    ).map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg }));
+    persistMosaicTiles(plan.id, mosaicId, tiles);
+  }
+
+  /** Frame-local step (degrees) between adjacent tiles of a mosaic. */
+  function mosaicStep(spec: SetupSpec, overlapPct: number): { stepW: number; stepH: number } {
+    const f = 1 - overlapPct / 100;
+    return { stepW: spec.wDeg * f, stepH: spec.hDeg * f };
+  }
+
+  /**
+   * Recompute a mosaic's outline centre/scale after its tile set changed (add /
+   * remove / trim) and return the tiles to persist. Mutates `mosaic`'s
+   * `centerRa`/`centerDec`/`cols`/`rows`.
+   *
+   * Default (anchor off, or no target DSO): keep the tiles where they are and
+   * move the centre to the tiles' bounding-box centre, so the outline stays
+   * aligned with them.
+   *
+   * Anchor on + target DSO: re-anchor — translate the whole tile set so the
+   * bounding-box centre lands back on the target DSO, keeping the object centred
+   * in the mosaic (the outline still encloses the tiles symmetrically).
+   */
+  function recenterMosaicTiles(
+    planId: string,
+    mosaic: { id: string; centerRa: number; centerDec: number; paDeg: number; dsoId: string | null; cols: number; rows: number },
+    tiles: Array<{ ra: number; dec: number; paDeg: number | null }>,
+    stepW: number,
+    stepH: number,
+  ): Array<{ ra: number; dec: number; paDeg: number | null }> {
+    const oldCenter = { ra: mosaic.centerRa, dec: mosaic.centerDec };
+    const oldPa = mosaic.paDeg;
+    const offsets = tiles.map(t => skyToFrameOffset(oldCenter, oldPa, t.ra, t.dec));
+    const shape = mosaicShapeFromOffsets(offsets, stepW, stepH);
+    const anchorOn = isAnchorSnapOn(`mosaic:${planId}:${mosaic.id}`);
+    const dso = anchorOn && mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
+    let newCenter: { ra: number; dec: number };
+    let newTiles = tiles;
+    if (dso) {
+      newCenter = { ra: dso.ra, dec: dso.dec };
+      newTiles = offsets.map((o, i) => {
+        const p = framePointToSky(newCenter, oldPa, o.gx - shape.centerGx, o.gy - shape.centerGy);
+        return { ra: p.ra, dec: p.dec, paDeg: tiles[i].paDeg };
+      });
+    } else {
+      newCenter = framePointToSky(oldCenter, oldPa, shape.centerGx, shape.centerGy);
+    }
+    mosaic.centerRa = newCenter.ra;
+    mosaic.centerDec = newCenter.dec;
+    mosaic.cols = shape.cols;
+    mosaic.rows = shape.rows;
+    return newTiles;
+  }
+
+  /**
+   * Sky positions where a tile can be added to the selected mosaic — the empty
+   * cells around its current tiles. The sky map renders a "+" at each and calls
+   * {@link addMosaicTile} when one is clicked. Empty while floating.
+   */
+  const activeMosaicAddCandidates = computed<Array<{ ra: number; dec: number }>>(() => {
+    const mid = activeMosaicId.value;
+    if (!mid || mosaicFloating.value[mid]) return [];
+    const plan = plansStore.plans.find(p => p.mosaics?.some(m => m.id === mid));
+    const mosaic = plan?.mosaics.find(m => m.id === mid);
+    const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
+    if (!plan || !mosaic || !spec) return [];
+    const center = { ra: mosaic.centerRa, dec: mosaic.centerDec };
+    const offsets = plan.entries
+      .filter(e => e.mosaicId === mid && e.ra != null && e.dec != null)
+      .map(e => skyToFrameOffset(center, mosaic.paDeg, e.ra!, e.dec!));
+    const { stepW, stepH } = mosaicStep(spec, mosaic.overlapPct);
+    return addCandidateOffsets(offsets, stepW, stepH).map(c => framePointToSky(center, mosaic.paDeg, c.gx, c.gy));
+  });
+
+  /** Add a tile to the selected mosaic at the given sky position (a "+" spot),
+   * then recentre + regrid the bounding box and persist. */
+  function addMosaicTile(ra: number, dec: number): void {
+    const mid = activeMosaicId.value;
+    const plan = mid ? plansStore.plans.find(p => p.mosaics?.some(m => m.id === mid)) : undefined;
+    const mosaic = plan?.mosaics.find(m => m.id === mid);
+    const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
+    if (!mid || !plan || !mosaic || !spec) return;
+    const tiles = plan.entries
+      .filter(e => e.mosaicId === mid && e.ra != null && e.dec != null)
+      .map(e => ({ ra: e.ra!, dec: e.dec!, paDeg: e.paDeg }));
+    tiles.push({ ra, dec, paDeg: mosaic.paDeg });
+    const { stepW, stepH } = mosaicStep(spec, mosaic.overlapPct);
+    const newTiles = recenterMosaicTiles(plan.id, mosaic, tiles, stepW, stepH);
+    persistMosaicTiles(plan.id, mid, newTiles);
+  }
+
+  /**
+   * Remove a single tile from its mosaic (per-tile editing → non-rectangular
+   * mosaics). `tileId` is the tile's renderable id (`plan:<plan>:<entry>`).
+   * Removing the last tile deletes the mosaic. The bounding `cols`/`rows` are
+   * recomputed so the displayed scale stays correct.
+   */
+  function removeMosaicTile(tileId: string): void {
+    const [, planId, entryId] = tileId.split(':');
+    const plan = plansStore.plans.find(p => p.id === planId);
+    const entry = plan?.entries.find(e => e.id === entryId);
+    const mosaicId = entry?.mosaicId ?? undefined;
+    const mosaic = mosaicId ? plan?.mosaics.find(m => m.id === mosaicId) : undefined;
+    const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
+    if (!plan || !entry || !mosaic || !spec) return;
+    const remaining = plan.entries.filter(e => e.mosaicId === mosaic.id && e.id !== entryId && e.ra != null && e.dec != null);
+    if (remaining.length === 0) { plansStore.deleteMosaic(planId, mosaic.id); return; }
+    const { stepW, stepH } = mosaicStep(spec, mosaic.overlapPct);
+    // Recentre the mosaic on the remaining tiles so the (now smaller) outline
+    // stays aligned with them — trimming a whole edge must not shift the outline.
+    // With the anchor on, re-anchor onto the target DSO instead (see helper).
+    const newTiles = recenterMosaicTiles(
+      planId, mosaic, remaining.map(e => ({ ra: e.ra!, dec: e.dec!, paDeg: e.paDeg })), stepW, stepH,
+    );
+    persistMosaicTiles(planId, mosaic.id, newTiles);
+  }
+
+  /** Sky centre of a plan entry (explicit frame centre, else its DSO position). */
+  function entryCenter(e: { ra: number | null; dec: number | null; dsoId: string | null }): { ra: number; dec: number } | null {
+    if (e.ra != null && e.dec != null) return { ra: e.ra, dec: e.dec };
+    const dso = e.dsoId ? getDSOById(e.dsoId) : undefined;
+    return dso ? { ra: dso.ra, dec: dso.dec } : null;
+  }
+
+  /**
+   * Merge gesture (sky map detects a frame dropped onto another frame/mosaic of
+   * the same plan): absorb the dragged standalone frame into the target. Into a
+   * mosaic → add it as a tile (snapped to the grid); onto another frame → create
+   * a new two-tile mosaic. The absorbed frame(s) are deleted.
+   */
+  async function mergeOnDrop(movedFrameId: string, targetId: string): Promise<void> {
+    if (!movedFrameId.startsWith('plan:')) return;
+    // Smart scopes don't tile, so dropping one frame on another must not build a
+    // tile mosaic — skip the merge entirely for a smart-scope plan.
+    const planId = movedFrameId.split(':')[1];
+    const setupId = plansStore.plans.find(p => p.id === planId)?.setupId;
+    if (setupId && specs.value.get(setupId)?.smart) return;
+    if (targetId.startsWith('mosaic:')) await mergeFrameIntoMosaic(movedFrameId, targetId.split(':')[2]);
+    else if (targetId.startsWith('plan:')) await mergeFramesIntoNewMosaic(movedFrameId, targetId);
+  }
+
+  async function mergeFrameIntoMosaic(frameId: string, mosaicId: string): Promise<void> {
+    const [, planId, entryId] = frameId.split(':');
+    const plan = plansStore.plans.find(p => p.id === planId);
+    const mosaic = plan?.mosaics.find(m => m.id === mosaicId);
+    const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
+    const frame = plan?.entries.find(e => e.id === entryId);
+    if (!plan || !mosaic || !spec || !frame) return;
+    const fc = entryCenter(frame);
+    const tiles = plan.entries
+      .filter(e => e.mosaicId === mosaicId && e.ra != null && e.dec != null)
+      .map(e => ({ ra: e.ra!, dec: e.dec!, paDeg: e.paDeg }));
+    if (!fc || tiles.length === 0) return;
+    const center = { ra: mosaic.centerRa, dec: mosaic.centerDec };
+    const { stepW, stepH } = mosaicStep(spec, mosaic.overlapPct);
+    // Snap the dropped frame to the nearest grid cell (aligned to a present tile).
+    const ref = skyToFrameOffset(center, mosaic.paDeg, tiles[0].ra, tiles[0].dec);
+    const fOff = skyToFrameOffset(center, mosaic.paDeg, fc.ra, fc.dec);
+    const snapGx = ref.gx + Math.round((fOff.gx - ref.gx) / stepW) * stepW;
+    const snapGy = ref.gy + Math.round((fOff.gy - ref.gy) / stepH) * stepH;
+    const occupied = tiles.some(t => {
+      const o = skyToFrameOffset(center, mosaic.paDeg, t.ra, t.dec);
+      return Math.abs(o.gx - snapGx) < stepW * 0.5 && Math.abs(o.gy - snapGy) < stepH * 0.5;
+    });
+    const newTiles = [...tiles];
+    if (!occupied) {
+      const p = framePointToSky(center, mosaic.paDeg, snapGx, snapGy);
+      newTiles.push({ ra: p.ra, dec: p.dec, paDeg: mosaic.paDeg });
+    }
+    const shape = mosaicShapeFromOffsets(newTiles.map(t => skyToFrameOffset(center, mosaic.paDeg, t.ra, t.dec)), stepW, stepH);
+    const nc = framePointToSky(center, mosaic.paDeg, shape.centerGx, shape.centerGy);
+    activeId.value = null;
+    await plansStore.updateMosaic(planId, mosaicId, {
+      dsoId: mosaic.dsoId, centerRa: nc.ra, centerDec: nc.dec, paDeg: mosaic.paDeg,
+      overlapPct: mosaic.overlapPct, cols: shape.cols, rows: shape.rows,
+      tiles: newTiles, replaceEntryIds: [entryId],
+    });
+  }
+
+  async function mergeFramesIntoNewMosaic(movedFrameId: string, targetFrameId: string): Promise<void> {
+    const [, planId, movedEntry] = movedFrameId.split(':');
+    const targetEntry = targetFrameId.split(':')[2];
+    const plan = plansStore.plans.find(p => p.id === planId);
+    const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
+    const moved = plan?.entries.find(e => e.id === movedEntry);
+    const target = plan?.entries.find(e => e.id === targetEntry);
+    if (!plan || !spec || !moved || !target) return;
+    const gc = entryCenter(target);
+    const fc = entryCenter(moved);
+    if (!gc || !fc) return;
+    const pa = target.paDeg ?? 0;
+    const overlapPct = 20;
+    const { stepW, stepH } = mosaicStep(spec, overlapPct);
+    // Snap the dropped frame to the cardinal neighbour of the target it leans toward.
+    const fOff = skyToFrameOffset(gc, pa, fc.ra, fc.dec);
+    let sgx = 0, sgy = 0;
+    if (Math.abs(fOff.gx) >= Math.abs(fOff.gy)) sgx = fOff.gx >= 0 ? stepW : -stepW;
+    else sgy = fOff.gy >= 0 ? stepH : -stepH;
+    const positions = [gc, framePointToSky(gc, pa, sgx, sgy)];
+    const shape = mosaicShapeFromOffsets(positions.map(t => skyToFrameOffset(gc, pa, t.ra, t.dec)), stepW, stepH);
+    const nc = framePointToSky(gc, pa, shape.centerGx, shape.centerGy);
+    activeId.value = null;
+    const id = await plansStore.createMosaic(planId, {
+      dsoId: target.dsoId ?? moved.dsoId ?? null, centerRa: nc.ra, centerDec: nc.dec, paDeg: pa,
+      overlapPct, cols: shape.cols, rows: shape.rows,
+      tiles: positions.map(t => ({ ra: t.ra, dec: t.dec, paDeg: pa })),
+      replaceEntryIds: [movedEntry, targetEntry],
+    });
+    if (id) activeMosaicId.value = id;
   }
 
   /** Create a floating frame at viewport centre for the given setup, and select
@@ -304,6 +772,43 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     adhoc.value.push({ id, setupId, anchor: { kind: 'screen', nx: 0.5, ny: 0.5 }, rotationDeg: 0 });
     activeId.value = id;
     persist();
+  }
+
+  /**
+   * Create a free frame pinned to the sky at the given centre for the given setup,
+   * and select it. Switches to free mode. Used by "show on map" so the frame
+   * stays on the target while panning/zooming.
+   */
+  function addAdhocFrameAtSky(setupId: string, ra: number, dec: number, dsoId: string | null = null): void {
+    if (selection.value.kind !== 'free') { selection.value = { kind: 'free' }; persistSelection(); }
+    const id = genId();
+    adhoc.value.push({ id, setupId, anchor: { kind: 'sky', ra, dec, dsoId }, rotationDeg: 0 });
+    activeId.value = id;
+    persist();
+  }
+
+  /** Re-insert a previously removed ad-hoc frame (undo). Switches to free mode
+   * so the restored frame is visible, and re-selects it. */
+  function restoreAdhocFrame(frame: AdhocFrame): void {
+    if (selection.value.kind !== 'free') { selection.value = { kind: 'free' }; persistSelection(); }
+    if (adhoc.value.some(f => f.id === frame.id)) return;
+    adhoc.value.push(frame);
+    activeId.value = frame.id;
+    persist();
+  }
+
+  /**
+   * Create a custom-location frame in the given plan at the supplied sky centre,
+   * select it, and switch to that plan. The new entry has no target DSO, so it
+   * renders (and lists) as a "custom location" until moved onto an object.
+   */
+  async function addPlanFrame(planId: string, ra: number, dec: number): Promise<void> {
+    if (selection.value.kind !== 'plan' || selection.value.planId !== planId) {
+      selection.value = { kind: 'plan', planId };
+      persistSelection();
+    }
+    const entryId = await plansStore.addCustomEntry(planId, ra, dec);
+    if (entryId) activeId.value = `plan:${planId}:${entryId}`;
   }
 
   /** Remove an ad-hoc frame (plan frames are deleted via deletePlanFrame). */
@@ -327,6 +832,33 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
 
   /** Apply an interactive move/rotate/pin change emitted by the sky map. */
   function applyChange(id: string, change: FovFrameChange): void {
+    // A mosaic outline frame: route move/rotate/pin to the whole mosaic.
+    if (id.startsWith('mosaic:')) {
+      const mosaicId = id.split(':')[2];
+      // Unpinned to floating: hold transient screen state; tiles hide.
+      if (change.anchor && change.anchor.kind === 'screen') {
+        const cur = mosaicFloating.value[mosaicId];
+        mosaicFloating.value = { ...mosaicFloating.value, [mosaicId]: {
+          nx: change.anchor.nx, ny: change.anchor.ny,
+          rotationDeg: change.screenRotationDeg ?? cur?.rotationDeg ?? 0,
+        } };
+        return;
+      }
+      // Pinned to the sky: clear floating and re-tile at the new centre/target.
+      if (change.anchor && change.anchor.kind === 'sky') {
+        if (mosaicFloating.value[mosaicId]) { const next = { ...mosaicFloating.value }; delete next[mosaicId]; mosaicFloating.value = next; }
+        transformMosaic(mosaicId, { centerRa: change.anchor.ra, centerDec: change.anchor.dec, paDeg: change.paDeg, dsoId: change.anchor.dsoId });
+        return;
+      }
+      // Rotating while floating updates the transient rotation only.
+      if (change.screenRotationDeg !== undefined) {
+        const cur = mosaicFloating.value[mosaicId];
+        if (cur) mosaicFloating.value = { ...mosaicFloating.value, [mosaicId]: { ...cur, rotationDeg: change.screenRotationDeg } };
+        return;
+      }
+      if (change.paDeg !== undefined) transformMosaic(mosaicId, { paDeg: change.paDeg });
+      return;
+    }
     if (id.startsWith('plan:')) {
       const [, planId, entryId] = id.split(':');
       // Unpinned to floating: hold screen state transiently (not in the plan).
@@ -368,6 +900,65 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     if (change.paDeg !== undefined) f.rotationDeg = change.paDeg;
     if (change.screenRotationDeg !== undefined) f.rotationDeg = change.screenRotationDeg;
     persist();
+  }
+
+  /**
+   * Commit a drag-to-extend on a plan frame: tile the dragged region with the
+   * plan's gear FOV and replace the single frame with a mosaic. A drag too small
+   * to need more than one tile is ignored (the single frame is kept).
+   */
+  async function applyResize(id: string, region: FovFrameResizeRegion): Promise<void> {
+    // Resizing an existing mosaic outline re-tiles it to the new region.
+    if (id.startsWith('mosaic:')) { resizeMosaic(id.split(':')[2], region); return; }
+
+    // Free (ad-hoc) frame: only a smart scope resizes — the single frame enlarges
+    // within its envelope (no tiling). Size is stored on the frame; a resize back
+    // to ~native clears it so it renders at native FOV again.
+    const adhocFrame = adhoc.value.find(f => f.id === id);
+    if (adhocFrame) {
+      const spec = specs.value.get(adhocFrame.setupId);
+      if (!spec || !spec.mosaic) return;
+      const { wDeg, hDeg } = clampSmartMosaicSize(region.wDeg, region.hDeg, spec.wDeg, spec.hDeg, spec.mosaic);
+      const native = isNearNativeFov(wDeg, hDeg, spec.wDeg, spec.hDeg);
+      adhocFrame.mosaicWDeg = native ? null : wDeg;
+      adhocFrame.mosaicHDeg = native ? null : hDeg;
+      persist();
+      return;
+    }
+
+    if (!id.startsWith('plan:')) return;
+    const [, planId, entryId] = id.split(':');
+    const plan = plansStore.plans.find(p => p.id === planId);
+    if (!plan || !plan.setupId) return;
+    const spec = specs.value.get(plan.setupId);
+    if (!spec) return;
+
+    // Smart scope: resize the single frame within its envelope, keeping it centred
+    // on its target (only the size persists — no tile mosaic is created).
+    if (spec.mosaic) {
+      const { wDeg, hDeg } = clampSmartMosaicSize(region.wDeg, region.hDeg, spec.wDeg, spec.hDeg, spec.mosaic);
+      const native = isNearNativeFov(wDeg, hDeg, spec.wDeg, spec.hDeg);
+      plansStore.setEntryPosition(planId, entryId, {
+        mosaicWDeg: native ? null : wDeg,
+        mosaicHDeg: native ? null : hDeg,
+      });
+      return;
+    }
+
+    const overlapPct = 20;
+    const { cols, rows } = planGrid(spec.wDeg, spec.hDeg, region.wDeg, region.hDeg, overlapPct);
+    if (cols * rows <= 1) return; // not extended enough to be a mosaic
+    const tiles = tileCenters(
+      { ra: region.centerRa, dec: region.centerDec }, region.paDeg,
+      cols, rows, spec.wDeg, spec.hDeg, overlapPct,
+    ).map(tl => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
+    const dsoId = plan.entries.find(e => e.id === entryId)?.dsoId ?? null;
+    if (planFloating.value[id]) { delete planFloating.value[id]; persistPlanFloating(); }
+    activeId.value = null;
+    await plansStore.createMosaic(planId, {
+      dsoId, centerRa: region.centerRa, centerDec: region.centerDec, paDeg: region.paDeg,
+      overlapPct, cols, rows, tiles, replaceEntryIds: [entryId],
+    });
   }
 
   /** Nudge a frame's rotation by `deltaDeg` (PA for pinned/plan, screen rotation for floating). */
@@ -430,10 +1021,26 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     isAdhocVisible,
     setAdhocVisible,
     setAllAdhocVisible,
+    framesVisible,
+    setFramesVisible,
+    toggleFramesVisible,
     addAdhocFrame,
+    addAdhocFrameAtSky,
+    restoreAdhocFrame,
+    addPlanFrame,
     removeFrame,
     deletePlanFrame,
+    pendingPopupOpen,
+    requestPopupOpen,
     applyChange,
+    applyResize,
+    activeMosaicId,
+    setActiveMosaic,
+    transformMosaic,
+    removeMosaicTile,
+    activeMosaicAddCandidates,
+    addMosaicTile,
+    mergeOnDrop,
     nudgeRotation,
     resetRotation,
   };

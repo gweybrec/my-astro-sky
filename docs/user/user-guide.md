@@ -16,6 +16,7 @@ MyAstroSky overlays your astrophotographs onto an interactive sky map using auto
 - [Photo organization](#photo-organization)
 - [Gallery mode](#gallery-mode)
 - [Targets tab](#targets-tab)
+- [Observing plans](#observing-plans)
 - [Search](#search)
 - [Display settings](#display-settings)
 - [Desktop error logs](#desktop-error-logs)
@@ -173,6 +174,44 @@ A modal opens with a form:
 Once saved, the new item appears immediately at the bottom of the relevant dropdown and is selected automatically.
 
 Custom gear is stored on the server (in the app database) and persists across sessions. It can be exported together with your other data via **Settings → Export → Custom telescopes/cameras/accessories**.
+
+---
+
+## Observing plans
+
+Observing plans let you build a target list for a specific night, linked to a gear setup. Plans are accessible from the **Cibles & Plans / Targets** view via the **My plans** tab.
+
+### Creating a plan
+
+Click **+ New plan** in the My plans tab. A plan is named after the night by default (e.g. *Night of 2026-06-17*) and can be renamed at any time with the pencil icon.
+
+Each plan has two optional settings, editable from the plan header:
+
+- **Night** — the observation date used to compute transit times and altitude curves.
+- **Setup** — the gear setup (telescope + camera + accessory) used to size the FOV frames on the map.
+
+### Adding targets
+
+Targets can be added to a plan from two places:
+
+- **Suggestions tab** — click the bookmark icon on any recommendation card and choose a plan (or create a new one).
+- **Search results** — open a DSO info panel from the search box and use the same bookmark button.
+
+Each plan entry shows the object name, type, transit time, and a link to open it on the map.
+
+### Viewing a plan on the map
+
+When a plan has a gear setup configured, each entry is represented as a **FOV frame** on the sky map — a rectangle sized to the telescope/camera field of view, centered on the target. Frames are visible in the Map view and can be dragged, rotated, and pinned.
+
+Use the **Show on map / Hide from map** toggle in the plan header to show or hide all frames at once.
+
+### Reordering and removing entries
+
+Drag entries to reorder them within a plan. Click the × button on an entry to remove it from the plan (the DSO itself is not deleted).
+
+### Exporting a plan
+
+Click **Export as PDF** in the plan header to generate a printable observation sheet with the target list, transit times, and FOV sketches.
 
 ---
 

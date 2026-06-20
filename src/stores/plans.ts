@@ -8,11 +8,16 @@ import {
   deletePlanAPI,
   reorderPlansAPI,
   addPlanEntryAPI,
+  addCustomPlanEntryAPI,
   removePlanEntryAPI,
   reorderPlanEntriesAPI,
   updatePlanEntryPAAPI,
   updatePlanEntryPositionAPI,
+  createPlanMosaicAPI,
+  updatePlanMosaicAPI,
+  deletePlanMosaicAPI,
   type Plan,
+  type MosaicParams,
 } from '../api';
 import { reportUnknownRendererError } from '../error-reporter';
 
@@ -73,15 +78,15 @@ export const usePlansStore = defineStore('plans', () => {
   }
 
   /**
-   * Update a plan's observation night and/or gear setup. Mutates the local
-   * cache immediately (so the caller can re-render without a round-trip) then
-   * persists in the background.
+   * Update a plan's observation night, gear setup and/or observing location.
+   * Mutates the local cache immediately (so the caller can re-render without a
+   * round-trip) then persists in the background.
    */
-  async function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null): Promise<void> {
+  async function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): Promise<void> {
     const plan = plans.value.find(p => p.id === id);
-    if (plan) { plan.nightOf = nightOf; plan.setupId = setupId; }
+    if (plan) { plan.nightOf = nightOf; plan.setupId = setupId; plan.lat = lat; plan.lon = lon; }
     try {
-      await updatePlanSettingsAPI(id, nightOf, setupId);
+      await updatePlanSettingsAPI(id, nightOf, setupId, lat, lon);
     } catch (err) {
       reportUnknownRendererError('plan_update_settings_failed', err, { id });
     }
@@ -111,6 +116,21 @@ export const usePlansStore = defineStore('plans', () => {
       await load();
     } catch (err) {
       reportUnknownRendererError('plan_add_entry_failed', err, { planId, dsoId });
+    }
+  }
+
+  /**
+   * Add a custom-location entry (no DSO) framed on empty sky at the given centre.
+   * Returns the new entry id, or null on failure.
+   */
+  async function addCustomEntry(planId: string, ra: number, dec: number): Promise<string | null> {
+    try {
+      const { id } = await addCustomPlanEntryAPI(planId, ra, dec);
+      await load();
+      return id;
+    } catch (err) {
+      reportUnknownRendererError('plan_add_custom_entry_failed', err, { planId });
+      return null;
     }
   }
 
@@ -159,7 +179,7 @@ export const usePlansStore = defineStore('plans', () => {
   function setEntryPosition(
     planId: string,
     entryId: string,
-    fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+    fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
   ): void {
     const entry = plans.value.find(p => p.id === planId)?.entries.find(e => e.id === entryId);
     if (entry) {
@@ -167,6 +187,8 @@ export const usePlansStore = defineStore('plans', () => {
       if ('dec' in fields) entry.dec = fields.dec ?? null;
       if ('paDeg' in fields) entry.paDeg = fields.paDeg ?? null;
       if ('dsoId' in fields) entry.dsoId = fields.dsoId ?? null;
+      if ('mosaicWDeg' in fields) entry.mosaicWDeg = fields.mosaicWDeg ?? null;
+      if ('mosaicHDeg' in fields) entry.mosaicHDeg = fields.mosaicHDeg ?? null;
     }
     const prev = paWriteTimers.get(entryId);
     if (prev) clearTimeout(prev);
@@ -176,10 +198,44 @@ export const usePlansStore = defineStore('plans', () => {
       paWriteTimers.delete(entryId);
       const e = plans.value.find(p => p.id === planId)?.entries.find(x => x.id === entryId);
       if (!e) return;
-      updatePlanEntryPositionAPI(planId, entryId, { ra: e.ra, dec: e.dec, paDeg: e.paDeg, dsoId: e.dsoId }).catch(err => {
+      updatePlanEntryPositionAPI(planId, entryId, { ra: e.ra, dec: e.dec, paDeg: e.paDeg, dsoId: e.dsoId, mosaicWDeg: e.mosaicWDeg, mosaicHDeg: e.mosaicHDeg }).catch(err => {
         reportUnknownRendererError('plan_set_entry_position_failed', err, { planId, entryId });
       });
     }, 250));
+  }
+
+  /**
+   * Create a mosaic in a plan from client-computed tiles. Returns the new mosaic
+   * id, or null on failure. Refreshes the cache so the tiles appear.
+   */
+  async function createMosaic(planId: string, params: MosaicParams): Promise<string | null> {
+    try {
+      const { id } = await createPlanMosaicAPI(planId, params);
+      await load();
+      return id;
+    } catch (err) {
+      reportUnknownRendererError('plan_create_mosaic_failed', err, { planId });
+      return null;
+    }
+  }
+
+  /** Replace a mosaic's parameters and tile set (used when re-tiling/regenerating). */
+  async function updateMosaic(planId: string, mosaicId: string, params: MosaicParams): Promise<void> {
+    try {
+      await updatePlanMosaicAPI(planId, mosaicId, params);
+      await load();
+    } catch (err) {
+      reportUnknownRendererError('plan_update_mosaic_failed', err, { planId, mosaicId });
+    }
+  }
+
+  async function deleteMosaic(planId: string, mosaicId: string): Promise<void> {
+    try {
+      await deletePlanMosaicAPI(planId, mosaicId);
+      await load();
+    } catch (err) {
+      reportUnknownRendererError('plan_delete_mosaic_failed', err, { planId, mosaicId });
+    }
   }
 
   async function reorderEntries(planId: string, ids: string[]): Promise<void> {
@@ -206,10 +262,14 @@ export const usePlansStore = defineStore('plans', () => {
     deletePlan,
     reorderPlans,
     addEntry,
+    addCustomEntry,
     removeEntry,
     toggleEntry,
     reorderEntries,
     setEntryPA,
     setEntryPosition,
+    createMosaic,
+    updateMosaic,
+    deleteMosaic,
   };
 });

@@ -728,6 +728,52 @@ export interface PlanEntry {
   ra: number | null;
   dec: number | null;
   notes: string | null;
+  /** Mosaic this entry is a tile of, or null for a standalone frame. */
+  mosaicId: string | null;
+  /** Smart-scope single-frame mosaic size (deg); null ⇒ render at native FOV. */
+  mosaicWDeg: number | null;
+  mosaicHDeg: number | null;
+}
+
+/** A mosaic: a group of tile entries covering one target. Tiles are the plan
+ * entries whose `mosaicId` equals this id; this record holds the group params. */
+export interface PlanMosaic {
+  id: string;
+  dsoId: string | null;
+  /** User-supplied name; null on legacy mosaics (then derived from the DSO). */
+  name: string | null;
+  /** Mosaic centre (degrees). */
+  centerRa: number;
+  centerDec: number;
+  /** Group position angle (°E of N). */
+  paDeg: number;
+  /** Overlap percentage between adjacent tiles. */
+  overlapPct: number;
+  cols: number;
+  rows: number;
+  position: number;
+}
+
+/** Per-tile sky centre sent to the server when creating/updating a mosaic. */
+export interface MosaicTileInput {
+  ra: number;
+  dec: number;
+  paDeg: number | null;
+}
+
+export interface MosaicParams {
+  dsoId: string | null;
+  /** Omit to leave a stored name unchanged (background drags/transforms). */
+  name?: string;
+  centerRa: number;
+  centerDec: number;
+  paDeg: number;
+  overlapPct: number;
+  cols: number;
+  rows: number;
+  tiles: MosaicTileInput[];
+  /** Standalone plan entries this mosaic replaces — deleted when it is created. */
+  replaceEntryIds?: string[];
 }
 
 export interface Plan {
@@ -738,7 +784,12 @@ export interface Plan {
   nightOf: string | null;
   /** Gear setup id used for this plan's FOV/recipe, or null. */
   setupId: string | null;
+  /** Observing latitude (°N), or null to fall back to the global location. */
+  lat: number | null;
+  /** Observing longitude (°E), or null to fall back to the global location. */
+  lon: number | null;
   entries: PlanEntry[];
+  mosaics: PlanMosaic[];
 }
 
 export async function getPlans(): Promise<Plan[]> {
@@ -775,11 +826,11 @@ export async function renamePlanAPI(id: string, name: string): Promise<void> {
   }
 }
 
-export async function updatePlanSettingsAPI(id: string, nightOf: string | null, setupId: string | null): Promise<void> {
+export async function updatePlanSettingsAPI(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nightOf, setupId }),
+    body: JSON.stringify({ nightOf, setupId, lat, lon }),
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
@@ -820,11 +871,60 @@ export async function addPlanEntryAPI(planId: string, dsoId: string): Promise<{ 
   return res.json();
 }
 
+/** Add a custom-location entry (no DSO) framed on empty sky at the given centre. */
+export async function addCustomPlanEntryAPI(planId: string, ra: number, dec: number): Promise<{ id: string }> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ra, dec }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to add custom frame to plan');
+  }
+  return res.json();
+}
+
 export async function removePlanEntryAPI(planId: string, entryId: string): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to remove target from plan');
+  }
+}
+
+/** Create a mosaic in a plan from client-computed tiles. Returns the mosaic id. */
+export async function createPlanMosaicAPI(planId: string, params: MosaicParams): Promise<{ id: string }> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to create mosaic');
+  }
+  return res.json();
+}
+
+/** Replace a mosaic's parameters and tile set. */
+export async function updatePlanMosaicAPI(planId: string, mosaicId: string, params: MosaicParams): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update mosaic');
+  }
+}
+
+export async function deletePlanMosaicAPI(planId: string, mosaicId: string): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to delete mosaic');
   }
 }
 
@@ -860,7 +960,7 @@ export async function updatePlanEntryPAAPI(planId: string, entryId: string, paDe
 export async function updatePlanEntryPositionAPI(
   planId: string,
   entryId: string,
-  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null },
+  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
 ): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, {
     method: 'PATCH',

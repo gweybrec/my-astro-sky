@@ -3,22 +3,24 @@
 
     <!-- Appearance -->
     <div class="settings-section-label">{{ t('settings.appearanceSection') }}</div>
-    <div class="settings-field">
-      <label class="settings-field-label">{{ t('settings.languageLabel') }}</label>
-      <select class="settings-field-input" :value="currentLang" @change="onLangChange">
-        <option value="fr">Français</option>
-        <option value="en">English</option>
-        <option value="es">Español</option>
-        <option value="de">Deutsch</option>
-      </select>
-    </div>
-    <div class="settings-field">
-      <label class="settings-field-label">{{ t('settings.themeLabel') }}</label>
-      <select class="settings-field-input" v-model="selectedTheme" @change="onThemeChange">
-        <option value="cold-blue-v2">{{ t('settings.themeColdBlueV2') }}</option>
-        <option value="warm">{{ t('settings.themeWarm') }}</option>
-        <option value="cold-blue">{{ t('settings.themeColdBlue') }}</option>
-      </select>
+    <div class="settings-fields-row">
+      <div class="settings-field">
+        <label class="settings-field-label">{{ t('settings.languageLabel') }}</label>
+        <select class="settings-field-input" :value="currentLang" @change="onLangChange">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
+      <div class="settings-field">
+        <label class="settings-field-label">{{ t('settings.themeLabel') }}</label>
+        <select class="settings-field-input" v-model="selectedTheme" @change="onThemeChange">
+          <option value="cold-blue-v2">{{ t('settings.themeColdBlueV2') }}</option>
+          <option value="warm">{{ t('settings.themeWarm') }}</option>
+          <option value="cold-blue">{{ t('settings.themeColdBlue') }}</option>
+        </select>
+      </div>
     </div>
 
     <hr class="settings-separator">

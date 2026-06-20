@@ -1085,7 +1085,7 @@
     },
     "/api/plans/{id}": {
       "put": {
-        "summary": "Rename a night plan",
+        "summary": "Rename a night plan or update its settings (night/setup/location)",
         "parameters": [
           {
             "in": "path",
@@ -1103,12 +1103,25 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "name"
-                ],
                 "properties": {
                   "name": {
                     "type": "string"
+                  },
+                  "nightOf": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "setupId": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "lat": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "lon": {
+                    "type": "number",
+                    "nullable": true
                   }
                 }
               }
@@ -1218,7 +1231,7 @@
     },
     "/api/plans/{id}/entries": {
       "post": {
-        "summary": "Add a DSO target to a plan",
+        "summary": "Add a target to a plan (DSO or custom location)",
         "parameters": [
           {
             "in": "path",
@@ -1232,17 +1245,29 @@
         ],
         "requestBody": {
           "required": true,
+          "description": "Provide `dsoId` for a catalog target, or `ra`/`dec` for a custom-location frame on empty sky.",
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "dsoId"
-                ],
                 "properties": {
                   "dsoId": {
                     "type": "string",
-                    "description": "DSO catalog id"
+                    "description": "DSO catalog id (omit for a custom location)"
+                  },
+                  "ra": {
+                    "type": "number",
+                    "description": "Frame-centre right ascension (deg)",
+                    "required for a custom location": null
+                  },
+                  "dec": {
+                    "type": "number",
+                    "description": "Frame-centre declination (deg)",
+                    "required for a custom location": null
+                  },
+                  "paDeg": {
+                    "type": "number",
+                    "description": "Framing position angle (°E of N)"
                   }
                 }
               }
@@ -1266,7 +1291,7 @@
             }
           },
           "400": {
-            "description": "Missing dsoId",
+            "description": "Missing dsoId or ra/dec",
             "content": {
               "application/json": {
                 "schema": {
@@ -1503,6 +1528,16 @@
                     "type": "string",
                     "nullable": true,
                     "description": "Target DSO id, or null for a custom location"
+                  },
+                  "mosaicWDeg": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Smart-scope single-frame mosaic width in degrees, or null to render at native FOV"
+                  },
+                  "mosaicHDeg": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Smart-scope single-frame mosaic height in degrees, or null to render at native FOV"
                   }
                 }
               }
@@ -1554,6 +1589,260 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/mosaics": {
+      "post": {
+        "summary": "Create a mosaic (a group of tile frames covering one target)",
+        "description": "The client computes the tile centres from the gear FOV, overlap and region; the server persists the mosaic and its tiles as plan entries tagged with the new mosaic id.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Plan ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "centerRa",
+                  "centerDec",
+                  "tiles"
+                ],
+                "properties": {
+                  "dsoId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Target DSO id (null for a multi-DSO/free mosaic)"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "User-supplied mosaic name"
+                  },
+                  "centerRa": {
+                    "type": "number",
+                    "description": "Mosaic centre RA (deg)"
+                  },
+                  "centerDec": {
+                    "type": "number",
+                    "description": "Mosaic centre Dec (deg)"
+                  },
+                  "paDeg": {
+                    "type": "number",
+                    "description": "Mosaic position angle (°E of N)"
+                  },
+                  "overlapPct": {
+                    "type": "number",
+                    "description": "Overlap percentage between tiles"
+                  },
+                  "cols": {
+                    "type": "integer",
+                    "description": "Grid columns"
+                  },
+                  "rows": {
+                    "type": "integer",
+                    "description": "Grid rows"
+                  },
+                  "tiles": {
+                    "type": "array",
+                    "description": "Per-tile sky centres",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ra": {
+                          "type": "number"
+                        },
+                        "dec": {
+                          "type": "number"
+                        },
+                        "paDeg": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mosaic created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body"
+          },
+          "404": {
+            "description": "Plan not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/mosaics/{mosaicId}": {
+      "put": {
+        "summary": "Replace a mosaic's parameters and tile set",
+        "description": "Updates the mosaic row and replaces all of its tile entries with the supplied tiles.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Plan ID"
+          },
+          {
+            "in": "path",
+            "name": "mosaicId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Mosaic ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "centerRa",
+                  "centerDec",
+                  "tiles"
+                ],
+                "properties": {
+                  "dsoId": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "User-supplied mosaic name (omit to leave unchanged)"
+                  },
+                  "centerRa": {
+                    "type": "number"
+                  },
+                  "centerDec": {
+                    "type": "number"
+                  },
+                  "paDeg": {
+                    "type": "number"
+                  },
+                  "overlapPct": {
+                    "type": "number"
+                  },
+                  "cols": {
+                    "type": "integer"
+                  },
+                  "rows": {
+                    "type": "integer"
+                  },
+                  "tiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ra": {
+                          "type": "number"
+                        },
+                        "dec": {
+                          "type": "number"
+                        },
+                        "paDeg": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  },
+                  "replaceEntryIds": {
+                    "type": "array",
+                    "description": "Standalone plan entries to delete (absorbed into this mosaic by a merge)",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mosaic updated"
+          },
+          "400": {
+            "description": "Invalid body"
+          },
+          "404": {
+            "description": "Mosaic not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a mosaic and all of its tile frames",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Plan ID"
+          },
+          {
+            "in": "path",
+            "name": "mosaicId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Mosaic ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mosaic deleted"
+          },
+          "404": {
+            "description": "Mosaic not found"
           },
           "500": {
             "description": "Server error"

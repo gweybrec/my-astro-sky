@@ -22,7 +22,9 @@ vi.mock('../../src/i18n', () => ({
 }));
 
 import FOVRibbon from '../../src/components/overlay/FOVRibbon.vue';
+import { buildFovPopup } from '../../src/fov-overlay';
 import { useCanvasStore } from '../../src/stores/canvas';
+import { useFovFramesStore } from '../../src/stores/fov-frames';
 import type { FovFrameSpec } from '../../src/sky-map';
 
 function makeSkyMap() {
@@ -32,6 +34,12 @@ function makeSkyMap() {
     setFovInstances: vi.fn(),
     setOnFovInstanceSelect: vi.fn(),
     setOnFovInstanceChange: vi.fn(),
+    setOnFovFrameResize: vi.fn(),
+    setOnMosaicTileRemove: vi.fn(),
+    setOnMosaicTileAdd: vi.fn(),
+    setMosaicAddCandidates: vi.fn(),
+    setOnFrameMerge: vi.fn(),
+    pinAllFloatingFrames: vi.fn(),
   };
 }
 
@@ -70,6 +78,139 @@ describe('FOVRibbon — onMounted frame initialisation', () => {
     expect(sm.setOnFovInstanceSelect).toHaveBeenCalled();
     expect(sm.setOnFovInstanceChange).toHaveBeenCalled();
     // The (empty) resolved frame list is pushed immediately via the watcher.
+    expect(sm.setFovInstances).toHaveBeenCalledWith([]);
+  });
+});
+
+describe('FOVRibbon — master show/hide-frames toggle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the eye button and toggles framesVisible on click', async () => {
+    const sm = makeSkyMap();
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      initialState: { canvas: { skyMap: sm, pendingFovOverride: null } },
+    });
+    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
+    await nextTick();
+
+    const fovStore = useFovFramesStore(pinia);
+    const eyeBtn = wrapper.find('.fov-visibility-btn');
+    expect(eyeBtn.exists()).toBe(true);
+    // Default visible → tooltip offers to hide.
+    expect(eyeBtn.attributes('title')).toBe('fovOverlay.hideFrames');
+
+    await eyeBtn.trigger('click');
+    expect(fovStore.toggleFramesVisible).toHaveBeenCalled();
+  });
+
+  it('freezes floating frames to the sky before hiding (nothing drifts while hidden)', async () => {
+    const sm = makeSkyMap();
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      initialState: {
+        canvas: { skyMap: sm, pendingFovOverride: null },
+        fovFrames: { framesVisible: true },
+      },
+    });
+    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
+    await nextTick();
+
+    await wrapper.find('.fov-visibility-btn').trigger('click');
+    // Floating frames are pinned to the sky first, then the toggle hides them.
+    expect(sm.pinAllFloatingFrames).toHaveBeenCalledTimes(1);
+    expect(useFovFramesStore(pinia).toggleFramesVisible).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not pin frames when showing them again', async () => {
+    const sm = makeSkyMap();
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      initialState: {
+        canvas: { skyMap: sm, pendingFovOverride: null },
+        fovFrames: { framesVisible: false },
+      },
+    });
+    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
+    await nextTick();
+
+    await wrapper.find('.fov-visibility-btn').trigger('click');
+    expect(sm.pinAllFloatingFrames).not.toHaveBeenCalled();
+    expect(useFovFramesStore(pinia).toggleFramesVisible).toHaveBeenCalledTimes(1);
+  });
+
+  it('dims the rotation buttons when frames are hidden', async () => {
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      initialState: {
+        canvas: { skyMap: makeSkyMap(), pendingFovOverride: null },
+        fovFrames: { framesVisible: false, activeId: 'adhoc-1' },
+      },
+    });
+    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
+    await nextTick();
+
+    // Even with an active frame, hidden frames disable the rotation buttons and
+    // the tooltip explains they're off because frames are hidden.
+    const rotateBtn = wrapper.find('.fov-rotate-btn');
+    expect(rotateBtn.classes()).toContain('opacity-40');
+    expect(rotateBtn.classes()).toContain('cursor-not-allowed');
+    expect(rotateBtn.attributes('title')).toBe('fovOverlay.framesHiddenHint');
+    // The eye button itself stays interactive and offers to show frames.
+    expect(wrapper.find('.fov-visibility-btn').attributes('title')).toBe('fovOverlay.showFrames');
+  });
+
+  it('explains rotation is disabled when no frame is selected', async () => {
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      initialState: {
+        canvas: { skyMap: makeSkyMap(), pendingFovOverride: null },
+        fovFrames: { framesVisible: true, activeId: null },
+      },
+    });
+    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
+    await nextTick();
+
+    const rotateBtn = wrapper.find('.fov-rotate-btn');
+    expect(rotateBtn.classes()).toContain('opacity-40');
+    expect(rotateBtn.classes()).toContain('cursor-not-allowed');
+    expect(rotateBtn.attributes('title')).toBe('fovOverlay.rotateNeedsSelection');
+  });
+
+  it('opens the frame manager when frames are shown via the eye toggle', async () => {
+    const sm = makeSkyMap();
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      stubActions: false,
+      initialState: {
+        canvas: { skyMap: sm, pendingFovOverride: null },
+        fovFrames: { framesVisible: false },
+      },
+    });
+    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
+    await nextTick();
+
+    expect(buildFovPopup).not.toHaveBeenCalled();
+    await wrapper.find('.fov-visibility-btn').trigger('click');
+    // Showing frames flips the toggle on and opens the frame-manager popup.
+    expect(useFovFramesStore(pinia).framesVisible).toBe(true);
+    expect(buildFovPopup).toHaveBeenCalledTimes(1);
+  });
+
+  it('pushes an empty frame set to the map while frames are hidden', async () => {
+    const sm = makeSkyMap();
+    const pinia = createTestingPinia({
+      createSpy: vi.fn,
+      initialState: {
+        canvas: { skyMap: sm, pendingFovOverride: null },
+        fovFrames: { framesVisible: false },
+      },
+    });
+    mount(FOVRibbon, { global: { plugins: [pinia] } });
+    await nextTick();
+
     expect(sm.setFovInstances).toHaveBeenCalledWith([]);
   });
 });

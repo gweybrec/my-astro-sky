@@ -14,6 +14,31 @@ function makePhoto(id: string, labels: string[] | undefined) {
   } as any;
 }
 
+// Photo with manual placement so applyTransform() actually runs (and would
+// otherwise force display:'block') during updateTransforms().
+function makePlacedPhoto(id: string, labels: string[] | undefined) {
+  return {
+    ...makePhoto(id, labels),
+    manualPlacement: {
+      centerRa: 0,
+      centerDec: 60,
+      rotationDeg: 0,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    },
+  } as any;
+}
+
+const VIEW = {
+  centerX: 0,
+  centerY: 0,
+  scale: 500,
+  rotationDeg: 0,
+  width: 800,
+  height: 600,
+};
+
 describe('PhotoOverlay label filtering', () => {
   let container: HTMLDivElement;
   let overlay: PhotoOverlay;
@@ -48,6 +73,28 @@ describe('PhotoOverlay label filtering', () => {
     const b = placed.find(p => p.photo.id === '2')!;
     expect(a.imgEl.style.display === 'block' || a.imgEl.style.display === '').toBe(true);
     expect(b.imgEl.style.display).toBe('none');
+  });
+
+  it('keeps label-hidden photos hidden after a pan/zoom (updateTransforms)', () => {
+    // Regression: previously applyTransform() unconditionally set display:'block',
+    // so hidden labels reappeared as soon as the user panned or zoomed.
+    container = document.createElement('div');
+    overlay = new PhotoOverlay(container, () => VIEW as any);
+
+    const a = makePlacedPhoto('1', ['A']);
+    const b = makePlacedPhoto('2', ['B']);
+    overlay.loadPhotos([a, b]);
+
+    overlay.setVisibleLabels({ 'A': true, 'B': false });
+
+    // Simulate a pan/zoom which recomputes every photo's transform.
+    overlay.updateTransforms();
+
+    const placed = overlay.getPlacedPhotos();
+    const pa = placed.find(p => p.photo.id === '1')!;
+    const pb = placed.find(p => p.photo.id === '2')!;
+    expect(pa.imgEl.style.display).toBe('block');
+    expect(pb.imgEl.style.display).toBe('none');
   });
 
   it('respects the (no label) special key for unlabeled photos', () => {

@@ -411,6 +411,110 @@ describe('DB import/export round-trip', () => {
   });
 });
 
+// ─── Plan + mosaic import/export round-trip ──────────────────────────────────
+// Regression for the export gap: /api/export must emit each plan's mosaics and
+// the per-entry mosaicId/mosaicWDeg/mosaicHDeg so a mosaic survives an
+// export→import cycle grouped (not as N ungrouped duplicate frames). This
+// mirrors the server's plan import/export mapping at the DB layer (the Express
+// route in server/index.ts is integration-only and excluded from the suite).
+
+describe('Plan + mosaic export/import round-trip', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv('DB_PATH', ':memory:');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('preserves a mosaic (grouping + tiles) and a smart-scope frame size across a round-trip', async () => {
+    const db = await import('../../server/db.js');
+
+    // ── Seed: a plan with a 2-tile mosaic plus a standalone smart-scope frame. ──
+    db.createPlan({
+      id: 'plan-1', name: 'Night A', position: 0, created_at: '2026-01-01T00:00:00.000Z',
+      night_of: '2026-06-20', setup_id: null, lat: 48.85, lon: 2.35,
+    });
+    db.createPlanMosaic(
+      {
+        id: 'mo-1', plan_id: 'plan-1', dso_id: 'M31', name: 'Andromeda mosaic',
+        center_ra: 10.68, center_dec: 41.27, pa_deg: 15, overlap_pct: 20, cols: 2, rows: 1,
+      },
+      [{ ra: 10.4, dec: 41.27, paDeg: 15 }, { ra: 10.9, dec: 41.27, paDeg: 15 }],
+    );
+    db.addPlanEntry({
+      id: 'pe-smart', plan_id: 'plan-1', dso_id: 'M42', position: 99, pa_deg: null,
+      ra: null, dec: null, notes: null, mosaic_id: null, mosaic_w_deg: 3.25, mosaic_h_deg: 3.25,
+    });
+
+    // ── Export (mirrors the /api/export plan mapping). ──
+    const allEntries = db.getAllPlanEntries();
+    const exported = db.getPlans().map(p => ({
+      id: p.id, name: p.name, position: p.position, nightOf: p.night_of, setupId: p.setup_id,
+      lat: p.lat, lon: p.lon,
+      entries: allEntries.filter(e => e.plan_id === p.id).map(e => ({
+        id: e.id, dsoId: e.dso_id, position: e.position, paDeg: e.pa_deg, ra: e.ra, dec: e.dec,
+        notes: e.notes, mosaicId: e.mosaic_id, mosaicWDeg: e.mosaic_w_deg, mosaicHDeg: e.mosaic_h_deg,
+      })),
+      mosaics: db.getPlanMosaics(p.id).map(m => ({
+        id: m.id, dsoId: m.dso_id, name: m.name, centerRa: m.center_ra, centerDec: m.center_dec,
+        paDeg: m.pa_deg, overlapPct: m.overlap_pct, cols: m.cols, rows: m.rows, position: m.position,
+      })),
+    }));
+    const bundle = JSON.parse(JSON.stringify(exported)); // survives JSON serialization
+
+    // ── Wipe, then re-import (mirrors the /api/import plan loop). ──
+    db.deletePlan('plan-1');
+    expect(db.getAllPlanMosaics()).toHaveLength(0);
+    expect(db.getAllPlanEntries()).toHaveLength(0);
+
+    for (const p of bundle) {
+      db.createPlan({
+        id: p.id, name: p.name, position: p.position, created_at: '2026-02-02T00:00:00.000Z',
+        night_of: p.nightOf, setup_id: p.setupId, lat: p.lat, lon: p.lon,
+      });
+      for (const e of p.entries) {
+        db.addPlanEntry({
+          id: e.id, plan_id: p.id, dso_id: e.dsoId, position: e.position, pa_deg: e.paDeg,
+          ra: e.ra, dec: e.dec, notes: e.notes, mosaic_id: e.mosaicId,
+          mosaic_w_deg: e.mosaicWDeg, mosaic_h_deg: e.mosaicHDeg,
+        });
+      }
+      for (const m of p.mosaics) {
+        db.addPlanMosaic({
+          id: m.id, plan_id: p.id, dso_id: m.dsoId, name: m.name, center_ra: m.centerRa,
+          center_dec: m.centerDec, pa_deg: m.paDeg, overlap_pct: m.overlapPct,
+          cols: m.cols, rows: m.rows, position: m.position,
+        });
+      }
+    }
+
+    // ── The mosaic record survived with its params. ──
+    const mosaics = db.getAllPlanMosaics();
+    expect(mosaics).toHaveLength(1);
+    expect(mosaics[0].id).toBe('mo-1');
+    expect(mosaics[0].name).toBe('Andromeda mosaic');
+    expect(mosaics[0].cols).toBe(2);
+
+    // ── Its two tiles stayed grouped (mosaic_id preserved, not nulled). ──
+    const entries = db.getAllPlanEntries();
+    const tiles = entries.filter(e => e.mosaic_id === 'mo-1');
+    expect(tiles).toHaveLength(2);
+
+    // ── The standalone smart-scope frame kept its single-frame size. ──
+    const smart = entries.find(e => e.id === 'pe-smart')!;
+    expect(smart.mosaic_id).toBeNull();
+    expect(smart.mosaic_w_deg).toBe(3.25);
+    expect(smart.mosaic_h_deg).toBe(3.25);
+
+    // ── Per-plan observing location survived too. ──
+    const plan = db.getPlans()[0];
+    expect(plan.lat).toBeCloseTo(48.85, 2);
+    expect(plan.lon).toBeCloseTo(2.35, 2);
+  });
+});
+
 // ─── updatePhotoMetadata ───────────────────────────────────────────────────────
 
 describe('updatePhotoMetadata', () => {

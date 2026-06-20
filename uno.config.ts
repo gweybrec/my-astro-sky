@@ -177,6 +177,14 @@ export default defineConfig({
       'hover:!bg-[var(--accent-fill-xl)]',
     ].join(' '),
 
+    // Selected/on state for a destructive icon toggle (e.g. a "Drop" choice):
+    // filled red, same footprint as `btn-icon` so toggling doesn't shift layout.
+    'btn-icon--danger-active': [
+      'btn-icon',
+      '!bg-[var(--btn-danger-bg)] !border-[var(--btn-danger-border)] !text-[var(--btn-danger-text)]',
+      'hover:!bg-[var(--btn-danger-bg-hover)]',
+    ].join(' '),
+
     // ── Inputs ───────────────────────────────────────────────────────────────
     // Replaces near-identical rules for star-search-input, tag-input,
     // radec-input, targets-coord-input, targets-date-input.

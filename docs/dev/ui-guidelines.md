@@ -635,6 +635,19 @@ Created dynamically when the user types in a chip input (see below). Each carrie
 | `.tag-chip.label-chip` | Green | User-defined label attached to a photo |
 | `.tag-chip-sm` | *(bug: missing bg/colour — fix this)* | Compact variant for the photo list |
 
+> **The remove `×` is always a `.tag-chip-remove` button** — never an ad-hoc utility-class
+> button. `.tag-chip-remove` gives the dim glyph + danger-red hover that every removable chip
+> shares. A chip's full anatomy is exactly: `<span class="tag-chip">` → label text →
+> `<button class="tag-chip-remove">×</button>`. Reproduce this markup identically whether you
+> build it in a Vue template (e.g. `MetadataEditorPanel.vue`) or via `document.createElement`
+> in a `.ts` file (e.g. the mosaic-edit popup in `fov-overlay.ts`).
+>
+> **Do not** re-style the chip with one-off utilities (`border-[var(--border-accent)]`,
+> `text-label`) or replace the remove button with hand-rolled classes
+> (`leading-none text-muted hover:text-bright`). The `.tag-chip` / `.tag-chip-remove` CSS pair
+> in `style.css` is the single source of truth; overriding it is how duplicate, drifting chip
+> widgets get created.
+
 #### Type / category badges (read-only display)
 
 No remove button. Display only.
@@ -841,6 +854,8 @@ btn.innerHTML = trashSvg;
 | `src/icons/credits.svg` | Database cylinder | `.settings-legal-btn` | 16 px |
 | `src/icons/telescope.svg` | Line-art telescope (tube + eyepiece + finder + tripod) | `.fov-telescope-btn` | `var(--font-size-large)` (set by `.fov-telescope-btn svg`) |
 | `src/icons/export.svg` | Box with outgoing up-right arrow | `.sky-export-control .sky-rotation-btn`, gallery filter-bar button | 16 px |
+| `src/icons/eye.svg` | Eye (shown) | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`) | 16 px / `1em` |
+| `src/icons/eye-off.svg` | Eye with slash (hidden) | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`) | 16 px / `1em` |
 
 One additional SVG lives as a `data:image/svg+xml` URI in `src/style.css` on `.targets-sort-select` (dropdown caret). It is a pure CSS concern — no TypeScript import needed.
 

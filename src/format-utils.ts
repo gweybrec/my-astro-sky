@@ -30,6 +30,11 @@ export function formatSize(majAxis: number | null, minAxis: number | null): stri
   return `${maj} × ${min}`;
 }
 
+/** Altitude in whole degrees, e.g. `42°`. */
+export function formatAlt(deg: number): string {
+  return `${deg.toFixed(0)}°`;
+}
+
 export function formatRating(rating: number | null): string {
   if (rating === null) return '';
   return '★'.repeat(rating) + '☆'.repeat(5 - rating);

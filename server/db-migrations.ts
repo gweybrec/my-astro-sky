@@ -88,7 +88,58 @@ export function applyMigrations(database: Database): number {
         `);
       },
     },
-    // Future migrations: { version: 4, run(d) { ... } },
+    {
+      version: 4,
+      run(d) {
+        // Mosaics: a group of tile entries covering one target. Tiles are plan
+        // entries tagged with a mosaic_id; the mosaic row holds the group params.
+        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_id TEXT'); } catch { /* exists */ }
+        d.exec(`
+          CREATE TABLE IF NOT EXISTS plan_mosaics (
+            id          TEXT PRIMARY KEY,
+            plan_id     TEXT NOT NULL,
+            dso_id      TEXT,
+            center_ra   REAL NOT NULL,
+            center_dec  REAL NOT NULL,
+            pa_deg      REAL NOT NULL DEFAULT 0,
+            overlap_pct REAL NOT NULL DEFAULT 20,
+            cols        INTEGER NOT NULL DEFAULT 1,
+            rows        INTEGER NOT NULL DEFAULT 1,
+            position    INTEGER NOT NULL DEFAULT 0
+          );
+        `);
+      },
+    },
+    {
+      // v5: mosaics gain an explicit user-supplied name (multi-DSO mosaics can't
+      // be named after a single target). Older mosaics keep NULL → name is still
+      // derived from the DSO at display time.
+      version: 5,
+      run(d) {
+        try { d.exec('ALTER TABLE plan_mosaics ADD COLUMN name TEXT'); } catch { /* exists */ }
+      },
+    },
+    {
+      // v6: plan entries gain an optional smart-scope single-frame mosaic size.
+      // A smart telescope (Seestar, Vespera, DWARF…) enlarges one frame rather
+      // than tiling a grid; these columns hold the chosen FOV (deg). NULL ⇒ the
+      // frame renders at its native FOV.
+      version: 6,
+      run(d) {
+        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_w_deg REAL'); } catch { /* exists */ }
+        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_h_deg REAL'); } catch { /* exists */ }
+      },
+    },
+    {
+      // v7: per-plan observing location (°N / °E). NULL ⇒ fall back to the
+      // global location (same pattern as night_of falling back to the global date).
+      version: 7,
+      run(d) {
+        try { d.exec('ALTER TABLE plans ADD COLUMN lat REAL'); } catch { /* exists */ }
+        try { d.exec('ALTER TABLE plans ADD COLUMN lon REAL'); } catch { /* exists */ }
+      },
+    },
+    // Future migrations: { version: 8, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;
