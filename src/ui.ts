@@ -248,8 +248,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       const sizeStr = formatSize(dso.majAxis, dso.minAxis);
       const isLPN = dso.id.startsWith('LPN-');
       const bestId = dso.catalogs[0] ?? dso.id;
+      const stripWs = (s: string) => s.replace(/\s+/g, '');
       const headerStr = dso.displayName
-        ? (isLPN || dso.displayName.includes(bestId) ? dso.displayName : `${dso.displayName} – ${bestId}`)
+        ? (isLPN || stripWs(dso.displayName).includes(stripWs(bestId)) ? dso.displayName : `${dso.displayName} – ${bestId}`)
         : (isLPN ? bestId.replace(/^LPN-/, '') : bestId);
       const nameStr = `<div class="dso-info-name">${headerStr}</div>`;
       const sizeRow = sizeStr !== '–' ? `<tr><td>${t('dso.size')}</td><td>${sizeStr}</td></tr>` : '';
