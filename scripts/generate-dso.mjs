@@ -33,6 +33,9 @@ function loadMetadataOverrides() {
       dec: typeof entry.dec === 'number' ? entry.dec : null,
       // type: corrected DSO type code (e.g. 'EN', 'RN', 'SNR') or null
       type: typeof entry.type === 'string' && entry.type ? entry.type : null,
+      // majAxis/minAxis: corrected angular size in arcmin (overrides catalog value)
+      majAxis: typeof entry.majAxis === 'number' ? entry.majAxis : null,
+      minAxis: typeof entry.minAxis === 'number' ? entry.minAxis : null,
     };
     map.set(id, override);
     for (const cat of catalogs) {
@@ -92,6 +95,9 @@ function applyMetadataOverrides(row, overrides) {
   row[16] = entry.difficulty ?? row[16];
   // type override (e.g. when OpenNGC records a nebula as '?' or generic 'Neb')
   if (entry.type) row[3] = entry.type;
+  // angular size override (arcmin) — e.g. correcting a wrong/missing diameter
+  if (entry.majAxis !== null) row[4] = entry.majAxis;
+  if (entry.minAxis !== null) row[5] = entry.minAxis;
   // Merge additional catalog aliases from override into row[12] (so e.g. M102 becomes searchable)
   if (Array.isArray(entry.catalogs) && Array.isArray(row[12])) {
     const existing = new Set(row[12].map(c => String(c).toUpperCase()));
@@ -263,7 +269,7 @@ const SH2_DATA = [
   ['SH2-144', 341.2, 59.88, 8.0, null],
   ['SH2-145', 336.37, 64.3, 10, null],
   ['SH2-146', 342.371, 59.916, 10, null],
-  ['SH2-147', 343.93, 58.47, 180.0, 'Nébuleuse Simeis 147'],
+  ['SH2-147', 343.93, 58.47, 180.0, null],
   ['SH2-148', 344.075, 58.517, 10, null],
   ['SH2-149', 344.07, 58.523, 10.0, null],
   ['SH2-150', 337.316, 64.852, 10, null],
@@ -296,7 +302,7 @@ const SH2_DATA = [
   ['SH2-182', 21.56, 66.31, 20.0, null],
   ['SH2-183', 21.07, 68.08, 10.0, null],
   ['SH2-184', 14.24, 56.01, 3.0, null],
-  ['SH2-185', 14.49, 60.78, 12.0, 'Nébuleuse IC 59/63'],
+  ['SH2-185', 14.49, 60.78, 120.0, 'Nébuleuse IC 59/63'],
   ['SH2-188', 22.81, 58.85, 8.0, null],
   ['SH2-190', 23.98, 61.87, 20.0, 'Nébuleuse de l\'Étoile de mer'],
   ['SH2-198', 27.61, 60.54, 90.0, 'Nébuleuse du Cœur IC 1805'],
@@ -567,6 +573,59 @@ const BARNARD_ALIASES = {
   Barnard168: 'IC5146',  // dark lane leading to the Cocoon Nebula (IC5146)
 };
 
+// ─── Curated vdB → NGC/IC/M/SH2/LBN cross-identifications ───────────────────
+// The van den Bergh (1966) catalog (VII/21) has NO NGC/IC column and gives only
+// galactic coordinates at 0.1° (~6') precision, marking the *illuminating star*.
+// Many vdB reflection nebulae are the same physical object as an NGC/IC/M/SH2/LBN
+// nebula but were not auto-matched (OpenNGC's Identifiers column omits the vdB id).
+// Each mapping below was verified against SIMBAD (positions coincide; vdB number
+// resolves to the nebula's illuminating star inside that object). When merged, the
+// vdB id is appended to the target row's catalogs[] and the standalone vdB row is
+// suppressed, so it inherits the target's precise position. Distinct objects that
+// merely lie near a cluster (vdB23≈M45, vdB6≈NGC654) are intentionally NOT merged.
+const VDB_ALIASES = {
+  5:   'SH2-185',  17:  'NGC1333', 19:  'IC348',   21:  'NGC1432', 22:  'IC349',
+  28:  'NGC1555',  33:  'NGC1788', 34:  'IC405',   44:  'IC420',   46:  'NGC1999',
+  50:  'IC431',    51:  'IC432',   52:  'NGC2023', 57:  'IC435',   59:  'M78',
+  60:  'NGC2071',  66:  'NGC2149', 67:  'NGC2170', 72:  'NGC2182', 73:  'NGC2185',
+  82:  'NGC2247',  85:  'NGC2282', 93:  'IC2177',  105: 'IC4603',  106: 'IC4604',
+  108: 'IC4605',   115: 'IC4684',  118: 'NGC6589', 119: 'NGC6590', 124: 'IC1287',
+  137: 'IC5076',   139: 'NGC7023', 140: 'LBN446',  99:  'SH2-1',
+};
+
+// Authoritative vdB positions (ICRS J2000, decimal degrees) resolved from SIMBAD
+// by illuminating star — replaces the coarse galactic→equatorial conversion for
+// standalone vdB rows. Regenerate via the SIMBAD TAP query documented in
+// docs/dev/dso-catalog.md. Keyed by vdB number; missing numbers fall back to the
+// galactic-coordinate conversion.
+const VDB_COORDS_PATH = join(__dirname, 'vdb-coords.json');
+const VDB_COORDS = existsSync(VDB_COORDS_PATH)
+  ? JSON.parse(readFileSync(VDB_COORDS_PATH, 'utf8'))
+  : {};
+
+// Authoritative SH2 angular diameters (arcmin) from the Sharpless (1959) catalogue,
+// Vizier VII/20 `Diam` column — the best machine-readable size source for these
+// H-II regions. Keyed by SH2 number. Used to correct the hand-entered SH2_DATA
+// majAxis values that diverge from Sharpless by >3× (see docs/dev/dso-catalog.md).
+// Regenerate: SELECT "Sh2", Diam FROM "VII/20/catalog" on the Vizier TAP service.
+const SHARPLESS_DIAM_PATH = join(__dirname, 'sharpless-diam.json');
+const SHARPLESS_DIAM = existsSync(SHARPLESS_DIAM_PATH)
+  ? JSON.parse(readFileSync(SHARPLESS_DIAM_PATH, 'utf8'))
+  : {};
+
+// ─── Curated SH2 → NGC/IC/Abell merges ─────────────────────────────────────
+// SH2 H-II regions that are the same physical object as an already-catalogued
+// NGC/IC/Abell nebula. The SH2 row is suppressed and its designations folded into
+// the target row's catalogs[] (so it inherits the target's position/type and there
+// is a single object). Sizes/names for the target are set in dso-metadata-overrides.
+// Verified against SIMBAD / standard references.
+const SH2_ALIASES = {
+  'SH2-95':  'NGC6842',  // small planetary nebula (= LBN 149)
+  'SH2-171': 'NGC7822',  // 180' Cep OB4 region; most-used designation NGC 7822
+  'SH2-190': 'IC1805',   // Heart Nebula
+  'SH2-290': 'Abell31',  // large ancient planetary nebula Abell 31
+};
+
 async function fetchBarnard() {
   const url = 'https://cdsarc.cds.unistra.fr/ftp/VII/220A/barnard.dat';
   console.log('Downloading Barnard catalog...');
@@ -814,6 +873,15 @@ async function main() {
   for (const [shId, ra, dec, majAxis] of SH2_DATA) {
     if (dec < -35) continue;
     const sh2Num = parseInt(shId.slice(4));   // 'SH2-17' → 17
+    // Prefer the authoritative Sharpless VII/20 diameter when the hand-entered
+    // value diverges from it by >3× (in either direction). Per-object exceptions
+    // where Sharpless itself is wrong (e.g. SH2-147/Simeis 147) are corrected via
+    // a majAxis override in dso-metadata-overrides.json.
+    const sharp = SHARPLESS_DIAM[sh2Num];
+    let sh2Maj = majAxis;
+    if (sharp != null) {
+      if (majAxis == null || sharp / majAxis > 3 || majAxis / sharp > 3) sh2Maj = sharp;
+    }
     const lbnSeq = sh2ToLbnSeq.get(sh2Num);
     const lbnIds = [];
     if (lbnSeq !== undefined) {
@@ -826,7 +894,7 @@ async function main() {
       Math.round(ra * 1000) / 1000,
       Math.round(dec * 1000) / 1000,
       'EN',
-      majAxis,
+      sh2Maj,
       null,
       0,
       null,
@@ -906,14 +974,36 @@ async function main() {
   }
   console.log(`Added ${ldnAdded} LDN entries (opacity ≥ 4)`);
 
+  // ── Step 7b: Curated vdB → NGC/IC/M/SH2/LBN aliases ──────────────────────
+  // Append each curated vdB id to its target object's catalogs[] and mark it
+  // assigned so the standalone loop below does not emit a duplicate marker.
+  // Targets are NGC/IC/M (Step 4), SH2 (Step 5), LBN (Step 6) — all already in
+  // `data` at this point. (Messier-only objects are added later in Step 11, but
+  // no vdB alias targets one — M78 already exists from OpenNGC.)
+  const rowByIdVdb = new Map(data.map(r => [String(r[0]).toUpperCase(), r]));
+  let vdbAliasMerged = 0;
+  for (const [num, targetId] of Object.entries(VDB_ALIASES)) {
+    const target = rowByIdVdb.get(String(targetId).toUpperCase());
+    if (!target) { console.warn(`Warning: vdB alias target ${targetId} not found for vdB${num}`); continue; }
+    const vdbId = `vdB${num}`;
+    if (!target[12].some(c => String(c).toLowerCase() === vdbId.toLowerCase())) target[12].push(vdbId);
+    assignedVdbNums.add(Number(num));
+    vdbAliasMerged++;
+  }
+  console.log(`Merged ${vdbAliasMerged} vdB aliases into existing objects`);
+
   // ── Step 8: Standalone vdB entries ───────────────────────────────────────
   // vdB entries not already assigned as cross-refs to NGC/IC objects.
-  // Coordinates: galactic (B1950 IAU 1958 system) → equatorial J2000.
+  // Position: authoritative SIMBAD star coords (VDB_COORDS) when available,
+  // else galactic (B1950 IAU 1958 system) → equatorial J2000 fallback.
   // BRadMax = semi-major radius in arcmin → majAxis = 2 × BRadMax (diameter).
   let vdbAdded = 0;
   for (const entry of vdbEntries) {
     if (assignedVdbNums.has(entry.vdb)) continue;
-    const { ra, dec } = galacticToEquatorial(entry.glon, entry.glat);
+    const simbad = VDB_COORDS[entry.vdb];
+    const { ra, dec } = simbad
+      ? { ra: simbad[0], dec: simbad[1] }
+      : galacticToEquatorial(entry.glon, entry.glat);
     if (dec < -35) continue;
     const vdbId = `vdB${entry.vdb}`;
     // Names come from dso-metadata-overrides.json via applyMetadataOverrides
@@ -1421,6 +1511,29 @@ async function main() {
     ]);
   }
   console.log(`Added ${messierOnlyEntries.length} Messier-only entries`);
+
+  // ── Curated SH2 → NGC/IC/Abell merges ────────────────────────────────────
+  // Fold each duplicate SH2 row into its NGC/IC/Abell parent (append designations
+  // to the target's catalogs[]) and drop the standalone SH2 row, so the region is a
+  // single object. Runs after all sources (incl. Abell PNe, Step 12) are in `data`.
+  const rowByIdSh2 = new Map(data.map(r => [String(r[0]).toUpperCase(), r]));
+  const sh2Suppress = new Set();
+  let sh2Merged = 0;
+  for (const [shId, targetId] of Object.entries(SH2_ALIASES)) {
+    const target = rowByIdSh2.get(String(targetId).toUpperCase());
+    if (!target) { console.warn(`Warning: SH2 alias target ${targetId} not found for ${shId}`); continue; }
+    const sh2row = rowByIdSh2.get(shId.toUpperCase());
+    const carried = sh2row ? sh2row[12] : [shId];
+    for (const c of carried) {
+      if (c && !target[12].some(x => String(x).toLowerCase() === String(c).toLowerCase())) target[12].push(c);
+    }
+    sh2Suppress.add(shId.toUpperCase());
+    sh2Merged++;
+  }
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (sh2Suppress.has(String(data[i][0]).toUpperCase())) data.splice(i, 1);
+  }
+  console.log(`Merged ${sh2Merged} SH2 aliases into existing objects`);
 
   const metadataOverrides = loadMetadataOverrides();
   if (metadataOverrides.size > 0) {

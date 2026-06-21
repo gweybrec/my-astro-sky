@@ -150,6 +150,8 @@ SB thresholds (after applying the magnitude cap):
 | `type` | string | Override the DSO type code (e.g. `"EN"`, `"RN"`, `"SNR"`) when OpenNGC records it as `"?"` or generic `"Neb"` |
 | `ra` | number | Override right ascension (degrees) — used for SIMBAD-corrected coordinates |
 | `dec` | number | Override declination (degrees) |
+| `majAxis` | number | Override the angular major-axis size (arcmin) — for correcting a wrong/missing diameter |
+| `minAxis` | number | Override the angular minor-axis size (arcmin) |
 
 All fields except `id` and `catalogs` are optional. `applyMetadataOverrides()` only writes non-null values, so omitting a field leaves the source-catalog value intact.
 
@@ -174,6 +176,35 @@ Two one-shot scripts were used to populate the file from previously hardcoded da
 ### Why SH2_DATA stays in generate-dso.mjs
 
 `SH2_DATA` is a *primary source catalog*, not an override. It defines the existence of Sharpless H-II region objects that do not appear in any downloadable machine-readable catalog used by the pipeline. `dso-metadata-overrides.json` can only override fields on objects that already exist — it cannot create new objects. SH2 object names and coordinates come from Sharpless 1959 (ApJS 4, 257) with SIMBAD corrections applied via `scripts/fix-sh2-coords.mjs`.
+
+### SH2 angular sizes — sourced from Sharpless VII/20
+
+The hand-entered `majAxis` values in `SH2_DATA` diverged from the authoritative Sharpless diameters for ~113 of ~313 entries (in *both* directions — some 10× too small, some 10× too big, including default `10′` placeholders). The pipeline now corrects these: in Step 5 it loads **`scripts/sharpless-diam.json`** (`SHARPLESS_DIAM`, the `Diam` column of Vizier `VII/20`) and, when a hand value diverges from Sharpless by **>3×**, substitutes the Sharpless diameter. Values already within 3× are left untouched.
+
+Per-object exceptions are corrected with a **`majAxis`/`minAxis` override** in `dso-metadata-overrides.json` (these fields are now supported by `applyMetadataOverrides`): SH2-312 → 720′×180′, NGC 7822 / SH2-171 region → 180′, IC 1805 / Heart → 150′, NGC 6357 / SH2-11 region → 90′.
+
+> **Caution — `SH2_DATA`'s 5th field is unused and unreliable.** It holds a stray French label that the pipeline does **not** read (display names come from the overrides file). Several are wrong; do not promote one into a real name without verifying. Notably **SH2-147 is *not* Simeis 147** — it is a small (~2′) HII region in Cepheus. Simeis 147 / the Spaghetti Nebula is **SH2-240** (SNR G180.0-01.7), which is named and sized correctly via its own override.
+
+Regenerate `sharpless-diam.json`: `SELECT "Sh2", Diam FROM "VII/20/catalog"` on the Vizier TAP service (`tapvizier.cds.unistra.fr`), written as `{ "<n>": <diam>, ... }`.
+
+> **SH2 → NGC/IC/Abell merges (`SH2_ALIASES`):** some SH2 H-II regions are the same physical object as an already-catalogued nebula. These are folded into the parent (designations appended to its `catalogs[]`, the SH2 row dropped) so the region is a single object: SH2-95→NGC 6842, SH2-171→NGC 7822, SH2-190→IC 1805 (Heart), SH2-290→Abell 31. The merge runs after all sources are loaded (Abell PNe come from a later step). Note: the **Heart Nebula is IC 1805 / SH2-190** (SH2-198 is a small separate region near the Soul Nebula, not the Heart — an earlier mislabel that has been corrected), and there is no "Starfish Nebula" (vestigial bad name, removed).
+
+## van den Bergh (vdB) reflection nebulae
+
+The VII/21 van den Bergh (1966) catalog has **no NGC/IC column** and gives only galactic coordinates at 0.1° (~6′) precision, marking each nebula's **illuminating star**. The pipeline therefore handles vdB specially in `generate-dso.mjs`:
+
+- **`VDB_ALIASES`** — a curated map of vdB number → existing NGC/IC/M/SH2/LBN id, for nebulae that are the same physical object but were not auto-matched (OpenNGC's `Identifiers` column omits the vdB id). Each merged vdB id is appended to the target row's `catalogs[]` and its standalone row is suppressed, so it inherits the target's precise position. Distinct objects merely *near* a cluster (vdB 23 ≈ M45, vdB 6 ≈ NGC 654) are intentionally **not** merged. Every mapping was verified against SIMBAD.
+- **`scripts/vdb-coords.json`** (`VDB_COORDS`) — authoritative ICRS J2000 positions for standalone vdB rows, resolved from SIMBAD by illuminating star, replacing the coarse galactic→equatorial conversion (which was up to ~8′ off and skipped B1950→J2000 precession). Missing numbers fall back to the conversion.
+
+Regenerate `vdb-coords.json` from SIMBAD's TAP service:
+
+```bash
+curl -s "https://simbad.cds.unistra.fr/simbad/sim-tap/sync" \
+  --data-urlencode "request=doQuery" --data-urlencode "lang=ADQL" --data-urlencode "format=csv" \
+  --data-urlencode "query=SELECT i.id, b.ra, b.dec FROM ident i JOIN basic b ON i.oidref=b.oid WHERE i.id LIKE 'VDB %'"
+```
+
+Keep only rows whose id is `VDB <n>` (drop multi-component `VDB <n>a/b/...`), and write `{ "<n>": [ra, dec], ... }`.
 
 ---
 
