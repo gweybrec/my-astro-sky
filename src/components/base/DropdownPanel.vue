@@ -4,7 +4,6 @@
       v-if="modelValue"
       ref="panelRef"
       class="dropdown-panel"
-      :style="posStyle"
       @click.stop
     >
       <slot />
@@ -14,6 +13,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue';
+import { attachAnchoredPanel } from '../../popup-utils';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -25,41 +25,31 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [v: boolean] }>();
 
 const panelRef = ref<HTMLElement>();
-const posStyle = ref<Record<string, string>>({});
-
-function reposition() {
-  const el = props.anchorEl;
-  if (!el) return;
-  const rect = el.getBoundingClientRect();
-  const spaceBelow = window.innerHeight - rect.bottom - 4;
-  const goAbove = spaceBelow < 200 && rect.top > spaceBelow;
-  const style: Record<string, string> = { position: 'fixed' };
-  if (props.minWidth) style.minWidth = props.minWidth;
-  if (props.alignRight) {
-    style.right = `${window.innerWidth - rect.right}px`;
-  } else {
-    style.left = `${rect.left}px`;
-  }
-  if (goAbove) {
-    style.bottom = `${window.innerHeight - rect.top + 4}px`;
-    style.top = 'auto';
-  } else {
-    style.top = `${rect.bottom + 4}px`;
-    style.bottom = 'auto';
-  }
-  posStyle.value = style;
-}
+let cleanup: (() => void) | null = null;
 
 function close() { emit('update:modelValue', false); }
 
+function teardown() {
+  cleanup?.();
+  cleanup = null;
+  document.removeEventListener('click', close);
+}
+
 watch(() => props.modelValue, (open) => {
   if (open) {
-    nextTick(reposition);
+    nextTick(() => {
+      if (!panelRef.value || !props.anchorEl) return;
+      cleanup = attachAnchoredPanel(panelRef.value, props.anchorEl, {
+        alignRight: props.alignRight,
+        minWidth: props.minWidth,
+        onAnchorOutOfView: close,
+      });
+    });
     document.addEventListener('click', close);
   } else {
-    document.removeEventListener('click', close);
+    teardown();
   }
 });
 
-onBeforeUnmount(() => document.removeEventListener('click', close));
+onBeforeUnmount(teardown);
 </script>
