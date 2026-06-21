@@ -554,6 +554,53 @@ function parseLDN(text) {
   return entries;
 }
 
+// Curated Barnard → existing-object identity/association map.
+// OpenNGC carries no Barnard cross-refs and SIMBAD treats Barnard dark nebulae
+// as distinct from the bright NGC/IC nebulae they are silhouetted against, so
+// these associations are a deliberate curation choice to avoid duplicate markers
+// on iconic objects. The bright object stays primary; the Barnard id becomes an
+// alias on it (and the standalone Barnard entry is suppressed). Verify any new
+// pair before adding it — do NOT add dark-nebula-next-to-cluster pairs (e.g.
+// B86/NGC6520, B81/NGC6401) which are genuinely separate objects.
+const BARNARD_ALIASES = {
+  Barnard33:  'IC434',   // Horsehead dark nebula, silhouetted against IC434
+  Barnard168: 'IC5146',  // dark lane leading to the Cocoon Nebula (IC5146)
+};
+
+async function fetchBarnard() {
+  const url = 'https://cdsarc.cds.unistra.fr/ftp/VII/220A/barnard.dat';
+  console.log('Downloading Barnard catalog...');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Barnard HTTP ${res.status}`);
+  return res.text();
+}
+
+// Parse Barnard's Catalogue of Dark Objects (VII/220A).
+// Byte layout (1-indexed per ReadMe): 2-5 Barn, 23-24 RA2000h, 26-27 RA2000m,
+// 29-30 RA2000s, 33 DE2000-, 34-35 DE2000d, 37-38 DE2000m, 40-44 Diam(arcmin).
+// J2000 coords are provided directly — no precession needed.
+// Returns array of: { barn, ra, dec, diam }
+function parseBarnard(text) {
+  const entries = [];
+  for (const line of text.split('\n')) {
+    if (line.length < 38) continue;
+    const barn = line.substring(1, 5).trim();           // e.g. "33", "67a"
+    if (!barn) continue;
+    const rah  = parseInt(line.substring(22, 24).trim());
+    const ram  = parseInt(line.substring(25, 27).trim());
+    const ras  = parseInt(line.substring(28, 30).trim()) || 0;
+    const sign = line.charAt(32) === '-' ? -1 : 1;
+    const ded  = parseInt(line.substring(33, 35).trim());
+    const dem  = parseInt(line.substring(36, 38).trim());
+    const diam = parseFloat(line.substring(39, 44).trim());
+    if (isNaN(rah) || isNaN(ram) || isNaN(ded) || isNaN(dem)) continue;
+    const ra  = (rah + ram / 60 + ras / 3600) * 15;
+    const dec = sign * (ded + dem / 60);
+    entries.push({ barn, ra, dec, diam: isNaN(diam) ? null : diam });
+  }
+  return entries;
+}
+
 async function fetchVdB() {
   const url = 'https://cdsarc.cds.unistra.fr/ftp/VII/21/catalog.dat';
   console.log('Downloading vdB catalog...');
@@ -613,10 +660,11 @@ async function main() {
   const rows = parseCSV(csvText);
   console.log(`Parsed ${rows.length} rows from OpenNGC`);
 
-  // ── Step 2: Download LBN / LDN / vdB catalogs ────────────────────────────
+  // ── Step 2: Download LBN / LDN / vdB / Barnard catalogs ─────────────────
   let lbnEntries = [];
   let ldnEntries = [];
   let vdbEntries = [];
+  let barnardEntries = [];
   try {
     const lbnText = await fetchLBN();
     lbnEntries = parseLBN(lbnText);
@@ -638,6 +686,12 @@ async function main() {
   } catch (e) {
     console.warn(`Warning: could not fetch vdB: ${e.message}`);
   }
+  try {
+    barnardEntries = parseBarnard(await fetchBarnard());
+    console.log(`Parsed ${barnardEntries.length} Barnard entries`);
+  } catch (e) {
+    console.warn(`Warning: could not fetch Barnard: ${e.message}`);
+  }
 
   // ── Step 3: Build SH2-number → LBN-seq map (from LBN cross-refs) ─────────
   // LBN's xrefCat='S', xrefNum=NN means this LBN entry corresponds to SH2-NN.
@@ -653,6 +707,9 @@ async function main() {
 
   // Track which vdB numbers are already assigned to an NGC/IC/SH2/LBN entry
   const assignedVdbNums = new Set();
+
+  // Track which Barnard ids are already assigned as cross-refs to NGC/IC entries
+  const assignedBarnardIds = new Set();
 
   // ── Step 4: Process OpenNGC CSV ──────────────────────────────────────────
   const data = [];
@@ -720,6 +777,10 @@ async function main() {
     const vdbMatches = [...identifiers.matchAll(/vdB\s+(\d+)/gi)];
     const vdbIds = vdbMatches.map(m => `vdB${parseInt(m[1])}`);
     for (const m of vdbMatches) assignedVdbNums.add(parseInt(m[1]));
+
+    // NOTE: OpenNGC's Identifiers column does not carry Barnard designations,
+    // so Barnard cross-refs are handled via the curated BARNARD_ALIASES map
+    // (applied after this loop), not by scanning Identifiers here.
 
     // ── Build catalogs array ──────────────────────────────────────────────
     // Priority: M first, then NGC/IC, then LBN, then vdB
@@ -880,8 +941,57 @@ async function main() {
   }
   console.log(`Added ${vdbAdded} standalone vdB entries`);
 
+  // ── Step 9: Apply curated Barnard aliases ────────────────────────────────
+  // Append each curated Barnard id to its target object's catalogs[] (field 12)
+  // and mark it assigned so it is not emitted as a standalone duplicate marker.
+  const rowById = new Map(data.map(r => [r[0], r]));
+  let barnardMerged = 0;
+  for (const e of barnardEntries) {
+    const barnId = `Barnard${e.barn}`;
+    const targetId = BARNARD_ALIASES[barnId];
+    if (!targetId) continue;
+    const target = rowById.get(targetId);
+    if (!target) { console.warn(`Warning: Barnard alias target ${targetId} not found for ${barnId}`); continue; }
+    target[12].push(barnId);
+    assignedBarnardIds.add(e.barn);
+    barnardMerged++;
+  }
+  console.log(`Merged ${barnardMerged} Barnard aliases into existing objects`);
 
-  // ── Step 9: Large Planetary Nebulae (Vogel Large PN Observing Guide) ───────
+  // ── Step 10: Standalone Barnard dark-object entries ───────────────────────
+  // Barnard objects not merged as a curated alias above.
+  // J2000 coordinates are read directly from the catalog (no conversion needed).
+  // Diam column is already a diameter in arcminutes.
+  let barnardAdded = 0;
+  for (const e of barnardEntries) {
+    if (assignedBarnardIds.has(e.barn)) continue;
+    if (e.dec < -35) continue;
+    const barnId = `Barnard${e.barn}`;
+    const majAxis = e.diam !== null ? Math.min(e.diam, 300) : null;
+    data.push([
+      barnId,
+      Math.round(e.ra * 1000) / 1000,
+      Math.round(e.dec * 1000) / 1000,
+      'DN',
+      majAxis,
+      null,
+      0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      [barnId],
+      null,
+      null,
+      null,
+      null,
+    ]);
+    barnardAdded++;
+  }
+  console.log(`Added ${barnardAdded} standalone Barnard entries`);
+
+  // ── Step 11: Large Planetary Nebulae (Vogel Large PN Observing Guide) ───────
   // Source: "Large Planetaries Observing Guide" by Reiner Vogel (reinervogel.net)
   // Emission line data from Madsen et al. 2006, Proc IAU Symp 234.
   //
@@ -1063,7 +1173,7 @@ async function main() {
   }
   console.log(`Added ${lpnAdded} standalone Large PN entries`);
 
-  // ── Step 10: Abell Planetary Nebulae (Abell 1966) ─────────────────────────
+  // ── Step 12: Abell Planetary Nebulae (Abell 1966) ─────────────────────────
   // Source: SIMBAD TAP query 'PN A66 %' (scripts/download-abell-pn.py).
   // 86 objects total. 14 already in DB are handled separately:
   //   - Abell 21 = SH2-274 (cross-ref 'Abell21' added in existingLPNUpdates above)

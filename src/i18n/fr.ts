@@ -95,6 +95,7 @@ const fr = {
       vdB: 'van den Bergh',
       Abell: 'Abell (nébuleuses planétaires)',
       LPN: 'Nébuleuses planétaires larges',
+      Barnard: 'Barnard (nébuleuses sombres)',
     },
     typeLabels: {
       GxS: 'Galaxies spirales',

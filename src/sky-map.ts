@@ -2799,7 +2799,7 @@ export class SkyMap {
       const label = isMess ? dso.id
         : dso.id.startsWith('LPN-') ? (dso.displayName || dso.id.replace(/^LPN-/, ''))
         : dso.id.replace('NGC', 'NGC ').replace(/^IC(\d)/, 'IC $1')
-               .replace('LBN', 'LBN ').replace('LDN', 'LDN ').replace('SH2-', 'Sh2-').replace('vdB', 'vdB ').replace(/^(Abell)(\d)/, '$1 $2');
+               .replace('LBN', 'LBN ').replace('LDN', 'LDN ').replace('SH2-', 'Sh2-').replace('vdB', 'vdB ').replace(/^(Abell)(\d)/, '$1 $2').replace(/^(Barnard)(\d)/, '$1 $2');
       ctx.font = '9px sans-serif';
       ctx.fillStyle = TYPE_COLORS[dso.type] || 'rgba(160, 160, 160, 0.7)';
       ctx.fillText(label, c.x + Math.max(2, rx) + 2, c.y);

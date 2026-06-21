@@ -125394,5 +125394,53 @@
   {
     "id": "NGC7823",
     "type": "GxS"
+  },
+  {
+    "id": "Barnard68",
+    "constellation": "Oph",
+    "rating": 3,
+    "difficulty": 4,
+    "names": {
+      "en": "Black Cloud"
+    }
+  },
+  {
+    "id": "Barnard72",
+    "constellation": "Oph",
+    "rating": 3,
+    "difficulty": 4,
+    "names": {
+      "en": "Snake Nebula",
+      "fr": "Nébuleuse du Serpent"
+    }
+  },
+  {
+    "id": "Barnard86",
+    "constellation": "Sgr",
+    "rating": 3,
+    "difficulty": 3,
+    "names": {
+      "en": "Ink Spot"
+    }
+  },
+  {
+    "id": "Barnard142",
+    "constellation": "Aql",
+    "rating": 3,
+    "difficulty": 3,
+    "names": {
+      "en": "Barnard's E Nebula",
+      "fr": "Nébuleuse E de Barnard"
+    }
+  },
+  {
+    "id": "Barnard143",
+    "constellation": "Aql",
+    "rating": 3,
+    "difficulty": 3,
+    "names": {
+      "en": "Barnard's E Nebula",
+      "fr": "Nébuleuse E de Barnard"
+    }
   }
 ]

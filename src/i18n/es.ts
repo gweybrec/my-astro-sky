@@ -97,6 +97,7 @@ const es: Translations = {
       vdB: 'van den Bergh',
       Abell: 'Abell (nebulosas planetarias)',
       LPN: 'Nebulosas planetarias grandes',
+      Barnard: 'Barnard (nebulosas oscuras)',
     },
     typeLabels: {
       GxS: 'Galaxias espirales',

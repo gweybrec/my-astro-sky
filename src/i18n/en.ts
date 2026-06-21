@@ -95,6 +95,7 @@ const en: Translations = {
       vdB: 'van den Bergh',
       Abell: 'Abell Planetary Nebulae',
       LPN: 'Large planetary nebulae',
+      Barnard: "Barnard's Dark Nebulae",
     },
     typeLabels: {
       GxS: 'Spiral galaxies',

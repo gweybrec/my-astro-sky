@@ -1,26 +1,32 @@
 ---
 name: add-dso-catalog
 description: >
-  Add a new external DSO catalog (e.g. RCW, Barnard, vdBH, Abell) to the sky map.
+  Add a new external DSO catalog (e.g. RCW, vdBH) to the sky map.
   Use when asked to integrate a new catalog, wire it into generate-dso.mjs, add its
-  prefix to dso-catalog.ts and ui.ts, add i18n labels, and validate against SIMBAD.
+  prefix to dso-catalog.ts, add i18n labels (4 languages), and validate against SIMBAD.
   Trigger phrases: "add catalog", "new catalog", "integrate catalog", "wire catalog",
   "add DSO catalog", "new object catalog".
 ---
 
 # Add a New DSO Catalog
 
-This skill guides you through integrating a new external DSO catalog (e.g. RCW, Barnard, van den Bergh-Hagen, Abell, etc.) into the sky map. It follows the exact same pattern used to add LBN and LDN.
+This skill guides you through integrating a new external DSO catalog (e.g. RCW, van den Bergh-Hagen, etc.) into the sky map. It follows the same pattern used to add LBN, LDN, vdB, Abell, and Barnard.
+
+> **Verify line numbers and current code before editing — this skill names files, not exact line numbers.** The codebase moves. The constants and helpers below have already relocated once (out of `ui.ts`). Always `grep`/Read the real current state of each file before applying an edit shown here.
 
 ## Unit Test Plan (mandatory, part of the plan)
 
 Before writing any code, the plan must explicitly address unit tests:
 
 - **List every test file to create or update**, with a brief description of what each test covers.
-- New catalog parse functions (`parseXXX`) and coordinate conversion paths used for the first time are pure functions — they must be tested with representative sample rows from the catalog source.
+- If a `parseXXX` introduces a genuinely new coordinate-math path (not just reading columns), that math is the thing to cover — but note `generate-dso.mjs` itself is not in the vitest scope (see below), so in practice this means reusing/extending coverage of the underlying helper, not testing `parseXXX` directly.
 - Reusing an existing coordinate helper (`precess1950to2000`, `galacticToEquatorial`) that already has coverage does not require new tests for the helper itself, but the plan must confirm the existing tests cover the conversion path being used.
 - If no unit test changes are needed, the plan must **state the justification** (e.g. "parse function is a trivial split with no branching; coordinate path is identical to the already-tested LDN path").
 - Identifying tests is part of the plan, not an afterthought. A plan that omits this section is incomplete.
+
+**Always required:** `tests/unit/dso-catalog.test.ts` has a parametrized `getDSOCatalog()` table (`it.each([...])`). Add a row for the new prefix, e.g. `['XXX123', 'XXX']`. Editing `src/dso-catalog.ts` triggers the vitest PostToolUse hook, so this surfaces immediately.
+
+**Usually not required:** `generate-dso.mjs` is a build-time script that no test imports and is outside the vitest scope — none of the existing `parseLBN`/`parseLDN`/`parseVdB`/`parseBarnard` functions are unit-tested. A new `parseXXX` only needs a test if it does non-trivial coordinate math that isn't already covered by `precess1950to2000`/`galacticToEquatorial`. If it reads a precomputed J2000 column (no conversion), state that as the justification and verify via the regeneration spot-checks instead.
 
 Tests live in `tests/unit/`. Run with `npm test`.
 
@@ -30,12 +36,14 @@ Tests live in `tests/unit/`. Run with `npm test`.
 
 1. `scripts/generate-dso.mjs` — download, parse, merge, and output to `dso.json`
 2. `public/data/dso.json` — regenerated artifact (run the script)
-3. `src/dso-catalog.ts` — `getDSOCatalog()` needs the new prefix
-4. `src/sky-map.ts` — label formatting `.replace()` chain for the new prefix
-5. `src/ui.ts` — `DSO_CATALOGS_ALL` and `DSO_CATALOGS_DEFAULT_ON`
-6. `src/i18n/fr.ts` and `src/i18n/en.ts` — label key for the new catalog
+3. `src/dso-catalog.ts` — **three** things: the `DSOCatalog` type union, `getDSOCatalog()`, `catalogSortKey()`, **and** the `DSO_CATALOGS_ALL` array (all live here, NOT in `ui.ts`)
+4. `src/display-settings.ts` — `DSO_CATALOGS_DEFAULT_ON` set (only change if on-by-default)
+5. `src/sky-map.ts` — label formatting `.replace()` chain; `visibleDSOCatalogs` default set (only if on at startup)
+6. `src/i18n/fr.ts`, `en.ts`, `es.ts`, `de.ts` — `catalogLabels` key in **all four** languages
+7. `tests/unit/dso-catalog.test.ts` — add a row to the `getDSOCatalog()` parametrized test
+8. `scripts/dso-metadata-overrides.json` — names / constellation / rating / difficulty for notable objects (optional but recommended)
 
-`src/sky-map.ts` `visibleDSOCatalogs` default set only needs updating if the catalog should be **on at startup**.
+> The constants `DSO_CATALOGS_ALL`, `getDSOCatalog`, and `catalogSortKey` moved out of `ui.ts` into `src/dso-catalog.ts`, and `DSO_CATALOGS_DEFAULT_ON` lives in `src/display-settings.ts`. If a step below references `ui.ts`, treat it as historical and find the real location.
 
 ## Custom DSO metadata
 
@@ -60,19 +68,29 @@ If you skip the second step, the objects still exist in the map, but the target 
 
 Before writing any code, pin down:
 
-| Question | Example (LBN) | Example (LDN) |
-|---|---|---|
-| Short prefix (used as catalog key) | `LBN` | `LDN` | `vdB` |
-| Full name | Lynds Bright Nebulae | Lynds Dark Nebulae | van den Bergh |
-| DSO type code used in render | `EN` or `RN` | `DN` | `RN` |
-| Source URL (VizieR FTP or HTTP) | `https://cdsarc.cds.unistra.fr/ftp/VII/9/catalog.dat` | `https://cdsarc.cds.unistra.fr/ftp/VII/7A/ldn` | `https://cdsarc.cds.unistra.fr/ftp/VII/21/catalog.dat` |
-| Epoch / coordinate system | B1950 RA/Dec | B1950 RA/Dec | Galactic l,b (IAU 1958) |
-| On by default in UI? | No | No | No |
-| Cross-refs in OpenNGC `Identifiers` column? | Yes (`LBN NNN`) | No | No |
+| Question | LBN | LDN | vdB | Barnard |
+|---|---|---|---|---|
+| Prefix (catalog key) | `LBN` | `LDN` | `vdB` | `Barnard` |
+| Full name | Lynds Bright Nebulae | Lynds Dark Nebulae | van den Bergh | Barnard Dark Objects |
+| DSO type code | `EN`/`RN` | `DN` | `RN` | `DN` |
+| Source (VizieR FTP) | `VII/9/catalog.dat` | `VII/7A/ldn` | `VII/21/catalog.dat` | `VII/220A/barnard.dat` |
+| Epoch / coord system | B1950 RA/Dec | B1950 RA/Dec | Galactic l,b | **J2000 RA/Dec (provided directly)** |
+| On by default? | No | No | No | No |
+| Cross-refs in OpenNGC `Identifiers`? | Yes (`LBN NNN`) | No | No | **No — none at all** |
 
-Use VizieR (https://vizier.cds.unistra.fr) to find the catalog's FTP URL and column layout.
+The **prefix can be spelled out** (e.g. `Barnard`, not `B`) — confirm the user's preference, since it sets the on-map label and every id. Avoid single-letter prefixes: they collide inside other ids (a literal `B` is a substring of `LBN`) and break the label formatter (see Step 6b).
 
-> **VizieR bot protection**: As of 2026, the VizieR *website* (ReadMe pages, search UI) is protected by the Anubis CAPTCHA and cannot be fetched automatically. However, the **FTP data files** at `cdsarc.cds.unistra.fr/ftp/...` are still accessible directly without any challenge. Always use the FTP path for `fetch()`. To read the ReadMe for column offsets, use the `viz-bin/ReadMe/` URL (which may still work as a fetch target) or look it up manually in a browser first.
+Use VizieR (https://vizier.cds.unistra.fr) to find the catalog's FTP path and column layout.
+
+> **VizieR access (verified 2026):** The VizieR *website / ReadMe pages / directory listings over HTTPS* are behind the **Anubis** JS-challenge — `WebFetch` and a browser get an "Access Denied" page. **But two paths still work:**
+> 1. **The build script's plain `fetch()` to the HTTPS `/ftp/` data file path works fine** — `fetchLBN`/`fetchLDN`/`fetchVdB`/`fetchBarnard` all use `https://cdsarc.cds.unistra.fr/ftp/VII/.../file.dat` and download successfully when `node scripts/generate-dso.mjs` runs. So keep using the HTTPS `/ftp/` URL in `fetchXXX()`.
+> 2. **To read the ReadMe / list a directory during research, use the real FTP protocol via `curl`** (Anubis only guards HTTP):
+>    ```bash
+>    curl -s "ftp://cdsarc.cds.unistra.fr/cats/VII/220A/"           # directory listing
+>    curl -s "ftp://cdsarc.cds.unistra.fr/cats/VII/220A/ReadMe"     # byte-offset table
+>    curl -s "ftp://cdsarc.cds.unistra.fr/cats/VII/220A/barnard.dat" | head   # sample rows
+>    ```
+>    Note the path difference: HTTPS uses `/ftp/VII/...`, the FTP protocol uses `/cats/VII/...`.
 
 ---
 
@@ -121,10 +139,14 @@ function parseXXX(text) {
 }
 ```
 
-**Coordinate conversion**: Three cases exist:
-- **B1950 RA/Dec** (e.g. LBN, LDN): use the existing `precess1950to2000(ra50, dec50)` helper → `{ ra, dec }` in J2000 degrees.
-- **Galactic (l, b)** (e.g. vdB, VII/21): use the `galacticToEquatorial(l_deg, b_deg)` helper → `{ ra, dec }` in J2000 degrees. This function was added to `generate-dso.mjs` when implementing vdB and is available for reuse.
-- **J2000 RA/Dec**: no conversion needed.
+**Coordinate conversion** — read the ReadMe's epoch carefully, then pick one:
+- **J2000 RA/Dec already in the file**: no conversion. **Check for this first** — many "old-epoch" VizieR catalogs include a precomputed J2000 column alongside the historical one. Barnard (`VII/220A`) lists *both* B1875 and J2000 (bytes 23–44); read the J2000 columns and ignore B1875 entirely. Don't precess what's already precessed.
+- **B1950 RA/Dec** (e.g. LBN, LDN): use `precess1950to2000(ra50, dec50)` → `{ ra, dec }` J2000 degrees.
+- **Galactic (l, b)** (e.g. vdB, `VII/21`): use `galacticToEquatorial(l_deg, b_deg)` → `{ ra, dec }` J2000 degrees.
+
+> The original published Barnard catalogue was epoch 1875.0; **do not assume "old catalog ⇒ galactic" or "⇒ B1950"**. Barnard is equatorial with a precomputed J2000 column. Verify per catalog from the ReadMe.
+
+When reading fixed-width columns, remember JS `substring` is **0-indexed** while VizieR ReadMe byte ranges are **1-indexed and inclusive**: ReadMe "bytes 23-24" → `line.substring(22, 24)`. Also handle blank optional sub-fields (e.g. Barnard's seconds-of-RA column is sometimes empty → default to 0), and trim before `parseInt`/`parseFloat`.
 
 ---
 
@@ -143,62 +165,112 @@ try {
 }
 ```
 
-### 3b. Handle cross-refs from OpenNGC (if they exist)
+### 3b. Handle cross-refs / merging (avoid duplicate markers)
 
-If OpenNGC's `Identifiers` column contains references like `XXX NNN`, add extraction inside the OpenNGC processing loop (Step 4 of the existing script):
+The goal is to avoid drawing a new marker on top of an object that's already in the catalog. There are **two distinct mechanisms** — pick based on whether OpenNGC actually knows your catalog.
+
+**FIRST, check whether OpenNGC even carries the catalog.** Do not assume it does. Download the CSV and grep its `Identifiers` column:
+
+```bash
+curl -s "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv" -o /tmp/ngc.csv
+grep -o "XXX *[0-9]*" /tmp/ngc.csv | sort -u | head     # does the token appear at all?
+```
+
+LBN and vdB *are* listed in OpenNGC Identifiers. **Barnard is not — there are zero Barnard/`B NNN` tokens in the entire file**, so the Identifiers approach merges nothing for it. Knowing this up front saves you from shipping dead regex code.
+
+**Mechanism A — OpenNGC Identifiers extraction** (use only if the grep above finds the token). Inside the OpenNGC loop, mirror the LBN/vdB blocks:
 
 ```js
 const xxxMatches = [...identifiers.matchAll(/XXX\s+(\d+)/g)];
 const xxxIds = xxxMatches.map(m => `XXX${parseInt(m[1])}`);
 for (const m of xxxMatches) assignedXxxIds.add(parseInt(m[1]));
-// ... then append xxxIds to the catalogs array
-catalogs.push(...xxxIds);
+// ... then append to the catalogs array: catalogs.push(...xxxIds);
+```
+Track assigned IDs with a `Set` declared before the loop: `const assignedXxxIds = new Set();`
+
+**Mechanism B — curated alias map** (use when OpenNGC doesn't carry the catalog, like Barnard). Define a small hand-verified map and apply it after the OpenNGC loop, appending the new id onto the existing object's `catalogs[]` (field index 12) and marking it assigned so the standalone step skips it:
+
+```js
+const XXX_ALIASES = { XXX33: 'IC434', XXX168: 'IC5146' };   // verified pairs only
+// ...after data[] is built from OpenNGC:
+const rowById = new Map(data.map(r => [r[0], r]));
+for (const e of xxxEntries) {
+  const id = `XXX${e.num}`, target = XXX_ALIASES[id] && rowById.get(XXX_ALIASES[id]);
+  if (target) { target[12].push(id); assignedXxxIds.add(e.num); }
+}
 ```
 
-Track assigned IDs with a `Set` declared before the loop: `const assignedXxxIds = new Set();`
+> **Do NOT auto-merge by position.** Proximity ≠ identity. A dark nebula sitting 1–5′ from an NGC object is frequently a *different* object (e.g. Barnard 81/Barnard 298 land on the globular clusters NGC 6401/NGC 6528; Barnard 86 "Ink Spot" sits next to the open cluster NGC 6520). Naive nearest-neighbour merging produces wrong aliases and hides famous names.
+>
+> **Verify every curated pair against SIMBAD** before adding it. Query the object and inspect its identifier list:
+> ```bash
+> curl -s "https://simbad.u-strasbg.fr/simbad/sim-id?output.format=ASCII&Ident=Barnard+33"
+> ```
+> Note SIMBAD often treats a Barnard dark nebula as **distinct** from the bright NGC/IC nebula it's silhouetted against (it had no NGC/IC cross-ID for any Barnard object), while it *does* equate many Barnard objects with **LDN** entries. Treat NGC/IC pairs as a deliberate UX choice (de-duplicating iconic targets like the Horsehead/IC434), and confirm the user wants it. When the alias target already carries the popular name (IC434 = "Horsehead Nebula", IC5146 = "Cocoon Nebula"), do **not** also add that name as an override on the now-suppressed standalone id — it would be dead config.
 
 ### 3c. Append standalone entries (not already assigned via cross-refs)
 
-Add as the **last step before the sort**, after the LDN step (current Step 7). New catalogs become Step 8, 9, etc.:
+Add after the other standalone steps (vdB), before the Large-PN / Abell steps. **The `data` row now has 17 columns** and the order must match the `fields` header exactly (a short row silently misaligns every later column):
+
+```
+fields = ['id','ra','dec','type','majAxis','minAxis','pa','mag',
+          'nameFr','nameEn','nameEs','nameDe','catalogs',
+          'emissionLines','constellation','rating','difficulty']
+```
 
 ```js
 // ── Step N: Standalone XXX entries ──────────────────────────────────────────
 let xxxAdded = 0;
 for (const entry of xxxEntries) {
   if (assignedXxxIds.has(entry.id)) continue;
-  const { ra, dec } = precess1950to2000(entry.ra50, entry.dec50); // or galacticToEquatorial
+  const { ra, dec } = precess1950to2000(entry.ra50, entry.dec50); // or galacticToEquatorial, or read J2000 directly
   if (dec < -35) continue;          // southern cut-off (same as rest of catalog)
   const xxxId = `XXX${entry.id}`;
-  const nameFr = FRENCH_NAMES[xxxId] || null;
-  const nameEn = ENGLISH_NAMES[xxxId] || null;
+  const majAxis = entry.diam != null ? Math.min(entry.diam, 300) : null; // cap huge hit areas
   data.push([
-    xxxId,
-    Math.round(ra * 1000) / 1000,
-    Math.round(dec * 1000) / 1000,
-    'EN',                            // or DN / RN etc. for this catalog
-    entry.diam || null,
-    null,
-    0,
-    entry.mag || null,               // include magnitude if the catalog has it
-    nameFr,
-    nameEn,
-    [xxxId],
+    xxxId,                          // 0  id
+    Math.round(ra * 1000) / 1000,   // 1  ra
+    Math.round(dec * 1000) / 1000,  // 2  dec
+    'DN',                           // 3  type (EN/RN/DN/PN/... for this catalog)
+    majAxis,                        // 4  majAxis (arcmin)
+    null,                           // 5  minAxis
+    0,                              // 6  pa
+    entry.mag ?? null,              // 7  mag (if the catalog has it)
+    null,                           // 8  nameFr
+    null,                           // 9  nameEn
+    null,                           // 10 nameEs
+    null,                           // 11 nameDe
+    [xxxId],                        // 12 catalogs
+    null,                           // 13 emissionLines
+    null,                           // 14 constellation
+    null,                           // 15 rating
+    null,                           // 16 difficulty
   ]);
   xxxAdded++;
 }
 console.log(`Added ${xxxAdded} standalone XXX entries`);
 ```
 
-Always look up `FRENCH_NAMES` and `ENGLISH_NAMES` for notable objects so they get proper names in tooltips. Also cap `majAxis` for catalogs that include very large objects (e.g. `Math.min(entry.radius * 2, 300)`) to avoid absurdly large hit areas on the map.
+> **Names are NOT set here.** The old `FRENCH_NAMES`/`ENGLISH_NAMES` maps no longer exist. Push `null` for all four name fields; names (and `constellation`/`rating`/`difficulty`) come from `scripts/dso-metadata-overrides.json`, applied by `applyMetadataOverrides()` at the end of generation (matched by primary `id`). See "Custom DSO metadata" above. So for an object merged as an alias (Mechanism B), its standalone id no longer exists — don't add an override for it.
 
 **Finding multilingual common names:** There is no official multilingual naming API — SIMBAD only stores English names. Only add names you can verify from an authoritative source (SIMBAD name list, printed star atlases). If no sourced name exists for a language, leave that field absent rather than translating from English.
 
-### 3d. Priority of `catalogs` array
+### 3d. Priority — update `catalogSortKey()` in `src/dso-catalog.ts`
 
-The first element of the `catalogs` array becomes `dso.id`. Priority order in the codebase is:
-`M > NGC > IC > SH2 > LBN > LDN > ...new catalog`
+When an object has several catalog ids, the displayed primary is chosen by `catalogSortKey()` (lower number = higher priority). Current order:
+`M(0) > NGC(1) > IC(2) > SH2(3) > LBN(4) > LDN(5) > vdB(6) > Abell(7) > LPN(8) > Barnard(9) > default(10)`
 
-For a new catalog that is never the primary identifier (i.e. only appears as an alias on an NGC/IC/SH2/LBN object), it will always be appended at the end of the `catalogs` array. For a new catalog where the object has **no** other identifier, it becomes the sole element.
+Add your prefix and bump the trailing `return` default:
+
+```typescript
+if (id.startsWith('Abell'))   return 7;
+if (id.startsWith('LPN'))     return 8;
+if (id.startsWith('Barnard')) return 9;
+if (id.startsWith('XXX'))     return 10;   // ← new
+return 11;                                 // ← bump default
+```
+
+Where to slot the new catalog matters: a catalog that only ever appears as an *alias* on a brighter object (Barnard on IC434) belongs **last** so the bright id stays primary. But if your catalog is the *more canonical* designation for an object it shares with a lower-priority catalog (e.g. Barnard vs LDN for the same dark nebula — "Barnard 72 / Snake Nebula" should win over "LDN 66"), give it a *higher* priority than that catalog so the famous name is shown. Decide deliberately.
 
 ---
 
@@ -209,115 +281,119 @@ node scripts/generate-dso.mjs
 ```
 
 Check the output:
-- Count of parsed and added entries (printed to console)
+- Console counts: `Parsed N entries`, `Added N standalone entries`, and (if Mechanism B) `Merged N aliases`. **Reconcile the numbers** — `parsed − standalone` should equal `merged + southern-cutoff skips`, not be silently assumed to be merges.
 - File size change in `public/data/dso.json`
-- Spot-check a known object in the terminal:
+- Spot-check a standalone object:
   ```bash
   node -e "
   const d = JSON.parse(require('fs').readFileSync('public/data/dso.json'));
-  const f = d.fields; const idI = f.indexOf('id'), raI = f.indexOf('ra'), decI = f.indexOf('dec'), majI = f.indexOf('majAxis'), enI = f.indexOf('nameEn');
-  const obj = d.data.find(r => r[idI] === 'XXX123');
-  console.log(obj ? [obj[raI], obj[decI], obj[majI], obj[enI]] : 'NOT FOUND');
+  const f = d.fields, I = x => f.indexOf(x);
+  const o = d.data.find(r => r[I('id')] === 'XXX123');
+  console.log(o ? [o[I('ra')], o[I('dec')], o[I('type')], o[I('majAxis')], o[I('nameEn')]] : 'NOT FOUND');
+  "
+  ```
+- If you used a curated alias map, verify the **merge** (alias appended to the target, no standalone duplicate, search resolves):
+  ```bash
+  node -e "
+  const d = JSON.parse(require('fs').readFileSync('public/data/dso.json'));
+  const f = d.fields, I = x => f.indexOf(x);
+  const t = d.data.find(r => r[I('id')] === 'IC434');
+  console.log('target catalogs:', t[I('catalogs')]);                              // should include XXX33
+  console.log('standalone gone:', !d.data.find(r => r[I('id')] === 'XXX33'));     // should be true
   "
   ```
 
+Then run `npm test` (the `dso-catalog.test.ts` change + hook) and `npm run build` to confirm types and the full suite are green before finishing.
+
 ---
 
-## Step 5 — Add the prefix to `getDSOCatalog()` in `src/dso-catalog.ts`
+## Step 5 — Update `src/dso-catalog.ts` (type, `getDSOCatalog`, `DSO_CATALOGS_ALL`)
+
+All three live in this file. Add `'XXX'` to the type union and the master list, and a branch to the resolver (and don't forget `catalogSortKey()` from Step 3d):
 
 ```typescript
+export type DSOCatalog = 'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard' | 'XXX';
+
+export const DSO_CATALOGS_ALL: DSOCatalog[] = ['M','NGC','IC','SH2','LBN','LDN','vdB','Abell','LPN','Barnard','XXX'];
+
 export function getDSOCatalog(id: string): DSOCatalog | null {
   if (/^M\d/.test(id)) return 'M';
-  if (id.startsWith('NGC')) return 'NGC';
-  if (id.startsWith('IC')) return 'IC';
-  if (id.startsWith('SH2')) return 'SH2';
-  if (id.startsWith('LBN')) return 'LBN';
-  if (id.startsWith('LDN')) return 'LDN';
-  if (id.startsWith('vdB')) return 'vdB';
-  if (id.startsWith('XXX')) return 'XXX';   // ← add this line
+  // ...existing branches...
+  if (id.startsWith('Barnard')) return 'Barnard';
+  if (id.startsWith('XXX')) return 'XXX';   // ← add
   return null;
 }
 ```
 
-Also add `'XXX'` to the `DSOCatalog` type:
-
-```typescript
-export type DSOCatalog = 'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'XXX';
-```
-
-> **Prefix order matters**: if any catalog prefix is a prefix of another (e.g. a hypothetical `vdBH` and `vdB`), check the more specific one first. All current prefixes are unambiguous.
+> **Prefix order matters**: if any prefix is a substring-prefix of another, check the more specific one first. (`vdB` precedes a hypothetical `vdBH`.) Single-letter prefixes are forbidden — see Step 6b.
 
 ---
 
-## Step 6 — Update `src/ui.ts`
+## Step 6 — Default-on set (`src/display-settings.ts`)
 
-Two constants at the top of the file (around line 63):
+`DSO_CATALOGS_DEFAULT_ON` controls which catalogs are checked at startup. **New catalogs are off by default** (LBN, LDN, vdB, Abell, LPN, Barnard all are) — usually leave this file untouched:
 
 ```typescript
-const DSO_CATALOGS_ALL = ['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'XXX'];
-// Only add to DEFAULT_ON if this catalog has ≤ ~2000 entries and good average mag.
-// LBN, LDN, vdB are off by default; new catalogs should usually also be off by default.
-const DSO_CATALOGS_DEFAULT_ON = new Set(['M', 'NGC', 'IC', 'SH2']);
+export const DSO_CATALOGS_DEFAULT_ON = new Set(['M', 'NGC', 'IC', 'SH2']);
 ```
 
-No other changes needed — the checkbox loop reads `DSO_CATALOGS_ALL` automatically and pulls the label from `t('dso.catalogLabels.XXX')`.
+No checkbox wiring is needed — the Display panel iterates `DSO_CATALOGS_ALL` and pulls each label from `t('dso.catalogLabels.XXX')`.
 
 ---
 
 ## Step 6b — Update the DSO label formatter in `src/sky-map.ts`
 
-Find the label formatting line (search for `replace('LBN'`) and add the new catalog's spacing rule:
+Find the label line (search for `replace('LBN'`) and add an **anchored** spacing rule:
 
 ```typescript
 const label = isMess ? dso.id
+  : dso.id.startsWith('LPN-') ? (dso.displayName || dso.id.replace(/^LPN-/, ''))
   : dso.id.replace('NGC', 'NGC ').replace(/^IC(\d)/, 'IC $1')
          .replace('LBN', 'LBN ').replace('LDN', 'LDN ').replace('SH2-', 'Sh2-')
-         .replace('vdB', 'vdB ').replace('XXX', 'XXX ');  // ← add
+         .replace('vdB', 'vdB ').replace(/^(Abell)(\d)/, '$1 $2')
+         .replace(/^(Barnard)(\d)/, '$1 $2')
+         .replace(/^(XXX)(\d)/, '$1 $2');   // ← add, anchored to start
 ```
 
-This inserts a space between the prefix and the number so canvas labels read `"XXX 123"` rather than `"XXX123"`.
+> **Use an anchored `/^PREFIX(\d)/` regex, NOT a bare `.replace('XXX', 'XXX ')`.** A bare replace rewrites the first match *anywhere* in the string — e.g. `.replace('B', 'B ')` would turn `LBN123` into `LB N123`. This is exactly why single-letter prefixes are banned and why `Abell`/`Barnard` use the anchored form.
 
 ---
 
-## Step 7 — Add i18n labels
+## Step 7 — Add i18n labels (all FOUR languages)
 
-### `src/i18n/fr.ts`
-
-In the `dso.catalogLabels` object (current state includes vdB):
+Add the `XXX` key to the `dso.catalogLabels` object in **`fr.ts`, `en.ts`, `es.ts`, and `de.ts`**. A missing key renders a blank checkbox label. Example (Barnard):
 
 ```typescript
-catalogLabels: {
-  M: 'Messier',
-  NGC: 'NGC',
-  IC: 'IC',
-  SH2: 'Sharpless',
-  LBN: 'Lynds (nébuleuses brillantes)',
-  LDN: 'Lynds (nébuleuses sombres)',
-  vdB: 'van den Bergh',
-  XXX: 'Nom complet FR',   // ← add
-},
+// src/i18n/fr.ts
+XXX: 'Barnard (nébuleuses sombres)',
+// src/i18n/en.ts
+XXX: "Barnard's Dark Nebulae",
+// src/i18n/es.ts
+XXX: 'Barnard (nebulosas oscuras)',
+// src/i18n/de.ts
+XXX: 'Barnard (Dunkelnebel)',
 ```
 
-### `src/i18n/en.ts`
+---
+
+## Step 7b — Update `tests/unit/dso-catalog.test.ts`
+
+Add a row to the parametrized `getDSOCatalog()` table (cover any id quirks too, e.g. a letter suffix like `Barnard67a`):
 
 ```typescript
-catalogLabels: {
-  M: 'Messier',
-  NGC: 'NGC',
-  IC: 'IC',
-  SH2: 'Sharpless',
-  LBN: "Lynds' Bright Nebulae",
-  LDN: "Lynds' Dark Nebulae",
-  vdB: 'van den Bergh',
-  XXX: 'Full English Name',   // ← add
-},
+it.each([
+  // ...existing rows...
+  ['XXX123', 'XXX'],
+])('getDSOCatalog(%s) === %s', (id, expected) => {
+  expect(getDSOCatalog(id)).toBe(expected);
+});
 ```
 
 ---
 
 ## Step 8 — Update `src/sky-map.ts` default set (optional)
 
-`visibleDSOCatalogs` defaults to `new Set(['M', 'NGC', 'IC', 'SH2'])` (around line 89). This controls what is rendered at startup. If the new catalog should be **visible by default** at startup, add it here. Otherwise leave it unchanged — the UI checkbox will start unchecked and the rendering will skip it.
+`visibleDSOCatalogs` defaults to `new Set(['M', 'NGC', 'IC', 'SH2'])`. This controls what is rendered at startup. If the new catalog should be **visible by default**, add it here (and to `DSO_CATALOGS_DEFAULT_ON` in Step 6). Otherwise leave both unchanged — the checkbox starts unchecked and rendering skips it.
 
 ---
 
@@ -370,6 +446,12 @@ OpenNGC's SH2 coordinates are **wrong for ~96 out of 259 objects** (errors of 2�
 - Query SIMBAD as `Sh2-NNN` (hyphen, mixed case). `Sh2 NNN` (space) returns NOT FOUND.
 - Worst-affected regions: SH2-1 to SH2-49 (Galactic centre), SH2-171 to SH2-220 (Perseus/Cassiopeia), SH2-238/239/245 (Taurus/Orion fringe).
 
+### Barnard (dark objects) — not in OpenNGC, distinct from IC/NGC in SIMBAD
+
+- OpenNGC's `Identifiers` column contains **no** Barnard references, so cross-refs are handled by the curated `BARNARD_ALIASES` map in `generate-dso.mjs` (currently `Barnard33→IC434`, `Barnard168→IC5146`), not by Identifiers scanning.
+- SIMBAD treats every Barnard dark nebula as a **distinct object** from the bright IC/NGC nebula it is silhouetted against (no NGC/IC cross-ID for any Barnard object), but **does** equate many Barnard objects with **LDN** entries (e.g. B86=LDN93, B92=LDN323). So Barnard↔IC/NGC merges are a deliberate de-duplication choice; Barnard↔LDN would be true identity (not yet merged).
+- Source `VII/220A` provides J2000 directly (bytes 23–44); ids use the spelled-out `Barnard` prefix. A few ids carry a letter suffix (`67a`, `83a`, `117a`).
+
 ### Abell planetary nebulae (LPN-AbellN)
 
 SIMBAD resolves plain "Abell N" to **galaxy clusters** (ACO N), not planetary nebulae. Always use the PN G identifier (stored in the `catalogs` array, e.g. `PN G318.4+41.4`) to verify in SIMBAD. The validation script already handles this (`PN A66 N` query format). All LPN-Abell* coordinates have been verified correct.
@@ -394,12 +476,16 @@ When adding new objects, check whether the French name collides with an existing
 
 ## Common pitfalls
 
-- **Coordinate system**: Check the ReadMe carefully. Three cases: B1950 RA/Dec (use `precess1950to2000()`), galactic l/b (use `galacticToEquatorial()`, implemented for vdB), or J2000 (no conversion). Old catalogs like Barnard, RCW, and vdB are galactic; LBN, LDN are B1950.
-- **VizieR bot protection**: The VizieR web UI (ReadMe pages, search) may be blocked by CAPTCHA when fetched programmatically. The raw FTP data files at `cdsarc.cds.unistra.fr/ftp/...` work fine. Use a browser to read the ReadMe for byte offsets, then use FTP URLs in `fetch()`.
-- **Southern cut-off**: The map uses a northern polar projection. Objects with `dec < -35` are off the visible map — the script skips them. If your catalog is purely southern, it won't add anything visible.
-- **Duplicate IDs**: If two objects end up with the same primary ID in `data`, the later one silently overwrites the former in the `dsoById` map. Check console for unexpected count drops.
-- **`assignedXxxIds` not initialized**: Must be declared as `const assignedXxxIds = new Set();` *before* the OpenNGC loop if cross-refs are extracted inside that loop.
-- **Label key missing**: If `t('dso.catalogLabels.XXX')` returns undefined, the checkbox label will be blank. Check that both `fr.ts` and `en.ts` have the key.
-- **`getDSOCatalog` returning null**: If the prefix isn't registered, catalog filtering will treat all XXX objects as unfiltered and always visible regardless of the checkbox state. Always add the prefix to both `DSOCatalog` type and `getDSOCatalog()`.
-- **Label formatting**: If the `.replace()` chain in `sky-map.ts` doesn't include the new prefix, canvas labels will read `"XXX123"` without spacing. Add `.replace('XXX', 'XXX ')` to the chain (Step 6b).
-- **Size capping**: Some catalogs include objects with very large angular radii (e.g. vdB 36 at 410'). Cap `majAxis` to avoid absurdly large hit areas: `Math.min(entry.radius * 2, 300)`.
+- **Coordinate system — verify per catalog, don't guess by age**: Read the ReadMe. Four cases: J2000 already present (no conversion — **check first**), B1950 (`precess1950to2000()`), galactic l/b (`galacticToEquatorial()`), or other. "Old catalog" tells you nothing: Barnard (1875/1927) is **equatorial with a precomputed J2000 column**, not galactic; vdB is galactic; LBN/LDN are B1950. The earlier version of this skill wrongly listed Barnard as galactic — don't trust memory, read the bytes.
+- **1-indexed ReadMe vs 0-indexed substring**: VizieR byte ranges are 1-indexed inclusive; `line.substring(start-1, end)`. Off-by-one here silently shifts every field.
+- **VizieR access**: HTTPS website/ReadMe/dir-listing is Anubis-walled (`WebFetch`/browser get "Access Denied"). But the build script's `fetch()` to the HTTPS `/ftp/.../*.dat` data file works, and `curl ftp://cdsarc.cds.unistra.fr/cats/...` (FTP protocol) works for ReadMe/listings. See Step 1.
+- **Assuming OpenNGC carries your catalog**: It carries LBN and vdB but **not** Barnard (zero tokens). `grep` the CSV before writing Identifiers-regex code, or it's dead code. Use a curated alias map instead (Step 3b, Mechanism B).
+- **Proximity ≠ identity**: Never auto-merge a new object onto its nearest existing object. Dark nebulae routinely sit next to unrelated clusters (Barnard 81→NGC 6401 globular, Barnard 86→NGC 6520 open cluster). Verify each curated pair in SIMBAD.
+- **Row field count**: A `data.push([...])` must have **17 elements** matching the `fields` header. A short row misaligns `catalogs`/`constellation`/`rating`/etc. for that object with no error.
+- **Names aren't set in `generate-dso.mjs`**: `FRENCH_NAMES`/`ENGLISH_NAMES` are gone. Push `null`; add names to `scripts/dso-metadata-overrides.json` (4 languages). Don't add an override for an id that was merged away as an alias.
+- **`catalogSortKey()` forgotten**: If you add the prefix to `getDSOCatalog()` but not `catalogSortKey()`, merged objects may pick the wrong primary id for display.
+- **Southern cut-off**: `dec < -35` objects are skipped (northern polar projection). A purely-southern catalog adds nothing visible.
+- **Label formatting — anchored regex only**: Use `.replace(/^(XXX)(\d)/, '$1 $2')`. A bare `.replace('B', 'B ')` corrupts substrings (`LBN` → `LB N`). Single-letter prefixes are banned for this reason.
+- **`getDSOCatalog` returning null**: An unregistered prefix makes those objects ignore the visibility checkbox (treated as unfiltered). Always register in both the `DSOCatalog` type and `getDSOCatalog()`.
+- **i18n key missing in any of 4 files**: A blank label means `fr/en/es/de` `catalogLabels.XXX` is missing somewhere.
+- **Size capping**: Cap `majAxis` for catalogs with huge objects: `Math.min(diam, 300)` — avoids absurd hit areas.

@@ -179,8 +179,10 @@ describe('getDSOCatalog()', () => {
     ['LBN254',  'LBN'],
     ['LDN1622', 'LDN'],
     ['vdB141',  'vdB'],
-    ['Abell21', 'Abell'],
-    ['LPN-1',   'LPN'],
+    ['Abell21',    'Abell'],
+    ['LPN-1',      'LPN'],
+    ['Barnard33',  'Barnard'],
+    ['Barnard67a', 'Barnard'],
   ])('getDSOCatalog(%s) === %s', (id, expected) => {
     expect(getDSOCatalog(id)).toBe(expected);
   });
