@@ -256,6 +256,25 @@ describe('searchDSOs()', () => {
     expect(searchDSOs('ngc 1976')[0]?.dso.id).toBe('M42');
   });
 
+  it('matches dotted aliases stored with spaces ("PK 217+14.1" → Abell24)', () => {
+    // Regression: the canonical "PK 217+14.1" is stored as "PK 217+14  1"
+    // (dot → double space). Neither "PK 217+14.1" nor "PK 217" matched because
+    // the query stripped spaces while the alias kept them.
+    const abell24: DSO = {
+      id: 'Abell24', ra: 112.3, dec: 3.0, type: 'PN', majAxis: 6, minAxis: 6, pa: 0,
+      mag: null, displayName: null, catalogs: ['Abell24', 'PK 217+14  1', 'PN G217.1+14.7'],
+      emissionLines: null, constellation: 'CMi', rating: 1, difficulty: 5,
+    };
+    mockGetDSOs.mockReturnValue([...TEST_DSOS, abell24]);
+    try {
+      expect(searchDSOs('PK 217+14.1')[0]?.dso.id).toBe('Abell24');
+      expect(searchDSOs('PK 217+14 1')[0]?.dso.id).toBe('Abell24');
+      expect(searchDSOs('PK 217').some(r => r.dso.id === 'Abell24')).toBe(true);
+    } finally {
+      mockGetDSOs.mockReturnValue(TEST_DSOS);
+    }
+  });
+
   it('formats LPN labels by stripping prefix when displayName is missing', () => {
     const lpn: DSO = {
       id: 'LPN-123',

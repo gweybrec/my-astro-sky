@@ -148,14 +148,24 @@ function dsoLabel(dso: DSO): string {
   return `${dso.id}${crossRefs || ` (${typeName})`}`;
 }
 
+/**
+ * Normalize a catalog designation for matching by dropping whitespace and dots.
+ * Catalog ids carry no internal spaces, and some aliases store the component
+ * separator inconsistently — e.g. the canonical "PK 217+14.1" is stored as
+ * "PK 217+14  1". Collapsing both to "pk217+141" lets either form match.
+ */
+function normCatId(s: string): string {
+  return s.toLowerCase().replace(/[\s.]+/g, '');
+}
+
 export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
   if (!query || query.length < 1) return [];
 
   const normalized = normalizeGreekLetters(query);
   const q = normalized.toLowerCase().trim();
-  // Catalog ids have no internal spaces, so match them space-insensitively:
-  // "barnard 33", "ngc 1976" and "m 42" should resolve like "barnard33" etc.
-  const qId = q.replace(/\s+/g, '');
+  // Match catalog ids space- and dot-insensitively: "barnard 33", "ngc 1976",
+  // "m 42" and "PK 217+14.1" resolve like "barnard33", "pk217+141", etc.
+  const qId = normCatId(q);
   const results: DSOSearchResult[] = [];
 
   for (const dso of getDSOs()) {
@@ -165,7 +175,7 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
     // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42, and
     // Barnard33 finds IC434). Distinguish exact from prefix: an exact alias is
     // the precise designation the user typed and must rank with an exact id.
-    const catsLower = dso.catalogs.map(c => c.toLowerCase());
+    const catsLower = dso.catalogs.map(c => normCatId(c));
     const aliasExact = catsLower.some(c => c === qId);
     const aliasPrefix = catsLower.some(c => c.startsWith(qId));
 
