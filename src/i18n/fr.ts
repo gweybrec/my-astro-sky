@@ -894,6 +894,7 @@ const fr = {
     infoHint: 'Entrez le nom d\'un objet (ex. M42) pour aider le solveur à localiser la zone du ciel.',
     infoPlacementTitle: 'Placement sur la carte',
     infoPlacement: 'Une fois la résolution terminée, cliquez sur « Sauvegarder et placer sur la carte » pour enregistrer les photos et les afficher sur la carte. Fermez la fenêtre sans cliquer sur ce bouton pour annuler — les photos non sauvegardées ne seront pas conservées.',
+    addMore: 'Ajouter d\'autres photos',
     labelsForAll: 'Étiquettes pour toutes les photos',
     labelsForAllHint: 'Ajoutées à chaque photo ; combinez avec les étiquettes par photo.',
   },
