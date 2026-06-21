@@ -136,13 +136,20 @@ export function getDSOTypeName(type: string): string {
 
 function dsoLabel(dso: DSO): string {
   const typeName = getDSOTypeName(dso.type);
-  const crossRefs = dso.catalogs.length > 1 ? ` (${dso.catalogs.slice(1).join(' · ')})` : '';
+  // Drop internal "LPN-xxx" ids from cross refs (consistent with the tooltip/info panel)
+  const crossRefList = dso.catalogs.slice(1).filter(c => !c.startsWith('LPN-'));
+  const crossRefs = crossRefList.length ? ` (${crossRefList.join(' · ')})` : '';
   if (dso.id.startsWith('LPN-')) {
     // For LPN objects, show displayName or stripped id (no "LPN-xxx" prefix in label)
     const name = dso.displayName || dso.id.replace(/^LPN-/, '');
     return `${name}${crossRefs || ` (${typeName})`}`;
   }
   if (dso.displayName) {
+    // When the display name is just the spaced-out id (e.g. id "Abell24",
+    // name "Abell 24"), don't repeat it — show the nicer spaced name alone.
+    if (normCatId(dso.id) === normCatId(dso.displayName)) {
+      return `${dso.displayName}${crossRefs}`;
+    }
     return `${dso.id} – ${dso.displayName}${crossRefs}`;
   }
   return `${dso.id}${crossRefs || ` (${typeName})`}`;

@@ -275,6 +275,20 @@ describe('searchDSOs()', () => {
     }
   });
 
+  it('does not repeat id and name when the name is just the spaced-out id', () => {
+    // Regression: id "Abell24" + displayName "Abell 24" produced the redundant
+    // label "Abell24 – Abell 24". Internal LPN- ids are also dropped from refs.
+    const abell24: DSO = {
+      id: 'Abell24', ra: 112.3, dec: 3.0, type: 'PN', majAxis: 6, minAxis: 6, pa: 0,
+      mag: null, displayName: 'Abell 24',
+      catalogs: ['Abell24', 'LPN-Abell24', 'PN G217.1+14.7'],
+      emissionLines: null, constellation: 'CMi', rating: 1, difficulty: 5,
+    };
+    mockGetDSOs.mockReturnValueOnce([...TEST_DSOS, abell24]);
+    const result = searchDSOs('Abell24')[0];
+    expect(result.label).toBe('Abell 24 (PN G217.1+14.7)');
+  });
+
   it('formats LPN labels by stripping prefix when displayName is missing', () => {
     const lpn: DSO = {
       id: 'LPN-123',
