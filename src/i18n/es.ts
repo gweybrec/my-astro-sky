@@ -898,6 +898,7 @@ const es: Translations = {
     infoHint: 'Introduce el nombre de un objeto (ej. M42) para ayudar al solver a localizar la zona del cielo.',
     infoPlacementTitle: 'Colocación en el mapa',
     infoPlacement: 'Una vez finalizada la resolución, haz clic en «Guardar y colocar en el mapa» para guardar las fotos y mostrarlas en el mapa. Cerrar la ventana sin hacer clic en ese botón descarta los cambios — las soluciones no guardadas no se conservarán.',
+    addMore: 'Añadir más fotos',
     labelsForAll: 'Etiquetas para todas las fotos',
     labelsForAllHint: 'Se añaden a cada foto; combínalas con las etiquetas por foto.',
   },

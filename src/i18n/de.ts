@@ -898,6 +898,7 @@ const de: Translations = {
     infoHint: 'Einen Objektnamen eingeben (z. B. M42), um dem Solver zu helfen, die Himmelsregion zu finden.',
     infoPlacementTitle: 'Auf Karte platzieren',
     infoPlacement: 'Nach Abschluss der Lösung auf «Speichern und auf Karte platzieren» klicken, um Fotos zu speichern und auf der Karte anzuzeigen. Fenster ohne Klick schließen, um zu verwerfen — nicht gespeicherte Lösungen bleiben nicht erhalten.',
+    addMore: 'Weitere Fotos hinzufügen',
     labelsForAll: 'Etiketten für alle Fotos',
     labelsForAllHint: 'Wird jedem Foto hinzugefügt; kombinierbar mit Foto-eigenen Etiketten.',
   },

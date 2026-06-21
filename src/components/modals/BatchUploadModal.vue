@@ -17,8 +17,9 @@
 
       <!-- Batch labels bar -->
       <div class="batch-labels-bar">
-        <span class="batch-labels-bar-title">{{ t('batch.labelsForAll') }}</span>
-        <div class="batch-labels-input-row">
+        <div class="batch-labels-bar-main">
+          <span class="batch-labels-bar-title">{{ t('batch.labelsForAll') }}</span>
+          <div class="batch-labels-input-row">
           <div v-if="batchLabels.length > 0" class="tag-chips">
             <span v-for="lbl in batchLabels" :key="lbl" class="tag-chip label-chip">
               {{ lbl }}
@@ -45,7 +46,16 @@
             </div>
           </div>
         </div>
-        <p class="batch-labels-bar-hint">{{ t('batch.labelsForAllHint') }}</p>
+          <p class="batch-labels-bar-hint">{{ t('batch.labelsForAllHint') }}</p>
+        </div>
+        <button
+          class="btn-action batch-add-more-btn"
+          :title="t('batch.addMore')"
+          @click="addMorePhotos"
+        >
+          <span class="batch-add-more-icon" v-html="addPhotoSvg"></span>
+          <span>{{ t('batch.addMore') }}</span>
+        </button>
       </div>
 
       <!-- Card list -->
@@ -137,6 +147,7 @@ import { placeBatchItem } from '../../batch-place';
 import { showToast } from '../../toast';
 import BatchCard from './BatchCard.vue';
 import CheckRow from '../base/CheckRow.vue';
+import addPhotoSvg from '../../icons/add-photo.svg?raw';
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -196,9 +207,13 @@ rememberFilters(
 const pendingFiles = uiStore.pendingBatchFiles ?? [];
 uiStore.pendingBatchFiles = null;
 
-const items = reactive<BatchItem[]>(
-  pendingFiles.map((file, idx) => ({
-    id: `batch-${Date.now()}-${idx}`,
+// Running counter so appended items always get a unique id (Date.now() alone can
+// collide when several files are added within the same millisecond).
+let itemSeq = 0;
+
+function createBatchItem(file: File): BatchItem {
+  return {
+    id: `batch-${Date.now()}-${itemSeq++}`,
     file,
     thumbBlobUrl: null,
     solver: defaultSolver(),
@@ -223,8 +238,34 @@ const items = reactive<BatchItem[]>(
     pollingTimer: null,
     solveAbort: null,
     metaOpen: false,
-  })),
-);
+  };
+}
+
+const items = reactive<BatchItem[]>(pendingFiles.map(createBatchItem));
+
+// ─── Add more photos without closing the modal ─────────────────────────────────
+function addMorePhotos() {
+  const allowedExt = /\.(jpe?g|png|webp)$/i;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
+  input.multiple = true;
+  input.onchange = () => {
+    if (!input.files || input.files.length === 0) return;
+    const selected = Array.from(input.files);
+    const valid = selected.filter(f => allowedExt.test(f.name));
+    if (valid.length === 0) {
+      showToast({ message: t('errors.invalidPhotoFormat'), type: 'error', duration: 3500 });
+      return;
+    }
+    if (valid.length !== selected.length) {
+      showToast({ message: t('errors.someFilesSkipped'), type: 'error', duration: 3500 });
+    }
+    // New items join as 'pending', bumping the total/unsolved count in the footer.
+    items.push(...valid.map(createBatchItem));
+  };
+  input.click();
+}
 
 // ─── Close / cleanup ──────────────────────────────────────────────────────────
 let cancelled = false;

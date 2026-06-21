@@ -4295,6 +4295,15 @@ details.targets-form-details[open] .targets-form-summary::before {
   background: var(--bg-deep);
   flex-shrink: 0;
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.batch-labels-bar-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
@@ -4303,6 +4312,29 @@ details.targets-form-details[open] .targets-form-summary::before {
   font-size: var(--font-size-small);
   color: var(--text-dim);
   font-weight: 500;
+}
+
+.batch-add-more-btn {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.batch-add-more-icon {
+  display: inline-block;
+  /* Measured against Arial cap metrics: the icon glyph occupies y 2..21 of its
+     24-unit viewBox, so at 0.919em the glyph height equals the cap height, and
+     vertical-align: -0.115em seats the glyph bottom on the text baseline. Net
+     result: the icon spans exactly the capital-letter band (cap-top → baseline). */
+  vertical-align: -0.115em;
+  margin-right: var(--space-2);
+}
+
+.batch-add-more-icon svg {
+  display: block;
+  width: 0.919em;
+  height: 0.919em;
 }
 
 .batch-labels-input-row {

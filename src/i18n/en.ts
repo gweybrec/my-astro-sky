@@ -896,6 +896,7 @@ const en: Translations = {
     infoHint: 'Enter an object name (e.g. M42) to help the solver locate the sky region.',
     infoPlacementTitle: 'Placing on the map',
     infoPlacement: 'Once solving is done, click “Save and place on map” to save photos and display them on the map. Close the window without clicking that button to discard — unsaved solves will not be kept.',
+    addMore: 'Add more photos',
     labelsForAll: 'Labels for all photos',
     labelsForAllHint: 'Added to every photo; combine with per-photo labels below.',
   },
