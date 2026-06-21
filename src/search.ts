@@ -153,24 +153,29 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
 
   const normalized = normalizeGreekLetters(query);
   const q = normalized.toLowerCase().trim();
+  // Catalog ids have no internal spaces, so match them space-insensitively:
+  // "barnard 33", "ngc 1976" and "m 42" should resolve like "barnard33" etc.
+  const qId = q.replace(/\s+/g, '');
   const results: DSOSearchResult[] = [];
 
   for (const dso of getDSOs()) {
     let score = 0;
     const idLower = dso.id.toLowerCase();
     const nameLower = dso.displayName ? dso.displayName.toLowerCase() : '';
-    // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42)
-    const aliasMatch = dso.catalogs.some(c => {
-      const cl = c.toLowerCase();
-      return cl === q || cl.startsWith(q);
-    });
+    // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42, and
+    // Barnard33 finds IC434). Distinguish exact from prefix: an exact alias is
+    // the precise designation the user typed and must rank with an exact id.
+    const catsLower = dso.catalogs.map(c => c.toLowerCase());
+    const aliasExact = catsLower.some(c => c === qId);
+    const aliasPrefix = catsLower.some(c => c.startsWith(qId));
 
-    // 1. Exact ID match
-    if (idLower === q) {
+    // 1. Exact match on the primary id OR any catalog alias (the exact thing typed).
+    //    e.g. "barnard33" → IC434 must beat "barnard330" (a mere id prefix).
+    if (idLower === qId || aliasExact) {
       score = 100;
     }
     // 2. ID prefix match
-    else if (idLower.startsWith(q)) {
+    else if (idLower.startsWith(qId)) {
       score = 90;
     }
     // 3. Exact name match
@@ -179,25 +184,26 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
     }
     // 4. Name starts with query
     else if (nameLower && nameLower.startsWith(q)) {
-      score = 65;
+      score = 70;
     }
-    // 5. Name contains query
+    // 5. Alias prefix match (e.g. "ngc19" → NGC1976, alias of M42)
+    else if (aliasPrefix) {
+      score = 60;
+    }
+    // 6. Name contains query
     else if (nameLower && nameLower.includes(q)) {
       score = 40;
     }
-    // 6. Alias exact/prefix match (e.g. "ngc1976" or "lbn974")
-    else if (aliasMatch) {
-      score = 50;
-    }
     // 7. Partial ID match (e.g. "ngc70" matches "NGC7000")
-    else if (idLower.includes(q)) {
-      score = 25;
+    else if (idLower.includes(qId)) {
+      score = 30;
     }
 
     if (score > 0) {
-      // Brightness boost
+      // Brightness boost — capped below the 10-point tier gap so an exact match
+      // always outranks a prefix match regardless of object brightness.
       const mag = dso.mag ?? 14;
-      score += Math.max(0, (10 - mag) * 1.5);
+      score += Math.min(9, Math.max(0, (10 - mag) * 1.5));
       results.push({ dso, label: dsoLabel(dso), score });
     }
   }

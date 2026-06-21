@@ -227,6 +227,35 @@ describe('searchDSOs()', () => {
     expect(exact.score).toBeGreaterThanOrEqual(prefix.score);
   });
 
+  it('exact alias ranks first over other objects whose id merely has the query as a prefix', () => {
+    // Regression: searching "Barnard33" returned Barnard330..337 (id-prefix) and
+    // never IC434, which carries "Barnard33" as an exact alias.
+    const ic434: DSO = {
+      id: 'IC434', ra: 85.2, dec: -2.45, type: 'EN', majAxis: 90, minAxis: 30, pa: 0,
+      mag: null, displayName: 'Horsehead Nebula', catalogs: ['IC434', 'LBN953', 'Barnard33'],
+      emissionLines: null, constellation: 'Ori', rating: 5, difficulty: 3,
+    };
+    const b330: DSO = {
+      id: 'Barnard330', ra: 270, dec: -25, type: 'DN', majAxis: 5, minAxis: 5, pa: 0,
+      mag: null, displayName: null, catalogs: ['Barnard330'],
+      emissionLines: null, constellation: 'Sgr', rating: 1, difficulty: 3,
+    };
+    mockGetDSOs.mockReturnValueOnce([b330, ic434]);
+    const results = searchDSOs('Barnard33');
+    expect(results[0].dso.id).toBe('IC434');
+  });
+
+  it('matches catalog ids ignoring spaces ("Barnard 33" → IC434, "ngc 1976" → M42)', () => {
+    const ic434: DSO = {
+      id: 'IC434', ra: 85.2, dec: -2.45, type: 'EN', majAxis: 90, minAxis: 30, pa: 0,
+      mag: null, displayName: 'Horsehead Nebula', catalogs: ['IC434', 'Barnard33'],
+      emissionLines: null, constellation: 'Ori', rating: 5, difficulty: 3,
+    };
+    mockGetDSOs.mockReturnValueOnce([ic434]);
+    expect(searchDSOs('Barnard 33')[0]?.dso.id).toBe('IC434');
+    expect(searchDSOs('ngc 1976')[0]?.dso.id).toBe('M42');
+  });
+
   it('formats LPN labels by stripping prefix when displayName is missing', () => {
     const lpn: DSO = {
       id: 'LPN-123',

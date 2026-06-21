@@ -235,15 +235,16 @@ function catalogSortKey(id: string): number {
   if (id.startsWith('LBN')) return 4;
   if (id.startsWith('LDN')) return 5;
   if (id.startsWith('vdB'))   return 6;
-  if (id.startsWith('Abell')) return 7;
-  if (id.startsWith('LPN'))   return 8;
-  return 9;
+  if (id.startsWith('Abell'))   return 7;
+  if (id.startsWith('LPN'))     return 8;
+  if (id.startsWith('Barnard')) return 9;
+  return 10;
 }
 
-export type DSOCatalog = 'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN';
+export type DSOCatalog = 'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard';
 
 /** Master catalog list — used by both the sky map toggles and the targets view. */
-export const DSO_CATALOGS_ALL: DSOCatalog[] = ['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN'];
+export const DSO_CATALOGS_ALL: DSOCatalog[] = ['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN', 'Barnard'];
 
 export function getDSOCatalog(id: string): DSOCatalog | null {
   if (/^M\d/.test(id)) return 'M';
@@ -255,6 +256,7 @@ export function getDSOCatalog(id: string): DSOCatalog | null {
   if (id.startsWith('vdB')) return 'vdB';
   if (id.startsWith('Abell')) return 'Abell';
   if (id.startsWith('LPN')) return 'LPN';
+  if (id.startsWith('Barnard')) return 'Barnard';
   return null;
 }
 

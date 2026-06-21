@@ -97,6 +97,7 @@ const de: Translations = {
       vdB: 'van den Bergh',
       Abell: 'Abell (Planetarische Nebel)',
       LPN: 'Große Planetarische Nebel',
+      Barnard: 'Barnard (Dunkelnebel)',
     },
     typeLabels: {
       GxS: 'Spiralgalaxien',

@@ -63,7 +63,7 @@ const photosStore = usePhotosStore();
 const listEl = ref<HTMLElement | null>(null);
 const filterInputEl = ref<HTMLInputElement | null>(null);
 const filterQuery = ref('');
-const overlapOnly = ref(false);
+const overlapOnly = ref(true);
 const listScrollTop = ref(0);
 
 const displayOrder = computed(() => [...photosStore.placedPhotos].reverse());
