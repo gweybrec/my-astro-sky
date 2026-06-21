@@ -1174,7 +1174,8 @@
     "difficulty": 2,
     "catalogs": [
       "IC1805",
-      "LBN654"
+      "LBN654",
+      "SH2-190"
     ],
     "names": {
       "fr": "Nébuleuse du Cœur",
@@ -1182,7 +1183,9 @@
       "es": "Nebulosa del Corazón",
       "de": "Herznebel"
     },
-    "type": "EN"
+    "type": "EN",
+    "majAxis": 150,
+    "minAxis": 150
   },
   {
     "id": "IC1848",
@@ -22572,8 +22575,11 @@
     "rating": 1,
     "difficulty": 3,
     "catalogs": [
-      "NGC6842"
-    ]
+      "NGC6842",
+      "SH2-95",
+      "LBN149"
+    ],
+    "type": "PN"
   },
   {
     "id": "NGC157",
@@ -62789,7 +62795,13 @@
     "catalogs": [
       "IC4592",
       "LBN1113"
-    ]
+    ],
+    "type": "RN",
+    "names": {
+      "fr": "Nébuleuse de la Tête de Cheval bleue",
+      "en": "Blue Horsehead Nebula",
+      "de": "Blauer Pferdekopfnebel"
+    }
   },
   {
     "id": "IC4596",
@@ -73182,8 +73194,16 @@
     "difficulty": 4,
     "catalogs": [
       "NGC1909",
-      "LBN959"
-    ]
+      "LBN959",
+      "IC2118"
+    ],
+    "type": "RN",
+    "names": {
+      "fr": "Nébuleuse de la Tête de Sorcière",
+      "en": "Witch Head Nebula",
+      "es": "Nebulosa Cabeza de Bruja",
+      "de": "Hexenkopfnebel"
+    }
   },
   {
     "id": "NGC1927",
@@ -95221,14 +95241,17 @@
     "rating": 3,
     "difficulty": 3,
     "catalogs": [
-      "NGC6357"
+      "NGC6357",
+      "SH2-11"
     ],
     "names": {
       "fr": "Nébuleuse de la Patte de Loup",
       "en": "Lobster Nebula",
       "es": "Nebulosa de la Langosta",
       "de": "Hummerklauennebel"
-    }
+    },
+    "majAxis": 90,
+    "minAxis": 90
   },
   {
     "id": "NGC6358",
@@ -102338,9 +102361,12 @@
     "difficulty": 3,
     "catalogs": [
       "NGC7822",
-      "LBN589"
+      "LBN589",
+      "SH2-171"
     ],
-    "type": "EN"
+    "type": "EN",
+    "majAxis": 180,
+    "minAxis": 180
   },
   {
     "id": "NGC7824",
@@ -103367,16 +103393,6 @@
     ]
   },
   {
-    "id": "SH2-95",
-    "constellation": "Vul",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-95",
-      "LBN149"
-    ]
-  },
-  {
     "id": "SH2-96",
     "constellation": "Cyg",
     "rating": 1,
@@ -103929,7 +103945,7 @@
   {
     "id": "SH2-147",
     "constellation": "Cep",
-    "rating": 3,
+    "rating": 1,
     "difficulty": 4,
     "catalogs": [
       "SH2-147"
@@ -104178,20 +104194,6 @@
     ]
   },
   {
-    "id": "SH2-171",
-    "constellation": "Cep",
-    "rating": 2,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-171"
-    ],
-    "names": {
-      "fr": "Nébuleuse SH2-171"
-    },
-    "ra": 0.28575,
-    "dec": 67.4213888888889
-  },
-  {
     "id": "SH2-173",
     "constellation": "Cas",
     "rating": 4,
@@ -104317,36 +104319,13 @@
     }
   },
   {
-    "id": "SH2-190",
-    "constellation": "Cas",
-    "rating": 3,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-190"
-    ],
-    "names": {
-      "fr": "Nébuleuse de l'Étoile de Mer",
-      "en": "Starfish Nebula",
-      "es": "Nebulosa de la Estrella de Mar",
-      "de": "Seesternnebel"
-    },
-    "ra": 38.21,
-    "dec": 61.47111111111111
-  },
-  {
     "id": "SH2-198",
     "constellation": "Cas",
-    "rating": 3,
+    "rating": 1,
     "difficulty": 3,
     "catalogs": [
       "SH2-198"
     ],
-    "names": {
-      "fr": "Nébuleuse du Cœur IC 1805",
-      "en": "Heart Nebula IC 1805",
-      "es": "Nebulosa del Corazón IC 1805",
-      "de": "Herznebel IC 1805"
-    },
     "ra": 42.50833333333334,
     "dec": 59.7
   },
@@ -104742,8 +104721,9 @@
       "fr": "Nébuleuse du Spaghetti",
       "en": "Spaghetti Nebula",
       "de": "Spaghettinebel",
-      "es": "NebulosaEspagueti"
+      "es": "Nebulosa Espagueti"
     },
+    "type": "SNR",
     "ra": 85.275,
     "dec": 28.083333333333332
   },
@@ -105001,8 +104981,10 @@
       "SH2-276"
     ],
     "names": {
-      "fr": "Grande Nébuleuse d'Orion Étendue",
-      "en": "Extended Great Orion Nebula"
+      "fr": "Boucle de Barnard",
+      "en": "Barnard's Loop",
+      "es": "Bucle de Barnard",
+      "de": "Barnards Loop"
     },
     "ra": 81.87500000000001,
     "dec": -3.9666666666666677
@@ -105156,20 +105138,6 @@
     ],
     "ra": 101.47500000000001,
     "dec": -7.300000000000001
-  },
-  {
-    "id": "SH2-290",
-    "constellation": "Cnc",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-290"
-    ],
-    "names": {
-      "fr": "Nébuleuse SH2-290"
-    },
-    "ra": 133.55485047748,
-    "dec": 8.8980392975
   },
   {
     "id": "SH2-292",
@@ -105448,7 +105416,9 @@
       "LBN1077"
     ],
     "ra": 134.79999999999998,
-    "dec": -25.68333333333333
+    "dec": -25.68333333333333,
+    "majAxis": 720,
+    "minAxis": 180
   },
   {
     "id": "SH2-313",
@@ -121383,19 +121353,6 @@
     "catalogs": [
       "NGC6853"
     ]
-  },
-  {
-    "id": "IC2118",
-    "names": {
-      "fr": "Nébuleuse Tête de Sorcière",
-      "en": "Witch Head Nebula",
-      "es": "Nebulosa Cabeza de Bruja",
-      "de": "Hexenkopfnebel"
-    },
-    "catalogs": [
-      "IC2118"
-    ],
-    "type": "RN"
   },
   {
     "id": "SH2-191",
