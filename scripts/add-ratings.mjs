@@ -13,6 +13,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import https from 'https';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -20,13 +21,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DSO_JSON_PATH = path.join(__dirname, '..', 'public/data/dso.json');
 const PDF_DATA_PATH = path.join(__dirname, 'data-750-best-dsos.json');
-const ASTRO_DB_PATH = '/home/gweybrec/workspace/other/astrogenerator/dbastrogenerator';
+// Astrogenerator SQLite DB (visual "interet"/"difficulte" per NGC/IC object), fetched
+// from upstream so this script is reproducible on any machine. Cached in the OS temp dir.
+const ASTRO_DB_URL = 'https://raw.githubusercontent.com/bterrier/astrogenerator/master/dbastrogenerator';
+const ASTRO_DB_PATH = path.join(os.tmpdir(), 'myastrosky-astrogenerator.sqlite');
 const OPENGC_URL = 'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv';
 
 // ─── Catalog membership sets ──────────────────────────────────────────────────
 
 // Messier objects excluded from the Messier floor (not genuine deep-sky targets)
 const MESSIER_FLOOR_EXCLUSIONS = new Set(['M40', 'M73']);
+
+// Iconic showpiece targets — guaranteed 5-star floor regardless of source scores.
+// These are the universally-imaged "must-see" objects whose photographic appeal the
+// averaged sources under-rate (e.g. the 750-Best PDF scores M81/M101 only 4). Curated
+// by hand; trim or extend freely. Any one matching designation in an object's `catalogs`
+// array is enough to trigger the floor.
+const FIVE_STAR = new Set([
+  // Messier icons
+  'M1',   'M8',   'M13',  'M16',  'M17',  'M20',  'M27',  'M31',  'M33',  'M42',
+  'M45',  'M51',  'M57',  'M63',  'M64',  'M81',  'M82',  'M97',  'M101', 'M104',
+  'M106',
+  // Non-Messier showpieces (NGC/IC)
+  'NGC253',  'NGC869',  'NGC884',  'NGC891',  'NGC2070', 'NGC2237', 'NGC3372',
+  'NGC4565', 'NGC5128', 'NGC5139', 'NGC6302', 'NGC6543', 'NGC6888', 'NGC6960',
+  'NGC6992', 'NGC7000', 'NGC7023', 'NGC7293', 'NGC7635',
+  'IC405',   'IC434',   'IC1396',  'IC1805',  'IC1848',
+]);
 
 // RASC Finest NGC — 110 objects, floor 4
 const RASC_FINEST_NGC = new Set([
@@ -113,6 +134,28 @@ function fetchUrl(url) {
   });
 }
 
+// Download a (possibly binary) file to disk, following one level of redirects.
+function downloadFile(url, destPath) {
+  return new Promise((resolve, reject) => {
+    https.get(url, res => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        res.resume();
+        downloadFile(res.headers.location, destPath).then(resolve, reject);
+        return;
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        return;
+      }
+      const file = fs.createWriteStream(destPath);
+      res.pipe(file);
+      file.on('finish', () => file.close(() => resolve(destPath)));
+      file.on('error', err => { fs.unlink(destPath, () => reject(err)); });
+    }).on('error', reject);
+  });
+}
+
 function parseOpenNGCSurfBr(csvText) {
   // Returns Map: 'NGC1' → surfBr (number)
   const map = new Map();
@@ -161,11 +204,13 @@ function interetToScore(interet) {
 function computeRating({ catalogs, type, mag, majAxis, nameFr, nameEn, pdf750, agMap }) {
   let sumWeighted = 0;
   let sumWeight = 0;
+  let scoreA = null;
 
   // Source A: 750 Best DSOs (weight 3)
   for (const cat of catalogs) {
     if (pdf750[cat] !== undefined) {
-      sumWeighted += pdf750[cat] * 3;
+      scoreA = pdf750[cat];
+      sumWeighted += scoreA * 3;
       sumWeight += 3;
       break;
     }
@@ -187,7 +232,13 @@ function computeRating({ catalogs, type, mag, majAxis, nameFr, nameEn, pdf750, a
   }
 
   if (sumWeight > 0) {
-    return Math.max(1, Math.min(5, Math.round(sumWeighted / sumWeight)));
+    const avg = Math.round(sumWeighted / sumWeight);
+    // The "rating" field is photographic interest, so Source A (750 Best DSOs) is the
+    // authoritative signal. Source B (astrogenerator visual "interet") only refines it —
+    // it must never drag a photographically-rated object below its A score. Without this,
+    // showpieces like M82 (A=5) get averaged down to 4 by middling visual scores.
+    const combined = scoreA !== null ? Math.max(scoreA, avg) : avg;
+    return Math.max(1, Math.min(5, combined));
   }
 
   // ── Heuristic fallback (no source matched) ──
@@ -219,6 +270,7 @@ function computeRating({ catalogs, type, mag, majAxis, nameFr, nameEn, pdf750, a
 function applyRatingFloors(rating, catalogs) {
   let floor = 0;
   for (const cat of catalogs) {
+    if (FIVE_STAR.has(cat))       floor = Math.max(floor, 5);
     if (/^M\d+$/.test(cat) && !MESSIER_FLOOR_EXCLUSIONS.has(cat)) floor = Math.max(floor, 4);
     if (RASC_FINEST_NGC.has(cat)) floor = Math.max(floor, 4);
     if (CALDWELL.has(cat))        floor = Math.max(floor, 4);
@@ -247,7 +299,9 @@ function computeDifficulty({ catalogs, type, mag, majAxis, emissionLines, surfBr
   const isMessier = catalogs.some(c => /^M\d+$/.test(c));
 
   // ── Galaxy: SurfBr is the gold standard ──
-  if (type === 'Gx') {
+  // Match every galaxy subtype (Gx, GxS, GxE, GxI, …) — not just the bare 'Gx' code,
+  // which would skip ~6,700 typed galaxies and leave them on the generic heuristic.
+  if (type.startsWith('Gx')) {
     // Cap difficulty based on total magnitude: a mag-10 galaxy that shows up in
     // 30 min should not be rated harder than 2 regardless of mean surface brightness
     // (which is diluted for large or edge-on galaxies). Formula: ceil((mag-7)/2),
@@ -321,7 +375,9 @@ async function main() {
   const pdf750 = JSON.parse(fs.readFileSync(PDF_DATA_PATH, 'utf8'));
   console.log(`  Source A (750 Best DSOs): ${Object.keys(pdf750).length} entries`);
 
-  // Load astrogenerator DB and build lookup map
+  // Download astrogenerator DB and build lookup map
+  console.log('  Fetching astrogenerator DB from GitHub...');
+  await downloadFile(ASTRO_DB_URL, ASTRO_DB_PATH);
   const agDb = new Database(ASTRO_DB_PATH, { readonly: true });
   const agRows = agDb.prepare('SELECT reference, interet, difficulte FROM ngcic').all();
   agDb.close();
@@ -377,7 +433,7 @@ async function main() {
   let nSourceA = 0, nSourceB = 0, nBoth = 0, nHeuristic = 0;
 
   // Spot-check log
-  const SPOT_CHECKS = new Set(['M42', 'M31', 'M1', 'SH2-240', 'M40', 'M73', 'NGC4565', 'NGC891']);
+  const SPOT_CHECKS = new Set(['M42', 'M31', 'M1', 'M81', 'M82', 'M101', 'M45', 'SH2-240', 'M40', 'M73', 'NGC4565', 'NGC891']);
 
   for (const row of dsoJson.data) {
     const catalogs      = row[idxCatalogs] ?? [row[idxId]];
