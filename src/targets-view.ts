@@ -17,6 +17,7 @@ import { buildSetupInfoRows } from './setup-info';
 import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
 import { formatPaDeg } from './frame-orientation';
 import { formatRA, formatDec, formatAlt } from './format-utils';
+import { attachAnchoredPanel } from './popup-utils';
 import type { GearPreset } from './gear-presets';
 import { recommendRecipe } from './imaging-recipe';
 import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, deleteGearSetupAPI, type GearSetupData, type Plan, type PlanMosaic } from './api';
@@ -912,7 +913,7 @@ export class TargetsView {
   private planPickerEl: HTMLElement | null = null;
   private planPickerOutside: ((ev: MouseEvent) => void) | null = null;
   private planPickerEsc: ((ev: KeyboardEvent) => void) | null = null;
-  private planPickerReposition: (() => void) | null = null;
+  private planPickerCleanup: (() => void) | null = null;
 
   constructor(skyMap: SkyMap, onNavigate: (ra: number, dec: number, setupId: string | null) => void) {
     this.skyMap = skyMap;
@@ -3246,30 +3247,6 @@ export class TargetsView {
 
     const picker = document.createElement('div');
     picker.className = 'plan-picker fixed z-tooltip bg-panel border border-subtle rounded-md shadow-lg py-2 min-w-[220px] max-h-[60vh] overflow-auto';
-    // Position only after the picker is in the DOM so we can measure its real
-    // size; re-run on scroll/resize so the popup keeps tracking the button.
-    const positionPicker = (): void => {
-      const rect = anchorEl.getBoundingClientRect();
-      // Discard the popup once the button is scrolled out of (or off) the viewport.
-      if (rect.bottom <= 0 || rect.top >= window.innerHeight
-          || rect.right <= 0 || rect.left >= window.innerWidth) {
-        this.closePlanPicker();
-        return;
-      }
-      const gap = 4;
-      const w = picker.offsetWidth || 240;
-      const h = picker.offsetHeight || 0;
-      // Horizontal: align the popup's right edge to the button's right edge,
-      // clamped into the viewport so it never overflows either side.
-      const left = Math.max(8, Math.min(rect.right - w, window.innerWidth - w - 8));
-      // Vertical: below the button, or above it if there isn't room below.
-      const below = rect.bottom + gap;
-      const top = (below + h <= window.innerHeight - 8 || rect.top < h)
-        ? below
-        : Math.max(8, rect.top - gap - h);
-      picker.style.left = `${left}px`;
-      picker.style.top = `${top}px`;
-    };
 
     const title = document.createElement('div');
     title.className = 'px-3 pb-1 text-micro uppercase text-label';
@@ -3322,12 +3299,12 @@ export class TargetsView {
 
     document.body.appendChild(picker);
     this.planPickerEl = picker;
-    positionPicker();
-
-    // Keep the popup glued to the button while it's open.
-    this.planPickerReposition = positionPicker;
-    window.addEventListener('scroll', this.planPickerReposition, true);
-    window.addEventListener('resize', this.planPickerReposition);
+    // Pin the picker to the button (native CSS anchoring where available, JS
+    // scroll-tracking fallback otherwise). Right-aligned to the button edge.
+    this.planPickerCleanup = attachAnchoredPanel(picker, anchorEl, {
+      alignRight: true,
+      onAnchorOutOfView: () => this.closePlanPicker(),
+    });
 
     // Close on outside click / Escape (deferred so this click doesn't immediately close it).
     setTimeout(() => {
@@ -3346,11 +3323,7 @@ export class TargetsView {
     if (this.planPickerEl) { this.planPickerEl.remove(); this.planPickerEl = null; }
     if (this.planPickerOutside) { document.removeEventListener('click', this.planPickerOutside); this.planPickerOutside = null; }
     if (this.planPickerEsc) { document.removeEventListener('keydown', this.planPickerEsc); this.planPickerEsc = null; }
-    if (this.planPickerReposition) {
-      window.removeEventListener('scroll', this.planPickerReposition, true);
-      window.removeEventListener('resize', this.planPickerReposition);
-      this.planPickerReposition = null;
-    }
+    if (this.planPickerCleanup) { this.planPickerCleanup(); this.planPickerCleanup = null; }
   }
 
   /** Refresh every card's plan-list button highlight + the mode badge. */
