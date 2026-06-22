@@ -1,5 +1,6 @@
 <template>
   <div class="panel-header">
+    <button class="panel-settings-btn" :title="t('shortcuts.title')" @click="openShortcuts">⌨</button>
     <button class="panel-settings-btn" :title="t('settings.modalTitle')" @click="openSettings">⚙</button>
   </div>
 </template>
@@ -12,5 +13,9 @@ const { t } = useI18n();
 
 function openSettings() {
   openVueModal('settings');
+}
+
+function openShortcuts() {
+  openVueModal('shortcuts');
 }
 </script>

@@ -51,6 +51,9 @@
 
   <!-- In-app update check (opened on startup when a newer release exists) -->
   <UpdateAvailableModal v-if="activeModal === 'update'" @close="closeModal()" />
+
+  <!-- Keyboard shortcuts cheat-sheet + remap -->
+  <KeyboardShortcutsModal v-if="activeModal === 'shortcuts'" @close="closeModal()" />
 </template>
 
 <script setup lang="ts">
@@ -73,8 +76,9 @@ import AboutModal from './components/modals/AboutModal.vue';
 import PrivacyModal from './components/modals/PrivacyModal.vue';
 import DataCreditsModal from './components/modals/DataCreditsModal.vue';
 import UpdateAvailableModal from './components/modals/UpdateAvailableModal.vue';
+import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue';
 
-type ModalName = 'settings' | 'solverSettings' | 'export' | 'import' | 'deleteAll' | 'batchUpload' | 'about' | 'privacy' | 'credits' | 'update';
+type ModalName = 'settings' | 'solverSettings' | 'export' | 'import' | 'deleteAll' | 'batchUpload' | 'about' | 'privacy' | 'credits' | 'update' | 'shortcuts';
 
 const activeModal = ref<ModalName | null>(null);
 const previousModal = ref<ModalName | null>(null);

@@ -2265,8 +2265,11 @@ app.post('/api/export', (req, res) => {
   try {
     const body = req.body as {
       mode?: string;
-      options?: { includeImages?: boolean; includeMetadata?: boolean; includeDsoOverrides?: boolean; includeCustomGear?: boolean; includeSetups?: boolean; includePlans?: boolean };
+      options?: { includeImages?: boolean; includeMetadata?: boolean; includeDsoOverrides?: boolean; includeCustomGear?: boolean; includeSetups?: boolean; includePlans?: boolean; includeShortcuts?: boolean };
       ids?: string[];
+      // Keyboard-shortcut bindings live in the client's localStorage; the client sends
+      // them here so they can be bundled into the backup ZIP as shortcuts.json.
+      shortcuts?: unknown;
     };
 
     // Support legacy mode='metadata' for backward compat with backup button
@@ -2278,6 +2281,7 @@ app.post('/api/export', (req, res) => {
     const includeCustomGear = options.includeCustomGear === true;
     const includeSetups = options.includeSetups === true;
     const includePlans = options.includePlans === true;
+    const includeShortcuts = options.includeShortcuts === true;
 
     const { ids } = body;
     const allPhotos = getAllPhotos();
@@ -2367,6 +2371,9 @@ app.post('/api/export', (req, res) => {
       }));
       archive.append(Buffer.from(JSON.stringify(plans, null, 2)), { name: 'plans.json' });
     }
+    if (includeShortcuts && body.shortcuts && typeof body.shortcuts === 'object') {
+      archive.append(Buffer.from(JSON.stringify(body.shortcuts, null, 2)), { name: 'shortcuts.json' });
+    }
 
     archive.finalize();
   } catch (err: any) {
@@ -2412,12 +2419,29 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         exists: existingSet.has(filenameToOriginalName.get(entry.filename) ?? ''),
       }));
 
+      // Keyboard shortcuts are localStorage-only, so they aren't imported server-side:
+      // we return the parsed bundle and the client applies it to localStorage.
+      let hasShortcuts = false;
+      let shortcuts: unknown;
+      const shortcutsEntry = zipDir.files.find(f => f.path === 'shortcuts.json');
+      if (shortcutsEntry) {
+        try {
+          const parsed = JSON.parse((await shortcutsEntry.buffer()).toString('utf8'));
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            hasShortcuts = true;
+            shortcuts = parsed;
+          }
+        } catch { /* ignore invalid shortcuts.json */ }
+      }
+
       res.json({
         hasMetadata: inspect.hasMetadata && inspect.photos.length > 0,
         photos: inspect.photos.length,
         hasDsoOverrides: inspect.hasDsoOverrides,
         hasCustomGear: inspect.hasCustomGear,
         hasSetups: inspect.hasSetups,
+        hasShortcuts,
+        shortcuts,
         images,
       });
     } else if (ext === '.json') {
@@ -2429,6 +2453,7 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         hasDsoOverrides: false,
         hasCustomGear: false,
         hasSetups: false,
+        hasShortcuts: false,
         images: [],
       });
     } else {

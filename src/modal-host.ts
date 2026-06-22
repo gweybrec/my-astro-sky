@@ -5,7 +5,7 @@ import type { SkyMap } from './sky-map';
 import type { PhotoOverlay } from './photo-overlay';
 import { reportUnknownRendererError } from './error-reporter';
 
-type ModalName = 'about' | 'privacy' | 'credits' | 'settings' | 'export' | 'import' | 'deleteAll' | 'batchUpload' | 'solverSettings' | 'update';
+type ModalName = 'about' | 'privacy' | 'credits' | 'settings' | 'export' | 'import' | 'deleteAll' | 'batchUpload' | 'solverSettings' | 'update' | 'shortcuts';
 
 let _appRef: { openModal: (name: ModalName | null) => void } | null = null;
 

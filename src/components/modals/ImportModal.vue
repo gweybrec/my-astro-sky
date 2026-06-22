@@ -30,7 +30,7 @@
         </div>
 
         <!-- Content checkboxes -->
-        <div v-if="preview.hasMetadata || preview.hasDsoOverrides || preview.hasCustomGear || preview.hasSetups || preview.hasPlans">
+        <div v-if="preview.hasMetadata || preview.hasDsoOverrides || preview.hasCustomGear || preview.hasSetups || preview.hasPlans || preview.hasShortcuts">
           <div class="export-options-label">{{ t('settings.importContent') }}</div>
           <label v-if="preview.hasMetadata" class="export-checkbox-row">
             <input type="checkbox" v-model="importMeta" />
@@ -47,6 +47,10 @@
           <label v-if="preview.hasSetups" class="export-checkbox-row">
             <input type="checkbox" v-model="importSetups" />
             {{ t('settings.importSetupsLabel') }}
+          </label>
+          <label v-if="preview.hasShortcuts" class="export-checkbox-row">
+            <input type="checkbox" v-model="importShortcuts" />
+            {{ t('settings.importShortcutsLabel') }}
           </label>
           <label v-if="preview.hasPlans" class="export-checkbox-row">
             <input type="checkbox" v-model="importPlans" />
@@ -103,6 +107,7 @@ import { ref, computed, reactive } from 'vue';
 import { t } from '../../i18n';
 import { usePhotosStore } from '../../stores/photos';
 import { useCanvasStore } from '../../stores/canvas';
+import { useShortcutsStore } from '../../stores/shortcuts';
 import { importPreview, importData, exportData, getPhotos } from '../../api';
 import type { ImportPreviewResult } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
@@ -113,6 +118,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const photosStore = usePhotosStore();
 const canvasStore = useCanvasStore();
+const shortcutsStore = useShortcutsStore();
 const hasPhotos = computed(() => photosStore.placedPhotos.length > 0);
 
 const phase = ref<'pick' | 'options'>('pick');
@@ -128,6 +134,7 @@ const importDso = ref(true);
 const importGear = ref(true);
 const importSetups = ref(true);
 const importPlans = ref(true);
+const importShortcuts = ref(true);
 const selectedImages = reactive(new Set<string>());
 
 const allImagesChecked = computed(() =>
@@ -146,7 +153,8 @@ const canImport = computed(() => {
     (preview.value.hasDsoOverrides && importDso.value) ||
     (preview.value.hasCustomGear && importGear.value) ||
     (preview.value.hasSetups && importSetups.value) ||
-    (preview.value.hasPlans && importPlans.value);
+    (preview.value.hasPlans && importPlans.value) ||
+    (preview.value.hasShortcuts && importShortcuts.value);
   const hasImages = someImagesChecked.value;
   return hasContent || hasImages;
 });
@@ -179,6 +187,7 @@ async function onFilePicked(e: Event) {
     importGear.value = true;
     importSetups.value = true;
     importPlans.value = true;
+    importShortcuts.value = true;
     phase.value = 'options';
   } catch (err: any) {
     showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
@@ -253,6 +262,12 @@ async function onImport() {
       const dsoMsg = t('settings.importedDsoOverrides').replace('{n}', String(result.dsoOverridesImported));
       showToast({ message: dsoMsg, type: 'info' });
       try { await reloadUserOverrides(); } catch { /* ignore */ }
+    }
+
+    // Keyboard shortcuts are localStorage-only — applied here on the client.
+    if (preview.value?.hasShortcuts && importShortcuts.value && preview.value.shortcuts) {
+      shortcutsStore.importJSON(preview.value.shortcuts);
+      showToast({ message: t('settings.importedShortcuts'), type: 'info' });
     }
   } catch (err: any) {
     showToast({ message: err.message ?? t('settings.importError'), type: 'error' });

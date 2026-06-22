@@ -28,6 +28,10 @@
           <input type="checkbox" v-model="includePlans" @change="update" />
           {{ t('settings.exportPlans') }}
         </label>
+        <label class="export-checkbox-row">
+          <input type="checkbox" v-model="includeShortcuts" @change="update" />
+          {{ t('settings.exportShortcuts') }}
+        </label>
 
         <div class="modal-divider"></div>
 
@@ -74,6 +78,7 @@
 import { ref, computed, reactive } from 'vue';
 import { t } from '../../i18n';
 import { usePhotosStore } from '../../stores/photos';
+import { useShortcutsStore } from '../../stores/shortcuts';
 import { exportData } from '../../api';
 import type { ExportOptions } from '../../api';
 import { showToast } from '../../toast';
@@ -82,6 +87,7 @@ import { formatBytes } from '../../format-utils';
 const emit = defineEmits<{ close: [] }>();
 
 const photosStore = usePhotosStore();
+const shortcutsStore = useShortcutsStore();
 const photos = computed(() => photosStore.placedPhotos.map(p => p.photo));
 
 const includeMeta = ref(true);
@@ -89,6 +95,7 @@ const includeDso = ref(false);
 const includeGear = ref(false);
 const includeSetups = ref(false);
 const includePlans = ref(false);
+const includeShortcuts = ref(false);
 const busy = ref(false);
 
 const selected = reactive(new Set<string>());
@@ -112,7 +119,7 @@ const sizeLabel = computed(() => {
 
 const canExport = computed(() =>
   includeDso.value || includeMeta.value || includeGear.value ||
-  includeSetups.value || includePlans.value || someChecked.value,
+  includeSetups.value || includePlans.value || includeShortcuts.value || someChecked.value,
 );
 
 function update() { /* reactivity via v-model */ }
@@ -141,10 +148,11 @@ async function onExport() {
     includeCustomGear: includeGear.value,
     includeSetups: includeSetups.value,
     includePlans: includePlans.value,
+    includeShortcuts: includeShortcuts.value,
   };
   busy.value = true;
   try {
-    await exportData(options, selectedIds);
+    await exportData(options, selectedIds, includeShortcuts.value ? shortcutsStore.bindings : undefined);
     emit('close');
   } catch (err: any) {
     showToast({ message: err.message ?? t('settings.importError'), type: 'error' });

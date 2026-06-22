@@ -406,18 +406,21 @@ export interface ExportOptions {
   includeCustomGear?: boolean;
   includeSetups?: boolean;
   includePlans?: boolean;
+  includeShortcuts?: boolean;
 }
 
 /**
  * Trigger a sky data export download.
  * Always produces a ZIP archive.
  * options controls what is included; ids: photo IDs to include (omit = all).
+ * shortcuts: the client's keyboard-shortcut bindings (localStorage), bundled as
+ * shortcuts.json when options.includeShortcuts is set — the server has no access to it.
  */
-export async function exportData(options: ExportOptions, ids: string[]): Promise<void> {
+export async function exportData(options: ExportOptions, ids: string[], shortcuts?: unknown): Promise<void> {
   const res = await fetch('/api/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ options, ids }),
+    body: JSON.stringify({ options, ids, shortcuts }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -444,6 +447,9 @@ export interface ImportPreviewResult {
   hasCustomGear: boolean;
   hasSetups: boolean;
   hasPlans: boolean;
+  hasShortcuts: boolean;
+  /** Parsed shortcuts.json content, applied client-side to localStorage on import. */
+  shortcuts?: unknown;
   images: ImportPreviewImage[];
 }
 
