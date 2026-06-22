@@ -20,32 +20,32 @@
         <div class="batch-labels-bar-main">
           <span class="batch-labels-bar-title">{{ t('batch.labelsForAll') }}</span>
           <div class="batch-labels-input-row">
-          <div v-if="batchLabels.length > 0" class="tag-chips">
-            <span v-for="lbl in batchLabels" :key="lbl" class="tag-chip label-chip">
-              {{ lbl }}
-              <button type="button" class="tag-chip-remove" @click="removeBatchLabel(lbl)">×</button>
-            </span>
-          </div>
-          <div class="tag-input-wrap relative">
-            <input
-              class="tag-input"
-              :placeholder="t('modal.metadataLabelsPlaceholder')"
-              v-model="batchLabelInput"
-              @input="showBatchLabelSuggest = true"
-              @focus="showBatchLabelSuggest = true"
-              @keydown="onBatchLabelKeydown"
-              @blur="onBatchLabelBlur"
-            />
-            <div v-if="showBatchLabelSuggest && batchLabelSuggestions.length" class="tag-suggest">
-              <div
-                v-for="suggestion in batchLabelSuggestions"
-                :key="suggestion"
-                class="tag-suggest-item"
-                @mousedown.prevent="selectBatchLabelSuggestion(suggestion)"
-              >{{ suggestion }}</div>
+            <div v-if="batchLabels.length > 0" class="tag-chips">
+              <span v-for="lbl in batchLabels" :key="lbl" class="tag-chip label-chip">
+                {{ lbl }}
+                <button type="button" class="tag-chip-remove" @click="removeBatchLabel(lbl)">×</button>
+              </span>
+            </div>
+            <div class="tag-input-wrap relative">
+              <input
+                class="tag-input"
+                :placeholder="t('modal.metadataLabelsPlaceholder')"
+                v-model="batchLabelInput"
+                @input="showBatchLabelSuggest = true"
+                @focus="showBatchLabelSuggest = true"
+                @keydown="onBatchLabelKeydown"
+                @blur="onBatchLabelBlur"
+              />
+              <div v-if="showBatchLabelSuggest && batchLabelSuggestions.length" class="tag-suggest">
+                <div
+                  v-for="suggestion in batchLabelSuggestions"
+                  :key="suggestion"
+                  class="tag-suggest-item"
+                  @mousedown.prevent="selectBatchLabelSuggestion(suggestion)"
+                >{{ suggestion }}</div>
+              </div>
             </div>
           </div>
-        </div>
           <p class="batch-labels-bar-hint">{{ t('batch.labelsForAllHint') }}</p>
         </div>
         <button

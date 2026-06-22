@@ -177,7 +177,9 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
 
   for (const dso of getDSOs()) {
     let score = 0;
-    const idLower = dso.id.toLowerCase();
+    // Normalize the id the same way as the query so id comparisons are symmetric
+    // (an id carrying a dot, e.g. "PK"-style, still matches its dot-stripped query).
+    const idNorm = normCatId(dso.id);
     const nameLower = dso.displayName ? dso.displayName.toLowerCase() : '';
     // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42, and
     // Barnard33 finds IC434). Distinguish exact from prefix: an exact alias is
@@ -188,11 +190,11 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
 
     // 1. Exact match on the primary id OR any catalog alias (the exact thing typed).
     //    e.g. "barnard33" → IC434 must beat "barnard330" (a mere id prefix).
-    if (idLower === qId || aliasExact) {
+    if (idNorm === qId || aliasExact) {
       score = 100;
     }
     // 2. ID prefix match
-    else if (idLower.startsWith(qId)) {
+    else if (idNorm.startsWith(qId)) {
       score = 90;
     }
     // 3. Exact name match
@@ -212,7 +214,7 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
       score = 40;
     }
     // 7. Partial ID match (e.g. "ngc70" matches "NGC7000")
-    else if (idLower.includes(qId)) {
+    else if (idNorm.includes(qId)) {
       score = 30;
     }
 

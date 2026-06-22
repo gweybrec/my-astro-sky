@@ -1530,9 +1530,12 @@ async function main() {
     sh2Suppress.add(shId.toUpperCase());
     sh2Merged++;
   }
-  for (let i = data.length - 1; i >= 0; i--) {
-    if (sh2Suppress.has(String(data[i][0]).toUpperCase())) data.splice(i, 1);
-  }
+  // Drop the suppressed standalone SH2 rows in a single in-place rebuild.
+  // NOTE: this mutates `data`, so every rowBy* lookup map built above is now stale —
+  // do not reuse them past this point (anything below must re-derive from `data`).
+  const keptRows = data.filter(r => !sh2Suppress.has(String(r[0]).toUpperCase()));
+  data.length = 0;
+  data.push(...keptRows);
   console.log(`Merged ${sh2Merged} SH2 aliases into existing objects`);
 
   const metadataOverrides = loadMetadataOverrides();
