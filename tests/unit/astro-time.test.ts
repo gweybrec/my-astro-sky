@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dateToJD, gmstHours, lstHours, sunAltDeg, twilightWindow, jdToDate } from '../../src/astro-time';
+import { dateToJD, gmstHours, lstHours, sunAltDeg, twilightWindow, jdToDate, moonRaDecDeg, moonPhase } from '../../src/astro-time';
 
 describe('dateToJD', () => {
   // Meeus, Astronomical Algorithms, Table 7.a
@@ -87,6 +87,55 @@ describe('sunAltDeg', () => {
     const altSummer = sunAltDeg(jdSummer, 48, 0); // Paris latitude
     const altWinter = sunAltDeg(jdWinter, 48, 0);
     expect(altSummer).toBeGreaterThan(altWinter);
+  });
+});
+
+describe('moonRaDecDeg', () => {
+  // Meeus, Astronomical Algorithms, worked example 47.a: 1992 April 12, 0h TD.
+  // Apparent geocentric α = 134.688°, δ = 13.768°. We use a reduced term set,
+  // so allow ~0.5° slack.
+  it('matches Meeus example 47.a within ~0.5°', () => {
+    const jd = dateToJD(new Date('1992-04-12T00:00:00Z'));
+    const { raDeg, decDeg } = moonRaDecDeg(jd);
+    expect(raDeg).toBeCloseTo(134.688, 0);
+    expect(decDeg).toBeCloseTo(13.768, 0);
+    expect(Math.abs(raDeg - 134.688)).toBeLessThan(0.5);
+    expect(Math.abs(decDeg - 13.768)).toBeLessThan(0.5);
+  });
+
+  it('RA stays in [0,360) and Dec within the lunar declination range', () => {
+    const { raDeg, decDeg } = moonRaDecDeg(dateToJD(new Date('2024-06-15T22:00:00Z')));
+    expect(raDeg).toBeGreaterThanOrEqual(0);
+    expect(raDeg).toBeLessThan(360);
+    expect(Math.abs(decDeg)).toBeLessThan(29); // |dec| never exceeds ~28.6°
+  });
+});
+
+describe('moonPhase', () => {
+  it('illumination near 0 at a new moon (2024-01-11 11:57 UTC)', () => {
+    const { illum, phaseIndex } = moonPhase(dateToJD(new Date('2024-01-11T11:57:00Z')));
+    expect(illum).toBeLessThan(0.05);
+    expect(phaseIndex).toBe(0);
+  });
+
+  it('illumination near 1 at a full moon (2024-01-25 17:54 UTC)', () => {
+    const { illum, phaseIndex } = moonPhase(dateToJD(new Date('2024-01-25T17:54:00Z')));
+    expect(illum).toBeGreaterThan(0.97);
+    expect(phaseIndex).toBe(4);
+  });
+
+  it('is waxing a few days after new moon and waning a few days after full', () => {
+    expect(moonPhase(dateToJD(new Date('2024-01-15T00:00:00Z'))).waxing).toBe(true);
+    expect(moonPhase(dateToJD(new Date('2024-01-29T00:00:00Z'))).waxing).toBe(false);
+  });
+
+  it('phaseIndex is always 0–7', () => {
+    for (let d = 0; d < 30; d++) {
+      const jd = dateToJD(new Date(2024, 0, 1 + d));
+      const { phaseIndex } = moonPhase(jd);
+      expect(phaseIndex).toBeGreaterThanOrEqual(0);
+      expect(phaseIndex).toBeLessThanOrEqual(7);
+    }
   });
 });
 

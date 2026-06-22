@@ -143,6 +143,59 @@ describe('Gallery', () => {
     expect(document.querySelector('.gallery-cinematic-overlay')).toBeNull();
   });
 
+  it('arrow keys navigate to the next/previous photo in the gallery', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M2', filename: 'a.jpg' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg' }),
+      makePhoto({ id: 'c', originalName: 'M100', filename: 'c.jpg' }),
+    ]);
+
+    const detailName = () => document.querySelector('.gallery-detail-name')?.textContent;
+    const pressArrow = (key: string) =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key }));
+
+    // Open the first (smart-sorted) photo
+    (document.querySelectorAll('.gallery-item')[0] as HTMLElement).click();
+    expect(detailName()).toBe('M2');
+
+    pressArrow('ArrowRight');
+    expect(detailName()).toBe('M31');
+
+    pressArrow('ArrowRight');
+    expect(detailName()).toBe('M100');
+
+    // Wraps around to the first
+    pressArrow('ArrowRight');
+    expect(detailName()).toBe('M2');
+
+    // Left wraps back to the last
+    pressArrow('ArrowLeft');
+    expect(detailName()).toBe('M100');
+
+    // Only one overlay exists at a time
+    expect(document.querySelectorAll('.gallery-cinematic-overlay').length).toBe(1);
+  });
+
+  it('arrow keys are ignored while typing in a metadata input', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M2', filename: 'a.jpg' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg' }),
+    ]);
+
+    (document.querySelectorAll('.gallery-item')[0] as HTMLElement).click();
+    expect(document.querySelector('.gallery-detail-name')?.textContent).toBe('M2');
+
+    const input = document.createElement('input');
+    document.querySelector('.gallery-cinematic-overlay')!.appendChild(input);
+    input.focus();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+
+    // Still on the same photo — navigation was not triggered
+    expect(document.querySelector('.gallery-detail-name')?.textContent).toBe('M2');
+  });
+
   it('show on map button calls onNavigateToMap and closes modal', async () => {
     const gallery = new Gallery();
     const photo = makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg' });

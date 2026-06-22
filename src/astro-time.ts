@@ -74,6 +74,111 @@ export function sunAltDeg(jd: number, latDeg: number, lonDeg: number): number {
   return Math.asin(Math.max(-1, Math.min(1, sinAlt))) / DEG;
 }
 
+// ─── Moon position & phase ──────────────────────────────────────────────────
+
+/**
+ * Moon's fundamental arguments (Meeus ch. 47), all in degrees.
+ * Shared by the position and phase calculations.
+ */
+function moonArgs(jd: number) {
+  const T = (jd - 2451545.0) / 36525.0;
+  const norm = (x: number) => ((x % 360) + 360) % 360;
+  return {
+    T,
+    Lp: norm(218.3164477 + 481267.88123421 * T - 0.0015786 * T * T + (T * T * T) / 538841 - (T * T * T * T) / 65194000), // mean longitude
+    D: norm(297.8501921 + 445267.1114034 * T - 0.0018819 * T * T + (T * T * T) / 545868 - (T * T * T * T) / 113065000), // mean elongation
+    M: norm(357.5291092 + 35999.0502909 * T - 0.0001536 * T * T + (T * T * T) / 24490000),                              // sun mean anomaly
+    Mp: norm(134.9633964 + 477198.8675055 * T + 0.0087414 * T * T + (T * T * T) / 69699 - (T * T * T * T) / 14712000),  // moon mean anomaly
+    F: norm(93.2720950 + 483202.0175233 * T - 0.0036539 * T * T - (T * T * T) / 3526000 + (T * T * T * T) / 863310000), // argument of latitude
+  };
+}
+
+/**
+ * Geocentric apparent Moon RA/Dec in degrees for a given JD.
+ * Low-precision reduced ELP (Meeus ch. 47, main periodic terms only):
+ * accurate to roughly ±0.3° — ample for an altitude curve and a coarse
+ * moon-to-target separation. Topocentric parallax (~1°) is intentionally
+ * omitted (it would not change the visual conclusions).
+ */
+export function moonRaDecDeg(jd: number): { raDeg: number; decDeg: number } {
+  const { T, Lp, D, M, Mp, F } = moonArgs(jd);
+  const d = D * DEG, m = M * DEG, mp = Mp * DEG, f = F * DEG;
+  // Eccentricity correction for terms involving the Sun's anomaly M.
+  const E = 1 - 0.002516 * T - 0.0000074 * T * T;
+
+  // Longitude terms Σl (coefficients in 1e-6 deg), args [D, M, M', F].
+  const lonTerms: [number, number, number, number, number][] = [
+    [6288774, 0, 0, 1, 0], [1274027, 2, 0, -1, 0], [658314, 2, 0, 0, 0],
+    [213618, 0, 0, 2, 0], [-185116, 0, 1, 0, 0], [-114332, 0, 0, 0, 2],
+    [58793, 2, 0, -2, 0], [57066, 2, -1, -1, 0], [53322, 2, 0, 1, 0],
+    [45758, 2, -1, 0, 0], [-40923, 0, 1, -1, 0], [-34720, 1, 0, 0, 0],
+    [-30383, 0, 1, 1, 0], [15327, 2, 0, 0, -2], [-12528, 0, 0, 1, 2],
+    [10980, 0, 0, 1, -2],
+  ];
+  // Latitude terms Σb.
+  const latTerms: [number, number, number, number, number][] = [
+    [5128122, 0, 0, 0, 1], [280602, 0, 0, 1, 1], [277693, 0, 0, 1, -1],
+    [173237, 2, 0, 0, -1], [55413, 2, 0, -1, 1], [46271, 2, 0, -1, -1],
+    [32573, 2, 0, 0, 1], [17198, 0, 0, 2, 1], [9266, 2, 0, 1, -1],
+    [8822, 0, 0, 2, -1], [8216, 2, -1, 0, -1], [4324, 2, 0, -2, -1],
+  ];
+
+  let sumL = 0, sumB = 0;
+  for (const [c, cd, cm, cmp, cf] of lonTerms) {
+    const e = cm === 0 ? 1 : Math.abs(cm) === 1 ? E : E * E;
+    sumL += c * e * Math.sin(cd * d + cm * m + cmp * mp + cf * f);
+  }
+  for (const [c, cd, cm, cmp, cf] of latTerms) {
+    const e = cm === 0 ? 1 : Math.abs(cm) === 1 ? E : E * E;
+    sumB += c * e * Math.sin(cd * d + cm * m + cmp * mp + cf * f);
+  }
+
+  const lambda = (Lp + sumL / 1e6) * DEG;   // ecliptic longitude
+  const beta = (sumB / 1e6) * DEG;          // ecliptic latitude
+  const eps = (23.439291 - 0.0130042 * T) * DEG; // mean obliquity
+
+  const ra = Math.atan2(
+    Math.sin(lambda) * Math.cos(eps) - Math.tan(beta) * Math.sin(eps),
+    Math.cos(lambda),
+  );
+  const dec = Math.asin(
+    Math.sin(beta) * Math.cos(eps) + Math.cos(beta) * Math.sin(eps) * Math.sin(lambda),
+  );
+  return { raDeg: ((ra / DEG) % 360 + 360) % 360, decDeg: dec / DEG };
+}
+
+/**
+ * Moon phase for a given JD (Meeus ch. 48, simplified):
+ * - `illum`: illuminated fraction of the disk (0 = new, 1 = full)
+ * - `waxing`: true while the Moon is growing (east of the Sun, elongation 0–180°)
+ * - `phaseIndex`: 0–7 selecting one of the 8 standard phase icons
+ *   (0 new · 1 waxing crescent · 2 first quarter · 3 waxing gibbous ·
+ *    4 full · 5 waning gibbous · 6 last quarter · 7 waning crescent)
+ */
+export function moonPhase(jd: number): { illum: number; waxing: boolean; phaseIndex: number } {
+  const { D, M, Mp } = moonArgs(jd);
+  const d = D * DEG, m = M * DEG, mp = Mp * DEG;
+  // Phase angle i (Sun–Moon–Earth), Meeus eq. 48.4.
+  const i =
+    180 - D
+    - 6.289 * Math.sin(mp)
+    + 2.100 * Math.sin(m)
+    - 1.274 * Math.sin(2 * d - mp)
+    - 0.658 * Math.sin(2 * d)
+    - 0.214 * Math.sin(2 * mp)
+    - 0.110 * Math.sin(d);
+  const illum = (1 + Math.cos(i * DEG)) / 2;
+  const waxing = D % 360 < 180; // elongation 0–180° → Moon east of Sun → waxing
+
+  let phaseIndex: number;
+  if (illum < 0.04) phaseIndex = 0;
+  else if (illum > 0.96) phaseIndex = 4;
+  else if (waxing) phaseIndex = illum < 0.46 ? 1 : illum < 0.54 ? 2 : 3;
+  else phaseIndex = illum < 0.46 ? 7 : illum < 0.54 ? 6 : 5;
+
+  return { illum, waxing, phaseIndex };
+}
+
 // ─── Twilight window ────────────────────────────────────────────────────────
 
 /**

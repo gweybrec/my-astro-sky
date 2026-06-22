@@ -40,8 +40,8 @@ import { useFovFramesStore } from './stores/fov-frames';
 import { useUiStore } from './stores/ui';
 import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
-import { twilightWindow } from './astro-time';
-import { maxAltDuringWindow, sampleAltCurve, type AltSample } from './sky-geometry';
+import { twilightWindow, dateToJD, moonRaDecDeg, moonPhase } from './astro-time';
+import { maxAltDuringWindow, sampleAltCurve, sampleMoonAltCurve, angularSeparationDeg, moonDangerLevel, type AltSample } from './sky-geometry';
 import { outlineFromGrid } from './mosaic';
 import { renderPlanPdf, type PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
@@ -73,6 +73,7 @@ interface TargetsPrefs {
   enabledConstellations?: string[];
   minAltDeg?: number;
   maxAltDeg?: number;
+  showMoon?: boolean;
 }
 
 function loadPrefs(): TargetsPrefs {
@@ -110,6 +111,33 @@ function loadPrefs(): TargetsPrefs {
 
 function savePrefs(p: TargetsPrefs): void {
   localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+}
+
+/**
+ * Tiny SVG of the Moon for one of the 8 standard phases (index 0 = new …
+ * 4 = full … 7 = waning crescent). The illuminated portion is built from a
+ * semicircle plus a terminator half-ellipse; waning phases mirror the waxing
+ * geometry horizontally. Northern-hemisphere convention (waxing lit on the
+ * right). The dark portion is left as the disk outline so it reads as the
+ * unlit limb against the chart background.
+ */
+function moonPhaseIconSvg(phaseIndex: number): string {
+  const r = 5, c = 6, size = 12;
+  const f = [0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25][phaseIndex] ?? 0.5; // illuminated fraction
+  const waning = phaseIndex >= 5;
+  let lit = '';
+  if (f >= 0.999) {
+    lit = `<circle cx="${c}" cy="${c}" r="${r}" fill="var(--moon-lit)"/>`;
+  } else if (f > 0.001) {
+    const b = r * (1 - 2 * f);            // terminator x-radius (signed: crescent vs gibbous)
+    const innerSweep = b <= 0 ? 1 : 0;
+    const d = `M${c},${c - r} A${r},${r} 0 0 1 ${c},${c + r} A${Math.abs(b).toFixed(2)},${r} 0 0 ${innerSweep} ${c},${c - r} Z`;
+    lit = `<path d="${d}" fill="var(--moon-lit)"/>`;
+  }
+  const flip = waning ? ` transform="translate(${size},0) scale(-1,1)"` : '';
+  return `<svg width="14" height="14" viewBox="0 0 ${size} ${size}" class="block">`
+    + `<circle cx="${c}" cy="${c}" r="${r}" fill="var(--bg-card)" stroke="var(--moon-curve)" stroke-width="0.75"/>`
+    + `<g${flip}>${lit}</g></svg>`;
 }
 
 export function sortCustomFirst<T extends { id: string }>(arr: T[]): T[] {
@@ -885,6 +913,19 @@ interface PlanTargetInfo {
   maxAltDeg: number;
   bestTimeUtc: Date;
   curve: AltSample[];
+  /** Moon–target angular separation (°) at the imaging time, or null when the moon overlay is off / moon never rises. */
+  moonSepDeg: number | null;
+}
+
+/**
+ * Moon overlay for a plan render — identical for every row of a plan (same
+ * night + location), so it is computed once and threaded into each chart.
+ * Null when the toggle is off or the Moon never clears the horizon.
+ */
+interface MoonOverlay {
+  curve: AltSample[];
+  phaseIndex: number;
+  illum: number;
 }
 
 export class TargetsView {
@@ -2125,7 +2166,8 @@ export class TargetsView {
     el.className = 'target-meta-item';
     if (tooltip) el.title = tooltip;
     const l = document.createElement('span');
-    l.className = 'target-meta-label';
+    // Labels stay on a single line — a wrapped label misaligns the meta grid.
+    l.className = 'target-meta-label whitespace-nowrap';
     l.textContent = label;
     const v = document.createElement('span');
     v.className = 'target-meta-value';
@@ -2133,6 +2175,28 @@ export class TargetsView {
     el.appendChild(l);
     el.appendChild(v);
     return el;
+  }
+
+  /**
+   * Moon-distance meta item, coloured by `moonDangerLevel` (separation + phase).
+   * Returns null when there is no separation to show (moon overlay off / never rises).
+   */
+  private moonSepMetaItem(sepDeg: number | null, illum: number): HTMLElement | null {
+    if (sepDeg == null) return null;
+    const level = moonDangerLevel(sepDeg, illum);
+    // Lead with an adjective so the number reads as a distance from the target,
+    // e.g. "Close (34°)" / "Far (109°)".
+    const adj = t({ danger: 'targets.plan.moonClose', warn: 'targets.plan.moonModerate', ok: 'targets.plan.moonFar' }[level]);
+    const item = this.metaItem(t('targets.plan.moonSeparation'), `${adj} (${formatAlt(sepDeg)})`, t('targets.plan.moonSeparationHelp'));
+    const token = { danger: '--color-danger', warn: '--status-warn-text', ok: '--status-success-text' }[level];
+    const value = item.querySelector('.target-meta-value') as HTMLElement;
+    // Inline style (not a utility class): `.target-meta-value` sets its own colour
+    // and would win the cascade tie by source order, so set it directly here.
+    value.style.color = `var(${token})`;
+    // The "Moon distance" value ("Medium (67°)") is longer than most — keep it
+    // on one line too (labels are already nowrap via metaItem).
+    value.classList.add('whitespace-nowrap');
+    return item;
   }
 
   // ─── My Plans (night plans) ─────────────────────────────────────────────────
@@ -2236,10 +2300,31 @@ export class TargetsView {
     };
   }
 
+  /** Moon–target angular separation (°) at a given UTC instant. */
+  private moonSeparationAt(raDeg: number, decDeg: number, at: Date): number {
+    const { raDeg: moonRa, decDeg: moonDec } = moonRaDecDeg(dateToJD(at));
+    return angularSeparationDeg(raDeg, decDeg, moonRa, moonDec);
+  }
+
+  /**
+   * Moon overlay for a plan night, computed once and shared by every row.
+   * Returns null when the toggle is off or the Moon stays below the horizon for
+   * the whole window (no curve, no separation badge).
+   */
+  private buildMoonOverlay(loc: ObserverLocation, win: { start: Date; end: Date }): MoonOverlay | null {
+    if (this.prefs.showMoon === false) return null;
+    const curve = sampleMoonAltCurve(loc.latDeg, loc.lonDeg, win.start, win.end);
+    if (!curve.some(s => s.altDeg > 0)) return null; // moon never rises this night
+    const midJd = dateToJD(new Date((win.start.getTime() + win.end.getTime()) / 2));
+    const { phaseIndex, illum } = moonPhase(midJd);
+    return { curve, phaseIndex, illum };
+  }
+
   private computePlanTargets(
     plan: { entries: Array<{ id: string; dsoId: string | null; ra: number | null; dec: number | null; mosaicId?: string | null }> },
     loc: ObserverLocation,
     win: { start: Date; end: Date },
+    moonEnabled: boolean,
   ): PlanTargetInfo[] {
     const out: PlanTargetInfo[] = [];
     for (const e of plan.entries) {
@@ -2253,7 +2338,8 @@ export class TargetsView {
       const dso = realDso ?? this.customLocationDso(e.id, ra, dec);
       const { maxAltDeg, atDate } = maxAltDuringWindow(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
       const curve = sampleAltCurve(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
-      out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve });
+      const moonSepDeg = moonEnabled ? this.moonSeparationAt(ra, dec, atDate) : null;
+      out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve, moonSepDeg });
     }
     // Transit-ordered: earliest culmination first.
     out.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
@@ -2555,18 +2641,20 @@ export class TargetsView {
         return;
       }
       const win = this.nightWindow(observer.loc, observer.dateNight);
-      const infos = this.computePlanTargets(plan, observer.loc, win);
+      const moon = this.buildMoonOverlay(observer.loc, win);
+      const infos = this.computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false);
       currentInfos = infos;
       currentWin = win;
 
-      trajWrap.appendChild(this.buildTimelineHeader(win));
+      trajWrap.appendChild(this.buildMoonToggle(renderTrajectories));
+      trajWrap.appendChild(this.buildTimelineHeader(win, observer.loc, moon));
       const list = document.createElement('div');
       list.className = 'flex flex-col divide-y divide-[var(--border-input)]';
       const fillers: Array<(p: GearPreset | null) => void> = [];
       const mosaicFillers: Array<(p: GearPreset | null) => void> = [];
       for (const info of infos) {
         const entryName = info.dso.displayName ?? info.dso.catalogs[0] ?? info.dso.id;
-        const { row, applyPreset } = this.buildPlanRow(plan.id, info, win, effectiveSetupId(), (rowEl) => {
+        const { row, applyPreset } = this.buildPlanRow(plan.id, info, win, effectiveSetupId(), moon, (rowEl) => {
           // Delete immediately with an undo toast (shared with the FOV popup).
           deleteFrameWithUndo({ kind: 'plan', planId: plan.id, entryId: info.entryId, name: entryName }, {
             onRemoved: () => {
@@ -2626,6 +2714,8 @@ export class TargetsView {
         meta.className = 'target-card-meta';
         meta.appendChild(this.metaItem(t('targets.results.maxAlt'), formatAlt(maxAltDeg), t('targets.tooltips.maxAlt')));
         meta.appendChild(this.metaItem(t('fovOverlay.angleLabel'), formatPaDeg(mosaic.paDeg), t('fovOverlay.angleHelp')));
+        const mosaicSep = moon ? this.moonSepMetaItem(this.moonSeparationAt(mosaic.centerRa, mosaic.centerDec, atDate), moon.illum) : null;
+        if (mosaicSep) meta.appendChild(mosaicSep);
 
         // RA/Dec are the mosaic centre — keep each value on one line so the
         // seconds never wrap below their label (nowrap, not a fixed width).
@@ -2667,7 +2757,7 @@ export class TargetsView {
         left.appendChild(meta2);
         left.appendChild(totalEl);
 
-        const chartWrap = this.buildPlanChart(curve, win, atDate);
+        const chartWrap = this.buildPlanChart(curve, win, atDate, moon);
 
         // Show-on-map: zoom to fit the whole mosaic (its envelope is the frame
         // used for the zoom calculation).
@@ -2783,8 +2873,15 @@ export class TargetsView {
           this.planPreset(setupId),
         ]);
 
+        // Moon overlay for the PDF charts (same night/location for every page).
+        const moon = observer ? this.buildMoonOverlay(observer.loc, win) : null;
+        const moonShared = moon
+          ? { moonCurve: moon.curve, moonPhaseIndex: moon.phaseIndex, moonIllum: moon.illum }
+          : {};
+
         const targets: PlanPdfTarget[] = infos.map(i => ({
           dso: i.dso, bestTimeUtc: i.bestTimeUtc, maxAltDeg: i.maxAltDeg, curve: i.curve, nightWin: win, mosaic: null,
+          ...moonShared, moonSepDeg: moon ? i.moonSepDeg : null,
         }));
 
         // One page per mosaic: trajectory from the centre + framed tile grid.
@@ -2805,6 +2902,7 @@ export class TargetsView {
             targets.push({
               dso, bestTimeUtc: atDate, maxAltDeg, curve, nightWin: win,
               mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles },
+              ...moonShared, moonSepDeg: moon ? this.moonSeparationAt(m.centerRa, m.centerDec, atDate) : null,
             });
           }
         }
@@ -2834,31 +2932,154 @@ export class TargetsView {
   private static readonly PLAN_INFO_COL = 'w-52';
   /** Width of the chart's left axis-label gutter, kept in sync with the header spacer. */
   private static readonly PLAN_AXIS_GUTTER = 'w-7';
+  /** Axis gutter width — wider when the moon icon needs a reserved strip left of the axis. */
+  private static axisGutterWidth(moon: MoonOverlay | null): string {
+    return moon ? 'w-8' : 'w-7';
+  }
 
-  private buildTimelineHeader(win: { start: Date; end: Date }): HTMLElement {
-    // Mirror the plan-row column layout so the dusk/dawn labels sit exactly
+  /** Show-moon toggle for the plan trajectory charts (persisted in prefs). */
+  private buildMoonToggle(rerender: () => void): HTMLElement {
+    const wrap = document.createElement('label');
+    wrap.className = 'flex items-center gap-1.5 text-base text-dim cursor-pointer w-fit';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'gear-manage-checkbox';
+    cb.checked = this.prefs.showMoon !== false;
+    cb.addEventListener('change', () => {
+      this.prefs.showMoon = cb.checked;
+      savePrefs(this.prefs);
+      rerender();
+    });
+    const txt = document.createElement('span');
+    txt.textContent = t('targets.plan.showMoon');
+    wrap.append(cb, txt);
+    return wrap;
+  }
+
+  /** Moonrise/moonset crossings (alt = 0) within the night window, interpolated. */
+  private moonEventsInWindow(loc: ObserverLocation, win: { start: Date; end: Date }): { type: 'rise' | 'set'; time: Date }[] {
+    const curve = sampleMoonAltCurve(loc.latDeg, loc.lonDeg, win.start, win.end, 5);
+    const events: { type: 'rise' | 'set'; time: Date }[] = [];
+    for (let i = 1; i < curve.length; i++) {
+      const a = curve[i - 1], b = curve[i];
+      if ((a.altDeg < 0) === (b.altDeg < 0)) continue; // no horizon crossing
+      const frac = a.altDeg / (a.altDeg - b.altDeg);   // linear interp to alt = 0
+      const tMs = a.time.getTime() + frac * (b.time.getTime() - a.time.getTime());
+      events.push({ type: b.altDeg >= a.altDeg ? 'rise' : 'set', time: new Date(tMs) });
+    }
+    return events;
+  }
+
+  /** A caption-over-time stack (e.g. "Night start" / "22:14"), used in the header. */
+  private timeStack(caption: string, time: Date, align: 'start' | 'center' | 'end'): HTMLElement {
+    const alignCls = align === 'end' ? 'items-end text-right' : align === 'center' ? 'items-center text-center' : 'items-start text-left';
+    const box = document.createElement('div');
+    box.className = `flex flex-col leading-tight ${alignCls}`;
+    const cap = document.createElement('span');
+    cap.className = 'text-micro text-dim';
+    cap.textContent = caption;
+    const tm = document.createElement('span');
+    tm.className = 'text-sub text-bright font-medium';
+    tm.textContent = formatTime(time);
+    box.append(cap, tm);
+    return box;
+  }
+
+  /**
+   * Keep the moon rise/set marker(s) on the same line as the night start/end
+   * labels without overlapping them: after layout, clamp each marker's centre to
+   * leave a margin from the start/end labels (and from each other). Re-runs on
+   * resize / when the row becomes visible; self-disconnects once detached.
+   */
+  private spaceMoonMarkers(
+    container: HTMLElement,
+    startEl: HTMLElement,
+    endEl: HTMLElement,
+    markers: { el: HTMLElement; f: number }[],
+  ): void {
+    if (markers.length === 0) return;
+    const MARGIN = 10; // px gap kept between labels
+    const adjust = () => {
+      const ca = container.getBoundingClientRect();
+      if (ca.width <= 0) return; // still hidden/collapsed — wait for a resize
+      const startRight = startEl.getBoundingClientRect().right - ca.left;
+      const endLeft = endEl.getBoundingClientRect().left - ca.left;
+      let prevRight = -Infinity;
+      for (const m of markers) {
+        const w = m.el.offsetWidth;
+        let minC = startRight + MARGIN + w / 2;
+        let maxC = endLeft - MARGIN - w / 2;
+        if (minC > maxC) minC = maxC = (startRight + endLeft) / 2; // window too narrow
+        let center = Math.min(Math.max(m.f * ca.width, minC), maxC);
+        if (center - w / 2 < prevRight + MARGIN) center = prevRight + MARGIN + w / 2; // clear previous marker
+        m.el.style.left = `${center.toFixed(1)}px`;
+        prevRight = center + w / 2;
+      }
+    };
+    const ro = new ResizeObserver(() => {
+      if (!container.isConnected) { ro.disconnect(); return; }
+      adjust();
+    });
+    ro.observe(container);
+  }
+
+  private buildTimelineHeader(
+    win: { start: Date; end: Date },
+    loc: ObserverLocation,
+    moon: MoonOverlay | null,
+  ): HTMLElement {
+    // Mirror the plan-row column layout so the night-start/end times sit exactly
     // over the start/end of the sparkline (the flex-1 chart column), accounting
     // for the axis-label gutter to the left of the plot.
     const header = document.createElement('div');
-    header.className = 'flex items-center gap-3';
+    header.className = 'flex items-end gap-3 pb-1';
 
     const infoSpacer = document.createElement('span');
     infoSpacer.className = `${TargetsView.PLAN_INFO_COL} shrink-0`;
 
     const gutterSpacer = document.createElement('span');
-    gutterSpacer.className = `${TargetsView.PLAN_AXIS_GUTTER} shrink-0`;
+    gutterSpacer.className = `${TargetsView.axisGutterWidth(moon)} shrink-0`;
 
-    const labels = document.createElement('div');
-    labels.className = 'flex-1 min-w-0 flex justify-between text-micro text-dim';
-    const a = document.createElement('span');
-    a.textContent = formatTime(win.start);
-    const b = document.createElement('span');
-    b.textContent = formatTime(win.end);
-    labels.appendChild(a);
-    labels.appendChild(b);
+    // Chart area: a single line holding night start (left), night end (right),
+    // and any moon rise/set marker(s) anchored at their horizon-crossing x — all
+    // aligned horizontally with the sparkline below.
+    const chartArea = document.createElement('div');
+    chartArea.className = 'flex-1 min-w-0 relative h-8';
+
+    const startEl = this.timeStack(t('targets.plan.nightStart'), win.start, 'start');
+    startEl.classList.add('absolute', 'bottom-0', 'left-0');
+    const endEl = this.timeStack(t('targets.plan.nightEnd'), win.end, 'end');
+    endEl.classList.add('absolute', 'bottom-0', 'right-0');
+    chartArea.append(startEl, endEl);
+
+    // Moon marker(s) — only when the overlay is on (and the moon clears the horizon).
+    if (moon) {
+      const events = this.moonEventsInWindow(loc, win);
+      // Same x-mapping as the chart (viewBox W=120 with a padX=2 left inset), so
+      // a marker sits exactly above where the moon line meets the horizon.
+      const W = 120, padX = 2;
+      const span = (win.end.getTime() - win.start.getTime()) || 1;
+      const xFrac = (d: Date) => (padX + ((d.getTime() - win.start.getTime()) / span) * (W - padX)) / W;
+      // Only when the moon actually rises/sets during the window — if it is up
+      // (or down) the whole window there is no event time to show.
+      const markers: { el: HTMLElement; f: number }[] = [];
+      for (const ev of events.slice(0, 2)) {
+        const f = Math.max(0, Math.min(1, xFrac(ev.time)));
+        const caption = t(ev.type === 'rise' ? 'targets.plan.moonrise' : 'targets.plan.moonset');
+        const marker = this.timeStack(caption, ev.time, 'center');
+        marker.classList.add('absolute', 'bottom-0', 'whitespace-nowrap');
+        marker.style.left = `${(f * 100).toFixed(1)}%`;
+        marker.style.transform = 'translateX(-50%)';
+        chartArea.appendChild(marker);
+        markers.push({ el: marker, f });
+      }
+      // After layout, nudge each moon marker so it keeps a margin from the night
+      // start/end labels (and from each other) instead of overlapping them.
+      this.spaceMoonMarkers(chartArea, startEl, endEl, markers);
+    }
 
     // Invisible clones of the row's trailing buttons (show-on-map + remove), to
-    // reserve the same width so the dusk/dawn labels line up with the chart ends.
+    // reserve the same width so the start/end times line up with the chart ends.
     const navSpacer = document.createElement('span');
     navSpacer.className = 'btn-icon shrink-0 invisible';
     navSpacer.innerHTML = mapPinSvg;
@@ -2868,7 +3089,7 @@ export class TargetsView {
 
     header.appendChild(infoSpacer);
     header.appendChild(gutterSpacer);
-    header.appendChild(labels);
+    header.appendChild(chartArea);
     header.appendChild(navSpacer);
     header.appendChild(removeSpacer);
     return header;
@@ -2887,6 +3108,7 @@ export class TargetsView {
     info: PlanTargetInfo,
     win: { start: Date; end: Date },
     effectiveSetupId: string | null,
+    moon: MoonOverlay | null,
     onDelete: (rowEl: HTMLElement) => void,
   ): { row: HTMLElement; applyPreset: (preset: GearPreset | null) => void } {
     const { dso } = info;
@@ -2945,6 +3167,8 @@ export class TargetsView {
     meta.appendChild(this.metaItem(t('targets.results.maxAlt'), formatAlt(info.maxAltDeg), t('targets.tooltips.maxAlt')));
     if (dso.mag !== null) meta.appendChild(this.metaItem('Mag', dso.mag.toFixed(1), t('targets.tooltips.mag')));
     if (dso.majAxis) meta.appendChild(this.metaItem(t('targets.results.size'), formatArcmin(dso.majAxis), t('targets.tooltips.size')));
+    const moonSep = moon ? this.moonSepMetaItem(info.moonSepDeg, moon.illum) : null;
+    if (moonSep) meta.appendChild(moonSep);
     left.appendChild(meta);
 
     const meta2 = document.createElement('div');
@@ -2982,7 +3206,7 @@ export class TargetsView {
     left.appendChild(filtersDetails);
 
     // ── Trajectory chart ──
-    const chartWrap = this.buildPlanChart(info.curve, win, info.bestTimeUtc);
+    const chartWrap = this.buildPlanChart(info.curve, win, info.bestTimeUtc, moon);
 
     // Show-on-map: same behaviour as the recommend card (free frame on target).
     const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
@@ -3038,19 +3262,23 @@ export class TargetsView {
     curve: AltSample[],
     win: { start: Date; end: Date },
     bestTimeUtc: Date,
+    moon: MoonOverlay | null,
   ): HTMLElement {
     // Layout: [axis-label gutter] [plot]. The graduations live in the gutter,
     // to the left of the axis, so they never overlap the trajectory.
-    const chart = this.buildAltChart(curve, win, bestTimeUtc);
+    const chart = this.buildAltChart(curve, win, bestTimeUtc, moon);
     const chartWrap = document.createElement('div');
     chartWrap.className = 'flex-1 min-w-0 flex';
 
     const gutter = document.createElement('div');
-    gutter.className = `relative ${TargetsView.PLAN_AXIS_GUTTER} shrink-0`;
+    // When the moon is shown the gutter widens and the graduations shift left to
+    // clear the moon-phase icon, which is pinned just left of the axis.
+    gutter.className = `relative ${TargetsView.axisGutterWidth(moon)} shrink-0`;
+    const tickRight = moon ? 'right-3' : 'right-1';
     // Left vertical-axis graduations (20/40/60/80°), centered on their gridlines.
     for (const tick of chart.ticks) {
       const tickLab = document.createElement('span');
-      tickLab.className = 'absolute right-1 text-micro text-dim leading-none -translate-y-1/2 pointer-events-none';
+      tickLab.className = `absolute ${tickRight} text-micro text-dim leading-none -translate-y-1/2 pointer-events-none`;
       tickLab.style.top = `${(tick.frac * 100).toFixed(1)}%`;
       tickLab.textContent = tick.label;
       gutter.appendChild(tickLab);
@@ -3059,6 +3287,20 @@ export class TargetsView {
     const chartBox = document.createElement('div');
     chartBox.className = 'relative flex-1 min-w-0';
     chartBox.appendChild(chart.svg);
+    // Moon-phase icon pinned just left of the axis (fixed x), at the moon's
+    // altitude where its trajectory meets the left edge. Anchored to the axis
+    // line itself — inset by padX inside the SVG (padX=2, W=120 → 1.667%) — with
+    // its right edge ~2px to its left, so the gap to the axis is consistent.
+    if (moon && chart.moonIconYFrac !== null) {
+      const icon = document.createElement('span');
+      icon.className = 'absolute block pointer-events-none';
+      icon.style.left = '1.667%';
+      icon.style.top = `${(chart.moonIconYFrac * 100).toFixed(1)}%`;
+      icon.style.transform = 'translate(calc(-100% - 2px), -50%)';
+      icon.title = t('targets.plan.moonLegend');
+      icon.innerHTML = moonPhaseIconSvg(moon.phaseIndex);
+      chartBox.appendChild(icon);
+    }
 
     chartWrap.appendChild(gutter);
     chartWrap.appendChild(chartBox);
@@ -3118,14 +3360,15 @@ export class TargetsView {
     curve: AltSample[],
     win: { start: Date; end: Date },
     transitTime: Date,
-  ): { svg: SVGSVGElement; lo: number; hi: number; hiFrac: number | null; loFrac: number | null; transitFrac: number | null; ticks: { label: string; frac: number }[] } {
+    moon: MoonOverlay | null,
+  ): { svg: SVGSVGElement; lo: number; hi: number; hiFrac: number | null; loFrac: number | null; transitFrac: number | null; moonIconYFrac: number | null; ticks: { label: string; frac: number }[] } {
     const NS = 'http://www.w3.org/2000/svg';
     const W = 120, H = 53, padY = 7, padX = 2;
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('class', 'block w-full h-[180px]');
-    if (curve.length === 0) return { svg, lo: 0, hi: 0, hiFrac: null, loFrac: null, transitFrac: null, ticks: [] };
+    if (curve.length === 0) return { svg, lo: 0, hi: 0, hiFrac: null, loFrac: null, transitFrac: null, moonIconYFrac: null, ticks: [] };
 
     const span = (win.end.getTime() - win.start.getTime()) || 1;
     // Fixed 0–90° Y scale so all objects are comparable.
@@ -3181,6 +3424,25 @@ export class TargetsView {
     svg.appendChild(mkRefLine(yAt(objHi)));
     svg.appendChild(mkRefLine(yAt(objLo)));
 
+    // Moon trajectory — drawn before the object curve so the accent object line
+    // stays visually dominant. Thin, dashed, muted. Returns the y-fraction of the
+    // moon's altitude at the window start so the phase icon can be pinned to the
+    // left axis (a fixed spot), instead of wandering with the culmination point.
+    let moonIconYFrac: number | null = null;
+    if (moon && moon.curve.length > 0) {
+      const mPts = moon.curve.map(s => `${xAt(s.time).toFixed(1)},${yAt(s.altDeg).toFixed(1)}`);
+      const mLine = document.createElementNS(NS, 'polyline');
+      mLine.setAttribute('points', mPts.join(' '));
+      mLine.setAttribute('class', 'fill-none stroke-[var(--moon-curve)]');
+      mLine.setAttribute('stroke-width', '1');
+      mLine.setAttribute('stroke-dasharray', '2 2');
+      mLine.setAttribute('stroke-linejoin', 'round');
+      mLine.setAttribute('stroke-linecap', 'round');
+      mLine.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(mLine);
+      moonIconYFrac = yAt(moon.curve[0].altDeg) / H; // altitude at the left edge
+    }
+
     const pts = curve.map(s => `${xAt(s.time).toFixed(1)},${yAt(s.altDeg).toFixed(1)}`);
 
     // Light fill under the trajectory, down to the object's min-altitude line.
@@ -3223,6 +3485,7 @@ export class TargetsView {
       hiFrac: yAt(objHi) / H,
       loFrac: yAt(objLo) / H,
       transitFrac,
+      moonIconYFrac,
       ticks,
     };
   }

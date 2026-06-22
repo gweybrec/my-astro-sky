@@ -501,9 +501,6 @@ export class Gallery {
 
     let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
-    document.addEventListener('keydown', onKey);
-
     let zoom: ReturnType<typeof createImageZoomPan> | null = null;
     let metaPanelTeardown: (() => void) | null = null;
     let metaPanelIsDirty: (() => boolean) | null = null;
@@ -523,6 +520,37 @@ export class Gallery {
       rawClose();
       return true;
     };
+
+    // ── Arrow-key navigation to the adjacent photo in the gallery ─────────────
+    const navigate = async (delta: number) => {
+      // Navigate within the active filtered list when the photo belongs to it,
+      // otherwise fall back to the full set (e.g. opened from the carousel).
+      const list = this.filteredPhotos.some(p => p.id === photo.id)
+        ? this.filteredPhotos
+        : this.photos;
+      if (list.length < 2) return;
+      const curIdx = list.findIndex(p => p.id === photo.id);
+      if (curIdx === -1) return;
+      const next = list[((curIdx + delta) % list.length + list.length) % list.length];
+      if (next.id === photo.id) return;
+      if (metaPanelIsDirty?.()) {
+        const discard = await confirmUnsavedChanges();
+        if (!discard) return;
+      }
+      rawClose();
+      this.openDetailModal(next);
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { close(); return; }
+      // Don't hijack arrow keys while typing in the metadata editor fields.
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' || target.isContentEditable)) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); navigate(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); navigate(1); }
+    };
+    document.addEventListener('keydown', onKey);
 
     // ── Image ────────────────────────────────────────────────────────────────
     const imgWrap = document.createElement('div');

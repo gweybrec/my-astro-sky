@@ -11,7 +11,7 @@ import { t } from './i18n';
 import { formatAlt } from './format-utils';
 import { buildSetupInfoRows } from './setup-info';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
-import type { AltSample } from './sky-geometry';
+import { moonDangerLevel, type AltSample } from './sky-geometry';
 
 // ─── Affine helpers (pure, unit-tested) ─────────────────────────────────────
 
@@ -259,6 +259,12 @@ export interface PlanPdfTarget {
     paDeg: number;
     tiles: { ra: number; dec: number }[];
   } | null;
+  /** Moon overlay (identical across pages); omitted when the moon toggle is off. */
+  moonCurve?: AltSample[];
+  moonPhaseIndex?: number;
+  moonIllum?: number;
+  /** Moon–target angular separation (°) at the imaging time, or null. */
+  moonSepDeg?: number | null;
 }
 
 export interface PlanPdfOptions {
@@ -418,17 +424,70 @@ function drawMetaColumn(doc: jsPDF, label: string, valueW: number, x: number, to
 }
 
 /** Draw a row of label/value pairs (micro uppercase label above a bold value), returning the end x cursor. */
-function drawMetaRow(doc: jsPDF, items: { label: string; value: string }[], x: number, top: number): number {
+function drawMetaRow(doc: jsPDF, items: { label: string; value: string; color?: [number, number, number] }[], x: number, top: number): number {
   let cx = x;
   for (const it of items) {
     doc.setFont(undefined as any, 'bold');
     doc.setFontSize(11);
     const vw = doc.getTextWidth(it.value);
-    doc.setTextColor(60, 60, 60);
+    const [r, g, b] = it.color ?? [60, 60, 60];
+    doc.setTextColor(r, g, b);
     doc.text(it.value, cx, top + 13);
     cx = drawMetaColumn(doc, it.label, vw, cx, top);
   }
   return cx;
+}
+
+/** PDF RGB colour for a moon-distance value, by danger level (matches the UI tokens). */
+function moonSepColor(sepDeg: number, illum: number): [number, number, number] {
+  return { danger: [204, 119, 119], warn: [202, 164, 74], ok: [106, 157, 106] }[moonDangerLevel(sepDeg, illum)] as [number, number, number];
+}
+
+/**
+ * Draw a small Moon phase glyph centred at (cx, cy) with radius r onto a 2D
+ * canvas. Mirrors the on-screen SVG icon: lit limb is a semicircle + terminator
+ * ellipse; waning phases mirror the waxing geometry. Northern-hemisphere
+ * convention (waxing lit on the right).
+ */
+function drawMoonPhaseToCanvas(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number, r: number,
+  phaseIndex: number, dpr: number,
+): void {
+  const f = [0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25][phaseIndex] ?? 0.5;
+  const waning = phaseIndex >= 5;
+  ctx.save();
+  // On the light PDF page the convention is inverted vs. the dark UI: the unlit
+  // (shadow) disk is grey and the illuminated portion is paper-white, so a full
+  // moon reads as a bright (empty) disk and a new moon as a filled grey one.
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(120,128,150,0.9)';
+  ctx.fill();
+  ctx.lineWidth = Math.max(0.75 * dpr, 0.5);
+  ctx.strokeStyle = 'rgba(90,98,120,0.9)';
+  // Illuminated portion (paper-white).
+  if (f > 0.001) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (waning) ctx.scale(-1, 1); // mirror to put the lit limb on the left
+    ctx.beginPath();
+    ctx.fillStyle = '#f8f8f8';
+    if (f >= 0.999) {
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+    } else {
+      const b = r * (1 - 2 * f); // terminator x-radius (signed)
+      ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false); // right limb, top→bottom
+      // terminator ellipse, bottom→top
+      ctx.ellipse(0, 0, Math.abs(b), r, 0, Math.PI / 2, -Math.PI / 2, b > 0);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  // Outline last, so the white lit fill never paints over the disk edge.
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**
@@ -446,6 +505,8 @@ function drawAltChartToCanvas(
   w: number,
   h: number,
   dpr: number,
+  moonCurve?: AltSample[],
+  moonPhaseIndex?: number,
 ): void {
   if (curve.length === 0) return;
   ctx.save();
@@ -458,7 +519,10 @@ function drawAltChartToCanvas(
   // Left gutter reserved for the axis-label graduations (outside the plot);
   // right gutter reserved for the min/max altitude value labels (mirrors the
   // on-screen sparkline, which shows them above/below their reference lines).
-  const gutter = 18 * dpr;
+  // When the moon is shown the left gutter widens to reserve a strip just left
+  // of the axis for the phase icon (the graduations shift further left).
+  const moonStrip = moonCurve && moonCurve.length > 0 ? 12 * dpr : 0;
+  const gutter = (moonStrip ? 28 : 18) * dpr;
   const rGutter = 22 * dpr;
   const plotW = w - gutter - rGutter;
   const plotR = gutter + plotW;          // right edge of the plot area
@@ -494,6 +558,27 @@ function drawAltChartToCanvas(
     ctx.beginPath(); ctx.moveTo(gutter, ry); ctx.lineTo(plotR, ry); ctx.stroke();
   }
   ctx.setLineDash([]);
+
+  // Moon trajectory — drawn before the object curve so the blue object line
+  // stays dominant. Thin, dashed, muted grey. A phase icon marks culmination.
+  if (moonCurve && moonCurve.length > 0) {
+    const mPts = moonCurve.map(s => ({ px: xAt(s.time), py: yAt(s.altDeg) }));
+    ctx.strokeStyle = 'rgba(120,128,150,0.8)';
+    ctx.lineWidth = dpr;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.setLineDash([2 * dpr, 2 * dpr]);
+    ctx.beginPath();
+    ctx.moveTo(mPts[0].px, mPts[0].py);
+    for (let i = 1; i < mPts.length; i++) ctx.lineTo(mPts[i].px, mPts[i].py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Phase icon pinned just left of the axis, at the moon's altitude where its
+    // trajectory meets the left edge (a fixed spot, matching the on-screen chart).
+    // Centre sits moonR + ~2.5px left of the axis so it isn't flush against it.
+    const moonR = 4.5 * dpr;
+    drawMoonPhaseToCanvas(ctx, gutter - moonR - 2.5 * dpr, yAt(moonCurve[0].altDeg), moonR, moonPhaseIndex ?? 4, dpr);
+  }
 
   // Area fill under trajectory.
   const pts = curve.map(s => ({ px: xAt(s.time), py: yAt(s.altDeg) }));
@@ -546,7 +631,7 @@ function drawAltChartToCanvas(
   ctx.textBaseline = 'middle';
   ctx.fillStyle = 'rgba(80,80,80,0.9)';
   for (const deg of AXIS_TICKS) {
-    ctx.fillText(`${deg}°`, gutter - 2 * dpr, yAt(deg));
+    ctx.fillText(`${deg}°`, gutter - moonStrip - 2 * dpr, yAt(deg));
   }
 
   // Min/max altitude value labels in the right gutter — max above its reference
@@ -794,11 +879,20 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
 
       // Metadata row: label/value pairs.
       const metaTop = chipY + chipH + 22;
-      const metaItems: { label: string; value: string }[] = [];
+      const metaItems: { label: string; value: string; color?: [number, number, number] }[] = [];
       if (dso.mag !== null) metaItems.push({ label: 'Mag', value: dso.mag.toFixed(1) });
       if (dso.majAxis) metaItems.push({ label: t('targets.results.size'), value: fmtArcmin(dso.majAxis) });
       metaItems.push({ label: t('targets.results.bestTime'), value: fmtTime(tgt.bestTimeUtc) });
       metaItems.push({ label: t('targets.results.maxAlt'), value: `${Math.round(tgt.maxAltDeg)}°` });
+      if (tgt.moonSepDeg != null) {
+        const level = moonDangerLevel(tgt.moonSepDeg, tgt.moonIllum ?? 1);
+        const adj = t({ danger: 'targets.plan.moonClose', warn: 'targets.plan.moonModerate', ok: 'targets.plan.moonFar' }[level]);
+        metaItems.push({
+          label: t('targets.plan.moonSeparation'),
+          value: `${adj} (${Math.round(tgt.moonSepDeg)}°)`,
+          color: moonSepColor(tgt.moonSepDeg, tgt.moonIllum ?? 1),
+        });
+      }
       let metaX = drawMetaRow(doc, metaItems, margin, metaTop);
       // Difficulty rendered as diamonds (filled = required), drawn as vectors
       // because jsPDF's standard fonts don't include the ◆/◇ glyphs.
@@ -832,7 +926,8 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       chartCtx.fillRect(0, 0, chartOff.width, chartOff.height);
       if (tgt.curve.length > 0) {
         drawAltChartToCanvas(chartCtx, tgt.curve, tgt.nightWin, tgt.bestTimeUtc,
-          0, 0, chartOff.width, chartOff.height, chartDpr);
+          0, 0, chartOff.width, chartOff.height, chartDpr,
+          tgt.moonCurve, tgt.moonPhaseIndex);
       }
       doc.addImage(chartOff.toDataURL('image/png'), 'PNG', margin, chartTop, contentW, chartH);
 

@@ -129,6 +129,10 @@
   --fov-frame-stroke: rgba(220, 60, 60, 0.85);
   --fov-frame-label:  rgba(220, 90, 90, 0.9);
 
+  /* Moon trajectory overlay (plan altitude charts) */
+  --moon-curve: rgba(180, 188, 210, 0.55); /* dashed moon path + phase-icon outline */
+  --moon-lit:   rgba(225, 230, 245, 0.92); /* illuminated portion of the phase icon */
+
   /* Sky map background gradient (read via getComputedStyle in sky-map.ts) */
   --sky-bg-inner: #1e1c2a;
   --sky-bg-outer: #000000;

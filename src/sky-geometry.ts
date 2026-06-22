@@ -2,7 +2,7 @@
  * Sky geometry — altitude/azimuth, transit time, visibility over a night.
  */
 
-import { dateToJD, lstHours } from './astro-time';
+import { dateToJD, lstHours, moonRaDecDeg } from './astro-time';
 
 const DEG = Math.PI / 180;
 
@@ -32,6 +32,40 @@ export function altAzFromRaDec(
 /** Transit LST (hours) = RA in hours */
 export function transitLstHours(raDeg: number): number {
   return raDeg / 15;
+}
+
+/**
+ * Great-circle angular separation in degrees between two equatorial points.
+ * Uses the haversine / atan2 form (numerically stable at small angles, which
+ * is exactly the regime the moon-proximity colour thresholds care about).
+ */
+export function angularSeparationDeg(
+  ra1Deg: number, dec1Deg: number,
+  ra2Deg: number, dec2Deg: number,
+): number {
+  const dRa = (ra2Deg - ra1Deg) * DEG;
+  const d1 = dec1Deg * DEG, d2 = dec2Deg * DEG;
+  const dDec = d2 - d1;
+  const a = Math.sin(dDec / 2) ** 2 + Math.cos(d1) * Math.cos(d2) * Math.sin(dRa / 2) ** 2;
+  return (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / DEG;
+}
+
+/**
+ * Moonlight interference level for a target, weighted by both the angular
+ * separation and the Moon's illuminated fraction. A near-full moon poisons a
+ * large swath of the sky; a thin crescent / new moon is harmless almost
+ * everywhere. Thresholds therefore scale with `illum` rather than being fixed
+ * degree cutoffs. Constants are deliberately coarse and easy to tune.
+ */
+const ILLUM_MAX_DANGER_DEG = 90; // danger radius at full moon
+const DANGER_TRANSITION_DEG = 30; // amber band beyond the red line
+export function moonDangerLevel(sepDeg: number, illum: number): 'danger' | 'warn' | 'ok' {
+  if (illum < 0.1) return 'ok'; // moon too dim to matter at any separation
+  const redLine = ILLUM_MAX_DANGER_DEG * illum;
+  const amberLine = redLine + DANGER_TRANSITION_DEG;
+  if (sepDeg < redLine) return 'danger';
+  if (sepDeg < amberLine) return 'warn';
+  return 'ok';
 }
 
 /**
@@ -111,6 +145,36 @@ export function sampleAltCurve(
     const lst = lstHours(jd, lonDeg);
     samples.push({ time: new Date(endMs), altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg });
   }
+  return samples;
+}
+
+/**
+ * Sample the Moon's altitude across a window, every `stepMin` minutes.
+ * Unlike `sampleAltCurve`, the Moon's RA/Dec is recomputed at every step
+ * because the Moon moves ~0.5°/hr (a fixed position would be wrong over a
+ * multi-hour night). Returns evenly-spaced, end-inclusive `{ time, altDeg }`.
+ */
+export function sampleMoonAltCurve(
+  latDeg: number,
+  lonDeg: number,
+  windowStart: Date,
+  windowEnd: Date,
+  stepMin = 10,
+): AltSample[] {
+  const startMs = windowStart.getTime();
+  const endMs = windowEnd.getTime();
+  const dtMs = Math.max(1, stepMin) * 60 * 1000;
+  const sampleAt = (tMs: number): AltSample => {
+    const time = new Date(tMs);
+    const jd = dateToJD(time);
+    const { raDeg, decDeg } = moonRaDecDeg(jd);
+    const lst = lstHours(jd, lonDeg);
+    return { time, altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg };
+  };
+  if (endMs <= startMs) return [sampleAt(startMs)];
+  const samples: AltSample[] = [];
+  for (let tMs = startMs; tMs <= endMs; tMs += dtMs) samples.push(sampleAt(tMs));
+  if (samples[samples.length - 1].time.getTime() < endMs) samples.push(sampleAt(endMs));
   return samples;
 }
 

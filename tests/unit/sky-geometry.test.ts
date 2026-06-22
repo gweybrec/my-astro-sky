@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { altAzFromRaDec, transitLstHours, maxAltDuringWindow, mightBeVisible, sampleAltCurve } from '../../src/sky-geometry';
-import { lstHours, dateToJD } from '../../src/astro-time';
+import { altAzFromRaDec, transitLstHours, maxAltDuringWindow, mightBeVisible, sampleAltCurve, angularSeparationDeg, sampleMoonAltCurve, moonDangerLevel } from '../../src/sky-geometry';
+import { lstHours, dateToJD, moonRaDecDeg } from '../../src/astro-time';
 
 describe('altAzFromRaDec', () => {
   it('object on meridian (LST = RA) has azimuth ≈ 180° (due south, north hemisphere)', () => {
@@ -134,5 +134,78 @@ describe('sampleAltCurve', () => {
     const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, start, 10);
     expect(curve.length).toBe(1);
     expect(curve[0].time.getTime()).toBe(start.getTime());
+  });
+});
+
+describe('angularSeparationDeg', () => {
+  it('identical points → 0°', () => {
+    expect(angularSeparationDeg(83, -5, 83, -5)).toBeCloseTo(0, 6);
+  });
+
+  it('antipodal points → 180°', () => {
+    expect(angularSeparationDeg(0, 0, 180, 0)).toBeCloseTo(180, 4);
+  });
+
+  it('90° apart on the equator', () => {
+    expect(angularSeparationDeg(0, 0, 90, 0)).toBeCloseTo(90, 6);
+  });
+
+  it('a known pair: Betelgeuse↔Rigel ≈ 18.6°', () => {
+    // Betelgeuse RA 88.79 Dec 7.41, Rigel RA 78.63 Dec -8.20
+    const sep = angularSeparationDeg(88.79, 7.41, 78.63, -8.20);
+    expect(sep).toBeCloseTo(18.6, 0);
+  });
+
+  it('handles RA wrap across 0/360', () => {
+    expect(angularSeparationDeg(359, 0, 1, 0)).toBeCloseTo(2, 4);
+  });
+});
+
+describe('sampleMoonAltCurve', () => {
+  const latDeg = 48.85, lonDeg = 2.35;
+  const start = new Date('2024-01-15T19:00:00Z');
+  const end = new Date('2024-01-16T05:00:00Z'); // 10h window
+
+  it('returns end-inclusive, evenly-spaced samples', () => {
+    const curve = sampleMoonAltCurve(latDeg, lonDeg, start, end, 60);
+    expect(curve.length).toBe(11);
+    expect(curve[0].time.getTime()).toBe(start.getTime());
+    expect(curve[curve.length - 1].time.getTime()).toBe(end.getTime());
+  });
+
+  it('recomputes the Moon position per step (curve differs from a fixed RA/Dec)', () => {
+    const moonCurve = sampleMoonAltCurve(latDeg, lonDeg, start, end, 60);
+    // A fixed-position curve using the Moon's RA/Dec at window start.
+    const { raDeg, decDeg } = moonRaDecDeg(dateToJD(start));
+    const fixed = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 60);
+    // The Moon moves ~5° over 10h, so the end altitude should diverge.
+    const dEnd = Math.abs(moonCurve[moonCurve.length - 1].altDeg - fixed[fixed.length - 1].altDeg);
+    expect(dEnd).toBeGreaterThan(0.5);
+  });
+});
+
+describe('moonDangerLevel', () => {
+  it('new moon is always ok, even very close', () => {
+    expect(moonDangerLevel(5, 0.0)).toBe('ok');
+    expect(moonDangerLevel(5, 0.05)).toBe('ok');
+  });
+
+  it('full moon: close is danger, far is ok', () => {
+    expect(moonDangerLevel(30, 1.0)).toBe('danger');
+    expect(moonDangerLevel(150, 1.0)).toBe('ok');
+  });
+
+  it('monotonic: smaller separation is never less dangerous', () => {
+    const rank = { danger: 2, warn: 1, ok: 0 } as const;
+    for (const illum of [0.3, 0.6, 0.9]) {
+      for (let s = 10; s < 180; s += 10) {
+        expect(rank[moonDangerLevel(s - 10, illum)]).toBeGreaterThanOrEqual(rank[moonDangerLevel(s, illum)]);
+      }
+    }
+  });
+
+  it('higher illumination is never less dangerous at a fixed separation', () => {
+    const rank = { danger: 2, warn: 1, ok: 0 } as const;
+    expect(rank[moonDangerLevel(50, 0.9)]).toBeGreaterThanOrEqual(rank[moonDangerLevel(50, 0.3)]);
   });
 });
