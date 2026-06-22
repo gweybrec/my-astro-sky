@@ -36,7 +36,11 @@
       "PowerShell(npm run *)",
       "PowerShell(npx vitest *)",
       "PowerShell(npm test 2>&1)",
-      "PowerShell(npx tsc 2>&1)"
+      "PowerShell(npx tsc 2>&1)",
+      "Bash(gh pr *)",
+      "Bash(git fetch *)",
+      "Bash(git diff *)",
+      "Read(//tmp/**)"
     ],
     "enabledMcpjsonServers": [
       "playwright"
