@@ -4269,6 +4269,13 @@ details.targets-form-details[open] .targets-form-summary::before {
 
 .batch-footer-actions {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.batch-footer-buttons {
+  display: flex;
   align-items: center;
   gap: var(--space-4);
 }

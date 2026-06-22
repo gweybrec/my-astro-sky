@@ -858,6 +858,7 @@ const fr = {
     modalTitle: 'Ajouter des photos',
     closeTitle: 'Fermer (les photos placées restent sur la carte ; les résolutions non sauvegardées seront perdues)',
     startButton: 'Démarrer la résolution',
+    cancelAll: 'Annuler la résolution',
     startingLabel: 'Démarrage…',
     removeItem: 'Retirer cette photo',
     solverLabel: 'Solveur :',

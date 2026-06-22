@@ -862,6 +862,7 @@ const de: Translations = {
     modalTitle: 'Fotos hinzufügen',
     closeTitle: 'Schließen (platzierte Fotos bleiben auf der Karte; nicht gespeicherte Lösungen gehen verloren)',
     startButton: 'Plate Solving starten',
+    cancelAll: 'Plate Solving abbrechen',
     startingLabel: 'Wird gestartet…',
     removeItem: 'Dieses Foto entfernen',
     solverLabel: 'Solver:',

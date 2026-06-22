@@ -84,18 +84,25 @@
         </div>
         <div class="batch-footer-actions">
           <CheckRow :label="t('batch.autoPlace')" v-model="autoPlace" :disabled="isStarting" />
-          <button
-            class="btn-action"
-            :disabled="isStarting || allSolversDisabled"
-            :title="allSolversDisabled ? t('batch.noSolverConfigured') : undefined"
-            @click="startSolving"
-          >{{ startBtnText }}</button>
-          <button
-            class="btn-confirm"
-            :disabled="!canPlace || autoPlace"
-            :title="autoPlace ? t('batch.autoPlaceDisabledTooltip') : undefined"
-            @click="placeAll"
-          >{{ t('batch.placeButton') }}</button>
+          <div class="batch-footer-buttons">
+            <button
+              class="btn-danger"
+              :disabled="!isStarting"
+              @click="cancelAllSolving"
+            >{{ t('batch.cancelAll') }}</button>
+            <button
+              class="btn-action"
+              :disabled="isStarting || allSolversDisabled"
+              :title="allSolversDisabled ? t('batch.noSolverConfigured') : undefined"
+              @click="startSolving"
+            >{{ startBtnText }}</button>
+            <button
+              class="btn-confirm"
+              :disabled="!canPlace || autoPlace"
+              :title="autoPlace ? t('batch.autoPlaceDisabledTooltip') : undefined"
+              @click="placeAll"
+            >{{ t('batch.placeButton') }}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -270,6 +277,10 @@ function addMorePhotos() {
 // ─── Close / cleanup ──────────────────────────────────────────────────────────
 let cancelled = false;
 
+// Generation token for the current solve run. Bumping it invalidates the queue
+// loop so a "Cancel solving" click stops launching further items.
+let activeSolveRun = 0;
+
 function close() {
   emit('close');
 }
@@ -315,25 +326,41 @@ const isStarting = ref(false);
 const startBtnText = computed(() => isStarting.value ? t('batch.startingLabel') : t('batch.startButton'));
 
 // ─── Solving logic ─────────────────────────────────────────────────────────────
-async function pollUntilDone(item: BatchItem, jobId: string): Promise<PlateSolveResult> {
+async function pollUntilDone(item: BatchItem, jobId: string, signal: AbortSignal): Promise<PlateSolveResult> {
   return new Promise((resolve, reject) => {
+    const stopPolling = () => {
+      if (item.pollingTimer !== null) { clearInterval(item.pollingTimer); item.pollingTimer = null; }
+      signal.removeEventListener('abort', onAbort);
+    };
+    const onAbort = () => {
+      stopPolling();
+      // No server-side cancel endpoint for online astrometry — we just stop polling.
+      reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    };
+
+    if (signal.aborted) { onAbort(); return; }
+    signal.addEventListener('abort', onAbort, { once: true });
+
     item.pollingTimer = setInterval(async () => {
       if (cancelled) {
-        clearInterval(item.pollingTimer!); item.pollingTimer = null;
+        stopPolling();
         reject(new Error('cancelled'));
         return;
       }
       try {
         const status = await pollPlateSolve(jobId);
+        // The poll request can resolve after an abort fired — bail without
+        // overwriting the canceled status the abort handler set.
+        if (signal.aborted) return;
         if (status.status === 'solved' && status.correspondences) {
-          clearInterval(item.pollingTimer!); item.pollingTimer = null;
+          stopPolling();
           resolve({ success: true, correspondences: status.correspondences, dsoIds: status.dsoIds });
         } else if (status.status === 'failed' || status.status === 'timeout') {
-          clearInterval(item.pollingTimer!); item.pollingTimer = null;
+          stopPolling();
           reject(new Error(status.error || t('modal.solveFailed')));
         }
       } catch (err) {
-        clearInterval(item.pollingTimer!); item.pollingTimer = null;
+        stopPolling();
         reject(err);
       }
     }, 2000);
@@ -438,10 +465,10 @@ async function solveItem(item: BatchItem) {
       item.localJobId = jobId;
       result = await pollUntilLocalDone(item, endpoint, jobId, item.solveAbort.signal);
     } else {
-      item.solveAbort = null;
+      item.solveAbort = new AbortController();
       if (cancelled) { cleanupItem(item); return; }
       const { jobId } = await submitPlateSolve(item.file, hints ? { ra: hints.ra!, dec: hints.dec!, radius: 2.0 } : undefined);
-      result = await pollUntilDone(item, jobId);
+      result = await pollUntilDone(item, jobId, item.solveAbort.signal);
     }
 
     if (cancelled) { cleanupItem(item); return; }
@@ -497,6 +524,7 @@ function retryItem(item: BatchItem) {
 
 // ─── Start solving queue ───────────────────────────────────────────────────────
 function startSolving() {
+  const runId = ++activeSolveRun;
   isStarting.value = true;
 
   const maxParallel = Math.max(
@@ -523,7 +551,7 @@ function startSolving() {
   }
 
   function checkAllDone() {
-    if (!cancelled && localActiveSlots === 0 && localQueue.length === 0 && onlineActiveCount === 0) {
+    if (!cancelled && runId === activeSolveRun && localActiveSlots === 0 && localQueue.length === 0 && onlineActiveCount === 0) {
       isStarting.value = false;
     }
   }
@@ -536,7 +564,7 @@ function startSolving() {
       const promise = item.wcsResult != null ? runWcsItem(item) : solveItem(item);
       void promise.finally(() => {
         localActiveSlots--;
-        if (!cancelled) {
+        if (!cancelled && runId === activeSolveRun) {
           startNextLocalItem();
           checkAllDone();
         }
@@ -549,15 +577,34 @@ function startSolving() {
   onlineQueue.forEach((item, idx) => {
     onlineActiveCount++;
     setTimeout(() => {
-      if (cancelled) { onlineActiveCount--; return; }
+      if (cancelled || runId !== activeSolveRun) { onlineActiveCount--; return; }
       void solveItem(item).finally(() => {
         onlineActiveCount--;
-        if (!cancelled) checkAllDone();
+        if (!cancelled && runId === activeSolveRun) checkAllDone();
       });
     }, idx * 1000);
   });
 
   startNextLocalItem();
+}
+
+// ─── Cancel all in-progress solves ─────────────────────────────────────────────
+// Stops every photo currently solving or queued, leaving already solved/placed/
+// failed photos untouched.
+function cancelAllSolving() {
+  activeSolveRun++; // invalidate the running queue → no new launches
+  for (const item of items) {
+    if (item.status === 'solving') {
+      // Local & online solves both carry an AbortController; aborting routes
+      // through solveItem's catch (AbortError → 'canceled') and finally cleanup.
+      item.solveAbort?.abort();
+    } else if (item.status === 'waiting') {
+      // Queued but not yet started — no controller/timers to abort.
+      cleanupItem(item);
+      item.status = 'canceled';
+    }
+  }
+  isStarting.value = false;
 }
 
 // ─── Place all solved photos ───────────────────────────────────────────────────

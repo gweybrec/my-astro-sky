@@ -862,6 +862,7 @@ const es: Translations = {
     modalTitle: 'Añadir fotos',
     closeTitle: 'Cerrar (las fotos colocadas permanecen en el mapa; las soluciones no guardadas se perderán)',
     startButton: 'Iniciar la solución de placa',
+    cancelAll: 'Cancelar la resolución',
     startingLabel: 'Iniciando…',
     removeItem: 'Quitar esta foto',
     solverLabel: 'Solver:',

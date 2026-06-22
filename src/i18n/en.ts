@@ -860,6 +860,7 @@ const en: Translations = {
     modalTitle: 'Add photos',
     closeTitle: 'Close (photos you placed remain on the map; unsaved solves will be lost)',
     startButton: 'Start plate solving',
+    cancelAll: 'Cancel solving',
     startingLabel: 'Starting…',
     removeItem: 'Remove this photo',
     solverLabel: 'Solver:',
