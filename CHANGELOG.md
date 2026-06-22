@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.5.0] - 2026-06-22
+
+### Features
+
+- Moon awareness in plans ([108e2e3](https://github.com/gweybrec/my-astro-sky/commit/108e2e35eeda93d3ab27fa73c1c9e85f8be49493))
+
+- Add keyboard shortcuts ([421408a](https://github.com/gweybrec/my-astro-sky/commit/421408a45c8b0481187a5a6ac49e737c54979e96))
+
+- Add a "cancel all solving" button when adding photos ([27ecd80](https://github.com/gweybrec/my-astro-sky/commit/27ecd808539d0bd06a0d64d50e382fd473ea7a23))
+
+
+### Bug Fixes
+
+- Only validate dimensions for the full-resolution image ([40407a6](https://github.com/gweybrec/my-astro-sky/commit/40407a670bef545737122928ce1a88b8223f9157))
+
+- Missing the ability to restoreplans from a backup ([6579f3b](https://github.com/gweybrec/my-astro-sky/commit/6579f3b2a65e2fdfda9701424f379f63fe6cfb55))
+
 ## [0.4.0] - 2026-06-22
 
 ### Features
