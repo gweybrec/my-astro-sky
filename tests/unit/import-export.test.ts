@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents } from '../../server/import-utils';
-import type { ZipEntry } from '../../server/import-utils';
+import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse } from '../../server/import-utils';
+import type { ZipEntry, ZipInspectResult } from '../../server/import-utils';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -1109,5 +1109,44 @@ describe('inspectZipContents — ZIP content inspection', () => {
   it('gracefully handles malformed JSON in dso-overrides (no throw)', async () => {
     const result = await inspectZipContents([mockEntry('dso-overrides.json', 'NOT JSON')]);
     expect(result.hasDsoOverrides).toBe(false);
+  });
+});
+
+describe('buildZipPreviewResponse', () => {
+  // A ZipInspectResult with every detectable section present.
+  const fullInspect: ZipInspectResult = {
+    hasMetadata: true,
+    photos: [{ filename: 'a.jpg', originalName: 'A.jpg', thumbFilename: null }],
+    hasDsoOverrides: true,
+    hasCustomGear: true,
+    hasSetups: true,
+    hasPlans: true,
+    imageEntries: [{ filename: 'a.jpg', size: 5000 }],
+  };
+  const noExtra = { hasShortcuts: false, shortcuts: undefined, images: [] };
+
+  it('forwards every has* flag from the inspect result (regression: hasPlans was dropped)', () => {
+    const res = buildZipPreviewResponse(fullInspect, noExtra);
+    expect(res.hasMetadata).toBe(true);
+    expect(res.hasDsoOverrides).toBe(true);
+    expect(res.hasCustomGear).toBe(true);
+    expect(res.hasSetups).toBe(true);
+    expect(res.hasPlans).toBe(true);
+  });
+
+  it('hasMetadata is false when the manifest carries no photos', () => {
+    const res = buildZipPreviewResponse({ ...fullInspect, hasMetadata: true, photos: [] }, noExtra);
+    expect(res.hasMetadata).toBe(false);
+    expect(res.photos).toBe(0);
+  });
+
+  it('reports the photo count and passes through shortcuts + images', () => {
+    const images = [{ filename: 'a.jpg', originalName: 'A.jpg', size: 5000, exists: false }];
+    const shortcuts = { save: 'ctrl+s' };
+    const res = buildZipPreviewResponse(fullInspect, { hasShortcuts: true, shortcuts, images });
+    expect(res.photos).toBe(1);
+    expect(res.hasShortcuts).toBe(true);
+    expect(res.shortcuts).toEqual(shortcuts);
+    expect(res.images).toEqual(images);
   });
 });

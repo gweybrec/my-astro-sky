@@ -15,7 +15,7 @@ import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 const _require = createRequire(import.meta.url);
 const unzipper = _require('unzipper') as typeof import('unzipper');
-import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents } from './import-utils.js';
+import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse } from './import-utils.js';
 import { extractWCS, wcsToCorrespondences, loadServerCatalog } from './wcs-reader.js';
 import { submitJob, getJobStatus, isConfigured as isAstrometryConfigured, listUserSubmissions, reuseSubmission, resetSession as resetAstrometrySession } from './astrometry.js';
 import { solveWithASTAP } from './astap.js';
@@ -2434,16 +2434,7 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         } catch { /* ignore invalid shortcuts.json */ }
       }
 
-      res.json({
-        hasMetadata: inspect.hasMetadata && inspect.photos.length > 0,
-        photos: inspect.photos.length,
-        hasDsoOverrides: inspect.hasDsoOverrides,
-        hasCustomGear: inspect.hasCustomGear,
-        hasSetups: inspect.hasSetups,
-        hasShortcuts,
-        shortcuts,
-        images,
-      });
+      res.json(buildZipPreviewResponse(inspect, { hasShortcuts, shortcuts, images }));
     } else if (ext === '.json') {
       const photos = JSON.parse(file.buffer.toString('utf8'));
       if (!Array.isArray(photos)) { res.status(400).json({ error: 'Format de manifeste invalide' }); return; }
@@ -2453,6 +2444,7 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         hasDsoOverrides: false,
         hasCustomGear: false,
         hasSetups: false,
+        hasPlans: false,
         hasShortcuts: false,
         images: [],
       });

@@ -24,6 +24,52 @@ export interface ZipInspectResult {
   imageEntries: Array<{ filename: string; size: number }>;
 }
 
+/** An image entry as surfaced to the import-preview client. */
+export interface PreviewImageEntry {
+  filename: string;
+  originalName: string;
+  size: number;
+  exists: boolean;
+}
+
+/** The JSON shape returned by the /api/import-preview endpoint for a ZIP bundle. */
+export interface ImportPreviewResponse {
+  hasMetadata: boolean;
+  photos: number;
+  hasDsoOverrides: boolean;
+  hasCustomGear: boolean;
+  hasSetups: boolean;
+  hasPlans: boolean;
+  hasShortcuts: boolean;
+  shortcuts?: unknown;
+  images: PreviewImageEntry[];
+}
+
+/**
+ * Maps a {@link ZipInspectResult} (plus the separately-parsed shortcuts and
+ * resolved image list) into the import-preview response sent to the client.
+ *
+ * Kept pure and exported so it is unit-testable: the endpoint in server/index.ts
+ * is excluded from coverage, and this mapping is exactly where a `has*` flag can
+ * be silently dropped on its way to the client.
+ */
+export function buildZipPreviewResponse(
+  inspect: ZipInspectResult,
+  extra: { hasShortcuts: boolean; shortcuts?: unknown; images: PreviewImageEntry[] },
+): ImportPreviewResponse {
+  return {
+    hasMetadata: inspect.hasMetadata && inspect.photos.length > 0,
+    photos: inspect.photos.length,
+    hasDsoOverrides: inspect.hasDsoOverrides,
+    hasCustomGear: inspect.hasCustomGear,
+    hasSetups: inspect.hasSetups,
+    hasPlans: inspect.hasPlans,
+    hasShortcuts: extra.hasShortcuts,
+    shortcuts: extra.shortcuts,
+    images: extra.images,
+  };
+}
+
 const ALLOWED_IMG_EXT = new Set(['.jpg', '.jpeg', '.png', '.fits', '.webp']);
 
 /**
