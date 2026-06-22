@@ -888,10 +888,11 @@ export class PhotoOverlay {
     this.placedPhotos.push(placed);
 
     img.onload = () => {
-      // Only check dimensions for the full-resolution image; thumbnails are intentionally smaller
-      const thumbSrc = photo.thumbFilename ? `/uploads/${photo.thumbFilename}` : null;
-      const isThumb = thumbSrc !== null && img.src.endsWith(thumbSrc);
-      if (!isThumb && (img.naturalWidth !== photo.width || img.naturalHeight !== photo.height)) {
+      // Only validate dimensions for the full-resolution image. The LOD swap loads a 400px
+      // thumbnail (server/index.ts) which is intentionally smaller, so assert dims only when
+      // the currently loaded src is the full image.
+      const isFullImage = img.src.endsWith(`/uploads/${photo.filename}`);
+      if (isFullImage && (img.naturalWidth !== photo.width || img.naturalHeight !== photo.height)) {
         reportUnknownRendererError('photo_dimension_mismatch', new Error(`Expected ${photo.width}×${photo.height} but got ${img.naturalWidth}×${img.naturalHeight}`), {
           photoName: photo.originalName,
           expected: `${photo.width}×${photo.height}`,
