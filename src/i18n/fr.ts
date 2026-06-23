@@ -343,7 +343,7 @@ const fr = {
     body: 'Une nouvelle version de MyAstroSky est disponible.',
     currentLabel: 'Actuelle',
     latestLabel: 'Dernière',
-    viewRelease: 'Voir la version',
+    viewRelease: 'Voir la dernière version',
     later: 'Plus tard',
   },
   modal: {

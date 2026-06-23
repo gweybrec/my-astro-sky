@@ -345,7 +345,7 @@ const de: Translations = {
     body: 'Eine neue Version von MyAstroSky ist verfügbar.',
     currentLabel: 'Aktuell',
     latestLabel: 'Neueste',
-    viewRelease: 'Version ansehen',
+    viewRelease: 'Neueste Version ansehen',
     later: 'Später',
   },
   modal: {
