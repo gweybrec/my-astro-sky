@@ -20,6 +20,12 @@ export interface ZipInspectResult {
   hasCustomGear: boolean;
   hasSetups: boolean;
   hasPlans: boolean;
+  /** Individual night plans in plans.json (id + name), for per-item import selection. */
+  planItems: Array<{ id: string; name: string }>;
+  /** Individual gear setups in gear-setups.json (id + name), for per-item import selection. */
+  setupItems: Array<{ id: string; name: string }>;
+  /** Individual custom gear in custom-gear.json (id + type + name), for per-item import selection. */
+  gearItems: Array<{ id: string; type: string; name: string }>;
   /** Image files in images/ directory, with thumbnails removed. */
   imageEntries: Array<{ filename: string; size: number }>;
 }
@@ -29,6 +35,31 @@ export interface PreviewImageEntry {
   filename: string;
   originalName: string;
   size: number;
+  exists: boolean;
+}
+
+/** A plan entry as surfaced to the import-preview client. */
+export interface PreviewPlanEntry {
+  id: string;
+  name: string;
+  /** true if a plan with the same name already exists (will be replaced if imported). */
+  exists: boolean;
+}
+
+/** A gear-setup entry as surfaced to the import-preview client. */
+export interface PreviewSetupEntry {
+  id: string;
+  name: string;
+  /** true if a setup with the same name already exists (will be replaced if imported). */
+  exists: boolean;
+}
+
+/** A custom-gear entry as surfaced to the import-preview client. */
+export interface PreviewGearEntry {
+  id: string;
+  type: string;
+  name: string;
+  /** true if gear of the same type + name already exists (will be replaced if imported). */
   exists: boolean;
 }
 
@@ -43,6 +74,9 @@ export interface ImportPreviewResponse {
   hasShortcuts: boolean;
   shortcuts?: unknown;
   images: PreviewImageEntry[];
+  plans: PreviewPlanEntry[];
+  setups: PreviewSetupEntry[];
+  gear: PreviewGearEntry[];
 }
 
 /**
@@ -55,7 +89,14 @@ export interface ImportPreviewResponse {
  */
 export function buildZipPreviewResponse(
   inspect: ZipInspectResult,
-  extra: { hasShortcuts: boolean; shortcuts?: unknown; images: PreviewImageEntry[] },
+  extra: {
+    hasShortcuts: boolean;
+    shortcuts?: unknown;
+    images: PreviewImageEntry[];
+    plans: PreviewPlanEntry[];
+    setups: PreviewSetupEntry[];
+    gear: PreviewGearEntry[];
+  },
 ): ImportPreviewResponse {
   return {
     hasMetadata: inspect.hasMetadata && inspect.photos.length > 0,
@@ -67,7 +108,22 @@ export function buildZipPreviewResponse(
     hasShortcuts: extra.hasShortcuts,
     shortcuts: extra.shortcuts,
     images: extra.images,
+    plans: extra.plans,
+    setups: extra.setups,
+    gear: extra.gear,
   };
+}
+
+/**
+ * Returns the ids of existing rows whose `name` collides with the given name.
+ * Used to resolve name-based override on import: a selected plan/setup/gear whose
+ * name already exists replaces the existing row(s) rather than duplicating them.
+ *
+ * Custom-gear callers pre-filter `existing` to the same `type` before calling,
+ * since a telescope and an accessory may legitimately share a name.
+ */
+export function idsToReplaceByName(existing: { id: string; name: string }[], name: string): string[] {
+  return existing.filter(e => e.name === name).map(e => e.id);
 }
 
 const ALLOWED_IMG_EXT = new Set(['.jpg', '.jpeg', '.png', '.fits', '.webp']);
@@ -84,6 +140,9 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
     hasCustomGear: false,
     hasSetups: false,
     hasPlans: false,
+    planItems: [],
+    setupItems: [],
+    gearItems: [],
     imageEntries: [],
   };
 
@@ -105,17 +164,38 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
     } else if (entry.path === 'custom-gear.json') {
       try {
         const gear = JSON.parse((await entry.buffer()).toString('utf8'));
-        if (Array.isArray(gear) && gear.length > 0) result.hasCustomGear = true;
+        if (Array.isArray(gear) && gear.length > 0) {
+          result.hasCustomGear = true;
+          for (const g of gear) {
+            if (typeof g?.id === 'string' && typeof g?.type === 'string') {
+              result.gearItems.push({ id: g.id, type: g.type, name: typeof g.name === 'string' ? g.name : g.id });
+            }
+          }
+        }
       } catch { /* ignore */ }
     } else if (entry.path === 'gear-setups.json') {
       try {
         const setups = JSON.parse((await entry.buffer()).toString('utf8'));
-        if (Array.isArray(setups) && setups.length > 0) result.hasSetups = true;
+        if (Array.isArray(setups) && setups.length > 0) {
+          result.hasSetups = true;
+          for (const s of setups) {
+            if (typeof s?.id === 'string') {
+              result.setupItems.push({ id: s.id, name: typeof s.name === 'string' ? s.name : s.id });
+            }
+          }
+        }
       } catch { /* ignore */ }
     } else if (entry.path === 'plans.json') {
       try {
         const plans = JSON.parse((await entry.buffer()).toString('utf8'));
-        if (Array.isArray(plans) && plans.length > 0) result.hasPlans = true;
+        if (Array.isArray(plans) && plans.length > 0) {
+          result.hasPlans = true;
+          for (const p of plans) {
+            if (typeof p?.id === 'string') {
+              result.planItems.push({ id: p.id, name: typeof p.name === 'string' ? p.name : p.id });
+            }
+          }
+        }
       } catch { /* ignore */ }
     } else if (entry.path.startsWith('images/')) {
       const baseName = path.basename(entry.path);

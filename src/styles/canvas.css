@@ -213,3 +213,19 @@ input:focus-visible {
   width: 16px;
   height: 16px;
 }
+
+/* ── Import modal: full-height vertical divider between adjacent columns ──────
+   The columns live in a `flex items-stretch` row, so every column is laid out
+   at the height of the tallest list. A `top:0; bottom:0` pseudo-element on each
+   column after the first therefore spans that full height. */
+.import-col + .import-col {
+  position: relative;
+}
+.import-col + .import-col::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--border-white-md);
+}

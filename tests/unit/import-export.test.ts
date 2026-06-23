@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse } from '../../server/import-utils';
+import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse, idsToReplaceByName } from '../../server/import-utils';
 import type { ZipEntry, ZipInspectResult } from '../../server/import-utils';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -515,6 +515,89 @@ describe('Plan + mosaic export/import round-trip', () => {
   });
 });
 
+// ─── Name-based override on import ───────────────────────────────────────────
+// The /api/import route matches plans/setups/gear by NAME (not internal id) so a
+// re-imported item replaces the hand-recreated one instead of duplicating it.
+// The Express route is integration-only/excluded; this mirrors its DB loop using
+// the same `idsToReplaceByName` helper the route calls.
+
+describe('Name-based override on import (replace, else add)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv('DB_PATH', ':memory:');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('plan with a colliding name replaces the existing one (by name, not id)', async () => {
+    const db = await import('../../server/db.js');
+    // User hand-created a plan named "Winter" with its own id.
+    db.createPlan({ id: 'local-id', name: 'Winter', position: 0, created_at: 'x', night_of: null, setup_id: null, lat: null, lon: null });
+
+    // Import a backup plan also named "Winter" but with a different (bundle) id.
+    const importedName = 'Winter';
+    idsToReplaceByName(db.getPlans(), importedName).forEach(db.deletePlan);
+    db.deletePlan('bundle-id');
+    db.createPlan({ id: 'bundle-id', name: importedName, position: 0, created_at: 'y', night_of: '2026-06-24', setup_id: null, lat: null, lon: null });
+
+    const plans = db.getPlans();
+    expect(plans).toHaveLength(1);
+    expect(plans[0].id).toBe('bundle-id');
+    expect(plans[0].name).toBe('Winter');
+  });
+
+  it('plan with no name match is added alongside existing plans', async () => {
+    const db = await import('../../server/db.js');
+    db.createPlan({ id: 'local-id', name: 'Winter', position: 0, created_at: 'x', night_of: null, setup_id: null, lat: null, lon: null });
+
+    const importedName = 'Summer';
+    idsToReplaceByName(db.getPlans(), importedName).forEach(db.deletePlan);
+    db.deletePlan('bundle-id');
+    db.createPlan({ id: 'bundle-id', name: importedName, position: 1, created_at: 'y', night_of: null, setup_id: null, lat: null, lon: null });
+
+    const names = db.getPlans().map(p => p.name).sort();
+    expect(names).toEqual(['Summer', 'Winter']);
+  });
+
+  it('gear setup with a colliding name replaces the existing one', async () => {
+    const db = await import('../../server/db.js');
+    db.upsertGearSetup({ id: 'local-id', name: 'Main rig', telescope_id: 't1', camera_id: 'c1', accessory_id: null, enabled: 1 });
+
+    const importedName = 'Main rig';
+    idsToReplaceByName(db.getAllGearSetups(), importedName).forEach(db.deleteGearSetup);
+    db.upsertGearSetup({ id: 'bundle-id', name: importedName, telescope_id: 't2', camera_id: 'c2', accessory_id: null, enabled: 1 });
+
+    const setups = db.getAllGearSetups();
+    expect(setups).toHaveLength(1);
+    expect(setups[0].id).toBe('bundle-id');
+    expect(setups[0].telescope_id).toBe('t2');
+  });
+
+  it('custom gear collision is scoped to the same type', async () => {
+    const db = await import('../../server/db.js');
+    // A telescope and an accessory may share a name without colliding.
+    db.upsertCustomGear('scope-local', 'telescope', { id: 'scope-local', name: 'Vega' });
+    db.upsertCustomGear('acc-1', 'accessory', { id: 'acc-1', name: 'Vega' });
+
+    // Import a telescope also named "Vega" → replaces only the telescope.
+    const importedName = 'Vega';
+    const sameType = db.getAllCustomGear()
+      .filter(r => r.type === 'telescope')
+      .map(r => ({ id: r.id, name: JSON.parse(r.data).name as string }));
+    idsToReplaceByName(sameType, importedName).forEach(db.deleteCustomGear);
+    db.upsertCustomGear('scope-bundle', 'telescope', { id: 'scope-bundle', name: importedName });
+
+    const all = db.getAllCustomGear();
+    const scopes = all.filter(r => r.type === 'telescope');
+    const accessories = all.filter(r => r.type === 'accessory');
+    expect(scopes).toHaveLength(1);
+    expect(scopes[0].id).toBe('scope-bundle');
+    expect(accessories).toHaveLength(1); // untouched
+    expect(accessories[0].id).toBe('acc-1');
+  });
+});
+
 // ─── updatePhotoMetadata ───────────────────────────────────────────────────────
 
 describe('updatePhotoMetadata', () => {
@@ -976,11 +1059,18 @@ describe('inspectZipContents — ZIP content inspection', () => {
     expect(result.hasDsoOverrides).toBe(false);
   });
 
-  it('detects custom-gear.json with entries → hasCustomGear true', async () => {
-    const gear = JSON.stringify([{ id: 'custom-1', type: 'telescope', name: 'MyScope' }]);
+  it('detects custom-gear.json with entries → hasCustomGear true + gearItems', async () => {
+    const gear = JSON.stringify([
+      { id: 'custom-1', type: 'telescope', name: 'MyScope' },
+      { id: 'custom-2', type: 'camera' }, // missing name → falls back to id
+    ]);
     const result = await inspectZipContents([mockEntry('custom-gear.json', gear)]);
     expect(result.hasCustomGear).toBe(true);
     expect(result.hasDsoOverrides).toBe(false);
+    expect(result.gearItems).toEqual([
+      { id: 'custom-1', type: 'telescope', name: 'MyScope' },
+      { id: 'custom-2', type: 'camera', name: 'custom-2' },
+    ]);
   });
 
   it('does NOT set hasCustomGear for an empty custom-gear array', async () => {
@@ -988,10 +1078,11 @@ describe('inspectZipContents — ZIP content inspection', () => {
     expect(result.hasCustomGear).toBe(false);
   });
 
-  it('detects gear-setups.json with entries → hasSetups true', async () => {
+  it('detects gear-setups.json with entries → hasSetups true + setupItems', async () => {
     const setups = JSON.stringify([{ id: 's1', telescopeId: 't1', cameraId: 'c1', name: 'Setup A', enabled: true }]);
     const result = await inspectZipContents([mockEntry('gear-setups.json', setups)]);
     expect(result.hasSetups).toBe(true);
+    expect(result.setupItems).toEqual([{ id: 's1', name: 'Setup A' }]);
   });
 
   it('does NOT set hasSetups for an empty gear-setups array', async () => {
@@ -999,11 +1090,18 @@ describe('inspectZipContents — ZIP content inspection', () => {
     expect(result.hasSetups).toBe(false);
   });
 
-  it('detects plans.json with entries → hasPlans true (independent of hasSetups)', async () => {
-    const plans = JSON.stringify([{ id: 'plan-1', name: 'Night A', position: 0, entries: [] }]);
+  it('detects plans.json with entries → hasPlans true (independent of hasSetups) + planItems', async () => {
+    const plans = JSON.stringify([
+      { id: 'plan-1', name: 'Night A', position: 0, entries: [] },
+      { id: 'plan-2', name: 'Night B', position: 1, entries: [] },
+    ]);
     const result = await inspectZipContents([mockEntry('plans.json', plans)]);
     expect(result.hasPlans).toBe(true);
     expect(result.hasSetups).toBe(false);
+    expect(result.planItems).toEqual([
+      { id: 'plan-1', name: 'Night A' },
+      { id: 'plan-2', name: 'Night B' },
+    ]);
   });
 
   it('does NOT set hasPlans for an empty plans array', async () => {
@@ -1121,9 +1219,12 @@ describe('buildZipPreviewResponse', () => {
     hasCustomGear: true,
     hasSetups: true,
     hasPlans: true,
+    planItems: [{ id: 'plan-1', name: 'Night A' }],
+    setupItems: [{ id: 'setup-1', name: 'Main rig' }],
+    gearItems: [{ id: 'gear-1', type: 'telescope', name: 'RC8' }],
     imageEntries: [{ filename: 'a.jpg', size: 5000 }],
   };
-  const noExtra = { hasShortcuts: false, shortcuts: undefined, images: [] };
+  const noExtra = { hasShortcuts: false, shortcuts: undefined, images: [], plans: [], setups: [], gear: [] };
 
   it('forwards every has* flag from the inspect result (regression: hasPlans was dropped)', () => {
     const res = buildZipPreviewResponse(fullInspect, noExtra);
@@ -1143,10 +1244,46 @@ describe('buildZipPreviewResponse', () => {
   it('reports the photo count and passes through shortcuts + images', () => {
     const images = [{ filename: 'a.jpg', originalName: 'A.jpg', size: 5000, exists: false }];
     const shortcuts = { save: 'ctrl+s' };
-    const res = buildZipPreviewResponse(fullInspect, { hasShortcuts: true, shortcuts, images });
+    const res = buildZipPreviewResponse(fullInspect, { hasShortcuts: true, shortcuts, images, plans: [], setups: [], gear: [] });
     expect(res.photos).toBe(1);
     expect(res.hasShortcuts).toBe(true);
     expect(res.shortcuts).toEqual(shortcuts);
     expect(res.images).toEqual(images);
+  });
+
+  it('passes through the resolved plans/setups/gear arrays (with exists flags)', () => {
+    const plans = [{ id: 'plan-1', name: 'Night A', exists: true }];
+    const setups = [{ id: 'setup-1', name: 'Main rig', exists: false }];
+    const gear = [{ id: 'gear-1', type: 'telescope', name: 'RC8', exists: true }];
+    const res = buildZipPreviewResponse(fullInspect, { hasShortcuts: false, images: [], plans, setups, gear });
+    expect(res.plans).toEqual(plans);
+    expect(res.setups).toEqual(setups);
+    expect(res.gear).toEqual(gear);
+  });
+});
+
+// ─── idsToReplaceByName ───────────────────────────────────────────────────────
+
+describe('idsToReplaceByName — name-collision resolution', () => {
+  const existing = [
+    { id: 'a', name: 'Night A' },
+    { id: 'b', name: 'Night B' },
+    { id: 'c', name: 'Night A' }, // duplicate name with a different id
+  ];
+
+  it('returns ids of every existing row whose name matches', () => {
+    expect(idsToReplaceByName(existing, 'Night A')).toEqual(['a', 'c']);
+  });
+
+  it('returns the single matching id', () => {
+    expect(idsToReplaceByName(existing, 'Night B')).toEqual(['b']);
+  });
+
+  it('returns an empty array when no name matches (added as new)', () => {
+    expect(idsToReplaceByName(existing, 'Night Z')).toEqual([]);
+  });
+
+  it('returns an empty array for an empty existing list', () => {
+    expect(idsToReplaceByName([], 'Anything')).toEqual([]);
   });
 });
