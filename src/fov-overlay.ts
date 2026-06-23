@@ -28,15 +28,18 @@ import {
   getGearSetups,
   createGearSetup,
   updateGearSetup,
+  deleteGearSetupAPI,
   type GearSetupData,
 } from './api';
 import trashSvg from './icons/trash.svg?raw';
 import anchorSvg from './icons/anchor.svg?raw';
 import penSvg from './icons/pen.svg?raw';
+import plusSvg from './icons/plus.svg?raw';
 import addFrameSvg from './icons/add-frame.svg?raw';
 import addMosaicSvg from './icons/add-mosaic.svg?raw';
 import planListSvg from './icons/plan-list.svg?raw';
-import { confirmPlanEntryDelete } from './photo-delete-confirm';
+import { confirmPlanEntryDelete, confirmSetupDelete } from './photo-delete-confirm';
+import { showToast } from './toast';
 import { deleteFrameWithUndo } from './frame-delete';
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -122,6 +125,11 @@ function buildSetupModal(opts: {
   initialName?: string;
   initialPrefs?: Partial<GearSectionPrefs>;
   onSave: (name: string, prefs: GearSectionPrefs) => Promise<void>;
+  /** Edit mode only: id of the setup being edited. Enables the plans-using list
+   *  and the delete button. */
+  setupId?: string;
+  /** Edit mode only: called after the setup is deleted (caller refreshes). */
+  onDeleted?: () => void;
 }): void {
   const uiStore = useUiStore();
   let currentPrefs: GearSectionPrefs = {
@@ -194,8 +202,69 @@ function buildSetupModal(opts: {
   const gearContainer = document.createElement('div');
   body.appendChild(gearContainer);
 
+  // Edit mode: a read-only list of plans that use this setup. Doubles as the
+  // explanation for why the delete button is disabled. Filled async below.
+  const plansSection = document.createElement('div');
+  plansSection.className = 'flex flex-col gap-1 hidden';
+  const plansLabel = document.createElement('label');
+  plansLabel.style.fontSize = 'var(--font-size-small)';
+  plansLabel.style.color = 'var(--text-label)';
+  plansLabel.textContent = t('fovOverlay.usedByPlans');
+  const plansList = document.createElement('ul');
+  plansList.className = 'text-small text-primary';
+  plansList.style.margin = '0';
+  plansList.style.paddingLeft = 'var(--space-4)';
+  plansSection.appendChild(plansLabel);
+  plansSection.appendChild(plansList);
+  body.appendChild(plansSection);
+
   const footer = document.createElement('div');
   footer.className = 'modal-footer';
+
+  // Edit mode: a delete button on the left, separated from cancel/save.
+  let deleteBtn: HTMLButtonElement | null = null;
+  if (opts.setupId) {
+    deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger mr-auto';
+    deleteBtn.textContent = t('photos.delete');
+    deleteBtn.disabled = true; // re-enabled once we know no plan uses the setup
+    footer.appendChild(deleteBtn);
+
+    const setupId = opts.setupId;
+    const plansStore = usePlansStore();
+    plansStore.ensureLoaded().then(() => {
+      const using = plansStore.plansUsingSetup(setupId);
+      if (using.length > 0) {
+        plansSection.classList.remove('hidden');
+        plansList.innerHTML = '';
+        for (const p of using) {
+          const li = document.createElement('li');
+          li.textContent = p.name;
+          plansList.appendChild(li);
+        }
+        deleteBtn!.disabled = true;
+        deleteBtn!.title = t('fovOverlay.deleteSetupDisabledTooltip');
+      } else {
+        deleteBtn!.disabled = false;
+        deleteBtn!.title = '';
+      }
+    }).catch(err => reportUnknownRendererError('fov_setup_plans', err));
+
+    deleteBtn.addEventListener('click', async () => {
+      if (deleteBtn!.disabled) return;
+      if (!(await confirmSetupDelete(opts.initialName ?? ''))) return;
+      deleteBtn!.disabled = true;
+      try {
+        await deleteGearSetupAPI(setupId);
+        close();
+        opts.onDeleted?.();
+      } catch (err) {
+        showToast({ message: String((err as Error)?.message ?? err), type: 'error', duration: 3500 });
+        deleteBtn!.disabled = false;
+      }
+    });
+  }
 
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
@@ -282,7 +351,11 @@ export function openAddSetupModal(onSaved: (setup: FovSetup) => void, enabled = 
 
 // ─── Edit setup modal ─────────────────────────────────────────────────────────
 
-export function openEditSetupModal(setup: FovSetup, onSaved: (updated: FovSetup) => void): void {
+export function openEditSetupModal(
+  setup: FovSetup,
+  onSaved: (updated: FovSetup) => void,
+  onDeleted?: () => void,
+): void {
   buildSetupModal({
     titleKey: 'fovOverlay.editModalTitle',
     initialName: setup.name,
@@ -291,6 +364,8 @@ export function openEditSetupModal(setup: FovSetup, onSaved: (updated: FovSetup)
       cameraId: setup.cameraId,
       accessoryId: setup.accessoryId,
     },
+    setupId: setup.id,
+    onDeleted,
     onSave: async (name, prefs) => {
       await updateGearSetup(setup.id, {
         name,
@@ -309,6 +384,158 @@ export function openEditSetupModal(setup: FovSetup, onSaved: (updated: FovSetup)
       });
     },
   });
+}
+
+// ─── Shared inline setup controls ([+] create, [edit]) ─────────────────────────
+
+/**
+ * Builds the `[+] [edit]` icon buttons placed next to every setup dropdown
+ * (Recommend tab, plan details, sky-map FOV popup). `+` opens the create modal,
+ * the pencil opens the edit modal (which now owns deletion). After any mutation
+ * the caller's `onMutated` runs so it can reload setups/specs and re-select.
+ *
+ * Call `refresh()` whenever the dropdown selection changes to re-evaluate the
+ * edit button's disabled state.
+ */
+export function buildSetupControls(opts: {
+  getSelectedSetup: () => FovSetup | undefined;
+  onMutated: () => void;
+  /** Whether setups created via `+` are enabled by default (Recommend tab: false). */
+  createEnabled?: boolean;
+}): { addBtn: HTMLButtonElement; editBtn: HTMLButtonElement; refresh: () => void } {
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn-icon';
+  addBtn.innerHTML = plusSvg;
+  addBtn.title = t('fovOverlay.addSetup');
+  addBtn.setAttribute('aria-label', t('fovOverlay.addSetup'));
+  addBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openAddSetupModal(() => opts.onMutated(), opts.createEnabled ?? true);
+  });
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn-icon';
+  editBtn.innerHTML = penSvg;
+  editBtn.title = t('fovOverlay.editModalTitle');
+  editBtn.setAttribute('aria-label', t('fovOverlay.editModalTitle'));
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const setup = opts.getSelectedSetup();
+    if (!setup) return;
+    openEditSetupModal(setup, () => opts.onMutated(), () => opts.onMutated());
+  });
+
+  const refresh = (): void => {
+    editBtn.disabled = !opts.getSelectedSetup();
+  };
+  refresh();
+
+  return { addBtn, editBtn, refresh };
+}
+
+// ─── Rename plan modal ─────────────────────────────────────────────────────────
+
+/**
+ * Lightweight modal to rename a plan. Targets & Plans renames inline on the plan
+ * name element; the sky-map popup has no such element (the plan lives in a
+ * dropdown), so renaming happens through this dialog instead.
+ */
+export function openRenamePlanModal(planId: string, currentName: string, onSaved?: () => void): void {
+  const uiStore = useUiStore();
+  const plansStore = usePlansStore();
+
+  uiStore.registerModal('fov-rename-plan');
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  const close = (): void => { uiStore.unregisterModal(); backdrop.remove(); };
+
+  const modal = document.createElement('div');
+  modal.className = 'modal settings-modal';
+
+  const header = document.createElement('div');
+  header.className = 'modal-header';
+  const title = document.createElement('h2');
+  title.textContent = t('targets.plan.rename');
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', close);
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+
+  const body = document.createElement('div');
+  body.className = 'modal-body modal-form-body';
+  const nameRow = document.createElement('div');
+  nameRow.style.display = 'flex';
+  nameRow.style.flexDirection = 'column';
+  nameRow.style.gap = 'var(--space-1)';
+  const nameLabelEl = document.createElement('label');
+  nameLabelEl.style.fontSize = 'var(--font-size-small)';
+  nameLabelEl.style.color = 'var(--text-label)';
+  nameLabelEl.textContent = t('fovOverlay.mosaicName');
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'dialog-input';
+  nameInput.value = currentName;
+  const nameError = document.createElement('span');
+  nameError.className = 'input-error-msg hidden';
+  nameError.textContent = t('fovOverlay.mosaicNameRequired');
+  nameInput.addEventListener('input', () => {
+    nameInput.classList.remove('input-error');
+    nameError.classList.add('hidden');
+  });
+  nameRow.appendChild(nameLabelEl);
+  nameRow.appendChild(nameInput);
+  nameRow.appendChild(nameError);
+  body.appendChild(nameRow);
+
+  const footer = document.createElement('div');
+  footer.className = 'modal-footer';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'btn-cancel';
+  cancelBtn.textContent = t('targets.gear.cancel');
+  cancelBtn.addEventListener('click', close);
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'btn-confirm';
+  saveBtn.textContent = t('targets.gear.save');
+
+  const submit = async (): Promise<void> => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      nameInput.classList.add('input-error');
+      nameError.classList.remove('hidden');
+      nameInput.focus();
+      return;
+    }
+    saveBtn.disabled = true;
+    try {
+      if (name !== currentName) await plansStore.renamePlan(planId, name);
+      close();
+      onSaved?.();
+    } catch (err) {
+      reportUnknownRendererError('fov_rename_plan', err);
+      saveBtn.disabled = false;
+    }
+  };
+  saveBtn.addEventListener('click', submit);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(); }
+  });
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(saveBtn);
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+  requestAnimationFrame(() => { nameInput.focus(); nameInput.select(); });
 }
 
 // ─── FOV frame-manager popup ───────────────────────────────────────────────────
@@ -367,37 +594,90 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     el.style.width = 'calc(100% + var(--space-3))';
   }
 
-  // Mode dropdown: Free frames, each plan, or "+ New plan".
-  const NEW_PLAN_VALUE = '__new_plan__';
+  // Mode dropdown: Free frames or each plan. Creating a plan is the [+] icon to
+  // the right; the pencil renames the selected plan (mirrors Targets & Plans).
   const FREE_VALUE = '__free__';
+  const modeRow = document.createElement('div');
+  modeRow.className = 'flex items-center gap-1';
   const select = document.createElement('select');
-  select.className = 'input-base w-full';
+  select.className = 'input-base';
   alignControlSelect(select);
+  select.style.flex = '1';
+  select.style.width = 'auto';
+  select.style.minWidth = '0';
   select.addEventListener('change', () => onSelectChange());
-  controls.appendChild(select);
+
+  const planAddBtn = document.createElement('button');
+  planAddBtn.type = 'button';
+  planAddBtn.className = 'btn-icon';
+  planAddBtn.innerHTML = plusSvg;
+  planAddBtn.title = t('targets.plan.newPlan');
+  planAddBtn.setAttribute('aria-label', t('targets.plan.newPlan'));
+  planAddBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const id = await plansStore.createPlan(defaultPlanName());
+    if (id) fovStore.setSelection({ kind: 'plan', planId: id });
+  });
+
+  const planEditBtn = document.createElement('button');
+  planEditBtn.type = 'button';
+  planEditBtn.className = 'btn-icon';
+  planEditBtn.innerHTML = penSvg;
+  planEditBtn.title = t('targets.plan.rename');
+  planEditBtn.setAttribute('aria-label', t('targets.plan.rename'));
+  planEditBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const sel = fovStore.selection;
+    if (sel.kind !== 'plan') return;
+    const plan = plansStore.plans.find(p => p.id === sel.planId);
+    if (plan) openRenamePlanModal(plan.id, plan.name);
+  });
+
+  modeRow.appendChild(select);
+  modeRow.appendChild(planAddBtn);
+  modeRow.appendChild(planEditBtn);
+  controls.appendChild(modeRow);
 
   // Plan setup dropdown (plan mode only): choose the gear setup for the plan.
-  // Persisted to the plan, so it reflects in the Targets & Plan tab.
+  // Persisted to the plan, so it reflects in the Targets & Plan tab. The unified
+  // [+] create / [edit] controls sit inline to its right.
+  const setupRow = document.createElement('div');
+  setupRow.className = 'flex items-center gap-1';
   const setupSelect = document.createElement('select');
-  setupSelect.className = 'input-base w-full';
+  setupSelect.className = 'input-base';
   alignControlSelect(setupSelect);
+  setupSelect.style.flex = '1';
+  setupSelect.style.width = 'auto';
+  setupSelect.style.minWidth = '0';
   setupSelect.addEventListener('change', () => onSetupChange());
-  controls.appendChild(setupSelect);
 
   // Gear setups for the setup dropdown (resolved async; labels include FOV).
   let gearSetups: GearSetupData[] = [];
+  const setupControls = buildSetupControls({
+    getSelectedSetup: () => gearSetups.find(s => s.id === setupSelect.value),
+    onMutated: () => { fovStore.loadSpecs(); loadPopupSetups(); },
+  });
+
+  setupRow.appendChild(setupSelect);
+  setupRow.appendChild(setupControls.addBtn);
+  setupRow.appendChild(setupControls.editBtn);
+  controls.appendChild(setupRow);
+
   // setupId → true when the setup's telescope is a smart/integrated scope, which
   // has its own mosaic mode — so the mosaic action is hidden for those.
   const setupIsSmart = new Map<string, boolean>();
-  Promise.all([getGearSetups(), getTelescopes()])
-    .then(([s, tels]) => {
-      gearSetups = s;
-      const smartTel = new Set(tels.filter(t => t.is_smart_telescope).map(t => t.id));
-      setupIsSmart.clear();
-      for (const setup of s) setupIsSmart.set(setup.id, smartTel.has(setup.telescopeId));
-      renderAll();
-    })
-    .catch(err => reportUnknownRendererError('fov_popup_load_setups', err));
+  function loadPopupSetups(): void {
+    Promise.all([getGearSetups(), getTelescopes()])
+      .then(([s, tels]) => {
+        gearSetups = s;
+        const smartTel = new Set(tels.filter(t => t.is_smart_telescope).map(t => t.id));
+        setupIsSmart.clear();
+        for (const setup of s) setupIsSmart.set(setup.id, smartTel.has(setup.telescopeId));
+        renderAll();
+      })
+      .catch(err => reportUnknownRendererError('fov_popup_load_setups', err));
+  }
+  loadPopupSetups();
 
   /** Whether the selected plan can build a mosaic (plan mode, has a setup, and
    * the setup's telescope is not a smart scope). */
@@ -491,13 +771,11 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       opt.textContent = plan.name;
       select.appendChild(opt);
     }
-    const newOpt = document.createElement('option');
-    newOpt.value = NEW_PLAN_VALUE;
-    newOpt.textContent = t('fovOverlay.newPlan');
-    select.appendChild(newOpt);
 
     const sel = fovStore.selection;
     select.value = sel.kind === 'plan' ? `plan:${sel.planId}` : FREE_VALUE;
+    // Renaming targets the selected plan, so it's only available in plan mode.
+    planEditBtn.disabled = sel.kind !== 'plan';
     // The footer row is always present; individual actions show per selection.
     // "Add frame" is offered for free frames, and for a plan once it has a gear
     // setup (without one a plan can't size — and therefore can't render — frames).
@@ -510,14 +788,8 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     planDetailsBtn.classList.toggle('hidden', sel.kind !== 'plan');
   }
 
-  async function onSelectChange() {
+  function onSelectChange() {
     const v = select.value;
-    if (v === NEW_PLAN_VALUE) {
-      const id = await plansStore.createPlan(defaultPlanName());
-      if (id) fovStore.setSelection({ kind: 'plan', planId: id });
-      else renderSelect(); // creation failed — restore the previous selection
-      return;
-    }
     if (v === FREE_VALUE) { fovStore.setSelection({ kind: 'free' }); return; }
     if (v.startsWith('plan:')) fovStore.setSelection({ kind: 'plan', planId: v.slice(5) });
   }
@@ -525,8 +797,8 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   function renderSetupSelect() {
     const sel = fovStore.selection;
     const plan = sel.kind === 'plan' ? plansStore.plans.find(p => p.id === sel.planId) : undefined;
-    // Setup dropdown is only meaningful for a plan.
-    setupSelect.style.display = plan ? '' : 'none';
+    // Setup dropdown + its controls are only meaningful for a plan.
+    setupRow.style.display = plan ? '' : 'none';
     if (!plan) return;
 
     setupSelect.innerHTML = '';
@@ -544,6 +816,7 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       setupSelect.appendChild(opt);
     }
     setupSelect.value = plan.setupId ?? '';
+    setupControls.refresh();
   }
 
   // Setup switching (with mosaic reconciliation) lives in ./setup-switch, shared

@@ -43,6 +43,11 @@ export const usePlansStore = defineStore('plans', () => {
     return plans.value.filter(p => p.entries.some(e => e.dsoId === dsoId));
   }
 
+  /** Plans that reference the given gear setup (used to guard setup deletion). */
+  function plansUsingSetup(setupId: string): Plan[] {
+    return plans.value.filter(p => p.setupId === setupId);
+  }
+
   async function load(): Promise<void> {
     try {
       plans.value = await getPlans();
@@ -254,6 +259,7 @@ export const usePlansStore = defineStore('plans', () => {
     entryCount,
     isInPlan,
     plansContaining,
+    plansUsingSetup,
     load,
     ensureLoaded,
     createPlan,

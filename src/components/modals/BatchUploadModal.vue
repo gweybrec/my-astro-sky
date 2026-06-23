@@ -151,6 +151,7 @@ import { stripExtension } from '../../file-utils';
 import { sanitizeIntegrationRows, DEFAULT_INTEGRATION_FILTERS, normalizeIntegrationFilterKey } from '../../batch-utils';
 import { filterLabelCandidates } from '../../autocomplete-utils';
 import { placeBatchItem } from '../../batch-place';
+import { confirmDiscardUnsavedSolves } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
 import BatchCard from './BatchCard.vue';
 import CheckRow from '../base/CheckRow.vue';
@@ -281,7 +282,10 @@ let cancelled = false;
 // loop so a "Cancel solving" click stops launching further items.
 let activeSolveRun = 0;
 
-function close() {
+async function close() {
+  // Warn before discarding photos that solved but were never saved/placed.
+  const unsavedSolved = items.filter(i => i.status === 'success').length;
+  if (unsavedSolved > 0 && !(await confirmDiscardUnsavedSolves(unsavedSolved))) return;
   emit('close');
 }
 
