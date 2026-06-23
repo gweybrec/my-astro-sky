@@ -440,6 +440,28 @@ export interface ImportPreviewImage {
   exists: boolean;
 }
 
+export interface ImportPreviewPlan {
+  id: string;
+  name: string;
+  /** true if a plan with the same name already exists (will be replaced if imported). */
+  exists: boolean;
+}
+
+export interface ImportPreviewSetup {
+  id: string;
+  name: string;
+  /** true if a setup with the same name already exists (will be replaced if imported). */
+  exists: boolean;
+}
+
+export interface ImportPreviewGear {
+  id: string;
+  type: string;
+  name: string;
+  /** true if gear of the same type + name already exists (will be replaced if imported). */
+  exists: boolean;
+}
+
 export interface ImportPreviewResult {
   hasMetadata: boolean;
   photos: number;
@@ -451,6 +473,9 @@ export interface ImportPreviewResult {
   /** Parsed shortcuts.json content, applied client-side to localStorage on import. */
   shortcuts?: unknown;
   images: ImportPreviewImage[];
+  plans: ImportPreviewPlan[];
+  setups: ImportPreviewSetup[];
+  gear: ImportPreviewGear[];
 }
 
 /** Dry-run: inspects ZIP/JSON bundle contents without writing to DB. */
@@ -474,11 +499,14 @@ export interface ImportResult {
 export interface ImportOptions {
   importMetadata: boolean;
   importDsoOverrides: boolean;
-  importCustomGear: boolean;
-  importSetups: boolean;
-  importPlans: boolean;
   /** null means no image filtering (metadata-only import). */
   selectedImages: string[] | null;
+  /** ids of plans to import (name-collisions are replaced); null/empty ⇒ none. */
+  selectedPlans: string[] | null;
+  /** ids of gear setups to import (name-collisions are replaced); null/empty ⇒ none. */
+  selectedSetups: string[] | null;
+  /** ids of custom gear to import (type+name-collisions are replaced); null/empty ⇒ none. */
+  selectedGear: string[] | null;
 }
 
 /** Import a sky bundle (.zip or .json) with the given options. */
@@ -487,10 +515,10 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
   fd.append('bundle', file);
   if (opts.importMetadata) fd.append('importMetadata', '1');
   if (opts.importDsoOverrides) fd.append('importDsoOverrides', '1');
-  if (opts.importCustomGear) fd.append('importCustomGear', '1');
-  if (opts.importSetups) fd.append('importSetups', '1');
-  if (opts.importPlans) fd.append('importPlans', '1');
   if (opts.selectedImages !== null) fd.append('selectedImages', JSON.stringify(opts.selectedImages));
+  if (opts.selectedPlans !== null) fd.append('selectedPlans', JSON.stringify(opts.selectedPlans));
+  if (opts.selectedSetups !== null) fd.append('selectedSetups', JSON.stringify(opts.selectedSetups));
+  if (opts.selectedGear !== null) fd.append('selectedGear', JSON.stringify(opts.selectedGear));
   const res = await fetch('/api/import', { method: 'POST', body: fd });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

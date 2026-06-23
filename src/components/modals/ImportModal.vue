@@ -1,6 +1,6 @@
 <template>
   <div class="modal-backdrop">
-    <div class="modal settings-modal--flex" @click.stop>
+    <div class="modal settings-modal--flex" :class="phase === 'options' ? '!max-w-[860px]' : ''" @click.stop>
       <div class="modal-header">
         <h2>{{ t('settings.importTitle') }}</h2>
         <button class="modal-close" @click="onClose">&times;</button>
@@ -29,62 +29,107 @@
           <button class="display-controls-btn text-small shrink-0" @click="resetToPick">{{ t('settings.importChangeFile') }}</button>
         </div>
 
-        <!-- Content checkboxes -->
-        <div v-if="preview.hasMetadata || preview.hasDsoOverrides || preview.hasCustomGear || preview.hasSetups || preview.hasPlans || preview.hasShortcuts">
+        <!-- Global toggles (no per-item selection) -->
+        <div v-if="preview.hasDsoOverrides || preview.hasShortcuts">
           <div class="export-options-label">{{ t('settings.importContent') }}</div>
-          <label v-if="preview.hasMetadata" class="export-checkbox-row">
-            <input type="checkbox" v-model="importMeta" />
-            {{ t('settings.importPhotoMeta').replace('{n}', String(preview.photos)) }}
-          </label>
           <label v-if="preview.hasDsoOverrides" class="export-checkbox-row">
             <input type="checkbox" v-model="importDso" />
             {{ t('settings.importDsoOverridesLabel') }}
-          </label>
-          <label v-if="preview.hasCustomGear" class="export-checkbox-row">
-            <input type="checkbox" v-model="importGear" />
-            {{ t('settings.importCustomGearLabel') }}
-          </label>
-          <label v-if="preview.hasSetups" class="export-checkbox-row">
-            <input type="checkbox" v-model="importSetups" />
-            {{ t('settings.importSetupsLabel') }}
           </label>
           <label v-if="preview.hasShortcuts" class="export-checkbox-row">
             <input type="checkbox" v-model="importShortcuts" />
             {{ t('settings.importShortcutsLabel') }}
           </label>
-          <label v-if="preview.hasPlans" class="export-checkbox-row">
-            <input type="checkbox" v-model="importPlans" />
-            {{ t('settings.importPlansLabel') }}
-          </label>
         </div>
 
-        <!-- Images list -->
-        <div v-if="preview.images.length > 0">
+        <!-- Per-item selectable lists -->
+        <template v-if="hasAnyList">
           <div class="modal-divider"></div>
-          <div class="export-photo-section">
-            <label class="export-select-all-row">
-              <input
-                type="checkbox"
-                :checked="allImagesChecked"
-                :indeterminate.prop="someImagesChecked && !allImagesChecked"
-                @change="toggleAllImages"
-              />
-              <span class="export-select-all-label">{{ t('settings.importImagesSection').replace('{n}', String(preview.images.length)) }}</span>
-            </label>
-            <div class="export-scroll-list">
-              <label v-for="img in preview.images" :key="img.filename" class="export-photo-row">
+          <div class="flex flex-wrap items-stretch">
+            <!-- Photos -->
+            <div v-if="preview.images.length > 0" class="export-photo-section import-col flex-1 min-w-[180px] px-4">
+              <label class="export-select-all-row">
                 <input
                   type="checkbox"
-                    :checked="selectedImages.has(img.filename)"
-                  @change="toggleImage(img.filename)"
+                  :checked="imgSel.all"
+                  :indeterminate.prop="imgSel.some && !imgSel.all"
+                  @change="imgSel.toggleAll"
                 />
-                <span class="text-ellipsis">{{ img.originalName }}</span>
-                <span v-if="img.exists" class="text-dim-xs import-existing-badge">{{ t('settings.importExistingBadge') }}</span>
-                <span class="text-dim-xs">{{ formatBytes(img.size) }}</span>
+                <span class="export-select-all-label">{{ t('settings.importImagesSection').replace('{n}', String(preview.images.length)) }}</span>
               </label>
+              <div class="export-scroll-list">
+                <label v-for="img in preview.images" :key="img.filename" class="export-photo-row">
+                  <input type="checkbox" :checked="imgSel.selected.has(img.filename)" @change="imgSel.toggle(img.filename)" />
+                  <span class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="text-small font-normal truncate min-w-0">{{ img.originalName }}</span>
+                    <span v-if="img.exists" class="import-warn-icon" :title="t('settings.importReplaceWarning')">⚠</span>
+                  </span>
+                  <span class="text-dim-xs">{{ formatBytes(img.size) }}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Plans -->
+            <div v-if="preview.plans.length > 0" class="export-photo-section import-col flex-1 min-w-[180px] px-4">
+              <label class="export-select-all-row">
+                <input
+                  type="checkbox"
+                  :checked="planSel.all"
+                  :indeterminate.prop="planSel.some && !planSel.all"
+                  @change="planSel.toggleAll"
+                />
+                <span class="export-select-all-label">{{ t('settings.importPlansSection').replace('{n}', String(preview.plans.length)) }}</span>
+              </label>
+              <div class="export-scroll-list">
+                <label v-for="p in preview.plans" :key="p.id" class="export-photo-row">
+                  <input type="checkbox" :checked="planSel.selected.has(p.id)" @change="planSel.toggle(p.id)" />
+                  <span class="text-small font-normal truncate min-w-0">{{ p.name }}</span>
+                  <span v-if="p.exists" class="import-warn-icon" :title="t('settings.importReplaceWarning')">⚠</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Setups -->
+            <div v-if="preview.setups.length > 0" class="export-photo-section import-col flex-1 min-w-[180px] px-4">
+              <label class="export-select-all-row">
+                <input
+                  type="checkbox"
+                  :checked="setupSel.all"
+                  :indeterminate.prop="setupSel.some && !setupSel.all"
+                  @change="setupSel.toggleAll"
+                />
+                <span class="export-select-all-label">{{ t('settings.importSetupsSection').replace('{n}', String(preview.setups.length)) }}</span>
+              </label>
+              <div class="export-scroll-list">
+                <label v-for="s in preview.setups" :key="s.id" class="export-photo-row">
+                  <input type="checkbox" :checked="setupSel.selected.has(s.id)" @change="setupSel.toggle(s.id)" />
+                  <span class="text-small font-normal truncate min-w-0">{{ s.name }}</span>
+                  <span v-if="s.exists" class="import-warn-icon" :title="t('settings.importReplaceWarning')">⚠</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Custom gear -->
+            <div v-if="preview.gear.length > 0" class="export-photo-section import-col flex-1 min-w-[180px] px-4">
+              <label class="export-select-all-row">
+                <input
+                  type="checkbox"
+                  :checked="gearSel.all"
+                  :indeterminate.prop="gearSel.some && !gearSel.all"
+                  @change="gearSel.toggleAll"
+                />
+                <span class="export-select-all-label">{{ t('settings.importGearSection').replace('{n}', String(preview.gear.length)) }}</span>
+              </label>
+              <div class="export-scroll-list">
+                <label v-for="g in preview.gear" :key="g.id" class="export-photo-row">
+                  <input type="checkbox" :checked="gearSel.selected.has(g.id)" @change="gearSel.toggle(g.id)" />
+                  <span class="text-small font-normal truncate min-w-0">{{ g.name }}</span>
+                  <span v-if="g.exists" class="import-warn-icon" :title="t('settings.importReplaceWarning')">⚠</span>
+                </label>
+              </div>
             </div>
           </div>
-        </div>
+        </template>
       </div>
 
       <div class="modal-footer">
@@ -129,34 +174,57 @@ const previewBusy = ref(false);
 const importBusy = ref(false);
 const backingUp = ref(false);
 
-const importMeta = ref(true);
 const importDso = ref(true);
-const importGear = ref(true);
-const importSetups = ref(true);
-const importPlans = ref(true);
 const importShortcuts = ref(true);
-const selectedImages = reactive(new Set<string>());
 
-const allImagesChecked = computed(() =>
-  preview.value !== null &&
-  preview.value.images.length > 0 &&
-  preview.value.images.every(img => selectedImages.has(img.filename))
-);
-const someImagesChecked = computed(() =>
-  preview.value?.images.some(img => selectedImages.has(img.filename)) ?? false
+/**
+ * A tri-state selection controller over a list of items keyed by `keyOf`.
+ * Wrapped in reactive() so its computed refs unwrap when accessed in templates.
+ */
+function useSelection<T>(itemsFn: () => T[], keyOf: (t: T) => string) {
+  const selected = reactive(new Set<string>());
+  return reactive({
+    selected,
+    all: computed(() => {
+      const list = itemsFn();
+      return list.length > 0 && list.every(i => selected.has(keyOf(i)));
+    }),
+    some: computed(() => itemsFn().some(i => selected.has(keyOf(i)))),
+    toggleAll(e: Event) {
+      if ((e.target as HTMLInputElement).checked) itemsFn().forEach(i => selected.add(keyOf(i)));
+      else selected.clear();
+    },
+    toggle(key: string) {
+      if (selected.has(key)) selected.delete(key);
+      else selected.add(key);
+    },
+    reset(selectAll: boolean) {
+      selected.clear();
+      if (selectAll) itemsFn().forEach(i => selected.add(keyOf(i)));
+    },
+  });
+}
+
+const imgSel = useSelection(() => preview.value?.images ?? [], i => i.filename);
+const planSel = useSelection(() => preview.value?.plans ?? [], i => i.id);
+const setupSel = useSelection(() => preview.value?.setups ?? [], i => i.id);
+const gearSel = useSelection(() => preview.value?.gear ?? [], i => i.id);
+
+const hasAnyList = computed(() =>
+  !!preview.value &&
+  (preview.value.images.length > 0 ||
+    preview.value.plans.length > 0 ||
+    preview.value.setups.length > 0 ||
+    preview.value.gear.length > 0)
 );
 
 const canImport = computed(() => {
   if (!preview.value) return false;
-  const hasContent =
-    (preview.value.hasMetadata && importMeta.value) ||
+  return (
+    imgSel.some || planSel.some || setupSel.some || gearSel.some ||
     (preview.value.hasDsoOverrides && importDso.value) ||
-    (preview.value.hasCustomGear && importGear.value) ||
-    (preview.value.hasSetups && importSetups.value) ||
-    (preview.value.hasPlans && importPlans.value) ||
-    (preview.value.hasShortcuts && importShortcuts.value);
-  const hasImages = someImagesChecked.value;
-  return hasContent || hasImages;
+    (preview.value.hasShortcuts && importShortcuts.value)
+  );
 });
 
 function onClose() {
@@ -168,7 +236,10 @@ function resetToPick() {
   preview.value = null;
   fileName.value = '';
   storedFile.value = null;
-  selectedImages.clear();
+  imgSel.reset(false);
+  planSel.reset(false);
+  setupSel.reset(false);
+  gearSel.reset(false);
 }
 
 async function onFilePicked(e: Event) {
@@ -180,13 +251,12 @@ async function onFilePicked(e: Event) {
   try {
     const result = await importPreview(file);
     preview.value = result;
-    selectedImages.clear();
-    result.images.forEach(img => selectedImages.add(img.filename));
-    importMeta.value = true;
+    // Pre-select everything by default.
+    imgSel.reset(true);
+    planSel.reset(true);
+    setupSel.reset(true);
+    gearSel.reset(true);
     importDso.value = true;
-    importGear.value = true;
-    importSetups.value = true;
-    importPlans.value = true;
     importShortcuts.value = true;
     phase.value = 'options';
   } catch (err: any) {
@@ -196,18 +266,6 @@ async function onFilePicked(e: Event) {
     previewBusy.value = false;
     (e.target as HTMLInputElement).value = '';
   }
-}
-
-function toggleAllImages(e: Event) {
-  const checked = (e.target as HTMLInputElement).checked;
-  if (!preview.value) return;
-  if (checked) preview.value.images.forEach(img => selectedImages.add(img.filename));
-  else selectedImages.clear();
-}
-
-function toggleImage(filename: string) {
-  if (selectedImages.has(filename)) selectedImages.delete(filename);
-  else selectedImages.add(filename);
 }
 
 async function doBackup() {
@@ -228,12 +286,13 @@ async function onImport() {
   try {
     const hasImages = preview.value.images.length > 0;
     const result = await importData(storedFile.value, {
-      importMetadata: preview.value.hasMetadata && importMeta.value,
+      // Photo metadata always travels with the photos that get imported.
+      importMetadata: preview.value.hasMetadata,
       importDsoOverrides: preview.value.hasDsoOverrides && importDso.value,
-      importCustomGear: preview.value.hasCustomGear && importGear.value,
-      importSetups: preview.value.hasSetups && importSetups.value,
-      importPlans: preview.value.hasPlans && importPlans.value,
-      selectedImages: hasImages ? Array.from(selectedImages) : null,
+      selectedImages: hasImages ? Array.from(imgSel.selected) : null,
+      selectedPlans: Array.from(planSel.selected),
+      selectedSetups: Array.from(setupSel.selected),
+      selectedGear: Array.from(gearSel.selected),
     });
     emit('close');
     const msg = t('settings.importSuccess')

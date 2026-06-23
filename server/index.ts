@@ -15,7 +15,7 @@ import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 const _require = createRequire(import.meta.url);
 const unzipper = _require('unzipper') as typeof import('unzipper');
-import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse } from './import-utils.js';
+import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse, idsToReplaceByName } from './import-utils.js';
 import { extractWCS, wcsToCorrespondences, loadServerCatalog } from './wcs-reader.js';
 import { submitJob, getJobStatus, isConfigured as isAstrometryConfigured, listUserSubmissions, reuseSubmission, resetSession as resetAstrometrySession } from './astrometry.js';
 import { solveWithASTAP } from './astap.js';
@@ -2434,7 +2434,23 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         } catch { /* ignore invalid shortcuts.json */ }
       }
 
-      res.json(buildZipPreviewResponse(inspect, { hasShortcuts, shortcuts, images }));
+      // Resolve name-based conflicts: a plan/setup/gear whose name already exists
+      // will be replaced (not duplicated) if the user selects it for import.
+      const existingPlanNames = new Set(getPlans().map(p => p.name));
+      const existingSetupNames = new Set(getAllGearSetups().map(s => s.name));
+      const existingGearKeys = new Set(
+        getAllCustomGear().map(g => {
+          let name = g.id;
+          try { const d = JSON.parse(g.data); if (typeof d?.name === 'string') name = d.name; } catch { /* ignore */ }
+          return `${g.type} ${name}`;
+        })
+      );
+
+      const plans = inspect.planItems.map(p => ({ ...p, exists: existingPlanNames.has(p.name) }));
+      const setups = inspect.setupItems.map(s => ({ ...s, exists: existingSetupNames.has(s.name) }));
+      const gear = inspect.gearItems.map(g => ({ ...g, exists: existingGearKeys.has(`${g.type} ${g.name}`) }));
+
+      res.json(buildZipPreviewResponse(inspect, { hasShortcuts, shortcuts, images, plans, setups, gear }));
     } else if (ext === '.json') {
       const photos = JSON.parse(file.buffer.toString('utf8'));
       if (!Array.isArray(photos)) { res.status(400).json({ error: 'Format de manifeste invalide' }); return; }
@@ -2447,6 +2463,9 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         hasPlans: false,
         hasShortcuts: false,
         images: [],
+        plans: [],
+        setups: [],
+        gear: [],
       });
     } else {
       res.status(400).json({ error: 'Format non supporté (.zip ou .json attendu)' }); return;
@@ -2468,7 +2487,8 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
  *         description: Import completed successfully
  */
 // Import photos from ZIP (full) or JSON (metadata only)
-// Form fields: bundle (file), importMetadata, importDsoOverrides, importCustomGear, importSetups, importPlans, selectedImages (JSON string[])
+// Form fields: bundle (file), importMetadata, importDsoOverrides, selectedImages,
+//              selectedPlans, selectedSetups, selectedGear (all JSON string[])
 app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
   try {
     const file = req.file;
@@ -2476,13 +2496,17 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
 
     const importMetadata = req.body?.importMetadata === '1';
     const importDsoOverrides = req.body?.importDsoOverrides === '1';
-    const importCustomGear = req.body?.importCustomGear === '1';
-    const importSetups = req.body?.importSetups === '1';
-    const importPlans = req.body?.importPlans === '1';
     // null means "no image filter" (metadata-only import); a Set means "import only these filenames"
     const selectedImages: Set<string> | null = req.body?.selectedImages
       ? new Set(JSON.parse(req.body.selectedImages) as string[])
       : null;
+    // Plans / setups / custom gear are now selected per item by id. An absent field
+    // means "import none of that category"; a Set means "import only these ids".
+    const parseIdSet = (raw: unknown): Set<string> =>
+      typeof raw === 'string' ? new Set(JSON.parse(raw) as string[]) : new Set<string>();
+    const selectedPlans = parseIdSet(req.body?.selectedPlans);
+    const selectedSetups = parseIdSet(req.body?.selectedSetups);
+    const selectedGear = parseIdSet(req.body?.selectedGear);
 
     const ext = path.extname(file.originalname).toLowerCase();
     let photos: any[] = [];
@@ -2507,7 +2531,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
       const gearSetupsEntry = zipDir.files.find(f => f.path === 'gear-setups.json');
       const plansEntry = zipDir.files.find(f => f.path === 'plans.json');
 
-      if (!manifestEntry && !dsoOverridesEntry && !customGearEntry && !gearSetupsEntry) {
+      if (!manifestEntry && !dsoOverridesEntry && !customGearEntry && !gearSetupsEntry && !plansEntry) {
         res.status(400).json({ error: 'Aucun contenu reconnu dans le ZIP' }); return;
       }
 
@@ -2531,14 +2555,21 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         } catch { /* ignore invalid dso-overrides.json */ }
       }
 
-      // Import custom gear
-      if (customGearEntry && importCustomGear) {
+      // Import custom gear (only the ids the user selected). Name-based override:
+      // existing gear of the same type + name is deleted before the imported one is
+      // written, so a re-imported item replaces rather than duplicates.
+      if (customGearEntry && selectedGear.size > 0) {
         try {
           const rawGear = JSON.parse((await customGearEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawGear)) {
             for (const g of rawGear) {
-              if (typeof g.id === 'string' && ['telescope', 'camera', 'accessory'].includes(g.type)) {
+              if (typeof g.id === 'string' && selectedGear.has(g.id) && ['telescope', 'camera', 'accessory'].includes(g.type)) {
                 const { id, type, ...data } = g;
+                const name = typeof data.name === 'string' ? data.name : id;
+                const sameType = getAllCustomGear()
+                  .filter(r => r.type === type)
+                  .map(r => { let n = r.id; try { const d = JSON.parse(r.data); if (typeof d?.name === 'string') n = d.name; } catch { /* ignore */ } return { id: r.id, name: n }; });
+                idsToReplaceByName(sameType, name).forEach(deleteCustomGearDB);
                 upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory', { ...data, id });
               }
             }
@@ -2546,13 +2577,17 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         } catch { /* ignore invalid custom-gear.json */ }
       }
 
-      // Import gear setups
-      if (gearSetupsEntry && importSetups) {
+      // Import gear setups (only the ids the user selected). Name-based override:
+      // an existing setup with the same name is deleted before the imported one is
+      // written, so a re-imported setup replaces rather than duplicates.
+      if (gearSetupsEntry && selectedSetups.size > 0) {
         try {
           const rawSetups = JSON.parse((await gearSetupsEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawSetups)) {
             for (const s of rawSetups) {
-              if (typeof s.id === 'string' && typeof s.telescopeId === 'string' && typeof s.cameraId === 'string') {
+              if (typeof s.id === 'string' && selectedSetups.has(s.id) && typeof s.telescopeId === 'string' && typeof s.cameraId === 'string') {
+                const name = typeof s.name === 'string' ? s.name : '';
+                idsToReplaceByName(getAllGearSetups(), name).forEach(deleteGearSetup);
                 upsertGearSetup({
                   id: s.id,
                   name: typeof s.name === 'string' ? s.name : '',
@@ -2567,14 +2602,19 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         } catch { /* ignore invalid gear-setups.json */ }
       }
 
-      // Import night plans. Re-import is idempotent: a plan with the same id is
-      // deleted (with its entries) then re-created.
-      if (plansEntry && importPlans) {
+      // Import night plans (only the ids the user selected). Name-based override:
+      // an existing plan with the same name is deleted (with its entries) before the
+      // imported one is recreated, so a re-imported plan replaces rather than
+      // duplicates. The bundle's id is kept so its entry/mosaic/setup refs resolve;
+      // we also delete any same-id row to avoid a primary-key collision on recreate.
+      if (plansEntry && selectedPlans.size > 0) {
         try {
           const rawPlans = JSON.parse((await plansEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawPlans)) {
             rawPlans.forEach((p, pi) => {
               if (typeof p.id !== 'string' || typeof p.name !== 'string') return;
+              if (!selectedPlans.has(p.id)) return;
+              idsToReplaceByName(getPlans(), p.name).forEach(deletePlan);
               deletePlan(p.id);
               createPlan({
                 id: p.id,

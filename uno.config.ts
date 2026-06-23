@@ -206,6 +206,9 @@ export default defineConfig({
     'status-info':    'bg-[var(--status-info-bg)] border border-[var(--status-info-border)] text-[var(--status-info-text)]',
     'status-warn':    'bg-[var(--status-warn-bg)] border border-[var(--status-warn-border)] text-[var(--status-warn-text)]',
 
+    // ── Import modal: name-collision warning marker ───────────────────────────
+    'import-warn-icon':  'shrink-0 cursor-help text-[var(--status-warn-text)]',
+
     // ── Solver probe results (SolverSettingsModal) ────────────────────────────
     'probe-ok':          'text-[var(--status-success-text)] text-sm',
     'probe-error':       'text-[var(--status-error-text)] text-sm',

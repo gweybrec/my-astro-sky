@@ -9,10 +9,6 @@
         <div class="export-options-label">{{ t('settings.exportOptions') }}</div>
 
         <label class="export-checkbox-row">
-          <input type="checkbox" v-model="includeMeta" @change="update" />
-          {{ t('settings.exportPhotoMeta') }}
-        </label>
-        <label class="export-checkbox-row">
           <input type="checkbox" v-model="includeDso" @change="update" />
           {{ t('settings.exportDsoOverrides') }}
         </label>
@@ -90,7 +86,6 @@ const photosStore = usePhotosStore();
 const shortcutsStore = useShortcutsStore();
 const photos = computed(() => photosStore.placedPhotos.map(p => p.photo));
 
-const includeMeta = ref(true);
 const includeDso = ref(false);
 const includeGear = ref(false);
 const includeSetups = ref(false);
@@ -118,7 +113,7 @@ const sizeLabel = computed(() => {
 });
 
 const canExport = computed(() =>
-  includeDso.value || includeMeta.value || includeGear.value ||
+  includeDso.value || includeGear.value ||
   includeSetups.value || includePlans.value || includeShortcuts.value || someChecked.value,
 );
 
@@ -143,7 +138,8 @@ async function onExport() {
   const selectedIds = photos.value.filter(p => selected.has(p.id)).map(p => p.id);
   const options: ExportOptions = {
     includeImages: selectedIds.length > 0,
-    includeMetadata: includeMeta.value,
+    // Photo metadata always travels with the photos.
+    includeMetadata: true,
     includeDsoOverrides: includeDso.value,
     includeCustomGear: includeGear.value,
     includeSetups: includeSetups.value,
