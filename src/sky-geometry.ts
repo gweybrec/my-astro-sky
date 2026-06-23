@@ -179,6 +179,31 @@ export function sampleMoonAltCurve(
 }
 
 /**
+ * Inverse of altAzFromRaDec: horizontal coordinates → equatorial.
+ * Needed for unprojecting fisheye canvas coordinates back to RA/Dec.
+ */
+export function raDecFromAltAz(
+  altDeg: number,
+  azDeg: number,
+  lstH: number,
+  latDeg: number,
+): { raDeg: number; decDeg: number } {
+  const alt = altDeg * DEG;
+  const az = azDeg * DEG;
+  const lat = latDeg * DEG;
+
+  const sinDec = Math.sin(lat) * Math.sin(alt) + Math.cos(lat) * Math.cos(alt) * Math.cos(az);
+  const dec = Math.asin(Math.max(-1, Math.min(1, sinDec)));
+
+  const cosHA = (Math.sin(alt) - Math.sin(lat) * sinDec) / (Math.cos(lat) * Math.cos(dec) + 1e-12);
+  let ha = Math.acos(Math.max(-1, Math.min(1, cosHA))) / DEG;
+  if (Math.sin(az) > 0) ha = 360 - ha;
+
+  let ra = ((lstH * 15 - ha) % 360 + 360) % 360;
+  return { raDeg: ra, decDeg: dec / DEG };
+}
+
+/**
  * For objects that might be above the horizon during the window,
  * returns true if max altitude ≥ minAltDeg.
  * Quick pre-filter using theoretical max altitude to avoid full sampling.

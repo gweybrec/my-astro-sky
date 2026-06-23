@@ -94,6 +94,23 @@
       </div>
     </div>
 
+    <!-- Fisheye projection toggle -->
+    <div class="display-controls-mag-row hemisphere-row">
+      <span class="display-controls-mag-label flex-1">{{ t('display.fisheye') }}</span>
+      <div class="hemisphere-pill">
+        <button
+          class="hemisphere-btn"
+          :class="{ 'hemisphere-btn--active': !fisheyeStore.active }"
+          @click="fisheyeStore.setActive(false)"
+        >{{ t('display.projStereo') }}</button>
+        <button
+          class="hemisphere-btn"
+          :class="{ 'hemisphere-btn--active': fisheyeStore.active }"
+          @click="fisheyeStore.setActive(true)"
+        >{{ t('display.projFisheye') }}</button>
+      </div>
+    </div>
+
     <!-- Border latitude slider -->
     <div class="display-controls-mag-row mt-6 mb-3">
       <label class="display-controls-mag-label border-slider-label" :title="t('display.borderLatTooltip')">
@@ -243,6 +260,7 @@ import CheckRow from '../base/CheckRow.vue';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import LabelsDropdown from './LabelsDropdown.vue';
 import { useDisplayStore } from '../../stores/display';
+import { useFisheyeStore } from '../../stores/fisheye';
 import { useI18n } from '../../composables/useI18n';
 import { isIAUStyle } from '../../types';
 import type { ConstellationStyle } from '../../types';
@@ -251,6 +269,7 @@ import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 
 const { t } = useI18n();
 const displayStore = useDisplayStore();
+const fisheyeStore = useFisheyeStore();
 
 const namesChecked = computed(() =>
   isIAUStyle(displayStore.constellationStyle) ? displayStore.showConstellationNames : false

@@ -1,5 +1,5 @@
 import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement, ApiErrorDetails, PhotoIntegration, AffineMatrix } from './types';
-import { project, toCanvas, fromCanvas, unproject } from './projection';
+import { project, toCanvas, fromCanvas, unproject, borderRadiusPU } from './projection';
 import { reportUnknownRendererError } from './error-reporter';
 import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform, affineToCSS } from './affine';
 import { getStarByHip, getStars } from './star-catalog';
@@ -420,9 +420,9 @@ export class PhotoOverlay {
    * border circle are hidden.  Call whenever hemisphere or borderLatDeg changes.
    */
   setBorderParams(hemisphere: 'north' | 'south', borderLatDeg: number) {
-    // Same formula for both hemispheres: r = tan((90 + lat) / 2)
-    this.borderRadiusPU = Math.tan((90 + borderLatDeg) / 2 * Math.PI / 180);
-    void hemisphere; // hemisphere affects projection module, not the radius formula
+    // In fisheye mode borderRadiusPU() returns 1.0 (horizon); in stereo it's the normal formula.
+    this.borderRadiusPU = borderRadiusPU(borderLatDeg);
+    void hemisphere;
   }
 
   private onPhotosChangedCallbacks: Array<() => void> = [];

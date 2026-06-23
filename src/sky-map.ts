@@ -1,5 +1,5 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
-import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle } from './projection';
+import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle, borderRadiusPU, getProjectionMode } from './projection';
 import { framePointToSky, clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
@@ -395,6 +395,9 @@ export class SkyMap {
   private hemisphere: 'north' | 'south' = 'north';
   private borderLatDeg = 45;
 
+  // Fisheye mode
+  private fisheyeMode = false;
+
   // Overlay canvas — sits above the photo layer in the DOM, used to draw frames on top of photos
   private overlayCanvas: HTMLCanvasElement | null = null;
   private overlayCtx: CanvasRenderingContext2D | null = null;
@@ -519,6 +522,28 @@ export class SkyMap {
     this.starIndexMaxMag = -1;
     this.dsoIndexMaxMag = -99999;
     this.render();
+  }
+
+  /** Switch to/from fisheye (azimuthal equidistant, zenith-centred) projection. */
+  setFisheyeMode(v: boolean) {
+    this.fisheyeMode = v;
+    this.invalidateSpatialIndexes();
+    this.cancelAnimation();
+    // Re-centre on zenith origin and fit the horizon circle in the view
+    this.view.centerX = 0;
+    this.view.centerY = 0;
+    this.view.rotationDeg = 0;
+    if (this.view.width > 0) {
+      this.view.scale = Math.min(this.view.width, this.view.height) / 2 * 0.90;
+    }
+    this.onViewChange?.();
+    this.render();
+  }
+
+  /** Invalidate spatial indexes so they are rebuilt on the next render. */
+  invalidateSpatialIndexes() {
+    this.starIndexMaxMag = -1;
+    this.dsoIndexMaxMag = -99999;
   }
 
   zoomBy(factor: number) {
@@ -1241,11 +1266,10 @@ export class SkyMap {
     this.renderBackground();
 
     // ── Hemisphere clip circle ──────────────────────────────────────────────
-    // borderLatDeg determines how far into the opposite hemisphere we show.
-    // The cutoff declination is −borderLatDeg (North) or +borderLatDeg (South).
-    // Its projection radius: r = tan((90 + borderLatDeg) / 2) (same formula for both).
+    // In stereo mode: borderLatDeg determines how far into the opposite hemisphere we show.
+    // In fisheye mode: borderRadiusPU() returns 1.0 (the horizon circle).
     const poleOrigin = toCanvas(0, 0, view);
-    const borderR = Math.tan((90 + this.borderLatDeg) / 2 * DEG2RAD) * view.scale;
+    const borderR = borderRadiusPU(this.borderLatDeg) * view.scale;
 
     ctx.save();
     ctx.beginPath();
@@ -1274,7 +1298,11 @@ export class SkyMap {
 
     ctx.globalAlpha = 1;
     if (this.showGrid) {
-      this.renderGrid();
+      if (this.fisheyeMode) {
+        this.renderFisheyeGrid();
+      } else {
+        this.renderGrid();
+      }
     }
     if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
       this.renderPhotoOutlines();
@@ -1319,7 +1347,7 @@ export class SkyMap {
     if (this.fovFrameSpecs.length === 0 && this.fovInstances.length === 0) return;
 
     const poleOrigin = toCanvas(0, 0, view);
-    const borderR = Math.tan((90 + this.borderLatDeg) / 2 * DEG2RAD) * view.scale;
+    const borderR = borderRadiusPU(this.borderLatDeg) * view.scale;
 
     oc.save();
     oc.beginPath();
@@ -2221,6 +2249,53 @@ export class SkyMap {
     ctx.restore();
   }
 
+  private renderFisheyeGrid() {
+    const { ctx, view } = this;
+    const origin = toCanvas(0, 0, view);
+    const hem = getHemisphere();
+
+    // Orthographic dome: equatorial RA/Dec grid, pole at centre, equator (r = 1)
+    // at the outer edge. Declination circles every 10° from the pole to the equator.
+    const decStart = hem === 'south' ? -80 : 80;
+    const decStep  = hem === 'south' ? 10 : -10;
+    for (let dec = decStart; hem === 'south' ? dec <= 0 : dec >= 0; dec += decStep) {
+      const r = Math.cos(dec * DEG2RAD) * view.scale;
+      ctx.beginPath();
+      ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = dec === 0 ? 'rgba(120, 210, 140, 0.9)' : 'rgba(100, 190, 120, 0.55)';
+      ctx.lineWidth = dec === 0 ? 1.5 : 0.8;
+      ctx.stroke();
+      // Dec label at the bottom of the circle (skip the pole and the equator edge)
+      if (r > 2 && Math.abs(dec) < 89 && dec !== 0) {
+        ctx.fillStyle = 'rgba(140, 220, 160, 1.0)';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(`${dec}°`, origin.x + 4, origin.y + r - 2);
+      }
+    }
+
+    // RA lines every 2h (30°) from the pole out to the equator
+    for (let raH = 0; raH < 24; raH += 2) {
+      const raRad = raH * 15 * DEG2RAD;
+      const edge = toCanvas(Math.sin(raRad), Math.cos(raRad), view); // equator (r = 1)
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(edge.x, edge.y);
+      ctx.strokeStyle = 'rgba(100, 190, 120, 0.55)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      // RA label near the equator
+      const labelProj = toCanvas(0.85 * Math.sin(raRad), 0.85 * Math.cos(raRad), view);
+      ctx.fillStyle = 'rgba(140, 220, 160, 1.0)';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${raH}h`, labelProj.x, labelProj.y);
+    }
+
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+  }
+
   private renderGrid() {
     const { ctx, view } = this;
     const origin = toCanvas(0, 0, view);
@@ -2302,14 +2377,19 @@ export class SkyMap {
         if (segment.length < 2) continue;
 
         ctx.beginPath();
-        const first = project(segment[0][0], segment[0][1]);
-        const firstC = toCanvas(first.x, first.y, view);
-        ctx.moveTo(firstC.x, firstC.y);
-
-        for (let i = 1; i < segment.length; i++) {
+        // In fisheye mode, points below the horizon project to (1e6, 1e6).
+        // Lift the pen at those points so a line doesn't streak across the sky.
+        let penDown = false;
+        for (let i = 0; i < segment.length; i++) {
           const p = project(segment[i][0], segment[i][1]);
+          if (p.x >= 1e5) { penDown = false; continue; }
           const c = toCanvas(p.x, p.y, view);
-          ctx.lineTo(c.x, c.y);
+          if (penDown) {
+            ctx.lineTo(c.x, c.y);
+          } else {
+            ctx.moveTo(c.x, c.y);
+            penDown = true;
+          }
         }
 
         ctx.stroke();
@@ -2339,9 +2419,12 @@ export class SkyMap {
       if (!isHighlighted) {
         // Skip magnitude check if maxMag is null (no limit)
         if (maxMag !== null && star.mag > maxMag) continue;
-        // Dec pre-filter: skip objects clearly outside the border
-        if (this.hemisphere === 'north' && star.dec < -(this.borderLatDeg + 2)) continue;
-        if (this.hemisphere === 'south' && star.dec > +(this.borderLatDeg + 2)) continue;
+        // Dec pre-filter: skip objects clearly outside the border (stereo only — in
+        // fisheye the far hemisphere is clipped by project() returning off-canvas).
+        if (!this.fisheyeMode) {
+          if (this.hemisphere === 'north' && star.dec < -(this.borderLatDeg + 2)) continue;
+          if (this.hemisphere === 'south' && star.dec > +(this.borderLatDeg + 2)) continue;
+        }
       }
 
       const p = project(star.ra, star.dec);
@@ -2455,9 +2538,12 @@ export class SkyMap {
         if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
         if (maxMag !== null && dso.mag !== null && dso.mag > maxMag) continue;
         if (dso.mag === null && maxMag !== null) continue;
-        // Dec pre-filter: skip objects clearly outside the border
-        if (this.hemisphere === 'north' && dso.dec < -(this.borderLatDeg + 2)) continue;
-        if (this.hemisphere === 'south' && dso.dec > +(this.borderLatDeg + 2)) continue;
+        // Dec pre-filter: skip objects clearly outside the border (stereo only — in
+        // fisheye the far hemisphere is clipped by project() returning off-canvas).
+        if (!this.fisheyeMode) {
+          if (this.hemisphere === 'north' && dso.dec < -(this.borderLatDeg + 2)) continue;
+          if (this.hemisphere === 'south' && dso.dec > +(this.borderLatDeg + 2)) continue;
+        }
       }
 
       const p = project(dso.ra, dso.dec);

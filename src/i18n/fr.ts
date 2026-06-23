@@ -163,6 +163,9 @@ const fr = {
     hemisphereSouth: 'Sud',
     borderLatDeg: 'Latitude (°)',
     borderLatTooltip: 'Latitude de l\'observateur : les objets hors de portée sont masqués (ex. 45 pour 45°N/S)',
+    fisheye: 'Projection',
+    projStereo: 'Stéréo',
+    projFisheye: 'Fisheye',
   },
   shortcuts: {
     title: 'Raccourcis clavier',
