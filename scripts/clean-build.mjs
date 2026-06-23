@@ -3,16 +3,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+// Only the build outputs a production Electron build actually regenerates:
+//   .vite — compiled main + preload bundles (package.json "main")
+//   dist  — Vite-built frontend bundled into the asar / served by Express
+//   out   — Forge's packaged app + installers
+// The node_modules/.vite and .cache entries are dev-server / transpile caches
+// that vite build does not use, so clearing them has no effect on the package.
 const targets = [
   '.vite',
   'dist',
   'out',
-  // Vite & plugin caches that may cause stale bundles
-  'node_modules/.vite',
-  'node_modules/.cache',
-  'node_modules/.cache/jiti',
-  'node_modules/.cache/vite',
-  '.vite-temp',
 ];
 
 for (const target of targets) {
