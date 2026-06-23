@@ -345,7 +345,7 @@ const es: Translations = {
     body: 'Hay una nueva versión de MyAstroSky disponible.',
     currentLabel: 'Actual',
     latestLabel: 'Última',
-    viewRelease: 'Ver versión',
+    viewRelease: 'Ver la última versión',
     later: 'Más tarde',
   },
   modal: {

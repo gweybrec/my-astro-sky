@@ -1,23 +1,24 @@
 <template>
-  <BaseModal :title="t('update.title')" @close="dismiss">
+  <BaseModal :title="t('update.title')" body-class="modal-form-body--loose" modal-class="!w-fit !max-w-[90vw]" @close="dismiss">
     <p class="text-para">{{ t('update.body') }}</p>
-    <div class="about-meta-block">
-      <div class="about-meta-row">
-        <span class="text-muted inline-block min-w-[64px]">{{ t('update.currentLabel') }}</span>
-        {{ current }}
+    <div class="flex items-center justify-center gap-6 py-2">
+      <div class="flex flex-col items-center gap-1">
+        <span class="text-muted text-small uppercase tracking-wide">{{ t('update.currentLabel') }}</span>
+        <span class="text-secondary text-body">{{ current }}</span>
       </div>
-      <div class="about-meta-row">
-        <span class="text-muted inline-block min-w-[64px]">{{ t('update.latestLabel') }}</span>
-        {{ latest }}
+      <span class="text-dim text-large" aria-hidden="true">→</span>
+      <div class="flex flex-col items-center gap-1">
+        <span class="text-muted text-small uppercase tracking-wide">{{ t('update.latestLabel') }}</span>
+        <span class="text-bright text-body font-medium">{{ latest }}</span>
       </div>
     </div>
     <template #footer>
-      <button class="display-controls-btn" @click="dismiss">{{ t('update.later') }}</button>
+      <button class="btn-cancel" @click="dismiss">{{ t('update.later') }}</button>
       <a
         :href="url"
         target="_blank"
         rel="noopener noreferrer"
-        class="btn-primary"
+        class="btn-action no-underline"
         @click="dismiss"
       >{{ t('update.viewRelease') }}</a>
     </template>
@@ -36,8 +37,11 @@ const emit = defineEmits<{ close: [] }>();
 const { t } = useI18n();
 const uiStore = useUiStore();
 
-const current = __APP_VERSION__;
-const latest = computed(() => uiStore.pendingUpdate?.latest ?? '');
+// Normalise to a single leading "v" so both versions display consistently
+// (the running build's __APP_VERSION__ has no prefix; GitHub tags carry one).
+const withV = (v: string) => (/^v/i.test(v) ? v : `v${v}`);
+const current = withV(__APP_VERSION__);
+const latest = computed(() => withV(uiStore.pendingUpdate?.latest ?? ''));
 const url = computed(() => uiStore.pendingUpdate?.url || `https://github.com/gweybrec/my-astro-sky/releases`);
 
 // Remember the announced version so it is not shown again on the next launch.
