@@ -29,7 +29,6 @@ export default defineConfig({
         // Express server, subprocess, and file-I/O — integration-only
         'server/index.ts',
         'server/astap.ts',
-        'server/star-search.ts',
       ],
     },
   },
