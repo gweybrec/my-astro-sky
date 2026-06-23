@@ -79,10 +79,26 @@ export function confirmPlanDelete(planName: string): Promise<boolean> {
   );
 }
 
+export function confirmSetupDelete(name: string): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('fovOverlay.deleteSetupTitle'),
+    t('fovOverlay.deleteSetupConfirm', { name }),
+    t('photos.delete'),
+  );
+}
+
 export function confirmPlanEntryDelete(targetName: string): Promise<boolean> {
   return confirmDeleteDialog(
     t('fovOverlay.deleteFrame'),
     t('fovOverlay.deleteFrameConfirm', { name: targetName }),
     t('fovOverlay.deleteFrame'),
+  );
+}
+
+export function confirmDiscardUnsavedSolves(count: number): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('batch.confirmCloseTitle'),
+    t('batch.confirmCloseMessage', { count: String(count) }),
+    t('batch.confirmCloseAction'),
   );
 }

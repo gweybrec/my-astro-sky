@@ -45,13 +45,15 @@ describe('buildFovPopup', () => {
     document.body.innerHTML = '';
   });
 
-  it('lists Free frames, every plan, and a New plan option', () => {
+  it('lists Free frames and every plan (creating a plan is a dedicated button)', () => {
     seedPlan('s1', []);
     const popup = buildFovPopup(() => {});
     const opts = Array.from(popup.querySelectorAll('select option')).map(o => (o as HTMLOptionElement).textContent);
     expect(opts).toContain('Free frames');
     expect(opts).toContain('Tonight');
-    expect(opts).toContain('+ New plan');
+    // The "+ New plan" dropdown entry was replaced by a [+] icon button.
+    expect(opts).not.toContain('+ New plan');
+    expect(popup.querySelector('[title="New plan"]')).not.toBeNull();
     popup.__cleanup?.();
   });
 
@@ -177,7 +179,9 @@ describe('buildFovPopup', () => {
     const popup = buildFovPopup(() => {});
     await new Promise(r => setTimeout(r));
     const setupSel = popup.querySelectorAll('select')[1] as HTMLSelectElement;
-    expect(setupSel.style.display).toBe('none');
+    // The setup dropdown and its [+]/[edit] controls share a row that is hidden
+    // outside plan mode.
+    expect((setupSel.parentElement as HTMLElement).style.display).toBe('none');
     popup.__cleanup?.();
   });
 

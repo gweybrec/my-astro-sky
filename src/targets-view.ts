@@ -20,7 +20,7 @@ import { formatRA, formatDec, formatAlt } from './format-utils';
 import { attachAnchoredPanel } from './popup-utils';
 import type { GearPreset } from './gear-presets';
 import { recommendRecipe } from './imaging-recipe';
-import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, deleteGearSetupAPI, type GearSetupData, type Plan, type PlanMosaic } from './api';
+import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, type GearSetupData, type Plan, type PlanMosaic } from './api';
 import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
 import { showToast } from './toast';
@@ -33,7 +33,7 @@ import trashSvg from './icons/trash.svg?raw';
 import penSvg from './icons/pen.svg?raw';
 import mapPinSvg from './icons/map-pin.svg?raw';
 import planListSvg from './icons/plan-list.svg?raw';
-import { openAddSetupModal, openEditSetupModal, buildFovFrameSpecs } from './fov-overlay';
+import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
 import { usePlansStore } from './stores/plans';
 import { useFovFramesStore } from './stores/fov-frames';
@@ -1618,50 +1618,33 @@ export class TargetsView {
     const select = document.createElement('select');
     select.className = 'targets-select';
 
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'btn-icon';
-    editBtn.innerHTML = penSvg;
-    editBtn.title = t('fovOverlay.editModalTitle');
-    editBtn.disabled = true;
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'btn-icon btn-icon--danger';
-    deleteBtn.innerHTML = trashSvg;
-    deleteBtn.title = t('photos.delete');
-    deleteBtn.disabled = true;
-
-    row.appendChild(label);
-    row.appendChild(select);
-    row.appendChild(editBtn);
-    row.appendChild(deleteBtn);
-    container.appendChild(row);
-
-    // ── "Add a setup" button on its own line (aligned with the select) ─────────
-    const addSetupBtn = document.createElement('button');
-    addSetupBtn.type = 'button';
-    addSetupBtn.className = 'targets-add-gear-btn';
-    addSetupBtn.textContent = t('fovOverlay.addSetup');
-    container.appendChild(addSetupBtn);
-
-    // ── FOV hint below ────────────────────────────────────────────────────────
-    const fovHintEl = document.createElement('div');
-    fovHintEl.className = 'targets-fov-hint';
-    container.appendChild(fovHintEl);
-
     let allSetups: GearSetupData[] = [];
 
     const rebuildSection = () => {
       this.buildGearSection(container);
     };
 
-    addSetupBtn.addEventListener('click', () => {
-      openAddSetupModal(() => {
+    // Unified [+] create / [edit] (edit owns deletion) controls, shared with the
+    // plan-details and sky-map FOV popup dropdowns.
+    const { addBtn, editBtn, refresh: refreshControls } = buildSetupControls({
+      getSelectedSetup: () => allSetups.find(s => s.id === select.value),
+      onMutated: () => {
         this.fovFramesStore.loadSpecs();
         rebuildSection();
-      }, false);
+      },
+      createEnabled: false,
     });
+
+    row.appendChild(label);
+    row.appendChild(select);
+    row.appendChild(addBtn);
+    row.appendChild(editBtn);
+    container.appendChild(row);
+
+    // ── FOV hint below ────────────────────────────────────────────────────────
+    const fovHintEl = document.createElement('div');
+    fovHintEl.className = 'targets-fov-hint';
+    container.appendChild(fovHintEl);
 
     const updateGearInfo = (setup: GearSetupData | undefined) => {
       fovHintEl.textContent = '';
@@ -1705,8 +1688,12 @@ export class TargetsView {
           this.randomBtn.disabled = true;
           this.randomBtn.title = t('targets.gear.noSetupTooltip');
         }
-        editBtn.disabled = true;
-        deleteBtn.disabled = true;
+        // The previously-selected setup no longer exists — clear the stale pref.
+        if (this.prefs.setupId) {
+          this.prefs.setupId = null;
+          savePrefs(this.prefs);
+        }
+        refreshControls();
         updateGearInfo(undefined);
         return;
       }
@@ -1732,42 +1719,14 @@ export class TargetsView {
       }
 
       const selectedSetup = () => allSetups.find(s => s.id === select.value);
-      editBtn.disabled = false;
-      deleteBtn.disabled = false;
+      refreshControls();
       updateGearInfo(selectedSetup());
 
       select.addEventListener('change', () => {
         this.prefs.setupId = select.value || null;
         savePrefs(this.prefs);
         updateGearInfo(selectedSetup());
-        editBtn.disabled = !select.value;
-        deleteBtn.disabled = !select.value;
-      });
-
-      editBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const setup = selectedSetup();
-        if (!setup) return;
-        openEditSetupModal(setup, () => {
-          this.fovFramesStore.loadSpecs();
-          rebuildSection();
-        });
-      });
-
-      deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const setup = selectedSetup();
-        if (!setup) return;
-        deleteGearSetupAPI(setup.id).then(() => {
-          if (this.prefs.setupId === setup.id) {
-            this.prefs.setupId = null;
-            savePrefs(this.prefs);
-          }
-          this.fovFramesStore.loadSpecs();
-          rebuildSection();
-        }).catch(err => {
-          showToast({ message: String(err?.message ?? err), type: 'error', duration: 3500 });
-        });
+        refreshControls();
       });
     }).catch(() => {
       select.innerHTML = '';
@@ -2585,8 +2544,15 @@ export class TargetsView {
     const setupSelect = document.createElement('select');
     setupSelect.className = 'targets-select !min-w-0 !flex-none w-auto';
     setupSelect.disabled = true;
+    let planSetups: GearSetupData[] = [];
+    const setupControls = buildSetupControls({
+      getSelectedSetup: () => planSetups.find(s => s.id === setupSelect.value),
+      onMutated: () => this.render(),
+    });
     setupRow.appendChild(setupLabel);
     setupRow.appendChild(setupSelect);
+    setupRow.appendChild(setupControls.addBtn);
+    setupRow.appendChild(setupControls.editBtn);
     controls.appendChild(setupRow);
 
     // Per-plan observing location (falls back to the global location when unset),
@@ -2816,11 +2782,13 @@ export class TargetsView {
     });
 
     getGearSetups().then(setups => {
+      planSetups = setups;
       if (setups.length === 0) {
         const opt = document.createElement('option');
         opt.value = '';
         opt.textContent = t('targets.gear.noSetup') ?? '—';
         setupSelect.appendChild(opt);
+        setupControls.refresh();
         return;
       }
       setupSelect.disabled = false;
@@ -2832,6 +2800,7 @@ export class TargetsView {
       }
       const eff = effectiveSetupId();
       setupSelect.value = (eff && setups.some(s => s.id === eff)) ? eff : setups[0].id;
+      setupControls.refresh();
       // Route through the shared setup-switch flow (same as the sky-view FOV
       // popup) so changing the setup with existing mosaics opens the Apply/Drop
       // confirmation modal instead of silently breaking them. The modal's apply
