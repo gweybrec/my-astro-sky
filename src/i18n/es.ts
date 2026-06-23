@@ -165,6 +165,9 @@ const es: Translations = {
     hemisphereSouth: 'Sur',
     borderLatDeg: 'Latitud (°)',
     borderLatTooltip: 'Latitud del observador: los objetos fuera de alcance se ocultan (ej. 45 para 45°N/S)',
+    fisheye: 'Proyección',
+    projStereo: 'Estéreo',
+    projFisheye: 'Ojo de pez',
   },
   shortcuts: {
     title: 'Atajos de teclado',

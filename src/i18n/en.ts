@@ -163,6 +163,9 @@ const en: Translations = {
     hemisphereSouth: 'South',
     borderLatDeg: 'Latitude (°)',
     borderLatTooltip: 'Observer latitude: objects out of reach are hidden (e.g. 45 for 45°N/S)',
+    fisheye: 'Projection',
+    projStereo: 'Stereo',
+    projFisheye: 'Fisheye',
   },
   shortcuts: {
     title: 'Keyboard shortcuts',

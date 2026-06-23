@@ -165,6 +165,9 @@ const de: Translations = {
     hemisphereSouth: 'Süd',
     borderLatDeg: 'Breitengrad (°)',
     borderLatTooltip: 'Beobachterbreite: nicht erreichbare Objekte werden ausgeblendet (z. B. 45 für 45°N/S)',
+    fisheye: 'Projektion',
+    projStereo: 'Stereo',
+    projFisheye: 'Fischauge',
   },
   shortcuts: {
     title: 'Tastenkürzel',
