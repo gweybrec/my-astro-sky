@@ -33,7 +33,7 @@ const DEG2RAD = Math.PI / 180;
 
 // ─── 1. Star catalog ─────────────────────────────────────────────────────────
 function loadCatalog() {
-  const starsData = JSON.parse(readFileSync(join(ROOT, 'public/data/stars.8.json'), 'utf8'));
+  const starsData = JSON.parse(readFileSync(join(ROOT, 'public/data/stars.14.json'), 'utf8'));
   const namesData = JSON.parse(readFileSync(join(ROOT, 'public/data/starnames.json'), 'utf8'));
 
   const stars = [];

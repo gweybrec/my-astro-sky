@@ -59,12 +59,11 @@ function normalizeRA(ra: number): number {
 export function loadServerCatalog(): CatalogStar[] {
   if (serverStars) return serverStars;
 
-  // Check environment variable first, then try common catalog files in order of preference
+  // Check environment variable first, then fall back to the shipped catalog
   const publicDataDir = process.env.PUBLIC_DATA_DIR || path.join(__dirname, '..', 'public', 'data');
   const catalogPaths = [
     process.env.STAR_CATALOG_PATH,
     path.join(publicDataDir, 'stars.14.json'),
-    path.join(publicDataDir, 'stars.8.json'),
   ].filter(Boolean) as string[];
 
   let starsPath: string | null = null;

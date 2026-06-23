@@ -68,18 +68,14 @@ export function loadDeepCatalog(): void {
   if (deepStars) return;
 
   const publicDataDir = process.env.PUBLIC_DATA_DIR || path.join(__dirname, '..', 'public', 'data');
-  const deepPath = path.join(__dirname, 'data', 'stars.deep.json');
-  const fallbackPath = path.join(publicDataDir, 'stars.8.json');
+  // The shipped deep catalog (stars.14.json, ~118k stars), shared with WCS matching
+  // via STAR_CATALOG_PATH.
+  const catalogPath = process.env.STAR_CATALOG_PATH
+    ? path.resolve(process.env.STAR_CATALOG_PATH)
+    : path.join(publicDataDir, 'stars.14.json');
   const namesPath = path.join(publicDataDir, 'starnames.json');
 
-  let catalogPath: string;
-  if (fs.existsSync(deepPath)) {
-    catalogPath = deepPath;
-    console.log('Chargement du catalogue profond (stars.deep.json)…');
-  } else {
-    catalogPath = fallbackPath;
-    console.log('Catalogue profond non trouvé, fallback sur stars.8.json');
-  }
+  console.log(`Chargement du catalogue profond (${path.basename(catalogPath)})…`);
 
   const starsData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
   const namesData = JSON.parse(fs.readFileSync(namesPath, 'utf-8'));
