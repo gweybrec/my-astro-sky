@@ -24,6 +24,7 @@ function makePhoto(overrides: Partial<Photo> = {}): Photo {
     correspondences: [],
     dsoIds: [],
     labels: [],
+    pointsOfInterest: [],
     notes: '',
     ...overrides,
   };
@@ -289,6 +290,36 @@ describe('Gallery', () => {
 
     // Re-enable all — back to 3
     gallery.setLabelFilter(['nebula', 'galaxy', '(no label)']);
+    expect(document.querySelectorAll('.gallery-item').length).toBe(3);
+  });
+
+  it('setPoiFilter restricts to photos with a matching point of interest', () => {
+    const gallery = new Gallery();
+    gallery.setPoiCategories([
+      { id: 'cat-comet', name: 'Comet', color: '#111', position: 0 },
+      { id: 'cat-asteroid', name: 'Asteroid', color: '#222', position: 1 },
+    ]);
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }] }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg', pointsOfInterest: [{ name: 'Vesta', categoryId: 'cat-asteroid' }] }),
+      makePhoto({ id: 'c', originalName: 'NGC7000', filename: 'c.jpg', pointsOfInterest: [] }),
+    ]);
+
+    // No filter → all visible.
+    expect(document.querySelectorAll('.gallery-item').length).toBe(3);
+
+    // Filter to the whole comet category → only the comet photo.
+    gallery.setPoiFilter(new Map([['cat-comet', new Set<string>()]]));
+    expect(document.querySelectorAll('.gallery-item').length).toBe(1);
+    expect(document.querySelector('.gallery-item-name')?.textContent).toBe('M42');
+
+    // Filter to a specific asteroid name → only the asteroid photo.
+    gallery.setPoiFilter(new Map([['cat-asteroid', new Set(['Vesta'])]]));
+    expect(document.querySelectorAll('.gallery-item').length).toBe(1);
+    expect(document.querySelector('.gallery-item-name')?.textContent).toBe('M31');
+
+    // Empty map disables the filter → all visible again.
+    gallery.setPoiFilter(new Map());
     expect(document.querySelectorAll('.gallery-item').length).toBe(3);
   });
 

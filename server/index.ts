@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, updatePlanEntryFrame, getAllPlanMosaics, getPlanMosaic, createPlanMosaic, updatePlanMosaic, deletePlanMosaic, addPlanMosaic, type PlanEntryRow, type PlanMosaicRow, type MosaicTileInput } from './db.js';
+import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, sanitizePois, getAllPoiCategories, upsertPoiCategory, deletePoiCategory, deleteAllPoiCategories, type PointOfInterestInput, type PoiCategoryRow, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, updatePlanEntryFrame, getAllPlanMosaics, getPlanMosaic, createPlanMosaic, updatePlanMosaic, deletePlanMosaic, addPlanMosaic, type PlanEntryRow, type PlanMosaicRow, type MosaicTileInput } from './db.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 const _require = createRequire(import.meta.url);
@@ -373,6 +373,8 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     let notes = '';
     try { dsoIds = JSON.parse(req.body?.dsoIds || '[]'); if (!Array.isArray(dsoIds)) dsoIds = []; } catch { dsoIds = []; }
     try { labels = JSON.parse(req.body?.labels || '[]'); if (!Array.isArray(labels)) labels = []; } catch { labels = []; }
+    let pointsOfInterest: PointOfInterestInput[] = [];
+    try { pointsOfInterest = sanitizePois(JSON.parse(req.body?.pointsOfInterest || '[]')); } catch { pointsOfInterest = []; }
     try {
       integrations = sanitizeIntegrationRows(JSON.parse(req.body?.integrations || '[]'));
     } catch {
@@ -402,7 +404,7 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     }
 
     // Store in database
-    createPhoto(id, filename, displayName, newWidth, newHeight, scaledCorrespondences, scaledManualPlacement, dsoIds, labels, notes, integrations, thumbFilename, observationDate);
+    createPhoto(id, filename, displayName, newWidth, newHeight, scaledCorrespondences, scaledManualPlacement, dsoIds, labels, notes, integrations, thumbFilename, observationDate, pointsOfInterest);
 
     res.json({
       id,
@@ -414,6 +416,7 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       correspondences: scaledCorrespondences,
       dsoIds,
       labels,
+      pointsOfInterest,
       integrations,
       notes,
       thumbFilename,
@@ -1408,6 +1411,211 @@ app.delete('/api/gear-setups', (_req, res) => {
   }
 });
 
+// ─── Points of Interest categories ──────────────────────────────────────────────
+
+function poiCategoryToApi(r: PoiCategoryRow) {
+  return { id: r.id, name: r.name, color: r.color, position: r.position };
+}
+
+/**
+ * @swagger
+ * /api/poi-categories:
+ *   get:
+ *     summary: Get all Points-of-Interest categories
+ *     responses:
+ *       200:
+ *         description: Array of categories ordered by position
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string }
+ *                   name: { type: string }
+ *                   color: { type: string }
+ *                   position: { type: number }
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/poi-categories', (_req, res) => {
+  try {
+    res.json(getAllPoiCategories().map(poiCategoryToApi));
+  } catch (err: any) {
+    console.error('[PoiCategories] Failed to list categories', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poi-categories:
+ *   post:
+ *     summary: Create a new Point-of-Interest category
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name: { type: string }
+ *               color: { type: string, description: "CSS color, e.g. #4ea1ff" }
+ *     responses:
+ *       200:
+ *         description: Category created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *       400:
+ *         description: Missing name
+ *       500:
+ *         description: Server error
+ */
+app.post('/api/poi-categories', (req, res) => {
+  try {
+    const { name, color } = req.body as any;
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' }); return;
+    }
+    const id = `cat-${uuidv4()}`;
+    const position = getAllPoiCategories().length;
+    upsertPoiCategory({
+      id, name: name.trim(),
+      color: typeof color === 'string' && color.trim() ? color.trim() : '#888888',
+      position,
+    });
+    res.json({ id });
+  } catch (err: any) {
+    console.error('[PoiCategories] Failed to create category', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poi-categories/{id}:
+ *   patch:
+ *     summary: Update a Point-of-Interest category (name/color/position)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               color: { type: string }
+ *               position: { type: number }
+ *     responses:
+ *       200:
+ *         description: Category updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       404:
+ *         description: Category not found
+ *       500:
+ *         description: Server error
+ */
+app.patch('/api/poi-categories/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = getAllPoiCategories().find(c => c.id === id);
+    if (!existing) { res.status(404).json({ error: 'Category not found' }); return; }
+    const { name, color, position } = req.body as any;
+    upsertPoiCategory({
+      id,
+      name: typeof name === 'string' && name.trim() ? name.trim() : existing.name,
+      color: typeof color === 'string' && color.trim() ? color.trim() : existing.color,
+      position: Number.isFinite(position) ? Number(position) : existing.position,
+    });
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[PoiCategories] Failed to update category', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poi-categories/{id}:
+ *   delete:
+ *     summary: Delete a Point-of-Interest category
+ *     description: >
+ *       Photos keep any POIs that referenced this category; those POIs are shown
+ *       under an "Uncategorized" group until re-tagged.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Category deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       404:
+ *         description: Category not found
+ *       500:
+ *         description: Server error
+ */
+app.delete('/api/poi-categories/:id', (req, res) => {
+  try {
+    const ok = deletePoiCategory(req.params.id);
+    if (!ok) { res.status(404).json({ error: 'Category not found' }); return; }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[PoiCategories] Failed to delete category', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poi-categories:
+ *   delete:
+ *     summary: Delete all Point-of-Interest categories
+ *     responses:
+ *       200:
+ *         description: All categories deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *                 deleted: { type: number }
+ *       500:
+ *         description: Server error
+ */
+app.delete('/api/poi-categories', (_req, res) => {
+  try {
+    const deleted = deleteAllPoiCategories();
+    res.json({ ok: true, deleted });
+  } catch (err: any) {
+    console.error('[PoiCategories] Failed to delete all categories', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Night plans ──────────────────────────────────────────────────────────────
 
 function planEntryToApi(e: PlanEntryRow) {
@@ -2265,7 +2473,7 @@ app.post('/api/export', (req, res) => {
   try {
     const body = req.body as {
       mode?: string;
-      options?: { includeImages?: boolean; includeMetadata?: boolean; includeDsoOverrides?: boolean; includeCustomGear?: boolean; includeSetups?: boolean; includePlans?: boolean; includeShortcuts?: boolean };
+      options?: { includeImages?: boolean; includeMetadata?: boolean; includeDsoOverrides?: boolean; includeCustomGear?: boolean; includeSetups?: boolean; includePlans?: boolean; includeShortcuts?: boolean; includePoiCategories?: boolean };
       ids?: string[];
       // Keyboard-shortcut bindings live in the client's localStorage; the client sends
       // them here so they can be bundled into the backup ZIP as shortcuts.json.
@@ -2282,6 +2490,7 @@ app.post('/api/export', (req, res) => {
     const includeSetups = options.includeSetups === true;
     const includePlans = options.includePlans === true;
     const includeShortcuts = options.includeShortcuts === true;
+    const includePoiCategories = options.includePoiCategories === true;
 
     const { ids } = body;
     const allPhotos = getAllPhotos();
@@ -2343,6 +2552,10 @@ app.post('/api/export', (req, res) => {
         enabled: r.enabled === 1,
       }));
       archive.append(Buffer.from(JSON.stringify(setups, null, 2)), { name: 'gear-setups.json' });
+    }
+    if (includePoiCategories) {
+      const cats = getAllPoiCategories().map(poiCategoryToApi);
+      archive.append(Buffer.from(JSON.stringify(cats, null, 2)), { name: 'poi-categories.json' });
     }
     if (includePlans) {
       const entriesByPlan = new Map<string, PlanEntryRow[]>();
@@ -2460,6 +2673,7 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         hasDsoOverrides: false,
         hasCustomGear: false,
         hasSetups: false,
+        hasPoiCategories: false,
         hasPlans: false,
         hasShortcuts: false,
         images: [],
@@ -2496,6 +2710,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
 
     const importMetadata = req.body?.importMetadata === '1';
     const importDsoOverrides = req.body?.importDsoOverrides === '1';
+    const importPoiCategories = req.body?.importPoiCategories === '1';
     // null means "no image filter" (metadata-only import); a Set means "import only these filenames"
     const selectedImages: Set<string> | null = req.body?.selectedImages
       ? new Set(JSON.parse(req.body.selectedImages) as string[])
@@ -2529,9 +2744,10 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
       const dsoOverridesEntry = zipDir.files.find(f => f.path === 'dso-overrides.json');
       const customGearEntry = zipDir.files.find(f => f.path === 'custom-gear.json');
       const gearSetupsEntry = zipDir.files.find(f => f.path === 'gear-setups.json');
+      const poiCategoriesEntry = zipDir.files.find(f => f.path === 'poi-categories.json');
       const plansEntry = zipDir.files.find(f => f.path === 'plans.json');
 
-      if (!manifestEntry && !dsoOverridesEntry && !customGearEntry && !gearSetupsEntry && !plansEntry) {
+      if (!manifestEntry && !dsoOverridesEntry && !customGearEntry && !gearSetupsEntry && !poiCategoriesEntry && !plansEntry) {
         res.status(400).json({ error: 'Aucun contenu reconnu dans le ZIP' }); return;
       }
 
@@ -2600,6 +2816,25 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
             }
           }
         } catch { /* ignore invalid gear-setups.json */ }
+      }
+
+      // Import POI categories (id-based upsert: a re-imported category with the same
+      // id replaces the existing one, keeping any photos' POI references valid).
+      if (poiCategoriesEntry && importPoiCategories) {
+        try {
+          const rawCats = JSON.parse((await poiCategoriesEntry.buffer()).toString('utf8'));
+          if (Array.isArray(rawCats)) {
+            rawCats.forEach((c, ci) => {
+              if (typeof c?.id !== 'string' || typeof c?.name !== 'string') return;
+              upsertPoiCategory({
+                id: c.id,
+                name: c.name,
+                color: typeof c.color === 'string' && c.color.trim() ? c.color : '#888888',
+                position: Number.isFinite(c.position) ? Number(c.position) : ci,
+              });
+            });
+          }
+        } catch { /* ignore invalid poi-categories.json */ }
       }
 
       // Import night plans (only the ids the user selected). Name-based override:
@@ -2742,6 +2977,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
           sanitizeIntegrationRows(p.integrations),
           thumbFilename,
           typeof p.observationDate === 'string' ? p.observationDate : null,
+          sanitizePois(p.pointsOfInterest),
         );
         if (result === 'imported') imported++; else skipped++;
       }
@@ -3100,9 +3336,10 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
       return;
     }
 
-    let { dsoIds, labels, integrations, notes, originalName, observationDate } = req.body;
+    let { dsoIds, labels, integrations, notes, originalName, observationDate, pointsOfInterest } = req.body;
     if (!Array.isArray(dsoIds)) dsoIds = [];
     if (!Array.isArray(labels)) labels = [];
+    pointsOfInterest = sanitizePois(pointsOfInterest);
     integrations = sanitizeIntegrationRows(integrations);
     if (typeof notes !== 'string') notes = '';
     notes = notes.slice(0, 5000);
@@ -3115,7 +3352,7 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
         ? observationDate.trim().slice(0, 50)
         : null;
 
-    updatePhotoMetadata(id, dsoIds, labels, notes, resolvedOriginalName, integrations, resolvedObsDate);
+    updatePhotoMetadata(id, dsoIds, labels, notes, resolvedOriginalName, integrations, resolvedObsDate, pointsOfInterest);
     res.json({ ok: true, ...(resolvedOriginalName !== undefined ? { originalName: resolvedOriginalName } : {}) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -236,6 +236,7 @@ function createBatchItem(file: File): BatchItem {
     diagnostics: undefined,
     dsoIds: [],
     labels: [],
+    pointsOfInterest: [],
     integrations: [],
     observationDate: '',
     notes: '',

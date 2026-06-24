@@ -59,13 +59,13 @@ describe('applyMigrations — fresh database', () => {
   it('returns the latest schema version after first run', () => {
     const db = freshBaseDb();
     const version = applyMigrations(db);
-    expect(version).toBe(7);
+    expect(version).toBe(9);
   });
 
   it('schema_version table contains the latest version', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 
   it('adds star_ra and star_dec columns to star_correspondences', () => {
@@ -102,8 +102,8 @@ describe('applyMigrations — idempotency', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     const v = applyMigrations(db);
-    expect(v).toBe(7);
-    expect(schemaVersion(db)).toBe(7);
+    expect(v).toBe(9);
+    expect(schemaVersion(db)).toBe(9);
   });
 });
 
@@ -127,7 +127,7 @@ describe('applyMigrations — v2 per-plan night/setup', () => {
   it('is a no-op (no throw) when the plans table is absent', () => {
     const db = freshBaseDb();
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 });
 
@@ -167,7 +167,7 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
     expect(row.dso_id).toBe('M42');
     expect(row.pa_deg).toBe(142);
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 
   it('is idempotent on an already-migrated plan_entries table', () => {
@@ -196,7 +196,7 @@ describe('applyMigrations — existing database (simulates upgrade)', () => {
     db.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
 
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 });
 
@@ -221,7 +221,7 @@ describe('applyMigrations — v4 mosaics', () => {
     expect(mosaicCols).toContain('center_ra');
     expect(mosaicCols).toContain('overlap_pct');
     expect(mosaicCols).toContain('cols');
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 
   it('is idempotent — a second run does not duplicate mosaic_id', () => {
@@ -243,7 +243,7 @@ describe('applyMigrations — v5 mosaic name', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     expect(getColumns(db, 'plan_mosaics')).toContain('name');
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 
   it('round-trips a stored mosaic name', () => {
@@ -276,7 +276,7 @@ describe('applyMigrations — v6 smart-scope mosaic size', () => {
     const cols = getColumns(db, 'plan_entries');
     expect(cols).toContain('mosaic_w_deg');
     expect(cols).toContain('mosaic_h_deg');
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 
   it('round-trips a stored smart mosaic size and preserves existing rows', () => {
@@ -325,7 +325,7 @@ describe('applyMigrations — v7 per-plan observing location', () => {
     const cols = getColumns(db, 'plans');
     expect(cols).toContain('lat');
     expect(cols).toContain('lon');
-    expect(schemaVersion(db)).toBe(7);
+    expect(schemaVersion(db)).toBe(9);
   });
 
   it('round-trips a stored per-plan location', () => {
@@ -357,6 +357,85 @@ describe('applyMigrations — v7 per-plan observing location', () => {
     expect(() => applyMigrations(db)).not.toThrow();
     expect(getColumns(db, 'plans').filter(c => c === 'lat').length).toBe(1);
     expect(getColumns(db, 'plans').filter(c => c === 'lon').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — v8 points of interest', () => {
+  it('adds the points_of_interest column to photos and creates poi_categories', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    expect(getColumns(db, 'photos')).toContain('points_of_interest');
+    const catCols = getColumns(db, 'poi_categories');
+    expect(catCols).toContain('name');
+    expect(catCols).toContain('color');
+    expect(catCols).toContain('position');
+    expect(schemaVersion(db)).toBe(9);
+  });
+
+  it('defaults points_of_interest to an empty JSON array', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    db.prepare('INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)')
+      .run('p1', 'a.jpg', 'a.jpg', 100, 100);
+    const row = db.prepare('SELECT points_of_interest FROM photos WHERE id = ?').get('p1') as { points_of_interest: string };
+    expect(row.points_of_interest).toBe('[]');
+  });
+
+  it('round-trips a stored POI category', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    db.prepare('INSERT INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)')
+      .run('cat-comet', 'Comet', '#4ea1ff', 0);
+    const row = db.prepare('SELECT * FROM poi_categories WHERE id = ?').get('cat-comet') as any;
+    expect(row.name).toBe('Comet');
+    expect(row.color).toBe('#4ea1ff');
+  });
+
+  it('is idempotent — a second run keeps a single points_of_interest column', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    expect(() => applyMigrations(db)).not.toThrow();
+    expect(getColumns(db, 'photos').filter(c => c === 'points_of_interest').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — v9 supernova type + ISS recolor', () => {
+  /** Apply v1..v8 only, then seed the original 4 default types (pre-v9 state). */
+  function seededPreV9(db: Database.Database) {
+    // Build the schema up to v8 by inserting a version row at 8 before running.
+    applyMigrations(db); // brings to latest, creates poi_categories
+    db.exec('DELETE FROM poi_categories');
+    db.prepare('UPDATE schema_version SET version = 8').run();
+    const ins = db.prepare('INSERT INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)');
+    ins.run('cat-comet', 'Comet', '#4ea1ff', 0);
+    ins.run('cat-asteroid', 'Asteroid', '#c9a227', 1);
+    ins.run('cat-satellite', 'Satellite', '#7bd88f', 2);
+    ins.run('cat-iss', 'ISS', '#ff7b7b', 3);
+  }
+
+  it('adds the Supernova type and recolors ISS to light grey on a seeded DB', () => {
+    const db = freshBaseDb();
+    seededPreV9(db);
+    applyMigrations(db);
+    const rows = db.prepare('SELECT id, color FROM poi_categories').all() as { id: string; color: string }[];
+    expect(rows.find(r => r.id === 'cat-supernova')?.color).toBe('#ff5a5a');
+    expect(rows.find(r => r.id === 'cat-iss')?.color).toBe('#cbd5e1');
+  });
+
+  it('does not seed Supernova on a fresh (empty) DB — db.ts seeds all 5 there', () => {
+    const db = freshBaseDb();
+    applyMigrations(db); // poi_categories created but empty; v9 must skip
+    const cnt = (db.prepare('SELECT COUNT(*) AS c FROM poi_categories').get() as { c: number }).c;
+    expect(cnt).toBe(0);
+  });
+
+  it('respects a user-customized ISS colour (only the default red is recolored)', () => {
+    const db = freshBaseDb();
+    seededPreV9(db);
+    db.prepare("UPDATE poi_categories SET color = '#123456' WHERE id = 'cat-iss'").run();
+    applyMigrations(db);
+    const iss = db.prepare("SELECT color FROM poi_categories WHERE id = 'cat-iss'").get() as { color: string };
+    expect(iss.color).toBe('#123456');
   });
 });
 

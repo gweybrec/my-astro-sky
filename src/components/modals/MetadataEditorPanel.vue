@@ -66,6 +66,9 @@
     </div>
   </div>
 
+  <!-- Points of Interest -->
+  <PoiEditor :pois="pointsOfInterest" @update:pois="emit('update:pointsOfInterest', $event)" />
+
   <!-- Integrations -->
   <div class="metadata-field">
     <label class="metadata-label">{{ t('modal.metadataIntegrations') }}</label>
@@ -139,17 +142,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { filterLabelCandidates } from '../../autocomplete-utils';
-import type { PhotoIntegration } from '../../types';
+import type { PhotoIntegration, PointOfInterest } from '../../types';
 import { t } from '../../i18n';
 import { searchDSOs } from '../../search';
 import { showToast } from '../../toast';
 import { normalizeIntegrationFilterKey } from '../../batch-utils';
 import FilterInput from './FilterInput.vue';
+import PoiEditor from './PoiEditor.vue';
 import trashSvg from '../../icons/trash.svg?raw';
 
 const props = defineProps<{
   dsoIds: string[];
   labels: string[];
+  pointsOfInterest: PointOfInterest[];
   integrations: PhotoIntegration[];
   observationDate: string;
   notes: string;
@@ -161,6 +166,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:dsoIds': [string[]];
   'update:labels': [string[]];
+  'update:pointsOfInterest': [PointOfInterest[]];
   'update:integrations': [PhotoIntegration[]];
   'update:observationDate': [string];
   'update:notes': [string];

@@ -48,6 +48,20 @@ export interface PhotoIntegration {
   filter: string;
 }
 
+/** A non-DSO object captured in a photo (comet, asteroid, satellite, ISS…). */
+export interface PointOfInterest {
+  name: string;
+  categoryId: string;
+}
+
+/** A user-managed POI category (e.g. Comet, Asteroid). Stored globally, not per-photo. */
+export interface PoiCategory {
+  id: string;
+  name: string;
+  color: string;
+  position: number;
+}
+
 export interface Photo {
   id: string;
   filename: string;
@@ -59,6 +73,7 @@ export interface Photo {
   manualPlacement?: ManualPlacement; // Store manual placement params to recompute transform with current view
   dsoIds: string[];
   labels: string[];
+  pointsOfInterest: PointOfInterest[];
   integrations?: PhotoIntegration[];
   observationDate?: string | null; // UTC ISO 8601 observation start (from DATE-OBS or user input)
   notes: string;

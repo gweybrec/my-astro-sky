@@ -2731,7 +2731,9 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  /* Above the gallery meta-editor (12000) and the POI types modal (13000) so the
+     "unsaved changes" confirmation is never hidden behind them. */
+  z-index: 13100;
 }
 .dialog {
   background: var(--bg-deep);

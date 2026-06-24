@@ -1,4 +1,5 @@
-import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement, ApiErrorDetails, PhotoIntegration, AffineMatrix } from './types';
+import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement, ApiErrorDetails, PhotoIntegration, PointOfInterest, PoiCategory, AffineMatrix } from './types';
+import { poisMatchFilter } from './poi';
 import { project, toCanvas, fromCanvas, unproject, borderRadiusPU } from './projection';
 import { reportUnknownRendererError } from './error-reporter';
 import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform, affineToCSS } from './affine';
@@ -408,6 +409,8 @@ export class PhotoOverlay {
   private borderRadiusPU = Infinity; // projection-unit radius of the border circle
   private showPhotos = true; // Global toggle for all photos
   private visibleLabels: { [label: string]: boolean } = {};
+  private visiblePois: Map<string, Set<string>> | null = null;
+  private poiCategories: PoiCategory[] = [];
 
   constructor(container: HTMLDivElement, getView: () => ViewState, skyMap?: SkyMap) {
     this.container = container;
@@ -455,15 +458,32 @@ export class PhotoOverlay {
     return placed.photo.labels.some(l => this.visibleLabels[l] !== false);
   }
 
+  /** True when the photo passes the current POI filter (no filter ⇒ allowed). */
+  private isPoiAllowed(placed: PlacedPhoto): boolean {
+    return poisMatchFilter(placed.photo.pointsOfInterest ?? [], this.poiCategories, this.visiblePois);
+  }
+
   private applyPhotoVisibility() {
     for (const placed of this.placedPhotos) {
-      const shouldDisplay = this.showPhotos && placed.visible && this.isLabelAllowed(placed);
+      const shouldDisplay = this.showPhotos && placed.visible && this.isLabelAllowed(placed) && this.isPoiAllowed(placed);
       placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
     }
   }
 
   setVisibleLabels(visibleLabels: { [label: string]: boolean }) {
     this.visibleLabels = visibleLabels || {};
+    this.applyPhotoVisibility();
+  }
+
+  /** Provide the live category list so the POI filter resolves names + orphans. */
+  setPoiCategories(categories: PoiCategory[]) {
+    this.poiCategories = categories;
+    this.applyPhotoVisibility();
+  }
+
+  /** Two-level sky POI filter; an empty map (or null) disables it. */
+  setVisiblePois(selected: Map<string, Set<string>> | null) {
+    this.visiblePois = selected && selected.size > 0 ? selected : null;
     this.applyPhotoVisibility();
   }
 
@@ -1255,7 +1275,7 @@ export class PhotoOverlay {
    */
   openManualIdentifyModal(
     file: File,
-    opts?: { initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string } },
+    opts?: { initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string } },
   ): Promise<ManualIdentifyResult> {
     return new Promise<ManualIdentifyResult>((resolve) => {
       const skyMap = this.skyMap;
@@ -1341,7 +1361,7 @@ export class PhotoOverlay {
       manualBtn.addEventListener('click', () => {
         const initialMeta = opts?.initialMeta ?? {
           originalName: stripExtension(file.name),
-          dsoIds: [], labels: [], integrations: [], observationDate: null, notes: '',
+          dsoIds: [], labels: [], pointsOfInterest: [], integrations: [], observationDate: null, notes: '',
         };
         // Hand off to the free-drag placement flow (it self-saves & places the photo).
         finish({ action: 'manual-placement' });
@@ -2070,7 +2090,7 @@ export class PhotoOverlay {
   }
 
   /** Open manual placement mode: semi-transparent photo draggable on the map */
-  openManualPlacement(file: File, initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string }) {
+  openManualPlacement(file: File, initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string }) {
     const view = this.getView();
 
     // Create preview img element
@@ -2258,7 +2278,7 @@ export class PhotoOverlay {
         // Compute DSOs from placement geometry if not already provided
         let metaToUpload = initialMeta;
         if (!metaToUpload) {
-          metaToUpload = { dsoIds: [], labels: [], integrations: [], observationDate: null, notes: '' };
+          metaToUpload = { dsoIds: [], labels: [], pointsOfInterest: [], integrations: [], observationDate: null, notes: '' };
         }
         if (metaToUpload.dsoIds.length === 0) {
           const centerProj2 = project(placement.centerRa, placement.centerDec);

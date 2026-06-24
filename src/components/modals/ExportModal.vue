@@ -21,6 +21,10 @@
           {{ t('settings.exportSetups') }}
         </label>
         <label class="export-checkbox-row">
+          <input type="checkbox" v-model="includePoiCategories" @change="update" />
+          {{ t('settings.exportPoiCategories') }}
+        </label>
+        <label class="export-checkbox-row">
           <input type="checkbox" v-model="includePlans" @change="update" />
           {{ t('settings.exportPlans') }}
         </label>
@@ -89,6 +93,7 @@ const photos = computed(() => photosStore.placedPhotos.map(p => p.photo));
 const includeDso = ref(false);
 const includeGear = ref(false);
 const includeSetups = ref(false);
+const includePoiCategories = ref(false);
 const includePlans = ref(false);
 const includeShortcuts = ref(false);
 const busy = ref(false);
@@ -114,7 +119,7 @@ const sizeLabel = computed(() => {
 
 const canExport = computed(() =>
   includeDso.value || includeGear.value ||
-  includeSetups.value || includePlans.value || includeShortcuts.value || someChecked.value,
+  includeSetups.value || includePoiCategories.value || includePlans.value || includeShortcuts.value || someChecked.value,
 );
 
 function update() { /* reactivity via v-model */ }
@@ -143,6 +148,7 @@ async function onExport() {
     includeDsoOverrides: includeDso.value,
     includeCustomGear: includeGear.value,
     includeSetups: includeSetups.value,
+    includePoiCategories: includePoiCategories.value,
     includePlans: includePlans.value,
     includeShortcuts: includeShortcuts.value,
   };
