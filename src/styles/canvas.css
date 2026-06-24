@@ -229,3 +229,27 @@ input:focus-visible {
   bottom: 0;
   border-left: 1px solid var(--border-white-md);
 }
+
+/* ── Points-of-Interest chips ──────────────────────────────────────────────────
+   A POI chip is a tag-chip prefixed with a category-coloured dot. The colour comes
+   from the inline `--poi-color` custom property set per chip (category data, not a
+   design token), consumed here via the ::before pseudo-element. */
+.poi-chip::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--poi-color, var(--text-dim));
+  flex: none;
+}
+
+/* Default POI types show a type icon (asteroid/comet/satellite/ISS) instead of the
+   plain colour dot. The icon is tinted with the type colour via currentColor. */
+.poi-chip--icon::before { display: none; }
+.poi-marker {
+  display: inline-flex;
+  align-items: center;
+  color: var(--poi-color, var(--text-dim));
+  flex: none;
+}
+.poi-marker svg { width: 0.95rem; height: 0.95rem; }

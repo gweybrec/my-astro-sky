@@ -139,7 +139,42 @@ export function applyMigrations(database: Database): number {
         try { d.exec('ALTER TABLE plans ADD COLUMN lon REAL'); } catch { /* exists */ }
       },
     },
-    // Future migrations: { version: 8, run(d) { ... } },
+    {
+      // v8: Points of Interest — non-DSO objects (comets, asteroids, satellites…)
+      // tagged on photos, each referencing a user-managed category. Categories are a
+      // global entity (like gear_setups); the per-photo POIs live in a JSON column.
+      version: 8,
+      run(d) {
+        try { d.exec("ALTER TABLE photos ADD COLUMN points_of_interest TEXT NOT NULL DEFAULT '[]'"); } catch { /* exists */ }
+        d.exec(`
+          CREATE TABLE IF NOT EXISTS poi_categories (
+            id       TEXT PRIMARY KEY,
+            name     TEXT NOT NULL DEFAULT '',
+            color    TEXT NOT NULL DEFAULT '#888888',
+            position INTEGER NOT NULL DEFAULT 0
+          );
+        `);
+      },
+    },
+    {
+      // v9: add the "Supernova" default POI type (red) and recolor the ISS type to
+      // light grey, for databases that were already seeded with the original 4 types.
+      // A fresh DB has an empty poi_categories here (it is seeded afterwards in db.ts
+      // with all 5 defaults) — so skip, to avoid leaving only Supernova behind.
+      version: 9,
+      run(d) {
+        const seeded = (d.prepare('SELECT COUNT(*) AS cnt FROM poi_categories').get() as { cnt: number }).cnt > 0;
+        if (!seeded) return;
+        try {
+          d.prepare(
+            "INSERT OR IGNORE INTO poi_categories (id, name, color, position) VALUES ('cat-supernova', 'Supernova', '#ff5a5a', 4)",
+          ).run();
+        } catch { /* ignore */ }
+        // Only recolor ISS if it still has the original default colour (respect user edits).
+        try { d.prepare("UPDATE poi_categories SET color = '#cbd5e1' WHERE id = 'cat-iss' AND color = '#ff7b7b'").run(); } catch { /* ignore */ }
+      },
+    },
+    // Future migrations: { version: 10, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

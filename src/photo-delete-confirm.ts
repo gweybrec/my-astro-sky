@@ -63,6 +63,60 @@ function confirmDeleteDialog(title: string, message: string, actionLabel: string
   });
 }
 
+/**
+ * Generic "you have unsaved changes — close without saving?" confirmation.
+ * Shared by the gallery metadata editor and the POI types editor. Resolves true
+ * when the user chooses to discard.
+ */
+export function confirmUnsavedChanges(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'dialog';
+    dialog.addEventListener('click', (e) => e.stopPropagation());
+
+    const message = document.createElement('p');
+    message.className = 'dialog-message';
+    message.textContent = t('gallery.unsavedChanges');
+
+    const buttons = document.createElement('div');
+    buttons.className = 'dialog-buttons';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-cancel';
+    cancelBtn.textContent = t('gallery.cancelEdit');
+
+    const discardBtn = document.createElement('button');
+    discardBtn.type = 'button';
+    discardBtn.className = 'btn-danger';
+    discardBtn.textContent = t('gallery.closeWithoutSaving');
+
+    const cleanup = () => {
+      document.removeEventListener('keydown', onKeyDown);
+      overlay.remove();
+    };
+    const closeWith = (confirmed: boolean) => { cleanup(); resolve(confirmed); };
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); closeWith(false); } };
+
+    overlay.addEventListener('click', () => closeWith(false));
+    cancelBtn.addEventListener('click', () => closeWith(false));
+    discardBtn.addEventListener('click', () => closeWith(true));
+
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(discardBtn);
+    dialog.appendChild(message);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', onKeyDown);
+
+    requestAnimationFrame(() => cancelBtn.focus());
+  });
+}
+
 export function confirmPhotoDelete(photoName: string): Promise<boolean> {
   return confirmDeleteDialog(
     t('photos.deleteConfirmTitle'),

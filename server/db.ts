@@ -132,8 +132,8 @@ db.exec(`
 `);
 
 const insertPhoto = db.prepare(
-  `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, notes, integrations, display_order, thumb_filename, observation_date)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`
+  `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`
 );
 const insertCorrespondence = db.prepare(
   'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -173,6 +173,35 @@ function sanitizeIntegrationRows(rows: any): IntegrationInput[] {
     .filter((entry) => entry.frames >= 1 && entry.seconds >= 1 && entry.filter.length > 0);
 }
 
+export interface PointOfInterestInput {
+  name: string;
+  categoryId: string;
+}
+
+/**
+ * Accept only well-formed POI entries: a non-empty trimmed name (≤100 chars) and a
+ * string categoryId. Orphan categoryIds (category since deleted) are preserved — the
+ * UI resolves them to an "Uncategorized" group at render time.
+ */
+export function sanitizePois(rows: any): PointOfInterestInput[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((entry: any) => ({
+      name: typeof entry?.name === 'string' ? entry.name.trim().slice(0, 100) : '',
+      categoryId: typeof entry?.categoryId === 'string' ? entry.categoryId.slice(0, 64) : '',
+    }))
+    .filter((entry) => entry.name.length > 0 && entry.categoryId.length > 0);
+}
+
+function parsePois(val: any): PointOfInterestInput[] {
+  if (!val) return [];
+  try {
+    return sanitizePois(JSON.parse(val));
+  } catch {
+    return [];
+  }
+}
+
 export function createPhoto(
   id: string,
   filename: string,
@@ -187,6 +216,7 @@ export function createPhoto(
   integrations?: IntegrationInput[],
   thumbFilename?: string | null,
   observationDate?: string | null,
+  pointsOfInterest?: PointOfInterestInput[],
 ) {
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
   const run = db.transaction(() => {
@@ -195,6 +225,7 @@ export function createPhoto(
       manualPlacement ?? null,
       JSON.stringify(dsoIds ?? []),
       JSON.stringify(labels ?? []),
+      JSON.stringify(sanitizePois(pointsOfInterest ?? [])),
       notes ?? '',
       JSON.stringify(sanitizedIntegrations),
       thumbFilename ?? null,
@@ -221,6 +252,7 @@ export function getAllPhotos() {
     ...(p.manual_placement ? { manualPlacement: JSON.parse(p.manual_placement) } : {}),
     dsoIds: parseJsonArray(p.dso_ids),
     labels: parseJsonArray(p.labels),
+    pointsOfInterest: parsePois(p.points_of_interest),
     notes: p.notes ?? '',
     integrations: parseIntegrationRows(p.integrations),
     observationDate: p.observation_date ?? null,
@@ -282,11 +314,11 @@ function parseIntegrationRows(val: any): IntegrationInput[] {
 }
 
 const updatePhotoMetadataStmt = db.prepare(
-  'UPDATE photos SET dso_ids = ?, labels = ?, notes = ?, integrations = ?, observation_date = ? WHERE id = ?'
+  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ? WHERE id = ?'
 );
 
 const updatePhotoMetadataWithNameStmt = db.prepare(
-  'UPDATE photos SET dso_ids = ?, labels = ?, notes = ?, integrations = ?, observation_date = ?, original_name = ? WHERE id = ?'
+  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, original_name = ? WHERE id = ?'
 );
 
 export function updatePhotoMetadata(
@@ -297,8 +329,10 @@ export function updatePhotoMetadata(
   originalName?: string,
   integrations?: IntegrationInput[],
   observationDate?: string | null,
+  pointsOfInterest?: PointOfInterestInput[],
 ): boolean {
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
+  const pois = JSON.stringify(sanitizePois(pointsOfInterest ?? []));
   const obsDate = typeof observationDate === 'string' && observationDate.length > 0
     ? observationDate.slice(0, 50)
     : null;
@@ -306,6 +340,7 @@ export function updatePhotoMetadata(
     const result = updatePhotoMetadataWithNameStmt.run(
       JSON.stringify(dsoIds),
       JSON.stringify(labels),
+      pois,
       notes,
       JSON.stringify(sanitizedIntegrations),
       obsDate,
@@ -317,6 +352,7 @@ export function updatePhotoMetadata(
   const result = updatePhotoMetadataStmt.run(
     JSON.stringify(dsoIds),
     JSON.stringify(labels),
+    pois,
     notes,
     JSON.stringify(sanitizedIntegrations),
     obsDate,
@@ -326,8 +362,8 @@ export function updatePhotoMetadata(
 }
 
 const insertPhotoWithId = db.prepare(
-  `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, notes, integrations, display_order, thumb_filename, observation_date)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`
+  `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`
 );
 const deletePhotoForReplace = db.prepare('DELETE FROM photos WHERE id = ?');
 
@@ -353,6 +389,7 @@ export function createPhotoWithId(
   integrations?: IntegrationInput[],
   thumbFilename?: string | null,
   observationDate?: string | null,
+  pointsOfInterest?: PointOfInterestInput[],
 ): 'imported' | 'skipped' {
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
   const run = db.transaction(() => {
@@ -365,6 +402,7 @@ export function createPhotoWithId(
       manualPlacement ?? null,
       JSON.stringify(dsoIds ?? []),
       JSON.stringify(labels ?? []),
+      JSON.stringify(sanitizePois(pointsOfInterest ?? [])),
       notes ?? '',
       JSON.stringify(sanitizedIntegrations),
       thumbFilename ?? null,
@@ -606,6 +644,56 @@ export function deleteGearSetup(id: string): boolean {
 
 export function deleteAllGearSetups(): number {
   return deleteAllGearSetupsStmt.run().changes;
+}
+
+// ─── Points of Interest categories ────────────────────────────────────────────
+
+export interface PoiCategoryRow {
+  id: string;
+  name: string;
+  color: string;
+  position: number;
+}
+
+const getAllPoiCategoriesStmt    = db.prepare('SELECT * FROM poi_categories ORDER BY position ASC, rowid ASC');
+const upsertPoiCategoryStmt      = db.prepare(
+  'INSERT OR REPLACE INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)',
+);
+const deletePoiCategoryStmt      = db.prepare('DELETE FROM poi_categories WHERE id = ?');
+const deleteAllPoiCategoriesStmt = db.prepare('DELETE FROM poi_categories');
+const countPoiCategoriesStmt     = db.prepare('SELECT COUNT(*) AS cnt FROM poi_categories');
+
+export function getAllPoiCategories(): PoiCategoryRow[] {
+  return getAllPoiCategoriesStmt.all() as PoiCategoryRow[];
+}
+
+export function upsertPoiCategory(row: PoiCategoryRow): void {
+  upsertPoiCategoryStmt.run(row.id, row.name.slice(0, 60), row.color.slice(0, 32), row.position);
+}
+
+export function deletePoiCategory(id: string): boolean {
+  return deletePoiCategoryStmt.run(id).changes > 0;
+}
+
+export function deleteAllPoiCategories(): number {
+  return deleteAllPoiCategoriesStmt.run().changes;
+}
+
+// Seed a few sensible default categories on first run (empty table only). They are
+// fully editable/deletable afterwards — this just gives the user a starting point.
+{
+  const cnt = (countPoiCategoriesStmt.get() as { cnt: number }).cnt;
+  if (cnt === 0) {
+    const defaults: PoiCategoryRow[] = [
+      { id: 'cat-comet',     name: 'Comet',     color: '#4ea1ff', position: 0 },
+      { id: 'cat-asteroid',  name: 'Asteroid',  color: '#c9a227', position: 1 },
+      { id: 'cat-satellite', name: 'Satellite', color: '#7bd88f', position: 2 },
+      { id: 'cat-iss',       name: 'ISS',       color: '#cbd5e1', position: 3 },
+      { id: 'cat-supernova', name: 'Supernova', color: '#ff5a5a', position: 4 },
+    ];
+    const seed = db.transaction(() => { for (const c of defaults) upsertPoiCategory(c); });
+    seed();
+  }
 }
 
 // ─── Night plans ────────────────────────────────────────────────────────────

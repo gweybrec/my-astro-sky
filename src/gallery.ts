@@ -1,10 +1,12 @@
-import type { Photo } from './types';
+import type { Photo, PoiCategory } from './types';
 import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
-import { confirmPhotoDelete } from './photo-delete-confirm';
+import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
 import { createLazyObserver } from './lazy-image';
 import { getDSOById } from './dso-catalog';
 import { createImageZoomPan } from './image-zoom';
+import { buildPoiFilterGroups, poisMatchFilter, type PoiFilterGroup } from './poi';
+import { poiTypeIcon } from './poi-icons';
 
 /**
  * Smart sorting for astronomical catalog names
@@ -56,54 +58,6 @@ export function smartSortPhotos(photos: Photo[]): Photo[] {
   });
 }
 
-function confirmUnsavedChanges(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'dialog-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'dialog';
-    dialog.addEventListener('click', (e) => e.stopPropagation());
-
-    const message = document.createElement('p');
-    message.className = 'dialog-message';
-    message.textContent = t('gallery.unsavedChanges');
-
-    const buttons = document.createElement('div');
-    buttons.className = 'dialog-buttons';
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'btn-cancel';
-    cancelBtn.textContent = t('gallery.cancelEdit');
-
-    const discardBtn = document.createElement('button');
-    discardBtn.type = 'button';
-    discardBtn.className = 'btn-danger';
-    discardBtn.textContent = t('gallery.closeWithoutSaving');
-
-    const cleanup = () => {
-      document.removeEventListener('keydown', onKeyDown);
-      overlay.remove();
-    };
-    const closeWith = (confirmed: boolean) => { cleanup(); resolve(confirmed); };
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); closeWith(false); } };
-
-    overlay.addEventListener('click', () => closeWith(false));
-    cancelBtn.addEventListener('click', () => closeWith(false));
-    discardBtn.addEventListener('click', () => closeWith(true));
-
-    buttons.appendChild(cancelBtn);
-    buttons.appendChild(discardBtn);
-    dialog.appendChild(message);
-    dialog.appendChild(buttons);
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
-    document.addEventListener('keydown', onKeyDown);
-
-    requestAnimationFrame(() => cancelBtn.focus());
-  });
-}
 
 export class Gallery {
   private container: HTMLElement;
@@ -115,6 +69,10 @@ export class Gallery {
   private filterByDSOCatalogs: string[] | null = null;
   private filterByLabels: string[] | null = null;
   private knownLabels = new Set<string>();
+  // Two-level POI filter: categoryId → set of selected names (empty set ⇒ whole
+  // category). null ⇒ no POI filter (every photo passes).
+  private filterByPois: Map<string, Set<string>> | null = null;
+  private poiCategories: PoiCategory[] = [];
   private searchQuery: string = '';
   private lazyObserver: IntersectionObserver;
   private carouselTimer: ReturnType<typeof setInterval> | null = null;
@@ -170,6 +128,23 @@ export class Gallery {
     this.applyFilters();
   }
 
+  /** Provide the live category list so POI chips/filters resolve names + orphans. */
+  setPoiCategories(categories: PoiCategory[]) {
+    this.poiCategories = categories;
+    this.applyFilters();
+  }
+
+  /** Two-level POI filter; an empty map (or null) disables it. */
+  setPoiFilter(selected: Map<string, Set<string>> | null) {
+    this.filterByPois = selected && selected.size > 0 ? selected : null;
+    this.applyFilters();
+  }
+
+  /** POI filter groups (category → distinct names with per-photo counts). */
+  getAllPois(): PoiFilterGroup[] {
+    return buildPoiFilterGroups(this.photos.map(p => p.pointsOfInterest ?? []), this.poiCategories);
+  }
+
   /** The photos currently passing the active filters, in display (smart-sorted) order. */
   getFilteredPhotos(): Photo[] {
     return [...this.filteredPhotos];
@@ -196,6 +171,7 @@ export class Gallery {
         photo.originalName.toLowerCase().includes(q) ||
         photo.dsoIds.some(id => id.toLowerCase().includes(q)) ||
         photo.labels.some(l => l.toLowerCase().includes(q)) ||
+        (photo.pointsOfInterest ?? []).some(p => p.name.toLowerCase().includes(q)) ||
         photo.notes.toLowerCase().includes(q)
       );
     }
@@ -256,13 +232,36 @@ export class Gallery {
       );
     }
 
+    // Two-level POI filter — only photos with ≥1 selected POI pass (positive selection).
+    if (this.filterByPois) {
+      filtered = filtered.filter(photo =>
+        poisMatchFilter(photo.pointsOfInterest ?? [], this.poiCategories, this.filterByPois)
+      );
+    }
+
     this.filteredPhotos = filtered;
     this.renderMosaic();
   }
 
-  private buildChips(dsoIds: string[], labels: string[]): HTMLElement {
+  private buildChips(dsoIds: string[], labels: string[], pois: import('./types').PointOfInterest[] = []): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'gallery-item-chips';
+    for (const poi of pois) {
+      const cat = this.poiCategories.find(c => c.id === poi.categoryId);
+      const icon = poiTypeIcon(poi.categoryId);
+      const chip = document.createElement('span');
+      chip.className = icon ? 'tag-chip poi-chip poi-chip--icon' : 'tag-chip poi-chip';
+      chip.style.setProperty('--poi-color', cat?.color ?? '#888888');
+      if (cat) chip.title = cat.name;
+      if (icon) {
+        const marker = document.createElement('span');
+        marker.className = 'poi-marker';
+        marker.innerHTML = icon;
+        chip.appendChild(marker);
+      }
+      chip.appendChild(document.createTextNode(poi.name));
+      wrap.appendChild(chip);
+    }
     for (const label of labels) {
       const chip = document.createElement('span');
       chip.className = 'tag-chip label-chip';
@@ -349,7 +348,7 @@ export class Gallery {
       caption.appendChild(nameEl);
 
       if (photo.dsoIds.length > 0 || photo.labels.length > 0) {
-        caption.appendChild(this.buildChips(photo.dsoIds, photo.labels));
+        caption.appendChild(this.buildChips(photo.dsoIds, photo.labels, photo.pointsOfInterest ?? []));
       }
 
       item.appendChild(img);

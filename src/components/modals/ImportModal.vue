@@ -30,11 +30,15 @@
         </div>
 
         <!-- Global toggles (no per-item selection) -->
-        <div v-if="preview.hasDsoOverrides || preview.hasShortcuts">
+        <div v-if="preview.hasDsoOverrides || preview.hasPoiCategories || preview.hasShortcuts">
           <div class="export-options-label">{{ t('settings.importContent') }}</div>
           <label v-if="preview.hasDsoOverrides" class="export-checkbox-row">
             <input type="checkbox" v-model="importDso" />
             {{ t('settings.importDsoOverridesLabel') }}
+          </label>
+          <label v-if="preview.hasPoiCategories" class="export-checkbox-row">
+            <input type="checkbox" v-model="importPoiCategories" />
+            {{ t('settings.importPoiCategoriesLabel') }}
           </label>
           <label v-if="preview.hasShortcuts" class="export-checkbox-row">
             <input type="checkbox" v-model="importShortcuts" />
@@ -153,6 +157,7 @@ import { t } from '../../i18n';
 import { usePhotosStore } from '../../stores/photos';
 import { useCanvasStore } from '../../stores/canvas';
 import { useShortcutsStore } from '../../stores/shortcuts';
+import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import { importPreview, importData, exportData, getPhotos } from '../../api';
 import type { ImportPreviewResult } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
@@ -164,6 +169,7 @@ const emit = defineEmits<{ close: [] }>();
 const photosStore = usePhotosStore();
 const canvasStore = useCanvasStore();
 const shortcutsStore = useShortcutsStore();
+const poiCategoriesStore = usePoiCategoriesStore();
 const hasPhotos = computed(() => photosStore.placedPhotos.length > 0);
 
 const phase = ref<'pick' | 'options'>('pick');
@@ -175,6 +181,7 @@ const importBusy = ref(false);
 const backingUp = ref(false);
 
 const importDso = ref(true);
+const importPoiCategories = ref(true);
 const importShortcuts = ref(true);
 
 /**
@@ -223,6 +230,7 @@ const canImport = computed(() => {
   return (
     imgSel.some || planSel.some || setupSel.some || gearSel.some ||
     (preview.value.hasDsoOverrides && importDso.value) ||
+    (preview.value.hasPoiCategories && importPoiCategories.value) ||
     (preview.value.hasShortcuts && importShortcuts.value)
   );
 });
@@ -289,6 +297,7 @@ async function onImport() {
       // Photo metadata always travels with the photos that get imported.
       importMetadata: preview.value.hasMetadata,
       importDsoOverrides: preview.value.hasDsoOverrides && importDso.value,
+      importPoiCategories: preview.value.hasPoiCategories && importPoiCategories.value,
       selectedImages: hasImages ? Array.from(imgSel.selected) : null,
       selectedPlans: Array.from(planSel.selected),
       selectedSetups: Array.from(setupSel.selected),
@@ -316,6 +325,11 @@ async function onImport() {
       if (gallery) gallery.loadPhotos(photos);
       photosStore.syncFromOverlay();
     } catch { /* non-fatal — user can refresh manually */ }
+
+    // Refresh POI categories if they were part of the bundle.
+    if (preview.value?.hasPoiCategories && importPoiCategories.value) {
+      try { await poiCategoriesStore.load(); } catch { /* ignore */ }
+    }
 
     if (result.dsoOverridesImported) {
       const dsoMsg = t('settings.importedDsoOverrides').replace('{n}', String(result.dsoOverridesImported));

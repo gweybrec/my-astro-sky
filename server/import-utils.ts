@@ -19,6 +19,7 @@ export interface ZipInspectResult {
   hasDsoOverrides: boolean;
   hasCustomGear: boolean;
   hasSetups: boolean;
+  hasPoiCategories: boolean;
   hasPlans: boolean;
   /** Individual night plans in plans.json (id + name), for per-item import selection. */
   planItems: Array<{ id: string; name: string }>;
@@ -70,6 +71,7 @@ export interface ImportPreviewResponse {
   hasDsoOverrides: boolean;
   hasCustomGear: boolean;
   hasSetups: boolean;
+  hasPoiCategories: boolean;
   hasPlans: boolean;
   hasShortcuts: boolean;
   shortcuts?: unknown;
@@ -104,6 +106,7 @@ export function buildZipPreviewResponse(
     hasDsoOverrides: inspect.hasDsoOverrides,
     hasCustomGear: inspect.hasCustomGear,
     hasSetups: inspect.hasSetups,
+    hasPoiCategories: inspect.hasPoiCategories,
     hasPlans: inspect.hasPlans,
     hasShortcuts: extra.hasShortcuts,
     shortcuts: extra.shortcuts,
@@ -139,6 +142,7 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
     hasDsoOverrides: false,
     hasCustomGear: false,
     hasSetups: false,
+    hasPoiCategories: false,
     hasPlans: false,
     planItems: [],
     setupItems: [],
@@ -184,6 +188,11 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
             }
           }
         }
+      } catch { /* ignore */ }
+    } else if (entry.path === 'poi-categories.json') {
+      try {
+        const cats = JSON.parse((await entry.buffer()).toString('utf8'));
+        if (Array.isArray(cats) && cats.length > 0) result.hasPoiCategories = true;
       } catch { /* ignore */ }
     } else if (entry.path === 'plans.json') {
       try {

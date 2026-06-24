@@ -54,6 +54,13 @@
       </DropdownPanel>
     </div>
 
+    <!-- Points of Interest dropdown (two-level: category → POI name) -->
+    <PoiFilterDropdown
+      :groups="poiGroups"
+      :selected="selectedPois"
+      @update:selected="onPoiUpdate"
+    />
+
     <!-- DSO types dropdown -->
     <div class="display-controls-mag-row">
       <button
@@ -141,6 +148,9 @@ import { useI18n } from '../../composables/useI18n';
 import { DSO_TYPES_ALL } from '../../display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import DropdownPanel from '../base/DropdownPanel.vue';
+import PoiFilterDropdown from './PoiFilterDropdown.vue';
+import { usePoiCategoriesStore } from '../../stores/poi-categories';
+import { buildPoiFilterGroups, type PoiFilterGroup } from '../../poi';
 import { showToast } from '../../toast';
 import { downloadBlob } from '../../file-utils';
 import { renderGalleryPdf } from '../../export-render';
@@ -150,8 +160,22 @@ import exportSvg from '../../icons/export.svg?raw';
 const { t } = useI18n();
 const uiStore = useUiStore();
 const canvasStore = useCanvasStore();
+const poiCategoriesStore = usePoiCategoriesStore();
 
 const viewMode = computed(() => uiStore.currentViewMode);
+
+// ── Points of Interest (two-level) ─────────────────────────────────────────────
+const poiGroups = ref<PoiFilterGroup[]>([]);
+const selectedPois = ref<Map<string, Set<string>>>(new Map());
+
+function refreshPois() {
+  poiGroups.value = canvasStore.gallery?.getAllPois() ?? [];
+}
+
+function onPoiUpdate(next: Map<string, Set<string>>) {
+  selectedPois.value = next;
+  canvasStore.gallery?.setPoiFilter(next.size > 0 ? next : null);
+}
 
 // ── Search ────────────────────────────────────────────────────────────────────
 const searchInputEl = ref<HTMLInputElement>();
@@ -323,6 +347,8 @@ watch(viewMode, (mode) => {
     selectedTypes.value = [...DSO_TYPES_ALL];
     selectedCatalogs.value = [...DSO_CATALOGS_ALL];
     refreshLabels();
+    poiCategoriesStore.ensureLoaded();
+    refreshPois();
     return;
   }
   searchQuery.value = '';
@@ -330,6 +356,7 @@ watch(viewMode, (mode) => {
   labelsInitialized.value = false;
   selectedTypes.value = [];
   selectedCatalogs.value = [];
+  selectedPois.value = new Map();
   labelOpen.value = false;
   typeOpen.value = false;
   catalogOpen.value = false;
@@ -337,5 +364,6 @@ watch(viewMode, (mode) => {
   canvasStore.gallery?.setLabelFilter(null);
   canvasStore.gallery?.setDSOTypeFilter([]);
   canvasStore.gallery?.setDSOCatalogFilter([]);
+  canvasStore.gallery?.setPoiFilter(null);
 });
 </script>

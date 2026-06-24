@@ -78,7 +78,7 @@ import DataCreditsModal from './components/modals/DataCreditsModal.vue';
 import UpdateAvailableModal from './components/modals/UpdateAvailableModal.vue';
 import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue';
 
-type ModalName = 'settings' | 'solverSettings' | 'export' | 'import' | 'deleteAll' | 'batchUpload' | 'about' | 'privacy' | 'credits' | 'update' | 'shortcuts';
+type ModalName ='settings' | 'solverSettings' | 'export' | 'import' | 'deleteAll' | 'batchUpload' | 'about' | 'privacy' | 'credits' | 'update' | 'shortcuts';
 
 const activeModal = ref<ModalName | null>(null);
 const previousModal = ref<ModalName | null>(null);

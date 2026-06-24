@@ -1,4 +1,4 @@
-import type { Photo, PhotoCorrespondence, PhotoIntegration } from './types';
+import type { Photo, PhotoCorrespondence, PhotoIntegration, PointOfInterest } from './types';
 import type { BatchItem } from './batch-types';
 import { sanitizeIntegrationRows } from './batch-utils';
 
@@ -10,6 +10,7 @@ type UploadFn = (
   metadata?: {
     dsoIds?: string[];
     labels?: string[];
+    pointsOfInterest?: PointOfInterest[];
     integrations?: PhotoIntegration[];
     notes?: string;
     displayName?: string;
@@ -30,6 +31,7 @@ export async function placeBatchItem(
     const photo = await uploadFn(item.file, item.solveCorrespondences!, undefined, undefined, {
       dsoIds: item.dsoIds,
       labels: [...new Set([...item.labels, ...batchLabels])],
+      pointsOfInterest: item.pointsOfInterest,
       integrations: sanitizeIntegrationRows(item.integrations),
       observationDate: item.observationDate || null,
       notes: item.notes,

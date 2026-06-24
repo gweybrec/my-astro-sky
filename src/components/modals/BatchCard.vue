@@ -147,6 +147,7 @@
           v-model:displayName="item.customName"
           v-model:dsoIds="item.dsoIds"
           v-model:labels="item.labels"
+          v-model:pointsOfInterest="item.pointsOfInterest"
           v-model:integrations="item.integrations"
           v-model:observationDate="item.observationDate"
           v-model:notes="item.notes"
@@ -154,6 +155,7 @@
           @update:displayName="scheduleMetaSave"
           @update:dsoIds="scheduleMetaSave"
           @update:labels="scheduleMetaSave"
+          @update:pointsOfInterest="scheduleMetaSave"
           @update:integrations="scheduleMetaSave"
           @update:observationDate="scheduleMetaSave"
           @update:notes="scheduleMetaSave"
@@ -328,6 +330,7 @@ async function openManual() {
         originalName: props.item.customName || undefined,
         dsoIds: props.item.dsoIds,
         labels: props.item.labels,
+        pointsOfInterest: props.item.pointsOfInterest,
         integrations: props.item.integrations,
         observationDate: props.item.observationDate || null,
         notes: props.item.notes,
@@ -440,6 +443,7 @@ async function flushMetaSave() {
   const payload = {
     dsoIds: [...props.item.dsoIds],
     labels: [...props.item.labels],
+    pointsOfInterest: props.item.pointsOfInterest.map(p => ({ ...p })),
     integrations: sanitizeIntegrationRows(props.item.integrations),
     observationDate: props.item.observationDate || null,
     notes: props.item.notes,

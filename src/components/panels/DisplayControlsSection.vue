@@ -6,6 +6,9 @@
     <!-- Labels dropdown (must be first after show-photos, per original DOM insertion order) -->
     <LabelsDropdown />
 
+    <!-- Points of Interest filter (two-level: category → POI name) -->
+    <SkyPoiDropdown />
+
     <!-- Show DSOs -->
     <CheckRow :label="t('dso.showDSOs')" :model-value="displayStore.showDSOs" @update:model-value="displayStore.setShowDSOs($event)" />
 
@@ -259,6 +262,7 @@ import SliderRow from '../base/SliderRow.vue';
 import CheckRow from '../base/CheckRow.vue';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import LabelsDropdown from './LabelsDropdown.vue';
+import SkyPoiDropdown from './SkyPoiDropdown.vue';
 import { useDisplayStore } from '../../stores/display';
 import { useFisheyeStore } from '../../stores/fisheye';
 import { useI18n } from '../../composables/useI18n';

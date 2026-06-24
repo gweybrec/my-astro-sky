@@ -16,6 +16,7 @@ import { useCanvasStore } from './stores/canvas';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
 import { useFovFramesStore } from './stores/fov-frames';
+import { usePoiCategoriesStore } from './stores/poi-categories';
 import { showToast } from './toast';
 import { getLang, t } from './i18n';
 import { reportRendererError, reportUnknownRendererError } from './error-reporter';
@@ -172,6 +173,17 @@ async function init() {
 
   // Mount Vue app after setupUI so modal callbacks are wired.
   mountVueApp(skyMap, overlay);
+
+  // Load user-managed POI categories (shared by editors and filters). Push them into
+  // the overlay + gallery so POI chips and filters resolve names/colours, and re-push
+  // whenever the categories change (create/edit/delete).
+  const poiCategoriesStore = usePoiCategoriesStore(pinia);
+  const pushPoiCategories = () => {
+    overlay.setPoiCategories(poiCategoriesStore.categories);
+    gallery.setPoiCategories(poiCategoriesStore.categories);
+  };
+  poiCategoriesStore.$subscribe(pushPoiCategories);
+  poiCategoriesStore.load().then(pushPoiCategories);
 
   // Load existing photos from backend
   try {

@@ -1,4 +1,4 @@
-import type { Photo, PhotoCorrespondence, PlateSolveResult, AstrometrySolveStatus, ManualPlacement, ApiErrorDetails, DSOUserOverride, PhotoIntegration } from './types';
+import type { Photo, PhotoCorrespondence, PlateSolveResult, AstrometrySolveStatus, ManualPlacement, ApiErrorDetails, DSOUserOverride, PhotoIntegration, PointOfInterest, PoiCategory } from './types';
 import { t, getLang } from './i18n';
 import { reportRendererError } from './error-reporter';
 import { downloadBlob } from './file-utils';
@@ -79,7 +79,7 @@ export function uploadPhoto(
   correspondences: PhotoCorrespondence[],
   manualPlacement?: ManualPlacement,
   onProgress?: (fraction: number) => void,
-  metadata?: { dsoIds?: string[]; labels?: string[]; integrations?: PhotoIntegration[]; notes?: string; displayName?: string; observationDate?: string | null },
+  metadata?: { dsoIds?: string[]; labels?: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; notes?: string; displayName?: string; observationDate?: string | null },
 ): Promise<Photo> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
@@ -90,6 +90,7 @@ export function uploadPhoto(
     }
     if (metadata?.dsoIds) formData.append('dsoIds', JSON.stringify(metadata.dsoIds));
     if (metadata?.labels) formData.append('labels', JSON.stringify(metadata.labels));
+    if (metadata?.pointsOfInterest) formData.append('pointsOfInterest', JSON.stringify(metadata.pointsOfInterest));
     if (metadata?.integrations) formData.append('integrations', JSON.stringify(metadata.integrations));
     if (metadata?.notes !== undefined) formData.append('notes', metadata.notes);
     if (metadata?.displayName) formData.append('displayName', metadata.displayName);
@@ -153,7 +154,7 @@ export async function updatePhotoManualPlacement(
 
 export async function updatePhotoMetadata(
   photoId: string,
-  metadata: { dsoIds: string[]; labels: string[]; integrations?: PhotoIntegration[]; notes: string; originalName?: string; observationDate?: string | null },
+  metadata: { dsoIds: string[]; labels: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; notes: string; originalName?: string; observationDate?: string | null },
 ): Promise<void> {
   const res = await fetch(`/api/photos/${photoId}/metadata`, {
     method: 'PATCH',
@@ -407,6 +408,7 @@ export interface ExportOptions {
   includeSetups?: boolean;
   includePlans?: boolean;
   includeShortcuts?: boolean;
+  includePoiCategories?: boolean;
 }
 
 /**
@@ -468,6 +470,7 @@ export interface ImportPreviewResult {
   hasDsoOverrides: boolean;
   hasCustomGear: boolean;
   hasSetups: boolean;
+  hasPoiCategories: boolean;
   hasPlans: boolean;
   hasShortcuts: boolean;
   /** Parsed shortcuts.json content, applied client-side to localStorage on import. */
@@ -499,6 +502,7 @@ export interface ImportResult {
 export interface ImportOptions {
   importMetadata: boolean;
   importDsoOverrides: boolean;
+  importPoiCategories?: boolean;
   /** null means no image filtering (metadata-only import). */
   selectedImages: string[] | null;
   /** ids of plans to import (name-collisions are replaced); null/empty ⇒ none. */
@@ -515,6 +519,7 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
   fd.append('bundle', file);
   if (opts.importMetadata) fd.append('importMetadata', '1');
   if (opts.importDsoOverrides) fd.append('importDsoOverrides', '1');
+  if (opts.importPoiCategories) fd.append('importPoiCategories', '1');
   if (opts.selectedImages !== null) fd.append('selectedImages', JSON.stringify(opts.selectedImages));
   if (opts.selectedPlans !== null) fd.append('selectedPlans', JSON.stringify(opts.selectedPlans));
   if (opts.selectedSetups !== null) fd.append('selectedSetups', JSON.stringify(opts.selectedSetups));
@@ -747,6 +752,50 @@ export async function deleteAllGearSetupsAPI(): Promise<void> {
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to delete all gear setups');
+  }
+}
+
+// ─── Points of Interest categories ───────────────────────────────────────────
+
+export async function getPoiCategories(): Promise<PoiCategory[]> {
+  const res = await fetch('/api/poi-categories');
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to load POI categories');
+  }
+  return res.json();
+}
+
+export async function createPoiCategory(data: { name: string; color: string }): Promise<{ id: string }> {
+  const res = await fetch('/api/poi-categories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to create POI category');
+  }
+  return res.json();
+}
+
+export async function updatePoiCategory(id: string, data: Partial<{ name: string; color: string; position: number }>): Promise<void> {
+  const res = await fetch(`/api/poi-categories/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update POI category');
+  }
+}
+
+export async function deletePoiCategoryAPI(id: string): Promise<void> {
+  const res = await fetch(`/api/poi-categories/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to delete POI category');
   }
 }
 

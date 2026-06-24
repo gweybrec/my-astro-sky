@@ -1,10 +1,11 @@
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
-import type { Photo, PhotoIntegration } from './types';
+import type { Photo, PhotoIntegration, PointOfInterest } from './types';
 import { updatePhotoMetadata } from './api';
 import { showToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
+import { pinia } from './pinia-instance';
 
 const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];
 
@@ -42,6 +43,7 @@ export function buildMetadataEditorPanel(
     displayName: photo.originalName,
     dsoIds: [...photo.dsoIds],
     labels: [...photo.labels],
+    pointsOfInterest: (photo.pointsOfInterest ?? []).map(p => ({ ...p })),
     integrations: sanitizeIntegrations(photo.integrations ?? []),
     observationDate: photo.observationDate ?? '',
     notes: photo.notes ?? '',
@@ -51,6 +53,7 @@ export function buildMetadataEditorPanel(
     displayName: original.displayName,
     dsoIds: [...original.dsoIds],
     labels: [...original.labels],
+    pointsOfInterest: original.pointsOfInterest.map(p => ({ ...p })),
     integrations: original.integrations.map(r => ({ ...r })),
     observationDate: original.observationDate,
     notes: original.notes,
@@ -62,6 +65,8 @@ export function buildMetadataEditorPanel(
     if (state.notes !== original.notes) return true;
     if (state.dsoIds.length !== original.dsoIds.length || state.dsoIds.some((v, i) => v !== original.dsoIds[i])) return true;
     if (state.labels.length !== original.labels.length || state.labels.some((v, i) => v !== original.labels[i])) return true;
+    if (state.pointsOfInterest.length !== original.pointsOfInterest.length
+      || state.pointsOfInterest.some((v, i) => v.name !== original.pointsOfInterest[i].name || v.categoryId !== original.pointsOfInterest[i].categoryId)) return true;
     if (state.integrations.length !== original.integrations.length) return true;
     for (let i = 0; i < state.integrations.length; i++) {
       const a = state.integrations[i], b = original.integrations[i];
@@ -92,6 +97,7 @@ export function buildMetadataEditorPanel(
       displayName: state.displayName,
       dsoIds: state.dsoIds,
       labels: state.labels,
+      pointsOfInterest: state.pointsOfInterest,
       integrations: state.integrations,
       observationDate: state.observationDate,
       notes: state.notes,
@@ -100,11 +106,15 @@ export function buildMetadataEditorPanel(
       'onUpdate:displayName': (v: string) => { state.displayName = v; },
       'onUpdate:dsoIds': (v: string[]) => { state.dsoIds = v; },
       'onUpdate:labels': (v: string[]) => { state.labels = v; },
+      'onUpdate:pointsOfInterest': (v: PointOfInterest[]) => { state.pointsOfInterest = v; },
       'onUpdate:integrations': (v: PhotoIntegration[]) => { state.integrations = v; },
       'onUpdate:observationDate': (v: string) => { state.observationDate = v; },
       'onUpdate:notes': (v: string) => { state.notes = v; },
     }),
   });
+  // PoiEditor (inside MetadataEditorPanel) reads the POI-categories / ui Pinia stores,
+  // so this imperatively-mounted app needs the shared pinia instance installed.
+  app.use(pinia);
   app.mount(panelEl);
 
   // ── Buttons (imperative DOM so gallery.ts can query and move them) ────────────
@@ -131,6 +141,7 @@ export function buildMetadataEditorPanel(
       await updatePhotoMetadata(photo.id, {
         dsoIds: state.dsoIds,
         labels: state.labels,
+        pointsOfInterest: state.pointsOfInterest,
         integrations: sanitizedIntegrations,
         observationDate: resolvedObsDate,
         notes: state.notes,
@@ -140,6 +151,7 @@ export function buildMetadataEditorPanel(
         ...photo,
         dsoIds: state.dsoIds,
         labels: state.labels,
+        pointsOfInterest: state.pointsOfInterest,
         integrations: sanitizedIntegrations,
         observationDate: resolvedObsDate,
         notes: state.notes,
