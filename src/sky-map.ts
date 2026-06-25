@@ -17,6 +17,7 @@ import {
 } from './fov-frame-geometry';
 import pinSvgRaw from './icons/pin.svg?raw';
 import { computeFovTargetScale } from './gear-presets';
+import { SKY_THEME, applyStarColor } from './sky-themes';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -237,39 +238,44 @@ function bvToRgb(bv: number): [number, number, number] {
 
   let r: number, g: number, b: number;
 
-  if (bv < 0) {
-    const t = (bv + 0.4) / 0.4;
-    r = 0.61 + 0.39 * t;
-    g = 0.70 + 0.30 * t;
+  if (bv < 0.4) {
+    // Hot stars: neutral white at the white point (B-V ≈ 0.4), increasingly
+    // blue toward B-V = -0.4. This makes B/A-type stars (Rigel, Vega) read as
+    // proper blue-white instead of pure white.
+    const t = (0.4 - bv) / 0.8; // 0 at bv=0.4, 1 at bv=-0.4
+    r = 1.0 - 0.45 * t;
+    g = 1.0 - 0.17 * t;
     b = 1.0;
-  } else if (bv < 0.4) {
-    const t = bv / 0.4;
-    r = 1.0;
-    g = 1.0 - 0.08 * t;
-    b = 1.0 - 0.22 * t;
   } else if (bv < 0.8) {
     const t = (bv - 0.4) / 0.4;
     r = 1.0;
-    g = 0.92 - 0.14 * t;
-    b = 0.78 - 0.26 * t;
+    g = 1.0 - 0.12 * t;
+    b = 1.0 - 0.32 * t;
   } else if (bv < 1.2) {
     const t = (bv - 0.8) / 0.4;
     r = 1.0;
-    g = 0.78 - 0.11 * t;
-    b = 0.52 - 0.12 * t;
+    g = 0.88 - 0.13 * t;
+    b = 0.68 - 0.20 * t;
   } else {
     const t = Math.min((bv - 1.2) / 0.8, 1);
     r = 1.0;
-    g = 0.67 - 0.09 * t;
-    b = 0.40 - 0.05 * t;
+    g = 0.75 - 0.13 * t;
+    b = 0.48 - 0.16 * t;
   }
 
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-function starRadius(mag: number, scale: number): number {
+/** How much stars may grow when zooming in, like looking through a telescope. */
+const STAR_ZOOM_CAP = 2.2;
+
+function starRadius(mag: number, scale: number, brightZoomBoost = 0): number {
   const base = Math.max(0.5, 3.5 - mag * 0.5);
-  const zoomFactor = Math.min(1, Math.sqrt(scale / 400));
+  // Stars grow when zooming in (telescope-like), up to a cap so they don't take
+  // over the view. Bright stars (mag < 3) get a higher cap so they stay prominent
+  // when zoomed in (Stellarium-like); the brightest grow the most.
+  const cap = STAR_ZOOM_CAP + (mag < 3 ? (3 - mag) * brightZoomBoost : 0);
+  const zoomFactor = Math.min(cap, Math.sqrt(scale / 400));
   return Math.max(1.5, base * zoomFactor);
 }
 
@@ -326,6 +332,8 @@ export class SkyMap {
   private showDSOLabels = true;
   private skyOpacity = 0.5;
   private backgroundOpacity = 1.0;
+  // The app's single sky theme (background, stars, glow, grid tint).
+  private readonly skyTheme = SKY_THEME;
   private maxStarCount = 2000;
   private maxDSOCount = 500;
   private highlightedDSO: string | null = null; // ID of DSO to always render
@@ -866,6 +874,9 @@ export class SkyMap {
         this.render();
       } else {
         if (!this.interactionEnabled) return;
+        // Cursor is over the (now-interactive) tooltip: leave it as-is so the
+        // user can move into it to select/copy without it hiding.
+        if ((e.target as HTMLElement)?.closest?.('#tooltip')) return;
         // Hover detection
         const rect = this.canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
@@ -2224,33 +2235,42 @@ export class SkyMap {
 
   private renderBackground() {
     const { ctx, view } = this;
+    const theme = this.skyTheme;
     const cx = view.width / 2;
     const cy = view.height / 2;
     const maxR = Math.sqrt(view.width * view.width + view.height * view.height);
 
-    // Solid black base (always opaque — ensures pitch-black at opacity 0)
-    ctx.fillStyle = '#000';
+    // Solid base (always opaque — ensures a clean floor at opacity 0)
+    ctx.fillStyle = theme.baseFill;
     ctx.fillRect(0, 0, view.width, view.height);
 
-    if (this.backgroundOpacity <= 0) return;
-
-    // Gradient overlay — color tokens are theme-specific, read at render time
-    const style = getComputedStyle(document.documentElement);
-    const inner = style.getPropertyValue('--sky-bg-inner').trim() || '#150d06';
-    const outer = style.getPropertyValue('--sky-bg-outer').trim() || '#000000';
+    const bgAlpha = this.backgroundOpacity * theme.bgOpacityScale;
+    if (bgAlpha <= 0) return;
 
     ctx.save();
-    ctx.globalAlpha = this.backgroundOpacity;
+    ctx.globalAlpha = bgAlpha;
+
+    // Theme gradient overlay (center → corner)
     const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
-    gradient.addColorStop(0, inner);
-    gradient.addColorStop(1, outer);
+    for (const [offset, color] of theme.bgStops) gradient.addColorStop(offset, color);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, view.width, view.height);
+
+    // Optional vignette: transparent from center to innerStop, darkening to the rim
+    if (theme.vignette) {
+      const v = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+      v.addColorStop(0, 'rgba(0,0,0,0)');
+      v.addColorStop(theme.vignette.innerStop, 'rgba(0,0,0,0)');
+      v.addColorStop(1, theme.vignette.color);
+      ctx.fillStyle = v;
+      ctx.fillRect(0, 0, view.width, view.height);
+    }
     ctx.restore();
   }
 
   private renderFisheyeGrid() {
     const { ctx, view } = this;
+    const theme = this.skyTheme;
     const origin = toCanvas(0, 0, view);
     const hem = getHemisphere();
 
@@ -2262,12 +2282,12 @@ export class SkyMap {
       const r = Math.cos(dec * DEG2RAD) * view.scale;
       ctx.beginPath();
       ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
-      ctx.strokeStyle = dec === 0 ? 'rgba(120, 210, 140, 0.9)' : 'rgba(100, 190, 120, 0.55)';
+      ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
       ctx.lineWidth = dec === 0 ? 1.5 : 0.8;
       ctx.stroke();
       // Dec label at the bottom of the circle (skip the pole and the equator edge)
       if (r > 2 && Math.abs(dec) < 89 && dec !== 0) {
-        ctx.fillStyle = 'rgba(140, 220, 160, 1.0)';
+        ctx.fillStyle = theme.gridLabelColor;
         ctx.font = '11px sans-serif';
         ctx.fillText(`${dec}°`, origin.x + 4, origin.y + r - 2);
       }
@@ -2280,12 +2300,12 @@ export class SkyMap {
       ctx.beginPath();
       ctx.moveTo(origin.x, origin.y);
       ctx.lineTo(edge.x, edge.y);
-      ctx.strokeStyle = 'rgba(100, 190, 120, 0.55)';
+      ctx.strokeStyle = theme.gridColor;
       ctx.lineWidth = 0.8;
       ctx.stroke();
       // RA label near the equator
       const labelProj = toCanvas(0.85 * Math.sin(raRad), 0.85 * Math.cos(raRad), view);
-      ctx.fillStyle = 'rgba(140, 220, 160, 1.0)';
+      ctx.fillStyle = theme.gridLabelColor;
       ctx.font = '11px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -2298,6 +2318,7 @@ export class SkyMap {
 
   private renderGrid() {
     const { ctx, view } = this;
+    const theme = this.skyTheme;
     const origin = toCanvas(0, 0, view);
     const hem = getHemisphere();
 
@@ -2311,9 +2332,7 @@ export class SkyMap {
       const r = Math.tan((90 + (hem === 'south' ? dec : -dec)) / 2 * DEG2RAD) * view.scale;
       ctx.beginPath();
       ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
-      ctx.strokeStyle = dec === 0
-        ? 'rgba(120, 210, 140, 0.9)'
-        : 'rgba(100, 190, 120, 0.55)';
+      ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
       ctx.lineWidth = dec === 0 ? 1.5 : 0.8;
       ctx.stroke();
 
@@ -2324,7 +2343,7 @@ export class SkyMap {
         // Position label at the bottom of the circle (y = origin.y + r)
         const lx = origin.x + 4;
         const ly = origin.y + r - 2;
-        ctx.fillStyle = 'rgba(140, 220, 160, 1.0)';
+        ctx.fillStyle = theme.gridLabelColor;
         ctx.font = '11px sans-serif';
         ctx.fillText(label, lx, ly);
       }
@@ -2344,7 +2363,7 @@ export class SkyMap {
       ctx.beginPath();
       ctx.moveTo(origin.x, origin.y);
       ctx.lineTo(borderCanvas.x, borderCanvas.y);
-      ctx.strokeStyle = 'rgba(100, 190, 120, 0.55)';
+      ctx.strokeStyle = theme.gridColor;
       ctx.lineWidth = 0.8;
       ctx.stroke();
 
@@ -2353,7 +2372,7 @@ export class SkyMap {
       const labelProj = toCanvas(0.85 * Math.sin(raRad), 0.85 * Math.cos(raRad), view);
       const lx = labelProj.x;
       const ly = labelProj.y;
-      ctx.fillStyle = 'rgba(140, 220, 160, 1.0)';
+      ctx.fillStyle = theme.gridLabelColor;
       ctx.font = '11px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -2367,9 +2386,7 @@ export class SkyMap {
     const { ctx, view } = this;
     const lines = getConstellationLines(this.constellationStyle);
 
-    const lineColor = getComputedStyle(document.documentElement)
-      .getPropertyValue('--constellation-line').trim() || 'rgba(210, 195, 178, 0.55)';
-    ctx.strokeStyle = lineColor;
+    ctx.strokeStyle = this.skyTheme.constellationLineColor;
     ctx.lineWidth = 1;
 
     for (const constellation of lines) {
@@ -2399,6 +2416,11 @@ export class SkyMap {
 
   private renderStars() {
     const { ctx, view } = this;
+    // Stars render at full opacity (not dimmed by skyOpacity like the rest of the
+    // sky), so their opaque cores fully occlude constellation/grid lines behind
+    // them instead of letting the line bleed through the middle of the star.
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = 1;
     const stars = getStars();
     // If maxMagOverride is Infinity, it means no limit
     let maxMag: number | null;
@@ -2456,24 +2478,67 @@ export class SkyMap {
       const p = project(star.ra, star.dec);
       const c = toCanvas(p.x, p.y, view);
 
-      const radius = starRadius(star.mag, view.scale);
-      const [r, g, b] = bvToRgb(star.bv);
+      const theme = this.skyTheme;
+      const radius = starRadius(star.mag, view.scale, theme.brightZoomBoost) * theme.radiusScale;
+      const spectral = bvToRgb(star.bv);
+      const [r, g, b] = applyStarColor(spectral, theme);
 
-      // Glow for bright stars
-      if (star.mag < 2) {
-        const glowR = radius * 4;
-        const gradient = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, glowR);
-        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
-        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-        ctx.fillStyle = gradient;
+      // How "established" the star is: 1 when well below the magnitude limit,
+      // ramping to 0 right at the limit (where it is just appearing).
+      const fadeRef = maxMag ?? computeMaxMag(view.scale);
+      const estab = star.hip === this.highlightedStar
+        ? 1
+        : Math.min(1, Math.max(0, (fadeRef - star.mag) / 1.5));
+      // Soft-edge fraction of the dot radius: a thin crisp rim (0.3) when
+      // established, a wider soft rim (~0.7) for stars that are just appearing so
+      // they fade in gently. The CORE is always fully opaque, so the background
+      // and constellation lines never show through the middle of a star.
+      const soft = 0.3 + 0.4 * (1 - estab);
+
+      // Brightness factor for the glow: 1 for the brightest, fading to 0 at the
+      // glow threshold so faint stars don't glow.
+      const glowBright = star.mag < theme.glowThresholdMag
+        ? Math.min(1, Math.max(0, (theme.glowThresholdMag - star.mag) / theme.glowThresholdMag))
+        : 0;
+      const glowAlpha = theme.glowOpacity * glowBright;
+
+      if (glowAlpha > 0.01) {
+        // Glowing star: opaque (near-white) core → soft edge → small halo, all in
+        // one radial gradient (no hard edge between dot and glow). The halo uses a
+        // MORE saturated color than the dot (orange for warm stars, blue for hot
+        // ones), so the glow is tinted even though the star core stays white. The
+        // falloff is convex — steep after the star with a faint tail — so it's tight.
+        const [gr, gg, gb] = applyStarColor(spectral, theme, theme.glowSaturation);
+        // The halo spreads further the more you zoom in (capped), so bright stars
+        // bloom obviously when zoomed. The dot stays the same size — only the glow
+        // extends, because coreEdge below keeps the dot pinned at `radius`.
+        const glowZoom = 1 + theme.glowZoomSpread * Math.max(0, Math.min(3, Math.sqrt(view.scale / 400)) - 1);
+        const glowR = radius * theme.glowRadiusMul * glowZoom;
+        const coreEdge = radius / glowR;             // dot edge as a fraction of glowR
+        const solidUntil = coreEdge * (1 - soft);    // fully opaque out to here
+        const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, glowR);
+        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
+        grad.addColorStop(solidUntil, `rgba(${r}, ${g}, ${b}, 1)`);            // solid white-ish core
+        // Smooth convex falloff from the dot edge to the rim, sampled at many
+        // stops so the glow fades continuously — no visible concentric rings.
+        const GLOW_STEPS = 12;
+        for (let i = 0; i <= GLOW_STEPS; i++) {
+          const f = i / GLOW_STEPS;                          // 0 at dot edge → 1 at rim
+          const stop = coreEdge + (1 - coreEdge) * f;
+          const a = glowAlpha * Math.pow(1 - f, 2.5);        // steep near star, faint tail
+          grad.addColorStop(stop, `rgba(${gr}, ${gg}, ${gb}, ${a})`);
+        }
+        ctx.fillStyle = grad;
         ctx.fillRect(c.x - glowR, c.y - glowR, glowR * 2, glowR * 2);
+      } else {
+        // Non-glowing star: opaque core with a soft translucent rim.
+        const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, radius);
+        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
+        grad.addColorStop(1 - soft, `rgba(${r}, ${g}, ${b}, 1)`);   // solid core
+        grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);          // soft rim
+        ctx.fillStyle = grad;
+        ctx.fillRect(c.x - radius, c.y - radius, radius * 2, radius * 2);
       }
-
-      // Star dot
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-      ctx.fill();
 
       // Highlight indicator for searched star
       if (star.hip === this.highlightedStar) {
@@ -2485,6 +2550,8 @@ export class SkyMap {
         ctx.stroke();
       }
     }
+
+    ctx.globalAlpha = prevAlpha;
   }
 
   private renderStarLabels() {
@@ -2505,7 +2572,7 @@ export class SkyMap {
         continue;
       }
 
-      const r = starRadius(star.mag, view.scale);
+      const r = starRadius(star.mag, view.scale, this.skyTheme.brightZoomBoost);
       ctx.fillText(star.name, c.x + r + 3, c.y);
     }
 

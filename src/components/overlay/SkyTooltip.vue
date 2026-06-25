@@ -4,6 +4,8 @@
     id="tooltip"
     :style="{ display: 'block', left: (uiStore.skyTooltipX + 15) + 'px', top: (uiStore.skyTooltipY + 15) + 'px' }"
     v-html="uiStore.skyTooltipHtml"
+    @mouseenter="uiStore.keepSkyTooltipAlive"
+    @mouseleave="uiStore.requestHideSkyTooltip"
   />
 </template>
 
