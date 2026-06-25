@@ -943,7 +943,9 @@ html, body {
   padding: var(--space-4) var(--space-6);
   font-size: var(--font-size-body);
   color: var(--text-secondary);
-  pointer-events: none;
+  pointer-events: auto;
+  user-select: text;
+  cursor: default;
   z-index: 100;
   white-space: normal;
   line-height: 1.6;

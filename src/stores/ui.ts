@@ -3,6 +3,11 @@ import { ref, computed } from 'vue';
 import type { ViewMode } from '../types';
 import { useCanvasStore } from './canvas';
 
+// Grace period before a hovered tooltip is dismissed. Gives the cursor time to
+// travel from the object into the (now-hoverable) tooltip, and tolerates small
+// mouse jitter.
+export const SKY_TOOLTIP_GRACE_MS = 250;
+
 export const useUiStore = defineStore('ui', () => {
   const canvasStore = useCanvasStore();
 
@@ -27,6 +32,15 @@ export const useUiStore = defineStore('ui', () => {
   const _forceSuppressTooltip = ref(false);
   const suppressSkyTooltip = computed(() => hasOpenModal.value || _forceSuppressTooltip.value);
 
+  // Non-reactive timer handle for the graceful-hide grace period (SKY_TOOLTIP_GRACE_MS).
+  let hideTimer: ReturnType<typeof setTimeout> | null = null;
+  function clearHideTimer() {
+    if (hideTimer !== null) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+  }
+
   function registerModal(name: string) {
     openModalName.value = name;
   }
@@ -35,10 +49,37 @@ export const useUiStore = defineStore('ui', () => {
     openModalName.value = null;
   }
 
-  function setSkyTooltip(html: string | null, x: number, y: number) {
+  function showSkyTooltip(html: string, x: number, y: number) {
+    clearHideTimer();
     skyTooltipHtml.value = html;
     skyTooltipX.value = x;
     skyTooltipY.value = y;
+  }
+
+  // Schedule a graceful hide. Does nothing if no tooltip is shown, and does NOT
+  // restart an already-pending timer — the cursor gets one fixed window to reach
+  // the tooltip; drifting into empty sky still lets the timer fire.
+  function requestHideSkyTooltip() {
+    if (skyTooltipHtml.value === null || hideTimer !== null) return;
+    hideTimer = setTimeout(() => {
+      hideTimer = null;
+      skyTooltipHtml.value = null;
+    }, SKY_TOOLTIP_GRACE_MS);
+  }
+
+  // Cancel a pending hide — called when the cursor enters the tooltip itself.
+  function keepSkyTooltipAlive() {
+    clearHideTimer();
+  }
+
+  // Back-compat shim for the canvas hover callbacks in ui.ts: null routes to a
+  // graceful hide, a non-null html shows immediately.
+  function setSkyTooltip(html: string | null, x: number, y: number) {
+    if (html === null) {
+      requestHideSkyTooltip();
+    } else {
+      showSkyTooltip(html, x, y);
+    }
   }
 
   function setForceSuppressTooltip(v: boolean) {
@@ -92,6 +133,7 @@ export const useUiStore = defineStore('ui', () => {
     panelCollapsed, currentViewMode, setPanelCollapsed, switchView,
     pendingBatchFiles, pendingUpdate, pendingPlanFocusId,
     skyTooltipHtml, skyTooltipX, skyTooltipY, suppressSkyTooltip,
-    setSkyTooltip, setForceSuppressTooltip,
+    setSkyTooltip, showSkyTooltip, requestHideSkyTooltip, keepSkyTooltipAlive,
+    setForceSuppressTooltip,
   };
 });
