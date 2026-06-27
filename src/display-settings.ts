@@ -15,12 +15,8 @@ export interface DisplaySettings {
   showPhotos: boolean;
   showPhotoOutlines: boolean;
   visibleLabels: { [label: string]: boolean };
-  maxMagnitude: number;
-  autoMagnitude: boolean;
   maxStarCount: number;
   maxDSOCount: number;
-  starSliderMax: number;
-  dsoSliderMax: number;
   skyOpacity: number;
   backgroundOpacity: number;
   showDSOs: boolean;
@@ -45,12 +41,8 @@ export const DEFAULT_SETTINGS: DisplaySettings = {
   showPhotos: true,
   showPhotoOutlines: false,
   visibleLabels: {},
-  maxMagnitude: 11,
-  autoMagnitude: false,
   maxStarCount: 500,
   maxDSOCount: 200,
-  starSliderMax: 1000,
-  dsoSliderMax: 500,
   skyOpacity: 0.7,
   backgroundOpacity: 0.5,
   showDSOs: true,

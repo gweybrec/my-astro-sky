@@ -132,16 +132,12 @@ describe('CheckRow', () => {
 
 const mockSetShowStars = vi.hoisted(() => vi.fn());
 const mockSetShowGrid = vi.hoisted(() => vi.fn());
-const mockSetMaxMag = vi.hoisted(() => vi.fn());
-const mockGetEffectiveMaxMag = vi.hoisted(() => vi.fn(() => 9.5));
 
 vi.mock('../../src/stores/canvas', () => ({
   useCanvasStore: () => ({
     skyMap: {
       setShowStars: mockSetShowStars,
       setShowGrid: mockSetShowGrid,
-      setMaxMag: mockSetMaxMag,
-      getEffectiveMaxMag: mockGetEffectiveMaxMag,
       setShowDSOs: vi.fn(),
       setVisibleDSOTypes: vi.fn(),
       setVisibleDSOCatalogs: vi.fn(),
@@ -163,12 +159,8 @@ vi.mock('../../src/display-settings', () => ({
     showPhotos: true,
     showPhotoOutlines: false,
     visibleLabels: {},
-    maxMagnitude: 11,
-    autoMagnitude: false,
     maxStarCount: 500,
     maxDSOCount: 200,
-    starSliderMax: 1000,
-    dsoSliderMax: 500,
     skyOpacity: 0.5,
     backgroundOpacity: 1.0,
     showDSOs: true,
@@ -216,27 +208,10 @@ describe('useDisplayStore', () => {
     expect(mockSetShowGrid).toHaveBeenCalledWith(true);
   });
 
-  it('setAutoMagnitude calls setMaxMag(null) and reads effectiveMag when enabling', () => {
-    const store = makeStore();
-    store.setAutoMagnitude(true);
-    expect(store.autoMagnitude).toBe(true);
-    expect(mockSetMaxMag).toHaveBeenCalledWith(null);
-    expect(store.effectiveMag).toBe(9.5);
-  });
-
   it('onMapViewChanged updates mapRotationDeg', () => {
     const store = makeStore();
-    store.onMapViewChanged(90, 8.2);
+    store.onMapViewChanged(90);
     expect(store.mapRotationDeg).toBe(90);
-  });
-
-  it('onMapViewChanged updates effectiveMag only when autoMagnitude is on', () => {
-    const store = makeStore();
-    store.onMapViewChanged(0, 8.0);
-    expect(store.effectiveMag).toBe(0); // autoMagnitude is false initially
-    store.setAutoMagnitude(true);
-    store.onMapViewChanged(0, 7.5);
-    expect(store.effectiveMag).toBe(7.5);
   });
 
   it('setShowDSOs updates store and calls skyMap', () => {

@@ -184,21 +184,15 @@ function selectResult(result: UnifiedSearchResult) {
   const skyMap = canvasStore.skyMap;
   if (!skyMap) return;
 
+  // The searched object is always drawn via the highlight bypass (renderStars /
+  // selectRenderedDSOs), so no magnitude override is needed to reveal a faint target.
   if (result.type === 'star') {
     setDSOHighlight(null);
     if (result.star) skyMap.setHighlightedStar(result.star.hip);
-    if (result.mag > skyMap.getEffectiveMaxMag()) {
-      skyMap.setMaxMag(Math.max(result.mag + 0.5, 6));
-    }
   } else if (result.type === 'dso' && result.dso) {
     skyMap.setShowDSOs(true);
     setDSOHighlight(result.dso.id);
     skyMap.setHighlightedStar(null);
-    if (result.dso.mag !== null && result.dso.mag > skyMap.getEffectiveMaxMag()) {
-      skyMap.setMaxMag(Math.max(result.dso.mag + 0.5, 6));
-    } else if (result.dso.mag === null) {
-      skyMap.setMaxMag(Infinity);
-    }
   }
 
   const defaultScale = result.type === 'dso' ? 1200 : 800;

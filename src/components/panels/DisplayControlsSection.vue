@@ -162,20 +162,6 @@
     <CheckRow :label="t('display.raDecGrid')" :model-value="displayStore.showGrid" @update:model-value="displayStore.setShowGrid" />
     <CheckRow :label="t('display.photoOutlines')" :model-value="displayStore.showPhotoOutlines" @update:model-value="displayStore.setShowPhotoOutlines" />
 
-    <!-- Magnitude slider -->
-    <SliderRow
-      :label="t('display.maxMagnitude')"
-      :min="1"
-      :max="14"
-      :step="0.5"
-      :model-value="displayStore.maxMagnitude"
-      :format-value="formatMag"
-      :disabled="displayStore.autoMagnitude"
-      @update:model-value="displayStore.setMaxMagnitude"
-    />
-    <!-- Auto magnitude (value display driven by store.effectiveMag) -->
-    <CheckRow :label="t('settings.autoMagnitude')" :model-value="displayStore.autoMagnitude" @update:model-value="displayStore.setAutoMagnitude" />
-
     <!-- Opacity sliders -->
     <SliderRow
       :label="t('display.skyOpacity')"
@@ -194,57 +180,31 @@
       @update:model-value="displayStore.setBackgroundOpacity"
     />
 
-    <!-- Max star count -->
+    <!-- Star density -->
     <div class="display-controls-mag-row">
       <label class="display-controls-mag-label">{{ t('display.maxStarCount') }} </label>
       <input
         type="range"
         class="display-controls-mag-slider"
         min="0"
-        :max="displayStore.starSliderMax"
-        step="100"
-        :value="displayStore.maxStarCount"
-        @input="(e) => displayStore.setMaxStarCount(parseInt((e.target as HTMLInputElement).value))"
-      />
-      <span class="display-controls-mag-value">{{ displayStore.maxStarCount }}</span>
-    </div>
-    <div class="display-controls-mag-row">
-      <label class="display-controls-mag-label">{{ t('settings.starSliderMax') }} </label>
-      <input
-        type="number"
-        class="display-controls-number-input"
-        min="1000"
-        max="50000"
-        step="1000"
-        :value="displayStore.starSliderMax"
-        @change="onStarSliderMaxChange"
+        :max="SLIDER_STEPS"
+        step="1"
+        :value="budgetToSliderPos(displayStore.maxStarCount, STAR_DENSITY_MAX)"
+        @input="(e) => displayStore.setMaxStarCount(sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), STAR_DENSITY_MAX))"
       />
     </div>
 
-    <!-- Max DSO count -->
+    <!-- DSO density -->
     <div class="display-controls-mag-row">
       <label class="display-controls-mag-label">{{ t('display.maxDSOCount') }} </label>
       <input
         type="range"
         class="display-controls-mag-slider"
         min="0"
-        :max="displayStore.dsoSliderMax"
-        step="50"
-        :value="displayStore.maxDSOCount"
-        @input="(e) => displayStore.setMaxDSOCount(parseInt((e.target as HTMLInputElement).value))"
-      />
-      <span class="display-controls-mag-value">{{ displayStore.maxDSOCount }}</span>
-    </div>
-    <div class="display-controls-mag-row">
-      <label class="display-controls-mag-label">{{ t('settings.dsoSliderMax') }} </label>
-      <input
-        type="number"
-        class="display-controls-number-input"
-        min="100"
-        max="10000"
-        step="100"
-        :value="displayStore.dsoSliderMax"
-        @change="onDsoSliderMaxChange"
+        :max="SLIDER_STEPS"
+        step="1"
+        :value="budgetToSliderPos(displayStore.maxDSOCount, DSO_DENSITY_MAX)"
+        @input="(e) => displayStore.setMaxDSOCount(sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), DSO_DENSITY_MAX))"
       />
     </div>
 
@@ -270,6 +230,10 @@ import { isIAUStyle } from '../../types';
 import type { ConstellationStyle } from '../../types';
 import { DSO_TYPES_ALL } from '../../display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
+import {
+  sliderPosToBudget, budgetToSliderPos,
+  STAR_DENSITY_MAX, DSO_DENSITY_MAX, SLIDER_STEPS,
+} from '../../density-slider';
 
 const { t } = useI18n();
 const displayStore = useDisplayStore();
@@ -279,11 +243,6 @@ const namesChecked = computed(() =>
   isIAUStyle(displayStore.constellationStyle) ? displayStore.showConstellationNames : false
 );
 
-function formatMag(v: number): string {
-  if (displayStore.autoMagnitude) return displayStore.effectiveMag.toFixed(1);
-  return v >= 14 ? '∞' : v.toFixed(1);
-}
-
 function onBorderLatInput(e: Event) {
   displayStore.setBorderLatDeg(parseInt((e.target as HTMLInputElement).value));
 }
@@ -291,20 +250,6 @@ function onBorderLatInput(e: Event) {
 async function onStyleChange(e: Event) {
   const style = (e.target as HTMLSelectElement).value as ConstellationStyle;
   await displayStore.setConstellationStyle(style);
-}
-
-function onStarSliderMaxChange(e: Event) {
-  const raw = parseInt((e.target as HTMLInputElement).value) || 5000;
-  const max = Math.max(1000, Math.min(50000, raw));
-  (e.target as HTMLInputElement).value = String(max);
-  displayStore.setStarSliderMax(max);
-}
-
-function onDsoSliderMaxChange(e: Event) {
-  const raw = parseInt((e.target as HTMLInputElement).value) || 2000;
-  const max = Math.max(100, Math.min(10000, raw));
-  (e.target as HTMLInputElement).value = String(max);
-  displayStore.setDsoSliderMax(max);
 }
 
 // ── Types dropdown ─────────────────────────────────────────────────────────────

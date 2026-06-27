@@ -1846,37 +1846,6 @@ html, body {
   color: var(--text-secondary);
 }
 
-.display-controls-number-input {
-  flex: 1;
-  min-width: 40px;
-  box-sizing: border-box;
-  background: var(--bg-input);
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--font-size-base);
-  padding: var(--space-1) var(--space-3);
-  text-align: right;
-  outline: none;
-  font-variant-numeric: tabular-nums;
-}
-.display-controls-number-input:focus {
-  border-color: var(--border-focus);
-}
-.display-controls-number-input::-webkit-inner-spin-button,
-.display-controls-number-input::-webkit-outer-spin-button {
-  opacity: 0.35;
-  filter: invert(0.85) hue-rotate(180deg);
-  cursor: pointer;
-}
-.display-controls-number-input:hover::-webkit-inner-spin-button,
-.display-controls-number-input:hover::-webkit-outer-spin-button,
-.display-controls-number-input:focus::-webkit-inner-spin-button,
-.display-controls-number-input:focus::-webkit-outer-spin-button {
-  opacity: 0.8;
-}
-
-
 
 .dso-toggle-row {
   margin-bottom: var(--space-5);

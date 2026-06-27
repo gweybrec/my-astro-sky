@@ -37,6 +37,7 @@
       "PowerShell(npx vitest *)",
       "PowerShell(npm test 2>&1)",
       "PowerShell(npx tsc 2>&1)",
+      "PowerShell(npm run build 2>&1)",
       "Bash(gh pr *)",
       "Bash(git fetch *)",
       "Bash(git diff *)",
