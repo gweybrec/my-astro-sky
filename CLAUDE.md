@@ -41,14 +41,15 @@ After editing `scripts/dso-metadata-overrides.json` or `scripts/generate-dso.mjs
 npm run dso:generate   # Rebuilds public/data/dso.json + recomputes constellations
 ```
 
-After changing rating/difficulty logic in `scripts/add-ratings.mjs`, strip and rebuild those columns:i
+After changing rating/difficulty/containment/priority logic in `scripts/add-ratings.mjs`, strip and rebuild those derived columns (the script recomputes all four together):
 
 ```bash
 node -e "
 const fs = require('fs'), path = 'public/data/dso.json';
 const d = JSON.parse(fs.readFileSync(path,'utf8'));
-const toRemove = ['rating','difficulty'].map(f=>d.fields.indexOf(f)).filter(i=>i>=0).sort((a,b)=>b-a);
-d.fields = d.fields.filter(f=>f!=='rating'&&f!=='difficulty');
+const DERIVED = ['rating','difficulty','containerId','priority'];
+const toRemove = DERIVED.map(f=>d.fields.indexOf(f)).filter(i=>i>=0).sort((a,b)=>b-a);
+d.fields = d.fields.filter(f=>!DERIVED.includes(f));
 d.data = d.data.map(r=>{const a=[...r];toRemove.forEach(i=>a.splice(i,1));return a;});
 fs.writeFileSync(path,JSON.stringify(d));
 "

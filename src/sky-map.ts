@@ -3,7 +3,8 @@ import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere,
 import { framePointToSky, clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
-import { getDSOs, getDSOCatalog } from './dso-catalog';
+import { getDSOs, getDSOCatalog, getDSOById } from './dso-catalog';
+import { selectDSOsToRender, DSO_CONTAINER_VISIBLE_RADIUS_PX, type SelectableDSO } from './dso-selection';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
 import { paToCanvasRotationDeg, canvasRotationToPaDeg } from './frame-orientation';
@@ -336,6 +337,11 @@ export class SkyMap {
   private readonly skyTheme = SKY_THEME;
   private maxStarCount = 2000;
   private maxDSOCount = 500;
+  // Per-frame cache of the DSO render selection — single source of truth shared by
+  // renderDSOs, renderDSOLabels and isDSORendered so drawing and hit-testing agree.
+  // Invalidated at the top of render(); rebuilt lazily (e.g. on a hover between frames).
+  private cachedSelectedDSOs: DSO[] | null = null;
+  private cachedSelectedDSOIds: Set<string> | null = null;
   private highlightedDSO: string | null = null; // ID of DSO to always render
   private highlightedStar: number | null = null; // HIP number of star to highlight
   private photoOutlines: PhotoOutline[] = [];
@@ -1134,80 +1140,10 @@ export class SkyMap {
    * Replicates the filtering logic from renderDSOs().
    */
   private isDSORendered(dso: DSO): boolean {
-    const { view } = this;
-    
-    const isHighlighted = this.highlightedDSO === dso.id;
-    
-    // Check type/catalog filters
-    if (!isHighlighted) {
-      if (!this.visibleDSOTypes.has(dso.type)) return false;
-      const cat = getDSOCatalog(dso.id);
-      if (cat && !this.visibleDSOCatalogs.has(cat)) return false;
-    }
-    
-    // Check magnitude filter
-    let maxMag: number | null;
-    if (this.maxMagOverride === Infinity) {
-      maxMag = null;
-    } else if (this.maxMagOverride !== null) {
-      maxMag = this.maxMagOverride;
-    } else {
-      maxMag = 6 + Math.log2(view.scale / 200) * 1.5;
-    }
-    if (!isHighlighted) {
-      if (maxMag !== null && dso.mag !== null && dso.mag > maxMag) return false;
-      if (dso.mag === null && maxMag !== null) return false;
-    }
-
-    // Check viewport bounds
-    const p = project(dso.ra, dso.dec);
-    const c = toCanvas(p.x, p.y, view);
-    const majorArcmin = dso.majAxis ?? 1;
-    const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale));
-    const margin = rx + 20;
-    if (c.x < -margin || c.x > view.width + margin || c.y < -margin || c.y > view.height + margin) {
-      return false;
-    }
-
-    // Check if it's in the top-N brightest DSOs in viewport
-    const visibleDSOs: DSO[] = [];
-    for (const d of getDSOs()) {
-      const dIsHighlighted = this.highlightedDSO === d.id;
-      
-      if (!dIsHighlighted) {
-        if (!this.visibleDSOTypes.has(d.type)) continue;
-        const cat = getDSOCatalog(d.id);
-        if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
-        if (maxMag !== null && d.mag !== null && d.mag > maxMag) continue;
-        if (d.mag === null && maxMag !== null) continue;
-      }
-
-      const dp = project(d.ra, d.dec);
-      const dc = toCanvas(dp.x, dp.y, view);
-      const dMajorArcmin = d.majAxis ?? 1;
-      const drx = Math.max(2, angularSizeToCanvasPx(dMajorArcmin / 2, d.dec, view.scale));
-      const dMargin = drx + 20;
-      if (dc.x < -dMargin || dc.x > view.width + dMargin || dc.y < -dMargin || dc.y > view.height + dMargin) {
-        continue;
-      }
-      visibleDSOs.push(d);
-    }
-
-    if (visibleDSOs.length <= this.maxDSOCount) {
-      return true; // No filtering needed
-    }
-
-    // Check if this DSO is in top-N brightest
-    const topDSOs = visibleDSOs
-      .sort((a, b) => {
-        if (a.id === this.highlightedDSO) return -1;
-        if (b.id === this.highlightedDSO) return 1;
-        const magA = a.mag ?? 999;
-        const magB = b.mag ?? 999;
-        return magA - magB;
-      })
-      .slice(0, this.maxDSOCount);
-    return topDSOs.includes(dso);
+    // Consult the same per-frame selection the renderer uses, so hover/click
+    // gating exactly matches what is drawn (including the container-size gate).
+    this.selectRenderedDSOs();
+    return this.cachedSelectedDSOIds!.has(dso.id);
   }
 
   private handleHover(mx: number, my: number, clientX: number, clientY: number) {
@@ -1270,6 +1206,10 @@ export class SkyMap {
   render() {
     const { ctx, view } = this;
     const { width, height } = view;
+
+    // Invalidate the per-frame DSO selection cache; rebuilt lazily by the first consumer.
+    this.cachedSelectedDSOs = null;
+    this.cachedSelectedDSOIds = null;
 
     ctx.save();
     ctx.clearRect(0, 0, width, height);
@@ -2579,26 +2519,29 @@ export class SkyMap {
     ctx.textBaseline = 'alphabetic';
   }
 
-  private renderDSOs() {
-    const { ctx, view } = this;
-    const dsos = getDSOs();
-    // Magnitude cutoff: slightly more generous than stars
-    // If maxMagOverride is Infinity, it means no limit
-    let maxMag: number | null;
-    if (this.maxMagOverride === Infinity) {
-      maxMag = null; // No magnitude limit
-    } else if (this.maxMagOverride !== null) {
-      maxMag = this.maxMagOverride; // Use explicit override
-    } else {
-      maxMag = 6 + Math.log2(view.scale / 200) * 1.5; // Compute from scale
-    }
+  /** DSO magnitude cutoff for the current zoom (null = no limit). */
+  private dsoMaxMag(): number | null {
+    if (this.maxMagOverride === Infinity) return null;
+    if (this.maxMagOverride !== null) return this.maxMagOverride;
+    return 6 + Math.log2(this.view.scale / 200) * 1.5; // compute from scale
+  }
 
-    // First pass: collect visible DSOs within viewport and magnitude limit
-    const visibleDSOs: DSO[] = [];
-    for (const dso of dsos) {
-      // Always include highlighted DSO
+  /**
+   * Single source of truth for which DSOs to draw this frame: applies the
+   * type/catalog/magnitude/viewport filters, the container-size gate (hide inner
+   * objects until their container renders large enough), then takes the top-N by
+   * precomputed render `priority` (spatial spread is baked in). Cached per frame
+   * so renderDSOs, renderDSOLabels and isDSORendered all agree.
+   */
+  private selectRenderedDSOs(): DSO[] {
+    if (this.cachedSelectedDSOs) return this.cachedSelectedDSOs;
+    const { view } = this;
+    const maxMag = this.dsoMaxMag();
+
+    const candidates: (SelectableDSO & { dso: DSO })[] = [];
+    for (const dso of getDSOs()) {
       const isHighlighted = this.highlightedDSO === dso.id;
-      
+
       if (!isHighlighted) {
         if (!this.visibleDSOTypes.has(dso.type)) continue;
         const cat = getDSOCatalog(dso.id);
@@ -2611,41 +2554,40 @@ export class SkyMap {
           if (this.hemisphere === 'north' && dso.dec < -(this.borderLatDeg + 2)) continue;
           if (this.hemisphere === 'south' && dso.dec > +(this.borderLatDeg + 2)) continue;
         }
+        // Container gate: hide an inner object until its container renders large
+        // enough on screen (so the container stays clean and clickable when zoomed out).
+        if (dso.containerId && dso.containerId !== this.highlightedDSO) {
+          const container = getDSOById(dso.containerId);
+          if (container) {
+            const cRx = Math.max(2, angularSizeToCanvasPx((container.majAxis ?? 1) / 2, container.dec, view.scale));
+            if (cRx < DSO_CONTAINER_VISIBLE_RADIUS_PX) continue;
+          }
+        }
       }
 
       const p = project(dso.ra, dso.dec);
       const c = toCanvas(p.x, p.y, view);
-
       const majorArcmin = dso.majAxis ?? 1;
       const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale));
       const margin = rx + 20;
-
-      // Skip if completely off-screen
       if (c.x < -margin || c.x > view.width + margin || c.y < -margin || c.y > view.height + margin) {
         continue;
       }
 
-      visibleDSOs.push(dso);
+      candidates.push({ id: dso.id, priority: dso.priority, isHighlighted, dso });
     }
 
-    // If we have more visible DSOs than the limit, keep only the brightest ones
-    let dsosToRender = visibleDSOs;
-    if (visibleDSOs.length > this.maxDSOCount) {
-      dsosToRender = visibleDSOs
-        .sort((a, b) => {
-          // Always prioritize highlighted DSO
-          if (a.id === this.highlightedDSO) return -1;
-          if (b.id === this.highlightedDSO) return 1;
-          // Sort by magnitude, treating null as infinity (always comes last)
-          const magA = a.mag ?? 999;
-          const magB = b.mag ?? 999;
-          return magA - magB;
-        })
-        .slice(0, this.maxDSOCount);
-    }
+    const selected = selectDSOsToRender(candidates, this.maxDSOCount).map(s => s.dso);
+    this.cachedSelectedDSOs = selected;
+    this.cachedSelectedDSOIds = new Set(selected.map(d => d.id));
+    return selected;
+  }
+
+  private renderDSOs() {
+    const { ctx, view } = this;
 
     // Render the selected DSOs
-    for (const dso of dsosToRender) {
+    for (const dso of this.selectRenderedDSOs()) {
       const p = project(dso.ra, dso.dec);
       const c = toCanvas(p.x, p.y, view);
 
@@ -2870,17 +2812,6 @@ export class SkyMap {
 
   private renderDSOLabels() {
     const { ctx, view } = this;
-    const dsos = getDSOs();
-    // Magnitude cutoff: slightly more generous than stars
-    // Handle Infinity as no limit, just like in renderDSOs
-    let maxMag: number | null;
-    if (this.maxMagOverride === Infinity) {
-      maxMag = null; // No magnitude limit
-    } else if (this.maxMagOverride !== null) {
-      maxMag = this.maxMagOverride; // Use explicit override
-    } else {
-      maxMag = 6 + Math.log2(view.scale / 200) * 1.5; // Compute from scale
-    }
 
     const TYPE_COLORS: Record<string, string> = {
       'Gx':  'rgba(220, 180, 100, 0.8)',
@@ -2896,48 +2827,8 @@ export class SkyMap {
 
     ctx.textBaseline = 'middle';
 
-    // First pass: collect visible DSOs (same filtering as renderDSOs)
-    const visibleDSOs: DSO[] = [];
-    for (const dso of dsos) {
-      const isHighlighted = this.highlightedDSO === dso.id;
-      
-      if (!isHighlighted) {
-        if (!this.visibleDSOTypes.has(dso.type)) continue;
-        const cat = getDSOCatalog(dso.id);
-        if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
-        if (maxMag !== null && dso.mag !== null && dso.mag > maxMag) continue;
-        if (dso.mag === null && maxMag !== null) continue;
-      }
-
-      const p = project(dso.ra, dso.dec);
-      const c = toCanvas(p.x, p.y, view);
-
-      // Basic viewport check (generous for labels that extend beyond circles)
-      if (c.x < -80 || c.x > view.width + 80 || c.y < -20 || c.y > view.height + 20) {
-        continue;
-      }
-
-      visibleDSOs.push(dso);
-    }
-
-    // If we have more visible DSOs than the limit, keep only the brightest ones
-    let dsosToLabel = visibleDSOs;
-    if (visibleDSOs.length > this.maxDSOCount) {
-      dsosToLabel = visibleDSOs
-        .sort((a, b) => {
-          // Always prioritize highlighted DSO
-          if (a.id === this.highlightedDSO) return -1;
-          if (b.id === this.highlightedDSO) return 1;
-          // Sort by magnitude, treating null as infinity (always comes last)
-          const magA = a.mag ?? 999;
-          const magB = b.mag ?? 999;
-          return magA - magB;
-        })
-        .slice(0, this.maxDSOCount);
-    }
-
-    // Render labels for selected DSOs
-    for (const dso of dsosToLabel) {
+    // Render labels for exactly the DSOs drawn this frame (shared selection).
+    for (const dso of this.selectRenderedDSOs()) {
       const isMess = dso.id.startsWith('M') && !dso.id.startsWith('M0');
       const majorArcmin = dso.majAxis ?? 1;
       const rx = angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale);

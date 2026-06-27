@@ -176,6 +176,8 @@ export interface DSO {
   constellation: string | null;  // 3-letter IAU abbreviation, e.g. "Lyr"
   rating: number | null;         // photographic interest 1–5 (null if missing from catalog)
   difficulty: number | null;     // imaging difficulty 1–5 (null if missing from catalog)
+  containerId: string | null;    // id of the smallest larger DSO enclosing this one (zoom-gated inner objects), null if none
+  priority: number;              // precomputed render order (lower = drawn first); spatial-spread blue-noise rank
 }
 
 export interface DSOSearchResult {

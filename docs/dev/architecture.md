@@ -199,6 +199,20 @@ Blob URLs are revoked when a card is removed (trash button) and when the modal c
 
 **Level-of-detail swap:** Inside `PhotoOverlay.applyTransform()`, the rendered pixel width is estimated as `Math.sqrt(matrix.a² + matrix.b²) × photo.width`. When this value drops below 300 px and `photo.thumbFilename` is set, `img.src` is switched to the thumbnail URL. When it rises above 300 px, it is switched back. `photo.width` (the authoritative database value) is always used for all matrix calculations — `imgEl.naturalWidth` is never used — so swapping `src` between full-res and thumbnail does not affect hit-testing, outline drawing, or transform accuracy.
 
+### DSO render selection (priority + spread + container gating)
+
+When the viewport holds more DSOs than the render budget (`maxDSOCount`, the "display few/many objects" setting), the map must choose which to draw. `SkyMap.selectRenderedDSOs()` (`src/sky-map.ts`) is the **single source of truth** for that choice, consumed by all three places that need it — `renderDSOs()` (shapes), `renderDSOLabels()` (labels), and `isDSORendered()` (hover/click hit-test gating). Keeping one selection guarantees drawing and hit-testing always agree (previously three copies of the logic could drift).
+
+The selection is:
+
+1. **Filter** — type/catalog/magnitude/viewport/hemisphere, as before.
+2. **Container gate** — an object with a `containerId` (see [dso-catalog.md](dso-catalog.md#containment-containerid)) is skipped while its container renders smaller than `DSO_CONTAINER_VISIBLE_RADIUS_PX` (18 px radius). This hides inner objects (e.g. those inside the Orion complex) until the container is large enough on screen to be clean and clickable. Bypassed when the object — or its container — is the highlighted/searched DSO.
+3. **Budget** — the remaining candidates are sorted by the precomputed `priority` (rating-weighted blue-noise spread, baked into the catalog at build time — see [dso-catalog.md → Render priority](dso-catalog.md#render-priority-spatial-spread)), highlighted pinned first, then sliced to `maxDSOCount`. This is `selectDSOsToRender()` in `src/dso-selection.ts` (pure, unit-tested). No per-frame spatial computation: the spread is precomputed, so this is just a sort + slice.
+
+**Why the container gate can't be precomputed:** unlike `priority`/`containerId`, it depends on the container's *current on-screen pixel size* (zoom), so it is evaluated each frame.
+
+**Caching:** the result is cached on the instance and invalidated at the top of `render()` (every state change calls `render()`), so the three consumers within a frame share one computation. Hover, which fires between frames against an unchanged view, reuses the cache (rebuilding lazily if absent). This is a net reduction vs. the old code, where `isDSORendered` re-scanned all DSOs on every hover.
+
 ### Server-side thumbnail generation
 
 On every upload, `server/index.ts` runs Sharp twice: once to resize the original to max 2048 px (stored as `{uuid}.jpg`) and once to produce `{uuid}_thumb.jpg` (width 400 px, JPEG quality 75). The thumbnail filename is stored in `photos.thumb_filename` and returned in `GET /api/photos` so every frontend module can use the server thumb without regenerating it client-side.

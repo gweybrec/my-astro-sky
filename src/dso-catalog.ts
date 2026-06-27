@@ -142,6 +142,8 @@ export async function loadDSOCatalog(): Promise<void> {
   const idxConstellation = fields.indexOf('constellation');
   const idxRating        = fields.indexOf('rating');
   const idxDifficulty    = fields.indexOf('difficulty');
+  const idxContainerId   = fields.indexOf('containerId');
+  const idxPriority      = fields.indexOf('priority');
 
   const lang = getLang();
 
@@ -180,6 +182,8 @@ export async function loadDSOCatalog(): Promise<void> {
       constellation,
       rating,
       difficulty,
+      containerId: idxContainerId >= 0 ? (row[idxContainerId] ?? null) : null,
+      priority: idxPriority >= 0 ? (row[idxPriority] ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER,
     };
     dsos.push(dso);
 
