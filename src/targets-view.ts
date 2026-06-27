@@ -2313,6 +2313,7 @@ export class TargetsView {
       displayName: t('fovOverlay.customLocation'),
       catalogs: [`${ra.toFixed(1)}°, ${dec.toFixed(1)}°`],
       emissionLines: null, constellation: null, rating: null, difficulty: null,
+      containerId: null, priority: Number.MAX_SAFE_INTEGER,
     };
   }
 

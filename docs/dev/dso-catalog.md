@@ -66,17 +66,24 @@ node scripts/add-constellations.mjs
 
 ---
 
-## Rating and Difficulty Fields
+## Rating, Difficulty, Priority, and Containment Fields
 
-`public/data/dso.json` is a columnar JSON with 15 fields. The `rating` (1–5 photographic interest) and `difficulty` (1–5 imaging effort) fields are computed by `scripts/add-ratings.mjs` and baked into the file. **To regenerate after changing the script:**
+`public/data/dso.json` is a columnar JSON. Several fields are derived (not raw catalog data) and baked in by the build scripts:
+
+- `rating` (1–5 photographic interest) and `difficulty` (1–5 imaging effort) — `scripts/add-ratings.mjs`
+- `containerId` (zoom-gated inner objects) — `scripts/add-ratings.mjs` (needs `rating`); see [Containment](#containment-containerid) below
+- `priority` (render order, spatial spread) — `scripts/add-ratings.mjs` (needs `rating`); see [Render priority](#render-priority-spatial-spread) below
+
+All four derived fields are produced together by `add-ratings.mjs`. **To regenerate:** rebuild the base catalog with `npm run dso:generate`, then strip the four derived columns and re-run the rating script:
 
 ```bash
-# Strip existing rating/difficulty columns, then re-add
+# Strip the derived columns, then re-add (add-ratings.mjs recomputes all four)
 node -e "
 const fs = require('fs'), path = 'public/data/dso.json';
 const d = JSON.parse(fs.readFileSync(path,'utf8'));
-const toRemove = ['rating','difficulty'].map(f=>d.fields.indexOf(f)).filter(i=>i>=0).sort((a,b)=>b-a);
-d.fields = d.fields.filter(f=>f!=='rating'&&f!=='difficulty');
+const DERIVED = ['rating','difficulty','containerId','priority'];
+const toRemove = DERIVED.map(f=>d.fields.indexOf(f)).filter(i=>i>=0).sort((a,b)=>b-a);
+d.fields = d.fields.filter(f=>!DERIVED.includes(f));
 d.data = d.data.map(r=>{const a=[...r];toRemove.forEach(i=>a.splice(i,1));return a;});
 fs.writeFileSync(path,JSON.stringify(d));
 "
@@ -127,6 +134,31 @@ SB thresholds (after applying the magnitude cap):
 - Messier cap at 2 applies here as well
 
 **Key design decision:** difficulty reflects how quickly a target *appears* in an image, not how impressive the final result can be. A galaxy that needs 5 hours to show fine spiral structure but appears in 20 minutes is still difficulty 2.
+
+### Render priority (spatial spread)
+
+`priority` is an integer **render order** (lower = drawn first) computed by `computeRenderPriority()` in `scripts/add-ratings.mjs`. It is *precomputed* because it is view-independent: the on-map selection at runtime is simply "take the lowest-`priority` objects currently in the viewport, up to the budget" (see [architecture.md → DSO render selection](architecture.md#dso-render-selection-priority--spread--container-gating)). Baking the spread in here keeps the runtime selection to a sort + slice, with no per-frame spatial computation.
+
+**Why it matters:** when zoomed out, dense regions (Orion, Sagittarius) used to consume the whole `maxDSOCount` budget while the rest of the sky stayed empty, and low-interest objects (vdB reflection nebulae, etc.) cluttered the view. `priority` fixes both: high-rating objects come first, and they are spread evenly over the sky.
+
+**Algorithm** — a rating-weighted progressive blue-noise (farthest-point) ordering:
+
+1. **Importance** per object = `rating` descending (null → 0), then `mag` ascending. This is what demotes minor objects — vdB and other rating-1/unrated objects rank last.
+2. **Equal-area sky coords** `x = RA/360`, `y = (sin(dec)+1)/2`, so grid cells cover equal solid angle (uniform angular spread).
+3. **Hierarchical grid tiers** — walking objects in importance order, each object claims the coarsest still-free cell from level 0 (whole sky) down to level `PRIORITY_MAX_LEVEL` (= 13, i.e. 2¹³ cells/axis). The level it lands at is its *spread tier*: the most important object in each coarse region surfaces first, finer detail fills in progressively.
+4. **Final `priority`** = sort by `(tier asc, importance asc)`. Any prefix (top-N) is therefore well-distributed over the sky for *any* render budget. O(n·levels), integer cell ops only (~20 ms for 14 k objects).
+
+To re-tune spread density, adjust `PRIORITY_MAX_LEVEL` (finer = denser allowed clustering) and regenerate.
+
+### Containment (`containerId`)
+
+`containerId` links a DSO to the **dominant object of its region** — the larger, *more important* DSO whose ellipse encloses it (or `null`). It powers zoom-gated inner objects on the map: a minor inner object (e.g. the NGC knots and M43 inside the Orion Nebula) is hidden until its container renders large enough on screen, so the container stays clean and clickable when zoomed out (the on-screen size gate lives at runtime in `sky-map.ts`, `DSO_CONTAINER_VISIBLE_RADIUS_PX`).
+
+Computed by `computeContainers()` in `scripts/add-ratings.mjs` — it lives there (not `generate-dso.mjs`) because the dominance test needs `rating`:
+
+- **Container candidates** = objects with `majAxis ≥ LARGE_CONTAINER_ARCMIN` (30′), binned into a coarse RA/Dec grid (`CONTAINER_GRID_DEG` = 5°), each inserted into every cell its bounding circle overlaps.
+- For each object, test only the candidates in its cell. A candidate is a valid container only if it is (a) **substantially larger** — `container.majAxis / inner.majAxis ≥ CONTAINER_SIZE_RATIO` (2.5), (b) **strictly more important** — `dsoImportance` (rating, then magnitude) higher than the inner object, and (c) its **ellipse encloses** the inner centre (offset decomposed onto major/minor axes via `pa`). The most important qualifying candidate wins.
+- **Why importance, not just size:** an iconic object that merely overlaps a larger *faint* backdrop must not be hidden behind it. The rule keeps M42 visible (it sits inside Barnard's Loop, rating 3 < M42's 5), M17 visible (inside SH2-45, rating 2), and M11 visible (over a dark nebula), while still gating genuine minor inner objects (NGC1973/5/7, M43) behind their dominant parent (M42). It also removes the need for a maximum-size cap: a genuinely important giant (a future LMC-type object) *should* gate its own clutter. No rating-5 object is ever gated.
 
 ---
 

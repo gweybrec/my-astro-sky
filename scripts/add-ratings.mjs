@@ -416,6 +416,8 @@ async function main() {
   }
 
   const idxId       = fields.indexOf('id');
+  const idxRa       = fields.indexOf('ra');
+  const idxDec      = fields.indexOf('dec');
   const idxType     = fields.indexOf('type');
   const idxMajAxis  = fields.indexOf('majAxis');
   const idxMag      = fields.indexOf('mag');
@@ -468,6 +470,25 @@ async function main() {
     }
   }
 
+  const idxRating  = fields.indexOf('rating');
+  const idxMinAxis = fields.indexOf('minAxis');
+  const idxPa      = fields.indexOf('pa');
+
+  // ── Containment: link each DSO to the dominant (larger, more important) DSO
+  // that encloses it, so the map can hide minor inner objects until that
+  // container renders large enough on screen. Uses rating, so it lives here.
+  dsoJson.fields.push('containerId');
+  const nLinked = computeContainers(dsoJson.data, { idxId, idxRa, idxDec, idxMajAxis, idxMinAxis, idxPa, idxMag, idxRating });
+  console.log(`\n✓ Linked ${nLinked.toLocaleString()} DSOs to a container`);
+
+  // ── Render priority: rating-weighted progressive blue-noise order ──────────
+  // Bakes the on-map spatial spread into a single per-object rank (lower = drawn
+  // first), so the runtime selection is just "top-N by priority within the
+  // viewport". See docs/dev/dso-catalog.md.
+  dsoJson.fields.push('priority');
+  computeRenderPriority(dsoJson.data, { idxRa, idxDec, idxMag, idxRating });
+  console.log(`✓ Assigned render priority to ${dsoJson.data.length.toLocaleString()} DSOs`);
+
   console.log('\n─── Rating distribution ───');
   for (let i = 1; i <= 5; i++) console.log(`  ${i}★: ${ratingDist[i].toLocaleString()}`);
   console.log('\n─── Difficulty distribution ───');
@@ -478,6 +499,145 @@ async function main() {
   // Write patched file
   fs.writeFileSync(DSO_JSON_PATH, JSON.stringify(dsoJson));
   console.log(`\n✓ Patched ${dsoJson.data.length.toLocaleString()} DSOs → ${DSO_JSON_PATH}`);
+}
+
+// ─── Containment (zoom-gated inner objects) ─────────────────────────────────
+const LARGE_CONTAINER_ARCMIN = 30;   // only objects this big can be containers
+const CONTAINER_SIZE_RATIO   = 2.5;  // container must be ≥ this × the inner majAxis
+const CONTAINER_GRID_DEG     = 5;    // coarse RA/Dec bin size
+
+/** Importance score (higher = more important): rating dominates, mag breaks ties. */
+function dsoImportance(row, idx) {
+  const rating = row[idx.idxRating] ?? 0;
+  const mag = row[idx.idxMag] ?? 99;
+  return rating * 100 - mag * 0.01;
+}
+
+/** Is point (ra,dec) inside the ellipse of object `c`? Small-angle planar approx. */
+function pointInDSOEllipse(ra, dec, c, idx) {
+  const maj = c[idx.idxMajAxis];
+  const min = c[idx.idxMinAxis] ?? maj;
+  const cDec = c[idx.idxDec];
+  const cosDec = Math.max(0.05, Math.cos(cDec * Math.PI / 180));
+  let dRa = ra - c[idx.idxRa];
+  if (dRa > 180) dRa -= 360; else if (dRa < -180) dRa += 360;
+  const dNorth = (dec - cDec) * 60;                       // arcmin
+  const dEast  = dRa * cosDec * 60;                       // arcmin
+  const pa = (c[idx.idxPa] ?? 0) * Math.PI / 180;         // major axis = PA east of north
+  const alongMaj = dNorth * Math.cos(pa) + dEast * Math.sin(pa);
+  const alongMin = -dNorth * Math.sin(pa) + dEast * Math.cos(pa);
+  const a = maj / 2, b = min / 2;
+  if (a <= 0 || b <= 0) return false;
+  return (alongMaj * alongMaj) / (a * a) + (alongMin * alongMin) / (b * b) <= 1;
+}
+
+/**
+ * Pushes a `containerId` (or null) onto each row: the enclosing object that is
+ * both substantially larger (size ratio) AND strictly more important than the
+ * inner object — i.e. the *dominant* object of the region. Minor inner objects
+ * (e.g. the knots inside M42) get gated behind it; an iconic object that merely
+ * overlaps a larger faint backdrop (M17 in SH2-45, M42 in Barnard's Loop) is NOT
+ * gated, because the backdrop is less important. Returns the count linked.
+ */
+function computeContainers(data, idx) {
+  const NC = 360 / CONTAINER_GRID_DEG;
+  const cellKey = (raCell, decCell) => `${raCell},${decCell}`;
+  // Bin candidate containers (large enough) into every grid cell they overlap.
+  const grid = new Map();
+  for (const row of data) {
+    const maj = row[idx.idxMajAxis];
+    if (maj == null || maj < LARGE_CONTAINER_ARCMIN) continue;
+    const radiusDeg = (maj / 2) / 60;
+    const cosDec = Math.max(0.05, Math.cos(row[idx.idxDec] * Math.PI / 180));
+    const raSpan = radiusDeg / cosDec;
+    const raMin = Math.floor((row[idx.idxRa] - raSpan) / CONTAINER_GRID_DEG);
+    const raMax = Math.floor((row[idx.idxRa] + raSpan) / CONTAINER_GRID_DEG);
+    const decMin = Math.floor((row[idx.idxDec] - radiusDeg) / CONTAINER_GRID_DEG);
+    const decMax = Math.floor((row[idx.idxDec] + radiusDeg) / CONTAINER_GRID_DEG);
+    for (let rc = raMin; rc <= raMax; rc++) {
+      const wrapped = ((rc % NC) + NC) % NC;
+      for (let dc = decMin; dc <= decMax; dc++) {
+        const k = cellKey(wrapped, dc);
+        let bucket = grid.get(k);
+        if (!bucket) grid.set(k, (bucket = []));
+        bucket.push(row);
+      }
+    }
+  }
+
+  let linked = 0;
+  for (const row of data) {
+    let containerId = null;
+    const innerMaj = row[idx.idxMajAxis] ?? 0.1;
+    const innerImp = dsoImportance(row, idx);
+    const raCell = ((Math.floor(row[idx.idxRa] / CONTAINER_GRID_DEG) % NC) + NC) % NC;
+    const decCell = Math.floor(row[idx.idxDec] / CONTAINER_GRID_DEG);
+    const bucket = grid.get(cellKey(raCell, decCell));
+    if (bucket) {
+      let bestImp = innerImp;   // container must be strictly more important than this
+      for (const c of bucket) {
+        if (c === row || c[idx.idxId] === row[idx.idxId]) continue;
+        if (c[idx.idxMajAxis] / innerMaj < CONTAINER_SIZE_RATIO) continue;  // size-ratio guard
+        const imp = dsoImportance(c, idx);
+        if (imp <= bestImp) continue;                                       // want the dominant encloser
+        if (pointInDSOEllipse(row[idx.idxRa], row[idx.idxDec], c, idx)) {
+          bestImp = imp;
+          containerId = c[idx.idxId];
+        }
+      }
+    }
+    row.push(containerId);
+    if (containerId) linked++;
+  }
+  return linked;
+}
+
+// ─── Render priority (progressive blue-noise order) ─────────────────────────
+const PRIORITY_MAX_LEVEL = 13;  // finest grid: 2^13 = 8192 cells per axis
+
+/**
+ * Assigns an integer `priority` (lower = drawn first) to every row, pushing it
+ * as the last column.
+ *
+ * Objects are walked in importance order (rating desc, then mag asc) and dropped
+ * into an equal-area hierarchical grid: each object claims the coarsest still-free
+ * cell, from level 0 (whole sky) down. The "level" at which it lands becomes its
+ * spread tier — the most important object in each coarse region surfaces first and
+ * finer detail fills in progressively. Final priority sorts by (tier, importance),
+ * so any prefix (top-N) is well spread over the sky for any render budget.
+ * O(n·levels), integer cell ops only.
+ */
+function computeRenderPriority(data, { idxRa, idxDec, idxMag, idxRating }) {
+  const n = data.length;
+  const importanceRank = data.map((_, i) => i).sort((a, b) => {
+    const ra = data[a][idxRating] ?? 0, rb = data[b][idxRating] ?? 0;
+    if (ra !== rb) return rb - ra;                              // rating desc
+    return (data[a][idxMag] ?? 99) - (data[b][idxMag] ?? 99);   // then mag asc
+  });
+
+  // Equal-area sky coords in [0,1): x from RA, y from sin(dec) so cells are equal area.
+  const skyXY = (row) => {
+    const x = ((row[idxRa] % 360) + 360) % 360 / 360;
+    const y = (Math.sin(row[idxDec] * Math.PI / 180) + 1) / 2;
+    return [Math.min(0.999999, Math.max(0, x)), Math.min(0.999999, Math.max(0, y))];
+  };
+
+  const occupied = new Set();
+  const tier = new Array(n).fill(PRIORITY_MAX_LEVEL);
+  for (const i of importanceRank) {
+    const [x, y] = skyXY(data[i]);
+    for (let L = 0; L <= PRIORITY_MAX_LEVEL; L++) {
+      const side = 1 << L;
+      const key = L * 0x10000000 + (Math.floor(x * side) * side + Math.floor(y * side));
+      if (!occupied.has(key)) { occupied.add(key); tier[i] = L; break; }
+    }
+  }
+
+  // Final order: coarser tier first, importance breaks ties.
+  const order = importanceRank.slice().sort((a, b) => tier[a] - tier[b]); // stable: keeps importance order within a tier
+  const priority = new Array(n);
+  for (let p = 0; p < order.length; p++) priority[order[p]] = p;
+  for (let i = 0; i < n; i++) data[i].push(priority[i]);
 }
 
 main().catch(err => {

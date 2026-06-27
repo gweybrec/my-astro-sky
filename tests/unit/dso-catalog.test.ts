@@ -34,48 +34,49 @@ const FIXTURE = {
     'id', 'ra', 'dec', 'type', 'majAxis', 'minAxis', 'pa', 'mag',
     'nameFr', 'nameEn', 'nameEs', 'nameDe',
     'catalogs', 'emissionLines', 'constellation', 'rating', 'difficulty',
+    'containerId', 'priority',
   ],
   data: [
     // M1 / NGC1952 — SNR in Taurus
     ['M1', 83.63, 22.01, 'SNR', 7, 5, 0, 8.4,
       'Nébuleuse du Crabe', 'Crab Nebula', null, null,
-      ['M1', 'NGC1952'], 'Hα', 'Tau', 4, 3],
-    // M42 / NGC1976 — EN in Orion  (close to M1 for angular-distance tests)
+      ['M1', 'NGC1952'], 'Hα', 'Tau', 4, 3, null, 1],
+    // M42 / NGC1976 — EN in Orion  (close to M1 for angular-distance tests). A container.
     ['M42', 83.82, -5.39, 'EN', 65, 60, 0, 4.0,
       "Nébuleuse d'Orion", 'Orion Nebula', null, null,
-      ['M42', 'NGC1976'], 'Hα', 'Ori', 5, 1],
-    // IC434 — EN in Orion (Horsehead region, near M42)
+      ['M42', 'NGC1976'], 'Hα', 'Ori', 5, 1, null, 0],
+    // IC434 — EN in Orion (Horsehead region, near M42). Inner object of M42.
     ['IC434', 84.05, -2.45, 'EN', 60, 10, 0, null,
       'Nébuleuse de la Tête de Cheval', 'Horsehead Nebula', null, null,
-      ['IC434'], 'Hα', 'Ori', 5, 4],
+      ['IC434'], 'Hα', 'Ori', 5, 4, 'M42', 5],
     // SH2-106 — remote field
     ['SH2-106', 308.76, 37.38, 'EN', 3, 2, 0, null,
       null, null, null, null,
-      ['SH2-106'], 'Hα', 'Cyg', 3, 4],
+      ['SH2-106'], 'Hα', 'Cyg', 3, 4, null, 7],
     // LBN object
     ['LBN254', 83.00, -6.00, 'EN', 120, 90, 0, null,
       null, null, null, null,
-      ['LBN254'], null, 'Ori', 2, 3],
+      ['LBN254'], null, 'Ori', 2, 3, null, 9],
     // LDN object
     ['LDN1622', 84.75, 1.75, 'DN', 40, 30, 0, null,
       null, null, null, null,
-      ['LDN1622'], null, 'Ori', 2, 4],
+      ['LDN1622'], null, 'Ori', 2, 4, null, 8],
     // vdB object
     ['vdB141', 315.22, 63.02, 'RN', 5, 5, 0, null,
       null, null, null, null,
-      ['vdB141'], null, 'Cep', 3, 5],
+      ['vdB141'], null, 'Cep', 3, 5, null, 6],
     // Abell
     ['Abell21', 112.54, 20.56, 'PN', 10, 8, 0, 9.8,
       null, 'Medusa Nebula', null, null,
-      ['Abell21', 'PK205+14.1'], null, 'Gem', 3, 4],
+      ['Abell21', 'PK205+14.1'], null, 'Gem', 3, 4, null, 3],
     // LPN
     ['LPN-1', 10.00, 10.00, 'PN', 2, 2, 0, 12.0,
       null, null, null, null,
-      ['LPN-1'], null, 'And', 1, 5],
+      ['LPN-1'], null, 'And', 1, 5, null, 4],
     // Origin DSO — at ra=0, dec=0 for findDSOsInImage geometry tests
     ['TESTOBJ', 0.0, 0.0, 'PN', 1, 1, 0, 10.0,
       null, 'Test Object', null, null,
-      ['TESTOBJ'], null, 'And', 1, 5],
+      ['TESTOBJ'], null, 'And', 1, 5, null, 2],
   ],
 };
 
@@ -122,6 +123,16 @@ describe('getDSOById()', () => {
 
   it('returns undefined for unknown id', () => {
     expect(getDSOById('DOES_NOT_EXIST')).toBeUndefined();
+  });
+
+  it('reads containerId (inner object → container id; container → null)', () => {
+    expect(getDSOById('IC434')!.containerId).toBe('M42');
+    expect(getDSOById('M42')!.containerId).toBeNull();
+  });
+
+  it('reads the precomputed render priority', () => {
+    expect(getDSOById('M42')!.priority).toBe(0);
+    expect(getDSOById('IC434')!.priority).toBe(5);
   });
 
   it('sets displayName to English value (lang=en)', () => {
