@@ -11,8 +11,10 @@
  *     helper runs) suppress inner objects until their container renders large
  *     enough on screen.
  *
- * So at runtime this collapses to: keep the highlighted object, then take the
- * lowest-`priority` candidates up to the budget.
+ * So at runtime this collapses to: keep the highlighted object, then keep every
+ * candidate whose `priority` is below a zoom-derived threshold. The threshold is a pure
+ * function of zoom + canvas size (see render-budget.ts), NOT of the current viewport
+ * contents, so DSOs never pop into a screen region that stays on screen while panning.
  */
 
 /** Pixel radius a container must render at before its inner objects are shown. */
@@ -27,16 +29,12 @@ export interface SelectableDSO {
 }
 
 /**
- * Returns the candidates to render, capped at `maxCount`. Candidates must already
- * be viewport-culled, filter-passed, and container-gated by the caller.
+ * Returns the candidates to render: the highlighted object (always) plus every
+ * candidate whose `priority` is below `priorityThreshold`. Candidates must already be
+ * viewport-culled, filter-passed, and container-gated by the caller. Input order is
+ * preserved (no sort), and the test is per-candidate, so the result for a given
+ * candidate never depends on what else is in view.
  */
-export function selectDSOsToRender<T extends SelectableDSO>(candidates: T[], maxCount: number): T[] {
-  if (candidates.length <= maxCount) return candidates;
-  return candidates
-    .slice()
-    .sort((a, b) => {
-      if (a.isHighlighted !== b.isHighlighted) return a.isHighlighted ? -1 : 1; // pin highlighted first
-      return a.priority - b.priority;                                            // precomputed blue-noise order
-    })
-    .slice(0, maxCount);
+export function selectDSOsToRender<T extends SelectableDSO>(candidates: T[], priorityThreshold: number): T[] {
+  return candidates.filter(c => c.isHighlighted || c.priority < priorityThreshold);
 }

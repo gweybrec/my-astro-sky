@@ -301,14 +301,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setVisibleDSOCatalogs(new Set(settings.dsoCatalogs));
   skyMap.setMaxStarCount(settings.maxStarCount);
   skyMap.setMaxDSOCount(settings.maxDSOCount);
-  if (settings.autoMagnitude) {
-    skyMap.setMaxMag(null);
-  } else {
-    skyMap.setMaxMag(settings.maxMagnitude >= 14 ? Infinity : settings.maxMagnitude);
-  }
   overlay.setDefaultOpacity(1.0);
 
-  // ─── Hook into view change to update auto magnitude display ──────────────
+  // ─── Hook into view change (dismiss tooltip, persist rotation, sync store) ──────────────
   const origOnViewChange = (skyMap as any)['onViewChange'] as (() => void) | null;
   skyMap.setOnViewChange(() => {
     origOnViewChange?.();
@@ -322,7 +317,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       saveSettings(settings);
     }
     updateDSOHighlightOverlay();
-    useDisplayStore(pinia).onMapViewChanged(currentRotation, skyMap.getEffectiveMaxMag());
+    useDisplayStore(pinia).onMapViewChanged(currentRotation);
   });
 
   // ─── Initialise section visibility for current view mode ─────────────────

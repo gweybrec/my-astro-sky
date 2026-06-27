@@ -19,12 +19,8 @@ export const useDisplayStore = defineStore('display', () => {
   const showPhotos = ref(s.showPhotos);
   const showPhotoOutlines = ref(s.showPhotoOutlines);
   const visibleLabels = ref<{ [label: string]: boolean }>({ ...s.visibleLabels });
-  const maxMagnitude = ref(s.maxMagnitude);
-  const autoMagnitude = ref(s.autoMagnitude);
   const maxStarCount = ref(s.maxStarCount);
   const maxDSOCount = ref(s.maxDSOCount);
-  const starSliderMax = ref(s.starSliderMax);
-  const dsoSliderMax = ref(s.dsoSliderMax);
   const skyOpacity = ref(s.skyOpacity);
   const backgroundOpacity = ref(s.backgroundOpacity);
   const showDSOs = ref(s.showDSOs);
@@ -37,9 +33,6 @@ export const useDisplayStore = defineStore('display', () => {
   const borderLatDeg = ref(s.borderLatDeg);
   const mapRotationDeg = ref(s.mapRotationDeg);
   const constellationStyle = ref<ConstellationStyle>(s.constellationStyle);
-
-  /** Updated on every map view change when autoMagnitude is on. */
-  const effectiveMag = ref(0);
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -54,12 +47,8 @@ export const useDisplayStore = defineStore('display', () => {
       showPhotos: showPhotos.value,
       showPhotoOutlines: showPhotoOutlines.value,
       visibleLabels: { ...visibleLabels.value },
-      maxMagnitude: maxMagnitude.value,
-      autoMagnitude: autoMagnitude.value,
       maxStarCount: maxStarCount.value,
       maxDSOCount: maxDSOCount.value,
-      starSliderMax: starSliderMax.value,
-      dsoSliderMax: dsoSliderMax.value,
       skyOpacity: skyOpacity.value,
       backgroundOpacity: backgroundOpacity.value,
       showDSOs: showDSOs.value,
@@ -153,26 +142,6 @@ export const useDisplayStore = defineStore('display', () => {
     persist();
   }
 
-  function setMaxMagnitude(v: number) {
-    maxMagnitude.value = v;
-    canvasStore.skyMap?.setMaxMag(v >= 14 ? Infinity : v);
-    persist();
-  }
-
-  function setAutoMagnitude(v: boolean) {
-    autoMagnitude.value = v;
-    const sm = canvasStore.skyMap;
-    if (sm) {
-      if (v) {
-        sm.setMaxMag(null);
-        effectiveMag.value = sm.getEffectiveMaxMag();
-      } else {
-        sm.setMaxMag(maxMagnitude.value >= 14 ? Infinity : maxMagnitude.value);
-      }
-    }
-    persist();
-  }
-
   function setSkyOpacity(v: number) {
     skyOpacity.value = v;
     canvasStore.skyMap?.setSkyOpacity(v);
@@ -191,27 +160,9 @@ export const useDisplayStore = defineStore('display', () => {
     persist();
   }
 
-  function setStarSliderMax(max: number) {
-    starSliderMax.value = max;
-    if (maxStarCount.value > max) {
-      maxStarCount.value = max;
-      canvasStore.skyMap?.setMaxStarCount(max);
-    }
-    persist();
-  }
-
   function setMaxDSOCount(count: number) {
     maxDSOCount.value = count;
     canvasStore.skyMap?.setMaxDSOCount(count);
-    persist();
-  }
-
-  function setDsoSliderMax(max: number) {
-    dsoSliderMax.value = max;
-    if (maxDSOCount.value > max) {
-      maxDSOCount.value = max;
-      canvasStore.skyMap?.setMaxDSOCount(max);
-    }
     persist();
   }
 
@@ -269,11 +220,8 @@ export const useDisplayStore = defineStore('display', () => {
   }
 
   /** Called from the setOnViewChange hook in ui.ts when the map view changes. */
-  function onMapViewChanged(newRotationDeg: number, effectiveMagValue: number) {
+  function onMapViewChanged(newRotationDeg: number) {
     mapRotationDeg.value = newRotationDeg;
-    if (autoMagnitude.value) {
-      effectiveMag.value = effectiveMagValue;
-    }
   }
 
   function setMapRotationDeg(deg: number) {
@@ -287,18 +235,17 @@ export const useDisplayStore = defineStore('display', () => {
     // state
     showStars, showConstellationLines, showConstellationNames,
     showStarLabels, showDSOLabels, showGrid, showPhotos, showPhotoOutlines,
-    visibleLabels, maxMagnitude, autoMagnitude, maxStarCount, maxDSOCount,
-    starSliderMax, dsoSliderMax, skyOpacity, backgroundOpacity,
+    visibleLabels, maxStarCount, maxDSOCount,
+    skyOpacity, backgroundOpacity,
     showDSOs, dsoTypes, dsoCatalogs,
     showStarTooltips, showDSOTooltips, simplifiedDSOTooltips,
     hemisphere, borderLatDeg, mapRotationDeg, constellationStyle,
-    effectiveMag,
     // actions
     setShowStars, setShowConstellationLines, setShowConstellationNames,
     setConstellationStyle, setShowStarLabels, setShowDSOLabels, setShowGrid,
     setShowPhotos, setShowPhotoOutlines, setVisibleLabel, setAllLabels,
-    setMaxMagnitude, setAutoMagnitude, setSkyOpacity, setBackgroundOpacity,
-    setMaxStarCount, setStarSliderMax, setMaxDSOCount, setDsoSliderMax,
+    setSkyOpacity, setBackgroundOpacity,
+    setMaxStarCount, setMaxDSOCount,
     setShowStarTooltips, setShowDSOTooltips, setSimplifiedDSOTooltips,
     setHemisphere, setBorderLatDeg, onMapViewChanged, setMapRotationDeg,
     setShowDSOs, setDsoTypes, setDsoCatalogs,

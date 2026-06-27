@@ -2,9 +2,13 @@ import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
 import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle, borderRadiusPU, getProjectionMode } from './projection';
 import { framePointToSky, clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
-import { getStars, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
+import { getStars, getStarMagsSorted, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
 import { getDSOs, getDSOCatalog, getDSOById } from './dso-catalog';
 import { selectDSOsToRender, DSO_CONTAINER_VISIBLE_RADIUS_PX, type SelectableDSO } from './dso-selection';
+import {
+  targetRenderCount, magThresholdForCount,
+  STAR_DENSITY_K, DSO_DENSITY_K, MIN_BUDGET_MULT,
+} from './render-budget';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
 import { paToCanvasRotationDeg, canvasRotationToPaDeg } from './frame-orientation';
@@ -325,7 +329,6 @@ export class SkyMap {
   private showConstellationLines = true;
   private showConstellationNames = true;
   private constellationStyle: ConstellationStyle = 'western';
-  private maxMagOverride: number | null = null;
   private visibleDSOTypes: Set<string> = new Set(['GxS', 'GxE', 'GxI', 'Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?']);
   private visibleDSOCatalogs: Set<string> = new Set(['M', 'NGC', 'IC', 'SH2']);
   private showGrid = true;
@@ -471,7 +474,6 @@ export class SkyMap {
   getOverlayCanvas(): HTMLCanvasElement | null {
     return this.overlayCanvas;
   }
-  setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
   setMaxStarCount(count: number) { this.maxStarCount = count; this.render(); }
   setMaxDSOCount(count: number) { this.maxDSOCount = count; this.render(); }
   setHighlightedDSO(dsoId: string | null) { this.highlightedDSO = dsoId; this.dsoIndexMaxMag = -99999; this.render(); }
@@ -588,7 +590,47 @@ export class SkyMap {
   }
 
   getShowGrid() { return this.showGrid; }
-  getEffectiveMaxMag(): number { return this.maxMagOverride ?? computeMaxMag(this.view.scale); }
+  /**
+   * Effective star magnitude cutoff for the current zoom + canvas. A star renders iff
+   * `star.mag <= this`. Two limits, both pan-invariant, combined by taking the brighter:
+   *
+   *   - the zoom magnitude gate `computeMaxMag(scale)` — a sane faint-limit curve;
+   *   - the density budget: the magnitude of the budget-th brightest star, derived from
+   *     the "star density" slider and the zoom/canvas (see render-budget.ts).
+   *
+   * Both depend only on zoom + canvas, never on what else is on screen, so stars never
+   * pop into a screen region that stays put while panning. The density budget replaces
+   * both the old viewport-relative top-N cap (which caused the popping) and the old
+   * manual "max magnitude" / "auto magnitude" controls.
+   */
+  private starMagThreshold(): number {
+    const { scale, width, height } = this.view;
+    const mags = getStarMagsSorted();
+    // Upper bound is the catalog length, not an artificial cap: on-screen count is
+    // already bounded by the field of view, so when zoomed in the magnitude gate below
+    // (not a count cap) decides how faint we go.
+    const count = targetRenderCount(
+      this.maxStarCount, scale, width, height, STAR_DENSITY_K,
+      this.maxStarCount * MIN_BUDGET_MULT, mags.length,
+    );
+    const densityMag = magThresholdForCount(mags, count);
+    return Math.min(computeMaxMag(scale), densityMag);
+  }
+
+  /**
+   * Pan-invariant DSO priority cutoff for the current zoom + canvas. A DSO renders iff
+   * `dso.priority < this` (priority is a dense global blue-noise rank, lower = drawn
+   * first). Independent of pan, mirroring {@link starMagThreshold}.
+   */
+  private dsoPriorityThreshold(): number {
+    const { scale, width, height } = this.view;
+    // Upper bound is the DSO catalog size; the per-DSO magnitude gate (dsoMaxMag) and
+    // the field of view bound how many actually draw when zoomed in.
+    return targetRenderCount(
+      this.maxDSOCount, scale, width, height, DSO_DENSITY_K,
+      this.maxDSOCount * MIN_BUDGET_MULT, getDSOs().length,
+    );
+  }
 
   private cancelAnimation() {
     if (this.animationId !== null) {
@@ -804,7 +846,9 @@ export class SkyMap {
   }
 
   private findClosestStar(mx: number, my: number): Star | null {
-    const maxMag = this.maxMagOverride ?? computeMaxMag(this.view.scale);
+    // Match the renderer's magnitude gate so the hover index is a superset of what is
+    // drawn (isStarRendered does the final confirm).
+    const maxMag = this.starMagThreshold();
     this.buildStarIndex(maxMag);
     const projPt = fromCanvas(mx, my, this.view);
     const threshold = 8 / this.view.scale;
@@ -1000,16 +1044,9 @@ export class SkyMap {
 
   private findClosestDSO(mx: number, my: number): DSO | null {
     if (!this.showDSOs) return null;
-    // Handle Infinity as no limit, same as renderDSOs
-    let maxMag: number | null;
-    if (this.maxMagOverride === Infinity) {
-      maxMag = null;
-    } else if (this.maxMagOverride !== null) {
-      maxMag = this.maxMagOverride + 4;
-    } else {
-      maxMag = computeMaxMag(this.view.scale) + 4;
-    }
-    this.buildDSOIndex(maxMag);
+    // DSOs are gated by priority (not magnitude), so the hit-test index must include all
+    // catalog DSOs — a superset of what is drawn; isDSORendered does the precise gating.
+    this.buildDSOIndex(null);
     const projPt = fromCanvas(mx, my, this.view);
 
     // Use a generous threshold to collect all nearby DSO centers.
@@ -1063,10 +1100,7 @@ export class SkyMap {
    */
   private dsosInFrame(f: RenderableFrame): DSO[] {
     if (!this.showDSOs) return [];
-    let maxMag: number | null;
-    if (this.maxMagOverride === Infinity) maxMag = null;
-    else if (this.maxMagOverride !== null) maxMag = this.maxMagOverride + 4;
-    else maxMag = computeMaxMag(this.view.scale) + 4;
+    const maxMag = computeMaxMag(this.view.scale) + 4;
     this.buildDSOIndex(maxMag);
 
     const { corners, cx, cy, halfW, halfH } = this.frameGeometry(f);
@@ -1093,17 +1127,11 @@ export class SkyMap {
    */
   private isStarRendered(star: Star): boolean {
     const { view } = this;
-    
-    // Check magnitude filter
-    let maxMag: number | null;
-    if (this.maxMagOverride === Infinity) {
-      maxMag = null;
-    } else if (this.maxMagOverride !== null) {
-      maxMag = this.maxMagOverride;
-    } else {
-      maxMag = computeMaxMag(view.scale);
+
+    // Same pan-invariant magnitude gate as renderStars (highlighted star always shows).
+    if (star.hip !== this.highlightedStar && star.mag > this.starMagThreshold()) {
+      return false;
     }
-    if (maxMag !== null && star.mag > maxMag) return false;
 
     // Check viewport bounds
     const p = project(star.ra, star.dec);
@@ -1112,27 +1140,7 @@ export class SkyMap {
       return false;
     }
 
-    // Check if it's in the top-N brightest stars in viewport
-    const visibleStars: Star[] = [];
-    for (const s of getStars()) {
-      if (maxMag !== null && s.mag > maxMag) continue;
-      const sp = project(s.ra, s.dec);
-      const sc = toCanvas(sp.x, sp.y, view);
-      if (sc.x < -20 || sc.x > view.width + 20 || sc.y < -20 || sc.y > view.height + 20) {
-        continue;
-      }
-      visibleStars.push(s);
-    }
-
-    if (visibleStars.length <= this.maxStarCount) {
-      return true; // No filtering needed
-    }
-
-    // Check if this star is in top-N brightest
-    const topStars = visibleStars
-      .sort((a, b) => a.mag - b.mag)
-      .slice(0, this.maxStarCount);
-    return topStars.includes(star);
+    return true;
   }
 
   /**
@@ -2362,25 +2370,18 @@ export class SkyMap {
     const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = 1;
     const stars = getStars();
-    // If maxMagOverride is Infinity, it means no limit
-    let maxMag: number | null;
-    if (this.maxMagOverride === Infinity) {
-      maxMag = null; // No magnitude limit
-    } else if (this.maxMagOverride !== null) {
-      maxMag = this.maxMagOverride; // Use explicit override
-    } else {
-      maxMag = computeMaxMag(view.scale); // Compute from scale
-    }
+    // Pan-invariant magnitude cutoff for this zoom + canvas (see render-budget.ts).
+    // A star renders iff its magnitude is at or below this threshold, regardless of what
+    // else is on screen — so panning never makes stars pop into the static part of the
+    // view.
+    const maxMag = this.starMagThreshold();
 
-    // First pass: collect visible stars within viewport and magnitude limit
-    const visibleStars: Star[] = [];
     for (const star of stars) {
-      // Always include highlighted star
+      // Always include the highlighted star.
       const isHighlighted = this.highlightedStar === star.hip;
-      
+
       if (!isHighlighted) {
-        // Skip magnitude check if maxMag is null (no limit)
-        if (maxMag !== null && star.mag > maxMag) continue;
+        if (star.mag > maxMag) continue;
         // Dec pre-filter: skip objects clearly outside the border (stereo only — in
         // fisheye the far hemisphere is clipped by project() returning off-canvas).
         if (!this.fisheyeMode) {
@@ -2397,27 +2398,6 @@ export class SkyMap {
         continue;
       }
 
-      visibleStars.push(star);
-    }
-
-    // If we have more visible stars than the limit, keep only the brightest ones
-    let starsToRender = visibleStars;
-    if (visibleStars.length > this.maxStarCount) {
-      starsToRender = visibleStars
-        .sort((a, b) => {
-          // Always prioritize highlighted star
-          if (a.hip === this.highlightedStar) return -1;
-          if (b.hip === this.highlightedStar) return 1;
-          return a.mag - b.mag;
-        })
-        .slice(0, this.maxStarCount);  // Take the brightest N stars
-    }
-
-    // Draw the selected stars
-    for (const star of starsToRender) {
-      const p = project(star.ra, star.dec);
-      const c = toCanvas(p.x, p.y, view);
-
       const theme = this.skyTheme;
       const radius = starRadius(star.mag, view.scale, theme.brightZoomBoost) * theme.radiusScale;
       const spectral = bvToRgb(star.bv);
@@ -2425,7 +2405,7 @@ export class SkyMap {
 
       // How "established" the star is: 1 when well below the magnitude limit,
       // ramping to 0 right at the limit (where it is just appearing).
-      const fadeRef = maxMag ?? computeMaxMag(view.scale);
+      const fadeRef = maxMag;
       const estab = star.hip === this.highlightedStar
         ? 1
         : Math.min(1, Math.max(0, (fadeRef - star.mag) / 1.5));
@@ -2519,24 +2499,18 @@ export class SkyMap {
     ctx.textBaseline = 'alphabetic';
   }
 
-  /** DSO magnitude cutoff for the current zoom (null = no limit). */
-  private dsoMaxMag(): number | null {
-    if (this.maxMagOverride === Infinity) return null;
-    if (this.maxMagOverride !== null) return this.maxMagOverride;
-    return 6 + Math.log2(this.view.scale / 200) * 1.5; // compute from scale
-  }
-
   /**
    * Single source of truth for which DSOs to draw this frame: applies the
-   * type/catalog/magnitude/viewport filters, the container-size gate (hide inner
-   * objects until their container renders large enough), then takes the top-N by
-   * precomputed render `priority` (spatial spread is baked in). Cached per frame
-   * so renderDSOs, renderDSOLabels and isDSORendered all agree.
+   * type/catalog/viewport filters and the container-size gate (hide inner objects until
+   * their container renders large enough), then keeps candidates whose precomputed
+   * render `priority` is below a pan-invariant, zoom-derived threshold (the density
+   * budget). `priority` is rating-weighted, so a low budget shows the brightest/most
+   * famous DSOs and a high budget fills the map with fainter ones — no magnitude gate.
+   * Cached per frame so renderDSOs, renderDSOLabels and isDSORendered all agree.
    */
   private selectRenderedDSOs(): DSO[] {
     if (this.cachedSelectedDSOs) return this.cachedSelectedDSOs;
     const { view } = this;
-    const maxMag = this.dsoMaxMag();
 
     const candidates: (SelectableDSO & { dso: DSO })[] = [];
     for (const dso of getDSOs()) {
@@ -2546,8 +2520,6 @@ export class SkyMap {
         if (!this.visibleDSOTypes.has(dso.type)) continue;
         const cat = getDSOCatalog(dso.id);
         if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
-        if (maxMag !== null && dso.mag !== null && dso.mag > maxMag) continue;
-        if (dso.mag === null && maxMag !== null) continue;
         // Dec pre-filter: skip objects clearly outside the border (stereo only — in
         // fisheye the far hemisphere is clipped by project() returning off-canvas).
         if (!this.fisheyeMode) {
@@ -2577,7 +2549,7 @@ export class SkyMap {
       candidates.push({ id: dso.id, priority: dso.priority, isHighlighted, dso });
     }
 
-    const selected = selectDSOsToRender(candidates, this.maxDSOCount).map(s => s.dso);
+    const selected = selectDSOsToRender(candidates, this.dsoPriorityThreshold()).map(s => s.dso);
     this.cachedSelectedDSOs = selected;
     this.cachedSelectedDSOIds = new Set(selected.map(d => d.id));
     return selected;

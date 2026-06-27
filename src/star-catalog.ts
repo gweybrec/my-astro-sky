@@ -4,6 +4,9 @@ import { getLang, t } from './i18n';
 let stars: Star[] = [];
 let starsByHip = new Map<number, Star>();
 let constellationInfos: ConstellationInfo[] = [];
+// Cached ascending magnitude list (brightest first), built lazily from `stars`.
+// `stars` is itself kept sorted by magnitude, so this is just its `mag` column.
+let starMagsSorted: number[] | null = null;
 
 // Constellation lines are stored per style; 'western' is loaded eagerly at startup.
 const constellationLinesByStyle = new Map<ConstellationStyle, ConstellationLine[]>();
@@ -81,6 +84,7 @@ export async function loadCatalog(): Promise<void> {
 
   // Sort by magnitude (brightest first) for rendering priority
   stars.sort((a, b) => a.mag - b.mag);
+  starMagsSorted = null; // invalidate cache; rebuilt lazily on next access
 
   // Parse and cache the default (western) constellation lines
   constellationLinesByStyle.set('western', parseConstellationLines(linesData));
@@ -116,6 +120,15 @@ export function getStars(): Star[] {
 
 export function getStarByHip(hip: number): Star | undefined {
   return starsByHip.get(hip);
+}
+
+/**
+ * Catalog magnitudes sorted ascending (brightest first), for the pan-invariant render
+ * budget (see render-budget.ts). Built once and cached; `stars` is already mag-sorted.
+ */
+export function getStarMagsSorted(): number[] {
+  if (!starMagsSorted) starMagsSorted = stars.map(s => s.mag);
+  return starMagsSorted;
 }
 
 export function getConstellationLines(style: ConstellationStyle = 'western'): ConstellationLine[] {
