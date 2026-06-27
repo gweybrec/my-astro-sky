@@ -30,6 +30,20 @@
 *::-webkit-scrollbar-corner      { background: var(--scrollbar-track); }
 
 
+/* ── Sky tooltip text selection ────────────────────────────────────────────── */
+/* While a text-selection drag started inside the sky tooltip is in progress, make
+   everything outside the tooltip non-selectable so dragging the cursor out of the
+   tooltip doesn't extend the selection across the whole page. The tooltip subtree
+   stays selectable. The body class is toggled by SkyTooltip.vue on mousedown/up. */
+body.tooltip-selecting {
+  user-select: none;
+}
+body.tooltip-selecting #tooltip,
+body.tooltip-selecting #tooltip * {
+  user-select: text;
+}
+
+
 /* ── Sky map / photo layer ─────────────────────────────────────────────────── */
 
 #sky-canvas {

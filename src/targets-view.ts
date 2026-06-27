@@ -32,7 +32,7 @@ import exportSvg from './icons/export.svg?raw';
 import trashSvg from './icons/trash.svg?raw';
 import penSvg from './icons/pen.svg?raw';
 import mapPinSvg from './icons/map-pin.svg?raw';
-import planListSvg from './icons/plan-list.svg?raw';
+import listPlusSvg from './icons/list-plus.svg?raw';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
 import { usePlansStore } from './stores/plans';
@@ -2090,7 +2090,7 @@ export class TargetsView {
     const editBtn = this.iconActionBtn(penSvg, t('dso.edit'));
     editBtn.addEventListener('click', () => { this.onEditDSO?.(dso); });
 
-    const planBtn = this.iconActionBtn(planListSvg, t('targets.plan.addToPlan'));
+    const planBtn = this.iconActionBtn(listPlusSvg, t('targets.plan.addToPlan'));
     planBtn.setAttribute('data-plan-dso', dso.id);
     this.refreshPlanBtnState(planBtn, dso.id);
     planBtn.addEventListener('click', () => { this.openPlanPicker(planBtn, dso.id); });

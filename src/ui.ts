@@ -201,8 +201,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setOnStarHover((star: Star | null, x: number, y: number) => {
     const ui = useUiStore(pinia);
     const ds = useDisplayStore(pinia);
-    if (!star || !ds.showStarTooltips || ui.suppressSkyTooltip) {
-      ui.setSkyTooltip(null, 0, 0);
+    if (!star || !ds.showStarTooltips || ui.isSkyTooltipSuppressed()) {
+      ui.setSkyTooltip(null, x, y);
       return;
     }
     const starMainName = (s: Star) =>
@@ -233,8 +233,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setOnDSOHover((dso: DSO | null, x: number, y: number) => {
     const ui = useUiStore(pinia);
     const ds = useDisplayStore(pinia);
-    if (!dso || !ds.showDSOTooltips || ui.suppressSkyTooltip) {
-      ui.setSkyTooltip(null, 0, 0);
+    if (!dso || !ds.showDSOTooltips || ui.isSkyTooltipSuppressed()) {
+      ui.setSkyTooltip(null, x, y);
       return;
     }
     let html: string;
@@ -262,7 +262,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       const emissionLinesRow = dso.emissionLines ? `<tr><td>${t('dso.emissionLines')}</td><td>${dso.emissionLines}</td></tr>` : '';
       html = `${nameStr}<table class="dso-info-table"><tr><td>${t('dso.type')}</td><td>${typeName}</td></tr><tr><td>${t('stars.magnitude')}</td><td>${magStr}</td></tr>${sizeRow}<tr><td>${t('dso.raDec')}</td><td>${raDec}</td></tr>${ratingRow}${difficultyRow}${emissionLinesRow}${crossRefRow}</table>`;
     }
-    ui.setSkyTooltip(html, x, y);
+    // Only full-mode tooltips carry the DSO (and thus the interactive action buttons);
+    // simplified tooltips stay minimal.
+    ui.setSkyTooltip(html, x, y, ds.simplifiedDSOTooltips ? null : dso);
   });
 
   // Panel toggle → use store
@@ -310,6 +312,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   const origOnViewChange = (skyMap as any)['onViewChange'] as (() => void) | null;
   skyMap.setOnViewChange(() => {
     origOnViewChange?.();
+    // The tooltip is anchored to a fixed screen position; once the sky pans/zooms it
+    // is stale, so dismiss it as soon as the view starts moving.
+    const uiForTooltip = useUiStore(pinia);
+    if (uiForTooltip.skyTooltipHtml) uiForTooltip.hideSkyTooltipNow();
     const currentRotation = normalizeRotationDeg(skyMap.getView().rotationDeg);
     if (currentRotation !== settings.mapRotationDeg) {
       settings.mapRotationDeg = currentRotation;

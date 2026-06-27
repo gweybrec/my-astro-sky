@@ -3,7 +3,6 @@ import { formatFov } from './gear-presets';
 import { reportUnknownRendererError } from './error-reporter';
 import { useFovFramesStore } from './stores/fov-frames';
 import { usePlansStore } from './stores/plans';
-import { useUiStore } from './stores/ui';
 import { getDSOById } from './dso-catalog';
 import { tileCenters, outlineFromGrid, transformMosaicToSetup } from './mosaic';
 import type { TargetFov, MosaicTransform } from './mosaic';
@@ -166,7 +165,6 @@ export async function requestSetupSwitch(plan: Plan, newSetupId: string | null, 
 export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newSetupId: string, items: SwitchItem[], hooks: SetupSwitchHooks): void {
   const plansStore = usePlansStore();
   const fovStore = useFovFramesStore();
-  const uiStore = useUiStore();
   const decisions = new Map<string, 'apply' | 'drop'>();
 
   const proposalText = (tr: MosaicTransform): string =>
@@ -174,16 +172,14 @@ export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newS
       ? `${tr.cols}×${tr.rows} · ${formatFov(tr.wDeg, tr.hDeg)}`
       : `${t('fovOverlay.switchSingleFrame')} · ${formatFov(tr.wDeg, tr.hDeg)}`;
 
-  // Register as an open modal (not the popup's force-suppress flag, which the
-  // popup's own mouseleave would clear) so the sky tooltip stays off throughout.
-  uiStore.registerModal('fov-setup-switch');
+  // The `.modal-backdrop` below is auto-detected as an open modal, so the sky
+  // tooltip stays suppressed for the whole lifetime of this dialog.
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   const modal = document.createElement('div');
   modal.className = 'modal settings-modal';
 
   const close = (revert: boolean): void => {
-    uiStore.unregisterModal();
     if (revert) hooks.onRevert();
     backdrop.remove();
   };

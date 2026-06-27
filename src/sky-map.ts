@@ -892,7 +892,7 @@ export class SkyMap {
         } else if (isOverPanel) {
           // Hide tooltips when mouse is over side panel
           if (this.onStarHover) {
-            this.onStarHover(null, 0, 0);
+            this.onStarHover(null, e.clientX, e.clientY);
           }
         }
       }
