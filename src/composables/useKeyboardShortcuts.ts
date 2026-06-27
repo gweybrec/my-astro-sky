@@ -50,7 +50,7 @@ export function useKeyboardShortcuts() {
     const el = document.activeElement as HTMLElement | null;
     const tag = (el?.tagName ?? '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || el?.isContentEditable) return;
-    if (uiStore.hasOpenModal) return;
+    if (uiStore.isModalOpen()) return;
 
     const key = normalizeKey(e);
     if (!key) return;

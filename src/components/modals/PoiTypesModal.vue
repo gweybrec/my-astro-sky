@@ -1,8 +1,9 @@
 <template>
   <Teleport to="body">
-    <!-- z above the gallery meta-editor overlay (z-index 12000) so it's never hidden. -->
+    <!-- modal-backdrop (so it suppresses sky tooltips like every other modal); the
+         !z override keeps it above the gallery meta-editor overlay (z-index 12000). -->
     <div
-      class="fixed inset-0 flex items-center justify-center bg-[var(--bg-overlay)] z-[13000]"
+      class="modal-backdrop !z-[13000]"
       @click.self="requestClose"
     >
       <div class="modal" @click.stop>

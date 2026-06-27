@@ -138,10 +138,9 @@ function buildSetupModal(opts: {
     accessoryId: opts.initialPrefs?.accessoryId ?? null,
   };
 
-  uiStore.registerModal('fov-setup');
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
-  const close = (): void => { uiStore.unregisterModal(); backdrop.remove(); };
+  const close = (): void => { backdrop.remove(); };
 
   const modal = document.createElement('div');
   modal.className = 'modal settings-modal';
@@ -446,10 +445,9 @@ export function openRenamePlanModal(planId: string, currentName: string, onSaved
   const uiStore = useUiStore();
   const plansStore = usePlansStore();
 
-  uiStore.registerModal('fov-rename-plan');
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
-  const close = (): void => { uiStore.unregisterModal(); backdrop.remove(); };
+  const close = (): void => { backdrop.remove(); };
 
   const modal = document.createElement('div');
   modal.className = 'modal settings-modal';
@@ -1151,8 +1149,7 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     const modal = document.createElement('div');
     modal.className = 'modal settings-modal';
 
-    uiStore.registerModal('fov-mosaic');
-    const close = (): void => { uiStore.unregisterModal(); backdrop.remove(); };
+    const close = (): void => { backdrop.remove(); };
 
     const head = document.createElement('div');
     head.className = 'modal-header';

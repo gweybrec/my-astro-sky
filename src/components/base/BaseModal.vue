@@ -21,7 +21,6 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed } from 'vue';
-import { useUiStore } from '../../stores/ui';
 
 const props = withDefaults(defineProps<{
   title?: string;
@@ -37,8 +36,6 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
-const uiStore = useUiStore();
-
 const sizeClass = computed(() => ({
   'settings-modal': props.size === 'wide',
   'modal-flex': props.size === 'flex',
@@ -53,12 +50,10 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  uiStore.registerModal(props.title || 'modal');
   window.addEventListener('keydown', onKeydown);
 });
 
 onUnmounted(() => {
-  uiStore.unregisterModal();
   window.removeEventListener('keydown', onKeydown);
 });
 </script>

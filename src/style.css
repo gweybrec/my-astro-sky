@@ -955,6 +955,13 @@ html, body {
 
 #tooltip .dso-info-name {
   margin-bottom: var(--space-2h);
+  cursor: default;
+}
+/* The tooltip title is plain text, not a clickable recenter link like in the side
+   panel — drop the link affordance from the global .dso-info-name rule. */
+#tooltip .dso-info-name:hover {
+  text-decoration: none;
+  color: var(--text-primary);
 }
 
 #tooltip .dso-info-table {
