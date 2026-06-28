@@ -1,5 +1,5 @@
 <template>
-  <div :class="['fov-ribbon', { 'fov-ribbon--collapsed': !ribbonOpen }]">
+  <div class="fov-ribbon">
     <!-- Telescope button (frame manager popup trigger) -->
     <button
       type="button"
@@ -23,86 +23,26 @@
       @focus="suppress(true)" @blur="suppress(false)"
       v-html="fovStore.framesVisible ? eyeSvg : eyeOffSvg"
     ></button>
-
-    <!-- Rotation step buttons (act on the active frame) -->
-    <button
-      v-for="step in ROTATION_STEPS"
-      :key="step.deg"
-      type="button"
-      class="sky-rotation-btn fov-rotate-btn"
-      :class="{ 'opacity-40 cursor-not-allowed': rotateDisabled }"
-      :title="rotateTitle(step)"
-      :aria-label="rotateTitle(step)"
-      @click="applyRotation(step.deg)"
-      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
-      @focus="suppress(true)" @blur="suppress(false)"
-      v-html="step.svg"
-    ></button>
-
-    <!-- Toggle collapse/expand -->
-    <button
-      type="button"
-      class="fov-ribbon-toggle"
-      :title="ribbonOpen ? t('fovOverlay.collapseRibbon') : t('fovOverlay.expandRibbon')"
-      :aria-label="ribbonOpen ? t('fovOverlay.collapseRibbon') : t('fovOverlay.expandRibbon')"
-      @click="toggleRibbon"
-      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
-      @focus="suppress(true)" @blur="suppress(false)"
-    >{{ ribbonOpen ? '◀' : '▶' }}</button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { watch, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
 import { useFovFramesStore } from '../../stores/fov-frames';
 import { usePlansStore } from '../../stores/plans';
-import { loadFovUiState, saveFovUiState, buildFovPopup } from '../../fov-overlay';
+import { buildFovPopup } from '../../fov-overlay';
 import { positionPopup } from '../../ui';
 import { useUiStore } from '../../stores/ui';
 import telescopeSvg from '../../icons/telescope.svg?raw';
 import eyeSvg from '../../icons/eye.svg?raw';
 import eyeOffSvg from '../../icons/eye-off.svg?raw';
-import rotateResetSvg from '../../icons/rotate-reset.svg?raw';
-import rotateM45Svg from '../../icons/rotate-m45.svg?raw';
-import rotateM15Svg from '../../icons/rotate-m15.svg?raw';
-import rotateM5Svg from '../../icons/rotate-m5.svg?raw';
-import rotateM1Svg from '../../icons/rotate-m1.svg?raw';
-import rotateP1Svg from '../../icons/rotate-p1.svg?raw';
-import rotateP5Svg from '../../icons/rotate-p5.svg?raw';
-import rotateP15Svg from '../../icons/rotate-p15.svg?raw';
-import rotateP45Svg from '../../icons/rotate-p45.svg?raw';
 
 const canvasStore = useCanvasStore();
 const fovStore = useFovFramesStore();
 const plansStore = usePlansStore();
 const uiStore = useUiStore();
-
-const fovUiState = loadFovUiState();
-const ribbonOpen = ref(fovUiState.ribbonOpen);
-const hasActive = computed(() => !!fovStore.activeId);
-// Rotation acts on the active frame, so it's disabled with no selection or when
-// all frames are hidden — the title then explains how to re-enable it.
-const rotateDisabled = computed(() => !hasActive.value || !fovStore.framesVisible);
-
-function rotateTitle(step: { deg: number; label: string }): string {
-  if (!fovStore.framesVisible) return t('fovOverlay.framesHiddenHint');
-  if (!hasActive.value) return t('fovOverlay.rotateNeedsSelection');
-  return step.deg === 0 ? t('fovOverlay.resetFrameRotation') : `${t('fovOverlay.rotateFrame')} ${step.label}`;
-}
-
-const ROTATION_STEPS = [
-  { deg: -45, label: '-45°', svg: rotateM45Svg },
-  { deg: -15, label: '-15°', svg: rotateM15Svg },
-  { deg:  -5, label:  '-5°', svg: rotateM5Svg  },
-  { deg:  -1, label:  '-1°', svg: rotateM1Svg  },
-  { deg:   0, label:   '0°', svg: rotateResetSvg },
-  { deg:   1, label:  '+1°', svg: rotateP1Svg  },
-  { deg:   5, label:  '+5°', svg: rotateP5Svg  },
-  { deg:  15, label: '+15°', svg: rotateP15Svg },
-  { deg:  45, label: '+45°', svg: rotateP45Svg },
-];
 
 let telescopeBtnEl: HTMLElement | null = null;
 let fovPopupEl: HTMLElement | null = null;
@@ -116,14 +56,6 @@ function toggleFramesVisibility() {
   // showing frames, close it when hiding them.
   if (fovStore.framesVisible) openFovPopup();
   else closeFovPopup();
-}
-
-function applyRotation(stepDeg: number) {
-  if (rotateDisabled.value) return;
-  const id = fovStore.activeId;
-  if (!id) return;
-  if (stepDeg === 0) fovStore.resetRotation(id);
-  else fovStore.nudgeRotation(id, stepDeg);
 }
 
 function closeFovPopup() {
@@ -144,12 +76,6 @@ function openFovPopup() {
 function togglePopup() {
   if (fovPopupEl) { closeFovPopup(); return; }
   openFovPopup();
-}
-
-function toggleRibbon() {
-  ribbonOpen.value = !ribbonOpen.value;
-  fovUiState.ribbonOpen = ribbonOpen.value;
-  saveFovUiState(fovUiState);
 }
 
 function suppress(v: boolean) {

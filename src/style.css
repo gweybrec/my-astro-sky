@@ -4862,40 +4862,11 @@ details.targets-form-details[open] .targets-form-summary::before {
   backdrop-filter: blur(4px);
 }
 
-.fov-ribbon--collapsed .fov-rotate-btn { display: none; }
-
 /* Telescope button SVG fills the button naturally */
 .fov-telescope-btn svg { width: var(--font-size-large); height: var(--font-size-large); }
 
-/* Rotation icons fill most of the button; SVG viewBox handles layout */
-.fov-rotate-btn svg { width: 28px; height: 28px; display: block; }
-
 /* Show/hide-frames eye toggle — inset like the corner controls (§2.19) */
 .fov-visibility-btn svg { width: 16px; height: 16px; display: block; }
-
-/* Toggle tab — sticks out to the right of the ribbon like the left-panel toggle */
-.fov-ribbon-toggle {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 14px;
-  height: 22px;
-  padding: 0;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-panel);
-  border-left: none;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-micro);
-  line-height: 1;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.14s ease, color 0.14s ease;
-}
-.fov-ribbon-toggle:hover { background: var(--bg-hover); color: var(--text-bright); }
 
 /* ─── FOV popup ─── */
 .fov-popup {

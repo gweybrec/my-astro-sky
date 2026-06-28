@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { RenderableFrame, FovFrameChange, FovFrameResizeRegion } from '../sky-map';
-import { planGrid, tileCenters, framePointToSky, skyToFrameOffset, mosaicShapeFromOffsets, addCandidateOffsets, smartMosaicEnvelope, clampSmartMosaicSize } from '../mosaic';
+import { planGrid, tileCenters, framePointToSky, skyToFrameOffset, mosaicShapeFromOffsets, addCandidateOffsets, smartMosaicEnvelope, clampSmartMosaicSize, autoRegionForDsos } from '../mosaic';
 import type { SmartMosaicEnvelope } from '../mosaic';
 import { getGearSetups, updatePlanMosaicAPI } from '../api';
 import { getTelescopes, getCameras, getAccessories, buildGearPreset } from '../gear-catalog';
@@ -33,7 +33,32 @@ export interface AdhocFrame {
   mosaicHDeg?: number | null;
 }
 
+/**
+ * An ad-hoc (free, not plan-derived) mosaic, persisted to localStorage. Mirrors a
+ * plan mosaic: a sky-anchored tile grid, edited on-canvas (move/rotate/resize,
+ * add/remove tile). Tiles are stored explicitly so a trimmed/non-rectangular set
+ * survives a move or rotation.
+ */
+export interface AdhocMosaic {
+  id: string;
+  setupId: string;
+  dsoId: string | null;
+  /** User-supplied name (from the mosaic modal); null ⇒ fall back to DSO/gear name. */
+  name?: string | null;
+  centerRa: number;
+  centerDec: number;
+  paDeg: number;
+  overlapPct: number;
+  cols: number;
+  rows: number;
+  tiles: Array<{ ra: number; dec: number; paDeg: number | null }>;
+}
+
+/** Geometry + identity of a free mosaic, minus its id (the create payload). */
+export type AdhocMosaicSpec = Omit<AdhocMosaic, 'id'>;
+
 const STORE_KEY = 'fov-frames-v1';
+const MOSAIC_STORE_KEY = 'fov-adhoc-mosaics-v1';
 const SELECTION_KEY = 'fov-frame-selection-v1';
 const ANCHOR_SNAP_KEY = 'fov-anchor-snap-v1';
 const PLAN_FLOATING_KEY = 'fov-plan-floating-v1';
@@ -56,9 +81,57 @@ function isNearNativeFov(wDeg: number, hDeg: number, nativeWDeg: number, nativeH
   return wDeg <= nativeWDeg * 1.01 && hDeg <= nativeHDeg * 1.01;
 }
 
+/**
+ * Ids of the mosaic tiles that have at least one free cardinal neighbour ("border"
+ * tiles) — only these show a per-tile delete button; inner tiles surrounded on all
+ * 4 sides cannot be removed individually. Grid cells are keyed relative to the
+ * first tile (not the centre): an even-sized grid sits half a step off the centre,
+ * where gnomonic distortion flips Math.round inconsistently and collapses distinct
+ * tiles onto the same cell. Inter-tile offsets are whole-step multiples and round
+ * cleanly. Shared by the plan and free (ad-hoc) mosaic render branches.
+ */
+function computeBorderTileIds(
+  tiles: Array<{ id: string; ra: number; dec: number }>,
+  center: { ra: number; dec: number },
+  paDeg: number,
+  stepW: number,
+  stepH: number,
+): Set<string> {
+  const out = new Set<string>();
+  if (tiles.length === 0) return out;
+  const offsets = tiles.map(t => ({ id: t.id, ...skyToFrameOffset(center, paDeg, t.ra, t.dec) }));
+  const ref = offsets[0];
+  const gridPositions = offsets.map(o => ({
+    id: o.id,
+    col: stepW > 0 ? Math.round((o.gx - ref.gx) / stepW) : 0,
+    row: stepH > 0 ? Math.round((ref.gy - o.gy) / stepH) : 0,
+  }));
+  const occupied = new Set(gridPositions.map(p => `${p.col},${p.row}`));
+  for (const p of gridPositions) {
+    const inner =
+      occupied.has(`${p.col - 1},${p.row}`) &&
+      occupied.has(`${p.col + 1},${p.row}`) &&
+      occupied.has(`${p.col},${p.row - 1}`) &&
+      occupied.has(`${p.col},${p.row + 1}`);
+    if (!inner) out.add(p.id);
+  }
+  return out;
+}
+
 function loadAdhoc(): AdhocFrame[] {
   try {
     const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadAdhocMosaics(): AdhocMosaic[] {
+  try {
+    const raw = localStorage.getItem(MOSAIC_STORE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -130,6 +203,9 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
   const plansStore = usePlansStore();
 
   const adhoc = ref<AdhocFrame[]>(loadAdhoc());
+  // Free (not plan-derived) mosaics, persisted locally — the free-mode mirror of
+  // plan mosaics. Edited on-canvas via the same interactions.
+  const adhocMosaics = ref<AdhocMosaic[]>(loadAdhocMosaics());
   const activeId = ref<string | null>(null);
   // The selected mosaic (group), mutually exclusive with a single active frame.
   const activeMosaicId = ref<string | null>(null);
@@ -166,6 +242,14 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       localStorage.setItem(STORE_KEY, JSON.stringify(adhoc.value));
     } catch (err) {
       reportUnknownRendererError('fov_frames_persist', err);
+    }
+  }
+
+  function persistAdhocMosaics(): void {
+    try {
+      localStorage.setItem(MOSAIC_STORE_KEY, JSON.stringify(adhocMosaics.value));
+    } catch (err) {
+      reportUnknownRendererError('fov_adhoc_mosaics_persist', err);
     }
   }
 
@@ -235,15 +319,26 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     persistHidden();
   }
 
-  /** Show/hide every free frame at once (the select-all checkbox). */
+  /** Show/hide a single free mosaic on the map (keyed, like frames, by its id). */
+  function setAdhocMosaicVisible(id: string, visible: boolean): void {
+    const next = { ...adhocHidden.value };
+    if (visible) delete next[id]; else next[id] = true;
+    adhocHidden.value = next;
+    if (!visible && activeMosaicId.value === id) activeMosaicId.value = null; // can't edit a hidden mosaic
+    persistHidden();
+  }
+
+  /** Show/hide every free frame and mosaic at once (the select-all checkbox). */
   function setAllAdhocVisible(visible: boolean): void {
     if (visible) {
       adhocHidden.value = {};
     } else {
       const next: Record<string, boolean> = {};
       for (const f of adhoc.value) next[f.id] = true;
+      for (const m of adhocMosaics.value) next[m.id] = true;
       adhocHidden.value = next;
       if (activeId.value && adhoc.value.some(f => f.id === activeId.value)) activeId.value = null;
+      if (activeMosaicId.value && adhocMosaics.value.some(m => m.id === activeMosaicId.value)) activeMosaicId.value = null;
     }
     persistHidden();
   }
@@ -328,30 +423,10 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       for (const mosaic of plan.mosaics ?? []) {
         const { stepW, stepH } = mosaicStep(spec, mosaic.overlapPct);
         const mosaicEntries = tiles.filter(e => e.mosaicId === mosaic.id && e.ra != null && e.dec != null);
-        const center = { ra: mosaic.centerRa, dec: mosaic.centerDec };
-        // Key grid cells relative to a present tile, not the mosaic centre: an
-        // even-sized grid sits half a step off the centre, so rounding gx/stepW
-        // lands on .5 boundaries where gnomonic distortion flips Math.round
-        // inconsistently and collapses distinct tiles onto the same cell. Inter-
-        // tile offsets are whole-step multiples and round cleanly (same trick as
-        // mosaicShapeFromOffsets / addCandidateOffsets).
-        const offsets = mosaicEntries.map(e => ({ id: e.id, ...skyToFrameOffset(center, mosaic.paDeg, e.ra!, e.dec!) }));
-        if (offsets.length === 0) continue;
-        const ref = offsets[0];
-        const gridPositions = offsets.map(o => ({
-          id: o.id,
-          col: stepW > 0 ? Math.round((o.gx - ref.gx) / stepW) : 0,
-          row: stepH > 0 ? Math.round((ref.gy - o.gy) / stepH) : 0,
-        }));
-        const occupied = new Set(gridPositions.map(p => `${p.col},${p.row}`));
-        for (const p of gridPositions) {
-          const inner =
-            occupied.has(`${p.col - 1},${p.row}`) &&
-            occupied.has(`${p.col + 1},${p.row}`) &&
-            occupied.has(`${p.col},${p.row - 1}`) &&
-            occupied.has(`${p.col},${p.row + 1}`);
-          if (!inner) borderTileIds.add(p.id);
-        }
+        for (const id of computeBorderTileIds(
+          mosaicEntries.map(e => ({ id: e.id, ra: e.ra!, dec: e.dec! })),
+          { ra: mosaic.centerRa, dec: mosaic.centerDec }, mosaic.paDeg, stepW, stepH,
+        )) borderTileIds.add(id);
       }
 
       // Resolve each standalone entry to a frame centre, then order them exactly
@@ -457,6 +532,54 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
         });
       } else {
         out.push({ ...base, anchorKind: 'screen', nx: f.anchor.nx, ny: f.anchor.ny, screenRotationDeg: f.rotationDeg });
+      }
+    }
+
+    // Free (ad-hoc) mosaics: the free-mode mirror of plan mosaics. Each renders as
+    // faint read-only tiles plus one selectable outline frame, exactly like a plan
+    // mosaic; interactions route to the free-mosaic ops by the `mosaic:free:` id.
+    for (const m of adhocMosaics.value) {
+      const spec = specs.value.get(m.setupId);
+      if (!spec) continue;
+      const outlineId = `mosaic:free:${m.id}`;
+      const center = { ra: m.centerRa, dec: m.centerDec };
+      const { stepW, stepH } = mosaicStep(spec, m.overlapPct);
+      const tilesWithIds = m.tiles.map((t, i) => ({ id: `free-tile:${m.id}:${i}`, ...t }));
+      const borderSet = computeBorderTileIds(
+        tilesWithIds.map(t => ({ id: t.id, ra: t.ra, dec: t.dec })), center, m.paDeg, stepW, stepH,
+      );
+      const floating = mosaicFloating.value[m.id];
+      const visible = isAdhocVisible(m.id);
+      // Tiles hide while the mosaic floats (outline becomes screen-anchored) or
+      // when the mosaic is toggled off via its checkbox.
+      if (!floating && visible) {
+        for (const t of tilesWithIds) {
+          out.push({
+            id: t.id, name: spec.name, label: spec.label, wDeg: spec.wDeg, hDeg: spec.hDeg,
+            active: false, movable: false, pinnable: false, derivesTargetFromContent: false,
+            anchorKind: 'sky', ra: t.ra, dec: t.dec, paDeg: t.paDeg,
+            mosaicId: m.id, mosaicIsBorderTile: borderSet.has(t.id),
+          });
+        }
+      }
+      const f = 1 - m.overlapPct / 100;
+      const wDeg = (m.cols - 1) * spec.wDeg * f + spec.wDeg;
+      const hDeg = (m.rows - 1) * spec.hDeg * f + spec.hDeg;
+      const dso = m.dsoId ? getDSOById(m.dsoId) : undefined;
+      // A user-supplied name wins (multi-DSO mosaics have no single DSO to name
+      // them); otherwise fall back to the DSO's name, then the gear spec.
+      const mosaicName = m.name ?? (dso ? (dso.displayName ?? dso.id) : null);
+      const base = {
+        id: outlineId, name: mosaicName ?? spec.name, label: spec.label, wDeg, hDeg,
+        active: m.id === activeMosaicId.value, visible,
+        movable: true, pinnable: true, isMosaicOutline: true,
+        derivesTargetFromContent: true, anchorSnap: !!m.dsoId && isAnchorSnapOn(outlineId),
+        dsoId: m.dsoId, anchorLabel: mosaicName,
+      };
+      if (floating) {
+        out.push({ ...base, resizable: false, anchorKind: 'screen', nx: floating.nx, ny: floating.ny, screenRotationDeg: floating.rotationDeg });
+      } else {
+        out.push({ ...base, resizable: true, anchorKind: 'sky', ra: m.centerRa, dec: m.centerDec, paDeg: m.paDeg });
       }
     }
 
@@ -577,7 +700,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
    * in the mosaic (the outline still encloses the tiles symmetrically).
    */
   function recenterMosaicTiles(
-    planId: string,
+    anchorKey: string,
     mosaic: { id: string; centerRa: number; centerDec: number; paDeg: number; dsoId: string | null; cols: number; rows: number },
     tiles: Array<{ ra: number; dec: number; paDeg: number | null }>,
     stepW: number,
@@ -587,7 +710,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     const oldPa = mosaic.paDeg;
     const offsets = tiles.map(t => skyToFrameOffset(oldCenter, oldPa, t.ra, t.dec));
     const shape = mosaicShapeFromOffsets(offsets, stepW, stepH);
-    const anchorOn = isAnchorSnapOn(`mosaic:${planId}:${mosaic.id}`);
+    const anchorOn = isAnchorSnapOn(anchorKey);
     const dso = anchorOn && mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
     let newCenter: { ra: number; dec: number };
     let newTiles = tiles;
@@ -615,6 +738,16 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
   const activeMosaicAddCandidates = computed<Array<{ ra: number; dec: number }>>(() => {
     const mid = activeMosaicId.value;
     if (!mid || mosaicFloating.value[mid]) return [];
+    // Free mosaic: candidates are the empty cells around its current tiles.
+    const fm = adhocMosaics.value.find(m => m.id === mid);
+    if (fm) {
+      const spec = specs.value.get(fm.setupId);
+      if (!spec) return [];
+      const center = { ra: fm.centerRa, dec: fm.centerDec };
+      const offsets = fm.tiles.map(t => skyToFrameOffset(center, fm.paDeg, t.ra, t.dec));
+      const { stepW, stepH } = mosaicStep(spec, fm.overlapPct);
+      return addCandidateOffsets(offsets, stepW, stepH).map(c => framePointToSky(center, fm.paDeg, c.gx, c.gy));
+    }
     const plan = plansStore.plans.find(p => p.mosaics?.some(m => m.id === mid));
     const mosaic = plan?.mosaics.find(m => m.id === mid);
     const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
@@ -631,6 +764,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
    * then recentre + regrid the bounding box and persist. */
   function addMosaicTile(ra: number, dec: number): void {
     const mid = activeMosaicId.value;
+    if (mid && findAdhocMosaic(mid)) { addAdhocMosaicTile(mid, ra, dec); return; }
     const plan = mid ? plansStore.plans.find(p => p.mosaics?.some(m => m.id === mid)) : undefined;
     const mosaic = plan?.mosaics.find(m => m.id === mid);
     const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
@@ -640,7 +774,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       .map(e => ({ ra: e.ra!, dec: e.dec!, paDeg: e.paDeg }));
     tiles.push({ ra, dec, paDeg: mosaic.paDeg });
     const { stepW, stepH } = mosaicStep(spec, mosaic.overlapPct);
-    const newTiles = recenterMosaicTiles(plan.id, mosaic, tiles, stepW, stepH);
+    const newTiles = recenterMosaicTiles(`mosaic:${plan.id}:${mosaic.id}`, mosaic, tiles, stepW, stepH);
     persistMosaicTiles(plan.id, mid, newTiles);
   }
 
@@ -651,6 +785,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
    * recomputed so the displayed scale stays correct.
    */
   function removeMosaicTile(tileId: string): void {
+    if (tileId.startsWith('free-tile:')) { removeAdhocMosaicTile(tileId); return; }
     const [, planId, entryId] = tileId.split(':');
     const plan = plansStore.plans.find(p => p.id === planId);
     const entry = plan?.entries.find(e => e.id === entryId);
@@ -665,9 +800,153 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     // stays aligned with them — trimming a whole edge must not shift the outline.
     // With the anchor on, re-anchor onto the target DSO instead (see helper).
     const newTiles = recenterMosaicTiles(
-      planId, mosaic, remaining.map(e => ({ ra: e.ra!, dec: e.dec!, paDeg: e.paDeg })), stepW, stepH,
+      `mosaic:${planId}:${mosaic.id}`, mosaic, remaining.map(e => ({ ra: e.ra!, dec: e.dec!, paDeg: e.paDeg })), stepW, stepH,
     );
     persistMosaicTiles(planId, mosaic.id, newTiles);
+  }
+
+  // ── Free (ad-hoc) mosaics ──────────────────────────────────────────────────
+  // The free-mode mirror of the plan-mosaic ops above. They reuse the same
+  // geometry helpers (tileCenters, recenterMosaicTiles, …) but read/write the
+  // local adhocMosaics list instead of a plan, and persist to localStorage.
+
+  function findAdhocMosaic(id: string): AdhocMosaic | undefined {
+    return adhocMosaics.value.find(m => m.id === id);
+  }
+
+  /** Create a free mosaic from an explicit spec (the mosaic modal's output),
+   * switch to free mode, select it, and return its id. */
+  function createAdhocMosaic(spec: AdhocMosaicSpec): string {
+    if (selection.value.kind !== 'free') { selection.value = { kind: 'free' }; persistSelection(); }
+    const id = genId();
+    adhocMosaics.value.push({ id, ...spec });
+    activeMosaicId.value = id;
+    activeId.value = null;
+    persistAdhocMosaics();
+    return id;
+  }
+
+  /** Quick free mosaic on a DSO: auto-size the grid to cover the object (from its
+   * catalog angular size) at the default overlap — no modal. Falls back to a
+   * single tile when the gear spec or the object's size is unknown. */
+  function addAdhocMosaic(setupId: string, ra: number, dec: number, dsoId: string | null = null): void {
+    const overlapPct = 20;
+    const spec = specs.value.get(setupId);
+    if (!spec) {
+      createAdhocMosaic({ setupId, dsoId, name: null, centerRa: ra, centerDec: dec, paDeg: 0, overlapPct, cols: 1, rows: 1, tiles: [{ ra, dec, paDeg: 0 }] });
+      return;
+    }
+    const dso = dsoId ? getDSOById(dsoId) : undefined;
+    const { center, region } = dso
+      ? autoRegionForDsos([dso], overlapPct)
+      : { center: { ra, dec }, region: { wDeg: 0, hDeg: 0, paDeg: 0 } };
+    const grid = planGrid(spec.wDeg, spec.hDeg, region.wDeg, region.hDeg, overlapPct);
+    const cols = Math.max(1, grid.cols), rows = Math.max(1, grid.rows);
+    const tiles = tileCenters(center, region.paDeg, cols, rows, spec.wDeg, spec.hDeg, overlapPct)
+      .map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg }));
+    createAdhocMosaic({ setupId, dsoId, name: null, centerRa: center.ra, centerDec: center.dec, paDeg: region.paDeg, overlapPct, cols, rows, tiles });
+  }
+
+  /** Remove a free mosaic (clearing selection/floating state). */
+  function removeAdhocMosaic(id: string): void {
+    const i = adhocMosaics.value.findIndex(m => m.id === id);
+    if (i < 0) return;
+    adhocMosaics.value.splice(i, 1);
+    if (activeMosaicId.value === id) activeMosaicId.value = null;
+    if (mosaicFloating.value[id]) { const next = { ...mosaicFloating.value }; delete next[id]; mosaicFloating.value = next; }
+    if (adhocHidden.value[id]) { const next = { ...adhocHidden.value }; delete next[id]; adhocHidden.value = next; persistHidden(); }
+    persistAdhocMosaics();
+  }
+
+  /** Move/rotate/retarget a whole free mosaic, preserving the tile set (each tile
+   * keeps its frame-local offset). Mirrors {@link transformMosaic}. */
+  function transformAdhocMosaic(id: string, fields: { centerRa?: number; centerDec?: number; paDeg?: number; dsoId?: string | null }): void {
+    const m = findAdhocMosaic(id);
+    if (!m) return;
+    const offsets = m.tiles.map(t => skyToFrameOffset({ ra: m.centerRa, dec: m.centerDec }, m.paDeg, t.ra, t.dec));
+    if (fields.centerRa != null) m.centerRa = fields.centerRa;
+    if (fields.centerDec != null) m.centerDec = fields.centerDec;
+    if (fields.paDeg != null) m.paDeg = fields.paDeg;
+    if (fields.dsoId !== undefined) m.dsoId = fields.dsoId;
+    const center = { ra: m.centerRa, dec: m.centerDec };
+    m.tiles = offsets.map(o => {
+      const p = framePointToSky(center, m.paDeg, o.gx, o.gy);
+      return { ra: p.ra, dec: p.dec, paDeg: m.paDeg };
+    });
+    persistAdhocMosaics();
+  }
+
+  /** Re-tile a free mosaic to a new region (corner-resize drag). Regrids to a full
+   * rectangle. Mirrors {@link resizeMosaic}. */
+  function resizeAdhocMosaic(id: string, region: FovFrameResizeRegion): void {
+    const m = findAdhocMosaic(id);
+    const spec = m ? specs.value.get(m.setupId) : undefined;
+    if (!m || !spec) return;
+    const { cols, rows } = planGrid(spec.wDeg, spec.hDeg, region.wDeg, region.hDeg, m.overlapPct);
+    m.cols = Math.max(1, cols);
+    m.rows = Math.max(1, rows);
+    m.centerRa = region.centerRa;
+    m.centerDec = region.centerDec;
+    m.paDeg = region.paDeg;
+    m.tiles = tileCenters({ ra: m.centerRa, dec: m.centerDec }, m.paDeg, m.cols, m.rows, spec.wDeg, spec.hDeg, m.overlapPct)
+      .map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg }));
+    persistAdhocMosaics();
+  }
+
+  /** Add a tile to a free mosaic at the given sky position, then recentre/regrid. */
+  function addAdhocMosaicTile(mosaicId: string, ra: number, dec: number): void {
+    const m = findAdhocMosaic(mosaicId);
+    const spec = m ? specs.value.get(m.setupId) : undefined;
+    if (!m || !spec) return;
+    const tiles = m.tiles.map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg }));
+    tiles.push({ ra, dec, paDeg: m.paDeg });
+    const { stepW, stepH } = mosaicStep(spec, m.overlapPct);
+    m.tiles = recenterMosaicTiles(`mosaic:free:${m.id}`, m, tiles, stepW, stepH);
+    persistAdhocMosaics();
+  }
+
+  /** Remove a single tile from a free mosaic (`free-tile:<mosaicId>:<index>`).
+   * Removing the last tile deletes the mosaic. */
+  function removeAdhocMosaicTile(tileId: string): void {
+    const [, mosaicId, idxStr] = tileId.split(':');
+    const idx = Number(idxStr);
+    const m = findAdhocMosaic(mosaicId);
+    const spec = m ? specs.value.get(m.setupId) : undefined;
+    if (!m || !spec || !Number.isInteger(idx)) return;
+    const remaining = m.tiles.filter((_, i) => i !== idx);
+    if (remaining.length === 0) { removeAdhocMosaic(mosaicId); return; }
+    const { stepW, stepH } = mosaicStep(spec, m.overlapPct);
+    m.tiles = recenterMosaicTiles(`mosaic:free:${m.id}`, m, remaining, stepW, stepH);
+    persistAdhocMosaics();
+  }
+
+  /** Move a free (pinned) frame into a plan as a custom-location entry, then drop
+   * the free frame. Floating frames have no sky position, so they're skipped. */
+  async function migrateFreeFrameToPlan(adhocId: string, planId: string): Promise<void> {
+    const f = adhoc.value.find(x => x.id === adhocId);
+    if (!f || f.anchor.kind !== 'sky') return;
+    const { ra, dec, dsoId } = f.anchor;
+    const entryId = await plansStore.addCustomEntry(planId, ra, dec);
+    if (!entryId) return;
+    plansStore.setEntryPosition(planId, entryId, { dsoId, paDeg: f.rotationDeg });
+    removeFrame(adhocId);
+    setSelection({ kind: 'plan', planId });
+    activeId.value = `plan:${planId}:${entryId}`;
+  }
+
+  /** Move a free mosaic into a plan (re-creating it as a plan mosaic with the same
+   * tiles), then drop the free mosaic. */
+  async function migrateFreeMosaicToPlan(adhocId: string, planId: string): Promise<void> {
+    const m = findAdhocMosaic(adhocId);
+    if (!m) return;
+    const newId = await plansStore.createMosaic(planId, {
+      dsoId: m.dsoId, name: m.name ?? undefined, centerRa: m.centerRa, centerDec: m.centerDec, paDeg: m.paDeg,
+      overlapPct: m.overlapPct, cols: m.cols, rows: m.rows,
+      tiles: m.tiles.map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg })),
+    });
+    removeAdhocMosaic(adhocId);
+    setSelection({ kind: 'plan', planId });
+    if (newId) activeMosaicId.value = newId;
   }
 
   /** Sky centre of a plan entry (explicit frame centre, else its DSO position). */
@@ -835,6 +1114,8 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     // A mosaic outline frame: route move/rotate/pin to the whole mosaic.
     if (id.startsWith('mosaic:')) {
       const mosaicId = id.split(':')[2];
+      // A free mosaic (`mosaic:free:<id>`) routes to the local ad-hoc ops.
+      const transform = id.split(':')[1] === 'free' ? transformAdhocMosaic : transformMosaic;
       // Unpinned to floating: hold transient screen state; tiles hide.
       if (change.anchor && change.anchor.kind === 'screen') {
         const cur = mosaicFloating.value[mosaicId];
@@ -847,7 +1128,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       // Pinned to the sky: clear floating and re-tile at the new centre/target.
       if (change.anchor && change.anchor.kind === 'sky') {
         if (mosaicFloating.value[mosaicId]) { const next = { ...mosaicFloating.value }; delete next[mosaicId]; mosaicFloating.value = next; }
-        transformMosaic(mosaicId, { centerRa: change.anchor.ra, centerDec: change.anchor.dec, paDeg: change.paDeg, dsoId: change.anchor.dsoId });
+        transform(mosaicId, { centerRa: change.anchor.ra, centerDec: change.anchor.dec, paDeg: change.paDeg, dsoId: change.anchor.dsoId });
         return;
       }
       // Rotating while floating updates the transient rotation only.
@@ -856,7 +1137,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
         if (cur) mosaicFloating.value = { ...mosaicFloating.value, [mosaicId]: { ...cur, rotationDeg: change.screenRotationDeg } };
         return;
       }
-      if (change.paDeg !== undefined) transformMosaic(mosaicId, { paDeg: change.paDeg });
+      if (change.paDeg !== undefined) transform(mosaicId, { paDeg: change.paDeg });
       return;
     }
     if (id.startsWith('plan:')) {
@@ -909,7 +1190,12 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
    */
   async function applyResize(id: string, region: FovFrameResizeRegion): Promise<void> {
     // Resizing an existing mosaic outline re-tiles it to the new region.
-    if (id.startsWith('mosaic:')) { resizeMosaic(id.split(':')[2], region); return; }
+    if (id.startsWith('mosaic:')) {
+      const mosaicId = id.split(':')[2];
+      if (id.split(':')[1] === 'free') resizeAdhocMosaic(mosaicId, region);
+      else resizeMosaic(mosaicId, region);
+      return;
+    }
 
     // Free (ad-hoc) frame: only a smart scope resizes — the single frame enlarges
     // within its envelope (no tiling). Size is stored on the frame; a resize back
@@ -1026,6 +1312,15 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     toggleFramesVisible,
     addAdhocFrame,
     addAdhocFrameAtSky,
+    adhocMosaics,
+    addAdhocMosaic,
+    createAdhocMosaic,
+    setAdhocMosaicVisible,
+    transformAdhocMosaic,
+    resizeAdhocMosaic,
+    removeAdhocMosaic,
+    migrateFreeFrameToPlan,
+    migrateFreeMosaicToPlan,
     restoreAdhocFrame,
     addPlanFrame,
     removeFrame,

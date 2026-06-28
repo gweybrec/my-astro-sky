@@ -8,8 +8,6 @@ vi.mock('../../src/api', () => ({
 }));
 
 vi.mock('../../src/fov-overlay', () => ({
-  loadFovUiState: () => ({ frameRotationDeg: 0, ribbonOpen: true }),
-  saveFovUiState: vi.fn(),
   buildFovPopup: vi.fn().mockReturnValue(document.createElement('div')),
 }));
 
@@ -139,44 +137,6 @@ describe('FOVRibbon — master show/hide-frames toggle', () => {
     await wrapper.find('.fov-visibility-btn').trigger('click');
     expect(sm.pinAllFloatingFrames).not.toHaveBeenCalled();
     expect(useFovFramesStore(pinia).toggleFramesVisible).toHaveBeenCalledTimes(1);
-  });
-
-  it('dims the rotation buttons when frames are hidden', async () => {
-    const pinia = createTestingPinia({
-      createSpy: vi.fn,
-      initialState: {
-        canvas: { skyMap: makeSkyMap(), pendingFovOverride: null },
-        fovFrames: { framesVisible: false, activeId: 'adhoc-1' },
-      },
-    });
-    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
-    await nextTick();
-
-    // Even with an active frame, hidden frames disable the rotation buttons and
-    // the tooltip explains they're off because frames are hidden.
-    const rotateBtn = wrapper.find('.fov-rotate-btn');
-    expect(rotateBtn.classes()).toContain('opacity-40');
-    expect(rotateBtn.classes()).toContain('cursor-not-allowed');
-    expect(rotateBtn.attributes('title')).toBe('fovOverlay.framesHiddenHint');
-    // The eye button itself stays interactive and offers to show frames.
-    expect(wrapper.find('.fov-visibility-btn').attributes('title')).toBe('fovOverlay.showFrames');
-  });
-
-  it('explains rotation is disabled when no frame is selected', async () => {
-    const pinia = createTestingPinia({
-      createSpy: vi.fn,
-      initialState: {
-        canvas: { skyMap: makeSkyMap(), pendingFovOverride: null },
-        fovFrames: { framesVisible: true, activeId: null },
-      },
-    });
-    const wrapper = mount(FOVRibbon, { global: { plugins: [pinia] } });
-    await nextTick();
-
-    const rotateBtn = wrapper.find('.fov-rotate-btn');
-    expect(rotateBtn.classes()).toContain('opacity-40');
-    expect(rotateBtn.classes()).toContain('cursor-not-allowed');
-    expect(rotateBtn.attributes('title')).toBe('fovOverlay.rotateNeedsSelection');
   });
 
   it('opens the frame manager when frames are shown via the eye toggle', async () => {

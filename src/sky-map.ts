@@ -401,6 +401,8 @@ export class SkyMap {
   // DSO click callback
   private hoveredDSO: DSO | null = null;
   private onDSOClick: ((dso: DSO) => void) | null = null;
+  // Clear-selection callback: fired on right-click to dismiss the active DSO/star selection.
+  private onClearSelection: (() => void) | null = null;
   // One-shot DSO picker: armed by a caller that wants the next DSO click (used
   // to choose a mosaic target). Fires once, alongside the normal click action.
   private onNextDSOPick: ((dso: DSO) => void) | null = null;
@@ -503,6 +505,7 @@ export class SkyMap {
   setOnFrameMerge(cb: (movedId: string, targetId: string) => void) { this.onFrameMerge = cb; }
   setOnPhotoClick(cb: (photoName: string) => void) { this.onPhotoClick = cb; }
   setOnDSOClick(cb: (dso: DSO) => void) { this.onDSOClick = cb; }
+  setOnClearSelection(cb: () => void) { this.onClearSelection = cb; }
 
   /** The currently selected/highlighted DSO id on the map, or null. */
   getHighlightedDSOId(): string | null { return this.highlightedDSO; }
@@ -890,6 +893,9 @@ export class SkyMap {
       if (e.button === 0) {
         const rectF = this.canvas.getBoundingClientRect();
         if (this.handleFrameMouseDown(e.clientX - rectF.left, e.clientY - rectF.top)) {
+          // A frame grab can start right over a DSO/star (e.g. the centre move
+          // dot sits on the DSO inside the frame), so hide any hover tooltip.
+          this.dismissTooltip();
           return; // frame interaction consumed the press — no pan
         }
         this.isPanning = true;
@@ -905,6 +911,14 @@ export class SkyMap {
           this.canvas.style.cursor = 'grabbing';
         }
       }
+    }) as EventListener);
+
+    // Right-click clears the active DSO/star selection (and suppresses the
+    // browser context menu when there was something to clear).
+    this.addEvent(this.canvas, 'contextmenu', ((e: MouseEvent) => {
+      if (this.highlightedDSO === null && this.highlightedStar === null) return;
+      e.preventDefault();
+      this.onClearSelection?.();
     }) as EventListener);
 
     this.addEvent(window, 'mousemove', ((e: MouseEvent) => {
@@ -1037,9 +1051,15 @@ export class SkyMap {
   setInteractionEnabled(enabled: boolean): void {
     this.interactionEnabled = enabled;
     if (!enabled) {
-      this.onStarHover?.(null, 0, 0);
-      this.onDSOHover?.(null, 0, 0);
+      this.dismissTooltip();
     }
+  }
+
+  /** Hide any visible hover tooltip (DSO or star) and clear the hovered DSO. */
+  private dismissTooltip(): void {
+    this.hoveredDSO = null;
+    this.onStarHover?.(null, 0, 0);
+    this.onDSOHover?.(null, 0, 0);
   }
 
   private findClosestDSO(mx: number, my: number): DSO | null {

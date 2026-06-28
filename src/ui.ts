@@ -83,6 +83,10 @@ let _selectDSOInSearch: (dsoId: string) => void = () => {};
 export function setSelectDSOInSearchHandler(fn: (dsoId: string) => void) {
   _selectDSOInSearch = fn;
 }
+let _clearDSOSelection: () => void = () => {};
+export function setClearDSOSelectionHandler(fn: () => void) {
+  _clearDSOSelection = fn;
+}
 
 export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery) {
   const panel = document.getElementById('side-panel')!;
@@ -157,6 +161,11 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     _selectDSOInSearch(dso.id);
   });
 
+  // Right-clicking the sky map clears the active DSO/star selection
+  skyMap.setOnClearSelection(() => {
+    _clearDSOSelection();
+  });
+
   // Navigate to map when clicking a gallery photo
   gallery.onNavigateToMap = (photo) => {
     window.dispatchEvent(new CustomEvent('switchToSkymap', {}));
@@ -201,7 +210,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setOnStarHover((star: Star | null, x: number, y: number) => {
     const ui = useUiStore(pinia);
     const ds = useDisplayStore(pinia);
-    if (!star || !ds.showStarTooltips || ui.isSkyTooltipSuppressed()) {
+    if (!star || !ds.showStarTooltips || ui.isSkyTooltipSuppressed(x, y)) {
       ui.setSkyTooltip(null, x, y);
       return;
     }
@@ -233,7 +242,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setOnDSOHover((dso: DSO | null, x: number, y: number) => {
     const ui = useUiStore(pinia);
     const ds = useDisplayStore(pinia);
-    if (!dso || !ds.showDSOTooltips || ui.isSkyTooltipSuppressed()) {
+    if (!dso || !ds.showDSOTooltips || ui.isSkyTooltipSuppressed(x, y)) {
       ui.setSkyTooltip(null, x, y);
       return;
     }

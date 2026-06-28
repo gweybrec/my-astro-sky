@@ -81,7 +81,7 @@ import { openDSOEditModal } from '../../dso-editor';
 import { buildFallbackDSOResult, findChipDSOResult, normalizeChipKey, shouldApplyChipSearchResults } from '../../dso-chip-search';
 import type { Star, DSO } from '../../types';
 import type { StarSearchResult } from '../../api';
-import { setDSOHighlight, setSelectDSOInSearchHandler } from '../../ui';
+import { setDSOHighlight, setSelectDSOInSearchHandler, setClearDSOSelectionHandler } from '../../ui';
 import StarInfoPanel from './StarInfoPanel.vue';
 import DSOInfoPanel from './DSOInfoPanel.vue';
 
@@ -281,10 +281,12 @@ function editDSO() {
 
 onMounted(() => {
   setSelectDSOInSearchHandler(selectDSOById);
+  setClearDSOSelectionHandler(() => clearState(true));
 });
 
 onUnmounted(() => {
   setSelectDSOInSearchHandler(() => {});
+  setClearDSOSelectionHandler(() => {});
   if (searchDebounce) clearTimeout(searchDebounce);
 });
 </script>
