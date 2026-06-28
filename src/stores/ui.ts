@@ -36,16 +36,29 @@ export function tooltipSafeZoneContains(
 export const useUiStore = defineStore('ui', () => {
   const canvasStore = useCanvasStore();
 
-  // Single source of truth for "is a modal/popup open": the presence of any
-  // full-screen overlay element in the DOM. Every modal/popup renders one of these
-  // backdrop overlays, so detection is automatic and needs no per-modal
-  // bookkeeping — this replaces the old register/unregisterModal mechanism that
-  // each overlay had to remember to call (and many didn't). To make a new overlay
-  // style block tooltips, give it one of these classes (or add the class here).
+  // Single source of truth for "is a modal open": the presence of any full-screen
+  // overlay element in the DOM. Every modal renders one of these backdrop overlays,
+  // so detection is automatic and needs no per-modal bookkeeping — this replaces
+  // the old register/unregisterModal mechanism that each overlay had to remember to
+  // call (and many didn't). Modals also block the map keyboard shortcuts. To make a
+  // new modal style block tooltips + shortcuts, give it one of these classes.
   const MODAL_OVERLAY_SELECTOR = '.modal-backdrop, .meta-editor-overlay, .dialog-overlay';
   function isModalOpen(): boolean {
     return typeof document !== 'undefined'
       && document.querySelector(MODAL_OVERLAY_SELECTOR) !== null;
+  }
+
+  // Non-modal floating popups that sit over the map (appended to <body> via
+  // positionPopup). They have no backdrop, so suppression is position-based: the
+  // tooltip is hidden only when the cursor is actually over the popup, so it can
+  // never render on top of one — but tooltips keep working over the rest of the
+  // open map (e.g. after "add frame" auto-opens the frame manager). Hit-testing the
+  // live cursor with elementFromPoint is leak-proof: unlike an enter/leave flag,
+  // there is nothing to get stuck if the popup is removed mid-hover.
+  const TOOLTIP_POPUP_SELECTOR = '.fov-popup, .photo-gear-popup';
+  function cursorOverPopup(clientX: number, clientY: number): boolean {
+    if (typeof document === 'undefined') return false;
+    return document.elementFromPoint(clientX, clientY)?.closest(TOOLTIP_POPUP_SELECTOR) != null;
   }
 
   const panelCollapsed = ref(false);
@@ -75,12 +88,16 @@ export const useUiStore = defineStore('ui', () => {
   // the whole page, so we suppress the hide until the mouse button is released.
   const skyTooltipSelecting = ref(false);
   const _forceSuppressTooltip = ref(false);
-  // Sky tooltips (star + DSO hover) are suppressed whenever a modal/popup is open,
-  // or while a backdrop-less popup (dropdown, gear popup, FOV ribbon) requested it.
-  // Read on every canvas hover, so a freshly-opened modal hides the tooltip on the
-  // next mouse move without any per-modal registration.
-  function isSkyTooltipSuppressed(): boolean {
-    return _forceSuppressTooltip.value || isModalOpen();
+  // Sky tooltips (star + DSO hover) are suppressed whenever a modal is open (its
+  // backdrop covers the whole map), while a small overlay control (FOV ribbon, map
+  // export / rotation buttons) requested it via the force flag on hover, or while
+  // the cursor is over a floating map popup. The cursor coords come from the canvas
+  // hover event; when absent (e.g. interaction disabled) only the modal/force checks
+  // apply.
+  function isSkyTooltipSuppressed(clientX?: number, clientY?: number): boolean {
+    if (_forceSuppressTooltip.value || isModalOpen()) return true;
+    if (clientX === undefined || clientY === undefined) return false;
+    return cursorOverPopup(clientX, clientY);
   }
 
   // True when the cursor sits in the safe zone between the anchor and the tooltip,

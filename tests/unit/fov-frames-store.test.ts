@@ -28,14 +28,16 @@ vi.mock('../../src/gear-presets', () => ({
 }));
 
 vi.mock('../../src/dso-catalog', () => ({
-  getDSOById: vi.fn((id: string) => (id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4 } : undefined)),
+  // M42 carries an angular size so the auto-sized free mosaic has a real footprint
+  // to cover (300'×240' → ~5°×4° + margin); other lookups stay size-less.
+  getDSOById: vi.fn((id: string) => (id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, majAxis: 300, minAxis: 240 } : undefined)),
 }));
 
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { useFovFramesStore } from '../../src/stores/fov-frames';
 import { usePlansStore } from '../../src/stores/plans';
-import { framePointToSky } from '../../src/mosaic';
+import { framePointToSky, tileCenters } from '../../src/mosaic';
 
 describe('fov-frames store', () => {
   beforeEach(() => {
@@ -786,6 +788,198 @@ describe('fov-frames store', () => {
     expect(outline.anchorLabel).toBeNull();
     expect(typeof outline.name).toBe('string');
     expect(outline.name.length).toBeGreaterThan(0);
+  });
+
+  // ── Free (ad-hoc) mosaics — the free-mode mirror of plan mosaics ─────────────
+  /** An explicit 2×2 free mosaic on M42, decoupled from addAdhocMosaic's
+   * auto-sizing so the generic mosaic-op tests have a fixed grid. */
+  function createFree2x2(store: ReturnType<typeof useFovFramesStore>): string {
+    const C = { ra: 83.8, dec: -5.4 };
+    const tiles = tileCenters(C, 0, 2, 2, 2.5, 1.7, 20).map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg }));
+    return store.createAdhocMosaic({ setupId: 's1', dsoId: 'M42', name: null, centerRa: C.ra, centerDec: C.dec, paDeg: 0, overlapPct: 20, cols: 2, rows: 2, tiles });
+  }
+
+  it('addAdhocMosaic auto-sizes the grid to cover the DSO at the default overlap, in free mode', async () => {
+    const store = await withSpecs();
+    store.setSelection({ kind: 'plan', planId: 'p1' }); // prove it switches back to free
+    store.addAdhocMosaic('s1', 84, -5, 'M42'); // M42: 300'×240' → ~4.8°×6.0° covering region
+
+    expect(store.selection).toEqual({ kind: 'free' });
+    expect(store.adhocMosaics).toHaveLength(1);
+    const m = store.adhocMosaics[0];
+    // tile 2.5°×1.7° at 20% overlap covering 4.8°×6.0° → 3 cols × 5 rows.
+    expect(m.cols).toBe(3);
+    expect(m.rows).toBe(5);
+    expect(m.tiles).toHaveLength(15);
+    // Centred on the object (single-DSO auto region anchors to it), not the click.
+    expect(m.centerRa).toBeCloseTo(83.8, 6);
+    expect(m.centerDec).toBeCloseTo(-5.4, 6);
+    expect(store.activeMosaicId).toBe(m.id);
+    expect(store.activeId).toBeNull();
+    expect(JSON.parse(localStorage.getItem('fov-adhoc-mosaics-v1')!)).toHaveLength(1);
+  });
+
+  it('addAdhocMosaic falls back to a single tile when the DSO has no catalog size', async () => {
+    const store = await withSpecs();
+    store.addAdhocMosaic('s1', 10, 20, 'UNKNOWN'); // getDSOById → undefined
+    const m = store.adhocMosaics[0];
+    expect(m.cols).toBe(1);
+    expect(m.rows).toBe(1);
+    expect(m.tiles).toHaveLength(1);
+  });
+
+  it('renders a free mosaic as faint tiles plus one selectable resizable outline', async () => {
+    const store = await withSpecs();
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+
+    const tiles = store.renderables.filter(f => f.mosaicId === id);
+    expect(tiles).toHaveLength(4);
+    expect(tiles.every(t => t.id.startsWith(`free-tile:${id}:`))).toBe(true);
+    expect(tiles.every(t => t.mosaicIsBorderTile === true)).toBe(true); // 2×2 → all border
+
+    const outline = store.renderables.find(f => f.id === `mosaic:free:${id}`)!;
+    expect(outline.isMosaicOutline).toBe(true);
+    expect(outline.movable).toBe(true);
+    expect(outline.pinnable).toBe(true);
+    expect(outline.resizable).toBe(true);
+    expect(outline.active).toBe(true);
+    expect(outline.anchorKind).toBe('sky');
+    expect(outline.dsoId).toBe('M42');
+  });
+
+  it('offers add-tile candidates around a free mosaic and adds one via the dispatcher', async () => {
+    const store = await withSpecs();
+    createFree2x2(store); // selected on creation
+    expect(store.activeMosaicAddCandidates).toHaveLength(8); // 2×2 → 8 perimeter cells
+    const spot = store.activeMosaicAddCandidates[0];
+    store.addMosaicTile(spot.ra, spot.dec);
+    expect(store.adhocMosaics[0].tiles).toHaveLength(5);
+  });
+
+  it('resizing a free mosaic outline re-tiles it to the new region', async () => {
+    const store = await withSpecs();
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+    // 9°×6° region with 2.5°×1.7° tiles at 20% overlap → 5×5 grid.
+    store.applyResize(`mosaic:free:${id}`, { centerRa: 83.8, centerDec: -5.4, wDeg: 9, hDeg: 6, paDeg: 0 });
+    const m = store.adhocMosaics[0];
+    expect(m.cols).toBe(5);
+    expect(m.rows).toBe(5);
+    expect(m.tiles).toHaveLength(25);
+  });
+
+  it('moving a free mosaic outline re-centres and preserves the tile count', async () => {
+    const store = await withSpecs();
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+    store.applyChange(`mosaic:free:${id}`, { anchor: { kind: 'sky', ra: 90, dec: 0, dsoId: 'M42' }, paDeg: 10 });
+    const m = store.adhocMosaics[0];
+    expect(m.centerRa).toBe(90);
+    expect(m.centerDec).toBe(0);
+    expect(m.paDeg).toBe(10);
+    expect(m.tiles).toHaveLength(4);
+  });
+
+  it('removing the last tile deletes the free mosaic', async () => {
+    const store = await withSpecs();
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+    // Tiles reindex after each removal, so removing index 0 four times empties it.
+    for (let i = 0; i < 4; i++) store.removeMosaicTile(`free-tile:${id}:0`);
+    expect(store.adhocMosaics).toHaveLength(0);
+  });
+
+  it('migrateFreeMosaicToPlan re-creates it as a plan mosaic and drops the free one', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{ id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId: 's1', entries: [], mosaics: [] }] as any;
+    const spy = vi.spyOn(plans, 'createMosaic').mockResolvedValue('mo-new');
+
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+    await store.migrateFreeMosaicToPlan(id, 'p1');
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [pid, params] = spy.mock.calls[0] as any;
+    expect(pid).toBe('p1');
+    expect(params.cols).toBe(2);
+    expect(params.tiles).toHaveLength(4);
+    expect(store.adhocMosaics).toHaveLength(0);
+    expect(store.selection).toEqual({ kind: 'plan', planId: 'p1' });
+  });
+
+  it('migrateFreeFrameToPlan adds a custom entry and drops the free frame', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{ id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId: 's1', entries: [], mosaics: [] }] as any;
+    const addSpy = vi.spyOn(plans, 'addCustomEntry').mockResolvedValue('e-new');
+    const posSpy = vi.spyOn(plans, 'setEntryPosition').mockImplementation(() => {});
+
+    store.addAdhocFrameAtSky('s1', 83.8, -5.4, 'M42');
+    const fid = store.adhoc[0].id;
+    await store.migrateFreeFrameToPlan(fid, 'p1');
+
+    expect(addSpy).toHaveBeenCalledWith('p1', 83.8, -5.4);
+    expect(posSpy).toHaveBeenCalledWith('p1', 'e-new', { dsoId: 'M42', paDeg: 0 });
+    expect(store.adhoc).toHaveLength(0);
+    expect(store.selection).toEqual({ kind: 'plan', planId: 'p1' });
+  });
+
+  it('createAdhocMosaic stores the supplied name on the outline', async () => {
+    const store = await withSpecs();
+    store.createAdhocMosaic({
+      setupId: 's1', dsoId: 'M42', name: 'My free mosaic',
+      centerRa: 83.8, centerDec: -5.4, paDeg: 0, overlapPct: 20, cols: 2, rows: 2,
+      tiles: [{ ra: 83, dec: -5, paDeg: 0 }, { ra: 84, dec: -5, paDeg: 0 }],
+    });
+    const id = store.adhocMosaics[0].id;
+    const outline = store.renderables.find(f => f.id === `mosaic:free:${id}`)!;
+    expect(outline.name).toBe('My free mosaic');
+    expect(outline.anchorLabel).toBe('My free mosaic');
+  });
+
+  it('setAdhocMosaicVisible hides a free mosaic: tiles drop, outline visible:false, deselected', async () => {
+    const store = await withSpecs();
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+    expect(store.activeMosaicId).toBe(id);
+
+    store.setAdhocMosaicVisible(id, false);
+    expect(store.renderables.filter(f => f.mosaicId === id)).toHaveLength(0); // tiles hidden
+    expect(store.renderables.find(f => f.id === `mosaic:free:${id}`)!.visible).toBe(false);
+    expect(store.activeMosaicId).toBeNull(); // hiding the active mosaic deselects it
+    expect(JSON.parse(localStorage.getItem('fov-frame-hidden-v1')!)[id]).toBe(true);
+
+    store.setAdhocMosaicVisible(id, true);
+    expect(store.renderables.filter(f => f.mosaicId === id)).toHaveLength(4);
+    expect(store.renderables.find(f => f.id === `mosaic:free:${id}`)!.visible).toBe(true);
+  });
+
+  it('setAllAdhocVisible hides free frames and mosaics together', async () => {
+    const store = await withSpecs();
+    store.addAdhocFrame('s1');
+    createFree2x2(store);
+    const mid = store.adhocMosaics[0].id;
+
+    store.setAllAdhocVisible(false);
+    expect(store.renderables.find(f => f.id === `mosaic:free:${mid}`)!.visible).toBe(false);
+    expect(store.renderables.filter(f => f.mosaicId === mid)).toHaveLength(0);
+    expect(store.activeMosaicId).toBeNull();
+
+    store.setAllAdhocVisible(true);
+    expect(store.renderables.find(f => f.id === `mosaic:free:${mid}`)!.visible).toBe(true);
+  });
+
+  it('a free mosaic only renders in free mode (not while a plan is selected)', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{ id: 'p1', name: 'T', position: 0, nightOf: null, setupId: 's1', entries: [], mosaics: [] }] as any;
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+    expect(store.renderables.some(f => f.id === `mosaic:free:${id}`)).toBe(true);
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+    expect(store.renderables.some(f => f.id === `mosaic:free:${id}`)).toBe(false);
   });
 });
 

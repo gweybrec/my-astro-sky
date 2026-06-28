@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import {
   useUiStore,
@@ -243,13 +243,49 @@ describe('ui store — modal detection & tooltip suppression', () => {
     },
   );
 
-  it('suppresses tooltips for a backdrop-less popup via the force flag', () => {
+  // Non-modal floating map popups (FOV frames, photo gear) suppress tooltips only
+  // while the cursor is over them (position-based, via elementFromPoint), so
+  // tooltips keep working over the rest of the map. They are NOT modals.
+  it.each(['fov-popup', 'photo-gear-popup'])(
+    'suppresses tooltips only while the cursor is over a .%s popup',
+    (cls) => {
+      const ui = useUiStore();
+      const popup = document.createElement('div');
+      popup.className = cls;
+      const inner = document.createElement('button');
+      popup.appendChild(inner);
+      document.body.appendChild(popup);
+
+      // Cursor over the popup → suppressed; over the open map → not.
+      const spy = vi.spyOn(document, 'elementFromPoint').mockReturnValue(inner);
+      expect(ui.isModalOpen()).toBe(false);
+      expect(ui.isSkyTooltipSuppressed(10, 10)).toBe(true);
+
+      spy.mockReturnValue(document.body);
+      expect(ui.isSkyTooltipSuppressed(10, 10)).toBe(false);
+      spy.mockRestore();
+    },
+  );
+
+  it('does not suppress map tooltips while a popup is open but the cursor is elsewhere', () => {
+    const ui = useUiStore();
+    const popup = document.createElement('div');
+    popup.className = 'fov-popup';
+    document.body.appendChild(popup);
+    const spy = vi.spyOn(document, 'elementFromPoint').mockReturnValue(document.body);
+    // Regression: auto-opening the FOV popup (e.g. after "add frame") must not kill
+    // tooltips across the whole map.
+    expect(ui.isSkyTooltipSuppressed(500, 500)).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('suppresses tooltips for a backdrop-less control via the force flag', () => {
     const ui = useUiStore();
     ui.setForceSuppressTooltip(true);
     expect(ui.isModalOpen()).toBe(false); // no DOM overlay
-    expect(ui.isSkyTooltipSuppressed()).toBe(true);
+    expect(ui.isSkyTooltipSuppressed(10, 10)).toBe(true);
 
     ui.setForceSuppressTooltip(false);
-    expect(ui.isSkyTooltipSuppressed()).toBe(false);
+    expect(ui.isSkyTooltipSuppressed(10, 10)).toBe(false);
   });
 });

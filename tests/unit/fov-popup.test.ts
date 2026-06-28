@@ -57,15 +57,26 @@ describe('buildFovPopup', () => {
     popup.__cleanup?.();
   });
 
-  it('suppresses the sky tooltip while the cursor is over the popup', () => {
+  it('is marked .fov-popup so the store suppresses tooltips over it (no leaky enter/leave flag)', () => {
     seedPlan('s1', []);
     const ui = useUiStore();
+    // The popup no longer toggles a force-suppress flag on hover (which could get
+    // stuck if the popup is removed mid-hover). Instead it carries the .fov-popup
+    // marker; the store hit-tests the cursor against it.
     const spy = vi.spyOn(ui, 'setForceSuppressTooltip');
     const popup = buildFovPopup(() => {});
+    expect(popup.classList.contains('fov-popup')).toBe(true);
     popup.dispatchEvent(new MouseEvent('mouseenter'));
-    expect(spy).toHaveBeenCalledWith(true);
     popup.dispatchEvent(new MouseEvent('mouseleave'));
-    expect(spy).toHaveBeenCalledWith(false);
+    expect(spy).not.toHaveBeenCalled();
+
+    // Cursor over the popup → suppressed; over the map → not.
+    document.body.appendChild(popup);
+    const ptSpy = vi.spyOn(document, 'elementFromPoint').mockReturnValue(popup);
+    expect(ui.isSkyTooltipSuppressed(10, 10)).toBe(true);
+    ptSpy.mockReturnValue(document.body);
+    expect(ui.isSkyTooltipSuppressed(10, 10)).toBe(false);
+    ptSpy.mockRestore();
     popup.__cleanup?.();
   });
 
