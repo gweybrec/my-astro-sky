@@ -1,0 +1,50 @@
+# Line-ending and diff policy for the repo.
+#
+# Default: auto-detect text vs binary, store text as LF in the repo. The working
+# tree stays per-platform (respects core.autocrlf / core.eol), so Windows users
+# keep CRLF locally while the committed blobs are always LF.
+* text=auto
+
+# Force source/text files to be treated as TEXT regardless of content. This is the
+# guard against the NUL-byte trap: a stray control byte (e.g. an accidental "\x00"
+# in a template literal) otherwise makes Git classify the file as binary, which
+# silently disables line-ending normalization AND hides the file from diffs. With
+# an explicit `text` attribute, normalization and diffing always apply.
+*.ts    text
+*.tsx   text
+*.cts   text
+*.mts   text
+*.js    text
+*.mjs   text
+*.cjs   text
+*.jsx   text
+*.vue   text
+*.json  text
+*.css   text
+*.scss  text
+*.html  text
+*.svg   text
+*.md    text
+*.yml   text
+*.yaml  text
+*.sh    text eol=lf
+
+# Known binary assets: never apply text conversion or attempt to diff them.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.gif   binary
+*.ico   binary
+*.icns  binary
+*.fits  binary
+*.fit   binary
+*.wcs   binary
+*.gz    binary
+*.zip   binary
+*.db    binary
+*.node  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
