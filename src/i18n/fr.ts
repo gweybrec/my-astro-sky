@@ -153,6 +153,7 @@ const fr = {
     showStarTooltips: 'Afficher infobulles étoiles',
     showDSOTooltips: 'Afficher infobulles DSO',
     simplifiedDSOTooltips: 'Infobulles simplifiées',
+    autoDensity: 'Auto',
     togglePanel: 'Afficher/Masquer le panneau',
     rotateLeft: 'Tourner le ciel à gauche (5°)',
     rotateReset: 'Réinitialiser la rotation du ciel',
@@ -165,6 +166,10 @@ const fr = {
     fisheye: 'Projection',
     projStereo: 'Stéréo',
     projFisheye: 'Fisheye',
+  },
+  performance: {
+    section: 'Performances',
+    smoothMotion: 'Déplacement et zoom fluides',
   },
   shortcuts: {
     title: 'Raccourcis clavier',

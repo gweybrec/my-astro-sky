@@ -19,6 +19,11 @@
     <DisplayControlsSection />
   </Teleport>
 
+  <!-- Performance section (density sliders + auto) at the bottom of the panel -->
+  <Teleport to="#vue-performance-section">
+    <PerformanceSection />
+  </Teleport>
+
   <!-- Phase 5: settings modal -->
   <SettingsModal v-if="activeModal === 'settings'" @close="closeModal()" />
   <SolverSettingsModal v-if="activeModal === 'solverSettings'" @close="closeModal()" />
@@ -62,6 +67,7 @@ import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts';
 import PanelHeader from './components/panels/PanelHeader.vue';
 import PhotosSection from './components/panels/PhotosSection.vue';
 import DisplayControlsSection from './components/panels/DisplayControlsSection.vue';
+import PerformanceSection from './components/panels/PerformanceSection.vue';
 import UnifiedSearch from './components/panels/UnifiedSearch.vue';
 import SettingsModal from './components/modals/SettingsModal.vue';
 import SolverSettingsModal from './components/modals/SolverSettingsModal.vue';

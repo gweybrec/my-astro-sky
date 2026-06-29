@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import type { ConstellationStyle } from '../types';
 import { isIAUStyle } from '../types';
 import { loadSettings, saveSettings, normalizeRotationDeg } from '../display-settings';
+import { AUTO_STAR_BUDGET } from '../density-slider';
 import { useCanvasStore } from './canvas';
 
 export const useDisplayStore = defineStore('display', () => {
@@ -21,6 +22,9 @@ export const useDisplayStore = defineStore('display', () => {
   const visibleLabels = ref<{ [label: string]: boolean }>({ ...s.visibleLabels });
   const maxStarCount = ref(s.maxStarCount);
   const maxDSOCount = ref(s.maxDSOCount);
+  const autoStarDensity = ref(s.autoStarDensity);
+  const autoDSODensity = ref(s.autoDSODensity);
+  const reduceDetailWhileMoving = ref(s.reduceDetailWhileMoving);
   const skyOpacity = ref(s.skyOpacity);
   const backgroundOpacity = ref(s.backgroundOpacity);
   const showDSOs = ref(s.showDSOs);
@@ -49,6 +53,9 @@ export const useDisplayStore = defineStore('display', () => {
       visibleLabels: { ...visibleLabels.value },
       maxStarCount: maxStarCount.value,
       maxDSOCount: maxDSOCount.value,
+      autoStarDensity: autoStarDensity.value,
+      autoDSODensity: autoDSODensity.value,
+      reduceDetailWhileMoving: reduceDetailWhileMoving.value,
       skyOpacity: skyOpacity.value,
       backgroundOpacity: backgroundOpacity.value,
       showDSOs: showDSOs.value,
@@ -166,6 +173,37 @@ export const useDisplayStore = defineStore('display', () => {
     persist();
   }
 
+  function setAutoStarDensity(v: boolean) {
+    autoStarDensity.value = v;
+    // In auto mode the star budget is fixed (constellations + bright stars); pin it so the
+    // disabled slider and the renderer agree.
+    if (v) {
+      maxStarCount.value = AUTO_STAR_BUDGET;
+      canvasStore.skyMap?.setMaxStarCount(AUTO_STAR_BUDGET);
+    }
+    canvasStore.skyMap?.setAutoStarDensity(v);
+    persist();
+  }
+
+  function setAutoDSODensity(v: boolean) {
+    autoDSODensity.value = v;
+    canvasStore.skyMap?.setAutoDSODensity(v);
+    persist();
+  }
+
+  /** Applied from the SkyMap DSO performance lever: reflect the tuned DSO budget in the
+   * (disabled) slider and persist it, without re-pushing to the map (it set the value). */
+  function applyAutoDensity(dso: number) {
+    maxDSOCount.value = dso;
+    persist();
+  }
+
+  function setReduceDetailWhileMoving(v: boolean) {
+    reduceDetailWhileMoving.value = v;
+    canvasStore.skyMap?.setMotionLOD(v);
+    persist();
+  }
+
   function setShowDSOs(v: boolean) {
     showDSOs.value = v;
     canvasStore.skyMap?.setShowDSOs(v);
@@ -236,6 +274,7 @@ export const useDisplayStore = defineStore('display', () => {
     showStars, showConstellationLines, showConstellationNames,
     showStarLabels, showDSOLabels, showGrid, showPhotos, showPhotoOutlines,
     visibleLabels, maxStarCount, maxDSOCount,
+    autoStarDensity, autoDSODensity, reduceDetailWhileMoving,
     skyOpacity, backgroundOpacity,
     showDSOs, dsoTypes, dsoCatalogs,
     showStarTooltips, showDSOTooltips, simplifiedDSOTooltips,
@@ -246,6 +285,7 @@ export const useDisplayStore = defineStore('display', () => {
     setShowPhotos, setShowPhotoOutlines, setVisibleLabel, setAllLabels,
     setSkyOpacity, setBackgroundOpacity,
     setMaxStarCount, setMaxDSOCount,
+    setAutoStarDensity, setAutoDSODensity, applyAutoDensity, setReduceDetailWhileMoving,
     setShowStarTooltips, setShowDSOTooltips, setSimplifiedDSOTooltips,
     setHemisphere, setBorderLatDeg, onMapViewChanged, setMapRotationDeg,
     setShowDSOs, setDsoTypes, setDsoCatalogs,

@@ -180,34 +180,6 @@
       @update:model-value="displayStore.setBackgroundOpacity"
     />
 
-    <!-- Star density -->
-    <div class="display-controls-mag-row">
-      <label class="display-controls-mag-label">{{ t('display.maxStarCount') }} </label>
-      <input
-        type="range"
-        class="display-controls-mag-slider"
-        min="0"
-        :max="SLIDER_STEPS"
-        step="1"
-        :value="budgetToSliderPos(displayStore.maxStarCount, STAR_DENSITY_MAX)"
-        @input="(e) => displayStore.setMaxStarCount(sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), STAR_DENSITY_MAX))"
-      />
-    </div>
-
-    <!-- DSO density -->
-    <div class="display-controls-mag-row">
-      <label class="display-controls-mag-label">{{ t('display.maxDSOCount') }} </label>
-      <input
-        type="range"
-        class="display-controls-mag-slider"
-        min="0"
-        :max="SLIDER_STEPS"
-        step="1"
-        :value="budgetToSliderPos(displayStore.maxDSOCount, DSO_DENSITY_MAX)"
-        @input="(e) => displayStore.setMaxDSOCount(sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), DSO_DENSITY_MAX))"
-      />
-    </div>
-
     <!-- Tooltip toggles -->
     <CheckRow :label="t('display.showStarTooltips')" :model-value="displayStore.showStarTooltips" @update:model-value="displayStore.setShowStarTooltips" />
     <CheckRow :label="t('display.showDSOTooltips')" :model-value="displayStore.showDSOTooltips" @update:model-value="displayStore.setShowDSOTooltips" />
@@ -230,10 +202,6 @@ import { isIAUStyle } from '../../types';
 import type { ConstellationStyle } from '../../types';
 import { DSO_TYPES_ALL } from '../../display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
-import {
-  sliderPosToBudget, budgetToSliderPos,
-  STAR_DENSITY_MAX, DSO_DENSITY_MAX, SLIDER_STEPS,
-} from '../../density-slider';
 
 const { t } = useI18n();
 const displayStore = useDisplayStore();

@@ -155,6 +155,7 @@ const es: Translations = {
     showStarTooltips: 'Mostrar tooltips de estrellas',
     showDSOTooltips: 'Mostrar tooltips de OPC',
     simplifiedDSOTooltips: 'Tooltips simplificados',
+    autoDensity: 'Auto',
     togglePanel: 'Mostrar/Ocultar panel',
     rotateLeft: 'Girar el cielo a la izquierda (5°)',
     rotateReset: 'Restablecer la rotación del cielo',
@@ -167,6 +168,10 @@ const es: Translations = {
     fisheye: 'Proyección',
     projStereo: 'Estéreo',
     projFisheye: 'Ojo de pez',
+  },
+  performance: {
+    section: 'Rendimiento',
+    smoothMotion: 'Desplazamiento y zoom fluidos',
   },
   shortcuts: {
     title: 'Atajos de teclado',

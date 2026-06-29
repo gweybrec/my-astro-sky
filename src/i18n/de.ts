@@ -155,6 +155,7 @@ const de: Translations = {
     showStarTooltips: 'Stern-Tooltips anzeigen',
     showDSOTooltips: 'DSO-Tooltips anzeigen',
     simplifiedDSOTooltips: 'Vereinfachte Tooltips',
+    autoDensity: 'Auto',
     togglePanel: 'Panel ein-/ausblenden',
     rotateLeft: 'Himmel nach links drehen (5°)',
     rotateReset: 'Himmelsdrehung zurücksetzen',
@@ -167,6 +168,10 @@ const de: Translations = {
     fisheye: 'Projektion',
     projStereo: 'Stereo',
     projFisheye: 'Fischauge',
+  },
+  performance: {
+    section: 'Leistung',
+    smoothMotion: 'Flüssiges Schwenken & Zoomen',
   },
   shortcuts: {
     title: 'Tastenkürzel',
