@@ -59,6 +59,7 @@
       :groups="poiGroups"
       :selected="selectedPois"
       @update:selected="onPoiUpdate"
+      @open="refreshPois"
     />
 
     <!-- DSO types dropdown -->

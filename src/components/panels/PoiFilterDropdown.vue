@@ -4,7 +4,7 @@
       ref="btnRef"
       type="button"
       class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
-      @click.stop="isOpen = !isOpen"
+      @click.stop="toggleOpen"
     >{{ t('gallery.filterPoi') }}{{ selectedCount > 0 ? ` (${selectedCount})` : '' }}</button>
 
     <DropdownPanel v-model="isOpen" :anchor-el="btnRef" :align-right="alignRight" min-width="240px">
@@ -63,10 +63,20 @@ const props = defineProps<{
   alignRight?: boolean;
 }>();
 
-const emit = defineEmits<{ 'update:selected': [Map<string, Set<string>>] }>();
+const emit = defineEmits<{
+  'update:selected': [Map<string, Set<string>>];
+  open: [];
+}>();
 
 const isOpen = ref(false);
 const btnRef = ref<HTMLButtonElement>();
+
+// Re-read the POI list every time the dropdown opens so POIs added to photos
+// since the gallery was entered show up without a view-mode round-trip.
+function toggleOpen() {
+  isOpen.value = !isOpen.value;
+  if (isOpen.value) emit('open');
+}
 
 const selectedCount = computed(() => {
   let n = 0;
