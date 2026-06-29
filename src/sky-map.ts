@@ -9,6 +9,7 @@ import {
   targetRenderCount, magThresholdForCount,
   STAR_DENSITY_K, DSO_DENSITY_K, MIN_BUDGET_MULT,
 } from './render-budget';
+import { DSO_DENSITY_MAX } from './density-slider';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
 import { paToCanvasRotationDeg, canvasRotationToPaDeg } from './frame-orientation';
@@ -388,6 +389,59 @@ export class SkyMap {
   // Animation
   private animationId: number | null = null;
 
+  // Coalesced-render frame handle (separate from animationId so navigation/snap
+  // animations and render coalescing never clobber each other's rAF handle).
+  private _renderRaf: number | null = null;
+
+  // ── Interaction LOD ────────────────────────────────────────────────────────
+  // While the user is actively panning/zooming we cap the star/DSO density budget
+  // so each frame stays cheap and motion is smooth even with the sliders maxed out.
+  // After motion settles, a full-budget redraw fills in the less-important objects
+  // (the brightest stars / highest-priority DSOs are always kept, so only the faint
+  // background appears "with a bit of delay"). See effectiveStarBudget / markInteracting.
+  private interacting = false;
+  private settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // Idle delay after the last interactive frame before the full-detail redraw.
+  private static readonly SETTLE_MS = 180;
+  // User toggle: when false, the motion LOD is disabled entirely — full detail is drawn
+  // while moving (no objects disappear/flicker), at the cost of motion smoothness. Only
+  // affects manual density (auto DSO already keeps frames smooth without throttling).
+  private motionLOD = true;
+
+  // The interaction cap is NOT a fixed number — it adapts to the machine. We measure
+  // each interactive frame's draw time and steer `interactionQuality` (0..1) so frames
+  // land near INTERACTION_TARGET_MS: a fast computer ramps the cap up toward the user's
+  // full density (q→1, no throttle); a slow one backs off toward the floor. The learned
+  // value persists across gestures, so only the first ~handful of frames of the very
+  // first pan are spent calibrating. The floors guarantee a usable minimum everywhere.
+  private interactionQuality = 0.5;
+  private static readonly INTERACTION_STAR_FLOOR = 300;
+  private static readonly INTERACTION_DSO_FLOOR = 100;
+  // Per-frame draw-time target (ms). ~10ms leaves headroom inside a 16.7ms / 60fps frame.
+  private static readonly INTERACTION_TARGET_MS = 10;
+
+  // ── Auto density ────────────────────────────────────────────────────────────
+  // Auto mode is the opposite philosophy to the motion LOD above: rather than throttle
+  // during motion (which makes objects pop in/out), it sizes the budget so EVERY frame is
+  // smooth, and renders that same budget whether moving or still — so nothing pops.
+  //   • Stars (autoStarDensity): held at a fixed budget (maxStarCount pinned to
+  //     AUTO_STAR_BUDGET by the store) — constellations + bright stars, cheap and constant.
+  //   • DSOs (autoDSODensity): the performance lever. Interactive frames (and a one-shot burst
+  //     when auto is switched on) are timed and the DSO budget nudged so draw time stays near
+  //     AUTO_TARGET_MS. Reported via onAutoDensityChange so the disabled slider tracks it.
+  // While DSO-auto is on it absorbs all the cost, so the motion LOD is disabled entirely
+  // (see effectiveStarBudget / effectiveDSOBudget). The LOD only applies to a manual axis.
+  private autoStarDensity = false;
+  private autoDSODensity = false;
+  private onAutoDensityChange: ((dso: number) => void) | null = null;
+  // One-shot calibration: set true when DSO-auto is switched on so the budget re-tunes
+  // immediately (at rest) instead of waiting for the next pan. Cleared once it converges.
+  private dsoCalibrating = false;
+  // Per-frame draw-time target for the DSO lever. Higher = more DSOs (motion a touch
+  // heavier); tuned to favour a fuller map since DSOs are the focus of the app.
+  private static readonly AUTO_TARGET_MS = 20;
+  private static readonly AUTO_DSO_MIN = 80;
+
   // Bound event handlers for cleanup
   private boundHandlers: { target: EventTarget; event: string; handler: EventListener }[] = [];
 
@@ -445,17 +499,17 @@ export class SkyMap {
 
   setShowDSOs(show: boolean) {
     this.showDSOs = show;
-    this.render();
+    this.requestRender();
   }
 
-  setShowStars(show: boolean) { this.showStars = show; this.render(); }
-  setShowConstellationLines(show: boolean) { this.showConstellationLines = show; this.render(); }
-  setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.render(); }
+  setShowStars(show: boolean) { this.showStars = show; this.requestRender(); }
+  setShowConstellationLines(show: boolean) { this.showConstellationLines = show; this.requestRender(); }
+  setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.requestRender(); }
 
   async setConstellationStyle(style: ConstellationStyle): Promise<void> {
     await loadConstellationStyle(style);
     this.constellationStyle = style;
-    this.render();
+    this.requestRender();
   }
 
   getConstellationStyle(): ConstellationStyle {
@@ -476,24 +530,33 @@ export class SkyMap {
   getOverlayCanvas(): HTMLCanvasElement | null {
     return this.overlayCanvas;
   }
-  setMaxStarCount(count: number) { this.maxStarCount = count; this.render(); }
-  setMaxDSOCount(count: number) { this.maxDSOCount = count; this.render(); }
-  setHighlightedDSO(dsoId: string | null) { this.highlightedDSO = dsoId; this.dsoIndexMaxMag = -99999; this.render(); }
-  setHighlightedStar(hip: number | null) { this.highlightedStar = hip; this.starIndexMaxMag = -1; this.render(); }
-  setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.dsoIndexMaxMag = -99999; this.render(); }
-  setVisibleDSOCatalogs(catalogs: Set<string>) { this.visibleDSOCatalogs = catalogs; this.dsoIndexMaxMag = -99999; this.render(); }
-  setShowGrid(show: boolean) { this.showGrid = show; this.render(); }
-  setShowStarLabels(show: boolean) { this.showStarLabels = show; this.render(); }
-  setShowDSOLabels(show: boolean) { this.showDSOLabels = show; this.render(); }
-  setSkyOpacity(v: number) { this.skyOpacity = v; this.render(); }
-  setBackgroundOpacity(v: number) { this.backgroundOpacity = v; this.render(); }
+  setMaxStarCount(count: number) { this.maxStarCount = count; this.requestRenderInteractive(); }
+  setMaxDSOCount(count: number) { this.maxDSOCount = count; this.requestRenderInteractive(); }
+  /** Fix the star budget (constellations + bright stars) and stop motion-throttling it. */
+  setAutoStarDensity(v: boolean) { this.autoStarDensity = v; if (v) this.requestRender(); }
+  /** Enable/disable performance-driven real-time auto-tuning of the DSO density budget.
+   * Enabling kicks off a one-shot calibration so the slider snaps to the right value now. */
+  setAutoDSODensity(v: boolean) { this.autoDSODensity = v; if (v) this.dsoCalibrating = true; this.requestRender(); }
+  /** Notified with the new DSO budget whenever auto-tuning changes it, so the UI can track it. */
+  setOnAutoDensityChange(cb: (dso: number) => void) { this.onAutoDensityChange = cb; }
+  /** Enable/disable the motion LOD (detail reduction while panning/zooming). */
+  setMotionLOD(v: boolean) { this.motionLOD = v; this.requestRender(); }
+  setHighlightedDSO(dsoId: string | null) { this.highlightedDSO = dsoId; this.dsoIndexMaxMag = -99999; this.requestRender(); }
+  setHighlightedStar(hip: number | null) { this.highlightedStar = hip; this.starIndexMaxMag = -1; this.requestRender(); }
+  setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.dsoIndexMaxMag = -99999; this.requestRender(); }
+  setVisibleDSOCatalogs(catalogs: Set<string>) { this.visibleDSOCatalogs = catalogs; this.dsoIndexMaxMag = -99999; this.requestRender(); }
+  setShowGrid(show: boolean) { this.showGrid = show; this.requestRender(); }
+  setShowStarLabels(show: boolean) { this.showStarLabels = show; this.requestRender(); }
+  setShowDSOLabels(show: boolean) { this.showDSOLabels = show; this.requestRender(); }
+  setSkyOpacity(v: number) { this.skyOpacity = v; this.requestRender(); }
+  setBackgroundOpacity(v: number) { this.backgroundOpacity = v; this.requestRender(); }
   setPhotoOutlines(outlines: PhotoOutline[]) { this.photoOutlines = outlines; }
-  setShowPhotoOutlines(show: boolean) { this.showPhotoOutlines = show; this.render(); }
-  setFovFrames(frames: FovFrameSpec[]) { this.fovFrameSpecs = frames; this.render(); }
-  setFovRotationDeg(deg: number) { this.fovRotationDeg = deg; this.render(); }
+  setShowPhotoOutlines(show: boolean) { this.showPhotoOutlines = show; this.requestRender(); }
+  setFovFrames(frames: FovFrameSpec[]) { this.fovFrameSpecs = frames; this.requestRender(); }
+  setFovRotationDeg(deg: number) { this.fovRotationDeg = deg; this.requestRender(); }
 
   /** Replace the interactive frame instances and re-render. */
-  setFovInstances(frames: RenderableFrame[]) { this.fovInstances = frames; this.render(); }
+  setFovInstances(frames: RenderableFrame[]) { this.fovInstances = frames; this.requestRender(); }
   /** Current interactive frame instances (for save/restore around off-screen renders). */
   getFovInstances(): RenderableFrame[] { return this.fovInstances; }
   setOnFovInstanceSelect(cb: (id: string | null) => void) { this.onFovInstanceSelect = cb; }
@@ -501,7 +564,7 @@ export class SkyMap {
   setOnFovFrameResize(cb: (id: string, region: FovFrameResizeRegion) => void) { this.onFovFrameResize = cb; }
   setOnMosaicTileRemove(cb: (tileId: string) => void) { this.onMosaicTileRemove = cb; }
   setOnMosaicTileAdd(cb: (ra: number, dec: number) => void) { this.onMosaicTileAdd = cb; }
-  setMosaicAddCandidates(c: Array<{ ra: number; dec: number }>) { this.mosaicAddCandidates = c; this.render(); }
+  setMosaicAddCandidates(c: Array<{ ra: number; dec: number }>) { this.mosaicAddCandidates = c; this.requestRender(); }
   setOnFrameMerge(cb: (movedId: string, targetId: string) => void) { this.onFrameMerge = cb; }
   setOnPhotoClick(cb: (photoName: string) => void) { this.onPhotoClick = cb; }
   setOnDSOClick(cb: (dso: DSO) => void) { this.onDSOClick = cb; }
@@ -531,7 +594,7 @@ export class SkyMap {
       this.view.scale = Math.min(this.view.width, this.view.height) / 2.2;
     }
     this.onViewChange?.();
-    this.render();
+    this.requestRender();
   }
 
   /** Update just the border latitude without switching hemisphere. */
@@ -540,7 +603,7 @@ export class SkyMap {
     // Invalidate spatial indexes so border check on hover stays consistent
     this.starIndexMaxMag = -1;
     this.dsoIndexMaxMag = -99999;
-    this.render();
+    this.requestRender();
   }
 
   /** Switch to/from fisheye (azimuthal equidistant, zenith-centred) projection. */
@@ -556,7 +619,7 @@ export class SkyMap {
       this.view.scale = Math.min(this.view.width, this.view.height) / 2 * 0.90;
     }
     this.onViewChange?.();
-    this.render();
+    this.requestRender();
   }
 
   /** Invalidate spatial indexes so they are rebuilt on the next render. */
@@ -568,7 +631,7 @@ export class SkyMap {
   zoomBy(factor: number) {
     this.view.scale = Math.max(50, Math.min(100000, this.view.scale * factor));
     this.onViewChange?.();
-    this.render();
+    this.requestRenderInteractive();
   }
 
   rotateByDeg(deltaDeg: number) {
@@ -578,7 +641,7 @@ export class SkyMap {
   setRotationDeg(rotationDeg: number) {
     this.view.rotationDeg = normalizeRotationDeg(rotationDeg);
     this.onViewChange?.();
-    this.render();
+    this.requestRenderInteractive();
   }
 
   resetRotation() {
@@ -589,7 +652,7 @@ export class SkyMap {
     this.view.centerX += dxPx / this.view.scale;
     this.view.centerY -= dyPx / this.view.scale;
     this.onViewChange?.();
-    this.render();
+    this.requestRender();
   }
 
   getShowGrid() { return this.showGrid; }
@@ -612,9 +675,10 @@ export class SkyMap {
     // Upper bound is the catalog length, not an artificial cap: on-screen count is
     // already bounded by the field of view, so when zoomed in the magnitude gate below
     // (not a count cap) decides how faint we go.
+    const budget = this.effectiveStarBudget();
     const count = targetRenderCount(
-      this.maxStarCount, scale, width, height, STAR_DENSITY_K,
-      this.maxStarCount * MIN_BUDGET_MULT, mags.length,
+      budget, scale, width, height, STAR_DENSITY_K,
+      budget * MIN_BUDGET_MULT, mags.length,
     );
     const densityMag = magThresholdForCount(mags, count);
     return Math.min(computeMaxMag(scale), densityMag);
@@ -629,9 +693,10 @@ export class SkyMap {
     const { scale, width, height } = this.view;
     // Upper bound is the DSO catalog size; the per-DSO magnitude gate (dsoMaxMag) and
     // the field of view bound how many actually draw when zoomed in.
+    const budget = this.effectiveDSOBudget();
     return targetRenderCount(
-      this.maxDSOCount, scale, width, height, DSO_DENSITY_K,
-      this.maxDSOCount * MIN_BUDGET_MULT, getDSOs().length,
+      budget, scale, width, height, DSO_DENSITY_K,
+      budget * MIN_BUDGET_MULT, getDSOs().length,
     );
   }
 
@@ -690,10 +755,17 @@ export class SkyMap {
       this.view.scale = startScale + (targetScale - startScale) * ease;
 
       this.onViewChange?.();
-      this.render();
-
       if (t < 1) {
+        // Reduced budget for smooth flight; markInteracting also arms the settle
+        // timer so the flag self-clears even if the animation is interrupted.
+        this.markInteracting();
+        this.render();
         this.animationId = requestAnimationFrame(step);
+      } else {
+        // Final frame: clear interaction state and paint full detail immediately.
+        if (this.settleTimer !== null) { clearTimeout(this.settleTimer); this.settleTimer = null; }
+        this.interacting = false;
+        this.render();
       }
     };
 
@@ -804,7 +876,7 @@ export class SkyMap {
 
     this.resizeOverlay();
     this.onViewChange?.();
-    this.render();
+    this.requestRender();
   }
 
   private resizeOverlay(): void {
@@ -884,7 +956,7 @@ export class SkyMap {
       this.view.centerY += before.y - after.y;
 
       this.onViewChange?.();
-      this.render();
+      this.requestRenderInteractive();
     }) as EventListener, { passive: false });
 
     // Pan with mouse drag
@@ -935,7 +1007,7 @@ export class SkyMap {
         this.view.centerX += this.panAnchorProjX - now.x;
         this.view.centerY += this.panAnchorProjY - now.y;
         this.onViewChange?.();
-        this.render();
+        this.requestRenderInteractive();
       } else {
         if (!this.interactionEnabled) return;
         // Cursor is over the (now-interactive) tooltip: leave it as-is so the
@@ -1042,6 +1114,14 @@ export class SkyMap {
   destroy() {
     this.cancelAnimation();
     this.cancelSnapAnim();
+    if (this._renderRaf !== null) {
+      cancelAnimationFrame(this._renderRaf);
+      this._renderRaf = null;
+    }
+    if (this.settleTimer !== null) {
+      clearTimeout(this.settleTimer);
+      this.settleTimer = null;
+    }
     for (const { target, event, handler } of this.boundHandlers) {
       target.removeEventListener(event, handler);
     }
@@ -1231,9 +1311,117 @@ export class SkyMap {
     }
   }
 
+  /**
+   * Coalesce bursts of render requests into one redraw per animation frame.
+   * High-frequency UI events (pan, wheel, frame drag, resize) and property
+   * setters call this instead of render() directly, so the main thread is freed
+   * between frames and we never redraw more often than the display refreshes.
+   * The export/offscreen path and in-flight animation steps call render() directly.
+   */
+  requestRender() {
+    if (this._renderRaf !== null) return;
+    this._renderRaf = requestAnimationFrame(() => {
+      this._renderRaf = null;
+      this.render();
+    });
+  }
+
+  /**
+   * Mark the map as actively interacting (pan/zoom/drag) and (re)arm the settle
+   * timer. While interacting, renderStars/renderDSOs use a reduced density budget
+   * (see effectiveStarBudget). When motion stops for SETTLE_MS, the flag clears and
+   * a full-budget redraw runs so the less-important objects fill back in. The timer
+   * always fires, so the flag can never get stuck on (e.g. an interrupted animation).
+   */
+  private markInteracting() {
+    this.interacting = true;
+    if (this.settleTimer !== null) clearTimeout(this.settleTimer);
+    this.settleTimer = setTimeout(() => {
+      this.settleTimer = null;
+      this.interacting = false;
+      this.requestRender();
+    }, SkyMap.SETTLE_MS);
+  }
+
+  /** Coalesced render for motion: throttles the density budget for a smooth frame. */
+  requestRenderInteractive() {
+    this.markInteracting();
+    this.requestRender();
+  }
+
+  /**
+   * Effective star density budget. In auto mode it is the fixed pinned budget, rendered
+   * the same whether moving or not (no pop). In manual mode the motion LOD applies — but
+   * only when the DSO lever is NOT auto (when it is, the lever keeps frames smooth, so
+   * stars need no throttling either).
+   */
+  private effectiveStarBudget(): number {
+    if (this.autoStarDensity) return this.maxStarCount;
+    if (this.motionLOD && this.interacting && !this.autoDSODensity) {
+      const floor = Math.min(SkyMap.INTERACTION_STAR_FLOOR, this.maxStarCount);
+      return Math.round(floor + (this.maxStarCount - floor) * this.interactionQuality);
+    }
+    return this.maxStarCount;
+  }
+
+  /**
+   * Effective DSO density budget. When DSO-auto is on, maxDSOCount is the live performance
+   * lever and is used as-is (no motion throttling → no pop). When manual, the motion LOD
+   * interpolates floor→full during active interaction.
+   */
+  private effectiveDSOBudget(): number {
+    if (this.motionLOD && !this.autoDSODensity && this.interacting) {
+      const floor = Math.min(SkyMap.INTERACTION_DSO_FLOOR, this.maxDSOCount);
+      return Math.round(floor + (this.maxDSOCount - floor) * this.interactionQuality);
+    }
+    return this.maxDSOCount;
+  }
+
+  /**
+   * Steer interactionQuality from a measured interactive frame draw time. Asymmetric with
+   * a hysteresis band for stability: drop fast when over budget (keep motion smooth), creep
+   * up slowly when there is clear headroom, and hold steady in between so it doesn't oscillate.
+   */
+  private adaptInteractionQuality(frameMs: number) {
+    const target = SkyMap.INTERACTION_TARGET_MS;
+    if (frameMs > target * 1.25) {
+      this.interactionQuality = Math.max(0, this.interactionQuality - 0.15);
+    } else if (frameMs < target * 0.7) {
+      this.interactionQuality = Math.min(1, this.interactionQuality + 0.05);
+    }
+  }
+
+  /**
+   * DSO performance lever: from a measured interactive frame time, nudge the DSO budget
+   * multiplicatively toward AUTO_TARGET_MS. Runs only while interacting (motion is the
+   * demanding case), and the same budget is then used at rest — so it never creeps up when
+   * idle and nothing pops when a gesture starts. A hysteresis band keeps a converged budget
+   * stable (factor 1 → no change → no extra render); it also stops at the clamp bounds.
+   * Because render cost is pan-invariant, a steady pan triggers no change; only real
+   * performance shifts (e.g. zoom) re-tune it.
+   */
+  private adaptAutoDensity(frameMs: number) {
+    if (!this.autoDSODensity) { this.dsoCalibrating = false; return; }
+    const target = SkyMap.AUTO_TARGET_MS;
+    const factor = frameMs > target * 1.3 ? 0.85 : frameMs < target * 0.6 ? 1.12 : 1;
+    if (factor === 1) { this.dsoCalibrating = false; return; } // converged → end any burst
+    const next = Math.max(SkyMap.AUTO_DSO_MIN, Math.min(DSO_DENSITY_MAX, Math.round(this.maxDSOCount * factor)));
+    if (next === this.maxDSOCount) { this.dsoCalibrating = false; return; } // at a bound → end burst
+    this.maxDSOCount = next;
+    this.onAutoDensityChange?.(next);
+    this.requestRender();
+  }
+
   render() {
     const { ctx, view } = this;
     const { width, height } = view;
+
+    // Time interactive frames to drive the adaptive budgets — plus a one-shot at-rest burst
+    // right after DSO-auto is switched on (dsoCalibrating) so the slider re-tunes immediately.
+    // Outside those, no measurement: the budget never creeps up at rest, so nothing pops when
+    // a gesture starts.
+    const measure = !this._renderingOffscreen && (this.interacting || this.dsoCalibrating);
+    const t0 = measure ? performance.now() : 0;
 
     // Invalidate the per-frame DSO selection cache; rebuilt lazily by the first consumer.
     this.cachedSelectedDSOs = null;
@@ -1312,6 +1500,14 @@ export class SkyMap {
 
     if (!this._renderingOffscreen) {
       this.renderOverlay();
+    }
+
+    if (t0) {
+      const ms = performance.now() - t0;
+      // DSO lever owns smoothness when auto (during motion or a calibration burst); otherwise
+      // the manual motion LOD calibrates from interactive frames.
+      if (this.autoDSODensity) this.adaptAutoDensity(ms);
+      else if (this.interacting) this.adaptInteractionQuality(ms);
     }
   }
 
@@ -2097,7 +2293,7 @@ export class SkyMap {
         halfH = (c.hDeg / Math.max(1e-6, f.hDeg)) * geo.halfH;
       }
       this.resizeDraft = { cx: r.cx, cy: r.cy, halfW, halfH, rotDeg: geo.rotDeg };
-      this.render();
+      this.requestRenderInteractive();
       return;
     }
 

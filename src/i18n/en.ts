@@ -153,6 +153,7 @@ const en: Translations = {
     showStarTooltips: 'Show star tooltips',
     showDSOTooltips: 'Show DSO tooltips',
     simplifiedDSOTooltips: 'Simplified tooltips',
+    autoDensity: 'Auto',
     togglePanel: 'Show/Hide panel',
     rotateLeft: 'Rotate sky left (5°)',
     rotateReset: 'Reset sky rotation',
@@ -165,6 +166,10 @@ const en: Translations = {
     fisheye: 'Projection',
     projStereo: 'Stereo',
     projFisheye: 'Fisheye',
+  },
+  performance: {
+    section: 'Performance',
+    smoothMotion: 'Smooth pan & zoom',
   },
   shortcuts: {
     title: 'Keyboard shortcuts',

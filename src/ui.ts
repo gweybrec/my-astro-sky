@@ -310,6 +310,14 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setVisibleDSOCatalogs(new Set(settings.dsoCatalogs));
   skyMap.setMaxStarCount(settings.maxStarCount);
   skyMap.setMaxDSOCount(settings.maxDSOCount);
+  // Auto-density: the DSO budget is the live performance lever; reflect each tuned value
+  // back into the display store so the (disabled) DSO slider tracks it.
+  skyMap.setOnAutoDensityChange((dso) => {
+    useDisplayStore(pinia).applyAutoDensity(dso);
+  });
+  skyMap.setAutoStarDensity(settings.autoStarDensity);
+  skyMap.setAutoDSODensity(settings.autoDSODensity);
+  skyMap.setMotionLOD(settings.reduceDetailWhileMoving);
   overlay.setDefaultOpacity(1.0);
 
   // ─── Hook into view change (dismiss tooltip, persist rotation, sync store) ──────────────
