@@ -4,6 +4,8 @@ import {
   groupPoisByCategory,
   buildPoiFilterGroups,
   poisMatchFilter,
+  prunePoiSelection,
+  poiSelectionsEqual,
   UNCATEGORIZED_ID,
 } from '../../src/poi';
 import type { PoiCategory, PointOfInterest } from '../../src/types';
@@ -56,6 +58,72 @@ describe('buildPoiFilterGroups', () => {
     const asteroid = groups.find(g => g.category.id === 'cat-asteroid')!;
     const vesta = asteroid.names.find(n => n.name === 'Vesta')!;
     expect(vesta.count).toBe(2); // counted once per photo, both photos have it
+  });
+});
+
+describe('prunePoiSelection', () => {
+  const groups = buildPoiFilterGroups(
+    [
+      [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
+      [{ name: 'Vesta', categoryId: 'cat-asteroid' }, { name: 'Ceres', categoryId: 'cat-asteroid' }],
+    ],
+    cats,
+  );
+
+  it('keeps selections whose category and name still exist', () => {
+    const sel = new Map([['cat-asteroid', new Set(['Vesta'])]]);
+    const pruned = prunePoiSelection(sel, groups);
+    expect(pruned.get('cat-asteroid')).toEqual(new Set(['Vesta']));
+  });
+
+  it('drops a name that no longer exists (e.g. its only photo was deleted)', () => {
+    const sel = new Map([['cat-asteroid', new Set(['Vesta', 'Pallas'])]]);
+    const pruned = prunePoiSelection(sel, groups);
+    expect(pruned.get('cat-asteroid')).toEqual(new Set(['Vesta'])); // Pallas dropped
+  });
+
+  it('drops a category entirely when none of its selected names survive', () => {
+    const sel = new Map([['cat-asteroid', new Set(['Pallas'])]]);
+    const pruned = prunePoiSelection(sel, groups);
+    expect(pruned.has('cat-asteroid')).toBe(false);
+  });
+
+  it('drops a category that no longer appears in any photo', () => {
+    const sel = new Map([['cat-deleted', new Set(['Ghost'])]]);
+    const pruned = prunePoiSelection(sel, groups);
+    expect(pruned.size).toBe(0);
+  });
+
+  it('keeps a whole-category ("" name-set) selection while the category has POIs', () => {
+    const sel = new Map([['cat-comet', new Set<string>()]]);
+    const pruned = prunePoiSelection(sel, groups);
+    expect(pruned.get('cat-comet')).toEqual(new Set());
+  });
+
+  it('does not mutate the input map', () => {
+    const sel = new Map([['cat-asteroid', new Set(['Vesta', 'Pallas'])]]);
+    prunePoiSelection(sel, groups);
+    expect(sel.get('cat-asteroid')).toEqual(new Set(['Vesta', 'Pallas']));
+  });
+});
+
+describe('poiSelectionsEqual', () => {
+  it('is true for structurally identical selections', () => {
+    const a = new Map([['cat-comet', new Set(['X'])], ['cat-asteroid', new Set<string>()]]);
+    const b = new Map([['cat-comet', new Set(['X'])], ['cat-asteroid', new Set<string>()]]);
+    expect(poiSelectionsEqual(a, b)).toBe(true);
+  });
+
+  it('is false when a name differs', () => {
+    const a = new Map([['cat-comet', new Set(['X'])]]);
+    const b = new Map([['cat-comet', new Set(['Y'])]]);
+    expect(poiSelectionsEqual(a, b)).toBe(false);
+  });
+
+  it('is false when category sets differ in size', () => {
+    const a = new Map([['cat-comet', new Set(['X'])]]);
+    const b = new Map([['cat-comet', new Set(['X'])], ['cat-asteroid', new Set(['Y'])]]);
+    expect(poiSelectionsEqual(a, b)).toBe(false);
   });
 });
 

@@ -323,6 +323,19 @@ describe('Gallery', () => {
     expect(document.querySelectorAll('.gallery-item').length).toBe(3);
   });
 
+  it('renders POI chips for a photo whose only metadata is points of interest', () => {
+    const gallery = new Gallery();
+    gallery.setPoiCategories([{ id: 'cat-comet', name: 'Comet', color: '#111', position: 0 }]);
+    // No dsoIds, no labels — only a POI. The chip must still render.
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', dsoIds: [], labels: [], pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }] }),
+    ]);
+
+    const chips = document.querySelectorAll('.gallery-item .poi-chip');
+    expect(chips.length).toBe(1);
+    expect(chips[0].textContent).toContain('C/2023 A3');
+  });
+
   it('setLabelFilter auto-includes genuinely new labels from metadata edits', () => {
     const gallery = new Gallery();
     const photo = makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', labels: ['nebula'] });

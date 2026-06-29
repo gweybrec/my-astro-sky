@@ -2655,13 +2655,13 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         getAllCustomGear().map(g => {
           let name = g.id;
           try { const d = JSON.parse(g.data); if (typeof d?.name === 'string') name = d.name; } catch { /* ignore */ }
-          return `${g.type} ${name}`;
+          return `${g.type}\u001f${name}`;
         })
       );
 
       const plans = inspect.planItems.map(p => ({ ...p, exists: existingPlanNames.has(p.name) }));
       const setups = inspect.setupItems.map(s => ({ ...s, exists: existingSetupNames.has(s.name) }));
-      const gear = inspect.gearItems.map(g => ({ ...g, exists: existingGearKeys.has(`${g.type} ${g.name}`) }));
+      const gear = inspect.gearItems.map(g => ({ ...g, exists: existingGearKeys.has(`${g.type}\u001f${g.name}`) }));
 
       res.json(buildZipPreviewResponse(inspect, { hasShortcuts, shortcuts, images, plans, setups, gear }));
     } else if (ext === '.json') {
@@ -2778,13 +2778,16 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         try {
           const rawGear = JSON.parse((await customGearEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawGear)) {
+            // Snapshot existing gear once, before importing, so name-based replacement
+            // targets only pre-import rows — two same-type+name items within this bundle
+            // must not delete each other.
+            const existingGear = getAllCustomGear()
+              .map(r => { let n = r.id; try { const d = JSON.parse(r.data); if (typeof d?.name === 'string') n = d.name; } catch { /* ignore */ } return { id: r.id, type: r.type, name: n }; });
             for (const g of rawGear) {
               if (typeof g.id === 'string' && selectedGear.has(g.id) && ['telescope', 'camera', 'accessory'].includes(g.type)) {
                 const { id, type, ...data } = g;
                 const name = typeof data.name === 'string' ? data.name : id;
-                const sameType = getAllCustomGear()
-                  .filter(r => r.type === type)
-                  .map(r => { let n = r.id; try { const d = JSON.parse(r.data); if (typeof d?.name === 'string') n = d.name; } catch { /* ignore */ } return { id: r.id, name: n }; });
+                const sameType = existingGear.filter(r => r.type === type);
                 idsToReplaceByName(sameType, name).forEach(deleteCustomGearDB);
                 upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory', { ...data, id });
               }
@@ -2800,10 +2803,15 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         try {
           const rawSetups = JSON.parse((await gearSetupsEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawSetups)) {
+            // Snapshot once (so same-name siblings in this bundle don't delete each
+            // other) and only replace by name when the name is non-empty — an empty
+            // name must not match, and delete, every existing unnamed setup. Same-id
+            // re-imports are still handled by upsertGearSetup.
+            const existingSetups = getAllGearSetups();
             for (const s of rawSetups) {
               if (typeof s.id === 'string' && selectedSetups.has(s.id) && typeof s.telescopeId === 'string' && typeof s.cameraId === 'string') {
                 const name = typeof s.name === 'string' ? s.name : '';
-                idsToReplaceByName(getAllGearSetups(), name).forEach(deleteGearSetup);
+                if (name) idsToReplaceByName(existingSetups, name).forEach(deleteGearSetup);
                 upsertGearSetup({
                   id: s.id,
                   name: typeof s.name === 'string' ? s.name : '',
@@ -2846,10 +2854,14 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         try {
           const rawPlans = JSON.parse((await plansEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawPlans)) {
+            // Snapshot once so two same-name plans in this bundle don't delete each
+            // other; replace by name only when non-empty. Same-id collisions are
+            // handled by the explicit deletePlan(p.id) below.
+            const existingPlans = getPlans();
             rawPlans.forEach((p, pi) => {
               if (typeof p.id !== 'string' || typeof p.name !== 'string') return;
               if (!selectedPlans.has(p.id)) return;
-              idsToReplaceByName(getPlans(), p.name).forEach(deletePlan);
+              if (p.name) idsToReplaceByName(existingPlans, p.name).forEach(deletePlan);
               deletePlan(p.id);
               createPlan({
                 id: p.id,

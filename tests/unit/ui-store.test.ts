@@ -53,6 +53,25 @@ describe('ui store — sky tooltip', () => {
     expect(ui.skyTooltipY).toBe(200);
   });
 
+  it('showSkyTooltip refuses to render while a modal is open (central suppression backstop)', () => {
+    const ui = useUiStore();
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    document.body.appendChild(backdrop);
+    // Even a caller that does not pre-check isSkyTooltipSuppressed must not draw over a modal.
+    ui.showSkyTooltip('<b>M42</b>', 100, 200);
+    expect(ui.skyTooltipHtml).toBeNull();
+    backdrop.remove();
+  });
+
+  it('showSkyTooltip refuses to render while the force-suppress flag is set', () => {
+    const ui = useUiStore();
+    ui.setForceSuppressTooltip(true);
+    ui.showSkyTooltip('<b>M42</b>', 100, 200);
+    expect(ui.skyTooltipHtml).toBeNull();
+    ui.setForceSuppressTooltip(false);
+  });
+
   // ─── Position freeze while approaching the tooltip (same object) ───────────────
 
   it('freezes position when the cursor moves toward the tooltip on the same object', () => {

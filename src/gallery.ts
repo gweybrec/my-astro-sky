@@ -347,7 +347,7 @@ export class Gallery {
       nameEl.textContent = photo.originalName;
       caption.appendChild(nameEl);
 
-      if (photo.dsoIds.length > 0 || photo.labels.length > 0) {
+      if (photo.dsoIds.length > 0 || photo.labels.length > 0 || (photo.pointsOfInterest?.length ?? 0) > 0) {
         caption.appendChild(this.buildChips(photo.dsoIds, photo.labels, photo.pointsOfInterest ?? []));
       }
 
