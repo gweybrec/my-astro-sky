@@ -150,7 +150,7 @@ import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import PoiFilterDropdown from './PoiFilterDropdown.vue';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { buildPoiFilterGroups, type PoiFilterGroup } from '../../poi';
+import { buildPoiFilterGroups, prunePoiSelection, poiSelectionsEqual, type PoiFilterGroup } from '../../poi';
 import { showToast } from '../../toast';
 import { downloadBlob } from '../../file-utils';
 import { renderGalleryPdf } from '../../export-render';
@@ -170,6 +170,13 @@ const selectedPois = ref<Map<string, Set<string>>>(new Map());
 
 function refreshPois() {
   poiGroups.value = canvasStore.gallery?.getAllPois() ?? [];
+  // Drop selections whose POIs/categories no longer exist so a stale filter can't
+  // hide every photo; re-apply to the gallery only when something actually changed.
+  const pruned = prunePoiSelection(selectedPois.value, poiGroups.value);
+  if (!poiSelectionsEqual(pruned, selectedPois.value)) {
+    selectedPois.value = pruned;
+    canvasStore.gallery?.setPoiFilter(pruned.size > 0 ? pruned : null);
+  }
 }
 
 function onPoiUpdate(next: Map<string, Set<string>>) {

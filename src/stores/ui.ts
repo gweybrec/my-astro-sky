@@ -120,6 +120,11 @@ export const useUiStore = defineStore('ui', () => {
 
   function showSkyTooltip(html: string, x: number, y: number, dso: DSO | null = null) {
     if (skyTooltipPinned.value) return; // frozen while the plan picker is open
+    // Central suppression gate: never render a sky tooltip over an open modal, a
+    // force-suppressing overlay control, or a floating popup — whichever caller
+    // invoked us. The hover callbacks also pre-check (to skip building the HTML);
+    // this is the backstop so any other caller can't draw on top of a modal.
+    if (isSkyTooltipSuppressed(x, y)) return;
     // While hovering the same object, the tooltip would normally follow the cursor
     // (it sits at cursor + offset, down-right). Inside a large object that makes it
     // impossible to reach: it keeps running away. So when the cursor moves *toward*
