@@ -24,10 +24,18 @@
         type="text"
         class="tag-input flex-[2_1_0%] min-w-0"
         :placeholder="t('modal.metadataPoiNamePlaceholder')"
+        ref="nameInputEl"
         v-model="nameInput"
         @keydown.enter.prevent="addPoi"
+        @blur="onNameBlur"
       />
-      <select v-model="categoryInput" class="tag-input flex-[1_1_0%] min-w-0 px-2">
+      <select
+        ref="categorySelect"
+        v-model="categoryInput"
+        class="tag-input flex-[1_1_0%] min-w-0 px-2"
+        @change="onCategoryChange"
+        @blur="onCategoryBlur"
+      >
         <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
       </select>
       <button
@@ -67,6 +75,8 @@ categoriesStore.ensureLoaded();
 const showTypes = ref(false);
 const nameInput = ref('');
 const categoryInput = ref('');
+const categorySelect = ref<HTMLSelectElement | null>(null);
+const nameInputEl = ref<HTMLInputElement | null>(null);
 
 // Default the type select to the first type once loaded / on changes.
 watch(categories, (cats) => {
@@ -84,6 +94,28 @@ function addPoi() {
   }
   emit('update:pois', [...props.pois, { name, categoryId: categoryInput.value }]);
   nameInput.value = '';
+}
+
+// Registering the chip on blur lets the user add a POI without clicking the
+// "Add" button. The one exception: when focus moves to the type dropdown, the
+// user is still choosing a type, so we defer registration to onCategoryChange /
+// onCategoryBlur instead of committing with the (not-yet-chosen) type.
+function onNameBlur(e: FocusEvent) {
+  if (e.relatedTarget && e.relatedTarget === categorySelect.value) return;
+  addPoi();
+}
+
+// The type was just chosen — commit the pending name with it.
+function onCategoryChange() {
+  if (nameInput.value.trim()) addPoi();
+}
+
+// Catches the case where the dropdown was opened but the type was left
+// unchanged (no change event): commit on leaving the dropdown, unless focus is
+// returning to the name input.
+function onCategoryBlur(e: FocusEvent) {
+  if (e.relatedTarget && e.relatedTarget === nameInputEl.value) return;
+  if (nameInput.value.trim()) addPoi();
 }
 
 function removePoi(idx: number) {
