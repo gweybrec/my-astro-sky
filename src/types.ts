@@ -9,6 +9,10 @@ export interface Star {
   flam?: string;
   constellation?: string;
   desig?: string;
+  // ── render cache (see projectCached) ──
+  _px?: number;
+  _py?: number;
+  _pg?: number;
 }
 
 export type ConstellationStyle = 'western' | 'stellarium' | 'rey' | 'chinese' | 'arabic';
@@ -178,6 +182,13 @@ export interface DSO {
   difficulty: number | null;     // imaging difficulty 1–5 (null if missing from catalog)
   containerId: string | null;    // id of the smallest larger DSO enclosing this one (zoom-gated inner objects), null if none
   priority: number;              // precomputed render order (lower = drawn first); spatial-spread blue-noise rank
+  catalog?: string | null;       // precomputed catalog prefix at load (see getDSOCatalog), null if none
+  // ── render cache (see projectCached / dsoSizeCos2) ──
+  _px?: number;
+  _py?: number;
+  _pg?: number;
+  _cos2?: number;  // cached angular-size dec factor for angularSizeToCanvasPx
+  _cos2g?: number; // projection generation _cos2 was computed for
 }
 
 export interface DSOSearchResult {

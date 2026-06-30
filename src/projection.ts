@@ -16,8 +16,20 @@ let _hemisphere: 'north' | 'south' = 'north';
 export type ProjectionMode = 'stereo' | 'fisheye';
 let _projectionMode: ProjectionMode = 'stereo';
 
+// Bumped whenever hemisphere or projection mode changes. project() output for a
+// fixed (ra, dec) depends only on these two globals (pan/zoom/rotation are applied
+// later by toCanvas), so cached projections are valid until this generation moves.
+let _projGeneration = 0;
+
+/** Current projection generation; see {@link projectCached}. */
+export function getProjectionGeneration(): number {
+  return _projGeneration;
+}
+
 export function setProjectionMode(mode: ProjectionMode): void {
+  if (mode === _projectionMode) return;
   _projectionMode = mode;
+  _projGeneration++;
 }
 
 export function getProjectionMode(): ProjectionMode {
@@ -25,7 +37,9 @@ export function getProjectionMode(): ProjectionMode {
 }
 
 export function setHemisphere(h: 'north' | 'south'): void {
+  if (h === _hemisphere) return;
   _hemisphere = h;
+  _projGeneration++;
 }
 
 export function getHemisphere(): 'north' | 'south' {
@@ -67,6 +81,35 @@ export function project(raDeg: number, decDeg: number): Point {
     x: r * Math.sin(raRad),
     y: r * Math.cos(raRad),
   };
+}
+
+/**
+ * Object whose sky position is fixed for the lifetime of the app (stars, DSOs) and
+ * which carries slots to memoise its projection. See {@link projectCached}.
+ */
+export interface ProjCacheHost {
+  ra: number;
+  dec: number;
+  _px?: number;  // cached projection-unit x
+  _py?: number;  // cached projection-unit y
+  _pg?: number;  // projection generation the cache was computed for
+}
+
+/**
+ * Project a fixed-position object once per hemisphere/mode change and reuse the
+ * stored projection-unit coords on every subsequent frame. project() does trig +
+ * an allocation per call; for the 10k+ stars/DSOs redrawn on every pan frame that
+ * dominated the render loop, yet the result only changes when the projection
+ * generation moves. Writes _px/_py onto the object — read them directly afterwards
+ * (no return value) so panning never re-projects or allocates.
+ */
+export function projectCached(o: ProjCacheHost): void {
+  if (o._pg !== _projGeneration) {
+    const p = project(o.ra, o.dec);
+    o._px = p.x;
+    o._py = p.y;
+    o._pg = _projGeneration;
+  }
 }
 
 /** Inverse projection: projection (x, y) → { ra°, dec° } */

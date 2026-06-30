@@ -184,6 +184,10 @@ export async function loadDSOCatalog(): Promise<void> {
       difficulty,
       containerId: idxContainerId >= 0 ? (row[idxContainerId] ?? null) : null,
       priority: idxPriority >= 0 ? (row[idxPriority] ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER,
+      // Catalog prefix is a pure function of the (immutable) id; precompute it once
+      // here so the per-frame selection loop reads a field instead of re-running the
+      // regex/startsWith chain for every DSO on every render.
+      catalog: getDSOCatalog(row[idxId]),
     };
     dsos.push(dso);
 
