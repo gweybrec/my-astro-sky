@@ -8,6 +8,15 @@
     >{{ t('gallery.filterPoi') }}{{ selectedCount > 0 ? ` (${selectedCount})` : '' }}</button>
 
     <DropdownPanel v-model="isOpen" :anchor-el="btnRef" :align-right="alignRight" min-width="240px">
+      <div class="labels-select-all-row justify-between">
+        <span class="labels-select-all-label text-muted">{{ selectedCount === 0 ? t('gallery.showingAll') : `${selectedCount} ${t('gallery.selected')}` }}</span>
+        <button
+          type="button"
+          class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
+          :disabled="selectedCount === 0"
+          @click="clearAll"
+        >✕ {{ t('display.clear') }}</button>
+      </div>
       <div v-if="groups.length === 0" class="px-6 py-3 text-muted text-base">—</div>
 
       <div v-for="group in groups" :key="group.category.id" class="mb-2">
@@ -122,5 +131,9 @@ function toggleCat(group: PoiFilterGroup, checked: boolean) {
     m.delete(group.category.id);
   }
   emit('update:selected', m);
+}
+
+function clearAll() {
+  emit('update:selected', new Map());
 }
 </script>

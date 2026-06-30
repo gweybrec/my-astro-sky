@@ -26,15 +26,15 @@
         @click.stop="labelOpen = !labelOpen"
       >{{ t('gallery.filterLabels') }}{{ selectedLabels.length > 0 ? ` (${selectedLabels.length})` : '' }}</button>
       <DropdownPanel v-model="labelOpen" :anchor-el="labelBtnRef" min-width="220px">
-        <label class="labels-select-all-row">
-          <input
-            ref="labelSelectAllRef"
-            type="checkbox"
-            :checked="allLabelsChecked"
-            @change="toggleAllLabels"
-          />
-          <span class="labels-select-all-label">{{ t('display.selectAll') }}</span>
-        </label>
+        <div class="labels-select-all-row justify-between">
+          <span class="labels-select-all-label text-muted">{{ selectedLabels.length === 0 ? t('gallery.showingAll') : `${selectedLabels.length} ${t('gallery.selected')}` }}</span>
+          <button
+            type="button"
+            class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
+            :disabled="selectedLabels.length === 0"
+            @click="clearLabels"
+          >✕ {{ t('display.clear') }}</button>
+        </div>
         <div v-if="availableLabels.length === 0" class="px-6 py-3 text-muted text-base">—</div>
         <label
           v-for="item in availableLabels"
@@ -71,15 +71,15 @@
         @click.stop="typeOpen = !typeOpen"
       >{{ t('gallery.filterTypes') }}{{ selectedTypes.length > 0 ? ` (${selectedTypes.length})` : '' }}</button>
       <DropdownPanel v-model="typeOpen" :anchor-el="typeBtnRef" min-width="240px">
-        <label class="labels-select-all-row">
-          <input
-            ref="typeSelectAllRef"
-            type="checkbox"
-            :checked="allTypesChecked"
-            @change="toggleAllTypes"
-          />
-          <span class="labels-select-all-label">{{ t('display.selectAll') }}</span>
-        </label>
+        <div class="labels-select-all-row justify-between">
+          <span class="labels-select-all-label text-muted">{{ selectedTypes.length === 0 ? t('gallery.showingAll') : `${selectedTypes.length} ${t('gallery.selected')}` }}</span>
+          <button
+            type="button"
+            class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
+            :disabled="selectedTypes.length === 0"
+            @click="clearTypes"
+          >✕ {{ t('display.clear') }}</button>
+        </div>
         <label
           v-for="type in DSO_TYPES_ALL"
           :key="type"
@@ -104,15 +104,15 @@
         @click.stop="catalogOpen = !catalogOpen"
       >{{ t('gallery.filterCatalogs') }}{{ selectedCatalogs.length > 0 ? ` (${selectedCatalogs.length})` : '' }}</button>
       <DropdownPanel v-model="catalogOpen" :anchor-el="catalogBtnRef" min-width="240px">
-        <label class="labels-select-all-row">
-          <input
-            ref="catalogSelectAllRef"
-            type="checkbox"
-            :checked="allCatalogsChecked"
-            @change="toggleAllCatalogs"
-          />
-          <span class="labels-select-all-label">{{ t('display.selectAll') }}</span>
-        </label>
+        <div class="labels-select-all-row justify-between">
+          <span class="labels-select-all-label text-muted">{{ selectedCatalogs.length === 0 ? t('gallery.showingAll') : `${selectedCatalogs.length} ${t('gallery.selected')}` }}</span>
+          <button
+            type="button"
+            class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
+            :disabled="selectedCatalogs.length === 0"
+            @click="clearCatalogs"
+          >✕ {{ t('display.clear') }}</button>
+        </div>
         <label
           v-for="cat in DSO_CATALOGS_ALL"
           :key="cat"
@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useUiStore } from '../../stores/ui';
 import { useCanvasStore } from '../../stores/canvas';
 import { useI18n } from '../../composables/useI18n';
@@ -219,35 +219,12 @@ async function onExport() {
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 const labelBtnRef = ref<HTMLButtonElement>();
-const labelSelectAllRef = ref<HTMLInputElement>();
 const labelOpen = ref(false);
 const availableLabels = ref<{ label: string; count: number }[]>([]);
 const selectedLabels = ref<string[]>([]);
-const labelsInitialized = ref(false);
-
-const allLabelsChecked = computed(() =>
-  availableLabels.value.length > 0 &&
-  availableLabels.value.every(item => selectedLabels.value.includes(item.label))
-);
-
-const someLabelsChecked = computed(() =>
-  availableLabels.value.some(item => selectedLabels.value.includes(item.label))
-);
-
-watch([allLabelsChecked, someLabelsChecked], () => {
-  if (labelSelectAllRef.value) {
-    labelSelectAllRef.value.indeterminate = someLabelsChecked.value && !allLabelsChecked.value;
-  }
-});
 
 function refreshLabels() {
-  const fresh = canvasStore.gallery?.getAllLabels() ?? [];
-  if (!labelsInitialized.value && fresh.length > 0) {
-    labelsInitialized.value = true;
-    selectedLabels.value = fresh.map(i => i.label);
-    canvasStore.gallery?.setLabelFilter(selectedLabels.value);
-  }
-  availableLabels.value = fresh;
+  availableLabels.value = canvasStore.gallery?.getAllLabels() ?? [];
 }
 
 function toggleLabel(label: string, checked: boolean) {
@@ -257,49 +234,19 @@ function toggleLabel(label: string, checked: boolean) {
   canvasStore.gallery?.setLabelFilter(selectedLabels.value);
 }
 
-function toggleAllLabels(e: Event) {
-  const checked = (e.target as HTMLInputElement).checked;
-  selectedLabels.value = checked ? availableLabels.value.map(i => i.label) : [];
-  canvasStore.gallery?.setLabelFilter(selectedLabels.value);
+function clearLabels() {
+  selectedLabels.value = [];
+  canvasStore.gallery?.setLabelFilter(null);
 }
 
-watch(labelOpen, (open) => {
-  if (open) { typeOpen.value = false; catalogOpen.value = false; refreshLabels(); }
-});
-
-function registerGalleryCallbacks() {
-  const gallery = canvasStore.gallery;
-  if (!gallery) return;
-  gallery.onNewLabelsAppeared = (newLabels: string[]) => {
-    const toAdd = newLabels.filter(l => !selectedLabels.value.includes(l));
-    if (toAdd.length > 0) selectedLabels.value = [...selectedLabels.value, ...toAdd];
-  };
-}
-
-onMounted(registerGalleryCallbacks);
-watch(() => canvasStore.gallery, registerGalleryCallbacks);
+// DropdownPanel closes any other open dropdown itself, so we only refresh here.
+watch(labelOpen, (open) => { if (open) refreshLabels(); });
 
 // ── DSO Types ─────────────────────────────────────────────────────────────────
 const typeBtnRef = ref<HTMLButtonElement>();
-const typeSelectAllRef = ref<HTMLInputElement>();
 const typeOpen = ref(false);
-watch(typeOpen, (open) => { if (open) { labelOpen.value = false; catalogOpen.value = false; } });
 
-const selectedTypes = ref<string[]>([...DSO_TYPES_ALL]);
-
-const allTypesChecked = computed(() =>
-  DSO_TYPES_ALL.every(t => selectedTypes.value.includes(t))
-);
-
-const someTypesChecked = computed(() =>
-  DSO_TYPES_ALL.some(t => selectedTypes.value.includes(t))
-);
-
-watch([allTypesChecked, someTypesChecked], () => {
-  if (typeSelectAllRef.value) {
-    typeSelectAllRef.value.indeterminate = someTypesChecked.value && !allTypesChecked.value;
-  }
-});
+const selectedTypes = ref<string[]>([]);
 
 function toggleType(type: string, checked: boolean) {
   selectedTypes.value = checked
@@ -308,33 +255,16 @@ function toggleType(type: string, checked: boolean) {
   canvasStore.gallery?.setDSOTypeFilter(selectedTypes.value);
 }
 
-function toggleAllTypes(e: Event) {
-  const checked = (e.target as HTMLInputElement).checked;
-  selectedTypes.value = checked ? [...DSO_TYPES_ALL] : [];
-  canvasStore.gallery?.setDSOTypeFilter(selectedTypes.value);
+function clearTypes() {
+  selectedTypes.value = [];
+  canvasStore.gallery?.setDSOTypeFilter([]);
 }
 
 // ── Catalogs ──────────────────────────────────────────────────────────────────
 const catalogBtnRef = ref<HTMLButtonElement>();
-const catalogSelectAllRef = ref<HTMLInputElement>();
 const catalogOpen = ref(false);
-watch(catalogOpen, (open) => { if (open) { labelOpen.value = false; typeOpen.value = false; } });
 
-const selectedCatalogs = ref<string[]>([...DSO_CATALOGS_ALL]);
-
-const allCatalogsChecked = computed(() =>
-  DSO_CATALOGS_ALL.every(c => selectedCatalogs.value.includes(c))
-);
-
-const someCatalogsChecked = computed(() =>
-  DSO_CATALOGS_ALL.some(c => selectedCatalogs.value.includes(c))
-);
-
-watch([allCatalogsChecked, someCatalogsChecked], () => {
-  if (catalogSelectAllRef.value) {
-    catalogSelectAllRef.value.indeterminate = someCatalogsChecked.value && !allCatalogsChecked.value;
-  }
-});
+const selectedCatalogs = ref<string[]>([]);
 
 function toggleCatalog(cat: string, checked: boolean) {
   selectedCatalogs.value = checked
@@ -343,17 +273,22 @@ function toggleCatalog(cat: string, checked: boolean) {
   canvasStore.gallery?.setDSOCatalogFilter(selectedCatalogs.value);
 }
 
-function toggleAllCatalogs(e: Event) {
-  const checked = (e.target as HTMLInputElement).checked;
-  selectedCatalogs.value = checked ? [...DSO_CATALOGS_ALL] : [];
-  canvasStore.gallery?.setDSOCatalogFilter(selectedCatalogs.value);
+function clearCatalogs() {
+  selectedCatalogs.value = [];
+  canvasStore.gallery?.setDSOCatalogFilter([]);
 }
 
 // ── Init / reset filters on gallery entry/exit ────────────────────────────────
 watch(viewMode, (mode) => {
   if (mode === 'gallery') {
-    selectedTypes.value = [...DSO_TYPES_ALL];
-    selectedCatalogs.value = [...DSO_CATALOGS_ALL];
+    selectedLabels.value = [];
+    selectedTypes.value = [];
+    selectedCatalogs.value = [];
+    selectedPois.value = new Map();
+    canvasStore.gallery?.setLabelFilter(null);
+    canvasStore.gallery?.setDSOTypeFilter([]);
+    canvasStore.gallery?.setDSOCatalogFilter([]);
+    canvasStore.gallery?.setPoiFilter(null);
     refreshLabels();
     poiCategoriesStore.ensureLoaded();
     refreshPois();
@@ -361,7 +296,6 @@ watch(viewMode, (mode) => {
   }
   searchQuery.value = '';
   selectedLabels.value = [];
-  labelsInitialized.value = false;
   selectedTypes.value = [];
   selectedCatalogs.value = [];
   selectedPois.value = new Map();
