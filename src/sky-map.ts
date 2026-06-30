@@ -290,6 +290,16 @@ function computeMaxMag(scale: number): number {
   return Math.max(6, raw);
 }
 
+// Snap a zoom scale to a ~6% multiplicative grid. The star sprite atlas is keyed on
+// this (not the raw scale), so a continuous zoom only rebuilds the atlas when it
+// crosses a bucket — a handful of times across the whole range instead of every
+// frame. Sprites end up at most ~3% off their exact size mid-zoom (imperceptible in
+// motion, snapped exact at bucket boundaries), with no drawImage rescaling.
+const ATLAS_SCALE_STEP = Math.log(1.06);
+function atlasScaleBucket(scale: number): number {
+  return Math.exp(Math.round(Math.log(scale) / ATLAS_SCALE_STEP) * ATLAS_SCALE_STEP);
+}
+
 // ─── Star painting (shared by the live draw and the sprite cache) ────────────
 // Resolved per-star drawing inputs. Everything here is a pure function of
 // (mag, bv, scale, maxMag, theme), so two stars with the same quantized mag/bv
@@ -2719,13 +2729,28 @@ export class SkyMap {
     // view.
     const maxMag = this.starMagThreshold();
 
-    // A sprite's shape depends only on (mag, bv) once scale and maxMag are fixed, so
-    // the atlas is valid for the whole pan and only rebuilt on zoom / mag-limit change.
-    if (view.scale !== this.starSpriteScale || maxMag !== this.starSpriteMaxMag) {
+    // The sprite atlas (offscreen canvas per quantized mag/bv) is expensive to build,
+    // so we only build it AT REST. A fast zoom changes scale by >1 bucket per frame, so
+    // rebuilding on every scale change churned hundreds of canvases per frame and drove
+    // the GC. Instead we freeze the atlas during a gesture and scale its sprites to the
+    // live zoom with drawImage (cheap), then rebuild a crisp atlas on the settle redraw.
+    // The bucketed scale keeps the at-rest sprite size stable across sub-bucket jitter.
+    const atlasScale = atlasScaleBucket(view.scale);
+    const atlasMaxMag = Math.round(maxMag * 10) / 10;
+    const atlasStale = atlasScale !== this.starSpriteScale || atlasMaxMag !== this.starSpriteMaxMag;
+    if (atlasStale && (!this.interacting || this.starSprites.size === 0)) {
       this.starSprites.clear();
-      this.starSpriteScale = view.scale;
-      this.starSpriteMaxMag = maxMag;
+      this.starSpriteScale = atlasScale;
+      this.starSpriteMaxMag = atlasMaxMag;
     }
+    // If we kept a frozen atlas from a different zoom bucket (mid-gesture), scale its
+    // sprites to the live zoom by the radius ratio (≈ √ of the scale ratio, matching
+    // starRadius' curve). At rest and during pan the bucket matches, so this is 1 and
+    // sprites draw crisp 1:1.
+    const frozenScale = this.starSpriteScale !== atlasScale;
+    const spriteScale = frozenScale && this.starSpriteScale > 0
+      ? Math.sqrt(view.scale / this.starSpriteScale)
+      : 1;
 
     for (const star of stars) {
       // Always include the highlighted star.
@@ -2768,11 +2793,18 @@ export class SkyMap {
       const key = magKey * 100 + bvKey;
       let sprite = this.starSprites.get(key);
       if (sprite === undefined) {
-        const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, false);
+        // Build at the atlas's frozen scale/maxMag so a sprite minted mid-gesture (a
+        // newly-appeared bucket) matches the rest of the atlas and scales identically.
+        const paint = computeStarPaint(star.mag, star.bv, this.starSpriteScale, this.starSpriteMaxMag, theme, false);
         sprite = this.buildStarSprite(paint);
         this.starSprites.set(key, sprite);
       }
-      ctx.drawImage(sprite.canvas, c.x - sprite.half, c.y - sprite.half);
+      if (spriteScale === 1) {
+        ctx.drawImage(sprite.canvas, c.x - sprite.half, c.y - sprite.half);
+      } else {
+        const h = sprite.half * spriteScale;
+        ctx.drawImage(sprite.canvas, c.x - h, c.y - h, sprite.canvas.width * spriteScale, sprite.canvas.height * spriteScale);
+      }
     }
 
     ctx.globalAlpha = prevAlpha;
