@@ -14,6 +14,7 @@ Project-specific skills live in `.claude/skills/`. The harness auto-invokes them
 | `add-dso-catalog` | Integrating a new DSO catalog (RCW, Barnard, Abell…) |
 | `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog |
 | `test-placement` | Testing astrophoto upload, plate solving, and sky-map placement |
+| `profile-performance` | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark |
 
 ---
 
@@ -116,6 +117,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 | `docs/dev/curved-arrow-svg.md` | Developers | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows |
 | `docs/dev/imaging-recipe.md` | Developers | Integration time algorithm, filter selection logic, type-family constants, tuning guide |
 | `docs/dev/target-recommender.md` | Developers | Target recommender pipeline: filters, scoring formula, diversity cap, altitude preferences, known constraints |
+| `docs/dev/render-performance.md` | Developers | Transferable canvas-perf techniques from the sky-map render loop: profiling, hoisting per-frame invariants, sprite atlas, input coalescing, cache-key bucketing/drift |
 | `docs/dev/ci.md` | Developers | GitHub Actions workflows: CI, tests, Docker image build/smoke-test, Electron release builds |
 
 **Rules:**
