@@ -97,6 +97,12 @@ describe('getDSOs()', () => {
   it('returns all loaded DSOs', () => {
     expect(getDSOs().length).toBe(FIXTURE.data.length);
   });
+
+  it('precomputes the catalog prefix on every DSO to match getDSOCatalog(id)', () => {
+    for (const dso of getDSOs()) {
+      expect(dso.catalog).toBe(getDSOCatalog(dso.id));
+    }
+  });
 });
 
 // ─── getDSOById ───────────────────────────────────────────────────────────────

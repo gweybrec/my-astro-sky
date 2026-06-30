@@ -1,9 +1,9 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
-import { project, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle, borderRadiusPU, getProjectionMode } from './projection';
+import { project, projectCached, getProjectionGeneration, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle, borderRadiusPU, getProjectionMode } from './projection';
 import { framePointToSky, clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getStarMagsSorted, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
-import { getDSOs, getDSOCatalog, getDSOById } from './dso-catalog';
+import { getDSOs, getDSOById } from './dso-catalog';
 import { selectDSOsToRender, DSO_CONTAINER_VISIBLE_RADIUS_PX, type SelectableDSO } from './dso-selection';
 import {
   targetRenderCount, magThresholdForCount,
@@ -290,6 +290,76 @@ function computeMaxMag(scale: number): number {
   return Math.max(6, raw);
 }
 
+// ─── Star painting (shared by the live draw and the sprite cache) ────────────
+// Resolved per-star drawing inputs. Everything here is a pure function of
+// (mag, bv, scale, maxMag, theme), so two stars with the same quantized mag/bv
+// share one sprite (see renderStars' atlas).
+interface StarPaint {
+  radius: number;
+  r: number; g: number; b: number;   // dot colour
+  soft: number;                       // soft-rim fraction of the radius
+  glowAlpha: number;
+  glowR: number;                      // glow extent in px (0 when no glow)
+  coreEdge: number;
+  solidUntil: number;
+  gr: number; gg: number; gb: number; // glow colour
+}
+
+function computeStarPaint(
+  mag: number, bv: number, scale: number, maxMag: number,
+  theme: typeof SKY_THEME, established = false,
+): StarPaint {
+  const radius = starRadius(mag, scale, theme.brightZoomBoost) * theme.radiusScale;
+  const spectral = bvToRgb(bv);
+  const [r, g, b] = applyStarColor(spectral, theme);
+  // 1 when well below the limit, ramping to 0 right at it (just-appearing stars).
+  const estab = established ? 1 : Math.min(1, Math.max(0, (maxMag - mag) / 1.5));
+  const soft = 0.3 + 0.4 * (1 - estab);
+  const glowBright = mag < theme.glowThresholdMag
+    ? Math.min(1, Math.max(0, (theme.glowThresholdMag - mag) / theme.glowThresholdMag))
+    : 0;
+  const glowAlpha = theme.glowOpacity * glowBright;
+  let glowR = 0, coreEdge = 0, solidUntil = 0, gr = r, gg = g, gb = b;
+  if (glowAlpha > 0.01) {
+    const glow = applyStarColor(spectral, theme, theme.glowSaturation);
+    gr = glow[0]; gg = glow[1]; gb = glow[2];
+    const glowZoom = 1 + theme.glowZoomSpread * Math.max(0, Math.min(3, Math.sqrt(scale / 400)) - 1);
+    glowR = radius * theme.glowRadiusMul * glowZoom;
+    coreEdge = radius / glowR;            // dot edge as a fraction of glowR
+    solidUntil = coreEdge * (1 - soft);   // fully opaque out to here
+  }
+  return { radius, r, g, b, soft, glowAlpha, glowR, coreEdge, solidUntil, gr, gg, gb };
+}
+
+/**
+ * Paint a single star at (cx, cy). Mirrors the original inline draw exactly: a
+ * one-gradient opaque-core→halo for glowing stars, else an opaque core with a soft
+ * rim. Used both to fill a sprite (cx=cy=half) and to draw the highlighted star live.
+ */
+function paintStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, p: StarPaint): void {
+  if (p.glowAlpha > 0.01) {
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, p.glowR);
+    grad.addColorStop(0, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
+    grad.addColorStop(p.solidUntil, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
+    const GLOW_STEPS = 12;
+    for (let i = 0; i <= GLOW_STEPS; i++) {
+      const f = i / GLOW_STEPS;
+      const stop = p.coreEdge + (1 - p.coreEdge) * f;
+      const a = p.glowAlpha * Math.pow(1 - f, 2.5);
+      grad.addColorStop(stop, `rgba(${p.gr}, ${p.gg}, ${p.gb}, ${a})`);
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - p.glowR, cy - p.glowR, p.glowR * 2, p.glowR * 2);
+  } else {
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, p.radius);
+    grad.addColorStop(0, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
+    grad.addColorStop(1 - p.soft, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
+    grad.addColorStop(1, `rgba(${p.r}, ${p.g}, ${p.b}, 0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - p.radius, cy - p.radius, p.radius * 2, p.radius * 2);
+  }
+}
+
 export function normalizeRotationDeg(deg: number): number {
   let normalized = ((deg % 360) + 360) % 360;
   if (normalized > 180) normalized -= 360;
@@ -299,12 +369,33 @@ export function normalizeRotationDeg(deg: number): number {
 // ─── DSO rendering helpers ──────────────────────────────────────────────────
 
 /** Convert angular size (arcmin) to canvas pixels accounting for stereographic scale */
-function angularSizeToCanvasPx(arcmin: number, decDeg: number, scale: number): number {
-  const colatitude = getHemisphere() === 'south' ? 90 + decDeg : 90 - decDeg;
-  const theta = colatitude * Math.PI / 180;
-  const cos2 = Math.cos(theta / 2) ** 2;
+function angularSizeToCanvasPx(arcmin: number, decDeg: number, scale: number, cos2?: number): number {
+  // cos2 depends only on dec + hemisphere; hot per-DSO callers pass a cached value
+  // (see dsoSizeCos2) so the trig runs once per object per hemisphere change instead
+  // of 2–3× per object every frame. Same formula either way, so hit-testing (which
+  // omits the arg) and rendering stay pixel-identical.
+  if (cos2 === undefined) {
+    const colatitude = getHemisphere() === 'south' ? 90 + decDeg : 90 - decDeg;
+    const theta = colatitude * Math.PI / 180;
+    cos2 = Math.cos(theta / 2) ** 2;
+  }
   const rad = (arcmin / 60) * Math.PI / 180;
   return (rad / (2 * cos2)) * scale;
+}
+
+/**
+ * Cached `cos²((90∓dec)/2)` factor for a DSO's angular-size conversion. Invalidated
+ * by the projection generation (hemisphere change), matching the formula in
+ * {@link angularSizeToCanvasPx}.
+ */
+function dsoSizeCos2(dso: DSO): number {
+  if (dso._cos2g !== getProjectionGeneration()) {
+    const colatitude = getHemisphere() === 'south' ? 90 + dso.dec : 90 - dso.dec;
+    const theta = colatitude * Math.PI / 180;
+    dso._cos2 = Math.cos(theta / 2) ** 2;
+    dso._cos2g = getProjectionGeneration();
+  }
+  return dso._cos2!;
 }
 
 /** Position angle (E of celestial north) → angle on canvas */
@@ -339,6 +430,20 @@ export class SkyMap {
   private backgroundOpacity = 1.0;
   // The app's single sky theme (background, stars, glow, grid tint).
   private readonly skyTheme = SKY_THEME;
+
+  // ── Star sprite atlas ──────────────────────────────────────────────────────
+  // Distinct quantized (mag, bv) sprites pre-rendered for the current zoom. Keyed
+  // by an integer bucket; rebuilt only when scale or the mag limit changes, so a
+  // pan reuses every sprite instead of rebuilding ~15-stop gradients per star.
+  private starSprites = new Map<number, { canvas: HTMLCanvasElement; half: number }>();
+  private starSpriteScale = -1;
+  private starSpriteMaxMag = -1;
+
+  // ── Hover hit-test throttle ────────────────────────────────────────────────
+  // mousemove fires faster than we can draw a tooltip, and the hit-test walks the
+  // star/DSO indexes + rebuilds the DSO selection. Coalesce to one test per frame.
+  private pendingHover: { mx: number; my: number; clientX: number; clientY: number } | null = null;
+  private hoverRaf: number | null = null;
   private maxStarCount = 2000;
   private maxDSOCount = 500;
   // Per-frame cache of the DSO render selection — single source of truth shared by
@@ -893,8 +998,8 @@ export class SkyMap {
     this.starIndex.clear();
     for (const star of getStars()) {
       if (star.mag > maxMag) continue;
-      const p = project(star.ra, star.dec);
-      this.starIndex.insert(star, p.x, p.y);
+      projectCached(star);
+      this.starIndex.insert(star, star._px!, star._py!);
     }
   }
 
@@ -909,14 +1014,14 @@ export class SkyMap {
       
       if (!isHighlighted) {
         if (!this.visibleDSOTypes.has(dso.type)) continue;
-        const cat = getDSOCatalog(dso.id);
+        const cat = dso.catalog;
         if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
         if (maxMag !== null && dso.mag !== null && dso.mag > maxMag) continue;
         if (dso.mag === null && maxMag !== null) continue;
       }
-      
-      const p = project(dso.ra, dso.dec);
-      this.dsoIndex.insert(dso, p.x, p.y);
+
+      projectCached(dso);
+      this.dsoIndex.insert(dso, dso._px!, dso._py!);
     }
   }
 
@@ -1024,7 +1129,7 @@ export class SkyMap {
                             e.clientX > window.innerWidth - 280; // Panel is 280px wide on the right
 
         if (mx >= 0 && my >= 0 && mx <= this.view.width && my <= this.view.height && !isOverPanel) {
-          this.handleHover(mx, my, e.clientX, e.clientY);
+          this.requestHover(mx, my, e.clientX, e.clientY);
         } else if (isOverPanel) {
           // Hide tooltips when mouse is over side panel
           if (this.onStarHover) {
@@ -1117,6 +1222,10 @@ export class SkyMap {
     if (this._renderRaf !== null) {
       cancelAnimationFrame(this._renderRaf);
       this._renderRaf = null;
+    }
+    if (this.hoverRaf !== null) {
+      cancelAnimationFrame(this.hoverRaf);
+      this.hoverRaf = null;
     }
     if (this.settleTimer !== null) {
       clearTimeout(this.settleTimer);
@@ -1252,6 +1361,23 @@ export class SkyMap {
     // gating exactly matches what is drawn (including the container-size gate).
     this.selectRenderedDSOs();
     return this.cachedSelectedDSOIds!.has(dso.id);
+  }
+
+  /**
+   * Schedule a hover hit-test for the next frame, coalescing bursts of mousemove
+   * events into one test. Skipped entirely while actively panning/zooming: the
+   * object under the cursor changes every frame and no tooltip is being read, so the
+   * work is wasted until motion settles.
+   */
+  private requestHover(mx: number, my: number, clientX: number, clientY: number) {
+    this.pendingHover = { mx, my, clientX, clientY };
+    if (this.interacting || this.hoverRaf !== null) return;
+    this.hoverRaf = requestAnimationFrame(() => {
+      this.hoverRaf = null;
+      const h = this.pendingHover;
+      this.pendingHover = null;
+      if (h) this.handleHover(h.mx, h.my, h.clientX, h.clientY);
+    });
   }
 
   private handleHover(mx: number, my: number, clientX: number, clientY: number) {
@@ -2586,11 +2712,20 @@ export class SkyMap {
     const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = 1;
     const stars = getStars();
+    const theme = this.skyTheme;
     // Pan-invariant magnitude cutoff for this zoom + canvas (see render-budget.ts).
     // A star renders iff its magnitude is at or below this threshold, regardless of what
     // else is on screen — so panning never makes stars pop into the static part of the
     // view.
     const maxMag = this.starMagThreshold();
+
+    // A sprite's shape depends only on (mag, bv) once scale and maxMag are fixed, so
+    // the atlas is valid for the whole pan and only rebuilt on zoom / mag-limit change.
+    if (view.scale !== this.starSpriteScale || maxMag !== this.starSpriteMaxMag) {
+      this.starSprites.clear();
+      this.starSpriteScale = view.scale;
+      this.starSpriteMaxMag = maxMag;
+    }
 
     for (const star of stars) {
       // Always include the highlighted star.
@@ -2606,88 +2741,53 @@ export class SkyMap {
         }
       }
 
-      const p = project(star.ra, star.dec);
-      const c = toCanvas(p.x, p.y, view);
+      projectCached(star);
+      const c = toCanvas(star._px!, star._py!, view);
 
       // Skip if off-screen (with margin)
       if (c.x < -20 || c.x > view.width + 20 || c.y < -20 || c.y > view.height + 20) {
         continue;
       }
 
-      const theme = this.skyTheme;
-      const radius = starRadius(star.mag, view.scale, theme.brightZoomBoost) * theme.radiusScale;
-      const spectral = bvToRgb(star.bv);
-      const [r, g, b] = applyStarColor(spectral, theme);
-
-      // How "established" the star is: 1 when well below the magnitude limit,
-      // ramping to 0 right at the limit (where it is just appearing).
-      const fadeRef = maxMag;
-      const estab = star.hip === this.highlightedStar
-        ? 1
-        : Math.min(1, Math.max(0, (fadeRef - star.mag) / 1.5));
-      // Soft-edge fraction of the dot radius: a thin crisp rim (0.3) when
-      // established, a wider soft rim (~0.7) for stars that are just appearing so
-      // they fade in gently. The CORE is always fully opaque, so the background
-      // and constellation lines never show through the middle of a star.
-      const soft = 0.3 + 0.4 * (1 - estab);
-
-      // Brightness factor for the glow: 1 for the brightest, fading to 0 at the
-      // glow threshold so faint stars don't glow.
-      const glowBright = star.mag < theme.glowThresholdMag
-        ? Math.min(1, Math.max(0, (theme.glowThresholdMag - star.mag) / theme.glowThresholdMag))
-        : 0;
-      const glowAlpha = theme.glowOpacity * glowBright;
-
-      if (glowAlpha > 0.01) {
-        // Glowing star: opaque (near-white) core → soft edge → small halo, all in
-        // one radial gradient (no hard edge between dot and glow). The halo uses a
-        // MORE saturated color than the dot (orange for warm stars, blue for hot
-        // ones), so the glow is tinted even though the star core stays white. The
-        // falloff is convex — steep after the star with a faint tail — so it's tight.
-        const [gr, gg, gb] = applyStarColor(spectral, theme, theme.glowSaturation);
-        // The halo spreads further the more you zoom in (capped), so bright stars
-        // bloom obviously when zoomed. The dot stays the same size — only the glow
-        // extends, because coreEdge below keeps the dot pinned at `radius`.
-        const glowZoom = 1 + theme.glowZoomSpread * Math.max(0, Math.min(3, Math.sqrt(view.scale / 400)) - 1);
-        const glowR = radius * theme.glowRadiusMul * glowZoom;
-        const coreEdge = radius / glowR;             // dot edge as a fraction of glowR
-        const solidUntil = coreEdge * (1 - soft);    // fully opaque out to here
-        const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, glowR);
-        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
-        grad.addColorStop(solidUntil, `rgba(${r}, ${g}, ${b}, 1)`);            // solid white-ish core
-        // Smooth convex falloff from the dot edge to the rim, sampled at many
-        // stops so the glow fades continuously — no visible concentric rings.
-        const GLOW_STEPS = 12;
-        for (let i = 0; i <= GLOW_STEPS; i++) {
-          const f = i / GLOW_STEPS;                          // 0 at dot edge → 1 at rim
-          const stop = coreEdge + (1 - coreEdge) * f;
-          const a = glowAlpha * Math.pow(1 - f, 2.5);        // steep near star, faint tail
-          grad.addColorStop(stop, `rgba(${gr}, ${gg}, ${gb}, ${a})`);
-        }
-        ctx.fillStyle = grad;
-        ctx.fillRect(c.x - glowR, c.y - glowR, glowR * 2, glowR * 2);
-      } else {
-        // Non-glowing star: opaque core with a soft translucent rim.
-        const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, radius);
-        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
-        grad.addColorStop(1 - soft, `rgba(${r}, ${g}, ${b}, 1)`);   // solid core
-        grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);          // soft rim
-        ctx.fillStyle = grad;
-        ctx.fillRect(c.x - radius, c.y - radius, radius * 2, radius * 2);
-      }
-
-      // Highlight indicator for searched star
-      if (star.hip === this.highlightedStar) {
+      if (isHighlighted) {
+        // Drawn live (not via the atlas): rare, uses estab=1, and gets a ring.
+        const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, true);
+        paintStar(ctx, c.x, c.y, paint);
         ctx.strokeStyle = 'rgba(192, 120, 48, 0.85)';
         ctx.lineWidth = 2;
         ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.arc(c.x, c.y, radius + 4, 0, Math.PI * 2);
+        ctx.arc(c.x, c.y, paint.radius + 4, 0, Math.PI * 2);
         ctx.stroke();
+        continue;
       }
+
+      // Quantize (mag, bv) to a sprite bucket: 0.25-mag and ~1/12 B-V steps.
+      const magKey = Math.round(star.mag * 4);
+      const bvKey = Math.round((Math.max(-0.4, Math.min(2.0, star.bv)) + 0.4) * 12);
+      const key = magKey * 100 + bvKey;
+      let sprite = this.starSprites.get(key);
+      if (sprite === undefined) {
+        const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, false);
+        sprite = this.buildStarSprite(paint);
+        this.starSprites.set(key, sprite);
+      }
+      ctx.drawImage(sprite.canvas, c.x - sprite.half, c.y - sprite.half);
     }
 
     ctx.globalAlpha = prevAlpha;
+  }
+
+  /** Render one star's sprite (centred) into an offscreen canvas sized to its extent. */
+  private buildStarSprite(paint: StarPaint): { canvas: HTMLCanvasElement; half: number } {
+    const extent = paint.glowAlpha > 0.01 ? paint.glowR : paint.radius;
+    const half = Math.ceil(extent) + 1;   // +1px so the soft rim isn't clipped
+    const canvas = document.createElement('canvas');
+    canvas.width = half * 2;
+    canvas.height = half * 2;
+    const sctx = canvas.getContext('2d')!;
+    paintStar(sctx, half, half, paint);
+    return { canvas, half };
   }
 
   private renderStarLabels() {
@@ -2701,8 +2801,8 @@ export class SkyMap {
     for (const star of stars) {
       if (star.mag > 3 || !star.name) continue;
 
-      const p = project(star.ra, star.dec);
-      const c = toCanvas(p.x, p.y, view);
+      projectCached(star);
+      const c = toCanvas(star._px!, star._py!, view);
 
       if (c.x < -50 || c.x > view.width + 50 || c.y < -50 || c.y > view.height + 50) {
         continue;
@@ -2734,7 +2834,7 @@ export class SkyMap {
 
       if (!isHighlighted) {
         if (!this.visibleDSOTypes.has(dso.type)) continue;
-        const cat = getDSOCatalog(dso.id);
+        const cat = dso.catalog;
         if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
         // Dec pre-filter: skip objects clearly outside the border (stereo only — in
         // fisheye the far hemisphere is clipped by project() returning off-canvas).
@@ -2747,16 +2847,16 @@ export class SkyMap {
         if (dso.containerId && dso.containerId !== this.highlightedDSO) {
           const container = getDSOById(dso.containerId);
           if (container) {
-            const cRx = Math.max(2, angularSizeToCanvasPx((container.majAxis ?? 1) / 2, container.dec, view.scale));
+            const cRx = Math.max(2, angularSizeToCanvasPx((container.majAxis ?? 1) / 2, container.dec, view.scale, dsoSizeCos2(container)));
             if (cRx < DSO_CONTAINER_VISIBLE_RADIUS_PX) continue;
           }
         }
       }
 
-      const p = project(dso.ra, dso.dec);
-      const c = toCanvas(p.x, p.y, view);
+      projectCached(dso);
+      const c = toCanvas(dso._px!, dso._py!, view);
       const majorArcmin = dso.majAxis ?? 1;
-      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale));
+      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, dsoSizeCos2(dso)));
       const margin = rx + 20;
       if (c.x < -margin || c.x > view.width + margin || c.y < -margin || c.y > view.height + margin) {
         continue;
@@ -2776,13 +2876,14 @@ export class SkyMap {
 
     // Render the selected DSOs
     for (const dso of this.selectRenderedDSOs()) {
-      const p = project(dso.ra, dso.dec);
-      const c = toCanvas(p.x, p.y, view);
+      projectCached(dso);
+      const c = toCanvas(dso._px!, dso._py!, view);
 
       const majorArcmin = dso.majAxis ?? 1;
       const minorArcmin = dso.minAxis ?? majorArcmin;
-      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale));
-      const ry = Math.max(2, angularSizeToCanvasPx(minorArcmin / 2, dso.dec, view.scale));
+      const cos2 = dsoSizeCos2(dso);
+      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, cos2));
+      const ry = Math.max(2, angularSizeToCanvasPx(minorArcmin / 2, dso.dec, view.scale, cos2));
       const angle = dsoCanvasAngle(dso.pa, dso.ra, view.rotationDeg);
 
       // Opacity based on magnitude
@@ -3019,14 +3120,14 @@ export class SkyMap {
     for (const dso of this.selectRenderedDSOs()) {
       const isMess = dso.id.startsWith('M') && !dso.id.startsWith('M0');
       const majorArcmin = dso.majAxis ?? 1;
-      const rx = angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale);
+      const rx = angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, dsoSizeCos2(dso));
 
       // Label visibility rules
       if (isMess && view.scale <= 100) continue;
       if (!isMess && (view.scale <= 300 || rx <= 4)) continue;
 
-      const p = project(dso.ra, dso.dec);
-      const c = toCanvas(p.x, p.y, view);
+      projectCached(dso);
+      const c = toCanvas(dso._px!, dso._py!, view);
 
       const label = isMess ? dso.id
         : dso.id.startsWith('LPN-') ? (dso.displayName || dso.id.replace(/^LPN-/, ''))

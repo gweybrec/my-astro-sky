@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { project, unproject, toCanvas, fromCanvas, setHemisphere, getHemisphere, borderRadiusPU, fitScaleForBorderCircle } from '../../src/projection';
+import { project, projectCached, getProjectionGeneration, unproject, toCanvas, fromCanvas, setHemisphere, getHemisphere, setProjectionMode, borderRadiusPU, fitScaleForBorderCircle } from '../../src/projection';
 
 const EPSILON = 1e-9;
 
@@ -157,5 +157,52 @@ describe('borderRadiusPU / fitScaleForBorderCircle', () => {
   it('is driven by the smaller dimension (portrait vs landscape)', () => {
     const lat = 45;
     expect(fitScaleForBorderCircle(800, 1200, lat)).toBeCloseTo(fitScaleForBorderCircle(1200, 800, lat), 12);
+  });
+});
+
+describe('projectCached / projection generation', () => {
+  it('writes cached projection matching project()', () => {
+    setHemisphere('north');
+    setProjectionMode('stereo');
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 123.456, dec: 67.89 };
+    projectCached(o);
+    const p = project(123.456, 67.89);
+    expect(o._px).toBeCloseTo(p.x, 12);
+    expect(o._py).toBeCloseTo(p.y, 12);
+    expect(o._pg).toBe(getProjectionGeneration());
+  });
+
+  it('does not re-project until the generation moves', () => {
+    setHemisphere('north');
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 10, dec: 20 };
+    projectCached(o);
+    // Tamper with the cache: a no-op call must leave the stale value untouched.
+    o._px = 999;
+    projectCached(o);
+    expect(o._px).toBe(999);
+  });
+
+  it('invalidates the cache when the hemisphere changes', () => {
+    setHemisphere('north');
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 10, dec: 20 };
+    projectCached(o);
+    const gen = getProjectionGeneration();
+    setHemisphere('south');
+    expect(getProjectionGeneration()).toBe(gen + 1);
+    projectCached(o);
+    const south = project(10, 20);
+    expect(o._px).toBeCloseTo(south.x, 12);
+    expect(o._py).toBeCloseTo(south.y, 12);
+    setHemisphere('north');
+  });
+
+  it('bumps the generation on a real projection-mode change but not on a no-op set', () => {
+    setProjectionMode('stereo');
+    const gen = getProjectionGeneration();
+    setProjectionMode('stereo');               // no-op
+    expect(getProjectionGeneration()).toBe(gen);
+    setProjectionMode('fisheye');              // real change
+    expect(getProjectionGeneration()).toBe(gen + 1);
+    setProjectionMode('stereo');               // restore for other tests
   });
 });
