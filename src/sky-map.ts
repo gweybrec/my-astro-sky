@@ -518,6 +518,11 @@ export class SkyMap {
   private settleTimer: ReturnType<typeof setTimeout> | null = null;
   // Idle delay after the last interactive frame before the full-detail redraw.
   private static readonly SETTLE_MS = 180;
+  // During a gesture the frozen star sprite atlas is rebuilt once the live zoom drifts
+  // past this radius ratio from it — bounding how much drawImage upscales (and thus
+  // pixelates) a frozen sprite, while a continuous zoom rebuilds only once per such
+  // step rather than every frame (see renderStars).
+  private static readonly ATLAS_REBUILD_RATIO = 1.3;
   // User toggle: when false, the motion LOD is disabled entirely — full detail is drawn
   // while moving (no objects disappear/flicker), at the cost of motion smoothness. Only
   // affects manual density (auto DSO already keeps frames smooth without throttling).
@@ -2729,24 +2734,30 @@ export class SkyMap {
     // view.
     const maxMag = this.starMagThreshold();
 
-    // The sprite atlas (offscreen canvas per quantized mag/bv) is expensive to build,
-    // so we only build it AT REST. A fast zoom changes scale by >1 bucket per frame, so
-    // rebuilding on every scale change churned hundreds of canvases per frame and drove
-    // the GC. Instead we freeze the atlas during a gesture and scale its sprites to the
-    // live zoom with drawImage (cheap), then rebuild a crisp atlas on the settle redraw.
-    // The bucketed scale keeps the at-rest sprite size stable across sub-bucket jitter.
+    // The sprite atlas (offscreen canvas per quantized mag/bv) is expensive to build, so
+    // we don't rebuild it on every frame. A fast zoom changes scale by >1 bucket per
+    // frame, which would churn hundreds of canvases per frame and drive the GC. Between
+    // rebuilds the frozen sprites are scaled to the live zoom with drawImage (cheap).
+    //
+    // Rebuild a crisp atlas: always at rest / when empty; during a gesture, only once the
+    // live zoom has drifted past ATLAS_REBUILD_RATIO from the frozen atlas. Throttling by
+    // scale drift (not time) bounds the upscale — and thus the pixelation — directly, and
+    // is self-limiting: each rebuild resets the drift to ~1, so a continuous zoom rebuilds
+    // once per ~1.3× step regardless of frame rate (no time-floor feedback loop).
     const atlasScale = atlasScaleBucket(view.scale);
     const atlasMaxMag = Math.round(maxMag * 10) / 10;
     const atlasStale = atlasScale !== this.starSpriteScale || atlasMaxMag !== this.starSpriteMaxMag;
-    if (atlasStale && (!this.interacting || this.starSprites.size === 0)) {
+    // How much the frozen sprites would be scaled to track the current zoom.
+    const liveRatio = this.starSpriteScale > 0 ? Math.sqrt(view.scale / this.starSpriteScale) : 1;
+    const drifted = liveRatio > SkyMap.ATLAS_REBUILD_RATIO || liveRatio < 1 / SkyMap.ATLAS_REBUILD_RATIO;
+    if (atlasStale && (!this.interacting || this.starSprites.size === 0 || drifted)) {
       this.starSprites.clear();
       this.starSpriteScale = atlasScale;
       this.starSpriteMaxMag = atlasMaxMag;
     }
-    // If we kept a frozen atlas from a different zoom bucket (mid-gesture), scale its
-    // sprites to the live zoom by the radius ratio (≈ √ of the scale ratio, matching
-    // starRadius' curve). At rest and during pan the bucket matches, so this is 1 and
-    // sprites draw crisp 1:1.
+    // Just-rebuilt frames draw crisp 1:1 (bucket matches); between rebuilds, scale the
+    // frozen sprites by the radius ratio (≈ √ of the scale ratio, matching starRadius'
+    // curve). At rest and during pan the bucket matches, so this stays 1.
     const frozenScale = this.starSpriteScale !== atlasScale;
     const spriteScale = frozenScale && this.starSpriteScale > 0
       ? Math.sqrt(view.scale / this.starSpriteScale)
