@@ -68,7 +68,6 @@ export class Gallery {
   private filterByDSOTypes: string[] | null = null;
   private filterByDSOCatalogs: string[] | null = null;
   private filterByLabels: string[] | null = null;
-  private knownLabels = new Set<string>();
   // Two-level POI filter: categoryId → set of selected names (empty set ⇒ whole
   // category). null ⇒ no POI filter (every photo passes).
   private filterByPois: Map<string, Set<string>> | null = null;
@@ -80,7 +79,6 @@ export class Gallery {
   onNavigateToMap: ((photo: Photo) => void) | null = null;
   onPhotoMetadataUpdated: ((photo: Photo) => void) | null = null;
   onDeletePhoto: ((photo: Photo) => void) | null = null;
-  onNewLabelsAppeared: ((labels: string[]) => void) | null = null;
 
   constructor() {
     this.container = document.getElementById('gallery-container')!;
@@ -113,13 +111,7 @@ export class Gallery {
   }
 
   setLabelFilter(labels: string[] | null) {
-    if (labels === null) {
-      this.filterByLabels = null;
-      this.knownLabels.clear();
-    } else {
-      labels.forEach(l => this.knownLabels.add(l));
-      this.filterByLabels = labels;
-    }
+    this.filterByLabels = (labels && labels.length > 0) ? labels : null;
     this.applyFilters();
   }
 
@@ -178,20 +170,6 @@ export class Gallery {
 
     // Filter by labels — null means no filter; (no label) sentinel controls unlabelled photos
     if (this.filterByLabels !== null) {
-      // Auto-include any labels that appeared since the filter was last set (e.g. from metadata edits)
-      const newLabels: string[] = [];
-      for (const p of this.photos) {
-        const labs = p.labels.length ? p.labels : ['(no label)'];
-        for (const l of labs) {
-          if (!this.filterByLabels.includes(l) && !this.knownLabels.has(l)) {
-            this.knownLabels.add(l);
-            this.filterByLabels = [...this.filterByLabels, l];
-            newLabels.push(l);
-          }
-        }
-      }
-      if (newLabels.length > 0) this.onNewLabelsAppeared?.(newLabels);
-
       const sel = this.filterByLabels;
       filtered = filtered.filter(photo =>
         photo.labels.length === 0

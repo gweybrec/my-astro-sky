@@ -265,7 +265,7 @@ describe('Gallery', () => {
     expect(updated.notes).toBe('updated via metadata');
   });
 
-  it('setLabelFilter actually filters out deselected labels', () => {
+  it('setLabelFilter is opt-in: null/empty shows all, non-empty narrows to matching photos', () => {
     const gallery = new Gallery();
     gallery.loadPhotos([
       makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', labels: ['nebula'] }),
@@ -273,23 +273,31 @@ describe('Gallery', () => {
       makePhoto({ id: 'c', originalName: 'NGC7000', filename: 'c.jpg', labels: [] }),
     ]);
 
-    // Initialize with all labels (as the filter bar does on gallery entry)
-    gallery.setLabelFilter(['nebula', 'galaxy', '(no label)']);
+    // Default (null) → all photos shown
     expect(document.querySelectorAll('.gallery-item').length).toBe(3);
 
-    // Deselect 'galaxy' — M31 should be hidden
-    gallery.setLabelFilter(['nebula', '(no label)']);
-    expect(document.querySelectorAll('.gallery-item').length).toBe(2);
-    const visibleNames = Array.from(document.querySelectorAll('.gallery-item-name')).map(n => n.textContent);
-    expect(visibleNames).not.toContain('M31');
+    // Empty array → treated as no filter → all photos shown
+    gallery.setLabelFilter([]);
+    expect(document.querySelectorAll('.gallery-item').length).toBe(3);
 
-    // Deselect '(no label)' too — NGC7000 should also be hidden
+    // Opt-in: only 'nebula' selected → only M42 shown
     gallery.setLabelFilter(['nebula']);
     expect(document.querySelectorAll('.gallery-item').length).toBe(1);
     expect(document.querySelector('.gallery-item-name')?.textContent).toBe('M42');
 
-    // Re-enable all — back to 3
+    // Add 'galaxy' → M42 + M31 shown
+    gallery.setLabelFilter(['nebula', 'galaxy']);
+    expect(document.querySelectorAll('.gallery-item').length).toBe(2);
+    const visibleNames = Array.from(document.querySelectorAll('.gallery-item-name')).map(n => n.textContent);
+    expect(visibleNames).toContain('M42');
+    expect(visibleNames).toContain('M31');
+
+    // Also select '(no label)' → all 3 shown
     gallery.setLabelFilter(['nebula', 'galaxy', '(no label)']);
+    expect(document.querySelectorAll('.gallery-item').length).toBe(3);
+
+    // Clear back to null → all photos shown
+    gallery.setLabelFilter(null);
     expect(document.querySelectorAll('.gallery-item').length).toBe(3);
   });
 
@@ -336,21 +344,29 @@ describe('Gallery', () => {
     expect(chips[0].textContent).toContain('C/2023 A3');
   });
 
-  it('setLabelFilter auto-includes genuinely new labels from metadata edits', () => {
+  it('new labels from metadata edits do not auto-join an active filter (opt-in model)', () => {
     const gallery = new Gallery();
     const photo = makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', labels: ['nebula'] });
     gallery.loadPhotos([photo]);
-    gallery.setLabelFilter(['nebula', '(no label)']);
 
-    const newLabelsSpy = vi.fn();
-    gallery.onNewLabelsAppeared = newLabelsSpy;
+    // Active filter: only 'nebula' selected
+    gallery.setLabelFilter(['nebula']);
+    expect(document.querySelectorAll('.gallery-item').length).toBe(1);
 
-    // Simulate metadata save adding a brand-new label
+    // Simulate metadata save adding a brand-new label 'deepsky'
     gallery['photos'][0] = { ...photo, labels: ['nebula', 'deepsky'] };
     gallery['applyFilters']();
 
-    expect(newLabelsSpy).toHaveBeenCalledWith(['deepsky']);
+    // M42 still passes because 'nebula' is still in the filter
     expect(document.querySelectorAll('.gallery-item').length).toBe(1);
+
+    // The filter was NOT expanded to include 'deepsky' automatically
+    // (a separate photo with only 'deepsky' would be hidden)
+    const photo2 = makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg', labels: ['deepsky'] });
+    gallery['photos'].push(photo2);
+    gallery['applyFilters']();
+    expect(document.querySelectorAll('.gallery-item').length).toBe(1);
+    expect(document.querySelector('.gallery-item-name')?.textContent).toBe('M42');
   });
 
   it('setDSOTypeFilter can be called without changing visible items (current implementation)', () => {

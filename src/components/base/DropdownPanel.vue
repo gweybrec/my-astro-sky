@@ -11,6 +11,15 @@
   </Teleport>
 </template>
 
+<script lang="ts">
+// Module-level registry so only one DropdownPanel is open at a time across the
+// whole app. Opening a panel closes whichever other panel was open. This lives
+// here (not in each caller) because the anchor buttons use `@click.stop`, which
+// prevents the document-click listener below from catching a cross-dropdown
+// click — so panels can't rely on outside-click to close each other.
+let closeActivePanel: (() => void) | null = null;
+</script>
+
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue';
 import { attachAnchoredPanel } from '../../popup-utils';
@@ -37,6 +46,9 @@ function teardown() {
 
 watch(() => props.modelValue, (open) => {
   if (open) {
+    // Close any other open dropdown before showing this one.
+    if (closeActivePanel && closeActivePanel !== close) closeActivePanel();
+    closeActivePanel = close;
     nextTick(() => {
       if (!panelRef.value || !props.anchorEl) return;
       cleanup = attachAnchoredPanel(panelRef.value, props.anchorEl, {
@@ -47,9 +59,13 @@ watch(() => props.modelValue, (open) => {
     });
     document.addEventListener('click', close);
   } else {
+    if (closeActivePanel === close) closeActivePanel = null;
     teardown();
   }
 });
 
-onBeforeUnmount(teardown);
+onBeforeUnmount(() => {
+  if (closeActivePanel === close) closeActivePanel = null;
+  teardown();
+});
 </script>
