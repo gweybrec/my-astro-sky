@@ -73,6 +73,32 @@ describe('SpatialIndex', () => {
     });
   });
 
+  describe('collect', () => {
+    it('returns empty array for empty index', () => {
+      const idx = new SpatialIndex<number>(1);
+      expect(idx.collect(0, 0, 100)).toEqual([]);
+    });
+
+    it('returns exactly the items within radius (any order), including the boundary', () => {
+      const idx = new SpatialIndex<string>(1);
+      idx.insert('in', 3, 0);    // distance = 3
+      idx.insert('edge', 5, 0);  // distance = 5 (collect uses <=)
+      idx.insert('out', 10, 0);  // distance = 10
+      const result = idx.collect(0, 0, 5);
+      expect(new Set(result)).toEqual(new Set(['in', 'edge']));
+    });
+
+    it('matches findAll as a set (collect is just findAll without the sort)', () => {
+      const idx = new SpatialIndex<string>(2);
+      idx.insert('A', 1, 0);
+      idx.insert('B', 4, 3);   // distance = 5
+      idx.insert('C', 7, 0);
+      idx.insert('D', 20, 20); // far outside
+      const r = 8;
+      expect(new Set(idx.collect(0, 0, r))).toEqual(new Set(idx.findAll(0, 0, r)));
+    });
+  });
+
   describe('clear', () => {
     it('removes all items', () => {
       const idx = new SpatialIndex<string>(1);
