@@ -7,12 +7,13 @@
         @click.stop="$emit('name-click')"
       >{{ placed.photo.originalName }}</span>
       <div class="photo-item-controls">
-        <button
+        <EyeToggleButton
           class="btn-icon"
+          :visible="placed.visible"
           :title="placed.visible ? t('photos.hide') : t('photos.show')"
-          @click.stop="$emit('toggle')"
-          v-html="placed.visible ? eyeSvg : eyeOffSvg"
-        ></button>
+          stop-propagation
+          @toggle="$emit('toggle')"
+        />
         <button
           class="btn-icon btn-gear"
           :title="t('photos.settings')"
@@ -42,8 +43,7 @@
 <script setup lang="ts">
 import { t } from '../../i18n';
 import PhotoChip from './PhotoChip.vue';
-import eyeSvg from '../../icons/eye.svg?raw';
-import eyeOffSvg from '../../icons/eye-off.svg?raw';
+import EyeToggleButton from '../base/EyeToggleButton.vue';
 import type { PlacedPhoto } from '../../photo-overlay';
 
 const props = withDefaults(defineProps<{
