@@ -184,6 +184,7 @@ Computed by `computeContainers()` in `scripts/add-ratings.mjs` — it lives ther
 | `dec` | number | Override declination (degrees) |
 | `majAxis` | number | Override the angular major-axis size (arcmin) — for correcting a wrong/missing diameter |
 | `minAxis` | number | Override the angular minor-axis size (arcmin) |
+| `mag` | number | Override or fill in the apparent magnitude |
 
 All fields except `id` and `catalogs` are optional. `applyMetadataOverrides()` only writes non-null values, so omitting a field leaves the source-catalog value intact.
 

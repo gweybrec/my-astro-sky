@@ -36,6 +36,8 @@ function loadMetadataOverrides() {
       // majAxis/minAxis: corrected angular size in arcmin (overrides catalog value)
       majAxis: typeof entry.majAxis === 'number' ? entry.majAxis : null,
       minAxis: typeof entry.minAxis === 'number' ? entry.minAxis : null,
+      // mag: corrected/added apparent magnitude (overrides catalog value)
+      mag: typeof entry.mag === 'number' ? entry.mag : null,
     };
     map.set(id, override);
     for (const cat of catalogs) {
@@ -98,6 +100,8 @@ function applyMetadataOverrides(row, overrides) {
   // angular size override (arcmin) — e.g. correcting a wrong/missing diameter
   if (entry.majAxis !== null) row[4] = entry.majAxis;
   if (entry.minAxis !== null) row[5] = entry.minAxis;
+  // magnitude override — e.g. correcting a wrong value or filling a missing one
+  if (entry.mag !== null) row[7] = entry.mag;
   // Merge additional catalog aliases from override into row[12] (so e.g. M102 becomes searchable)
   if (Array.isArray(entry.catalogs) && Array.isArray(row[12])) {
     const existing = new Set(row[12].map(c => String(c).toUpperCase()));
@@ -624,6 +628,7 @@ const SH2_ALIASES = {
   'SH2-171': 'NGC7822',  // 180' Cep OB4 region; most-used designation NGC 7822
   'SH2-190': 'IC1805',   // Heart Nebula
   'SH2-290': 'Abell31',  // large ancient planetary nebula Abell 31
+  'SH2-281': 'M42',      // Orion Nebula (= NGC 1976 = LBN 974)
 };
 
 async function fetchBarnard() {
