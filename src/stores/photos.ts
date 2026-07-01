@@ -10,7 +10,11 @@ export const usePhotosStore = defineStore('photos', () => {
 
   function syncFromOverlay() {
     const overlay = canvasStore.overlay;
-    placedPhotos.value = overlay ? [...overlay.getPlacedPhotos()] : [];
+    // Shallow-clone each entry (not just the array) so components bound to a single
+    // PlacedPhoto (e.g. the selected-photo card) see a new object reference when a
+    // field like `visible` is mutated in place by the overlay — otherwise Vue's
+    // computed/prop equality check sees the same reference and skips the re-render.
+    placedPhotos.value = overlay ? overlay.getPlacedPhotos().map(p => ({ ...p })) : [];
   }
 
   function selectPhoto(photoId: string | null) {

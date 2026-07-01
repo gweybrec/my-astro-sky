@@ -13,16 +13,14 @@
     ></button>
 
     <!-- Master show/hide-frames toggle (hides all frames regardless of mode) -->
-    <button
-      type="button"
+    <EyeToggleButton
       class="sky-rotation-btn fov-visibility-btn"
+      :visible="fovStore.framesVisible"
       :title="fovStore.framesVisible ? t('fovOverlay.hideFrames') : t('fovOverlay.showFrames')"
-      :aria-label="fovStore.framesVisible ? t('fovOverlay.hideFrames') : t('fovOverlay.showFrames')"
-      @click="toggleFramesVisibility"
+      @toggle="toggleFramesVisibility"
       @mouseenter="suppress(true)" @mouseleave="suppress(false)"
       @focus="suppress(true)" @blur="suppress(false)"
-      v-html="fovStore.framesVisible ? eyeSvg : eyeOffSvg"
-    ></button>
+    />
   </div>
 </template>
 
@@ -35,9 +33,8 @@ import { usePlansStore } from '../../stores/plans';
 import { buildFovPopup } from '../../fov-overlay';
 import { positionPopup } from '../../ui';
 import { useUiStore } from '../../stores/ui';
+import EyeToggleButton from '../base/EyeToggleButton.vue';
 import telescopeSvg from '../../icons/telescope.svg?raw';
-import eyeSvg from '../../icons/eye.svg?raw';
-import eyeOffSvg from '../../icons/eye-off.svg?raw';
 
 const canvasStore = useCanvasStore();
 const fovStore = useFovFramesStore();
