@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { project, projectCached, getProjectionGeneration, unproject, toCanvas, fromCanvas, setHemisphere, getHemisphere, setProjectionMode, borderRadiusPU, fitScaleForBorderCircle } from '../../src/projection';
+import { project, projectCached, getProjectionGeneration, invalidateProjections, unproject, toCanvas, fromCanvas, setHemisphere, getHemisphere, setProjectionMode, borderRadiusPU, fitScaleForBorderCircle } from '../../src/projection';
 
 const EPSILON = 1e-9;
 
@@ -194,6 +194,18 @@ describe('projectCached / projection generation', () => {
     expect(o._px).toBeCloseTo(south.x, 12);
     expect(o._py).toBeCloseTo(south.y, 12);
     setHemisphere('north');
+  });
+
+  it('invalidateProjections bumps the generation and forces a recompute', () => {
+    setHemisphere('north');
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 10, dec: 20 };
+    projectCached(o);
+    const gen = getProjectionGeneration();
+    o._px = 999;                 // simulate a stale cached value
+    invalidateProjections();     // e.g. the object's ra/dec changed
+    expect(getProjectionGeneration()).toBe(gen + 1);
+    projectCached(o);
+    expect(o._px).toBeCloseTo(project(10, 20).x, 12);
   });
 
   it('bumps the generation on a real projection-mode change but not on a no-op set', () => {

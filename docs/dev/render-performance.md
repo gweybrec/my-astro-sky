@@ -45,6 +45,8 @@ Callers then read `o._px / o._py` directly — no return value, so panning re-pr
 
 > **Pattern:** a *generation/epoch counter* is the cleanest cache-invalidation primitive when the inputs change rarely and atomically. Bump on the rare event; compare a stored stamp on the hot path. No per-object subscriptions, no manual cache clears scattered through the code. The one rule: **every** mutation of the underlying state must route through the function that bumps the counter (here, all hemisphere/mode changes go through `setHemisphere`/`setProjectionMode`).
 
+> **The failure mode, learned the hard way.** That "one rule" is exactly where this kind of cache bites you. The projection also changes when a user *override* edits a DSO's `ra`/`dec` — a path that does **not** go through `setHemisphere`. The first cut of the cache missed it, so an edited DSO kept rendering and hit-testing at its old position until the next hemisphere toggle. The fix is a dedicated `invalidateProjections()` (just `_projGeneration++`) called from the override path. When you add a generation cache, enumerate *every* writer of the underlying state — not just the obvious one — and make each bump the counter.
+
 ### 1b. Precompute pure derived values at load, not per frame
 
 `getDSOCatalog(id)` mapped a DSO id to its catalog prefix with a regex + a chain of `startsWith` — run for every DSO **every frame** during the selection pass. The id is immutable, so the result is computed **once at load** and stored as a field (`dso.catalog`). The per-frame line becomes a field read. Cost: 48 ms → gone.
@@ -137,6 +139,21 @@ This is **self-limiting**: each rebuild resets the drift to ~1, so a continuous 
 
 ---
 
+## Technique 5 — Cull work before you do it (and know when to stop)
+
+`selectRenderedDSOs` linearly scanned all ~14k DSOs every frame to decide which fall in the viewport. The fix is a spatial cull: index every DSO by its projection position (generation-keyed, so rebuilt only on hemisphere/mode/override change — Technique 1 again), and per frame query only the cells near the viewport. The query radius is the viewport half-diagonal plus a margin for object size.
+
+Two details made it correct and effective:
+
+- **Don't let outliers set the margin.** The margin must cover an object whose *centre* is off-screen but whose *body* reaches in. A handful of giant DSOs (Barnard's Loop, big molecular clouds) would force a margin so wide it pulled in most of the catalog — defeating the cull. Solution: objects larger than a threshold (~0.04 projection units) bypass the index into a small always-considered list (~36 objects), so the spatial margin stays tight for the other 99%. Per-frame iteration then drops from ~14k to ~3,900 at 4× zoom, ~250 at 17×, ~60 at 70× — **viewport-bounded, not O(catalog)**.
+- **Sort only if you need order.** `findAll` sorts by distance; viewport culling doesn't care about order, so it uses a sort-free `collect`.
+
+> **The honest result.** A clean A/B (cull vs full scan, identical scripted pan) showed **frame time unchanged — 52.0 vs 51.6 ms, within noise.** The trace had already said DSO selection was only ~3% of CPU; the frame is bottlenecked on star drawing and native canvas/raster overhead. So this is a real **CPU-work and scalability** win (per-frame cost stops growing with the catalog) — but **not** an FPS win, because it wasn't the bottleneck.
+>
+> **Pattern / when to stop.** Once the profile is *flat* — top items are irreducible drawing plus `(program)`/`(garbage collector)` native overhead, with no single function dominating — you've hit diminishing returns. Further "optimisations" the profile lists at low single-digit percentages will measure as noise. The right move is to A/B them honestly and report that they don't move frame time, rather than shipping complexity for an imagined win. Keep such a change only for a secondary reason (scalability, battery, correctness), and say so.
+
+---
+
 ## Results
 
 Measured on identical scripted interactions at above-average density (median `requestAnimationFrame` delta):
@@ -155,6 +172,9 @@ Per-function self time (% of active CPU), original vs final trace:
 | `addColorStop` | 339 ms (9%) | 137 ms (2%) |
 | `getDSOCatalog` | 48 ms | 0 (precomputed) |
 | `angularSizeToCanvasPx` | 54 ms | 23 ms |
+| `buildStarSprite` (incl, zoom) | 30% of active CPU | 3.5% |
+
+The spatial DSO cull (Technique 5) reduced per-frame DSO iteration up to ~200× when zoomed in but did **not** change frame time (it wasn't the bottleneck) — kept for scalability, not FPS.
 
 ---
 
@@ -167,3 +187,4 @@ Per-function self time (% of active CPU), original vs final trace:
 5. **Check your cache key cadence.** If the key changes as fast as the cached value, it's not a cache. Quantise the key; freeze during gestures; refresh on a bounded *drift*, never on a bare timer whose interval is near the work's cost.
 6. **A/B every claim.** Stash, run the identical scripted interaction, restore, run again. Watch hidden costs (allocations, GC), not just frame time.
 7. **Keep render and hit-test on one code path.** If you cache a value for drawing, the hit-test must consume the same value/formula or clicks will miss what you see.
+8. **Know when to stop.** When the profile is flat (irreducible drawing + native overhead on top, nothing dominating), low-percentage items will measure as noise. A/B them honestly; ship only the ones that move the needle, or keep one for a stated secondary reason (scalability, battery, correctness).

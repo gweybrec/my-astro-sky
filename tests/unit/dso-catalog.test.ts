@@ -9,6 +9,7 @@ vi.mock('../../src/i18n', () => ({
 // Makes it easy to reason about which DSOs fall inside a given image region.
 vi.mock('../../src/projection', () => ({
   project: vi.fn((ra: number, dec: number) => ({ x: ra / 360, y: dec / 90 })),
+  invalidateProjections: vi.fn(),
 }));
 
 import type { PhotoCorrespondence } from '../../src/types';

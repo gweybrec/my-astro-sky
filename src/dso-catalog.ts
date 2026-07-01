@@ -1,7 +1,7 @@
 import type { DSO, DSOType, DSOUserOverride, PhotoCorrespondence } from './types';
 import type { AffineMatrix } from './types';
 import { getLang } from './i18n';
-import { project } from './projection';
+import { project, invalidateProjections } from './projection';
 import { computeAffineTransform } from './affine';
 import { getDsoOverrides } from './api';
 
@@ -47,8 +47,15 @@ export function applyUserOverrideToDso(dso: DSO, override: DSOUserOverride, lang
   const effectiveEs = override.names?.es ?? base.nameEs;
   const effectiveDe = override.names?.de ?? base.nameDe;
   dso.displayName = computeDisplayName(effectiveFr, effectiveEn, effectiveEs, effectiveDe, lang);
-  if (override.ra !== undefined) dso.ra = override.ra;
-  if (override.dec !== undefined) dso.dec = override.dec;
+  const newRa = override.ra ?? dso.ra;
+  const newDec = override.dec ?? dso.dec;
+  if (newRa !== dso.ra || newDec !== dso.dec) {
+    dso.ra = newRa;
+    dso.dec = newDec;
+    // Position changed: drop the cached projection so projectCached / spatial indexes
+    // recompute instead of serving the object's old place on the map.
+    invalidateProjections();
+  }
   if (override.constellation !== undefined) dso.constellation = override.constellation;
   if (override.rating !== undefined) dso.rating = override.rating;
   if (override.difficulty !== undefined) dso.difficulty = override.difficulty;
@@ -58,8 +65,11 @@ export function applyUserOverrideToDso(dso: DSO, override: DSOUserOverride, lang
 function resetDsoToBase(dso: DSO, lang: string): void {
   const base = baseValues.get(dso.id);
   if (!base) return;
-  dso.ra = base.ra;
-  dso.dec = base.dec;
+  if (dso.ra !== base.ra || dso.dec !== base.dec) {
+    dso.ra = base.ra;
+    dso.dec = base.dec;
+    invalidateProjections();
+  }
   dso.displayName = computeDisplayName(base.nameFr, base.nameEn, base.nameEs, base.nameDe, lang);
   dso.constellation = base.constellation;
   dso.rating = base.rating;

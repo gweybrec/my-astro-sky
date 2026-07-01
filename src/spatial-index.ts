@@ -67,6 +67,33 @@ export class SpatialIndex<T> {
   }
 
   /**
+   * Collect every item within `radius` of (qx, qy), in arbitrary order. Like
+   * {@link findAll} but without the distance sort — use when the caller only needs
+   * the set (e.g. viewport culling), not nearest-first ordering.
+   */
+  collect(qx: number, qy: number, radius: number): T[] {
+    const minCx = this.cellCoord(qx - radius);
+    const maxCx = this.cellCoord(qx + radius);
+    const minCy = this.cellCoord(qy - radius);
+    const maxCy = this.cellCoord(qy + radius);
+
+    const r2 = radius * radius;
+    const out: T[] = [];
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const bucket = this.cells.get(this.key(cx, cy));
+        if (!bucket) continue;
+        for (const entry of bucket) {
+          const dx = entry.x - qx;
+          const dy = entry.y - qy;
+          if (dx * dx + dy * dy <= r2) out.push(entry.item);
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
    * Find all items within `radius` of (qx, qy), sorted by distance ascending.
    */
   findAll(qx: number, qy: number, radius: number): T[] {

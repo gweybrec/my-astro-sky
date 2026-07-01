@@ -42,6 +42,16 @@ export function setHemisphere(h: 'north' | 'south'): void {
   _projGeneration++;
 }
 
+/**
+ * Force every cached projection to recompute on next use, without a hemisphere/mode
+ * change. Call when an object's own `ra`/`dec` changed (e.g. a DSO coordinate
+ * override) so {@link projectCached} and generation-keyed spatial indexes don't keep
+ * serving its old position.
+ */
+export function invalidateProjections(): void {
+  _projGeneration++;
+}
+
 export function getHemisphere(): 'north' | 'south' {
   return _hemisphere;
 }

@@ -394,6 +394,13 @@ function angularSizeToCanvasPx(arcmin: number, decDeg: number, scale: number, co
 }
 
 /**
+ * Body-radius threshold (projection units) above which a DSO bypasses the viewport
+ * spatial index and is always considered in {@link SkyMap.selectRenderedDSOs}. Keeps
+ * the query margin tight for the ~99% of normal objects; ~0.04 PU ≈ a 4.6° radius.
+ */
+const DSO_GIANT_BODY_PU = 0.04;
+
+/**
  * Cached `cos²((90∓dec)/2)` factor for a DSO's angular-size conversion. Invalidated
  * by the projection generation (hemisphere change), matching the formula in
  * {@link angularSizeToCanvasPx}.
@@ -493,6 +500,14 @@ export class SkyMap {
   private dsoIndex = new SpatialIndex<DSO>(0.02);
   private starIndexMaxMag = -1;
   private dsoIndexMaxMag = -99999; // Sentinel value meaning "not initialized"
+
+  // All DSOs indexed by projection position (no mag/filter), for viewport culling in
+  // selectRenderedDSOs. Positions change only with the projection generation, so this
+  // is rebuilt once per hemisphere/mode change (or DSO coordinate override), not per frame.
+  private dsoAllIndex = new SpatialIndex<DSO>(0.02);
+  private dsoGiants: DSO[] = [];   // bodies larger than the query margin; always considered
+  private dsoAllIndexGen = -1;
+  private dsoMaxBodyPU = 0; // largest indexed (non-giant) body radius (projection units)
 
   // Pan state
   private isPanning = false;
@@ -2867,12 +2882,55 @@ export class SkyMap {
    * famous DSOs and a high budget fills the map with fainter ones — no magnitude gate.
    * Cached per frame so renderDSOs, renderDSOLabels and isDSORendered all agree.
    */
+  /**
+   * (Re)build the all-DSO position index used for viewport culling. Positions depend
+   * only on the projection generation (hemisphere/mode/coordinate override), so this
+   * rebuilds at most once per such change, never per frame. Also records the largest
+   * on-border DSO body radius so the viewport query can include big objects whose
+   * centre sits just off-screen.
+   */
+  private ensureDsoAllIndex(): void {
+    const gen = getProjectionGeneration();
+    if (this.dsoAllIndexGen === gen) return;
+    this.dsoAllIndex.clear();
+    this.dsoGiants = [];
+    let maxBody = 0;
+    for (const dso of getDSOs()) {
+      projectCached(dso);
+      // Body radius (projection units) = rx / scale, independent of zoom. A handful of
+      // very large objects (Barnard's Loop, big LBN/LDN clouds) would force a wide query
+      // margin for everyone, so they bypass the index and are always considered.
+      const near = dso._px! * dso._px! + dso._py! * dso._py! < 4; // exclude far hemisphere
+      const body = near ? ((dso.majAxis ?? 1) / 2 / 60) * DEG2RAD / (2 * dsoSizeCos2(dso)) : 0;
+      if (body > DSO_GIANT_BODY_PU) {
+        this.dsoGiants.push(dso);
+      } else {
+        this.dsoAllIndex.insert(dso, dso._px!, dso._py!);
+        if (body > maxBody) maxBody = body;
+      }
+    }
+    this.dsoMaxBodyPU = maxBody;
+    this.dsoAllIndexGen = gen;
+  }
+
   private selectRenderedDSOs(): DSO[] {
     if (this.cachedSelectedDSOs) return this.cachedSelectedDSOs;
     const { view } = this;
 
+    // Viewport cull: query the position index for DSOs whose centre is within the
+    // visible disc plus a margin for the largest body and the off-screen render margin.
+    // This replaces a full scan of all ~12k DSOs every frame with a bounded query —
+    // a big win when zoomed in (small viewport), a no-op cost when zoomed out.
+    this.ensureDsoAllIndex();
+    const queryR = Math.hypot(view.width / 2, view.height / 2) / view.scale
+      + this.dsoMaxBodyPU + 20 / view.scale;
+    const nearby = this.dsoAllIndex.collect(view.centerX, view.centerY, queryR);
+
     const candidates: (SelectableDSO & { dso: DSO })[] = [];
-    for (const dso of getDSOs()) {
+    // The spatial query covers normal-sized objects; the few giant DSOs (body larger
+    // than the query margin) live outside the index and are always considered, so the
+    // margin can stay tight without ever missing a large object near the edge.
+    for (const src of [nearby, this.dsoGiants]) for (const dso of src) {
       const isHighlighted = this.highlightedDSO === dso.id;
 
       if (!isHighlighted) {
