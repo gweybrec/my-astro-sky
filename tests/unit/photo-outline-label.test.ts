@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { photoLabelEdgeIndex, photoLabelTransform } from '../../src/sky-map';
+import { photoLabelEdgeIndex, photoLabelTransform } from '../../src/photo-outline';
 import type { Point } from '../../src/types';
 
 const DEG = Math.PI / 180;
