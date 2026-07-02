@@ -765,7 +765,6 @@
       "M8",
       "NGC6523",
       "LBN25",
-      "Sharpless 25",
       "RCW 146",
       "Gum 72"
     ],
@@ -927,7 +926,6 @@
       "M16",
       "NGC6611",
       "LBN67",
-      "Sharpless 49",
       "RCW 165",
       "Cr 375",
       "Gum 83"
@@ -1257,8 +1255,7 @@
       "IC1805",
       "LBN654",
       "SH2-190",
-      "NGC 896",
-      "Westerhout 4 (W4"
+      "NGC 896"
     ],
     "names": {
       "fr": "Nébuleuse du Cœur",
@@ -1721,7 +1718,6 @@
       "M17",
       "NGC6618",
       "LBN60",
-      "Sharpless 45",
       "RCW 160",
       "Gum 81"
     ],
@@ -1809,7 +1805,6 @@
       "IC5146",
       "LBN424",
       "Caldwell 19",
-      "Sh 2-125",
       "Cr 470"
     ],
     "names": {
@@ -1879,7 +1874,11 @@
       "Sh2-142",
       "Cr 452"
     ],
-    "type": "OC"
+    "type": "OC",
+    "names": {
+      "en": "Wizard Nebula",
+      "fr": "Nébuleuse du Sorcier"
+    }
   },
   {
     "id": "vdB26",
@@ -2143,8 +2142,7 @@
       "NGC1893",
       "Cr 63",
       "Mel 33",
-      "C0519+333",
-      "Sh 2-236"
+      "C0519+333"
     ]
   },
   {
@@ -3237,7 +3235,6 @@
       "M20",
       "NGC6514",
       "LBN27",
-      "Sharpless 30",
       "RCW 147",
       "Gum 76"
     ],
@@ -6148,8 +6145,7 @@
       "SH2-274",
       "Abell 21",
       "PN G205.1+14.2",
-      "PK 205+14.1",
-      "Sharpless 2-274"
+      "PK 205+14.1"
     ],
     "names": {
       "es": "Nebulosa Medusa",
@@ -36300,8 +36296,7 @@
     "difficulty": 3,
     "catalogs": [
       "IC410",
-      "LBN807",
-      "Sh 2-236"
+      "LBN807"
     ],
     "type": "EN"
   },
@@ -66886,8 +66881,6 @@
       "NGC281",
       "LBN616",
       "IC 11",
-      "Sh2-184",
-      "Sharpless 184",
       "LBN 123.17-06.28"
     ],
     "type": "EN",
@@ -70056,10 +70049,7 @@
     "rating": 1,
     "difficulty": 3,
     "catalogs": [
-      "NGC896",
-      "IC1805",
-      "Sh 2-190",
-      "Westerhout 4 (W4"
+      "NGC896"
     ],
     "type": "EN",
     "mag": 6.5
@@ -73107,8 +73097,7 @@
       "NGC1491",
       "LBN704",
       "Ced 25",
-      "LBN 706",
-      "Sharpless 2-206"
+      "LBN 706"
     ],
     "type": "EN",
     "names": {
@@ -73141,8 +73130,7 @@
     "difficulty": 4,
     "catalogs": [
       "NGC1499",
-      "LBN756",
-      "Sharpless 220"
+      "LBN756"
     ],
     "names": {
       "fr": "Nébuleuse de Californie",
@@ -73151,7 +73139,8 @@
       "de": "Californianebel"
     },
     "type": "EN",
-    "mag": 6
+    "mag": 6,
+    "pa": 120
   },
   {
     "id": "NGC1504",
@@ -73307,8 +73296,7 @@
     "rating": 4,
     "difficulty": 3,
     "catalogs": [
-      "NGC1555",
-      "Sharpless 238"
+      "NGC1555"
     ],
     "type": "RN",
     "names": {
@@ -74528,8 +74516,7 @@
     "rating": 4,
     "difficulty": 3,
     "catalogs": [
-      "NGC2024",
-      "NGC 2024 and Sharpless 277"
+      "NGC2024"
     ],
     "names": {
       "fr": "Nébuleuse de la Flamme",
@@ -74941,7 +74928,6 @@
     "difficulty": 3,
     "catalogs": [
       "NGC2237",
-      "SH 2-275",
       "Caldwell 49"
     ],
     "names": {
@@ -75460,7 +75446,6 @@
       "LBN1041",
       "GUM 4",
       "LBN 227.66-00.09",
-      "SH 2-298",
       "RCW 5"
     ],
     "type": "EN",
@@ -99293,7 +99278,6 @@
     "catalogs": [
       "NGC6888",
       "LBN203",
-      "Sharpless 105",
       "Caldwell 27"
     ],
     "type": "EN",
@@ -99738,10 +99722,7 @@
     "rating": 1,
     "difficulty": 1,
     "catalogs": [
-      "NGC6989",
-      "NGC 7000",
-      "Sharpless 117",
-      "Caldwell 20"
+      "NGC6989"
     ],
     "mag": 4
   },
@@ -99828,7 +99809,6 @@
     "catalogs": [
       "NGC7000",
       "LBN373",
-      "Sharpless 117",
       "Caldwell 20"
     ],
     "names": {
@@ -103144,7 +103124,6 @@
     "catalogs": [
       "NGC7635",
       "LBN548",
-      "Sharpless 162 (Sh2-162",
       "Caldwell 11"
     ],
     "type": "EN",
@@ -104448,28 +104427,6 @@
     ]
   },
   {
-    "id": "SH2-25",
-    "constellation": "Sgr",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-25",
-      "RCW 146",
-      "Gum 72",
-      "NGC 6523",
-      "NGC 6530"
-    ],
-    "ra": 270.90416666666664,
-    "dec": -24.386666666666667,
-    "mag": 4.6,
-    "names": {
-      "en": "Lagoon Nebula",
-      "fr": "Nébuleuse de la Lagune",
-      "es": "Nebulosa de la Laguna",
-      "de": "Lagunennebel"
-    }
-  },
-  {
     "id": "SH2-26",
     "constellation": "Sgr",
     "rating": 1,
@@ -104519,28 +104476,6 @@
     },
     "ra": 272.65000000000003,
     "dec": -23.983333333333334
-  },
-  {
-    "id": "SH2-30",
-    "constellation": "Sgr",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-30",
-      "M20",
-      "NGC 6514",
-      "RCW 147",
-      "Gum 76"
-    ],
-    "ra": 270.875,
-    "dec": -23.01666666666667,
-    "mag": 6.3,
-    "names": {
-      "en": "Trifid Nebula",
-      "fr": "Nébuleuse Trifide",
-      "es": "Nebulosa Trífida",
-      "de": "Trifidnebel"
-    }
   },
   {
     "id": "SH2-31",
@@ -104682,26 +104617,6 @@
     ]
   },
   {
-    "id": "SH2-45",
-    "constellation": "Sgr",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-45",
-      "M17",
-      "RCW 160",
-      "Gum 81"
-    ],
-    "ra": 275.08833333333325,
-    "dec": -16.22694444444444,
-    "mag": 6,
-    "names": {
-      "en": "Omega Nebula",
-      "es": "Nebulosa Omega",
-      "de": "Omeganebel"
-    }
-  },
-  {
     "id": "SH2-46",
     "constellation": "Ser",
     "rating": 3,
@@ -104738,28 +104653,6 @@
     "dec": -14.534597546543946
   },
   {
-    "id": "SH2-49",
-    "constellation": "Ser",
-    "rating": 3,
-    "difficulty": 4,
-    "catalogs": [
-      "SH2-49",
-      "NGC 6611",
-      "RCW 165",
-      "Cr 375",
-      "Gum 83"
-    ],
-    "names": {
-      "fr": "Nébuleuse de W43",
-      "en": "Eagle Nebula",
-      "es": "Nebulosa del Águila",
-      "de": "Adlernebel"
-    },
-    "ra": 274.75,
-    "dec": -13.866666666666667,
-    "mag": 6.4
-  },
-  {
     "id": "SH2-50",
     "constellation": "Sct",
     "rating": 1,
@@ -104777,15 +104670,6 @@
     "catalogs": [
       "SH2-51",
       "LBN65"
-    ]
-  },
-  {
-    "id": "SH2-52",
-    "constellation": "Sgr",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-52"
     ]
   },
   {
@@ -105137,21 +105021,6 @@
     ]
   },
   {
-    "id": "SH2-86",
-    "constellation": "Vul",
-    "rating": 3,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-86"
-    ],
-    "names": {
-      "fr": "Nébuleuse NGC 6820",
-      "en": "NGC 6820 Nebula",
-      "es": "Nebulosa NGC 6820",
-      "de": "NGC-6820-Nebel"
-    }
-  },
-  {
     "id": "SH2-87",
     "constellation": "Vul",
     "rating": 1,
@@ -105241,16 +105110,6 @@
     ]
   },
   {
-    "id": "SH2-97",
-    "constellation": "Cyg",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-97",
-      "LBN151"
-    ]
-  },
-  {
     "id": "SH2-98",
     "constellation": "Cyg",
     "rating": 1,
@@ -105333,22 +105192,6 @@
       "SH2-104",
       "LBN195"
     ]
-  },
-  {
-    "id": "SH2-105",
-    "constellation": "Cyg",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-105",
-      "NGC 6888",
-      "Caldwell 27"
-    ],
-    "mag": 7.4,
-    "names": {
-      "en": "Crescent Nebula",
-      "fr": "Nébuleuse du Croissant"
-    }
   },
   {
     "id": "SH2-106",
@@ -105466,32 +105309,6 @@
     }
   },
   {
-    "id": "SH2-116",
-    "constellation": "Cyg",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-116"
-    ]
-  },
-  {
-    "id": "SH2-117",
-    "constellation": "Cyg",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-117",
-      "NGC 7000",
-      "Caldwell 20"
-    ],
-    "mag": 4,
-    "names": {
-      "en": "North America Nebula",
-      "fr": "Nébuleuse de l'Amérique du Nord",
-      "de": "Nordamerikanebel"
-    }
-  },
-  {
     "id": "SH2-118",
     "constellation": "Cyg",
     "rating": 1,
@@ -105562,24 +105379,6 @@
     ]
   },
   {
-    "id": "SH2-125",
-    "constellation": "Cyg",
-    "rating": 3,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-125",
-      "Caldwell 19",
-      "Cr 470"
-    ],
-    "names": {
-      "fr": "Nébuleuse du Cocon IC 5146",
-      "en": "Cocoon Nebula IC 5146",
-      "es": "Nebulosa del Capullo IC 5146",
-      "de": "Kokonnebel IC 5146"
-    },
-    "mag": 7.2
-  },
-  {
     "id": "SH2-126",
     "constellation": "Lac",
     "rating": 1,
@@ -105597,16 +105396,6 @@
     "catalogs": [
       "SH2-127",
       "LBN436"
-    ]
-  },
-  {
-    "id": "SH2-128",
-    "constellation": "Cep",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-128",
-      "LBN443"
     ]
   },
   {
@@ -105745,23 +105534,6 @@
       "SH2-141",
       "LBN509"
     ]
-  },
-  {
-    "id": "SH2-142",
-    "constellation": "Cep",
-    "rating": 3,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-142",
-      "Cr 452"
-    ],
-    "names": {
-      "fr": "Nébuleuse de l'Araignée",
-      "en": "Spider Nebula",
-      "es": "Nebulosa de la Araña",
-      "de": "Spinnennebel"
-    },
-    "mag": 7.2
   },
   {
     "id": "SH2-143",
@@ -105958,22 +105730,6 @@
       "SH2-161",
       "LBN547"
     ]
-  },
-  {
-    "id": "SH2-162",
-    "constellation": "Cas",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-162",
-      "Sharpless 162 (Sh2-162",
-      "Caldwell 11"
-    ],
-    "names": {
-      "fr": "Nébuleuse de la Bulle",
-      "en": "Bubble Nebula"
-    },
-    "mag": 10
   },
   {
     "id": "SH2-163",
@@ -106200,24 +105956,6 @@
     "dec": 59.7
   },
   {
-    "id": "SH2-199",
-    "constellation": "Cas",
-    "rating": 3,
-    "difficulty": 4,
-    "catalogs": [
-      "SH2-199",
-      "LBN 667 - Cluster is IC 1848"
-    ],
-    "names": {
-      "fr": "Nébuleuse de l'Âme IC 1848",
-      "en": "Soul Nebula IC 1848",
-      "es": "Nebulosa del Alma IC 1848",
-      "de": "Seelennebel IC 1848"
-    },
-    "ra": 42.855000000000004,
-    "dec": 60.418888888888894
-  },
-  {
     "id": "SH2-200",
     "constellation": "Cas",
     "rating": 4,
@@ -106271,21 +106009,6 @@
     },
     "ra": 58.05833333333334,
     "dec": 53.416666666666664
-  },
-  {
-    "id": "SH2-206",
-    "constellation": "Per",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-206",
-      "LBN706"
-    ],
-    "names": {
-      "fr": "Nébuleuse SH2-206"
-    },
-    "ra": 60.816250000000004,
-    "dec": 51.315
   },
   {
     "id": "SH2-207",
@@ -106358,17 +106081,6 @@
     "dec": 50.876666666666665
   },
   {
-    "id": "SH2-212",
-    "constellation": "Per",
-    "rating": 2,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-212"
-    ],
-    "ra": 70.15216666666667,
-    "dec": 50.46230555555556
-  },
-  {
     "id": "SH2-219",
     "constellation": "Aur",
     "rating": 1,
@@ -106377,23 +106089,6 @@
       "SH2-219",
       "LBN747"
     ]
-  },
-  {
-    "id": "SH2-220",
-    "constellation": "Per",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-220",
-      "NGC 1499"
-    ],
-    "names": {
-      "fr": "Nébuleuse Californie",
-      "en": "California Nebula"
-    },
-    "ra": 60.824999999999996,
-    "dec": 36.42166666666667,
-    "mag": 6
   },
   {
     "id": "SH2-221",
@@ -106525,24 +106220,6 @@
     "dec": 35.839799344896036
   },
   {
-    "id": "SH2-236",
-    "constellation": "Aur",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-236",
-      "Cr 63",
-      "Mel 33",
-      "C0519+333"
-    ],
-    "names": {
-      "fr": "Nébuleuse SH2-236"
-    },
-    "ra": 80.64999999999999,
-    "dec": 33.36666666666666,
-    "mag": 7.5
-  },
-  {
     "id": "SH2-237",
     "constellation": "Aur",
     "rating": 1,
@@ -106556,21 +106233,6 @@
     "ra": 82.845,
     "dec": 34.233,
     "mag": 10.1
-  },
-  {
-    "id": "SH2-238",
-    "constellation": "Tau",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-238"
-    ],
-    "names": {
-      "fr": "Nébuleuse SH2-238",
-      "es": "Nebulosa de Hind"
-    },
-    "ra": 65.487826,
-    "dec": 19.535162000000003
   },
   {
     "id": "SH2-239",
@@ -106694,23 +106356,6 @@
     },
     "ra": 95.63333333333333,
     "dec": 22.974999999999998
-  },
-  {
-    "id": "SH2-252",
-    "constellation": "Ori",
-    "rating": 3,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-252"
-    ],
-    "names": {
-      "fr": "Nébuleuse de la Tête de Singe",
-      "en": "Monkey Head Nebula",
-      "es": "Nebulosa Cabeza de Mono",
-      "de": "Affenkopfnebel"
-    },
-    "ra": 92.41250000000001,
-    "dec": 20.486666666666668
   },
   {
     "id": "SH2-254",
@@ -106880,25 +106525,6 @@
     "ra": 81.87500000000001,
     "dec": -3.9666666666666677,
     "mag": 5
-  },
-  {
-    "id": "SH2-277",
-    "constellation": "Ori",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-277",
-      "NGC 2024 and Sharpless 277"
-    ],
-    "names": {
-      "fr": "Nébuleuse de la Flamme",
-      "en": "Flame Nebula",
-      "es": "Nebulosa de la Flama",
-      "de": "Flammennebel"
-    },
-    "ra": 85.59250000000002,
-    "dec": -1.9230555555555555,
-    "mag": 10
   },
   {
     "id": "SH2-278",
@@ -107118,21 +106744,6 @@
     "dec": -12.316666666666666
   },
   {
-    "id": "SH2-298",
-    "constellation": "CMa",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-298",
-      "GUM 4",
-      "LBN 227.66-00.09",
-      "LBN 1041",
-      "RCW 5"
-    ],
-    "ra": 109.625,
-    "dec": -13.226666666666667
-  },
-  {
     "id": "SH2-299",
     "constellation": "Pup",
     "rating": 1,
@@ -107328,18 +106939,6 @@
     "dec": -25.68333333333333,
     "majAxis": 720,
     "minAxis": 180
-  },
-  {
-    "id": "SH2-313",
-    "constellation": "Hya",
-    "rating": 1,
-    "difficulty": 3,
-    "catalogs": [
-      "SH2-313"
-    ],
-    "names": {
-      "fr": "Nébuleuse SH2-313"
-    }
   },
   {
     "id": "LBN5",
@@ -123275,15 +122874,6 @@
     },
     "catalogs": [
       "SH2-191"
-    ]
-  },
-  {
-    "id": "SH2-216",
-    "names": {
-      "fr": "Nébuleuse SH2-216"
-    },
-    "catalogs": [
-      "SH2-216"
     ]
   },
   {

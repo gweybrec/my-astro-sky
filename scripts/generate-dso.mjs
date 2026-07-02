@@ -36,6 +36,9 @@ function loadMetadataOverrides() {
       // majAxis/minAxis: corrected angular size in arcmin (overrides catalog value)
       majAxis: typeof entry.majAxis === 'number' ? entry.majAxis : null,
       minAxis: typeof entry.minAxis === 'number' ? entry.minAxis : null,
+      // pa: corrected position angle in degrees, E of celestial north (overrides catalog value,
+      // usually 0 when OpenNGC's PosAng is blank — see docs/dev/dso-catalog.md)
+      pa: typeof entry.pa === 'number' ? entry.pa : null,
       // mag: corrected/added apparent magnitude (overrides catalog value)
       mag: typeof entry.mag === 'number' ? entry.mag : null,
     };
@@ -100,6 +103,9 @@ function applyMetadataOverrides(row, overrides) {
   // angular size override (arcmin) — e.g. correcting a wrong/missing diameter
   if (entry.majAxis !== null) row[4] = entry.majAxis;
   if (entry.minAxis !== null) row[5] = entry.minAxis;
+  // position angle override (degrees, E of celestial north) — e.g. correcting a
+  // missing/wrong orientation
+  if (entry.pa !== null) row[6] = entry.pa;
   // magnitude override — e.g. correcting a wrong value or filling a missing one
   if (entry.mag !== null) row[7] = entry.mag;
   // Merge additional catalog aliases from override into row[12] (so e.g. M102 becomes searchable)
@@ -624,11 +630,39 @@ const SHARPLESS_DIAM = existsSync(SHARPLESS_DIAM_PATH)
 // is a single object). Sizes/names for the target are set in dso-metadata-overrides.
 // Verified against SIMBAD / standard references.
 const SH2_ALIASES = {
+  'SH2-25':  'M8',       // Lagoon Nebula
+  'SH2-30':  'M20',      // Trifid Nebula
+  'SH2-45':  'M17',      // Omega/Swan Nebula
+  'SH2-49':  'M16',      // Eagle Nebula (= IC 4703)
+  'SH2-52':  'Abell65',  // planetary nebula
+  'SH2-86':  'NGC6820',  // nebula around the NGC 6823 cluster (cluster kept separate)
   'SH2-95':  'NGC6842',  // small planetary nebula (= LBN 149)
+  'SH2-97':  'NGC6847',
+  'SH2-105': 'NGC6888',  // Crescent Nebula
+  'SH2-116': 'Abell71',  // planetary nebula (also a compact HII region)
+  'SH2-117': 'NGC7000',  // North America Nebula
+  'SH2-125': 'IC5146',   // Cocoon Nebula
+  'SH2-128': 'Abell77',  // compact HII region masquerading as a planetary nebula
+  'SH2-142': 'NGC7380',  // Wizard Nebula (cluster + nebula share the NGC number)
+  'SH2-162': 'NGC7635',  // Bubble Nebula
   'SH2-171': 'NGC7822',  // 180' Cep OB4 region; most-used designation NGC 7822
+  'SH2-184': 'NGC281',   // Pac-Man Nebula
   'SH2-190': 'IC1805',   // Heart Nebula
-  'SH2-290': 'Abell31',  // large ancient planetary nebula Abell 31
+  'SH2-199': 'IC1848',   // Soul Nebula
+  'SH2-206': 'NGC1491',  // Fossil Footprint Nebula
+  'SH2-212': 'NGC1624',
+  'SH2-220': 'NGC1499',  // California Nebula (= LBN 756)
+  'SH2-236': 'IC410',    // Tadpoles Nebula (NGC 1893 cluster kept separate)
+  'SH2-238': 'NGC1555',  // Hind's Variable Nebula
+  'SH2-252': 'NGC2174',  // Monkey Head Nebula (NGC 2175 cluster kept separate)
+  'SH2-275': 'NGC2237',  // Rosette Nebula (NGC 2238/2246 sub-features kept separate)
+  'SH2-277': 'NGC2024',  // Flame Nebula
   'SH2-281': 'M42',      // Orion Nebula (= NGC 1976 = LBN 974)
+  'SH2-290': 'Abell31',  // large ancient planetary nebula Abell 31
+  'SH2-292': 'IC2177',   // Seagull Nebula (NGC 2327 sub-feature kept separate)
+  'SH2-298': 'NGC2359',  // Thor's Helmet
+  'SH2-311': 'NGC2467',  // Skull and Crossbones Nebula
+  'SH2-313': 'Abell35',  // planetary nebula
 };
 
 async function fetchBarnard() {

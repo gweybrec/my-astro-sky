@@ -184,6 +184,7 @@ Computed by `computeContainers()` in `scripts/add-ratings.mjs` — it lives ther
 | `dec` | number | Override declination (degrees) |
 | `majAxis` | number | Override the angular major-axis size (arcmin) — for correcting a wrong/missing diameter |
 | `minAxis` | number | Override the angular minor-axis size (arcmin) |
+| `pa` | number | Override the position angle (degrees, E of celestial north) — OpenNGC leaves this blank (defaults to 0) for most nebulae; derive a real value from a plate-solved photo when the default orientation is visibly wrong |
 | `mag` | number | Override or fill in the apparent magnitude |
 
 All fields except `id` and `catalogs` are optional. `applyMetadataOverrides()` only writes non-null values, so omitting a field leaves the source-catalog value intact.
@@ -220,7 +221,15 @@ Per-object exceptions are corrected with a **`majAxis`/`minAxis` override** in `
 
 Regenerate `sharpless-diam.json`: `SELECT "Sh2", Diam FROM "VII/20/catalog"` on the Vizier TAP service (`tapvizier.cds.unistra.fr`), written as `{ "<n>": <diam>, ... }`.
 
-> **SH2 → NGC/IC/Abell merges (`SH2_ALIASES`):** some SH2 H-II regions are the same physical object as an already-catalogued nebula. These are folded into the parent (designations appended to its `catalogs[]`, the SH2 row dropped) so the region is a single object: SH2-95→NGC 6842, SH2-171→NGC 7822, SH2-190→IC 1805 (Heart), SH2-290→Abell 31. The merge runs after all sources are loaded (Abell PNe come from a later step). Note: the **Heart Nebula is IC 1805 / SH2-190** (SH2-198 is a small separate region near the Soul Nebula, not the Heart — an earlier mislabel that has been corrected), and there is no "Starfish Nebula" (vestigial bad name, removed).
+> **SH2 → NGC/IC/M/Abell merges (`SH2_ALIASES`):** many SH2 H-II regions are the same physical object as an already-catalogued nebula (most named/famous nebulae — Lagoon, Trifid, Omega, Eagle, Bubble, Cocoon, Crescent, Flame, North America, Heart, Soul, Pac-Man, Wizard, Thor's Helmet, Skull and Crossbones, Monkey Head, Rosette, Seagull, Running Man, several Abell planetary nebulae, etc. — have both an SH2 number and an NGC/IC/M designation). These are folded into the parent (designations appended to its `catalogs[]`, the SH2 row dropped) so the region is a single object rather than two entries at slightly different coordinates/sizes. See the `SH2_ALIASES` table in `generate-dso.mjs` for the full curated list (33 entries as of this writing) — each entry's inline comment names the object. The merge runs after all sources are loaded (Abell PNe come from a later step).
+>
+> When a physical complex genuinely has multiple valid NGC/IC numbers for distinct sub-features (e.g. Rosette Nebula = NGC 2237/2238/2246, Running Man = NGC 1973/1975/1977, Monkey Head cluster NGC 2175 vs. nebula NGC 2174), only the canonical/most-cited NGC number is merged with the SH2 designation — the sibling numbers are kept as separate objects, matching how they're actually catalogued.
+>
+> Note: the **Heart Nebula is IC 1805 / SH2-190** (SH2-198 is a small separate region near the Soul Nebula, not the Heart — an earlier mislabel that has been corrected), and there is no "Starfish Nebula" (vestigial bad name, removed). **Sh2-142 is the Wizard Nebula, not "Spider Nebula"** (a mislabel that was in the override file — corrected).
+>
+> **Alias-collision hazard:** `loadMetadataOverrides()` indexes every override entry by *each* of its own `catalogs[]` strings, last-write-wins. If object A's override entry lists object B's own id as one of its aliases (a copy-paste mistake), A's entry silently replaces B's in the lookup map — B's row then renders with A's name/size/rating instead of its own. This exact bug was found and fixed for **NGC 896 / IC 1805** (NGC 896 had wrongly claimed "IC1805" as its own alias, so the real IC 1805/Heart Nebula row was showing NGC 896's data — no name, wrong size, wrong rating). When adding or editing an override entry's `catalogs[]`, don't include another real object's own id unless they are in fact the same object (and if so, prefer registering the merge in `SH2_ALIASES`/`VDB_ALIASES`/etc. instead of hand-listing the alias).
+>
+> **NGC 1499's position angle** was blank in OpenNGC (defaults to 0°, drawing the ellipse north-south), but the real nebula runs diagonally. Measured PA≈120° (E of N) from a user's plate-solved photo — see `pa` override above.
 
 ## van den Bergh (vdB) reflection nebulae
 
