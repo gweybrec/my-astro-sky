@@ -2,7 +2,7 @@ import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
 import { project, projectCached, getProjectionGeneration, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle, borderRadiusPU, getProjectionMode } from './projection';
 import { clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
-import { getStars, getStarMagsSorted, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
+import { getStars, getStarMagsSorted, loadConstellationStyle, normalizeRA } from './star-catalog';
 import { getDSOs, getDSOById } from './dso-catalog';
 import { selectDSOsToRender, DSO_CONTAINER_VISIBLE_RADIUS_PX, type SelectableDSO } from './dso-selection';
 import {
@@ -18,7 +18,6 @@ import {
   canvasRotationDegFromCursor,
   resizeFromCorner,
 } from './fov-frame-geometry';
-import pinSvgRaw from './icons/pin.svg?raw';
 import { computeFovTargetScale } from './gear-presets';
 import { SKY_THEME } from './sky-themes';
 import {
@@ -47,27 +46,12 @@ import {
 import { findMergeTarget, resizeRegionFromDraft, type ResizeDraft } from './frame-interaction';
 import { easeInOutCubic, navigateDurationMs, navigateProfile, zoomAboutPoint } from './sky-view-math';
 import { pickDsoAtCursor } from './hover-hit-test';
+import {
+  drawBackground, drawFisheyeGrid, drawGrid, drawConstellationLines, drawConstellationNames,
+  drawPinGlyph, drawTileTrash, drawTileAdd, TILE_TRASH_R,
+} from './sky-draw';
 
 const DEG2RAD = Math.PI / 180;
-
-/** Pushpin glyph path (24×24 box) extracted from the shared icon asset. */
-const PIN_PATH_D = pinSvgRaw.match(/\bd="([^"]+)"/)?.[1] ?? '';
-/** Lazily-built Path2D for the pushpin glyph. Lazy so module load does not
- * require a DOM (Path2D is absent in the unit-test environment). */
-let pinPath2D: Path2D | null = null;
-function getPinPath(): Path2D {
-  return (pinPath2D ??= new Path2D(PIN_PATH_D));
-}
-
-/** Trash glyph (24×24 box), built from the shared trash icon's subpaths. Stroked. */
-const TRASH_PATHS_D = ['M3 6L5 6L21 6', 'M19 6l-1 14H6L5 6', 'M10 11v6M14 11v6', 'M9 6V4h6v2'];
-let trashPath2D: Path2D | null = null;
-function getTrashPath(): Path2D {
-  if (trashPath2D) return trashPath2D;
-  const p = new Path2D();
-  for (const d of TRASH_PATHS_D) p.addPath(new Path2D(d));
-  return (trashPath2D = p);
-}
 
 // Photo-outline geometry now lives in ./photo-outline; re-exported here for the
 // existing import sites (tests, export-render, overlays) that reference sky-map.
@@ -1241,7 +1225,7 @@ export class SkyMap {
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
-    this.renderBackground();
+    drawBackground(ctx, view, this.skyTheme, this.backgroundOpacity);
 
     // ── Hemisphere clip circle ──────────────────────────────────────────────
     // In stereo mode: borderLatDeg determines how far into the opposite hemisphere we show.
@@ -1256,7 +1240,7 @@ export class SkyMap {
 
     ctx.globalAlpha = this.skyOpacity;
     if (this.showConstellationLines) {
-      this.renderConstellationLines();
+      drawConstellationLines(ctx, view, this.constellationStyle, this.skyTheme.constellationLineColor);
     }
     if (this.showDSOs) {
       this.renderDSOs();
@@ -1271,15 +1255,15 @@ export class SkyMap {
       this.renderDSOLabels();
     }
     if (this.showConstellationNames) {
-      this.renderConstellationNames();
+      drawConstellationNames(ctx, view);
     }
 
     ctx.globalAlpha = 1;
     if (this.showGrid) {
       if (this.fisheyeMode) {
-        this.renderFisheyeGrid();
+        drawFisheyeGrid(ctx, view, this.skyTheme);
       } else {
-        this.renderGrid();
+        drawGrid(ctx, view, this.skyTheme, this.borderLatDeg);
       }
     }
     if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
@@ -1501,7 +1485,7 @@ export class SkyMap {
         // Border tiles of the selected mosaic carry a delete button (large tiles only).
         if (f.mosaicId === activeMosaicId && f.mosaicIsBorderTile && this.tileTrashVisible(halfW, halfH)) {
           ctx.globalAlpha = 1;
-          this.drawTileTrash({ x: cx, y: cy }, dangerColor);
+          drawTileTrash(ctx, { x: cx, y: cy }, dangerColor);
         }
         ctx.restore();
         continue; // tiles: outline only, no label/handles
@@ -1550,7 +1534,7 @@ export class SkyMap {
         }
         if (f.pinnable) {
           // Pin toggle glyph: pushpin lifted just above the top-right corner.
-          this.drawPinGlyph(this.framePinGlyphPos(corners[1], rotDeg), f.anchorKind === 'sky', activeColor);
+          drawPinGlyph(ctx, this.framePinGlyphPos(corners[1], rotDeg), f.anchorKind === 'sky', activeColor);
         }
         if (f.resizable) {
           // Corner resize handles (small squares) — drag to extend into a mosaic.
@@ -1614,7 +1598,7 @@ export class SkyMap {
     // Add ("+") buttons at the empty neighbour cells of the selected mosaic.
     if (activeMosaicId && this.mosaicAddCandidates.length && this.mosaicEditButtonsVisible(activeMosaicId)) {
       const avoid = this.activeOutlineRotateAvoid();
-      for (const c of this.mosaicAddCandidates) this.drawTileAdd(this.candidateCanvasPoint(c, avoid), activeColor);
+      for (const c of this.mosaicAddCandidates) drawTileAdd(ctx, this.candidateCanvasPoint(c, avoid), activeColor);
     }
   }
 
@@ -1624,66 +1608,9 @@ export class SkyMap {
     return framePinGlyphPos(corner, rotDeg);
   }
 
-  /** Draw the pushpin glyph centred at `at`, filled when pinned. Source path is a 24×24 box. */
-  private drawPinGlyph(at: Point, filled: boolean, color: string): void {
-    const { ctx } = this;
-    const size = 16;
-    ctx.save();
-    ctx.translate(at.x - size / 2, at.y - size / 2);
-    ctx.scale(size / 24, size / 24);
-    const path = getPinPath();
-    if (filled) {
-      ctx.fillStyle = color;
-      ctx.fill(path);
-    } else {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.8 * (24 / size);
-      ctx.stroke(path);
-    }
-    ctx.restore();
-  }
-
-  /** Radius of a tile's delete button, and whether the tile is large enough to host one. */
-  private static readonly TILE_TRASH_R = 11;
+  /** Whether a tile is large enough to host its delete/add button. */
   private tileTrashVisible(halfW: number, halfH: number): boolean {
     return Math.min(halfW, halfH) >= 16; // only on tiles big enough that the icon fits
-  }
-
-  /** Draw a delete (trash) button centred at `at`, used per-tile on the selected mosaic. */
-  private drawTileTrash(at: Point, color: string): void {
-    const { ctx } = this;
-    const size = 16;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(at.x, at.y, SkyMap.TILE_TRASH_R, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(15,15,18,0.78)';
-    ctx.fill();
-    ctx.translate(at.x - size / 2, at.y - size / 2);
-    ctx.scale(size / 24, size / 24);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2 * (24 / size);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke(getTrashPath());
-    ctx.restore();
-  }
-
-  /** Draw an add (plus) button centred at `at`, used at the "+" spots around a mosaic. */
-  private drawTileAdd(at: Point, color: string): void {
-    const { ctx } = this;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(at.x, at.y, SkyMap.TILE_TRASH_R, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(15,15,18,0.78)';
-    ctx.fill();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(at.x - 5, at.y); ctx.lineTo(at.x + 5, at.y);
-    ctx.moveTo(at.x, at.y - 5); ctx.lineTo(at.x, at.y + 5);
-    ctx.stroke();
-    ctx.restore();
   }
 
   /** Whether the selected mosaic's tiles are large enough to host their edit
@@ -1710,10 +1637,10 @@ export class SkyMap {
   private candidateCanvasPoint(c: { ra: number; dec: number }, avoid?: { handle: Point; center: Point } | null): Point {
     const p = project(c.ra, c.dec);
     let pt = toCanvas(p.x, p.y, this.view);
-    if (avoid && Math.hypot(pt.x - avoid.handle.x, pt.y - avoid.handle.y) < SkyMap.TILE_TRASH_R * 2 + 4) {
+    if (avoid && Math.hypot(pt.x - avoid.handle.x, pt.y - avoid.handle.y) < TILE_TRASH_R * 2 + 4) {
       const dx = pt.x - avoid.center.x, dy = pt.y - avoid.center.y;
       const len = Math.hypot(dx, dy) || 1;
-      const newDist = Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) + SkyMap.TILE_TRASH_R + 14;
+      const newDist = Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) + TILE_TRASH_R + 14;
       pt = { x: avoid.center.x + (dx / len) * newDist, y: avoid.center.y + (dy / len) * newDist };
     }
     return pt;
@@ -1764,7 +1691,7 @@ export class SkyMap {
         if (this.mosaicEditButtonsVisible(mosaicId)) {
           const avoid = this.activeOutlineRotateAvoid();
           for (const c of this.mosaicAddCandidates) {
-            if (isNearHandle(mx, my, this.candidateCanvasPoint(c, avoid), SkyMap.TILE_TRASH_R)) {
+            if (isNearHandle(mx, my, this.candidateCanvasPoint(c, avoid), TILE_TRASH_R)) {
               this.onMosaicTileAdd?.(c.ra, c.dec);
               return true;
             }
@@ -1772,7 +1699,7 @@ export class SkyMap {
           for (const t of this.fovInstances) {
             if (t.mosaicId !== mosaicId || !t.mosaicIsBorderTile) continue;
             const tg = this.frameGeometry(t);
-            if (isNearHandle(mx, my, { x: tg.cx, y: tg.cy }, SkyMap.TILE_TRASH_R)) {
+            if (isNearHandle(mx, my, { x: tg.cx, y: tg.cy }, TILE_TRASH_R)) {
               this.onMosaicTileRemove?.(t.id);
               return true;
             }
@@ -2087,187 +2014,6 @@ export class SkyMap {
     const region = resizeRegionFromDraft(f, draft, this.view, fromCanvas, unproject);
     this.render();
     this.onFovFrameResize?.(f.id, region);
-  }
-
-  private renderBackground() {
-    const { ctx, view } = this;
-    const theme = this.skyTheme;
-    const cx = view.width / 2;
-    const cy = view.height / 2;
-    const maxR = Math.sqrt(view.width * view.width + view.height * view.height);
-
-    // Solid base (always opaque — ensures a clean floor at opacity 0)
-    ctx.fillStyle = theme.baseFill;
-    ctx.fillRect(0, 0, view.width, view.height);
-
-    const bgAlpha = this.backgroundOpacity * theme.bgOpacityScale;
-    if (bgAlpha <= 0) return;
-
-    ctx.save();
-    ctx.globalAlpha = bgAlpha;
-
-    // Theme gradient overlay (center → corner)
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
-    for (const [offset, color] of theme.bgStops) gradient.addColorStop(offset, color);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, view.width, view.height);
-
-    // Optional vignette: transparent from center to innerStop, darkening to the rim
-    if (theme.vignette) {
-      const v = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
-      v.addColorStop(0, 'rgba(0,0,0,0)');
-      v.addColorStop(theme.vignette.innerStop, 'rgba(0,0,0,0)');
-      v.addColorStop(1, theme.vignette.color);
-      ctx.fillStyle = v;
-      ctx.fillRect(0, 0, view.width, view.height);
-    }
-    ctx.restore();
-  }
-
-  private renderFisheyeGrid() {
-    const { ctx, view } = this;
-    const theme = this.skyTheme;
-    const origin = toCanvas(0, 0, view);
-    const hem = getHemisphere();
-
-    // Orthographic dome: equatorial RA/Dec grid, pole at centre, equator (r = 1)
-    // at the outer edge. Declination circles every 10° from the pole to the equator.
-    const decStart = hem === 'south' ? -80 : 80;
-    const decStep  = hem === 'south' ? 10 : -10;
-    for (let dec = decStart; hem === 'south' ? dec <= 0 : dec >= 0; dec += decStep) {
-      const r = Math.cos(dec * DEG2RAD) * view.scale;
-      ctx.beginPath();
-      ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
-      ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
-      ctx.lineWidth = dec === 0 ? 1.5 : 0.8;
-      ctx.stroke();
-      // Dec label at the bottom of the circle (skip the pole and the equator edge)
-      if (r > 2 && Math.abs(dec) < 89 && dec !== 0) {
-        ctx.fillStyle = theme.gridLabelColor;
-        ctx.font = '11px sans-serif';
-        ctx.fillText(`${dec}°`, origin.x + 4, origin.y + r - 2);
-      }
-    }
-
-    // RA lines every 2h (30°) from the pole out to the equator
-    for (let raH = 0; raH < 24; raH += 2) {
-      const raRad = raH * 15 * DEG2RAD;
-      const edge = toCanvas(Math.sin(raRad), Math.cos(raRad), view); // equator (r = 1)
-      ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y);
-      ctx.lineTo(edge.x, edge.y);
-      ctx.strokeStyle = theme.gridColor;
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-      // RA label near the equator
-      const labelProj = toCanvas(0.85 * Math.sin(raRad), 0.85 * Math.cos(raRad), view);
-      ctx.fillStyle = theme.gridLabelColor;
-      ctx.font = '11px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${raH}h`, labelProj.x, labelProj.y);
-    }
-
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-  }
-
-  private renderGrid() {
-    const { ctx, view } = this;
-    const theme = this.skyTheme;
-    const origin = toCanvas(0, 0, view);
-    const hem = getHemisphere();
-
-    // Declination circles every 10°
-    // North: from +80° outward to -borderLatDeg (the clip edge); South: from -80° to +borderLatDeg
-    const decStart = hem === 'south' ? -80 : 80;
-    const decEnd   = hem === 'south' ? this.borderLatDeg : -this.borderLatDeg;
-    const decStep  = hem === 'south' ? 10 : -10;
-
-    for (let dec = decStart; hem === 'south' ? dec <= decEnd : dec >= decEnd; dec += decStep) {
-      const r = Math.tan((90 + (hem === 'south' ? dec : -dec)) / 2 * DEG2RAD) * view.scale;
-      ctx.beginPath();
-      ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
-      ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
-      ctx.lineWidth = dec === 0 ? 1.5 : 0.8;
-      ctx.stroke();
-
-      // Dec label (avoid labelling the pole and the boundary)
-      const label = `${dec}°`;
-      const absR = r;
-      if (absR > 2 && Math.abs(dec) < 89) {
-        // Position label at the bottom of the circle (y = origin.y + r)
-        const lx = origin.x + 4;
-        const ly = origin.y + r - 2;
-        ctx.fillStyle = theme.gridLabelColor;
-        ctx.font = '11px sans-serif';
-        ctx.fillText(label, lx, ly);
-      }
-    }
-
-    // RA lines every 2h (30°)
-    // maxR = projection radius of the border dec circle
-    const borderRProj = Math.tan((90 + this.borderLatDeg) / 2 * DEG2RAD);
-    for (let raH = 0; raH < 24; raH += 2) {
-      const raDeg = raH * 15;
-      const raRad = raDeg * DEG2RAD;
-
-      const borderProjX = borderRProj * Math.sin(raRad);
-      const borderProjY = borderRProj * Math.cos(raRad);
-      const borderCanvas = toCanvas(borderProjX, borderProjY, view);
-
-      ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y);
-      ctx.lineTo(borderCanvas.x, borderCanvas.y);
-      ctx.strokeStyle = theme.gridColor;
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-
-      // RA label near the equator
-      // Equator is at r=1 in projection units, but use a slightly inner position
-      const labelProj = toCanvas(0.85 * Math.sin(raRad), 0.85 * Math.cos(raRad), view);
-      const lx = labelProj.x;
-      const ly = labelProj.y;
-      ctx.fillStyle = theme.gridLabelColor;
-      ctx.font = '11px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${raH}h`, lx, ly);
-      ctx.textAlign = 'start';
-      ctx.textBaseline = 'alphabetic';
-    }
-  }
-
-  private renderConstellationLines() {
-    const { ctx, view } = this;
-    const lines = getConstellationLines(this.constellationStyle);
-
-    ctx.strokeStyle = this.skyTheme.constellationLineColor;
-    ctx.lineWidth = 1;
-
-    for (const constellation of lines) {
-      for (const segment of constellation.segments) {
-        if (segment.length < 2) continue;
-
-        ctx.beginPath();
-        // In fisheye mode, points below the horizon project to (1e6, 1e6).
-        // Lift the pen at those points so a line doesn't streak across the sky.
-        let penDown = false;
-        for (let i = 0; i < segment.length; i++) {
-          const p = project(segment[i][0], segment[i][1]);
-          if (p.x >= 1e5) { penDown = false; continue; }
-          const c = toCanvas(p.x, p.y, view);
-          if (penDown) {
-            ctx.lineTo(c.x, c.y);
-          } else {
-            ctx.moveTo(c.x, c.y);
-            penDown = true;
-          }
-        }
-
-        ctx.stroke();
-      }
-    }
   }
 
   private renderStars() {
@@ -2790,27 +2536,4 @@ export class SkyMap {
     ctx.textBaseline = 'alphabetic';
   }
 
-  private renderConstellationNames() {
-    const { ctx, view } = this;
-    const infos = getConstellationInfos();
-
-    ctx.font = '11px sans-serif';
-    ctx.fillStyle = 'rgba(185, 170, 155, 0.4)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    for (const info of infos) {
-      const p = project(info.ra, info.dec);
-      const c = toCanvas(p.x, p.y, view);
-
-      if (c.x < -100 || c.x > view.width + 100 || c.y < -100 || c.y > view.height + 100) {
-        continue;
-      }
-
-      ctx.fillText(info.displayName.toUpperCase(), c.x, c.y);
-    }
-
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-  }
 }
