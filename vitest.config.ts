@@ -21,6 +21,7 @@ export default defineConfig({
         'src/photo-overlay.ts',
         'src/sky-map.ts',
         'src/sky-draw.ts',
+        'src/dso-draw.ts',
         'src/targets-view.ts',
         'src/metadata-editor.ts',
         'src/toast.ts',
