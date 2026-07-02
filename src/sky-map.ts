@@ -793,6 +793,9 @@ export class SkyMap {
     this.addEvent(this.canvas, 'wheel', ((e: WheelEvent) => {
       e.preventDefault();
       this.cancelAnimation();
+      // A wheel gesture takes over from hovering: hide any tooltip so it doesn't
+      // linger over the moving map while the user zooms.
+      this.dismissTooltip();
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
