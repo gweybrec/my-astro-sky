@@ -3,6 +3,7 @@ import { shallowRef } from 'vue';
 import type { SkyMap, FovFrameSpec } from '../sky-map';
 import type { PhotoOverlay } from '../photo-overlay';
 import type { Photo } from '../types';
+import type { PoiFilterGroup } from '../poi';
 
 /** Minimal interface for objects that can show/hide themselves. */
 export interface ShowHide {
@@ -12,10 +13,13 @@ export interface ShowHide {
 
 /** Extended interface for the Gallery, exposing filter methods to Vue components. */
 export interface GalleryInterface extends ShowHide {
+  loadPhotos(photos: Photo[]): void;
   setSearchQuery(q: string): void;
   setLabelFilter(labels: string[] | null): void;
   setDSOTypeFilter(types: string[]): void;
   setDSOCatalogFilter(catalogs: string[]): void;
+  setPoiFilter(selected: Map<string, Set<string>> | null): void;
+  getAllPois(): PoiFilterGroup[];
   getAllLabels(): { label: string; count: number }[];
   getFilteredPhotos(): Photo[];
 }
