@@ -276,13 +276,16 @@ function bvToRgb(bv: number): [number, number, number] {
 const STAR_ZOOM_CAP = 2.2;
 
 function starRadius(mag: number, scale: number, brightZoomBoost = 0): number {
-  const base = Math.max(0.5, 3.5 - mag * 0.5);
+  // Floors are low enough that the faintest stars keep shrinking with magnitude
+  // instead of bottoming out at one uniform size (paintStar's radial gradient
+  // stays round at any radius, so a low floor doesn't risk a "square" look).
+  const base = Math.max(0.3, 3.5 - mag * 0.5);
   // Stars grow when zooming in (telescope-like), up to a cap so they don't take
   // over the view. Bright stars (mag < 3) get a higher cap so they stay prominent
   // when zoomed in (Stellarium-like); the brightest grow the most.
   const cap = STAR_ZOOM_CAP + (mag < 3 ? (3 - mag) * brightZoomBoost : 0);
   const zoomFactor = Math.min(cap, Math.sqrt(scale / 400));
-  return Math.max(1.5, base * zoomFactor);
+  return Math.max(0.9, base * zoomFactor);
 }
 
 function computeMaxMag(scale: number): number {
