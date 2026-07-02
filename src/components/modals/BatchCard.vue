@@ -409,7 +409,7 @@ function selectFirstHintResult() {
 }
 
 function clearHint() {
-  props.item.hintCoords = undefined;
+  props.item.hintCoords = null;
   props.item.hintTargetName = '';
   hintQuery.value = '';
   showHintDropdown.value = false;

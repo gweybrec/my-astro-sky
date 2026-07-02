@@ -1,5 +1,5 @@
 <template>
-  <CollapsibleSection :title="t('dso.section')" :defaultOpen="false" v-model:open="displayStore.dsoSectionOpen">
+  <CollapsibleSection :title="t('dso.section')" :defaultOpen="false">
     <CheckRow :label="t('dso.showDSOs')" :modelValue="displayStore.showDSOs" @update:modelValue="displayStore.setShowDSOs($event)" />
 
     <!-- Types dropdown -->
