@@ -1,6 +1,6 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
 import { project, projectCached, getProjectionGeneration, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle, borderRadiusPU, getProjectionMode } from './projection';
-import { framePointToSky, clampSmartMosaicSize } from './mosaic';
+import { clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getStarMagsSorted, getConstellationLines, getConstellationInfos, loadConstellationStyle, normalizeRA } from './star-catalog';
 import { getDSOs, getDSOById } from './dso-catalog';
@@ -9,21 +9,44 @@ import {
   targetRenderCount, magThresholdForCount,
   STAR_DENSITY_K, DSO_DENSITY_K, MIN_BUDGET_MULT,
 } from './render-budget';
-import { DSO_DENSITY_MAX } from './density-slider';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
-import { paToCanvasRotationDeg, canvasRotationToPaDeg } from './frame-orientation';
 import {
   isNearPolygonBorder,
   isNearHandle,
   rotateHandlePos,
   canvasRotationDegFromCursor,
   resizeFromCorner,
-  convexPolygonsOverlap,
 } from './fov-frame-geometry';
 import pinSvgRaw from './icons/pin.svg?raw';
 import { computeFovTargetScale } from './gear-presets';
-import { SKY_THEME, applyStarColor } from './sky-themes';
+import { SKY_THEME } from './sky-themes';
+import {
+  computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint, type StarPaint,
+} from './star-render-math';
+import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle, DSO_GIANT_BODY_PU } from './dso-render-math';
+import { InteractionLod } from './interaction-lod';
+import {
+  pointInConvexPolygon,
+  photoLabelEdgeIndex,
+  photoLabelTransform,
+  findTopPhotoOutlineAtPoint,
+  type PhotoOutline,
+} from './photo-outline';
+import {
+  computeFovFrameCorners,
+  frameAnchorCanvas,
+  canvasRotDegToPa,
+  frameCanvasRotationDeg,
+  frameGeometry,
+  mosaicOutlinePath,
+  frameHandlesVisible,
+  framePinGlyphPos,
+  type FrameGeometry,
+} from './frame-geometry';
+import { findMergeTarget, resizeRegionFromDraft, type ResizeDraft } from './frame-interaction';
+import { easeInOutCubic, navigateDurationMs, navigateProfile, zoomAboutPoint } from './sky-view-math';
+import { pickDsoAtCursor } from './hover-hit-test';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -46,55 +69,15 @@ function getTrashPath(): Path2D {
   return (trashPath2D = p);
 }
 
-/** Returns true if (px, py) is inside the convex polygon defined by pts (winding order irrelevant). */
-function pointInConvexPolygon(px: number, py: number, pts: Point[]): boolean {
-  const n = pts.length;
-  let sign = 0;
-  for (let i = 0; i < n; i++) {
-    const a = pts[i];
-    const b = pts[(i + 1) % n];
-    const cross = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x);
-    if (cross === 0) continue;
-    const s = cross > 0 ? 1 : -1;
-    if (sign === 0) sign = s;
-    else if (sign !== s) return false;
-  }
-  return sign !== 0;
-}
-
-export interface PhotoOutline {
-  name: string;
-  corners: Point[];
-}
-
-/**
- * Returns 0 or 1: the index of the longer of the two adjacent edges of a
- * rectangular quad. Only two edges need checking since opposite sides are equal.
- */
-export function photoLabelEdgeIndex(corners: Point[]): 0 | 1 {
-  const len0 = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
-  const len1 = Math.hypot(corners[2].x - corners[1].x, corners[2].y - corners[1].y);
-  return len1 > len0 ? 1 : 0;
-}
-
-/**
- * Returns the canvas anchor point and rotation angle to render a label along
- * the given edge, flipping direction when the raw angle would be upside-down.
- */
-export function photoLabelTransform(
-  corners: Point[],
-  edgeIdx: 0 | 1,
-): { x: number; y: number; angle: number } {
-  const p0 = corners[edgeIdx];
-  const p1 = corners[(edgeIdx + 1) % corners.length];
-  const angle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
-  if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
-    // Flip and normalize so the result stays in [-π/2, π/2]
-    const flipped = angle + Math.PI;
-    return { x: p1.x, y: p1.y, angle: flipped > Math.PI ? flipped - 2 * Math.PI : flipped };
-  }
-  return { x: p0.x, y: p0.y, angle };
-}
+// Photo-outline geometry now lives in ./photo-outline; re-exported here for the
+// existing import sites (tests, export-render, overlays) that reference sky-map.
+export {
+  pointInConvexPolygon,
+  photoLabelEdgeIndex,
+  photoLabelTransform,
+  findTopPhotoOutlineAtPoint,
+};
+export type { PhotoOutline };
 
 /** FOV frame specification stored in angular dimensions (computed to canvas px at render time). */
 export interface FovFrameSpec {
@@ -204,145 +187,12 @@ export interface FovFrameChange {
   screenRotationDeg?: number;
 }
 
-/**
- * Rotates a rectangle of half-dimensions (halfWPx × halfHPx) centred at (cx, cy)
- * by rotationDeg and returns the 4 corners clockwise from top-left.
- */
-export function computeFovFrameCorners(
-  halfWPx: number,
-  halfHPx: number,
-  cx: number,
-  cy: number,
-  rotationDeg: number,
-): Point[] {
-  const angle = rotationDeg * DEG2RAD;
-  const cosA = Math.cos(angle);
-  const sinA = Math.sin(angle);
-  const raw: Point[] = [
-    { x: -halfWPx, y: -halfHPx },
-    { x:  halfWPx, y: -halfHPx },
-    { x:  halfWPx, y:  halfHPx },
-    { x: -halfWPx, y:  halfHPx },
-  ];
-  return raw.map(p => ({
-    x: cx + p.x * cosA - p.y * sinA,
-    y: cy + p.x * sinA + p.y * cosA,
-  }));
-}
+// Frame canvas geometry now lives in ./frame-geometry (imported above);
+// computeFovFrameCorners is re-exported here for existing import sites (export-render, tests).
+export { computeFovFrameCorners };
 
-export function findTopPhotoOutlineAtPoint(px: number, py: number, outlines: PhotoOutline[]): string | null {
-  for (let i = outlines.length - 1; i >= 0; i--) {
-    if (pointInConvexPolygon(px, py, outlines[i].corners)) {
-      return outlines[i].name;
-    }
-  }
-  return null;
-}
-
-function bvToRgb(bv: number): [number, number, number] {
-  bv = Math.max(-0.4, Math.min(2.0, bv));
-
-  let r: number, g: number, b: number;
-
-  if (bv < 0.4) {
-    // Hot stars: neutral white at the white point (B-V ≈ 0.4), increasingly
-    // blue toward B-V = -0.4. This makes B/A-type stars (Rigel, Vega) read as
-    // proper blue-white instead of pure white.
-    const t = (0.4 - bv) / 0.8; // 0 at bv=0.4, 1 at bv=-0.4
-    r = 1.0 - 0.45 * t;
-    g = 1.0 - 0.17 * t;
-    b = 1.0;
-  } else if (bv < 0.8) {
-    const t = (bv - 0.4) / 0.4;
-    r = 1.0;
-    g = 1.0 - 0.12 * t;
-    b = 1.0 - 0.32 * t;
-  } else if (bv < 1.2) {
-    const t = (bv - 0.8) / 0.4;
-    r = 1.0;
-    g = 0.88 - 0.13 * t;
-    b = 0.68 - 0.20 * t;
-  } else {
-    const t = Math.min((bv - 1.2) / 0.8, 1);
-    r = 1.0;
-    g = 0.75 - 0.13 * t;
-    b = 0.48 - 0.16 * t;
-  }
-
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
-
-/** How much stars may grow when zooming in, like looking through a telescope. */
-const STAR_ZOOM_CAP = 2.2;
-
-function starRadius(mag: number, scale: number, brightZoomBoost = 0): number {
-  // Floors are low enough that the faintest stars keep shrinking with magnitude
-  // instead of bottoming out at one uniform size (paintStar's radial gradient
-  // stays round at any radius, so a low floor doesn't risk a "square" look).
-  const base = Math.max(0.3, 3.5 - mag * 0.5);
-  // Stars grow when zooming in (telescope-like), up to a cap so they don't take
-  // over the view. Bright stars (mag < 3) get a higher cap so they stay prominent
-  // when zoomed in (Stellarium-like); the brightest grow the most.
-  const cap = STAR_ZOOM_CAP + (mag < 3 ? (3 - mag) * brightZoomBoost : 0);
-  const zoomFactor = Math.min(cap, Math.sqrt(scale / 400));
-  return Math.max(0.9, base * zoomFactor);
-}
-
-function computeMaxMag(scale: number): number {
-  const raw = 6 + Math.log2(scale / 200);
-  return Math.max(6, raw);
-}
-
-// Snap a zoom scale to a ~6% multiplicative grid. The star sprite atlas is keyed on
-// this (not the raw scale), so a continuous zoom only rebuilds the atlas when it
-// crosses a bucket — a handful of times across the whole range instead of every
-// frame. Sprites end up at most ~3% off their exact size mid-zoom (imperceptible in
-// motion, snapped exact at bucket boundaries), with no drawImage rescaling.
-const ATLAS_SCALE_STEP = Math.log(1.06);
-function atlasScaleBucket(scale: number): number {
-  return Math.exp(Math.round(Math.log(scale) / ATLAS_SCALE_STEP) * ATLAS_SCALE_STEP);
-}
-
-// ─── Star painting (shared by the live draw and the sprite cache) ────────────
-// Resolved per-star drawing inputs. Everything here is a pure function of
-// (mag, bv, scale, maxMag, theme), so two stars with the same quantized mag/bv
-// share one sprite (see renderStars' atlas).
-interface StarPaint {
-  radius: number;
-  r: number; g: number; b: number;   // dot colour
-  soft: number;                       // soft-rim fraction of the radius
-  glowAlpha: number;
-  glowR: number;                      // glow extent in px (0 when no glow)
-  coreEdge: number;
-  solidUntil: number;
-  gr: number; gg: number; gb: number; // glow colour
-}
-
-function computeStarPaint(
-  mag: number, bv: number, scale: number, maxMag: number,
-  theme: typeof SKY_THEME, established = false,
-): StarPaint {
-  const radius = starRadius(mag, scale, theme.brightZoomBoost) * theme.radiusScale;
-  const spectral = bvToRgb(bv);
-  const [r, g, b] = applyStarColor(spectral, theme);
-  // 1 when well below the limit, ramping to 0 right at it (just-appearing stars).
-  const estab = established ? 1 : Math.min(1, Math.max(0, (maxMag - mag) / 1.5));
-  const soft = 0.3 + 0.4 * (1 - estab);
-  const glowBright = mag < theme.glowThresholdMag
-    ? Math.min(1, Math.max(0, (theme.glowThresholdMag - mag) / theme.glowThresholdMag))
-    : 0;
-  const glowAlpha = theme.glowOpacity * glowBright;
-  let glowR = 0, coreEdge = 0, solidUntil = 0, gr = r, gg = g, gb = b;
-  if (glowAlpha > 0.01) {
-    const glow = applyStarColor(spectral, theme, theme.glowSaturation);
-    gr = glow[0]; gg = glow[1]; gb = glow[2];
-    const glowZoom = 1 + theme.glowZoomSpread * Math.max(0, Math.min(3, Math.sqrt(scale / 400)) - 1);
-    glowR = radius * theme.glowRadiusMul * glowZoom;
-    coreEdge = radius / glowR;            // dot edge as a fraction of glowR
-    solidUntil = coreEdge * (1 - soft);   // fully opaque out to here
-  }
-  return { radius, r, g, b, soft, glowAlpha, glowR, coreEdge, solidUntil, gr, gg, gb };
-}
+// Star size/colour/glow maths now live in ./star-render-math (imported above);
+// only the canvas draw (paintStar) and sprite cache stay here.
 
 /**
  * Paint a single star at (cx, cy). Mirrors the original inline draw exactly: a
@@ -379,51 +229,7 @@ export function normalizeRotationDeg(deg: number): number {
   return normalized;
 }
 
-// ─── DSO rendering helpers ──────────────────────────────────────────────────
-
-/** Convert angular size (arcmin) to canvas pixels accounting for stereographic scale */
-function angularSizeToCanvasPx(arcmin: number, decDeg: number, scale: number, cos2?: number): number {
-  // cos2 depends only on dec + hemisphere; hot per-DSO callers pass a cached value
-  // (see dsoSizeCos2) so the trig runs once per object per hemisphere change instead
-  // of 2–3× per object every frame. Same formula either way, so hit-testing (which
-  // omits the arg) and rendering stay pixel-identical.
-  if (cos2 === undefined) {
-    const colatitude = getHemisphere() === 'south' ? 90 + decDeg : 90 - decDeg;
-    const theta = colatitude * Math.PI / 180;
-    cos2 = Math.cos(theta / 2) ** 2;
-  }
-  const rad = (arcmin / 60) * Math.PI / 180;
-  return (rad / (2 * cos2)) * scale;
-}
-
-/**
- * Body-radius threshold (projection units) above which a DSO bypasses the viewport
- * spatial index and is always considered in {@link SkyMap.selectRenderedDSOs}. Keeps
- * the query margin tight for the ~99% of normal objects; ~0.04 PU ≈ a 4.6° radius.
- */
-const DSO_GIANT_BODY_PU = 0.04;
-
-/**
- * Cached `cos²((90∓dec)/2)` factor for a DSO's angular-size conversion. Invalidated
- * by the projection generation (hemisphere change), matching the formula in
- * {@link angularSizeToCanvasPx}.
- */
-function dsoSizeCos2(dso: DSO): number {
-  if (dso._cos2g !== getProjectionGeneration()) {
-    const colatitude = getHemisphere() === 'south' ? 90 + dso.dec : 90 - dso.dec;
-    const theta = colatitude * Math.PI / 180;
-    dso._cos2 = Math.cos(theta / 2) ** 2;
-    dso._cos2g = getProjectionGeneration();
-  }
-  return dso._cos2!;
-}
-
-/** Position angle (E of celestial north) → angle on canvas */
-function dsoCanvasAngle(pa: number, raDeg: number, viewRotationDeg: number): number {
-  const raRad = raDeg * Math.PI / 180;
-  const northAngle = Math.atan2(Math.cos(raRad), -Math.sin(raRad));
-  return northAngle - pa * Math.PI / 180 + viewRotationDeg * DEG2RAD;
-}
+// DSO angular-size / orientation maths now live in ./dso-render-math (imported above).
 
 export type StarHoverCallback = (star: Star | null, x: number, y: number) => void;
 export type DSOHoverCallback = (dso: DSO | null, x: number, y: number) => void;
@@ -484,7 +290,7 @@ export class SkyMap {
   private onFovInstanceChange: ((id: string, change: FovFrameChange) => void) | null = null;
   private frameDrag: { id: string; mode: 'move' | 'rotate' | 'resize'; corner?: number } | null = null;
   // Transient rubber-band rectangle shown while a resize drag is in progress.
-  private resizeDraft: { cx: number; cy: number; halfW: number; halfH: number; rotDeg: number } | null = null;
+  private resizeDraft: ResizeDraft | null = null;
   // DSO the active move-drag will snap to on release; drives the elastic overlay.
   private snapCandidate: { id: string; ra: number; dec: number; majAxis: number } | null = null;
   // In-flight snap-back animation after a release within range (requestAnimationFrame handle).
@@ -526,59 +332,18 @@ export class SkyMap {
   // animations and render coalescing never clobber each other's rAF handle).
   private _renderRaf: number | null = null;
 
-  // ── Interaction LOD ────────────────────────────────────────────────────────
-  // While the user is actively panning/zooming we cap the star/DSO density budget
-  // so each frame stays cheap and motion is smooth even with the sliders maxed out.
-  // After motion settles, a full-budget redraw fills in the less-important objects
-  // (the brightest stars / highest-priority DSOs are always kept, so only the faint
-  // background appears "with a bit of delay"). See effectiveStarBudget / markInteracting.
-  private interacting = false;
+  // ── Interaction LOD & auto density ──────────────────────────────────────────
+  // All adaptive-budget state and decisions live in InteractionLod (unit-tested).
+  // SkyMap keeps only the concrete budgets (maxStarCount/maxDSOCount), the settle
+  // timer, and the render/callback side effects.
+  private lod = new InteractionLod();
   private settleTimer: ReturnType<typeof setTimeout> | null = null;
-  // Idle delay after the last interactive frame before the full-detail redraw.
-  private static readonly SETTLE_MS = 180;
+  private onAutoDensityChange: ((dso: number) => void) | null = null;
   // During a gesture the frozen star sprite atlas is rebuilt once the live zoom drifts
   // past this radius ratio from it — bounding how much drawImage upscales (and thus
   // pixelates) a frozen sprite, while a continuous zoom rebuilds only once per such
   // step rather than every frame (see renderStars).
   private static readonly ATLAS_REBUILD_RATIO = 1.3;
-  // User toggle: when false, the motion LOD is disabled entirely — full detail is drawn
-  // while moving (no objects disappear/flicker), at the cost of motion smoothness. Only
-  // affects manual density (auto DSO already keeps frames smooth without throttling).
-  private motionLOD = true;
-
-  // The interaction cap is NOT a fixed number — it adapts to the machine. We measure
-  // each interactive frame's draw time and steer `interactionQuality` (0..1) so frames
-  // land near INTERACTION_TARGET_MS: a fast computer ramps the cap up toward the user's
-  // full density (q→1, no throttle); a slow one backs off toward the floor. The learned
-  // value persists across gestures, so only the first ~handful of frames of the very
-  // first pan are spent calibrating. The floors guarantee a usable minimum everywhere.
-  private interactionQuality = 0.5;
-  private static readonly INTERACTION_STAR_FLOOR = 300;
-  private static readonly INTERACTION_DSO_FLOOR = 100;
-  // Per-frame draw-time target (ms). ~10ms leaves headroom inside a 16.7ms / 60fps frame.
-  private static readonly INTERACTION_TARGET_MS = 10;
-
-  // ── Auto density ────────────────────────────────────────────────────────────
-  // Auto mode is the opposite philosophy to the motion LOD above: rather than throttle
-  // during motion (which makes objects pop in/out), it sizes the budget so EVERY frame is
-  // smooth, and renders that same budget whether moving or still — so nothing pops.
-  //   • Stars (autoStarDensity): held at a fixed budget (maxStarCount pinned to
-  //     AUTO_STAR_BUDGET by the store) — constellations + bright stars, cheap and constant.
-  //   • DSOs (autoDSODensity): the performance lever. Interactive frames (and a one-shot burst
-  //     when auto is switched on) are timed and the DSO budget nudged so draw time stays near
-  //     AUTO_TARGET_MS. Reported via onAutoDensityChange so the disabled slider tracks it.
-  // While DSO-auto is on it absorbs all the cost, so the motion LOD is disabled entirely
-  // (see effectiveStarBudget / effectiveDSOBudget). The LOD only applies to a manual axis.
-  private autoStarDensity = false;
-  private autoDSODensity = false;
-  private onAutoDensityChange: ((dso: number) => void) | null = null;
-  // One-shot calibration: set true when DSO-auto is switched on so the budget re-tunes
-  // immediately (at rest) instead of waiting for the next pan. Cleared once it converges.
-  private dsoCalibrating = false;
-  // Per-frame draw-time target for the DSO lever. Higher = more DSOs (motion a touch
-  // heavier); tuned to favour a fuller map since DSOs are the focus of the app.
-  private static readonly AUTO_TARGET_MS = 20;
-  private static readonly AUTO_DSO_MIN = 80;
 
   // Bound event handlers for cleanup
   private boundHandlers: { target: EventTarget; event: string; handler: EventListener }[] = [];
@@ -671,14 +436,14 @@ export class SkyMap {
   setMaxStarCount(count: number) { this.maxStarCount = count; this.requestRenderInteractive(); }
   setMaxDSOCount(count: number) { this.maxDSOCount = count; this.requestRenderInteractive(); }
   /** Fix the star budget (constellations + bright stars) and stop motion-throttling it. */
-  setAutoStarDensity(v: boolean) { this.autoStarDensity = v; if (v) this.requestRender(); }
+  setAutoStarDensity(v: boolean) { this.lod.autoStarDensity = v; if (v) this.requestRender(); }
   /** Enable/disable performance-driven real-time auto-tuning of the DSO density budget.
    * Enabling kicks off a one-shot calibration so the slider snaps to the right value now. */
-  setAutoDSODensity(v: boolean) { this.autoDSODensity = v; if (v) this.dsoCalibrating = true; this.requestRender(); }
+  setAutoDSODensity(v: boolean) { this.lod.autoDSODensity = v; if (v) this.lod.dsoCalibrating = true; this.requestRender(); }
   /** Notified with the new DSO budget whenever auto-tuning changes it, so the UI can track it. */
   setOnAutoDensityChange(cb: (dso: number) => void) { this.onAutoDensityChange = cb; }
   /** Enable/disable the motion LOD (detail reduction while panning/zooming). */
-  setMotionLOD(v: boolean) { this.motionLOD = v; this.requestRender(); }
+  setMotionLOD(v: boolean) { this.lod.motionLOD = v; this.requestRender(); }
   setHighlightedDSO(dsoId: string | null) { this.highlightedDSO = dsoId; this.dsoIndexMaxMag = -99999; this.requestRender(); }
   setHighlightedStar(hip: number | null) { this.highlightedStar = hip; this.starIndexMaxMag = -1; this.requestRender(); }
   setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.dsoIndexMaxMag = -99999; this.requestRender(); }
@@ -813,7 +578,7 @@ export class SkyMap {
     // Upper bound is the catalog length, not an artificial cap: on-screen count is
     // already bounded by the field of view, so when zoomed in the magnitude gate below
     // (not a count cap) decides how faint we go.
-    const budget = this.effectiveStarBudget();
+    const budget = this.lod.effectiveStarBudget(this.maxStarCount);
     const count = targetRenderCount(
       budget, scale, width, height, STAR_DENSITY_K,
       budget * MIN_BUDGET_MULT, mags.length,
@@ -831,7 +596,7 @@ export class SkyMap {
     const { scale, width, height } = this.view;
     // Upper bound is the DSO catalog size; the per-DSO magnitude gate (dsoMaxMag) and
     // the field of view bound how many actually draw when zoomed in.
-    const budget = this.effectiveDSOBudget();
+    const budget = this.lod.effectiveDSOBudget(this.maxDSOCount);
     return targetRenderCount(
       budget, scale, width, height, DSO_DENSITY_K,
       budget * MIN_BUDGET_MULT, getDSOs().length,
@@ -865,16 +630,9 @@ export class SkyMap {
     const startScale = this.view.scale;
     const startTime = performance.now();
 
-    // Adaptive duration based on distance and zoom ratio
-    const dx = target.x - startX;
-    const dy = target.y - startY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const viewExtent = Math.max(this.view.width, this.view.height) / startScale;
-    const normalizedDist = Math.min(dist / Math.max(viewExtent, 0.001), 1);
-    const zoomRatio = Math.max(targetScale / startScale, startScale / targetScale);
-    const duration = Math.max(300, Math.min(1200,
-      300 + normalizedDist * 600 + Math.log2(Math.max(1, zoomRatio)) * 200
-    ));
+    // Adaptive duration based on distance and zoom ratio.
+    const { normalizedDist, zoomRatio } = navigateProfile(this.view, target.x, target.y, targetScale);
+    const duration = navigateDurationMs(normalizedDist, zoomRatio);
 
     const step = (now: number) => {
       let t = (now - startTime) / duration;
@@ -883,10 +641,7 @@ export class SkyMap {
         this.animationId = null;
       }
 
-      // easeInOutCubic
-      const ease = t < 0.5
-        ? 4 * t * t * t
-        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      const ease = easeInOutCubic(t);
 
       this.view.centerX = startX + (target.x - startX) * ease;
       this.view.centerY = startY + (target.y - startY) * ease;
@@ -902,7 +657,7 @@ export class SkyMap {
       } else {
         // Final frame: clear interaction state and paint full detail immediately.
         if (this.settleTimer !== null) { clearTimeout(this.settleTimer); this.settleTimer = null; }
-        this.interacting = false;
+        this.lod.endInteraction();
         this.render();
       }
     };
@@ -1082,16 +837,12 @@ export class SkyMap {
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
 
-      // Get projection coords under mouse before zoom
-      const before = fromCanvas(mx, my, this.view);
-
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      this.view.scale = Math.max(50, Math.min(1000000, this.view.scale * factor));
-
-      // Keep the same projection point anchored under the cursor after zoom.
-      const after = fromCanvas(mx, my, this.view);
-      this.view.centerX += before.x - after.x;
-      this.view.centerY += before.y - after.y;
+      // Keep the projection point under the cursor anchored across the zoom.
+      const z = zoomAboutPoint(this.view, mx, my, factor, 50, 1000000);
+      this.view.scale = z.scale;
+      this.view.centerX = z.centerX;
+      this.view.centerY = z.centerY;
 
       this.onViewChange?.();
       this.requestRenderInteractive();
@@ -1291,48 +1042,11 @@ export class SkyMap {
     this.buildDSOIndex(null);
     const projPt = fromCanvas(mx, my, this.view);
 
-    // Use a generous threshold to collect all nearby DSO centers.
-    // Large DSOs (e.g. M42 at 90') have centers that may be far from the cursor
-    // even though the cursor is inside their rendered ellipse.
+    // Generous threshold collects all nearby DSO centres: large DSOs (e.g. M42 at 90')
+    // have centres far from the cursor even when it sits inside their rendered ellipse.
     const generousThreshold = 200 / this.view.scale;
     const candidates = this.dsoIndex.findAll(projPt.x, projPt.y, generousThreshold);
-
-    if (candidates.length === 0) return null;
-
-    // Among candidates whose rendered ellipse contains the cursor, prefer the smallest.
-    // This gives priority to inner/compact objects over large encompassing DSOs.
-    const { scale } = this.view;
-    const contained: DSO[] = [];
-    for (const dso of candidates) {
-      const majorArcmin = dso.majAxis ?? 1;
-      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, scale));
-      const dsoProj = project(dso.ra, dso.dec);
-      const dsoCanvas = toCanvas(dsoProj.x, dsoProj.y, this.view);
-      const dx = dsoCanvas.x - mx;
-      const dy = dsoCanvas.y - my;
-      const distPx = Math.sqrt(dx * dx + dy * dy);
-      if (distPx <= rx) {
-        contained.push(dso);
-      }
-    }
-
-    if (contained.length > 0) {
-      // Return the contained DSO with the smallest rendered size
-      contained.sort((a, b) => (a.majAxis ?? 1) - (b.majAxis ?? 1));
-      return contained[0];
-    }
-
-    // Fallback: nearest by center within the original tight threshold
-    const tightThreshold = 20 / this.view.scale;
-    for (const dso of candidates) {
-      const dsoProj = project(dso.ra, dso.dec);
-      const dx = dsoProj.x - projPt.x;
-      const dy = dsoProj.y - projPt.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist <= tightThreshold) return dso;
-    }
-
-    return null;
+    return pickDsoAtCursor(candidates, mx, my, this.view);
   }
 
   /**
@@ -1404,7 +1118,7 @@ export class SkyMap {
    */
   private requestHover(mx: number, my: number, clientX: number, clientY: number) {
     this.pendingHover = { mx, my, clientX, clientY };
-    if (this.interacting || this.hoverRaf !== null) return;
+    if (this.lod.interacting || this.hoverRaf !== null) return;
     this.hoverRaf = requestAnimationFrame(() => {
       this.hoverRaf = null;
       const h = this.pendingHover;
@@ -1488,86 +1202,24 @@ export class SkyMap {
   /**
    * Mark the map as actively interacting (pan/zoom/drag) and (re)arm the settle
    * timer. While interacting, renderStars/renderDSOs use a reduced density budget
-   * (see effectiveStarBudget). When motion stops for SETTLE_MS, the flag clears and
-   * a full-budget redraw runs so the less-important objects fill back in. The timer
-   * always fires, so the flag can never get stuck on (e.g. an interrupted animation).
+   * (see InteractionLod.effectiveStarBudget). When motion stops for SETTLE_MS, the
+   * flag clears and a full-budget redraw runs so the less-important objects fill back
+   * in. The timer always fires, so the flag can never get stuck on (e.g. an interrupted
+   * animation). The adaptive-budget maths live in InteractionLod; SkyMap owns the timer.
    */
   private markInteracting() {
-    this.interacting = true;
+    this.lod.beginInteraction();
     if (this.settleTimer !== null) clearTimeout(this.settleTimer);
     this.settleTimer = setTimeout(() => {
       this.settleTimer = null;
-      this.interacting = false;
+      this.lod.endInteraction();
       this.requestRender();
-    }, SkyMap.SETTLE_MS);
+    }, InteractionLod.SETTLE_MS);
   }
 
   /** Coalesced render for motion: throttles the density budget for a smooth frame. */
   requestRenderInteractive() {
     this.markInteracting();
-    this.requestRender();
-  }
-
-  /**
-   * Effective star density budget. In auto mode it is the fixed pinned budget, rendered
-   * the same whether moving or not (no pop). In manual mode the motion LOD applies — but
-   * only when the DSO lever is NOT auto (when it is, the lever keeps frames smooth, so
-   * stars need no throttling either).
-   */
-  private effectiveStarBudget(): number {
-    if (this.autoStarDensity) return this.maxStarCount;
-    if (this.motionLOD && this.interacting && !this.autoDSODensity) {
-      const floor = Math.min(SkyMap.INTERACTION_STAR_FLOOR, this.maxStarCount);
-      return Math.round(floor + (this.maxStarCount - floor) * this.interactionQuality);
-    }
-    return this.maxStarCount;
-  }
-
-  /**
-   * Effective DSO density budget. When DSO-auto is on, maxDSOCount is the live performance
-   * lever and is used as-is (no motion throttling → no pop). When manual, the motion LOD
-   * interpolates floor→full during active interaction.
-   */
-  private effectiveDSOBudget(): number {
-    if (this.motionLOD && !this.autoDSODensity && this.interacting) {
-      const floor = Math.min(SkyMap.INTERACTION_DSO_FLOOR, this.maxDSOCount);
-      return Math.round(floor + (this.maxDSOCount - floor) * this.interactionQuality);
-    }
-    return this.maxDSOCount;
-  }
-
-  /**
-   * Steer interactionQuality from a measured interactive frame draw time. Asymmetric with
-   * a hysteresis band for stability: drop fast when over budget (keep motion smooth), creep
-   * up slowly when there is clear headroom, and hold steady in between so it doesn't oscillate.
-   */
-  private adaptInteractionQuality(frameMs: number) {
-    const target = SkyMap.INTERACTION_TARGET_MS;
-    if (frameMs > target * 1.25) {
-      this.interactionQuality = Math.max(0, this.interactionQuality - 0.15);
-    } else if (frameMs < target * 0.7) {
-      this.interactionQuality = Math.min(1, this.interactionQuality + 0.05);
-    }
-  }
-
-  /**
-   * DSO performance lever: from a measured interactive frame time, nudge the DSO budget
-   * multiplicatively toward AUTO_TARGET_MS. Runs only while interacting (motion is the
-   * demanding case), and the same budget is then used at rest — so it never creeps up when
-   * idle and nothing pops when a gesture starts. A hysteresis band keeps a converged budget
-   * stable (factor 1 → no change → no extra render); it also stops at the clamp bounds.
-   * Because render cost is pan-invariant, a steady pan triggers no change; only real
-   * performance shifts (e.g. zoom) re-tune it.
-   */
-  private adaptAutoDensity(frameMs: number) {
-    if (!this.autoDSODensity) { this.dsoCalibrating = false; return; }
-    const target = SkyMap.AUTO_TARGET_MS;
-    const factor = frameMs > target * 1.3 ? 0.85 : frameMs < target * 0.6 ? 1.12 : 1;
-    if (factor === 1) { this.dsoCalibrating = false; return; } // converged → end any burst
-    const next = Math.max(SkyMap.AUTO_DSO_MIN, Math.min(DSO_DENSITY_MAX, Math.round(this.maxDSOCount * factor)));
-    if (next === this.maxDSOCount) { this.dsoCalibrating = false; return; } // at a bound → end burst
-    this.maxDSOCount = next;
-    this.onAutoDensityChange?.(next);
     this.requestRender();
   }
 
@@ -1579,7 +1231,7 @@ export class SkyMap {
     // right after DSO-auto is switched on (dsoCalibrating) so the slider re-tunes immediately.
     // Outside those, no measurement: the budget never creeps up at rest, so nothing pops when
     // a gesture starts.
-    const measure = !this._renderingOffscreen && (this.interacting || this.dsoCalibrating);
+    const measure = this.lod.shouldMeasure(this._renderingOffscreen);
     const t0 = measure ? performance.now() : 0;
 
     // Invalidate the per-frame DSO selection cache; rebuilt lazily by the first consumer.
@@ -1665,8 +1317,16 @@ export class SkyMap {
       const ms = performance.now() - t0;
       // DSO lever owns smoothness when auto (during motion or a calibration burst); otherwise
       // the manual motion LOD calibrates from interactive frames.
-      if (this.autoDSODensity) this.adaptAutoDensity(ms);
-      else if (this.interacting) this.adaptInteractionQuality(ms);
+      if (this.lod.autoDSODensity) {
+        const r = this.lod.adaptAutoDensity(ms, this.maxDSOCount);
+        if (r.changed) {
+          this.maxDSOCount = r.next;
+          this.onAutoDensityChange?.(r.next);
+          this.requestRender();
+        }
+      } else if (this.lod.interacting) {
+        this.lod.adaptInteractionQuality(ms);
+      }
     }
   }
 
@@ -1785,132 +1445,26 @@ export class SkyMap {
 
   // ── Interactive frame instances ────────────────────────────────────────────
 
-  /** Canvas centre for a frame instance (resolved from its anchor + live view). */
+  // ── Frame canvas geometry ────────────────────────────────────────────────
+  // The maths lives in ./frame-geometry (pure, unit-tested); these thin wrappers
+  // bind the live `this.view` so the many call sites below stay unchanged.
   private frameAnchorCanvas(f: RenderableFrame): { cx: number; cy: number } {
-    if (f.anchorKind === 'sky') {
-      const p = project(f.ra ?? 0, f.dec ?? 0);
-      const c = toCanvas(p.x, p.y, this.view);
-      return { cx: c.x, cy: c.y };
-    }
-    return { cx: (f.nx ?? 0.5) * this.view.width, cy: (f.ny ?? 0.5) * this.view.height };
+    return frameAnchorCanvas(f, this.view);
   }
-
-  /**
-   * Canvas rotation (deg) of a pinned frame for a given position angle. The
-   * frame's *up* (top edge) must point to celestial north at PA 0°, so we add
-   * 90° to `dsoCanvasAngle` — which orients a DSO's *major axis* (local +x).
-   */
-  private paToCanvasRotDeg(paDeg: number, raDeg: number): number {
-    return paToCanvasRotationDeg(paDeg, raDeg, this.view.rotationDeg);
-  }
-
-  /** Inverse of {@link paToCanvasRotDeg}: recover PA (°E of N) from a canvas rotation. */
   private canvasRotDegToPa(rotDeg: number, raDeg: number): number {
-    return canvasRotationToPaDeg(rotDeg, raDeg, this.view.rotationDeg);
+    return canvasRotDegToPa(rotDeg, raDeg, this.view);
   }
-
-  /** Canvas rotation (deg) for a frame instance. */
   private frameCanvasRotationDeg(f: RenderableFrame): number {
-    if (f.anchorKind === 'sky') {
-      return this.paToCanvasRotDeg(f.paDeg ?? 0, f.ra ?? 0);
-    }
-    return f.screenRotationDeg ?? 0;
+    return frameCanvasRotationDeg(f, this.view);
   }
-
-  private frameGeometry(f: RenderableFrame): { corners: Point[]; cx: number; cy: number; rotDeg: number; halfW: number; halfH: number } {
-    // A mosaic outline hugs its tiles exactly via tangent-plane (gnomonic)
-    // geometry. The same geometry is used whether it's pinned or floating (centre
-    // and PA are derived from the anchor either way), so the pin/float toggle is
-    // continuous — no jump — and shares the standard frame code.
-    if (f.isMosaicOutline) {
-      const g = this.mosaicOutlineGeometry(f);
-      if (g) return g;
-    }
-    const { cx, cy } = this.frameAnchorCanvas(f);
-    const decForSize = f.anchorKind === 'sky' ? (f.dec ?? 0) : unproject(this.view.centerX, this.view.centerY).dec;
-    const halfW = angularSizeToCanvasPx(f.wDeg * 30, decForSize, this.view.scale);
-    const halfH = angularSizeToCanvasPx(f.hDeg * 30, decForSize, this.view.scale);
-    const rotDeg = this.frameCanvasRotationDeg(f);
-    const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rotDeg);
-    return { corners, cx, cy, rotDeg, halfW, halfH };
+  private frameGeometry(f: RenderableFrame): FrameGeometry {
+    return frameGeometry(f, this.view);
   }
-
-  /**
-   * Sky centre + position angle of a mosaic outline. Pinned: the stored centre
-   * and PA. Floating: the sky point under its screen anchor and the PA that
-   * reproduces its screen rotation there — so the gnomonic geometry is continuous
-   * as the pin toggles between sky and screen.
-   */
-  private mosaicCenterPa(f: RenderableFrame): { center: { ra: number; dec: number }; paDeg: number } | null {
-    if (f.anchorKind === 'sky') {
-      if (f.ra == null || f.dec == null) return null;
-      return { center: { ra: f.ra, dec: f.dec }, paDeg: f.paDeg ?? 0 };
-    }
-    const { cx, cy } = this.frameAnchorCanvas(f);
-    const proj = fromCanvas(cx, cy, this.view);
-    const center = unproject(proj.x, proj.y);
-    return { center, paDeg: this.canvasRotDegToPa(f.screenRotationDeg ?? 0, center.ra) };
-  }
-
-  /**
-   * Handle geometry of a mosaic outline: its four region corners (the exact
-   * tangent-plane corners that {@link mosaicOutlinePath} draws to, so handles sit
-   * on the outline), plus centre, rotation and local half-extents.
-   */
-  private mosaicOutlineGeometry(f: RenderableFrame): { corners: Point[]; cx: number; cy: number; rotDeg: number; halfW: number; halfH: number } | null {
-    const cp = this.mosaicCenterPa(f);
-    if (!cp) return null;
-    const halfW = f.wDeg / 2, halfH = f.hDeg / 2;
-    const corner = (gx: number, gy: number): Point => {
-      const s = framePointToSky(cp.center, cp.paDeg, gx, gy);
-      const p = project(s.ra, s.dec);
-      return toCanvas(p.x, p.y, this.view);
-    };
-    // gy+ is "up" (frame north), which is computeFovFrameCorners' −y, so these map
-    // to its clockwise-from-top-left corner order.
-    const corners = [corner(-halfW, halfH), corner(halfW, halfH), corner(halfW, -halfH), corner(-halfW, -halfH)];
-    const cx = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4;
-    const cy = (corners[0].y + corners[1].y + corners[2].y + corners[3].y) / 4;
-    const rotDeg = this.frameCanvasRotationDeg(f);
-    const a = rotDeg * DEG2RAD, cos = Math.cos(a), sin = Math.sin(a);
-    let minL = Infinity, maxL = -Infinity, minM = Infinity, maxM = -Infinity;
-    for (const p of corners) {
-      const l = p.x * cos + p.y * sin, m = -p.x * sin + p.y * cos;
-      minL = Math.min(minL, l); maxL = Math.max(maxL, l);
-      minM = Math.min(minM, m); maxM = Math.max(maxM, m);
-    }
-    return { corners, cx, cy, rotDeg, halfW: (maxL - minL) / 2, halfH: (maxM - minM) / 2 };
-  }
-
-  /**
-   * Outline polyline of a mosaic: the boundary of its tangent-plane region,
-   * sampled and projected so it follows the exact same geometry as the tiles
-   * (they share the placement math). Curves with the projection just like the
-   * grid does — unlike a straight corner-to-corner rectangle.
-   */
   private mosaicOutlinePath(f: RenderableFrame): Point[] | null {
-    const cp = this.mosaicCenterPa(f);
-    if (!cp) return null;
-    const { center, paDeg } = cp;
-    const halfW = f.wDeg / 2, halfH = f.hDeg / 2;
-    const N = 16; // samples per edge — enough to render the curvature smoothly
-    const pts: Point[] = [];
-    const add = (gx: number, gy: number) => {
-      const s = framePointToSky(center, paDeg, gx, gy);
-      const p = project(s.ra, s.dec);
-      pts.push(toCanvas(p.x, p.y, this.view));
-    };
-    for (let i = 0; i <= N; i++) add(-halfW + (2 * halfW * i) / N, halfH);   // top
-    for (let i = 1; i <= N; i++) add(halfW, halfH - (2 * halfH * i) / N);    // right
-    for (let i = 1; i <= N; i++) add(halfW - (2 * halfW * i) / N, -halfH);   // bottom
-    for (let i = 1; i < N; i++) add(-halfW, -halfH + (2 * halfH * i) / N);   // left
-    return pts;
+    return mosaicOutlinePath(f, this.view);
   }
-
-  /** Handles (rotation needle, pin, centre dot) are shown only while the frame
-   * is large enough that its centre dot isn't crowding the edges. */
   private frameHandlesVisible(halfW: number, halfH: number): boolean {
-    return Math.min(halfW, halfH) >= 12;
+    return frameHandlesVisible(halfW, halfH);
   }
 
   private renderFovInstances() {
@@ -2067,9 +1621,7 @@ export class SkyMap {
   /** Pin glyph position: the top-right corner lifted outward (local "up") so the
    * icon sits just above the frame with a small margin. */
   private framePinGlyphPos(corner: Point, rotDeg: number): Point {
-    const ang = rotDeg * DEG2RAD;
-    const margin = 14; // half icon (8) + a few px gap
-    return { x: corner.x + Math.sin(ang) * margin, y: corner.y - Math.cos(ang) * margin };
+    return framePinGlyphPos(corner, rotDeg);
   }
 
   /** Draw the pushpin glyph centred at `at`, filled when pinned. Source path is a 24×24 box. */
@@ -2516,19 +2068,8 @@ export class SkyMap {
    * frame or a mosaic of the same plan (emits the merge for the store to apply). */
   private checkFrameMerge(movedId: string): void {
     if (!this.onFrameMerge) return;
-    const moved = this.fovInstances.find(f => f.id === movedId);
-    if (!moved) return;
-    const movedPlan = movedId.split(':')[1];
-    const movedCorners = this.frameGeometry(moved).corners;
-    for (const f of this.fovInstances) {
-      if (f.id === movedId || f.mosaicId || f.visible === false) continue;
-      const isFrameOrMosaic = f.id.startsWith('plan:') || f.id.startsWith('mosaic:');
-      if (!isFrameOrMosaic || f.id.split(':')[1] !== movedPlan) continue;
-      if (convexPolygonsOverlap(movedCorners, this.frameGeometry(f).corners)) {
-        this.onFrameMerge(movedId, f.id);
-        return;
-      }
-    }
+    const targetId = findMergeTarget(movedId, this.fovInstances, this.view);
+    if (targetId) this.onFrameMerge(movedId, targetId);
   }
 
   /**
@@ -2543,17 +2084,9 @@ export class SkyMap {
     this.resizeDraft = null;
     const f = draft ? this.fovInstances.find(x => x.id === frameId) : undefined;
     if (!draft || !f) { this.render(); return; }
-    const geo = this.frameGeometry(f);
-    // Px → degrees via the frame's own tile size (avoids re-inverting the projection).
-    const wDeg = f.wDeg * (draft.halfW / Math.max(1e-6, geo.halfW));
-    const hDeg = f.hDeg * (draft.halfH / Math.max(1e-6, geo.halfH));
-    const proj = fromCanvas(draft.cx, draft.cy, this.view);
-    const { ra, dec } = unproject(proj.x, proj.y);
-    // PA that reproduces the frame's on-screen orientation at the new centre
-    // (works whether the frame was sky- or screen-anchored).
-    const paDeg = this.canvasRotDegToPa(geo.rotDeg, ra);
+    const region = resizeRegionFromDraft(f, draft, this.view, fromCanvas, unproject);
     this.render();
-    this.onFovFrameResize?.(f.id, { centerRa: ra, centerDec: dec, wDeg, hDeg, paDeg });
+    this.onFovFrameResize?.(f.id, region);
   }
 
   private renderBackground() {
@@ -2768,7 +2301,7 @@ export class SkyMap {
     // How much the frozen sprites would be scaled to track the current zoom.
     const liveRatio = this.starSpriteScale > 0 ? Math.sqrt(view.scale / this.starSpriteScale) : 1;
     const drifted = liveRatio > SkyMap.ATLAS_REBUILD_RATIO || liveRatio < 1 / SkyMap.ATLAS_REBUILD_RATIO;
-    if (atlasStale && (!this.interacting || this.starSprites.size === 0 || drifted)) {
+    if (atlasStale && (!this.lod.interacting || this.starSprites.size === 0 || drifted)) {
       this.starSprites.clear();
       this.starSpriteScale = atlasScale;
       this.starSpriteMaxMag = atlasMaxMag;
