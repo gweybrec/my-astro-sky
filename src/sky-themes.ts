@@ -62,6 +62,10 @@ export interface SkyThemeConfig {
   gridEquatorColor: string;
   gridLabelColor: string;
   constellationLineColor: string;
+  /** Color of the constellation *name* labels (uppercase, faint). */
+  constellationNameColor: string;
+  /** Color of the bright-star name labels. */
+  starLabelColor: string;
 }
 
 /**
@@ -97,6 +101,8 @@ export const SKY_THEME: SkyThemeConfig = {
   gridEquatorColor: 'rgba(120, 165, 235, 0.65)',
   gridLabelColor: 'rgba(155, 190, 240, 0.9)',
   constellationLineColor: 'rgba(140, 165, 220, 0.5)',
+  constellationNameColor: 'rgba(185, 170, 155, 0.4)',
+  starLabelColor: 'rgba(195, 180, 160, 0.55)',
 };
 
 const clamp255 = (n: number): number => Math.max(0, Math.min(255, Math.round(n)));
