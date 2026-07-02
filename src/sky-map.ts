@@ -21,8 +21,9 @@ import {
 import { computeFovTargetScale } from './gear-presets';
 import { SKY_THEME } from './sky-themes';
 import {
-  computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint, type StarPaint,
+  computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint,
 } from './star-render-math';
+import { paintStar, buildStarSprite } from './star-draw';
 import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle, DSO_GIANT_BODY_PU } from './dso-render-math';
 import { InteractionLod } from './interaction-lod';
 import {
@@ -50,8 +51,9 @@ import {
   drawBackground, drawFisheyeGrid, drawGrid, drawConstellationLines, drawConstellationNames,
   drawPinGlyph, drawTileTrash, drawTileAdd, TILE_TRASH_R,
 } from './sky-draw';
-import { FONTS, BORDER_RING, HIGHLIGHT_RING, PHOTO_OUTLINE } from './canvas-theme';
+import { FONTS, BORDER_RING, HIGHLIGHT_RING, PHOTO_OUTLINE, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR } from './canvas-theme';
 import { drawDsoMarker, drawDsoHighlightRing } from './dso-draw';
+import { formatDsoLabel, dsoLabelVisible } from './dso-label';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -177,37 +179,8 @@ export interface FovFrameChange {
 // computeFovFrameCorners is re-exported here for existing import sites (export-render, tests).
 export { computeFovFrameCorners };
 
-// Star size/colour/glow maths now live in ./star-render-math (imported above);
-// only the canvas draw (paintStar) and sprite cache stay here.
-
-/**
- * Paint a single star at (cx, cy). Mirrors the original inline draw exactly: a
- * one-gradient opaque-core→halo for glowing stars, else an opaque core with a soft
- * rim. Used both to fill a sprite (cx=cy=half) and to draw the highlighted star live.
- */
-function paintStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, p: StarPaint): void {
-  if (p.glowAlpha > 0.01) {
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, p.glowR);
-    grad.addColorStop(0, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
-    grad.addColorStop(p.solidUntil, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
-    const GLOW_STEPS = 12;
-    for (let i = 0; i <= GLOW_STEPS; i++) {
-      const f = i / GLOW_STEPS;
-      const stop = p.coreEdge + (1 - p.coreEdge) * f;
-      const a = p.glowAlpha * Math.pow(1 - f, 2.5);
-      grad.addColorStop(stop, `rgba(${p.gr}, ${p.gg}, ${p.gb}, ${a})`);
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(cx - p.glowR, cy - p.glowR, p.glowR * 2, p.glowR * 2);
-  } else {
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, p.radius);
-    grad.addColorStop(0, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
-    grad.addColorStop(1 - p.soft, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
-    grad.addColorStop(1, `rgba(${p.r}, ${p.g}, ${p.b}, 0)`);
-    ctx.fillStyle = grad;
-    ctx.fillRect(cx - p.radius, cy - p.radius, p.radius * 2, p.radius * 2);
-  }
-}
+// Star size/colour/glow maths live in ./star-render-math; the canvas star draw
+// (paintStar) and sprite baking (buildStarSprite) live in ./star-draw.
 
 export function normalizeRotationDeg(deg: number): number {
   let normalized = ((deg % 360) + 360) % 360;
@@ -2118,7 +2091,7 @@ export class SkyMap {
         // Build at the atlas's frozen scale/maxMag so a sprite minted mid-gesture (a
         // newly-appeared bucket) matches the rest of the atlas and scales identically.
         const paint = computeStarPaint(star.mag, star.bv, this.starSpriteScale, this.starSpriteMaxMag, theme, false);
-        sprite = this.buildStarSprite(paint);
+        sprite = buildStarSprite(paint);
         this.starSprites.set(key, sprite);
       }
       if (spriteScale === 1) {
@@ -2130,18 +2103,6 @@ export class SkyMap {
     }
 
     ctx.globalAlpha = prevAlpha;
-  }
-
-  /** Render one star's sprite (centred) into an offscreen canvas sized to its extent. */
-  private buildStarSprite(paint: StarPaint): { canvas: HTMLCanvasElement; half: number } {
-    const extent = paint.glowAlpha > 0.01 ? paint.glowR : paint.radius;
-    const half = Math.ceil(extent) + 1;   // +1px so the soft rim isn't clipped
-    const canvas = document.createElement('canvas');
-    canvas.width = half * 2;
-    canvas.height = half * 2;
-    const sctx = canvas.getContext('2d')!;
-    paintStar(sctx, half, half, paint);
-    return { canvas, half };
   }
 
   private renderStarLabels() {
@@ -2305,41 +2266,20 @@ export class SkyMap {
 
   private renderDSOLabels() {
     const { ctx, view } = this;
-
-    const TYPE_COLORS: Record<string, string> = {
-      'Gx':  'rgba(220, 180, 100, 0.8)',
-      'OC':  'rgba(200, 185, 160, 0.8)',
-      'GC':  'rgba(255, 200, 80, 0.8)',
-      'EN':  'rgba(220, 100, 100, 0.8)',
-      'RN':  'rgba(160, 175, 185, 0.75)',
-      'PN':  'rgba(80, 200, 220, 0.9)',
-      'SNR': 'rgba(80, 200, 150, 0.8)',
-      'DN':  'rgba(120, 120, 140, 0.6)',
-      '?':   'rgba(160, 160, 160, 0.6)',
-    };
-
     ctx.textBaseline = 'middle';
 
     // Render labels for exactly the DSOs drawn this frame (shared selection).
     for (const dso of this.selectRenderedDSOs()) {
-      const isMess = dso.id.startsWith('M') && !dso.id.startsWith('M0');
       const majorArcmin = dso.majAxis ?? 1;
       const rx = angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, dsoSizeCos2(dso));
-
-      // Label visibility rules
-      if (isMess && view.scale <= 100) continue;
-      if (!isMess && (view.scale <= 300 || rx <= 4)) continue;
+      if (!dsoLabelVisible(dso, rx, view)) continue;
 
       projectCached(dso);
       const c = toCanvas(dso._px!, dso._py!, view);
 
-      const label = isMess ? dso.id
-        : dso.id.startsWith('LPN-') ? (dso.displayName || dso.id.replace(/^LPN-/, ''))
-        : dso.id.replace('NGC', 'NGC ').replace(/^IC(\d)/, 'IC $1')
-               .replace('LBN', 'LBN ').replace('LDN', 'LDN ').replace('SH2-', 'Sh2-').replace('vdB', 'vdB ').replace(/^(Abell)(\d)/, '$1 $2').replace(/^(Barnard)(\d)/, '$1 $2');
-      ctx.font = '9px sans-serif';
-      ctx.fillStyle = TYPE_COLORS[dso.type] || 'rgba(160, 160, 160, 0.7)';
-      ctx.fillText(label, c.x + Math.max(2, rx) + 2, c.y);
+      ctx.font = FONTS.dsoLabel;
+      ctx.fillStyle = DSO_LABEL_COLORS[dso.type] ?? DEFAULT_DSO_LABEL_COLOR;
+      ctx.fillText(formatDsoLabel(dso), c.x + Math.max(2, rx) + 2, c.y);
     }
 
     ctx.textBaseline = 'alphabetic';
