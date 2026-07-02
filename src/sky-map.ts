@@ -2813,6 +2813,18 @@ export class SkyMap {
         continue;
       }
 
+      // Glow halos (bright stars, mag < glowThresholdMag) are a soft radial gradient
+      // several times the dot's radius — the 1.3x atlas drift bound (imperceptible on
+      // small solid dots) is visibly blurry on them. Only ~321 stars catalog-wide are
+      // glow-eligible, so draw them live at the true zoom scale during the drift window
+      // instead of blitting the frozen/scaled sprite — same treatment as the highlighted
+      // star above, gated to the exact frames (frozenScale) where the blur would show.
+      if (frozenScale && star.mag < theme.glowThresholdMag) {
+        const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, false);
+        paintStar(ctx, c.x, c.y, paint);
+        continue;
+      }
+
       // Quantize (mag, bv) to a sprite bucket: 0.25-mag and ~1/12 B-V steps.
       const magKey = Math.round(star.mag * 4);
       const bvKey = Math.round((Math.max(-0.4, Math.min(2.0, star.bv)) + 0.4) * 12);
