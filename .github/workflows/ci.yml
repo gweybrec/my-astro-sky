@@ -21,10 +21,10 @@ jobs:
       - run: npm ci
 
       - name: Type-check frontend
-        run: npx tsc --noEmit
+        run: npm run typecheck:client
 
       - name: Type-check server
-        run: npx tsc --noEmit -p tsconfig.server.json
+        run: npm run typecheck:server
 
       - name: Build
         run: npx vite build

@@ -25,6 +25,9 @@ npm run dev          # Runs Vite (port 5173) + Express (port 3001) via concurren
 npm run dev:client   # Vite frontend only
 npm run dev:server   # Express server with tsx watch (hot reload)
 npm run build        # tsc type-check + vite build to dist/
+npm run typecheck    # Type-check frontend (vue-tsc) + server (tsc)
+npm run typecheck:client  # vue-tsc --noEmit (type-checks .vue SFCs; plain tsc does not)
+npm run typecheck:server  # tsc --noEmit -p tsconfig.server.json
 npm run preview      # Preview production build
 npm test             # Run unit test suite (Vitest)
 npm run test:watch   # Vitest in watch mode

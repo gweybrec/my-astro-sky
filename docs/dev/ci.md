@@ -11,8 +11,8 @@ All workflows live in `.github/workflows/`. They are independent — each serves
 **Runner:** `ubuntu-latest`
 
 **Steps:**
-1. `npx tsc --noEmit` — type-checks the frontend (Vue + TypeScript)
-2. `npx tsc --noEmit -p tsconfig.server.json` — type-checks the Express backend
+1. `npm run typecheck:client` (`vue-tsc --noEmit`) — type-checks the frontend, including inside `.vue` SFCs (plain `tsc` treats `.vue` files as opaque via the shim and does not check their `<script>` blocks)
+2. `npm run typecheck:server` (`tsc --noEmit -p tsconfig.server.json`) — type-checks the Express backend
 3. `npx vite build` — verifies the frontend bundles without errors
 
 This workflow does **not** build or run Electron — it only validates that the TypeScript compiles and Vite produces a valid bundle.
