@@ -49,11 +49,12 @@ import { easeInOutCubic, navigateDurationMs, navigateProfile, zoomAboutPoint } f
 import { pickDsoAtCursor } from './hover-hit-test';
 import {
   drawBackground, drawFisheyeGrid, drawGrid, drawConstellationLines, drawConstellationNames,
-  drawPinGlyph, drawTileTrash, drawTileAdd, TILE_TRASH_R,
+  drawTileTrash, drawTileAdd, TILE_TRASH_R,
 } from './sky-draw';
-import { FONTS, BORDER_RING, HIGHLIGHT_RING, PHOTO_OUTLINE, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR } from './canvas-theme';
+import { FONTS, FRAME, BORDER_RING, HIGHLIGHT_RING, PHOTO_OUTLINE, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR } from './canvas-theme';
 import { drawDsoMarker, drawDsoHighlightRing } from './dso-draw';
 import { formatDsoLabel, dsoLabelVisible } from './dso-label';
+import { drawFramePolyline, drawEdgeLabel, drawFrameHandles, drawResizeDraftRect, drawElasticSnapLine } from './frame-draw';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -1329,29 +1330,10 @@ export class SkyMap {
       ctx.strokeStyle = PHOTO_OUTLINE.stroke;
       ctx.lineWidth = PHOTO_OUTLINE.lineWidth;
       ctx.setLineDash(PHOTO_OUTLINE.dash);
-
-      ctx.beginPath();
-      ctx.moveTo(corners[0].x, corners[0].y);
-      for (let i = 1; i < corners.length; i++) {
-        ctx.lineTo(corners[i].x, corners[i].y);
-      }
-      ctx.closePath();
-      ctx.stroke();
+      drawFramePolyline(ctx, corners);
 
       // Label along the longest edge, always readable (not upside-down)
-      ctx.setLineDash([]);
-      ctx.font = FONTS.frameLabel;
-      ctx.fillStyle = PHOTO_OUTLINE.label;
-
-      const edgeIdx = photoLabelEdgeIndex(corners);
-      const label = photoLabelTransform(corners, edgeIdx);
-
-      ctx.save();
-      ctx.translate(label.x, label.y);
-      ctx.rotate(label.angle);
-      ctx.fillText(name, 4, -5);
-      ctx.restore();
-
+      drawEdgeLabel(ctx, corners, name, PHOTO_OUTLINE.label);
       ctx.restore();
     }
   }
@@ -1364,8 +1346,8 @@ export class SkyMap {
 
     // Resolve CSS token values from computed style (canvas does not support CSS vars directly)
     const cs = getComputedStyle(this.canvas);
-    const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || 'rgba(220,60,60,0.85)';
-    const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || 'rgba(220,90,90,0.9)';
+    const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || FRAME.strokeFallback;
+    const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || FRAME.labelFallback;
 
     for (const spec of this.fovFrameSpecs) {
       const halfWPx = angularSizeToCanvasPx(spec.wDeg * 30, dec, view.scale);
@@ -1374,30 +1356,10 @@ export class SkyMap {
 
       ctx.save();
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([8, 4]);
-
-      ctx.beginPath();
-      ctx.moveTo(corners[0].x, corners[0].y);
-      for (let i = 1; i < corners.length; i++) {
-        ctx.lineTo(corners[i].x, corners[i].y);
-      }
-      ctx.closePath();
-      ctx.stroke();
-
-      ctx.setLineDash([]);
-      ctx.font = '11px sans-serif';
-      ctx.fillStyle = labelColor;
-
-      const edgeIdx = photoLabelEdgeIndex(corners);
-      const lbl = photoLabelTransform(corners, edgeIdx);
-
-      ctx.save();
-      ctx.translate(lbl.x, lbl.y);
-      ctx.rotate(lbl.angle);
-      ctx.fillText(spec.label, 4, -5);
-      ctx.restore();
-
+      ctx.lineWidth = FRAME.lineWidth;
+      ctx.setLineDash(FRAME.dashOutline);
+      drawFramePolyline(ctx, corners);
+      drawEdgeLabel(ctx, corners, spec.label, labelColor);
       ctx.restore();
     }
   }
@@ -1429,10 +1391,10 @@ export class SkyMap {
   private renderFovInstances() {
     const { ctx } = this;
     const cs = getComputedStyle(this.canvas);
-    const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || 'rgba(220,60,60,0.85)';
-    const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || 'rgba(220,90,90,0.9)';
+    const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || FRAME.strokeFallback;
+    const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || FRAME.labelFallback;
     const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
-    const dangerColor = cs.getPropertyValue('--color-danger').trim() || '#cc7777';
+    const dangerColor = cs.getPropertyValue('--color-danger').trim() || FRAME.dangerFallback;
     // The selected mosaic's tiles each get a delete button (per-tile editing).
     const activeMosaicId = this.fovInstances.find(f => f.active && f.isMosaicOutline)?.id.split(':')[2];
 
@@ -1445,16 +1407,12 @@ export class SkyMap {
       ctx.save();
       ctx.globalAlpha = isTile ? 0.4 : isActive ? 1 : 0.5;
       ctx.strokeStyle = isActive && !isTile ? activeColor : strokeColor;
-      ctx.lineWidth = isActive && !isTile ? 2 : 1.5;
-      ctx.setLineDash([8, 4]);
+      ctx.lineWidth = isActive && !isTile ? FRAME.lineWidthActive : FRAME.lineWidth;
+      ctx.setLineDash(FRAME.dashOutline);
       // A mosaic outline traces its tile perimeter (follows projection curvature);
       // every other frame is its 4-corner rectangle.
       const outline = f.isMosaicOutline ? (this.mosaicOutlinePath(f) ?? corners) : corners;
-      ctx.beginPath();
-      ctx.moveTo(outline[0].x, outline[0].y);
-      for (let i = 1; i < outline.length; i++) ctx.lineTo(outline[i].x, outline[i].y);
-      ctx.closePath();
-      ctx.stroke();
+      drawFramePolyline(ctx, outline);
 
       if (isTile) {
         // Border tiles of the selected mosaic carry a delete button (large tiles only).
@@ -1471,51 +1429,20 @@ export class SkyMap {
       const edgeIdx = photoLabelEdgeIndex(corners);
       const a = corners[edgeIdx];
       const b = corners[(edgeIdx + 1) % corners.length];
-      const longEdgePx = Math.hypot(b.x - a.x, b.y - a.y);
-      if (longEdgePx >= 48) {
-        ctx.setLineDash([]);
-        ctx.font = '11px sans-serif';
-        ctx.fillStyle = isActive ? activeColor : labelColor;
-        const lbl = photoLabelTransform(corners, edgeIdx);
-        ctx.save();
-        ctx.translate(lbl.x, lbl.y);
-        ctx.rotate(lbl.angle);
-        ctx.fillText(f.name, 4, -5);
-        ctx.restore();
+      if (Math.hypot(b.x - a.x, b.y - a.y) >= FRAME.labelMinEdgePx) {
+        drawEdgeLabel(ctx, corners, f.name, isActive ? activeColor : labelColor);
       }
 
       // Handles on the active frame only (so other frames stay locked), and only
       // while the frame is large enough that the centre dot isn't near the edges.
       if (isActive && this.frameHandlesVisible(halfW, halfH)) {
-        const ang = rotDeg * DEG2RAD;
-        const topMidX = cx + halfH * Math.sin(ang);
-        const topMidY = cy - halfH * Math.cos(ang);
-        const h = rotateHandlePos(cx, cy, halfH, rotDeg, 24);
-        ctx.strokeStyle = activeColor;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(topMidX, topMidY);
-        ctx.lineTo(h.x, h.y);
-        ctx.stroke();
-        ctx.fillStyle = activeColor;
-        ctx.beginPath();
-        ctx.arc(h.x, h.y, 5, 0, Math.PI * 2);
-        ctx.fill();
-        if (f.movable) {
-          // Move handle (centre dot).
-          ctx.beginPath();
-          ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        if (f.pinnable) {
-          // Pin toggle glyph: pushpin lifted just above the top-right corner.
-          drawPinGlyph(ctx, this.framePinGlyphPos(corners[1], rotDeg), f.anchorKind === 'sky', activeColor);
-        }
-        if (f.resizable) {
-          // Corner resize handles (small squares) — drag to extend into a mosaic.
-          ctx.fillStyle = activeColor;
-          for (const c of corners) ctx.fillRect(c.x - 3, c.y - 3, 6, 6);
-        }
+        drawFrameHandles(
+          ctx,
+          { corners, cx, cy, rotDeg, halfH },
+          { movable: f.movable, pinnable: !!f.pinnable, resizable: !!f.resizable, anchorSky: f.anchorKind === 'sky' },
+          activeColor,
+          this.framePinGlyphPos(corners[1], rotDeg),
+        );
       }
       ctx.restore();
     }
@@ -1523,17 +1450,7 @@ export class SkyMap {
     // Rubber-band preview of a drag-to-extend in progress.
     if (this.resizeDraft) {
       const d = this.resizeDraft;
-      const pv = computeFovFrameCorners(d.halfW, d.halfH, d.cx, d.cy, d.rotDeg);
-      ctx.save();
-      ctx.strokeStyle = activeColor;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(pv[0].x, pv[0].y);
-      for (let i = 1; i < pv.length; i++) ctx.lineTo(pv[i].x, pv[i].y);
-      ctx.closePath();
-      ctx.stroke();
-      ctx.restore();
+      drawResizeDraftRect(ctx, computeFovFrameCorners(d.halfW, d.halfH, d.cx, d.cy, d.rotDeg), activeColor);
     }
 
     // Elastic line: while moving a frame whose anchor will snap, a taut line runs
@@ -1551,22 +1468,7 @@ export class SkyMap {
         const rx = Math.max(2, angularSizeToCanvasPx(snap.majAxis / 2, snap.dec, this.view.scale));
         const breakPx = Math.max(rx, 20);
         const tension = Math.min(1, Math.hypot(cx - dc.x, cy - dc.y) / breakPx);
-        ctx.save();
-        ctx.strokeStyle = activeColor;
-        ctx.fillStyle = activeColor;
-        ctx.setLineDash([]);
-        ctx.globalAlpha = 0.5 + 0.5 * tension;
-        ctx.lineWidth = 1.5 + 1.5 * tension;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(dc.x, dc.y);
-        ctx.stroke();
-        // Ring marking the snap target at the DSO centre.
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(dc.x, dc.y, 5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
+        drawElasticSnapLine(ctx, { x: cx, y: cy }, dc, tension, activeColor);
       }
     }
 
