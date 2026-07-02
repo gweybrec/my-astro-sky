@@ -22,6 +22,7 @@ export default defineConfig({
         'src/sky-map.ts',
         'src/sky-draw.ts',
         'src/dso-draw.ts',
+        'src/star-draw.ts',
         'src/targets-view.ts',
         'src/metadata-editor.ts',
         'src/toast.ts',
