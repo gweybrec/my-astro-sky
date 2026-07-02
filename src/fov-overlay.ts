@@ -410,6 +410,157 @@ export function openSetupPicker(onPick: (setupId: string) => void, opts: { exclu
     .catch(err => reportUnknownRendererError('fov_pick_setup', err));
 }
 
+/**
+ * Combined "create a frame/mosaic" picker shown from a DSO tooltip: lets the
+ * user add directly into an existing (or brand-new) plan — sized by the plan's
+ * own gear setup — or as a free-standing frame/mosaic sized by a picked (or
+ * brand-new) gear setup. Unlike {@link openSetupPicker} (still used by the FOV
+ * popup's own footer, which already knows whether it's in plan or free mode),
+ * this always offers both destinations since the tooltip has no prior context.
+ *
+ * `onSetupPick(setupId)` fires for the free-frame branches — same contract as
+ * `openSetupPicker`, the caller builds the ad-hoc frame/mosaic itself.
+ * `onDone()` fires after either plan branch, since those are handled internally.
+ */
+export function openFramePicker(
+  kind: 'frame' | 'mosaic',
+  dso: { id: string; ra: number; dec: number },
+  onSetupPick: (setupId: string) => void,
+  onDone: () => void,
+): void {
+  const fovStore = useFovFramesStore();
+  const plansStore = usePlansStore();
+
+  Promise.all([
+    plansStore.ensureLoaded(),
+    getGearSetups(),
+    kind === 'mosaic' ? getTelescopes() : Promise.resolve([]),
+  ]).then(([, setups, tels]) => {
+    const smartTelIds = new Set((tels as Array<{ id: string; is_smart_telescope?: boolean }>).filter(t => t.is_smart_telescope).map(t => t.id));
+    const setupIsSmart = (setupId: string | null): boolean =>
+      !!setupId && smartTelIds.has(setups.find(s => s.id === setupId)?.telescopeId ?? '');
+
+    // Smart scopes have their own single-frame mosaic mode, so mosaics exclude
+    // them from both sections; plans with no setup at all stay eligible either
+    // way (the graceful single-tile fallback handles that case).
+    const freeSetups = kind === 'mosaic' ? setups.filter(s => !smartTelIds.has(s.telescopeId)) : setups;
+    const eligiblePlans = kind === 'mosaic'
+      ? plansStore.plans.filter(p => !p.setupId || !setupIsSmart(p.setupId))
+      : plansStore.plans;
+
+    buildFramePickerModal(kind, dso, eligiblePlans, freeSetups, fovStore, plansStore, onSetupPick, onDone);
+  }).catch(err => reportUnknownRendererError('fov_pick_frame_target', err));
+}
+
+function buildFramePickerModal(
+  kind: 'frame' | 'mosaic',
+  dso: { id: string; ra: number; dec: number },
+  eligiblePlans: ReturnType<typeof usePlansStore>['plans'],
+  freeSetups: FovSetup[],
+  fovStore: ReturnType<typeof useFovFramesStore>,
+  plansStore: ReturnType<typeof usePlansStore>,
+  onSetupPick: (setupId: string) => void,
+  onDone: () => void,
+): void {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'modal settings-modal';
+  const close = () => backdrop.remove();
+
+  const head = document.createElement('div');
+  head.className = 'modal-header';
+  const h2 = document.createElement('h2');
+  h2.textContent = t(kind === 'frame' ? 'fovOverlay.createFrameTitle' : 'fovOverlay.createMosaicTitle');
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'modal-close'; x.textContent = '×';
+  x.addEventListener('click', close);
+  head.appendChild(h2); head.appendChild(x);
+
+  const bodyM = document.createElement('div');
+  bodyM.className = 'modal-body modal-form-body';
+  const gridClass = 'grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2';
+
+  function defaultPlanName(): string {
+    const nice = new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    return t('targets.plan.defaultName', { date: nice });
+  }
+
+  async function doPlanAction(planId: string): Promise<void> {
+    if (kind === 'frame') {
+      await plansStore.addEntry(planId, dso.id);
+      fovStore.setSelection({ kind: 'plan', planId });
+    } else {
+      await fovStore.addAdhocMosaicToPlan(planId, dso.ra, dso.dec, dso.id);
+    }
+  }
+
+  // ── "Add to a plan" section ────────────────────────────────────────────────
+  const planSection = document.createElement('div');
+  planSection.className = 'flex flex-col gap-2';
+  const planLabel = document.createElement('div');
+  planLabel.className = 'text-small text-label uppercase';
+  planLabel.textContent = t('targets.plan.addToPlan');
+  planSection.appendChild(planLabel);
+  const planGridEl = document.createElement('div');
+  planGridEl.className = gridClass;
+  for (const plan of eligiblePlans) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-action';
+    b.textContent = plan.name;
+    b.addEventListener('click', () => { close(); doPlanAction(plan.id).then(onDone); });
+    planGridEl.appendChild(b);
+  }
+  planSection.appendChild(planGridEl);
+  const newPlanBtn = document.createElement('button');
+  newPlanBtn.type = 'button';
+  newPlanBtn.className = 'btn-cancel self-start';
+  newPlanBtn.textContent = '+ ' + t('targets.plan.newPlan');
+  newPlanBtn.addEventListener('click', () => {
+    close();
+    plansStore.createPlan(defaultPlanName()).then((id) => {
+      if (!id) return;
+      doPlanAction(id).then(onDone);
+    });
+  });
+  planSection.appendChild(newPlanBtn);
+  bodyM.appendChild(planSection);
+
+  // ── "Add as a free frame" section ──────────────────────────────────────────
+  const freeSection = document.createElement('div');
+  freeSection.className = 'flex flex-col gap-2 mt-4';
+  const freeLabel = document.createElement('div');
+  freeLabel.className = 'text-small text-label uppercase';
+  freeLabel.textContent = t('fovOverlay.addFreeFrame');
+  freeSection.appendChild(freeLabel);
+  const freeGridEl = document.createElement('div');
+  freeGridEl.className = gridClass;
+  for (const setup of freeSetups) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-action';
+    b.textContent = setup.name;
+    b.addEventListener('click', () => { close(); onSetupPick(setup.id); });
+    freeGridEl.appendChild(b);
+  }
+  freeSection.appendChild(freeGridEl);
+  const addSetupBtn = document.createElement('button');
+  addSetupBtn.type = 'button';
+  addSetupBtn.className = 'btn-cancel self-start';
+  addSetupBtn.textContent = '+ ' + t('fovOverlay.newSetup');
+  addSetupBtn.addEventListener('click', () => {
+    close();
+    openAddSetupModal((created) => { useFovFramesStore().loadSpecs().then(() => onSetupPick(created.id)); });
+  });
+  freeSection.appendChild(addSetupBtn);
+  bodyM.appendChild(freeSection);
+
+  modal.appendChild(head); modal.appendChild(bodyM);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+}
+
 // ─── Shared inline setup controls ([+] create, [edit]) ─────────────────────────
 
 /**

@@ -828,6 +828,69 @@ describe('fov-frames store', () => {
     expect(m.tiles).toHaveLength(1);
   });
 
+  it('addAdhocMosaicToPlan auto-sizes the grid to cover the DSO and creates it in the plan', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{ id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId: 's1', entries: [], mosaics: [] }] as any;
+    const spy = vi.spyOn(plans, 'createMosaic').mockResolvedValue('mo-new');
+
+    const id = await store.addAdhocMosaicToPlan('p1', 84, -5, 'M42'); // M42: 300'×240' → ~4.8°×6.0° covering region
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [pid, params] = spy.mock.calls[0] as any;
+    expect(pid).toBe('p1');
+    // tile 2.5°×1.7° at 20% overlap covering 4.8°×6.0° → 3 cols × 5 rows.
+    expect(params.cols).toBe(3);
+    expect(params.rows).toBe(5);
+    expect(params.tiles).toHaveLength(15);
+    expect(params.centerRa).toBeCloseTo(83.8, 6);
+    expect(params.centerDec).toBeCloseTo(-5.4, 6);
+    expect(store.selection).toEqual({ kind: 'plan', planId: 'p1' });
+    expect(store.activeMosaicId).toBe('mo-new');
+    expect(id).toBe('mo-new');
+  });
+
+  it('addAdhocMosaicToPlan falls back to a single tile when the plan has no setup', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{ id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId: null, entries: [], mosaics: [] }] as any;
+    const spy = vi.spyOn(plans, 'createMosaic').mockResolvedValue('mo-new');
+
+    await store.addAdhocMosaicToPlan('p1', 10, 20, 'M42');
+
+    const [, params] = spy.mock.calls[0] as any;
+    expect(params.cols).toBe(1);
+    expect(params.rows).toBe(1);
+    expect(params.tiles).toEqual([{ ra: 10, dec: 20, paDeg: 0 }]);
+  });
+
+  it('addAdhocMosaicToPlan falls back to a single tile when the plan setup has no resolved spec', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{ id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId: 'unresolved', entries: [], mosaics: [] }] as any;
+    const spy = vi.spyOn(plans, 'createMosaic').mockResolvedValue('mo-new');
+
+    await store.addAdhocMosaicToPlan('p1', 10, 20, 'M42');
+
+    const [, params] = spy.mock.calls[0] as any;
+    expect(params.cols).toBe(1);
+    expect(params.rows).toBe(1);
+    expect(params.tiles).toEqual([{ ra: 10, dec: 20, paDeg: 0 }]);
+  });
+
+  it('addAdhocMosaicToPlan returns null and still switches selection when createMosaic fails', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    plans.plans = [{ id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId: 's1', entries: [], mosaics: [] }] as any;
+    vi.spyOn(plans, 'createMosaic').mockResolvedValue(null);
+
+    const id = await store.addAdhocMosaicToPlan('p1', 84, -5, 'M42');
+
+    expect(id).toBeNull();
+    expect(store.selection).toEqual({ kind: 'plan', planId: 'p1' });
+    expect(store.activeMosaicId).toBeNull();
+  });
+
   it('renders a free mosaic as faint tiles plus one selectable resizable outline', async () => {
     const store = await withSpecs();
     createFree2x2(store);

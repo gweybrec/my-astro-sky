@@ -847,6 +847,32 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     createAdhocMosaic({ setupId, dsoId, name: null, centerRa: center.ra, centerDec: center.dec, paDeg: region.paDeg, overlapPct, cols, rows, tiles });
   }
 
+  /** Quick plan mosaic on a DSO: auto-size the grid to the plan's gear setup and
+   * the object's catalog angular size, same heuristic as {@link addAdhocMosaic}.
+   * Falls back to a single tile when the plan has no setup or an unresolved spec. */
+  async function addAdhocMosaicToPlan(planId: string, ra: number, dec: number, dsoId: string | null = null): Promise<string | null> {
+    const overlapPct = 20;
+    const plan = plansStore.plans.find(p => p.id === planId);
+    const spec = plan?.setupId ? specs.value.get(plan.setupId) : undefined;
+    let id: string | null;
+    if (!spec) {
+      id = await plansStore.createMosaic(planId, { dsoId, centerRa: ra, centerDec: dec, paDeg: 0, overlapPct, cols: 1, rows: 1, tiles: [{ ra, dec, paDeg: 0 }] });
+    } else {
+      const dso = dsoId ? getDSOById(dsoId) : undefined;
+      const { center, region } = dso
+        ? autoRegionForDsos([dso], overlapPct)
+        : { center: { ra, dec }, region: { wDeg: 0, hDeg: 0, paDeg: 0 } };
+      const grid = planGrid(spec.wDeg, spec.hDeg, region.wDeg, region.hDeg, overlapPct);
+      const cols = Math.max(1, grid.cols), rows = Math.max(1, grid.rows);
+      const tiles = tileCenters(center, region.paDeg, cols, rows, spec.wDeg, spec.hDeg, overlapPct)
+        .map(t => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg }));
+      id = await plansStore.createMosaic(planId, { dsoId, centerRa: center.ra, centerDec: center.dec, paDeg: region.paDeg, overlapPct, cols, rows, tiles });
+    }
+    setSelection({ kind: 'plan', planId });
+    if (id) activeMosaicId.value = id;
+    return id;
+  }
+
   /** Remove a free mosaic (clearing selection/floating state). */
   function removeAdhocMosaic(id: string): void {
     const i = adhocMosaics.value.findIndex(m => m.id === id);
@@ -1314,6 +1340,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     addAdhocFrameAtSky,
     adhocMosaics,
     addAdhocMosaic,
+    addAdhocMosaicToPlan,
     createAdhocMosaic,
     setAdhocMosaicVisible,
     transformAdhocMosaic,
