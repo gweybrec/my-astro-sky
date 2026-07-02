@@ -10,6 +10,7 @@ import type { Point, ViewState, ConstellationStyle } from './types';
 import { project, toCanvas, getHemisphere } from './projection';
 import { getConstellationLines, getConstellationInfos } from './star-catalog';
 import type { SKY_THEME } from './sky-themes';
+import { FONTS, GRID, TILE_BUTTON } from './canvas-theme';
 import pinSvgRaw from './icons/pin.svg?raw';
 
 type SkyTheme = typeof SKY_THEME;
@@ -67,12 +68,12 @@ export function drawFisheyeGrid(ctx: CanvasRenderingContext2D, view: ViewState, 
     ctx.beginPath();
     ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
     ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
-    ctx.lineWidth = dec === 0 ? 1.5 : 0.8;
+    ctx.lineWidth = dec === 0 ? GRID.equatorLineWidth : GRID.lineWidth;
     ctx.stroke();
     // Dec label at the bottom of the circle (skip the pole and the equator edge)
     if (r > 2 && Math.abs(dec) < 89 && dec !== 0) {
       ctx.fillStyle = theme.gridLabelColor;
-      ctx.font = '11px sans-serif';
+      ctx.font = FONTS.gridLabel;
       ctx.fillText(`${dec}°`, origin.x + 4, origin.y + r - 2);
     }
   }
@@ -85,12 +86,12 @@ export function drawFisheyeGrid(ctx: CanvasRenderingContext2D, view: ViewState, 
     ctx.moveTo(origin.x, origin.y);
     ctx.lineTo(edge.x, edge.y);
     ctx.strokeStyle = theme.gridColor;
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = GRID.lineWidth;
     ctx.stroke();
     // RA label near the equator
     const labelProj = toCanvas(0.85 * Math.sin(raRad), 0.85 * Math.cos(raRad), view);
     ctx.fillStyle = theme.gridLabelColor;
-    ctx.font = '11px sans-serif';
+    ctx.font = FONTS.gridLabel;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${raH}h`, labelProj.x, labelProj.y);
@@ -117,13 +118,13 @@ export function drawGrid(
     ctx.beginPath();
     ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
     ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
-    ctx.lineWidth = dec === 0 ? 1.5 : 0.8;
+    ctx.lineWidth = dec === 0 ? GRID.equatorLineWidth : GRID.lineWidth;
     ctx.stroke();
 
     // Dec label (avoid labelling the pole and the boundary)
     if (r > 2 && Math.abs(dec) < 89) {
       ctx.fillStyle = theme.gridLabelColor;
-      ctx.font = '11px sans-serif';
+      ctx.font = FONTS.gridLabel;
       ctx.fillText(`${dec}°`, origin.x + 4, origin.y + r - 2);
     }
   }
@@ -139,13 +140,13 @@ export function drawGrid(
     ctx.moveTo(origin.x, origin.y);
     ctx.lineTo(borderCanvas.x, borderCanvas.y);
     ctx.strokeStyle = theme.gridColor;
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = GRID.lineWidth;
     ctx.stroke();
 
     // RA label near the equator (r=1 in projection units; slightly inner)
     const labelProj = toCanvas(0.85 * Math.sin(raRad), 0.85 * Math.cos(raRad), view);
     ctx.fillStyle = theme.gridLabelColor;
-    ctx.font = '11px sans-serif';
+    ctx.font = FONTS.gridLabel;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${raH}h`, labelProj.x, labelProj.y);
@@ -188,11 +189,11 @@ export function drawConstellationLines(
   }
 }
 
-export function drawConstellationNames(ctx: CanvasRenderingContext2D, view: ViewState): void {
+export function drawConstellationNames(ctx: CanvasRenderingContext2D, view: ViewState, theme: SkyTheme): void {
   const infos = getConstellationInfos();
 
-  ctx.font = '11px sans-serif';
-  ctx.fillStyle = 'rgba(185, 170, 155, 0.4)';
+  ctx.font = FONTS.constellationName;
+  ctx.fillStyle = theme.constellationNameColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -228,8 +229,8 @@ function getTrashPath(): Path2D {
   return (trashPath2D = p);
 }
 
-/** Radius of a tile's delete/add button. */
-export const TILE_TRASH_R = 11;
+/** Radius of a tile's delete/add button (re-exported for hit-testing in sky-map). */
+export const TILE_TRASH_R = TILE_BUTTON.radius;
 
 /** Draw the pushpin glyph centred at `at`, filled when pinned. Source path is a 24×24 box. */
 export function drawPinGlyph(ctx: CanvasRenderingContext2D, at: Point, filled: boolean, color: string): void {
@@ -255,7 +256,7 @@ export function drawTileTrash(ctx: CanvasRenderingContext2D, at: Point, color: s
   ctx.save();
   ctx.beginPath();
   ctx.arc(at.x, at.y, TILE_TRASH_R, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(15,15,18,0.78)';
+  ctx.fillStyle = TILE_BUTTON.bg;
   ctx.fill();
   ctx.translate(at.x - size / 2, at.y - size / 2);
   ctx.scale(size / 24, size / 24);
@@ -272,7 +273,7 @@ export function drawTileAdd(ctx: CanvasRenderingContext2D, at: Point, color: str
   ctx.save();
   ctx.beginPath();
   ctx.arc(at.x, at.y, TILE_TRASH_R, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(15,15,18,0.78)';
+  ctx.fillStyle = TILE_BUTTON.bg;
   ctx.fill();
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;

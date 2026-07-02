@@ -50,6 +50,7 @@ import {
   drawBackground, drawFisheyeGrid, drawGrid, drawConstellationLines, drawConstellationNames,
   drawPinGlyph, drawTileTrash, drawTileAdd, TILE_TRASH_R,
 } from './sky-draw';
+import { FONTS, BORDER_RING, HIGHLIGHT_RING, PHOTO_OUTLINE } from './canvas-theme';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -1255,7 +1256,7 @@ export class SkyMap {
       this.renderDSOLabels();
     }
     if (this.showConstellationNames) {
-      drawConstellationNames(ctx, view);
+      drawConstellationNames(ctx, view, this.skyTheme);
     }
 
     ctx.globalAlpha = 1;
@@ -1286,8 +1287,8 @@ export class SkyMap {
     ctx.save();
     ctx.beginPath();
     ctx.arc(poleOrigin.x, poleOrigin.y, borderR, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(200, 185, 168, 0.3)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = BORDER_RING.color;
+    ctx.lineWidth = BORDER_RING.lineWidth;
     ctx.stroke();
     ctx.restore();
 
@@ -1351,9 +1352,9 @@ export class SkyMap {
       if (corners.length < 4) continue;
 
       ctx.save();
-      ctx.strokeStyle = 'rgba(192, 120, 48, 0.55)';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = PHOTO_OUTLINE.stroke;
+      ctx.lineWidth = PHOTO_OUTLINE.lineWidth;
+      ctx.setLineDash(PHOTO_OUTLINE.dash);
 
       ctx.beginPath();
       ctx.moveTo(corners[0].x, corners[0].y);
@@ -1365,8 +1366,8 @@ export class SkyMap {
 
       // Label along the longest edge, always readable (not upside-down)
       ctx.setLineDash([]);
-      ctx.font = '11px sans-serif';
-      ctx.fillStyle = 'rgba(192, 120, 48, 0.85)';
+      ctx.font = FONTS.frameLabel;
+      ctx.fillStyle = PHOTO_OUTLINE.label;
 
       const edgeIdx = photoLabelEdgeIndex(corners);
       const label = photoLabelTransform(corners, edgeIdx);
@@ -2086,11 +2087,11 @@ export class SkyMap {
         // Drawn live (not via the atlas): rare, uses estab=1, and gets a ring.
         const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, true);
         paintStar(ctx, c.x, c.y, paint);
-        ctx.strokeStyle = 'rgba(192, 120, 48, 0.85)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = HIGHLIGHT_RING.color;
+        ctx.lineWidth = HIGHLIGHT_RING.lineWidth;
         ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.arc(c.x, c.y, paint.radius + 4, 0, Math.PI * 2);
+        ctx.arc(c.x, c.y, paint.radius + HIGHLIGHT_RING.padPx, 0, Math.PI * 2);
         ctx.stroke();
         continue;
       }
@@ -2146,8 +2147,8 @@ export class SkyMap {
     const { ctx, view } = this;
     const stars = getStars();
 
-    ctx.font = '10px sans-serif';
-    ctx.fillStyle = 'rgba(195, 180, 160, 0.55)';
+    ctx.font = FONTS.starLabel;
+    ctx.fillStyle = this.skyTheme.starLabelColor;
     ctx.textBaseline = 'middle';
 
     for (const star of stars) {
