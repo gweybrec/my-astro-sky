@@ -43,7 +43,7 @@ npm run build          # tsc type-check + Vite build → dist/
 npx tsx server/index.ts
 ```
 
-Express serves the built frontend from `dist/` on `:3001`. Requires Node.js 24+ on the host.
+Express serves the built frontend from `dist/` on `:3001`. Requires Node.js 24.18+ on the host.
 
 ---
 
@@ -187,7 +187,7 @@ For the portable `.zip` install, simply delete the extracted folder. User data i
 
 To uninstall on Windows: **Settings → Apps → MyAstroSky → Uninstall** (or via Add/Remove Programs).
 
-> **Prerequisites on Windows:** Node.js 24+, Git, `npm install`, and `npm run generate-icons` (see above).
+> **Prerequisites on Windows:** Node.js 24.18+, Git, `npm install`, and `npm run generate-icons` (see above).
 
 **macOS** — built per-architecture (`MakerZIP` + `MakerDMG` for `darwin`). The release workflow builds both Apple Silicon (`arm64`, on a `macos-14` runner) and Intel (`x64`, on a `macos-13` runner). Per architecture it produces:
 
@@ -208,24 +208,13 @@ User data lives in `~/Library/Application Support/MyAstroSky/` (see the user-dat
 
 ### Implementation notes
 
-### Known packaging patches
+### Node.js version constraint (Electron packaging)
 
-The `patches/` directory contains patches applied automatically by `patch-package` on every `npm install` (via the `postinstall` script).
+Node.js v24.16.0 introduced a regression in stream destruction propagation (`stream: propagate destruction in duplexPair`) that broke `fd-slicer` 1.1.0, an abandoned library (last release 2018) used by `yauzl`, which `extract-zip` depends on. The symptom was Electron packaging (`electron:make`) hanging indefinitely on the "Copying files" step — `openReadStream` would never emit `data`, `end`, or `error`.
 
-#### `patches/extract-zip+2.0.1.patch`
+The regression was reverted upstream and confirmed fixed in **Node.js 24.18.0** ([nodejs/node#63487](https://github.com/nodejs/node/issues/63487), now closed). A previously applied `patch-package` patch that swapped `extract-zip`'s implementation for `unzipper` is no longer needed and has been removed — `npm run electron:make` uses stock `extract-zip` again.
 
-**Root cause:** Node.js v24.16.0 introduced a regression in stream destruction propagation (`stream: propagate destruction in duplexPair`) that broke `fd-slicer` 1.1.0, an abandoned library (last release 2018). `fd-slicer` is used by `yauzl`, which is used by `extract-zip`. The symptom was the Electron packaging hanging indefinitely on the "Copying files" step — `openReadStream` would never emit `data`, `end`, or `error`.
-
-**What the patch does:** Replaces `extract-zip`'s internal implementation (164 lines of `yauzl` + `fd-slicer` code) with a 10-line wrapper using `unzipper` (already a direct dependency), which is unaffected by the regression.
-
-**Upstream issues to watch (open as of June 2026):**
-- [nodejs/node#63487](https://github.com/nodejs/node/issues/63487) — Node 24.16.0: extract-zip hangs extracting
-- [max-mapper/extract-zip#154](https://github.com/max-mapper/extract-zip/issues/154) — Zip extraction fail in Node 26.1.0
-
-**How to remove the patch** once either issue is resolved and `extract-zip` ships a fixed version:
-1. Delete `patches/extract-zip+2.0.1.patch`
-2. Remove `"postinstall": "patch-package"` from `package.json` scripts
-3. Remove `patch-package` from devDependencies: `npm uninstall --save-dev patch-package`
+**Do not build on Node 26.1.0+**: a similar zip-extraction hang has been reported there ([max-mapper/extract-zip#154](https://github.com/max-mapper/extract-zip/issues/154), open as of June 2026). Stick to **Node.js 24.18+ (24.x line)** for packaging until that issue is resolved.
 
 ### Platform notes
 

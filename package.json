@@ -11,7 +11,6 @@
   "type": "module",
   "main": ".vite/build/main.js",
   "scripts": {
-    "postinstall": "patch-package",
     "predev": "npm rebuild",
     "dev": "concurrently \"vite\" \"tsx watch server/index.ts\"",
     "dev:client": "vite",
@@ -63,7 +62,6 @@
     "git-cliff": "^2.10.1",
     "happy-dom": "^18.0.1",
     "node-abi": "^4.31.0",
-    "patch-package": "^8.0.1",
     "png2icons": "^2.0.1",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",

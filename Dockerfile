@@ -30,9 +30,8 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 
-# Install runtime deps only. --ignore-scripts skips the root `postinstall`
-# (patch-package, a devDependency that is absent here); the native modules are
-# then built explicitly with `npm rebuild`.
+# Install runtime deps only, skipping install scripts of dependencies; the
+# native modules are then built explicitly with `npm rebuild`.
 RUN npm ci --omit=dev --ignore-scripts \
   && npm rebuild better-sqlite3 sharp
 

@@ -13,7 +13,7 @@ Web application for overlaying astrophotos onto an interactive sky map with auto
 
 ## Prerequisites
 
-- Node.js 24+ and npm 10+
+- Node.js 24.18+ and npm 10+
 - **Plate solver (optional)**: ASTAP and online solving (nova.astrometry.net) work on Linux, macOS, and Windows. `solve-field` is Linux-only — on Windows it is automatically hidden in the UI.
 
 ## Installation

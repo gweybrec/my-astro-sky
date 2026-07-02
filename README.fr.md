@@ -13,7 +13,7 @@ Application web pour superposer des astrophotographies sur une carte du ciel int
 
 ## Prérequis
 
-- Node.js 24+ et npm 10+
+- Node.js 24.18+ et npm 10+
 - **Solveur de plaque (optionnel)** : ASTAP et la résolution en ligne (nova.astrometry.net) fonctionnent sur Linux, macOS et Windows. `solve-field` est réservé à Linux — sur Windows, l'option est automatiquement masquée dans l'interface.
 
 ## Installation
