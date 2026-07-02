@@ -137,6 +137,21 @@ This is **self-limiting**: each rebuild resets the drift to ~1, so a continuous 
 
 > **Pattern:** throttle by the quantity you actually care about bounding. Here the user-visible quantity is *upscale blur*, so throttle on the scale ratio, which bounds blur directly and sidesteps the timing feedback loop entirely.
 
+### Addendum — glow halos need a tighter bound than 1.3x
+
+The 1.3x drift bound (Fix part 3 above) is imperceptible on small solid-color star
+dots but visibly blurs the larger, soft radial-gradient glow halos bright stars
+get (computeStarPaint's glowR, several times the dot radius). Rather than tighten
+the global drift ratio (which would rebuild the atlas more often for all stars,
+most of which don't need it), glow-eligible stars (mag < theme.glowThresholdMag,
+~321 stars catalog-wide) are drawn live at the true zoom scale during the drift
+window instead of being blitted from the frozen/scaled atlas — the same "live
+draw, bypass the atlas" treatment already used for the single highlighted star.
+Gated on `frozenScale` (false at rest/pan), so the extra cost is paid only during the
+exact frames where the artifact would otherwise be visible, on a population 1.5-2
+orders of magnitude smaller than the one that motivated the atlas in the first
+place (Technique 2).
+
 ---
 
 ## Technique 5 — Cull work before you do it (and know when to stop)
