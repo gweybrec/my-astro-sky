@@ -7,13 +7,13 @@
 ### Solving fails immediately with no result
 
 - **For ASTAP:** Make sure you filled in the **Target object** field (e.g. `M31`, `NGC 7000`) before clicking Solve. ASTAP is much more reliable with a position hint.
-- **For online (astrometry.net):** Check that you have entered a valid API key in Settings. See [Installing Plate Solvers](installing-solvers.md#astrometrynet-online--api-key-setup).
+- **For online (astrometry.net):** Check that you have entered a valid API key in Settings. See [Installing Plate Solvers](/user/installing-solvers.md#astrometrynet-online--api-key-setup).
 - **Try a different solver:** If one method fails, try another. Each solver has different strengths — a highly-stretched image that stumps ASTAP may solve fine via astrometry.net.
-- **Fall back to manual placement:** If all solvers fail, use [Manual placement](user-guide.md#manual-placement) — it always works.
+- **Fall back to manual placement:** If all solvers fail, use [Manual placement](/user/user-guide.md#manual-placement) — it always works.
 
 ### "solve-field" option is greyed out on Windows
 
-This is expected. solve-field has no native Windows build. Use ASTAP (native) or the online solver instead. If you have WSL2, you can enable solve-field through WSL — see [Installing Plate Solvers](installing-solvers.md#solve-field-astrometrynet-local--most-accurate).
+This is expected. solve-field has no native Windows build. Use ASTAP (native) or the online solver instead. If you have WSL2, you can enable solve-field through WSL — see [Installing Plate Solvers](/user/installing-solvers.md#solve-field-astrometrynet-local--most-accurate).
 
 ### ASTAP says "executable not found"
 

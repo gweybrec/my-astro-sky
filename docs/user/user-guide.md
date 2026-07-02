@@ -2,7 +2,7 @@
 
 MyAstroSky overlays your astrophotographs onto an interactive sky map using automatic plate solving. Photos are positioned with mathematically correct rotation, scale, and position.
 
-> **New to the app?** Start with [Getting Started](getting-started.md) first.
+> **New to the app?** Start with [Getting Started](/user/getting-started.md) first. Something not working? See [Troubleshooting](/user/troubleshooting.md).
 
 ---
 
@@ -56,13 +56,13 @@ Use this whenever your file already has astrometric metadata.
 
 Uploads the image to [nova.astrometry.net](https://nova.astrometry.net) for solving. Requires a free API key configured in Settings. Typically takes 30–60 seconds.
 
-Best choice if you don't have a local solver installed and don't mind cloud upload. See [Installing Plate Solvers](installing-solvers.md) for API key setup.
+Best choice if you don't have a local solver installed and don't mind cloud upload. See [Installing Plate Solvers](/user/installing-solvers.md) for API key setup.
 
 ### 3. solve-field (local) — most accurate
 
 **Linux only.** Uses the astrometry.net algorithms locally. Gives the best accuracy for heavily processed or stretched images. Takes 10–30 seconds. On Windows the option is automatically disabled — use ASTAP or online solving instead.
 
-See [Installing Plate Solvers](installing-solvers.md) for setup instructions.
+See [Installing Plate Solvers](/user/installing-solvers.md) for setup instructions.
 
 ### 4. ASTAP (local) — fastest
 
@@ -70,7 +70,7 @@ Professional local solver. Works on Linux, macOS, and **Windows**. Solves in ~3�
 
 **Position hints** (recommended): type the object name — `M31`, `NGC 7000`, `Andromeda` — in the "Target object" field. This dramatically improves reliability.
 
-See [Installing Plate Solvers](installing-solvers.md) for setup instructions.
+See [Installing Plate Solvers](/user/installing-solvers.md) for setup instructions.
 
 ---
 

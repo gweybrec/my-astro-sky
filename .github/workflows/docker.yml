@@ -1,6 +1,7 @@
 name: Docker
 
-# Guards the Docker image — the recommended self-hosting path (see docs/dev/distribution.md).
+# Guards the Docker image — the recommended self-hosting path
+# (see docs/user/installing-app.md for the walkthrough, docs/dev/distribution.md for operator reference).
 # Build alone catches Dockerfile/build-context regressions; the smoke test additionally
 # proves the container boots and resolves its runtime assets (resources/, star catalog).
 #

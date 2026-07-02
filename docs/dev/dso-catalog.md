@@ -137,7 +137,7 @@ SB thresholds (after applying the magnitude cap):
 
 ### Render priority (spatial spread)
 
-`priority` is an integer **render order** (lower = drawn first) computed by `computeRenderPriority()` in `scripts/add-ratings.mjs`. It is *precomputed* because it is view-independent: the on-map selection at runtime is simply "take the lowest-`priority` objects currently in the viewport, up to the budget" (see [architecture.md → DSO render selection](architecture.md#dso-render-selection-priority--spread--container-gating)). Baking the spread in here keeps the runtime selection to a sort + slice, with no per-frame spatial computation.
+`priority` is an integer **render order** (lower = drawn first) computed by `computeRenderPriority()` in `scripts/add-ratings.mjs`. It is *precomputed* because it is view-independent: the on-map selection at runtime is simply "take the lowest-`priority` objects currently in the viewport, up to the budget" (see [architecture.md → DSO render selection](/dev/architecture.md#dso-render-selection-priority--spread--container-gating)). Baking the spread in here keeps the runtime selection to a sort + slice, with no per-frame spatial computation.
 
 **Why it matters:** when zoomed out, dense regions (Orion, Sagittarius) used to consume the whole `maxDSOCount` budget while the rest of the sky stayed empty, and low-interest objects (vdB reflection nebulae, etc.) cluttered the view. `priority` fixes both: high-rating objects come first, and they are spread evenly over the sky.
 

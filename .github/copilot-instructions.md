@@ -11,10 +11,12 @@ Copilot instructions and skills must never duplicate knowledge — they always r
 | [`docs/dev/architecture.md`](../docs/dev/architecture.md) | Full frontend/backend module descriptions, data flows, key types |
 | [`docs/dev/dso-catalog.md`](../docs/dev/dso-catalog.md) | SIMBAD validation, known OpenNGC issues, rating/difficulty field docs |
 | [`docs/user/user-guide.md`](../docs/user/user-guide.md) | User manual: features, plate solving, installation, how to access the app |
-| [`docs/dev/distribution.md`](../docs/dev/distribution.md) | All deployment options (dev, prod, Docker, LAN), Electron packaging plan, platform solver matrix |
+| [`docs/user/installing-app.md`](../docs/user/installing-app.md) | End-user install paths: desktop app download/install/uninstall, self-hosting via Docker, LAN sharing |
+| [`docs/dev/distribution.md`](../docs/dev/distribution.md) | Building/running from source, Electron packaging internals, env var & CSP config reference |
 | [`docs/dev/ui-guidelines.md`](../docs/dev/ui-guidelines.md) | CSS colour tokens, typography, component class inventory, known CSS issues |
 | [`docs/dev/curved-arrow-svg.md`](../docs/dev/curved-arrow-svg.md) | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows |
 | [`docs/dev/target-recommender.md`](../docs/dev/target-recommender.md) | Target recommender pipeline: filters, scoring, diversity cap, altitude preferences, known constraints |
+| [`docs/dev/imaging-recipe.md`](../docs/dev/imaging-recipe.md) | Integration time algorithm, filter selection logic, type-family constants, tuning guide |
 | [`docs/dev/render-performance.md`](../docs/dev/render-performance.md) | Transferable canvas-perf techniques from the sky-map render loop: profiling, hoisting invariants, sprite atlas, input coalescing, cache-key bucketing/drift |
 | [`docs/dev/ci.md`](../docs/dev/ci.md) | GitHub Actions workflows: CI, tests, Electron release builds |
 | [`.claude/skills/add-dso-catalog/SKILL.md`](../.claude/skills/add-dso-catalog/SKILL.md) | Step-by-step guide for integrating a new DSO catalog, SIMBAD validation step, known data quality issues |
@@ -29,11 +31,13 @@ When asked about any of the following topics, **read the corresponding Claude fi
 - **Frontend or backend modules, data flows, types** → read `docs/dev/architecture.md`
 - **DSO catalog structure, SIMBAD validation, rating/difficulty** → read `docs/dev/dso-catalog.md`
 - **User-facing features, plate solving, installation** → read `docs/user/user-guide.md`
-- **Deployment, packaging, distribution, Electron, Docker** → read `docs/dev/distribution.md`
-- **GitHub Actions workflows, CI, release builds** → read `docs/dev/ci.md`
+- **End-user install/self-hosting instructions (desktop app, Docker, LAN)** → read `docs/user/installing-app.md`
+- **Building from source, Electron packaging internals, deployment config reference** → read `docs/dev/distribution.md`
+- **GitHub Actions workflows, CI, release builds, docs deployment** → read `docs/dev/ci.md`
 - **Canvas/render performance, per-frame loop optimisation, profiling traces** → read `docs/dev/render-performance.md`
 - **CSS classes, colour palette, component patterns, UI red flags** → read `docs/dev/ui-guidelines.md`
 - **Curved-arc SVG arrows, arrowhead geometry** → read `docs/dev/curved-arrow-svg.md`
+- **Imaging recipe / integration time / filter selection logic** → read `docs/dev/imaging-recipe.md`
 - **Adding a new DSO catalog** → read `.claude/skills/add-dso-catalog/SKILL.md`
 - **Testing photo placement** → read `.claude/skills/test-placement/SKILL.md`
 - **Overriding/correcting DSO metadata** (wrong name, type, coords) → read `.claude/skills/override-dso-metadata/SKILL.md`

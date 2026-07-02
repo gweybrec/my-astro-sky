@@ -1,6 +1,8 @@
 # Distribution & deployment
 
-How to build, run, and distribute MyAstroSky. Intended for developers and maintainers.
+How to build, run from source, and package MyAstroSky. Intended for developers and maintainers.
+
+> **Looking to install or self-host the app, not build it from source?** See [Installing MyAstroSky](/user/installing-app.md) — desktop app download, self-hosting via Docker, and LAN sharing, all end-user-facing.
 
 ---
 
@@ -15,7 +17,7 @@ How to build, run, and distribute MyAstroSky. Intended for developers and mainta
   - [Configuration reference](#configuration-reference)
   - [Option 5 — Desktop app with Electron](#option-5--desktop-app-with-electron)
     - [Architecture](#architecture)
-    - [Building and installing](#building-and-installing)
+    - [Building the packages](#building-the-packages)
     - [Implementation notes](#implementation-notes)
     - [Platform notes](#platform-notes)
     - [ASTAP path on Windows](#astap-path-on-windows)
@@ -49,25 +51,15 @@ Express serves the built frontend from `dist/` on `:3001`. Requires Node.js 24.1
 
 ## Option 3 — Local network sharing
 
-Run Option 2, find your LAN IP (`ip a` on Linux, `ipconfig` on Windows), and share `http://<lan-ip>:3001` with anyone on the same Wi-Fi or network. No internet required, no server needed.
+Run Option 2, find your LAN IP (`ip a` on Linux, `ipconfig` on Windows), and share `http://<lan-ip>:3001` with anyone on the same Wi-Fi or network. No internet required, no server needed. The same walkthrough, phrased for end users, is in [Installing MyAstroSky](/user/installing-app.md#sharing-on-your-local-wifi-lan).
 
 ---
 
 ## Option 4 — Self-hosted Docker (share via URL)
 
-The recommended way to host for others. Requires Docker on any Linux server or VPS (1 GB RAM is sufficient).
-
-```bash
-git clone https://github.com/gweybrec/my-astro-sky.git
-cd my-astro-sky
-docker compose up --build -d
-```
-
-The app listens on port 3001. Expose it via a reverse proxy (nginx, Caddy) with a domain name if desired.
+The recommended way to host for others. Requires Docker on any Linux server or VPS (1 GB RAM is sufficient). The basic `docker compose up --build -d` walkthrough is in [Installing MyAstroSky](/user/installing-app.md#self-hosting-for-a-group-docker) — the reference below is the operator-level detail (volumes, image contents) for whoever maintains the instance.
 
 `docker-compose.yml` stores the SQLite database (`/data`) and uploaded photos (`/app/uploads`) in named Docker volumes (`dbdata` and `uploads`) — data survives container restarts and image rebuilds. Inspect or back them up with `docker volume ls` / `docker volume inspect`. `stars.14.json` is committed to the repo and baked into the Docker image automatically.
-
-**Sharing**: send the URL to users — they open it in a browser, nothing to install on their side.
 
 ---
 
@@ -145,7 +137,9 @@ Important limitation (expected behavior):
 - In browser/web deployments (Docker, Node.js server, hosted URL), this action is intentionally unavailable and this is **not a bug**.
 - Reason: opening a local OS folder requires Electron desktop APIs, which are not present in standard browsers.
 
-### Building and installing
+### Building the packages
+
+End-user download, install, and uninstall steps live in [Installing MyAstroSky](/user/installing-app.md) — this section is about producing the packages, for whoever cuts a release.
 
 > **Prerequisites:** `build/icons/` must exist before running `electron:make`. Generate it once with:
 > ```bash
@@ -161,50 +155,30 @@ npm run electron:make
 
 **Linux** — produces two outputs in `out/make/`:
 
-| File | Usage |
+| File | Corresponds to |
 |---|---|
-| `deb/x64/my-astro-sky_<version>_amd64.deb` | Install with `sudo dpkg -i my-astro-sky_*.deb`, then launch **MyAstroSky** from your application menu |
-| `zip/linux/x64/my-astro-sky-linux-x64-<version>.zip` | Portable: extract and run the `my-astro-sky` binary directly, no installation needed |
-
-**Uninstalling on Linux:**
-
-```bash
-# Remove the app
-sudo apt remove my-astro-sky
-
-# Optional: also delete user data (photos, database, settings)
-rm -rf ~/.config/MyAstroSky
-```
-
-For the portable `.zip` install, simply delete the extracted folder. User data in `~/.config/MyAstroSky` is not removed automatically in either case.
+| `deb/x64/my-astro-sky_<version>_amd64.deb` | The `.deb` installer end users download |
+| `zip/linux/x64/my-astro-sky-linux-x64-<version>.zip` | The portable zip end users download |
 
 **Windows** — run `npm run electron:make` on a Windows machine (cross-compiling from Linux is not supported by Squirrel). Produces:
 
-| File | Usage |
+| File | Corresponds to |
 |---|---|
-| `out/make/squirrel.windows/x64/MyAstroSkySetup.exe` | Double-click to install; adds MyAstroSky to the Start Menu and Apps list |
+| `out/make/squirrel.windows/x64/MyAstroSkySetup.exe` | The installer end users download |
 | `out/make/squirrel.windows/x64/my-astro-sky-<version>-full.nupkg` | Used internally by Squirrel for updates — not needed by end users |
-
-To uninstall on Windows: **Settings → Apps → MyAstroSky → Uninstall** (or via Add/Remove Programs).
 
 > **Prerequisites on Windows:** Node.js 24.18+, Git, `npm install`, and `npm run generate-icons` (see above).
 
 **macOS** — built per-architecture (`MakerZIP` + `MakerDMG` for `darwin`). The release workflow builds both Apple Silicon (`arm64`, on a `macos-14` runner) and Intel (`x64`, on a `macos-13` runner). Per architecture it produces:
 
-| File | Usage |
+| File | Corresponds to |
 |---|---|
-| `MyAstroSky-<arch>.dmg` | Drag-to-Applications disk image. Open it, drag **MyAstroSky** into Applications |
-| `out/make/zip/darwin/<arch>/MyAstroSky-darwin-<arch>-<version>.zip` | Portable: unzip and run `MyAstroSky.app` |
+| `MyAstroSky-<arch>.dmg` | The disk image end users download |
+| `out/make/zip/darwin/<arch>/MyAstroSky-darwin-<arch>-<version>.zip` | The portable zip end users download |
 
 Choose by your Mac: **Apple Silicon (M1/M2/M3+) → `arm64`**, **Intel → `x64`**. An `arm64` build will not run on an Intel Mac.
 
-> **Gatekeeper (unsigned app):** these builds are **not code-signed or notarized** (no Apple Developer ID). On first launch macOS will refuse to open the app ("cannot be opened because the developer cannot be verified", or "is damaged and can't be opened"). To run it:
-> - **Right-click** (or Control-click) `MyAstroSky.app` → **Open** → click **Open** in the dialog. macOS remembers this choice afterward; or
-> - From Terminal, clear the quarantine attribute: `xattr -cr /Applications/MyAstroSky.app`
->
-> This is expected for unsigned apps and not a bug. To remove the warning entirely would require an Apple Developer ID ($99/yr) and wiring signing + notarization secrets into the release workflow.
-
-User data lives in `~/Library/Application Support/MyAstroSky/` (see the user-data table above). To uninstall: drag the app to the Trash; optionally `rm -rf ~/Library/Application\ Support/MyAstroSky` to also delete photos, database, and settings.
+> **Gatekeeper (unsigned app):** these builds are **not code-signed or notarized** (no Apple Developer ID) — macOS will refuse to open them on first launch. The end-user workaround (right-click → Open) is documented in [Installing MyAstroSky](/user/installing-app.md). This is expected for unsigned apps, not a bug; removing the warning entirely would require an Apple Developer ID ($99/yr) and wiring signing + notarization secrets into the release workflow — currently not planned.
 
 ### Implementation notes
 

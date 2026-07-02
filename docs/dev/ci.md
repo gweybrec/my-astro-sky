@@ -42,9 +42,19 @@ This workflow does **not** build or run Electron — it only validates that the 
 1. `docker/setup-buildx-action` + `docker/build-push-action` — build the image (`load: true`) with GitHub Actions layer cache (`cache-from`/`cache-to: type=gha`). Cold builds take a few minutes (two `npm ci` passes + native `better-sqlite3`/`sharp` rebuild + `vite build`); cached runs are much faster.
 2. **Smoke test** — `docker run` the image, poll `GET /api/config` until healthy, then hit `GET /api/telescopes`. `/api/config` proves the server booted; `/api/telescopes` returns the built-in gear catalog read from `resources/*.json` at startup, proving the Dockerfile wired up `RESOURCES_DIR` (and, alongside `PUBLIC_DATA_DIR` / `STAR_CATALOG_PATH`, the catalog assets). On failure the container logs are dumped.
 
-This guards the **recommended self-hosting path** (see [distribution.md](distribution.md)). It exists because the Dockerfile previously rotted unnoticed — nothing in CI ever built it.
+This guards the **recommended self-hosting path** (walkthrough in [installing-app.md](/user/installing-app.md#self-hosting-for-a-group-docker), operator reference in [distribution.md](/dev/distribution.md#option-4--self-hosted-docker-share-via-url)). It exists because the Dockerfile previously rotted unnoticed — nothing in CI ever built it.
 
 > **TODO — publish to GHCR (deferred).** This workflow only *builds and smoke-tests* the image; it does not publish it. A future enhancement will push the image to `ghcr.io/gweybrec/my-astro-sky` on tag/release (add `permissions: packages: write`, `docker/login-action` against `ghcr.io`, and `push: true` with versioned + `latest` tags) so users can `docker pull` instead of `docker compose up --build`.
+
+---
+
+## Docs site (GitHub Pages, no workflow)
+
+The docsify site in `docs/` is **not** deployed by a workflow — it uses GitHub Pages' built-in **"Deploy from a branch"** source (**Settings → Pages → Source → Deploy from a branch → `master`, folder `/docs`**), configured once in the repo settings. GitHub republishes it automatically on every push to `master`, no CI involved.
+
+`docs/.nojekyll` disables GitHub's default Jekyll processing, which would otherwise silently drop underscore-prefixed files like `docs/_sidebar.md` and break docsify's navigation. It's required either way, independent of which Pages source is used.
+
+An Actions-based deployment (`actions/upload-pages-artifact` + `actions/deploy-pages`) was considered but dropped — for a purely static site with no build step, it's equivalent to the branch-deploy source and adds a workflow to maintain for no functional benefit.
 
 ---
 
@@ -90,7 +100,7 @@ Runs once per architecture. No `apt-get` step is needed — macOS runners ship X
    - `MyAstroSky-<arch>.dmg` — drag-to-Applications disk image
    - `out/make/zip/darwin/<arch>/MyAstroSky-darwin-<arch>-<version>.zip` — portable zip
 
-The DMG filename embeds the arch (via `process.arch` in `forge.config.ts`) so the two matrix legs don't collide when attached to one Release. The builds are **unsigned** — see [distribution.md](distribution.md) for the Gatekeeper workaround users need on first launch.
+The DMG filename embeds the arch (via `process.arch` in `forge.config.ts`) so the two matrix legs don't collide when attached to one Release. The builds are **unsigned** — see [distribution.md](/dev/distribution.md) for the Gatekeeper workaround users need on first launch.
 
 > **Cost note:** macOS runners are free for public repos but billed at a **10× minute multiplier** for private repos. This job runs twice (one per arch) per release.
 

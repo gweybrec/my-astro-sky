@@ -31,7 +31,8 @@
     "electron:make": "npm run clean && npm run build && electron-rebuild && electron-forge make",
     "electron:package": "npm run clean && npm run build && electron-rebuild && electron-forge package",
     "swagger:generate": "node scripts/swagger-docs.mjs",
-    "dso:generate": "node scripts/generate-dso.mjs && node scripts/add-constellations.mjs"
+    "dso:generate": "node scripts/generate-dso.mjs && node scripts/add-constellations.mjs",
+    "docs:serve": "docsify serve docs"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
@@ -57,6 +58,7 @@
     "@vitest/coverage-v8": "^3.2.4",
     "@vue/test-utils": "^2.4.11",
     "concurrently": "^9.2.1",
+    "docsify-cli": "^4.4.4",
     "electron": "^36.9.5",
     "electron-packager": "^16.0.0",
     "git-cliff": "^2.10.1",

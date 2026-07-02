@@ -7,7 +7,7 @@
 
 Application web pour superposer des astrophotographies sur une carte du ciel interactive avec résolution de plaque automatique.
 
-→ [Guide utilisateur](docs/user/user-guide.md) · [Architecture](docs/dev/architecture.md) · [Distribution](docs/dev/distribution.md)
+📖 **[Documentation complète](https://gweybrec.github.io/my-astro-sky/)** — installation de l'application, solveurs de plaque, fonctionnalités et (pour les contributeurs) architecture et déploiement.
 
 ---
 
@@ -54,4 +54,4 @@ npm test
 
 ---
 
-Voir le [guide utilisateur](docs/user/user-guide.md) pour l'installation des solveurs de plaque (ASTAP, solve-field), la documentation des fonctionnalités et les détails de déploiement.
+Voir le [site de documentation](https://gweybrec.github.io/my-astro-sky/) pour l'installation des solveurs de plaque (ASTAP, solve-field), la documentation des fonctionnalités et les détails de déploiement — ou parcourir [`docs/`](docs/) directement sur GitHub.

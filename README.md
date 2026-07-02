@@ -7,7 +7,7 @@
 
 Web application for overlaying astrophotos onto an interactive sky map with automatic plate solving.
 
-→ [User guide](docs/user/user-guide.md) · [Architecture](docs/dev/architecture.md) · [Distribution](docs/dev/distribution.md)
+📖 **[Full documentation](https://gweybrec.github.io/my-astro-sky/)** — installing the app, plate solvers, features, and (for contributors) architecture & deployment.
 
 ---
 
@@ -54,4 +54,4 @@ npm test
 
 ---
 
-See the [user guide](docs/user/user-guide.md) for plate solver installation (ASTAP, solve-field), feature documentation, and deployment details.
+See the [documentation site](https://gweybrec.github.io/my-astro-sky/) for plate solver installation (ASTAP, solve-field), feature documentation, and deployment details — or browse [`docs/`](docs/) directly on GitHub.

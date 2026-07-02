@@ -3,6 +3,7 @@
 **User Guide**
 
 - [Getting Started](user/getting-started.md)
+- [Installing MyAstroSky](user/installing-app.md)
 - [Features Reference](user/user-guide.md)
 - [Installing Plate Solvers](user/installing-solvers.md)
 - [Troubleshooting](user/troubleshooting.md)
@@ -18,5 +19,6 @@
 - [Plate Solve & Placement](dev/solve-field-placement.md)
 - [Imaging Recipe](dev/imaging-recipe.md)
 - [Distribution & Deployment](dev/distribution.md)
+- [Render Performance](dev/render-performance.md)
 - [CI / CD](dev/ci.md)
 - [SVG Curved Arrows](dev/curved-arrow-svg.md)

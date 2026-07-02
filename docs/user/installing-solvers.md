@@ -89,4 +89,4 @@ There is no native Windows build of solve-field. On Windows, use WSL2:
 
 After installing a solver, upload a test image and select that solver in the upload modal. If it finds a solution, the photo will snap into place on the sky map.
 
-If it fails, see [Troubleshooting](troubleshooting.md) for common issues.
+If it fails, see [Troubleshooting](/user/troubleshooting.md) for common issues.

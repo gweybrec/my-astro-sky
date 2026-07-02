@@ -20,6 +20,17 @@
       }
       // cold-blue-v2 is default — no attribute needed
     })();
+
+    // Apply doc mode (user/dev) before first paint to avoid a flash of both
+    // sidebar sections. The current route wins when it unambiguously belongs
+    // to one section; otherwise fall back to the last manually chosen mode.
+    (function () {
+      var hash = window.location.hash || '';
+      var mode = /^#\/dev\//.test(hash) ? 'dev'
+        : /^#\/user\//.test(hash) ? 'user'
+        : (localStorage.getItem('docs-mode') || 'user');
+      document.documentElement.setAttribute('data-doc-mode', mode);
+    })();
   </script>
 </head>
 <body>
@@ -78,6 +89,78 @@
             var isWarm = document.documentElement.getAttribute('data-theme') === 'warm';
             btn.textContent = isWarm ? 'Cold theme' : 'Warm theme';
             btn.title = isWarm ? 'Switch to cold blue theme' : 'Switch to warm amber theme';
+          }
+        },
+        function (hook) {
+          // User Guide vs Developer Docs sidebar split: only one section's
+          // links are shown at a time. The section shown follows the current
+          // route when the route unambiguously belongs to one side (so
+          // clicking into a dev page always shows the dev sidebar); the
+          // toggle button lets you preview the other side's links without
+          // navigating (e.g. from the home page, where the route is neutral).
+          hook.doneEach(function () {
+            tagSidebarSections();
+            syncModeFromRoute();
+            ensureToggle();
+          });
+
+          // Docsify renders each section's heading as its own <p><strong>
+          // sibling of the following <ul>, with an <hr> between the two
+          // sections (see _sidebar.md) — walk siblings and tag each element
+          // with the section it belongs to so CSS can show/hide by mode.
+          function tagSidebarSections() {
+            var nav = document.querySelector('.sidebar-nav');
+            if (!nav) return;
+            var current = null;
+            Array.prototype.forEach.call(nav.children, function (el) {
+              var text = el.tagName === 'P' ? el.textContent.trim() : '';
+              if (text === 'User Guide') current = 'user';
+              else if (text === 'Developer Docs') current = 'dev';
+              else if (el.tagName === 'HR') current = null;
+              if (current) el.setAttribute('data-mode', current);
+            });
+          }
+
+          function syncModeFromRoute() {
+            var hash = window.location.hash || '';
+            if (/^#\/dev\//.test(hash)) setMode('dev');
+            else if (/^#\/user\//.test(hash)) setMode('user');
+            // Neutral routes (home page, search results) leave the current mode alone.
+          }
+
+          function setMode(mode) {
+            document.documentElement.setAttribute('data-doc-mode', mode);
+            localStorage.setItem('docs-mode', mode);
+            var toggle = document.getElementById('mode-toggle');
+            if (toggle) {
+              Array.prototype.forEach.call(toggle.querySelectorAll('button'), function (btn) {
+                btn.classList.toggle('active', btn.dataset.setMode === mode);
+              });
+            }
+          }
+
+          function ensureToggle() {
+            if (document.getElementById('mode-toggle')) return;
+            var nav = document.querySelector('.sidebar-nav');
+            if (!nav) return;
+            var wrap = document.createElement('div');
+            wrap.id = 'mode-toggle';
+            wrap.className = 'mode-toggle';
+            ['user', 'dev'].forEach(function (mode) {
+              var btn = document.createElement('button');
+              btn.dataset.setMode = mode;
+              btn.textContent = mode === 'user' ? 'User Guide' : 'Dev Guide';
+              btn.title = mode === 'user' ? 'Show User Guide links' : 'Show Dev Guide links';
+              btn.addEventListener('click', function () { setMode(mode); });
+              wrap.appendChild(btn);
+            });
+            // First child of the sidebar-nav — the same container as the
+            // table of contents — right above the "User Guide" heading.
+            nav.insertBefore(wrap, nav.firstChild);
+            var current = document.documentElement.getAttribute('data-doc-mode') || 'user';
+            Array.prototype.forEach.call(wrap.querySelectorAll('button'), function (btn) {
+              btn.classList.toggle('active', btn.dataset.setMode === current);
+            });
           }
         }
       ]

@@ -57,6 +57,7 @@ MyAstroSky lets you overlay your astrophotographs onto a live, interactive sky m
 | | |
 |---|---|
 | **New user?** | Start with [Getting Started](user/getting-started.md) |
+| **Installing the app** | See [Installing MyAstroSky](user/installing-app.md) |
 | **Using the app?** | See [Features Reference](user/user-guide.md) |
 | **Plate solver setup** | See [Installing Plate Solvers](user/installing-solvers.md) |
 | **Something broken?** | See [Troubleshooting](user/troubleshooting.md) |

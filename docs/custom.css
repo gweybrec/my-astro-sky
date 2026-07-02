@@ -359,9 +359,28 @@ body {
 
 .markdown-section table {
   border-collapse: collapse !important;
+  border: none !important;
   width: 100% !important;
   margin: 16px 0 24px !important;
   font-size: 0.92em !important;
+}
+
+/* Some tables (e.g. "Quick links" on the home page) use an empty header row
+   as a GFM trick to get a headerless table. Left alone it still renders as a
+   padded, bordered strip with nothing in it — hide it outright when every
+   th in the header is empty. */
+.markdown-section thead:not(:has(th:not(:empty))) {
+  display: none !important;
+}
+
+/* vue.css puts a 1px border on tr as well as on all four sides of every
+   th/td by default — reset all three before re-adding just the bottom rule,
+   otherwise its light default colour leaks through (most visibly as a
+   top border on the first row) while only the bottom is themed dark. */
+.markdown-section tr,
+.markdown-section th,
+.markdown-section td {
+  border: none !important;
 }
 
 .markdown-section th {
@@ -516,6 +535,50 @@ body {
   color: var(--text-primary) !important;
   border-color: var(--accent-color) !important;
   background: var(--accent-fill-sm) !important;
+}
+
+/* ── User / Dev sidebar mode toggle ──────────────────────────────────────── */
+
+/* Sections are tagged data-mode="user"/"dev" by JS (see index.html); show
+   only the active one so both link sets are never visible together. The
+   divider <hr> between them is redundant once one side is hidden. */
+:root[data-doc-mode="user"] .sidebar-nav > [data-mode="dev"] { display: none !important; }
+:root[data-doc-mode="dev"] .sidebar-nav > [data-mode="user"] { display: none !important; }
+.sidebar-nav > hr { display: none !important; }
+
+.mode-toggle {
+  display: flex !important;
+  gap: 4px !important;
+  width: auto !important;
+  margin: 0 16px 16px !important;
+  padding: 3px !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-accent) !important;
+  border-radius: 20px !important;
+}
+
+.mode-toggle button {
+  flex: 1 1 0 !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-secondary) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.06em !important;
+  padding: 6px 10px !important;
+  border-radius: 16px !important;
+  cursor: pointer !important;
+  transition: color 0.15s, background 0.15s !important;
+}
+
+.mode-toggle button:hover {
+  color: var(--text-primary) !important;
+}
+
+.mode-toggle button.active {
+  background: var(--accent-fill-md) !important;
+  color: var(--text-bright) !important;
 }
 
 /* ── Sidebar collapse / hamburger toggle button ──────────────────────────── */
