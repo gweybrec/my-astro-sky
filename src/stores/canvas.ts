@@ -18,7 +18,6 @@ export interface GalleryInterface extends ShowHide {
   setDSOCatalogFilter(catalogs: string[]): void;
   getAllLabels(): { label: string; count: number }[];
   getFilteredPhotos(): Photo[];
-  onNewLabelsAppeared: ((labels: string[]) => void) | null;
 }
 
 export const useCanvasStore = defineStore('canvas', () => {
