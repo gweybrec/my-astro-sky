@@ -26,6 +26,16 @@ jobs:
       - name: Type-check server
         run: npm run typecheck:server
 
+      # docs/icon.png is a committed copy of public/icon.png — the GitHub Pages docs
+      # site has no build step (see docs/dev/distribution.md), so it can't be generated
+      # at deploy time. Catch drift here instead of letting it go unnoticed.
+      - name: Check docs icon is in sync with public/icon.png
+        run: |
+          cmp public/icon.png docs/icon.png || {
+            echo "::error::docs/icon.png is out of sync with public/icon.png — run 'npm run generate-icons' and commit the result.";
+            exit 1;
+          }
+
       # Warn-only: ESLint rules are all `warn`, so this surfaces issues in the log
       # without failing the build. See eslint.config.js / CLAUDE.md.
       - name: Lint

@@ -14,9 +14,10 @@ All workflows live in `.github/workflows/`. They are independent — each serves
 
 1. `npm run typecheck:client` (`vue-tsc --noEmit`) — type-checks the frontend, including inside `.vue` SFCs (plain `tsc` treats `.vue` files as opaque via the shim and does not check their `<script>` blocks)
 2. `npm run typecheck:server` (`tsc --noEmit -p tsconfig.server.json`) — type-checks the Express backend
-3. `npm run lint` (`eslint .`) — **warn-only**: every rule is `warn`, so ESLint exits 0 and this step surfaces issues in the log without failing the build (see `eslint.config.js` and `CLAUDE.md`)
-4. `npm run format:check` (`prettier --check .`) — **blocking**: fails if any file isn't Prettier-formatted. This is the one hard lint/format gate
-5. `npx vite build` — verifies the frontend bundles without errors
+3. `cmp public/icon.png docs/icon.png` — **blocking**: `docs/icon.png` is a committed copy kept in sync by `npm run generate-icons` (see [Building the packages](distribution.md#building-the-packages)); this catches drift since the workflow-free GitHub Pages docs site can't regenerate it at deploy time
+4. `npm run lint` (`eslint .`) — **warn-only**: every rule is `warn`, so ESLint exits 0 and this step surfaces issues in the log without failing the build (see `eslint.config.js` and `CLAUDE.md`)
+5. `npm run format:check` (`prettier --check .`) — **blocking**: fails if any file isn't Prettier-formatted
+6. `npx vite build` — verifies the frontend bundles without errors
 
 This workflow does **not** build or run Electron — it only validates that the TypeScript compiles, the code is lint-clean/formatted, and Vite produces a valid bundle.
 

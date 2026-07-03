@@ -19,7 +19,9 @@ mkdirSync('build/icons', { recursive: true });
 writeFileSync('build/icons/icon.png', src);
 console.log('✓ build/icons/icon.png');
 
-// Docs site — keep in sync with public/icon.png
+// Docs site — keep in sync with public/icon.png. Commit this alongside icon changes:
+// ci.yml fails the build if the two drift, since GitHub Pages has no build step to
+// regenerate it at deploy time.
 writeFileSync('docs/icon.png', src);
 console.log('✓ docs/icon.png');
 

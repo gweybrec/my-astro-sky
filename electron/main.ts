@@ -247,4 +247,21 @@ ipcMain.handle('get-location', async () => {
 
 app.on('window-all-closed', () => app.quit());
 
-main().catch(console.error);
+main().catch((error: unknown) => {
+  console.error(error);
+  const err = error instanceof Error ? error : new Error(String(error));
+  try {
+    logMainError('main_startup_failure', err);
+  } catch {
+    // Intentionally ignore to avoid recursive crashes.
+  }
+  try {
+    // A failed launch otherwise shows no window and logs only to a console nobody
+    // sees — this is the one visible signal the user gets that something went wrong.
+    dialog.showErrorBox('MyAstroSky failed to start', err.message);
+  } catch {
+    // Best effort — if the dialog itself can't be shown (e.g. no display), there's
+    // nothing more we can surface; fall through to exit below.
+  }
+  app.exit(1);
+});

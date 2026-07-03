@@ -147,7 +147,11 @@ End-user download, install, and uninstall steps live in [Installing MyAstroSky](
 > npm run generate-icons
 > ```
 >
-> Re-run it any time `public/icon.png` changes. The `build/icons/` directory is not committed to the repo.
+> Re-run it any time `public/icon.png` changes. The `build/icons/` directory is not committed to the repo, but
+> the script also writes `docs/icon.png` (a committed copy, used by the docs site) — commit that alongside
+> your `public/icon.png` change. `ci.yml` fails the build if the two ever drift, since the workflow-free
+> GitHub Pages docs site (see [Docs site (GitHub Pages, no workflow)](#docs-site-github-pages-no-workflow))
+> has no build step to regenerate it at deploy time.
 
 Generate the platform packages from the repo root:
 
