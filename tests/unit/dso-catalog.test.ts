@@ -229,6 +229,30 @@ const FIXTURE = {
       null,
       3,
     ],
+    // Abell35 — id's own prefix ('Abell', priority 7) ranks lower than one of its own
+    // aliases ('SH2-313', priority 3). Regression fixture for the catalogs-sort bug where
+    // the alias displaced the object's own id from catalogs[0].
+    [
+      'Abell35',
+      193.39,
+      -22.87,
+      'PN',
+      13,
+      11,
+      0,
+      13.3,
+      'Abell 35',
+      'Abell 35',
+      null,
+      null,
+      ['Abell35', 'LPN-Abell35', 'PN G303.6+40.0', 'SH2-313'],
+      null,
+      'Hya',
+      3,
+      2,
+      null,
+      10,
+    ],
     // LPN
     [
       'LPN-1',
@@ -350,6 +374,14 @@ describe('getDSOById()', () => {
     const dso = getDSOById('M1');
     expect(dso!.catalogs[0]).toMatch(/^M\d/);
     expect(dso!.catalogs[1]).toBe('NGC1952');
+  });
+
+  it("catalogs[0] is always the object's own id, even when an alias outranks its prefix", () => {
+    // Abell35's catalogs include 'SH2-313', whose family (SH2) sorts ahead of 'Abell' in
+    // catalogSortKey — the id must still win the tiebreak so it stays the primary designation.
+    const dso = getDSOById('Abell35');
+    expect(dso!.catalogs[0]).toBe('Abell35');
+    expect(dso!.catalogs).toContain('SH2-313');
   });
 });
 

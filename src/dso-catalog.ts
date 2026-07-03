@@ -168,12 +168,18 @@ export async function loadDSOCatalog(): Promise<void> {
     else if (lang === 'de') displayName = nameDe || nameEn || nameFr;
     else displayName = nameEn || nameFr;
 
-    // catalogs field: array of all catalog IDs sorted by display priority, or fall back to [id]
+    // catalogs field: array of all catalog IDs sorted by display priority, or fall back to [id].
+    // The object's own id always sorts first — it's the canonical designation regardless of
+    // which catalog family it belongs to, and callers rely on catalogs[0] === id (ID row,
+    // "also known as" cross-refs). A merged-in alias from a higher-priority family (e.g. an
+    // SH2 alias on an Abell-primary object) must not displace it.
     const catalogs: string[] =
       idxCatalogs >= 0 && Array.isArray(row[idxCatalogs])
-        ? [...row[idxCatalogs]].sort(
-            (a: string, b: string) => catalogSortKey(a) - catalogSortKey(b),
-          )
+        ? [...row[idxCatalogs]].sort((a: string, b: string) => {
+            if (a === row[idxId]) return -1;
+            if (b === row[idxId]) return 1;
+            return catalogSortKey(a) - catalogSortKey(b);
+          })
         : [row[idxId]];
 
     const constellation: string | null =
