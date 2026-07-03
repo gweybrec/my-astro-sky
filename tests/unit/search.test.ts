@@ -27,22 +27,113 @@ const mockGetDSOs = vi.mocked(getDSOs);
 const mockSearchStarsAPI = vi.mocked(searchStarsAPI);
 
 const TEST_STARS: Star[] = [
-  { hip: 27989, ra: 88.79, dec: 7.41,   mag: 0.45, bv: 1.85, name: 'Betelgeuse', bayer: 'α', desig: 'α Ori', constellation: 'Ori' },
-  { hip: 32349, ra: 101.29, dec: -16.71, mag: 0.18, bv: -0.03, name: 'Rigel',     bayer: 'β', desig: 'β Ori', constellation: 'Ori' },
-  { hip: 21421, ra: 68.98,  dec: 16.51,  mag: 0.87, bv: 0.44,  name: 'Aldebaran', bayer: 'α', constellation: 'Tau' },
-  { hip: 91262, ra: 279.23, dec: 38.78,  mag: 0.03, bv: 0.00,  name: 'Vega',      bayer: 'α', constellation: 'Lyr' },
-  { hip: 65477, ra: 201.29, dec: -11.16, mag: 2.75, bv: -0.08, desig: '67 Vir',  constellation: 'Vir' },
+  {
+    hip: 27989,
+    ra: 88.79,
+    dec: 7.41,
+    mag: 0.45,
+    bv: 1.85,
+    name: 'Betelgeuse',
+    bayer: 'α',
+    desig: 'α Ori',
+    constellation: 'Ori',
+  },
+  {
+    hip: 32349,
+    ra: 101.29,
+    dec: -16.71,
+    mag: 0.18,
+    bv: -0.03,
+    name: 'Rigel',
+    bayer: 'β',
+    desig: 'β Ori',
+    constellation: 'Ori',
+  },
+  {
+    hip: 21421,
+    ra: 68.98,
+    dec: 16.51,
+    mag: 0.87,
+    bv: 0.44,
+    name: 'Aldebaran',
+    bayer: 'α',
+    constellation: 'Tau',
+  },
+  {
+    hip: 91262,
+    ra: 279.23,
+    dec: 38.78,
+    mag: 0.03,
+    bv: 0.0,
+    name: 'Vega',
+    bayer: 'α',
+    constellation: 'Lyr',
+  },
+  {
+    hip: 65477,
+    ra: 201.29,
+    dec: -11.16,
+    mag: 2.75,
+    bv: -0.08,
+    desig: '67 Vir',
+    constellation: 'Vir',
+  },
 ];
 
-const M42: DSO  = { id: 'M42',    ra: 83.82,  dec: -5.39,  type: 'EN',  majAxis: 65,  minAxis: 60, pa: 0,  mag: 4.0,  displayName: 'Orion Nebula',      catalogs: ['M42', 'NGC1976'], emissionLines: 'Hα', constellation: 'Ori', rating: 5, difficulty: 1 };
-const M31: DSO  = { id: 'M31',    ra: 10.68,  dec: 41.27,  type: 'GxS', majAxis: 190, minAxis: 60, pa: 35, mag: 3.44, displayName: 'Andromeda Galaxy',  catalogs: ['M31', 'NGC224'],  emissionLines: null, constellation: 'And', rating: 5, difficulty: 2 };
-const N2024: DSO = { id: 'NGC2024', ra: 85.42, dec: -1.84, type: 'EN',  majAxis: 30,  minAxis: 30, pa: 0,  mag: null, displayName: 'Flame Nebula',      catalogs: ['NGC2024'],        emissionLines: null, constellation: 'Ori', rating: 3, difficulty: 2 };
+const M42: DSO = {
+  id: 'M42',
+  ra: 83.82,
+  dec: -5.39,
+  type: 'EN',
+  majAxis: 65,
+  minAxis: 60,
+  pa: 0,
+  mag: 4.0,
+  displayName: 'Orion Nebula',
+  catalogs: ['M42', 'NGC1976'],
+  emissionLines: 'Hα',
+  constellation: 'Ori',
+  rating: 5,
+  difficulty: 1,
+};
+const M31: DSO = {
+  id: 'M31',
+  ra: 10.68,
+  dec: 41.27,
+  type: 'GxS',
+  majAxis: 190,
+  minAxis: 60,
+  pa: 35,
+  mag: 3.44,
+  displayName: 'Andromeda Galaxy',
+  catalogs: ['M31', 'NGC224'],
+  emissionLines: null,
+  constellation: 'And',
+  rating: 5,
+  difficulty: 2,
+};
+const N2024: DSO = {
+  id: 'NGC2024',
+  ra: 85.42,
+  dec: -1.84,
+  type: 'EN',
+  majAxis: 30,
+  minAxis: 30,
+  pa: 0,
+  mag: null,
+  displayName: 'Flame Nebula',
+  catalogs: ['NGC2024'],
+  emissionLines: null,
+  constellation: 'Ori',
+  rating: 3,
+  difficulty: 2,
+};
 
 const TEST_DSOS: DSO[] = [M42, M31, N2024];
 
 beforeAll(() => {
   mockGetStars.mockReturnValue(TEST_STARS);
-  mockGetStarByHip.mockImplementation((hip: number) => TEST_STARS.find(s => s.hip === hip));
+  mockGetStarByHip.mockImplementation((hip: number) => TEST_STARS.find((s) => s.hip === hip));
   mockGetDSOs.mockReturnValue(TEST_DSOS);
 });
 
@@ -82,7 +173,7 @@ describe('searchStars()', () => {
   });
 
   it('prefix name match scores lower than exact match', () => {
-    const exact  = searchStars('Betelgeuse')[0];
+    const exact = searchStars('Betelgeuse')[0];
     const prefix = searchStars('Betelgeu')[0];
     expect(prefix.score).toBeLessThan(exact.score);
   });
@@ -95,19 +186,19 @@ describe('searchStars()', () => {
 
   it('normalizes Greek letter names before matching (alpha → α)', () => {
     const results = searchStars('alpha ori');
-    const bayer = results.find(r => r.star.bayer === 'α' && r.star.constellation === 'Ori');
+    const bayer = results.find((r) => r.star.bayer === 'α' && r.star.constellation === 'Ori');
     expect(bayer).toBeDefined();
   });
 
   it('matches by Bayer designation', () => {
     const results = searchStars('β ori');
     expect(results.length).toBeGreaterThan(0);
-    expect(results.some(r => r.star.hip === 32349)).toBe(true);
+    expect(results.some((r) => r.star.hip === 32349)).toBe(true);
   });
 
   it('matches by constellation prefix', () => {
     const results = searchStars('lyr');
-    expect(results.some(r => r.star.constellation === 'Lyr')).toBe(true);
+    expect(results.some((r) => r.star.constellation === 'Lyr')).toBe(true);
   });
 
   it('respects limit parameter', () => {
@@ -122,14 +213,14 @@ describe('searchStars()', () => {
   });
 
   it('contains match scores lower than prefix match', () => {
-    const prefix   = searchStars('Veg')[0];  // "Vega".startsWith("Veg")
-    const contains = searchStars('ega')[0];  // "Vega".includes("ega")
+    const prefix = searchStars('Veg')[0]; // "Vega".startsWith("Veg")
+    const contains = searchStars('ega')[0]; // "Vega".includes("ega")
     expect(prefix.score).toBeGreaterThan(contains.score);
   });
 
   it('matches by desig field', () => {
     const results = searchStars('67 vir');
-    expect(results.some(r => r.star.hip === 65477)).toBe(true);
+    expect(results.some((r) => r.star.hip === 65477)).toBe(true);
   });
 
   it('matches by Flamsteed designation when no name/desig exists', () => {
@@ -140,11 +231,11 @@ describe('searchStars()', () => {
       mag: 4.2,
       bv: 0.5,
       flam: 47,
-      constellation: 'UMa'
+      constellation: 'UMa',
     };
     mockGetStars.mockReturnValueOnce([...TEST_STARS, flamStar]);
     const results = searchStars('47 uma');
-    expect(results.some(r => r.star.hip === 12345)).toBe(true);
+    expect(results.some((r) => r.star.hip === 12345)).toBe(true);
   });
 
   it('uses HIP fallback label when name/desig/flam are absent', () => {
@@ -154,7 +245,7 @@ describe('searchStars()', () => {
       dec: 0,
       mag: 2.34,
       bv: 0.1,
-      constellation: undefined
+      constellation: undefined,
     };
     mockGetStarByHip.mockReturnValueOnce(unnamed);
     const results = searchStars('42');
@@ -182,7 +273,7 @@ describe('searchDSOs()', () => {
   });
 
   it('ID prefix match', () => {
-    const ids = searchDSOs('M3').map(r => r.dso.id);
+    const ids = searchDSOs('M3').map((r) => r.dso.id);
     expect(ids).toContain('M31');
   });
 
@@ -193,7 +284,7 @@ describe('searchDSOs()', () => {
   });
 
   it('name prefix match', () => {
-    expect(searchDSOs('Orion').some(r => r.dso.id === 'M42')).toBe(true);
+    expect(searchDSOs('Orion').some((r) => r.dso.id === 'M42')).toBe(true);
   });
 
   it('name contains match', () => {
@@ -207,7 +298,7 @@ describe('searchDSOs()', () => {
   });
 
   it('partial ID match', () => {
-    expect(searchDSOs('ngc202').some(r => r.dso.id === 'NGC2024')).toBe(true);
+    expect(searchDSOs('ngc202').some((r) => r.dso.id === 'NGC2024')).toBe(true);
   });
 
   it('respects limit parameter', () => {
@@ -222,7 +313,7 @@ describe('searchDSOs()', () => {
   });
 
   it('exact match scores higher than prefix match', () => {
-    const exact  = searchDSOs('M42')[0];
+    const exact = searchDSOs('M42')[0];
     const prefix = searchDSOs('M4')[0];
     expect(exact.score).toBeGreaterThanOrEqual(prefix.score);
   });
@@ -231,14 +322,36 @@ describe('searchDSOs()', () => {
     // Regression: searching "Barnard33" returned Barnard330..337 (id-prefix) and
     // never IC434, which carries "Barnard33" as an exact alias.
     const ic434: DSO = {
-      id: 'IC434', ra: 85.2, dec: -2.45, type: 'EN', majAxis: 90, minAxis: 30, pa: 0,
-      mag: null, displayName: 'Horsehead Nebula', catalogs: ['IC434', 'LBN953', 'Barnard33'],
-      emissionLines: null, constellation: 'Ori', rating: 5, difficulty: 3,
+      id: 'IC434',
+      ra: 85.2,
+      dec: -2.45,
+      type: 'EN',
+      majAxis: 90,
+      minAxis: 30,
+      pa: 0,
+      mag: null,
+      displayName: 'Horsehead Nebula',
+      catalogs: ['IC434', 'LBN953', 'Barnard33'],
+      emissionLines: null,
+      constellation: 'Ori',
+      rating: 5,
+      difficulty: 3,
     };
     const b330: DSO = {
-      id: 'Barnard330', ra: 270, dec: -25, type: 'DN', majAxis: 5, minAxis: 5, pa: 0,
-      mag: null, displayName: null, catalogs: ['Barnard330'],
-      emissionLines: null, constellation: 'Sgr', rating: 1, difficulty: 3,
+      id: 'Barnard330',
+      ra: 270,
+      dec: -25,
+      type: 'DN',
+      majAxis: 5,
+      minAxis: 5,
+      pa: 0,
+      mag: null,
+      displayName: null,
+      catalogs: ['Barnard330'],
+      emissionLines: null,
+      constellation: 'Sgr',
+      rating: 1,
+      difficulty: 3,
     };
     mockGetDSOs.mockReturnValueOnce([b330, ic434]);
     const results = searchDSOs('Barnard33');
@@ -247,9 +360,20 @@ describe('searchDSOs()', () => {
 
   it('matches catalog ids ignoring spaces ("Barnard 33" → IC434, "ngc 1976" → M42)', () => {
     const ic434: DSO = {
-      id: 'IC434', ra: 85.2, dec: -2.45, type: 'EN', majAxis: 90, minAxis: 30, pa: 0,
-      mag: null, displayName: 'Horsehead Nebula', catalogs: ['IC434', 'Barnard33'],
-      emissionLines: null, constellation: 'Ori', rating: 5, difficulty: 3,
+      id: 'IC434',
+      ra: 85.2,
+      dec: -2.45,
+      type: 'EN',
+      majAxis: 90,
+      minAxis: 30,
+      pa: 0,
+      mag: null,
+      displayName: 'Horsehead Nebula',
+      catalogs: ['IC434', 'Barnard33'],
+      emissionLines: null,
+      constellation: 'Ori',
+      rating: 5,
+      difficulty: 3,
     };
     mockGetDSOs.mockReturnValueOnce([ic434]);
     expect(searchDSOs('Barnard 33')[0]?.dso.id).toBe('IC434');
@@ -261,15 +385,26 @@ describe('searchDSOs()', () => {
     // (dot → double space). Neither "PK 217+14.1" nor "PK 217" matched because
     // the query stripped spaces while the alias kept them.
     const abell24: DSO = {
-      id: 'Abell24', ra: 112.3, dec: 3.0, type: 'PN', majAxis: 6, minAxis: 6, pa: 0,
-      mag: null, displayName: null, catalogs: ['Abell24', 'PK 217+14  1', 'PN G217.1+14.7'],
-      emissionLines: null, constellation: 'CMi', rating: 1, difficulty: 5,
+      id: 'Abell24',
+      ra: 112.3,
+      dec: 3.0,
+      type: 'PN',
+      majAxis: 6,
+      minAxis: 6,
+      pa: 0,
+      mag: null,
+      displayName: null,
+      catalogs: ['Abell24', 'PK 217+14  1', 'PN G217.1+14.7'],
+      emissionLines: null,
+      constellation: 'CMi',
+      rating: 1,
+      difficulty: 5,
     };
     mockGetDSOs.mockReturnValue([...TEST_DSOS, abell24]);
     try {
       expect(searchDSOs('PK 217+14.1')[0]?.dso.id).toBe('Abell24');
       expect(searchDSOs('PK 217+14 1')[0]?.dso.id).toBe('Abell24');
-      expect(searchDSOs('PK 217').some(r => r.dso.id === 'Abell24')).toBe(true);
+      expect(searchDSOs('PK 217').some((r) => r.dso.id === 'Abell24')).toBe(true);
     } finally {
       mockGetDSOs.mockReturnValue(TEST_DSOS);
     }
@@ -279,10 +414,20 @@ describe('searchDSOs()', () => {
     // Regression: id "Abell24" + displayName "Abell 24" produced the redundant
     // label "Abell24 – Abell 24". Internal LPN- ids are also dropped from refs.
     const abell24: DSO = {
-      id: 'Abell24', ra: 112.3, dec: 3.0, type: 'PN', majAxis: 6, minAxis: 6, pa: 0,
-      mag: null, displayName: 'Abell 24',
+      id: 'Abell24',
+      ra: 112.3,
+      dec: 3.0,
+      type: 'PN',
+      majAxis: 6,
+      minAxis: 6,
+      pa: 0,
+      mag: null,
+      displayName: 'Abell 24',
       catalogs: ['Abell24', 'LPN-Abell24', 'PN G217.1+14.7'],
-      emissionLines: null, constellation: 'CMi', rating: 1, difficulty: 5,
+      emissionLines: null,
+      constellation: 'CMi',
+      rating: 1,
+      difficulty: 5,
     };
     mockGetDSOs.mockReturnValueOnce([...TEST_DSOS, abell24]);
     const result = searchDSOs('Abell24')[0];
@@ -304,7 +449,7 @@ describe('searchDSOs()', () => {
       emissionLines: null,
       constellation: 'Ori',
       rating: 1,
-      difficulty: 5
+      difficulty: 5,
     };
     mockGetDSOs.mockReturnValueOnce([...TEST_DSOS, lpn]);
     const result = searchDSOs('LPN-123')[0];
@@ -334,11 +479,11 @@ describe('searchUnified()', () => {
         mag: 1.2,
         name: 'Test Star',
         label: 'Test Star',
-        score: 77
-      }
+        score: 77,
+      },
     ]);
     const results = await searchUnified('test');
-    expect(results.some(r => r.type === 'star' && r.star?.hip === 1)).toBe(true);
+    expect(results.some((r) => r.type === 'star' && r.star?.hip === 1)).toBe(true);
   });
 
   it('returns empty array for empty query', async () => {
@@ -348,7 +493,7 @@ describe('searchUnified()', () => {
   it('merges DSO results into unified list (stars API mocked empty)', async () => {
     const results = await searchUnified('Orion Nebula');
     expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.type === 'dso' || r.type === 'star')).toBe(true);
+    expect(results.every((r) => r.type === 'dso' || r.type === 'star')).toBe(true);
   });
 
   it('returns results sorted by score descending', async () => {
@@ -361,7 +506,7 @@ describe('searchUnified()', () => {
   it('respects the unified limit parameter', async () => {
     mockSearchStarsAPI.mockResolvedValueOnce([
       { hip: 10, ra: 1, dec: 1, mag: 2, label: 'S1', score: 95 },
-      { hip: 11, ra: 2, dec: 2, mag: 2, label: 'S2', score: 94 }
+      { hip: 11, ra: 2, dec: 2, mag: 2, label: 'S2', score: 94 },
     ] as any);
     const results = await searchUnified('m', 1);
     expect(results).toHaveLength(1);

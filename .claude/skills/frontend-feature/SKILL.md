@@ -39,6 +39,7 @@ grep -r "your-concept" src/style.css
 ```
 
 Key files to check:
+
 - `src/ui.ts` — all panel/modal/widget construction; reuse helpers where possible
 - `src/style.css` — existing classes; never add a new class without checking for a match
 - `src/i18n/fr.ts` — existing translation keys (avoid duplicate keys)
@@ -51,12 +52,12 @@ Key files to check:
 
 Tokens are defined in `:root` in `src/style.css`. Full list in `docs/dev/ui-guidelines.md`.
 
-| Category | Key tokens |
-|---|---|
+| Category    | Key tokens                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
 | Backgrounds | `--bg-app`, `--bg-deep`, `--bg-modal`, `--bg-panel`, `--bg-card`, `--bg-input`, `--bg-surface`, `--bg-hover` |
-| Text | `--text-primary`, `--text-secondary`, `--text-label`, `--text-dim`, `--text-muted`, `--text-bright` |
-| Borders | `--border-panel`, `--border-input`, `--border-subtle`, `--border-accent`, `--border-focus` |
-| Accent | `--accent-bg`, `--accent-bg-hover`, `--accent-border`, `--accent-color` |
+| Text        | `--text-primary`, `--text-secondary`, `--text-label`, `--text-dim`, `--text-muted`, `--text-bright`          |
+| Borders     | `--border-panel`, `--border-input`, `--border-subtle`, `--border-accent`, `--border-focus`                   |
+| Accent      | `--accent-bg`, `--accent-bg-hover`, `--accent-border`, `--accent-color`                                      |
 
 **Typography:** section headers 13px/600/0.05em letter-spacing; body/labels 13px; secondary 12px; chips 11px; tiny 10px. Use the system font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`).
 
@@ -68,26 +69,27 @@ Tokens are defined in `:root` in `src/style.css`. Full list in `docs/dev/ui-guid
 
 Check these before adding a new class:
 
-| What you need | Reuse |
-|---|---|
-| Primary action button | `.btn-primary` or `.add-photo-btn-top` |
-| Icon-only button | `.btn-icon` |
-| Toolbar toggle button | `.display-controls-btn` |
-| Confirm / submit | `.modal-submit` |
-| Cancel / dismiss | `.modal-cancel` |
-| Auto-solve / pick-map | `.btn-auto-solve`, `.btn-pick-map` |
-| Text input | `.star-search-input`, `.radec-input`, `.dialog-input` |
-| Number input in a row | `.display-controls-number-input` |
-| Tag / chip | `.tag-chip` |
-| Type label chip | `.search-item-type`, `.target-card-type` |
-| Info panel | `.dso-info-panel` |
-| Target card | `.target-card` |
-| Modal backdrop | `.modal-backdrop` |
-| Modal container | `.modal`, `.modal-header`, `.modal-body` |
-| Overlay (full-screen) | `.meta-editor-overlay`, `.dialog-overlay` |
-| Collapsible section | `.sidebar-section`, `.modal-panel`; or `<details>/<summary>` |
+| What you need         | Reuse                                                        |
+| --------------------- | ------------------------------------------------------------ |
+| Primary action button | `.btn-primary` or `.add-photo-btn-top`                       |
+| Icon-only button      | `.btn-icon`                                                  |
+| Toolbar toggle button | `.display-controls-btn`                                      |
+| Confirm / submit      | `.modal-submit`                                              |
+| Cancel / dismiss      | `.modal-cancel`                                              |
+| Auto-solve / pick-map | `.btn-auto-solve`, `.btn-pick-map`                           |
+| Text input            | `.star-search-input`, `.radec-input`, `.dialog-input`        |
+| Number input in a row | `.display-controls-number-input`                             |
+| Tag / chip            | `.tag-chip`                                                  |
+| Type label chip       | `.search-item-type`, `.target-card-type`                     |
+| Info panel            | `.dso-info-panel`                                            |
+| Target card           | `.target-card`                                               |
+| Modal backdrop        | `.modal-backdrop`                                            |
+| Modal container       | `.modal`, `.modal-header`, `.modal-body`                     |
+| Overlay (full-screen) | `.meta-editor-overlay`, `.dialog-overlay`                    |
+| Collapsible section   | `.sidebar-section`, `.modal-panel`; or `<details>/<summary>` |
 
 **Known consolidation opportunities** (address when touching nearby code, not proactively):
+
 - Multiple button classes do the same thing → `btn-confirm` / `btn-action` is the target
 - `.targets-coord-input` and `.targets-date-input` are identical → should merge
 
@@ -105,6 +107,7 @@ src/i18n/es.ts
 ```
 
 Pattern:
+
 ```typescript
 // In fr.ts
 mySection: {
@@ -145,9 +148,11 @@ try {
 ## Step 6 — Browser verification
 
 Ask the user before running Playwright:
+
 > "Should I run Playwright browser tests to verify the UI, or will you test it yourself?"
 
 **If the user wants automated verification:**
+
 1. Start the dev server: `npm run dev` (Vite port 5173 + Express port 3001)
 2. Navigate: `browser_navigate` to `http://localhost:5173`
 3. Take a snapshot: `browser_snapshot` to confirm layout

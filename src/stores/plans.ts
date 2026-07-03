@@ -35,17 +35,17 @@ export const usePlansStore = defineStore('plans', () => {
   const entryCount = computed(() => plans.value.reduce((n, p) => n + p.entries.length, 0));
 
   function isInPlan(dsoId: string, planId: string): boolean {
-    const plan = plans.value.find(p => p.id === planId);
-    return !!plan && plan.entries.some(e => e.dsoId === dsoId);
+    const plan = plans.value.find((p) => p.id === planId);
+    return !!plan && plan.entries.some((e) => e.dsoId === dsoId);
   }
 
   function plansContaining(dsoId: string): Plan[] {
-    return plans.value.filter(p => p.entries.some(e => e.dsoId === dsoId));
+    return plans.value.filter((p) => p.entries.some((e) => e.dsoId === dsoId));
   }
 
   /** Plans that reference the given gear setup (used to guard setup deletion). */
   function plansUsingSetup(setupId: string): Plan[] {
-    return plans.value.filter(p => p.setupId === setupId);
+    return plans.value.filter((p) => p.setupId === setupId);
   }
 
   async function load(): Promise<void> {
@@ -87,9 +87,20 @@ export const usePlansStore = defineStore('plans', () => {
    * Mutates the local cache immediately (so the caller can re-render without a
    * round-trip) then persists in the background.
    */
-  async function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): Promise<void> {
-    const plan = plans.value.find(p => p.id === id);
-    if (plan) { plan.nightOf = nightOf; plan.setupId = setupId; plan.lat = lat; plan.lon = lon; }
+  async function updatePlanSettings(
+    id: string,
+    nightOf: string | null,
+    setupId: string | null,
+    lat: number | null,
+    lon: number | null,
+  ): Promise<void> {
+    const plan = plans.value.find((p) => p.id === id);
+    if (plan) {
+      plan.nightOf = nightOf;
+      plan.setupId = setupId;
+      plan.lat = lat;
+      plan.lon = lon;
+    }
     try {
       await updatePlanSettingsAPI(id, nightOf, setupId, lat, lon);
     } catch (err) {
@@ -150,8 +161,8 @@ export const usePlansStore = defineStore('plans', () => {
 
   /** Toggle a DSO in a plan: add if absent, remove if present. */
   async function toggleEntry(planId: string, dsoId: string): Promise<void> {
-    const plan = plans.value.find(p => p.id === planId);
-    const existing = plan?.entries.find(e => e.dsoId === dsoId);
+    const plan = plans.value.find((p) => p.id === planId);
+    const existing = plan?.entries.find((e) => e.dsoId === dsoId);
     if (existing) await removeEntry(planId, existing.id);
     else await addEntry(planId, dsoId);
   }
@@ -163,16 +174,19 @@ export const usePlansStore = defineStore('plans', () => {
    * deliberately does NOT call load().
    */
   function setEntryPA(planId: string, entryId: string, paDeg: number | null): void {
-    const entry = plans.value.find(p => p.id === planId)?.entries.find(e => e.id === entryId);
+    const entry = plans.value.find((p) => p.id === planId)?.entries.find((e) => e.id === entryId);
     if (entry) entry.paDeg = paDeg;
     const prev = paWriteTimers.get(entryId);
     if (prev) clearTimeout(prev);
-    paWriteTimers.set(entryId, setTimeout(() => {
-      paWriteTimers.delete(entryId);
-      updatePlanEntryPAAPI(planId, entryId, paDeg).catch(err => {
-        reportUnknownRendererError('plan_set_entry_pa_failed', err, { planId, entryId });
-      });
-    }, 250));
+    paWriteTimers.set(
+      entryId,
+      setTimeout(() => {
+        paWriteTimers.delete(entryId);
+        updatePlanEntryPAAPI(planId, entryId, paDeg).catch((err) => {
+          reportUnknownRendererError('plan_set_entry_pa_failed', err, { planId, entryId });
+        });
+      }, 250),
+    );
   }
 
   /**
@@ -184,9 +198,16 @@ export const usePlansStore = defineStore('plans', () => {
   function setEntryPosition(
     planId: string,
     entryId: string,
-    fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
+    fields: {
+      ra?: number | null;
+      dec?: number | null;
+      paDeg?: number | null;
+      dsoId?: string | null;
+      mosaicWDeg?: number | null;
+      mosaicHDeg?: number | null;
+    },
   ): void {
-    const entry = plans.value.find(p => p.id === planId)?.entries.find(e => e.id === entryId);
+    const entry = plans.value.find((p) => p.id === planId)?.entries.find((e) => e.id === entryId);
     if (entry) {
       if ('ra' in fields) entry.ra = fields.ra ?? null;
       if ('dec' in fields) entry.dec = fields.dec ?? null;
@@ -199,14 +220,24 @@ export const usePlansStore = defineStore('plans', () => {
     if (prev) clearTimeout(prev);
     // Flush the entry's full framing from the cache so a move and a rotation that
     // land in the same debounce window can't drop each other's field.
-    paWriteTimers.set(entryId, setTimeout(() => {
-      paWriteTimers.delete(entryId);
-      const e = plans.value.find(p => p.id === planId)?.entries.find(x => x.id === entryId);
-      if (!e) return;
-      updatePlanEntryPositionAPI(planId, entryId, { ra: e.ra, dec: e.dec, paDeg: e.paDeg, dsoId: e.dsoId, mosaicWDeg: e.mosaicWDeg, mosaicHDeg: e.mosaicHDeg }).catch(err => {
-        reportUnknownRendererError('plan_set_entry_position_failed', err, { planId, entryId });
-      });
-    }, 250));
+    paWriteTimers.set(
+      entryId,
+      setTimeout(() => {
+        paWriteTimers.delete(entryId);
+        const e = plans.value.find((p) => p.id === planId)?.entries.find((x) => x.id === entryId);
+        if (!e) return;
+        updatePlanEntryPositionAPI(planId, entryId, {
+          ra: e.ra,
+          dec: e.dec,
+          paDeg: e.paDeg,
+          dsoId: e.dsoId,
+          mosaicWDeg: e.mosaicWDeg,
+          mosaicHDeg: e.mosaicHDeg,
+        }).catch((err) => {
+          reportUnknownRendererError('plan_set_entry_position_failed', err, { planId, entryId });
+        });
+      }, 250),
+    );
   }
 
   /**
@@ -225,7 +256,11 @@ export const usePlansStore = defineStore('plans', () => {
   }
 
   /** Replace a mosaic's parameters and tile set (used when re-tiling/regenerating). */
-  async function updateMosaic(planId: string, mosaicId: string, params: MosaicParams): Promise<void> {
+  async function updateMosaic(
+    planId: string,
+    mosaicId: string,
+    params: MosaicParams,
+  ): Promise<void> {
     try {
       await updatePlanMosaicAPI(planId, mosaicId, params);
       await load();

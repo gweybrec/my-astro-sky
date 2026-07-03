@@ -50,7 +50,7 @@ export function showKeyValueTooltip(
   anchor: HTMLElement,
   rows: [string, string | null | undefined][],
 ): void {
-  _buildTooltip(anchor, tip => {
+  _buildTooltip(anchor, (tip) => {
     const table = document.createElement('table');
     table.className = 'dso-info-table';
     for (const [key, val] of rows) {
@@ -72,13 +72,16 @@ export function showKeyValueTooltip(
  * Show a tooltip near `anchor` with custom content built by `populate`,
  * reusing the shared toggle / positioning / close-on-outside-click logic.
  */
-export function showCustomTooltip(anchor: HTMLElement, populate: (tip: HTMLDivElement) => void): void {
+export function showCustomTooltip(
+  anchor: HTMLElement,
+  populate: (tip: HTMLDivElement) => void,
+): void {
   _buildTooltip(anchor, populate);
 }
 
 /** Show a plain-text description tooltip near `anchor`. */
 export function showTextTooltip(anchor: HTMLElement, text: string): void {
-  _buildTooltip(anchor, tip => {
+  _buildTooltip(anchor, (tip) => {
     const p = document.createElement('p');
     p.className = 'tooltip-text';
     p.textContent = text;

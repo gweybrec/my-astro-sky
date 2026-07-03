@@ -13,7 +13,9 @@ export function applyMigrations(database: Database): number {
       version INTEGER NOT NULL DEFAULT 0
     )
   `);
-  const count = (database.prepare('SELECT COUNT(*) AS cnt FROM schema_version').get() as { cnt: number }).cnt;
+  const count = (
+    database.prepare('SELECT COUNT(*) AS cnt FROM schema_version').get() as { cnt: number }
+  ).cnt;
   if (count === 0) {
     database.prepare('INSERT INTO schema_version (version) VALUES (0)').run();
   }
@@ -27,16 +29,56 @@ export function applyMigrations(database: Database): number {
       run(d) {
         // All additive columns added since the initial schema.
         // try/catch makes each step idempotent on existing databases.
-        try { d.exec('ALTER TABLE star_correspondences ADD COLUMN star_ra REAL'); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE star_correspondences ADD COLUMN star_dec REAL'); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE photos ADD COLUMN manual_placement TEXT'); } catch { /* exists */ }
-        try { d.exec("ALTER TABLE photos ADD COLUMN dso_ids TEXT NOT NULL DEFAULT '[]'"); } catch { /* exists */ }
-        try { d.exec("ALTER TABLE photos ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'"); } catch { /* exists */ }
-        try { d.exec("ALTER TABLE photos ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); } catch { /* exists */ }
-        try { d.exec("ALTER TABLE photos ADD COLUMN integrations TEXT NOT NULL DEFAULT '[]'"); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE photos ADD COLUMN display_order INTEGER'); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE photos ADD COLUMN thumb_filename TEXT'); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT'); } catch { /* exists */ }
+        try {
+          d.exec('ALTER TABLE star_correspondences ADD COLUMN star_ra REAL');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE star_correspondences ADD COLUMN star_dec REAL');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE photos ADD COLUMN manual_placement TEXT');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec("ALTER TABLE photos ADD COLUMN dso_ids TEXT NOT NULL DEFAULT '[]'");
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec("ALTER TABLE photos ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'");
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec("ALTER TABLE photos ADD COLUMN notes TEXT NOT NULL DEFAULT ''");
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec("ALTER TABLE photos ADD COLUMN integrations TEXT NOT NULL DEFAULT '[]'");
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE photos ADD COLUMN display_order INTEGER');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE photos ADD COLUMN thumb_filename TEXT');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
+        } catch {
+          /* exists */
+        }
         // Backfill display_order for any rows present before the column was added.
         d.exec(`
           WITH ranked AS (
@@ -53,8 +95,16 @@ export function applyMigrations(database: Database): number {
       version: 2,
       run(d) {
         // Per-plan observation night and gear setup.
-        try { d.exec('ALTER TABLE plans ADD COLUMN night_of TEXT'); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE plans ADD COLUMN setup_id TEXT'); } catch { /* exists */ }
+        try {
+          d.exec('ALTER TABLE plans ADD COLUMN night_of TEXT');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE plans ADD COLUMN setup_id TEXT');
+        } catch {
+          /* exists */
+        }
       },
     },
     {
@@ -68,8 +118,10 @@ export function applyMigrations(database: Database): number {
           .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='plan_entries'")
           .get();
         if (!exists) return;
-        const cols = d.prepare("PRAGMA table_info('plan_entries')").all() as Array<{ name: string }>;
-        if (cols.some(c => c.name === 'ra')) return; // already migrated
+        const cols = d.prepare("PRAGMA table_info('plan_entries')").all() as Array<{
+          name: string;
+        }>;
+        if (cols.some((c) => c.name === 'ra')) return; // already migrated
         d.exec(`
           CREATE TABLE plan_entries_new (
             id       TEXT PRIMARY KEY,
@@ -93,7 +145,11 @@ export function applyMigrations(database: Database): number {
       run(d) {
         // Mosaics: a group of tile entries covering one target. Tiles are plan
         // entries tagged with a mosaic_id; the mosaic row holds the group params.
-        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_id TEXT'); } catch { /* exists */ }
+        try {
+          d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_id TEXT');
+        } catch {
+          /* exists */
+        }
         d.exec(`
           CREATE TABLE IF NOT EXISTS plan_mosaics (
             id          TEXT PRIMARY KEY,
@@ -116,7 +172,11 @@ export function applyMigrations(database: Database): number {
       // derived from the DSO at display time.
       version: 5,
       run(d) {
-        try { d.exec('ALTER TABLE plan_mosaics ADD COLUMN name TEXT'); } catch { /* exists */ }
+        try {
+          d.exec('ALTER TABLE plan_mosaics ADD COLUMN name TEXT');
+        } catch {
+          /* exists */
+        }
       },
     },
     {
@@ -126,8 +186,16 @@ export function applyMigrations(database: Database): number {
       // frame renders at its native FOV.
       version: 6,
       run(d) {
-        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_w_deg REAL'); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_h_deg REAL'); } catch { /* exists */ }
+        try {
+          d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_w_deg REAL');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE plan_entries ADD COLUMN mosaic_h_deg REAL');
+        } catch {
+          /* exists */
+        }
       },
     },
     {
@@ -135,8 +203,16 @@ export function applyMigrations(database: Database): number {
       // global location (same pattern as night_of falling back to the global date).
       version: 7,
       run(d) {
-        try { d.exec('ALTER TABLE plans ADD COLUMN lat REAL'); } catch { /* exists */ }
-        try { d.exec('ALTER TABLE plans ADD COLUMN lon REAL'); } catch { /* exists */ }
+        try {
+          d.exec('ALTER TABLE plans ADD COLUMN lat REAL');
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE plans ADD COLUMN lon REAL');
+        } catch {
+          /* exists */
+        }
       },
     },
     {
@@ -145,7 +221,11 @@ export function applyMigrations(database: Database): number {
       // global entity (like gear_setups); the per-photo POIs live in a JSON column.
       version: 8,
       run(d) {
-        try { d.exec("ALTER TABLE photos ADD COLUMN points_of_interest TEXT NOT NULL DEFAULT '[]'"); } catch { /* exists */ }
+        try {
+          d.exec("ALTER TABLE photos ADD COLUMN points_of_interest TEXT NOT NULL DEFAULT '[]'");
+        } catch {
+          /* exists */
+        }
         d.exec(`
           CREATE TABLE IF NOT EXISTS poi_categories (
             id       TEXT PRIMARY KEY,
@@ -163,15 +243,25 @@ export function applyMigrations(database: Database): number {
       // with all 5 defaults) — so skip, to avoid leaving only Supernova behind.
       version: 9,
       run(d) {
-        const seeded = (d.prepare('SELECT COUNT(*) AS cnt FROM poi_categories').get() as { cnt: number }).cnt > 0;
+        const seeded =
+          (d.prepare('SELECT COUNT(*) AS cnt FROM poi_categories').get() as { cnt: number }).cnt >
+          0;
         if (!seeded) return;
         try {
           d.prepare(
             "INSERT OR IGNORE INTO poi_categories (id, name, color, position) VALUES ('cat-supernova', 'Supernova', '#ff5a5a', 4)",
           ).run();
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         // Only recolor ISS if it still has the original default colour (respect user edits).
-        try { d.prepare("UPDATE poi_categories SET color = '#cbd5e1' WHERE id = 'cat-iss' AND color = '#ff7b7b'").run(); } catch { /* ignore */ }
+        try {
+          d.prepare(
+            "UPDATE poi_categories SET color = '#cbd5e1' WHERE id = 'cat-iss' AND color = '#ff7b7b'",
+          ).run();
+        } catch {
+          /* ignore */
+        }
       },
     },
     // Future migrations: { version: 10, run(d) { ... } },

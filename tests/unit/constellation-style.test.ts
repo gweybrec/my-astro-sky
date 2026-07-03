@@ -60,8 +60,15 @@ describe('parseConstellationLines', () => {
           geometry: {
             type: 'MultiLineString',
             coordinates: [
-              [[90.0, 10.0], [91.0, 11.0], [92.0, 12.0]],
-              [[85.0, 5.0], [86.0, 6.0]],
+              [
+                [90.0, 10.0],
+                [91.0, 11.0],
+                [92.0, 12.0],
+              ],
+              [
+                [85.0, 5.0],
+                [86.0, 6.0],
+              ],
             ],
           },
         },
@@ -87,7 +94,12 @@ describe('parseConstellationLines', () => {
           geometry: {
             type: 'MultiLineString',
             // -60 RA should become 300
-            coordinates: [[[-60.0, 45.0], [-50.0, 40.0]]],
+            coordinates: [
+              [
+                [-60.0, 45.0],
+                [-50.0, 40.0],
+              ],
+            ],
           },
         },
       ],
@@ -104,18 +116,35 @@ describe('parseConstellationLines', () => {
       features: [
         {
           id: 'And',
-          geometry: { type: 'MultiLineString', coordinates: [[[10, 40], [15, 35]]] },
+          geometry: {
+            type: 'MultiLineString',
+            coordinates: [
+              [
+                [10, 40],
+                [15, 35],
+              ],
+            ],
+          },
         },
         {
           id: 'Cas',
-          geometry: { type: 'MultiLineString', coordinates: [[[20, 60], [25, 63], [30, 60]]] },
+          geometry: {
+            type: 'MultiLineString',
+            coordinates: [
+              [
+                [20, 60],
+                [25, 63],
+                [30, 60],
+              ],
+            ],
+          },
         },
       ],
     };
 
     const result = parseConstellationLines(geoJSON);
     expect(result).toHaveLength(2);
-    expect(result.map(c => c.id)).toEqual(['And', 'Cas']);
+    expect(result.map((c) => c.id)).toEqual(['And', 'Cas']);
   });
 
   it('returns empty array for empty FeatureCollection', () => {

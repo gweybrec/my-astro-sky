@@ -60,7 +60,9 @@ describe('getFileDimensions', () => {
       naturalHeight = 1080;
       onload: (() => void) | null = null;
       onerror: (() => void) | null = null;
-      set src(_: string) { Promise.resolve().then(() => this.onload?.()); }
+      set src(_: string) {
+        Promise.resolve().then(() => this.onload?.());
+      }
     }
     vi.stubGlobal('Image', MockImage);
 
@@ -77,7 +79,9 @@ describe('getFileDimensions', () => {
       naturalHeight = 0;
       onload: (() => void) | null = null;
       onerror: (() => void) | null = null;
-      set src(_: string) { Promise.resolve().then(() => this.onerror?.()); }
+      set src(_: string) {
+        Promise.resolve().then(() => this.onerror?.());
+      }
     }
     vi.stubGlobal('Image', MockImage);
 

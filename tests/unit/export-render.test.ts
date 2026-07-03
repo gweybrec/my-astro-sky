@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { scaleMatrixForDpr, computeGalleryLayout, computeFramedViewScale } from '../../src/export-render';
+import {
+  scaleMatrixForDpr,
+  computeGalleryLayout,
+  computeFramedViewScale,
+} from '../../src/export-render';
 import { angularSizeToCanvasPxForDSO } from '../../src/dso-highlight';
 
 describe('scaleMatrixForDpr', () => {
@@ -46,9 +50,15 @@ describe('computeGalleryLayout', () => {
   it('paginates: N photos at perPage per page ⇒ ceil(N / perPage) pages', () => {
     const l = layout(0);
     const perPage = l.perPage;
-    expect(computeGalleryLayout(perPage, PAGE_W, PAGE_H, MARGIN, GAP, COLUMNS, CAPTION_H).pages).toBe(1);
-    expect(computeGalleryLayout(perPage + 1, PAGE_W, PAGE_H, MARGIN, GAP, COLUMNS, CAPTION_H).pages).toBe(2);
-    expect(computeGalleryLayout(perPage * 3, PAGE_W, PAGE_H, MARGIN, GAP, COLUMNS, CAPTION_H).pages).toBe(3);
+    expect(
+      computeGalleryLayout(perPage, PAGE_W, PAGE_H, MARGIN, GAP, COLUMNS, CAPTION_H).pages,
+    ).toBe(1);
+    expect(
+      computeGalleryLayout(perPage + 1, PAGE_W, PAGE_H, MARGIN, GAP, COLUMNS, CAPTION_H).pages,
+    ).toBe(2);
+    expect(
+      computeGalleryLayout(perPage * 3, PAGE_W, PAGE_H, MARGIN, GAP, COLUMNS, CAPTION_H).pages,
+    ).toBe(3);
   });
 
   it('always reports at least one page, even for zero photos', () => {
@@ -59,7 +69,10 @@ describe('computeGalleryLayout', () => {
 describe('computeFramedViewScale', () => {
   it('sizes the binding axis so the FOV occupies the requested fraction', () => {
     // Square image, wider-than-tall FOV ⇒ width binds.
-    const imgW = 500, imgH = 500, frac = 0.6, dec = 0;
+    const imgW = 500,
+      imgH = 500,
+      frac = 0.6,
+      dec = 0;
     const scale = computeFramedViewScale(1, 0.5, dec, imgW, imgH, frac);
     const frameWidthPx = 2 * angularSizeToCanvasPxForDSO(1 * 30, dec, scale);
     expect(frameWidthPx).toBeCloseTo(frac * imgW, 3);

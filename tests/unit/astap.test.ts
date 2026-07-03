@@ -73,16 +73,19 @@ import { solveWithASTAP, cdMatrixSkewDeg, MAX_CD_SKEW_DEG } from '../../server/a
 
 // Real CD matrices captured from running ASTAP on test-photos/M97+M108.jpg.
 // Conformal = a correct solve; sheared = ASTAP's wrong-scale false match.
-const CONFORMAL_CD = { CD1_1: -5.777e-4, CD1_2: 3.259e-4, CD2_1: 3.261e-4, CD2_2: 5.580e-4 };
+const CONFORMAL_CD = { CD1_1: -5.777e-4, CD1_2: 3.259e-4, CD2_1: 3.261e-4, CD2_2: 5.58e-4 };
 const SHEARED_CD = { CD1_1: -7.054e-4, CD1_2: 7.831e-5, CD2_1: -5.001e-4, CD2_2: 5.305e-4 };
 
 describe('cdMatrixSkewDeg()', () => {
   it('is ~0 for a conformal (perpendicular, equal-length) CD matrix', () => {
-    expect(cdMatrixSkewDeg({ CD1_1: -4.17e-4, CD1_2: 0, CD2_1: 0, CD2_2: 4.17e-4 })).toBeCloseTo(0, 5);
+    expect(cdMatrixSkewDeg({ CD1_1: -4.17e-4, CD1_2: 0, CD2_1: 0, CD2_2: 4.17e-4 })).toBeCloseTo(
+      0,
+      5,
+    );
     expect(cdMatrixSkewDeg(CONFORMAL_CD)).toBeLessThan(MAX_CD_SKEW_DEG);
   });
 
-  it('is large for ASTAP\'s sheared false-match CD matrix', () => {
+  it("is large for ASTAP's sheared false-match CD matrix", () => {
     const skew = cdMatrixSkewDeg(SHEARED_CD);
     expect(skew).toBeGreaterThan(40);
     expect(skew).toBeGreaterThan(MAX_CD_SKEW_DEG);
@@ -182,7 +185,11 @@ describe('solveWithASTAP()', () => {
   // skewed-parallelogram placement.
   it('rejects a distorted (sheared) solution instead of placing it', async () => {
     mockParseFITSHeader.mockReturnValue({
-      CRPIX1: 960, CRPIX2: 540, CRVAL1: 84.05, CRVAL2: -1.2, ...SHEARED_CD,
+      CRPIX1: 960,
+      CRPIX2: 540,
+      CRVAL1: 84.05,
+      CRVAL2: -1.2,
+      ...SHEARED_CD,
     });
 
     const result = await solveWithASTAP(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
@@ -193,14 +200,7 @@ describe('solveWithASTAP()', () => {
   });
 
   it('converts RA/Dec hints to hours and SPD in the ASTAP command', async () => {
-    await solveWithASTAP(
-      Buffer.from('img'),
-      '.jpg',
-      1920,
-      1080,
-      { ra: 83.6, dec: 22.0 },
-      'en',
-    );
+    await solveWithASTAP(Buffer.from('img'), '.jpg', 1920, 1080, { ra: 83.6, dec: 22.0 }, 'en');
 
     const args = mockWrapExecForWSL.mock.calls.find(
       (c) => Array.isArray(c[1]) && (c[1] as string[]).includes('-wcs'),

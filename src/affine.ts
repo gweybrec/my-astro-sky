@@ -7,8 +7,13 @@ import { t } from './i18n';
  */
 function isCollinear(det: number, p0: Point, p1: Point, p2: Point): boolean {
   const scale = Math.max(
-    Math.abs(p0.x), Math.abs(p0.y), Math.abs(p1.x), Math.abs(p1.y),
-    Math.abs(p2.x), Math.abs(p2.y), 1,
+    Math.abs(p0.x),
+    Math.abs(p0.y),
+    Math.abs(p1.x),
+    Math.abs(p1.y),
+    Math.abs(p2.x),
+    Math.abs(p2.y),
+    1,
   );
 
   return Math.abs(det) < 1e-10 * scale * scale;
@@ -30,10 +35,7 @@ export function computeAffineTransform(
   const [c0, c1, c2] = canvasPoints;
 
   // Matrix A = [[px0, py0, 1], [px1, py1, 1], [px2, py2, 1]]
-  const det =
-    p0.x * (p1.y - p2.y) -
-    p0.y * (p1.x - p2.x) +
-    (p1.x * p2.y - p2.x * p1.y);
+  const det = p0.x * (p1.y - p2.y) - p0.y * (p1.x - p2.x) + (p1.x * p2.y - p2.x * p1.y);
 
   if (isCollinear(det, p0, p1, p2)) {
     throw new Error(t('errors.collinearPoints'));
@@ -63,7 +65,14 @@ export function computeAffineTransform(
   const d = inv[1][0] * c0.y + inv[1][1] * c1.y + inv[1][2] * c2.y;
   const f = inv[2][0] * c0.y + inv[2][1] * c1.y + inv[2][2] * c2.y;
 
-  if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) || !isFinite(e) || !isFinite(f)) {
+  if (
+    !isFinite(a) ||
+    !isFinite(b) ||
+    !isFinite(c) ||
+    !isFinite(d) ||
+    !isFinite(e) ||
+    !isFinite(f)
+  ) {
     throw new Error(t('errors.invalidAffine'));
   }
 
@@ -120,10 +129,7 @@ export function affineToCSS(m: AffineMatrix): string {
  * Falls back to the exact 3-point solver when N === 3.
  * Minimises sum of squared residuals over all N pairs.
  */
-export function computeAffineLSQ(
-  photoPoints: Point[],
-  canvasPoints: Point[],
-): AffineMatrix {
+export function computeAffineLSQ(photoPoints: Point[], canvasPoints: Point[]): AffineMatrix {
   const n = photoPoints.length;
   if (n < 2) throw new Error(t('errors.minPoints'));
   if (n === 2) {
@@ -141,29 +147,49 @@ export function computeAffineLSQ(
 
   // Normal equations for CSS affine: newX = a·px + c·py + e, newY = b·px + d·py + f
   // Build A^T·A (3×3) and solve two right-hand sides (for X and for Y).
-  let s_xx = 0, s_xy = 0, s_x = 0;
-  let s_yy = 0, s_y = 0;
-  let s_xX = 0, s_yX = 0, s_X = 0;
-  let s_xY = 0, s_yY = 0, s_Y = 0;
+  let s_xx = 0,
+    s_xy = 0,
+    s_x = 0;
+  let s_yy = 0,
+    s_y = 0;
+  let s_xX = 0,
+    s_yX = 0,
+    s_X = 0;
+  let s_xY = 0,
+    s_yY = 0,
+    s_Y = 0;
 
   for (let i = 0; i < n; i++) {
-    const x = photoPoints[i].x, y = photoPoints[i].y;
-    const X = canvasPoints[i].x, Y = canvasPoints[i].y;
-    s_xx += x * x; s_xy += x * y; s_x += x;
-    s_yy += y * y; s_y += y;
-    s_xX += x * X; s_yX += y * X; s_X += X;
-    s_xY += x * Y; s_yY += y * Y; s_Y += Y;
+    const x = photoPoints[i].x,
+      y = photoPoints[i].y;
+    const X = canvasPoints[i].x,
+      Y = canvasPoints[i].y;
+    s_xx += x * x;
+    s_xy += x * y;
+    s_x += x;
+    s_yy += y * y;
+    s_y += y;
+    s_xX += x * X;
+    s_yX += y * X;
+    s_X += X;
+    s_xY += x * Y;
+    s_yY += y * Y;
+    s_Y += Y;
   }
 
   // M = [[s_xx, s_xy, s_x], [s_xy, s_yy, s_y], [s_x, s_y, n]]
-  const m00 = s_xx, m01 = s_xy, m02 = s_x;
-  const m10 = s_xy, m11 = s_yy, m12 = s_y;
-  const m20 = s_x,  m21 = s_y,  m22 = n;
+  const m00 = s_xx,
+    m01 = s_xy,
+    m02 = s_x;
+  const m10 = s_xy,
+    m11 = s_yy,
+    m12 = s_y;
+  const m20 = s_x,
+    m21 = s_y,
+    m22 = n;
 
   const det =
-    m00 * (m11 * m22 - m12 * m21) -
-    m01 * (m10 * m22 - m12 * m20) +
-    m02 * (m10 * m21 - m11 * m20);
+    m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20) + m02 * (m10 * m21 - m11 * m20);
 
   // Relative singularity threshold based on normal matrix scale
   const mScale = Math.max(Math.abs(m00), Math.abs(m11), m22, 1);
@@ -173,7 +199,8 @@ export function computeAffineLSQ(
     // to a similarity transform (scale+rotation+translation) computed from
     // the most separated pair of points — this is sufficient to place the
     // image when an affine (6-DOF) fit is underdetermined.
-    let bestI = 0, bestJ = 1;
+    let bestI = 0,
+      bestJ = 1;
     let maxDist2 = 0;
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
@@ -202,16 +229,26 @@ export function computeAffineLSQ(
 
   // Solve M·x = rhs via Cramer's rule
   function cramer(r0: number, r1: number, r2: number): [number, number, number] {
-    const d0 = r0 * (m11 * m22 - m12 * m21) - m01 * (r1 * m22 - m12 * r2) + m02 * (r1 * m21 - m11 * r2);
-    const d1 = m00 * (r1 * m22 - m12 * r2) - r0 * (m10 * m22 - m12 * m20) + m02 * (m10 * r2 - r1 * m20);
-    const d2 = m00 * (m11 * r2 - r1 * m21) - m01 * (m10 * r2 - r1 * m20) + r0 * (m10 * m21 - m11 * m20);
+    const d0 =
+      r0 * (m11 * m22 - m12 * m21) - m01 * (r1 * m22 - m12 * r2) + m02 * (r1 * m21 - m11 * r2);
+    const d1 =
+      m00 * (r1 * m22 - m12 * r2) - r0 * (m10 * m22 - m12 * m20) + m02 * (m10 * r2 - r1 * m20);
+    const d2 =
+      m00 * (m11 * r2 - r1 * m21) - m01 * (m10 * r2 - r1 * m20) + r0 * (m10 * m21 - m11 * m20);
     return [d0 / det, d1 / det, d2 / det];
   }
 
   const [a, c, e] = cramer(s_xX, s_yX, s_X);
   const [b, d, f] = cramer(s_xY, s_yY, s_Y);
 
-  if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) || !isFinite(e) || !isFinite(f)) {
+  if (
+    !isFinite(a) ||
+    !isFinite(b) ||
+    !isFinite(c) ||
+    !isFinite(d) ||
+    !isFinite(e) ||
+    !isFinite(f)
+  ) {
     throw new Error(t('errors.invalidAffine'));
   }
 

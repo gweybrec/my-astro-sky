@@ -2,7 +2,12 @@
   <!-- Display name -->
   <div class="metadata-field">
     <label class="metadata-label">{{ t('modal.metadataFilename') }}</label>
-    <input type="text" class="tag-input" :value="displayName" @input="emit('update:displayName', ($event.target as HTMLInputElement).value)" />
+    <input
+      type="text"
+      class="tag-input"
+      :value="displayName"
+      @input="emit('update:displayName', ($event.target as HTMLInputElement).value)"
+    />
   </div>
 
   <!-- DSOs -->
@@ -30,7 +35,9 @@
           :key="r.dso.id"
           class="tag-suggest-item"
           @mousedown.prevent="addDso(r.dso.id)"
-        >{{ r.dso.id }}{{ r.dso.displayName ? ` — ${r.dso.displayName}` : '' }}</div>
+        >
+          {{ r.dso.id }}{{ r.dso.displayName ? ` — ${r.dso.displayName}` : '' }}
+        </div>
       </div>
     </div>
   </div>
@@ -61,7 +68,9 @@
           :key="suggestion"
           class="tag-suggest-item"
           @mousedown.prevent="selectLabelSuggestion(suggestion)"
-        >{{ suggestion }}</div>
+        >
+          {{ suggestion }}
+        </div>
       </div>
     </div>
   </div>
@@ -75,7 +84,9 @@
     <div class="integration-rows">
       <div v-for="(row, idx) in integrations" :key="idx" class="integration-row">
         <input
-          type="number" min="0" step="1"
+          type="number"
+          min="0"
+          step="1"
           class="tag-input integration-input integration-frames-input"
           :placeholder="t('modal.metadataIntegrationsFramesPlaceholder')"
           :title="t('modal.metadataIntegrationsFramesTooltip')"
@@ -84,7 +95,9 @@
         />
         <span class="integration-operator">x</span>
         <input
-          type="number" min="0" step="1"
+          type="number"
+          min="0"
+          step="1"
           class="tag-input integration-input integration-seconds-input"
           :placeholder="t('modal.metadataIntegrationsSecondsPlaceholder')"
           :title="t('modal.metadataIntegrationsSecondsTooltip')"
@@ -195,7 +208,10 @@ let dsoSearchTimer: ReturnType<typeof setTimeout> | null = null;
 function onDsoInput() {
   if (dsoSearchTimer) clearTimeout(dsoSearchTimer);
   const q = dsoQuery.value.trim();
-  if (!q) { showDsoSuggest.value = false; return; }
+  if (!q) {
+    showDsoSuggest.value = false;
+    return;
+  }
   dsoSearchTimer = setTimeout(() => {
     const results = searchDSOs(q, 8);
     dsoResults.value = results;
@@ -221,11 +237,16 @@ function addDsoFromInput() {
 }
 
 function removeDso(id: string) {
-  emit('update:dsoIds', props.dsoIds.filter(d => d !== id));
+  emit(
+    'update:dsoIds',
+    props.dsoIds.filter((d) => d !== id),
+  );
 }
 
 function hideDsoSuggest() {
-  setTimeout(() => { showDsoSuggest.value = false; }, 150);
+  setTimeout(() => {
+    showDsoSuggest.value = false;
+  }, 150);
 }
 
 // ─── Labels ───────────────────────────────────────────────────────────────────
@@ -269,18 +290,23 @@ function onLabelKeydown(e: KeyboardEvent) {
 function onLabelBlur() {
   commitLabel(labelInput.value);
   labelInput.value = '';
-  setTimeout(() => { showLabelSuggest.value = false; }, 150);
+  setTimeout(() => {
+    showLabelSuggest.value = false;
+  }, 150);
 }
 
 function removeLabel(lbl: string) {
-  emit('update:labels', props.labels.filter(l => l !== lbl));
+  emit(
+    'update:labels',
+    props.labels.filter((l) => l !== lbl),
+  );
 }
 
 // ─── Integration rows ─────────────────────────────────────────────────────────
 function onFramesInput(idx: number, e: Event) {
   const raw = (e.target as HTMLInputElement).value.trim();
   if (!raw) {
-    const updated = props.integrations.map((r, i) => i === idx ? { ...r, frames: 0 } : r);
+    const updated = props.integrations.map((r, i) => (i === idx ? { ...r, frames: 0 } : r));
     emit('update:integrations', updated);
     return;
   }
@@ -289,14 +315,14 @@ function onFramesInput(idx: number, e: Event) {
     showToast({ message: t('errors.invalidIntegrationNumber'), type: 'error', duration: 4000 });
     return;
   }
-  const updated = props.integrations.map((r, i) => i === idx ? { ...r, frames: parsed } : r);
+  const updated = props.integrations.map((r, i) => (i === idx ? { ...r, frames: parsed } : r));
   emit('update:integrations', updated);
 }
 
 function onSecondsInput(idx: number, e: Event) {
   const raw = (e.target as HTMLInputElement).value.trim();
   if (!raw) {
-    const updated = props.integrations.map((r, i) => i === idx ? { ...r, seconds: 0 } : r);
+    const updated = props.integrations.map((r, i) => (i === idx ? { ...r, seconds: 0 } : r));
     emit('update:integrations', updated);
     return;
   }
@@ -305,12 +331,12 @@ function onSecondsInput(idx: number, e: Event) {
     showToast({ message: t('errors.invalidIntegrationNumber'), type: 'error', duration: 4000 });
     return;
   }
-  const updated = props.integrations.map((r, i) => i === idx ? { ...r, seconds: parsed } : r);
+  const updated = props.integrations.map((r, i) => (i === idx ? { ...r, seconds: parsed } : r));
   emit('update:integrations', updated);
 }
 
 function onFilterSelect(idx: number, v: string) {
-  const updated = props.integrations.map((r, i) => i === idx ? { ...r, filter: v } : r);
+  const updated = props.integrations.map((r, i) => (i === idx ? { ...r, filter: v } : r));
   emit('update:integrations', updated);
 }
 
@@ -322,7 +348,10 @@ function onFilterCommit(v: string) {
 }
 
 function removeIntegrationRow(idx: number) {
-  emit('update:integrations', props.integrations.filter((_, i) => i !== idx));
+  emit(
+    'update:integrations',
+    props.integrations.filter((_, i) => i !== idx),
+  );
 }
 
 function addIntegrationRow() {

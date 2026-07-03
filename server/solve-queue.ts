@@ -37,7 +37,10 @@ export function getJob(id: string): LocalSolveJob | undefined {
   return jobs.get(id);
 }
 
-export function updateJob(id: string, updates: Partial<Pick<LocalSolveJob, 'status' | 'result' | 'error'>>): void {
+export function updateJob(
+  id: string,
+  updates: Partial<Pick<LocalSolveJob, 'status' | 'result' | 'error'>>,
+): void {
   const job = jobs.get(id);
   if (job) Object.assign(job, updates);
 }

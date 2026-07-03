@@ -117,12 +117,25 @@ export class InteractionLod {
    * it (updates maxDSOCount, notifies the slider, re-renders).
    */
   adaptAutoDensity(frameMs: number, maxDSOCount: number): AutoDensityResult {
-    if (!this.autoDSODensity) { this.dsoCalibrating = false; return { next: maxDSOCount, changed: false }; }
+    if (!this.autoDSODensity) {
+      this.dsoCalibrating = false;
+      return { next: maxDSOCount, changed: false };
+    }
     const target = InteractionLod.AUTO_TARGET_MS;
     const factor = frameMs > target * 1.3 ? 0.85 : frameMs < target * 0.6 ? 1.12 : 1;
-    if (factor === 1) { this.dsoCalibrating = false; return { next: maxDSOCount, changed: false }; } // converged
-    const next = clamp(Math.round(maxDSOCount * factor), InteractionLod.AUTO_DSO_MIN, DSO_DENSITY_MAX);
-    if (next === maxDSOCount) { this.dsoCalibrating = false; return { next: maxDSOCount, changed: false }; } // at a bound
+    if (factor === 1) {
+      this.dsoCalibrating = false;
+      return { next: maxDSOCount, changed: false };
+    } // converged
+    const next = clamp(
+      Math.round(maxDSOCount * factor),
+      InteractionLod.AUTO_DSO_MIN,
+      DSO_DENSITY_MAX,
+    );
+    if (next === maxDSOCount) {
+      this.dsoCalibrating = false;
+      return { next: maxDSOCount, changed: false };
+    } // at a bound
     return { next, changed: true };
   }
 }

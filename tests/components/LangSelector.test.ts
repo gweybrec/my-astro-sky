@@ -17,7 +17,9 @@ function mountSelector() {
 }
 
 describe('LangSelector', () => {
-  afterEach(() => { mockSetLang.mockClear(); });
+  afterEach(() => {
+    mockSetLang.mockClear();
+  });
 
   it('renders 4 language buttons', () => {
     const wrapper = mountSelector();
@@ -26,7 +28,7 @@ describe('LangSelector', () => {
 
   it('shows all 4 language codes as uppercase', () => {
     const wrapper = mountSelector();
-    const labels = wrapper.findAll('.lang-btn').map(b => b.text());
+    const labels = wrapper.findAll('.lang-btn').map((b) => b.text());
     expect(labels).toEqual(['FR', 'EN', 'ES', 'DE']);
   });
 

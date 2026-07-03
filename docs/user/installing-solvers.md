@@ -42,6 +42,7 @@ powershell -ExecutionPolicy Bypass -File scripts\install-astap.ps1
 The script will prompt for an install directory, then download `astap_cli.exe` and the D50 star catalog (~900 MB).
 
 After installation:
+
 1. Open the app **Settings**.
 2. Set the **ASTAP executable path** to the full path of `astap_cli.exe` you chose (e.g. `C:\astap\astap_cli.exe`).
 

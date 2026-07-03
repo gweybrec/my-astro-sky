@@ -98,7 +98,10 @@ describe('parseServerError — code-based error translation', () => {
   it('returns data.error unchanged when code is absent (non-translated server message)', async () => {
     localStorage.setItem('lang', 'en');
     const { parseServerError } = await import('../../src/api');
-    const result = parseServerError({ error: 'Something specific went wrong' }, 'errors.loadPhotos');
+    const result = parseServerError(
+      { error: 'Something specific went wrong' },
+      'errors.loadPhotos',
+    );
     expect(result).toBe('Something specific went wrong');
   });
 });

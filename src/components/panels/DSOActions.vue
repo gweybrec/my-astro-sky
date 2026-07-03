@@ -57,16 +57,26 @@ function revealOnMap() {
 }
 
 function onAddFrame() {
-  openFramePicker('frame', props.dso, (setupId) => {
-    fovStore.addAdhocFrameAtSky(setupId, props.dso.ra, props.dso.dec, props.dso.id);
-    revealOnMap();
-  }, revealOnMap);
+  openFramePicker(
+    'frame',
+    props.dso,
+    (setupId) => {
+      fovStore.addAdhocFrameAtSky(setupId, props.dso.ra, props.dso.dec, props.dso.id);
+      revealOnMap();
+    },
+    revealOnMap,
+  );
 }
 
 function onAddMosaic() {
-  openFramePicker('mosaic', props.dso, (setupId) => {
-    fovStore.addAdhocMosaic(setupId, props.dso.ra, props.dso.dec, props.dso.id);
-    revealOnMap();
-  }, revealOnMap);
+  openFramePicker(
+    'mosaic',
+    props.dso,
+    (setupId) => {
+      fovStore.addAdhocMosaic(setupId, props.dso.ra, props.dso.dec, props.dso.id);
+      revealOnMap();
+    },
+    revealOnMap,
+  );
 }
 </script>

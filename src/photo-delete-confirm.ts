@@ -1,6 +1,10 @@
 import { t } from './i18n';
 
-function confirmDeleteDialog(title: string, message: string, actionLabel: string): Promise<boolean> {
+function confirmDeleteDialog(
+  title: string,
+  message: string,
+  actionLabel: string,
+): Promise<boolean> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'dialog-overlay';
@@ -98,8 +102,16 @@ export function confirmUnsavedChanges(): Promise<boolean> {
       document.removeEventListener('keydown', onKeyDown);
       overlay.remove();
     };
-    const closeWith = (confirmed: boolean) => { cleanup(); resolve(confirmed); };
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); closeWith(false); } };
+    const closeWith = (confirmed: boolean) => {
+      cleanup();
+      resolve(confirmed);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeWith(false);
+      }
+    };
 
     overlay.addEventListener('click', () => closeWith(false));
     cancelBtn.addEventListener('click', () => closeWith(false));

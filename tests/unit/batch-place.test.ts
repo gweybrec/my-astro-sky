@@ -76,7 +76,7 @@ describe('placeBatchItem — state transitions', () => {
     const item = makeItem();
     let observedStatus = '';
     const uploadFn = () =>
-      new Promise<Photo>(resolve => {
+      new Promise<Photo>((resolve) => {
         observedStatus = item.status;
         setTimeout(() => resolve(fakePhoto), 0);
       });
@@ -110,7 +110,7 @@ describe('placeBatchItem — state transitions', () => {
     expect(capturedLabels).toContain('A');
     expect(capturedLabels).toContain('B');
     expect(capturedLabels).toContain('C');
-    expect(capturedLabels.filter(l => l === 'B').length).toBe(1);
+    expect(capturedLabels.filter((l) => l === 'B').length).toBe(1);
   });
 
   it('does not call onPlaced on failure', async () => {

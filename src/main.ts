@@ -101,14 +101,17 @@ async function init() {
     if (setupId) {
       try {
         const setups = await getGearSetups();
-        const targetSetup = setups.find(s => s.id === setupId);
+        const targetSetup = setups.find((s) => s.id === setupId);
         if (targetSetup) {
           const specs = await buildFovFrameSpecs([{ ...targetSetup, enabled: true }]);
           if (specs.length > 0) {
             const spec = specs[0];
             const view = skyMap.getView();
             const targetScale = computeFovTargetScale(
-              spec.wDeg, spec.hDeg, dec, getHemisphere(),
+              spec.wDeg,
+              spec.hDeg,
+              dec,
+              getHemisphere(),
               Math.min(view.width, view.height),
             );
             // Open the target as a free frame pinned to the sky: switches the FOV
@@ -122,14 +125,18 @@ async function init() {
             return;
           }
         }
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
 
     uiStore.switchView('skymap');
     skyMap.navigateTo(ra, dec, Math.max(skyMap.getView().scale, 800));
   });
   targetsView.onEditDSO = (dso) => {
-    openDSOEditModal(dso, () => { skyMap.render(); });
+    openDSOEditModal(dso, () => {
+      skyMap.render();
+    });
   };
 
   // Update photo transforms and outlines when map view changes.
@@ -161,9 +168,15 @@ async function init() {
   document.getElementById('tab-gallery')!.textContent = t('app.viewModeGallery') || 'Gallery';
   document.getElementById('tab-targets')!.textContent = t('targets.viewMode') || 'Targets';
 
-  document.getElementById('tab-skymap')!.addEventListener('click', () => uiStore.switchView('skymap'));
-  document.getElementById('tab-gallery')!.addEventListener('click', () => uiStore.switchView('gallery'));
-  document.getElementById('tab-targets')!.addEventListener('click', () => uiStore.switchView('targets'));
+  document
+    .getElementById('tab-skymap')!
+    .addEventListener('click', () => uiStore.switchView('skymap'));
+  document
+    .getElementById('tab-gallery')!
+    .addEventListener('click', () => uiStore.switchView('gallery'));
+  document
+    .getElementById('tab-targets')!
+    .addEventListener('click', () => uiStore.switchView('targets'));
 
   // Allow other modules to switch to skymap programmatically
   window.addEventListener('switchToSkymap', () => uiStore.switchView('skymap'));
@@ -211,7 +224,11 @@ async function checkForUpdate() {
     if (!isUpdateAvailable(__APP_VERSION__, latest.version)) return;
 
     let dismissed: string | null = null;
-    try { dismissed = localStorage.getItem(DISMISSED_UPDATE_KEY); } catch { /* ignore */ }
+    try {
+      dismissed = localStorage.getItem(DISMISSED_UPDATE_KEY);
+    } catch {
+      /* ignore */
+    }
     if (dismissed === latest.version) return;
 
     const uiStore = useUiStore(pinia);
@@ -223,7 +240,9 @@ async function checkForUpdate() {
 }
 
 init()
-  .then(() => { void checkForUpdate(); })
+  .then(() => {
+    void checkForUpdate();
+  })
   .catch((err) => {
     reportUnknownRendererError('app_init_failure', err);
   });

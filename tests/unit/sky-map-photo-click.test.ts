@@ -31,7 +31,12 @@ describe('pointInConvexPolygon', () => {
 
   it('detects a point inside a rotated (non-axis-aligned) quad', () => {
     // Diamond centred at origin, corners on the axes at distance 10.
-    const diamond: Point[] = [{ x: 0, y: -10 }, { x: 10, y: 0 }, { x: 0, y: 10 }, { x: -10, y: 0 }];
+    const diamond: Point[] = [
+      { x: 0, y: -10 },
+      { x: 10, y: 0 },
+      { x: 0, y: 10 },
+      { x: -10, y: 0 },
+    ];
     expect(pointInConvexPolygon(0, 0, diamond)).toBe(true);
     expect(pointInConvexPolygon(8, 8, diamond)).toBe(false); // outside the edges
   });
@@ -57,9 +62,7 @@ describe('findTopPhotoOutlineAtPoint', () => {
   });
 
   it('returns null when no photo contains the point', () => {
-    const outlines = [
-      { name: 'photo', corners: rect(10, 10, 110, 110) },
-    ];
+    const outlines = [{ name: 'photo', corners: rect(10, 10, 110, 110) }];
 
     expect(findTopPhotoOutlineAtPoint(200, 200, outlines)).toBeNull();
   });

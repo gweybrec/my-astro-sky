@@ -10,49 +10,49 @@ pick from. Each item notes rough **value** and **effort** (S/M/L) and the main f
 ## A. Planning & recommender
 
 - [ ] **A1 — Moon awareness** _(value: high, effort: M)_ — moon phase, altitude, and angular
-  separation per target; "moon impact" badge, optional score penalty + min-separation filter
-  (narrowband penalized less). Reuses sun/twilight altitude code. → `src/astro-time.ts`,
-  `src/sky-geometry.ts`, `src/target-recommender.ts`, `src/targets-view.ts`
+      separation per target; "moon impact" badge, optional score penalty + min-separation filter
+      (narrowband penalized less). Reuses sun/twilight altitude code. → `src/astro-time.ts`,
+      `src/sky-geometry.ts`, `src/target-recommender.ts`, `src/targets-view.ts`
 - [ ] **A2 — Session / "tonight plan" planner** _(value: high, effort: M-L)_ — let the user pick a
-  set of targets (from recommender / search) into a persistent "tonight plan"; show them in a
-  transit-ordered list with an altitude timeline; export to text/CSV. Foundation that A3 builds on.
-  Builds on existing altitude sampling + twilight window. → `src/target-recommender.ts`, new panel
+      set of targets (from recommender / search) into a persistent "tonight plan"; show them in a
+      transit-ordered list with an altitude timeline; export to text/CSV. Foundation that A3 builds on.
+      Builds on existing altitude sampling + twilight window. → `src/target-recommender.ts`, new panel
 - [ ] **A3 — Per-target framing & rotation** _(value: high, effort: M, depends on A2)_ — extend the
-  existing FOV frame so each chosen target in the tonight plan spawns its own **anchored** frame
-  (small pin icon to attach/detach a frame from a DSO), each **rotatable individually**, with a
-  **camera position-angle (°E of N) readout** to dial into the rotator/mount. Per-target rotation
-  syncs back into the tonight list. → `src/fov-overlay.ts`, `src/sky-map.ts`, `src/projection.ts`
+      existing FOV frame so each chosen target in the tonight plan spawns its own **anchored** frame
+      (small pin icon to attach/detach a frame from a DSO), each **rotatable individually**, with a
+      **camera position-angle (°E of N) readout** to dial into the rotator/mount. Per-target rotation
+      syncs back into the tonight list. → `src/fov-overlay.ts`, `src/sky-map.ts`, `src/projection.ts`
 - [ ] **A6 — Multi-night projects** _(value: high, effort: M)_ — track active targets with
-  integration goals ("M31 — 8h / 20h"), accumulate from linked photos. Overlaps with B1/B2.
+      integration goals ("M31 — 8h / 20h"), accumulate from linked photos. Overlaps with B1/B2.
 - [x] **A4 — Mosaic planner** _(done)_ — N×M panel grid with overlap % for oversized targets; tiles
-  on map + total integration estimate; full per-tile editing (add/remove), merge of overlapping
-  frames. → `src/mosaic.ts`, `src/sky-map.ts`, `src/stores/fov-frames.ts`, `server/db.ts`
+      on map + total integration estimate; full per-tile editing (add/remove), merge of overlapping
+      frames. → `src/mosaic.ts`, `src/sky-map.ts`, `src/stores/fov-frames.ts`, `server/db.ts`
 - [ ] **A5 — Weather / cloud / seeing** _(value: med-high, effort: M)_ — forecast for the site
-  (Open-Meteo / 7Timer!), clear-sky outlook for the planned night. New backend proxy route (mirror
-  `version/latest` pattern). → `server/index.ts`
+      (Open-Meteo / 7Timer!), clear-sky outlook for the planned night. New backend proxy route (mirror
+      `version/latest` pattern). → `server/index.ts`
 - [ ] **A7 — "Visible right now" / live mode** _(value: med, effort: S)_ — highlight what's
-  well-placed this hour. Trivial slice of A2.
+      well-placed this hour. Trivial slice of A2.
 - [ ] **D5 — Geolocation fallback fix** _(value: low-med, effort: S)_ — longitude-aware night window
-  at extreme UTC offsets (documented constraint). → `src/target-recommender.ts`
+      at extreme UTC offsets (documented constraint). → `src/target-recommender.ts`
 
 ## B. Photo & data management
 
 - [ ] **B3 — Deep FITS/EXIF parse on upload** _(value: high, effort: M)_ — capture exposure,
-  gain/ISO, temperature, filter, camera, scope, dateObs to auto-fill metadata. Follow
-  `add-photo-metadata` skill. → `server/wcs-reader.ts`
+      gain/ISO, temperature, filter, camera, scope, dateObs to auto-fill metadata. Follow
+      `add-photo-metadata` skill. → `server/wcs-reader.ts`
 - [ ] **B1 — Observation log / journal** _(value: high, effort: M-L)_ — first-class "session" entity
-  (date, site, gear, conditions, notes) that photos attach to; turns gallery into a logbook.
-  Structural addition. → `server/db-migrations.ts`, gallery, export
+      (date, site, gear, conditions, notes) that photos attach to; turns gallery into a logbook.
+      Structural addition. → `server/db-migrations.ts`, gallery, export
 - [ ] **B5 — Annotation layer on photos** _(value: high, effort: M)_ — auto-label catalogued DSOs/
-  stars that fall inside a solved frame (from WCS + DSO catalog). → `src/dso-catalog.ts`, overlay
+      stars that fall inside a solved frame (from WCS + DSO catalog). → `src/dso-catalog.ts`, overlay
 - [ ] **B2 — Integration statistics dashboard** _(value: med-high, effort: M)_ — totals by target/
-  filter/gear/month; charts. Pure aggregation over existing `integrations[]` + `observationDate`.
+      filter/gear/month; charts. Pure aggregation over existing `integrations[]` + `observationDate`.
 - [ ] **B4 — Auto-link photo → gear** _(value: med, effort: M)_ — match FITS header camera/scope to
-  the gear catalog. Depends on B3. → fuzzy match vs `resources/*.json`
+      the gear catalog. Depends on B3. → fuzzy match vs `resources/*.json`
 - [ ] **B6 — Before/after & revision compare** _(value: med, effort: M)_ — multiple versions of a
-  target, slider/side-by-side compare. Gallery extension.
+      target, slider/side-by-side compare. Gallery extension.
 - [ ] **B7 — Smart collections / saved filters** _(value: med, effort: S-M)_ — auto-groups and saved
-  search queries over existing labels/types.
+      search queries over existing labels/types.
 
 ## C. Sharing & community
 
@@ -60,25 +60,25 @@ pick from. Each item notes rough **value** and **effort** (S/M/L) and the main f
 > ip-api.com warning). C1/C2 are local-only and safe; C3/C4 need explicit consent flows.
 
 - [ ] **C2 — Shareable annotated photo card** _(value: high, effort: M, local-only)_ — single
-  annotated image: photo + DSO labels + gear + integration + date, for social posting. Builds on B5.
+      annotated image: photo + DSO labels + gear + integration + date, for social posting. Builds on B5.
 - [ ] **C1 — Export map/gallery as image or PDF** _(value: high, effort: M)_ — high-res render of the
-  current map view (with overlays) or a gallery contact sheet to PNG/PDF.
+      current map view (with overlays) or a gallery contact sheet to PNG/PDF.
 - [ ] **C3 — Read-only shared link / static export** _(value: med-high, effort: L)_ — self-contained
-  static HTML bundle of selected photos placed on the map; hostable or offline. Reuses export infra.
+      static HTML bundle of selected photos placed on the map; hostable or offline. Reuses export infra.
 - [ ] **C4 — Optional cloud sync / backup** _(value: med, effort: L)_ — push export bundle to a
-  user-supplied destination (S3-compatible / Drive). Opt-in, local-first.
+      user-supplied destination (S3-compatible / Drive). Opt-in, local-first.
 
 ## D. Polish & platform
 
 - [ ] **D2 — Touch / mobile sky-map controls** _(value: med-high, effort: M)_ — pinch-zoom,
-  touch-drag, responsive panels. → `src/sky-map.ts`
+      touch-drag, responsive panels. → `src/sky-map.ts`
 - [ ] **D6 — astrometry.net WCS post-fetch** _(value: med, effort: S-M)_ — fetch WCS file after solve
-  to fill dateObs/expTime (closes documented pre-fill gap). Pairs with B3. → `server/astrometry.ts`
+      to fill dateObs/expTime (closes documented pre-fill gap). Pairs with B3. → `server/astrometry.ts`
 - [ ] **D1 — Split `server/index.ts`** _(value: med/maintainability, effort: M)_ — break ~3k-line
-  file into route modules (photos, solve, gear, settings, export). Keep Swagger annotations.
+      file into route modules (photos, solve, gear, settings, export). Keep Swagger annotations.
 - [ ] **D3 — Offline tiles / PWA** _(value: med, effort: M)_ — catalog data is already static JSON.
 - [ ] **D4 — Accessibility pass** _(value: med, effort: M)_ — keyboard nav, ARIA on modals, contrast
-  tokens (see `docs/dev/ui-guidelines.md`).
+      tokens (see `docs/dev/ui-guidelines.md`).
 
 ---
 
@@ -94,7 +94,7 @@ pick from. Each item notes rough **value** and **effort** (S/M/L) and the main f
 
 # Details
 
-Expanded explanation of each item — enough to understand the *what* and *why* without a full spec.
+Expanded explanation of each item — enough to understand the _what_ and _why_ without a full spec.
 
 ## A. Planning & recommender
 
@@ -127,7 +127,7 @@ actually set at the scope. This item closes those gaps:
 A2 is the prerequisite: the set of chosen targets is what drives which anchored frames exist. → `src/fov-overlay.ts`, `src/sky-map.ts`, `src/projection.ts`
 
 **A2 — Session / "tonight plan" planner.** Today you get a flat list of good targets but no way to
-*commit* to a subset for a given night. This adds the notion of a **tonight plan**: the user picks
+_commit_ to a subset for a given night. This adds the notion of a **tonight plan**: the user picks
 targets (from the recommender or search) into a persistent list, ordered by when they transit (cross
 the meridian, their best moment), with a simple timeline showing when each rises above the altitude
 floor and when it peaks — so you can sequence a night without overlap. Exportable to text/CSV to
@@ -156,7 +156,7 @@ route following the same pattern already used to check for app updates, with coo
 the existing geolocation.
 
 **A7 — "Visible right now" / live mode.** A lightweight, instant-gratification slice of the planner:
-given the current time, just highlight what's well placed *this hour* for a quick "what should I
+given the current time, just highlight what's well placed _this hour_ for a quick "what should I
 point at now" answer. Essentially the planner restricted to "now."
 
 **D5 — Geolocation fallback fix.** (Listed under A because it's a recommender fix.) At extreme
@@ -175,7 +175,7 @@ capture capture-date/exposure. Follow the `add-photo-metadata` skill since it to
 and export.
 
 **B1 — Observation log / journal.** Right now photos are the top-level entity, but the natural unit of
-amateur astronomy is the *session*: "the night of June 3rd, from my backyard, with this rig, under
+amateur astronomy is the _session_: "the night of June 3rd, from my backyard, with this rig, under
 these conditions." This adds a first-class session record (date, site, gear, sky conditions, notes)
 that photos attach to, turning the gallery into a logbook. It's the most structural addition here and
 the foundation that makes stats (B2), projects (A6), and richer sharing more powerful.
@@ -246,9 +246,9 @@ flagged as design debt). Splitting it into focused route modules (photos, solvin
 export) makes the code easier to navigate and safer to change. Pure refactor with no behavior change —
 must preserve the Swagger annotations on every route.
 
-**D3 — Offline / PWA (web build only).** *Scope clarification: the Electron desktop build is already
+**D3 — Offline / PWA (web build only).** _Scope clarification: the Electron desktop build is already
 fully offline, and the catalog files are already static — so this is purely about the browser-hosted
-deployment.* Turning the web app into a PWA (service worker + manifest) would cache the app shell and
+deployment._ Turning the web app into a PWA (service worker + manifest) would cache the app shell and
 the static catalog/star JSON in the browser, so the map, search, and catalog browsing keep working
 with no network and load instantly on repeat visits. The `/api` features (upload, solving) still need
 the server, so it's partial offline. **Low priority given the desktop app already covers offline

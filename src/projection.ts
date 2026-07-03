@@ -84,9 +84,10 @@ export function project(raDeg: number, decDeg: number): Point {
     return { x: r * Math.sin(raRad), y: r * Math.cos(raRad) };
   }
   const raRad = raDeg * DEG2RAD;
-  const r = _hemisphere === 'south'
-    ? Math.tan((90 + decDeg) / 2 * DEG2RAD)
-    : Math.tan((90 - decDeg) / 2 * DEG2RAD);
+  const r =
+    _hemisphere === 'south'
+      ? Math.tan(((90 + decDeg) / 2) * DEG2RAD)
+      : Math.tan(((90 - decDeg) / 2) * DEG2RAD);
   return {
     x: r * Math.sin(raRad),
     y: r * Math.cos(raRad),
@@ -100,9 +101,9 @@ export function project(raDeg: number, decDeg: number): Point {
 export interface ProjCacheHost {
   ra: number;
   dec: number;
-  _px?: number;  // cached projection-unit x
-  _py?: number;  // cached projection-unit y
-  _pg?: number;  // projection generation the cache was computed for
+  _px?: number; // cached projection-unit x
+  _py?: number; // cached projection-unit y
+  _pg?: number; // projection generation the cache was computed for
 }
 
 /**
@@ -134,9 +135,8 @@ export function unproject(x: number, y: number): { ra: number; dec: number } {
     return { ra, dec };
   }
   const r = Math.sqrt(x * x + y * y);
-  const dec = _hemisphere === 'south'
-    ? 2 * Math.atan(r) * RAD2DEG - 90
-    : 90 - 2 * Math.atan(r) * RAD2DEG;
+  const dec =
+    _hemisphere === 'south' ? 2 * Math.atan(r) * RAD2DEG - 90 : 90 - 2 * Math.atan(r) * RAD2DEG;
   let ra = Math.atan2(x, y) * RAD2DEG;
   if (ra < 0) ra += 360;
   return { ra, dec };
@@ -150,7 +150,7 @@ export function unproject(x: number, y: number): { ra: number; dec: number } {
  */
 export function borderRadiusPU(borderLatDeg: number): number {
   if (_projectionMode === 'fisheye') return 1.0;
-  return Math.tan((90 + borderLatDeg) / 2 * DEG2RAD);
+  return Math.tan(((90 + borderLatDeg) / 2) * DEG2RAD);
 }
 
 /**
@@ -158,7 +158,12 @@ export function borderRadiusPU(borderLatDeg: number): number {
  * into a cssW × cssH frame, leaving a small margin. Used by the "full sky map"
  * export to frame the entire projection regardless of the current zoom.
  */
-export function fitScaleForBorderCircle(cssW: number, cssH: number, borderLatDeg: number, margin = 0.96): number {
+export function fitScaleForBorderCircle(
+  cssW: number,
+  cssH: number,
+  borderLatDeg: number,
+  margin = 0.96,
+): number {
   const r = borderRadiusPU(borderLatDeg);
   if (r <= 0 || !isFinite(r)) return 0;
   return (Math.min(cssW, cssH) / 2 / r) * margin;
@@ -166,7 +171,7 @@ export function fitScaleForBorderCircle(cssW: number, cssH: number, borderLatDeg
 
 /** Projection coordinates → canvas pixel coordinates */
 export function toCanvas(px: number, py: number, view: ViewState): Point {
-  const theta = (view.rotationDeg * DEG2RAD);
+  const theta = view.rotationDeg * DEG2RAD;
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
 
@@ -185,7 +190,7 @@ export function toCanvas(px: number, py: number, view: ViewState): Point {
 
 /** Canvas pixel coordinates → projection coordinates */
 export function fromCanvas(cx: number, cy: number, view: ViewState): Point {
-  const theta = (view.rotationDeg * DEG2RAD);
+  const theta = view.rotationDeg * DEG2RAD;
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
 

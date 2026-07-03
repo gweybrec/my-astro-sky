@@ -1,11 +1,21 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
-  easeInOutCubic, navigateDurationMs, navigateProfile, zoomAboutPoint,
+  easeInOutCubic,
+  navigateDurationMs,
+  navigateProfile,
+  zoomAboutPoint,
 } from '../../src/sky-view-math';
 import { fromCanvas, setHemisphere } from '../../src/projection';
 import type { ViewState } from '../../src/types';
 
-const view: ViewState = { centerX: 0.1, centerY: 0.2, scale: 600, rotationDeg: 0, width: 800, height: 600 };
+const view: ViewState = {
+  centerX: 0.1,
+  centerY: 0.2,
+  scale: 600,
+  rotationDeg: 0,
+  width: 800,
+  height: 600,
+};
 
 describe('easeInOutCubic', () => {
   it('pins the endpoints and the midpoint', () => {
@@ -57,10 +67,16 @@ describe('zoomAboutPoint', () => {
   beforeEach(() => setHemisphere('north'));
 
   it('keeps the projection point under the cursor fixed across the zoom', () => {
-    const mx = 520, my = 240;
+    const mx = 520,
+      my = 240;
     const before = fromCanvas(mx, my, view);
     const z = zoomAboutPoint(view, mx, my, 1.1, 50, 1e6);
-    const after = fromCanvas(mx, my, { ...view, scale: z.scale, centerX: z.centerX, centerY: z.centerY });
+    const after = fromCanvas(mx, my, {
+      ...view,
+      scale: z.scale,
+      centerX: z.centerX,
+      centerY: z.centerY,
+    });
     expect(after.x).toBeCloseTo(before.x, 9);
     expect(after.y).toBeCloseTo(before.y, 9);
   });

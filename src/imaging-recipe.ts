@@ -7,10 +7,10 @@ import type { DSO } from './types';
 import type { GearPreset } from './gear-presets';
 
 export interface FilterRec {
-  name: string;       // 'Ha', 'OIII', 'SII', 'L', 'R', 'G', 'B', 'RGB'
+  name: string; // 'Ha', 'OIII', 'SII', 'L', 'R', 'G', 'B', 'RGB'
   subSeconds: number; // recommended sub-exposure in seconds
-  count: number;      // recommended number of subs
-  hours: number;      // total hours for this filter
+  count: number; // recommended number of subs
+  hours: number; // total hours for this filter
 }
 
 export interface ImagingRecipe {
@@ -41,7 +41,7 @@ function magBand(mag: number | null): MagBand {
  * diminishing returns much faster than it does for a faint diffuse nebula.
  */
 const HOURS_BY_DIFFICULTY_DEFAULT = [0.25, 0.75, 2.5, 4.0, 8.0]; // large nebulae (EN, SNR, RN, DN)
-const HOURS_BY_DIFFICULTY_GC = [0.25, 0.50, 1.0, 2.0, 4.0]; // globular clusters
+const HOURS_BY_DIFFICULTY_GC = [0.25, 0.5, 1.0, 2.0, 4.0]; // globular clusters
 const HOURS_BY_DIFFICULTY_OC = [0.15, 0.33, 0.75, 1.5, 3.0]; // open clusters
 const HOURS_BY_DIFFICULTY_PN = [0.15, 0.33, 0.75, 1.5, 3.0]; // planetary nebulae
 
@@ -75,8 +75,7 @@ function computeTotalHours(dso: DSO, apertureMm: number): number {
   const isGC = dso.type === 'GC';
   const isOC = dso.type === 'OC';
   const isPN = dso.type === 'PN';
-  const isGx =
-    dso.type === 'GxS' || dso.type === 'GxE' || dso.type === 'GxI' || dso.type === 'Gx';
+  const isGx = dso.type === 'GxS' || dso.type === 'GxE' || dso.type === 'GxI' || dso.type === 'Gx';
   const table = isGC
     ? HOURS_BY_DIFFICULTY_GC
     : isOC
@@ -124,8 +123,7 @@ export function recommendRecipe(dso: DSO, preset: GearPreset): ImagingRecipe {
   const emissionTypes: DSO['type'][] = ['EN', 'PN', 'SNR'];
   const isEmission =
     emissionTypes.includes(dso.type) ||
-    (typeof dso.displayName === 'string' &&
-      /nebul|nébul/i.test(dso.displayName));
+    (typeof dso.displayName === 'string' && /nebul|nébul/i.test(dso.displayName));
 
   // Color / built-in telescopes → single session
   if (!preset.mono || preset.builtIn) {

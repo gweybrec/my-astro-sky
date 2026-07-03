@@ -21,9 +21,12 @@ describe('SkyMap rotation', () => {
   beforeEach(() => {
     originalGetContext = HTMLCanvasElement.prototype.getContext;
 
-    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-      setTransform: () => {},
-    } as unknown as CanvasRenderingContext2D));
+    HTMLCanvasElement.prototype.getContext = vi.fn(
+      () =>
+        ({
+          setTransform: () => {},
+        }) as unknown as CanvasRenderingContext2D,
+    );
 
     vi.spyOn(SkyMap.prototype, 'render').mockImplementation(() => {});
   });
@@ -111,31 +114,37 @@ describe('SkyMap rotation', () => {
 
     const anchor = fromCanvas(startX, startY, map.getView());
 
-    canvas.dispatchEvent(new MouseEvent('mousedown', {
-      button: 0,
-      clientX: startX,
-      clientY: startY,
-      bubbles: true,
-      cancelable: true,
-    }));
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        button: 0,
+        clientX: startX,
+        clientY: startY,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
 
-    window.dispatchEvent(new MouseEvent('mousemove', {
-      clientX: endX,
-      clientY: endY,
-      bubbles: true,
-      cancelable: true,
-    }));
+    window.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: endX,
+        clientY: endY,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
 
     const after = fromCanvas(endX, endY, map.getView());
     expect(after.x).toBeCloseTo(anchor.x, 8);
     expect(after.y).toBeCloseTo(anchor.y, 8);
 
-    window.dispatchEvent(new MouseEvent('mouseup', {
-      button: 0,
-      clientX: endX,
-      clientY: endY,
-      bubbles: true,
-      cancelable: true,
-    }));
+    window.dispatchEvent(
+      new MouseEvent('mouseup', {
+        button: 0,
+        clientX: endX,
+        clientY: endY,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   });
 });

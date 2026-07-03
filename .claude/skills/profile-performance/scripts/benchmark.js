@@ -21,7 +21,10 @@
 
   let allocs = 0;
   const origCreate = document.createElement.bind(document);
-  document.createElement = (tag) => { if (tag === 'canvas') allocs++; return origCreate(tag); };
+  document.createElement = (tag) => {
+    if (tag === 'canvas') allocs++;
+    return origCreate(tag);
+  };
 
   const fire = (type, x, y, buttons = 1) => {
     const ev = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, buttons });
@@ -29,7 +32,9 @@
     canvas.dispatchEvent(ev);
   };
   const wheel = (dy) =>
-    canvas.dispatchEvent(new WheelEvent('wheel', { bubbles: true, clientX: cx, clientY: cy, deltaY: dy }));
+    canvas.dispatchEvent(
+      new WheelEvent('wheel', { bubbles: true, clientX: cx, clientY: cy, deltaY: dy }),
+    );
 
   return new Promise((resolve) => {
     const frames = [];
@@ -69,4 +74,4 @@
     };
     requestAnimationFrame(tick);
   });
-}
+};

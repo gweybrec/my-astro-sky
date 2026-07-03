@@ -14,7 +14,7 @@ export const usePhotosStore = defineStore('photos', () => {
     // PlacedPhoto (e.g. the selected-photo card) see a new object reference when a
     // field like `visible` is mutated in place by the overlay — otherwise Vue's
     // computed/prop equality check sees the same reference and skips the re-render.
-    placedPhotos.value = overlay ? overlay.getPlacedPhotos().map(p => ({ ...p })) : [];
+    placedPhotos.value = overlay ? overlay.getPlacedPhotos().map((p) => ({ ...p })) : [];
   }
 
   function selectPhoto(photoId: string | null) {

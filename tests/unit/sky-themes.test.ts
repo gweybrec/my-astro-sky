@@ -1,14 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import {
-  applyStarColor,
-  SKY_THEME,
-  type SkyThemeConfig,
-} from '../../src/sky-themes';
+import { applyStarColor, SKY_THEME, type SkyThemeConfig } from '../../src/sky-themes';
 
 function makeTheme(overrides: Partial<SkyThemeConfig>): SkyThemeConfig {
   return {
     baseFill: '#000',
-    bgStops: [[0, '#000'], [1, '#000']],
+    bgStops: [
+      [0, '#000'],
+      [1, '#000'],
+    ],
     vignette: null,
     bgOpacityScale: 1,
     starTint: { rMul: 1, gMul: 1, bMul: 1 },
@@ -74,8 +73,8 @@ describe('applyStarColor', () => {
   it('honors a saturation override (for the glow color)', () => {
     const theme = makeTheme({ starSaturation: 0.3 });
     const warm: [number, number, number] = [255, 152, 92];
-    const dot = applyStarColor(warm, theme);                 // near-white dot
-    const glow = applyStarColor(warm, theme, 1.2);           // strongly tinted glow
+    const dot = applyStarColor(warm, theme); // near-white dot
+    const glow = applyStarColor(warm, theme, 1.2); // strongly tinted glow
     // the glow keeps much more of the warm color than the dot
     expect(glow[2]).toBeLessThan(dot[2]); // bluer channel pulled further down → more orange
     expect(dot[1] - dot[2]).toBeLessThan(glow[1] - glow[2]); // warm spread larger in glow

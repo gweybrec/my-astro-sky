@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bvToRgb, starRadius, computeMaxMag, atlasScaleBucket, ATLAS_SCALE_STEP,
+  bvToRgb,
+  starRadius,
+  computeMaxMag,
+  atlasScaleBucket,
+  ATLAS_SCALE_STEP,
   computeStarPaint,
 } from '../../src/star-render-math';
 import { SKY_THEME } from '../../src/sky-themes';

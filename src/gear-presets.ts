@@ -41,16 +41,15 @@ export function pixelScaleArcsec(p: GearPreset): number {
 
 /** Formats a FOV as "24'" or "1.5°", width × height */
 export function formatFov(wDeg: number, hDeg: number): string {
-  const fmt = (d: number) =>
-    d >= 1 ? `${d.toFixed(1)}°` : `${(d * 60).toFixed(0)}'`;
+  const fmt = (d: number) => (d >= 1 ? `${d.toFixed(1)}°` : `${(d * 60).toFixed(0)}'`);
   return `${fmt(wDeg)} × ${fmt(hDeg)}`;
 }
 
 /** Short label used on the sky map frame: "1280 mm · FOV 24' × 18' · 1.0″/px" */
 export function formatGearFovLabel(p: GearPreset): string {
-  const fov   = fovDeg(p);
+  const fov = fovDeg(p);
   const scale = pixelScaleArcsec(p);
-  const fl    = p.focalLengthMm.toFixed(0);
+  const fl = p.focalLengthMm.toFixed(0);
   return `${fl} mm · FOV ${formatFov(fov.wDeg, fov.hDeg)} · ${scale.toFixed(1)}″/px`;
 }
 
@@ -87,7 +86,10 @@ export function computeFovTargetScale(
 ): number {
   const maxDeg = Math.max(wDeg, hDeg);
   const colatitude = hemisphere === 'south' ? 90 + decDeg : 90 - decDeg;
-  const theta = colatitude * Math.PI / 180;
+  const theta = (colatitude * Math.PI) / 180;
   const cos2 = Math.cos(theta / 2) ** 2;
-  return Math.max(300, Math.min(50000, canvasMinDim * fillFraction * cos2 / (maxDeg * Math.PI / 360)));
+  return Math.max(
+    300,
+    Math.min(50000, (canvasMinDim * fillFraction * cos2) / ((maxDeg * Math.PI) / 360)),
+  );
 }

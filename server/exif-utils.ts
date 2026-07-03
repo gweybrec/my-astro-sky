@@ -14,18 +14,28 @@
  * @param orientation - EXIF orientation tag value (1–8); defaults to identity
  */
 export function rawToBrowserCoords(
-  rawX: number, rawY: number,
-  rawW: number, rawH: number,
-  orientation: number
+  rawX: number,
+  rawY: number,
+  rawW: number,
+  rawH: number,
+  orientation: number,
 ): { x: number; y: number } {
   switch (orientation) {
-    case 2: return { x: rawW - 1 - rawX, y: rawY };
-    case 3: return { x: rawW - 1 - rawX, y: rawH - 1 - rawY };
-    case 4: return { x: rawX, y: rawH - 1 - rawY };
-    case 5: return { x: rawY, y: rawX };
-    case 6: return { x: rawH - 1 - rawY, y: rawX };          // 90° CW
-    case 7: return { x: rawH - 1 - rawY, y: rawW - 1 - rawX };
-    case 8: return { x: rawY, y: rawW - 1 - rawX };          // 90° CCW (270° CW)
-    default: return { x: rawX, y: rawY }; // orientation 1 or unknown
+    case 2:
+      return { x: rawW - 1 - rawX, y: rawY };
+    case 3:
+      return { x: rawW - 1 - rawX, y: rawH - 1 - rawY };
+    case 4:
+      return { x: rawX, y: rawH - 1 - rawY };
+    case 5:
+      return { x: rawY, y: rawX };
+    case 6:
+      return { x: rawH - 1 - rawY, y: rawX }; // 90° CW
+    case 7:
+      return { x: rawH - 1 - rawY, y: rawW - 1 - rawX };
+    case 8:
+      return { x: rawY, y: rawW - 1 - rawX }; // 90° CCW (270° CW)
+    default:
+      return { x: rawX, y: rawY }; // orientation 1 or unknown
   }
 }

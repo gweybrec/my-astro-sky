@@ -9,7 +9,12 @@ export const UNCATEGORIZED_COLOR = '#888888';
 
 /** The synthetic category shown for POIs whose `categoryId` no longer resolves. */
 export function uncategorizedCategory(): PoiCategory {
-  return { id: UNCATEGORIZED_ID, name: t('poi.uncategorized'), color: UNCATEGORIZED_COLOR, position: Number.MAX_SAFE_INTEGER };
+  return {
+    id: UNCATEGORIZED_ID,
+    name: t('poi.uncategorized'),
+    color: UNCATEGORIZED_COLOR,
+    position: Number.MAX_SAFE_INTEGER,
+  };
 }
 
 /**
@@ -18,7 +23,7 @@ export function uncategorizedCategory(): PoiCategory {
  * (chips, filters, map) calls this so orphans are treated identically everywhere.
  */
 export function resolveCategory(categoryId: string, categories: PoiCategory[]): PoiCategory {
-  return categories.find(c => c.id === categoryId) ?? uncategorizedCategory();
+  return categories.find((c) => c.id === categoryId) ?? uncategorizedCategory();
 }
 
 export interface PoiGroup {
@@ -30,12 +35,18 @@ export interface PoiGroup {
  * Group a photo's POIs by their resolved category, ordered by category position
  * (Uncategorized last). Categories with no matching POI are omitted.
  */
-export function groupPoisByCategory(pois: PointOfInterest[], categories: PoiCategory[]): PoiGroup[] {
+export function groupPoisByCategory(
+  pois: PointOfInterest[],
+  categories: PoiCategory[],
+): PoiGroup[] {
   const byId = new Map<string, PoiGroup>();
   for (const poi of pois) {
     const cat = resolveCategory(poi.categoryId, categories);
     let group = byId.get(cat.id);
-    if (!group) { group = { category: cat, pois: [] }; byId.set(cat.id, group); }
+    if (!group) {
+      group = { category: cat, pois: [] };
+      byId.set(cat.id, group);
+    }
     group.pois.push(poi);
   }
   return Array.from(byId.values()).sort((a, b) => a.category.position - b.category.position);
@@ -67,15 +78,19 @@ export function buildPoiFilterGroups(
       if (seen.has(key)) continue;
       seen.add(key);
       let names = counts.get(cat.id);
-      if (!names) { names = new Map(); counts.set(cat.id, names); }
+      if (!names) {
+        names = new Map();
+        counts.set(cat.id, names);
+      }
       names.set(poi.name, (names.get(poi.name) ?? 0) + 1);
     }
   }
   const groups: PoiFilterGroup[] = [];
   for (const [catId, names] of counts) {
-    const category = catId === UNCATEGORIZED_ID
-      ? uncategorizedCategory()
-      : categories.find(c => c.id === catId) ?? uncategorizedCategory();
+    const category =
+      catId === UNCATEGORIZED_ID
+        ? uncategorizedCategory()
+        : (categories.find((c) => c.id === catId) ?? uncategorizedCategory());
     groups.push({
       category,
       names: Array.from(names.entries())
@@ -100,16 +115,19 @@ export function prunePoiSelection(
   groups: PoiFilterGroup[],
 ): Map<string, Set<string>> {
   const available = new Map<string, Set<string>>(
-    groups.map(g => [g.category.id, new Set(g.names.map(n => n.name))]),
+    groups.map((g) => [g.category.id, new Set(g.names.map((n) => n.name))]),
   );
   const pruned = new Map<string, Set<string>>();
   for (const [catId, names] of selected) {
     const avail = available.get(catId);
-    if (!avail) continue;                              // category no longer present
-    if (names.size === 0) { pruned.set(catId, new Set()); continue; } // "whole category"
+    if (!avail) continue; // category no longer present
+    if (names.size === 0) {
+      pruned.set(catId, new Set());
+      continue;
+    } // "whole category"
     const kept = new Set<string>();
     for (const n of names) if (avail.has(n)) kept.add(n);
-    if (kept.size > 0) pruned.set(catId, kept);        // drop entirely if no name survives
+    if (kept.size > 0) pruned.set(catId, kept); // drop entirely if no name survives
   }
   return pruned;
 }
@@ -148,7 +166,7 @@ export function poisMatchFilter(
   for (const poi of pois) {
     const catId = resolveCategory(poi.categoryId, categories).id;
     const names = selected.get(catId);
-    if (!names) continue;            // category not selected
+    if (!names) continue; // category not selected
     if (names.size === 0 || names.has(poi.name)) return true;
   }
   return false;

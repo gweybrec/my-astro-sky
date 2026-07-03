@@ -12,15 +12,18 @@
 import eyeSvg from '../../icons/eye.svg?raw';
 import eyeOffSvg from '../../icons/eye-off.svg?raw';
 
-const props = withDefaults(defineProps<{
-  visible: boolean;
-  title: string;
-  // Most callers nest this inside a larger clickable row and need to stop the
-  // click from also triggering the row (see PhotoItem.vue). Overlay buttons
-  // (e.g. FOVRibbon) intentionally let the click bubble to document, which
-  // other open popups rely on to close themselves (see DropdownPanel.vue).
-  stopPropagation?: boolean;
-}>(), { stopPropagation: false });
+const props = withDefaults(
+  defineProps<{
+    visible: boolean;
+    title: string;
+    // Most callers nest this inside a larger clickable row and need to stop the
+    // click from also triggering the row (see PhotoItem.vue). Overlay buttons
+    // (e.g. FOVRibbon) intentionally let the click bubble to document, which
+    // other open popups rely on to close themselves (see DropdownPanel.vue).
+    stopPropagation?: boolean;
+  }>(),
+  { stopPropagation: false },
+);
 
 const emit = defineEmits<{ toggle: [] }>();
 

@@ -67,7 +67,8 @@ describe('settings security behavior', () => {
     setSetting('ASTROMETRY_API_KEY', 'super-secret');
 
     const db = new Database(dbPath, { readonly: true });
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('ASTROMETRY_API_KEY') as { value: string } | undefined;
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('ASTROMETRY_API_KEY') as
+      { value: string } | undefined;
     db.close();
 
     expect(row).toBeDefined();

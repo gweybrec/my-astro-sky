@@ -29,14 +29,17 @@ describe('SPA catch-all /api guard', () => {
     // Catch-all registered first — intentionally worst-case ordering (mirrors the old async-IIFE bug).
     // The /api guard is what makes /api routes reachable in this scenario.
     app.get('/{*splat}', (req, res, next) => {
-      if (req.path.startsWith('/api')) { next(); return; }
+      if (req.path.startsWith('/api')) {
+        next();
+        return;
+      }
       res.status(200).send('spa');
     });
 
     // /api/docs registered AFTER the catch-all — simulates swagger appended by an async function.
     app.get('/api/docs', (_req, res) => res.status(200).json({ swagger: true }));
 
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
       server = http.createServer(app);
       server.listen(0, resolve);
     });
@@ -44,7 +47,7 @@ describe('SPA catch-all /api guard', () => {
     base = `http://localhost:${addr.port}`;
   });
 
-  afterAll(() => new Promise<void>(resolve => server.close(() => resolve())));
+  afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
   it('reaches /api/docs even when it is registered after the catch-all', async () => {
     const res = await fetch(`${base}/api/docs`);

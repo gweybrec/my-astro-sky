@@ -15,7 +15,10 @@ import { angularSizeToCanvasPx } from './dso-render-math';
  * Returns null when nothing qualifies. Pixel-identical to the old inline logic.
  */
 export function pickDsoAtCursor(
-  candidates: DSO[], mx: number, my: number, view: ViewState,
+  candidates: DSO[],
+  mx: number,
+  my: number,
+  view: ViewState,
 ): DSO | null {
   if (candidates.length === 0) return null;
   const projPt = fromCanvas(mx, my, view);

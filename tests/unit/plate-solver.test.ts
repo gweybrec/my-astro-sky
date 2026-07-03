@@ -75,8 +75,12 @@ function makeSuccessFixture() {
   const p6 = { x: (p1.x + p3.x) / 2 + 5, y: (p1.y + p3.y) / 2 - 6 };
 
   const byHip = new Map<number, { x: number; y: number }>([
-    [1001, p1], [1002, p2], [1003, p3],
-    [1004, p4], [1005, p5], [1006, p6],
+    [1001, p1],
+    [1002, p2],
+    [1003, p3],
+    [1004, p4],
+    [1005, p5],
+    [1006, p6],
   ]);
 
   const a = 1.0e-5;
@@ -163,7 +167,10 @@ describe('solvePlate()', () => {
     mockGetStars.mockReturnValue([]);
 
     const result = await solvePlate(
-      [{ x: 1, y: 1, brightness: 10, size: 2 }, { x: 2, y: 2, brightness: 9, size: 2 }],
+      [
+        { x: 1, y: 1, brightness: 10, size: 2 },
+        { x: 2, y: 2, brightness: 9, size: 2 },
+      ],
       1000,
       800,
     );

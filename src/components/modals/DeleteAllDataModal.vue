@@ -12,7 +12,9 @@
             class="display-controls-btn self-start text-small"
             :disabled="!hasPhotos || backingUp"
             @click="doBackup"
-          >{{ t('settings.importBackupBtn') }}</button>
+          >
+            {{ t('settings.importBackupBtn') }}
+          </button>
         </div>
 
         <div class="modal-divider"></div>
@@ -53,11 +55,13 @@
               <input
                 type="checkbox"
                 class="checkbox-danger"
-                  :checked="selectedPhotos.has(photo.id)"
+                :checked="selectedPhotos.has(photo.id)"
                 @change="togglePhoto(photo.id)"
               />
               <span class="text-ellipsis">{{ photo.originalName }}</span>
-              <span class="text-dim-xs">{{ photo.fileSize ? formatBytes(photo.fileSize) : '—' }}</span>
+              <span class="text-dim-xs">{{
+                photo.fileSize ? formatBytes(photo.fileSize) : '—'
+              }}</span>
             </label>
           </div>
         </div>
@@ -86,7 +90,14 @@ import { ref, computed, reactive } from 'vue';
 import { t } from '../../i18n';
 import { usePhotosStore } from '../../stores/photos';
 import { useCanvasStore } from '../../stores/canvas';
-import { exportData, deleteBulkPhotos, deleteAllPhotoMetadata, deleteAllDsoOverrides, deleteAllCustomGear, deleteAllGearSetupsAPI } from '../../api';
+import {
+  exportData,
+  deleteBulkPhotos,
+  deleteAllPhotoMetadata,
+  deleteAllDsoOverrides,
+  deleteAllCustomGear,
+  deleteAllGearSetupsAPI,
+} from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
 import { buildDeleteSummaryLines } from '../../delete-utils';
 import { showToast } from '../../toast';
@@ -98,7 +109,7 @@ const emit = defineEmits<{ close: [] }>();
 const photosStore = usePhotosStore();
 const canvasStore = useCanvasStore();
 
-const photos = computed(() => photosStore.placedPhotos.map(p => p.photo));
+const photos = computed(() => photosStore.placedPhotos.map((p) => p.photo));
 const hasPhotos = computed(() => photos.value.length > 0);
 
 const deleteMeta = ref(false);
@@ -110,11 +121,18 @@ const backingUp = ref(false);
 
 const selectedPhotos = reactive(new Set<string>());
 
-const allPhotoChecked = computed(() => photos.value.length > 0 && photos.value.every(p => selectedPhotos.has(p.id)));
-const somePhotoChecked = computed(() => photos.value.some(p => selectedPhotos.has(p.id)));
+const allPhotoChecked = computed(
+  () => photos.value.length > 0 && photos.value.every((p) => selectedPhotos.has(p.id)),
+);
+const somePhotoChecked = computed(() => photos.value.some((p) => selectedPhotos.has(p.id)));
 
-const canDelete = computed(() =>
-  deleteMeta.value || deleteDso.value || deleteGear.value || deleteSetups.value || somePhotoChecked.value,
+const canDelete = computed(
+  () =>
+    deleteMeta.value ||
+    deleteDso.value ||
+    deleteGear.value ||
+    deleteSetups.value ||
+    somePhotoChecked.value,
 );
 
 type ConfirmStep = { lines: string[] };
@@ -126,7 +144,7 @@ function onClose() {
 
 function toggleAll(e: Event) {
   const checked = (e.target as HTMLInputElement).checked;
-  if (checked) photos.value.forEach(p => selectedPhotos.add(p.id));
+  if (checked) photos.value.forEach((p) => selectedPhotos.add(p.id));
   else selectedPhotos.clear();
 }
 
@@ -137,7 +155,7 @@ function togglePhoto(id: string) {
 
 async function doBackup() {
   backingUp.value = true;
-  const ids = photos.value.map(p => p.id);
+  const ids = photos.value.map((p) => p.id);
   try {
     await exportData({ includeImages: true, includeMetadata: true }, ids);
   } catch (err: any) {
@@ -148,7 +166,7 @@ async function doBackup() {
 }
 
 function onDelete() {
-  const selectedPhotoIds = photos.value.filter(p => selectedPhotos.has(p.id)).map(p => p.id);
+  const selectedPhotoIds = photos.value.filter((p) => selectedPhotos.has(p.id)).map((p) => p.id);
   const lines = buildDeleteSummaryLines(
     {
       photoMetadata: deleteMeta.value,
@@ -166,7 +184,7 @@ function onDelete() {
 async function onConfirmed() {
   confirmStep.value = null;
   busy.value = true;
-  const selectedPhotoIds = photos.value.filter(p => selectedPhotos.has(p.id)).map(p => p.id);
+  const selectedPhotoIds = photos.value.filter((p) => selectedPhotos.has(p.id)).map((p) => p.id);
   try {
     if (deleteMeta.value) {
       await deleteAllPhotoMetadata();

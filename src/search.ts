@@ -7,11 +7,30 @@ import { t } from './i18n';
 
 // Greek letter mapping for Latin input (alpha -> α, beta -> β, etc.)
 const greekLetterMap: Record<string, string> = {
-  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
-  zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ',
-  lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', omicron: 'ο',
-  pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ',
-  phi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω'
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ε',
+  zeta: 'ζ',
+  eta: 'η',
+  theta: 'θ',
+  iota: 'ι',
+  kappa: 'κ',
+  lambda: 'λ',
+  mu: 'μ',
+  nu: 'ν',
+  xi: 'ξ',
+  omicron: 'ο',
+  pi: 'π',
+  rho: 'ρ',
+  sigma: 'σ',
+  tau: 'τ',
+  upsilon: 'υ',
+  phi: 'φ',
+  chi: 'χ',
+  psi: 'ψ',
+  omega: 'ω',
 };
 
 /**
@@ -88,9 +107,7 @@ export function searchStars(query: string, limit = 10): SearchResult[] {
     // Match by Bayer designation
     if (score === 0 && star.desig) {
       const d = star.desig.toLowerCase();
-      const full = star.constellation
-        ? `${star.desig} ${star.constellation}`.toLowerCase()
-        : d;
+      const full = star.constellation ? `${star.desig} ${star.constellation}`.toLowerCase() : d;
 
       if (full.startsWith(q) || d.startsWith(q)) score = 50;
       else if (full.includes(q) || d.includes(q)) score = 30;
@@ -137,7 +154,7 @@ export function getDSOTypeName(type: string): string {
 function dsoLabel(dso: DSO): string {
   const typeName = getDSOTypeName(dso.type);
   // Drop internal "LPN-xxx" ids from cross refs (consistent with the tooltip/info panel)
-  const crossRefList = dso.catalogs.slice(1).filter(c => !c.startsWith('LPN-'));
+  const crossRefList = dso.catalogs.slice(1).filter((c) => !c.startsWith('LPN-'));
   const crossRefs = crossRefList.length ? ` (${crossRefList.join(' · ')})` : '';
   if (dso.id.startsWith('LPN-')) {
     // For LPN objects, show displayName or stripped id (no "LPN-xxx" prefix in label)
@@ -184,9 +201,9 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
     // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42, and
     // Barnard33 finds IC434). Distinguish exact from prefix: an exact alias is
     // the precise designation the user typed and must rank with an exact id.
-    const catsLower = dso.catalogs.map(c => normCatId(c));
-    const aliasExact = catsLower.some(c => c === qId);
-    const aliasPrefix = catsLower.some(c => c.startsWith(qId));
+    const catsLower = dso.catalogs.map((c) => normCatId(c));
+    const aliasExact = catsLower.some((c) => c === qId);
+    const aliasPrefix = catsLower.some((c) => c.startsWith(qId));
 
     // 1. Exact match on the primary id OR any catalog alias (the exact thing typed).
     //    e.g. "barnard33" → IC434 must beat "barnard330" (a mere id prefix).

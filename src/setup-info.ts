@@ -8,8 +8,13 @@
 
 import { t } from './i18n';
 import {
-  buildGearPreset, telescopeLabel, cameraLabel, accessoryLabel,
-  type TelescopeData, type CameraData, type AccessoryData,
+  buildGearPreset,
+  telescopeLabel,
+  cameraLabel,
+  accessoryLabel,
+  type TelescopeData,
+  type CameraData,
+  type AccessoryData,
 } from './gear-catalog';
 import { fovDeg, pixelScaleArcsec, formatFov } from './gear-presets';
 

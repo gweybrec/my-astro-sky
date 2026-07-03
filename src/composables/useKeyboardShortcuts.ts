@@ -24,23 +24,56 @@ export function useKeyboardShortcuts() {
     const view = sm.getView();
 
     switch (id) {
-      case 'toggleStars': displayStore.setShowStars(!displayStore.showStars); return true;
-      case 'toggleConstellationLines': displayStore.setShowConstellationLines(!displayStore.showConstellationLines); return true;
-      case 'toggleConstellationNames': displayStore.setShowConstellationNames(!displayStore.showConstellationNames); return true;
-      case 'toggleDSOs': displayStore.setShowDSOs(!displayStore.showDSOs); return true;
-      case 'toggleDSOLabels': displayStore.setShowDSOLabels(!displayStore.showDSOLabels); return true;
-      case 'toggleStarLabels': displayStore.setShowStarLabels(!displayStore.showStarLabels); return true;
-      case 'toggleGrid': displayStore.setShowGrid(!displayStore.showGrid); return true;
-      case 'togglePhotos': displayStore.setShowPhotos(!displayStore.showPhotos); return true;
-      case 'togglePhotoOutlines': displayStore.setShowPhotoOutlines(!displayStore.showPhotoOutlines); return true;
-      case 'togglePanel': uiStore.setPanelCollapsed(!uiStore.panelCollapsed); return true;
-      case 'zoomIn': sm.zoomBy(1.3); return true;
-      case 'zoomOut': sm.zoomBy(1 / 1.3); return true;
-      case 'panLeft': sm.panBy(-view.width * 0.1, 0); return true;
-      case 'panRight': sm.panBy(view.width * 0.1, 0); return true;
-      case 'panUp': sm.panBy(0, -view.height * 0.1); return true;
-      case 'panDown': sm.panBy(0, view.height * 0.1); return true;
-      default: return false;
+      case 'toggleStars':
+        displayStore.setShowStars(!displayStore.showStars);
+        return true;
+      case 'toggleConstellationLines':
+        displayStore.setShowConstellationLines(!displayStore.showConstellationLines);
+        return true;
+      case 'toggleConstellationNames':
+        displayStore.setShowConstellationNames(!displayStore.showConstellationNames);
+        return true;
+      case 'toggleDSOs':
+        displayStore.setShowDSOs(!displayStore.showDSOs);
+        return true;
+      case 'toggleDSOLabels':
+        displayStore.setShowDSOLabels(!displayStore.showDSOLabels);
+        return true;
+      case 'toggleStarLabels':
+        displayStore.setShowStarLabels(!displayStore.showStarLabels);
+        return true;
+      case 'toggleGrid':
+        displayStore.setShowGrid(!displayStore.showGrid);
+        return true;
+      case 'togglePhotos':
+        displayStore.setShowPhotos(!displayStore.showPhotos);
+        return true;
+      case 'togglePhotoOutlines':
+        displayStore.setShowPhotoOutlines(!displayStore.showPhotoOutlines);
+        return true;
+      case 'togglePanel':
+        uiStore.setPanelCollapsed(!uiStore.panelCollapsed);
+        return true;
+      case 'zoomIn':
+        sm.zoomBy(1.3);
+        return true;
+      case 'zoomOut':
+        sm.zoomBy(1 / 1.3);
+        return true;
+      case 'panLeft':
+        sm.panBy(-view.width * 0.1, 0);
+        return true;
+      case 'panRight':
+        sm.panBy(view.width * 0.1, 0);
+        return true;
+      case 'panUp':
+        sm.panBy(0, -view.height * 0.1);
+        return true;
+      case 'panDown':
+        sm.panBy(0, view.height * 0.1);
+        return true;
+      default:
+        return false;
     }
   }
 

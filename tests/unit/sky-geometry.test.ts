@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { altAzFromRaDec, transitLstHours, maxAltDuringWindow, mightBeVisible, sampleAltCurve, angularSeparationDeg, sampleMoonAltCurve, moonDangerLevel } from '../../src/sky-geometry';
+import {
+  altAzFromRaDec,
+  transitLstHours,
+  maxAltDuringWindow,
+  mightBeVisible,
+  sampleAltCurve,
+  angularSeparationDeg,
+  sampleMoonAltCurve,
+  moonDangerLevel,
+} from '../../src/sky-geometry';
 import { lstHours, dateToJD, moonRaDecDeg } from '../../src/astro-time';
 
 describe('altAzFromRaDec', () => {
@@ -91,7 +100,10 @@ describe('maxAltDuringWindow', () => {
 });
 
 describe('sampleAltCurve', () => {
-  const raDeg = 84, decDeg = -1.2, latDeg = 48.85, lonDeg = 2.35;
+  const raDeg = 84,
+    decDeg = -1.2,
+    latDeg = 48.85,
+    lonDeg = 2.35;
   const start = new Date('2024-01-15T19:00:00Z');
   const end = new Date('2024-01-16T05:00:00Z'); // 10h window
 
@@ -125,7 +137,7 @@ describe('sampleAltCurve', () => {
 
   it('peak sample altitude is close to maxAltDuringWindow', () => {
     const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 10);
-    const peak = Math.max(...curve.map(s => s.altDeg));
+    const peak = Math.max(...curve.map((s) => s.altDeg));
     const { maxAltDeg } = maxAltDuringWindow(raDeg, decDeg, latDeg, lonDeg, start, end, 10);
     expect(peak).toBeCloseTo(maxAltDeg, 5);
   });
@@ -152,7 +164,7 @@ describe('angularSeparationDeg', () => {
 
   it('a known pair: Betelgeuse↔Rigel ≈ 18.6°', () => {
     // Betelgeuse RA 88.79 Dec 7.41, Rigel RA 78.63 Dec -8.20
-    const sep = angularSeparationDeg(88.79, 7.41, 78.63, -8.20);
+    const sep = angularSeparationDeg(88.79, 7.41, 78.63, -8.2);
     expect(sep).toBeCloseTo(18.6, 0);
   });
 
@@ -162,7 +174,8 @@ describe('angularSeparationDeg', () => {
 });
 
 describe('sampleMoonAltCurve', () => {
-  const latDeg = 48.85, lonDeg = 2.35;
+  const latDeg = 48.85,
+    lonDeg = 2.35;
   const start = new Date('2024-01-15T19:00:00Z');
   const end = new Date('2024-01-16T05:00:00Z'); // 10h window
 
@@ -199,7 +212,9 @@ describe('moonDangerLevel', () => {
     const rank = { danger: 2, warn: 1, ok: 0 } as const;
     for (const illum of [0.3, 0.6, 0.9]) {
       for (let s = 10; s < 180; s += 10) {
-        expect(rank[moonDangerLevel(s - 10, illum)]).toBeGreaterThanOrEqual(rank[moonDangerLevel(s, illum)]);
+        expect(rank[moonDangerLevel(s - 10, illum)]).toBeGreaterThanOrEqual(
+          rank[moonDangerLevel(s, illum)],
+        );
       }
     }
   });

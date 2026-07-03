@@ -17,7 +17,12 @@ export function buildPhotoQueryMatches(photos: Photo[], query: string): PhotoQue
     const matchesName = photo.originalName.toLowerCase().includes(q);
     const matchesNotes = photo.notes.toLowerCase().includes(q);
 
-    if (!matchesName && !matchesNotes && matchingDsoIds.length === 0 && matchingLabels.length === 0) {
+    if (
+      !matchesName &&
+      !matchesNotes &&
+      matchingDsoIds.length === 0 &&
+      matchingLabels.length === 0
+    ) {
       continue;
     }
 

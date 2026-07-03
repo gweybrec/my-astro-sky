@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { project, projectCached, getProjectionGeneration, invalidateProjections, unproject, toCanvas, fromCanvas, setHemisphere, getHemisphere, setProjectionMode, borderRadiusPU, fitScaleForBorderCircle } from '../../src/projection';
+import {
+  project,
+  projectCached,
+  getProjectionGeneration,
+  invalidateProjections,
+  unproject,
+  toCanvas,
+  fromCanvas,
+  setHemisphere,
+  getHemisphere,
+  setProjectionMode,
+  borderRadiusPU,
+  fitScaleForBorderCircle,
+} from '../../src/projection';
 
 const EPSILON = 1e-9;
 
@@ -40,7 +53,7 @@ describe('project / unproject roundtrip', () => {
     expect(p.x).toBeCloseTo(0, 9);
     expect(p.y).toBeCloseTo(0, 9);
 
-    const rt = unproject(...Object.values(project(123.4, -45.6)) as [number, number]);
+    const rt = unproject(...(Object.values(project(123.4, -45.6)) as [number, number]));
     expect(rt.dec).toBeCloseTo(-45.6, 9);
     const raDiff = Math.abs(rt.ra - 123.4) % 360;
     expect(Math.min(raDiff, 360 - raDiff)).toBeLessThan(EPSILON);
@@ -71,7 +84,7 @@ describe('hemisphere state', () => {
 describe('RA increases counter-clockwise (sky chart convention)', () => {
   it('higher RA projects to the LEFT of lower RA at same Dec', () => {
     const p1 = project(350, 45); // high RA
-    const p2 = project(10, 45);  // low RA
+    const p2 = project(10, 45); // low RA
     // In projection space, sin(RA) component: sin(350°) ≈ -0.17, sin(10°) ≈ 0.17
     // RA increasing → x decreasing (CCW on sky = CW in standard math coords)
     // Just verify they are different and the convention holds:
@@ -141,13 +154,16 @@ describe('toCanvas / fromCanvas roundtrip', () => {
 
 describe('borderRadiusPU / fitScaleForBorderCircle', () => {
   it('border radius uses r = tan((90 + lat) / 2)', () => {
-    expect(borderRadiusPU(45)).toBeCloseTo(Math.tan((90 + 45) / 2 * Math.PI / 180), 12);
+    expect(borderRadiusPU(45)).toBeCloseTo(Math.tan((((90 + 45) / 2) * Math.PI) / 180), 12);
     // lat = 0 ⇒ tan(45°) = 1 (the celestial equator circle)
     expect(borderRadiusPU(0)).toBeCloseTo(1, 12);
   });
 
   it('fit scale frames the whole border circle within the smaller dimension', () => {
-    const cssW = 1200, cssH = 800, lat = 45, margin = 0.96;
+    const cssW = 1200,
+      cssH = 800,
+      lat = 45,
+      margin = 0.96;
     const scale = fitScaleForBorderCircle(cssW, cssH, lat, margin);
     // The border circle diameter in canvas px must fit the smaller dimension (× margin).
     const diameterPx = 2 * borderRadiusPU(lat) * scale;
@@ -156,7 +172,10 @@ describe('borderRadiusPU / fitScaleForBorderCircle', () => {
 
   it('is driven by the smaller dimension (portrait vs landscape)', () => {
     const lat = 45;
-    expect(fitScaleForBorderCircle(800, 1200, lat)).toBeCloseTo(fitScaleForBorderCircle(1200, 800, lat), 12);
+    expect(fitScaleForBorderCircle(800, 1200, lat)).toBeCloseTo(
+      fitScaleForBorderCircle(1200, 800, lat),
+      12,
+    );
   });
 });
 
@@ -164,7 +183,10 @@ describe('projectCached / projection generation', () => {
   it('writes cached projection matching project()', () => {
     setHemisphere('north');
     setProjectionMode('stereo');
-    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 123.456, dec: 67.89 };
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = {
+      ra: 123.456,
+      dec: 67.89,
+    };
     projectCached(o);
     const p = project(123.456, 67.89);
     expect(o._px).toBeCloseTo(p.x, 12);
@@ -174,7 +196,10 @@ describe('projectCached / projection generation', () => {
 
   it('does not re-project until the generation moves', () => {
     setHemisphere('north');
-    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 10, dec: 20 };
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = {
+      ra: 10,
+      dec: 20,
+    };
     projectCached(o);
     // Tamper with the cache: a no-op call must leave the stale value untouched.
     o._px = 999;
@@ -184,7 +209,10 @@ describe('projectCached / projection generation', () => {
 
   it('invalidates the cache when the hemisphere changes', () => {
     setHemisphere('north');
-    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 10, dec: 20 };
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = {
+      ra: 10,
+      dec: 20,
+    };
     projectCached(o);
     const gen = getProjectionGeneration();
     setHemisphere('south');
@@ -198,11 +226,14 @@ describe('projectCached / projection generation', () => {
 
   it('invalidateProjections bumps the generation and forces a recompute', () => {
     setHemisphere('north');
-    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = { ra: 10, dec: 20 };
+    const o: { ra: number; dec: number; _px?: number; _py?: number; _pg?: number } = {
+      ra: 10,
+      dec: 20,
+    };
     projectCached(o);
     const gen = getProjectionGeneration();
-    o._px = 999;                 // simulate a stale cached value
-    invalidateProjections();     // e.g. the object's ra/dec changed
+    o._px = 999; // simulate a stale cached value
+    invalidateProjections(); // e.g. the object's ra/dec changed
     expect(getProjectionGeneration()).toBe(gen + 1);
     projectCached(o);
     expect(o._px).toBeCloseTo(project(10, 20).x, 12);
@@ -211,10 +242,10 @@ describe('projectCached / projection generation', () => {
   it('bumps the generation on a real projection-mode change but not on a no-op set', () => {
     setProjectionMode('stereo');
     const gen = getProjectionGeneration();
-    setProjectionMode('stereo');               // no-op
+    setProjectionMode('stereo'); // no-op
     expect(getProjectionGeneration()).toBe(gen);
-    setProjectionMode('fisheye');              // real change
+    setProjectionMode('fisheye'); // real change
     expect(getProjectionGeneration()).toBe(gen + 1);
-    setProjectionMode('stereo');               // restore for other tests
+    setProjectionMode('stereo'); // restore for other tests
   });
 });

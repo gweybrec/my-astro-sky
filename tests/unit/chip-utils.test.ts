@@ -7,13 +7,13 @@ vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
 
 describe('createFilterBadge', () => {
   it.each([
-    ['Ha',  'filter-ha'],
-    ['OIII','filter-oiii'],
+    ['Ha', 'filter-ha'],
+    ['OIII', 'filter-oiii'],
     ['SII', 'filter-sii'],
-    ['L',   'filter-l'],
-    ['R',   'filter-r'],
-    ['G',   'filter-g'],
-    ['B',   'filter-b'],
+    ['L', 'filter-l'],
+    ['R', 'filter-r'],
+    ['G', 'filter-g'],
+    ['B', 'filter-b'],
     ['RGB', 'filter-rgb'],
   ])('known filter %s → CSS class %s', (name, cls) => {
     const badge = createFilterBadge(name);
@@ -80,7 +80,9 @@ function getClearBtn(el: HTMLElement) {
 // ─── Initial state ────────────────────────────────────────────────────────────
 
 describe('buildIntegrationFilterField – initial state', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('empty initialValue → shows input, hides badge display', () => {
     const { el } = build({ initialValue: '' });
@@ -113,7 +115,9 @@ describe('buildIntegrationFilterField – initial state', () => {
 // ─── Typing / onSelect ───────────────────────────────────────────────────────
 
 describe('buildIntegrationFilterField – typing', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('typing calls onSelect with current value on each keystroke', () => {
     const { el, onSelect } = build({});
@@ -159,7 +163,9 @@ describe('buildIntegrationFilterField – typing', () => {
 // ─── Suggestion click (mousedown) ────────────────────────────────────────────
 
 describe('buildIntegrationFilterField – suggestion click', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('clicking suggestion calls onSelect and onCommit with label', () => {
     const { el, onSelect, onCommit } = build({ labels: ['OIII'] });
@@ -218,7 +224,9 @@ describe('buildIntegrationFilterField – suggestion click', () => {
 // ─── Enter key ───────────────────────────────────────────────────────────────
 
 describe('buildIntegrationFilterField – Enter key', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('Enter on non-empty input commits value and shows badge', () => {
     const { el, onSelect, onCommit } = build({});
@@ -309,7 +317,9 @@ describe('buildIntegrationFilterField – blur', () => {
 // ─── Clear button ─────────────────────────────────────────────────────────────
 
 describe('buildIntegrationFilterField – clear button', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('clear button calls onSelect with empty string', () => {
     const { el, onSelect } = build({ initialValue: 'Ha' });
@@ -336,7 +346,9 @@ describe('buildIntegrationFilterField – clear button', () => {
 // ─── Badge click re-enters edit mode ─────────────────────────────────────────
 
 describe('buildIntegrationFilterField – badge click re-enters edit mode', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('clicking the badge shows input and hides badge area', () => {
     const { el } = build({ initialValue: 'OIII' });
@@ -357,7 +369,9 @@ describe('buildIntegrationFilterField – badge click re-enters edit mode', () =
 // ─── Custom filter becomes autocomplete entry ─────────────────────────────────
 
 describe('buildIntegrationFilterField – custom filter autocomplete persistence', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('onCommit is called with custom typed value so caller can add it to the map', () => {
     const committed: string[] = [];
@@ -390,7 +404,7 @@ describe('buildIntegrationFilterField – custom filter autocomplete persistence
     input.classList.remove('hidden');
     input.value = '';
     input.dispatchEvent(new Event('focus'));
-    const labels = Array.from(getSuggestions(el)).map(i => i.textContent ?? '');
-    expect(labels.some(l => l.includes('CustomDB'))).toBe(true);
+    const labels = Array.from(getSuggestions(el)).map((i) => i.textContent ?? '');
+    expect(labels.some((l) => l.includes('CustomDB'))).toBe(true);
   });
 });

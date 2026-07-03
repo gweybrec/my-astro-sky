@@ -43,7 +43,10 @@ export const usePoiCategoriesStore = defineStore('poiCategories', () => {
     await load();
   }
 
-  async function update(id: string, data: Partial<{ name: string; color: string; position: number }>): Promise<void> {
+  async function update(
+    id: string,
+    data: Partial<{ name: string; color: string; position: number }>,
+  ): Promise<void> {
     await updatePoiCategory(id, data);
     await load();
   }

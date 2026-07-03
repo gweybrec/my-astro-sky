@@ -4,16 +4,33 @@ import { setActivePinia, createPinia } from 'pinia';
 // Keep the heavy gear/catalog/targets modules out of the popup under test.
 vi.mock('../../src/api', () => ({
   getGearSetups: vi.fn().mockResolvedValue([
-    { id: 's1', name: 'Setup 1', telescopeId: 't1', cameraId: 'c1', accessoryId: null, enabled: true },
+    {
+      id: 's1',
+      name: 'Setup 1',
+      telescopeId: 't1',
+      cameraId: 'c1',
+      accessoryId: null,
+      enabled: true,
+    },
   ]),
   createGearSetup: vi.fn(),
   updateGearSetup: vi.fn(),
 }));
 vi.mock('../../src/gear-catalog', () => ({
   getTelescopes: vi.fn().mockResolvedValue([{ id: 't1', focal_length_mm: 500, aperture_mm: 80 }]),
-  getCameras: vi.fn().mockResolvedValue([{ id: 'c1', sensor_width_mm: 23, sensor_height_mm: 15, pixel_size_um: 3.8, color_type: 'OSC' }]),
+  getCameras: vi.fn().mockResolvedValue([
+    {
+      id: 'c1',
+      sensor_width_mm: 23,
+      sensor_height_mm: 15,
+      pixel_size_um: 3.8,
+      color_type: 'OSC',
+    },
+  ]),
   getAccessories: vi.fn().mockResolvedValue([]),
-  buildGearPreset: vi.fn().mockReturnValue({ focalLengthMm: 500, sensorWidthMm: 23, sensorHeightMm: 15 }),
+  buildGearPreset: vi
+    .fn()
+    .mockReturnValue({ focalLengthMm: 500, sensorWidthMm: 23, sensorHeightMm: 15 }),
 }));
 vi.mock('../../src/gear-presets', () => ({
   fovDeg: vi.fn().mockReturnValue({ wDeg: 2.5, hDeg: 1.7 }),
@@ -21,7 +38,9 @@ vi.mock('../../src/gear-presets', () => ({
   formatFov: vi.fn().mockReturnValue('5.0° × 3.0°'),
 }));
 vi.mock('../../src/dso-catalog', () => ({
-  getDSOById: vi.fn((id: string) => (id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, displayName: 'Orion Nebula' } : undefined)),
+  getDSOById: vi.fn((id: string) =>
+    id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, displayName: 'Orion Nebula' } : undefined,
+  ),
 }));
 vi.mock('../../src/targets-view', () => ({ buildGearSectionContent: vi.fn() }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
@@ -34,7 +53,18 @@ import { useCanvasStore } from '../../src/stores/canvas';
 
 function seedPlan(setupId: string | null, entries: any[]) {
   const plans = usePlansStore();
-  (plans as any).plans = [{ id: 'p1', name: 'Tonight', position: 0, nightOf: null, setupId, lat: null, lon: null, entries }];
+  (plans as any).plans = [
+    {
+      id: 'p1',
+      name: 'Tonight',
+      position: 0,
+      nightOf: null,
+      setupId,
+      lat: null,
+      lon: null,
+      entries,
+    },
+  ];
   (plans as any).loaded = true;
 }
 
@@ -48,7 +78,9 @@ describe('buildFovPopup', () => {
   it('lists Free frames and every plan (creating a plan is a dedicated button)', () => {
     seedPlan('s1', []);
     const popup = buildFovPopup(() => {});
-    const opts = Array.from(popup.querySelectorAll('select option')).map(o => (o as HTMLOptionElement).textContent);
+    const opts = Array.from(popup.querySelectorAll('select option')).map(
+      (o) => (o as HTMLOptionElement).textContent,
+    );
     expect(opts).toContain('Free frames');
     expect(opts).toContain('Tonight');
     // The "+ New plan" dropdown entry was replaced by a [+] icon button.
@@ -81,7 +113,9 @@ describe('buildFovPopup', () => {
   });
 
   it('labels a plan-entry row by its DSO name', async () => {
-    seedPlan('s1', [{ id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null }]);
+    seedPlan('s1', [
+      { id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null },
+    ]);
     const store = useFovFramesStore();
     await store.loadSpecs();
     store.setSelection({ kind: 'plan', planId: 'p1' });
@@ -91,7 +125,9 @@ describe('buildFovPopup', () => {
   });
 
   it('labels a null-DSO plan entry as a custom location', async () => {
-    seedPlan('s1', [{ id: 'e1', dsoId: null, position: 0, paDeg: null, ra: 12, dec: 34, notes: null }]);
+    seedPlan('s1', [
+      { id: 'e1', dsoId: null, position: 0, paDeg: null, ra: 12, dec: 34, notes: null },
+    ]);
     const store = useFovFramesStore();
     await store.loadSpecs();
     store.setSelection({ kind: 'plan', planId: 'p1' });
@@ -101,10 +137,13 @@ describe('buildFovPopup', () => {
   });
 
   it('shows the anchor toggle on both free and plan rows (parity)', async () => {
-    seedPlan('s1', [{ id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null }]);
+    seedPlan('s1', [
+      { id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null },
+    ]);
     const store = useFovFramesStore();
     await store.loadSpecs();
-    const anchorSel = '[title="Anchor: snapping to nearest object"], [title="Anchor off: pin anywhere"]';
+    const anchorSel =
+      '[title="Anchor: snapping to nearest object"], [title="Anchor off: pin anywhere"]';
 
     // Free row: anchor toggle present.
     store.addAdhocFrame('s1');
@@ -127,7 +166,8 @@ describe('buildFovPopup', () => {
     await store.loadSpecs();
     store.addAdhocFrame('s1');
     const id = store.activeId!;
-    const anchorSel = '[title="Anchor: snapping to nearest object"], [title="Anchor off: pin anywhere"]';
+    const anchorSel =
+      '[title="Anchor: snapping to nearest object"], [title="Anchor off: pin anywhere"]';
 
     // Default: anchoring on → active class + aria-pressed="true".
     let popup = buildFovPopup(() => {});
@@ -146,29 +186,33 @@ describe('buildFovPopup', () => {
   });
 
   it('plan mode: setup dropdown lists the gear setup with its FOV label and selects the plan setup', async () => {
-    seedPlan('s1', [{ id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null }]);
+    seedPlan('s1', [
+      { id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null },
+    ]);
     const store = useFovFramesStore();
     await store.loadSpecs();
     store.setSelection({ kind: 'plan', planId: 'p1' });
     const popup = buildFovPopup(() => {});
-    await new Promise(r => setTimeout(r)); // let getGearSetups + renderAll run
+    await new Promise((r) => setTimeout(r)); // let getGearSetups + renderAll run
 
     const setupSel = popup.querySelectorAll('select')[1] as HTMLSelectElement;
     expect(setupSel.style.display).not.toBe('none');
-    const labels = Array.from(setupSel.options).map(o => o.textContent);
-    expect(labels.filter(l => l === 'Setup 1 · 2.5° × 1.7°').length).toBe(1);
+    const labels = Array.from(setupSel.options).map((o) => o.textContent);
+    expect(labels.filter((l) => l === 'Setup 1 · 2.5° × 1.7°').length).toBe(1);
     expect(setupSel.value).toBe('s1');
     popup.__cleanup?.();
   });
 
   it('plan mode: changing the setup dropdown persists to the plan (no mosaics → direct)', async () => {
-    seedPlan(null, [{ id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null }]);
+    seedPlan(null, [
+      { id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null },
+    ]);
     const store = useFovFramesStore();
     const plans = usePlansStore();
     await store.loadSpecs();
     store.setSelection({ kind: 'plan', planId: 'p1' });
     const popup = buildFovPopup(() => {});
-    await new Promise(r => setTimeout(r));
+    await new Promise((r) => setTimeout(r));
 
     const spy = vi.spyOn(plans, 'updatePlanSettings').mockResolvedValue();
     const setupSel = popup.querySelectorAll('select')[1] as HTMLSelectElement;
@@ -176,7 +220,7 @@ describe('buildFovPopup', () => {
     setupSel.dispatchEvent(new Event('change'));
     // onSetupChange now awaits loadSpecs to decide whether mosaics need a
     // transformation popup; with none it persists directly on the next tick.
-    await new Promise(r => setTimeout(r));
+    await new Promise((r) => setTimeout(r));
     expect(spy).toHaveBeenCalledWith('p1', null, 's1', null, null);
     expect(document.querySelector('.modal-backdrop')).toBeNull(); // no switch modal
     popup.__cleanup?.();
@@ -188,7 +232,7 @@ describe('buildFovPopup', () => {
     await store.loadSpecs();
     store.addAdhocFrame('s1');
     const popup = buildFovPopup(() => {});
-    await new Promise(r => setTimeout(r));
+    await new Promise((r) => setTimeout(r));
     const setupSel = popup.querySelectorAll('select')[1] as HTMLSelectElement;
     // The setup dropdown and its [+]/[edit] controls share a row that is hidden
     // outside plan mode.
@@ -208,7 +252,9 @@ describe('buildFovPopup', () => {
     store.setAdhocVisible(a, false);
 
     const popup = buildFovPopup(() => {});
-    const selectAll = popup.querySelector('.fov-popup-select-all-row input[type="checkbox"]') as HTMLInputElement;
+    const selectAll = popup.querySelector(
+      '.fov-popup-select-all-row input[type="checkbox"]',
+    ) as HTMLInputElement;
     expect(selectAll).not.toBeNull();
     expect(selectAll.indeterminate).toBe(true);
 
@@ -219,7 +265,9 @@ describe('buildFovPopup', () => {
   });
 
   it('plan mode: no visibility checkboxes', async () => {
-    seedPlan('s1', [{ id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null }]);
+    seedPlan('s1', [
+      { id: 'e1', dsoId: 'M42', position: 0, paDeg: null, ra: null, dec: null, notes: null },
+    ]);
     const store = useFovFramesStore();
     await store.loadSpecs();
     store.setSelection({ kind: 'plan', planId: 'p1' });
@@ -233,7 +281,9 @@ describe('buildFovPopup', () => {
     const store = useFovFramesStore();
     await store.loadSpecs();
     const addFrameBtn = (popup: HTMLElement) =>
-      Array.from(popup.querySelectorAll('.fov-popup-footer button')).find(b => b.getAttribute('title') === 'Add a frame') as HTMLButtonElement;
+      Array.from(popup.querySelectorAll('.fov-popup-footer button')).find(
+        (b) => b.getAttribute('title') === 'Add a frame',
+      ) as HTMLButtonElement;
 
     // No gear setup → add-frame action hidden (a plan can't size/render frames),
     // but the footer row itself (with the plan-details jump) stays visible.
@@ -277,7 +327,16 @@ describe('buildFovPopup', () => {
     seedPlan('s1', []);
     const plans = usePlansStore();
     (plans as any).plans[0].mosaics = [
-      { id: 'm1', dsoId: 'M42', centerRa: 83.8, centerDec: -5.4, paDeg: 0, overlapPct: 20, cols: 3, rows: 2 },
+      {
+        id: 'm1',
+        dsoId: 'M42',
+        centerRa: 83.8,
+        centerDec: -5.4,
+        paDeg: 0,
+        overlapPct: 20,
+        cols: 3,
+        rows: 2,
+      },
     ];
     const store = useFovFramesStore();
     await store.loadSpecs();
@@ -295,7 +354,17 @@ describe('buildFovPopup', () => {
     seedPlan('s1', []);
     const plans = usePlansStore();
     (plans as any).plans[0].mosaics = [
-      { id: 'm1', dsoId: 'M42', name: 'My region', centerRa: 83.8, centerDec: -5.4, paDeg: 0, overlapPct: 20, cols: 3, rows: 2 },
+      {
+        id: 'm1',
+        dsoId: 'M42',
+        name: 'My region',
+        centerRa: 83.8,
+        centerDec: -5.4,
+        paDeg: 0,
+        overlapPct: 20,
+        cols: 3,
+        rows: 2,
+      },
     ];
     const store = useFovFramesStore();
     await store.loadSpecs();
@@ -309,7 +378,7 @@ describe('buildFovPopup', () => {
     const modal = document.querySelector('.modal-backdrop .modal')!;
     expect(modal.querySelector('h2')!.textContent).toBe('Edit mosaic');
     const nums = Array.from(modal.querySelectorAll('input[type="number"]')) as HTMLInputElement[];
-    expect(nums.map(i => i.value)).toEqual(['20', '3', '2']); // overlap, cols, rows
+    expect(nums.map((i) => i.value)).toEqual(['20', '3', '2']); // overlap, cols, rows
     // Name pre-filled from the stored mosaic name (first text input).
     const nameInput = modal.querySelector('input[type="text"]') as HTMLInputElement;
     expect(nameInput.value).toBe('My region');
@@ -333,7 +402,9 @@ describe('buildFovPopup', () => {
     const spy = vi.spyOn(plans, 'createMosaic').mockResolvedValue('m9');
 
     const popup = buildFovPopup(() => {});
-    const addBtn = Array.from(popup.querySelectorAll('button')).find(b => b.getAttribute('title') === 'Add a mosaic') as HTMLButtonElement;
+    const addBtn = Array.from(popup.querySelectorAll('button')).find(
+      (b) => b.getAttribute('title') === 'Add a mosaic',
+    ) as HTMLButtonElement;
     expect(addBtn).toBeDefined();
     addBtn.click();
 
@@ -342,7 +413,9 @@ describe('buildFovPopup', () => {
     (modal.querySelector('.btn-confirm') as HTMLButtonElement).click();
 
     expect(spy).not.toHaveBeenCalled();
-    expect((modal.querySelector('input[type="text"]') as HTMLElement).classList.contains('input-error')).toBe(true);
+    expect(
+      (modal.querySelector('input[type="text"]') as HTMLElement).classList.contains('input-error'),
+    ).toBe(true);
     // Both the name and target error messages are revealed.
     expect(modal.querySelectorAll('.input-error-msg:not(.hidden)').length).toBe(2);
     popup.__cleanup?.();
@@ -356,7 +429,9 @@ describe('buildFovPopup', () => {
     const popup = buildFovPopup(() => {});
     // No standalone center button; the name carries the "center on map" affordance.
     expect(popup.querySelector('button[title="Center on map"]')).toBeNull();
-    expect(popup.querySelector('.fov-popup-setup-row .flex-1')!.getAttribute('title')).toBe('Center on map');
+    expect(popup.querySelector('.fov-popup-setup-row .flex-1')!.getAttribute('title')).toBe(
+      'Center on map',
+    );
     popup.__cleanup?.();
   });
 });

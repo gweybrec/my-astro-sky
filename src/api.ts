@@ -1,10 +1,24 @@
-import type { Photo, PhotoCorrespondence, PlateSolveResult, AstrometrySolveStatus, ManualPlacement, ApiErrorDetails, DSOUserOverride, PhotoIntegration, PointOfInterest, PoiCategory } from './types';
+import type {
+  Photo,
+  PhotoCorrespondence,
+  PlateSolveResult,
+  AstrometrySolveStatus,
+  ManualPlacement,
+  ApiErrorDetails,
+  DSOUserOverride,
+  PhotoIntegration,
+  PointOfInterest,
+  PoiCategory,
+} from './types';
 import { t, getLang } from './i18n';
 import { reportRendererError } from './error-reporter';
 import { downloadBlob } from './file-utils';
 
 /** Translate a server error response using the `code` field when available. */
-export function parseServerError(data: { error?: string; code?: string }, fallbackKey: string): string {
+export function parseServerError(
+  data: { error?: string; code?: string },
+  fallbackKey: string,
+): string {
   if (data.code) {
     const translated = t('serverErrors.' + data.code);
     if (!translated.startsWith('serverErrors.')) return translated;
@@ -67,7 +81,7 @@ export async function searchStarsByPosition(options: {
     dec: String(options.dec),
     radius: String(options.radius),
     magLimit: String(options.magLimit ?? 10),
-    limit: String(options.limit ?? 20)
+    limit: String(options.limit ?? 20),
   });
   const res = await fetch(`/api/stars/nearby?${params}`);
   if (!res.ok) return [];
@@ -79,7 +93,15 @@ export function uploadPhoto(
   correspondences: PhotoCorrespondence[],
   manualPlacement?: ManualPlacement,
   onProgress?: (fraction: number) => void,
-  metadata?: { dsoIds?: string[]; labels?: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; notes?: string; displayName?: string; observationDate?: string | null },
+  metadata?: {
+    dsoIds?: string[];
+    labels?: string[];
+    pointsOfInterest?: PointOfInterest[];
+    integrations?: PhotoIntegration[];
+    notes?: string;
+    displayName?: string;
+    observationDate?: string | null;
+  },
 ): Promise<Photo> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
@@ -90,8 +112,10 @@ export function uploadPhoto(
     }
     if (metadata?.dsoIds) formData.append('dsoIds', JSON.stringify(metadata.dsoIds));
     if (metadata?.labels) formData.append('labels', JSON.stringify(metadata.labels));
-    if (metadata?.pointsOfInterest) formData.append('pointsOfInterest', JSON.stringify(metadata.pointsOfInterest));
-    if (metadata?.integrations) formData.append('integrations', JSON.stringify(metadata.integrations));
+    if (metadata?.pointsOfInterest)
+      formData.append('pointsOfInterest', JSON.stringify(metadata.pointsOfInterest));
+    if (metadata?.integrations)
+      formData.append('integrations', JSON.stringify(metadata.integrations));
     if (metadata?.notes !== undefined) formData.append('notes', metadata.notes);
     if (metadata?.displayName) formData.append('displayName', metadata.displayName);
     if (metadata?.observationDate) formData.append('observationDate', metadata.observationDate);
@@ -119,7 +143,9 @@ export function uploadPhoto(
         try {
           const body = JSON.parse(xhr.responseText);
           errorMsg = parseServerError(body, 'errors.uploadFailed');
-        } catch { /* non-JSON response, keep default */ }
+        } catch {
+          /* non-JSON response, keep default */
+        }
         reject(new Error(errorMsg));
       }
     };
@@ -142,7 +168,7 @@ export async function deletePhotoAPI(id: string): Promise<void> {
 
 export async function updatePhotoManualPlacement(
   photoId: string,
-  manualPlacement: ManualPlacement | null
+  manualPlacement: ManualPlacement | null,
 ): Promise<void> {
   const res = await fetch(`/api/photos/${photoId}/manual-placement`, {
     method: 'PATCH',
@@ -154,7 +180,15 @@ export async function updatePhotoManualPlacement(
 
 export async function updatePhotoMetadata(
   photoId: string,
-  metadata: { dsoIds: string[]; labels: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; notes: string; originalName?: string; observationDate?: string | null },
+  metadata: {
+    dsoIds: string[];
+    labels: string[];
+    pointsOfInterest?: PointOfInterest[];
+    integrations?: PhotoIntegration[];
+    notes: string;
+    originalName?: string;
+    observationDate?: string | null;
+  },
 ): Promise<void> {
   const res = await fetch(`/api/photos/${photoId}/metadata`, {
     method: 'PATCH',
@@ -173,7 +207,11 @@ export async function updatePhotoOrder(photoIds: string[]): Promise<void> {
   if (!res.ok) throw new Error(t('errors.updatePhoto'));
 }
 
-export async function solveWCS(file: File, targetWidth?: number, targetHeight?: number): Promise<PlateSolveResult> {
+export async function solveWCS(
+  file: File,
+  targetWidth?: number,
+  targetHeight?: number,
+): Promise<PlateSolveResult> {
   const formData = new FormData();
   formData.append('photo', file);
   formData.append('lang', getLang());
@@ -193,7 +231,16 @@ export async function solveWCS(file: File, targetWidth?: number, targetHeight?: 
   return res.json();
 }
 
-export async function submitPlateSolve(file: File, hints?: { ra?: number; dec?: number; radius?: number; scale_lower?: number; scale_upper?: number }): Promise<{ jobId: string }> {
+export async function submitPlateSolve(
+  file: File,
+  hints?: {
+    ra?: number;
+    dec?: number;
+    radius?: number;
+    scale_lower?: number;
+    scale_upper?: number;
+  },
+): Promise<{ jobId: string }> {
   const formData = new FormData();
   formData.append('photo', file);
   if (hints?.ra !== undefined) formData.append('ra', String(hints.ra));
@@ -305,9 +352,9 @@ async function parseSolverFailure(
   const isGeneric = /^(error|erreur)$/i.test(serverError);
   const message = hasCodeTranslation
     ? translatedCode
-    : (serverError && !isGeneric
+    : serverError && !isGeneric
       ? serverError
-      : `${fallbackMessage} (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''})`);
+      : `${fallbackMessage} (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''})`;
 
   reportRendererError({
     category: 'api_solver_http_error',
@@ -339,8 +386,18 @@ export async function solveWithASTAP(
   fd.append('lang', getLang());
   const res = await fetch('/api/solve-astap', { method: 'POST', body: fd, signal });
   if (!res.ok) {
-    const parsed = await parseSolverFailure(res, 'POST', '/api/solve-astap', t('errors.astapError'));
-    return { success: false, error: parsed.message, code: parsed.code, errorDetails: parsed.details };
+    const parsed = await parseSolverFailure(
+      res,
+      'POST',
+      '/api/solve-astap',
+      t('errors.astapError'),
+    );
+    return {
+      success: false,
+      error: parsed.message,
+      code: parsed.code,
+      errorDetails: parsed.details,
+    };
   }
   return res.json();
 }
@@ -359,8 +416,18 @@ export async function solveWithSolveField(
   fd.append('lang', getLang());
   const res = await fetch('/api/solve-field', { method: 'POST', body: fd, signal });
   if (!res.ok) {
-    const parsed = await parseSolverFailure(res, 'POST', '/api/solve-field', t('errors.solveFieldError'));
-    return { success: false, error: parsed.message, code: parsed.code, errorDetails: parsed.details };
+    const parsed = await parseSolverFailure(
+      res,
+      'POST',
+      '/api/solve-field',
+      t('errors.solveFieldError'),
+    );
+    return {
+      success: false,
+      error: parsed.message,
+      code: parsed.code,
+      errorDetails: parsed.details,
+    };
   }
   return res.json();
 }
@@ -384,12 +451,15 @@ export async function listAstrometrySubmissions(): Promise<AstrometrySubmission[
   return data.submissions || [];
 }
 
-export async function reuseAstrometrySubmission(file: File, jobId: number): Promise<PlateSolveResult> {
+export async function reuseAstrometrySubmission(
+  file: File,
+  jobId: number,
+): Promise<PlateSolveResult> {
   const fd = new FormData();
   fd.append('photo', file);
   fd.append('jobId', String(jobId));
   fd.append('lang', getLang());
-  
+
   const res = await fetch('/api/astrometry/reuse', { method: 'POST', body: fd });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -418,7 +488,11 @@ export interface ExportOptions {
  * shortcuts: the client's keyboard-shortcut bindings (localStorage), bundled as
  * shortcuts.json when options.includeShortcuts is set — the server has no access to it.
  */
-export async function exportData(options: ExportOptions, ids: string[], shortcuts?: unknown): Promise<void> {
+export async function exportData(
+  options: ExportOptions,
+  ids: string[],
+  shortcuts?: unknown,
+): Promise<void> {
   const res = await fetch('/api/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -520,9 +594,11 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
   if (opts.importMetadata) fd.append('importMetadata', '1');
   if (opts.importDsoOverrides) fd.append('importDsoOverrides', '1');
   if (opts.importPoiCategories) fd.append('importPoiCategories', '1');
-  if (opts.selectedImages !== null) fd.append('selectedImages', JSON.stringify(opts.selectedImages));
+  if (opts.selectedImages !== null)
+    fd.append('selectedImages', JSON.stringify(opts.selectedImages));
   if (opts.selectedPlans !== null) fd.append('selectedPlans', JSON.stringify(opts.selectedPlans));
-  if (opts.selectedSetups !== null) fd.append('selectedSetups', JSON.stringify(opts.selectedSetups));
+  if (opts.selectedSetups !== null)
+    fd.append('selectedSetups', JSON.stringify(opts.selectedSetups));
   if (opts.selectedGear !== null) fd.append('selectedGear', JSON.stringify(opts.selectedGear));
   const res = await fetch('/api/import', { method: 'POST', body: fd });
   if (!res.ok) {
@@ -766,7 +842,10 @@ export async function getPoiCategories(): Promise<PoiCategory[]> {
   return res.json();
 }
 
-export async function createPoiCategory(data: { name: string; color: string }): Promise<{ id: string }> {
+export async function createPoiCategory(data: {
+  name: string;
+  color: string;
+}): Promise<{ id: string }> {
   const res = await fetch('/api/poi-categories', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -779,7 +858,10 @@ export async function createPoiCategory(data: { name: string; color: string }): 
   return res.json();
 }
 
-export async function updatePoiCategory(id: string, data: Partial<{ name: string; color: string; position: number }>): Promise<void> {
+export async function updatePoiCategory(
+  id: string,
+  data: Partial<{ name: string; color: string; position: number }>,
+): Promise<void> {
   const res = await fetch(`/api/poi-categories/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -909,7 +991,13 @@ export async function renamePlanAPI(id: string, name: string): Promise<void> {
   }
 }
 
-export async function updatePlanSettingsAPI(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): Promise<void> {
+export async function updatePlanSettingsAPI(
+  id: string,
+  nightOf: string | null,
+  setupId: string | null,
+  lat: number | null,
+  lon: number | null,
+): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -955,7 +1043,11 @@ export async function addPlanEntryAPI(planId: string, dsoId: string): Promise<{ 
 }
 
 /** Add a custom-location entry (no DSO) framed on empty sky at the given centre. */
-export async function addCustomPlanEntryAPI(planId: string, ra: number, dec: number): Promise<{ id: string }> {
+export async function addCustomPlanEntryAPI(
+  planId: string,
+  ra: number,
+  dec: number,
+): Promise<{ id: string }> {
   const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -969,7 +1061,10 @@ export async function addCustomPlanEntryAPI(planId: string, ra: number, dec: num
 }
 
 export async function removePlanEntryAPI(planId: string, entryId: string): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' });
+  const res = await fetch(
+    `/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`,
+    { method: 'DELETE' },
+  );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to remove target from plan');
@@ -977,7 +1072,10 @@ export async function removePlanEntryAPI(planId: string, entryId: string): Promi
 }
 
 /** Create a mosaic in a plan from client-computed tiles. Returns the mosaic id. */
-export async function createPlanMosaicAPI(planId: string, params: MosaicParams): Promise<{ id: string }> {
+export async function createPlanMosaicAPI(
+  planId: string,
+  params: MosaicParams,
+): Promise<{ id: string }> {
   const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -991,12 +1089,19 @@ export async function createPlanMosaicAPI(planId: string, params: MosaicParams):
 }
 
 /** Replace a mosaic's parameters and tile set. */
-export async function updatePlanMosaicAPI(planId: string, mosaicId: string, params: MosaicParams): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
+export async function updatePlanMosaicAPI(
+  planId: string,
+  mosaicId: string,
+  params: MosaicParams,
+): Promise<void> {
+  const res = await fetch(
+    `/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    },
+  );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to update mosaic');
@@ -1004,7 +1109,10 @@ export async function updatePlanMosaicAPI(planId: string, mosaicId: string, para
 }
 
 export async function deletePlanMosaicAPI(planId: string, mosaicId: string): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`, { method: 'DELETE' });
+  const res = await fetch(
+    `/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`,
+    { method: 'DELETE' },
+  );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to delete mosaic');
@@ -1023,12 +1131,19 @@ export async function reorderPlanEntriesAPI(planId: string, ids: string[]): Prom
   }
 }
 
-export async function updatePlanEntryPAAPI(planId: string, entryId: string, paDeg: number | null): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ paDeg }),
-  });
+export async function updatePlanEntryPAAPI(
+  planId: string,
+  entryId: string,
+  paDeg: number | null,
+): Promise<void> {
+  const res = await fetch(
+    `/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paDeg }),
+    },
+  );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to update plan entry position angle');
@@ -1043,13 +1158,23 @@ export async function updatePlanEntryPAAPI(planId: string, entryId: string, paDe
 export async function updatePlanEntryPositionAPI(
   planId: string,
   entryId: string,
-  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
+  fields: {
+    ra?: number | null;
+    dec?: number | null;
+    paDeg?: number | null;
+    dsoId?: string | null;
+    mosaicWDeg?: number | null;
+    mosaicHDeg?: number | null;
+  },
 ): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(fields),
-  });
+  const res = await fetch(
+    `/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    },
+  );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to update plan entry position');

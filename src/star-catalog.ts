@@ -23,7 +23,7 @@ export function parseConstellationLines(linesData: any): ConstellationLine[] {
     result.push({
       id: f.id,
       segments: f.geometry.coordinates.map((seg: number[][]) =>
-        seg.map(([ra, dec]: number[]) => [normalizeRA(ra), dec] as [number, number])
+        seg.map(([ra, dec]: number[]) => [normalizeRA(ra), dec] as [number, number]),
       ),
     });
   }
@@ -33,7 +33,9 @@ export function parseConstellationLines(linesData: any): ConstellationLine[] {
 async function fetchJSON(url: string): Promise<any> {
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(t('errors.catalogLoad', { url, status: res.status, statusText: res.statusText }));
+    throw new Error(
+      t('errors.catalogLoad', { url, status: res.status, statusText: res.statusText }),
+    );
   }
   return res.json();
 }
@@ -127,7 +129,7 @@ export function getStarByHip(hip: number): Star | undefined {
  * budget (see render-budget.ts). Built once and cached; `stars` is already mag-sorted.
  */
 export function getStarMagsSorted(): number[] {
-  if (!starMagsSorted) starMagsSorted = stars.map(s => s.mag);
+  if (!starMagsSorted) starMagsSorted = stars.map((s) => s.mag);
   return starMagsSorted;
 }
 
@@ -140,5 +142,5 @@ export function getConstellationInfos(): ConstellationInfo[] {
 }
 
 export function getNamedStars(): Star[] {
-  return stars.filter(s => s.name || s.bayer);
+  return stars.filter((s) => s.name || s.bayer);
 }

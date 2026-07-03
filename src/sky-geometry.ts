@@ -10,7 +10,7 @@ const DEG = Math.PI / 180;
 export function altAzFromRaDec(
   raDeg: number,
   decDeg: number,
-  lstH: number,       // local sidereal time in hours
+  lstH: number, // local sidereal time in hours
   latDeg: number,
 ): { altDeg: number; azDeg: number } {
   const ha = ((lstH - raDeg / 15 + 24) % 24) * 15 * DEG; // hour angle rad
@@ -21,8 +21,7 @@ export function altAzFromRaDec(
   const altRad = Math.asin(Math.max(-1, Math.min(1, sinAlt)));
 
   const cosAz =
-    (Math.sin(dec) - Math.sin(altRad) * Math.sin(lat)) /
-    (Math.cos(altRad) * Math.cos(lat) + 1e-12);
+    (Math.sin(dec) - Math.sin(altRad) * Math.sin(lat)) / (Math.cos(altRad) * Math.cos(lat) + 1e-12);
   let az = Math.acos(Math.max(-1, Math.min(1, cosAz))) / DEG;
   if (Math.sin(ha) > 0) az = 360 - az;
 
@@ -40,11 +39,14 @@ export function transitLstHours(raDeg: number): number {
  * is exactly the regime the moon-proximity colour thresholds care about).
  */
 export function angularSeparationDeg(
-  ra1Deg: number, dec1Deg: number,
-  ra2Deg: number, dec2Deg: number,
+  ra1Deg: number,
+  dec1Deg: number,
+  ra2Deg: number,
+  dec2Deg: number,
 ): number {
   const dRa = (ra2Deg - ra1Deg) * DEG;
-  const d1 = dec1Deg * DEG, d2 = dec2Deg * DEG;
+  const d1 = dec1Deg * DEG,
+    d2 = dec2Deg * DEG;
   const dDec = d2 - d1;
   const a = Math.sin(dDec / 2) ** 2 + Math.cos(d1) * Math.cos(d2) * Math.sin(dRa / 2) ** 2;
   return (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / DEG;
@@ -85,11 +87,7 @@ export function maxAltDuringWindow(
   let best = -Infinity;
   let bestDate = windowStart;
 
-  for (
-    let t = windowStart.getTime();
-    t <= windowEnd.getTime();
-    t += dtMs
-  ) {
+  for (let t = windowStart.getTime(); t <= windowEnd.getTime(); t += dtMs) {
     const date = new Date(t);
     const jd = dateToJD(date);
     const lst = lstHours(jd, lonDeg);
@@ -143,7 +141,10 @@ export function sampleAltCurve(
   if (last.time.getTime() < endMs) {
     const jd = dateToJD(windowEnd);
     const lst = lstHours(jd, lonDeg);
-    samples.push({ time: new Date(endMs), altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg });
+    samples.push({
+      time: new Date(endMs),
+      altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg,
+    });
   }
   return samples;
 }
@@ -199,7 +200,7 @@ export function raDecFromAltAz(
   let ha = Math.acos(Math.max(-1, Math.min(1, cosHA))) / DEG;
   if (Math.sin(az) > 0) ha = 360 - ha;
 
-  let ra = ((lstH * 15 - ha) % 360 + 360) % 360;
+  let ra = (((lstH * 15 - ha) % 360) + 360) % 360;
   return { raDeg: ra, decDeg: dec / DEG };
 }
 
@@ -208,11 +209,7 @@ export function raDecFromAltAz(
  * returns true if max altitude ≥ minAltDeg.
  * Quick pre-filter using theoretical max altitude to avoid full sampling.
  */
-export function mightBeVisible(
-  decDeg: number,
-  latDeg: number,
-  minAltDeg = 30,
-): boolean {
+export function mightBeVisible(decDeg: number, latDeg: number, minAltDeg = 30): boolean {
   // Maximum possible altitude = 90 - |lat - dec|, capped
   const maxPossible = 90 - Math.abs(latDeg - decDeg);
   return maxPossible >= minAltDeg;

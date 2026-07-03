@@ -1,20 +1,42 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
-  computeFovFrameCorners, frameAnchorCanvas, frameCanvasRotationDeg, frameGeometry,
-  frameHandlesVisible, framePinGlyphPos, paToCanvasRotDeg, canvasRotDegToPa,
+  computeFovFrameCorners,
+  frameAnchorCanvas,
+  frameCanvasRotationDeg,
+  frameGeometry,
+  frameHandlesVisible,
+  framePinGlyphPos,
+  paToCanvasRotDeg,
+  canvasRotDegToPa,
 } from '../../src/frame-geometry';
 import { setHemisphere } from '../../src/projection';
 import type { RenderableFrame } from '../../src/sky-map';
 import type { ViewState } from '../../src/types';
 
-const view: ViewState = { centerX: 0, centerY: 0, scale: 600, rotationDeg: 0, width: 800, height: 600 };
+const view: ViewState = {
+  centerX: 0,
+  centerY: 0,
+  scale: 600,
+  rotationDeg: 0,
+  width: 800,
+  height: 600,
+};
 
 /** Screen-anchored frame — deterministic without a projection round-trip. */
 function screenFrame(over: Partial<RenderableFrame> = {}): RenderableFrame {
   return {
-    id: 'f1', name: 'Rig', label: 'Rig 1°×0.5°', wDeg: 1, hDeg: 0.5,
-    active: true, movable: true, anchorKind: 'screen', nx: 0.5, ny: 0.5,
-    screenRotationDeg: 0, ...over,
+    id: 'f1',
+    name: 'Rig',
+    label: 'Rig 1°×0.5°',
+    wDeg: 1,
+    hDeg: 0.5,
+    active: true,
+    movable: true,
+    anchorKind: 'screen',
+    nx: 0.5,
+    ny: 0.5,
+    screenRotationDeg: 0,
+    ...over,
   };
 }
 
@@ -22,7 +44,7 @@ describe('computeFovFrameCorners', () => {
   it('returns 4 corners centred at (cx, cy) with no rotation', () => {
     const c = computeFovFrameCorners(10, 5, 100, 200, 0);
     expect(c).toHaveLength(4);
-    expect(c[0]).toEqual({ x: 90, y: 195 });  // top-left
+    expect(c[0]).toEqual({ x: 90, y: 195 }); // top-left
     expect(c[2]).toEqual({ x: 110, y: 205 }); // bottom-right
   });
 
@@ -36,7 +58,10 @@ describe('computeFovFrameCorners', () => {
 
 describe('frameAnchorCanvas', () => {
   it('maps a screen anchor to nx*width, ny*height', () => {
-    expect(frameAnchorCanvas(screenFrame({ nx: 0.25, ny: 0.5 }), view)).toEqual({ cx: 200, cy: 300 });
+    expect(frameAnchorCanvas(screenFrame({ nx: 0.25, ny: 0.5 }), view)).toEqual({
+      cx: 200,
+      cy: 300,
+    });
   });
 });
 
@@ -76,7 +101,8 @@ describe('framePinGlyphPos', () => {
 
 describe('paToCanvasRotDeg / canvasRotDegToPa round-trip', () => {
   it('recovers the original position angle', () => {
-    const ra = 80, pa = 33;
+    const ra = 80,
+      pa = 33;
     const rot = paToCanvasRotDeg(pa, ra, view);
     const back = canvasRotDegToPa(rot, ra, view);
     // canvasRotDegToPa normalises into [0,360); 33° round-trips to itself.

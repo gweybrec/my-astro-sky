@@ -132,28 +132,28 @@ function angularDistance(ra1: number, dec1: number, ra2: number, dec2: number): 
 }
 
 export async function loadDSOCatalog(): Promise<void> {
-  const json = await fetch('/data/dso.json').then(r => r.json());
+  const json = await fetch('/data/dso.json').then((r) => r.json());
 
   const fields: string[] = json.fields;
-  const idxId       = fields.indexOf('id');
-  const idxRa       = fields.indexOf('ra');
-  const idxDec      = fields.indexOf('dec');
-  const idxType     = fields.indexOf('type');
-  const idxMajAxis  = fields.indexOf('majAxis');
-  const idxMinAxis  = fields.indexOf('minAxis');
-  const idxPa       = fields.indexOf('pa');
-  const idxMag      = fields.indexOf('mag');
-  const idxNameFr   = fields.indexOf('nameFr');
-  const idxNameEn   = fields.indexOf('nameEn');
-  const idxNameEs   = fields.indexOf('nameEs');
-  const idxNameDe   = fields.indexOf('nameDe');
+  const idxId = fields.indexOf('id');
+  const idxRa = fields.indexOf('ra');
+  const idxDec = fields.indexOf('dec');
+  const idxType = fields.indexOf('type');
+  const idxMajAxis = fields.indexOf('majAxis');
+  const idxMinAxis = fields.indexOf('minAxis');
+  const idxPa = fields.indexOf('pa');
+  const idxMag = fields.indexOf('mag');
+  const idxNameFr = fields.indexOf('nameFr');
+  const idxNameEn = fields.indexOf('nameEn');
+  const idxNameEs = fields.indexOf('nameEs');
+  const idxNameDe = fields.indexOf('nameDe');
   const idxCatalogs = fields.indexOf('catalogs');
   const idxEmissionLines = fields.indexOf('emissionLines');
   const idxConstellation = fields.indexOf('constellation');
-  const idxRating        = fields.indexOf('rating');
-  const idxDifficulty    = fields.indexOf('difficulty');
-  const idxContainerId   = fields.indexOf('containerId');
-  const idxPriority      = fields.indexOf('priority');
+  const idxRating = fields.indexOf('rating');
+  const idxDifficulty = fields.indexOf('difficulty');
+  const idxContainerId = fields.indexOf('containerId');
+  const idxPriority = fields.indexOf('priority');
 
   const lang = getLang();
 
@@ -169,23 +169,27 @@ export async function loadDSOCatalog(): Promise<void> {
     else displayName = nameEn || nameFr;
 
     // catalogs field: array of all catalog IDs sorted by display priority, or fall back to [id]
-    const catalogs: string[] = (idxCatalogs >= 0 && Array.isArray(row[idxCatalogs]))
-      ? [...row[idxCatalogs]].sort((a: string, b: string) => catalogSortKey(a) - catalogSortKey(b))
-      : [row[idxId]];
+    const catalogs: string[] =
+      idxCatalogs >= 0 && Array.isArray(row[idxCatalogs])
+        ? [...row[idxCatalogs]].sort(
+            (a: string, b: string) => catalogSortKey(a) - catalogSortKey(b),
+          )
+        : [row[idxId]];
 
-    const constellation: string | null = idxConstellation >= 0 ? (row[idxConstellation] ?? null) : null;
+    const constellation: string | null =
+      idxConstellation >= 0 ? (row[idxConstellation] ?? null) : null;
     const rating: number | null = idxRating >= 0 ? (row[idxRating] ?? null) : null;
     const difficulty: number | null = idxDifficulty >= 0 ? (row[idxDifficulty] ?? null) : null;
 
     const dso: DSO = {
-      id:      row[idxId],
-      ra:      row[idxRa],
-      dec:     row[idxDec],
-      type:    row[idxType] as DSOType,
+      id: row[idxId],
+      ra: row[idxRa],
+      dec: row[idxDec],
+      type: row[idxType] as DSOType,
       majAxis: row[idxMajAxis],
       minAxis: row[idxMinAxis],
-      pa:      row[idxPa] ?? 0,
-      mag:     row[idxMag],
+      pa: row[idxPa] ?? 0,
+      mag: row[idxMag],
       displayName,
       catalogs,
       emissionLines: idxEmissionLines >= 0 ? (row[idxEmissionLines] ?? null) : null,
@@ -193,7 +197,8 @@ export async function loadDSOCatalog(): Promise<void> {
       rating,
       difficulty,
       containerId: idxContainerId >= 0 ? (row[idxContainerId] ?? null) : null,
-      priority: idxPriority >= 0 ? (row[idxPriority] ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER,
+      priority:
+        idxPriority >= 0 ? (row[idxPriority] ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER,
       // Catalog prefix is a pure function of the (immutable) id; precompute it once
       // here so the per-frame selection loop reads a field instead of re-running the
       // regex/startsWith chain for every DSO on every render.
@@ -246,23 +251,35 @@ export function getDSOById(id: string): DSO | undefined {
 
 /** Priority order for picking the best display catalog ID (lower = higher priority). */
 function catalogSortKey(id: string): number {
-  if (/^M\d/.test(id))    return 0; // Messier
+  if (/^M\d/.test(id)) return 0; // Messier
   if (id.startsWith('NGC')) return 1;
-  if (id.startsWith('IC'))  return 2;
+  if (id.startsWith('IC')) return 2;
   if (id.startsWith('SH2')) return 3;
   if (id.startsWith('LBN')) return 4;
   if (id.startsWith('LDN')) return 5;
-  if (id.startsWith('vdB'))   return 6;
-  if (id.startsWith('Abell'))   return 7;
-  if (id.startsWith('LPN'))     return 8;
+  if (id.startsWith('vdB')) return 6;
+  if (id.startsWith('Abell')) return 7;
+  if (id.startsWith('LPN')) return 8;
   if (id.startsWith('Barnard')) return 9;
   return 10;
 }
 
-export type DSOCatalog = 'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard';
+export type DSOCatalog =
+  'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard';
 
 /** Master catalog list — used by both the sky map toggles and the targets view. */
-export const DSO_CATALOGS_ALL: DSOCatalog[] = ['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN', 'Barnard'];
+export const DSO_CATALOGS_ALL: DSOCatalog[] = [
+  'M',
+  'NGC',
+  'IC',
+  'SH2',
+  'LBN',
+  'LDN',
+  'vdB',
+  'Abell',
+  'LPN',
+  'Barnard',
+];
 
 export function getDSOCatalog(id: string): DSOCatalog | null {
   if (/^M\d/.test(id)) return 'M';
@@ -311,10 +328,10 @@ export function findDSOsInImage(
   const det = a * d - b * c;
   if (Math.abs(det) < 1e-30) return [];
   const inv: AffineMatrix = {
-    a:  d / det,
+    a: d / det,
     b: -b / det,
     c: -c / det,
-    d:  a / det,
+    d: a / det,
     e: (c * f - d * e) / det,
     f: (b * e - a * f) / det,
   };
@@ -358,7 +375,7 @@ export function findDSOIdsFromCorrespondences(
       photoPoints as [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }],
       projPoints as [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }],
     );
-    return findDSOsInImage(aff, imgWidth, imgHeight).map(d => d.id);
+    return findDSOsInImage(aff, imgWidth, imgHeight).map((d) => d.id);
   } catch {
     return [];
   }

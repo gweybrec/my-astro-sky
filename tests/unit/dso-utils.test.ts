@@ -27,7 +27,11 @@ describe('normalizeDSOAliases', () => {
   });
 
   it('handles mix of aliased and plain entries', () => {
-    const result = normalizeDSOAliases(['NGC 6205', 'M 13 / NGC 6205', 'Hercules Globular Cluster']);
+    const result = normalizeDSOAliases([
+      'NGC 6205',
+      'M 13 / NGC 6205',
+      'Hercules Globular Cluster',
+    ]);
     expect(result).toContain('NGC6205');
     expect(result).toContain('M13');
     expect(result).toContain('HerculesGlobularCluster');
@@ -43,7 +47,9 @@ describe('normalizeDSOAliases', () => {
   });
 
   it('processes real astrometry.net objects_in_field fixture (job 10796000 — M13 field)', () => {
-    const raw = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'astrometry/10796000-objects.json'), 'utf8'));
+    const raw = JSON.parse(
+      fs.readFileSync(path.join(FIXTURES, 'astrometry/10796000-objects.json'), 'utf8'),
+    );
     const result = normalizeDSOAliases(raw.objects_in_field);
     // Job 10796000: NGC 6205, M 13, NGC 6207, Hercules Globular Cluster
     expect(result).toContain('NGC6205');

@@ -35,7 +35,7 @@ Traces are large (10–40 MB). Don't `Read` them — parse with the script in St
 
 ## Step 1 — Parse the trace into hot functions
 
-Run the bundled parser against the trace. It aggregates the embedded CPU sampling profile (`Profile` + `ProfileChunk` events) by **self time** (where the CPU is) and **inclusive time** (which callers own it), reported as a % of *active* (non-idle) CPU.
+Run the bundled parser against the trace. It aggregates the embedded CPU sampling profile (`Profile` + `ProfileChunk` events) by **self time** (where the CPU is) and **inclusive time** (which callers own it), reported as a % of _active_ (non-idle) CPU.
 
 ```bash
 node .claude/skills/profile-performance/scripts/parse-trace.mjs Trace-XXXX.json
@@ -51,21 +51,21 @@ Trace line numbers come from the **bundled** output (e.g. `sky-map.ts?t=...:2147
 Grep  pattern="function renderStars|private renderStars|renderDSOs|project\b"  path="src"
 ```
 
-Then `Read` the function and work out *why* it's hot.
+Then `Read` the function and work out _why_ it's hot.
 
 ## Step 3 — Pick the optimisation
 
 Match the symptom to a technique from `docs/dev/render-performance.md`:
 
-| Symptom in the trace | Technique |
-|---|---|
-| A pure transform (`project`, trig) high in self time, called per element per frame | Cache it; invalidate with a **generation counter** bumped only on the rare state change |
-| A regex / string parse / lookup per element per frame, on immutable data | Precompute **once at load**, store as a field |
-| A per-element factor that depends only on slow-changing state (dec, hemisphere) | Memoise per object, invalidate by generation |
-| Canvas gradient/path builtins (`addColorStop`, `createRadialGradient`, `fillRect`) dominating | **Sprite atlas**: build once to an offscreen canvas keyed by quantised appearance, `drawImage` to blit |
-| Work running per `mousemove`/`wheel`/`resize` | **Coalesce** to one per `requestAnimationFrame`; **skip** during active gestures |
-| `(garbage collector)` high + many short-lived objects/canvases | Stop allocating in the loop (cache results, freeze caches during gestures) |
-| A cache that rebuilds every frame | Its **key changes too fast** — quantise/bucket it, freeze during gestures, refresh on bounded **drift** not a timer (see the feedback-loop warning in the doc) |
+| Symptom in the trace                                                                          | Technique                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A pure transform (`project`, trig) high in self time, called per element per frame            | Cache it; invalidate with a **generation counter** bumped only on the rare state change                                                                        |
+| A regex / string parse / lookup per element per frame, on immutable data                      | Precompute **once at load**, store as a field                                                                                                                  |
+| A per-element factor that depends only on slow-changing state (dec, hemisphere)               | Memoise per object, invalidate by generation                                                                                                                   |
+| Canvas gradient/path builtins (`addColorStop`, `createRadialGradient`, `fillRect`) dominating | **Sprite atlas**: build once to an offscreen canvas keyed by quantised appearance, `drawImage` to blit                                                         |
+| Work running per `mousemove`/`wheel`/`resize`                                                 | **Coalesce** to one per `requestAnimationFrame`; **skip** during active gestures                                                                               |
+| `(garbage collector)` high + many short-lived objects/canvases                                | Stop allocating in the loop (cache results, freeze caches during gestures)                                                                                     |
+| A cache that rebuilds every frame                                                             | Its **key changes too fast** — quantise/bucket it, freeze during gestures, refresh on bounded **drift** not a timer (see the feedback-loop warning in the doc) |
 
 Keep render and hit-test on the **same formula/value** — if you cache something for drawing, the click/hover hit-test must consume the same thing or it will miss what's drawn.
 

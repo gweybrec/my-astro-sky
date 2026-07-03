@@ -7,8 +7,10 @@
       :title="t('fovOverlay.btnTitle')"
       :aria-label="t('fovOverlay.btnTitle')"
       @click.stop="togglePopup"
-      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
-      @focus="suppress(true)" @blur="suppress(false)"
+      @mouseenter="suppress(true)"
+      @mouseleave="suppress(false)"
+      @focus="suppress(true)"
+      @blur="suppress(false)"
       v-html="telescopeSvg"
     ></button>
 
@@ -18,8 +20,10 @@
       :visible="fovStore.framesVisible"
       :title="fovStore.framesVisible ? t('fovOverlay.hideFrames') : t('fovOverlay.showFrames')"
       @toggle="toggleFramesVisibility"
-      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
-      @focus="suppress(true)" @blur="suppress(false)"
+      @mouseenter="suppress(true)"
+      @mouseleave="suppress(false)"
+      @focus="suppress(true)"
+      @blur="suppress(false)"
     />
   </div>
 </template>
@@ -71,7 +75,10 @@ function openFovPopup() {
 }
 
 function togglePopup() {
-  if (fovPopupEl) { closeFovPopup(); return; }
+  if (fovPopupEl) {
+    closeFovPopup();
+    return;
+  }
   openFovPopup();
 }
 
@@ -97,17 +104,20 @@ onMounted(() => {
   // Interactive frame system: wire canvas interactions to the store and push
   // the resolved frames to the map whenever plans / ad-hoc frames change.
   if (sm) {
-    sm.setOnFovInstanceSelect(id => fovStore.setActive(id));
+    sm.setOnFovInstanceSelect((id) => fovStore.setActive(id));
     sm.setOnFovInstanceChange((id, change) => fovStore.applyChange(id, change));
     sm.setOnFovFrameResize((id, region) => fovStore.applyResize(id, region));
-    sm.setOnMosaicTileRemove(tileId => fovStore.removeMosaicTile(tileId));
+    sm.setOnMosaicTileRemove((tileId) => fovStore.removeMosaicTile(tileId));
     sm.setOnMosaicTileAdd((ra, dec) => fovStore.addMosaicTile(ra, dec));
     sm.setOnFrameMerge((movedId, targetId) => fovStore.mergeOnDrop(movedId, targetId));
   }
   plansStore.ensureLoaded();
   fovStore.loadSpecs();
   // Refresh gear specs when a plan's setup changes (a new setup may need sizing).
-  watch(() => plansStore.plans.map(p => p.setupId).join(','), () => fovStore.loadSpecs());
+  watch(
+    () => plansStore.plans.map((p) => p.setupId).join(','),
+    () => fovStore.loadSpecs(),
+  );
   // Push the resolved frames to the map, gated by the master visibility toggle:
   // when frames are hidden we push an empty set (selection/renderables are kept
   // intact so the popup list stays editable and toggling back restores them).
@@ -119,7 +129,8 @@ onMounted(() => {
   // Push the selected mosaic's add-tile ("+") candidate positions to the map.
   watch(
     () => fovStore.activeMosaicAddCandidates,
-    () => sm?.setMosaicAddCandidates(fovStore.framesVisible ? fovStore.activeMosaicAddCandidates : []),
+    () =>
+      sm?.setMosaicAddCandidates(fovStore.framesVisible ? fovStore.activeMosaicAddCandidates : []),
     { deep: true, immediate: true },
   );
   // Open the frame manager on request (e.g. jumping here from a plan's details).
@@ -132,7 +143,10 @@ onMounted(() => {
     fovStore.setFramesVisible(true);
     openFovPopup();
   };
-  watch(() => fovStore.pendingPopupOpen, () => consumePopupOpen());
+  watch(
+    () => fovStore.pendingPopupOpen,
+    () => consumePopupOpen(),
+  );
   consumePopupOpen();
 });
 

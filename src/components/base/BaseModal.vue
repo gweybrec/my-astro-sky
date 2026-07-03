@@ -22,17 +22,20 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed } from 'vue';
 
-const props = withDefaults(defineProps<{
-  title?: string;
-  size?: 'default' | 'wide' | 'flex';
-  bodyClass?: string;
-  modalClass?: string;
-}>(), {
-  title: '',
-  size: 'default',
-  bodyClass: undefined,
-  modalClass: undefined,
-});
+const props = withDefaults(
+  defineProps<{
+    title?: string;
+    size?: 'default' | 'wide' | 'flex';
+    bodyClass?: string;
+    modalClass?: string;
+  }>(),
+  {
+    title: '',
+    size: 'default',
+    bodyClass: undefined,
+    modalClass: undefined,
+  },
+);
 
 const emit = defineEmits<{ close: [] }>();
 

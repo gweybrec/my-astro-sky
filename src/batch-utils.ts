@@ -33,13 +33,18 @@ export function wcsErrorMessage(
   if (code === 'UNSUPPORTED_FORMAT') {
     return { key: 'modal.wcsParseError', params: { filename, detail: result.error || code } };
   }
-  return { key: 'modal.wcsParseError', params: { filename, detail: result.error || code || 'unknown error' } };
+  return {
+    key: 'modal.wcsParseError',
+    params: { filename, detail: result.error || code || 'unknown error' },
+  };
 }
 
 export function sanitizeIntegrationRows(rows: PhotoIntegration[]): PhotoIntegration[] {
-  return rows.map(row => ({
-    frames: Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
-    seconds: Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
+  return rows.map((row) => ({
+    frames:
+      Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
+    seconds:
+      Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
     filter: row.filter.trim(),
   }));
 }

@@ -20,7 +20,9 @@ function loadMetadataOverrides() {
   const map = new Map();
 
   const addEntry = (entry) => {
-    const id = String(entry.id ?? '').trim().toUpperCase();
+    const id = String(entry.id ?? '')
+      .trim()
+      .toUpperCase();
     if (!id) return;
     const catalogs = Array.isArray(entry.catalogs) ? entry.catalogs.map(String) : [];
     const override = {
@@ -67,7 +69,7 @@ function loadMetadataOverrides() {
     const catalogs = Array.isArray(row[idxCatalogs]) ? row[idxCatalogs].map(String) : [];
     const entry = {
       id,
-      constellation: idxConstellation >= 0 ? row[idxConstellation] ?? null : null,
+      constellation: idxConstellation >= 0 ? (row[idxConstellation] ?? null) : null,
       rating: idxRating >= 0 ? (row[idxRating] ?? null) : null,
       difficulty: idxDifficulty >= 0 ? (row[idxDifficulty] ?? null) : null,
       catalogs,
@@ -110,7 +112,7 @@ function applyMetadataOverrides(row, overrides) {
   if (entry.mag !== null) row[7] = entry.mag;
   // Merge additional catalog aliases from override into row[12] (so e.g. M102 becomes searchable)
   if (Array.isArray(entry.catalogs) && Array.isArray(row[12])) {
-    const existing = new Set(row[12].map(c => String(c).toUpperCase()));
+    const existing = new Set(row[12].map((c) => String(c).toUpperCase()));
     for (const cat of entry.catalogs) {
       if (cat && !existing.has(String(cat).toUpperCase())) {
         row[12].push(cat);
@@ -119,7 +121,6 @@ function applyMetadataOverrides(row, overrides) {
     }
   }
 }
-
 
 // ─── SH2 catalogue (integrated data block) ──────────────────────────────────
 // SH2_DATA is a *primary source catalog*, not an override file.
@@ -274,7 +275,7 @@ const SH2_DATA = [
   ['SH2-139', 338.75, 58.22, 10, null],
   ['SH2-140', 334.783, 63.285, 10.0, null],
   ['SH2-141', 337.16, 61.631, 10, null],
-  ['SH2-142', 341.883, 58.048, 25.0, 'Nébuleuse de l\'Araignée'],
+  ['SH2-142', 341.883, 58.048, 25.0, "Nébuleuse de l'Araignée"],
   ['SH2-143', 342.55, 57.7, 10.0, null],
   ['SH2-144', 341.2, 59.88, 8.0, null],
   ['SH2-145', 336.37, 64.3, 10, null],
@@ -314,9 +315,9 @@ const SH2_DATA = [
   ['SH2-184', 14.24, 56.01, 3.0, null],
   ['SH2-185', 14.49, 60.78, 120.0, 'Nébuleuse IC 59/63'],
   ['SH2-188', 22.638, 58.414, 8.0, null],
-  ['SH2-190', 23.98, 61.87, 20.0, 'Nébuleuse de l\'Étoile de mer'],
+  ['SH2-190', 23.98, 61.87, 20.0, "Nébuleuse de l'Étoile de mer"],
   ['SH2-198', 27.61, 60.54, 90.0, 'Nébuleuse du Cœur IC 1805'],
-  ['SH2-199', 34.36, 60.58, 150.0, 'Nébuleuse de l\'Âme IC 1848'],
+  ['SH2-199', 34.36, 60.58, 150.0, "Nébuleuse de l'Âme IC 1848"],
   ['SH2-200', 30.46, 63.33, 30.0, null],
   ['SH2-201', 34.59, 63.88, 60.0, null],
   ['SH2-204', 45.21, 57.64, 5.0, null],
@@ -362,7 +363,7 @@ const SH2_DATA = [
   ['SH2-273', 100.0, 22.5, 20.0, null],
   ['SH2-274', 111.25, 0.74, 90.0, null],
   ['SH2-275', 98.33, 8.79, 10.0, null],
-  ['SH2-276', 83.78, -5.42, 180.0, 'Grande Nébuleuse d\'Orion étendue'],
+  ['SH2-276', 83.78, -5.42, 180.0, "Grande Nébuleuse d'Orion étendue"],
   ['SH2-277', 81.76, -5.98, 20.0, null],
   ['SH2-278', 80.89, 4.07, 10.0, null],
   ['SH2-279', 83.817, -4.821, 20.0, 'Nébuleuse de Running Man'],
@@ -393,7 +394,7 @@ const SH2_DATA = [
   ['SH2-305', 126.65, -34.58, 12.0, null],
   ['SH2-306', 129.12, -34.67, 8.0, null],
   ['SH2-307', 139.34, -34.87, 8.0, null],
-  ['SH2-308', 98.49, -14.37, 40.0, 'Nébuleuse de l\'Étoile de Mer Zeta Puppis'],
+  ['SH2-308', 98.49, -14.37, 40.0, "Nébuleuse de l'Étoile de Mer Zeta Puppis"],
   ['SH2-309', 112.95, -19.435, 10, null],
   ['SH2-310', 111.02, -25.971, 10, null],
   ['SH2-311', 123.96, -26.68, 90.0, 'Nébuleuse NGC 2467'],
@@ -403,23 +404,35 @@ const SH2_DATA = [
 
 // ─── OpenNGC type mapping ────────────────────────────────────────────────────
 const TYPE_MAP = {
-  'G':    'Gx',  'Gxy':  'Gx', 'GxyP': 'Gx',
-  'GGroup': 'Gx', 'GPair': 'Gx', 'GTrpl': 'Gx',
-  'OCl':  'OC',  'OClAs': 'OC',
-  'GCl':  'GC',
-  'EN':   'EN',  'EmN':  'EN', 'EnN':  'EN', 'HII': 'EN',
-  'RN':   'RN',  'RefN': 'RN',
-  'PN':   'PN',
-  'SNR':  'SNR',
-  'DN':   'DN',  'DrkN': 'DN',
-  'C+N':  'EN',  'Cl+N': 'EN',
-  'Neb':  '?',   'Nov':  '?', 'Other': '?',
-  '*':    null,   '**':   null, // Skip single/double stars
-  'Dup':  null,   'PD':   null,
+  G: 'Gx',
+  Gxy: 'Gx',
+  GxyP: 'Gx',
+  GGroup: 'Gx',
+  GPair: 'Gx',
+  GTrpl: 'Gx',
+  OCl: 'OC',
+  OClAs: 'OC',
+  GCl: 'GC',
+  EN: 'EN',
+  EmN: 'EN',
+  EnN: 'EN',
+  HII: 'EN',
+  RN: 'RN',
+  RefN: 'RN',
+  PN: 'PN',
+  SNR: 'SNR',
+  DN: 'DN',
+  DrkN: 'DN',
+  'C+N': 'EN',
+  'Cl+N': 'EN',
+  Neb: '?',
+  Nov: '?',
+  Other: '?',
+  '*': null,
+  '**': null, // Skip single/double stars
+  Dup: null,
+  PD: null,
 };
-
-
-
 
 function parseRA(raStr) {
   if (!raStr) return null;
@@ -454,14 +467,16 @@ function galacticToEquatorial(l_deg, b_deg) {
   const toRad = Math.PI / 180;
   const toDeg = 180 / Math.PI;
   const alphaNGP = 192.85948 * toRad;
-  const deltaNGP = 27.12825  * toRad;
-  const lNCP     = 122.93192 * toRad;
+  const deltaNGP = 27.12825 * toRad;
+  const lNCP = 122.93192 * toRad;
   const l = l_deg * toRad;
   const b = b_deg * toRad;
-  const sinDec = Math.sin(b) * Math.sin(deltaNGP) + Math.cos(b) * Math.cos(deltaNGP) * Math.cos(lNCP - l);
+  const sinDec =
+    Math.sin(b) * Math.sin(deltaNGP) + Math.cos(b) * Math.cos(deltaNGP) * Math.cos(lNCP - l);
   const dec = Math.asin(Math.max(-1, Math.min(1, sinDec)));
   const cosDecSinHA = Math.cos(b) * Math.sin(lNCP - l);
-  const cosDecCosHA = Math.cos(deltaNGP) * Math.sin(b) - Math.sin(deltaNGP) * Math.cos(b) * Math.cos(lNCP - l);
+  const cosDecCosHA =
+    Math.cos(deltaNGP) * Math.sin(b) - Math.sin(deltaNGP) * Math.cos(b) * Math.cos(lNCP - l);
   let ra = (alphaNGP + Math.atan2(cosDecSinHA, cosDecCosHA)) * toDeg;
   ra = ((ra % 360) + 360) % 360;
   return { ra, dec: dec * toDeg };
@@ -470,9 +485,9 @@ function galacticToEquatorial(l_deg, b_deg) {
 // ─── Precession B1950 → J2000 (IAU FK4→FK5 rotation matrix, Murray 1989) ────
 function precess1950to2000(ra_deg, dec_deg) {
   const M = [
-    [ 0.9999256782, -0.0111820611, -0.0048579477],
-    [ 0.0111820610,  0.9999374784, -0.0000271765],
-    [ 0.0048579479, -0.0000271474,  0.9999881997],
+    [0.9999256782, -0.0111820611, -0.0048579477],
+    [0.011182061, 0.9999374784, -0.0000271765],
+    [0.0048579479, -0.0000271474, 0.9999881997],
   ];
   const toRad = Math.PI / 180;
   const ra = ra_deg * toRad;
@@ -480,12 +495,12 @@ function precess1950to2000(ra_deg, dec_deg) {
   const x = Math.cos(dec) * Math.cos(ra);
   const y = Math.cos(dec) * Math.sin(ra);
   const z = Math.sin(dec);
-  const x2 = M[0][0]*x + M[0][1]*y + M[0][2]*z;
-  const y2 = M[1][0]*x + M[1][1]*y + M[1][2]*z;
-  const z2 = M[2][0]*x + M[2][1]*y + M[2][2]*z;
+  const x2 = M[0][0] * x + M[0][1] * y + M[0][2] * z;
+  const y2 = M[1][0] * x + M[1][1] * y + M[1][2] * z;
+  const z2 = M[2][0] * x + M[2][1] * y + M[2][2] * z;
   return {
-    ra:  (Math.atan2(y2, x2) * 180 / Math.PI + 360) % 360,
-    dec: Math.asin(Math.max(-1, Math.min(1, z2))) * 180 / Math.PI,
+    ra: ((Math.atan2(y2, x2) * 180) / Math.PI + 360) % 360,
+    dec: (Math.asin(Math.max(-1, Math.min(1, z2))) * 180) / Math.PI,
   };
 }
 
@@ -514,21 +529,21 @@ function parseLBN(text) {
     if (!t) continue;
     const p = t.split(/\s+/);
     if (p.length < 12) continue;
-    const seq    = parseInt(p[0]);
-    const rah    = parseInt(p[3]);
-    const ram    = parseFloat(p[4]);
+    const seq = parseInt(p[0]);
+    const rah = parseInt(p[3]);
+    const ram = parseFloat(p[4]);
     const deSign = p[5].startsWith('-') ? -1 : 1;
-    const deAbs  = Math.abs(parseFloat(p[5]));
-    const deMin  = parseFloat(p[6]);
-    const diam1  = parseFloat(p[7]);   // arcmin, largest
-    const diam2  = parseFloat(p[8]);   // arcmin, smallest
-    const color  = parseInt(p[10]);    // 1=blue(RN), 2-4=red(EN)
+    const deAbs = Math.abs(parseFloat(p[5]));
+    const deMin = parseFloat(p[6]);
+    const diam1 = parseFloat(p[7]); // arcmin, largest
+    const diam2 = parseFloat(p[8]); // arcmin, smallest
+    const color = parseInt(p[10]); // 1=blue(RN), 2-4=red(EN)
     // p[12] = identification number (not the LBN seq)
     // p[13] = xref catalog prefix (S, NGC, IC, DG, C…), p[14] = number
     const xrefCat = p.length >= 15 ? p[13] : null;
     const xrefNum = p.length >= 15 ? parseInt(p[14]) : NaN;
     if (isNaN(seq) || isNaN(rah) || isNaN(ram) || isNaN(deAbs) || isNaN(deMin)) continue;
-    const ra50  = (rah + ram / 60) * 15;
+    const ra50 = (rah + ram / 60) * 15;
     const dec50 = deSign * (deAbs + deMin / 60);
     entries.push({ seq, ra50, dec50, diam1, diam2, color, xrefCat, xrefNum });
   }
@@ -557,17 +572,17 @@ function parseLDN(text) {
   const entries = [];
   for (const line of text.split('\n')) {
     if (line.length < 45) continue;
-    const ldn     = parseInt(line.substring(0, 4).trim());
-    const rah     = parseInt(line.substring(5, 7).trim());
-    const ram     = parseFloat(line.substring(8, 12).trim());
-    const deSign  = line.charAt(15) === '-' ? -1 : 1;
-    const deAbs   = parseFloat(line.substring(16, 18).trim());
-    const deMin   = parseFloat(line.substring(19, 21).trim());
-    const area    = parseFloat(line.substring(36, 43).trim());
+    const ldn = parseInt(line.substring(0, 4).trim());
+    const rah = parseInt(line.substring(5, 7).trim());
+    const ram = parseFloat(line.substring(8, 12).trim());
+    const deSign = line.charAt(15) === '-' ? -1 : 1;
+    const deAbs = parseFloat(line.substring(16, 18).trim());
+    const deMin = parseFloat(line.substring(19, 21).trim());
+    const area = parseFloat(line.substring(36, 43).trim());
     const opacity = parseInt(line.substring(44, 45).trim());
-    if (isNaN(ldn) || ldn === 0) continue;   // skip the 4 unnumbered trailing entries
+    if (isNaN(ldn) || ldn === 0) continue; // skip the 4 unnumbered trailing entries
     if (isNaN(rah) || isNaN(ram) || isNaN(deAbs) || isNaN(deMin) || isNaN(area)) continue;
-    const ra50  = (rah + ram / 60) * 15;
+    const ra50 = (rah + ram / 60) * 15;
     const dec50 = deSign * (deAbs + deMin / 60);
     entries.push({ ldn, ra50, dec50, area, opacity });
   }
@@ -583,8 +598,8 @@ function parseLDN(text) {
 // pair before adding it — do NOT add dark-nebula-next-to-cluster pairs (e.g.
 // B86/NGC6520, B81/NGC6401) which are genuinely separate objects.
 const BARNARD_ALIASES = {
-  Barnard33:  'IC434',   // Horsehead dark nebula, silhouetted against IC434
-  Barnard168: 'IC5146',  // dark lane leading to the Cocoon Nebula (IC5146)
+  Barnard33: 'IC434', // Horsehead dark nebula, silhouetted against IC434
+  Barnard168: 'IC5146', // dark lane leading to the Cocoon Nebula (IC5146)
 };
 
 // ─── Curated vdB → NGC/IC/M/SH2/LBN cross-identifications ───────────────────
@@ -598,13 +613,40 @@ const BARNARD_ALIASES = {
 // suppressed, so it inherits the target's precise position. Distinct objects that
 // merely lie near a cluster (vdB23≈M45, vdB6≈NGC654) are intentionally NOT merged.
 const VDB_ALIASES = {
-  5:   'SH2-185',  17:  'NGC1333', 19:  'IC348',   21:  'NGC1432', 22:  'IC349',
-  28:  'NGC1555',  33:  'NGC1788', 34:  'IC405',   44:  'IC420',   46:  'NGC1999',
-  50:  'IC431',    51:  'IC432',   52:  'NGC2023', 57:  'IC435',   59:  'M78',
-  60:  'NGC2071',  66:  'NGC2149', 67:  'NGC2170', 72:  'NGC2182', 73:  'NGC2185',
-  82:  'NGC2247',  85:  'NGC2282', 93:  'IC2177',  105: 'IC4603',  106: 'IC4604',
-  108: 'IC4605',   115: 'IC4684',  118: 'NGC6589', 119: 'NGC6590', 124: 'IC1287',
-  137: 'IC5076',   139: 'NGC7023', 140: 'LBN446',  99:  'SH2-1',
+  5: 'SH2-185',
+  17: 'NGC1333',
+  19: 'IC348',
+  21: 'NGC1432',
+  22: 'IC349',
+  28: 'NGC1555',
+  33: 'NGC1788',
+  34: 'IC405',
+  44: 'IC420',
+  46: 'NGC1999',
+  50: 'IC431',
+  51: 'IC432',
+  52: 'NGC2023',
+  57: 'IC435',
+  59: 'M78',
+  60: 'NGC2071',
+  66: 'NGC2149',
+  67: 'NGC2170',
+  72: 'NGC2182',
+  73: 'NGC2185',
+  82: 'NGC2247',
+  85: 'NGC2282',
+  93: 'IC2177',
+  105: 'IC4603',
+  106: 'IC4604',
+  108: 'IC4605',
+  115: 'IC4684',
+  118: 'NGC6589',
+  119: 'NGC6590',
+  124: 'IC1287',
+  137: 'IC5076',
+  139: 'NGC7023',
+  140: 'LBN446',
+  99: 'SH2-1',
 };
 
 // Authoritative vdB positions (ICRS J2000, decimal degrees) resolved from SIMBAD
@@ -634,39 +676,39 @@ const SHARPLESS_DIAM = existsSync(SHARPLESS_DIAM_PATH)
 // is a single object). Sizes/names for the target are set in dso-metadata-overrides.
 // Verified against SIMBAD / standard references.
 const SH2_ALIASES = {
-  'SH2-25':  'M8',       // Lagoon Nebula
-  'SH2-30':  'M20',      // Trifid Nebula
-  'SH2-45':  'M17',      // Omega/Swan Nebula
-  'SH2-49':  'M16',      // Eagle Nebula (= IC 4703)
-  'SH2-52':  'Abell65',  // planetary nebula
-  'SH2-86':  'NGC6820',  // nebula around the NGC 6823 cluster (cluster kept separate)
-  'SH2-95':  'NGC6842',  // small planetary nebula (= LBN 149)
-  'SH2-97':  'NGC6847',
-  'SH2-105': 'NGC6888',  // Crescent Nebula
-  'SH2-116': 'Abell71',  // planetary nebula (also a compact HII region)
-  'SH2-117': 'NGC7000',  // North America Nebula
-  'SH2-125': 'IC5146',   // Cocoon Nebula
-  'SH2-128': 'Abell77',  // compact HII region masquerading as a planetary nebula
-  'SH2-142': 'NGC7380',  // Wizard Nebula (cluster + nebula share the NGC number)
-  'SH2-162': 'NGC7635',  // Bubble Nebula
-  'SH2-171': 'NGC7822',  // 180' Cep OB4 region; most-used designation NGC 7822
-  'SH2-184': 'NGC281',   // Pac-Man Nebula
-  'SH2-190': 'IC1805',   // Heart Nebula
-  'SH2-199': 'IC1848',   // Soul Nebula
-  'SH2-206': 'NGC1491',  // Fossil Footprint Nebula
+  'SH2-25': 'M8', // Lagoon Nebula
+  'SH2-30': 'M20', // Trifid Nebula
+  'SH2-45': 'M17', // Omega/Swan Nebula
+  'SH2-49': 'M16', // Eagle Nebula (= IC 4703)
+  'SH2-52': 'Abell65', // planetary nebula
+  'SH2-86': 'NGC6820', // nebula around the NGC 6823 cluster (cluster kept separate)
+  'SH2-95': 'NGC6842', // small planetary nebula (= LBN 149)
+  'SH2-97': 'NGC6847',
+  'SH2-105': 'NGC6888', // Crescent Nebula
+  'SH2-116': 'Abell71', // planetary nebula (also a compact HII region)
+  'SH2-117': 'NGC7000', // North America Nebula
+  'SH2-125': 'IC5146', // Cocoon Nebula
+  'SH2-128': 'Abell77', // compact HII region masquerading as a planetary nebula
+  'SH2-142': 'NGC7380', // Wizard Nebula (cluster + nebula share the NGC number)
+  'SH2-162': 'NGC7635', // Bubble Nebula
+  'SH2-171': 'NGC7822', // 180' Cep OB4 region; most-used designation NGC 7822
+  'SH2-184': 'NGC281', // Pac-Man Nebula
+  'SH2-190': 'IC1805', // Heart Nebula
+  'SH2-199': 'IC1848', // Soul Nebula
+  'SH2-206': 'NGC1491', // Fossil Footprint Nebula
   'SH2-212': 'NGC1624',
-  'SH2-220': 'NGC1499',  // California Nebula (= LBN 756)
-  'SH2-236': 'IC410',    // Tadpoles Nebula (NGC 1893 cluster kept separate)
-  'SH2-238': 'NGC1555',  // Hind's Variable Nebula
-  'SH2-252': 'NGC2174',  // Monkey Head Nebula (NGC 2175 cluster kept separate)
-  'SH2-275': 'NGC2237',  // Rosette Nebula (NGC 2238/2246 sub-features kept separate)
-  'SH2-277': 'NGC2024',  // Flame Nebula
-  'SH2-281': 'M42',      // Orion Nebula (= NGC 1976 = LBN 974)
-  'SH2-290': 'Abell31',  // large ancient planetary nebula Abell 31
-  'SH2-292': 'IC2177',   // Seagull Nebula (NGC 2327 sub-feature kept separate)
-  'SH2-298': 'NGC2359',  // Thor's Helmet
-  'SH2-311': 'NGC2467',  // Skull and Crossbones Nebula
-  'SH2-313': 'Abell35',  // planetary nebula
+  'SH2-220': 'NGC1499', // California Nebula (= LBN 756)
+  'SH2-236': 'IC410', // Tadpoles Nebula (NGC 1893 cluster kept separate)
+  'SH2-238': 'NGC1555', // Hind's Variable Nebula
+  'SH2-252': 'NGC2174', // Monkey Head Nebula (NGC 2175 cluster kept separate)
+  'SH2-275': 'NGC2237', // Rosette Nebula (NGC 2238/2246 sub-features kept separate)
+  'SH2-277': 'NGC2024', // Flame Nebula
+  'SH2-281': 'M42', // Orion Nebula (= NGC 1976 = LBN 974)
+  'SH2-290': 'Abell31', // large ancient planetary nebula Abell 31
+  'SH2-292': 'IC2177', // Seagull Nebula (NGC 2327 sub-feature kept separate)
+  'SH2-298': 'NGC2359', // Thor's Helmet
+  'SH2-311': 'NGC2467', // Skull and Crossbones Nebula
+  'SH2-313': 'Abell35', // planetary nebula
 };
 
 // ─── Curated cross-catalog duplicate merges (generic) ───────────────────────
@@ -684,78 +726,294 @@ const SH2_ALIASES = {
 // vs the SH2-37/IC1283/IC1284 emission cloud, or M8 vs its embedded cluster
 // NGC 6530) means the two are related but physically distinct objects.
 const DUPLICATE_MERGE_ALIASES = {
-  "NGC6526": "M8", "IC4703": "M16", "NGC72": "NGC70", "NGC547": "NGC545",
-  "NGC601": "NGC599", "NGC756": "NGC734", "NGC751": "NGC750", "NGC895": "NGC894",
-  "NGC932": "NGC930", "IC240": "NGC999", "IC254": "NGC1065", "NGC1295": "NGC1290",
-  "IC1988": "NGC1425", "IC2111": "NGC1722", "NGC1855": "NGC1854", "vdB36": "NGC1909",
-  "SH2-237": "NGC1931", "NGC1973": "NGC1977", "NGC1975": "NGC1977", "SH2-279": "NGC1977",
-  "IC2137": "NGC1979", "NGC2069": "NGC2070", "IC2145": "NGC2086", "NGC2238": "NGC2237",
-  "NGC2246": "NGC2237", "SH2-273": "NGC2264", "NGC2361": "NGC2359", "NGC2445": "NGC2444",
-  "NGC2530": "NGC2529", "NGC2531": "NGC2529", "NGC2606": "NGC2603", "NGC2631": "NGC2630",
-  "NGC2875": "NGC2874", "IC543": "NGC2902", "NGC3184": "NGC3180", "NGC3193": "NGC3187",
-  "IC2599": "NGC3324", "NGC3387": "NGC3386", "NGC3396": "NGC3395", "NGC3500": "NGC3465",
-  "NGC3579": "NGC3576", "NGC3581": "NGC3576", "NGC3582": "NGC3576", "NGC3584": "NGC3576",
-  "NGC3586": "NGC3576", "IC738": "NGC3915", "IC2983": "NGC4006", "IC2997": "NGC4090",
-  "IC3329": "NGC4393", "IC3708": "NGC4654", "IC3834": "NGC4726", "NGC4776": "NGC4759",
-  "NGC4778": "NGC4761", "IC839": "NGC4851", "NGC4896": "NGC4895", "NGC4914": "NGC4912",
-  "NGC5545": "NGC5544", "NGC5869": "NGC5865", "IC1122": "NGC5931", "IC4588": "NGC6051",
-  "IC1190": "NGC6061", "NGC6147": "NGC6141", "NGC6165": "NGC6164", "NGC6248": "NGC6237",
-  "NGC6286": "NGC6285", "NGC6474": "NGC6473", "IC4677": "NGC6543", "IC1283": "IC1284",
-  "SH2-37": "IC1284", "NGC6727": "NGC6726", "IC1316": "NGC6901", "LBN280": "NGC6914",
-  "vdB146": "NGC7129", "NGC7237": "NGC7236", "NGC7304": "NGC7303", "SH2-158": "NGC7538",
-  "NGC7551": "NGC7540", "NGC7753": "NGC7752", "LBN582": "NGC7822", "LBN583": "NGC7822",
-  "LBN591": "IC10", "IC257": "IC256", "IC296": "IC294", "LBN773": "IC336",
-  "SH2-234": "IC417", "IC444": "SH2-249", "vdB75": "SH2-249", "LBN845": "SH2-249",
-  "SH2-288": "IC466", "LBN1040": "IC468", "SH2-131": "IC1396", "LBN455": "IC1396",
-  "SH2-156": "IC1470", "SH2-201": "IC1871", "SH2-255": "IC2162", "IC2948": "IC2944",
-  "IC3719": "IC3716", "IC3881": "IC3877", "IC4068": "IC4067", "IC4462": "IC4461",
-  "vdB100": "IC4592", "LBN1107": "IC4606", "SH2-44": "IC4701", "IC5067": "IC5070",
-  "LBN353": "IC5070", "vdB104": "SH2-9", "LBN1104": "SH2-9", "LBN96": "SH2-68",
-  "LBN104": "SH2-72", "LBN129": "SH2-82", "LBN168": "SH2-101", "LBN337": "SH2-112",
-  "LBN669": "SH2-198", "LBN710": "SH2-209", "vdB88": "SH2-293", "vdB94": "SH2-297",
-  "LBN1039": "SH2-297", "LBN134": "vdB126", "LBN241": "LBN240", "LBN349": "LBN348",
-  "LBN368": "LBN367", "LBN504": "vdB143", "LBN523": "vdB154", "LBN531": "vdB152",
-  "LBN624": "LPN-EGB1", "LBN682": "vdB15", "LBN734": "vdB12", "LBN744": "LPN-Sh2216",
-  "LBN746": "vdB16", "LBN772": "LBN770", "LBN785": "vdB27", "LBN823": "vdB65",
-  "LBN832": "LBN831", "LBN848": "vdB35", "LBN850": "vdB37", "LBN851": "vdB37",
-  "LBN866": "vdB38", "LBN874": "LBN873", "LBN926": "LPN-Ko2-2", "LBN972": "LBN971",
-  "LBN973": "LBN971", "LBN995": "vdB69", "LBN1000": "vdB74", "LBN1023": "vdB87",
-  "LBN1062": "vdB98", "LBN1108": "vdB107", "LDN11": "Barnard57", "LDN14": "Barnard260",
-  "LDN15": "Barnard51", "LDN35": "Barnard289", "LDN36": "Barnard267", "LDN42": "Barnard78",
-  "LDN53": "Barnard71", "LDN54": "Barnard70", "LDN55": "Barnard69", "LDN57": "Barnard68",
-  "LDN66": "Barnard72", "LDN85": "Barnard261", "LDN93": "Barnard86", "LDN100": "Barnard62",
-  "LDN108": "Barnard90", "LDN109": "Barnard83", "LDN111": "Barnard61", "LDN112": "Barnard75",
-  "LDN144": "Barnard277", "LDN173": "Barnard64", "LDN177": "Barnard259", "LDN178": "Barnard268",
-  "LDN210": "Barnard303", "LDN213": "Barnard302", "LDN216": "Barnard79", "LDN219": "Barnard276",
-  "LDN227": "Barnard91", "LDN235": "Barnard84", "LDN239": "Barnard98", "LDN323": "Barnard92",
-  "LDN327": "Barnard93", "LDN330": "Barnard284", "LDN356": "Barnard311", "LDN379": "Barnard312",
-  "LDN401": "Barnard102", "LDN406": "Barnard95", "LDN647": "Barnard330", "LDN663": "Barnard335",
-  "LDN688": "Barnard142", "LDN694": "Barnard143", "LDN701": "Barnard334", "LDN702": "Barnard336",
-  "LDN705": "Barnard337", "LDN707": "Barnard340", "LDN853": "Barnard147", "LDN860": "Barnard146",
-  "LDN865": "Barnard145", "LDN880": "Barnard343", "LDN885": "Barnard342", "LDN889": "Barnard347",
-  "LDN941": "Barnard352", "LDN950": "Barnard356", "LDN970": "Barnard361", "LDN973": "Barnard159",
-  "LDN1017": "Barnard362", "LDN1053": "Barnard357", "Barnard360": "Barnard151", "LDN1063": "Barnard151",
-  "LDN1065": "Barnard151", "LDN1068": "Barnard359", "LDN1070": "Barnard164", "LDN1071": "Barnard354",
-  "LDN1075": "Barnard157", "LDN1080": "Barnard154", "LDN1082": "Barnard150", "LDN1088": "Barnard160",
-  "LDN1090": "Barnard365", "LDN1095": "Barnard162", "LDN1106": "Barnard163", "LDN1113": "Barnard367",
-  "LDN1125": "Barnard152", "LDN1137": "Barnard368", "LDN1144": "Barnard166", "LDN1149": "Barnard170",
-  "LDN1153": "Barnard171", "LDN1164": "Barnard174", "LDN1165": "Barnard174", "LDN1169": "Barnard173",
-  "LDN1387": "Barnard6", "LDN1406": "Barnard21", "LDN1407": "Barnard12", "LDN1445": "Barnard15",
-  "LDN1448": "Barnard203", "LDN1450": "Barnard205", "LDN1451": "Barnard202", "LDN1455": "Barnard204",
-  "LDN1470": "Barnard4", "LDN1471": "Barnard5", "LDN1495": "Barnard211", "LDN1503": "Barnard23",
-  "LDN1507": "Barnard24", "LDN1517": "Barnard27", "LDN1521": "Barnard19", "LDN1522": "Barnard222",
-  "LDN1523": "Barnard29", "LDN1529": "Barnard18", "LDN1570": "Barnard227", "LDN1577": "Barnard30",
-  "LDN1582": "Barnard32", "LDN1596": "Barnard35", "LDN1599": "Barnard36", "LDN1605": "Barnard37",
-  "LDN1610": "Barnard39", "LDN1682": "Barnard55", "LDN1685": "Barnard56", "LDN1698": "Barnard252",
-  "LDN1712": "Barnard44", "LDN1725": "Barnard254", "LDN1727": "Barnard249", "LDN1733": "Barnard248",
-  "LDN1736": "Barnard244", "LDN1737": "Barnard244", "LDN1742": "Barnard250", "LDN1744": "Barnard45",
-  "LDN1746": "Barnard59", "LDN1749": "Barnard256", "LDN1752": "Barnard43", "LDN1759": "Barnard238",
-  "LDN1768": "Barnard66", "LDN1771": "Barnard87", "LDN1772": "Barnard65", "LDN1773": "Barnard67",
-  "LDN1775": "Barnard46", "LDN1786": "Barnard300", "LDN1791": "Barnard47", "LDN1798": "Barnard295",
-  "LBN1117": "SH2-12", "LBN449": "SH2-129", "LBN471": "SH2-132", "LBN540": "SH2-157",
-  "LBN696": "SH2-205", "LBN796": "SH2-230", "LBN864": "SH2-261", "LBN865": "SH2-264",
-  "LBN986": "SH2-284", "LBN218": "vdB133", "LBN541": "vdB149", "LBN578": "vdB1",
-  "LBN680": "vdB10", "LBN721": "vdB18", "LDN102": "Barnard67a", "LDN302": "Barnard84a",
+  NGC6526: 'M8',
+  IC4703: 'M16',
+  NGC72: 'NGC70',
+  NGC547: 'NGC545',
+  NGC601: 'NGC599',
+  NGC756: 'NGC734',
+  NGC751: 'NGC750',
+  NGC895: 'NGC894',
+  NGC932: 'NGC930',
+  IC240: 'NGC999',
+  IC254: 'NGC1065',
+  NGC1295: 'NGC1290',
+  IC1988: 'NGC1425',
+  IC2111: 'NGC1722',
+  NGC1855: 'NGC1854',
+  vdB36: 'NGC1909',
+  'SH2-237': 'NGC1931',
+  NGC1973: 'NGC1977',
+  NGC1975: 'NGC1977',
+  'SH2-279': 'NGC1977',
+  IC2137: 'NGC1979',
+  NGC2069: 'NGC2070',
+  IC2145: 'NGC2086',
+  NGC2238: 'NGC2237',
+  NGC2246: 'NGC2237',
+  'SH2-273': 'NGC2264',
+  NGC2361: 'NGC2359',
+  NGC2445: 'NGC2444',
+  NGC2530: 'NGC2529',
+  NGC2531: 'NGC2529',
+  NGC2606: 'NGC2603',
+  NGC2631: 'NGC2630',
+  NGC2875: 'NGC2874',
+  IC543: 'NGC2902',
+  NGC3184: 'NGC3180',
+  NGC3193: 'NGC3187',
+  IC2599: 'NGC3324',
+  NGC3387: 'NGC3386',
+  NGC3396: 'NGC3395',
+  NGC3500: 'NGC3465',
+  NGC3579: 'NGC3576',
+  NGC3581: 'NGC3576',
+  NGC3582: 'NGC3576',
+  NGC3584: 'NGC3576',
+  NGC3586: 'NGC3576',
+  IC738: 'NGC3915',
+  IC2983: 'NGC4006',
+  IC2997: 'NGC4090',
+  IC3329: 'NGC4393',
+  IC3708: 'NGC4654',
+  IC3834: 'NGC4726',
+  NGC4776: 'NGC4759',
+  NGC4778: 'NGC4761',
+  IC839: 'NGC4851',
+  NGC4896: 'NGC4895',
+  NGC4914: 'NGC4912',
+  NGC5545: 'NGC5544',
+  NGC5869: 'NGC5865',
+  IC1122: 'NGC5931',
+  IC4588: 'NGC6051',
+  IC1190: 'NGC6061',
+  NGC6147: 'NGC6141',
+  NGC6165: 'NGC6164',
+  NGC6248: 'NGC6237',
+  NGC6286: 'NGC6285',
+  NGC6474: 'NGC6473',
+  IC4677: 'NGC6543',
+  IC1283: 'IC1284',
+  'SH2-37': 'IC1284',
+  NGC6727: 'NGC6726',
+  IC1316: 'NGC6901',
+  LBN280: 'NGC6914',
+  vdB146: 'NGC7129',
+  NGC7237: 'NGC7236',
+  NGC7304: 'NGC7303',
+  'SH2-158': 'NGC7538',
+  NGC7551: 'NGC7540',
+  NGC7753: 'NGC7752',
+  LBN582: 'NGC7822',
+  LBN583: 'NGC7822',
+  LBN591: 'IC10',
+  IC257: 'IC256',
+  IC296: 'IC294',
+  LBN773: 'IC336',
+  'SH2-234': 'IC417',
+  IC444: 'SH2-249',
+  vdB75: 'SH2-249',
+  LBN845: 'SH2-249',
+  'SH2-288': 'IC466',
+  LBN1040: 'IC468',
+  'SH2-131': 'IC1396',
+  LBN455: 'IC1396',
+  'SH2-156': 'IC1470',
+  'SH2-201': 'IC1871',
+  'SH2-255': 'IC2162',
+  IC2948: 'IC2944',
+  IC3719: 'IC3716',
+  IC3881: 'IC3877',
+  IC4068: 'IC4067',
+  IC4462: 'IC4461',
+  vdB100: 'IC4592',
+  LBN1107: 'IC4606',
+  'SH2-44': 'IC4701',
+  IC5067: 'IC5070',
+  LBN353: 'IC5070',
+  vdB104: 'SH2-9',
+  LBN1104: 'SH2-9',
+  LBN96: 'SH2-68',
+  LBN104: 'SH2-72',
+  LBN129: 'SH2-82',
+  LBN168: 'SH2-101',
+  LBN337: 'SH2-112',
+  LBN669: 'SH2-198',
+  LBN710: 'SH2-209',
+  vdB88: 'SH2-293',
+  vdB94: 'SH2-297',
+  LBN1039: 'SH2-297',
+  LBN134: 'vdB126',
+  LBN241: 'LBN240',
+  LBN349: 'LBN348',
+  LBN368: 'LBN367',
+  LBN504: 'vdB143',
+  LBN523: 'vdB154',
+  LBN531: 'vdB152',
+  LBN624: 'LPN-EGB1',
+  LBN682: 'vdB15',
+  LBN734: 'vdB12',
+  LBN744: 'LPN-Sh2216',
+  LBN746: 'vdB16',
+  LBN772: 'LBN770',
+  LBN785: 'vdB27',
+  LBN823: 'vdB65',
+  LBN832: 'LBN831',
+  LBN848: 'vdB35',
+  LBN850: 'vdB37',
+  LBN851: 'vdB37',
+  LBN866: 'vdB38',
+  LBN874: 'LBN873',
+  LBN926: 'LPN-Ko2-2',
+  LBN972: 'LBN971',
+  LBN973: 'LBN971',
+  LBN995: 'vdB69',
+  LBN1000: 'vdB74',
+  LBN1023: 'vdB87',
+  LBN1062: 'vdB98',
+  LBN1108: 'vdB107',
+  LDN11: 'Barnard57',
+  LDN14: 'Barnard260',
+  LDN15: 'Barnard51',
+  LDN35: 'Barnard289',
+  LDN36: 'Barnard267',
+  LDN42: 'Barnard78',
+  LDN53: 'Barnard71',
+  LDN54: 'Barnard70',
+  LDN55: 'Barnard69',
+  LDN57: 'Barnard68',
+  LDN66: 'Barnard72',
+  LDN85: 'Barnard261',
+  LDN93: 'Barnard86',
+  LDN100: 'Barnard62',
+  LDN108: 'Barnard90',
+  LDN109: 'Barnard83',
+  LDN111: 'Barnard61',
+  LDN112: 'Barnard75',
+  LDN144: 'Barnard277',
+  LDN173: 'Barnard64',
+  LDN177: 'Barnard259',
+  LDN178: 'Barnard268',
+  LDN210: 'Barnard303',
+  LDN213: 'Barnard302',
+  LDN216: 'Barnard79',
+  LDN219: 'Barnard276',
+  LDN227: 'Barnard91',
+  LDN235: 'Barnard84',
+  LDN239: 'Barnard98',
+  LDN323: 'Barnard92',
+  LDN327: 'Barnard93',
+  LDN330: 'Barnard284',
+  LDN356: 'Barnard311',
+  LDN379: 'Barnard312',
+  LDN401: 'Barnard102',
+  LDN406: 'Barnard95',
+  LDN647: 'Barnard330',
+  LDN663: 'Barnard335',
+  LDN688: 'Barnard142',
+  LDN694: 'Barnard143',
+  LDN701: 'Barnard334',
+  LDN702: 'Barnard336',
+  LDN705: 'Barnard337',
+  LDN707: 'Barnard340',
+  LDN853: 'Barnard147',
+  LDN860: 'Barnard146',
+  LDN865: 'Barnard145',
+  LDN880: 'Barnard343',
+  LDN885: 'Barnard342',
+  LDN889: 'Barnard347',
+  LDN941: 'Barnard352',
+  LDN950: 'Barnard356',
+  LDN970: 'Barnard361',
+  LDN973: 'Barnard159',
+  LDN1017: 'Barnard362',
+  LDN1053: 'Barnard357',
+  Barnard360: 'Barnard151',
+  LDN1063: 'Barnard151',
+  LDN1065: 'Barnard151',
+  LDN1068: 'Barnard359',
+  LDN1070: 'Barnard164',
+  LDN1071: 'Barnard354',
+  LDN1075: 'Barnard157',
+  LDN1080: 'Barnard154',
+  LDN1082: 'Barnard150',
+  LDN1088: 'Barnard160',
+  LDN1090: 'Barnard365',
+  LDN1095: 'Barnard162',
+  LDN1106: 'Barnard163',
+  LDN1113: 'Barnard367',
+  LDN1125: 'Barnard152',
+  LDN1137: 'Barnard368',
+  LDN1144: 'Barnard166',
+  LDN1149: 'Barnard170',
+  LDN1153: 'Barnard171',
+  LDN1164: 'Barnard174',
+  LDN1165: 'Barnard174',
+  LDN1169: 'Barnard173',
+  LDN1387: 'Barnard6',
+  LDN1406: 'Barnard21',
+  LDN1407: 'Barnard12',
+  LDN1445: 'Barnard15',
+  LDN1448: 'Barnard203',
+  LDN1450: 'Barnard205',
+  LDN1451: 'Barnard202',
+  LDN1455: 'Barnard204',
+  LDN1470: 'Barnard4',
+  LDN1471: 'Barnard5',
+  LDN1495: 'Barnard211',
+  LDN1503: 'Barnard23',
+  LDN1507: 'Barnard24',
+  LDN1517: 'Barnard27',
+  LDN1521: 'Barnard19',
+  LDN1522: 'Barnard222',
+  LDN1523: 'Barnard29',
+  LDN1529: 'Barnard18',
+  LDN1570: 'Barnard227',
+  LDN1577: 'Barnard30',
+  LDN1582: 'Barnard32',
+  LDN1596: 'Barnard35',
+  LDN1599: 'Barnard36',
+  LDN1605: 'Barnard37',
+  LDN1610: 'Barnard39',
+  LDN1682: 'Barnard55',
+  LDN1685: 'Barnard56',
+  LDN1698: 'Barnard252',
+  LDN1712: 'Barnard44',
+  LDN1725: 'Barnard254',
+  LDN1727: 'Barnard249',
+  LDN1733: 'Barnard248',
+  LDN1736: 'Barnard244',
+  LDN1737: 'Barnard244',
+  LDN1742: 'Barnard250',
+  LDN1744: 'Barnard45',
+  LDN1746: 'Barnard59',
+  LDN1749: 'Barnard256',
+  LDN1752: 'Barnard43',
+  LDN1759: 'Barnard238',
+  LDN1768: 'Barnard66',
+  LDN1771: 'Barnard87',
+  LDN1772: 'Barnard65',
+  LDN1773: 'Barnard67',
+  LDN1775: 'Barnard46',
+  LDN1786: 'Barnard300',
+  LDN1791: 'Barnard47',
+  LDN1798: 'Barnard295',
+  LBN1117: 'SH2-12',
+  LBN449: 'SH2-129',
+  LBN471: 'SH2-132',
+  LBN540: 'SH2-157',
+  LBN696: 'SH2-205',
+  LBN796: 'SH2-230',
+  LBN864: 'SH2-261',
+  LBN865: 'SH2-264',
+  LBN986: 'SH2-284',
+  LBN218: 'vdB133',
+  LBN541: 'vdB149',
+  LBN578: 'vdB1',
+  LBN680: 'vdB10',
+  LBN721: 'vdB18',
+  LDN102: 'Barnard67a',
+  LDN302: 'Barnard84a',
 };
 
 async function fetchBarnard() {
@@ -775,17 +1033,17 @@ function parseBarnard(text) {
   const entries = [];
   for (const line of text.split('\n')) {
     if (line.length < 38) continue;
-    const barn = line.substring(1, 5).trim();           // e.g. "33", "67a"
+    const barn = line.substring(1, 5).trim(); // e.g. "33", "67a"
     if (!barn) continue;
-    const rah  = parseInt(line.substring(22, 24).trim());
-    const ram  = parseInt(line.substring(25, 27).trim());
-    const ras  = parseInt(line.substring(28, 30).trim()) || 0;
+    const rah = parseInt(line.substring(22, 24).trim());
+    const ram = parseInt(line.substring(25, 27).trim());
+    const ras = parseInt(line.substring(28, 30).trim()) || 0;
     const sign = line.charAt(32) === '-' ? -1 : 1;
-    const ded  = parseInt(line.substring(33, 35).trim());
-    const dem  = parseInt(line.substring(36, 38).trim());
+    const ded = parseInt(line.substring(33, 35).trim());
+    const dem = parseInt(line.substring(36, 38).trim());
     const diam = parseFloat(line.substring(39, 44).trim());
     if (isNaN(rah) || isNaN(ram) || isNaN(ded) || isNaN(dem)) continue;
-    const ra  = (rah + ram / 60 + ras / 3600) * 15;
+    const ra = (rah + ram / 60 + ras / 3600) * 15;
     const dec = sign * (ded + dem / 60);
     entries.push({ barn, ra, dec, diam: isNaN(diam) ? null : diam });
   }
@@ -810,10 +1068,10 @@ function parseVdB(text) {
   for (const line of text.split('\n')) {
     if (!line.trim() || line.startsWith('#')) continue;
     if (line.length < 29) continue;
-    const vdb     = parseInt(line.substring(1, 4));
-    const glon    = parseFloat(line.substring(24, 29));
-    const glat    = parseFloat(line.substring(29, 34));
-    const vmag    = parseFloat(line.substring(44, 49));
+    const vdb = parseInt(line.substring(1, 4));
+    const glon = parseFloat(line.substring(24, 29));
+    const glat = parseFloat(line.substring(29, 34));
+    const vmag = parseFloat(line.substring(44, 49));
     const bradmax = parseFloat(line.substring(70, 75));
     if (isNaN(vdb) || vdb < 1) continue;
     if (isNaN(glon) || isNaN(glat)) continue;
@@ -821,7 +1079,7 @@ function parseVdB(text) {
       vdb,
       glon,
       glat,
-      vmag:    isNaN(vmag) ? null : vmag,
+      vmag: isNaN(vmag) ? null : vmag,
       bradmax: isNaN(bradmax) ? null : bradmax,
     });
   }
@@ -830,7 +1088,7 @@ function parseVdB(text) {
 
 function parseCSV(text) {
   const lines = text.split('\n');
-  const headers = lines[0].split(';').map(h => h.trim());
+  const headers = lines[0].split(';').map((h) => h.trim());
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -886,7 +1144,7 @@ async function main() {
 
   // ── Step 3: Build SH2-number → LBN-seq map (from LBN cross-refs) ─────────
   // LBN's xrefCat='S', xrefNum=NN means this LBN entry corresponds to SH2-NN.
-  const sh2ToLbnSeq = new Map();   // SH2 number → LBN seq
+  const sh2ToLbnSeq = new Map(); // SH2 number → LBN seq
   for (const lbn of lbnEntries) {
     if (lbn.xrefCat === 'S' && !isNaN(lbn.xrefNum)) {
       sh2ToLbnSeq.set(lbn.xrefNum, lbn.seq);
@@ -916,14 +1174,20 @@ async function main() {
     const rawType = row['Type'] || row['ObjectType'] || '';
     const mappedType = TYPE_MAP[rawType];
     if (mappedType === null || mappedType === undefined) {
-      if (mappedType === null) { skipped++; continue; }
+      if (mappedType === null) {
+        skipped++;
+        continue;
+      }
     }
     const dsoType = mappedType || '?';
 
     // Parse coordinates
     const ra = parseRA(row['RA'] || row['Ra']);
     const dec = parseDec(row['Dec'] || row['DEC']);
-    if (ra === null || dec === null) { skipped++; continue; }
+    if (ra === null || dec === null) {
+      skipped++;
+      continue;
+    }
 
     // Build ID
     let id = '';
@@ -932,11 +1196,15 @@ async function main() {
       const prefix = catName.startsWith('NGC') ? 'NGC' : 'IC';
       const suffix = catName.slice(prefix.length).trim();
       // Skip sub-components like NGC5866B — they would collide with the main object id
-      if (!/^\d+$/.test(suffix)) { skipped++; continue; }
+      if (!/^\d+$/.test(suffix)) {
+        skipped++;
+        continue;
+      }
       const num = parseInt(suffix, 10);
       id = `${prefix}${num}`;
     } else {
-      skipped++; continue;
+      skipped++;
+      continue;
     }
 
     // Messier designation
@@ -960,13 +1228,13 @@ async function main() {
     // ── Extract LBN cross-refs from Identifiers field ─────────────────────
     const identifiers = row['Identifiers'] || '';
     const lbnMatches = [...identifiers.matchAll(/LBN\s+(\d+)/g)];
-    const lbnIds = lbnMatches.map(m => `LBN${parseInt(m[1])}`);
+    const lbnIds = lbnMatches.map((m) => `LBN${parseInt(m[1])}`);
     for (const m of lbnMatches) assignedLbnSeqs.add(parseInt(m[1]));
 
     // ── Extract vdB cross-refs from Identifiers field ─────────────────────
     // Matches "VdB 23", "vdB 23", "VDB 23" but not "vdBH NNN" (Herbst catalog)
     const vdbMatches = [...identifiers.matchAll(/vdB\s+(\d+)/gi)];
-    const vdbIds = vdbMatches.map(m => `vdB${parseInt(m[1])}`);
+    const vdbIds = vdbMatches.map((m) => `vdB${parseInt(m[1])}`);
     for (const m of vdbMatches) assignedVdbNums.add(parseInt(m[1]));
 
     // NOTE: OpenNGC's Identifiers column does not carry Barnard designations,
@@ -976,8 +1244,8 @@ async function main() {
     // ── Build catalogs array ──────────────────────────────────────────────
     // Priority: M first, then NGC/IC, then LBN, then vdB
     const catalogs = [];
-    if (primaryId !== id) catalogs.push(primaryId);  // M-number
-    catalogs.push(id);                                // NGC/IC
+    if (primaryId !== id) catalogs.push(primaryId); // M-number
+    catalogs.push(id); // NGC/IC
     catalogs.push(...lbnIds);
     catalogs.push(...vdbIds);
 
@@ -1004,7 +1272,7 @@ async function main() {
   // ── Step 5: SH2 objects (with optional LBN cross-ref) ────────────────────
   for (const [shId, ra, dec, majAxis] of SH2_DATA) {
     if (dec < -35) continue;
-    const sh2Num = parseInt(shId.slice(4));   // 'SH2-17' → 17
+    const sh2Num = parseInt(shId.slice(4)); // 'SH2-17' → 17
     // Prefer the authoritative Sharpless VII/20 diameter when the hand-entered
     // value diverges from it by >3× (in either direction). Per-object exceptions
     // where Sharpless itself is wrong (e.g. SH2-147/Simeis 147) are corrected via
@@ -1082,7 +1350,7 @@ async function main() {
     if (dec < -35) continue;
     // Estimate diameter from area (sq degrees): assume circular
     const radiusDeg = Math.sqrt(ldn.area / Math.PI);
-    const majAxisArcmin = Math.round(radiusDeg * 60 * 2 * 10) / 10;  // diameter
+    const majAxisArcmin = Math.round(radiusDeg * 60 * 2 * 10) / 10; // diameter
     const ldnId = `LDN${ldn.ldn}`;
     data.push([
       ldnId,
@@ -1112,13 +1380,17 @@ async function main() {
   // Targets are NGC/IC/M (Step 4), SH2 (Step 5), LBN (Step 6) — all already in
   // `data` at this point. (Messier-only objects are added later in Step 11, but
   // no vdB alias targets one — M78 already exists from OpenNGC.)
-  const rowByIdVdb = new Map(data.map(r => [String(r[0]).toUpperCase(), r]));
+  const rowByIdVdb = new Map(data.map((r) => [String(r[0]).toUpperCase(), r]));
   let vdbAliasMerged = 0;
   for (const [num, targetId] of Object.entries(VDB_ALIASES)) {
     const target = rowByIdVdb.get(String(targetId).toUpperCase());
-    if (!target) { console.warn(`Warning: vdB alias target ${targetId} not found for vdB${num}`); continue; }
+    if (!target) {
+      console.warn(`Warning: vdB alias target ${targetId} not found for vdB${num}`);
+      continue;
+    }
     const vdbId = `vdB${num}`;
-    if (!target[12].some(c => String(c).toLowerCase() === vdbId.toLowerCase())) target[12].push(vdbId);
+    if (!target[12].some((c) => String(c).toLowerCase() === vdbId.toLowerCase()))
+      target[12].push(vdbId);
     assignedVdbNums.add(Number(num));
     vdbAliasMerged++;
   }
@@ -1166,14 +1438,17 @@ async function main() {
   // ── Step 9: Apply curated Barnard aliases ────────────────────────────────
   // Append each curated Barnard id to its target object's catalogs[] (field 12)
   // and mark it assigned so it is not emitted as a standalone duplicate marker.
-  const rowById = new Map(data.map(r => [r[0], r]));
+  const rowById = new Map(data.map((r) => [r[0], r]));
   let barnardMerged = 0;
   for (const e of barnardEntries) {
     const barnId = `Barnard${e.barn}`;
     const targetId = BARNARD_ALIASES[barnId];
     if (!targetId) continue;
     const target = rowById.get(targetId);
-    if (!target) { console.warn(`Warning: Barnard alias target ${targetId} not found for ${barnId}`); continue; }
+    if (!target) {
+      console.warn(`Warning: Barnard alias target ${targetId} not found for ${barnId}`);
+      continue;
+    }
     target[12].push(barnId);
     assignedBarnardIds.add(e.barn);
     barnardMerged++;
@@ -1225,24 +1500,27 @@ async function main() {
   // Build a lookup: canonical existingId → { emissionLines, extraCatIds, coordFix, magFix, nameEnFix, nameFrFix }
   // coordFix: { ra, dec, majAxis, minAxis } overrides wrong OpenNGC coordinates
   const existingLPNUpdates = [
-    { id: 'NGC7293', emissionLines: 'HD and OIII',           extraCatIds: [] },
-    { id: 'M27',    emissionLines: 'Halo OIII',              extraCatIds: [] },
-    { id: 'NGC1360', emissionLines: null,                    extraCatIds: [] },
-    { id: 'SH2-174', emissionLines: null,                    extraCatIds: ['PN G120.3+18.3'] },
-    { id: 'SH2-68',  emissionLines: null,                    extraCatIds: ['PN G030.6+06.2'] },
+    { id: 'NGC7293', emissionLines: 'HD and OIII', extraCatIds: [] },
+    { id: 'M27', emissionLines: 'Halo OIII', extraCatIds: [] },
+    { id: 'NGC1360', emissionLines: null, extraCatIds: [] },
+    { id: 'SH2-174', emissionLines: null, extraCatIds: ['PN G120.3+18.3'] },
+    { id: 'SH2-68', emissionLines: null, extraCatIds: ['PN G030.6+06.2'] },
     { id: 'SH2-176', emissionLines: 'mostly NII, HD weaker', extraCatIds: ['PN G120.2-05.3'] },
-    { id: 'SH2-188', emissionLines: 'HD > OIII',             extraCatIds: ['Simeis 22', 'PN G128.0-04.1'] },
-    { id: 'SH2-200', emissionLines: 'OIII and HD',           extraCatIds: ['HDW 2', 'PN G138.1+04.1'] },
-    { id: 'SH2-78',  emissionLines: 'OIII and HD',           extraCatIds: ['CTSS 3', 'PN G046.8+03.8'] },
+    { id: 'SH2-188', emissionLines: 'HD > OIII', extraCatIds: ['Simeis 22', 'PN G128.0-04.1'] },
+    { id: 'SH2-200', emissionLines: 'OIII and HD', extraCatIds: ['HDW 2', 'PN G138.1+04.1'] },
+    { id: 'SH2-78', emissionLines: 'OIII and HD', extraCatIds: ['CTSS 3', 'PN G046.8+03.8'] },
     // SH2-274 IS the Medusa Nebula / Abell 21 but OpenNGC has wrong coordinates (7h25m +0°44').
     // Correct position: RA 07h 29m 02.69s, Dec +13° 14' 48.4" (Gemini)
     // 'Abell21' (no space) added so getDSOById('Abell21') resolves to this object.
-    { id: 'SH2-274', emissionLines: 'OIII and HD',
+    {
+      id: 'SH2-274',
+      emissionLines: 'OIII and HD',
       extraCatIds: ['Abell 21', 'Abell21', 'PN G205.1+14.2', 'PK 205+14.1'],
       coordFix: {
-        ra:  (7 + 29/60 + 2.69/3600) * 15,  // 112.261°
-        dec:  13 + 14/60 + 48.4/3600,        // +13.247°
-        majAxis: 12, minAxis: 9,
+        ra: (7 + 29 / 60 + 2.69 / 3600) * 15, // 112.261°
+        dec: 13 + 14 / 60 + 48.4 / 3600, // +13.247°
+        majAxis: 12,
+        minAxis: 9,
       },
       magFix: 10.2,
       nameEnFix: 'Medusa Nebula',
@@ -1263,7 +1541,15 @@ async function main() {
 
   // Apply updates to existing entries
   let existingUpdated = 0;
-  for (const { id, emissionLines, extraCatIds, coordFix, magFix, nameEnFix, nameFrFix } of existingLPNUpdates) {
+  for (const {
+    id,
+    emissionLines,
+    extraCatIds,
+    coordFix,
+    magFix,
+    nameEnFix,
+    nameFrFix,
+  } of existingLPNUpdates) {
     const idx = dataIdxById.get(id);
     if (idx === undefined) {
       console.warn(`LPN update: ${id} NOT FOUND in data, skipping`);
@@ -1297,80 +1583,371 @@ async function main() {
 
   // New standalone LPN entries (not in any existing catalog)
   // Format: [id, ra°, dec°, type, majAxis', minAxis', pa, mag, nameFr, nameEn, catalogs[], emissionLines]
-  function hms(h, m, s) { return (h + m / 60 + s / 3600) * 15; }
-  function dms(d, m, s, neg = false) { const v = d + m / 60 + s / 3600; return neg ? -v : v; }
+  function hms(h, m, s) {
+    return (h + m / 60 + s / 3600) * 15;
+  }
+  function dms(d, m, s, neg = false) {
+    const v = d + m / 60 + s / 3600;
+    return neg ? -v : v;
+  }
 
   const lpnEntries = [
     // [id, ra, dec, majAxis, minAxis, emissionLines, nameEn, nameFr, otherCatIds]
-    ['LPN-Sh2216',      hms( 4,43,22), dms(46,42, 7),   100, null, 'OIII > HD',  // coords from SIMBAD (PN G158.5+00.7)
-      'Sh 2-216', 'Sh 2-216', ['SH2-216', 'PN G158.6+00.7']],
-    ['LPN-Outters4',    hms(21,11,48), dms(59,59,12),    69,   20, null,
-      'Outters 4', 'Outters 4', []],
-    ['LPN-TK2',         hms(17,38, 2), dms(66,53,48),    60, null, null,
-      'TK 2', 'TK 2', ['RE 1738+665', 'PN G096.8+31.9']],
-    ['LPN-TK1',         hms( 8,27, 6), dms(31,30, 9),    30, null, null,
-      'TK 1', 'TK 1', ['TON 320', 'PN G191.4+33.0']],
-    ['LPN-WeDe1',       hms( 5,59,24), dms(10,41,40),    22,   17, null,
-      'WeDe 1', 'WeDe 1', ['WDHS 1', 'PN G197.4-06.4']],
-    ['LPN-PuWe1',       hms( 6,19,34), dms(55,36,42),    20, null, 'HD and OIII',
-      'PuWe 1', 'PuWe 1', ['PN G158.9+17.8']],
-    ['LPN-PFP1',        hms( 7,22,18), dms( 6,21,46,true), 19, 18, 'mostly NII, HD and OIII weak',
-      'PFP 1', 'PFP 1', ['PN G222.1+03.9']],
+    [
+      'LPN-Sh2216',
+      hms(4, 43, 22),
+      dms(46, 42, 7),
+      100,
+      null,
+      'OIII > HD', // coords from SIMBAD (PN G158.5+00.7)
+      'Sh 2-216',
+      'Sh 2-216',
+      ['SH2-216', 'PN G158.6+00.7'],
+    ],
+    ['LPN-Outters4', hms(21, 11, 48), dms(59, 59, 12), 69, 20, null, 'Outters 4', 'Outters 4', []],
+    [
+      'LPN-TK2',
+      hms(17, 38, 2),
+      dms(66, 53, 48),
+      60,
+      null,
+      null,
+      'TK 2',
+      'TK 2',
+      ['RE 1738+665', 'PN G096.8+31.9'],
+    ],
+    [
+      'LPN-TK1',
+      hms(8, 27, 6),
+      dms(31, 30, 9),
+      30,
+      null,
+      null,
+      'TK 1',
+      'TK 1',
+      ['TON 320', 'PN G191.4+33.0'],
+    ],
+    [
+      'LPN-WeDe1',
+      hms(5, 59, 24),
+      dms(10, 41, 40),
+      22,
+      17,
+      null,
+      'WeDe 1',
+      'WeDe 1',
+      ['WDHS 1', 'PN G197.4-06.4'],
+    ],
+    [
+      'LPN-PuWe1',
+      hms(6, 19, 34),
+      dms(55, 36, 42),
+      20,
+      null,
+      'HD and OIII',
+      'PuWe 1',
+      'PuWe 1',
+      ['PN G158.9+17.8'],
+    ],
+    [
+      'LPN-PFP1',
+      hms(7, 22, 18),
+      dms(6, 21, 46, true),
+      19,
+      18,
+      'mostly NII, HD and OIII weak',
+      'PFP 1',
+      'PFP 1',
+      ['PN G222.1+03.9'],
+    ],
     // Abell PNe: primary IDs are now Abell{N} (Abell catalog priority > LPN).
     // LPN-Abell{N} is kept as a secondary cross-reference (same pattern as M > NGC).
-    ['Abell31',     hms( 8,54,13), dms( 8,53,58),    17,   16, 'OIII > HD',
-      'Abell 31', 'Abell 31', ['LPN-Abell31', 'PN G219.1+31.2'], 12.0],
-    ['LPN-IsWe2',       hms(22,13,22), dms(65,53,55),    16,   14, 'mostly HD, HE & OIII',
-      'IsWe 2', 'IsWe 2', ['PN G107.7+07.8']],
-    ['Abell35',     hms(12,53,33), dms(22,52,23,true), 13, 11, 'HD and OIII',  // coords from SIMBAD (PN A66 35); maj updated to SIMBAD 12.87→13
-      'Abell 35', 'Abell 35', ['LPN-Abell35', 'PN G303.6+40.0'], 13.3],
-    ['LPN-HFG1',        hms( 3, 3,46), dms(64,54,36),    15, null, 'mostly OIII',  // coords from SIMBAD (PN G136.3+05.5)
-      'HFG 1', 'HFG 1', ['PN G136.3+05.5']],
-    ['Abell74',     hms(21,16,52), dms(24, 8,51),    15,   13, 'HD and OIII',
-      'Abell 74', 'Abell 74', ['LPN-Abell74', 'PN G072.7-17.1'], 15.8],
-    ['Abell7',      hms( 5, 3, 8), dms(15,36,13,true), 13, 11, 'HD and OIII',  // maj updated to SIMBAD 12.73→13
-      'Abell 7', 'Abell 7', ['LPN-Abell7', 'PN G215.5-30.8'], 13.2],
-    ['LPN-IsWe1',       hms( 3,49, 5), dms(50, 0,15),    13, null, null,
-      'IsWe 1', 'IsWe 1', ['PN G149.7-03.3']],
-    ['LPN-EGB6',        hms( 9,53, 0), dms(13,44,50),    13,   11, 'OIII > HD',
-      'EGB 6', 'EGB 6', ['PN G221.5+46.3']],
-    ['LPN-MWP1',        hms(21,17, 7), dms(34,12,40),    13,    9, 'OIII > HD',
-      'MWP 1', 'MWP 1', ['PN G080.3-10.4']],
-    ['LPN-Jacoby1',     hms(15,21,47), dms(52,22, 5),    11, null, 'mostly OIII',
-      'Jacoby 1', 'Jacoby 1', ['PK 085+52.1']],
-    ['LPN-HDW3',        hms( 3,27,15), dms(45,24,19),     9, null, 'OIII > HD',
-      'HDW 3', 'HDW 3', ['HW 4', 'PN G149.4-09.2']],
-    ['LPN-DeHt5',       hms(22,19,34), dms(70,56, 1),     9, null, 'HD > OIII',
-      'DeHt 5', 'DeHt 5', ['DHW 5', 'PN G111.0+11.6']],
-    ['LPN-LoTr5',       hms(12,55,34), dms(25,53,28),     9, null, 'mostly OIII',
-      'LoTr 5', 'LoTr 5', ['PN G339.9+88.4']],
+    [
+      'Abell31',
+      hms(8, 54, 13),
+      dms(8, 53, 58),
+      17,
+      16,
+      'OIII > HD',
+      'Abell 31',
+      'Abell 31',
+      ['LPN-Abell31', 'PN G219.1+31.2'],
+      12.0,
+    ],
+    [
+      'LPN-IsWe2',
+      hms(22, 13, 22),
+      dms(65, 53, 55),
+      16,
+      14,
+      'mostly HD, HE & OIII',
+      'IsWe 2',
+      'IsWe 2',
+      ['PN G107.7+07.8'],
+    ],
+    [
+      'Abell35',
+      hms(12, 53, 33),
+      dms(22, 52, 23, true),
+      13,
+      11,
+      'HD and OIII', // coords from SIMBAD (PN A66 35); maj updated to SIMBAD 12.87→13
+      'Abell 35',
+      'Abell 35',
+      ['LPN-Abell35', 'PN G303.6+40.0'],
+      13.3,
+    ],
+    [
+      'LPN-HFG1',
+      hms(3, 3, 46),
+      dms(64, 54, 36),
+      15,
+      null,
+      'mostly OIII', // coords from SIMBAD (PN G136.3+05.5)
+      'HFG 1',
+      'HFG 1',
+      ['PN G136.3+05.5'],
+    ],
+    [
+      'Abell74',
+      hms(21, 16, 52),
+      dms(24, 8, 51),
+      15,
+      13,
+      'HD and OIII',
+      'Abell 74',
+      'Abell 74',
+      ['LPN-Abell74', 'PN G072.7-17.1'],
+      15.8,
+    ],
+    [
+      'Abell7',
+      hms(5, 3, 8),
+      dms(15, 36, 13, true),
+      13,
+      11,
+      'HD and OIII', // maj updated to SIMBAD 12.73→13
+      'Abell 7',
+      'Abell 7',
+      ['LPN-Abell7', 'PN G215.5-30.8'],
+      13.2,
+    ],
+    [
+      'LPN-IsWe1',
+      hms(3, 49, 5),
+      dms(50, 0, 15),
+      13,
+      null,
+      null,
+      'IsWe 1',
+      'IsWe 1',
+      ['PN G149.7-03.3'],
+    ],
+    [
+      'LPN-EGB6',
+      hms(9, 53, 0),
+      dms(13, 44, 50),
+      13,
+      11,
+      'OIII > HD',
+      'EGB 6',
+      'EGB 6',
+      ['PN G221.5+46.3'],
+    ],
+    [
+      'LPN-MWP1',
+      hms(21, 17, 7),
+      dms(34, 12, 40),
+      13,
+      9,
+      'OIII > HD',
+      'MWP 1',
+      'MWP 1',
+      ['PN G080.3-10.4'],
+    ],
+    [
+      'LPN-Jacoby1',
+      hms(15, 21, 47),
+      dms(52, 22, 5),
+      11,
+      null,
+      'mostly OIII',
+      'Jacoby 1',
+      'Jacoby 1',
+      ['PK 085+52.1'],
+    ],
+    [
+      'LPN-HDW3',
+      hms(3, 27, 15),
+      dms(45, 24, 19),
+      9,
+      null,
+      'OIII > HD',
+      'HDW 3',
+      'HDW 3',
+      ['HW 4', 'PN G149.4-09.2'],
+    ],
+    [
+      'LPN-DeHt5',
+      hms(22, 19, 34),
+      dms(70, 56, 1),
+      9,
+      null,
+      'HD > OIII',
+      'DeHt 5',
+      'DeHt 5',
+      ['DHW 5', 'PN G111.0+11.6'],
+    ],
+    [
+      'LPN-LoTr5',
+      hms(12, 55, 34),
+      dms(25, 53, 28),
+      9,
+      null,
+      'mostly OIII',
+      'LoTr 5',
+      'LoTr 5',
+      ['PN G339.9+88.4'],
+    ],
     // Abell 29/36: RA given as "HH MM.m" (decimal minutes, no seconds)
-    ['Abell29',     hms( 8,40,18), dms(20,54,36,true),  8, null, null,  // coords from SIMBAD (PN A66 29)
-      'Abell 29', 'Abell 29', ['LPN-Abell29', 'PN G244.5+12.5'], 14.3],
-    ['Abell36',     (13 + 40.7/60) * 15, dms(19,53, 0,true), 6, null, 'mostly OIII',  // maj updated to SIMBAD 6.12→6
-      'Abell 36', 'Abell 36', ['LPN-Abell36', 'PN G318.4+41.4'], 11.8],
-    ['LPN-Ko2-2',       hms( 6,52,28), dms( 9,58,17),     7, null, 'OIII and HD',
-      'Kohoutek 2-2', 'Kohoutek 2-2', ['PN G204.1+04.7']],
-    ['LPN-JnEr1',       hms( 7,57,51), dms(53,25,16),     7,    6, 'OIII and HD',
-      'Jones-Emberson 1', 'Jones-Emberson 1', ['VV 47', 'PN G164.8+31.1']],
-    ['LPN-YM16',        hms(18,54,57), dms( 6, 2,31),     6, null, null,
-      'Yerkes-McDonald 16', 'Yerkes-McDonald 16', ['PN G038.7+01.9']],
-    ['LPN-IPHASX205013', hms(20,50, 5), dms(46,52,48),    6, null, 'OIII and HD',
-      'Ear Nebula', 'Ear Nebula', ['IPHASX J205013.7+465518']],
-    ['Abell24',     hms( 7,51,38), dms( 3, 0,27),     6, null, null,
-      'Abell 24', 'Abell 24', ['LPN-Abell24', 'PN G217.1+14.7']],
-    ['Abell28',     hms( 8,41,35), dms(58,14, 3),     4, null, null,  // maj updated to SIMBAD 4.47→4
-      'Abell 28', 'Abell 28', ['LPN-Abell28', 'PN G158.8+37.1']],
-    ['LPN-EGB1',        hms( 1, 7, 8), dms(73,33,24),     5, null, 'OIII and HD',
-      'EGB 1', 'EGB 1', ['HDW 1', 'PN G124.0+10.7']],
-    ['Abell45',     hms(18,30,17), dms(11,36,54,true), 5, null, null,
-      'Abell 45', 'Abell 45', ['LPN-Abell45', 'PN G020.2-00.6']],
-    ['LPN-Jones1',      hms(23,35,53), dms(30,28, 2),     5, null, 'mostly OIII',
-      'Jones 1', 'Jones 1', ['PN G104.2-29.6']],
+    [
+      'Abell29',
+      hms(8, 40, 18),
+      dms(20, 54, 36, true),
+      8,
+      null,
+      null, // coords from SIMBAD (PN A66 29)
+      'Abell 29',
+      'Abell 29',
+      ['LPN-Abell29', 'PN G244.5+12.5'],
+      14.3,
+    ],
+    [
+      'Abell36',
+      (13 + 40.7 / 60) * 15,
+      dms(19, 53, 0, true),
+      6,
+      null,
+      'mostly OIII', // maj updated to SIMBAD 6.12→6
+      'Abell 36',
+      'Abell 36',
+      ['LPN-Abell36', 'PN G318.4+41.4'],
+      11.8,
+    ],
+    [
+      'LPN-Ko2-2',
+      hms(6, 52, 28),
+      dms(9, 58, 17),
+      7,
+      null,
+      'OIII and HD',
+      'Kohoutek 2-2',
+      'Kohoutek 2-2',
+      ['PN G204.1+04.7'],
+    ],
+    [
+      'LPN-JnEr1',
+      hms(7, 57, 51),
+      dms(53, 25, 16),
+      7,
+      6,
+      'OIII and HD',
+      'Jones-Emberson 1',
+      'Jones-Emberson 1',
+      ['VV 47', 'PN G164.8+31.1'],
+    ],
+    [
+      'LPN-YM16',
+      hms(18, 54, 57),
+      dms(6, 2, 31),
+      6,
+      null,
+      null,
+      'Yerkes-McDonald 16',
+      'Yerkes-McDonald 16',
+      ['PN G038.7+01.9'],
+    ],
+    [
+      'LPN-IPHASX205013',
+      hms(20, 50, 5),
+      dms(46, 52, 48),
+      6,
+      null,
+      'OIII and HD',
+      'Ear Nebula',
+      'Ear Nebula',
+      ['IPHASX J205013.7+465518'],
+    ],
+    [
+      'Abell24',
+      hms(7, 51, 38),
+      dms(3, 0, 27),
+      6,
+      null,
+      null,
+      'Abell 24',
+      'Abell 24',
+      ['LPN-Abell24', 'PN G217.1+14.7'],
+    ],
+    [
+      'Abell28',
+      hms(8, 41, 35),
+      dms(58, 14, 3),
+      4,
+      null,
+      null, // maj updated to SIMBAD 4.47→4
+      'Abell 28',
+      'Abell 28',
+      ['LPN-Abell28', 'PN G158.8+37.1'],
+    ],
+    [
+      'LPN-EGB1',
+      hms(1, 7, 8),
+      dms(73, 33, 24),
+      5,
+      null,
+      'OIII and HD',
+      'EGB 1',
+      'EGB 1',
+      ['HDW 1', 'PN G124.0+10.7'],
+    ],
+    [
+      'Abell45',
+      hms(18, 30, 17),
+      dms(11, 36, 54, true),
+      5,
+      null,
+      null,
+      'Abell 45',
+      'Abell 45',
+      ['LPN-Abell45', 'PN G020.2-00.6'],
+    ],
+    [
+      'LPN-Jones1',
+      hms(23, 35, 53),
+      dms(30, 28, 2),
+      5,
+      null,
+      'mostly OIII',
+      'Jones 1',
+      'Jones 1',
+      ['PN G104.2-29.6'],
+    ],
   ];
 
   let lpnAdded = 0;
-  for (const [id, ra, dec, majAxis, minAxis, emissionLines, nameEn, nameFr, otherCatIds, mag = null] of lpnEntries) {
+  for (const [
+    id,
+    ra,
+    dec,
+    majAxis,
+    minAxis,
+    emissionLines,
+    nameEn,
+    nameFr,
+    otherCatIds,
+    mag = null,
+  ] of lpnEntries) {
     if (dec < -35) continue; // southern cut-off
     const cats = [id, ...otherCatIds];
     data.push([
@@ -1409,100 +1986,100 @@ async function main() {
   // that already carries an Abell{N} catalog ID (standalone, LPN-migrated,
   // NGC/IC primary, or SH2-274). Abell 85 = CTB 1 SNR has no PN cross-refs.
   const ABELL_CROSSREFS = {
-    'Abell1':  ['PK 119+06  1', 'PN ARO  198', 'PN G119.4+06.5'],
-    'Abell2':  ['PK 122-04  1', 'PN ARO  202', 'PN G122.1-04.9'],
-    'Abell3':  ['PK 131+02  1', 'PN ARO  204', 'PN G131.5+02.6'],
-    'Abell4':  ['PK 144-15  1', 'PN ARO  205', 'PN G144.3-15.5'],
-    'Abell5':  ['PK 141-07  1', 'PN ARO  206', 'PN G141.7-07.8'],
-    'Abell6':  ['PK 136+04  1', 'PN ARO  207', 'PN G136.1+04.9'],
-    'Abell7':  ['PK 215-30  1', 'PN ARO  215', 'PN G215.5-30.8'],
-    'Abell8':  ['PK 167-00  1', 'PN ARO  216', 'PN G167.0-00.9'],
-    'Abell9':  ['PK 172+00  1', 'PN ARO  122'],
-    'Abell10': ['PK 197-14  1', 'PN ARO  176', 'PN G197.2-14.2'],
-    'Abell11': ['PK 196-12  1', 'PN ARO  217'],
-    'Abell12': ['PK 198-06  1', 'PN ARO  220', 'PN G198.6-06.3'],
-    'Abell13': ['PK 204-08  1', 'PN ARO  124', 'PN G204.0-08.5'],
-    'Abell14': ['PK 197-03  1', 'PN ARO  125', 'PN G197.8-03.3'],
-    'Abell15': ['PK 233-16  1', 'PN ARO  221', 'PN G233.5-16.3'],
-    'Abell16': ['PK 153+22  1', 'PN ARO  222', 'PN G153.7+22.8'],
-    'Abell17': ['PK 221-04  1', 'PN ARO  223'],
-    'Abell18': ['PK 216-00  1', 'PN ARO  224', 'PN G216.0-00.2'],
-    'Abell19': ['PK 200+08  1', 'PN ARO  130', 'PN G200.7+08.4'],
-    'Abell20': ['PK 214+07  1', 'PN ARO  132', 'PN G214.9+07.8'],
-    'Abell21': ['PK 205+14  1', 'PN ARO  388', 'PN G205.1+14.2'],
-    'Abell22': ['PK 215+11  1', 'PN ARO  133', 'PN G215.6+11.1'],
-    'Abell23': ['PK 249-05  1', 'PN ARO  542', 'PN G249.3-05.4'],
-    'Abell24': ['PK 217+14  1', 'PN ARO  134', 'PN G217.1+14.7'],
-    'Abell25': ['PK 224+15', 'PK 224+15  1', 'PN ARO  246', 'PN G224.3+15.3'],
-    'Abell26': ['PK 250+00  1', 'PN ARO  545', 'PN G250.3+00.1'],
-    'Abell27': ['PK 252+04  1', 'PN G252.6+04.4'],
-    'Abell28': ['PK 158+37', 'PK 158+37  1', 'PN G158.8+37.1'],
-    'Abell29': ['PK 244+12  1', 'PN G244.5+12.5'],
-    'Abell30': ['PK 208+33  1', 'PN G208.5+33.2'],
-    'Abell31': ['PK 219+31', 'PK 219+31  1', 'PN ARO  135', 'PN G219.1+31.2'],
-    'Abell32': ['PK 227+33  1', 'PN ARO  178'],
-    'Abell33': ['PK 238+34  1', 'PN ARO   65', 'PN G238.0+34.8'],
-    'Abell34': ['PK 248+29  1', 'PN G248.7+29.5'],
-    'Abell35': ['PK 303+40  1', 'PN G303.6+40.0'],
-    'Abell36': ['PK 318+41  1', 'PN G318.4+41.4'],
-    'Abell37': ['PK 326+42  1', 'PN G326.6+42.2', 'PN G326.7+42.2'],
-    'Abell38': ['PK 346+12  1', 'PN G346.9+12.4'],
-    'Abell39': ['PK 047+42  1', 'PN ARO  180', 'PN G047.0+42.4'],
-    'Abell40': ['PK 359+15  1', 'PN G359.1+15.1'],
-    'Abell41': ['PK 009+10  1', 'PN G009.6+10.5'],
-    'Abell42': ['PK 016+13  1', 'PN G016.0+13.5'],
-    'Abell43': ['PK 036+17  1', 'PN ARO  181', 'PN G036.0+17.6'],
-    'Abell44': ['PK 015-03  1', 'PN ARO  278', 'PN G015.6-03.0'],
-    'Abell45': ['PK 020-00  1', 'PN G020.0-00.6', 'PN G020.2-00.6'],
-    'Abell46': ['PK 055+16  1', 'PN ARO  119', 'PN G055.4+16.0'],
-    'Abell47': ['PK 030+03  1', 'PN ARO  138', 'PN G030.8+03.4'],
-    'Abell48': ['PK 029+00  1', 'PN G029.0+00.4'],
-    'Abell49': ['PK 027-03  1', 'PN G027.3-03.4'],
-    'Abell50': ['PK 078+18  1', 'PN G078.5+18.7'],
-    'Abell51': ['PK 017-10  1', 'PN ARO  300', 'PN G017.6-10.2'],
-    'Abell52': ['PK 050+05  1', 'PN ARO  144', 'PN G050.4+05.2'],
-    'Abell53': ['PK 040-00  1', 'PN ARO  183', 'PN G040.3-00.4'],
-    'Abell54': ['PK 055+06  1', 'PN ARO  184', 'PN G055.3+06.6'],
-    'Abell55': ['PK 033-05  1', 'PN G033.0-05.3'],
-    'Abell56': ['PK 037-03  2', 'PN ARO  146', 'PN G037.9-03.4'],
-    'Abell57': ['PK 058+06  1', 'PN ARO  149', 'PN G058.6+06.1'],
-    'Abell58': ['PK 037-05  1', 'PN ARO  150', 'PN G037.5-05.1'],
-    'Abell59': ['PK 053+03  1', 'PN ARO   84', 'PN G053.3+03.0'],
-    'Abell60': ['PK 025-11  1', 'PN ARO  314', 'PN G025.0-11.6'],
-    'Abell61': ['PK 077+14', 'PK 077+14  1', 'PN G077.6+14.7'],
-    'Abell62': ['PK 047-04  1', 'PN ARO  155', 'PN G047.1-04.2'],
-    'Abell63': ['PK 053-03  1', 'PN ARO  161', 'PN G053.8-03.0'],
-    'Abell64': ['PK 044-09  1', 'PN ARO  163'],
-    'Abell65': ['PK 017-21  1', 'PN ARO   36', 'PN G017.3-21.9'],
-    'Abell66': ['PK 019-23  1', 'PN ARO  339', 'PN G019.8-23.7'],
-    'Abell67': ['PK 043-13  1', 'PN ARO  117', 'PN G043.5-13.4'],
-    'Abell68': ['PK 060-04  1', 'PN ARO  166', 'PN G060.0-04.3'],
-    'Abell69': ['PK 076+01  1', 'PN ARO   15', 'PN G076.3+01.1'],
-    'Abell70': ['PK 038-25  1', 'PN ARO  351', 'PN G038.1-25.4'],
-    'Abell71': ['PK 085+04  1', 'PN ARO  352', 'PN G084.9+04.4'],
-    'Abell72': ['PK 059-18  1', 'PN ARO  173', 'PN G059.7-18.7'],
-    'Abell73': ['PK 095+07  1', 'PN ARO  356', 'PN G095.2+07.8'],
-    'Abell74': ['PK 072-17', 'PK 072-17  1', 'PN ARO  193', 'PN G072.7-17.1'],
-    'Abell75': ['PK 101+08  1', 'PN ARO  359', 'PN G101.8+08.7'],
-    'Abell76': ['PK 050-36  1', 'PN ARO  360'],
-    'Abell77': ['PK 097+03  1', 'PN ARO  363', 'PN G097.5+03.1'],
-    'Abell78': ['PK 081-14  1', 'PN ARO  174', 'PN G081.2-14.9'],
-    'Abell79': ['PK 102-02  1', 'PN ARO  372', 'PN G102.9-02.3'],
-    'Abell80': ['PK 102-05  1', 'PN ARO  375', 'PN G102.8-05.0'],
-    'Abell81': ['PK 117+18  1', 'PN ARO  376', 'PN G117.5+18.9'],
-    'Abell82': ['PK 114-04  1', 'PN ARO  114', 'PN G114.0-04.6'],
-    'Abell83': ['PK 113-06  1', 'PN ARO  385', 'PN G113.6-06.9'],
-    'Abell84': ['PK 112-10  1', 'PN ARO  115', 'PN G112.9-10.2'],
-    'Abell85': [],  // CTB 1 SNR – no PN cross-refs in SIMBAD
-    'Abell86': ['PK 118+08  2', 'PN ARO  245', 'PN G118.7+08.2'],
+    Abell1: ['PK 119+06  1', 'PN ARO  198', 'PN G119.4+06.5'],
+    Abell2: ['PK 122-04  1', 'PN ARO  202', 'PN G122.1-04.9'],
+    Abell3: ['PK 131+02  1', 'PN ARO  204', 'PN G131.5+02.6'],
+    Abell4: ['PK 144-15  1', 'PN ARO  205', 'PN G144.3-15.5'],
+    Abell5: ['PK 141-07  1', 'PN ARO  206', 'PN G141.7-07.8'],
+    Abell6: ['PK 136+04  1', 'PN ARO  207', 'PN G136.1+04.9'],
+    Abell7: ['PK 215-30  1', 'PN ARO  215', 'PN G215.5-30.8'],
+    Abell8: ['PK 167-00  1', 'PN ARO  216', 'PN G167.0-00.9'],
+    Abell9: ['PK 172+00  1', 'PN ARO  122'],
+    Abell10: ['PK 197-14  1', 'PN ARO  176', 'PN G197.2-14.2'],
+    Abell11: ['PK 196-12  1', 'PN ARO  217'],
+    Abell12: ['PK 198-06  1', 'PN ARO  220', 'PN G198.6-06.3'],
+    Abell13: ['PK 204-08  1', 'PN ARO  124', 'PN G204.0-08.5'],
+    Abell14: ['PK 197-03  1', 'PN ARO  125', 'PN G197.8-03.3'],
+    Abell15: ['PK 233-16  1', 'PN ARO  221', 'PN G233.5-16.3'],
+    Abell16: ['PK 153+22  1', 'PN ARO  222', 'PN G153.7+22.8'],
+    Abell17: ['PK 221-04  1', 'PN ARO  223'],
+    Abell18: ['PK 216-00  1', 'PN ARO  224', 'PN G216.0-00.2'],
+    Abell19: ['PK 200+08  1', 'PN ARO  130', 'PN G200.7+08.4'],
+    Abell20: ['PK 214+07  1', 'PN ARO  132', 'PN G214.9+07.8'],
+    Abell21: ['PK 205+14  1', 'PN ARO  388', 'PN G205.1+14.2'],
+    Abell22: ['PK 215+11  1', 'PN ARO  133', 'PN G215.6+11.1'],
+    Abell23: ['PK 249-05  1', 'PN ARO  542', 'PN G249.3-05.4'],
+    Abell24: ['PK 217+14  1', 'PN ARO  134', 'PN G217.1+14.7'],
+    Abell25: ['PK 224+15', 'PK 224+15  1', 'PN ARO  246', 'PN G224.3+15.3'],
+    Abell26: ['PK 250+00  1', 'PN ARO  545', 'PN G250.3+00.1'],
+    Abell27: ['PK 252+04  1', 'PN G252.6+04.4'],
+    Abell28: ['PK 158+37', 'PK 158+37  1', 'PN G158.8+37.1'],
+    Abell29: ['PK 244+12  1', 'PN G244.5+12.5'],
+    Abell30: ['PK 208+33  1', 'PN G208.5+33.2'],
+    Abell31: ['PK 219+31', 'PK 219+31  1', 'PN ARO  135', 'PN G219.1+31.2'],
+    Abell32: ['PK 227+33  1', 'PN ARO  178'],
+    Abell33: ['PK 238+34  1', 'PN ARO   65', 'PN G238.0+34.8'],
+    Abell34: ['PK 248+29  1', 'PN G248.7+29.5'],
+    Abell35: ['PK 303+40  1', 'PN G303.6+40.0'],
+    Abell36: ['PK 318+41  1', 'PN G318.4+41.4'],
+    Abell37: ['PK 326+42  1', 'PN G326.6+42.2', 'PN G326.7+42.2'],
+    Abell38: ['PK 346+12  1', 'PN G346.9+12.4'],
+    Abell39: ['PK 047+42  1', 'PN ARO  180', 'PN G047.0+42.4'],
+    Abell40: ['PK 359+15  1', 'PN G359.1+15.1'],
+    Abell41: ['PK 009+10  1', 'PN G009.6+10.5'],
+    Abell42: ['PK 016+13  1', 'PN G016.0+13.5'],
+    Abell43: ['PK 036+17  1', 'PN ARO  181', 'PN G036.0+17.6'],
+    Abell44: ['PK 015-03  1', 'PN ARO  278', 'PN G015.6-03.0'],
+    Abell45: ['PK 020-00  1', 'PN G020.0-00.6', 'PN G020.2-00.6'],
+    Abell46: ['PK 055+16  1', 'PN ARO  119', 'PN G055.4+16.0'],
+    Abell47: ['PK 030+03  1', 'PN ARO  138', 'PN G030.8+03.4'],
+    Abell48: ['PK 029+00  1', 'PN G029.0+00.4'],
+    Abell49: ['PK 027-03  1', 'PN G027.3-03.4'],
+    Abell50: ['PK 078+18  1', 'PN G078.5+18.7'],
+    Abell51: ['PK 017-10  1', 'PN ARO  300', 'PN G017.6-10.2'],
+    Abell52: ['PK 050+05  1', 'PN ARO  144', 'PN G050.4+05.2'],
+    Abell53: ['PK 040-00  1', 'PN ARO  183', 'PN G040.3-00.4'],
+    Abell54: ['PK 055+06  1', 'PN ARO  184', 'PN G055.3+06.6'],
+    Abell55: ['PK 033-05  1', 'PN G033.0-05.3'],
+    Abell56: ['PK 037-03  2', 'PN ARO  146', 'PN G037.9-03.4'],
+    Abell57: ['PK 058+06  1', 'PN ARO  149', 'PN G058.6+06.1'],
+    Abell58: ['PK 037-05  1', 'PN ARO  150', 'PN G037.5-05.1'],
+    Abell59: ['PK 053+03  1', 'PN ARO   84', 'PN G053.3+03.0'],
+    Abell60: ['PK 025-11  1', 'PN ARO  314', 'PN G025.0-11.6'],
+    Abell61: ['PK 077+14', 'PK 077+14  1', 'PN G077.6+14.7'],
+    Abell62: ['PK 047-04  1', 'PN ARO  155', 'PN G047.1-04.2'],
+    Abell63: ['PK 053-03  1', 'PN ARO  161', 'PN G053.8-03.0'],
+    Abell64: ['PK 044-09  1', 'PN ARO  163'],
+    Abell65: ['PK 017-21  1', 'PN ARO   36', 'PN G017.3-21.9'],
+    Abell66: ['PK 019-23  1', 'PN ARO  339', 'PN G019.8-23.7'],
+    Abell67: ['PK 043-13  1', 'PN ARO  117', 'PN G043.5-13.4'],
+    Abell68: ['PK 060-04  1', 'PN ARO  166', 'PN G060.0-04.3'],
+    Abell69: ['PK 076+01  1', 'PN ARO   15', 'PN G076.3+01.1'],
+    Abell70: ['PK 038-25  1', 'PN ARO  351', 'PN G038.1-25.4'],
+    Abell71: ['PK 085+04  1', 'PN ARO  352', 'PN G084.9+04.4'],
+    Abell72: ['PK 059-18  1', 'PN ARO  173', 'PN G059.7-18.7'],
+    Abell73: ['PK 095+07  1', 'PN ARO  356', 'PN G095.2+07.8'],
+    Abell74: ['PK 072-17', 'PK 072-17  1', 'PN ARO  193', 'PN G072.7-17.1'],
+    Abell75: ['PK 101+08  1', 'PN ARO  359', 'PN G101.8+08.7'],
+    Abell76: ['PK 050-36  1', 'PN ARO  360'],
+    Abell77: ['PK 097+03  1', 'PN ARO  363', 'PN G097.5+03.1'],
+    Abell78: ['PK 081-14  1', 'PN ARO  174', 'PN G081.2-14.9'],
+    Abell79: ['PK 102-02  1', 'PN ARO  372', 'PN G102.9-02.3'],
+    Abell80: ['PK 102-05  1', 'PN ARO  375', 'PN G102.8-05.0'],
+    Abell81: ['PK 117+18  1', 'PN ARO  376', 'PN G117.5+18.9'],
+    Abell82: ['PK 114-04  1', 'PN ARO  114', 'PN G114.0-04.6'],
+    Abell83: ['PK 113-06  1', 'PN ARO  385', 'PN G113.6-06.9'],
+    Abell84: ['PK 112-10  1', 'PN ARO  115', 'PN G112.9-10.2'],
+    Abell85: [], // CTB 1 SNR – no PN cross-refs in SIMBAD
+    Abell86: ['PK 118+08  2', 'PN ARO  245', 'PN G118.7+08.2'],
   };
 
   // Add Abell{N} cross-ref IDs to existing NGC/IC entries
   const abellNGCICRefs = [
-    { id: 'IC972',   abellId: 'Abell37' },
+    { id: 'IC972', abellId: 'Abell37' },
     { id: 'NGC6742', abellId: 'Abell50' },
     { id: 'NGC7076', abellId: 'Abell75' },
-    { id: 'IC1454',  abellId: 'Abell81' },
+    { id: 'IC1454', abellId: 'Abell81' },
   ];
   for (const { id, abellId } of abellNGCICRefs) {
     const idx = dataIdxById.get(id);
@@ -1517,84 +2094,960 @@ async function main() {
   // 72 standalone Abell entries (RA/Dec/size from SIMBAD; coords in J2000 degrees)
   // Format: [id, ra, dec, type, majAxis', minAxis', pa, mag, nameFr, nameEn, catalogs[], emissionLines]
   const abellEntries = [
-    ['Abell1',  3.229,   69.173, 'PN', 0.78, null, 0, null, null, null, ['Abell1',  'PN G119.4+06.5'], null],
-    ['Abell2',  11.394,  57.96,  'PN', 0.52, null, 0, null, null, null, ['Abell2',  'PN G122.1-04.9'], null],
-    ['Abell3',  33.028,  64.151, 'PN', 1,    null, 0, null, null, null, ['Abell3',  'PN G131.5+02.6'], null],
-    ['Abell4',  41.349,  42.551, 'PN', 0.33, null, 0, null, null, null, ['Abell4',  'PN G144.3-15.5'], null],
-    ['Abell5',  43.063,  50.598, 'PN', 2.12, null, 0, null, null, null, ['Abell5',  'PN G141.7-07.8'], null],
-    ['Abell6',  44.674,  64.502, 'PN', 3.1,  null, 0, null, null, null, ['Abell6',  'PN G136.1+04.9'], null],
-    ['Abell8',  76.66,   39.136, 'PN', 1,    null, 0, null, null, null, ['Abell8',  'PN G167.0-00.9'], null],
-    ['Abell9',  82.236,  36.051, 'PN', 0.62, null, 0, null, null, null, ['Abell9'                    ], null],
-    ['Abell10', 82.94,    6.934, 'PN', 0.33, null, 0, null, null, null, ['Abell10', 'PN G197.2-14.2'], null],
-    ['Abell11', 84.34,    8.258, '?',  0.32, null, 0, null, null, null, ['Abell11'                   ], null],  // SIMBAD otype: G (galaxy)
-    ['Abell12', 90.584,   9.654, 'PN', 0.62, null, 0, null, null, null, ['Abell12', 'PN G198.6-06.3'], null],
-    ['Abell13', 91.2,     3.943, 'PN', 2.54, null, 0, 19.9, null, null, ['Abell13', 'PN G204.0-08.5'], null],
-    ['Abell14', 92.786,  11.779, 'PN', 0.55, null, 0, 15.2, null, null, ['Abell14', 'PN G197.8-03.3'], null],
-    ['Abell15', 96.758,  -25.38, 'PN', 0.57, null, 0, 15.7, null, null, ['Abell15', 'PN G233.5-16.3'], null],
-    ['Abell16', 100.981,  61.79, 'PN', 2.35, null, 0, 18.7, null, null, ['Abell16', 'PN G153.7+22.8'], null],
-    ['Abell17', 102.158,  -9.544,'PN', 0.71, null, 0, null, null, null, ['Abell17'                   ], null],  // SIMBAD otype: PN? (uncertain)
-    ['Abell18', 104.061,  -2.886,'PN', 1.22, null, 0, 20.9, null, null, ['Abell18', 'PN G216.0-00.2'], null],
-    ['Abell19', 104.985,  14.609,'PN', 1.12, null, 0, null, null, null, ['Abell19', 'PN G200.7+08.4'], null],
-    ['Abell20', 110.74,   1.759, 'PN', 1.12, null, 0, 16.5, null, null, ['Abell20', 'PN G214.9+07.8'], null],
-    ['Abell22', 114.033,  2.708, 'PN', 1.4,  null, 0, 19.6, null, null, ['Abell22', 'PN G215.6+11.1'], null],
-    ['Abell23', 115.825, -34.754,'PN', 0.9,  null, 0, null, null, null, ['Abell23', 'PN G249.3-05.4'], null],
-    ['Abell25', 121.694,  -2.876,'PN', 2.77, null, 0, 18.4, null, null, ['Abell25', 'PN G224.3+15.3'], null],
-    ['Abell26', 122.257, -32.674,'PN', 0.67, null, 0, 11.6, null, null, ['Abell26', 'PN G250.3+00.1'], null],
-    ['Abell27', 127.969, -32.102,'PN', 0.72, null, 0, null, null, null, ['Abell27', 'PN G252.6+04.4'], null],
-    ['Abell30', 131.723,  17.88, 'PN', 0.29, null, 0, 14.3, null, null, ['Abell30', 'PN G208.5+33.2'], null],
-    ['Abell32', 139.103,  3.891, '?',  2.23, null, 0, null, null, null, ['Abell32'                   ], null],  // SIMBAD otype: ? (unknown)
-    ['Abell33', 144.788,  -2.808,'PN', 4.47, null, 0, null, null, null, ['Abell33', 'PN G238.0+34.8'], null],
-    ['Abell34', 146.397, -13.171,'PN', 4.83, null, 0, 16.3, null, null, ['Abell34', 'PN G248.7+29.5'], null],
-    ['Abell38', 245.829, -31.75, 'PN', 1.53, null, 0, 20,   null, null, ['Abell38', 'PN G346.9+12.4'], null],
-    ['Abell39', 246.89,   27.909,'PN', 2.9,  null, 0, 15.6, null, null, ['Abell39', 'PN G047.0+42.4'], null],
-    ['Abell40', 252.144, -21.014,'PN', 0.57, null, 0, null, null, null, ['Abell40', 'PN G359.1+15.1'], null],
-    ['Abell41', 262.258, -15.218,'PN', 0.31, null, 0, 15.9, null, null, ['Abell41', 'PN G009.6+10.5'], null],
-    ['Abell42', 262.871,  -8.319,'PN', null, null, 0, 20.2, null, null, ['Abell42', 'PN G016.0+13.5'], null],
-    ['Abell43', 268.384,  10.623,'PN', 1.33, null, 0, 14.7, null, null, ['Abell43', 'PN G036.0+17.6'], null],
-    ['Abell44', 277.547, -16.757,'PN', 0.1,  null, 0, null, null, null, ['Abell44', 'PN G015.6-03.0'], null],
-    ['Abell46', 277.827,  26.937,'PN', 1.06, null, 0, null, null, null, ['Abell46', 'PN G055.4+16.0'], null],
-    ['Abell47', 278.844,  -0.231,'PN', null, null, 0, null, null, null, ['Abell47', 'PN G030.8+03.4'], null],
-    ['Abell48', 280.696,  -3.221,'PN', 0.7,  null, 0, null, null, null, ['Abell48', 'PN G029.0+00.4'], null],
-    ['Abell49', 283.368,  -6.48, 'PN', null, null, 0, null, null, null, ['Abell49', 'PN G027.3-03.4'], null],
-    ['Abell51', 285.256, -18.204,'PN', 1.12, null, 0, 15.4, null, null, ['Abell51', 'PN G017.6-10.2'], null],
-    ['Abell52', 286.135,  17.952,'PN', null, null, 0, null, null, null, ['Abell52', 'PN G050.4+05.2'], null],
-    ['Abell53', 286.691,  6.398, 'PN', 0.52, null, 0, null, null, null, ['Abell53', 'PN G040.3-00.4'], null],
-    ['Abell54', 287.165,  22.983,'PN', 0.93, null, 0, null, null, null, ['Abell54', 'PN G055.3+06.6'], null],
-    ['Abell55', 287.607,  -2.34, 'PN', 0.8,  null, 0, null, null, null, ['Abell55', 'PN G033.0-05.3'], null],
-    ['Abell56', 288.275,  2.88,  'PN', null, null, 0, null, null, null, ['Abell56', 'PN G037.9-03.4'], null],
-    ['Abell57', 289.274,  25.626,'PN', null, null, 0, 17.7, null, null, ['Abell57', 'PN G058.6+06.1'], null],
-    ['Abell58', 289.585,  1.783, 'PN', null, null, 0, null, null, null, ['Abell58', 'PN G037.5-05.1'], null],
-    ['Abell59', 289.667,  19.576,'PN', 1.43, null, 0, null, null, null, ['Abell59', 'PN G053.3+03.0'], null],
-    ['Abell60', 289.824, -12.243,'PN', 1.23, null, 0, null, null, null, ['Abell60', 'PN G025.0-11.6'], null],
-    ['Abell61', 289.793,  46.248,'PN', null, null, 0, null, null, null, ['Abell61', 'PN G077.6+14.7'], null],
-    ['Abell62', 293.325,  10.617,'PN', 2.68, null, 0, null, null, null, ['Abell62', 'PN G047.1-04.2'], null],
-    ['Abell63', 295.543,  17.087,'PN', null, null, 0, null, null, null, ['Abell63', 'PN G053.8-03.0'], null],
-    ['Abell64', 296.395,  5.564, '?',  0.58, null, 0, null, null, null, ['Abell64'                   ], null],  // SIMBAD otype: AG? (AGN candidate)
-    ['Abell65', 296.643, -23.137,'PN', 1.8,  null, 0, 15.8, null, null, ['Abell65', 'PN G017.3-21.9'], null],
-    ['Abell66', 299.381, -21.613,'PN', 4.45, null, 0, 17.4, null, null, ['Abell66', 'PN G019.8-23.7'], null],
-    ['Abell67', 299.613,  3.05,  'PN', 1.12, null, 0, null, null, null, ['Abell67', 'PN G043.5-13.4'], null],
-    ['Abell68', 300.044,  21.716,'PN', null, null, 0, null, null, null, ['Abell68', 'PN G060.0-04.3'], null],
-    ['Abell69', 304.993,  38.401,'PN', 0.37, null, 0, null, null, null, ['Abell69', 'PN G076.3+01.1'], null],
-    ['Abell70', 307.888,  -7.088,'PN', 0.7,  null, 0, null, null, null, ['Abell70', 'PN G038.1-25.4'], null],
-    ['Abell71', 308.097,  47.347,'PN', 2.63, null, 0, 19.3, null, null, ['Abell71', 'PN G084.9+04.4'], null],
-    ['Abell72', 312.509,  13.558,'PN', 2.12, null, 0, 16.1, null, null, ['Abell72', 'PN G059.7-18.7'], null],
-    ['Abell73', 314.113,  57.434,'PN', 1.22, null, 0, null, null, null, ['Abell73', 'PN G095.2+07.8'], null],
-    ['Abell76', 322.516,  -2.808,'?',  null, null, 0, null, null, null, ['Abell76'                   ], null],  // SIMBAD otype: EmG (emission galaxy)
-    ['Abell77', 323.041,  55.881,'EN', 1.21, null, 0, null, null, null, ['Abell77', 'PN G097.5+03.1'], null],  // SIMBAD otype: HII
-    ['Abell78', 323.872,  31.696,'PN', 1.78, null, 0, 13.2, null, null, ['Abell78', 'PN G081.2-14.9'], null],
-    ['Abell79', 336.572,  54.827,'PN', 0.9,  null, 0, 17.0, null, null, ['Abell79', 'PN G102.9-02.3'], null],
-    ['Abell80', 338.69,   52.435,'PN', 1.83, null, 0, null, null, null, ['Abell80', 'PN G102.8-05.0'], null],
-    ['Abell82', 356.449,  57.066,'PN', 1.35, null, 0, null, null, null, ['Abell82', 'PN G114.0-04.6'], null],
-    ['Abell83', 356.695,  54.744,'PN', 0.78, null, 0, null, null, null, ['Abell83', 'PN G113.6-06.9'], null],
-    ['Abell84', 356.934,  51.399,'PN', 1.58, null, 0, 18.6, null, null, ['Abell84', 'PN G112.9-10.2'], null],
-    ['Abell85', 359.804,  62.437,'SNR',34,   null, 0, null, null, null, ['Abell85'                   ], null],  // CTB 1, SNR (not a true PN)
-    ['Abell86', 0.379,    70.708,'PN', 1.05, null, 0, null, null, null, ['Abell86', 'PN G118.7+08.2'], null],
+    [
+      'Abell1',
+      3.229,
+      69.173,
+      'PN',
+      0.78,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell1', 'PN G119.4+06.5'],
+      null,
+    ],
+    [
+      'Abell2',
+      11.394,
+      57.96,
+      'PN',
+      0.52,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell2', 'PN G122.1-04.9'],
+      null,
+    ],
+    [
+      'Abell3',
+      33.028,
+      64.151,
+      'PN',
+      1,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell3', 'PN G131.5+02.6'],
+      null,
+    ],
+    [
+      'Abell4',
+      41.349,
+      42.551,
+      'PN',
+      0.33,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell4', 'PN G144.3-15.5'],
+      null,
+    ],
+    [
+      'Abell5',
+      43.063,
+      50.598,
+      'PN',
+      2.12,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell5', 'PN G141.7-07.8'],
+      null,
+    ],
+    [
+      'Abell6',
+      44.674,
+      64.502,
+      'PN',
+      3.1,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell6', 'PN G136.1+04.9'],
+      null,
+    ],
+    [
+      'Abell8',
+      76.66,
+      39.136,
+      'PN',
+      1,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell8', 'PN G167.0-00.9'],
+      null,
+    ],
+    ['Abell9', 82.236, 36.051, 'PN', 0.62, null, 0, null, null, null, ['Abell9'], null],
+    [
+      'Abell10',
+      82.94,
+      6.934,
+      'PN',
+      0.33,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell10', 'PN G197.2-14.2'],
+      null,
+    ],
+    ['Abell11', 84.34, 8.258, '?', 0.32, null, 0, null, null, null, ['Abell11'], null], // SIMBAD otype: G (galaxy)
+    [
+      'Abell12',
+      90.584,
+      9.654,
+      'PN',
+      0.62,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell12', 'PN G198.6-06.3'],
+      null,
+    ],
+    [
+      'Abell13',
+      91.2,
+      3.943,
+      'PN',
+      2.54,
+      null,
+      0,
+      19.9,
+      null,
+      null,
+      ['Abell13', 'PN G204.0-08.5'],
+      null,
+    ],
+    [
+      'Abell14',
+      92.786,
+      11.779,
+      'PN',
+      0.55,
+      null,
+      0,
+      15.2,
+      null,
+      null,
+      ['Abell14', 'PN G197.8-03.3'],
+      null,
+    ],
+    [
+      'Abell15',
+      96.758,
+      -25.38,
+      'PN',
+      0.57,
+      null,
+      0,
+      15.7,
+      null,
+      null,
+      ['Abell15', 'PN G233.5-16.3'],
+      null,
+    ],
+    [
+      'Abell16',
+      100.981,
+      61.79,
+      'PN',
+      2.35,
+      null,
+      0,
+      18.7,
+      null,
+      null,
+      ['Abell16', 'PN G153.7+22.8'],
+      null,
+    ],
+    ['Abell17', 102.158, -9.544, 'PN', 0.71, null, 0, null, null, null, ['Abell17'], null], // SIMBAD otype: PN? (uncertain)
+    [
+      'Abell18',
+      104.061,
+      -2.886,
+      'PN',
+      1.22,
+      null,
+      0,
+      20.9,
+      null,
+      null,
+      ['Abell18', 'PN G216.0-00.2'],
+      null,
+    ],
+    [
+      'Abell19',
+      104.985,
+      14.609,
+      'PN',
+      1.12,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell19', 'PN G200.7+08.4'],
+      null,
+    ],
+    [
+      'Abell20',
+      110.74,
+      1.759,
+      'PN',
+      1.12,
+      null,
+      0,
+      16.5,
+      null,
+      null,
+      ['Abell20', 'PN G214.9+07.8'],
+      null,
+    ],
+    [
+      'Abell22',
+      114.033,
+      2.708,
+      'PN',
+      1.4,
+      null,
+      0,
+      19.6,
+      null,
+      null,
+      ['Abell22', 'PN G215.6+11.1'],
+      null,
+    ],
+    [
+      'Abell23',
+      115.825,
+      -34.754,
+      'PN',
+      0.9,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell23', 'PN G249.3-05.4'],
+      null,
+    ],
+    [
+      'Abell25',
+      121.694,
+      -2.876,
+      'PN',
+      2.77,
+      null,
+      0,
+      18.4,
+      null,
+      null,
+      ['Abell25', 'PN G224.3+15.3'],
+      null,
+    ],
+    [
+      'Abell26',
+      122.257,
+      -32.674,
+      'PN',
+      0.67,
+      null,
+      0,
+      11.6,
+      null,
+      null,
+      ['Abell26', 'PN G250.3+00.1'],
+      null,
+    ],
+    [
+      'Abell27',
+      127.969,
+      -32.102,
+      'PN',
+      0.72,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell27', 'PN G252.6+04.4'],
+      null,
+    ],
+    [
+      'Abell30',
+      131.723,
+      17.88,
+      'PN',
+      0.29,
+      null,
+      0,
+      14.3,
+      null,
+      null,
+      ['Abell30', 'PN G208.5+33.2'],
+      null,
+    ],
+    ['Abell32', 139.103, 3.891, '?', 2.23, null, 0, null, null, null, ['Abell32'], null], // SIMBAD otype: ? (unknown)
+    [
+      'Abell33',
+      144.788,
+      -2.808,
+      'PN',
+      4.47,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell33', 'PN G238.0+34.8'],
+      null,
+    ],
+    [
+      'Abell34',
+      146.397,
+      -13.171,
+      'PN',
+      4.83,
+      null,
+      0,
+      16.3,
+      null,
+      null,
+      ['Abell34', 'PN G248.7+29.5'],
+      null,
+    ],
+    [
+      'Abell38',
+      245.829,
+      -31.75,
+      'PN',
+      1.53,
+      null,
+      0,
+      20,
+      null,
+      null,
+      ['Abell38', 'PN G346.9+12.4'],
+      null,
+    ],
+    [
+      'Abell39',
+      246.89,
+      27.909,
+      'PN',
+      2.9,
+      null,
+      0,
+      15.6,
+      null,
+      null,
+      ['Abell39', 'PN G047.0+42.4'],
+      null,
+    ],
+    [
+      'Abell40',
+      252.144,
+      -21.014,
+      'PN',
+      0.57,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell40', 'PN G359.1+15.1'],
+      null,
+    ],
+    [
+      'Abell41',
+      262.258,
+      -15.218,
+      'PN',
+      0.31,
+      null,
+      0,
+      15.9,
+      null,
+      null,
+      ['Abell41', 'PN G009.6+10.5'],
+      null,
+    ],
+    [
+      'Abell42',
+      262.871,
+      -8.319,
+      'PN',
+      null,
+      null,
+      0,
+      20.2,
+      null,
+      null,
+      ['Abell42', 'PN G016.0+13.5'],
+      null,
+    ],
+    [
+      'Abell43',
+      268.384,
+      10.623,
+      'PN',
+      1.33,
+      null,
+      0,
+      14.7,
+      null,
+      null,
+      ['Abell43', 'PN G036.0+17.6'],
+      null,
+    ],
+    [
+      'Abell44',
+      277.547,
+      -16.757,
+      'PN',
+      0.1,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell44', 'PN G015.6-03.0'],
+      null,
+    ],
+    [
+      'Abell46',
+      277.827,
+      26.937,
+      'PN',
+      1.06,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell46', 'PN G055.4+16.0'],
+      null,
+    ],
+    [
+      'Abell47',
+      278.844,
+      -0.231,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell47', 'PN G030.8+03.4'],
+      null,
+    ],
+    [
+      'Abell48',
+      280.696,
+      -3.221,
+      'PN',
+      0.7,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell48', 'PN G029.0+00.4'],
+      null,
+    ],
+    [
+      'Abell49',
+      283.368,
+      -6.48,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell49', 'PN G027.3-03.4'],
+      null,
+    ],
+    [
+      'Abell51',
+      285.256,
+      -18.204,
+      'PN',
+      1.12,
+      null,
+      0,
+      15.4,
+      null,
+      null,
+      ['Abell51', 'PN G017.6-10.2'],
+      null,
+    ],
+    [
+      'Abell52',
+      286.135,
+      17.952,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell52', 'PN G050.4+05.2'],
+      null,
+    ],
+    [
+      'Abell53',
+      286.691,
+      6.398,
+      'PN',
+      0.52,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell53', 'PN G040.3-00.4'],
+      null,
+    ],
+    [
+      'Abell54',
+      287.165,
+      22.983,
+      'PN',
+      0.93,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell54', 'PN G055.3+06.6'],
+      null,
+    ],
+    [
+      'Abell55',
+      287.607,
+      -2.34,
+      'PN',
+      0.8,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell55', 'PN G033.0-05.3'],
+      null,
+    ],
+    [
+      'Abell56',
+      288.275,
+      2.88,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell56', 'PN G037.9-03.4'],
+      null,
+    ],
+    [
+      'Abell57',
+      289.274,
+      25.626,
+      'PN',
+      null,
+      null,
+      0,
+      17.7,
+      null,
+      null,
+      ['Abell57', 'PN G058.6+06.1'],
+      null,
+    ],
+    [
+      'Abell58',
+      289.585,
+      1.783,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell58', 'PN G037.5-05.1'],
+      null,
+    ],
+    [
+      'Abell59',
+      289.667,
+      19.576,
+      'PN',
+      1.43,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell59', 'PN G053.3+03.0'],
+      null,
+    ],
+    [
+      'Abell60',
+      289.824,
+      -12.243,
+      'PN',
+      1.23,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell60', 'PN G025.0-11.6'],
+      null,
+    ],
+    [
+      'Abell61',
+      289.793,
+      46.248,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell61', 'PN G077.6+14.7'],
+      null,
+    ],
+    [
+      'Abell62',
+      293.325,
+      10.617,
+      'PN',
+      2.68,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell62', 'PN G047.1-04.2'],
+      null,
+    ],
+    [
+      'Abell63',
+      295.543,
+      17.087,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell63', 'PN G053.8-03.0'],
+      null,
+    ],
+    ['Abell64', 296.395, 5.564, '?', 0.58, null, 0, null, null, null, ['Abell64'], null], // SIMBAD otype: AG? (AGN candidate)
+    [
+      'Abell65',
+      296.643,
+      -23.137,
+      'PN',
+      1.8,
+      null,
+      0,
+      15.8,
+      null,
+      null,
+      ['Abell65', 'PN G017.3-21.9'],
+      null,
+    ],
+    [
+      'Abell66',
+      299.381,
+      -21.613,
+      'PN',
+      4.45,
+      null,
+      0,
+      17.4,
+      null,
+      null,
+      ['Abell66', 'PN G019.8-23.7'],
+      null,
+    ],
+    [
+      'Abell67',
+      299.613,
+      3.05,
+      'PN',
+      1.12,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell67', 'PN G043.5-13.4'],
+      null,
+    ],
+    [
+      'Abell68',
+      300.044,
+      21.716,
+      'PN',
+      null,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell68', 'PN G060.0-04.3'],
+      null,
+    ],
+    [
+      'Abell69',
+      304.993,
+      38.401,
+      'PN',
+      0.37,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell69', 'PN G076.3+01.1'],
+      null,
+    ],
+    [
+      'Abell70',
+      307.888,
+      -7.088,
+      'PN',
+      0.7,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell70', 'PN G038.1-25.4'],
+      null,
+    ],
+    [
+      'Abell71',
+      308.097,
+      47.347,
+      'PN',
+      2.63,
+      null,
+      0,
+      19.3,
+      null,
+      null,
+      ['Abell71', 'PN G084.9+04.4'],
+      null,
+    ],
+    [
+      'Abell72',
+      312.509,
+      13.558,
+      'PN',
+      2.12,
+      null,
+      0,
+      16.1,
+      null,
+      null,
+      ['Abell72', 'PN G059.7-18.7'],
+      null,
+    ],
+    [
+      'Abell73',
+      314.113,
+      57.434,
+      'PN',
+      1.22,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell73', 'PN G095.2+07.8'],
+      null,
+    ],
+    ['Abell76', 322.516, -2.808, '?', null, null, 0, null, null, null, ['Abell76'], null], // SIMBAD otype: EmG (emission galaxy)
+    [
+      'Abell77',
+      323.041,
+      55.881,
+      'EN',
+      1.21,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell77', 'PN G097.5+03.1'],
+      null,
+    ], // SIMBAD otype: HII
+    [
+      'Abell78',
+      323.872,
+      31.696,
+      'PN',
+      1.78,
+      null,
+      0,
+      13.2,
+      null,
+      null,
+      ['Abell78', 'PN G081.2-14.9'],
+      null,
+    ],
+    [
+      'Abell79',
+      336.572,
+      54.827,
+      'PN',
+      0.9,
+      null,
+      0,
+      17.0,
+      null,
+      null,
+      ['Abell79', 'PN G102.9-02.3'],
+      null,
+    ],
+    [
+      'Abell80',
+      338.69,
+      52.435,
+      'PN',
+      1.83,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell80', 'PN G102.8-05.0'],
+      null,
+    ],
+    [
+      'Abell82',
+      356.449,
+      57.066,
+      'PN',
+      1.35,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell82', 'PN G114.0-04.6'],
+      null,
+    ],
+    [
+      'Abell83',
+      356.695,
+      54.744,
+      'PN',
+      0.78,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell83', 'PN G113.6-06.9'],
+      null,
+    ],
+    [
+      'Abell84',
+      356.934,
+      51.399,
+      'PN',
+      1.58,
+      null,
+      0,
+      18.6,
+      null,
+      null,
+      ['Abell84', 'PN G112.9-10.2'],
+      null,
+    ],
+    ['Abell85', 359.804, 62.437, 'SNR', 34, null, 0, null, null, null, ['Abell85'], null], // CTB 1, SNR (not a true PN)
+    [
+      'Abell86',
+      0.379,
+      70.708,
+      'PN',
+      1.05,
+      null,
+      0,
+      null,
+      null,
+      null,
+      ['Abell86', 'PN G118.7+08.2'],
+      null,
+    ],
   ];
 
   let abellAdded = 0;
-  for (const [id, ra, dec, type, majAxis, minAxis, pa, mag, nameFr, nameEn, catalogs, emissionLines] of abellEntries) {
+  for (const [
+    id,
+    ra,
+    dec,
+    type,
+    majAxis,
+    minAxis,
+    pa,
+    mag,
+    nameFr,
+    nameEn,
+    catalogs,
+    emissionLines,
+  ] of abellEntries) {
     if (dec < -35) continue; // southern cut-off (none excluded for this catalog)
-    data.push([id, ra, dec, type, majAxis, minAxis, pa, mag, nameFr, nameEn, null, null, catalogs, emissionLines, null, null, null]);
+    data.push([
+      id,
+      ra,
+      dec,
+      type,
+      majAxis,
+      minAxis,
+      pa,
+      mag,
+      nameFr,
+      nameEn,
+      null,
+      null,
+      catalogs,
+      emissionLines,
+      null,
+      null,
+      null,
+    ]);
     abellAdded++;
   }
   console.log(`Added ${abellAdded} standalone Abell PN entries`);
@@ -1637,9 +3090,15 @@ async function main() {
       minAxis,
       pa,
       mag,
-      null, null, null, null,
+      null,
+      null,
+      null,
+      null,
       cats,
-      null, null, null, null,
+      null,
+      null,
+      null,
+      null,
     ]);
   }
   console.log(`Added ${messierOnlyEntries.length} Messier-only entries`);
@@ -1648,16 +3107,20 @@ async function main() {
   // Fold each duplicate SH2 row into its NGC/IC/Abell parent (append designations
   // to the target's catalogs[]) and drop the standalone SH2 row, so the region is a
   // single object. Runs after all sources (incl. Abell PNe, Step 12) are in `data`.
-  const rowByIdSh2 = new Map(data.map(r => [String(r[0]).toUpperCase(), r]));
+  const rowByIdSh2 = new Map(data.map((r) => [String(r[0]).toUpperCase(), r]));
   const sh2Suppress = new Set();
   let sh2Merged = 0;
   for (const [shId, targetId] of Object.entries(SH2_ALIASES)) {
     const target = rowByIdSh2.get(String(targetId).toUpperCase());
-    if (!target) { console.warn(`Warning: SH2 alias target ${targetId} not found for ${shId}`); continue; }
+    if (!target) {
+      console.warn(`Warning: SH2 alias target ${targetId} not found for ${shId}`);
+      continue;
+    }
     const sh2row = rowByIdSh2.get(shId.toUpperCase());
     const carried = sh2row ? sh2row[12] : [shId];
     for (const c of carried) {
-      if (c && !target[12].some(x => String(x).toLowerCase() === String(c).toLowerCase())) target[12].push(c);
+      if (c && !target[12].some((x) => String(x).toLowerCase() === String(c).toLowerCase()))
+        target[12].push(c);
     }
     sh2Suppress.add(shId.toUpperCase());
     sh2Merged++;
@@ -1665,7 +3128,7 @@ async function main() {
   // Drop the suppressed standalone SH2 rows in a single in-place rebuild.
   // NOTE: this mutates `data`, so every rowBy* lookup map built above is now stale —
   // do not reuse them past this point (anything below must re-derive from `data`).
-  const keptRows = data.filter(r => !sh2Suppress.has(String(r[0]).toUpperCase()));
+  const keptRows = data.filter((r) => !sh2Suppress.has(String(r[0]).toUpperCase()));
   data.length = 0;
   data.push(...keptRows);
   console.log(`Merged ${sh2Merged} SH2 aliases into existing objects`);
@@ -1675,21 +3138,25 @@ async function main() {
   // source/target catalog pair. Runs after SH2_ALIASES so a row already merged
   // above (e.g. an SH2 id folded into an NGC target) is looked up by its final
   // post-merge identity.
-  const rowByIdDup = new Map(data.map(r => [String(r[0]).toUpperCase(), r]));
+  const rowByIdDup = new Map(data.map((r) => [String(r[0]).toUpperCase(), r]));
   const dupSuppress = new Set();
   let dupMerged = 0;
   for (const [srcId, targetId] of Object.entries(DUPLICATE_MERGE_ALIASES)) {
     const target = rowByIdDup.get(String(targetId).toUpperCase());
-    if (!target) { console.warn(`Warning: duplicate-merge target ${targetId} not found for ${srcId}`); continue; }
+    if (!target) {
+      console.warn(`Warning: duplicate-merge target ${targetId} not found for ${srcId}`);
+      continue;
+    }
     const srcRow = rowByIdDup.get(srcId.toUpperCase());
     const carried = srcRow ? srcRow[12] : [srcId];
     for (const c of carried) {
-      if (c && !target[12].some(x => String(x).toLowerCase() === String(c).toLowerCase())) target[12].push(c);
+      if (c && !target[12].some((x) => String(x).toLowerCase() === String(c).toLowerCase()))
+        target[12].push(c);
     }
     dupSuppress.add(srcId.toUpperCase());
     dupMerged++;
   }
-  const keptRows2 = data.filter(r => !dupSuppress.has(String(r[0]).toUpperCase()));
+  const keptRows2 = data.filter((r) => !dupSuppress.has(String(r[0]).toUpperCase()));
   data.length = 0;
   data.push(...keptRows2);
   console.log(`Merged ${dupMerged} cross-catalog duplicate aliases into existing objects`);
@@ -1699,7 +3166,9 @@ async function main() {
     for (const row of data) {
       applyMetadataOverrides(row, metadataOverrides);
     }
-    console.log(`Applied names/constellation/rating/difficulty metadata overrides to ${metadataOverrides.size} objects`);
+    console.log(
+      `Applied names/constellation/rating/difficulty metadata overrides to ${metadataOverrides.size} objects`,
+    );
   }
 
   // ── Sort by magnitude (brightest first, nulls last) ───────────────────────
@@ -1716,7 +3185,25 @@ async function main() {
   console.log(`Generated ${total} DSOs total (skipped ${skipped} OpenNGC rows)`);
 
   const output = {
-    fields: ['id', 'ra', 'dec', 'type', 'majAxis', 'minAxis', 'pa', 'mag', 'nameFr', 'nameEn', 'nameEs', 'nameDe', 'catalogs', 'emissionLines', 'constellation', 'rating', 'difficulty'],
+    fields: [
+      'id',
+      'ra',
+      'dec',
+      'type',
+      'majAxis',
+      'minAxis',
+      'pa',
+      'mag',
+      'nameFr',
+      'nameEn',
+      'nameEs',
+      'nameDe',
+      'catalogs',
+      'emissionLines',
+      'constellation',
+      'rating',
+      'difficulty',
+    ],
     data,
   };
 
@@ -1725,5 +3212,7 @@ async function main() {
   console.log(`Written to ${OUT_PATH} (${(JSON.stringify(output).length / 1024).toFixed(1)} KB)`);
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
-
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

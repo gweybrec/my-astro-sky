@@ -129,7 +129,7 @@ export function detectStars(
   const maxSpotSize = Math.min(160, Math.max(80, Math.round(w * h * 0.0004)));
   const spots: DetectedSpot[] = [];
   for (const comp of components.values()) {
-    if (comp.count < 2) continue;          // skip single-pixel noise
+    if (comp.count < 2) continue; // skip single-pixel noise
     if (comp.count > maxSpotSize) continue; // skip extended objects (nebulae)
     spots.push({
       x: comp.sx / comp.sb,

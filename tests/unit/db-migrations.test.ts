@@ -35,12 +35,13 @@ function freshBaseDb(): Database.Database {
 }
 
 function getColumns(db: Database.Database, table: string): string[] {
-  return (db.pragma(`table_info(${table})`) as { name: string }[]).map(r => r.name);
+  return (db.pragma(`table_info(${table})`) as { name: string }[]).map((r) => r.name);
 }
 
 function schemaVersion(db: Database.Database): number {
   try {
-    const row = db.prepare('SELECT version FROM schema_version').get() as { version: number } | undefined;
+    const row = db.prepare('SELECT version FROM schema_version').get() as
+      { version: number } | undefined;
     return row?.version ?? 0;
   } catch {
     return -1;
@@ -150,8 +151,9 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
   it('rebuilds plan_entries: dso_id becomes nullable, ra/dec added, rows preserved', () => {
     const db = freshBaseDb();
     withOldPlanEntries(db);
-    db.prepare('INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, notes) VALUES (?, ?, ?, ?, ?, ?)')
-      .run('e1', 'p1', 'M42', 0, 142, 'note');
+    db.prepare(
+      'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run('e1', 'p1', 'M42', 0, 142, 'note');
 
     applyMigrations(db);
 
@@ -160,7 +162,10 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     expect(cols).toContain('dec');
     // dso_id is now nullable (was NOT NULL) — a null insert must succeed.
     expect(() =>
-      db.prepare('INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      db
+        .prepare(
+          'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        )
         .run('e2', 'p1', null, 1, null, 12.3, 45.6, null),
     ).not.toThrow();
 
@@ -176,7 +181,7 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
     const cols = getColumns(db, 'plan_entries');
-    expect(cols.filter(c => c === 'ra').length).toBe(1);
+    expect(cols.filter((c) => c === 'ra').length).toBe(1);
   });
 });
 
@@ -234,7 +239,7 @@ describe('applyMigrations — v4 mosaics', () => {
     `);
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(getColumns(db, 'plan_entries').filter(c => c === 'mosaic_id').length).toBe(1);
+    expect(getColumns(db, 'plan_entries').filter((c) => c === 'mosaic_id').length).toBe(1);
   });
 });
 
@@ -249,9 +254,12 @@ describe('applyMigrations — v5 mosaic name', () => {
   it('round-trips a stored mosaic name', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    db.prepare('INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec) VALUES (?, ?, ?, ?, ?, ?)')
-      .run('mo1', 'p1', null, 'Orion region', 83.5, -5);
-    const row = db.prepare('SELECT name FROM plan_mosaics WHERE id = ?').get('mo1') as { name: string };
+    db.prepare(
+      'INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run('mo1', 'p1', null, 'Orion region', 83.5, -5);
+    const row = db.prepare('SELECT name FROM plan_mosaics WHERE id = ?').get('mo1') as {
+      name: string;
+    };
     expect(row.name).toBe('Orion region');
   });
 
@@ -259,7 +267,7 @@ describe('applyMigrations — v5 mosaic name', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(getColumns(db, 'plan_mosaics').filter(c => c === 'name').length).toBe(1);
+    expect(getColumns(db, 'plan_mosaics').filter((c) => c === 'name').length).toBe(1);
   });
 });
 
@@ -287,10 +295,18 @@ describe('applyMigrations — v6 smart-scope mosaic size', () => {
         position INTEGER NOT NULL, pa_deg REAL, ra REAL, dec REAL, notes TEXT
       );
     `);
-    db.prepare('INSERT INTO plan_entries (id, plan_id, dso_id, position) VALUES (?, ?, ?, ?)')
-      .run('e1', 'p1', 'M42', 0);
+    db.prepare('INSERT INTO plan_entries (id, plan_id, dso_id, position) VALUES (?, ?, ?, ?)').run(
+      'e1',
+      'p1',
+      'M42',
+      0,
+    );
     applyMigrations(db);
-    db.prepare('UPDATE plan_entries SET mosaic_w_deg = ?, mosaic_h_deg = ? WHERE id = ?').run(4.33, 2.43, 'e1');
+    db.prepare('UPDATE plan_entries SET mosaic_w_deg = ?, mosaic_h_deg = ? WHERE id = ?').run(
+      4.33,
+      2.43,
+      'e1',
+    );
     const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
     expect(row.dso_id).toBe('M42');
     expect(row.mosaic_w_deg).toBeCloseTo(4.33, 6);
@@ -307,8 +323,8 @@ describe('applyMigrations — v6 smart-scope mosaic size', () => {
     `);
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(getColumns(db, 'plan_entries').filter(c => c === 'mosaic_w_deg').length).toBe(1);
-    expect(getColumns(db, 'plan_entries').filter(c => c === 'mosaic_h_deg').length).toBe(1);
+    expect(getColumns(db, 'plan_entries').filter((c) => c === 'mosaic_w_deg').length).toBe(1);
+    expect(getColumns(db, 'plan_entries').filter((c) => c === 'mosaic_h_deg').length).toBe(1);
   });
 });
 
@@ -336,8 +352,12 @@ describe('applyMigrations — v7 per-plan observing location', () => {
         created_at TEXT NOT NULL, night_of TEXT, setup_id TEXT
       );
     `);
-    db.prepare('INSERT INTO plans (id, name, position, created_at) VALUES (?, ?, ?, ?)')
-      .run('p1', 'Tonight', 0, '2026-06-20');
+    db.prepare('INSERT INTO plans (id, name, position, created_at) VALUES (?, ?, ?, ?)').run(
+      'p1',
+      'Tonight',
+      0,
+      '2026-06-20',
+    );
     applyMigrations(db);
     db.prepare('UPDATE plans SET lat = ?, lon = ? WHERE id = ?').run(48.85, 2.35, 'p1');
     const row = db.prepare('SELECT * FROM plans WHERE id = ?').get('p1') as any;
@@ -355,8 +375,8 @@ describe('applyMigrations — v7 per-plan observing location', () => {
     `);
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(getColumns(db, 'plans').filter(c => c === 'lat').length).toBe(1);
-    expect(getColumns(db, 'plans').filter(c => c === 'lon').length).toBe(1);
+    expect(getColumns(db, 'plans').filter((c) => c === 'lat').length).toBe(1);
+    expect(getColumns(db, 'plans').filter((c) => c === 'lon').length).toBe(1);
   });
 });
 
@@ -375,17 +395,24 @@ describe('applyMigrations — v8 points of interest', () => {
   it('defaults points_of_interest to an empty JSON array', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    db.prepare('INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)')
-      .run('p1', 'a.jpg', 'a.jpg', 100, 100);
-    const row = db.prepare('SELECT points_of_interest FROM photos WHERE id = ?').get('p1') as { points_of_interest: string };
+    db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
+    ).run('p1', 'a.jpg', 'a.jpg', 100, 100);
+    const row = db.prepare('SELECT points_of_interest FROM photos WHERE id = ?').get('p1') as {
+      points_of_interest: string;
+    };
     expect(row.points_of_interest).toBe('[]');
   });
 
   it('round-trips a stored POI category', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    db.prepare('INSERT INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)')
-      .run('cat-comet', 'Comet', '#4ea1ff', 0);
+    db.prepare('INSERT INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)').run(
+      'cat-comet',
+      'Comet',
+      '#4ea1ff',
+      0,
+    );
     const row = db.prepare('SELECT * FROM poi_categories WHERE id = ?').get('cat-comet') as any;
     expect(row.name).toBe('Comet');
     expect(row.color).toBe('#4ea1ff');
@@ -395,7 +422,7 @@ describe('applyMigrations — v8 points of interest', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(getColumns(db, 'photos').filter(c => c === 'points_of_interest').length).toBe(1);
+    expect(getColumns(db, 'photos').filter((c) => c === 'points_of_interest').length).toBe(1);
   });
 });
 
@@ -406,7 +433,9 @@ describe('applyMigrations — v9 supernova type + ISS recolor', () => {
     applyMigrations(db); // brings to latest, creates poi_categories
     db.exec('DELETE FROM poi_categories');
     db.prepare('UPDATE schema_version SET version = 8').run();
-    const ins = db.prepare('INSERT INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)');
+    const ins = db.prepare(
+      'INSERT INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)',
+    );
     ins.run('cat-comet', 'Comet', '#4ea1ff', 0);
     ins.run('cat-asteroid', 'Asteroid', '#c9a227', 1);
     ins.run('cat-satellite', 'Satellite', '#7bd88f', 2);
@@ -417,9 +446,12 @@ describe('applyMigrations — v9 supernova type + ISS recolor', () => {
     const db = freshBaseDb();
     seededPreV9(db);
     applyMigrations(db);
-    const rows = db.prepare('SELECT id, color FROM poi_categories').all() as { id: string; color: string }[];
-    expect(rows.find(r => r.id === 'cat-supernova')?.color).toBe('#ff5a5a');
-    expect(rows.find(r => r.id === 'cat-iss')?.color).toBe('#cbd5e1');
+    const rows = db.prepare('SELECT id, color FROM poi_categories').all() as {
+      id: string;
+      color: string;
+    }[];
+    expect(rows.find((r) => r.id === 'cat-supernova')?.color).toBe('#ff5a5a');
+    expect(rows.find((r) => r.id === 'cat-iss')?.color).toBe('#cbd5e1');
   });
 
   it('does not seed Supernova on a fresh (empty) DB — db.ts seeds all 5 there', () => {
@@ -434,7 +466,9 @@ describe('applyMigrations — v9 supernova type + ISS recolor', () => {
     seededPreV9(db);
     db.prepare("UPDATE poi_categories SET color = '#123456' WHERE id = 'cat-iss'").run();
     applyMigrations(db);
-    const iss = db.prepare("SELECT color FROM poi_categories WHERE id = 'cat-iss'").get() as { color: string };
+    const iss = db.prepare("SELECT color FROM poi_categories WHERE id = 'cat-iss'").get() as {
+      color: string;
+    };
     expect(iss.color).toBe('#123456');
   });
 });
@@ -446,17 +480,20 @@ describe('applyMigrations — display_order backfill', () => {
     db.exec('ALTER TABLE photos ADD COLUMN display_order INTEGER');
     db.prepare(
       `INSERT INTO photos (id, filename, original_name, width, height, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?)`,
     ).run('id1', 'a.jpg', 'a.jpg', 100, 100, '2026-01-01T00:00:00Z');
     db.prepare(
       `INSERT INTO photos (id, filename, original_name, width, height, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?)`,
     ).run('id2', 'b.jpg', 'b.jpg', 100, 100, '2026-01-02T00:00:00Z');
 
     // Both have NULL display_order at this point
     applyMigrations(db);
 
-    const rows = db.prepare('SELECT id, display_order FROM photos ORDER BY created_at').all() as { id: string; display_order: number }[];
+    const rows = db.prepare('SELECT id, display_order FROM photos ORDER BY created_at').all() as {
+      id: string;
+      display_order: number;
+    }[];
     expect(rows[0].display_order).not.toBeNull();
     expect(rows[1].display_order).not.toBeNull();
     expect(rows[0].display_order).toBe(0);

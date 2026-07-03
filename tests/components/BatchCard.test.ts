@@ -90,8 +90,8 @@ async function triggerWcsChange(wrapper: ReturnType<typeof mountCard>, wcsFile: 
   });
   await input.trigger('change');
   // Flush all microtasks (two promise hops: getFileDimensions + solveWCS)
-  await new Promise<void>(resolve => setTimeout(resolve, 0));
-  await new Promise<void>(resolve => setTimeout(resolve, 0));
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -111,10 +111,13 @@ beforeEach(() => {
   });
 
   // IntersectionObserver is not available in happy-dom
-  vi.stubGlobal('IntersectionObserver', class {
-    observe() {}
-    disconnect() {}
-  });
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
 });
 
 afterEach(() => {
@@ -166,7 +169,13 @@ describe('BatchCard — open WCS file', () => {
       success: true,
       correspondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 }],
       dsoIds: [],
-      dimensionWarning: { sourceW: 4000, sourceH: 3000, targetW: 1920, targetH: 1080, aspectMismatch: true },
+      dimensionWarning: {
+        sourceW: 4000,
+        sourceH: 3000,
+        targetW: 1920,
+        targetH: 1080,
+        aspectMismatch: true,
+      },
     });
 
     const item = makeItem();
@@ -181,7 +190,15 @@ describe('BatchCard — open WCS file', () => {
     // The /api/solve-wcs route never populates dsoIds, so the card must fall back
     // to matching the solved correspondences against the local catalog.
     const correspondences = [
-      { pointIndex: 0, photoX: 100, photoY: 100, starHip: 0, starName: 's0', starRa: 210, starDec: 54 },
+      {
+        pointIndex: 0,
+        photoX: 100,
+        photoY: 100,
+        starHip: 0,
+        starName: 's0',
+        starRa: 210,
+        starDec: 54,
+      },
     ];
     mockSolveWCS.mockResolvedValue({ success: true, correspondences, dsoIds: [] });
     mockFindDSOIds.mockReturnValue(['M101', 'NGC5474']);
@@ -250,7 +267,13 @@ describe('BatchCard — open WCS file', () => {
       success: true,
       correspondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 }],
       dsoIds: [],
-      dimensionWarning: { sourceW: 4000, sourceH: 3000, targetW: 1920, targetH: 1080, aspectMismatch: false },
+      dimensionWarning: {
+        sourceW: 4000,
+        sourceH: 3000,
+        targetW: 1920,
+        targetH: 1080,
+        aspectMismatch: false,
+      },
     });
 
     const item = makeItem();
@@ -267,7 +290,11 @@ describe('BatchCard — controls locked while solving', () => {
 
   function mountWithStatus(status: BatchItem['status']) {
     return mount(BatchCard, {
-      props: { item: makeItem({ status }), solverAvailability: allAvailable, knownFilterMap: new Map() },
+      props: {
+        item: makeItem({ status }),
+        solverAvailability: allAvailable,
+        knownFilterMap: new Map(),
+      },
       global: { stubs: { BatchSolveStatus: true, MetadataEditorPanel: true } },
       attachTo: document.body,
     });

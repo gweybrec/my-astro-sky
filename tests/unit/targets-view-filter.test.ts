@@ -27,7 +27,10 @@ vi.mock('../../src/star-catalog', () => ({ getConstellationInfos: vi.fn() }));
 vi.mock('../../src/target-recommender', () => ({ recommendTargets: vi.fn() }));
 vi.mock('../../src/imaging-recipe', () => ({ recommendRecipe: vi.fn() }));
 vi.mock('../../src/sky-map', () => ({}));
-vi.mock('../../src/tooltip-utils', () => ({ showKeyValueTooltip: vi.fn(), showTextTooltip: vi.fn() }));
+vi.mock('../../src/tooltip-utils', () => ({
+  showKeyValueTooltip: vi.fn(),
+  showTextTooltip: vi.fn(),
+}));
 vi.mock('../../src/chip-utils', () => ({ createTargetsChip: vi.fn(), createFilterBadge: vi.fn() }));
 
 function makeDSO(overrides: Partial<DSO> & { id: string }): DSO {
@@ -69,14 +72,14 @@ describe('filterTargetDSOs — photographedIds exclusion', () => {
     const dsos = [makeDSO({ id: 'NGC1234' }), makeDSO({ id: 'M42' }), makeDSO({ id: 'NGC7000' })];
     const photographedIds = new Set(['M42']);
     const result = filterTargetDSOs(dsos, { ...baseOpts, photographedIds });
-    expect(result.map(d => d.id)).toEqual(['NGC1234', 'NGC7000']);
+    expect(result.map((d) => d.id)).toEqual(['NGC1234', 'NGC7000']);
   });
 
   it('excludes multiple photographed DSOs at once', () => {
     const dsos = [makeDSO({ id: 'M31' }), makeDSO({ id: 'M33' }), makeDSO({ id: 'NGC224' })];
     const photographedIds = new Set(['M31', 'M33']);
     const result = filterTargetDSOs(dsos, { ...baseOpts, photographedIds });
-    expect(result.map(d => d.id)).toEqual(['NGC224']);
+    expect(result.map((d) => d.id)).toEqual(['NGC224']);
   });
 
   it('returns empty array when all DSOs are photographed', () => {
@@ -102,15 +105,18 @@ describe('filterTargetDSOs — photographedIds exclusion', () => {
 
 describe('filterTargetDSOs — type / rating / difficulty / catalog filters', () => {
   it('excludes DSOs of disabled types', () => {
-    const dsos = [makeDSO({ id: 'NGC1234', type: 'Gx' as any }), makeDSO({ id: 'NGC5678', type: 'EN' as any })];
+    const dsos = [
+      makeDSO({ id: 'NGC1234', type: 'Gx' as any }),
+      makeDSO({ id: 'NGC5678', type: 'EN' as any }),
+    ];
     const result = filterTargetDSOs(dsos, { ...baseOpts, enabledTypes: new Set(['EN']) });
-    expect(result.map(d => d.id)).toEqual(['NGC5678']);
+    expect(result.map((d) => d.id)).toEqual(['NGC5678']);
   });
 
   it('excludes DSOs with disabled rating', () => {
     const dsos = [makeDSO({ id: 'NGC1', rating: 1 }), makeDSO({ id: 'NGC2', rating: 5 })];
     const result = filterTargetDSOs(dsos, { ...baseOpts, enabledRatings: new Set([5]) });
-    expect(result.map(d => d.id)).toEqual(['NGC2']);
+    expect(result.map((d) => d.id)).toEqual(['NGC2']);
   });
 
   it('does not exclude DSOs with null rating regardless of enabledRatings', () => {
@@ -122,7 +128,7 @@ describe('filterTargetDSOs — type / rating / difficulty / catalog filters', ()
   it('excludes DSOs from disabled catalog', () => {
     const dsos = [makeDSO({ id: 'M42' }), makeDSO({ id: 'NGC1976' })];
     const result = filterTargetDSOs(dsos, { ...baseOpts, enabledCatalogs: new Set(['NGC']) });
-    expect(result.map(d => d.id)).toEqual(['NGC1976']);
+    expect(result.map((d) => d.id)).toEqual(['NGC1976']);
   });
 
   it('combines photographedIds exclusion with type filter', () => {
@@ -137,27 +143,36 @@ describe('filterTargetDSOs — type / rating / difficulty / catalog filters', ()
       enabledTypes: new Set(['EN']),
       photographedIds: new Set(['M42']),
     });
-    expect(result.map(d => d.id)).toEqual(['NGC1977']);
+    expect(result.map((d) => d.id)).toEqual(['NGC1977']);
   });
 });
 
 describe('filterTargetDSOs — constellation filter', () => {
   it('passes all DSOs when enabledConstellations is null', () => {
-    const dsos = [makeDSO({ id: 'M42', constellation: 'ORI' }), makeDSO({ id: 'M31', constellation: 'AND' })];
+    const dsos = [
+      makeDSO({ id: 'M42', constellation: 'ORI' }),
+      makeDSO({ id: 'M31', constellation: 'AND' }),
+    ];
     const result = filterTargetDSOs(dsos, { ...baseOpts, enabledConstellations: null });
     expect(result).toHaveLength(2);
   });
 
   it('keeps DSOs in selected constellations', () => {
-    const dsos = [makeDSO({ id: 'M42', constellation: 'ORI' }), makeDSO({ id: 'M31', constellation: 'AND' })];
+    const dsos = [
+      makeDSO({ id: 'M42', constellation: 'ORI' }),
+      makeDSO({ id: 'M31', constellation: 'AND' }),
+    ];
     const result = filterTargetDSOs(dsos, { ...baseOpts, enabledConstellations: new Set(['ORI']) });
-    expect(result.map(d => d.id)).toEqual(['M42']);
+    expect(result.map((d) => d.id)).toEqual(['M42']);
   });
 
   it('excludes DSOs in non-selected constellations', () => {
-    const dsos = [makeDSO({ id: 'M42', constellation: 'ORI' }), makeDSO({ id: 'NGC7000', constellation: 'CYG' })];
+    const dsos = [
+      makeDSO({ id: 'M42', constellation: 'ORI' }),
+      makeDSO({ id: 'NGC7000', constellation: 'CYG' }),
+    ];
     const result = filterTargetDSOs(dsos, { ...baseOpts, enabledConstellations: new Set(['CYG']) });
-    expect(result.map(d => d.id)).toEqual(['NGC7000']);
+    expect(result.map((d) => d.id)).toEqual(['NGC7000']);
   });
 
   it('always passes DSOs with null constellation regardless of filter', () => {
@@ -167,7 +182,10 @@ describe('filterTargetDSOs — constellation filter', () => {
   });
 
   it('returns empty when no constellation matches', () => {
-    const dsos = [makeDSO({ id: 'M42', constellation: 'ORI' }), makeDSO({ id: 'M31', constellation: 'AND' })];
+    const dsos = [
+      makeDSO({ id: 'M42', constellation: 'ORI' }),
+      makeDSO({ id: 'M31', constellation: 'AND' }),
+    ];
     const result = filterTargetDSOs(dsos, { ...baseOpts, enabledConstellations: new Set(['CYG']) });
     expect(result).toHaveLength(0);
   });
@@ -182,7 +200,7 @@ describe('sortCustomFirst', () => {
     ];
     const result = sortCustomFirst(input);
     expect(result[0].id).toBe('custom-myscope');
-    expect(result.slice(1).map(r => r.id)).toEqual(['celestron-c8', 'atik-314']);
+    expect(result.slice(1).map((r) => r.id)).toEqual(['celestron-c8', 'atik-314']);
   });
 
   it('preserves relative order within each group', () => {
@@ -193,16 +211,22 @@ describe('sortCustomFirst', () => {
       { id: 'custom-a', label: 'A custom' },
     ];
     const result = sortCustomFirst(input);
-    expect(result.map(r => r.id)).toEqual(['custom-z', 'custom-a', 'b-builtin', 'a-builtin']);
+    expect(result.map((r) => r.id)).toEqual(['custom-z', 'custom-a', 'b-builtin', 'a-builtin']);
   });
 
   it('returns all items when all are custom', () => {
-    const input = [{ id: 'custom-x', label: 'X' }, { id: 'custom-y', label: 'Y' }];
+    const input = [
+      { id: 'custom-x', label: 'X' },
+      { id: 'custom-y', label: 'Y' },
+    ];
     expect(sortCustomFirst(input)).toEqual(input);
   });
 
   it('returns all items when none are custom', () => {
-    const input = [{ id: 'builtin-x', label: 'X' }, { id: 'builtin-y', label: 'Y' }];
+    const input = [
+      { id: 'builtin-x', label: 'X' },
+      { id: 'builtin-y', label: 'Y' },
+    ];
     expect(sortCustomFirst(input)).toEqual(input);
   });
 
@@ -215,10 +239,38 @@ describe('sortCustomFirst', () => {
 
 describe('filterTargetDSOs — M13/M10/M12 catalog and type filters', () => {
   // Real coordinates and properties of these DSOs
-  const m13 = makeDSO({ id: 'M13',  type: 'GC' as any, constellation: 'Her', rating: 5, difficulty: 1, catalogs: ['M13', 'NGC6205'] });
-  const m10 = makeDSO({ id: 'M10',  type: 'GC' as any, constellation: 'Oph', rating: 4, difficulty: 2, catalogs: ['M10', 'NGC6254'] });
-  const m12 = makeDSO({ id: 'M12',  type: 'GC' as any, constellation: 'Oph', rating: 4, difficulty: 2, catalogs: ['M12', 'NGC6218'] });
-  const m92 = makeDSO({ id: 'M92',  type: 'GC' as any, constellation: 'Her', rating: 4, difficulty: 1, catalogs: ['M92', 'NGC6341'] });
+  const m13 = makeDSO({
+    id: 'M13',
+    type: 'GC' as any,
+    constellation: 'Her',
+    rating: 5,
+    difficulty: 1,
+    catalogs: ['M13', 'NGC6205'],
+  });
+  const m10 = makeDSO({
+    id: 'M10',
+    type: 'GC' as any,
+    constellation: 'Oph',
+    rating: 4,
+    difficulty: 2,
+    catalogs: ['M10', 'NGC6254'],
+  });
+  const m12 = makeDSO({
+    id: 'M12',
+    type: 'GC' as any,
+    constellation: 'Oph',
+    rating: 4,
+    difficulty: 2,
+    catalogs: ['M12', 'NGC6218'],
+  });
+  const m92 = makeDSO({
+    id: 'M92',
+    type: 'GC' as any,
+    constellation: 'Her',
+    rating: 4,
+    difficulty: 1,
+    catalogs: ['M92', 'NGC6341'],
+  });
 
   it('all four pass with GC type + Messier catalog enabled', () => {
     const opts: DSOFilterOptions = {
@@ -227,7 +279,7 @@ describe('filterTargetDSOs — M13/M10/M12 catalog and type filters', () => {
       enabledCatalogs: new Set(['M']),
     };
     const result = filterTargetDSOs([m13, m10, m12, m92], opts);
-    expect(result.map(d => d.id)).toEqual(['M13', 'M10', 'M12', 'M92']);
+    expect(result.map((d) => d.id)).toEqual(['M13', 'M10', 'M12', 'M92']);
   });
 
   it('M13 is excluded when GC type is disabled', () => {
@@ -287,6 +339,6 @@ describe('filterTargetDSOs — M13/M10/M12 catalog and type filters', () => {
       enabledConstellations: new Set(['Her']),
     };
     const result = filterTargetDSOs([m13, m10], opts);
-    expect(result.map(d => d.id)).toEqual(['M13']);
+    expect(result.map((d) => d.id)).toEqual(['M13']);
   });
 });

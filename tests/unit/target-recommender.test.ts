@@ -91,7 +91,7 @@ describe('recommendTargets scoring — individual scores via TargetSuggestion ou
   it('results are sorted by score descending', () => {
     // Create DSOs with predictably different scores
     const bright = makeDSO({ id: 'BRIGHT', mag: 3.0, dec: 40, ra: 84, majAxis: 40 });
-    const faint  = makeDSO({ id: 'FAINT2', mag: 12.0, dec: 40, ra: 84.1, majAxis: 40 });
+    const faint = makeDSO({ id: 'FAINT2', mag: 12.0, dec: 40, ra: 84.1, majAxis: 40 });
     const results = recommendTargets([faint, bright], testPreset, testLocation, winterNight);
     if (results.length >= 2) {
       expect(results[0].score).toBeGreaterThanOrEqual(results[1].score);
@@ -101,15 +101,21 @@ describe('recommendTargets scoring — individual scores via TargetSuggestion ou
   it('diversity cap: max 2 of same DSO type when alternatives exist', () => {
     // 3 galaxies + 3 emission nebulae, all well-placed (dec=45°, winter night)
     // limit=4: diversity cap yields ≤2 Gx + ≤2 EN = 4 total, no top-up needed
-    const galaxies = [1, 2, 3].map(i =>
-      makeDSO({ id: `GX${i}`, type: 'Gx' as any, dec: 45, ra: 120 + i, mag: 7.0, majAxis: 20 })
+    const galaxies = [1, 2, 3].map((i) =>
+      makeDSO({ id: `GX${i}`, type: 'Gx' as any, dec: 45, ra: 120 + i, mag: 7.0, majAxis: 20 }),
     );
-    const nebulae = [1, 2, 3].map(i =>
-      makeDSO({ id: `EN${i}`, type: 'EN' as any, dec: 45, ra: 124 + i, mag: 7.0, majAxis: 20 })
+    const nebulae = [1, 2, 3].map((i) =>
+      makeDSO({ id: `EN${i}`, type: 'EN' as any, dec: 45, ra: 124 + i, mag: 7.0, majAxis: 20 }),
     );
-    const results = recommendTargets([...galaxies, ...nebulae], testPreset, testLocation, winterNight, 4);
+    const results = recommendTargets(
+      [...galaxies, ...nebulae],
+      testPreset,
+      testLocation,
+      winterNight,
+      4,
+    );
     if (results.length >= 2) {
-      const gxCount = results.filter(r => r.dso.type === 'Gx').length;
+      const gxCount = results.filter((r) => r.dso.type === 'Gx').length;
       expect(gxCount).toBeLessThanOrEqual(2);
     }
   });
@@ -172,44 +178,84 @@ describe('mightBeVisible — altitude pre-filter', () => {
 describe('maxAltDuringWindow — M13/M10/M12/M92 at lat=45.17°N, June 12 2026', () => {
   const june12window = {
     start: new Date('2026-06-12T21:00:00Z'),
-    end:   new Date('2026-06-13T03:00:00Z'),
+    end: new Date('2026-06-13T03:00:00Z'),
   };
   const lat = 45.17;
   const lon = 5.0;
 
   it('M13 peaks at 75–85° during the window', () => {
-    const { maxAltDeg } = maxAltDuringWindow(250.423, 36.461, lat, lon, june12window.start, june12window.end, 5);
+    const { maxAltDeg } = maxAltDuringWindow(
+      250.423,
+      36.461,
+      lat,
+      lon,
+      june12window.start,
+      june12window.end,
+      5,
+    );
     expect(maxAltDeg).toBeGreaterThan(75);
     expect(maxAltDeg).toBeLessThan(85);
   });
 
   it('M92 peaks at 82–90° during the window', () => {
-    const { maxAltDeg } = maxAltDuringWindow(259.28, 43.137, lat, lon, june12window.start, june12window.end, 5);
+    const { maxAltDeg } = maxAltDuringWindow(
+      259.28,
+      43.137,
+      lat,
+      lon,
+      june12window.start,
+      june12window.end,
+      5,
+    );
     expect(maxAltDeg).toBeGreaterThan(82);
     expect(maxAltDeg).toBeLessThanOrEqual(90);
   });
 
   it('M10 peaks at 35–48° during the window', () => {
-    const { maxAltDeg } = maxAltDuringWindow(254.287, -4.099, lat, lon, june12window.start, june12window.end, 5);
+    const { maxAltDeg } = maxAltDuringWindow(
+      254.287,
+      -4.099,
+      lat,
+      lon,
+      june12window.start,
+      june12window.end,
+      5,
+    );
     expect(maxAltDeg).toBeGreaterThan(35);
     expect(maxAltDeg).toBeLessThan(48);
   });
 
   it('M12 peaks at 38–50° during the window', () => {
-    const { maxAltDeg } = maxAltDuringWindow(251.811, -1.948, lat, lon, june12window.start, june12window.end, 5);
+    const { maxAltDeg } = maxAltDuringWindow(
+      251.811,
+      -1.948,
+      lat,
+      lon,
+      june12window.start,
+      june12window.end,
+      5,
+    );
     expect(maxAltDeg).toBeGreaterThan(38);
     expect(maxAltDeg).toBeLessThan(50);
   });
 
   it('all four reach at least 20° — none should be altitude-filtered', () => {
     const objects = [
-      { id: 'M13',  ra: 250.423, dec: 36.461 },
-      { id: 'M92',  ra: 259.28,  dec: 43.137 },
-      { id: 'M10',  ra: 254.287, dec: -4.099 },
-      { id: 'M12',  ra: 251.811, dec: -1.948 },
+      { id: 'M13', ra: 250.423, dec: 36.461 },
+      { id: 'M92', ra: 259.28, dec: 43.137 },
+      { id: 'M10', ra: 254.287, dec: -4.099 },
+      { id: 'M12', ra: 251.811, dec: -1.948 },
     ];
     for (const o of objects) {
-      const { maxAltDeg } = maxAltDuringWindow(o.ra, o.dec, lat, lon, june12window.start, june12window.end, 5);
+      const { maxAltDeg } = maxAltDuringWindow(
+        o.ra,
+        o.dec,
+        lat,
+        lon,
+        june12window.start,
+        june12window.end,
+        5,
+      );
       expect(maxAltDeg, `${o.id} should reach ≥20° from lat=${lat}°N`).toBeGreaterThanOrEqual(20);
     }
   });
@@ -221,34 +267,93 @@ describe('recommendTargets — M13/M10/M12/M92 at lat=45.17°N, June 12 2026', (
   const june12location = { latDeg: 45.17, lonDeg: 5.0 };
   const june12night = new Date('2026-06-12T12:00:00Z');
 
-  const m13 = makeDSO({ id: 'M13', ra: 250.423, dec: 36.461, type: 'GC' as any, majAxis: 16.5, mag: 5.8,  constellation: 'Her', rating: 5, difficulty: 1 });
-  const m10 = makeDSO({ id: 'M10', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3,  mag: 4.98, constellation: 'Oph', rating: 4, difficulty: 2 });
-  const m12 = makeDSO({ id: 'M12', ra: 251.811, dec: -1.948, type: 'GC' as any, majAxis: 11.1, mag: 6.07, constellation: 'Oph', rating: 4, difficulty: 2 });
-  const m92 = makeDSO({ id: 'M92', ra: 259.28,  dec: 43.137, type: 'GC' as any, majAxis: 14.4, mag: 6.52, constellation: 'Her', rating: 4, difficulty: 1 });
+  const m13 = makeDSO({
+    id: 'M13',
+    ra: 250.423,
+    dec: 36.461,
+    type: 'GC' as any,
+    majAxis: 16.5,
+    mag: 5.8,
+    constellation: 'Her',
+    rating: 5,
+    difficulty: 1,
+  });
+  const m10 = makeDSO({
+    id: 'M10',
+    ra: 254.287,
+    dec: -4.099,
+    type: 'GC' as any,
+    majAxis: 9.3,
+    mag: 4.98,
+    constellation: 'Oph',
+    rating: 4,
+    difficulty: 2,
+  });
+  const m12 = makeDSO({
+    id: 'M12',
+    ra: 251.811,
+    dec: -1.948,
+    type: 'GC' as any,
+    majAxis: 11.1,
+    mag: 6.07,
+    constellation: 'Oph',
+    rating: 4,
+    difficulty: 2,
+  });
+  const m92 = makeDSO({
+    id: 'M92',
+    ra: 259.28,
+    dec: 43.137,
+    type: 'GC' as any,
+    majAxis: 14.4,
+    mag: 6.52,
+    constellation: 'Her',
+    rating: 4,
+    difficulty: 1,
+  });
 
   it('M13 appears in results with default options (minAlt=20, maxAlt=90)', () => {
-    const results = recommendTargets([m13], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 90 });
-    expect(results.map(r => r.dso.id)).toContain('M13');
+    const results = recommendTargets([m13], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
+    expect(results.map((r) => r.dso.id)).toContain('M13');
   });
 
   it('M10 appears in results with default options (minAlt=20, maxAlt=90)', () => {
-    const results = recommendTargets([m10], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 90 });
-    expect(results.map(r => r.dso.id)).toContain('M10');
+    const results = recommendTargets([m10], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
+    expect(results.map((r) => r.dso.id)).toContain('M10');
   });
 
   it('M12 appears in results with default options (minAlt=20, maxAlt=90)', () => {
-    const results = recommendTargets([m12], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 90 });
-    expect(results.map(r => r.dso.id)).toContain('M12');
+    const results = recommendTargets([m12], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
+    expect(results.map((r) => r.dso.id)).toContain('M12');
   });
 
   it('M92 appears in results with default options (minAlt=20, maxAlt=90)', () => {
-    const results = recommendTargets([m92], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 90 });
-    expect(results.map(r => r.dso.id)).toContain('M92');
+    const results = recommendTargets([m92], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
+    expect(results.map((r) => r.dso.id)).toContain('M92');
   });
 
   it('all four appear together with default options', () => {
-    const results = recommendTargets([m13, m10, m12, m92], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 90 });
-    const ids = results.map(r => r.dso.id);
+    const results = recommendTargets(
+      [m13, m10, m12, m92],
+      testPreset,
+      june12location,
+      june12night,
+      10,
+      { minAltDeg: 20, maxAltDeg: 90 },
+    );
+    const ids = results.map((r) => r.dso.id);
     expect(ids).toContain('M13');
     expect(ids).toContain('M10');
     expect(ids).toContain('M12');
@@ -257,8 +362,15 @@ describe('recommendTargets — M13/M10/M12/M92 at lat=45.17°N, June 12 2026', (
 
   it('all four appear with the legacy minAlt=30 default', () => {
     // From 45.17°N all four transit above 30°, so the old default should work too
-    const results = recommendTargets([m13, m10, m12, m92], testPreset, june12location, june12night, 10, { minAltDeg: 30, maxAltDeg: 90 });
-    const ids = results.map(r => r.dso.id);
+    const results = recommendTargets(
+      [m13, m10, m12, m92],
+      testPreset,
+      june12location,
+      june12night,
+      10,
+      { minAltDeg: 30, maxAltDeg: 90 },
+    );
+    const ids = results.map((r) => r.dso.id);
     expect(ids).toContain('M13');
     expect(ids).toContain('M10');
     expect(ids).toContain('M12');
@@ -271,22 +383,45 @@ describe('recommendTargets — M13/M10/M12/M92 at lat=45.17°N, June 12 2026', (
 describe('recommendTargets — minAltDeg option', () => {
   const june12location = { latDeg: 45.17, lonDeg: 5.0 };
   const june12night = new Date('2026-06-12T12:00:00Z');
-  const m13 = makeDSO({ id: 'M13', ra: 250.423, dec: 36.461, type: 'GC' as any, majAxis: 16.5, mag: 5.8 });
-  const m10 = makeDSO({ id: 'M10', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3,  mag: 4.98 });
+  const m13 = makeDSO({
+    id: 'M13',
+    ra: 250.423,
+    dec: 36.461,
+    type: 'GC' as any,
+    majAxis: 16.5,
+    mag: 5.8,
+  });
+  const m10 = makeDSO({
+    id: 'M10',
+    ra: 254.287,
+    dec: -4.099,
+    type: 'GC' as any,
+    majAxis: 9.3,
+    mag: 4.98,
+  });
 
   it('M10 (transit ≈41°) is excluded when minAltDeg=50', () => {
-    const results = recommendTargets([m10], testPreset, june12location, june12night, 10, { minAltDeg: 50, maxAltDeg: 90 });
-    expect(results.map(r => r.dso.id)).not.toContain('M10');
+    const results = recommendTargets([m10], testPreset, june12location, june12night, 10, {
+      minAltDeg: 50,
+      maxAltDeg: 90,
+    });
+    expect(results.map((r) => r.dso.id)).not.toContain('M10');
   });
 
   it('M13 (transit ≈81°) is included when minAltDeg=50', () => {
-    const results = recommendTargets([m13], testPreset, june12location, june12night, 10, { minAltDeg: 50, maxAltDeg: 90 });
-    expect(results.map(r => r.dso.id)).toContain('M13');
+    const results = recommendTargets([m13], testPreset, june12location, june12night, 10, {
+      minAltDeg: 50,
+      maxAltDeg: 90,
+    });
+    expect(results.map((r) => r.dso.id)).toContain('M13');
   });
 
   it('both included when minAltDeg=20 (default)', () => {
-    const results = recommendTargets([m13, m10], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 90 });
-    const ids = results.map(r => r.dso.id);
+    const results = recommendTargets([m13, m10], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
+    const ids = results.map((r) => r.dso.id);
     expect(ids).toContain('M13');
     expect(ids).toContain('M10');
   });
@@ -297,28 +432,61 @@ describe('recommendTargets — minAltDeg option', () => {
 describe('recommendTargets — maxAltDeg option', () => {
   const june12location = { latDeg: 45.17, lonDeg: 5.0 };
   const june12night = new Date('2026-06-12T12:00:00Z');
-  const m13 = makeDSO({ id: 'M13', ra: 250.423, dec: 36.461, type: 'GC' as any, majAxis: 16.5, mag: 5.8 });
-  const m10 = makeDSO({ id: 'M10', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3,  mag: 4.98 });
-  const m92 = makeDSO({ id: 'M92', ra: 259.28,  dec: 43.137, type: 'GC' as any, majAxis: 14.4, mag: 6.52 });
+  const m13 = makeDSO({
+    id: 'M13',
+    ra: 250.423,
+    dec: 36.461,
+    type: 'GC' as any,
+    majAxis: 16.5,
+    mag: 5.8,
+  });
+  const m10 = makeDSO({
+    id: 'M10',
+    ra: 254.287,
+    dec: -4.099,
+    type: 'GC' as any,
+    majAxis: 9.3,
+    mag: 4.98,
+  });
+  const m92 = makeDSO({
+    id: 'M92',
+    ra: 259.28,
+    dec: 43.137,
+    type: 'GC' as any,
+    majAxis: 14.4,
+    mag: 6.52,
+  });
 
   it('M13 (transit ≈81°) is excluded when maxAltDeg=80', () => {
-    const results = recommendTargets([m13], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 80 });
-    expect(results.map(r => r.dso.id)).not.toContain('M13');
+    const results = recommendTargets([m13], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 80,
+    });
+    expect(results.map((r) => r.dso.id)).not.toContain('M13');
   });
 
   it('M92 (transit ≈88°) is excluded when maxAltDeg=80', () => {
-    const results = recommendTargets([m92], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 80 });
-    expect(results.map(r => r.dso.id)).not.toContain('M92');
+    const results = recommendTargets([m92], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 80,
+    });
+    expect(results.map((r) => r.dso.id)).not.toContain('M92');
   });
 
   it('M10 (transit ≈41°) is included when maxAltDeg=80', () => {
-    const results = recommendTargets([m10], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 80 });
-    expect(results.map(r => r.dso.id)).toContain('M10');
+    const results = recommendTargets([m10], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 80,
+    });
+    expect(results.map((r) => r.dso.id)).toContain('M10');
   });
 
   it('all three included when maxAltDeg=90', () => {
-    const results = recommendTargets([m13, m10, m92], testPreset, june12location, june12night, 10, { minAltDeg: 20, maxAltDeg: 90 });
-    const ids = results.map(r => r.dso.id);
+    const results = recommendTargets([m13, m10, m92], testPreset, june12location, june12night, 10, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
+    const ids = results.map((r) => r.dso.id);
     expect(ids).toContain('M13');
     expect(ids).toContain('M10');
     expect(ids).toContain('M92');
@@ -336,8 +504,14 @@ describe('altScore formula uses minAlt', () => {
     // Object at dec=-1.2° from Paris (lat=48.85°), transits at ~40°
     const dso = makeDSO({ id: 'MED', ra: 84.05, dec: -1.2, mag: 4.0, majAxis: 60 });
 
-    const r20 = recommendTargets([dso], lowAltPreset, testLocation, winterNight, 1, { minAltDeg: 20, maxAltDeg: 90 });
-    const r30 = recommendTargets([dso], lowAltPreset, testLocation, winterNight, 1, { minAltDeg: 30, maxAltDeg: 90 });
+    const r20 = recommendTargets([dso], lowAltPreset, testLocation, winterNight, 1, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
+    const r30 = recommendTargets([dso], lowAltPreset, testLocation, winterNight, 1, {
+      minAltDeg: 30,
+      maxAltDeg: 90,
+    });
 
     if (r20.length > 0 && r30.length > 0) {
       // Same object, same altitude — minAlt=20 gives a higher altScore
@@ -348,7 +522,10 @@ describe('altScore formula uses minAlt', () => {
   it('object at 70°+ always gets altScore=1 regardless of minAlt', () => {
     // From Paris, an object at dec=45° transits at ~86° → altScore=1
     const highObj = makeDSO({ id: 'HIGH', ra: 120, dec: 45, mag: 5.0, majAxis: 30 });
-    const r = recommendTargets([highObj], testPreset, testLocation, winterNight, 1, { minAltDeg: 20, maxAltDeg: 90 });
+    const r = recommendTargets([highObj], testPreset, testLocation, winterNight, 1, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
     if (r.length > 0) {
       expect(r[0].altScore).toBe(1);
     }
@@ -363,11 +540,14 @@ describe('diversity cap with limit=5000', () => {
     const june12night = new Date('2026-06-12T12:00:00Z');
     const gcObjects = [
       makeDSO({ id: 'GC1', ra: 250.423, dec: 36.461, type: 'GC' as any, majAxis: 16.5, mag: 5.8 }),
-      makeDSO({ id: 'GC2', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3,  mag: 4.98 }),
+      makeDSO({ id: 'GC2', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3, mag: 4.98 }),
       makeDSO({ id: 'GC3', ra: 251.811, dec: -1.948, type: 'GC' as any, majAxis: 11.1, mag: 6.07 }),
-      makeDSO({ id: 'GC4', ra: 259.28,  dec: 43.137, type: 'GC' as any, majAxis: 14.4, mag: 6.52 }),
+      makeDSO({ id: 'GC4', ra: 259.28, dec: 43.137, type: 'GC' as any, majAxis: 14.4, mag: 6.52 }),
     ];
-    const results = recommendTargets(gcObjects, testPreset, june12location, june12night, 5000, { minAltDeg: 20, maxAltDeg: 90 });
+    const results = recommendTargets(gcObjects, testPreset, june12location, june12night, 5000, {
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    });
     expect(results).toHaveLength(4); // all 4 should appear (2 in diverse, 2 in top-up)
   });
 
@@ -377,12 +557,26 @@ describe('diversity cap with limit=5000', () => {
     const june12night = new Date('2026-06-12T12:00:00Z');
     const gcObjects = [
       makeDSO({ id: 'GC1', ra: 250.423, dec: 36.461, type: 'GC' as any, majAxis: 16.5, mag: 5.8 }),
-      makeDSO({ id: 'GC2', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3,  mag: 4.98 }),
+      makeDSO({ id: 'GC2', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3, mag: 4.98 }),
       makeDSO({ id: 'GC3', ra: 251.811, dec: -1.948, type: 'GC' as any, majAxis: 11.1, mag: 6.07 }),
     ];
-    const ocObject = makeDSO({ id: 'OC1', ra: 282.8, dec: -6.3, type: 'OC' as any, majAxis: 14, mag: 5.8 });
-    const results = recommendTargets([...gcObjects, ocObject], testPreset, june12location, june12night, 3, { minAltDeg: 20, maxAltDeg: 90 });
-    const gcCount = results.filter(r => r.dso.type === 'GC').length;
+    const ocObject = makeDSO({
+      id: 'OC1',
+      ra: 282.8,
+      dec: -6.3,
+      type: 'OC' as any,
+      majAxis: 14,
+      mag: 5.8,
+    });
+    const results = recommendTargets(
+      [...gcObjects, ocObject],
+      testPreset,
+      june12location,
+      june12night,
+      3,
+      { minAltDeg: 20, maxAltDeg: 90 },
+    );
+    const gcCount = results.filter((r) => r.dso.type === 'GC').length;
     expect(gcCount).toBeLessThanOrEqual(2);
   });
 });
@@ -394,15 +588,15 @@ describe('scoreDso — standalone single-object scoring (used by plans)', () => 
     const dso = makeDSO({ id: 'FAINT', majAxis: null as any, mag: 20 });
     const { score, fovFitScore, altScore, brightnessScore } = scoreDso(dso, testPreset, 60);
     expect(Number.isFinite(score)).toBe(true);
-    expect(fovFitScore).toBe(0);      // sizeless → 0 FOV fit
-    expect(brightnessScore).toBe(0);  // far below limiting magnitude
+    expect(fovFitScore).toBe(0); // sizeless → 0 FOV fit
+    expect(brightnessScore).toBe(0); // far below limiting magnitude
     expect(altScore).toBeGreaterThan(0);
   });
 
   it('score equals the weighted sum of its components', () => {
     const dso = makeDSO({ id: 'M', majAxis: 30, mag: 6 });
     const r = scoreDso(dso, testPreset, 70);
-    const expected = 0.45 * r.altScore + 0.35 * r.fovFitScore + 0.20 * r.brightnessScore;
+    const expected = 0.45 * r.altScore + 0.35 * r.fovFitScore + 0.2 * r.brightnessScore;
     expect(r.score).toBeCloseTo(expected, 6);
   });
 
@@ -416,7 +610,7 @@ describe('scoreDso — standalone single-object scoring (used by plans)', () => 
 
   it('altScore is 0 below the minimum altitude and clamps to 1 at high altitude', () => {
     const dso = makeDSO({ id: 'A', majAxis: 30, mag: 6 });
-    expect(scoreDso(dso, testPreset, 10).altScore).toBe(0);   // below default minAlt (20)
-    expect(scoreDso(dso, testPreset, 85).altScore).toBe(1);   // ≥70 → clamped to 1
+    expect(scoreDso(dso, testPreset, 10).altScore).toBe(0); // below default minAlt (20)
+    expect(scoreDso(dso, testPreset, 85).altScore).toBe(1); // ≥70 → clamped to 1
   });
 });

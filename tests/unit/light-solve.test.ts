@@ -27,7 +27,11 @@ const mockDetectStars = vi.mocked(detectStars);
 const mockSearchStarsByPosition = vi.mocked(searchStarsByPosition);
 
 function fakeImageData(): ImageData {
-  return { width: 10, height: 10, data: new Uint8ClampedArray(10 * 10 * 4) } as unknown as ImageData;
+  return {
+    width: 10,
+    height: 10,
+    data: new Uint8ClampedArray(10 * 10 * 4),
+  } as unknown as ImageData;
 }
 
 describe('lightSolve()', () => {
@@ -36,7 +40,12 @@ describe('lightSolve()', () => {
   });
 
   it('returns no-stars message when detector finds no spots', async () => {
-    mockDetectStars.mockReturnValue({ spots: [], imageWidth: 10, imageHeight: 10, scaleFromOriginal: 1 });
+    mockDetectStars.mockReturnValue({
+      spots: [],
+      imageWidth: 10,
+      imageHeight: 10,
+      scaleFromOriginal: 1,
+    });
 
     const result = await lightSolve(fakeImageData(), 10, 10);
 
@@ -52,7 +61,12 @@ describe('lightSolve()', () => {
       brightness: i + 1,
       size: 3,
     }));
-    mockDetectStars.mockReturnValue({ spots, imageWidth: 20, imageHeight: 20, scaleFromOriginal: 1 });
+    mockDetectStars.mockReturnValue({
+      spots,
+      imageWidth: 20,
+      imageHeight: 20,
+      scaleFromOriginal: 1,
+    });
 
     const result = await lightSolve(fakeImageData(), 20, 20);
 
@@ -146,6 +160,9 @@ describe('lightSolve()', () => {
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0].suggestedStars).toBeUndefined();
     expect(result.message).toContain('lightSolve.foundStars');
-    expect(reportUnknownRendererError).toHaveBeenCalledWith('light_solve_catalog_search', expect.any(Error));
+    expect(reportUnknownRendererError).toHaveBeenCalledWith(
+      'light_solve_catalog_search',
+      expect.any(Error),
+    );
   });
 });

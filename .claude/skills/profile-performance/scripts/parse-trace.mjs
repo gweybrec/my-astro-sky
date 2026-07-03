@@ -35,7 +35,7 @@ for (const e of events) {
   }
 }
 
-const fn = (id) => (nodes[id] ? (nodes[id].cf.functionName || '(anonymous)') : '?');
+const fn = (id) => (nodes[id] ? nodes[id].cf.functionName || '(anonymous)' : '?');
 const key = (cf) =>
   `${cf.functionName || '(anonymous)'}  @${(cf.url || '').split('/').pop()}:${cf.lineNumber}`;
 
@@ -59,7 +59,10 @@ for (let i = 0; i < samples.length; i++) {
   const seen = new Set();
   while (id != null && nodes[id]) {
     const k = key(nodes[id].cf);
-    if (!seen.has(k)) { seen.add(k); inclByFn[k] = (inclByFn[k] || 0) + d; }
+    if (!seen.has(k)) {
+      seen.add(k);
+      inclByFn[k] = (inclByFn[k] || 0) + d;
+    }
     id = nodes[id].parent;
   }
 }
@@ -72,8 +75,10 @@ const top = (obj) =>
     .sort((a, b) => b[1] - a[1])
     .slice(0, topN);
 
-console.log(`samples ${samples.length}  total ${(total / 1000).toFixed(0)}ms  ` +
-            `idle ${(idle / 1000).toFixed(0)}ms  active ${(active / 1000).toFixed(0)}ms\n`);
+console.log(
+  `samples ${samples.length}  total ${(total / 1000).toFixed(0)}ms  ` +
+    `idle ${(idle / 1000).toFixed(0)}ms  active ${(active / 1000).toFixed(0)}ms\n`,
+);
 console.log('=== TOP SELF TIME (ms, %active) ===');
 for (const [k, us] of top(selfByFn)) console.log(ms(us), pct(us), k);
 console.log('\n=== TOP INCLUSIVE TIME (ms, %active) ===');

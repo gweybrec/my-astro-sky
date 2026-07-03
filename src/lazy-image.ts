@@ -9,7 +9,9 @@ function getWorker(): Worker | null {
   if (_worker) return _worker;
   try {
     _worker = new ThumbnailWorker() as Worker;
-    (_worker as Worker).onmessage = (e: MessageEvent<{ id: string; blob?: Blob; error?: string }>) => {
+    (_worker as Worker).onmessage = (
+      e: MessageEvent<{ id: string; blob?: Blob; error?: string }>,
+    ) => {
       const { id, blob, error } = e.data;
       const resolve = pending.get(id);
       if (!resolve) return;
@@ -17,7 +19,10 @@ function getWorker(): Worker | null {
       resolve(!error && blob ? URL.createObjectURL(blob) : null);
     };
     (_worker as Worker).onerror = (e) => {
-      reportUnknownRendererError('thumbnail_worker_error', new Error(e.message ?? 'Thumbnail worker error'));
+      reportUnknownRendererError(
+        'thumbnail_worker_error',
+        new Error(e.message ?? 'Thumbnail worker error'),
+      );
     };
   } catch {
     // Worker not available (e.g., test environment or unsupported browser)

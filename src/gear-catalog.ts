@@ -69,7 +69,7 @@ let _accessories: AccessoryData[] | null = null;
 
 export async function getTelescopes(): Promise<TelescopeData[]> {
   if (!_telescopes) {
-    _telescopes = await fetch('/api/telescopes').then(r => {
+    _telescopes = await fetch('/api/telescopes').then((r) => {
       if (!r.ok) throw new Error(`Failed to load telescopes: ${r.status}`);
       return r.json();
     });
@@ -79,7 +79,7 @@ export async function getTelescopes(): Promise<TelescopeData[]> {
 
 export async function getCameras(): Promise<CameraData[]> {
   if (!_cameras) {
-    _cameras = await fetch('/api/cameras').then(r => {
+    _cameras = await fetch('/api/cameras').then((r) => {
       if (!r.ok) throw new Error(`Failed to load cameras: ${r.status}`);
       return r.json();
     });
@@ -89,7 +89,7 @@ export async function getCameras(): Promise<CameraData[]> {
 
 export async function getAccessories(): Promise<AccessoryData[]> {
   if (!_accessories) {
-    _accessories = await fetch('/api/accessories').then(r => {
+    _accessories = await fetch('/api/accessories').then((r) => {
       if (!r.ok) throw new Error(`Failed to load accessories: ${r.status}`);
       return r.json();
     });
@@ -115,8 +115,7 @@ export function buildGearPreset(
   camera: CameraData,
   accessory: AccessoryData | null,
 ): GearPreset {
-  const effectiveFocalLengthMm =
-    telescope.focal_length_mm * (accessory?.magnification_factor ?? 1);
+  const effectiveFocalLengthMm = telescope.focal_length_mm * (accessory?.magnification_factor ?? 1);
   return {
     apertureMm: telescope.aperture_mm,
     focalLengthMm: effectiveFocalLengthMm,

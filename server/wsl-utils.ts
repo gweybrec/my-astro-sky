@@ -20,7 +20,11 @@ export function wslPath(pathValue: string, useWSL: boolean): string {
   return useWSL ? toWSLPath(pathValue) : pathValue;
 }
 
-export function wrapExecForWSL(bin: string, args: string[], useWSL: boolean): { cmd: string; args: string[] } {
+export function wrapExecForWSL(
+  bin: string,
+  args: string[],
+  useWSL: boolean,
+): { cmd: string; args: string[] } {
   if (!useWSL) {
     return { cmd: bin, args };
   }

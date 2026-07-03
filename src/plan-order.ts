@@ -25,7 +25,9 @@ export function readObserverPrefs(): ObserverPrefs {
       const p = JSON.parse(raw);
       return { lat: p.lat ?? null, lon: p.lon ?? null, lastDateISO: p.lastDateISO ?? null };
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { lat: null, lon: null, lastDateISO: null };
 }
 
@@ -38,12 +40,34 @@ export function nightWindowFor(loc: ObserverLocation, dateNight: Date): { start:
   const tw = twilightWindow(dateNight, loc.latDeg, loc.lonDeg);
   if (tw) return { start: tw.start, end: tw.end };
   return {
-    start: new Date(Date.UTC(dateNight.getUTCFullYear(), dateNight.getUTCMonth(), dateNight.getUTCDate(), 20, 0, 0)),
-    end: new Date(Date.UTC(dateNight.getUTCFullYear(), dateNight.getUTCMonth(), dateNight.getUTCDate() + 1, 6, 0, 0)),
+    start: new Date(
+      Date.UTC(
+        dateNight.getUTCFullYear(),
+        dateNight.getUTCMonth(),
+        dateNight.getUTCDate(),
+        20,
+        0,
+        0,
+      ),
+    ),
+    end: new Date(
+      Date.UTC(
+        dateNight.getUTCFullYear(),
+        dateNight.getUTCMonth(),
+        dateNight.getUTCDate() + 1,
+        6,
+        0,
+        0,
+      ),
+    ),
   };
 }
 
-export interface OrderableEntry { id: string; ra: number; dec: number; }
+export interface OrderableEntry {
+  id: string;
+  ra: number;
+  dec: number;
+}
 
 /**
  * Order plan entries by transit time (earliest culmination first), using the
@@ -55,19 +79,33 @@ export interface OrderableEntry { id: string; ra: number; dec: number; }
  */
 export function orderPlanEntryIds(entries: OrderableEntry[], nightOf: string | null): string[] {
   const prefs = readObserverPrefs();
-  if (prefs.lat == null || prefs.lon == null ||
-      prefs.lat < -90 || prefs.lat > 90 || prefs.lon < -180 || prefs.lon > 180) {
-    return entries.map(e => e.id);
+  if (
+    prefs.lat == null ||
+    prefs.lon == null ||
+    prefs.lat < -90 ||
+    prefs.lat > 90 ||
+    prefs.lon < -180 ||
+    prefs.lon > 180
+  ) {
+    return entries.map((e) => e.id);
   }
   const loc: ObserverLocation = { latDeg: prefs.lat, lonDeg: prefs.lon };
   const dateStr = nightOf ?? prefs.lastDateISO ?? todayISO();
   const dateNight = new Date(dateStr + 'T12:00:00Z');
   const win = nightWindowFor(loc, dateNight);
   return entries
-    .map(e => ({
+    .map((e) => ({
       id: e.id,
-      t: maxAltDuringWindow(e.ra, e.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10).atDate.getTime(),
+      t: maxAltDuringWindow(
+        e.ra,
+        e.dec,
+        loc.latDeg,
+        loc.lonDeg,
+        win.start,
+        win.end,
+        10,
+      ).atDate.getTime(),
     }))
     .sort((a, b) => a.t - b.t)
-    .map(x => x.id);
+    .map((x) => x.id);
 }

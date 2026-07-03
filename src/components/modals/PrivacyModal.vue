@@ -1,5 +1,10 @@
 <template>
-  <BaseModal :title="t('settings.privacyTitle')" size="wide" body-class="modal-form-body--loose" @close="$emit('close')">
+  <BaseModal
+    :title="t('settings.privacyTitle')"
+    size="wide"
+    body-class="modal-form-body--loose"
+    @close="$emit('close')"
+  >
     <p class="text-para">{{ t('settings.privacyLocal') }}</p>
     <div class="privacy-warning-block">
       <div class="privacy-warning-title">{{ t('settings.privacyException') }}</div>

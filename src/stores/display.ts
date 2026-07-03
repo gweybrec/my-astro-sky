@@ -71,7 +71,9 @@ export const useDisplayStore = defineStore('display', () => {
     };
   }
 
-  function persist() { saveSettings(snap()); }
+  function persist() {
+    saveSettings(snap());
+  }
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
   // canvasStore.skyMap / canvasStore.overlay are already unwrapped by Pinia
@@ -271,23 +273,61 @@ export const useDisplayStore = defineStore('display', () => {
 
   return {
     // state
-    showStars, showConstellationLines, showConstellationNames,
-    showStarLabels, showDSOLabels, showGrid, showPhotos, showPhotoOutlines,
-    visibleLabels, maxStarCount, maxDSOCount,
-    autoStarDensity, autoDSODensity, reduceDetailWhileMoving,
-    skyOpacity, backgroundOpacity,
-    showDSOs, dsoTypes, dsoCatalogs,
-    showStarTooltips, showDSOTooltips, simplifiedDSOTooltips,
-    hemisphere, borderLatDeg, mapRotationDeg, constellationStyle,
+    showStars,
+    showConstellationLines,
+    showConstellationNames,
+    showStarLabels,
+    showDSOLabels,
+    showGrid,
+    showPhotos,
+    showPhotoOutlines,
+    visibleLabels,
+    maxStarCount,
+    maxDSOCount,
+    autoStarDensity,
+    autoDSODensity,
+    reduceDetailWhileMoving,
+    skyOpacity,
+    backgroundOpacity,
+    showDSOs,
+    dsoTypes,
+    dsoCatalogs,
+    showStarTooltips,
+    showDSOTooltips,
+    simplifiedDSOTooltips,
+    hemisphere,
+    borderLatDeg,
+    mapRotationDeg,
+    constellationStyle,
     // actions
-    setShowStars, setShowConstellationLines, setShowConstellationNames,
-    setConstellationStyle, setShowStarLabels, setShowDSOLabels, setShowGrid,
-    setShowPhotos, setShowPhotoOutlines, setVisibleLabel, setAllLabels,
-    setSkyOpacity, setBackgroundOpacity,
-    setMaxStarCount, setMaxDSOCount,
-    setAutoStarDensity, setAutoDSODensity, applyAutoDensity, setReduceDetailWhileMoving,
-    setShowStarTooltips, setShowDSOTooltips, setSimplifiedDSOTooltips,
-    setHemisphere, setBorderLatDeg, onMapViewChanged, setMapRotationDeg,
-    setShowDSOs, setDsoTypes, setDsoCatalogs,
+    setShowStars,
+    setShowConstellationLines,
+    setShowConstellationNames,
+    setConstellationStyle,
+    setShowStarLabels,
+    setShowDSOLabels,
+    setShowGrid,
+    setShowPhotos,
+    setShowPhotoOutlines,
+    setVisibleLabel,
+    setAllLabels,
+    setSkyOpacity,
+    setBackgroundOpacity,
+    setMaxStarCount,
+    setMaxDSOCount,
+    setAutoStarDensity,
+    setAutoDSODensity,
+    applyAutoDensity,
+    setReduceDetailWhileMoving,
+    setShowStarTooltips,
+    setShowDSOTooltips,
+    setSimplifiedDSOTooltips,
+    setHemisphere,
+    setBorderLatDeg,
+    onMapViewChanged,
+    setMapRotationDeg,
+    setShowDSOs,
+    setDsoTypes,
+    setDsoCatalogs,
   };
 });

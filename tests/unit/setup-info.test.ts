@@ -3,26 +3,49 @@ import { buildSetupInfoRows } from '../../src/setup-info';
 import type { TelescopeData, CameraData, AccessoryData } from '../../src/gear-catalog';
 
 const TELESCOPE: TelescopeData = {
-  id: 'celestron-c8-sct', brand: 'Celestron', model: 'C8 SCT',
-  type: 'SCT', optical_design: 'Schmidt-Cassegrain', aperture_mm: 203.2,
-  focal_length_mm: 2032, f_ratio: 10, is_smart_telescope: false,
-  integrated_camera: false, integrated_camera_id: null,
-  mount_interface: 'Losmandy', optical_notes: null, recommended_use: ['deep-sky'],
+  id: 'celestron-c8-sct',
+  brand: 'Celestron',
+  model: 'C8 SCT',
+  type: 'SCT',
+  optical_design: 'Schmidt-Cassegrain',
+  aperture_mm: 203.2,
+  focal_length_mm: 2032,
+  f_ratio: 10,
+  is_smart_telescope: false,
+  integrated_camera: false,
+  integrated_camera_id: null,
+  mount_interface: 'Losmandy',
+  optical_notes: null,
+  recommended_use: ['deep-sky'],
   status: 'active',
 };
 
 const CAMERA: CameraData = {
-  id: 'atik-314l-plus', brand: 'Atik', model: '314L+',
-  sensor: 'Sony ICX285AL', sensor_generation: 'CCD', color_type: 'Mono',
-  sensor_width_mm: 8.98, sensor_height_mm: 6.71,
-  pixel_size_um: 6.45, resolution_x: 1391, resolution_y: 1039,
-  recommended_use: ['deep-sky'], status: 'active',
+  id: 'atik-314l-plus',
+  brand: 'Atik',
+  model: '314L+',
+  sensor: 'Sony ICX285AL',
+  sensor_generation: 'CCD',
+  color_type: 'Mono',
+  sensor_width_mm: 8.98,
+  sensor_height_mm: 6.71,
+  pixel_size_um: 6.45,
+  resolution_x: 1391,
+  resolution_y: 1039,
+  recommended_use: ['deep-sky'],
+  status: 'active',
 };
 
 const REDUCER: AccessoryData = {
-  id: 'celestron-fr-0-63', brand: 'Celestron', model: 'Focal Reducer 0.63×',
-  type: 'focal-reducer', magnification_factor: 0.63,
-  notes: null, thread_input: null, thread_output: null, status: 'active',
+  id: 'celestron-fr-0-63',
+  brand: 'Celestron',
+  model: 'Focal Reducer 0.63×',
+  type: 'focal-reducer',
+  magnification_factor: 0.63,
+  notes: null,
+  thread_input: null,
+  thread_output: null,
+  status: 'active',
 };
 
 /** Convenience: turn the row tuples into a {label: value} map keyed by label. */

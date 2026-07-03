@@ -1,10 +1,43 @@
-import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement, ApiErrorDetails, PhotoIntegration, PointOfInterest, PoiCategory, AffineMatrix } from './types';
+import type {
+  Photo,
+  PhotoCorrespondence,
+  Star,
+  Point,
+  ViewState,
+  ManualPlacement,
+  ApiErrorDetails,
+  PhotoIntegration,
+  PointOfInterest,
+  PoiCategory,
+  AffineMatrix,
+} from './types';
 import { poisMatchFilter } from './poi';
 import { project, toCanvas, fromCanvas, unproject, borderRadiusPU } from './projection';
 import { reportUnknownRendererError } from './error-reporter';
-import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform, affineToCSS } from './affine';
+import {
+  computeAffineTransform,
+  computeAffineLSQ,
+  computeSimilarityTransform,
+  affineToCSS,
+} from './affine';
 import { getStarByHip, getStars } from './star-catalog';
-import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP, solveWithSolveField, searchStarsAPI, searchStarsByPosition, listAstrometrySubmissions, reuseAstrometrySubmission, updatePhotoMetadata, updatePhotoManualPlacement, loadServerSettings, getSolverAvailability } from './api';
+import {
+  uploadPhoto,
+  deletePhotoAPI,
+  solveWCS,
+  submitPlateSolve,
+  pollPlateSolve,
+  solveWithASTAP,
+  solveWithSolveField,
+  searchStarsAPI,
+  searchStarsByPosition,
+  listAstrometrySubmissions,
+  reuseAstrometrySubmission,
+  updatePhotoMetadata,
+  updatePhotoManualPlacement,
+  loadServerSettings,
+  getSolverAvailability,
+} from './api';
 import { searchUnified, searchDSOs } from './search';
 import { showToast } from './toast';
 import { getDSOById, findDSOsInImage } from './dso-catalog';
@@ -31,9 +64,11 @@ function normalizeIntegrationFilterKey(value: string): string {
 }
 
 function sanitizeIntegrationRows(rows: PhotoIntegration[]): PhotoIntegration[] {
-  return rows.map(row => ({
-    frames: Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
-    seconds: Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
+  return rows.map((row) => ({
+    frames:
+      Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
+    seconds:
+      Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
     filter: row.filter.trim(),
   }));
 }
@@ -46,7 +81,11 @@ async function loadAstrometrySubmissionsWithCache(forceRefresh = false): Promise
   const now = Date.now();
 
   // Avoid re-querying astrometry.net if we just fetched submissions.
-  if (!forceRefresh && astrometrySubmissionsCache && (now - astrometrySubmissionsCache.at) < ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS) {
+  if (
+    !forceRefresh &&
+    astrometrySubmissionsCache &&
+    now - astrometrySubmissionsCache.at < ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS
+  ) {
     return astrometrySubmissionsCache.submissions;
   }
 
@@ -174,7 +213,9 @@ function showHintsInfoTooltip(anchorElement: HTMLElement) {
 
   // Intro
   const intro = document.createElement('p');
-  intro.textContent = t('modal.hintsInfoIntro') || 'Automatic solving identifies stars in your photo to place it on the sky map.';
+  intro.textContent =
+    t('modal.hintsInfoIntro') ||
+    'Automatic solving identifies stars in your photo to place it on the sky map.';
   tooltip.appendChild(intro);
 
   // Options section
@@ -183,23 +224,31 @@ function showHintsInfoTooltip(anchorElement: HTMLElement) {
   tooltip.appendChild(optionsTitle);
 
   const optionsList = document.createElement('ul');
-  
+
   const solveFieldItem = document.createElement('li');
-  solveFieldItem.innerHTML = t('modal.hintsInfoSolveField') || '<strong>solve-field (local)</strong>: Local astrometry.net solver, accurate and private. Requires index files installation (~2.4GB). Takes 10-30 seconds.';
+  solveFieldItem.innerHTML =
+    t('modal.hintsInfoSolveField') ||
+    '<strong>solve-field (local)</strong>: Local astrometry.net solver, accurate and private. Requires index files installation (~2.4GB). Takes 10-30 seconds.';
   optionsList.appendChild(solveFieldItem);
-  
+
   const astapItem = document.createElement('li');
-  astapItem.innerHTML = t('modal.hintsInfoASTAP') || '<strong>ASTAP (local)</strong>: Fast (~3-5 seconds) but requires local installation. Works best with position hints.';
+  astapItem.innerHTML =
+    t('modal.hintsInfoASTAP') ||
+    '<strong>ASTAP (local)</strong>: Fast (~3-5 seconds) but requires local installation. Works best with position hints.';
   optionsList.appendChild(astapItem);
-  
+
   const onlineItem = document.createElement('li');
-  onlineItem.innerHTML = t('modal.hintsInfoOnline') || '<strong>Online (astrometry.net)</strong>: Cloud service, accurate but may take 30-60 seconds. Works for most images.';
+  onlineItem.innerHTML =
+    t('modal.hintsInfoOnline') ||
+    '<strong>Online (astrometry.net)</strong>: Cloud service, accurate but may take 30-60 seconds. Works for most images.';
   optionsList.appendChild(onlineItem);
-  
+
   const wcsItem = document.createElement('li');
-  wcsItem.innerHTML = t('modal.hintsInfoWCS') || '<strong>Metadata (WCS)</strong>: Reads coordinates already present in FITS/TIFF files (instant).';
+  wcsItem.innerHTML =
+    t('modal.hintsInfoWCS') ||
+    '<strong>Metadata (WCS)</strong>: Reads coordinates already present in FITS/TIFF files (instant).';
   optionsList.appendChild(wcsItem);
-  
+
   tooltip.appendChild(optionsList);
 
   // Recommendations section
@@ -208,23 +257,29 @@ function showHintsInfoTooltip(anchorElement: HTMLElement) {
   tooltip.appendChild(recoTitle);
 
   const recoList = document.createElement('ul');
-  
+
   const hintsItem = document.createElement('li');
-  hintsItem.textContent = t('modal.hintsInfoUseHints') || 'For images with few bright stars (galaxies, nebulae), enter the target object name in the field above.';
+  hintsItem.textContent =
+    t('modal.hintsInfoUseHints') ||
+    'For images with few bright stars (galaxies, nebulae), enter the target object name in the field above.';
   recoList.appendChild(hintsItem);
-  
+
   const fovHintItem = document.createElement('li');
-  fovHintItem.textContent = 'If you know your image field of view (FOV), entering it significantly improves ASTAP solving reliability.';
+  fovHintItem.textContent =
+    'If you know your image field of view (FOV), entering it significantly improves ASTAP solving reliability.';
   recoList.appendChild(fovHintItem);
-  
+
   const minStarsItem = document.createElement('li');
-  minStarsItem.textContent = t('modal.hintsInfoMinStars') || 'ASTAP requires ~100-300 detectable stars in the image (magnitude up to 16).';
+  minStarsItem.textContent =
+    t('modal.hintsInfoMinStars') ||
+    'ASTAP requires ~100-300 detectable stars in the image (magnitude up to 16).';
   recoList.appendChild(minStarsItem);
-  
+
   const fovItem = document.createElement('li');
-  fovItem.textContent = t('modal.hintsInfoFOV') || 'Works best for fields 0.5° to 10° (most amateur photos).';
+  fovItem.textContent =
+    t('modal.hintsInfoFOV') || 'Works best for fields 0.5° to 10° (most amateur photos).';
   recoList.appendChild(fovItem);
-  
+
   tooltip.appendChild(recoList);
 
   // Troubleshooting section
@@ -233,39 +288,41 @@ function showHintsInfoTooltip(anchorElement: HTMLElement) {
   tooltip.appendChild(troubleTitle);
 
   const troubleList = document.createElement('ul');
-  
+
   const tryHintsItem = document.createElement('li');
-  tryHintsItem.textContent = t('modal.hintsInfoTryHints') || 'Try adding a position hint (object name).';
+  tryHintsItem.textContent =
+    t('modal.hintsInfoTryHints') || 'Try adding a position hint (object name).';
   troubleList.appendChild(tryHintsItem);
-  
+
   const tryOnlineItem = document.createElement('li');
   tryOnlineItem.textContent = t('modal.hintsInfoTryOnline') || 'Use online solving if ASTAP fails.';
   troubleList.appendChild(tryOnlineItem);
-  
+
   const manualItem = document.createElement('li');
-  manualItem.textContent = t('modal.hintsInfoManual') || 'As a last resort, use manual star identification.';
+  manualItem.textContent =
+    t('modal.hintsInfoManual') || 'As a last resort, use manual star identification.';
   troubleList.appendChild(manualItem);
-  
+
   tooltip.appendChild(troubleList);
 
   // Position near the icon
   _currentTooltipAnchor = anchorElement;
   document.body.appendChild(tooltip);
-  
+
   const rect = anchorElement.getBoundingClientRect();
   const tooltipRect = tooltip.getBoundingClientRect();
-  
+
   // Position to the right of the icon if space, otherwise to the left
   let left = rect.right + 10;
   if (left + tooltipRect.width > window.innerWidth - 20) {
     left = rect.left - tooltipRect.width - 10;
   }
-  
+
   let top = rect.top;
   if (top + tooltipRect.height > window.innerHeight - 20) {
     top = window.innerHeight - tooltipRect.height - 20;
   }
-  
+
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${top}px`;
 
@@ -332,7 +389,8 @@ function showManualInfoTooltip(anchorElement: HTMLElement) {
   let left = rect.right + 10;
   if (left + tooltipRect.width > window.innerWidth - 20) left = rect.left - tooltipRect.width - 10;
   let top = rect.top;
-  if (top + tooltipRect.height > window.innerHeight - 20) top = window.innerHeight - tooltipRect.height - 20;
+  if (top + tooltipRect.height > window.innerHeight - 20)
+    top = window.innerHeight - tooltipRect.height - 20;
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${top}px`;
 
@@ -342,7 +400,9 @@ function showManualInfoTooltip(anchorElement: HTMLElement) {
       document.removeEventListener('click', closeOnClickOutside);
     }
   };
-  setTimeout(() => { document.addEventListener('click', closeOnClickOutside); }, 100);
+  setTimeout(() => {
+    document.addEventListener('click', closeOnClickOutside);
+  }, 100);
 }
 
 function showMetaInfoTooltip(anchorElement: HTMLElement) {
@@ -386,7 +446,8 @@ function showMetaInfoTooltip(anchorElement: HTMLElement) {
   let left = rect.right + 10;
   if (left + tooltipRect.width > window.innerWidth - 20) left = rect.left - tooltipRect.width - 10;
   let top = rect.top;
-  if (top + tooltipRect.height > window.innerHeight - 20) top = window.innerHeight - tooltipRect.height - 20;
+  if (top + tooltipRect.height > window.innerHeight - 20)
+    top = window.innerHeight - tooltipRect.height - 20;
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${top}px`;
 
@@ -396,7 +457,9 @@ function showMetaInfoTooltip(anchorElement: HTMLElement) {
       document.removeEventListener('click', closeOnClickOutside);
     }
   };
-  setTimeout(() => { document.addEventListener('click', closeOnClickOutside); }, 100);
+  setTimeout(() => {
+    document.addEventListener('click', closeOnClickOutside);
+  }, 100);
 }
 
 export class PhotoOverlay {
@@ -455,17 +518,25 @@ export class PhotoOverlay {
     if (!placed.photo.labels || placed.photo.labels.length === 0) {
       return this.visibleLabels['(no label)'] !== false;
     }
-    return placed.photo.labels.some(l => this.visibleLabels[l] !== false);
+    return placed.photo.labels.some((l) => this.visibleLabels[l] !== false);
   }
 
   /** True when the photo passes the current POI filter (no filter ⇒ allowed). */
   private isPoiAllowed(placed: PlacedPhoto): boolean {
-    return poisMatchFilter(placed.photo.pointsOfInterest ?? [], this.poiCategories, this.visiblePois);
+    return poisMatchFilter(
+      placed.photo.pointsOfInterest ?? [],
+      this.poiCategories,
+      this.visiblePois,
+    );
   }
 
   private applyPhotoVisibility() {
     for (const placed of this.placedPhotos) {
-      const shouldDisplay = this.showPhotos && placed.visible && this.isLabelAllowed(placed) && this.isPoiAllowed(placed);
+      const shouldDisplay =
+        this.showPhotos &&
+        placed.visible &&
+        this.isLabelAllowed(placed) &&
+        this.isPoiAllowed(placed);
       placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
     }
   }
@@ -514,8 +585,10 @@ export class PhotoOverlay {
         const cc = toCanvas(placed.projCentroid.x, placed.projCentroid.y, view);
         const margin = placed.projHalfDiag * view.scale * 2;
         if (
-          cc.x + margin < 0 || cc.x - margin > view.width ||
-          cc.y + margin < 0 || cc.y - margin > view.height
+          cc.x + margin < 0 ||
+          cc.x - margin > view.width ||
+          cc.y + margin < 0 ||
+          cc.y - margin > view.height
         ) {
           placed.viewportCulled = true;
           placed.imgEl.style.display = 'none';
@@ -529,7 +602,7 @@ export class PhotoOverlay {
   }
 
   getPlacedPhotos(): PlacedPhoto[] {
-    return this.placedPhotos.filter(p => !p.pendingDelete);
+    return this.placedPhotos.filter((p) => !p.pendingDelete);
   }
 
   /**
@@ -569,9 +642,15 @@ export class PhotoOverlay {
 
     try {
       if (photoPoints.length === 2) {
-        return computeSimilarityTransform(photoPoints as [Point, Point], canvasPoints as [Point, Point]);
+        return computeSimilarityTransform(
+          photoPoints as [Point, Point],
+          canvasPoints as [Point, Point],
+        );
       } else if (photoPoints.length === 3) {
-        return computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point]);
+        return computeAffineTransform(
+          photoPoints as [Point, Point, Point],
+          canvasPoints as [Point, Point, Point],
+        );
       }
       return computeAffineLSQ(photoPoints, canvasPoints);
     } catch {
@@ -590,7 +669,7 @@ export class PhotoOverlay {
 
   /** Update in-memory photo data (dsoIds, labels, notes) after a metadata edit */
   updatePhotoData(updated: Photo): void {
-    const idx = this.placedPhotos.findIndex(p => p.photo.id === updated.id);
+    const idx = this.placedPhotos.findIndex((p) => p.photo.id === updated.id);
     if (idx >= 0) {
       // Replace with a new object so Vue's shallowRef detects the change via reference equality
       this.placedPhotos[idx] = { ...this.placedPhotos[idx], photo: updated };
@@ -603,7 +682,13 @@ export class PhotoOverlay {
     const results: PhotoCanvasQuad[] = [];
 
     for (const placed of this.placedPhotos) {
-      if (!placed.visible || placed.borderHidden || placed.viewportCulled || placed.photo.correspondences.length < 2) continue;
+      if (
+        !placed.visible ||
+        placed.borderHidden ||
+        placed.viewportCulled ||
+        placed.photo.correspondences.length < 2
+      )
+        continue;
 
       const photoPoints: Point[] = [];
       const canvasPoints: Point[] = [];
@@ -622,9 +707,15 @@ export class PhotoOverlay {
       try {
         let matrix;
         if (photoPoints.length === 2) {
-          matrix = computeSimilarityTransform(photoPoints as [Point, Point], canvasPoints as [Point, Point]);
+          matrix = computeSimilarityTransform(
+            photoPoints as [Point, Point],
+            canvasPoints as [Point, Point],
+          );
         } else if (photoPoints.length === 3) {
-          matrix = computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point]);
+          matrix = computeAffineTransform(
+            photoPoints as [Point, Point, Point],
+            canvasPoints as [Point, Point, Point],
+          );
         } else {
           matrix = computeAffineLSQ(photoPoints, canvasPoints);
         }
@@ -640,7 +731,7 @@ export class PhotoOverlay {
           { x: 0, y: h },
         ];
 
-        const corners = photoCorners.map(p => ({
+        const corners = photoCorners.map((p) => ({
           x: matrix.a * p.x + matrix.c * p.y + matrix.e,
           y: matrix.b * p.x + matrix.d * p.y + matrix.f,
         }));
@@ -660,8 +751,12 @@ export class PhotoOverlay {
   }
 
   /** Compute the center RA/Dec and ideal scale to fit a photo in the viewport */
-  getPhotoCenterAndScale(photoId: string, viewWidth: number, viewHeight: number): { ra: number; dec: number; scale: number } | null {
-    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+  getPhotoCenterAndScale(
+    photoId: string,
+    viewWidth: number,
+    viewHeight: number,
+  ): { ra: number; dec: number; scale: number } | null {
+    const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed || placed.photo.correspondences.length < 2) return null;
 
     const photoPoints: Point[] = [];
@@ -680,9 +775,15 @@ export class PhotoOverlay {
     try {
       let matrix;
       if (photoPoints.length === 2) {
-        matrix = computeSimilarityTransform(photoPoints as [Point, Point], projPoints as [Point, Point]);
+        matrix = computeSimilarityTransform(
+          photoPoints as [Point, Point],
+          projPoints as [Point, Point],
+        );
       } else if (photoPoints.length === 3) {
-        matrix = computeAffineTransform(photoPoints as [Point, Point, Point], projPoints as [Point, Point, Point]);
+        matrix = computeAffineTransform(
+          photoPoints as [Point, Point, Point],
+          projPoints as [Point, Point, Point],
+        );
       } else {
         matrix = computeAffineLSQ(photoPoints, projPoints);
       }
@@ -691,17 +792,22 @@ export class PhotoOverlay {
       const h = placed.photo.height;
 
       const photoCorners = [
-        { x: 0, y: 0 }, { x: w, y: 0 },
-        { x: w, y: h }, { x: 0, y: h },
+        { x: 0, y: 0 },
+        { x: w, y: 0 },
+        { x: w, y: h },
+        { x: 0, y: h },
       ];
 
-      const projCorners = photoCorners.map(p => ({
+      const projCorners = photoCorners.map((p) => ({
         x: matrix.a * p.x + matrix.c * p.y + matrix.e,
         y: matrix.b * p.x + matrix.d * p.y + matrix.f,
       }));
 
       // Bounding box in projection space
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        maxX = -Infinity,
+        minY = Infinity,
+        maxY = -Infinity;
       for (const c of projCorners) {
         if (c.x < minX) minX = c.x;
         if (c.x > maxX) maxX = c.x;
@@ -726,10 +832,12 @@ export class PhotoOverlay {
 
   /** Compute the average RA/Dec center of a photo from its star correspondences */
   getPhotoCenter(photoId: string): { ra: number; dec: number } | null {
-    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed || placed.photo.correspondences.length === 0) return null;
 
-    let sumX = 0, sumY = 0, count = 0;
+    let sumX = 0,
+      sumY = 0,
+      count = 0;
     for (const corr of placed.photo.correspondences) {
       const raDec = getCorrRaDec(corr);
       if (!raDec) continue;
@@ -745,14 +853,14 @@ export class PhotoOverlay {
   }
 
   setPhotoOpacity(photoId: string, opacity: number) {
-    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed) return;
     placed.opacity = opacity;
     placed.imgEl.style.opacity = String(opacity);
   }
 
   toggleVisibility(photoId: string) {
-    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed) return;
     placed.visible = !placed.visible;
     const shouldDisplay = this.showPhotos && placed.visible;
@@ -765,7 +873,7 @@ export class PhotoOverlay {
   setMultiplePhotosVisible(photoIds: string[], visible: boolean) {
     const view = this.getView();
     for (const id of photoIds) {
-      const placed = this.placedPhotos.find(p => p.photo.id === id);
+      const placed = this.placedPhotos.find((p) => p.photo.id === id);
       if (!placed) continue;
       placed.visible = visible;
       const shouldDisplay = this.showPhotos && visible;
@@ -778,24 +886,31 @@ export class PhotoOverlay {
   }
 
   movePhotoUp(photoId: string) {
-    const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
+    const idx = this.placedPhotos.findIndex((p) => p.photo.id === photoId);
     if (idx < 0 || idx >= this.placedPhotos.length - 1) return;
-    [this.placedPhotos[idx], this.placedPhotos[idx + 1]] = [this.placedPhotos[idx + 1], this.placedPhotos[idx]];
+    [this.placedPhotos[idx], this.placedPhotos[idx + 1]] = [
+      this.placedPhotos[idx + 1],
+      this.placedPhotos[idx],
+    ];
     this.reorderDOM();
     this.fireOnPhotosChanged();
   }
 
   movePhotoDown(photoId: string) {
-    const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
+    const idx = this.placedPhotos.findIndex((p) => p.photo.id === photoId);
     if (idx <= 0) return;
-    [this.placedPhotos[idx], this.placedPhotos[idx - 1]] = [this.placedPhotos[idx - 1], this.placedPhotos[idx]];
+    [this.placedPhotos[idx], this.placedPhotos[idx - 1]] = [
+      this.placedPhotos[idx - 1],
+      this.placedPhotos[idx],
+    ];
     this.reorderDOM();
     this.fireOnPhotosChanged();
   }
 
   reorderPhoto(photoId: string, newIndex: number) {
-    const oldIdx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
-    if (oldIdx < 0 || newIndex < 0 || newIndex >= this.placedPhotos.length || oldIdx === newIndex) return;
+    const oldIdx = this.placedPhotos.findIndex((p) => p.photo.id === photoId);
+    if (oldIdx < 0 || newIndex < 0 || newIndex >= this.placedPhotos.length || oldIdx === newIndex)
+      return;
     const [item] = this.placedPhotos.splice(oldIdx, 1);
     this.placedPhotos.splice(newIndex, 0, item);
     this.reorderDOM();
@@ -836,7 +951,7 @@ export class PhotoOverlay {
   }
 
   hidePhoto(photoId: string) {
-    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed) return;
     placed.pendingDelete = true;
     placed.imgEl.style.display = 'none';
@@ -844,7 +959,7 @@ export class PhotoOverlay {
   }
 
   unhidePhoto(photoId: string) {
-    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed) return;
     placed.pendingDelete = false;
     placed.imgEl.style.display = placed.visible ? 'block' : 'none';
@@ -858,10 +973,14 @@ export class PhotoOverlay {
     try {
       await deletePhotoAPI(photoId);
     } catch (err: any) {
-      showToast({ message: t('photos.deleteError', { message: err.message }), type: 'error', duration: 5000 });
+      showToast({
+        message: t('photos.deleteError', { message: err.message }),
+        type: 'error',
+        duration: 5000,
+      });
       return;
     }
-    const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
+    const idx = this.placedPhotos.findIndex((p) => p.photo.id === photoId);
     if (idx >= 0) {
       this.placedPhotos[idx].imgEl.remove();
       this.placedPhotos.splice(idx, 1);
@@ -872,22 +991,22 @@ export class PhotoOverlay {
   /** Remove specific photos from the in-memory overlay without calling the API (call bulk API first). */
   removePhotosFromMap(ids: string[]) {
     const idSet = new Set(ids);
-    const removed = this.placedPhotos.filter(p => idSet.has(p.photo.id));
-    removed.forEach(p => p.imgEl.remove());
-    this.placedPhotos = this.placedPhotos.filter(p => !idSet.has(p.photo.id));
+    const removed = this.placedPhotos.filter((p) => idSet.has(p.photo.id));
+    removed.forEach((p) => p.imgEl.remove());
+    this.placedPhotos = this.placedPhotos.filter((p) => !idSet.has(p.photo.id));
     if (removed.length > 0) this.fireOnPhotosChanged();
   }
 
   /** Remove all photos from the in-memory overlay without calling the API. */
   clearAllPhotos() {
-    this.placedPhotos.forEach(p => p.imgEl.remove());
+    this.placedPhotos.forEach((p) => p.imgEl.remove());
     this.placedPhotos = [];
     this.fireOnPhotosChanged();
   }
 
   private addPhotoToMap(photo: Photo) {
     // Check if photo already exists
-    const existing = this.placedPhotos.find(p => p.photo.id === photo.id);
+    const existing = this.placedPhotos.find((p) => p.photo.id === photo.id);
     if (existing) {
       console.log(`[addPhotoToMap] Photo ${photo.originalName} already exists, skipping duplicate`);
       return;
@@ -904,7 +1023,16 @@ export class PhotoOverlay {
     this.container.appendChild(img);
 
     img.style.opacity = String(this.defaultOpacity);
-    const placed: PlacedPhoto = { photo, imgEl: img, visible: true, opacity: this.defaultOpacity, borderHidden: false, viewportCulled: false, projCentroid: null, projHalfDiag: 0 };
+    const placed: PlacedPhoto = {
+      photo,
+      imgEl: img,
+      visible: true,
+      opacity: this.defaultOpacity,
+      borderHidden: false,
+      viewportCulled: false,
+      projCentroid: null,
+      projHalfDiag: 0,
+    };
     this.placedPhotos.push(placed);
 
     img.onload = () => {
@@ -913,11 +1041,17 @@ export class PhotoOverlay {
       // the currently loaded src is the full image.
       const isFullImage = img.src.endsWith(`/uploads/${photo.filename}`);
       if (isFullImage && (img.naturalWidth !== photo.width || img.naturalHeight !== photo.height)) {
-        reportUnknownRendererError('photo_dimension_mismatch', new Error(`Expected ${photo.width}×${photo.height} but got ${img.naturalWidth}×${img.naturalHeight}`), {
-          photoName: photo.originalName,
-          expected: `${photo.width}×${photo.height}`,
-          actual: `${img.naturalWidth}×${img.naturalHeight}`,
-        });
+        reportUnknownRendererError(
+          'photo_dimension_mismatch',
+          new Error(
+            `Expected ${photo.width}×${photo.height} but got ${img.naturalWidth}×${img.naturalHeight}`,
+          ),
+          {
+            photoName: photo.originalName,
+            expected: `${photo.width}×${photo.height}`,
+            actual: `${img.naturalWidth}×${img.naturalHeight}`,
+          },
+        );
       }
 
       img.style.visibility = 'visible';
@@ -934,11 +1068,11 @@ export class PhotoOverlay {
       placed.projCentroid = cp;
       const halfDiagPx = Math.sqrt((photo.width / 2) ** 2 + (photo.height / 2) ** 2);
       placed.projHalfDiag = halfDiagPx * photo.manualPlacement.projPerPx;
-      imgEl.style.display = (this.showPhotos && this.isLabelAllowed(placed)) ? 'block' : 'none';
+      imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
       applyManualTransform(imgEl, photo.manualPlacement, view, photo.width, photo.height);
       return;
     }
-    
+
     if (photo.correspondences.length < 2) return;
 
     const photoPoints: Point[] = [];
@@ -962,8 +1096,10 @@ export class PhotoOverlay {
     const cx = projPoints.reduce((s, p) => s + p.x, 0) / projPoints.length;
     const cy = projPoints.reduce((s, p) => s + p.y, 0) / projPoints.length;
     placed.projCentroid = { x: cx, y: cy };
-    placed.projHalfDiag = projPoints.reduce((m, p) =>
-      Math.max(m, Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2)), 0);
+    placed.projHalfDiag = projPoints.reduce(
+      (m, p) => Math.max(m, Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2)),
+      0,
+    );
 
     // Check if photo centroid is inside the border circle
     if (Math.sqrt(cx * cx + cy * cy) > this.borderRadiusPU) {
@@ -972,14 +1108,20 @@ export class PhotoOverlay {
       return;
     }
     placed.borderHidden = false;
-    imgEl.style.display = (this.showPhotos && this.isLabelAllowed(placed)) ? 'block' : 'none';
+    imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
 
     try {
       let matrix;
       if (photoPoints.length === 2) {
-        matrix = computeSimilarityTransform(photoPoints as [Point, Point], canvasPoints as [Point, Point]);
+        matrix = computeSimilarityTransform(
+          photoPoints as [Point, Point],
+          canvasPoints as [Point, Point],
+        );
       } else if (photoPoints.length === 3) {
-        matrix = computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point]);
+        matrix = computeAffineTransform(
+          photoPoints as [Point, Point, Point],
+          canvasPoints as [Point, Point, Point],
+        );
       } else {
         matrix = computeAffineLSQ(photoPoints, canvasPoints);
       }
@@ -999,22 +1141,28 @@ export class PhotoOverlay {
       imgEl.style.display = 'none';
       if (!this.affineErrorShown.has(photo.id)) {
         this.affineErrorShown.add(photo.id);
-        showToast({ message: t('photos.placementError', { name: photo.originalName }), type: 'error', duration: 5000 });
+        showToast({
+          message: t('photos.placementError', { name: photo.originalName }),
+          type: 'error',
+          duration: 5000,
+        });
       }
     }
   }
 
-  async showSubmissionSelectionDialog(options?: { allowUpload?: boolean }): Promise<{ action: 'upload' | 'reuse' | 'cancel'; jobId?: number }> {
+  async showSubmissionSelectionDialog(options?: {
+    allowUpload?: boolean;
+  }): Promise<{ action: 'upload' | 'reuse' | 'cancel'; jobId?: number }> {
     return new Promise((resolve) => {
       const allowUpload = options?.allowUpload ?? true;
       let currentPage = 0;
       let allSubmissions: any[] = [];
       const itemsPerPage = 20;
-      
+
       // Create modal backdrop
       const backdrop = document.createElement('div');
       backdrop.className = 'modal-backdrop';
-      
+
       // Create modal
       const modal = document.createElement('div');
       modal.className = 'registration-modal submission-selection-modal';
@@ -1051,15 +1199,18 @@ export class PhotoOverlay {
       // Content container (scrollable)
       const content = document.createElement('div');
       content.className = 'modal-scroll';
-      
+
       // Loading indicator
       const loading = document.createElement('div');
       loading.className = 'modal-loading-placeholder';
-      loading.innerHTML = '<div class="auto-solve-spinner"></div><div style="margin-top: 12px;">' + t('modal.loadingSubmissions') + '</div>';
+      loading.innerHTML =
+        '<div class="auto-solve-spinner"></div><div style="margin-top: 12px;">' +
+        t('modal.loadingSubmissions') +
+        '</div>';
       content.appendChild(loading);
-      
+
       modal.appendChild(content);
-      
+
       // Footer with pagination and buttons
       const footer = document.createElement('div');
       footer.className = 'astrometry-modal-footer';
@@ -1074,13 +1225,13 @@ export class PhotoOverlay {
 
       const pageButtons = document.createElement('div');
       pageButtons.className = 'pagination-btn-group';
-      
+
       const prevBtn = document.createElement('button');
       prevBtn.className = 'btn-secondary';
       prevBtn.textContent = t('modal.prevPage');
       prevBtn.disabled = true;
       pageButtons.appendChild(prevBtn);
-      
+
       const nextBtn = document.createElement('button');
       nextBtn.className = 'btn-secondary';
       nextBtn.textContent = t('modal.nextPage');
@@ -1092,14 +1243,14 @@ export class PhotoOverlay {
       refreshBtn.textContent = t('modal.refreshSubmissions');
       refreshBtn.title = t('modal.refreshSubmissions');
       pageButtons.appendChild(refreshBtn);
-      
+
       paginationContainer.appendChild(pageButtons);
       footer.appendChild(paginationContainer);
-      
+
       // Action buttons
       const buttonsContainer = document.createElement('div');
       buttonsContainer.className = 'modal-action-row';
-      
+
       if (allowUpload) {
         const uploadButton = document.createElement('button');
         uploadButton.className = 'btn-action';
@@ -1110,22 +1261,22 @@ export class PhotoOverlay {
         };
         buttonsContainer.appendChild(uploadButton);
       }
-      
+
       footer.appendChild(buttonsContainer);
       modal.appendChild(footer);
-      
+
       backdrop.appendChild(modal);
       document.body.appendChild(backdrop);
-      
+
       // Function to render current page
       function renderPage() {
         const totalPages = Math.ceil(allSubmissions.length / itemsPerPage);
         const start = currentPage * itemsPerPage;
         const end = start + itemsPerPage;
         const pageSubmissions = allSubmissions.slice(start, end);
-        
+
         content.innerHTML = '';
-        
+
         if (allSubmissions.length === 0) {
           const noSubmissions = document.createElement('div');
           noSubmissions.className = 'modal-loading-placeholder';
@@ -1137,11 +1288,13 @@ export class PhotoOverlay {
 
         // Show pagination
         paginationContainer.classList.remove('hidden');
-        pageInfo.textContent = t('modal.submissionPage', { current: currentPage + 1, total: totalPages }) + ' — ' + 
-                               t('modal.submissionCount', { count: allSubmissions.length });
+        pageInfo.textContent =
+          t('modal.submissionPage', { current: currentPage + 1, total: totalPages }) +
+          ' — ' +
+          t('modal.submissionCount', { count: allSubmissions.length });
         prevBtn.disabled = currentPage === 0;
         nextBtn.disabled = currentPage >= totalPages - 1;
-        
+
         // Render submissions
         const list = document.createElement('div');
         list.className = 'submission-list';
@@ -1162,9 +1315,10 @@ export class PhotoOverlay {
 
           const itemSubtitle = document.createElement('div');
           itemSubtitle.className = 'submission-item-subtitle';
-          const dimsText = (typeof sub.width === 'number' && typeof sub.height === 'number')
-            ? ` - ${sub.width}x${sub.height}px`
-            : '';
+          const dimsText =
+            typeof sub.width === 'number' && typeof sub.height === 'number'
+              ? ` - ${sub.width}x${sub.height}px`
+              : '';
           itemSubtitle.textContent = `Job #${sub.jobId}${dimsText}`;
           itemInfo.appendChild(itemSubtitle);
 
@@ -1187,10 +1341,10 @@ export class PhotoOverlay {
           };
           list.appendChild(item);
         }
-        
+
         content.appendChild(list);
       }
-      
+
       // Pagination button handlers
       prevBtn.onclick = () => {
         if (currentPage > 0) {
@@ -1198,7 +1352,7 @@ export class PhotoOverlay {
           renderPage();
         }
       };
-      
+
       prevBtn.onmouseenter = () => {
         if (!prevBtn.disabled) {
           prevBtn.style.background = 'rgba(80, 120, 200, 0.5)';
@@ -1207,7 +1361,7 @@ export class PhotoOverlay {
       prevBtn.onmouseleave = () => {
         prevBtn.style.background = 'rgba(60, 100, 180, 0.3)';
       };
-      
+
       nextBtn.onclick = () => {
         const totalPages = Math.ceil(allSubmissions.length / itemsPerPage);
         if (currentPage < totalPages - 1) {
@@ -1215,7 +1369,7 @@ export class PhotoOverlay {
           renderPage();
         }
       };
-      
+
       nextBtn.onmouseenter = () => {
         if (!nextBtn.disabled) {
           nextBtn.style.background = 'rgba(80, 120, 200, 0.5)';
@@ -1224,29 +1378,29 @@ export class PhotoOverlay {
       nextBtn.onmouseleave = () => {
         nextBtn.style.background = 'rgba(60, 100, 180, 0.3)';
       };
-      
+
       function fetchAndRenderSubmissions(forceRefresh = false) {
         refreshBtn.disabled = true;
         refreshBtn.textContent = forceRefresh ? '…' : t('modal.refreshSubmissions');
         return loadAstrometrySubmissionsWithCache(forceRefresh)
-        .then(submissions => {
-          allSubmissions = submissions;
-          currentPage = 0;
-          renderPage();
-        })
-        .catch(err => {
-          reportUnknownRendererError('astrometry_list_submissions', err);
-          content.innerHTML = '';
-          
-          const error = document.createElement('div');
-          error.className = 'modal-loading-error';
-          error.innerHTML = `<div style="font-size: 24px; margin-bottom: 8px;">⚠</div><div>${err.message || 'Failed to load submissions'}</div>`;
-          content.appendChild(error);
-        })
-        .finally(() => {
-          refreshBtn.disabled = false;
-          refreshBtn.textContent = t('modal.refreshSubmissions');
-        });
+          .then((submissions) => {
+            allSubmissions = submissions;
+            currentPage = 0;
+            renderPage();
+          })
+          .catch((err) => {
+            reportUnknownRendererError('astrometry_list_submissions', err);
+            content.innerHTML = '';
+
+            const error = document.createElement('div');
+            error.className = 'modal-loading-error';
+            error.innerHTML = `<div style="font-size: 24px; margin-bottom: 8px;">⚠</div><div>${err.message || 'Failed to load submissions'}</div>`;
+            content.appendChild(error);
+          })
+          .finally(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = t('modal.refreshSubmissions');
+          });
       }
 
       refreshBtn.onclick = () => {
@@ -1275,7 +1429,17 @@ export class PhotoOverlay {
    */
   openManualIdentifyModal(
     file: File,
-    opts?: { initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string } },
+    opts?: {
+      initialMeta?: {
+        originalName?: string;
+        dsoIds: string[];
+        labels: string[];
+        pointsOfInterest?: PointOfInterest[];
+        integrations?: PhotoIntegration[];
+        observationDate?: string | null;
+        notes: string;
+      };
+    },
   ): Promise<ManualIdentifyResult> {
     return new Promise<ManualIdentifyResult>((resolve) => {
       const skyMap = this.skyMap;
@@ -1361,7 +1525,12 @@ export class PhotoOverlay {
       manualBtn.addEventListener('click', () => {
         const initialMeta = opts?.initialMeta ?? {
           originalName: stripExtension(file.name),
-          dsoIds: [], labels: [], pointsOfInterest: [], integrations: [], observationDate: null, notes: '',
+          dsoIds: [],
+          labels: [],
+          pointsOfInterest: [],
+          integrations: [],
+          observationDate: null,
+          notes: '',
         };
         // Hand off to the free-drag placement flow (it self-saves & places the photo).
         finish({ action: 'manual-placement' });
@@ -1558,8 +1727,8 @@ export class PhotoOverlay {
             return;
           }
 
-          const starsWithDistance = nearbyStars.map(star => {
-            const dRa = (star.ra - hintCoords!.ra) * Math.cos(star.dec * Math.PI / 180);
+          const starsWithDistance = nearbyStars.map((star) => {
+            const dRa = (star.ra - hintCoords!.ra) * Math.cos((star.dec * Math.PI) / 180);
             const dDec = star.dec - hintCoords!.dec;
             const distance = Math.sqrt(dRa * dRa + dDec * dDec);
             return { star, distance };
@@ -1568,7 +1737,11 @@ export class PhotoOverlay {
 
           const listHeader = document.createElement('div');
           listHeader.className = 'suggest-list-header';
-          listHeader.textContent = t('lightSolve.foundNearby', { count: nearbyStars.length, target: hintTargetName, radius: searchRadius.toFixed(1) });
+          listHeader.textContent = t('lightSolve.foundNearby', {
+            count: nearbyStars.length,
+            target: hintTargetName,
+            radius: searchRadius.toFixed(1),
+          });
           suggestList.appendChild(listHeader);
 
           starsWithDistance.slice(0, 10).forEach(({ star, distance }) => {
@@ -1581,10 +1754,13 @@ export class PhotoOverlay {
               </div>
             `;
             starItem.addEventListener('click', () => {
-              const activeIdx = points.findIndex(p => p === null);
+              const activeIdx = points.findIndex((p) => p === null);
               if (activeIdx === -1) return;
               showToast({
-                message: t('lightSolve.lookForStar', { name: star.name || `HIP ${star.hip}`, mag: star.mag.toFixed(1) }),
+                message: t('lightSolve.lookForStar', {
+                  name: star.name || `HIP ${star.hip}`,
+                  mag: star.mag.toFixed(1),
+                }),
                 type: 'info',
                 duration: 5000,
               });
@@ -1597,7 +1773,11 @@ export class PhotoOverlay {
           reportUnknownRendererError('suggest_stars_error', err);
           suggestBtn.textContent = t('lightSolve.suggestButton');
           suggestBtn.disabled = false;
-          showToast({ message: err.message || t('lightSolve.searchFailed'), type: 'error', duration: 3000 });
+          showToast({
+            message: err.message || t('lightSolve.searchFailed'),
+            type: 'error',
+            duration: 3000,
+          });
         }
       });
 
@@ -1704,19 +1884,25 @@ export class PhotoOverlay {
         raHours.type = 'number';
         raHours.placeholder = t('modal.raHours');
         raHours.className = 'radec-input-small';
-        raHours.min = '0'; raHours.max = '23'; raHours.step = '1';
+        raHours.min = '0';
+        raHours.max = '23';
+        raHours.step = '1';
 
         const raMinutes = document.createElement('input');
         raMinutes.type = 'number';
         raMinutes.placeholder = t('modal.raMinutes');
         raMinutes.className = 'radec-input-small';
-        raMinutes.min = '0'; raMinutes.max = '59'; raMinutes.step = '1';
+        raMinutes.min = '0';
+        raMinutes.max = '59';
+        raMinutes.step = '1';
 
         const raSeconds = document.createElement('input');
         raSeconds.type = 'number';
         raSeconds.placeholder = t('modal.raSeconds');
         raSeconds.className = 'radec-input-small';
-        raSeconds.min = '0'; raSeconds.max = '59'; raSeconds.step = '0.01';
+        raSeconds.min = '0';
+        raSeconds.max = '59';
+        raSeconds.step = '0.01';
 
         raInputs.appendChild(raHours);
         raInputs.appendChild(raMinutes);
@@ -1742,19 +1928,25 @@ export class PhotoOverlay {
         decDegrees.type = 'number';
         decDegrees.placeholder = t('modal.decDegrees');
         decDegrees.className = 'radec-input-small';
-        decDegrees.min = '-89'; decDegrees.max = '89'; decDegrees.step = '1';
+        decDegrees.min = '-89';
+        decDegrees.max = '89';
+        decDegrees.step = '1';
 
         const decMinutes = document.createElement('input');
         decMinutes.type = 'number';
         decMinutes.placeholder = t('modal.decMinutes');
         decMinutes.className = 'radec-input-small';
-        decMinutes.min = '0'; decMinutes.max = '59'; decMinutes.step = '1';
+        decMinutes.min = '0';
+        decMinutes.max = '59';
+        decMinutes.step = '1';
 
         const decSeconds = document.createElement('input');
         decSeconds.type = 'number';
         decSeconds.placeholder = t('modal.decSeconds');
         decSeconds.className = 'radec-input-small';
-        decSeconds.min = '0'; decSeconds.max = '59'; decSeconds.step = '0.01';
+        decSeconds.min = '0';
+        decSeconds.max = '59';
+        decSeconds.step = '0.01';
 
         decInputs.appendChild(decDegrees);
         decInputs.appendChild(decMinutes);
@@ -1873,10 +2065,16 @@ export class PhotoOverlay {
               `;
               item.addEventListener('click', () => {
                 const star: Star = {
-                  hip: result.hip, ra: result.ra, dec: result.dec,
-                  mag: result.mag, bv: result.bv,
-                  name: result.name, bayer: result.bayer, flam: result.flam,
-                  constellation: result.constellation, desig: result.desig,
+                  hip: result.hip,
+                  ra: result.ra,
+                  dec: result.dec,
+                  mag: result.mag,
+                  bv: result.bv,
+                  name: result.name,
+                  bayer: result.bayer,
+                  flam: result.flam,
+                  constellation: result.constellation,
+                  desig: result.desig,
                 };
                 const displayName = result.label.split(' – ')[0].trim();
                 selectStar(i, star, displayName);
@@ -1888,7 +2086,9 @@ export class PhotoOverlay {
         });
 
         searchInput.addEventListener('blur', () => {
-          setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+          setTimeout(() => {
+            dropdown.style.display = 'none';
+          }, 200);
         });
 
         searchInput.addEventListener('focus', () => {
@@ -1912,7 +2112,7 @@ export class PhotoOverlay {
       formSide.appendChild(cancelBtn);
 
       submitBtn.addEventListener('click', () => {
-        const correspondences = points.filter(p => isPointComplete(p)) as PhotoCorrespondence[];
+        const correspondences = points.filter((p) => isPointComplete(p)) as PhotoCorrespondence[];
         if (correspondences.length < 2) return;
         finish({ action: 'validate', correspondences });
       });
@@ -1944,8 +2144,10 @@ export class PhotoOverlay {
           if (!marker || !points[idx]) return;
           const imgRect = photoImg.getBoundingClientRect();
           const cR = photoContainer.getBoundingClientRect();
-          const displayX = (imgRect.left - cR.left) + (points[idx]!.photoX / naturalWidth) * imgRect.width;
-          const displayY = (imgRect.top - cR.top) + (points[idx]!.photoY / naturalHeight) * imgRect.height;
+          const displayX =
+            imgRect.left - cR.left + (points[idx]!.photoX / naturalWidth) * imgRect.width;
+          const displayY =
+            imgRect.top - cR.top + (points[idx]!.photoY / naturalHeight) * imgRect.height;
           marker.style.left = `${displayX}px`;
           marker.style.top = `${displayY}px`;
         });
@@ -1954,7 +2156,10 @@ export class PhotoOverlay {
       const updateCursor = () => {
         photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grab' : 'crosshair';
       };
-      zoom.onTransformChange(() => { updateCursor(); updateMarkerPositions(); });
+      zoom.onTransformChange(() => {
+        updateCursor();
+        updateMarkerPositions();
+      });
       photoContainer.addEventListener('pointerdown', () => {
         photoContainer.style.cursor = zoom!.getState().scale > 1 ? 'grabbing' : 'crosshair';
       });
@@ -2083,14 +2288,25 @@ export class PhotoOverlay {
       }
 
       function checkComplete() {
-        const completeCount = points.filter(p => isPointComplete(p)).length;
+        const completeCount = points.filter((p) => isPointComplete(p)).length;
         submitBtn.disabled = completeCount < 2;
       }
     });
   }
 
   /** Open manual placement mode: semi-transparent photo draggable on the map */
-  openManualPlacement(file: File, initialMeta?: { originalName?: string; dsoIds: string[]; labels: string[]; pointsOfInterest?: PointOfInterest[]; integrations?: PhotoIntegration[]; observationDate?: string | null; notes: string }) {
+  openManualPlacement(
+    file: File,
+    initialMeta?: {
+      originalName?: string;
+      dsoIds: string[];
+      labels: string[];
+      pointsOfInterest?: PointOfInterest[];
+      integrations?: PhotoIntegration[];
+      observationDate?: string | null;
+      notes: string;
+    },
+  ) {
     const view = this.getView();
 
     // Create preview img element
@@ -2128,7 +2344,7 @@ export class PhotoOverlay {
     const centerSky = unproject(centerProj.x, centerProj.y);
     placement.centerRa = centerSky.ra;
     placement.centerDec = centerSky.dec;
-    placement.projPerPx = 1 / initView.scale * 0.5;
+    placement.projPerPx = (1 / initView.scale) * 0.5;
 
     // Toolbar
     const toolbar = document.createElement('div');
@@ -2208,13 +2424,17 @@ export class PhotoOverlay {
     });
 
     // Scroll on image → zoom
-    imgEl.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      placement.projPerPx *= factor;
-      redraw(this.getView());
-    }, { passive: false });
+    imgEl.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        placement.projPerPx *= factor;
+        redraw(this.getView());
+      },
+      { passive: false },
+    );
 
     // Rotation slider
     rotationRange.addEventListener('input', () => {
@@ -2225,14 +2445,18 @@ export class PhotoOverlay {
 
     // Zoom slider (log scale)
     zoomRange.addEventListener('input', () => {
-      const baseScale = 1 / this.getView().scale * 0.5;
+      const baseScale = (1 / this.getView().scale) * 0.5;
       placement.projPerPx = baseScale * Math.pow(2, parseFloat(zoomRange.value));
       redraw(this.getView());
     });
 
     // Mirror buttons
-    const mirrorBtnX = toolbar.querySelector('.manual-mirror-btn[data-axis="x"]') as HTMLButtonElement;
-    const mirrorBtnY = toolbar.querySelector('.manual-mirror-btn[data-axis="y"]') as HTMLButtonElement;
+    const mirrorBtnX = toolbar.querySelector(
+      '.manual-mirror-btn[data-axis="x"]',
+    ) as HTMLButtonElement;
+    const mirrorBtnY = toolbar.querySelector(
+      '.manual-mirror-btn[data-axis="y"]',
+    ) as HTMLButtonElement;
 
     mirrorBtnX.addEventListener('click', () => {
       placement.mirrorX = !placement.mirrorX;
@@ -2264,41 +2488,67 @@ export class PhotoOverlay {
       try {
         console.log('[Manual Validation] Placement:', placement);
         console.log('[Manual Validation] Photo dimensions:', naturalWidth, 'x', naturalHeight);
-        
-        const correspondences = buildSyntheticCorrespondences(placement, naturalWidth, naturalHeight, this.getView());
+
+        const correspondences = buildSyntheticCorrespondences(
+          placement,
+          naturalWidth,
+          naturalHeight,
+          this.getView(),
+        );
         if (!correspondences) {
           showToast({ message: t('manual.noStarsFound'), type: 'error', duration: 5000 });
           validateBtn.disabled = false;
           validateBtn.textContent = t('manual.validate');
           return;
         }
-        
+
         console.log('[Manual Validation] Generated correspondences:', correspondences);
-        
+
         // Compute DSOs from placement geometry if not already provided
         let metaToUpload = initialMeta;
         if (!metaToUpload) {
-          metaToUpload = { dsoIds: [], labels: [], pointsOfInterest: [], integrations: [], observationDate: null, notes: '' };
+          metaToUpload = {
+            dsoIds: [],
+            labels: [],
+            pointsOfInterest: [],
+            integrations: [],
+            observationDate: null,
+            notes: '',
+          };
         }
         if (metaToUpload.dsoIds.length === 0) {
           const centerProj2 = project(placement.centerRa, placement.centerDec);
-          const rotRad2 = placement.rotationDeg * Math.PI / 180;
-          const mx2 = placement.mirrorX ? -1 : 1; const my2 = placement.mirrorY ? -1 : 1;
-          const cx2 = naturalWidth / 2; const cy2 = naturalHeight / 2;
+          const rotRad2 = (placement.rotationDeg * Math.PI) / 180;
+          const mx2 = placement.mirrorX ? -1 : 1;
+          const my2 = placement.mirrorY ? -1 : 1;
+          const cx2 = naturalWidth / 2;
+          const cy2 = naturalHeight / 2;
           const cosR2 = Math.cos(rotRad2) * placement.projPerPx;
           const sinR2 = Math.sin(rotRad2) * placement.projPerPx;
-          const a2 = cosR2 * mx2; const b2 = sinR2 * mx2;
-          const c2 = -sinR2 * my2; const d2 = cosR2 * my2;
-          const aff = { a: a2, b: b2, c: c2, d: d2, e: centerProj2.x - a2 * cx2 - c2 * cy2, f: centerProj2.y - b2 * cx2 - d2 * cy2 };
-          metaToUpload = { ...metaToUpload, dsoIds: findDSOsInImage(aff, naturalWidth, naturalHeight).map(d => d.id) };
+          const a2 = cosR2 * mx2;
+          const b2 = sinR2 * mx2;
+          const c2 = -sinR2 * my2;
+          const d2 = cosR2 * my2;
+          const aff = {
+            a: a2,
+            b: b2,
+            c: c2,
+            d: d2,
+            e: centerProj2.x - a2 * cx2 - c2 * cy2,
+            f: centerProj2.y - b2 * cx2 - d2 * cy2,
+          };
+          metaToUpload = {
+            ...metaToUpload,
+            dsoIds: findDSOsInImage(aff, naturalWidth, naturalHeight).map((d) => d.id),
+          };
         }
-        
+
         // Compute the manual CSS matrix for comparison
         const view = this.getView();
         const centerProj = project(placement.centerRa, placement.centerDec);
         const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
         const pxPerPx = placement.projPerPx * view.scale;
-        const rotRad = placement.rotationDeg * Math.PI / 180;
+        const rotRad = (placement.rotationDeg * Math.PI) / 180;
         const mx = placement.mirrorX ? -1 : 1;
         const my = placement.mirrorY ? -1 : 1;
         const cx = naturalWidth / 2;
@@ -2310,18 +2560,26 @@ export class PhotoOverlay {
           b: sinR * mx,
           c: -sinR * my,
           d: cosR * my,
-          e: centerCanvas.x - (cosR * mx) * cx - (-sinR * my) * cy,
-          f: centerCanvas.y - (sinR * mx) * cx - (cosR * my) * cy,
+          e: centerCanvas.x - cosR * mx * cx - -sinR * my * cy,
+          f: centerCanvas.y - sinR * mx * cx - cosR * my * cy,
         };
         console.log('[Manual Validation] Manual CSS matrix:', manualMatrix, 'at view:', view);
         (window as any).__manualMatrix = manualMatrix; // Store for comparison
-        
-        const photo = await uploadPhoto(file, correspondences, placement, undefined, { ...metaToUpload, observationDate: metaToUpload.observationDate ?? null, displayName: initialMeta?.originalName || stripExtension(file.name) });
+
+        const photo = await uploadPhoto(file, correspondences, placement, undefined, {
+          ...metaToUpload,
+          observationDate: metaToUpload.observationDate ?? null,
+          displayName: initialMeta?.originalName || stripExtension(file.name),
+        });
         cleanup();
         this.addPhotoToMap(photo);
         this.fireOnPhotosChanged();
       } catch (err: any) {
-        showToast({ message: t('modal.uploadError', { message: err.message }), type: 'error', duration: 5000 });
+        showToast({
+          message: t('modal.uploadError', { message: err.message }),
+          type: 'error',
+          duration: 5000,
+        });
         validateBtn.disabled = false;
         validateBtn.textContent = t('manual.validate');
       }
@@ -2333,7 +2591,7 @@ export class PhotoOverlay {
     photo: Photo,
     view: ViewState,
     naturalWidth: number,
-    naturalHeight: number
+    naturalHeight: number,
   ): ManualPlacement {
     // Default fallback
     const defaultPlacement: ManualPlacement = {
@@ -2369,7 +2627,7 @@ export class PhotoOverlay {
       // Compute affine transform: photo pixels → projection space
       const matrix = computeAffineTransform(
         photoPoints as [Point, Point, Point],
-        projPoints as [Point, Point, Point]
+        projPoints as [Point, Point, Point],
       );
 
       // Transform photo center to projection space
@@ -2406,11 +2664,13 @@ export class PhotoOverlay {
   }
 
   /** Extract matrix coefficients from CSS transform string */
-  private extractMatrixFromTransform(transform: string): { a: number; b: number; c: number; d: number; e: number; f: number } | null {
+  private extractMatrixFromTransform(
+    transform: string,
+  ): { a: number; b: number; c: number; d: number; e: number; f: number } | null {
     if (!transform || transform === 'none') return null;
     const match = transform.match(/matrix\(([^)]+)\)/);
     if (!match) return null;
-    const values = match[1].split(',').map(v => parseFloat(v.trim()));
+    const values = match[1].split(',').map((v) => parseFloat(v.trim()));
     if (values.length !== 6) return null;
     return { a: values[0], b: values[1], c: values[2], d: values[3], e: values[4], f: values[5] };
   }
@@ -2420,7 +2680,7 @@ export class PhotoOverlay {
     matrix: { a: number; b: number; c: number; d: number; e: number; f: number },
     view: ViewState,
     photoWidth: number,
-    photoHeight: number
+    photoHeight: number,
   ): ManualPlacement {
     // The matrix maps photo pixel (px, py) to canvas pixel (cx, cy):
     // cx = a*px + c*py + e
@@ -2469,7 +2729,7 @@ export class PhotoOverlay {
 
   /** Open repositioning mode for an existing photo */
   startRepositioning(photoId: string) {
-    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed) return;
 
     const photo = placed.photo;
@@ -2479,7 +2739,7 @@ export class PhotoOverlay {
     // Hide the original photo during repositioning
     imgEl.style.display = 'none';
 
-    // Create a preview element  
+    // Create a preview element
     const previewEl = document.createElement('img');
     previewEl.className = 'photo-overlay-img manual-placement-img';
     previewEl.style.opacity = '0.5';
@@ -2493,12 +2753,12 @@ export class PhotoOverlay {
 
     // Initialize placement from photo's current state
     let placement: ManualPlacement;
-    
+
     if (photo.manualPlacement) {
       // Use existing manual placement
       placement = { ...photo.manualPlacement };
     } else {
-     // Extract placement from the current CSS transform matrix
+      // Extract placement from the current CSS transform matrix
       // This ensures the repositioned photo starts exactly where it currently is
       const matrix = this.extractMatrixFromTransform(imgEl.style.transform);
       if (matrix) {
@@ -2507,7 +2767,12 @@ export class PhotoOverlay {
         placement.rotationDeg = Math.round(placement.rotationDeg);
       } else {
         // Fallback: derive from correspondences (shouldn't normally happen)
-        placement = this.derivePlacementFromCorrespondences(photo, view, naturalWidth, naturalHeight);
+        placement = this.derivePlacementFromCorrespondences(
+          photo,
+          view,
+          naturalWidth,
+          naturalHeight,
+        );
         placement.rotationDeg = Math.round(placement.rotationDeg);
       }
     }
@@ -2592,13 +2857,17 @@ export class PhotoOverlay {
     });
 
     // Scroll on image → zoom
-    previewEl.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      placement.projPerPx *= factor;
-      redraw(this.getView());
-    }, { passive: false });
+    previewEl.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        placement.projPerPx *= factor;
+        redraw(this.getView());
+      },
+      { passive: false },
+    );
 
     // Rotation slider
     rotationRange.addEventListener('input', () => {
@@ -2608,18 +2877,22 @@ export class PhotoOverlay {
     });
 
     // Zoom slider (log scale)
-    const baseScale = placement.projPerPx / (1 / view.scale * 0.5);
+    const baseScale = placement.projPerPx / ((1 / view.scale) * 0.5);
     const initialZoomValue = Math.log2(baseScale);
     zoomRange.value = String(initialZoomValue);
     zoomRange.addEventListener('input', () => {
-      const baseScale = 1 / this.getView().scale * 0.5;
+      const baseScale = (1 / this.getView().scale) * 0.5;
       placement.projPerPx = baseScale * Math.pow(2, parseFloat(zoomRange.value));
       redraw(this.getView());
     });
 
     // Mirror buttons
-    const mirrorBtnX = toolbar.querySelector('.manual-mirror-btn[data-axis="x"]') as HTMLButtonElement;
-    const mirrorBtnY = toolbar.querySelector('.manual-mirror-btn[data-axis="y"]') as HTMLButtonElement;
+    const mirrorBtnX = toolbar.querySelector(
+      '.manual-mirror-btn[data-axis="x"]',
+    ) as HTMLButtonElement;
+    const mirrorBtnY = toolbar.querySelector(
+      '.manual-mirror-btn[data-axis="y"]',
+    ) as HTMLButtonElement;
 
     mirrorBtnX.addEventListener('click', () => {
       placement.mirrorX = !placement.mirrorX;
@@ -2650,17 +2923,21 @@ export class PhotoOverlay {
 
       try {
         await updatePhotoManualPlacement(photoId, placement);
-        
+
         // Update local photo object
         photo.manualPlacement = placement;
-        
+
         // Clean up preview
         cleanup();
-        
+
         // Reapply transform with new placement
         this.applyTransform(placed, this.getView());
-        
-        showToast({ message: t('photos.repositioned', { name: photo.originalName }), type: 'info', duration: 3000 });
+
+        showToast({
+          message: t('photos.repositioned', { name: photo.originalName }),
+          type: 'info',
+          duration: 3000,
+        });
       } catch (err: any) {
         showToast({ message: t('errors.updatePhoto'), type: 'error', duration: 5000 });
         validateBtn.disabled = false;
@@ -2690,7 +2967,7 @@ function computeManualMatrix(
   const my = placement.mirrorY ? -1 : 1;
 
   // Rotation angle (convert PA to canvas angle)
-  const rotRad = placement.rotationDeg * Math.PI / 180;
+  const rotRad = (placement.rotationDeg * Math.PI) / 180;
 
   // CSS matrix to map photo pixel (0,0) to canvas
   // The photo pixel (cx, cy) maps to center
@@ -2740,7 +3017,7 @@ function buildSyntheticCorrespondences(
   const centerProj = project(placement.centerRa, placement.centerDec);
   const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
   const pxPerPx = placement.projPerPx * view.scale;
-  const rotRad = placement.rotationDeg * Math.PI / 180;
+  const rotRad = (placement.rotationDeg * Math.PI) / 180;
   const mx = placement.mirrorX ? -1 : 1;
   const my = placement.mirrorY ? -1 : 1;
   const cx = natW / 2;
@@ -2759,21 +3036,25 @@ function buildSyntheticCorrespondences(
 
   for (let idx = 0; idx < photoPoints.length; idx++) {
     const [px, py] = photoPoints[idx];
-    
+
     // Apply the CSS matrix to get canvas coordinates (same as applyManualTransform)
     const canvasX = a * px + c * py + e;
     const canvasY = b * px + d * py + f;
-    
+
     // Convert canvas → projection → celestial
     const proj = fromCanvas(canvasX, canvasY, view);
     const sky = unproject(proj.x, proj.y);
 
-    console.log(`[buildSyntheticCorrespondences] Sample ${idx}: photo(${px.toFixed(1)}, ${py.toFixed(1)}) → canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → proj(${proj.x.toFixed(4)}, ${proj.y.toFixed(4)}) → sky(${sky.ra.toFixed(3)}, ${sky.dec.toFixed(3)})`);
-    
+    console.log(
+      `[buildSyntheticCorrespondences] Sample ${idx}: photo(${px.toFixed(1)}, ${py.toFixed(1)}) → canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → proj(${proj.x.toFixed(4)}, ${proj.y.toFixed(4)}) → sky(${sky.ra.toFixed(3)}, ${sky.dec.toFixed(3)})`,
+    );
+
     // Verify round-trip: celestial back to canvas should give same result
     const verifyProj = project(sky.ra, sky.dec);
     const verifyCanvas = toCanvas(verifyProj.x, verifyProj.y, view);
-    console.log(`[buildSyntheticCorrespondences] Round-trip check: canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → celestial → canvas(${verifyCanvas.x.toFixed(1)}, ${verifyCanvas.y.toFixed(1)}) - diff: (${(verifyCanvas.x - canvasX).toFixed(3)}, ${(verifyCanvas.y - canvasY).toFixed(3)})`);
+    console.log(
+      `[buildSyntheticCorrespondences] Round-trip check: canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → celestial → canvas(${verifyCanvas.x.toFixed(1)}, ${verifyCanvas.y.toFixed(1)}) - diff: (${(verifyCanvas.x - canvasX).toFixed(3)}, ${(verifyCanvas.y - canvasY).toFixed(3)})`,
+    );
 
     // Use exact celestial coordinates to preserve the manual transform
     correspondences.push({

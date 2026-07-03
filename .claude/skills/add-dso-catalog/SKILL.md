@@ -68,21 +68,22 @@ If you skip the second step, the objects still exist in the map, but the target 
 
 Before writing any code, pin down:
 
-| Question | LBN | LDN | vdB | Barnard |
-|---|---|---|---|---|
-| Prefix (catalog key) | `LBN` | `LDN` | `vdB` | `Barnard` |
-| Full name | Lynds Bright Nebulae | Lynds Dark Nebulae | van den Bergh | Barnard Dark Objects |
-| DSO type code | `EN`/`RN` | `DN` | `RN` | `DN` |
-| Source (VizieR FTP) | `VII/9/catalog.dat` | `VII/7A/ldn` | `VII/21/catalog.dat` | `VII/220A/barnard.dat` |
-| Epoch / coord system | B1950 RA/Dec | B1950 RA/Dec | Galactic l,b | **J2000 RA/Dec (provided directly)** |
-| On by default? | No | No | No | No |
-| Cross-refs in OpenNGC `Identifiers`? | Yes (`LBN NNN`) | No | No | **No — none at all** |
+| Question                             | LBN                  | LDN                | vdB                  | Barnard                              |
+| ------------------------------------ | -------------------- | ------------------ | -------------------- | ------------------------------------ |
+| Prefix (catalog key)                 | `LBN`                | `LDN`              | `vdB`                | `Barnard`                            |
+| Full name                            | Lynds Bright Nebulae | Lynds Dark Nebulae | van den Bergh        | Barnard Dark Objects                 |
+| DSO type code                        | `EN`/`RN`            | `DN`               | `RN`                 | `DN`                                 |
+| Source (VizieR FTP)                  | `VII/9/catalog.dat`  | `VII/7A/ldn`       | `VII/21/catalog.dat` | `VII/220A/barnard.dat`               |
+| Epoch / coord system                 | B1950 RA/Dec         | B1950 RA/Dec       | Galactic l,b         | **J2000 RA/Dec (provided directly)** |
+| On by default?                       | No                   | No                 | No                   | No                                   |
+| Cross-refs in OpenNGC `Identifiers`? | Yes (`LBN NNN`)      | No                 | No                   | **No — none at all**                 |
 
 The **prefix can be spelled out** (e.g. `Barnard`, not `B`) — confirm the user's preference, since it sets the on-map label and every id. Avoid single-letter prefixes: they collide inside other ids (a literal `B` is a substring of `LBN`) and break the label formatter (see Step 6b).
 
 Use VizieR (https://vizier.cds.unistra.fr) to find the catalog's FTP path and column layout.
 
-> **VizieR access (verified 2026):** The VizieR *website / ReadMe pages / directory listings over HTTPS* are behind the **Anubis** JS-challenge — `WebFetch` and a browser get an "Access Denied" page. **But two paths still work:**
+> **VizieR access (verified 2026):** The VizieR _website / ReadMe pages / directory listings over HTTPS_ are behind the **Anubis** JS-challenge — `WebFetch` and a browser get an "Access Denied" page. **But two paths still work:**
+>
 > 1. **The build script's plain `fetch()` to the HTTPS `/ftp/` data file path works fine** — `fetchLBN`/`fetchLDN`/`fetchVdB`/`fetchBarnard` all use `https://cdsarc.cds.unistra.fr/ftp/VII/.../file.dat` and download successfully when `node scripts/generate-dso.mjs` runs. So keep using the HTTPS `/ftp/` URL in `fetchXXX()`.
 > 2. **To read the ReadMe / list a directory during research, use the real FTP protocol via `curl`** (Anubis only guards HTTP):
 >    ```bash
@@ -102,7 +103,7 @@ Add after the existing `fetchLDN` function:
 
 ```js
 async function fetchXXX() {
-  const url = 'https://cdsarc.cds.unistra.fr/ftp/...';   // VizieR FTP path
+  const url = 'https://cdsarc.cds.unistra.fr/ftp/...'; // VizieR FTP path
   console.log('Downloading XXX catalog...');
   const res = await fetch(url);
   if (!res.ok) throw new Error(`XXX HTTP ${res.status}`);
@@ -122,17 +123,17 @@ function parseXXX(text) {
   for (const line of text.split('\n')) {
     if (!line.trim() || line.startsWith('#')) continue;
     // Example fixed-width parse (adjust columns to ReadMe file):
-    const id   = parseInt(line.substring(0, 4).trim());
-    const rah  = parseFloat(line.substring(5, 7).trim());
-    const ram  = parseFloat(line.substring(8, 12).trim());
+    const id = parseInt(line.substring(0, 4).trim());
+    const rah = parseFloat(line.substring(5, 7).trim());
+    const ram = parseFloat(line.substring(8, 12).trim());
     const decd = parseFloat(line.substring(13, 15).trim());
     const decm = parseFloat(line.substring(16, 18).trim());
     const diam = parseFloat(line.substring(20, 25).trim()) || null;
 
     if (isNaN(id)) continue;
 
-    const ra50  = (rah + ram / 60) * 15;          // h,m → degrees
-    const dec50 = decd + decm / 60;               // +/- handle separately
+    const ra50 = (rah + ram / 60) * 15; // h,m → degrees
+    const dec50 = decd + decm / 60; // +/- handle separately
     entries.push({ id, ra50, dec50, diam });
   }
   return entries;
@@ -140,7 +141,8 @@ function parseXXX(text) {
 ```
 
 **Coordinate conversion** — read the ReadMe's epoch carefully, then pick one:
-- **J2000 RA/Dec already in the file**: no conversion. **Check for this first** — many "old-epoch" VizieR catalogs include a precomputed J2000 column alongside the historical one. Barnard (`VII/220A`) lists *both* B1875 and J2000 (bytes 23–44); read the J2000 columns and ignore B1875 entirely. Don't precess what's already precessed.
+
+- **J2000 RA/Dec already in the file**: no conversion. **Check for this first** — many "old-epoch" VizieR catalogs include a precomputed J2000 column alongside the historical one. Barnard (`VII/220A`) lists _both_ B1875 and J2000 (bytes 23–44); read the J2000 columns and ignore B1875 entirely. Don't precess what's already precessed.
 - **B1950 RA/Dec** (e.g. LBN, LDN): use `precess1950to2000(ra50, dec50)` → `{ ra, dec }` J2000 degrees.
 - **Galactic (l, b)** (e.g. vdB, `VII/21`): use `galacticToEquatorial(l_deg, b_deg)` → `{ ra, dec }` J2000 degrees.
 
@@ -176,37 +178,44 @@ curl -s "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_f
 grep -o "XXX *[0-9]*" /tmp/ngc.csv | sort -u | head     # does the token appear at all?
 ```
 
-LBN and vdB *are* listed in OpenNGC Identifiers. **Barnard is not — there are zero Barnard/`B NNN` tokens in the entire file**, so the Identifiers approach merges nothing for it. Knowing this up front saves you from shipping dead regex code.
+LBN and vdB _are_ listed in OpenNGC Identifiers. **Barnard is not — there are zero Barnard/`B NNN` tokens in the entire file**, so the Identifiers approach merges nothing for it. Knowing this up front saves you from shipping dead regex code.
 
 **Mechanism A — OpenNGC Identifiers extraction** (use only if the grep above finds the token). Inside the OpenNGC loop, mirror the LBN/vdB blocks:
 
 ```js
 const xxxMatches = [...identifiers.matchAll(/XXX\s+(\d+)/g)];
-const xxxIds = xxxMatches.map(m => `XXX${parseInt(m[1])}`);
+const xxxIds = xxxMatches.map((m) => `XXX${parseInt(m[1])}`);
 for (const m of xxxMatches) assignedXxxIds.add(parseInt(m[1]));
 // ... then append to the catalogs array: catalogs.push(...xxxIds);
 ```
+
 Track assigned IDs with a `Set` declared before the loop: `const assignedXxxIds = new Set();`
 
 **Mechanism B — curated alias map** (use when OpenNGC doesn't carry the catalog, like Barnard). Define a small hand-verified map and apply it after the OpenNGC loop, appending the new id onto the existing object's `catalogs[]` (field index 12) and marking it assigned so the standalone step skips it:
 
 ```js
-const XXX_ALIASES = { XXX33: 'IC434', XXX168: 'IC5146' };   // verified pairs only
+const XXX_ALIASES = { XXX33: 'IC434', XXX168: 'IC5146' }; // verified pairs only
 // ...after data[] is built from OpenNGC:
-const rowById = new Map(data.map(r => [r[0], r]));
+const rowById = new Map(data.map((r) => [r[0], r]));
 for (const e of xxxEntries) {
-  const id = `XXX${e.num}`, target = XXX_ALIASES[id] && rowById.get(XXX_ALIASES[id]);
-  if (target) { target[12].push(id); assignedXxxIds.add(e.num); }
+  const id = `XXX${e.num}`,
+    target = XXX_ALIASES[id] && rowById.get(XXX_ALIASES[id]);
+  if (target) {
+    target[12].push(id);
+    assignedXxxIds.add(e.num);
+  }
 }
 ```
 
-> **Do NOT auto-merge by position.** Proximity ≠ identity. A dark nebula sitting 1–5′ from an NGC object is frequently a *different* object (e.g. Barnard 81/Barnard 298 land on the globular clusters NGC 6401/NGC 6528; Barnard 86 "Ink Spot" sits next to the open cluster NGC 6520). Naive nearest-neighbour merging produces wrong aliases and hides famous names.
+> **Do NOT auto-merge by position.** Proximity ≠ identity. A dark nebula sitting 1–5′ from an NGC object is frequently a _different_ object (e.g. Barnard 81/Barnard 298 land on the globular clusters NGC 6401/NGC 6528; Barnard 86 "Ink Spot" sits next to the open cluster NGC 6520). Naive nearest-neighbour merging produces wrong aliases and hides famous names.
 >
 > **Verify every curated pair against SIMBAD** before adding it. Query the object and inspect its identifier list:
+>
 > ```bash
 > curl -s "https://simbad.u-strasbg.fr/simbad/sim-id?output.format=ASCII&Ident=Barnard+33"
 > ```
-> Note SIMBAD often treats a Barnard dark nebula as **distinct** from the bright NGC/IC nebula it's silhouetted against (it had no NGC/IC cross-ID for any Barnard object), while it *does* equate many Barnard objects with **LDN** entries. Treat NGC/IC pairs as a deliberate UX choice (de-duplicating iconic targets like the Horsehead/IC434), and confirm the user wants it. When the alias target already carries the popular name (IC434 = "Horsehead Nebula", IC5146 = "Cocoon Nebula"), do **not** also add that name as an override on the now-suppressed standalone id — it would be dead config.
+>
+> Note SIMBAD often treats a Barnard dark nebula as **distinct** from the bright NGC/IC nebula it's silhouetted against (it had no NGC/IC cross-ID for any Barnard object), while it _does_ equate many Barnard objects with **LDN** entries. Treat NGC/IC pairs as a deliberate UX choice (de-duplicating iconic targets like the Horsehead/IC434), and confirm the user wants it. When the alias target already carries the popular name (IC434 = "Horsehead Nebula", IC5146 = "Cocoon Nebula"), do **not** also add that name as an override on the now-suppressed standalone id — it would be dead config.
 
 ### 3c. Append standalone entries (not already assigned via cross-refs)
 
@@ -224,27 +233,27 @@ let xxxAdded = 0;
 for (const entry of xxxEntries) {
   if (assignedXxxIds.has(entry.id)) continue;
   const { ra, dec } = precess1950to2000(entry.ra50, entry.dec50); // or galacticToEquatorial, or read J2000 directly
-  if (dec < -35) continue;          // southern cut-off (same as rest of catalog)
+  if (dec < -35) continue; // southern cut-off (same as rest of catalog)
   const xxxId = `XXX${entry.id}`;
   const majAxis = entry.diam != null ? Math.min(entry.diam, 300) : null; // cap huge hit areas
   data.push([
-    xxxId,                          // 0  id
-    Math.round(ra * 1000) / 1000,   // 1  ra
-    Math.round(dec * 1000) / 1000,  // 2  dec
-    'DN',                           // 3  type (EN/RN/DN/PN/... for this catalog)
-    majAxis,                        // 4  majAxis (arcmin)
-    null,                           // 5  minAxis
-    0,                              // 6  pa
-    entry.mag ?? null,              // 7  mag (if the catalog has it)
-    null,                           // 8  nameFr
-    null,                           // 9  nameEn
-    null,                           // 10 nameEs
-    null,                           // 11 nameDe
-    [xxxId],                        // 12 catalogs
-    null,                           // 13 emissionLines
-    null,                           // 14 constellation
-    null,                           // 15 rating
-    null,                           // 16 difficulty
+    xxxId, // 0  id
+    Math.round(ra * 1000) / 1000, // 1  ra
+    Math.round(dec * 1000) / 1000, // 2  dec
+    'DN', // 3  type (EN/RN/DN/PN/... for this catalog)
+    majAxis, // 4  majAxis (arcmin)
+    null, // 5  minAxis
+    0, // 6  pa
+    entry.mag ?? null, // 7  mag (if the catalog has it)
+    null, // 8  nameFr
+    null, // 9  nameEn
+    null, // 10 nameEs
+    null, // 11 nameDe
+    [xxxId], // 12 catalogs
+    null, // 13 emissionLines
+    null, // 14 constellation
+    null, // 15 rating
+    null, // 16 difficulty
   ]);
   xxxAdded++;
 }
@@ -263,14 +272,14 @@ When an object has several catalog ids, the displayed primary is chosen by `cata
 Add your prefix and bump the trailing `return` default:
 
 ```typescript
-if (id.startsWith('Abell'))   return 7;
-if (id.startsWith('LPN'))     return 8;
+if (id.startsWith('Abell')) return 7;
+if (id.startsWith('LPN')) return 8;
 if (id.startsWith('Barnard')) return 9;
-if (id.startsWith('XXX'))     return 10;   // ← new
-return 11;                                 // ← bump default
+if (id.startsWith('XXX')) return 10; // ← new
+return 11; // ← bump default
 ```
 
-Where to slot the new catalog matters: a catalog that only ever appears as an *alias* on a brighter object (Barnard on IC434) belongs **last** so the bright id stays primary. But if your catalog is the *more canonical* designation for an object it shares with a lower-priority catalog (e.g. Barnard vs LDN for the same dark nebula — "Barnard 72 / Snake Nebula" should win over "LDN 66"), give it a *higher* priority than that catalog so the famous name is shown. Decide deliberately.
+Where to slot the new catalog matters: a catalog that only ever appears as an _alias_ on a brighter object (Barnard on IC434) belongs **last** so the bright id stays primary. But if your catalog is the _more canonical_ designation for an object it shares with a lower-priority catalog (e.g. Barnard vs LDN for the same dark nebula — "Barnard 72 / Snake Nebula" should win over "LDN 66"), give it a _higher_ priority than that catalog so the famous name is shown. Decide deliberately.
 
 ---
 
@@ -281,6 +290,7 @@ node scripts/generate-dso.mjs
 ```
 
 Check the output:
+
 - Console counts: `Parsed N entries`, `Added N standalone entries`, and (if Mechanism B) `Merged N aliases`. **Reconcile the numbers** — `parsed − standalone` should equal `merged + southern-cutoff skips`, not be silently assumed to be merges.
 - File size change in `public/data/dso.json`
 - Spot-check a standalone object:
@@ -312,15 +322,28 @@ Then run `npm test` (the `dso-catalog.test.ts` change + hook) and `npm run build
 All three live in this file. Add `'XXX'` to the type union and the master list, and a branch to the resolver (and don't forget `catalogSortKey()` from Step 3d):
 
 ```typescript
-export type DSOCatalog = 'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard' | 'XXX';
+export type DSOCatalog =
+  'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard' | 'XXX';
 
-export const DSO_CATALOGS_ALL: DSOCatalog[] = ['M','NGC','IC','SH2','LBN','LDN','vdB','Abell','LPN','Barnard','XXX'];
+export const DSO_CATALOGS_ALL: DSOCatalog[] = [
+  'M',
+  'NGC',
+  'IC',
+  'SH2',
+  'LBN',
+  'LDN',
+  'vdB',
+  'Abell',
+  'LPN',
+  'Barnard',
+  'XXX',
+];
 
 export function getDSOCatalog(id: string): DSOCatalog | null {
   if (/^M\d/.test(id)) return 'M';
   // ...existing branches...
   if (id.startsWith('Barnard')) return 'Barnard';
-  if (id.startsWith('XXX')) return 'XXX';   // ← add
+  if (id.startsWith('XXX')) return 'XXX'; // ← add
   return null;
 }
 ```
@@ -346,16 +369,23 @@ No checkbox wiring is needed — the Display panel iterates `DSO_CATALOGS_ALL` a
 Find the label line (search for `replace('LBN'`) and add an **anchored** spacing rule:
 
 ```typescript
-const label = isMess ? dso.id
-  : dso.id.startsWith('LPN-') ? (dso.displayName || dso.id.replace(/^LPN-/, ''))
-  : dso.id.replace('NGC', 'NGC ').replace(/^IC(\d)/, 'IC $1')
-         .replace('LBN', 'LBN ').replace('LDN', 'LDN ').replace('SH2-', 'Sh2-')
-         .replace('vdB', 'vdB ').replace(/^(Abell)(\d)/, '$1 $2')
-         .replace(/^(Barnard)(\d)/, '$1 $2')
-         .replace(/^(XXX)(\d)/, '$1 $2');   // ← add, anchored to start
+const label = isMess
+  ? dso.id
+  : dso.id.startsWith('LPN-')
+    ? dso.displayName || dso.id.replace(/^LPN-/, '')
+    : dso.id
+        .replace('NGC', 'NGC ')
+        .replace(/^IC(\d)/, 'IC $1')
+        .replace('LBN', 'LBN ')
+        .replace('LDN', 'LDN ')
+        .replace('SH2-', 'Sh2-')
+        .replace('vdB', 'vdB ')
+        .replace(/^(Abell)(\d)/, '$1 $2')
+        .replace(/^(Barnard)(\d)/, '$1 $2')
+        .replace(/^(XXX)(\d)/, '$1 $2'); // ← add, anchored to start
 ```
 
-> **Use an anchored `/^PREFIX(\d)/` regex, NOT a bare `.replace('XXX', 'XXX ')`.** A bare replace rewrites the first match *anywhere* in the string — e.g. `.replace('B', 'B ')` would turn `LBN123` into `LB N123`. This is exactly why single-letter prefixes are banned and why `Abell`/`Barnard` use the anchored form.
+> **Use an anchored `/^PREFIX(\d)/` regex, NOT a bare `.replace('XXX', 'XXX ')`.** A bare replace rewrites the first match _anywhere_ in the string — e.g. `.replace('B', 'B ')` would turn `LBN123` into `LB N123`. This is exactly why single-letter prefixes are banned and why `Abell`/`Barnard` use the anchored form.
 
 ---
 
@@ -425,9 +455,10 @@ node scripts/validate-simbad.mjs --scope lbn --deg 1.0 --out scripts/report-lbn.
 ```
 
 The script checks:
+
 - **coord_drift** — our RA/Dec vs SIMBAD's (flags anything > threshold degrees)
 - **name_mismatch** — distinctive part of `nameEn` not found in SIMBAD's alias list
-- **name_wrong_object** — proper name resolves in SIMBAD to a *different* object (naming confusion)
+- **name_wrong_object** — proper name resolves in SIMBAD to a _different_ object (naming confusion)
 - **not_found** — SIMBAD doesn't recognise the identifier (possible normalisation issue)
 
 For any `coord_drift` finding above ~1°: update the coordinates to SIMBAD's values, then rerun `node scripts/add-constellations.mjs`.
@@ -458,15 +489,16 @@ SIMBAD resolves plain "Abell N" to **galaxy clusters** (ACO N), not planetary ne
 
 ### Naming confusions already fixed
 
-| ID | Problem | Resolution |
-|---|---|---|
-| SH2-147 | Named "Simeis 147 Nebula" — wrong; Simeis 147 is Sh2-240 in Taurus | Names cleared |
-| SH2-240 | Wrong coords (RA 97°, Gem) + wrong name ("Pencil Nebula") | Corrected: RA=85.275°, Dec=28.083° (Tau); name → "Spaghetti Nebula"; aliases: LBN822, Simeis 147 |
-| IC443 | No name | Added: "Jellyfish Nebula" / "Nébuleuse de la Méduse" |
+| ID      | Problem                                                            | Resolution                                                                                       |
+| ------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| SH2-147 | Named "Simeis 147 Nebula" — wrong; Simeis 147 is Sh2-240 in Taurus | Names cleared                                                                                    |
+| SH2-240 | Wrong coords (RA 97°, Gem) + wrong name ("Pencil Nebula")          | Corrected: RA=85.275°, Dec=28.083° (Tau); name → "Spaghetti Nebula"; aliases: LBN822, Simeis 147 |
+| IC443   | No name                                                            | Added: "Jellyfish Nebula" / "Nébuleuse de la Méduse"                                             |
 
 ### French proper name collisions
 
 "Méduse" means both "jellyfish" and "Medusa" in French — no linguistic workaround:
+
 - IC443 (Jellyfish Nebula, SNR) → `nameFr: "Nébuleuse de la Méduse"`
 - SH2-274 / Abell 21 (Medusa Nebula, PN) → `nameFr: "Nébuleuse de la Méduse"` (identical — accepted)
 

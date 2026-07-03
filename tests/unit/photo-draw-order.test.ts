@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Photo } from '../../src/types';
-import { filterDrawOrderPhotos, findOverlappingPhotoIds, polygonsOverlap, type PhotoCanvasQuad } from '../../src/photo-draw-order';
+import {
+  filterDrawOrderPhotos,
+  findOverlappingPhotoIds,
+  polygonsOverlap,
+  type PhotoCanvasQuad,
+} from '../../src/photo-draw-order';
 
 function makePhoto(id: string, overrides: Partial<Photo> = {}): Photo {
   return {

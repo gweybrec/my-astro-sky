@@ -3,7 +3,20 @@ import { detectInitialDensity, AUTO_STAR_BUDGET } from './density-slider';
 
 export const SETTINGS_KEY = 'display-settings';
 
-export const DSO_TYPES_ALL = ['GxS', 'GxE', 'GxI', 'Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?'];
+export const DSO_TYPES_ALL = [
+  'GxS',
+  'GxE',
+  'GxI',
+  'Gx',
+  'OC',
+  'GC',
+  'EN',
+  'RN',
+  'PN',
+  'SNR',
+  'DN',
+  '?',
+];
 export const DSO_CATALOGS_DEFAULT_ON = new Set(['M', 'NGC', 'IC', 'SH2']);
 
 export interface DisplaySettings {
@@ -106,7 +119,9 @@ export function loadSettings(): DisplaySettings {
       settings.mapRotationDeg = normalizeRotationDeg(Number(settings.mapRotationDeg) || 0);
       return pinAutoStarBudget(settings);
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   // First launch (no saved settings): seed the density budgets from a rough hardware
   // guess so the very first render is reasonable. Auto-tuning refines it immediately.
   const seed = detectInitialDensity();

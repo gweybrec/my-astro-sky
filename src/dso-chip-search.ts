@@ -24,7 +24,10 @@ export function matchesChipDSO(result: UnifiedSearchResult, chipId: string): boo
   return result.dso.catalogs.some((catalogId) => normalizeChipKey(String(catalogId)) === chipKey);
 }
 
-export function findChipDSOResult(results: UnifiedSearchResult[], chipId: string): UnifiedSearchResult | undefined {
+export function findChipDSOResult(
+  results: UnifiedSearchResult[],
+  chipId: string,
+): UnifiedSearchResult | undefined {
   return results.find((result) => matchesChipDSO(result, chipId));
 }
 

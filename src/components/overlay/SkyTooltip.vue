@@ -2,12 +2,21 @@
   <div
     v-if="uiStore.skyTooltipHtml"
     id="tooltip"
-    :style="{ display: 'block', left: (uiStore.skyTooltipX + SKY_TOOLTIP_OFFSET) + 'px', top: (uiStore.skyTooltipY + SKY_TOOLTIP_OFFSET) + 'px' }"
+    :style="{
+      display: 'block',
+      left: uiStore.skyTooltipX + SKY_TOOLTIP_OFFSET + 'px',
+      top: uiStore.skyTooltipY + SKY_TOOLTIP_OFFSET + 'px',
+    }"
     @mousedown="onSelectStart"
     @wheel="onWheel"
   >
     <div v-html="uiStore.skyTooltipHtml"></div>
-    <DSOActions v-if="uiStore.skyTooltipDSO" :dso="uiStore.skyTooltipDSO" pins-tooltip @edit="onEdit" />
+    <DSOActions
+      v-if="uiStore.skyTooltipDSO"
+      :dso="uiStore.skyTooltipDSO"
+      pins-tooltip
+      @edit="onEdit"
+    />
   </div>
 </template>
 
@@ -42,21 +51,25 @@ function onWheel(e: WheelEvent) {
   const canvas = canvasStore.skyMap?.getCanvas();
   if (!canvas) return;
   e.preventDefault();
-  canvas.dispatchEvent(new WheelEvent('wheel', {
-    deltaX: e.deltaX,
-    deltaY: e.deltaY,
-    deltaMode: e.deltaMode,
-    clientX: e.clientX,
-    clientY: e.clientY,
-    bubbles: false,
-    cancelable: true,
-  }));
+  canvas.dispatchEvent(
+    new WheelEvent('wheel', {
+      deltaX: e.deltaX,
+      deltaY: e.deltaY,
+      deltaMode: e.deltaMode,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      bubbles: false,
+      cancelable: true,
+    }),
+  );
 }
 
 function onEdit() {
   const dso = uiStore.skyTooltipDSO;
   if (!dso) return;
   uiStore.hideSkyTooltipNow();
-  openDSOEditModal(dso, () => { canvasStore.skyMap?.render(); });
+  openDSOEditModal(dso, () => {
+    canvasStore.skyMap?.render();
+  });
 }
 </script>

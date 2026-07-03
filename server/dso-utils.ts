@@ -9,7 +9,10 @@
  *   ["NGC5457", "M101"]
  */
 export function normalizeDSOAliases(rawEntries: string[]): string[] {
-  return rawEntries.flatMap(entry =>
-    entry.split(' / ').map(alias => alias.trim().replace(/\s+/g, '')).filter(Boolean)
+  return rawEntries.flatMap((entry) =>
+    entry
+      .split(' / ')
+      .map((alias) => alias.trim().replace(/\s+/g, ''))
+      .filter(Boolean),
   );
 }

@@ -41,15 +41,24 @@ describe('msg.solveField', () => {
   });
 
   it('noSolutionHintNone — is bilingual', () => {
-    assertBilingual(msg.solveField.noSolutionHintNone('fr'), msg.solveField.noSolutionHintNone('en'));
+    assertBilingual(
+      msg.solveField.noSolutionHintNone('fr'),
+      msg.solveField.noSolutionHintNone('en'),
+    );
   });
 
   it('noSolutionHintNoFov — is bilingual', () => {
-    assertBilingual(msg.solveField.noSolutionHintNoFov('fr'), msg.solveField.noSolutionHintNoFov('en'));
+    assertBilingual(
+      msg.solveField.noSolutionHintNoFov('fr'),
+      msg.solveField.noSolutionHintNoFov('en'),
+    );
   });
 
   it('noSolutionHintFull — is bilingual', () => {
-    assertBilingual(msg.solveField.noSolutionHintFull('fr'), msg.solveField.noSolutionHintFull('en'));
+    assertBilingual(
+      msg.solveField.noSolutionHintFull('fr'),
+      msg.solveField.noSolutionHintFull('en'),
+    );
   });
 
   it('failed — is bilingual and includes field count', () => {
@@ -68,7 +77,10 @@ describe('msg.solveField', () => {
 
   it('missingWcsKey — is bilingual and contains the key name', () => {
     const key = 'CD1_1';
-    assertBilingual(msg.solveField.missingWcsKey('fr', key), msg.solveField.missingWcsKey('en', key));
+    assertBilingual(
+      msg.solveField.missingWcsKey('fr', key),
+      msg.solveField.missingWcsKey('en', key),
+    );
     expect(msg.solveField.missingWcsKey('fr', key)).toContain(key);
     expect(msg.solveField.missingWcsKey('en', key)).toContain(key);
     expect(msg.solveField.missingWcsKey('fr', key).toLowerCase()).toContain('manquante');
@@ -169,7 +181,10 @@ describe('msg.api', () => {
   });
 
   it('cannotDetermineImageDimensions — is bilingual', () => {
-    assertBilingual(msg.api.cannotDetermineImageDimensions('fr'), msg.api.cannotDetermineImageDimensions('en'));
+    assertBilingual(
+      msg.api.cannotDetermineImageDimensions('fr'),
+      msg.api.cannotDetermineImageDimensions('en'),
+    );
   });
 
   it('notEnoughCatalogStars — is bilingual', () => {
@@ -182,13 +197,19 @@ describe('msg.api', () => {
 
   it('unsupportedFormatAstap — is bilingual and includes extension', () => {
     const ext = '.tiff';
-    assertBilingual(msg.api.unsupportedFormatAstap('fr', ext), msg.api.unsupportedFormatAstap('en', ext));
+    assertBilingual(
+      msg.api.unsupportedFormatAstap('fr', ext),
+      msg.api.unsupportedFormatAstap('en', ext),
+    );
     expect(msg.api.unsupportedFormatAstap('en', ext)).toContain(ext);
   });
 
   it('unsupportedFormatSolveField — is bilingual and includes extension', () => {
     const ext = '.fit';
-    assertBilingual(msg.api.unsupportedFormatSolveField('fr', ext), msg.api.unsupportedFormatSolveField('en', ext));
+    assertBilingual(
+      msg.api.unsupportedFormatSolveField('fr', ext),
+      msg.api.unsupportedFormatSolveField('en', ext),
+    );
     expect(msg.api.unsupportedFormatSolveField('en', ext)).toContain(ext);
   });
 

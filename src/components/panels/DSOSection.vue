@@ -1,6 +1,10 @@
 <template>
   <CollapsibleSection :title="t('dso.section')" :defaultOpen="false">
-    <CheckRow :label="t('dso.showDSOs')" :modelValue="displayStore.showDSOs" @update:modelValue="displayStore.setShowDSOs($event)" />
+    <CheckRow
+      :label="t('dso.showDSOs')"
+      :modelValue="displayStore.showDSOs"
+      @update:modelValue="displayStore.setShowDSOs($event)"
+    />
 
     <!-- Types dropdown -->
     <div class="display-controls-mag-row" :style="{ opacity: displayStore.showDSOs ? '1' : '0.4' }">
@@ -10,7 +14,10 @@
         class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
         :disabled="!displayStore.showDSOs"
         @click.stop="typeOpen = !typeOpen"
-      >{{ t('gallery.filterTypes') }}{{ displayStore.dsoTypes.length > 0 ? ` (${displayStore.dsoTypes.length})` : '' }}</button>
+      >
+        {{ t('gallery.filterTypes')
+        }}{{ displayStore.dsoTypes.length > 0 ? ` (${displayStore.dsoTypes.length})` : '' }}
+      </button>
       <DropdownPanel v-model="typeOpen" :anchor-el="typeBtnRef" min-width="240px">
         <label class="labels-select-all-row">
           <input
@@ -44,7 +51,10 @@
         class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
         :disabled="!displayStore.showDSOs"
         @click.stop="catalogOpen = !catalogOpen"
-      >{{ t('gallery.filterCatalogs') }}{{ displayStore.dsoCatalogs.length > 0 ? ` (${displayStore.dsoCatalogs.length})` : '' }}</button>
+      >
+        {{ t('gallery.filterCatalogs')
+        }}{{ displayStore.dsoCatalogs.length > 0 ? ` (${displayStore.dsoCatalogs.length})` : '' }}
+      </button>
       <DropdownPanel v-model="catalogOpen" :anchor-el="catalogBtnRef" min-width="240px">
         <label class="labels-select-all-row">
           <input
@@ -90,8 +100,12 @@ const typeBtnRef = ref<HTMLButtonElement>();
 const typeSelectAllRef = ref<HTMLInputElement>();
 const typeOpen = ref(false);
 
-const allTypesChecked = computed(() => DSO_TYPES_ALL.every(ty => displayStore.dsoTypes.includes(ty)));
-const someTypesChecked = computed(() => DSO_TYPES_ALL.some(ty => displayStore.dsoTypes.includes(ty)));
+const allTypesChecked = computed(() =>
+  DSO_TYPES_ALL.every((ty) => displayStore.dsoTypes.includes(ty)),
+);
+const someTypesChecked = computed(() =>
+  DSO_TYPES_ALL.some((ty) => displayStore.dsoTypes.includes(ty)),
+);
 
 watch([allTypesChecked, someTypesChecked], () => {
   if (typeSelectAllRef.value) {
@@ -107,10 +121,12 @@ watch(typeOpen, (open) => {
         typeSelectAllRef.value.indeterminate = someTypesChecked.value && !allTypesChecked.value;
     });
   }
-});;
+});
 
 function toggleType(type: string, checked: boolean) {
-  const next = DSO_TYPES_ALL.filter(ty => ty === type ? checked : displayStore.dsoTypes.includes(ty));
+  const next = DSO_TYPES_ALL.filter((ty) =>
+    ty === type ? checked : displayStore.dsoTypes.includes(ty),
+  );
   displayStore.setDsoTypes(next);
 }
 
@@ -123,12 +139,17 @@ const catalogBtnRef = ref<HTMLButtonElement>();
 const catalogSelectAllRef = ref<HTMLInputElement>();
 const catalogOpen = ref(false);
 
-const allCatalogsChecked = computed(() => DSO_CATALOGS_ALL.every(c => displayStore.dsoCatalogs.includes(c)));
-const someCatalogsChecked = computed(() => DSO_CATALOGS_ALL.some(c => displayStore.dsoCatalogs.includes(c)));
+const allCatalogsChecked = computed(() =>
+  DSO_CATALOGS_ALL.every((c) => displayStore.dsoCatalogs.includes(c)),
+);
+const someCatalogsChecked = computed(() =>
+  DSO_CATALOGS_ALL.some((c) => displayStore.dsoCatalogs.includes(c)),
+);
 
 watch([allCatalogsChecked, someCatalogsChecked], () => {
   if (catalogSelectAllRef.value) {
-    catalogSelectAllRef.value.indeterminate = someCatalogsChecked.value && !allCatalogsChecked.value;
+    catalogSelectAllRef.value.indeterminate =
+      someCatalogsChecked.value && !allCatalogsChecked.value;
   }
 });
 
@@ -137,13 +158,16 @@ watch(catalogOpen, (open) => {
     typeOpen.value = false;
     nextTick(() => {
       if (catalogSelectAllRef.value)
-        catalogSelectAllRef.value.indeterminate = someCatalogsChecked.value && !allCatalogsChecked.value;
+        catalogSelectAllRef.value.indeterminate =
+          someCatalogsChecked.value && !allCatalogsChecked.value;
     });
   }
-});;
+});
 
 function toggleCatalog(cat: string, checked: boolean) {
-  const next = DSO_CATALOGS_ALL.filter(c => c === cat ? checked : displayStore.dsoCatalogs.includes(c));
+  const next = DSO_CATALOGS_ALL.filter((c) =>
+    c === cat ? checked : displayStore.dsoCatalogs.includes(c),
+  );
   displayStore.setDsoCatalogs(next);
 }
 

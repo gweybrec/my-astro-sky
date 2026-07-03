@@ -63,12 +63,16 @@ describe('CollapsibleSection', () => {
 
 describe('SliderRow', () => {
   it('renders label', () => {
-    const wrapper = mount(SliderRow, { props: { label: 'Test', min: 0, max: 10, step: 1, modelValue: 5 } });
+    const wrapper = mount(SliderRow, {
+      props: { label: 'Test', min: 0, max: 10, step: 1, modelValue: 5 },
+    });
     expect(wrapper.find('label').text()).toContain('Test');
   });
 
   it('emits update:modelValue on input', async () => {
-    const wrapper = mount(SliderRow, { props: { label: 'X', min: 0, max: 10, step: 1, modelValue: 3 } });
+    const wrapper = mount(SliderRow, {
+      props: { label: 'X', min: 0, max: 10, step: 1, modelValue: 3 },
+    });
     const input = wrapper.find('input[type="range"]');
     await input.setValue('7');
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([7]);
@@ -76,19 +80,30 @@ describe('SliderRow', () => {
 
   it('uses formatValue when provided', () => {
     const wrapper = mount(SliderRow, {
-      props: { label: 'X', min: 0, max: 14, step: 0.5, modelValue: 14, formatValue: (v: number) => v >= 14 ? '∞' : v.toFixed(1) },
+      props: {
+        label: 'X',
+        min: 0,
+        max: 14,
+        step: 0.5,
+        modelValue: 14,
+        formatValue: (v: number) => (v >= 14 ? '∞' : v.toFixed(1)),
+      },
     });
     expect(wrapper.find('.display-controls-mag-value').text()).toBe('∞');
   });
 
   it('applies 0.4 opacity when disabled', () => {
-    const wrapper = mount(SliderRow, { props: { label: 'X', min: 0, max: 10, step: 1, modelValue: 5, disabled: true } });
+    const wrapper = mount(SliderRow, {
+      props: { label: 'X', min: 0, max: 10, step: 1, modelValue: 5, disabled: true },
+    });
     const row = wrapper.find('.display-controls-mag-row');
     expect((row.element as HTMLElement).style.opacity).toBe('0.4');
   });
 
   it('disables the input when disabled prop is true', () => {
-    const wrapper = mount(SliderRow, { props: { label: 'X', min: 0, max: 10, step: 1, modelValue: 5, disabled: true } });
+    const wrapper = mount(SliderRow, {
+      props: { label: 'X', min: 0, max: 10, step: 1, modelValue: 5, disabled: true },
+    });
     expect((wrapper.find('input[type="range"]').element as HTMLInputElement).disabled).toBe(true);
   });
 });
@@ -108,7 +123,9 @@ describe('CheckRow', () => {
 
   it('reflects unchecked state', () => {
     const wrapper = mount(CheckRow, { props: { label: 'X', modelValue: false } });
-    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false);
+    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(
+      false,
+    );
   });
 
   it('emits update:modelValue on change', async () => {
@@ -119,7 +136,9 @@ describe('CheckRow', () => {
 
   it('disables the checkbox when disabled prop is true', () => {
     const wrapper = mount(CheckRow, { props: { label: 'X', modelValue: true, disabled: true } });
-    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(true);
+    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(
+      true,
+    );
   });
 
   it('applies 0.4 opacity when disabled', () => {
@@ -269,21 +288,23 @@ describe('DSO controls in DisplayControlsSection', () => {
     });
   }
 
-  afterEach(() => { document.body.innerHTML = ''; });
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('renders Types and Catalogs dropdown buttons', () => {
     const wrapper = mountDSOSection();
     const buttons = wrapper.findAll('button.display-dropdown-btn');
-    const texts = buttons.map(b => b.text());
-    expect(texts.some(t => t.includes('Types'))).toBe(true);
-    expect(texts.some(t => t.includes('Catalogs'))).toBe(true);
+    const texts = buttons.map((b) => b.text());
+    expect(texts.some((t) => t.includes('Types'))).toBe(true);
+    expect(texts.some((t) => t.includes('Catalogs'))).toBe(true);
   });
 
   it('Types button shows active-count suffix when not all types selected', () => {
     const wrapper = mountDSOSection();
     // initial state: dsoTypes: ['GxS', 'OC', 'GC'] — 3 of 12
     const buttons = wrapper.findAll('button.display-dropdown-btn');
-    const typeBtn = buttons.find(b => b.text().includes('Types'));
+    const typeBtn = buttons.find((b) => b.text().includes('Types'));
     expect(typeBtn?.text()).toContain('(3)');
   });
 
@@ -291,7 +312,7 @@ describe('DSO controls in DisplayControlsSection', () => {
     const wrapper = mountDSOSection();
     // initial state: dsoCatalogs: ['M', 'NGC'] — 2 of 9
     const buttons = wrapper.findAll('button.display-dropdown-btn');
-    const catBtn = buttons.find(b => b.text().includes('Catalogs'));
+    const catBtn = buttons.find((b) => b.text().includes('Catalogs'));
     expect(catBtn?.text()).toContain('(2)');
   });
 
@@ -302,8 +323,8 @@ describe('DSO controls in DisplayControlsSection', () => {
     store.showDSOs = false;
     await wrapper.vm.$nextTick();
     const buttons = wrapper.findAll('button.display-dropdown-btn');
-    const typeBtn = buttons.find(b => b.text().includes('Types'));
-    const catBtn = buttons.find(b => b.text().includes('Catalogs'));
+    const typeBtn = buttons.find((b) => b.text().includes('Types'));
+    const catBtn = buttons.find((b) => b.text().includes('Catalogs'));
     expect((typeBtn?.element as HTMLButtonElement).disabled).toBe(true);
     expect((catBtn?.element as HTMLButtonElement).disabled).toBe(true);
   });

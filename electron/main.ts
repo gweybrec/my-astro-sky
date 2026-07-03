@@ -25,7 +25,9 @@ function initSettingsEncryptionKey(): void {
   if (existing && isValidKeyBase64(existing)) return;
 
   if (!safeStorage.isEncryptionAvailable()) {
-    console.warn('[Security] safeStorage is unavailable; SETTINGS_ENCRYPTION_KEY was not provisioned.');
+    console.warn(
+      '[Security] safeStorage is unavailable; SETTINGS_ENCRYPTION_KEY was not provisioned.',
+    );
     return;
   }
 
@@ -45,7 +47,11 @@ function initSettingsEncryptionKey(): void {
       // Key file exists but can't be decrypted (wrong app identity, corrupted, or
       // leftover from a dev/test run). Delete it so we generate a fresh key below.
       console.warn('[Security] Existing key could not be decrypted; generating a new one.');
-      try { fs.unlinkSync(keyPath); } catch { /* best effort */ }
+      try {
+        fs.unlinkSync(keyPath);
+      } catch {
+        /* best effort */
+      }
     }
   }
 
@@ -92,7 +98,8 @@ function waitForPort(port: number, maxAttempts = 30): Promise<void> {
       socket.on('error', () => {
         socket.destroy();
         if (++attempts < maxAttempts) setTimeout(attempt, 300);
-        else reject(new Error(`Express did not start on port ${port} after ${maxAttempts} attempts`));
+        else
+          reject(new Error(`Express did not start on port ${port} after ${maxAttempts} attempts`));
       });
       socket.on('timeout', () => {
         socket.destroy();
@@ -111,10 +118,7 @@ let rendererCrashTimes: number[] = [];
  * Log a renderer crash and auto-reload the window to recover. If the renderer keeps
  * crashing (a crash loop), stop reloading and offer the user a Reload/Quit dialog.
  */
-function handleRendererGone(
-  win: BrowserWindow,
-  details: Electron.RenderProcessGoneDetails,
-): void {
+function handleRendererGone(win: BrowserWindow, details: Electron.RenderProcessGoneDetails): void {
   logCrash('renderer_process_gone', new Error(`Renderer gone: ${details.reason}`), {
     reason: details.reason,
     exitCode: details.exitCode,
@@ -182,18 +186,18 @@ async function main() {
     const uploadsDir = path.join(userData, 'uploads');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-    process.env.UPLOADS_DIR    = uploadsDir;
-    process.env.DB_PATH        = path.join(userData, 'data.db');
+    process.env.UPLOADS_DIR = uploadsDir;
+    process.env.DB_PATH = path.join(userData, 'data.db');
 
     // Read-only app assets bundled in the asar.
     // Vite copies public/data/* into dist/data/ at build time, so all catalog
     // files are available under dist/ — no separate public/data/ copy needed.
     const appPath = app.getAppPath();
     const distDataDir = path.join(appPath, 'dist', 'data');
-    process.env.DIST_DIR        = path.join(appPath, 'dist');
+    process.env.DIST_DIR = path.join(appPath, 'dist');
     process.env.PUBLIC_DATA_DIR = distDataDir;
     process.env.STAR_CATALOG_PATH = path.join(distDataDir, 'stars.14.json');
-    process.env.RESOURCES_DIR  = path.join(appPath, 'resources');
+    process.env.RESOURCES_DIR = path.join(appPath, 'resources');
   }
 
   // Dynamic import AFTER env vars are set — static ESM imports are hoisted and
@@ -229,10 +233,9 @@ async function main() {
 
   win.loadURL(`http://localhost:${port}`);
   win.maximize();
-  
+
   // Dev tools if needed for debugging. Never enable in production builds.
   // win.webContents.openDevTools();
-
 }
 
 ipcMain.handle('get-location', async () => {

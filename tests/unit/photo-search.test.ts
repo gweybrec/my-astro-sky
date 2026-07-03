@@ -45,7 +45,11 @@ describe('buildPhotoQueryMatches', () => {
   });
 
   it('matches by notes while keeping chip matches empty when no chips match', () => {
-    const photo = makePhoto({ notes: 'captured with filter', dsoIds: ['M42'], labels: ['widefield'] });
+    const photo = makePhoto({
+      notes: 'captured with filter',
+      dsoIds: ['M42'],
+      labels: ['widefield'],
+    });
     const matches = buildPhotoQueryMatches([photo], 'filter');
 
     expect(matches).toHaveLength(1);

@@ -12,8 +12,12 @@ const fakeDSO = (id: string) => ({ id, catalogs: [id] }) as unknown as DSO;
 
 describe('tooltipSafeZoneContains', () => {
   // Anchor at (100,100), a tall/wide tooltip rect, margin 16.
-  const ax = 100, ay = 100;
-  const left = 115, top = 115, right = 215, bottom = 315;
+  const ax = 100,
+    ay = 100;
+  const left = 115,
+    top = 115,
+    right = 215,
+    bottom = 315;
   const m = SKY_TOOLTIP_SAFE_MARGIN;
   const inZone = (x: number, y: number) =>
     tooltipSafeZoneContains(x, y, ax, ay, left, top, right, bottom, m);
@@ -29,13 +33,13 @@ describe('tooltipSafeZoneContains', () => {
   });
 
   it('rejects points outside the padded box', () => {
-    expect(inZone(60, 60)).toBe(false);   // past the anchor
+    expect(inZone(60, 60)).toBe(false); // past the anchor
     expect(inZone(250, 250)).toBe(false); // right of the tooltip
     expect(inZone(150, 340)).toBe(false); // below the tooltip
   });
 
   it('honours the margin', () => {
-    expect(inZone(100 - m, 100)).toBe(true);     // exactly on the padded edge
+    expect(inZone(100 - m, 100)).toBe(true); // exactly on the padded edge
     expect(inZone(100 - m - 1, 100)).toBe(false); // just past it
   });
 });
@@ -93,7 +97,11 @@ describe('ui store — sky tooltip', () => {
   it('tolerates small jitter while heading toward the tooltip', () => {
     const ui = useUiStore();
     ui.showSkyTooltip('M42', 100, 100);
-    ui.showSkyTooltip('M42', 100 - SKY_TOOLTIP_FOLLOW_TOLERANCE, 100 - SKY_TOOLTIP_FOLLOW_TOLERANCE);
+    ui.showSkyTooltip(
+      'M42',
+      100 - SKY_TOOLTIP_FOLLOW_TOLERANCE,
+      100 - SKY_TOOLTIP_FOLLOW_TOLERANCE,
+    );
     expect(ui.skyTooltipX).toBe(100);
     expect(ui.skyTooltipY).toBe(100);
   });

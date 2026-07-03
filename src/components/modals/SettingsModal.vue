@@ -1,6 +1,10 @@
 <template>
-  <BaseModal :title="t('settings.modalTitle')" size="wide" body-class="modal-form-body" @close="$emit('close')">
-
+  <BaseModal
+    :title="t('settings.modalTitle')"
+    size="wide"
+    body-class="modal-form-body"
+    @close="$emit('close')"
+  >
     <!-- Appearance -->
     <div class="settings-section-label">{{ t('settings.appearanceSection') }}</div>
     <div class="settings-fields-row">
@@ -23,7 +27,7 @@
       </div>
     </div>
 
-    <hr class="settings-separator">
+    <hr class="settings-separator" />
 
     <!-- Import / Export -->
     <div class="settings-section-label">{{ t('settings.importExportLabel') }}</div>
@@ -32,13 +36,15 @@
       <button class="btn-action" @click="onImport">{{ t('settings.importData') }}</button>
     </div>
 
-    <hr class="settings-separator">
+    <hr class="settings-separator" />
 
     <!-- Solver / API -->
     <div class="settings-section-label">{{ t('settings.solverSection') }}</div>
-    <button class="btn-action btn-action--full" @click="openSolverSettings">{{ t('settings.openSolverSettings') }}</button>
+    <button class="btn-action btn-action--full" @click="openSolverSettings">
+      {{ t('settings.openSolverSettings') }}
+    </button>
 
-    <hr class="settings-separator">
+    <hr class="settings-separator" />
 
     <!-- Legal -->
     <div class="settings-section-label">{{ t('settings.legalSection') }}</div>
@@ -55,21 +61,27 @@
       <span>{{ t('settings.dataCreditsBtn') }}</span>
     </button>
 
-    <hr class="settings-separator">
+    <hr class="settings-separator" />
 
     <!-- Diagnostics -->
     <div class="settings-section-label">{{ t('settings.diagnosticsSection') }}</div>
     <div class="settings-mono-hint">{{ logsPathHint }}</div>
-    <button class="btn-action btn-action--full" :disabled="!logsAvailable" :title="logsAvailable ? '' : t('settings.openLogsFolderUnavailable')" @click="onOpenLogs">
+    <button
+      class="btn-action btn-action--full"
+      :disabled="!logsAvailable"
+      :title="logsAvailable ? '' : t('settings.openLogsFolderUnavailable')"
+      @click="onOpenLogs"
+    >
       {{ t('settings.openLogsFolder') }}
     </button>
 
-    <hr class="settings-separator">
+    <hr class="settings-separator" />
 
     <!-- Danger zone -->
-    <div class="settings-section-label settings-danger-label">{{ t('settings.dangerSection') }}</div>
+    <div class="settings-section-label settings-danger-label">
+      {{ t('settings.dangerSection') }}
+    </div>
     <button class="btn-danger w-full" @click="onDeleteAll">{{ t('settings.deleteAllBtn') }}</button>
-
   </BaseModal>
 </template>
 
@@ -91,11 +103,15 @@ const { t, lang: currentLang, setLang } = useI18n();
 const settingsStore = useSettingsStore();
 
 // Language
-function onLangChange(e: Event) { setLang((e.target as HTMLSelectElement).value as Lang); }
+function onLangChange(e: Event) {
+  setLang((e.target as HTMLSelectElement).value as Lang);
+}
 
 // Theme
 const selectedTheme = ref<Theme>(loadTheme());
-function onThemeChange() { applyTheme(selectedTheme.value); }
+function onThemeChange() {
+  applyTheme(selectedTheme.value);
+}
 
 const logsPathHint = ref(t('settings.logsPathHintLoading'));
 const logsAvailable = ref(false);
@@ -103,8 +119,12 @@ const logsAvailable = ref(false);
 onMounted(async () => {
   if (window.myAstroDiagnostics?.getLogsPathHint) {
     logsAvailable.value = true;
-    logsPathHint.value = t('settings.logsPathLabel') + ' ' +
-      await window.myAstroDiagnostics.getLogsPathHint().catch(() => t('settings.logsPathUnavailable'));
+    logsPathHint.value =
+      t('settings.logsPathLabel') +
+      ' ' +
+      (await window.myAstroDiagnostics
+        .getLogsPathHint()
+        .catch(() => t('settings.logsPathUnavailable')));
   } else {
     logsPathHint.value = t('settings.logsPathUnavailable');
   }

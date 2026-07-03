@@ -1,6 +1,6 @@
 name: Bug report
 description: Something isn't working as expected
-labels: ["bug"]
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -13,7 +13,7 @@ body:
     attributes:
       label: App version
       description: You'll find it in the **About** section of the app (usually in the menu or settings). If you can't find it, just leave it blank.
-      placeholder: "e.g. 0.1.0"
+      placeholder: 'e.g. 0.1.0'
     validations:
       required: false
 
@@ -22,7 +22,7 @@ body:
     attributes:
       label: Operating system
       description: Which system are you using?
-      placeholder: "e.g. Windows 11, macOS Sonoma"
+      placeholder: 'e.g. Windows 11, macOS Sonoma'
     validations:
       required: true
 

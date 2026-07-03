@@ -10,44 +10,84 @@ import type { TelescopeData, CameraData, AccessoryData } from '../../src/gear-ca
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const C8_TELESCOPE: TelescopeData = {
-  id: 'celestron-c8-sct', brand: 'Celestron', model: 'C8 SCT',
-  type: 'SCT', optical_design: 'Schmidt-Cassegrain', aperture_mm: 203.2,
-  focal_length_mm: 2032, f_ratio: 10, is_smart_telescope: false,
-  integrated_camera: false, integrated_camera_id: null,
-  mount_interface: 'Losmandy', optical_notes: null, recommended_use: ['deep-sky'],
+  id: 'celestron-c8-sct',
+  brand: 'Celestron',
+  model: 'C8 SCT',
+  type: 'SCT',
+  optical_design: 'Schmidt-Cassegrain',
+  aperture_mm: 203.2,
+  focal_length_mm: 2032,
+  f_ratio: 10,
+  is_smart_telescope: false,
+  integrated_camera: false,
+  integrated_camera_id: null,
+  mount_interface: 'Losmandy',
+  optical_notes: null,
+  recommended_use: ['deep-sky'],
   status: 'active',
 };
 
 const ATIK_CAMERA: CameraData = {
-  id: 'atik-314l-plus', brand: 'Atik', model: '314L+',
-  sensor: 'Sony ICX285AL', sensor_generation: 'CCD', color_type: 'Mono',
-  sensor_width_mm: 8.98, sensor_height_mm: 6.71,
-  pixel_size_um: 6.45, resolution_x: 1391, resolution_y: 1039,
-  recommended_use: ['deep-sky'], status: 'active',
+  id: 'atik-314l-plus',
+  brand: 'Atik',
+  model: '314L+',
+  sensor: 'Sony ICX285AL',
+  sensor_generation: 'CCD',
+  color_type: 'Mono',
+  sensor_width_mm: 8.98,
+  sensor_height_mm: 6.71,
+  pixel_size_um: 6.45,
+  resolution_x: 1391,
+  resolution_y: 1039,
+  recommended_use: ['deep-sky'],
+  status: 'active',
 };
 
 const OSC_CAMERA: CameraData = {
-  ...ATIK_CAMERA, id: 'osc-cam', color_type: 'OSC',
+  ...ATIK_CAMERA,
+  id: 'osc-cam',
+  color_type: 'OSC',
 };
 
 const REDUCER_063: AccessoryData = {
-  id: 'celestron-fr-0-63', brand: 'Celestron', model: 'Focal Reducer 0.63×',
-  type: 'focal-reducer', magnification_factor: 0.63,
-  notes: null, thread_input: null, thread_output: null, status: 'active',
+  id: 'celestron-fr-0-63',
+  brand: 'Celestron',
+  model: 'Focal Reducer 0.63×',
+  type: 'focal-reducer',
+  magnification_factor: 0.63,
+  notes: null,
+  thread_input: null,
+  thread_output: null,
+  status: 'active',
 };
 
 const BARLOW_2X: AccessoryData = {
-  id: 'barlow-2x', brand: 'Generic', model: 'Barlow 2×',
-  type: 'barlow', magnification_factor: 2.0,
-  notes: null, thread_input: null, thread_output: null, status: 'active',
+  id: 'barlow-2x',
+  brand: 'Generic',
+  model: 'Barlow 2×',
+  type: 'barlow',
+  magnification_factor: 2.0,
+  notes: null,
+  thread_input: null,
+  thread_output: null,
+  status: 'active',
 };
 
 const SMART_TELESCOPE: TelescopeData = {
-  id: 'seestar-s50', brand: 'ZWO', model: 'Seestar S50',
-  type: 'Smart Telescope', optical_design: 'refractor', aperture_mm: 50,
-  focal_length_mm: 250, f_ratio: 5, is_smart_telescope: true,
-  integrated_camera: true, integrated_camera_id: 'seestar-s50-camera',
-  mount_interface: null, optical_notes: null, recommended_use: ['wide-field'],
+  id: 'seestar-s50',
+  brand: 'ZWO',
+  model: 'Seestar S50',
+  type: 'Smart Telescope',
+  optical_design: 'refractor',
+  aperture_mm: 50,
+  focal_length_mm: 250,
+  f_ratio: 5,
+  is_smart_telescope: true,
+  integrated_camera: true,
+  integrated_camera_id: 'seestar-s50-camera',
+  mount_interface: null,
+  optical_notes: null,
+  recommended_use: ['wide-field'],
   status: 'active',
 };
 
@@ -115,9 +155,9 @@ describe('fovDeg', () => {
   });
 
   it('widens FOV with 0.63× reducer', () => {
-    const presetNative  = buildGearPreset(C8_TELESCOPE, ATIK_CAMERA, null);
+    const presetNative = buildGearPreset(C8_TELESCOPE, ATIK_CAMERA, null);
     const presetReduced = buildGearPreset(C8_TELESCOPE, ATIK_CAMERA, REDUCER_063);
-    const fovNative  = fovDeg(presetNative);
+    const fovNative = fovDeg(presetNative);
     const fovReduced = fovDeg(presetReduced);
     expect(fovReduced.wDeg).toBeGreaterThan(fovNative.wDeg);
     expect(fovReduced.hDeg).toBeGreaterThan(fovNative.hDeg);
@@ -149,7 +189,7 @@ describe('pixelScaleArcsec', () => {
   });
 
   it('pixel scale increases when focal length decreases', () => {
-    const presetNative  = buildGearPreset(C8_TELESCOPE, ATIK_CAMERA, null);
+    const presetNative = buildGearPreset(C8_TELESCOPE, ATIK_CAMERA, null);
     const presetReduced = buildGearPreset(C8_TELESCOPE, ATIK_CAMERA, REDUCER_063);
     expect(pixelScaleArcsec(presetReduced)).toBeGreaterThan(pixelScaleArcsec(presetNative));
   });

@@ -50,12 +50,12 @@ Every new or modified route in `server/index.ts` **must** have a `@swagger` JSDo
 
 ### Required fields
 
-| Field | Rule |
-|---|---|
-| `summary` | Short title (≤ 10 words) |
-| `parameters` | Every path/query param: `in`, `name`, `required`, `schema.type`, `description` |
-| `requestBody` | For POST/PUT/PATCH: full `content: application/json` schema with all properties, types, and descriptions |
-| `responses` | `200` with response schema + **every error code the handler can return** (400, 404, 500) with `description` and error shape |
+| Field         | Rule                                                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `summary`     | Short title (≤ 10 words)                                                                                                    |
+| `parameters`  | Every path/query param: `in`, `name`, `required`, `schema.type`, `description`                                              |
+| `requestBody` | For POST/PUT/PATCH: full `content: application/json` schema with all properties, types, and descriptions                    |
+| `responses`   | `200` with response schema + **every error code the handler can return** (400, 404, 500) with `description` and error shape |
 
 ### Template
 

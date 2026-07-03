@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, dev]
   pull_request:
-    branches: [master]
+    branches: [master, dev]
 
 jobs:
   build:
@@ -25,6 +25,15 @@ jobs:
 
       - name: Type-check server
         run: npm run typecheck:server
+
+      # Warn-only: ESLint rules are all `warn`, so this surfaces issues in the log
+      # without failing the build. See eslint.config.js / CLAUDE.md.
+      - name: Lint
+        run: npm run lint
+
+      # Blocking: formatting is deterministic once the repo is Prettier-clean.
+      - name: Prettier check
+        run: npm run format:check
 
       - name: Build
         run: npx vite build

@@ -1,6 +1,10 @@
 import { wrapExecForWSL } from './wsl-utils.js';
 
-export type ExecAsync = (cmd: string, args: string[], opts?: { timeout?: number }) => Promise<{ stdout: string; stderr: string }>;
+export type ExecAsync = (
+  cmd: string,
+  args: string[],
+  opts?: { timeout?: number },
+) => Promise<{ stdout: string; stderr: string }>;
 
 interface ExecError extends Error {
   code?: string | number;
@@ -10,14 +14,22 @@ interface ExecError extends Error {
 
 function execErrorFields(err: unknown): { code: number; stdout: string; stderr: string } {
   const e = err as ExecError;
-  const code = typeof e.code === 'number' ? e.code : (e.code === 'ENOENT' ? -1 : 1);
+  const code = typeof e.code === 'number' ? e.code : e.code === 'ENOENT' ? -1 : 1;
   return { code, stdout: e.stdout ?? '', stderr: e.stderr ?? e.message ?? String(err) };
 }
 
 // ─── ASTAP probe ─────────────────────────────────────────────────────────────
 
-export interface AstapProbeOk   { ok: true;  output: string }
-export interface AstapProbeErr  { ok: false; code: number; stdout: string; stderr: string }
+export interface AstapProbeOk {
+  ok: true;
+  output: string;
+}
+export interface AstapProbeErr {
+  ok: false;
+  code: number;
+  stdout: string;
+  stderr: string;
+}
 export type AstapProbeResult = AstapProbeOk | AstapProbeErr;
 
 export async function probeAstap(
@@ -37,8 +49,16 @@ export async function probeAstap(
 
 // ─── solve-field probe ────────────────────────────────────────────────────────
 
-export interface SolveFieldProbeOk  { ok: true;  version: string }
-export interface SolveFieldProbeErr { ok: false; code: number; stdout: string; stderr: string }
+export interface SolveFieldProbeOk {
+  ok: true;
+  version: string;
+}
+export interface SolveFieldProbeErr {
+  ok: false;
+  code: number;
+  stdout: string;
+  stderr: string;
+}
 export type SolveFieldProbeResult = SolveFieldProbeOk | SolveFieldProbeErr;
 
 export async function probeSolveField(
@@ -58,8 +78,15 @@ export async function probeSolveField(
 
 // ─── data-dir probe ───────────────────────────────────────────────────────────
 
-export interface DataDirProbeOk  { ok: true;  output: string }
-export interface DataDirProbeErr { ok: false; code: number; output: string }
+export interface DataDirProbeOk {
+  ok: true;
+  output: string;
+}
+export interface DataDirProbeErr {
+  ok: false;
+  code: number;
+  output: string;
+}
 export type DataDirProbeResult = DataDirProbeOk | DataDirProbeErr;
 
 export async function probeDataDir(
@@ -88,7 +115,7 @@ export async function probeDataDir(
     return { ok: true, output: stdout };
   } catch (err) {
     const e = err as ExecError;
-    const code = typeof e.code === 'number' ? e.code : (e.code === 'ENOENT' ? -1 : 1);
+    const code = typeof e.code === 'number' ? e.code : e.code === 'ENOENT' ? -1 : 1;
     const output = (e.stdout ?? '') + (e.stderr ? '\n' + e.stderr : '');
     return { ok: false, code, output };
   }

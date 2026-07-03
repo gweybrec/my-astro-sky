@@ -70,7 +70,12 @@ function tilesAlong(tileDeg: number, regionDeg: number, overlap: number): number
  * about (ra0, dec0) → sky coordinates. The standard-coordinate inverse, with the
  * ρ→0 limit handled so a zero offset returns the centre exactly.
  */
-function offsetSky(ra0Deg: number, dec0Deg: number, eastDeg: number, northDeg: number): { ra: number; dec: number } {
+function offsetSky(
+  ra0Deg: number,
+  dec0Deg: number,
+  eastDeg: number,
+  northDeg: number,
+): { ra: number; dec: number } {
   const xi = eastDeg * DEG2RAD;
   const eta = northDeg * DEG2RAD;
   const rho = Math.hypot(xi, eta);
@@ -91,7 +96,12 @@ function offsetSky(ra0Deg: number, dec0Deg: number, eastDeg: number, northDeg: n
  * placement math {@link tileCenters} uses, exposed so the mosaic outline can be
  * sampled to follow the same tangent-plane geometry as its tiles.
  */
-export function framePointToSky(center: { ra: number; dec: number }, paDeg: number, gxDeg: number, gyDeg: number): { ra: number; dec: number } {
+export function framePointToSky(
+  center: { ra: number; dec: number },
+  paDeg: number,
+  gxDeg: number,
+  gyDeg: number,
+): { ra: number; dec: number } {
   const paRad = paDeg * DEG2RAD;
   const east = gxDeg * Math.cos(paRad) + gyDeg * Math.sin(paRad);
   const north = -gxDeg * Math.sin(paRad) + gyDeg * Math.cos(paRad);
@@ -104,14 +114,23 @@ export function framePointToSky(center: { ra: number; dec: number }, paDeg: numb
  * recover a tile's place in the mosaic frame so a move/rotate can be applied
  * while preserving the (possibly non-rectangular) tile set.
  */
-export function skyToFrameOffset(center: { ra: number; dec: number }, paDeg: number, ra: number, dec: number): { gx: number; gy: number } {
+export function skyToFrameOffset(
+  center: { ra: number; dec: number },
+  paDeg: number,
+  ra: number,
+  dec: number,
+): { gx: number; gy: number } {
   // Forward gnomonic: (ra, dec) → standard coordinates (east, north) about centre.
-  const ra0 = center.ra * DEG2RAD, dec0 = center.dec * DEG2RAD;
-  const raR = ra * DEG2RAD, decR = dec * DEG2RAD;
+  const ra0 = center.ra * DEG2RAD,
+    dec0 = center.dec * DEG2RAD;
+  const raR = ra * DEG2RAD,
+    decR = dec * DEG2RAD;
   const dRa = raR - ra0;
   const cosc = Math.sin(dec0) * Math.sin(decR) + Math.cos(dec0) * Math.cos(decR) * Math.cos(dRa);
-  const east = (Math.cos(decR) * Math.sin(dRa) / cosc) * RAD2DEG;
-  const north = ((Math.cos(dec0) * Math.sin(decR) - Math.sin(dec0) * Math.cos(decR) * Math.cos(dRa)) / cosc) * RAD2DEG;
+  const east = ((Math.cos(decR) * Math.sin(dRa)) / cosc) * RAD2DEG;
+  const north =
+    ((Math.cos(dec0) * Math.sin(decR) - Math.sin(dec0) * Math.cos(decR) * Math.cos(dRa)) / cosc) *
+    RAD2DEG;
   // Un-rotate by PA (inverse of the rotation in framePointToSky).
   const paRad = paDeg * DEG2RAD;
   return {
@@ -125,16 +144,27 @@ export function skyToFrameOffset(center: { ra: number; dec: number }, paDeg: num
  * current tiles (one tile-step out, on the tiles' lattice). De-duplicated. These
  * are the "+" spots shown around a selected mosaic.
  */
-export function addCandidateOffsets(offsets: Array<{ gx: number; gy: number }>, stepW: number, stepH: number): Array<{ gx: number; gy: number }> {
+export function addCandidateOffsets(
+  offsets: Array<{ gx: number; gy: number }>,
+  stepW: number,
+  stepH: number,
+): Array<{ gx: number; gy: number }> {
   if (offsets.length === 0 || stepW <= 0 || stepH <= 0) return [];
   const ref = offsets[0];
   // Cell key relative to a present tile, so half-step lattices (even grids) key cleanly.
-  const key = (gx: number, gy: number) => `${Math.round((gx - ref.gx) / stepW)}:${Math.round((gy - ref.gy) / stepH)}`;
-  const present = new Set(offsets.map(o => key(o.gx, o.gy)));
+  const key = (gx: number, gy: number) =>
+    `${Math.round((gx - ref.gx) / stepW)}:${Math.round((gy - ref.gy) / stepH)}`;
+  const present = new Set(offsets.map((o) => key(o.gx, o.gy)));
   const out = new Map<string, { gx: number; gy: number }>();
   for (const o of offsets) {
-    for (const [dx, dy] of [[stepW, 0], [-stepW, 0], [0, stepH], [0, -stepH]]) {
-      const gx = o.gx + dx, gy = o.gy + dy;
+    for (const [dx, dy] of [
+      [stepW, 0],
+      [-stepW, 0],
+      [0, stepH],
+      [0, -stepH],
+    ]) {
+      const gx = o.gx + dx,
+        gy = o.gy + dy;
       const k = key(gx, gy);
       if (!present.has(k) && !out.has(k)) out.set(k, { gx, gy });
     }
@@ -148,12 +178,21 @@ export function addCandidateOffsets(offsets: Array<{ gx: number; gy: number }>, 
  * outline stays aligned with the tiles after trimming) and the bounding grid
  * dimensions (cols × rows in tile-step units, for the displayed scale).
  */
-export function mosaicShapeFromOffsets(offsets: Array<{ gx: number; gy: number }>, stepW: number, stepH: number): { centerGx: number; centerGy: number; cols: number; rows: number } {
+export function mosaicShapeFromOffsets(
+  offsets: Array<{ gx: number; gy: number }>,
+  stepW: number,
+  stepH: number,
+): { centerGx: number; centerGy: number; cols: number; rows: number } {
   if (offsets.length === 0) return { centerGx: 0, centerGy: 0, cols: 0, rows: 0 };
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
   for (const o of offsets) {
-    minX = Math.min(minX, o.gx); maxX = Math.max(maxX, o.gx);
-    minY = Math.min(minY, o.gy); maxY = Math.max(maxY, o.gy);
+    minX = Math.min(minX, o.gx);
+    maxX = Math.max(maxX, o.gx);
+    minY = Math.min(minY, o.gy);
+    maxY = Math.max(maxY, o.gy);
   }
   const cols = stepW > 0 ? Math.round((maxX - minX) / stepW) + 1 : 1;
   const rows = stepH > 0 ? Math.round((maxY - minY) / stepH) + 1 : 1;
@@ -236,8 +275,8 @@ export function mosaicBounds(
 ): { wDeg: number; hDeg: number } {
   if (tiles.length === 0) return { wDeg: 0, hDeg: 0 };
   const overlap = overlapFraction(overlapPct);
-  const cols = tiles.map(t => t.col);
-  const rows = tiles.map(t => t.row);
+  const cols = tiles.map((t) => t.col);
+  const rows = tiles.map((t) => t.row);
   const colSpan = Math.max(...cols) - Math.min(...cols);
   const rowSpan = Math.max(...rows) - Math.min(...rows);
   return {
@@ -302,7 +341,10 @@ export function smartMosaicEnvelope(
 ): SmartMosaicEnvelope | null {
   if (!cap) return null;
   if (Number.isFinite(cap.scale) && (cap.scale as number) > 1) {
-    return { maxWDeg: nativeWDeg * (cap.scale as number), maxHDeg: nativeHDeg * (cap.scale as number) };
+    return {
+      maxWDeg: nativeWDeg * (cap.scale as number),
+      maxHDeg: nativeHDeg * (cap.scale as number),
+    };
   }
   if (Number.isFinite(cap.max_long_edge_deg) && (cap.max_long_edge_deg as number) > 0) {
     const longEdge = cap.max_long_edge_deg as number;
@@ -391,7 +433,13 @@ export function transformMosaicToSetup(
   target: TargetFov,
 ): MosaicTransform {
   if (target.envelope) {
-    const { wDeg, hDeg } = clampSmartMosaicSize(outlineWDeg, outlineHDeg, target.wDeg, target.hDeg, target.envelope);
+    const { wDeg, hDeg } = clampSmartMosaicSize(
+      outlineWDeg,
+      outlineHDeg,
+      target.wDeg,
+      target.hDeg,
+      target.envelope,
+    );
     return { kind: 'single', wDeg, hDeg };
   }
   if (target.tileable) {
@@ -417,19 +465,25 @@ export function autoRegionForDsos(
   dsos: Array<Pick<DSO, 'ra' | 'dec' | 'majAxis' | 'minAxis' | 'pa'>>,
   marginPct = 20,
 ): { center: { ra: number; dec: number }; region: MosaicRegion } {
-  if (dsos.length === 0) return { center: { ra: 0, dec: 0 }, region: { wDeg: 0, hDeg: 0, paDeg: 0 } };
+  if (dsos.length === 0)
+    return { center: { ra: 0, dec: 0 }, region: { wDeg: 0, hDeg: 0, paDeg: 0 } };
   if (dsos.length === 1) {
     const d = dsos[0];
     return { center: { ra: d.ra, dec: d.dec }, region: autoRegionForDso(d, marginPct) };
   }
   const margin = Math.max(0, marginPct) / 100;
   const ref = { ra: dsos[0].ra, dec: dsos[0].dec };
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
   for (const d of dsos) {
     const { gx, gy } = skyToFrameOffset(ref, 0, d.ra, d.dec); // east, north (deg) at PA 0
     const r = d.majAxis != null ? d.majAxis / 60 / 2 : 0;
-    minX = Math.min(minX, gx - r); maxX = Math.max(maxX, gx + r);
-    minY = Math.min(minY, gy - r); maxY = Math.max(maxY, gy + r);
+    minX = Math.min(minX, gx - r);
+    maxX = Math.max(maxX, gx + r);
+    minY = Math.min(minY, gy - r);
+    maxY = Math.max(maxY, gy + r);
   }
   const center = framePointToSky(ref, 0, (minX + maxX) / 2, (minY + maxY) / 2);
   return {

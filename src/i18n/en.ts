@@ -42,7 +42,9 @@ const en: Translations = {
   },
   search: {
     section: 'Search',
-    placeholder: 'Search star or DSO\u2026',    tooltip: 'Search for a star or deep-sky object by name or catalog number',    typeStar: 'Star',
+    placeholder: 'Search star or DSO\u2026',
+    tooltip: 'Search for a star or deep-sky object by name or catalog number',
+    typeStar: 'Star',
     typeDSO: 'DSO',
     noResults: 'No results',
     recenter: 'Re-center on this object',
@@ -174,7 +176,8 @@ const en: Translations = {
   },
   shortcuts: {
     title: 'Keyboard shortcuts',
-    intro: 'Press a key to toggle a sky-map element on or off. Click ✎ to reassign a key. Changes are saved automatically.',
+    intro:
+      'Press a key to toggle a sky-map element on or off. Click ✎ to reassign a key. Changes are saved automatically.',
     rebind: 'Reassign',
     pressAKey: 'Press a key…',
     resetOne: 'Reset',
@@ -240,9 +243,11 @@ const en: Translations = {
     importSetupsSection: 'Setups ({n})',
     importGearSection: 'Telescopes/cameras ({n})',
     importSelectAll: 'Select all',
-    importReplaceWarning: 'An item with the same name already exists and will be replaced if you import it.',
+    importReplaceWarning:
+      'An item with the same name already exists and will be replaced if you import it.',
     importBackupWarning: 'Recommended: create a backup of your current data before restoring.',
-    deleteBackupWarning: 'Recommended: create a backup of your current data before deleting anything.',
+    deleteBackupWarning:
+      'Recommended: create a backup of your current data before deleting anything.',
     importBackupBtn: 'Create a backup (ZIP)',
     importSuccess: 'Restored: {n} photo(s) ({s} skipped)',
     importError: 'Backup / restore error',
@@ -265,18 +270,25 @@ const en: Translations = {
     astrometryApiKeySet: 'Key configured — enter a new key to replace it',
     astrometryApiKeyPlaceholder: 'Enter API key…',
     astapPath: 'Path to astap_cli',
-    astapPathTooltip: 'Full path to the astap_cli binary. ASTAP is a fast offline plate solver — no internet or API key required.<br><br>Used for single-photo and batch solving when ASTAP is selected. Leave empty if ASTAP is not installed.<br><br>If using WSL, this must be a Linux path inside WSL (e.g. /opt/astap/astap_cli).<br><br>Run scripts/install-astap.sh to install.',
+    astapPathTooltip:
+      'Full path to the astap_cli binary. ASTAP is a fast offline plate solver — no internet or API key required.<br><br>Used for single-photo and batch solving when ASTAP is selected. Leave empty if ASTAP is not installed.<br><br>If using WSL, this must be a Linux path inside WSL (e.g. /opt/astap/astap_cli).<br><br>Run scripts/install-astap.sh to install.',
     solveFieldPath: 'Path to solve-field',
-    solveFieldPathTooltip: 'Full path to the solve-field binary from the Astrometry.net package.<br><br>Used for single-photo and batch solving when solve-field is selected.<br><br>If using WSL, this must be a Linux path inside WSL (e.g. /usr/bin/solve-field).<br><br>Leave empty to use the system PATH.<br><br>Requires index files in the Astrometry index directory.<br><br>Run scripts/install-solve-field.sh to install.',
+    solveFieldPathTooltip:
+      'Full path to the solve-field binary from the Astrometry.net package.<br><br>Used for single-photo and batch solving when solve-field is selected.<br><br>If using WSL, this must be a Linux path inside WSL (e.g. /usr/bin/solve-field).<br><br>Leave empty to use the system PATH.<br><br>Requires index files in the Astrometry index directory.<br><br>Run scripts/install-solve-field.sh to install.',
     astrometryDataDir: 'Astrometry index directory',
-    astrometryDataDirTooltip: 'Directory containing astrometry.net index files (.fits).<br><br>Used by solve-field to match star patterns in your photos.<br><br>Larger index files cover wider fields of view.<br><br>Example: /usr/local/astrometry/data or /var/lib/astrometry/data.<br><br>Run scripts/install-solve-field.sh to download the appropriate index files.',
+    astrometryDataDirTooltip:
+      'Directory containing astrometry.net index files (.fits).<br><br>Used by solve-field to match star patterns in your photos.<br><br>Larger index files cover wider fields of view.<br><br>Example: /usr/local/astrometry/data or /var/lib/astrometry/data.<br><br>Run scripts/install-solve-field.sh to download the appropriate index files.',
     maxParallelSolves: 'Max parallel solves (local solvers)',
-    maxParallelSolvesTooltip: 'Maximum number of local solves (solve-field or ASTAP) running at the same time.<br><br>Extra photos wait in queue for a free slot.<br><br>Recommended: 1–2 on slow machines, 4 on most machines, 6–8 on high-end machines.<br><br>Has no effect on astrometry.net: online submissions start immediately, staggered 1 s apart.',
-    astrometryApiKeyTooltip: 'API key for the astrometry.net online plate-solving service. Required to submit photos to nova.astrometry.net.<br><br>Stored on the server and never sent back to the browser after saving.<br><br>Not needed if you only use ASTAP or solve-field.<br><br>Get a free key at https://nova.astrometry.net/api_help.',
+    maxParallelSolvesTooltip:
+      'Maximum number of local solves (solve-field or ASTAP) running at the same time.<br><br>Extra photos wait in queue for a free slot.<br><br>Recommended: 1–2 on slow machines, 4 on most machines, 6–8 on high-end machines.<br><br>Has no effect on astrometry.net: online submissions start immediately, staggered 1 s apart.',
+    astrometryApiKeyTooltip:
+      'API key for the astrometry.net online plate-solving service. Required to submit photos to nova.astrometry.net.<br><br>Stored on the server and never sent back to the browser after saving.<br><br>Not needed if you only use ASTAP or solve-field.<br><br>Get a free key at https://nova.astrometry.net/api_help.',
     useWslSolveField: 'Use WSL2 for solve-field',
     useWslAstap: 'Use WSL2 for ASTAP',
-    wslSolveFieldTooltip: 'Runs solve-field inside your WSL Linux distro instead of native Windows.<br><br>When enabled, the solve-field path and related directories must be Linux paths inside WSL.<br><br>Install solve-field inside WSL. See the user guide for setup instructions for WSL2, Ubuntu, and solve-field.',
-    wslAstapTooltip: 'Runs ASTAP inside your WSL Linux distro instead of native Windows.<br><br>When enabled, the ASTAP path and related directories must be Linux paths inside WSL.<br><br>Install ASTAP inside WSL. See the user guide for setup instructions for WSL2, Ubuntu, and ASTAP.',
+    wslSolveFieldTooltip:
+      'Runs solve-field inside your WSL Linux distro instead of native Windows.<br><br>When enabled, the solve-field path and related directories must be Linux paths inside WSL.<br><br>Install solve-field inside WSL. See the user guide for setup instructions for WSL2, Ubuntu, and solve-field.',
+    wslAstapTooltip:
+      'Runs ASTAP inside your WSL Linux distro instead of native Windows.<br><br>When enabled, the ASTAP path and related directories must be Linux paths inside WSL.<br><br>Install ASTAP inside WSL. See the user guide for setup instructions for WSL2, Ubuntu, and ASTAP.',
     saveSettings: 'Save',
     clearApiKey: 'Clear API key',
     settingsSaved: 'Settings saved',
@@ -302,14 +314,19 @@ const en: Translations = {
     aboutBuildLabel: 'Build time',
     aboutAuthorLabel: 'Author',
     aboutLicenseLabel: 'License',
-    aboutDesc: 'MyAstroSky is an interactive sky map for astrophotographers. Overlay your astrophotographs on a stereographic polar projection, position them manually or with plate solvers, and explore your sky.',
-    aboutFeatures: 'Stereographic polar projection · Plate solving (ASTAP, solve-field, astrometry.net) · 12,000+ deep-sky objects · Target recommendations · Observing plans by night · Backup & restore to transfer between devices and users',
+    aboutDesc:
+      'MyAstroSky is an interactive sky map for astrophotographers. Overlay your astrophotographs on a stereographic polar projection, position them manually or with plate solvers, and explore your sky.',
+    aboutFeatures:
+      'Stereographic polar projection · Plate solving (ASTAP, solve-field, astrometry.net) · 12,000+ deep-sky objects · Target recommendations · Observing plans by night · Backup & restore to transfer between devices and users',
     privacyTitle: 'Privacy',
-    privacyLocal: 'All your data (photos, metadata, settings) is stored locally on your device. External network connections are limited to the cases described below.',
+    privacyLocal:
+      'All your data (photos, metadata, settings) is stored locally on your device. External network connections are limited to the cases described below.',
     privacyException: 'Exception: astrometry.net solver',
-    privacyAstrometry: 'When you use the astrometry.net solver, your image is uploaded to nova.astrometry.net for plate solving. An API key is required. No other data is transmitted.',
+    privacyAstrometry:
+      'When you use the astrometry.net solver, your image is uploaded to nova.astrometry.net for plate solving. An API key is required. No other data is transmitted.',
     privacyExceptionGeoloc: 'Exception: IP-based geolocation',
-    privacyGeoloc: 'When you use the auto-detect location button in the Targets tab, your IP address is sent to ip-api.com to estimate your geographic coordinates. No other data is transmitted.',
+    privacyGeoloc:
+      'When you use the auto-detect location button in the Targets tab, your IP address is sent to ip-api.com to estimate your geographic coordinates. No other data is transmitted.',
     dataCreditsTitle: 'Data credits',
     dataCreditsCatalogsLabel: 'Catalogues',
     dataCreditsDocsLabel: 'Reference documents',
@@ -353,22 +370,26 @@ const en: Translations = {
   },
   modal: {
     title: 'Add a photo to the map',
-    instructions: 'Click on 2 or 3 points in the photo, then identify each (star or RA/Dec coordinates).',
+    instructions:
+      'Click on 2 or 3 points in the photo, then identify each (star or RA/Dec coordinates).',
     autoSolve: 'Automatic solve',
     wcsButton: 'Metadata (FITS/TIFF)…',
     wcsRemove: 'Remove WCS solution',
     wcsUnavailable: 'Available for TIFF/FITS files',
     wcsCompanionReading: 'Reading WCS metadata from {filename}…',
     wcsCompanionSuccess: '{filename} ✓ — {width}×{height} px, {count} star(s)',
-    wcsNoMetadata: 'No WCS metadata found in {filename}. This file was not plate-solved. Open it in Siril / PixInsight, run plate solving, then try again.',
+    wcsNoMetadata:
+      'No WCS metadata found in {filename}. This file was not plate-solved. Open it in Siril / PixInsight, run plate solving, then try again.',
     wcsParseError: 'Error reading {filename}: {detail}',
     wcsDimensionMismatchTitle: 'Different dimensions',
-    wcsDimensionMismatchBody: 'The JPEG is {jpegW}×{jpegH} px and the FITS/TIFF is {fitsW}×{fitsH} px. The aspect ratios do not match — the overlay may be inaccurate.',
+    wcsDimensionMismatchBody:
+      'The JPEG is {jpegW}×{jpegH} px and the FITS/TIFF is {fitsW}×{fitsH} px. The aspect ratios do not match — the overlay may be inaccurate.',
     wcsContinueAnyway: 'Continue anyway',
     onlineButton: 'Online (astrometry.net)',
     localButton: 'Solve locally',
     astapButton: 'ASTAP (local)',
-    manualInstructions: 'Click on 2 or 3 recognizable stars in the photo, then identify each one by name or RA/Dec coordinates.',
+    manualInstructions:
+      'Click on 2 or 3 recognizable stars in the photo, then identify each one by name or RA/Dec coordinates.',
     manualButton: 'Manual placement on map',
     manualTooltip: 'Drag and drop photo on the map',
     manualIdentifyTitle: 'Identify stars — {name}',
@@ -387,7 +408,7 @@ const en: Translations = {
     raSeconds: 's (0-59)',
     decLabel: 'Declination',
     decDegrees: '° (±0-89)',
-    decMinutes: '\' (0-59)',
+    decMinutes: "' (0-59)",
     decSeconds: '" (0-59)',
     raDecSet: 'RA {ra} Dec {dec}',
     invalidCoordinates: 'Invalid coordinates',
@@ -400,7 +421,8 @@ const en: Translations = {
     wcsFound: 'WCS metadata found!',
     solvingOnline: 'Solving\u2026 ({seconds}s)',
     solvingOnlineSlow: 'Still solving on astrometry.net…',
-    solveTimeoutHint: 'This can take up to 10 minutes. You can close this modal and come back later — once solved, the image will appear in the submissions list and you can reuse it.',
+    solveTimeoutHint:
+      'This can take up to 10 minutes. You can close this modal and come back later — once solved, the image will appear in the submissions list and you can reuse it.',
     slowSolveHint: 'Still in progress, this can take several minutes…',
     solvedOnline: '✓ Solved in {seconds}s — ready to place on map',
     errorDetailsSummary: 'Error details',
@@ -443,31 +465,46 @@ const en: Translations = {
     hintsInfoTitle: 'Automatic Solving - Help',
     hintsInfoIntro: 'Automatic solving identifies stars in your photo to place it on the sky map.',
     hintsInfoOptions: 'Available options',
-    hintsInfoWCS: '<strong>Metadata (FITS/TIFF)</strong>: Pick a companion FITS/TIFF file (e.g. from Siril) to extract WCS coordinates and apply them to your JPEG (instant).',
-    hintsInfoOnline: '<strong>Online (astrometry.net)</strong>: Cloud service, accurate but may take 30-60 seconds. Your file will be uploaded to astrometry.net and accessible in "My Images" on your online dashboard. Works for most images.',
-    hintsInfoSolveField: '<strong>solve-field (local)</strong>: Local astrometry.net solver, accurate and private. Requires index files installation (~2.4GB). Takes 10-30 seconds.',
-    hintsInfoASTAP: '<strong>ASTAP (local)</strong>: Fast (~3-5 seconds) but requires local installation. Works best with position hints.',
+    hintsInfoWCS:
+      '<strong>Metadata (FITS/TIFF)</strong>: Pick a companion FITS/TIFF file (e.g. from Siril) to extract WCS coordinates and apply them to your JPEG (instant).',
+    hintsInfoOnline:
+      '<strong>Online (astrometry.net)</strong>: Cloud service, accurate but may take 30-60 seconds. Your file will be uploaded to astrometry.net and accessible in "My Images" on your online dashboard. Works for most images.',
+    hintsInfoSolveField:
+      '<strong>solve-field (local)</strong>: Local astrometry.net solver, accurate and private. Requires index files installation (~2.4GB). Takes 10-30 seconds.',
+    hintsInfoASTAP:
+      '<strong>ASTAP (local)</strong>: Fast (~3-5 seconds) but requires local installation. Works best with position hints.',
     hintsInfoRecommendations: 'Recommendations',
-    hintsInfoUseHints: 'For images with few bright stars (galaxies, nebulae), enter the target object name in the field above.',
-    hintsInfoMinStars: 'ASTAP requires ~100-300 detectable stars in the image (magnitude up to 16).',
+    hintsInfoUseHints:
+      'For images with few bright stars (galaxies, nebulae), enter the target object name in the field above.',
+    hintsInfoMinStars:
+      'ASTAP requires ~100-300 detectable stars in the image (magnitude up to 16).',
     hintsInfoFOV: 'Works best for fields 0.5° to 10° (most amateur photos).',
     hintsInfoTroubleshooting: 'If solving fails',
     hintsInfoTryHints: 'Try adding a position hint (object name).',
     hintsInfoTryOnline: 'Use online solving if ASTAP fails.',
     hintsInfoManual: 'As a last resort, use manual star identification.',
     manualInfoTitle: 'Manual identification — Help',
-    manualInfoWhen: 'Use when automatic plate solving fails, or for images with an unusual field of view.',
+    manualInfoWhen:
+      'Use when automatic plate solving fails, or for images with an unusual field of view.',
     manualInfoMethodsTitle: 'Two approaches',
-    manualInfoMethodMap: '<strong>Place directly on map</strong>: Drag and drop the photo to its approximate position on the sky map. Quick but less precise.',
-    manualInfoMethodStars: '<strong>Identify 2–3 stars</strong>: Click on 2-3 recognizable stars in the photo, then identify each one by name or RA/Dec coordinates. The system places the photo precisely.',
+    manualInfoMethodMap:
+      '<strong>Place directly on map</strong>: Drag and drop the photo to its approximate position on the sky map. Quick but less precise.',
+    manualInfoMethodStars:
+      '<strong>Identify 2–3 stars</strong>: Click on 2-3 recognizable stars in the photo, then identify each one by name or RA/Dec coordinates. The system places the photo precisely.',
     manualInfoTipsTitle: 'Tip',
-    manualInfoSuggest: 'The "Suggest stars" button (after entering a target name in plate solving) lists bright nearby stars to help identify them.',
+    manualInfoSuggest:
+      'The "Suggest stars" button (after entering a target name in plate solving) lists bright nearby stars to help identify them.',
     metaInfoTitle: 'Additional info — Help',
-    metaInfoAuto: 'After a successful plate solve, objects in the image field are detected and filled in automatically.',
-    metaInfoDsos: '<strong>Objects</strong>: Deep-sky objects visible in the image. Used for searching and filtering.',
-    metaInfoLabels: '<strong>Labels</strong>: Short custom tags (e.g. "2024", "Ha", "narrowband"). Used to filter photos in the side panel.',
-    metaInfoNotes: '<strong>Notes</strong>: Free-form text — acquisition details, equipment, processing, comments.',
-    metaInfoEdit: 'These fields can be edited at any time by clicking on the photo on the map, then "Edit".',
+    metaInfoAuto:
+      'After a successful plate solve, objects in the image field are detected and filled in automatically.',
+    metaInfoDsos:
+      '<strong>Objects</strong>: Deep-sky objects visible in the image. Used for searching and filtering.',
+    metaInfoLabels:
+      '<strong>Labels</strong>: Short custom tags (e.g. "2024", "Ha", "narrowband"). Used to filter photos in the side panel.',
+    metaInfoNotes:
+      '<strong>Notes</strong>: Free-form text — acquisition details, equipment, processing, comments.',
+    metaInfoEdit:
+      'These fields can be edited at any time by clicking on the photo on the map, then "Edit".',
     metadataToggle: 'Additional info (DSOs, labels, integration, notes)',
     metadataFilename: 'Filename',
     metadataDsos: 'Objects in this image',
@@ -486,7 +523,8 @@ const en: Translations = {
     metadataIntegrationsSecondsTooltip: 'Exposure time for one frame (seconds)',
     metadataIntegrationsSecondsSuffix: 's',
     metadataIntegrationsFilterPlaceholder: 'filter',
-    metadataIntegrationsFilterTooltip: 'Acquisition filter (R, G, B, Halpha, OIII, Luminance, or custom)',
+    metadataIntegrationsFilterTooltip:
+      'Acquisition filter (R, G, B, Halpha, OIII, Luminance, or custom)',
     metadataIntegrationsRemoveRow: 'Remove integration row',
     metadataObsDate: 'Observation date',
     metadataObsDatePlaceholder: 'Observation start date and time',
@@ -535,15 +573,20 @@ const en: Translations = {
     notEnoughStars: 'Not enough stars detected',
     noSolution: 'No solution found',
     imageLoadFailed: 'Failed to load image',
-    astapNoSolution: 'No solution found. ASTAP detected {stars} stars and {quads} quads in the image',
-    astapNoSolutionWithFov: 'No solution found. ASTAP detected {stars} stars and {quads} quads in the image (last attempt: FOV {fov}°)',
-    astapDatabaseMissing: 'ASTAP failed. Verify that the star database is installed in {path}. Run: sudo bash scripts/install-astap.sh',
+    astapNoSolution:
+      'No solution found. ASTAP detected {stars} stars and {quads} quads in the image',
+    astapNoSolutionWithFov:
+      'No solution found. ASTAP detected {stars} stars and {quads} quads in the image (last attempt: FOV {fov}°)',
+    astapDatabaseMissing:
+      'ASTAP failed. Verify that the star database is installed in {path}. Run: sudo bash scripts/install-astap.sh',
     astapFailed: 'ASTAP failed ({stars} stars detected)',
     astapNoWcs: 'ASTAP did not produce a WCS file',
     astapTimeout: 'ASTAP timeout (60 s)',
-    astapSuggestions: 'Possible causes: (1) Heavy image processing distorting star patterns, (2) Significant nebulosity interfering with detection, (3) Incorrect catalog position. Try: ',
+    astapSuggestions:
+      'Possible causes: (1) Heavy image processing distorting star patterns, (2) Significant nebulosity interfering with detection, (3) Incorrect catalog position. Try: ',
     astapSuggestionsWithHint: '(1) Use online solver, or (2) Manual identification.',
-    astapSuggestionsNoHint: '(1) Provide position hint (target object), (2) Use online solver, or (3) Manual identification.',
+    astapSuggestionsNoHint:
+      '(1) Provide position hint (target object), (2) Use online solver, or (3) Manual identification.',
     listSubmissionsFailed: 'Failed to fetch submissions',
     reuseSubmissionFailed: 'Failed to reuse submission',
     invalidPhotoFormat: 'Invalid photo format. Allowed formats: JPG, PNG, WEBP.',
@@ -582,11 +625,13 @@ const en: Translations = {
     addPoi: '+ Add point of interest',
     addType: '+ Add type',
     typesTitle: 'Point of interest types',
-    typesHint: 'The shared list of types. Deleting a type keeps its points of interest on photos as “Uncategorized”.',
+    typesHint:
+      'The shared list of types. Deleting a type keeps its points of interest on photos as “Uncategorized”.',
     noTypes: 'No types yet.',
     newTypePlaceholder: 'New type name…',
     deleteType: 'Delete type',
-    deleteConfirm: 'Delete the type “{name}”? Photos keep their points of interest as Uncategorized.',
+    deleteConfirm:
+      'Delete the type “{name}”? Photos keep their points of interest as Uncategorized.',
     colorLabel: 'Color',
   },
   gallery: {
@@ -634,7 +679,8 @@ const en: Translations = {
       moonClose: 'Close',
       moonModerate: 'Medium',
       moonFar: 'Far',
-      moonSeparationHelp: 'Angular distance between the Moon and the target at imaging time. A small angle near a bright Moon means moonlight will wash out the target.',
+      moonSeparationHelp:
+        'Angular distance between the Moon and the target at imaging time. A small angle near a bright Moon means moonlight will wash out the target.',
       panelDetails: 'Panel-by-panel details',
       panelDetailsTitle: 'Panel details',
       panelColumn: 'Panel',
@@ -659,7 +705,8 @@ const en: Translations = {
       accessory: 'Accessory',
       noAccessory: 'None (no accessory)',
       noAccessorySelected: 'No accessory selected',
-      smartTelescopeLocked: 'Smart telescopes have an integrated sensor — camera and accessories cannot be changed.',
+      smartTelescopeLocked:
+        'Smart telescopes have an integrated sensor — camera and accessories cannot be changed.',
       effectiveFocalLength: 'Effective focal length',
       addTelescope: '+ Add telescope',
       addCamera: '+ Add camera',
@@ -739,7 +786,8 @@ const en: Translations = {
           sensorWidthMm: 'Physical sensor width, in millimetres',
           sensorHeightMm: 'Physical sensor height, in millimetres',
           pixelSizeUm: 'Physical size of one pixel, in micrometres',
-          magnificationFactor: 'Focal length multiplier — reducers < 1 (e.g. 0.63×), barlows > 1 (e.g. 2×)',
+          magnificationFactor:
+            'Focal length multiplier — reducers < 1 (e.g. 0.63×), barlows > 1 (e.g. 2×)',
           opticalDesign: 'Optical system architecture, e.g. SCT, Refractor, Newtonian',
           mountInterface: 'Focuser thread size or back-focus standard, e.g. M48, 2", T2',
           opticalNotes: 'Any other relevant notes about this telescope',
@@ -770,10 +818,10 @@ const en: Translations = {
     generating: 'Computing…',
     perPage: 'Results per page',
     pagination: {
-      first:   'First page',
-      prev:    'Previous page',
-      next:    'Next page',
-      last:    'Last page',
+      first: 'First page',
+      prev: 'Previous page',
+      next: 'Next page',
+      last: 'Last page',
       results: 'results',
     },
     typeFilter: 'Object types',
@@ -781,13 +829,16 @@ const en: Translations = {
     difficultyFilter: 'Difficulty',
     catalogFilter: 'Catalogs',
     includeOversized: 'Include objects larger than FOV',
-    includeOversizedTooltip: 'Include nebulae larger than the field of view. The photo will be a framed portion of the object.',
+    includeOversizedTooltip:
+      'Include nebulae larger than the field of view. The photo will be a framed portion of the object.',
     excludePhotographed: 'Exclude already photographed objects',
-    excludePhotographedTooltip: 'Excludes objects present in the DSO metadata of your photos. Useful for discovering new targets.',
+    excludePhotographedTooltip:
+      'Excludes objects present in the DSO metadata of your photos. Useful for discovering new targets.',
     altRangeLabel: 'Altitude',
     minAlt: 'Min',
     maxAlt: 'Max',
-    altRangeTooltip: 'Exclude objects whose transit altitude is below the minimum or above the maximum.',
+    altRangeTooltip:
+      'Exclude objects whose transit altitude is below the minimum or above the maximum.',
     constellationFilter: 'Constellations',
     constellationSelect: 'Select constellations',
     constellationSelectAll: 'Select all',
@@ -821,7 +872,8 @@ const en: Translations = {
     },
     results: {
       empty: 'No targets found for these parameters. Try a different date or equipment.',
-      noDarkNight: 'No astronomical night tonight at this latitude (sun too high). Results based on nautical twilight window.',
+      noDarkNight:
+        'No astronomical night tonight at this latitude (sun too high). Results based on nautical twilight window.',
       maxAlt: 'Max alt.',
       bestTime: 'Transit',
       size: 'Size',
@@ -890,7 +942,8 @@ const en: Translations = {
     mosaicCreate: 'Create mosaic',
     deleteMosaic: 'Remove mosaic',
     switchSetupTitle: 'Change setup',
-    switchSetupIntro: 'This plan has mosaics that don’t map directly onto the new setup. For each one, apply the closest match or drop it.',
+    switchSetupIntro:
+      'This plan has mosaics that don’t map directly onto the new setup. For each one, apply the closest match or drop it.',
     switchApply: 'Apply',
     switchDrop: 'Drop',
     switchConfirm: 'OK',
@@ -910,14 +963,16 @@ const en: Translations = {
     unpin: 'Unpin (free-float)',
     centerOnMap: 'Center on map',
     angleLabel: 'Angle',
-    angleHelp: 'Framing rotation — the camera position angle in degrees east of celestial north (0° points the frame toward north). This is the angle to set on your rotator to reproduce the framing.',
+    angleHelp:
+      'Framing rotation — the camera position angle in degrees east of celestial north (0° points the frame toward north). This is the angle to set on your rotator to reproduce the framing.',
     freeFrames: 'Free frames',
     newPlan: '+ New plan',
     customLocation: 'Custom location',
     planNeedsSetup: 'Choose a gear setup above to size this plan’s frames.',
     anchorOn: 'Anchor: snapping to nearest object',
     anchorOff: 'Anchor off: pin anywhere',
-    deleteFrameConfirm: 'Remove “{name}” from this plan? It will also disappear from Targets & Plan.',
+    deleteFrameConfirm:
+      'Remove “{name}” from this plan? It will also disappear from Targets & Plan.',
     showOnMap: 'Show on map',
     showFrames: 'Show frames',
     hideFrames: 'Hide frames',
@@ -928,7 +983,8 @@ const en: Translations = {
     modalTitle: 'Add photos',
     closeTitle: 'Close (photos you placed remain on the map; unsaved solves will be lost)',
     confirmCloseTitle: 'Discard unsaved photos?',
-    confirmCloseMessage: 'You have {count} solved photo(s) that have not been saved yet. If you close, they will be lost.',
+    confirmCloseMessage:
+      'You have {count} solved photo(s) that have not been saved yet. If you close, they will be lost.',
     confirmCloseAction: 'Close anyway',
     startButton: 'Start plate solving',
     cancelAll: 'Cancel solving',
@@ -950,7 +1006,8 @@ const en: Translations = {
     statusPlacing: 'Uploading to map…',
     placingProgress: 'Uploading and placing…',
     autoPlace: 'Auto save and place after solve',
-    autoPlaceDisabledTooltip: 'Auto save is enabled — photos are placed automatically after solving',
+    autoPlaceDisabledTooltip:
+      'Auto save is enabled — photos are placed automatically after solving',
     placeButton: 'Save and place on map',
     progressPlaced: '· {placed} placed',
     wcsLoaded: '✓ WCS',
@@ -961,13 +1018,16 @@ const en: Translations = {
     infoTitle: 'Batch photo upload',
     infoIntro: 'Load multiple photos and run plate solving concurrently.',
     infoSolversTitle: 'Solvers',
-    infoSolvers: 'Choose a solver per photo: solve-field (local), ASTAP (local), or astrometry.net (online). With the online solver, the photo is uploaded to nova.astrometry.net. You can also re-use an existing astrometry.net solution using the dedicated button.',
+    infoSolvers:
+      'Choose a solver per photo: solve-field (local), ASTAP (local), or astrometry.net (online). With the online solver, the photo is uploaded to nova.astrometry.net. You can also re-use an existing astrometry.net solution using the dedicated button.',
     infoWcsTitle: 'Pre-solved WCS',
-    infoWcs: 'If a photo is already solved, load its FITS or TIFF file via "Metadata (FITS/TIFF)…". Plate solving will be skipped.',
+    infoWcs:
+      'If a photo is already solved, load its FITS or TIFF file via "Metadata (FITS/TIFF)…". Plate solving will be skipped.',
     infoHintTitle: 'Position hint',
     infoHint: 'Enter an object name (e.g. M42) to help the solver locate the sky region.',
     infoPlacementTitle: 'Placing on the map',
-    infoPlacement: 'Once solving is done, click “Save and place on map” to save photos and display them on the map. Close the window without clicking that button to discard — unsaved solves will not be kept.',
+    infoPlacement:
+      'Once solving is done, click “Save and place on map” to save photos and display them on the map. Close the window without clicking that button to discard — unsaved solves will not be kept.',
     addMore: 'Add more photos',
     labelsForAll: 'Labels for all photos',
     labelsForAllHint: 'Added to every photo; combine with per-photo labels below.',

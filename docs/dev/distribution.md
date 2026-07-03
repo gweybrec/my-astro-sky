@@ -69,13 +69,13 @@ Solver settings (ASTAP path, solve-field path, index file directory) and the ast
 
 Copy `.env.example` to `.env` and fill in what you need (Node.js / Docker deployments only — `.env` is not loaded in Electron):
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `ASTROMETRY_API_KEY` | _(none)_ | astrometry.net online API key. If set via env var, the value is used directly and in-app edits are blocked (`SETTING_LOCKED_BY_ENV`). Useful for Docker secrets or CI. |
-| `STAR_CATALOG_PATH` | `public/data/stars.14.json` | Path to the star catalog JSON used for WCS star matching. |
-| `PORT` | `3001` | TCP port Express listens on. |
-| `DB_PATH` | `./data.db` | SQLite database path. |
-| `SETTINGS_ENCRYPTION_KEY` | _(auto in Electron)_ | Base64-encoded 32-byte key for encrypting secrets (e.g. the API key) in the DB. Electron auto-provisions it via `safeStorage`. For Docker, inject it as a secret if you want at-rest encryption; omit it and secrets are stored in plaintext. |
+| Variable                  | Default                     | Purpose                                                                                                                                                                                                                                       |
+| ------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ASTROMETRY_API_KEY`      | _(none)_                    | astrometry.net online API key. If set via env var, the value is used directly and in-app edits are blocked (`SETTING_LOCKED_BY_ENV`). Useful for Docker secrets or CI.                                                                        |
+| `STAR_CATALOG_PATH`       | `public/data/stars.14.json` | Path to the star catalog JSON used for WCS star matching.                                                                                                                                                                                     |
+| `PORT`                    | `3001`                      | TCP port Express listens on.                                                                                                                                                                                                                  |
+| `DB_PATH`                 | `./data.db`                 | SQLite database path.                                                                                                                                                                                                                         |
+| `SETTINGS_ENCRYPTION_KEY` | _(auto in Electron)_        | Base64-encoded 32-byte key for encrypting secrets (e.g. the API key) in the DB. Electron auto-provisions it via `safeStorage`. For Docker, inject it as a secret if you want at-rest encryption; omit it and secrets are stored in plaintext. |
 
 In the Electron desktop app, `.env` is never loaded. `DB_PATH`, `UPLOADS_DIR`, `STAR_CATALOG_PATH`, and `PORT` are set programmatically by `electron/main.ts` at startup.
 
@@ -104,11 +104,11 @@ MyAstroSky.exe
 
 User-writable data lives outside the asar, in the OS user-data directory:
 
-| OS | Path |
-|---|---|
-| Windows | `%APPDATA%\MyAstroSky\` |
-| Linux | `~/.config/MyAstroSky/` |
-| macOS | `~/Library/Application Support/MyAstroSky/` |
+| OS      | Path                                        |
+| ------- | ------------------------------------------- |
+| Windows | `%APPDATA%\MyAstroSky\`                     |
+| Linux   | `~/.config/MyAstroSky/`                     |
+| macOS   | `~/Library/Application Support/MyAstroSky/` |
 
 The Electron main process sets `UPLOADS_DIR` and `DB_PATH` env vars pointing there before starting Express.
 
@@ -142,9 +142,11 @@ Important limitation (expected behavior):
 End-user download, install, and uninstall steps live in [Installing MyAstroSky](/user/installing-app.md) — this section is about producing the packages, for whoever cuts a release.
 
 > **Prerequisites:** `build/icons/` must exist before running `electron:make`. Generate it once with:
+>
 > ```bash
 > npm run generate-icons
 > ```
+>
 > Re-run it any time `public/icon.png` changes. The `build/icons/` directory is not committed to the repo.
 
 Generate the platform packages from the repo root:
@@ -155,25 +157,25 @@ npm run electron:make
 
 **Linux** — produces two outputs in `out/make/`:
 
-| File | Corresponds to |
-|---|---|
-| `deb/x64/my-astro-sky_<version>_amd64.deb` | The `.deb` installer end users download |
-| `zip/linux/x64/my-astro-sky-linux-x64-<version>.zip` | The portable zip end users download |
+| File                                                 | Corresponds to                          |
+| ---------------------------------------------------- | --------------------------------------- |
+| `deb/x64/my-astro-sky_<version>_amd64.deb`           | The `.deb` installer end users download |
+| `zip/linux/x64/my-astro-sky-linux-x64-<version>.zip` | The portable zip end users download     |
 
 **Windows** — run `npm run electron:make` on a Windows machine (cross-compiling from Linux is not supported by Squirrel). Produces:
 
-| File | Corresponds to |
-|---|---|
-| `out/make/squirrel.windows/x64/MyAstroSkySetup.exe` | The installer end users download |
+| File                                                              | Corresponds to                                                    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `out/make/squirrel.windows/x64/MyAstroSkySetup.exe`               | The installer end users download                                  |
 | `out/make/squirrel.windows/x64/my-astro-sky-<version>-full.nupkg` | Used internally by Squirrel for updates — not needed by end users |
 
 > **Prerequisites on Windows:** Node.js 24.18+, Git, `npm install`, and `npm run generate-icons` (see above).
 
 **macOS** — built per-architecture (`MakerZIP` + `MakerDMG` for `darwin`). The release workflow builds both Apple Silicon (`arm64`, on a `macos-14` runner) and Intel (`x64`, on a `macos-13` runner). Per architecture it produces:
 
-| File | Corresponds to |
-|---|---|
-| `MyAstroSky-<arch>.dmg` | The disk image end users download |
+| File                                                                | Corresponds to                      |
+| ------------------------------------------------------------------- | ----------------------------------- |
+| `MyAstroSky-<arch>.dmg`                                             | The disk image end users download   |
 | `out/make/zip/darwin/<arch>/MyAstroSky-darwin-<arch>-<version>.zip` | The portable zip end users download |
 
 Choose by your Mac: **Apple Silicon (M1/M2/M3+) → `arm64`**, **Intel → `x64`**. An `arm64` build will not run on an Intel Mac.
@@ -192,11 +194,11 @@ The regression was reverted upstream and confirmed fixed in **Node.js 24.18.0** 
 
 ### Platform notes
 
-| | Linux | macOS | Windows |
-|---|---|---|---|
-| solve-field | ✅ | ❌ (not available) | ❌ (not available) |
-| ASTAP | ✅ `install-astap.sh` | install from hnsky.org | ✅ `install-astap.ps1` |
-| nova.astrometry.net | ✅ | ✅ | ✅ |
+|                     | Linux                 | macOS                  | Windows                |
+| ------------------- | --------------------- | ---------------------- | ---------------------- |
+| solve-field         | ✅                    | ❌ (not available)     | ❌ (not available)     |
+| ASTAP               | ✅ `install-astap.sh` | install from hnsky.org | ✅ `install-astap.ps1` |
+| nova.astrometry.net | ✅                    | ✅                     | ✅                     |
 
 The UI already reads `solveFieldAvailable` from `/api/config` (set to `process.platform !== 'win32'` on the backend) and disables the solve-field option in the batch modal when it is false.
 

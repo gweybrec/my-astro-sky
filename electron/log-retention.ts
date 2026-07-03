@@ -71,7 +71,8 @@ export function cleanupOldLogsSafely(
       !LOG_FILENAME_RE.test(entry.name) &&
       !LOG_FILENAME_BATCH_RE.test(entry.name) &&
       !LOG_FILENAME_CRASH_RE.test(entry.name)
-    ) continue;
+    )
+      continue;
 
     const candidatePath = path.join(logsDir, entry.name);
 

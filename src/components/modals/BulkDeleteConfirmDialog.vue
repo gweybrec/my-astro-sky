@@ -9,7 +9,9 @@
         {{ t('settings.deleteConfirmPermanent') }}
       </p>
       <div class="dialog-buttons">
-        <button type="button" class="btn-cancel" @click="$emit('cancel')">{{ t('modal.cancel') }}</button>
+        <button type="button" class="btn-cancel" @click="$emit('cancel')">
+          {{ t('modal.cancel') }}
+        </button>
         <button ref="confirmBtnEl" type="button" class="btn-danger" @click="$emit('confirm')">
           {{ t('settings.deleteAction') }}
         </button>
@@ -28,7 +30,10 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>();
 const confirmBtnEl = ref<HTMLButtonElement | null>(null);
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Escape') { e.preventDefault(); emit('cancel'); }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    emit('cancel');
+  }
 }
 
 onMounted(() => {

@@ -46,11 +46,13 @@ describe('getSolverAvailability', () => {
   });
 
   it('all available when everything is configured', () => {
-    const avail = getSolverAvailability(makeSettings({
-      SOLVE_FIELD_PATH: '/usr/bin/solve-field',
-      ASTAP_PATH: '/opt/astap/astap_cli',
-      apiKeySet: true,
-    }));
+    const avail = getSolverAvailability(
+      makeSettings({
+        SOLVE_FIELD_PATH: '/usr/bin/solve-field',
+        ASTAP_PATH: '/opt/astap/astap_cli',
+        apiKeySet: true,
+      }),
+    );
     expect(avail).toEqual({ solveField: true, astap: true, astrometry: true });
   });
 });

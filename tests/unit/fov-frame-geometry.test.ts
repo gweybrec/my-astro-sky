@@ -22,10 +22,10 @@ describe('fov frame geometry', () => {
   it('distToSegment handles endpoints and interior projection', () => {
     const a = { x: 0, y: 0 };
     const b = { x: 10, y: 0 };
-    expect(distToSegment(5, 4, a, b)).toBeCloseTo(4);   // perpendicular
-    expect(distToSegment(-3, 0, a, b)).toBeCloseTo(3);  // beyond start
-    expect(distToSegment(13, 0, a, b)).toBeCloseTo(3);  // beyond end
-    expect(distToSegment(0, 0, a, a)).toBeCloseTo(0);   // degenerate segment
+    expect(distToSegment(5, 4, a, b)).toBeCloseTo(4); // perpendicular
+    expect(distToSegment(-3, 0, a, b)).toBeCloseTo(3); // beyond start
+    expect(distToSegment(13, 0, a, b)).toBeCloseTo(3); // beyond end
+    expect(distToSegment(0, 0, a, a)).toBeCloseTo(0); // degenerate segment
   });
 
   it('minDistToPolygonEdges finds nearest edge', () => {
@@ -90,7 +90,7 @@ describe('fov frame geometry', () => {
       expect(r.cx).toBeCloseTo(100);
       expect(r.cy).toBeCloseTo(100);
       expect(r.halfW).toBeCloseTo(150); // |250-100|
-      expect(r.halfH).toBeCloseTo(50);  // |150-100|
+      expect(r.halfH).toBeCloseTo(50); // |150-100|
     });
 
     it('any corner gives the same centre and extents (symmetry)', () => {
@@ -105,20 +105,25 @@ describe('fov frame geometry', () => {
     it('projects the drag onto the frame axes for a rotated frame', () => {
       // 90°-rotated square: local right = (0,1), local down = (-1,0). Centre (100,100).
       const rotated = [
-        { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 50, y: 150 }, { x: 50, y: 50 },
+        { x: 150, y: 50 },
+        { x: 150, y: 150 },
+        { x: 50, y: 150 },
+        { x: 50, y: 50 },
       ];
       const r = resizeFromCorner(rotated, 1, 150, 250, 90);
       expect(r.cx).toBeCloseTo(100);
       expect(r.cy).toBeCloseTo(100);
       expect(r.halfW).toBeCloseTo(150); // along local-x (screen y): |250-100|
-      expect(r.halfH).toBeCloseTo(50);  // along local-y (screen x): |150-100|
+      expect(r.halfH).toBeCloseTo(50); // along local-y (screen x): |150-100|
     });
   });
 
   describe('convexPolygonsOverlap', () => {
     const sq = (cx: number, cy: number, h = 50) => [
-      { x: cx - h, y: cy - h }, { x: cx + h, y: cy - h },
-      { x: cx + h, y: cy + h }, { x: cx - h, y: cy + h },
+      { x: cx - h, y: cy - h },
+      { x: cx + h, y: cy - h },
+      { x: cx + h, y: cy + h },
+      { x: cx - h, y: cy + h },
     ];
 
     it('detects overlapping squares', () => {
@@ -137,7 +142,10 @@ describe('fov frame geometry', () => {
     it('finds a separating axis for a diagonal gap a bounding box would miss', () => {
       // Two rotated squares whose AABBs overlap but the shapes don't.
       const diamond = (cx: number, cy: number, r: number) => [
-        { x: cx, y: cy - r }, { x: cx + r, y: cy }, { x: cx, y: cy + r }, { x: cx - r, y: cy },
+        { x: cx, y: cy - r },
+        { x: cx + r, y: cy },
+        { x: cx, y: cy + r },
+        { x: cx - r, y: cy },
       ];
       expect(convexPolygonsOverlap(diamond(0, 0, 50), diamond(90, 90, 50))).toBe(false);
     });

@@ -54,7 +54,13 @@ export function isNearHandle(px: number, py: number, h: Pt, radius: number): boo
  * centre along the frame's local "up" (−y) direction, for the given canvas
  * rotation in degrees.
  */
-export function rotateHandlePos(cx: number, cy: number, halfHPx: number, rotationDeg: number, distPx = 24): Pt {
+export function rotateHandlePos(
+  cx: number,
+  cy: number,
+  halfHPx: number,
+  rotationDeg: number,
+  distPx = 24,
+): Pt {
   const angle = rotationDeg * DEG2RAD;
   const up = halfHPx + distPx; // local point (0, -up)
   return {
@@ -68,7 +74,12 @@ export function rotateHandlePos(cx: number, cy: number, halfHPx: number, rotatio
  * the cursor — the inverse of {@link rotateHandlePos}. Local "up" (sin θ, −cos θ)
  * must align with (mx−cx, my−cy), giving θ = atan2(dx, −dy).
  */
-export function canvasRotationDegFromCursor(cx: number, cy: number, mx: number, my: number): number {
+export function canvasRotationDegFromCursor(
+  cx: number,
+  cy: number,
+  mx: number,
+  my: number,
+): number {
   return Math.atan2(mx - cx, -(my - cy)) * RAD2DEG;
 }
 
@@ -85,9 +96,20 @@ export function convexPolygonsOverlap(a: Pt[], b: Pt[]): boolean {
       // Axis = edge normal.
       const ax = -(p2.y - p1.y);
       const ay = p2.x - p1.x;
-      let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
-      for (const p of a) { const d = p.x * ax + p.y * ay; minA = Math.min(minA, d); maxA = Math.max(maxA, d); }
-      for (const p of b) { const d = p.x * ax + p.y * ay; minB = Math.min(minB, d); maxB = Math.max(maxB, d); }
+      let minA = Infinity,
+        maxA = -Infinity,
+        minB = Infinity,
+        maxB = -Infinity;
+      for (const p of a) {
+        const d = p.x * ax + p.y * ay;
+        minA = Math.min(minA, d);
+        maxA = Math.max(maxA, d);
+      }
+      for (const p of b) {
+        const d = p.x * ax + p.y * ay;
+        minB = Math.min(minB, d);
+        maxB = Math.max(maxB, d);
+      }
       if (maxA < minB || maxB < minA) return false; // a gap on this axis → no overlap
     }
   }
@@ -114,7 +136,13 @@ export interface ResizeResult {
  * axis (cos, sin) and down axis (−sin, cos); each |projection| is a half-extent
  * (the dragged corner sits a half-width/height from the centre).
  */
-export function resizeFromCorner(corners: Pt[], cornerIdx: number, mx: number, my: number, rotationDeg: number): ResizeResult {
+export function resizeFromCorner(
+  corners: Pt[],
+  cornerIdx: number,
+  mx: number,
+  my: number,
+  rotationDeg: number,
+): ResizeResult {
   const opp = corners[(cornerIdx + 2) % 4];
   const drag = corners[cornerIdx];
   const cx = (opp.x + drag.x) / 2; // frame centre (unchanged by the resize)
@@ -124,8 +152,8 @@ export function resizeFromCorner(corners: Pt[], cornerIdx: number, mx: number, m
   const a = rotationDeg * DEG2RAD;
   const cosA = Math.cos(a);
   const sinA = Math.sin(a);
-  const localW = dx * cosA + dy * sinA;     // along local +x (right)
-  const localH = dx * -sinA + dy * cosA;    // along local +y (down)
+  const localW = dx * cosA + dy * sinA; // along local +x (right)
+  const localH = dx * -sinA + dy * cosA; // along local +y (down)
   return {
     cx,
     cy,

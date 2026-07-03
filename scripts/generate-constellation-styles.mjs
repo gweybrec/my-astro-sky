@@ -23,9 +23,9 @@ const STELLARIUM_BASE =
 
 const STYLES = [
   { key: 'stellarium', culture: 'modern' },
-  { key: 'rey',        culture: 'modern_rey' },
-  { key: 'chinese',    culture: 'chinese' },
-  { key: 'arabic',     culture: 'arabic_al-sufi' },
+  { key: 'rey', culture: 'modern_rey' },
+  { key: 'chinese', culture: 'chinese' },
+  { key: 'arabic', culture: 'arabic_al-sufi' },
 ];
 
 // ─── Build HIP → {ra, dec} map from stars.14.json ───────────────────────────
@@ -107,8 +107,8 @@ function convertCulture(indexData, hipMap, styleName) {
 
   console.log(
     `  [${styleName}] ${features.length} constellations, ` +
-    `${totalPolylines - skippedPolylines}/${totalPolylines} polylines, ` +
-    `${missingHips} missing HIP lookups`
+      `${totalPolylines - skippedPolylines}/${totalPolylines} polylines, ` +
+      `${missingHips} missing HIP lookups`,
   );
 
   return { type: 'FeatureCollection', features };
@@ -139,7 +139,7 @@ async function main() {
   console.log('\nDone.');
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal error:', err);
   process.exit(1);
 });

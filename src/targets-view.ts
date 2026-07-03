@@ -7,8 +7,14 @@ import { t } from './i18n';
 import { getDSOs, getDSOCatalog, DSO_CATALOGS_ALL } from './dso-catalog';
 import { getConstellationInfos } from './star-catalog';
 import {
-  getTelescopes, getCameras, getAccessories, buildGearPreset, invalidateGearCache,
-  telescopeLabel, cameraLabel, accessoryLabel,
+  getTelescopes,
+  getCameras,
+  getAccessories,
+  buildGearPreset,
+  invalidateGearCache,
+  telescopeLabel,
+  cameraLabel,
+  accessoryLabel,
 } from './gear-catalog';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import { formatGearFovLabel, fovDeg, formatFov, computeFovTargetScale } from './gear-presets';
@@ -20,7 +26,15 @@ import { formatRA, formatDec, formatAlt } from './format-utils';
 import { attachAnchoredPanel } from './popup-utils';
 import type { GearPreset } from './gear-presets';
 import { recommendRecipe } from './imaging-recipe';
-import { createCustomGear, deleteCustomGear, getPhotos, getGearSetups, type GearSetupData, type Plan, type PlanMosaic } from './api';
+import {
+  createCustomGear,
+  deleteCustomGear,
+  getPhotos,
+  getGearSetups,
+  type GearSetupData,
+  type Plan,
+  type PlanMosaic,
+} from './api';
 import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
 import { showToast } from './toast';
@@ -41,7 +55,14 @@ import { useUiStore } from './stores/ui';
 import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
 import { twilightWindow, dateToJD, moonRaDecDeg, moonPhase } from './astro-time';
-import { maxAltDuringWindow, sampleAltCurve, sampleMoonAltCurve, angularSeparationDeg, moonDangerLevel, type AltSample } from './sky-geometry';
+import {
+  maxAltDuringWindow,
+  sampleAltCurve,
+  sampleMoonAltCurve,
+  angularSeparationDeg,
+  moonDangerLevel,
+  type AltSample,
+} from './sky-geometry';
 import { outlineFromGrid } from './mosaic';
 import { renderPlanPdf, type PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
@@ -52,7 +73,16 @@ import { confirmPlanDelete, confirmPlanEntryDelete } from './photo-delete-confir
 
 const PREFS_KEY = 'targets-prefs-v3';
 
-type SortKey = 'score' | 'altitude' | 'transit' | 'magnitude' | 'size' | 'fov-fit' | 'name' | 'rating' | 'difficulty';
+type SortKey =
+  | 'score'
+  | 'altitude'
+  | 'transit'
+  | 'magnitude'
+  | 'size'
+  | 'fov-fit'
+  | 'name'
+  | 'rating'
+  | 'difficulty';
 
 interface TargetsPrefs {
   setupId: string | null;
@@ -122,22 +152,26 @@ function savePrefs(p: TargetsPrefs): void {
  * unlit limb against the chart background.
  */
 function moonPhaseIconSvg(phaseIndex: number): string {
-  const r = 5, c = 6, size = 12;
+  const r = 5,
+    c = 6,
+    size = 12;
   const f = [0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25][phaseIndex] ?? 0.5; // illuminated fraction
   const waning = phaseIndex >= 5;
   let lit = '';
   if (f >= 0.999) {
     lit = `<circle cx="${c}" cy="${c}" r="${r}" fill="var(--moon-lit)"/>`;
   } else if (f > 0.001) {
-    const b = r * (1 - 2 * f);            // terminator x-radius (signed: crescent vs gibbous)
+    const b = r * (1 - 2 * f); // terminator x-radius (signed: crescent vs gibbous)
     const innerSweep = b <= 0 ? 1 : 0;
     const d = `M${c},${c - r} A${r},${r} 0 0 1 ${c},${c + r} A${Math.abs(b).toFixed(2)},${r} 0 0 ${innerSweep} ${c},${c - r} Z`;
     lit = `<path d="${d}" fill="var(--moon-lit)"/>`;
   }
   const flip = waning ? ` transform="translate(${size},0) scale(-1,1)"` : '';
-  return `<svg width="14" height="14" viewBox="0 0 ${size} ${size}" class="block">`
-    + `<circle cx="${c}" cy="${c}" r="${r}" fill="var(--bg-card)" stroke="var(--moon-curve)" stroke-width="0.75"/>`
-    + `<g${flip}>${lit}</g></svg>`;
+  return (
+    `<svg width="14" height="14" viewBox="0 0 ${size} ${size}" class="block">` +
+    `<circle cx="${c}" cy="${c}" r="${r}" fill="var(--bg-card)" stroke="var(--moon-curve)" stroke-width="0.75"/>` +
+    `<g${flip}>${lit}</g></svg>`
+  );
 }
 
 export function sortCustomFirst<T extends { id: string }>(arr: T[]): T[] {
@@ -150,7 +184,19 @@ export function sortCustomFirst<T extends { id: string }>(arr: T[]): T[] {
 
 // ─── DSO type labels ──────────────────────────────────────────────────────────
 
-const ALL_DSO_TYPES = ['GxS', 'GxE', 'GxI', 'Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN'] as const;
+const ALL_DSO_TYPES = [
+  'GxS',
+  'GxE',
+  'GxI',
+  'Gx',
+  'OC',
+  'GC',
+  'EN',
+  'RN',
+  'PN',
+  'SNR',
+  'DN',
+] as const;
 
 export interface DSOFilterOptions {
   enabledTypes: Set<string>;
@@ -162,14 +208,19 @@ export interface DSOFilterOptions {
 }
 
 export function filterTargetDSOs(dsos: DSO[], opts: DSOFilterOptions): DSO[] {
-  return dsos.filter(d => {
+  return dsos.filter((d) => {
     if (!opts.enabledTypes.has(d.type as string)) return false;
     if (d.rating !== null && !opts.enabledRatings.has(d.rating)) return false;
     if (d.difficulty !== null && !opts.enabledDifficulties.has(d.difficulty)) return false;
     const cat = getDSOCatalog(d.id);
     if (cat !== null && !opts.enabledCatalogs.has(cat)) return false;
     if (opts.photographedIds !== null && opts.photographedIds.has(d.id)) return false;
-    if (opts.enabledConstellations !== null && d.constellation !== null && !opts.enabledConstellations.has(d.constellation)) return false;
+    if (
+      opts.enabledConstellations !== null &&
+      d.constellation !== null &&
+      !opts.enabledConstellations.has(d.constellation)
+    )
+      return false;
     return true;
   });
 }
@@ -227,15 +278,28 @@ function buildPageList(current: number, total: number): (number | null)[] {
 function sortSuggestions(suggestions: TargetSuggestion[], sortBy: SortKey): TargetSuggestion[] {
   const arr = [...suggestions];
   switch (sortBy) {
-    case 'altitude':   return arr.sort((a, b) => b.maxAltDeg - a.maxAltDeg);
-    case 'transit':    return arr.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
-    case 'magnitude':  return arr.sort((a, b) => (a.dso.mag ?? 99) - (b.dso.mag ?? 99));
-    case 'size':       return arr.sort((a, b) => (b.dso.majAxis ?? 0) - (a.dso.majAxis ?? 0));
-    case 'fov-fit':    return arr.sort((a, b) => b.fovFitScore - a.fovFitScore);
-    case 'name':       return arr.sort((a, b) => (a.dso.catalogs[0] ?? a.dso.id).localeCompare(b.dso.catalogs[0] ?? b.dso.id, undefined, { numeric: true }));
-    case 'rating':     return arr.sort((a, b) => (b.dso.rating ?? 0) - (a.dso.rating ?? 0));
-    case 'difficulty': return arr.sort((a, b) => (b.dso.difficulty ?? 0) - (a.dso.difficulty ?? 0));
-    default:           return arr.sort((a, b) => b.score - a.score);
+    case 'altitude':
+      return arr.sort((a, b) => b.maxAltDeg - a.maxAltDeg);
+    case 'transit':
+      return arr.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
+    case 'magnitude':
+      return arr.sort((a, b) => (a.dso.mag ?? 99) - (b.dso.mag ?? 99));
+    case 'size':
+      return arr.sort((a, b) => (b.dso.majAxis ?? 0) - (a.dso.majAxis ?? 0));
+    case 'fov-fit':
+      return arr.sort((a, b) => b.fovFitScore - a.fovFitScore);
+    case 'name':
+      return arr.sort((a, b) =>
+        (a.dso.catalogs[0] ?? a.dso.id).localeCompare(b.dso.catalogs[0] ?? b.dso.id, undefined, {
+          numeric: true,
+        }),
+      );
+    case 'rating':
+      return arr.sort((a, b) => (b.dso.rating ?? 0) - (a.dso.rating ?? 0));
+    case 'difficulty':
+      return arr.sort((a, b) => (b.dso.difficulty ?? 0) - (a.dso.difficulty ?? 0));
+    default:
+      return arr.sort((a, b) => b.score - a.score);
   }
 }
 
@@ -258,43 +322,191 @@ export function openAddGearModal(
 ): void {
   const titles: Record<string, string> = {
     telescope: t('targets.gear.addTelescopeTitle'),
-    camera:    t('targets.gear.addCameraTitle'),
+    camera: t('targets.gear.addCameraTitle'),
     accessory: t('targets.gear.addAccessoryTitle'),
   };
 
   const fieldsByType: Record<string, FieldDef[]> = {
     telescope: [
-      { key: 'brand',           label: t('targets.gear.fields.brand'),          type: 'text',   required: true,  helpKey: 'brand',           placeholder: 'e.g. Celestron' },
-      { key: 'model',           label: t('targets.gear.fields.model'),          type: 'text',   required: true,  helpKey: 'model',           placeholder: 'e.g. C8 SCT' },
-      { key: 'aperture_mm',     label: t('targets.gear.fields.apertureMm'),     type: 'number', required: true,  helpKey: 'apertureMm',     step: '0.1',  placeholder: 'e.g. 203' },
-      { key: 'focal_length_mm', label: t('targets.gear.fields.focalLengthMm'),  type: 'number', required: true,  helpKey: 'focalLengthMm',  step: '0.1',  placeholder: 'e.g. 2032' },
-      { key: 'optical_design',  label: t('targets.gear.fields.opticalDesign'),  type: 'text',   required: false, helpKey: 'opticalDesign',  placeholder: 'e.g. Schmidt-Cassegrain' },
-      { key: 'mount_interface', label: t('targets.gear.fields.mountInterface'), type: 'text',   required: false, helpKey: 'mountInterface', placeholder: 'e.g. M48, 2"' },
-      { key: 'optical_notes',   label: t('targets.gear.fields.opticalNotes'),   type: 'text',   required: false, helpKey: 'opticalNotes' },
+      {
+        key: 'brand',
+        label: t('targets.gear.fields.brand'),
+        type: 'text',
+        required: true,
+        helpKey: 'brand',
+        placeholder: 'e.g. Celestron',
+      },
+      {
+        key: 'model',
+        label: t('targets.gear.fields.model'),
+        type: 'text',
+        required: true,
+        helpKey: 'model',
+        placeholder: 'e.g. C8 SCT',
+      },
+      {
+        key: 'aperture_mm',
+        label: t('targets.gear.fields.apertureMm'),
+        type: 'number',
+        required: true,
+        helpKey: 'apertureMm',
+        step: '0.1',
+        placeholder: 'e.g. 203',
+      },
+      {
+        key: 'focal_length_mm',
+        label: t('targets.gear.fields.focalLengthMm'),
+        type: 'number',
+        required: true,
+        helpKey: 'focalLengthMm',
+        step: '0.1',
+        placeholder: 'e.g. 2032',
+      },
+      {
+        key: 'optical_design',
+        label: t('targets.gear.fields.opticalDesign'),
+        type: 'text',
+        required: false,
+        helpKey: 'opticalDesign',
+        placeholder: 'e.g. Schmidt-Cassegrain',
+      },
+      {
+        key: 'mount_interface',
+        label: t('targets.gear.fields.mountInterface'),
+        type: 'text',
+        required: false,
+        helpKey: 'mountInterface',
+        placeholder: 'e.g. M48, 2"',
+      },
+      {
+        key: 'optical_notes',
+        label: t('targets.gear.fields.opticalNotes'),
+        type: 'text',
+        required: false,
+        helpKey: 'opticalNotes',
+      },
     ],
     camera: [
-      { key: 'brand',            label: t('targets.gear.fields.brand'),          type: 'text',   required: true,  helpKey: 'brand',          placeholder: 'e.g. Atik' },
-      { key: 'model',            label: t('targets.gear.fields.model'),          type: 'text',   required: true,  helpKey: 'model',          placeholder: 'e.g. 314L+' },
       {
-        key: 'color_type', label: t('targets.gear.fields.colorType'), type: 'select', required: true, helpKey: 'colorType',
+        key: 'brand',
+        label: t('targets.gear.fields.brand'),
+        type: 'text',
+        required: true,
+        helpKey: 'brand',
+        placeholder: 'e.g. Atik',
+      },
+      {
+        key: 'model',
+        label: t('targets.gear.fields.model'),
+        type: 'text',
+        required: true,
+        helpKey: 'model',
+        placeholder: 'e.g. 314L+',
+      },
+      {
+        key: 'color_type',
+        label: t('targets.gear.fields.colorType'),
+        type: 'select',
+        required: true,
+        helpKey: 'colorType',
         options: [
-          { value: 'OSC',  label: t('targets.gear.colorTypeOSC') },
+          { value: 'OSC', label: t('targets.gear.colorTypeOSC') },
           { value: 'Mono', label: t('targets.gear.colorTypeMono') },
         ],
       },
-      { key: 'sensor_width_mm',  label: t('targets.gear.fields.sensorWidthMm'),  type: 'number', required: true,  helpKey: 'sensorWidthMm',  step: '0.01', placeholder: 'e.g. 8.98' },
-      { key: 'sensor_height_mm', label: t('targets.gear.fields.sensorHeightMm'), type: 'number', required: true,  helpKey: 'sensorHeightMm', step: '0.01', placeholder: 'e.g. 6.71' },
-      { key: 'pixel_size_um',    label: t('targets.gear.fields.pixelSizeUm'),    type: 'number', required: true,  helpKey: 'pixelSizeUm',    step: '0.01', placeholder: 'e.g. 6.45' },
-      { key: 'sensor',           label: t('targets.gear.fields.sensor'),          type: 'text',   required: false, helpKey: 'sensor',         placeholder: 'e.g. Sony ICX285AL' },
+      {
+        key: 'sensor_width_mm',
+        label: t('targets.gear.fields.sensorWidthMm'),
+        type: 'number',
+        required: true,
+        helpKey: 'sensorWidthMm',
+        step: '0.01',
+        placeholder: 'e.g. 8.98',
+      },
+      {
+        key: 'sensor_height_mm',
+        label: t('targets.gear.fields.sensorHeightMm'),
+        type: 'number',
+        required: true,
+        helpKey: 'sensorHeightMm',
+        step: '0.01',
+        placeholder: 'e.g. 6.71',
+      },
+      {
+        key: 'pixel_size_um',
+        label: t('targets.gear.fields.pixelSizeUm'),
+        type: 'number',
+        required: true,
+        helpKey: 'pixelSizeUm',
+        step: '0.01',
+        placeholder: 'e.g. 6.45',
+      },
+      {
+        key: 'sensor',
+        label: t('targets.gear.fields.sensor'),
+        type: 'text',
+        required: false,
+        helpKey: 'sensor',
+        placeholder: 'e.g. Sony ICX285AL',
+      },
     ],
     accessory: [
-      { key: 'brand',                label: t('targets.gear.fields.brand'),               type: 'text',   required: true,  helpKey: 'brand',               placeholder: 'e.g. Celestron' },
-      { key: 'model',                label: t('targets.gear.fields.model'),               type: 'text',   required: true,  helpKey: 'model',               placeholder: 'e.g. Focal Reducer 0.63×' },
-      { key: 'magnification_factor', label: t('targets.gear.fields.magnificationFactor'), type: 'number', required: true,  helpKey: 'magnificationFactor', step: '0.01', placeholder: 'e.g. 0.63' },
-      { key: 'type',                 label: t('targets.gear.fields.accessoryType'),       type: 'text',   required: false, helpKey: 'accessoryType',       placeholder: 'e.g. focal reducer' },
-      { key: 'notes',                label: t('targets.gear.fields.accessoryNotes'),      type: 'text',   required: false, helpKey: 'accessoryNotes' },
-      { key: 'thread_input',         label: t('targets.gear.fields.threadInput'),         type: 'text',   required: false, helpKey: 'threadInput',         placeholder: 'e.g. M48' },
-      { key: 'thread_output',        label: t('targets.gear.fields.threadOutput'),        type: 'text',   required: false, helpKey: 'threadOutput',        placeholder: 'e.g. M42' },
+      {
+        key: 'brand',
+        label: t('targets.gear.fields.brand'),
+        type: 'text',
+        required: true,
+        helpKey: 'brand',
+        placeholder: 'e.g. Celestron',
+      },
+      {
+        key: 'model',
+        label: t('targets.gear.fields.model'),
+        type: 'text',
+        required: true,
+        helpKey: 'model',
+        placeholder: 'e.g. Focal Reducer 0.63×',
+      },
+      {
+        key: 'magnification_factor',
+        label: t('targets.gear.fields.magnificationFactor'),
+        type: 'number',
+        required: true,
+        helpKey: 'magnificationFactor',
+        step: '0.01',
+        placeholder: 'e.g. 0.63',
+      },
+      {
+        key: 'type',
+        label: t('targets.gear.fields.accessoryType'),
+        type: 'text',
+        required: false,
+        helpKey: 'accessoryType',
+        placeholder: 'e.g. focal reducer',
+      },
+      {
+        key: 'notes',
+        label: t('targets.gear.fields.accessoryNotes'),
+        type: 'text',
+        required: false,
+        helpKey: 'accessoryNotes',
+      },
+      {
+        key: 'thread_input',
+        label: t('targets.gear.fields.threadInput'),
+        type: 'text',
+        required: false,
+        helpKey: 'threadInput',
+        placeholder: 'e.g. M48',
+      },
+      {
+        key: 'thread_output',
+        label: t('targets.gear.fields.threadOutput'),
+        type: 'text',
+        required: false,
+        helpKey: 'threadOutput',
+        placeholder: 'e.g. M42',
+      },
     ],
   };
 
@@ -336,7 +548,7 @@ export function openAddGearModal(
       helpIcon.className = 'hints-info-icon';
       helpIcon.textContent = 'ℹ';
       const hk = field.helpKey;
-      helpIcon.addEventListener('click', e => {
+      helpIcon.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         showTextTooltip(helpIcon, t(`targets.gear.fields.help.${hk}`));
@@ -466,17 +678,17 @@ export function openManageGearModal(
 ): void {
   const titles: Record<string, string> = {
     telescope: t('targets.gear.manageTelescopeTitle'),
-    camera:    t('targets.gear.manageCameraTitle'),
+    camera: t('targets.gear.manageCameraTitle'),
     accessory: t('targets.gear.manageAccessoryTitle'),
   };
   const addLabels: Record<string, string> = {
     telescope: t('targets.gear.addTelescope'),
-    camera:    t('targets.gear.addCamera'),
+    camera: t('targets.gear.addCamera'),
     accessory: t('targets.gear.addAccessory'),
   };
   const selectedCountKeys: Record<string, string> = {
     telescope: 'targets.gear.telescopesSelected',
-    camera:    'targets.gear.camerasSelected',
+    camera: 'targets.gear.camerasSelected',
     accessory: 'targets.gear.accessoriesSelected',
   };
 
@@ -512,9 +724,14 @@ export function openManageGearModal(
   list.className = 'gear-manage-list';
 
   function updateCount(): void {
-    const total = allGear.filter(g => !pendingDeletes.has(g.id)).length;
-    const selected = allGear.filter(g => !currentHidden.has(g.id) && !pendingDeletes.has(g.id)).length;
-    const base = t(selectedCountKeys[gearType], { selected: String(selected), total: String(total) });
+    const total = allGear.filter((g) => !pendingDeletes.has(g.id)).length;
+    const selected = allGear.filter(
+      (g) => !currentHidden.has(g.id) && !pendingDeletes.has(g.id),
+    ).length;
+    const base = t(selectedCountKeys[gearType], {
+      selected: String(selected),
+      total: String(total),
+    });
     if (requireOne && selected === 0) {
       countEl.className = 'gear-manage-count gear-manage-count--error';
       countEl.textContent = `${base}. ${t('targets.gear.atLeastOneRequired')}`;
@@ -573,7 +790,9 @@ export function openManageGearModal(
           },
           onExpire: () => {
             pendingDeletes.delete(gear.id);
-            deleteCustomGear(gear.id).then(() => invalidateGearCache(gearType)).catch(() => {});
+            deleteCustomGear(gear.id)
+              .then(() => invalidateGearCache(gearType))
+              .catch(() => {});
           },
         });
 
@@ -604,11 +823,24 @@ export function openManageGearModal(
   addBtn.addEventListener('click', () => {
     backdrop.remove();
     openAddGearModal(gearType, () => {
-      const getList = gearType === 'telescope' ? getTelescopes : gearType === 'camera' ? getCameras : getAccessories;
-      const labelFn = gearType === 'telescope' ? telescopeLabel : gearType === 'camera' ? cameraLabel : accessoryLabel;
-      getList().then(newAll => {
+      const getList =
+        gearType === 'telescope'
+          ? getTelescopes
+          : gearType === 'camera'
+            ? getCameras
+            : getAccessories;
+      const labelFn =
+        gearType === 'telescope'
+          ? telescopeLabel
+          : gearType === 'camera'
+            ? cameraLabel
+            : accessoryLabel;
+      getList().then((newAll) => {
         const sorted = sortCustomFirst(newAll as Array<{ id: string }>);
-        const gearWithLabels = sorted.map(g => ({ id: g.id, label: (labelFn as (g: any) => string)(g) }));
+        const gearWithLabels = sorted.map((g) => ({
+          id: g.id,
+          label: (labelFn as (g: any) => string)(g),
+        }));
         openManageGearModal(gearType, gearWithLabels, currentHidden, onClose);
       });
     });
@@ -620,7 +852,9 @@ export function openManageGearModal(
   closeBtn.addEventListener('click', () => {
     for (const [id, item] of pendingDeletes) {
       item.dismissFn();
-      deleteCustomGear(id).then(() => invalidateGearCache(gearType)).catch(() => {});
+      deleteCustomGear(id)
+        .then(() => invalidateGearCache(gearType))
+        .catch(() => {});
     }
     backdrop.remove();
     onClose(currentHidden, new Set(pendingDeletes.keys()));
@@ -686,7 +920,10 @@ export function buildInfoButton(onClick: () => void): HTMLSpanElement {
   const btn = document.createElement('span');
   btn.className = 'hints-info-icon';
   btn.textContent = 'ℹ';
-  btn.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
   return btn;
 }
 
@@ -706,202 +943,262 @@ export function buildGearSectionContent(
 ): void {
   container.innerHTML = `<div class="targets-form-row"><span class="targets-label" style="color:#888">…</span></div>`;
 
-  Promise.all([getTelescopes(), getCameras(), getAccessories()]).then(([telescopes, cameras, accessories]) => {
-    container.innerHTML = '';
+  Promise.all([getTelescopes(), getCameras(), getAccessories()])
+    .then(([telescopes, cameras, accessories]) => {
+      container.innerHTML = '';
 
-    const hiddenSet = new Set(prefs.hiddenGearIds ?? []);
+      const hiddenSet = new Set(prefs.hiddenGearIds ?? []);
 
-    const fovHintEl = document.createElement('div');
-    fovHintEl.className = 'targets-fov-hint';
+      const fovHintEl = document.createElement('div');
+      fovHintEl.className = 'targets-fov-hint';
 
-    const updateFovHint = (tel: TelescopeData | undefined, cam: CameraData | undefined, acc: AccessoryData | null): void => {
-      if (!tel || !cam) { fovHintEl.textContent = ''; return; }
-      const preset = buildGearPreset(tel, cam, acc);
-      fovHintEl.textContent = `${t('targets.gear.effectiveFocalLength')}: ${formatGearFovLabel(preset)}`;
-    };
+      const updateFovHint = (
+        tel: TelescopeData | undefined,
+        cam: CameraData | undefined,
+        acc: AccessoryData | null,
+      ): void => {
+        if (!tel || !cam) {
+          fovHintEl.textContent = '';
+          return;
+        }
+        const preset = buildGearPreset(tel, cam, acc);
+        fovHintEl.textContent = `${t('targets.gear.effectiveFocalLength')}: ${formatGearFovLabel(preset)}`;
+      };
 
-    // ── Telescope row ────────────────────────────────────────────────────
-    const visibleTelescopes = sortCustomFirst(telescopes).filter(tel => !hiddenSet.has(tel.id));
-    if (!visibleTelescopes.find(tel => tel.id === prefs.telescopeId)) {
-      callbacks.onPrefsChange({ telescopeId: visibleTelescopes[0]?.id ?? '' });
-    }
-
-    const { row: telRow, select: telSelect } = buildGearRow(
-      t('targets.gear.telescope'),
-      visibleTelescopes.map(tel => ({ value: tel.id, label: telescopeLabel(tel) })),
-      prefs.telescopeId,
-    );
-    const telInfoBtn = buildInfoButton(() => {
-      const tel = visibleTelescopes.find(t => t.id === telSelect.value);
-      if (!tel) return;
-      showKeyValueTooltip(telInfoBtn, [
-        [t('targets.gear.info.brand'),         tel.brand],
-        [t('targets.gear.info.model'),         tel.model],
-        [t('targets.gear.info.opticalDesign'), tel.optical_design],
-        [t('targets.gear.info.mountInterface'), tel.mount_interface],
-        [t('targets.gear.info.opticalNotes'),  tel.optical_notes],
-        [t('targets.gear.info.recommendedUse'), tel.recommended_use?.map(u => t(`targets.gear.info.useLabels.${u}`)).join(', ') ?? null],
-      ]);
-    });
-    telRow.appendChild(telInfoBtn);
-    container.appendChild(telRow);
-
-    const telManageBtn = buildAddButton(t('targets.gear.manageTelescope'), () => {
-      const all = sortCustomFirst(telescopes).map(tel => ({ id: tel.id, label: telescopeLabel(tel) }));
-      openManageGearModal('telescope', all, new Set(prefs.hiddenGearIds ?? []),
-        (newHidden, deleted) => {
-          if (deleted.size > 0) invalidateGearCache('telescope');
-          const visible = sortCustomFirst(telescopes).filter(t => !newHidden.has(t.id) && !deleted.has(t.id));
-          const newTelId = visible.find(t => t.id === prefs.telescopeId)
-            ? prefs.telescopeId
-            : (visible[0]?.id ?? '');
-          callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], telescopeId: newTelId });
-          callbacks.onRebuild(container);
-        });
-    });
-    container.appendChild(telManageBtn);
-
-    // ── Camera row ───────────────────────────────────────────────────────
-    const currentTel = visibleTelescopes.find(t => t.id === prefs.telescopeId);
-    const isSmart = currentTel?.is_smart_telescope ?? false;
-
-    const visibleCameras = sortCustomFirst(cameras).filter(cam => !hiddenSet.has(cam.id));
-    if (prefs.cameraId && !visibleCameras.find(c => c.id === prefs.cameraId)) {
-      callbacks.onPrefsChange({ cameraId: visibleCameras[0]?.id ?? null });
-    }
-
-    // Determine camera ID: for smart telescopes, use integrated camera
-    let initialCamId = prefs.cameraId;
-    if (isSmart && currentTel?.integrated_camera_id) {
-      initialCamId = currentTel.integrated_camera_id;
-    }
-
-    const { row: camRow, select: camSelect } = buildGearRow(
-      t('targets.gear.camera'),
-      visibleCameras.map(cam => ({ value: cam.id, label: cameraLabel(cam) })),
-      initialCamId ?? (visibleCameras[0]?.id ?? ''),
-      isSmart ? t('targets.gear.smartTelescopeLocked') : undefined,
-    );
-    const camInfoBtn = buildInfoButton(() => {
-      const cam = visibleCameras.find(c => c.id === camSelect.value);
-      if (!cam) return;
-      showKeyValueTooltip(camInfoBtn, [
-        [t('targets.gear.info.brand'),      cam.brand],
-        [t('targets.gear.info.model'),      cam.model],
-        [t('targets.gear.info.sensor'),     cam.sensor],
-        [t('targets.gear.info.sensorSize'), `${cam.sensor_width_mm} × ${cam.sensor_height_mm} mm`],
-        [t('targets.gear.info.resolution'), `${cam.resolution_x} × ${cam.resolution_y} px`],
-        [t('targets.gear.info.recommendedUse'), cam.recommended_use?.map(u => t(`targets.gear.info.useLabels.${u}`)).join(', ') ?? null],
-      ]);
-    });
-    camRow.appendChild(camInfoBtn);
-    container.appendChild(camRow);
-
-    const camManageBtn = buildAddButton(t('targets.gear.manageCamera'), () => {
-      const all = sortCustomFirst(cameras).map(cam => ({ id: cam.id, label: cameraLabel(cam) }));
-      openManageGearModal('camera', all, new Set(prefs.hiddenGearIds ?? []),
-        (newHidden, deleted) => {
-          if (deleted.size > 0) invalidateGearCache('camera');
-          const visible = sortCustomFirst(cameras).filter(c => !newHidden.has(c.id) && !deleted.has(c.id));
-          const newCamId = prefs.cameraId && visible.find(c => c.id === prefs.cameraId)
-            ? prefs.cameraId
-            : (visible[0]?.id ?? null);
-          callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], cameraId: newCamId });
-          callbacks.onRebuild(container);
-        });
-    });
-    if (isSmart) camManageBtn.classList.add('hidden');
-    container.appendChild(camManageBtn);
-
-    // ── Accessory row ────────────────────────────────────────────────────
-    const visibleAccessories = sortCustomFirst(accessories).filter(acc => !hiddenSet.has(acc.id));
-    if (prefs.accessoryId && !visibleAccessories.find(a => a.id === prefs.accessoryId)) {
-      callbacks.onPrefsChange({ accessoryId: null });
-    }
-
-    const accOptions = [
-      { value: '', label: t('targets.gear.noAccessory') },
-      ...visibleAccessories.map(acc => ({ value: acc.id, label: accessoryLabel(acc) })),
-    ];
-    const { row: accRow, select: accSelect } = buildGearRow(
-      t('targets.gear.accessory'),
-      accOptions,
-      isSmart ? '' : (prefs.accessoryId ?? ''),
-      isSmart ? t('targets.gear.smartTelescopeLocked') : undefined,
-    );
-    const accInfoBtn = buildInfoButton(() => {
-      const acc = visibleAccessories.find(a => a.id === accSelect.value);
-      if (!acc) {
-        showTextTooltip(accInfoBtn, t('targets.gear.noAccessorySelected'));
-        return;
+      // ── Telescope row ────────────────────────────────────────────────────
+      const visibleTelescopes = sortCustomFirst(telescopes).filter((tel) => !hiddenSet.has(tel.id));
+      if (!visibleTelescopes.find((tel) => tel.id === prefs.telescopeId)) {
+        callbacks.onPrefsChange({ telescopeId: visibleTelescopes[0]?.id ?? '' });
       }
-      showKeyValueTooltip(accInfoBtn, [
-        [t('targets.gear.info.brand'),          acc.brand],
-        [t('targets.gear.info.model'),          acc.model],
-        [t('targets.gear.info.accessoryNotes'), acc.notes],
-        [t('targets.gear.info.threadInput'),    acc.thread_input],
-        [t('targets.gear.info.threadOutput'),   acc.thread_output],
-      ]);
-    });
-    accRow.appendChild(accInfoBtn);
-    container.appendChild(accRow);
 
-    const accManageBtn = buildAddButton(t('targets.gear.manageAccessory'), () => {
-      const all = sortCustomFirst(accessories).map(acc => ({ id: acc.id, label: accessoryLabel(acc) }));
-      openManageGearModal('accessory', all, new Set(prefs.hiddenGearIds ?? []),
-        (newHidden, deleted) => {
-          if (deleted.size > 0) invalidateGearCache('accessory');
-          const visible = sortCustomFirst(accessories).filter(a => !newHidden.has(a.id) && !deleted.has(a.id));
-          const newAccId = prefs.accessoryId && visible.find(a => a.id === prefs.accessoryId)
-            ? prefs.accessoryId
+      const { row: telRow, select: telSelect } = buildGearRow(
+        t('targets.gear.telescope'),
+        visibleTelescopes.map((tel) => ({ value: tel.id, label: telescopeLabel(tel) })),
+        prefs.telescopeId,
+      );
+      const telInfoBtn = buildInfoButton(() => {
+        const tel = visibleTelescopes.find((t) => t.id === telSelect.value);
+        if (!tel) return;
+        showKeyValueTooltip(telInfoBtn, [
+          [t('targets.gear.info.brand'), tel.brand],
+          [t('targets.gear.info.model'), tel.model],
+          [t('targets.gear.info.opticalDesign'), tel.optical_design],
+          [t('targets.gear.info.mountInterface'), tel.mount_interface],
+          [t('targets.gear.info.opticalNotes'), tel.optical_notes],
+          [
+            t('targets.gear.info.recommendedUse'),
+            tel.recommended_use?.map((u) => t(`targets.gear.info.useLabels.${u}`)).join(', ') ??
+              null,
+          ],
+        ]);
+      });
+      telRow.appendChild(telInfoBtn);
+      container.appendChild(telRow);
+
+      const telManageBtn = buildAddButton(t('targets.gear.manageTelescope'), () => {
+        const all = sortCustomFirst(telescopes).map((tel) => ({
+          id: tel.id,
+          label: telescopeLabel(tel),
+        }));
+        openManageGearModal(
+          'telescope',
+          all,
+          new Set(prefs.hiddenGearIds ?? []),
+          (newHidden, deleted) => {
+            if (deleted.size > 0) invalidateGearCache('telescope');
+            const visible = sortCustomFirst(telescopes).filter(
+              (t) => !newHidden.has(t.id) && !deleted.has(t.id),
+            );
+            const newTelId = visible.find((t) => t.id === prefs.telescopeId)
+              ? prefs.telescopeId
+              : (visible[0]?.id ?? '');
+            callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], telescopeId: newTelId });
+            callbacks.onRebuild(container);
+          },
+        );
+      });
+      container.appendChild(telManageBtn);
+
+      // ── Camera row ───────────────────────────────────────────────────────
+      const currentTel = visibleTelescopes.find((t) => t.id === prefs.telescopeId);
+      const isSmart = currentTel?.is_smart_telescope ?? false;
+
+      const visibleCameras = sortCustomFirst(cameras).filter((cam) => !hiddenSet.has(cam.id));
+      if (prefs.cameraId && !visibleCameras.find((c) => c.id === prefs.cameraId)) {
+        callbacks.onPrefsChange({ cameraId: visibleCameras[0]?.id ?? null });
+      }
+
+      // Determine camera ID: for smart telescopes, use integrated camera
+      let initialCamId = prefs.cameraId;
+      if (isSmart && currentTel?.integrated_camera_id) {
+        initialCamId = currentTel.integrated_camera_id;
+      }
+
+      const { row: camRow, select: camSelect } = buildGearRow(
+        t('targets.gear.camera'),
+        visibleCameras.map((cam) => ({ value: cam.id, label: cameraLabel(cam) })),
+        initialCamId ?? visibleCameras[0]?.id ?? '',
+        isSmart ? t('targets.gear.smartTelescopeLocked') : undefined,
+      );
+      const camInfoBtn = buildInfoButton(() => {
+        const cam = visibleCameras.find((c) => c.id === camSelect.value);
+        if (!cam) return;
+        showKeyValueTooltip(camInfoBtn, [
+          [t('targets.gear.info.brand'), cam.brand],
+          [t('targets.gear.info.model'), cam.model],
+          [t('targets.gear.info.sensor'), cam.sensor],
+          [
+            t('targets.gear.info.sensorSize'),
+            `${cam.sensor_width_mm} × ${cam.sensor_height_mm} mm`,
+          ],
+          [t('targets.gear.info.resolution'), `${cam.resolution_x} × ${cam.resolution_y} px`],
+          [
+            t('targets.gear.info.recommendedUse'),
+            cam.recommended_use?.map((u) => t(`targets.gear.info.useLabels.${u}`)).join(', ') ??
+              null,
+          ],
+        ]);
+      });
+      camRow.appendChild(camInfoBtn);
+      container.appendChild(camRow);
+
+      const camManageBtn = buildAddButton(t('targets.gear.manageCamera'), () => {
+        const all = sortCustomFirst(cameras).map((cam) => ({
+          id: cam.id,
+          label: cameraLabel(cam),
+        }));
+        openManageGearModal(
+          'camera',
+          all,
+          new Set(prefs.hiddenGearIds ?? []),
+          (newHidden, deleted) => {
+            if (deleted.size > 0) invalidateGearCache('camera');
+            const visible = sortCustomFirst(cameras).filter(
+              (c) => !newHidden.has(c.id) && !deleted.has(c.id),
+            );
+            const newCamId =
+              prefs.cameraId && visible.find((c) => c.id === prefs.cameraId)
+                ? prefs.cameraId
+                : (visible[0]?.id ?? null);
+            callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], cameraId: newCamId });
+            callbacks.onRebuild(container);
+          },
+        );
+      });
+      if (isSmart) camManageBtn.classList.add('hidden');
+      container.appendChild(camManageBtn);
+
+      // ── Accessory row ────────────────────────────────────────────────────
+      const visibleAccessories = sortCustomFirst(accessories).filter(
+        (acc) => !hiddenSet.has(acc.id),
+      );
+      if (prefs.accessoryId && !visibleAccessories.find((a) => a.id === prefs.accessoryId)) {
+        callbacks.onPrefsChange({ accessoryId: null });
+      }
+
+      const accOptions = [
+        { value: '', label: t('targets.gear.noAccessory') },
+        ...visibleAccessories.map((acc) => ({ value: acc.id, label: accessoryLabel(acc) })),
+      ];
+      const { row: accRow, select: accSelect } = buildGearRow(
+        t('targets.gear.accessory'),
+        accOptions,
+        isSmart ? '' : (prefs.accessoryId ?? ''),
+        isSmart ? t('targets.gear.smartTelescopeLocked') : undefined,
+      );
+      const accInfoBtn = buildInfoButton(() => {
+        const acc = visibleAccessories.find((a) => a.id === accSelect.value);
+        if (!acc) {
+          showTextTooltip(accInfoBtn, t('targets.gear.noAccessorySelected'));
+          return;
+        }
+        showKeyValueTooltip(accInfoBtn, [
+          [t('targets.gear.info.brand'), acc.brand],
+          [t('targets.gear.info.model'), acc.model],
+          [t('targets.gear.info.accessoryNotes'), acc.notes],
+          [t('targets.gear.info.threadInput'), acc.thread_input],
+          [t('targets.gear.info.threadOutput'), acc.thread_output],
+        ]);
+      });
+      accRow.appendChild(accInfoBtn);
+      container.appendChild(accRow);
+
+      const accManageBtn = buildAddButton(t('targets.gear.manageAccessory'), () => {
+        const all = sortCustomFirst(accessories).map((acc) => ({
+          id: acc.id,
+          label: accessoryLabel(acc),
+        }));
+        openManageGearModal(
+          'accessory',
+          all,
+          new Set(prefs.hiddenGearIds ?? []),
+          (newHidden, deleted) => {
+            if (deleted.size > 0) invalidateGearCache('accessory');
+            const visible = sortCustomFirst(accessories).filter(
+              (a) => !newHidden.has(a.id) && !deleted.has(a.id),
+            );
+            const newAccId =
+              prefs.accessoryId && visible.find((a) => a.id === prefs.accessoryId)
+                ? prefs.accessoryId
+                : null;
+            callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], accessoryId: newAccId });
+            callbacks.onRebuild(container);
+          },
+        );
+      });
+      if (isSmart) accManageBtn.classList.add('hidden');
+      container.appendChild(accManageBtn);
+
+      // ── FOV hint ─────────────────────────────────────────────────────────
+      container.appendChild(fovHintEl);
+
+      // Initial hint
+      const currentCam = visibleCameras.find(
+        (c) =>
+          c.id ===
+          (isSmart && currentTel?.integrated_camera_id
+            ? currentTel.integrated_camera_id
+            : (prefs.cameraId ?? '')),
+      );
+      const currentAcc = isSmart
+        ? null
+        : (visibleAccessories.find((a) => a.id === (prefs.accessoryId ?? '')) ?? null);
+      updateFovHint(currentTel, currentCam, currentAcc);
+
+      // ── Change handlers ──────────────────────────────────────────────────
+      telSelect.addEventListener('change', () => {
+        callbacks.onPrefsChange({ telescopeId: telSelect.value });
+        callbacks.onRebuild(container);
+      });
+
+      camSelect.addEventListener('change', () => {
+        if (!isSmart) {
+          callbacks.onPrefsChange({ cameraId: camSelect.value });
+          const tel = visibleTelescopes.find((t) => t.id === telSelect.value);
+          const cam = visibleCameras.find((c) => c.id === camSelect.value);
+          const acc = accSelect.value
+            ? (visibleAccessories.find((a) => a.id === accSelect.value) ?? null)
             : null;
-          callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], accessoryId: newAccId });
-          callbacks.onRebuild(container);
-        });
+          updateFovHint(tel, cam, acc);
+        }
+      });
+
+      accSelect.addEventListener('change', () => {
+        if (!isSmart) {
+          callbacks.onPrefsChange({ accessoryId: accSelect.value || null });
+          const tel = visibleTelescopes.find((t) => t.id === telSelect.value);
+          const cam = visibleCameras.find((c) => c.id === camSelect.value);
+          const acc = accSelect.value
+            ? (visibleAccessories.find((a) => a.id === accSelect.value) ?? null)
+            : null;
+          updateFovHint(tel, cam, acc);
+        }
+      });
+    })
+    .catch(() => {
+      container.innerHTML =
+        '<div class="targets-form-row" style="color:#e55">Failed to load gear catalog</div>';
     });
-    if (isSmart) accManageBtn.classList.add('hidden');
-    container.appendChild(accManageBtn);
-
-    // ── FOV hint ─────────────────────────────────────────────────────────
-    container.appendChild(fovHintEl);
-
-    // Initial hint
-    const currentCam = visibleCameras.find(c => c.id === (
-      isSmart && currentTel?.integrated_camera_id
-        ? currentTel.integrated_camera_id
-        : (prefs.cameraId ?? '')
-    ));
-    const currentAcc = isSmart ? null : (visibleAccessories.find(a => a.id === (prefs.accessoryId ?? '')) ?? null);
-    updateFovHint(currentTel, currentCam, currentAcc);
-
-    // ── Change handlers ──────────────────────────────────────────────────
-    telSelect.addEventListener('change', () => {
-      callbacks.onPrefsChange({ telescopeId: telSelect.value });
-      callbacks.onRebuild(container);
-    });
-
-    camSelect.addEventListener('change', () => {
-      if (!isSmart) {
-        callbacks.onPrefsChange({ cameraId: camSelect.value });
-        const tel = visibleTelescopes.find(t => t.id === telSelect.value);
-        const cam = visibleCameras.find(c => c.id === camSelect.value);
-        const acc = accSelect.value ? (visibleAccessories.find(a => a.id === accSelect.value) ?? null) : null;
-        updateFovHint(tel, cam, acc);
-      }
-    });
-
-    accSelect.addEventListener('change', () => {
-      if (!isSmart) {
-        callbacks.onPrefsChange({ accessoryId: accSelect.value || null });
-        const tel = visibleTelescopes.find(t => t.id === telSelect.value);
-        const cam = visibleCameras.find(c => c.id === camSelect.value);
-        const acc = accSelect.value ? (visibleAccessories.find(a => a.id === accSelect.value) ?? null) : null;
-        updateFovHint(tel, cam, acc);
-      }
-    });
-  }).catch(() => {
-    container.innerHTML = '<div class="targets-form-row" style="color:#e55">Failed to load gear catalog</div>';
-  });
 }
 
 // ─── TargetsView class ────────────────────────────────────────────────────────
@@ -956,7 +1253,10 @@ export class TargetsView {
   private planPickerEsc: ((ev: KeyboardEvent) => void) | null = null;
   private planPickerCleanup: (() => void) | null = null;
 
-  constructor(skyMap: SkyMap, onNavigate: (ra: number, dec: number, setupId: string | null) => void) {
+  constructor(
+    skyMap: SkyMap,
+    onNavigate: (ra: number, dec: number, setupId: string | null) => void,
+  ) {
     this.skyMap = skyMap;
     this.onNavigate = onNavigate;
     this.prefs = loadPrefs();
@@ -978,8 +1278,11 @@ export class TargetsView {
     for (const [entryId, span] of this.paSpans) {
       let paDeg: number | null = null;
       for (const p of this.plansStore.plans) {
-        const e = p.entries.find(en => en.id === entryId);
-        if (e) { paDeg = e.paDeg; break; }
+        const e = p.entries.find((en) => en.id === entryId);
+        if (e) {
+          paDeg = e.paDeg;
+          break;
+        }
       }
       span.textContent = paDeg != null ? formatPaDeg(paDeg) : '—';
     }
@@ -1034,9 +1337,11 @@ export class TargetsView {
 
   private buildModeToggle(): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'targets-mode-toggle inline-flex gap-1 mb-4 p-1 bg-card border border-subtle rounded-md';
+    row.className =
+      'targets-mode-toggle inline-flex gap-1 mb-4 p-1 bg-card border border-subtle rounded-md';
 
-    const SEG_BASE = 'px-5 py-2 rounded-sm text-body font-medium cursor-pointer border-0 transition-colors';
+    const SEG_BASE =
+      'px-5 py-2 rounded-sm text-body font-medium cursor-pointer border-0 transition-colors';
     const SEG_ACTIVE = ' bg-[var(--accent-bg)] text-bright';
     const SEG_IDLE = ' bg-transparent text-secondary hover:text-bright';
 
@@ -1120,12 +1425,18 @@ export class TargetsView {
       const rm = (abs - d) * 60;
       let m = Math.floor(rm);
       let s = Math.round((rm - m) * 60);
-      if (s >= 60) { s = 0; m++; }
-      if (m >= 60) { m = 0; d++; }
+      if (s >= 60) {
+        s = 0;
+        m++;
+      }
+      if (m >= 60) {
+        m = 0;
+        d++;
+      }
       return [d * sign, m, s];
     };
     const dmsToDecimal = (d: number, m: number, s: number): number => {
-      const sign = (d < 0 || Object.is(d, -0)) ? -1 : 1;
+      const sign = d < 0 || Object.is(d, -0) ? -1 : 1;
       return sign * (Math.abs(d) + m / 60 + s / 3600);
     };
 
@@ -1143,12 +1454,13 @@ export class TargetsView {
         locBtn.disabled = false;
       };
       if ((window as any).electronAPI) {
-        (window as any).electronAPI.getLocation()
+        (window as any).electronAPI
+          .getLocation()
           .then((c: { latitude: number; longitude: number }) => onSuccess(c.latitude, c.longitude))
           .catch(onError);
       } else {
         navigator.geolocation.getCurrentPosition(
-          pos => onSuccess(pos.coords.latitude, pos.coords.longitude),
+          (pos) => onSuccess(pos.coords.latitude, pos.coords.longitude),
           onError,
         );
       }
@@ -1157,15 +1469,24 @@ export class TargetsView {
     const buildCoordEntry = (fmt: 'decimal' | 'dms'): void => {
       coordEntry.innerHTML = '';
       fmtToggle.textContent = fmt === 'decimal' ? 'DMS (° ′ ″)' : 'Decimal';
-      fmtToggle.title = fmt === 'decimal' ? 'Switch to degrees/arcminutes/arcseconds' : 'Switch to decimal degrees';
+      fmtToggle.title =
+        fmt === 'decimal' ? 'Switch to degrees/arcminutes/arcseconds' : 'Switch to decimal degrees';
       if (fmt === 'decimal') {
         const latIn = document.createElement('input');
-        latIn.type = 'number'; latIn.className = 'targets-coord-input';
-        latIn.placeholder = t('targets.location.lat'); latIn.step = '0.01'; latIn.min = '-90'; latIn.max = '90';
+        latIn.type = 'number';
+        latIn.className = 'targets-coord-input';
+        latIn.placeholder = t('targets.location.lat');
+        latIn.step = '0.01';
+        latIn.min = '-90';
+        latIn.max = '90';
         if (getLat() !== null) latIn.value = String(getLat());
         const lonIn = document.createElement('input');
-        lonIn.type = 'number'; lonIn.className = 'targets-coord-input';
-        lonIn.placeholder = t('targets.location.lon'); lonIn.step = '0.01'; lonIn.min = '-180'; lonIn.max = '180';
+        lonIn.type = 'number';
+        lonIn.className = 'targets-coord-input';
+        lonIn.placeholder = t('targets.location.lon');
+        lonIn.step = '0.01';
+        lonIn.min = '-180';
+        lonIn.max = '180';
         if (getLon() !== null) lonIn.value = String(getLon());
         const sync = (): void => {
           const la = isNaN(parseFloat(latIn.value)) ? null : parseFloat(latIn.value);
@@ -1174,42 +1495,72 @@ export class TargetsView {
         };
         latIn.addEventListener('change', sync);
         lonIn.addEventListener('change', sync);
-        locBtn.onclick = () => geoLocate(() => {
-          if (getLat() !== null) latIn.value = String(getLat());
-          if (getLon() !== null) lonIn.value = String(getLon());
-        });
+        locBtn.onclick = () =>
+          geoLocate(() => {
+            if (getLat() !== null) latIn.value = String(getLat());
+            if (getLon() !== null) lonIn.value = String(getLon());
+          });
         const makeDecimalGroup = (label: string, input: HTMLInputElement): HTMLElement => {
-          const wrap = document.createElement('div'); wrap.className = 'targets-dms-group';
-          const lbl = document.createElement('span'); lbl.className = 'targets-dms-label'; lbl.textContent = label;
-          wrap.appendChild(lbl); wrap.appendChild(input); return wrap;
+          const wrap = document.createElement('div');
+          wrap.className = 'targets-dms-group';
+          const lbl = document.createElement('span');
+          lbl.className = 'targets-dms-label';
+          lbl.textContent = label;
+          wrap.appendChild(lbl);
+          wrap.appendChild(input);
+          return wrap;
         };
         coordEntry.appendChild(makeDecimalGroup('Lat', latIn));
         coordEntry.appendChild(makeDecimalGroup('Lon', lonIn));
       } else {
         const makeDMSGroup = (isLat: boolean): { el: HTMLElement; getVal: () => number | null } => {
           const initial = isLat ? getLat() : getLon();
-          let dV = 0, mV = 0, sV = 0;
+          let dV = 0,
+            mV = 0,
+            sV = 0;
           if (initial !== null) [dV, mV, sV] = decimalToDMS(initial);
-          const wrap = document.createElement('div'); wrap.className = 'targets-dms-group';
-          const lbl = document.createElement('span'); lbl.className = 'targets-dms-label'; lbl.textContent = isLat ? 'Lat' : 'Lon';
+          const wrap = document.createElement('div');
+          wrap.className = 'targets-dms-group';
+          const lbl = document.createElement('span');
+          lbl.className = 'targets-dms-label';
+          lbl.textContent = isLat ? 'Lat' : 'Lon';
           const dIn = document.createElement('input');
-          dIn.type = 'number'; dIn.className = 'targets-dms-input';
-          dIn.min = isLat ? '-90' : '-180'; dIn.max = isLat ? '90' : '180'; dIn.step = '1';
+          dIn.type = 'number';
+          dIn.className = 'targets-dms-input';
+          dIn.min = isLat ? '-90' : '-180';
+          dIn.max = isLat ? '90' : '180';
+          dIn.step = '1';
           if (initial !== null) dIn.value = String(dV);
-          const sep1 = document.createElement('span'); sep1.className = 'targets-dms-sep'; sep1.textContent = '°';
+          const sep1 = document.createElement('span');
+          sep1.className = 'targets-dms-sep';
+          sep1.textContent = '°';
           const mIn = document.createElement('input');
-          mIn.type = 'number'; mIn.className = 'targets-dms-input targets-dms-sub';
-          mIn.min = '0'; mIn.max = '59'; mIn.step = '1'; mIn.placeholder = '0';
+          mIn.type = 'number';
+          mIn.className = 'targets-dms-input targets-dms-sub';
+          mIn.min = '0';
+          mIn.max = '59';
+          mIn.step = '1';
+          mIn.placeholder = '0';
           if (initial !== null) mIn.value = String(mV);
-          const sep2 = document.createElement('span'); sep2.className = 'targets-dms-sep'; sep2.textContent = "'";
+          const sep2 = document.createElement('span');
+          sep2.className = 'targets-dms-sep';
+          sep2.textContent = "'";
           const sIn = document.createElement('input');
-          sIn.type = 'number'; sIn.className = 'targets-dms-input targets-dms-sub';
-          sIn.min = '0'; sIn.max = '59'; sIn.step = '1'; sIn.placeholder = '0';
+          sIn.type = 'number';
+          sIn.className = 'targets-dms-input targets-dms-sub';
+          sIn.min = '0';
+          sIn.max = '59';
+          sIn.step = '1';
+          sIn.placeholder = '0';
           if (initial !== null) sIn.value = String(sV);
-          const sep3 = document.createElement('span'); sep3.className = 'targets-dms-sep'; sep3.textContent = '″';
+          const sep3 = document.createElement('span');
+          sep3.className = 'targets-dms-sep';
+          sep3.textContent = '″';
           wrap.append(lbl, dIn, sep1, mIn, sep2, sIn, sep3);
           const getVal = (): number | null => {
-            const d = parseFloat(dIn.value); const m = parseFloat(mIn.value) || 0; const s = parseFloat(sIn.value) || 0;
+            const d = parseFloat(dIn.value);
+            const m = parseFloat(mIn.value) || 0;
+            const s = parseFloat(sIn.value) || 0;
             if (isNaN(d)) return null;
             return dmsToDecimal(d, m, s);
           };
@@ -1217,9 +1568,11 @@ export class TargetsView {
         };
         const latGroup = makeDMSGroup(true);
         const lonGroup = makeDMSGroup(false);
-        const sync = (): void => { onChange(latGroup.getVal(), lonGroup.getVal()); };
-        latGroup.el.querySelectorAll('input').forEach(i => i.addEventListener('change', sync));
-        lonGroup.el.querySelectorAll('input').forEach(i => i.addEventListener('change', sync));
+        const sync = (): void => {
+          onChange(latGroup.getVal(), lonGroup.getVal());
+        };
+        latGroup.el.querySelectorAll('input').forEach((i) => i.addEventListener('change', sync));
+        lonGroup.el.querySelectorAll('input').forEach((i) => i.addEventListener('change', sync));
         locBtn.onclick = () => geoLocate(() => buildCoordEntry('dms'));
         coordEntry.appendChild(latGroup.el);
         coordEntry.appendChild(lonGroup.el);
@@ -1261,11 +1614,17 @@ export class TargetsView {
     locLabel.className = 'targets-label';
     locLabel.textContent = t('targets.location.label');
     locSection.appendChild(locLabel);
-    locSection.appendChild(this.buildLocationWidget({
-      getLat: () => this.prefs.lat,
-      getLon: () => this.prefs.lon,
-      onChange: (la, lo) => { this.prefs.lat = la; this.prefs.lon = lo; savePrefs(this.prefs); },
-    }));
+    locSection.appendChild(
+      this.buildLocationWidget({
+        getLat: () => this.prefs.lat,
+        getLon: () => this.prefs.lon,
+        onChange: (la, lo) => {
+          this.prefs.lat = la;
+          this.prefs.lon = lo;
+          savePrefs(this.prefs);
+        },
+      }),
+    );
     form.appendChild(locSection);
 
     // ── Date ─────────────────────────────────────────────────────────────────
@@ -1276,9 +1635,13 @@ export class TargetsView {
     dateLabel.textContent = t('targets.date.label');
     this.dateInput = document.createElement('input');
     const dateInput = this.dateInput;
-    dateInput.type = 'date'; dateInput.className = 'targets-coord-input';
+    dateInput.type = 'date';
+    dateInput.className = 'targets-coord-input';
     dateInput.value = this.prefs.lastDateISO ?? todayISO();
-    dateInput.addEventListener('change', () => { this.prefs.lastDateISO = dateInput.value; savePrefs(this.prefs); });
+    dateInput.addEventListener('change', () => {
+      this.prefs.lastDateISO = dateInput.value;
+      savePrefs(this.prefs);
+    });
     dateRow.appendChild(dateLabel);
     dateRow.appendChild(dateInput);
     form.appendChild(dateRow);
@@ -1297,8 +1660,10 @@ export class TargetsView {
       const cb = chip.querySelector('input')!;
       cb.checked = enabledTypeSet.has(type);
       cb.addEventListener('change', () => {
-        if (cb.checked) enabledTypeSet.add(type); else enabledTypeSet.delete(type);
-        this.prefs.enabledTypes = [...enabledTypeSet]; savePrefs(this.prefs);
+        if (cb.checked) enabledTypeSet.add(type);
+        else enabledTypeSet.delete(type);
+        this.prefs.enabledTypes = [...enabledTypeSet];
+        savePrefs(this.prefs);
       });
       typeFilters.appendChild(chip);
     }
@@ -1317,15 +1682,22 @@ export class TargetsView {
     compassEl.className = 'targets-type-filters';
     const enabledDirSet = new Set(this.prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
     const DIR_DEFS: [string, 'north' | 'south' | 'east' | 'west', string][] = [
-      ['N', 'north', '↑'], ['S', 'south', '↓'], ['E', 'east', '→'], ['W', 'west', '←'],
+      ['N', 'north', '↑'],
+      ['S', 'south', '↓'],
+      ['E', 'east', '→'],
+      ['W', 'west', '←'],
     ];
     for (const [key, i18nKey, arrow] of DIR_DEFS) {
-      const chip = createTargetsChip(`${arrow} ${t(`targets.horizon.${i18nKey}`)}`, { title: t(`targets.horizon.${i18nKey}Tooltip`) ?? key });
+      const chip = createTargetsChip(`${arrow} ${t(`targets.horizon.${i18nKey}`)}`, {
+        title: t(`targets.horizon.${i18nKey}Tooltip`) ?? key,
+      });
       const cb = chip.querySelector('input')!;
       cb.checked = enabledDirSet.has(key);
       cb.addEventListener('change', () => {
-        if (cb.checked) enabledDirSet.add(key); else enabledDirSet.delete(key);
-        this.prefs.horizonDirs = [...enabledDirSet]; savePrefs(this.prefs);
+        if (cb.checked) enabledDirSet.add(key);
+        else enabledDirSet.delete(key);
+        this.prefs.horizonDirs = [...enabledDirSet];
+        savePrefs(this.prefs);
       });
       compassEl.appendChild(chip);
     }
@@ -1344,7 +1716,12 @@ export class TargetsView {
     const altEntry = document.createElement('div');
     altEntry.className = 'targets-coord-entry';
 
-    const makeAltGroup = (labelKey: string, defaultVal: number, min: number, max: number): HTMLInputElement => {
+    const makeAltGroup = (
+      labelKey: string,
+      defaultVal: number,
+      min: number,
+      max: number,
+    ): HTMLInputElement => {
       const group = document.createElement('div');
       group.className = 'targets-dms-group';
       const lbl = document.createElement('span');
@@ -1354,7 +1731,9 @@ export class TargetsView {
       inp.type = 'number';
       inp.className = 'targets-dms-input';
       inp.setAttribute('aria-label', t(`targets.${labelKey}`) + ' °');
-      inp.min = String(min); inp.max = String(max); inp.step = '1';
+      inp.min = String(min);
+      inp.max = String(max);
+      inp.step = '1';
       inp.value = String(defaultVal);
       const unit = document.createElement('span');
       unit.className = 'targets-dms-sep';
@@ -1371,11 +1750,17 @@ export class TargetsView {
 
     minAltInput.addEventListener('change', () => {
       const v = parseInt(minAltInput.value, 10);
-      if (!isNaN(v)) { this.prefs.minAltDeg = v; savePrefs(this.prefs); }
+      if (!isNaN(v)) {
+        this.prefs.minAltDeg = v;
+        savePrefs(this.prefs);
+      }
     });
     maxAltInput.addEventListener('change', () => {
       const v = parseInt(maxAltInput.value, 10);
-      if (!isNaN(v)) { this.prefs.maxAltDeg = v; savePrefs(this.prefs); }
+      if (!isNaN(v)) {
+        this.prefs.maxAltDeg = v;
+        savePrefs(this.prefs);
+      }
     });
 
     altRow.appendChild(altLabel);
@@ -1386,7 +1771,11 @@ export class TargetsView {
     // Deduplicate by IAU id (Serpens appears twice in the data as Caput + Cauda)
     const seen = new Set<string>();
     const allConstInfos = getConstellationInfos()
-      .filter(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true; })
+      .filter((c) => {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        return true;
+      })
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
     const totalConsts = allConstInfos.length;
     const constRow = document.createElement('div');
@@ -1406,7 +1795,9 @@ export class TargetsView {
     };
     updateConstCount();
     constSelectBtn.addEventListener('click', () => {
-      const selectedSet = new Set<string>(this.prefs.enabledConstellations ?? allConstInfos.map(c => c.id));
+      const selectedSet = new Set<string>(
+        this.prefs.enabledConstellations ?? allConstInfos.map((c) => c.id),
+      );
       const backdrop = document.createElement('div');
       backdrop.className = 'modal-backdrop';
       const modal = document.createElement('div');
@@ -1419,7 +1810,8 @@ export class TargetsView {
       closeBtn.className = 'modal-close';
       closeBtn.textContent = '×';
       const save = () => {
-        this.prefs.enabledConstellations = selectedSet.size === totalConsts ? undefined : [...selectedSet];
+        this.prefs.enabledConstellations =
+          selectedSet.size === totalConsts ? undefined : [...selectedSet];
         savePrefs(this.prefs);
         updateConstCount();
         backdrop.remove();
@@ -1443,14 +1835,19 @@ export class TargetsView {
       grid.className = 'targets-const-grid';
       const chipCbs: HTMLInputElement[] = [];
       const updateSelectAllCb = () => {
-        const n = chipCbs.filter(cb => cb.checked).length;
+        const n = chipCbs.filter((cb) => cb.checked).length;
         selectAllCb.indeterminate = n > 0 && n < totalConsts;
         selectAllCb.checked = n === totalConsts;
       };
       selectAllCb.addEventListener('change', () => {
         const checked = selectAllCb.checked;
-        chipCbs.forEach(cb => { cb.checked = checked; });
-        allConstInfos.forEach(c => { if (checked) selectedSet.add(c.id); else selectedSet.delete(c.id); });
+        chipCbs.forEach((cb) => {
+          cb.checked = checked;
+        });
+        allConstInfos.forEach((c) => {
+          if (checked) selectedSet.add(c.id);
+          else selectedSet.delete(c.id);
+        });
       });
       for (const c of allConstInfos) {
         const chip = createTargetsChip(c.displayName);
@@ -1458,7 +1855,8 @@ export class TargetsView {
         cb.value = c.id;
         cb.checked = selectedSet.has(c.id);
         cb.addEventListener('change', () => {
-          if (cb.checked) selectedSet.add(c.id); else selectedSet.delete(c.id);
+          if (cb.checked) selectedSet.add(c.id);
+          else selectedSet.delete(c.id);
           updateSelectAllCb();
         });
         chipCbs.push(cb);
@@ -1500,8 +1898,10 @@ export class TargetsView {
       const cb = chip.querySelector('input')!;
       cb.checked = enabledRatingSet.has(r);
       cb.addEventListener('change', () => {
-        if (cb.checked) enabledRatingSet.add(r); else enabledRatingSet.delete(r);
-        this.prefs.enabledRatings = [...enabledRatingSet]; savePrefs(this.prefs);
+        if (cb.checked) enabledRatingSet.add(r);
+        else enabledRatingSet.delete(r);
+        this.prefs.enabledRatings = [...enabledRatingSet];
+        savePrefs(this.prefs);
       });
       ratingFilters.appendChild(chip);
     }
@@ -1523,8 +1923,10 @@ export class TargetsView {
       const cb = chip.querySelector('input')!;
       cb.checked = enabledDiffSet.has(d);
       cb.addEventListener('change', () => {
-        if (cb.checked) enabledDiffSet.add(d); else enabledDiffSet.delete(d);
-        this.prefs.enabledDifficulties = [...enabledDiffSet]; savePrefs(this.prefs);
+        if (cb.checked) enabledDiffSet.add(d);
+        else enabledDiffSet.delete(d);
+        this.prefs.enabledDifficulties = [...enabledDiffSet];
+        savePrefs(this.prefs);
       });
       diffFilters.appendChild(chip);
     }
@@ -1546,8 +1948,10 @@ export class TargetsView {
       const cb = chip.querySelector('input')!;
       cb.checked = enabledCatSet.has(cat);
       cb.addEventListener('change', () => {
-        if (cb.checked) enabledCatSet.add(cat); else enabledCatSet.delete(cat);
-        this.prefs.enabledCatalogs = [...enabledCatSet]; savePrefs(this.prefs);
+        if (cb.checked) enabledCatSet.add(cat);
+        else enabledCatSet.delete(cat);
+        this.prefs.enabledCatalogs = [...enabledCatSet];
+        savePrefs(this.prefs);
       });
       catFilters.appendChild(chip);
     }
@@ -1558,16 +1962,28 @@ export class TargetsView {
     // ── Include oversized / Exclude photographed ─────────────────────────────
     const oversizedRow = document.createElement('div');
     oversizedRow.className = 'targets-form-row';
-    const oversizedChip = createTargetsChip(t('targets.includeOversized'), { extraClass: 'targets-oversized-chip', title: t('targets.includeOversizedTooltip') });
+    const oversizedChip = createTargetsChip(t('targets.includeOversized'), {
+      extraClass: 'targets-oversized-chip',
+      title: t('targets.includeOversizedTooltip'),
+    });
     const oversizedCb = oversizedChip.querySelector('input')!;
     oversizedCb.checked = this.prefs.includeOversized ?? false;
-    oversizedCb.addEventListener('change', () => { this.prefs.includeOversized = oversizedCb.checked; savePrefs(this.prefs); });
+    oversizedCb.addEventListener('change', () => {
+      this.prefs.includeOversized = oversizedCb.checked;
+      savePrefs(this.prefs);
+    });
     oversizedRow.appendChild(oversizedChip);
 
-    const excludePhotographedChip = createTargetsChip(t('targets.excludePhotographed'), { extraClass: 'targets-oversized-chip', title: t('targets.excludePhotographedTooltip') });
+    const excludePhotographedChip = createTargetsChip(t('targets.excludePhotographed'), {
+      extraClass: 'targets-oversized-chip',
+      title: t('targets.excludePhotographedTooltip'),
+    });
     const excludePhotographedCb = excludePhotographedChip.querySelector('input')!;
     excludePhotographedCb.checked = this.prefs.excludePhotographed ?? false;
-    excludePhotographedCb.addEventListener('change', () => { this.prefs.excludePhotographed = excludePhotographedCb.checked; savePrefs(this.prefs); });
+    excludePhotographedCb.addEventListener('change', () => {
+      this.prefs.excludePhotographed = excludePhotographedCb.checked;
+      savePrefs(this.prefs);
+    });
     oversizedRow.appendChild(excludePhotographedChip);
 
     form.appendChild(oversizedRow);
@@ -1626,8 +2042,12 @@ export class TargetsView {
 
     // Unified [+] create / [edit] (edit owns deletion) controls, shared with the
     // plan-details and sky-map FOV popup dropdowns.
-    const { addBtn, editBtn, refresh: refreshControls } = buildSetupControls({
-      getSelectedSetup: () => allSetups.find(s => s.id === select.value),
+    const {
+      addBtn,
+      editBtn,
+      refresh: refreshControls,
+    } = buildSetupControls({
+      getSelectedSetup: () => allSetups.find((s) => s.id === select.value),
       onMutated: () => {
         this.fovFramesStore.loadSpecs();
         rebuildSection();
@@ -1650,90 +2070,102 @@ export class TargetsView {
       fovHintEl.textContent = '';
       infoIcon.onclick = null;
       if (!setup) return;
-      Promise.all([getTelescopes(), getCameras(), getAccessories()]).then(([tels, cams, accs]) => {
-        const tel = tels.find(t => t.id === setup.telescopeId);
-        const effectiveCameraId = tel?.is_smart_telescope && tel.integrated_camera_id
-          ? tel.integrated_camera_id
-          : setup.cameraId;
-        const cam = cams.find(c => c.id === effectiveCameraId);
-        const acc = (tel?.is_smart_telescope || !setup.accessoryId)
-          ? null
-          : (accs.find(a => a.id === setup.accessoryId) ?? null);
-        if (!tel || !cam) return;
-        const preset = buildGearPreset(tel, cam, acc);
-        fovHintEl.textContent = `${t('targets.gear.effectiveFocalLength')}: ${formatGearFovLabel(preset)}`;
-        const tooltipRows = buildSetupInfoRows(tel, cam, acc);
-        infoIcon.onclick = (e) => {
-          e.stopPropagation();
-          showKeyValueTooltip(infoIcon, tooltipRows);
-        };
-      }).catch(() => {});
+      Promise.all([getTelescopes(), getCameras(), getAccessories()])
+        .then(([tels, cams, accs]) => {
+          const tel = tels.find((t) => t.id === setup.telescopeId);
+          const effectiveCameraId =
+            tel?.is_smart_telescope && tel.integrated_camera_id
+              ? tel.integrated_camera_id
+              : setup.cameraId;
+          const cam = cams.find((c) => c.id === effectiveCameraId);
+          const acc =
+            tel?.is_smart_telescope || !setup.accessoryId
+              ? null
+              : (accs.find((a) => a.id === setup.accessoryId) ?? null);
+          if (!tel || !cam) return;
+          const preset = buildGearPreset(tel, cam, acc);
+          fovHintEl.textContent = `${t('targets.gear.effectiveFocalLength')}: ${formatGearFovLabel(preset)}`;
+          const tooltipRows = buildSetupInfoRows(tel, cam, acc);
+          infoIcon.onclick = (e) => {
+            e.stopPropagation();
+            showKeyValueTooltip(infoIcon, tooltipRows);
+          };
+        })
+        .catch(() => {});
     };
 
-    getGearSetups().then(setups => {
-      allSetups = setups;
-      select.innerHTML = '';
+    getGearSetups()
+      .then((setups) => {
+        allSetups = setups;
+        select.innerHTML = '';
 
-      if (setups.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = t('targets.gear.noSetup');
-        select.appendChild(opt);
-        select.disabled = true;
+        if (setups.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = t('targets.gear.noSetup');
+          select.appendChild(opt);
+          select.disabled = true;
+          if (this.generateBtn) {
+            this.generateBtn.disabled = true;
+            this.generateBtn.title = t('targets.gear.noSetupTooltip');
+          }
+          if (this.randomBtn) {
+            this.randomBtn.disabled = true;
+            this.randomBtn.title = t('targets.gear.noSetupTooltip');
+          }
+          // The previously-selected setup no longer exists — clear the stale pref.
+          if (this.prefs.setupId) {
+            this.prefs.setupId = null;
+            savePrefs(this.prefs);
+          }
+          refreshControls();
+          updateGearInfo(undefined);
+          return;
+        }
+
+        select.disabled = false;
         if (this.generateBtn) {
-          this.generateBtn.disabled = true;
-          this.generateBtn.title = t('targets.gear.noSetupTooltip');
+          this.generateBtn.disabled = false;
+          this.generateBtn.title = '';
         }
         if (this.randomBtn) {
-          this.randomBtn.disabled = true;
-          this.randomBtn.title = t('targets.gear.noSetupTooltip');
+          this.randomBtn.disabled = false;
+          this.randomBtn.title = '';
         }
-        // The previously-selected setup no longer exists — clear the stale pref.
-        if (this.prefs.setupId) {
-          this.prefs.setupId = null;
+
+        for (const s of setups) {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name;
+          select.appendChild(opt);
+        }
+
+        // Restore or auto-select
+        const savedId = this.prefs.setupId;
+        const match = savedId ? setups.find((s) => s.id === savedId) : null;
+        select.value = match ? savedId! : setups[0].id;
+        if (!match) {
+          this.prefs.setupId = setups[0].id;
           savePrefs(this.prefs);
         }
+
+        const selectedSetup = () => allSetups.find((s) => s.id === select.value);
         refreshControls();
-        updateGearInfo(undefined);
-        return;
-      }
-
-      select.disabled = false;
-      if (this.generateBtn) { this.generateBtn.disabled = false; this.generateBtn.title = ''; }
-      if (this.randomBtn) { this.randomBtn.disabled = false; this.randomBtn.title = ''; }
-
-      for (const s of setups) {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = s.name;
-        select.appendChild(opt);
-      }
-
-      // Restore or auto-select
-      const savedId = this.prefs.setupId;
-      const match = savedId ? setups.find(s => s.id === savedId) : null;
-      select.value = match ? savedId! : setups[0].id;
-      if (!match) {
-        this.prefs.setupId = setups[0].id;
-        savePrefs(this.prefs);
-      }
-
-      const selectedSetup = () => allSetups.find(s => s.id === select.value);
-      refreshControls();
-      updateGearInfo(selectedSetup());
-
-      select.addEventListener('change', () => {
-        this.prefs.setupId = select.value || null;
-        savePrefs(this.prefs);
         updateGearInfo(selectedSetup());
-        refreshControls();
+
+        select.addEventListener('change', () => {
+          this.prefs.setupId = select.value || null;
+          savePrefs(this.prefs);
+          updateGearInfo(selectedSetup());
+          refreshControls();
+        });
+      })
+      .catch(() => {
+        select.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.textContent = '…';
+        select.appendChild(opt);
       });
-    }).catch(() => {
-      select.innerHTML = '';
-      const opt = document.createElement('option');
-      opt.textContent = '…';
-      select.appendChild(opt);
-    });
   }
 
   // ─── Run recommendation ────────────────────────────────────────────────────
@@ -1753,7 +2185,9 @@ export class TargetsView {
     }
 
     const allGenBtns = document.querySelectorAll<HTMLButtonElement>('.targets-generate-btn');
-    allGenBtns.forEach(b => { b.disabled = true; });
+    allGenBtns.forEach((b) => {
+      b.disabled = true;
+    });
     btn.textContent = t('targets.generating');
     const savedScroll = this.container.scrollTop;
     resultsEl.innerHTML = `<div class="targets-spinner"></div>`;
@@ -1762,41 +2196,52 @@ export class TargetsView {
 
     try {
       const [setups, telescopes, cameras, accessories] = await Promise.all([
-        getGearSetups(), getTelescopes(), getCameras(), getAccessories(),
+        getGearSetups(),
+        getTelescopes(),
+        getCameras(),
+        getAccessories(),
       ]);
 
-      const setup = setups.find(s => s.id === this.prefs.setupId);
+      const setup = setups.find((s) => s.id === this.prefs.setupId);
       if (!setup) {
         resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
-        allGenBtns.forEach(b => { b.disabled = false; });
+        allGenBtns.forEach((b) => {
+          b.disabled = false;
+        });
         btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
         return;
       }
 
-      const telescope = telescopes.find(t => t.id === setup.telescopeId);
+      const telescope = telescopes.find((t) => t.id === setup.telescopeId);
       if (!telescope) {
         resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
-        allGenBtns.forEach(b => { b.disabled = false; });
+        allGenBtns.forEach((b) => {
+          b.disabled = false;
+        });
         btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
         return;
       }
 
       // For smart telescopes, use integrated camera ID
-      const effectiveCameraId = telescope.is_smart_telescope && telescope.integrated_camera_id
-        ? telescope.integrated_camera_id
-        : setup.cameraId;
+      const effectiveCameraId =
+        telescope.is_smart_telescope && telescope.integrated_camera_id
+          ? telescope.integrated_camera_id
+          : setup.cameraId;
 
-      const camera = cameras.find(c => c.id === effectiveCameraId);
+      const camera = cameras.find((c) => c.id === effectiveCameraId);
       if (!camera) {
         resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
-        allGenBtns.forEach(b => { b.disabled = false; });
+        allGenBtns.forEach((b) => {
+          b.disabled = false;
+        });
         btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
         return;
       }
 
-      const accessory = (telescope.is_smart_telescope || !setup.accessoryId)
-        ? null
-        : (accessories.find(a => a.id === setup.accessoryId) ?? null);
+      const accessory =
+        telescope.is_smart_telescope || !setup.accessoryId
+          ? null
+          : (accessories.find((a) => a.id === setup.accessoryId) ?? null);
 
       const preset = buildGearPreset(telescope, camera, accessory);
 
@@ -1808,14 +2253,16 @@ export class TargetsView {
       const enabledDifficulties = new Set(this.prefs.enabledDifficulties ?? [1, 2, 3, 4, 5]);
       const enabledCatalogs = new Set(this.prefs.enabledCatalogs ?? [...DSO_CATALOGS_ALL]);
       const allConsts = getConstellationInfos();
-      const enabledConstellations = (this.prefs.enabledConstellations && this.prefs.enabledConstellations.length < allConsts.length)
-        ? new Set(this.prefs.enabledConstellations)
-        : null;
+      const enabledConstellations =
+        this.prefs.enabledConstellations &&
+        this.prefs.enabledConstellations.length < allConsts.length
+          ? new Set(this.prefs.enabledConstellations)
+          : null;
 
       let photographedIds: Set<string> | null = null;
       if (this.prefs.excludePhotographed) {
         const photos = await getPhotos();
-        photographedIds = new Set(photos.flatMap(p => p.dsoIds));
+        photographedIds = new Set(photos.flatMap((p) => p.dsoIds));
       }
 
       const filteredDSOs = filterTargetDSOs(dsos, {
@@ -1830,21 +2277,18 @@ export class TargetsView {
       const enabledDirs = new Set(this.prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
       const dirFilterActive = enabledDirs.size < 4;
 
-      const rawSuggestions = recommendTargets(
-        filteredDSOs, preset, location, dateNight, 5000,
-        {
-          ignoreFovFit: this.prefs.includeOversized ?? false,
-          minAltDeg: this.prefs.minAltDeg ?? 20,
-          maxAltDeg: this.prefs.maxAltDeg ?? 80,
-        },
-      );
+      const rawSuggestions = recommendTargets(filteredDSOs, preset, location, dateNight, 5000, {
+        ignoreFovFit: this.prefs.includeOversized ?? false,
+        minAltDeg: this.prefs.minAltDeg ?? 20,
+        maxAltDeg: this.prefs.maxAltDeg ?? 80,
+      });
 
       let suggestions: TargetSuggestion[];
       if (!dirFilterActive) {
         suggestions = rawSuggestions;
       } else {
         const midnightUTC = dateNight.getTime() + (12 - lon / 15) * 3600 * 1000;
-        suggestions = rawSuggestions.filter(s => {
+        suggestions = rawSuggestions.filter((s) => {
           const isNorth = s.dso.dec > lat;
           if (!enabledDirs.has('N') && isNorth) return false;
           if (!enabledDirs.has('S') && !isNorth) return false;
@@ -1855,7 +2299,9 @@ export class TargetsView {
         });
       }
 
-      allGenBtns.forEach(b => { b.disabled = false; });
+      allGenBtns.forEach((b) => {
+        b.disabled = false;
+      });
       btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
 
       this.lastPool = mode === 'random' ? shuffleArray(suggestions) : suggestions;
@@ -1866,7 +2312,9 @@ export class TargetsView {
       this.renderResults(resultsEl);
       this.container.scrollTop = savedScroll;
     } catch (err: any) {
-      allGenBtns.forEach(b => { b.disabled = false; });
+      allGenBtns.forEach((b) => {
+        b.disabled = false;
+      });
       btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
       resultsEl.innerHTML = `<div class="targets-empty">${err.message}</div>`;
     }
@@ -1881,10 +2329,10 @@ export class TargetsView {
       return;
     }
 
-    const sortKey  = this.prefs.sortBy ?? 'rating';
+    const sortKey = this.prefs.sortBy ?? 'rating';
     const pageSize = this.prefs.pageSize ?? 15;
-    const sorted   = sortSuggestions(this.lastPool, sortKey);
-    const total    = sorted.length;
+    const sorted = sortSuggestions(this.lastPool, sortKey);
+    const total = sorted.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     this.currentPage = Math.max(0, Math.min(this.currentPage, totalPages - 1));
     const pageSlice = sorted.slice(this.currentPage * pageSize, (this.currentPage + 1) * pageSize);
@@ -1903,19 +2351,21 @@ export class TargetsView {
     const sortSelect = document.createElement('select');
     sortSelect.className = 'targets-sort-select';
     const sortOpts: [SortKey, () => string][] = [
-      ['rating',     () => t('targets.sort.rating')],
-      ['score',      () => t('targets.sort.score')],
-      ['altitude',   () => t('targets.sort.altitude')],
-      ['transit',    () => t('targets.sort.transit')],
-      ['magnitude',  () => t('targets.sort.magnitude')],
-      ['size',       () => t('targets.sort.size')],
-      ['fov-fit',    () => t('targets.sort.fovFit')],
-      ['name',       () => t('targets.sort.name')],
+      ['rating', () => t('targets.sort.rating')],
+      ['score', () => t('targets.sort.score')],
+      ['altitude', () => t('targets.sort.altitude')],
+      ['transit', () => t('targets.sort.transit')],
+      ['magnitude', () => t('targets.sort.magnitude')],
+      ['size', () => t('targets.sort.size')],
+      ['fov-fit', () => t('targets.sort.fovFit')],
+      ['name', () => t('targets.sort.name')],
       ['difficulty', () => t('targets.sort.difficulty')],
     ];
     for (const [value, labelFn] of sortOpts) {
       const opt = document.createElement('option');
-      opt.value = value; opt.textContent = labelFn(); opt.selected = value === sortKey;
+      opt.value = value;
+      opt.textContent = labelFn();
+      opt.selected = value === sortKey;
       sortSelect.appendChild(opt);
     }
     sortSelect.addEventListener('change', () => {
@@ -1932,7 +2382,9 @@ export class TargetsView {
     pageSizeSelect.title = t('targets.perPage');
     for (const n of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]) {
       const opt = document.createElement('option');
-      opt.value = String(n); opt.textContent = `${n} ${t('targets.perPage')}`; opt.selected = n === pageSize;
+      opt.value = String(n);
+      opt.textContent = `${n} ${t('targets.perPage')}`;
+      opt.selected = n === pageSize;
       pageSizeSelect.appendChild(opt);
     }
     pageSizeSelect.addEventListener('change', () => {
@@ -1948,7 +2400,8 @@ export class TargetsView {
     const navBtn = (label: string, title: string, targetPage: number): HTMLButtonElement => {
       const b = document.createElement('button');
       b.className = 'targets-pagination-btn';
-      b.textContent = label; b.title = title;
+      b.textContent = label;
+      b.title = title;
       b.addEventListener('click', () => navigate(targetPage));
       return b;
     };
@@ -1958,11 +2411,14 @@ export class TargetsView {
     for (const p of buildPageList(cp, totalPages)) {
       if (p === null) {
         const dot = document.createElement('span');
-        dot.className = 'targets-pagination-ellipsis'; dot.textContent = '…';
+        dot.className = 'targets-pagination-ellipsis';
+        dot.textContent = '…';
         paginationEl.appendChild(dot);
       } else {
         const b = document.createElement('button');
-        b.className = 'targets-pagination-btn targets-pagination-btn--page' + (p === cp ? ' targets-pagination-btn--active' : '');
+        b.className =
+          'targets-pagination-btn targets-pagination-btn--page' +
+          (p === cp ? ' targets-pagination-btn--active' : '');
         b.textContent = String(p + 1);
         b.addEventListener('click', () => navigate(p));
         paginationEl.appendChild(b);
@@ -1984,7 +2440,10 @@ export class TargetsView {
 
   // ─── Target card ───────────────────────────────────────────────────────────
 
-  private buildTargetCard(s: TargetSuggestion, preset: ReturnType<typeof buildGearPreset>): HTMLElement {
+  private buildTargetCard(
+    s: TargetSuggestion,
+    preset: ReturnType<typeof buildGearPreset>,
+  ): HTMLElement {
     const card = document.createElement('div');
     card.className = 'target-card';
     const { dso } = s;
@@ -1998,7 +2457,9 @@ export class TargetsView {
     titleEl.className = 'target-card-title';
     const bestName = dso.displayName || dso.catalogs[0] || dso.id;
     if (dso.displayName) {
-      titleEl.appendChild(Object.assign(document.createElement('span'), { textContent: dso.displayName }));
+      titleEl.appendChild(
+        Object.assign(document.createElement('span'), { textContent: dso.displayName }),
+      );
       const primaryId = dso.catalogs[0] || dso.id;
       const idSpan = document.createElement('span');
       idSpan.className = 'target-card-catalog-id';
@@ -2029,7 +2490,7 @@ export class TargetsView {
       const constEl = document.createElement('div');
       constEl.className = 'target-card-const';
       constEl.textContent = dso.constellation.toUpperCase();
-      const constInfo = getConstellationInfos().find(c => c.id === dso.constellation);
+      const constInfo = getConstellationInfos().find((c) => c.id === dso.constellation);
       if (constInfo) constEl.title = constInfo.name;
       chipsRow.appendChild(constEl);
     }
@@ -2038,21 +2499,58 @@ export class TargetsView {
 
     const meta = document.createElement('div');
     meta.className = 'target-card-meta';
-    meta.appendChild(this.metaItem(t('targets.results.maxAlt'), formatAlt(s.maxAltDeg), t('targets.tooltips.maxAlt')));
-    meta.appendChild(this.metaItem(t('targets.results.bestTime'), formatTime(s.bestTimeUtc), t('targets.tooltips.bestTime')));
-    if (dso.mag !== null) meta.appendChild(this.metaItem('Mag', dso.mag.toFixed(1), t('targets.tooltips.mag')));
-    if (dso.majAxis) meta.appendChild(this.metaItem(t('targets.results.size'), formatArcmin(dso.majAxis), t('targets.tooltips.size')));
+    meta.appendChild(
+      this.metaItem(
+        t('targets.results.maxAlt'),
+        formatAlt(s.maxAltDeg),
+        t('targets.tooltips.maxAlt'),
+      ),
+    );
+    meta.appendChild(
+      this.metaItem(
+        t('targets.results.bestTime'),
+        formatTime(s.bestTimeUtc),
+        t('targets.tooltips.bestTime'),
+      ),
+    );
+    if (dso.mag !== null)
+      meta.appendChild(this.metaItem('Mag', dso.mag.toFixed(1), t('targets.tooltips.mag')));
+    if (dso.majAxis)
+      meta.appendChild(
+        this.metaItem(
+          t('targets.results.size'),
+          formatArcmin(dso.majAxis),
+          t('targets.tooltips.size'),
+        ),
+      );
     card.appendChild(meta);
 
     const meta2 = document.createElement('div');
     meta2.className = 'target-card-meta';
     if (dso.difficulty !== null) {
-      const diffEl = this.metaItem(t('targets.sort.difficulty'), '◆'.repeat(dso.difficulty) + '◇'.repeat(5 - dso.difficulty), t('targets.tooltips.difficulty'));
-      diffEl.querySelector('.target-meta-value')!.className = 'target-meta-value target-card-difficulty';
+      const diffEl = this.metaItem(
+        t('targets.sort.difficulty'),
+        '◆'.repeat(dso.difficulty) + '◇'.repeat(5 - dso.difficulty),
+        t('targets.tooltips.difficulty'),
+      );
+      diffEl.querySelector('.target-meta-value')!.className =
+        'target-meta-value target-card-difficulty';
       meta2.appendChild(diffEl);
     }
-    meta2.appendChild(this.metaItem(t('targets.results.score'), `${Math.round(s.score * 100)}%`, t('targets.tooltips.score')));
-    meta2.appendChild(this.metaItem(t('targets.results.fov'), `${Math.round(s.fovFitScore * 100)}%`, t('targets.tooltips.fov')));
+    meta2.appendChild(
+      this.metaItem(
+        t('targets.results.score'),
+        `${Math.round(s.score * 100)}%`,
+        t('targets.tooltips.score'),
+      ),
+    );
+    meta2.appendChild(
+      this.metaItem(
+        t('targets.results.fov'),
+        `${Math.round(s.fovFitScore * 100)}%`,
+        t('targets.tooltips.fov'),
+      ),
+    );
     card.appendChild(meta2);
 
     const totalEl = document.createElement('div');
@@ -2085,15 +2583,21 @@ export class TargetsView {
     actionsDiv.className = 'target-actions-row';
 
     const navBtnEl = this.iconActionBtn(mapPinSvg, t('targets.results.openOnMap'));
-    navBtnEl.addEventListener('click', () => { this.onNavigate(dso.ra, dso.dec, this.prefs.setupId); });
+    navBtnEl.addEventListener('click', () => {
+      this.onNavigate(dso.ra, dso.dec, this.prefs.setupId);
+    });
 
     const editBtn = this.iconActionBtn(penSvg, t('dso.edit'));
-    editBtn.addEventListener('click', () => { this.onEditDSO?.(dso); });
+    editBtn.addEventListener('click', () => {
+      this.onEditDSO?.(dso);
+    });
 
     const planBtn = this.iconActionBtn(listPlusSvg, t('targets.plan.addToPlan'));
     planBtn.setAttribute('data-plan-dso', dso.id);
     this.refreshPlanBtnState(planBtn, dso.id);
-    planBtn.addEventListener('click', () => { this.openPlanPicker(planBtn, dso.id); });
+    planBtn.addEventListener('click', () => {
+      this.openPlanPicker(planBtn, dso.id);
+    });
 
     actionsDiv.appendChild(navBtnEl);
     actionsDiv.appendChild(editBtn);
@@ -2145,9 +2649,23 @@ export class TargetsView {
     const level = moonDangerLevel(sepDeg, illum);
     // Lead with an adjective so the number reads as a distance from the target,
     // e.g. "Close (34°)" / "Far (109°)".
-    const adj = t({ danger: 'targets.plan.moonClose', warn: 'targets.plan.moonModerate', ok: 'targets.plan.moonFar' }[level]);
-    const item = this.metaItem(t('targets.plan.moonSeparation'), `${adj} (${formatAlt(sepDeg)})`, t('targets.plan.moonSeparationHelp'));
-    const token = { danger: '--color-danger', warn: '--status-warn-text', ok: '--status-success-text' }[level];
+    const adj = t(
+      {
+        danger: 'targets.plan.moonClose',
+        warn: 'targets.plan.moonModerate',
+        ok: 'targets.plan.moonFar',
+      }[level],
+    );
+    const item = this.metaItem(
+      t('targets.plan.moonSeparation'),
+      `${adj} (${formatAlt(sepDeg)})`,
+      t('targets.plan.moonSeparationHelp'),
+    );
+    const token = {
+      danger: '--color-danger',
+      warn: '--status-warn-text',
+      ok: '--status-success-text',
+    }[level];
     const value = item.querySelector('.target-meta-value') as HTMLElement;
     // Inline style (not a utility class): `.target-meta-value` sets its own colour
     // and would win the cascade tie by source order, so set it directly here.
@@ -2177,7 +2695,11 @@ export class TargetsView {
    * shows the frames, and zooms using the mosaic's overall envelope (cols × rows
    * tiles) as the frame for the scale calculation — so the entire mosaic fits.
    */
-  private async navigateToMosaic(planId: string, mosaic: PlanMosaic, setupId: string | null): Promise<void> {
+  private async navigateToMosaic(
+    planId: string,
+    mosaic: PlanMosaic,
+    setupId: string | null,
+  ): Promise<void> {
     this.fovFramesStore.setSelection({ kind: 'plan', planId });
     this.fovFramesStore.setFramesVisible(true);
     const preset = await this.planPreset(setupId);
@@ -2186,7 +2708,13 @@ export class TargetsView {
       const { wDeg: tileW, hDeg: tileH } = fovDeg(preset);
       const env = outlineFromGrid(mosaic.cols, mosaic.rows, tileW, tileH, mosaic.overlapPct);
       const view = this.skyMap.getView();
-      scale = computeFovTargetScale(env.wDeg, env.hDeg, mosaic.centerDec, getHemisphere(), Math.min(view.width, view.height));
+      scale = computeFovTargetScale(
+        env.wDeg,
+        env.hDeg,
+        mosaic.centerDec,
+        getHemisphere(),
+        Math.min(view.width, view.height),
+      );
     } else {
       scale = Math.max(this.skyMap.getView().scale, 400);
     }
@@ -2200,20 +2728,25 @@ export class TargetsView {
     if (!setupId) return null;
     try {
       const [setups, telescopes, cameras, accessories] = await Promise.all([
-        getGearSetups(), getTelescopes(), getCameras(), getAccessories(),
+        getGearSetups(),
+        getTelescopes(),
+        getCameras(),
+        getAccessories(),
       ]);
-      const setup = setups.find(s => s.id === setupId);
+      const setup = setups.find((s) => s.id === setupId);
       if (!setup) return null;
-      const telescope = telescopes.find(tel => tel.id === setup.telescopeId);
+      const telescope = telescopes.find((tel) => tel.id === setup.telescopeId);
       if (!telescope) return null;
-      const effectiveCameraId = telescope.is_smart_telescope && telescope.integrated_camera_id
-        ? telescope.integrated_camera_id
-        : setup.cameraId;
-      const camera = cameras.find(c => c.id === effectiveCameraId);
+      const effectiveCameraId =
+        telescope.is_smart_telescope && telescope.integrated_camera_id
+          ? telescope.integrated_camera_id
+          : setup.cameraId;
+      const camera = cameras.find((c) => c.id === effectiveCameraId);
       if (!camera) return null;
-      const accessory = (telescope.is_smart_telescope || !setup.accessoryId)
-        ? null
-        : (accessories.find(a => a.id === setup.accessoryId) ?? null);
+      const accessory =
+        telescope.is_smart_telescope || !setup.accessoryId
+          ? null
+          : (accessories.find((a) => a.id === setup.accessoryId) ?? null);
       return buildGearPreset(telescope, camera, accessory);
     } catch (err) {
       reportUnknownRendererError('plan_preset_failed', err, { setupId });
@@ -2222,26 +2755,34 @@ export class TargetsView {
   }
 
   /** Resolve a gear setup id to its name + raw telescope/camera/accessory (for the PDF summary). */
-  private async resolvePlanSetup(
-    setupId: string | null,
-  ): Promise<{ name: string; tel: TelescopeData; cam: CameraData; acc: AccessoryData | null } | null> {
+  private async resolvePlanSetup(setupId: string | null): Promise<{
+    name: string;
+    tel: TelescopeData;
+    cam: CameraData;
+    acc: AccessoryData | null;
+  } | null> {
     if (!setupId) return null;
     try {
       const [setups, telescopes, cameras, accessories] = await Promise.all([
-        getGearSetups(), getTelescopes(), getCameras(), getAccessories(),
+        getGearSetups(),
+        getTelescopes(),
+        getCameras(),
+        getAccessories(),
       ]);
-      const setup = setups.find(s => s.id === setupId);
+      const setup = setups.find((s) => s.id === setupId);
       if (!setup) return null;
-      const tel = telescopes.find(t => t.id === setup.telescopeId);
+      const tel = telescopes.find((t) => t.id === setup.telescopeId);
       if (!tel) return null;
-      const effectiveCameraId = tel.is_smart_telescope && tel.integrated_camera_id
-        ? tel.integrated_camera_id
-        : setup.cameraId;
-      const cam = cameras.find(c => c.id === effectiveCameraId);
+      const effectiveCameraId =
+        tel.is_smart_telescope && tel.integrated_camera_id
+          ? tel.integrated_camera_id
+          : setup.cameraId;
+      const cam = cameras.find((c) => c.id === effectiveCameraId);
       if (!cam) return null;
-      const acc = (tel.is_smart_telescope || !setup.accessoryId)
-        ? null
-        : (accessories.find(a => a.id === setup.accessoryId) ?? null);
+      const acc =
+        tel.is_smart_telescope || !setup.accessoryId
+          ? null
+          : (accessories.find((a) => a.id === setup.accessoryId) ?? null);
       return { name: setup.name, tel, cam, acc };
     } catch (err) {
       reportUnknownRendererError('plan_setup_resolve_failed', err, { setupId });
@@ -2254,8 +2795,26 @@ export class TargetsView {
     const tw = twilightWindow(dateNight, loc.latDeg, loc.lonDeg);
     if (tw) return { start: tw.start, end: tw.end };
     return {
-      start: new Date(Date.UTC(dateNight.getUTCFullYear(), dateNight.getUTCMonth(), dateNight.getUTCDate(), 20, 0, 0)),
-      end: new Date(Date.UTC(dateNight.getUTCFullYear(), dateNight.getUTCMonth(), dateNight.getUTCDate() + 1, 6, 0, 0)),
+      start: new Date(
+        Date.UTC(
+          dateNight.getUTCFullYear(),
+          dateNight.getUTCMonth(),
+          dateNight.getUTCDate(),
+          20,
+          0,
+          0,
+        ),
+      ),
+      end: new Date(
+        Date.UTC(
+          dateNight.getUTCFullYear(),
+          dateNight.getUTCMonth(),
+          dateNight.getUTCDate() + 1,
+          6,
+          0,
+          0,
+        ),
+      ),
     };
   }
 
@@ -2270,17 +2829,28 @@ export class TargetsView {
    * Returns null when the toggle is off or the Moon stays below the horizon for
    * the whole window (no curve, no separation badge).
    */
-  private buildMoonOverlay(loc: ObserverLocation, win: { start: Date; end: Date }): MoonOverlay | null {
+  private buildMoonOverlay(
+    loc: ObserverLocation,
+    win: { start: Date; end: Date },
+  ): MoonOverlay | null {
     if (this.prefs.showMoon === false) return null;
     const curve = sampleMoonAltCurve(loc.latDeg, loc.lonDeg, win.start, win.end);
-    if (!curve.some(s => s.altDeg > 0)) return null; // moon never rises this night
+    if (!curve.some((s) => s.altDeg > 0)) return null; // moon never rises this night
     const midJd = dateToJD(new Date((win.start.getTime() + win.end.getTime()) / 2));
     const { phaseIndex, illum } = moonPhase(midJd);
     return { curve, phaseIndex, illum };
   }
 
   private computePlanTargets(
-    plan: { entries: Array<{ id: string; dsoId: string | null; ra: number | null; dec: number | null; mosaicId?: string | null }> },
+    plan: {
+      entries: Array<{
+        id: string;
+        dsoId: string | null;
+        ra: number | null;
+        dec: number | null;
+        mosaicId?: string | null;
+      }>;
+    },
     loc: ObserverLocation,
     win: { start: Date; end: Date },
     moonEnabled: boolean,
@@ -2295,7 +2865,15 @@ export class TargetsView {
       if (ra == null || dec == null) continue; // nothing to place
       // A frame on empty sky keeps a trajectory but has no catalogue metadata.
       const dso = realDso ?? this.customLocationDso(e.id, ra, dec);
-      const { maxAltDeg, atDate } = maxAltDuringWindow(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+      const { maxAltDeg, atDate } = maxAltDuringWindow(
+        ra,
+        dec,
+        loc.latDeg,
+        loc.lonDeg,
+        win.start,
+        win.end,
+        10,
+      );
       const curve = sampleAltCurve(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
       const moonSepDeg = moonEnabled ? this.moonSeparationAt(ra, dec, atDate) : null;
       out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve, moonSepDeg });
@@ -2309,17 +2887,31 @@ export class TargetsView {
   private customLocationDso(entryId: string, ra: number, dec: number): DSO {
     return {
       id: `custom:${entryId}`,
-      ra, dec, type: '?', majAxis: null, minAxis: null, pa: 0, mag: null,
+      ra,
+      dec,
+      type: '?',
+      majAxis: null,
+      minAxis: null,
+      pa: 0,
+      mag: null,
       displayName: t('fovOverlay.customLocation'),
       catalogs: [`${ra.toFixed(1)}°, ${dec.toFixed(1)}°`],
-      emissionLines: null, constellation: null, rating: null, difficulty: null,
-      containerId: null, priority: Number.MAX_SAFE_INTEGER,
+      emissionLines: null,
+      constellation: null,
+      rating: null,
+      difficulty: null,
+      containerId: null,
+      priority: Number.MAX_SAFE_INTEGER,
     };
   }
 
   private defaultPlanName(): string {
     const dateStr = this.prefs.lastDateISO ?? todayISO();
-    const nice = new Date(dateStr + 'T12:00:00Z').toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    const nice = new Date(dateStr + 'T12:00:00Z').toLocaleDateString([], {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
     return t('targets.plan.defaultName', { date: nice });
   }
 
@@ -2336,7 +2928,7 @@ export class TargetsView {
     win: { start: Date; end: Date },
   ): void {
     const tiles = plan.entries
-      .filter(e => e.mosaicId === mosaic.id && e.ra != null && e.dec != null)
+      .filter((e) => e.mosaicId === mosaic.id && e.ra != null && e.dec != null)
       .sort((a, b) => a.position - b.position);
 
     showCustomTooltip(anchor, (tip) => {
@@ -2370,7 +2962,15 @@ export class TargetsView {
 
       const tbody = document.createElement('tbody');
       tiles.forEach((e, i) => {
-        const { maxAltDeg } = maxAltDuringWindow(e.ra!, e.dec!, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+        const { maxAltDeg } = maxAltDuringWindow(
+          e.ra!,
+          e.dec!,
+          loc.latDeg,
+          loc.lonDeg,
+          win.start,
+          win.end,
+          10,
+        );
         const cells = [
           String(i + 1),
           formatAlt(maxAltDeg),
@@ -2398,8 +2998,9 @@ export class TargetsView {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = plan.name;
-    input.className = 'flex-1 min-w-0 bg-[var(--bg-input)] border border-subtle text-bright text-sub font-medium px-2 py-1 rounded-sm focus:outline-none focus:border-focus';
-    input.addEventListener('click', e => e.stopPropagation());
+    input.className =
+      'flex-1 min-w-0 bg-[var(--bg-input)] border border-subtle text-bright text-sub font-medium px-2 py-1 rounded-sm focus:outline-none focus:border-focus';
+    input.addEventListener('click', (e) => e.stopPropagation());
 
     let done = false;
     const finish = async (save: boolean) => {
@@ -2415,8 +3016,13 @@ export class TargetsView {
     };
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        finish(false);
+      }
     });
     input.addEventListener('blur', () => finish(true));
 
@@ -2461,7 +3067,8 @@ export class TargetsView {
 
   private buildPlanSection(plan: Plan): HTMLElement {
     const details = document.createElement('details');
-    details.className = 'targets-plan-section border border-solid border-[var(--border-accent)] rounded-md bg-card';
+    details.className =
+      'targets-plan-section border border-solid border-[var(--border-accent)] rounded-md bg-card';
 
     const summary = document.createElement('summary');
     summary.className = 'flex items-center gap-2 px-4 py-3 cursor-pointer select-none';
@@ -2472,15 +3079,19 @@ export class TargetsView {
 
     const count = document.createElement('span');
     count.className = 'text-dim text-small shrink-0';
-    const setCount = (n: number) => { count.textContent = `(${n})`; };
+    const setCount = (n: number) => {
+      count.textContent = `(${n})`;
+    };
     // A mosaic counts as one item (its tiles aren't listed individually).
-    const itemCount = () => plan.entries.filter(e => !e.mosaicId).length + (plan.mosaics?.length ?? 0);
+    const itemCount = () =>
+      plan.entries.filter((e) => !e.mosaicId).length + (plan.mosaics?.length ?? 0);
     setCount(itemCount());
 
     const showOnMapBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
     showOnMapBtn.classList.add('shrink-0');
     showOnMapBtn.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       // Select this plan in the FOV system, jump to the sky map, and open the
       // frame-manager popup on it.
       this.fovFramesStore.setSelection({ kind: 'plan', planId: plan.id });
@@ -2492,7 +3103,8 @@ export class TargetsView {
     const renameBtn = this.iconActionBtn(penSvg, t('targets.plan.rename'));
     renameBtn.classList.add('shrink-0');
     renameBtn.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       this.startRenamePlan(plan, nameEl);
     });
     const exportBtn = this.iconActionBtn(exportSvg, t('targets.plan.exportPdf'));
@@ -2547,7 +3159,7 @@ export class TargetsView {
     setupSelect.disabled = true;
     let planSetups: GearSetupData[] = [];
     const setupControls = buildSetupControls({
-      getSelectedSetup: () => planSetups.find(s => s.id === setupSelect.value),
+      getSelectedSetup: () => planSetups.find((s) => s.id === setupSelect.value),
       onMutated: () => this.render(),
     });
     setupRow.appendChild(setupLabel);
@@ -2565,16 +3177,24 @@ export class TargetsView {
     locLabel.className = 'text-base text-dim shrink-0';
     locLabel.textContent = t('targets.location.label');
     locRow.appendChild(locLabel);
-    locRow.appendChild(this.buildLocationWidget({
-      getLat: () => plan.lat,
-      getLon: () => plan.lon,
-      onChange: (la, lo) => {
-        plan.lat = la;
-        plan.lon = lo;
-        this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId, plan.lat, plan.lon);
-        renderTrajectories();
-      },
-    }));
+    locRow.appendChild(
+      this.buildLocationWidget({
+        getLat: () => plan.lat,
+        getLon: () => plan.lon,
+        onChange: (la, lo) => {
+          plan.lat = la;
+          plan.lon = lo;
+          this.plansStore.updatePlanSettings(
+            plan.id,
+            plan.nightOf,
+            plan.setupId,
+            plan.lat,
+            plan.lon,
+          );
+          renderTrajectories();
+        },
+      }),
+    );
     controls.appendChild(locRow);
 
     body.appendChild(controls);
@@ -2602,7 +3222,7 @@ export class TargetsView {
         trajWrap.innerHTML = `<div class="targets-empty">${t('targets.location.notSet')}</div>`;
         return;
       }
-      const hasStandalone = plan.entries.some(e => !e.mosaicId);
+      const hasStandalone = plan.entries.some((e) => !e.mosaicId);
       if (!hasStandalone && (plan.mosaics?.length ?? 0) === 0) {
         trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
         return;
@@ -2621,25 +3241,38 @@ export class TargetsView {
       const mosaicFillers: Array<(p: GearPreset | null) => void> = [];
       for (const info of infos) {
         const entryName = info.dso.displayName ?? info.dso.catalogs[0] ?? info.dso.id;
-        const { row, applyPreset } = this.buildPlanRow(plan.id, info, win, effectiveSetupId(), moon, (rowEl) => {
-          // Delete immediately with an undo toast (shared with the FOV popup).
-          deleteFrameWithUndo({ kind: 'plan', planId: plan.id, entryId: info.entryId, name: entryName }, {
-            onRemoved: () => {
-              // In-place removal — must NOT collapse or rebuild the whole plan.
-              rowEl.remove();
-              plan.entries = plan.entries.filter(e => e.id !== info.entryId);
-              currentInfos = currentInfos.filter(i => i.entryId !== info.entryId);
-              setCount(itemCount());
-              this.updatePlanBadge();
-              if (!plan.entries.some(e => !e.mosaicId) && (plan.mosaics?.length ?? 0) === 0) {
-                trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
-              }
-            },
-            // Restore re-creates the entry in the store (fresh objects), so re-render
-            // the whole view, keeping this plan expanded.
-            onRestored: () => { this.uiStore.pendingPlanFocusId = plan.id; this.render(); },
-          });
-        });
+        const { row, applyPreset } = this.buildPlanRow(
+          plan.id,
+          info,
+          win,
+          effectiveSetupId(),
+          moon,
+          (rowEl) => {
+            // Delete immediately with an undo toast (shared with the FOV popup).
+            deleteFrameWithUndo(
+              { kind: 'plan', planId: plan.id, entryId: info.entryId, name: entryName },
+              {
+                onRemoved: () => {
+                  // In-place removal — must NOT collapse or rebuild the whole plan.
+                  rowEl.remove();
+                  plan.entries = plan.entries.filter((e) => e.id !== info.entryId);
+                  currentInfos = currentInfos.filter((i) => i.entryId !== info.entryId);
+                  setCount(itemCount());
+                  this.updatePlanBadge();
+                  if (!plan.entries.some((e) => !e.mosaicId) && (plan.mosaics?.length ?? 0) === 0) {
+                    trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
+                  }
+                },
+                // Restore re-creates the entry in the store (fresh objects), so re-render
+                // the whole view, keeping this plan expanded.
+                onRestored: () => {
+                  this.uiStore.pendingPlanFocusId = plan.id;
+                  this.render();
+                },
+              },
+            );
+          },
+        );
         fillers.push(applyPreset);
         list.appendChild(row);
       }
@@ -2649,22 +3282,35 @@ export class TargetsView {
       // A mosaic counts as N panels, each imaged like the target, so the total
       // integration is the single-object recipe × the tile count.
       for (const mosaic of plan.mosaics ?? []) {
-        const tileCount = plan.entries.filter(e => e.mosaicId === mosaic.id).length;
+        const tileCount = plan.entries.filter((e) => e.mosaicId === mosaic.id).length;
         const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : null;
         const name = dso ? (dso.displayName ?? dso.id) : t('fovOverlay.customLocation');
 
         // Trajectory + altitude metadata are computed from the mosaic centre, so
         // they need no catalogue object (only computable values are shown).
         const { maxAltDeg, atDate } = maxAltDuringWindow(
-          mosaic.centerRa, mosaic.centerDec,
-          observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+          mosaic.centerRa,
+          mosaic.centerDec,
+          observer.loc.latDeg,
+          observer.loc.lonDeg,
+          win.start,
+          win.end,
+          10,
+        );
         const curve = sampleAltCurve(
-          mosaic.centerRa, mosaic.centerDec,
-          observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+          mosaic.centerRa,
+          mosaic.centerDec,
+          observer.loc.latDeg,
+          observer.loc.lonDeg,
+          win.start,
+          win.end,
+          10,
+        );
 
         // Same three-column layout as a standalone plan row (info · chart · delete).
         const row = document.createElement('div');
-        row.className = 'flex items-start gap-3 py-3 border-0 border-solid border-t border-[var(--border-input)]';
+        row.className =
+          'flex items-start gap-3 py-3 border-0 border-solid border-t border-[var(--border-input)]';
 
         // Grow the column to fit the (wider) panel summary on one line rather
         // than the fixed target-row width — the chart simply takes what's left.
@@ -2679,9 +3325,26 @@ export class TargetsView {
         // the first, the mosaic centre coordinates on the second.
         const meta = document.createElement('div');
         meta.className = 'target-card-meta';
-        meta.appendChild(this.metaItem(t('targets.results.maxAlt'), formatAlt(maxAltDeg), t('targets.tooltips.maxAlt')));
-        meta.appendChild(this.metaItem(t('fovOverlay.angleLabel'), formatPaDeg(mosaic.paDeg), t('fovOverlay.angleHelp')));
-        const mosaicSep = moon ? this.moonSepMetaItem(this.moonSeparationAt(mosaic.centerRa, mosaic.centerDec, atDate), moon.illum) : null;
+        meta.appendChild(
+          this.metaItem(
+            t('targets.results.maxAlt'),
+            formatAlt(maxAltDeg),
+            t('targets.tooltips.maxAlt'),
+          ),
+        );
+        meta.appendChild(
+          this.metaItem(
+            t('fovOverlay.angleLabel'),
+            formatPaDeg(mosaic.paDeg),
+            t('fovOverlay.angleHelp'),
+          ),
+        );
+        const mosaicSep = moon
+          ? this.moonSepMetaItem(
+              this.moonSeparationAt(mosaic.centerRa, mosaic.centerDec, atDate),
+              moon.illum,
+            )
+          : null;
         if (mosaicSep) meta.appendChild(mosaicSep);
 
         // RA/Dec are the mosaic centre — keep each value on one line so the
@@ -2708,7 +3371,8 @@ export class TargetsView {
         infoIcon.textContent = 'ℹ';
         infoIcon.title = t('targets.plan.panelDetails');
         infoIcon.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
+          e.preventDefault();
+          e.stopPropagation();
           this.showMosaicPanelDetails(infoIcon, plan, mosaic, observer.loc, win);
         });
         summaryRow.append(sub, infoIcon);
@@ -2730,16 +3394,19 @@ export class TargetsView {
         // used for the zoom calculation).
         const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
         navBtn.classList.add('shrink-0');
-        navBtn.addEventListener('click', () => { void this.navigateToMosaic(plan.id, mosaic, effectiveSetupId()); });
+        navBtn.addEventListener('click', () => {
+          void this.navigateToMosaic(plan.id, mosaic, effectiveSetupId());
+        });
 
         const del = this.iconActionBtn(trashSvg, t('fovOverlay.deleteMosaic'));
         del.classList.add('shrink-0', 'btn-icon--danger');
         del.addEventListener('click', async (e) => {
-          e.preventDefault(); e.stopPropagation();
-          if (!await confirmPlanEntryDelete(name)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (!(await confirmPlanEntryDelete(name))) return;
           await this.plansStore.deleteMosaic(plan.id, mosaic.id);
-          plan.mosaics = plan.mosaics.filter(m => m.id !== mosaic.id);
-          plan.entries = plan.entries.filter(en => en.mosaicId !== mosaic.id);
+          plan.mosaics = plan.mosaics.filter((m) => m.id !== mosaic.id);
+          plan.entries = plan.entries.filter((en) => en.mosaicId !== mosaic.id);
           setCount(itemCount());
           renderTrajectories();
         });
@@ -2768,7 +3435,7 @@ export class TargetsView {
       }
 
       // Score / FOV-fit / integration time need a gear preset (resolved async).
-      this.planPreset(effectiveSetupId()).then(preset => {
+      this.planPreset(effectiveSetupId()).then((preset) => {
         for (const f of fillers) f(preset);
         for (const f of mosaicFillers) f(preset);
       });
@@ -2782,41 +3449,46 @@ export class TargetsView {
       renderTrajectories();
     });
 
-    getGearSetups().then(setups => {
-      planSetups = setups;
-      if (setups.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = t('targets.gear.noSetup') ?? '—';
-        setupSelect.appendChild(opt);
+    getGearSetups()
+      .then((setups) => {
+        planSetups = setups;
+        if (setups.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = t('targets.gear.noSetup') ?? '—';
+          setupSelect.appendChild(opt);
+          setupControls.refresh();
+          return;
+        }
+        setupSelect.disabled = false;
+        for (const s of setups) {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name;
+          setupSelect.appendChild(opt);
+        }
+        const eff = effectiveSetupId();
+        setupSelect.value = eff && setups.some((s) => s.id === eff) ? eff : setups[0].id;
         setupControls.refresh();
-        return;
-      }
-      setupSelect.disabled = false;
-      for (const s of setups) {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = s.name;
-        setupSelect.appendChild(opt);
-      }
-      const eff = effectiveSetupId();
-      setupSelect.value = (eff && setups.some(s => s.id === eff)) ? eff : setups[0].id;
-      setupControls.refresh();
-      // Route through the shared setup-switch flow (same as the sky-view FOV
-      // popup) so changing the setup with existing mosaics opens the Apply/Drop
-      // confirmation modal instead of silently breaking them. The modal's apply
-      // path reloads the plans store (replacing `plan`), so re-render the whole
-      // Targets view rather than just the trajectories.
-      setupSelect.addEventListener('change', () => {
-        requestSetupSwitch(plan, setupSelect.value || null, {
-          onRevert: () => { setupSelect.value = plan.setupId ?? ''; },
-          onApplied: () => this.render(),
+        // Route through the shared setup-switch flow (same as the sky-view FOV
+        // popup) so changing the setup with existing mosaics opens the Apply/Drop
+        // confirmation modal instead of silently breaking them. The modal's apply
+        // path reloads the plans store (replacing `plan`), so re-render the whole
+        // Targets view rather than just the trajectories.
+        setupSelect.addEventListener('change', () => {
+          requestSetupSwitch(plan, setupSelect.value || null, {
+            onRevert: () => {
+              setupSelect.value = plan.setupId ?? '';
+            },
+            onApplied: () => this.render(),
+          });
         });
-      });
-    }).catch(() => {});
+      })
+      .catch(() => {});
 
     deleteBtn.addEventListener('click', async (e) => {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       const confirmed = await confirmPlanDelete(plan.name);
       if (!confirmed) return;
       await this.plansStore.deletePlan(plan.id);
@@ -2825,7 +3497,8 @@ export class TargetsView {
     });
 
     exportBtn.addEventListener('click', async (e) => {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       const hasMosaics = (plan.mosaics?.length ?? 0) > 0;
       if (!currentWin || (currentInfos.length === 0 && !hasMosaics)) {
         showToast({ message: t('targets.plan.empty'), type: 'info', duration: 2000 });
@@ -2849,9 +3522,15 @@ export class TargetsView {
           ? { moonCurve: moon.curve, moonPhaseIndex: moon.phaseIndex, moonIllum: moon.illum }
           : {};
 
-        const targets: PlanPdfTarget[] = infos.map(i => ({
-          dso: i.dso, bestTimeUtc: i.bestTimeUtc, maxAltDeg: i.maxAltDeg, curve: i.curve, nightWin: win, mosaic: null,
-          ...moonShared, moonSepDeg: moon ? i.moonSepDeg : null,
+        const targets: PlanPdfTarget[] = infos.map((i) => ({
+          dso: i.dso,
+          bestTimeUtc: i.bestTimeUtc,
+          maxAltDeg: i.maxAltDeg,
+          curve: i.curve,
+          nightWin: win,
+          mosaic: null,
+          ...moonShared,
+          moonSepDeg: moon ? i.moonSepDeg : null,
         }));
 
         // One page per mosaic: trajectory from the centre + framed tile grid.
@@ -2859,20 +3538,40 @@ export class TargetsView {
           const { wDeg: tileW, hDeg: tileH } = fovDeg(preset);
           for (const m of plan.mosaics ?? []) {
             const tiles = plan.entries
-              .filter(en => en.mosaicId === m.id && en.ra != null && en.dec != null)
-              .map(en => ({ ra: en.ra as number, dec: en.dec as number }));
+              .filter((en) => en.mosaicId === m.id && en.ra != null && en.dec != null)
+              .map((en) => ({ ra: en.ra as number, dec: en.dec as number }));
             const { maxAltDeg, atDate } = maxAltDuringWindow(
-              m.centerRa, m.centerDec, observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+              m.centerRa,
+              m.centerDec,
+              observer.loc.latDeg,
+              observer.loc.lonDeg,
+              win.start,
+              win.end,
+              10,
+            );
             const curve = sampleAltCurve(
-              m.centerRa, m.centerDec, observer.loc.latDeg, observer.loc.lonDeg, win.start, win.end, 10);
+              m.centerRa,
+              m.centerDec,
+              observer.loc.latDeg,
+              observer.loc.lonDeg,
+              win.start,
+              win.end,
+              10,
+            );
             const realDso = m.dsoId ? getDSOById(m.dsoId) : null;
-            const dso = realDso ?? this.customLocationDso(`mosaic:${m.id}`, m.centerRa, m.centerDec);
+            const dso =
+              realDso ?? this.customLocationDso(`mosaic:${m.id}`, m.centerRa, m.centerDec);
             if (!realDso && m.name) dso.displayName = m.name;
             const env = outlineFromGrid(m.cols, m.rows, tileW, tileH, m.overlapPct);
             targets.push({
-              dso, bestTimeUtc: atDate, maxAltDeg, curve, nightWin: win,
+              dso,
+              bestTimeUtc: atDate,
+              maxAltDeg,
+              curve,
+              nightWin: win,
               mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles },
-              ...moonShared, moonSepDeg: moon ? this.moonSeparationAt(m.centerRa, m.centerDec, atDate) : null,
+              ...moonShared,
+              moonSepDeg: moon ? this.moonSeparationAt(m.centerRa, m.centerDec, atDate) : null,
             });
           }
         }
@@ -2883,7 +3582,11 @@ export class TargetsView {
           planName: plan.name,
           targets,
           fovSpecs,
-          header: { nightOf: plan.nightOf, latDeg: plan.lat ?? this.prefs.lat ?? null, lonDeg: plan.lon ?? this.prefs.lon ?? null },
+          header: {
+            nightOf: plan.nightOf,
+            latDeg: plan.lat ?? this.prefs.lat ?? null,
+            lonDeg: plan.lon ?? this.prefs.lon ?? null,
+          },
           setup,
         });
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
@@ -2927,13 +3630,17 @@ export class TargetsView {
   }
 
   /** Moonrise/moonset crossings (alt = 0) within the night window, interpolated. */
-  private moonEventsInWindow(loc: ObserverLocation, win: { start: Date; end: Date }): { type: 'rise' | 'set'; time: Date }[] {
+  private moonEventsInWindow(
+    loc: ObserverLocation,
+    win: { start: Date; end: Date },
+  ): { type: 'rise' | 'set'; time: Date }[] {
     const curve = sampleMoonAltCurve(loc.latDeg, loc.lonDeg, win.start, win.end, 5);
     const events: { type: 'rise' | 'set'; time: Date }[] = [];
     for (let i = 1; i < curve.length; i++) {
-      const a = curve[i - 1], b = curve[i];
-      if ((a.altDeg < 0) === (b.altDeg < 0)) continue; // no horizon crossing
-      const frac = a.altDeg / (a.altDeg - b.altDeg);   // linear interp to alt = 0
+      const a = curve[i - 1],
+        b = curve[i];
+      if (a.altDeg < 0 === b.altDeg < 0) continue; // no horizon crossing
+      const frac = a.altDeg / (a.altDeg - b.altDeg); // linear interp to alt = 0
       const tMs = a.time.getTime() + frac * (b.time.getTime() - a.time.getTime());
       events.push({ type: b.altDeg >= a.altDeg ? 'rise' : 'set', time: new Date(tMs) });
     }
@@ -2942,7 +3649,12 @@ export class TargetsView {
 
   /** A caption-over-time stack (e.g. "Night start" / "22:14"), used in the header. */
   private timeStack(caption: string, time: Date, align: 'start' | 'center' | 'end'): HTMLElement {
-    const alignCls = align === 'end' ? 'items-end text-right' : align === 'center' ? 'items-center text-center' : 'items-start text-left';
+    const alignCls =
+      align === 'end'
+        ? 'items-end text-right'
+        : align === 'center'
+          ? 'items-center text-center'
+          : 'items-start text-left';
     const box = document.createElement('div');
     box.className = `flex flex-col leading-tight ${alignCls}`;
     const cap = document.createElement('span');
@@ -2987,7 +3699,10 @@ export class TargetsView {
       }
     };
     const ro = new ResizeObserver(() => {
-      if (!container.isConnected) { ro.disconnect(); return; }
+      if (!container.isConnected) {
+        ro.disconnect();
+        return;
+      }
       adjust();
     });
     ro.observe(container);
@@ -3027,9 +3742,11 @@ export class TargetsView {
       const events = this.moonEventsInWindow(loc, win);
       // Same x-mapping as the chart (viewBox W=120 with a padX=2 left inset), so
       // a marker sits exactly above where the moon line meets the horizon.
-      const W = 120, padX = 2;
-      const span = (win.end.getTime() - win.start.getTime()) || 1;
-      const xFrac = (d: Date) => (padX + ((d.getTime() - win.start.getTime()) / span) * (W - padX)) / W;
+      const W = 120,
+        padX = 2;
+      const span = win.end.getTime() - win.start.getTime() || 1;
+      const xFrac = (d: Date) =>
+        (padX + ((d.getTime() - win.start.getTime()) / span) * (W - padX)) / W;
       // Only when the moon actually rises/sets during the window — if it is up
       // (or down) the whole window there is no event time to show.
       const markers: { el: HTMLElement; f: number }[] = [];
@@ -3095,7 +3812,9 @@ export class TargetsView {
     const titleEl = document.createElement('div');
     titleEl.className = 'target-card-title';
     if (dso.displayName) {
-      titleEl.appendChild(Object.assign(document.createElement('span'), { textContent: dso.displayName }));
+      titleEl.appendChild(
+        Object.assign(document.createElement('span'), { textContent: dso.displayName }),
+      );
       const idSpan = document.createElement('span');
       idSpan.className = 'target-card-catalog-id';
       idSpan.textContent = ' ' + (dso.catalogs[0] || dso.id);
@@ -3116,7 +3835,7 @@ export class TargetsView {
       const constEl = document.createElement('div');
       constEl.className = 'target-card-const';
       constEl.textContent = dso.constellation.toUpperCase();
-      const constInfo = getConstellationInfos().find(c => c.id === dso.constellation);
+      const constInfo = getConstellationInfos().find((c) => c.id === dso.constellation);
       if (constInfo) constEl.title = constInfo.name;
       chips.appendChild(constEl);
     }
@@ -3134,9 +3853,23 @@ export class TargetsView {
     // Meta — always shown (no collapsible).
     const meta = document.createElement('div');
     meta.className = 'target-card-meta';
-    meta.appendChild(this.metaItem(t('targets.results.maxAlt'), formatAlt(info.maxAltDeg), t('targets.tooltips.maxAlt')));
-    if (dso.mag !== null) meta.appendChild(this.metaItem('Mag', dso.mag.toFixed(1), t('targets.tooltips.mag')));
-    if (dso.majAxis) meta.appendChild(this.metaItem(t('targets.results.size'), formatArcmin(dso.majAxis), t('targets.tooltips.size')));
+    meta.appendChild(
+      this.metaItem(
+        t('targets.results.maxAlt'),
+        formatAlt(info.maxAltDeg),
+        t('targets.tooltips.maxAlt'),
+      ),
+    );
+    if (dso.mag !== null)
+      meta.appendChild(this.metaItem('Mag', dso.mag.toFixed(1), t('targets.tooltips.mag')));
+    if (dso.majAxis)
+      meta.appendChild(
+        this.metaItem(
+          t('targets.results.size'),
+          formatArcmin(dso.majAxis),
+          t('targets.tooltips.size'),
+        ),
+      );
     const moonSep = moon ? this.moonSepMetaItem(info.moonSepDeg, moon.illum) : null;
     if (moonSep) meta.appendChild(moonSep);
     left.appendChild(meta);
@@ -3144,8 +3877,13 @@ export class TargetsView {
     const meta2 = document.createElement('div');
     meta2.className = 'target-card-meta';
     if (dso.difficulty !== null) {
-      const diffEl = this.metaItem(t('targets.sort.difficulty'), '◆'.repeat(dso.difficulty) + '◇'.repeat(5 - dso.difficulty), t('targets.tooltips.difficulty'));
-      diffEl.querySelector('.target-meta-value')!.className = 'target-meta-value target-card-difficulty';
+      const diffEl = this.metaItem(
+        t('targets.sort.difficulty'),
+        '◆'.repeat(dso.difficulty) + '◇'.repeat(5 - dso.difficulty),
+        t('targets.tooltips.difficulty'),
+      );
+      diffEl.querySelector('.target-meta-value')!.className =
+        'target-meta-value target-card-difficulty';
       meta2.appendChild(diffEl);
     }
     const scoreItem = this.metaItem(t('targets.results.score'), '—', t('targets.tooltips.score'));
@@ -3153,8 +3891,14 @@ export class TargetsView {
     meta2.appendChild(scoreItem);
     meta2.appendChild(fovItem);
     // Live framing angle (updated when the frame is rotated on the map).
-    const entryPa = this.plansStore.plans.find(p => p.id === planId)?.entries.find(e => e.id === info.entryId)?.paDeg ?? null;
-    const paItem = this.metaItem(t('fovOverlay.angleLabel'), entryPa != null ? formatPaDeg(entryPa) : '—', t('fovOverlay.angleHelp'));
+    const entryPa =
+      this.plansStore.plans.find((p) => p.id === planId)?.entries.find((e) => e.id === info.entryId)
+        ?.paDeg ?? null;
+    const paItem = this.metaItem(
+      t('fovOverlay.angleLabel'),
+      entryPa != null ? formatPaDeg(entryPa) : '—',
+      t('fovOverlay.angleHelp'),
+    );
     meta2.appendChild(paItem);
     this.paSpans.set(info.entryId, paItem.querySelector('.target-meta-value')!);
     left.appendChild(meta2);
@@ -3181,14 +3925,18 @@ export class TargetsView {
     // Show-on-map: same behaviour as the recommend card (free frame on target).
     const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
     navBtn.classList.add('shrink-0');
-    navBtn.addEventListener('click', () => { this.onNavigate(dso.ra, dso.dec, effectiveSetupId); });
+    navBtn.addEventListener('click', () => {
+      this.onNavigate(dso.ra, dso.dec, effectiveSetupId);
+    });
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn-icon btn-icon--danger shrink-0';
     removeBtn.title = t('targets.plan.remove');
     removeBtn.innerHTML = trashSvg;
-    removeBtn.addEventListener('click', () => { onDelete(row); });
+    removeBtn.addEventListener('click', () => {
+      onDelete(row);
+    });
 
     row.appendChild(left);
     row.appendChild(chartWrap);
@@ -3202,7 +3950,8 @@ export class TargetsView {
         minAltDeg: this.prefs.minAltDeg ?? 20,
       });
       scoreItem.querySelector('.target-meta-value')!.textContent = `${Math.round(score * 100)}%`;
-      fovItem.querySelector('.target-meta-value')!.textContent = `${Math.round(fovFitScore * 100)}%`;
+      fovItem.querySelector('.target-meta-value')!.textContent =
+        `${Math.round(fovFitScore * 100)}%`;
       const recipe = recommendRecipe(dso, preset);
       totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
       filterList.innerHTML = '';
@@ -3301,14 +4050,16 @@ export class TargetsView {
       // start/end axis.
       const transitShift = 'translateX(-50%)';
       const tl = document.createElement('span');
-      tl.className = 'absolute top-0 text-micro text-dim leading-none px-0.5 bg-card whitespace-nowrap pointer-events-none';
+      tl.className =
+        'absolute top-0 text-micro text-dim leading-none px-0.5 bg-card whitespace-nowrap pointer-events-none';
       tl.style.left = transitX;
       tl.style.transform = transitShift;
       tl.textContent = t('targets.plan.transit');
       chartBox.appendChild(tl);
 
       const th = document.createElement('span');
-      th.className = 'absolute bottom-0 text-micro text-dim leading-none px-0.5 bg-card whitespace-nowrap pointer-events-none';
+      th.className =
+        'absolute bottom-0 text-micro text-dim leading-none px-0.5 bg-card whitespace-nowrap pointer-events-none';
       th.style.left = transitX;
       th.style.transform = transitShift;
       th.textContent = formatTime(bestTimeUtc);
@@ -3331,18 +4082,42 @@ export class TargetsView {
     win: { start: Date; end: Date },
     transitTime: Date,
     moon: MoonOverlay | null,
-  ): { svg: SVGSVGElement; lo: number; hi: number; hiFrac: number | null; loFrac: number | null; transitFrac: number | null; moonIconYFrac: number | null; ticks: { label: string; frac: number }[] } {
+  ): {
+    svg: SVGSVGElement;
+    lo: number;
+    hi: number;
+    hiFrac: number | null;
+    loFrac: number | null;
+    transitFrac: number | null;
+    moonIconYFrac: number | null;
+    ticks: { label: string; frac: number }[];
+  } {
     const NS = 'http://www.w3.org/2000/svg';
-    const W = 120, H = 53, padY = 7, padX = 2;
+    const W = 120,
+      H = 53,
+      padY = 7,
+      padX = 2;
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('class', 'block w-full h-[180px]');
-    if (curve.length === 0) return { svg, lo: 0, hi: 0, hiFrac: null, loFrac: null, transitFrac: null, moonIconYFrac: null, ticks: [] };
+    if (curve.length === 0)
+      return {
+        svg,
+        lo: 0,
+        hi: 0,
+        hiFrac: null,
+        loFrac: null,
+        transitFrac: null,
+        moonIconYFrac: null,
+        ticks: [],
+      };
 
-    const span = (win.end.getTime() - win.start.getTime()) || 1;
+    const span = win.end.getTime() - win.start.getTime() || 1;
     // Fixed 0–90° Y scale so all objects are comparable.
-    const lo = 0, hi = 90, range = 90;
+    const lo = 0,
+      hi = 90,
+      range = 90;
     const usableH = H - 2 * padY;
 
     // The plot is inset by padX so the left axis (and a transit line at the
@@ -3358,33 +4133,39 @@ export class TargetsView {
     for (const deg of TICK_DEGS) {
       const g = document.createElementNS(NS, 'line');
       const y = yAt(deg);
-      g.setAttribute('x1', String(padX)); g.setAttribute('x2', String(W));
-      g.setAttribute('y1', String(y)); g.setAttribute('y2', String(y));
+      g.setAttribute('x1', String(padX));
+      g.setAttribute('x2', String(W));
+      g.setAttribute('y1', String(y));
+      g.setAttribute('y2', String(y));
       g.setAttribute('class', 'stroke-[var(--border-input)]');
       g.setAttribute('stroke-width', '0.5');
       g.setAttribute('vector-effect', 'non-scaling-stroke');
       svg.appendChild(g);
     }
-    const ticks = TICK_DEGS.map(deg => ({ label: formatAlt(deg), frac: yAt(deg) / H }));
+    const ticks = TICK_DEGS.map((deg) => ({ label: formatAlt(deg), frac: yAt(deg) / H }));
 
     // Left vertical axis — always present, so every chart has a consistent frame.
     const axis = document.createElementNS(NS, 'line');
-    axis.setAttribute('x1', String(padX)); axis.setAttribute('x2', String(padX));
-    axis.setAttribute('y1', String(padY)); axis.setAttribute('y2', String(H - padY));
+    axis.setAttribute('x1', String(padX));
+    axis.setAttribute('x2', String(padX));
+    axis.setAttribute('y1', String(padY));
+    axis.setAttribute('y2', String(H - padY));
     axis.setAttribute('class', 'stroke-[var(--border-input)]');
     axis.setAttribute('stroke-width', '1');
     axis.setAttribute('vector-effect', 'non-scaling-stroke');
     svg.appendChild(axis);
 
     // Object's actual altitude extremes (for reference lines and labels).
-    const alts = curve.map(s => s.altDeg);
+    const alts = curve.map((s) => s.altDeg);
     const objLo = Math.max(0, Math.min(...alts));
     const objHi = Math.max(...alts);
 
     const mkRefLine = (y: number) => {
       const l = document.createElementNS(NS, 'line');
-      l.setAttribute('x1', String(padX)); l.setAttribute('x2', String(W));
-      l.setAttribute('y1', String(y)); l.setAttribute('y2', String(y));
+      l.setAttribute('x1', String(padX));
+      l.setAttribute('x2', String(W));
+      l.setAttribute('y1', String(y));
+      l.setAttribute('y2', String(y));
       l.setAttribute('class', 'stroke-[var(--text-dim)]');
       l.setAttribute('stroke-width', '1');
       l.setAttribute('stroke-dasharray', '3 3');
@@ -3400,7 +4181,7 @@ export class TargetsView {
     // left axis (a fixed spot), instead of wandering with the culmination point.
     let moonIconYFrac: number | null = null;
     if (moon && moon.curve.length > 0) {
-      const mPts = moon.curve.map(s => `${xAt(s.time).toFixed(1)},${yAt(s.altDeg).toFixed(1)}`);
+      const mPts = moon.curve.map((s) => `${xAt(s.time).toFixed(1)},${yAt(s.altDeg).toFixed(1)}`);
       const mLine = document.createElementNS(NS, 'polyline');
       mLine.setAttribute('points', mPts.join(' '));
       mLine.setAttribute('class', 'fill-none stroke-[var(--moon-curve)]');
@@ -3413,12 +4194,15 @@ export class TargetsView {
       moonIconYFrac = yAt(moon.curve[0].altDeg) / H; // altitude at the left edge
     }
 
-    const pts = curve.map(s => `${xAt(s.time).toFixed(1)},${yAt(s.altDeg).toFixed(1)}`);
+    const pts = curve.map((s) => `${xAt(s.time).toFixed(1)},${yAt(s.altDeg).toFixed(1)}`);
 
     // Light fill under the trajectory, down to the object's min-altitude line.
     const yMinLine = yAt(objLo);
     const area = document.createElementNS(NS, 'path');
-    area.setAttribute('d', `M${pts[0].split(',')[0]},${yMinLine} L${pts.join(' L')} L${W},${yMinLine} Z`);
+    area.setAttribute(
+      'd',
+      `M${pts[0].split(',')[0]},${yMinLine} L${pts.join(' L')} L${W},${yMinLine} Z`,
+    );
     area.setAttribute('class', 'fill-[var(--accent-fill-sm)] stroke-none');
     svg.appendChild(area);
 
@@ -3441,8 +4225,10 @@ export class TargetsView {
       // overlay labels line up with the drawn line.
       transitFrac = tx / W;
       const vLine = document.createElementNS(NS, 'line');
-      vLine.setAttribute('x1', tx.toFixed(1)); vLine.setAttribute('x2', tx.toFixed(1));
-      vLine.setAttribute('y1', String(padY)); vLine.setAttribute('y2', String(H - padY));
+      vLine.setAttribute('x1', tx.toFixed(1));
+      vLine.setAttribute('x2', tx.toFixed(1));
+      vLine.setAttribute('y1', String(padY));
+      vLine.setAttribute('y2', String(H - padY));
       vLine.setAttribute('class', 'stroke-[var(--text-dim)]');
       vLine.setAttribute('stroke-width', '1');
       vLine.setAttribute('stroke-dasharray', '2 2');
@@ -3451,7 +4237,9 @@ export class TargetsView {
     }
 
     return {
-      svg, lo: objLo, hi: objHi,
+      svg,
+      lo: objLo,
+      hi: objHi,
       hiFrac: yAt(objHi) / H,
       loFrac: yAt(objLo) / H,
       transitFrac,
@@ -3465,7 +4253,7 @@ export class TargetsView {
     if (!setupId) return [];
     try {
       const setups = await getGearSetups();
-      const setup = setups.find(s => s.id === setupId);
+      const setup = setups.find((s) => s.id === setupId);
       if (!setup) return [];
       return await buildFovFrameSpecs([{ ...setup, enabled: true }]);
     } catch (err) {
@@ -3479,7 +4267,8 @@ export class TargetsView {
     this.closePlanPicker();
 
     const picker = document.createElement('div');
-    picker.className = 'plan-picker fixed z-tooltip bg-panel border border-subtle rounded-md shadow-lg py-2 min-w-[220px] max-h-[60vh] overflow-auto';
+    picker.className =
+      'plan-picker fixed z-tooltip bg-panel border border-subtle rounded-md shadow-lg py-2 min-w-[220px] max-h-[60vh] overflow-auto';
 
     const title = document.createElement('div');
     title.className = 'px-3 pb-1 text-micro uppercase text-label';
@@ -3494,7 +4283,8 @@ export class TargetsView {
       for (const plan of this.plansStore.plans) {
         const rowBtn = document.createElement('button');
         rowBtn.type = 'button';
-        rowBtn.className = 'flex items-center gap-2 w-full text-left px-3 py-2 bg-transparent border-0 cursor-pointer text-primary hover:bg-[var(--accent-fill-sm)]';
+        rowBtn.className =
+          'flex items-center gap-2 w-full text-left px-3 py-2 bg-transparent border-0 cursor-pointer text-primary hover:bg-[var(--accent-fill-sm)]';
         const check = document.createElement('span');
         check.className = 'w-4 shrink-0 text-bright';
         check.textContent = this.plansStore.isInPlan(dsoId, plan.id) ? '✓' : '';
@@ -3519,7 +4309,8 @@ export class TargetsView {
 
     const newRow = document.createElement('button');
     newRow.type = 'button';
-    newRow.className = 'flex items-center gap-2 w-full text-left px-3 py-2 bg-transparent border-0 cursor-pointer text-primary hover:bg-[var(--accent-fill-sm)]';
+    newRow.className =
+      'flex items-center gap-2 w-full text-left px-3 py-2 bg-transparent border-0 cursor-pointer text-primary hover:bg-[var(--accent-fill-sm)]';
     newRow.textContent = '+ ' + t('targets.plan.newPlan');
     newRow.addEventListener('click', async () => {
       const id = await this.plansStore.createPlan(this.defaultPlanName());
@@ -3542,28 +4333,48 @@ export class TargetsView {
     // Close on outside click / Escape (deferred so this click doesn't immediately close it).
     setTimeout(() => {
       this.planPickerOutside = (ev: MouseEvent) => {
-        if (this.planPickerEl && !this.planPickerEl.contains(ev.target as Node) && ev.target !== anchorEl) {
+        if (
+          this.planPickerEl &&
+          !this.planPickerEl.contains(ev.target as Node) &&
+          ev.target !== anchorEl
+        ) {
           this.closePlanPicker();
         }
       };
-      this.planPickerEsc = (ev: KeyboardEvent) => { if (ev.key === 'Escape') this.closePlanPicker(); };
+      this.planPickerEsc = (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') this.closePlanPicker();
+      };
       document.addEventListener('click', this.planPickerOutside);
       document.addEventListener('keydown', this.planPickerEsc);
     }, 0);
   }
 
   private closePlanPicker(): void {
-    if (this.planPickerEl) { this.planPickerEl.remove(); this.planPickerEl = null; }
-    if (this.planPickerOutside) { document.removeEventListener('click', this.planPickerOutside); this.planPickerOutside = null; }
-    if (this.planPickerEsc) { document.removeEventListener('keydown', this.planPickerEsc); this.planPickerEsc = null; }
-    if (this.planPickerCleanup) { this.planPickerCleanup(); this.planPickerCleanup = null; }
+    if (this.planPickerEl) {
+      this.planPickerEl.remove();
+      this.planPickerEl = null;
+    }
+    if (this.planPickerOutside) {
+      document.removeEventListener('click', this.planPickerOutside);
+      this.planPickerOutside = null;
+    }
+    if (this.planPickerEsc) {
+      document.removeEventListener('keydown', this.planPickerEsc);
+      this.planPickerEsc = null;
+    }
+    if (this.planPickerCleanup) {
+      this.planPickerCleanup();
+      this.planPickerCleanup = null;
+    }
   }
 
   /** Refresh every card's plan-list button highlight + the mode badge. */
   private refreshAllPlanButtons(): void {
     this.updatePlanBadge();
-    this.container.querySelectorAll<HTMLButtonElement>('.target-card [data-plan-dso]').forEach(btn => {
-      this.refreshPlanBtnState(btn, btn.getAttribute('data-plan-dso')!);
-    });
+    this.container
+      .querySelectorAll<HTMLButtonElement>('.target-card [data-plan-dso]')
+      .forEach((btn) => {
+        this.refreshPlanBtnState(btn, btn.getAttribute('data-plan-dso')!);
+      });
   }
 }

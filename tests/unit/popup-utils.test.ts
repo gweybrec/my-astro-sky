@@ -5,7 +5,14 @@ import { trackAnchoredPosition, attachAnchoredPanel } from '../../src/popup-util
 function makeAnchor(box: Partial<DOMRect>): HTMLElement {
   const el = document.createElement('button');
   const rect = {
-    top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0, x: 0, y: 0,
+    top: 0,
+    left: 0,
+    bottom: 0,
+    right: 0,
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0,
     ...box,
   } as DOMRect;
   el.getBoundingClientRect = () => rect;
@@ -136,14 +143,24 @@ describe('trackAnchoredPosition', () => {
   });
 
   it('repositions on scroll', () => {
-    const rect = { top: 100, bottom: 120, left: 200, right: 300, width: 100, height: 20, x: 200, y: 100 } as DOMRect;
+    const rect = {
+      top: 100,
+      bottom: 120,
+      left: 200,
+      right: 300,
+      width: 100,
+      height: 20,
+      x: 200,
+      y: 100,
+    } as DOMRect;
     const anchor = document.createElement('button');
     anchor.getBoundingClientRect = () => ({ ...rect });
     const panel = makePanel(150, 100);
     const cleanup = trackAnchoredPosition(panel, anchor);
     expect(panel.style.top).toBe('124px');
     // Simulate the anchor moving up as the page scrolls.
-    rect.top = 50; rect.bottom = 70;
+    rect.top = 50;
+    rect.bottom = 70;
     window.dispatchEvent(new Event('scroll'));
     expect(panel.style.top).toBe('74px');
     cleanup();

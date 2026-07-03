@@ -2,16 +2,8 @@ import { watch } from 'vue';
 import { t } from './i18n';
 import type { FovFrameSpec } from './sky-map';
 import type { DSO } from './types';
-import {
-  buildGearSectionContent,
-  type GearSectionPrefs,
-} from './targets-view';
-import {
-  getTelescopes,
-  getCameras,
-  getAccessories,
-  buildGearPreset,
-} from './gear-catalog';
+import { buildGearSectionContent, type GearSectionPrefs } from './targets-view';
+import { getTelescopes, getCameras, getAccessories, buildGearPreset } from './gear-catalog';
 import { formatSetupCanvasLabel, formatFov, fovDeg } from './gear-presets';
 import { formatPaDeg } from './frame-orientation';
 import { reportUnknownRendererError } from './error-reporter';
@@ -52,26 +44,31 @@ function angularDistDeg(ra1: number, dec1: number, ra2: number, dec2: number): n
   const d2r = Math.PI / 180;
   const dLat = (dec2 - dec1) * d2r;
   const dLon = (ra2 - ra1) * d2r;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(dec1 * d2r) * Math.cos(dec2 * d2r) * Math.sin(dLon / 2) ** 2;
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(dec1 * d2r) * Math.cos(dec2 * d2r) * Math.sin(dLon / 2) ** 2;
   return (2 * Math.asin(Math.min(1, Math.sqrt(h)))) / d2r;
 }
 
 // ─── Frame spec builder ───────────────────────────────────────────────────────
 
 export async function buildFovFrameSpecs(setups: FovSetup[]): Promise<FovFrameSpec[]> {
-  const enabled = setups.filter(s => s.enabled);
+  const enabled = setups.filter((s) => s.enabled);
   if (enabled.length === 0) return [];
 
   try {
     const [telescopes, cameras, accessories] = await Promise.all([
-      getTelescopes(), getCameras(), getAccessories(),
+      getTelescopes(),
+      getCameras(),
+      getAccessories(),
     ]);
 
     const specs: FovFrameSpec[] = [];
     for (const setup of enabled) {
-      const tel = telescopes.find(t => t.id === setup.telescopeId);
-      const cam = cameras.find(c => c.id === setup.cameraId);
-      const acc = setup.accessoryId ? accessories.find(a => a.id === setup.accessoryId) ?? null : null;
+      const tel = telescopes.find((t) => t.id === setup.telescopeId);
+      const cam = cameras.find((c) => c.id === setup.cameraId);
+      const acc = setup.accessoryId
+        ? (accessories.find((a) => a.id === setup.accessoryId) ?? null)
+        : null;
       if (!tel || !cam) continue;
 
       const preset = buildGearPreset(tel, cam, acc);
@@ -111,7 +108,9 @@ function buildSetupModal(opts: {
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
-  const close = (): void => { backdrop.remove(); };
+  const close = (): void => {
+    backdrop.remove();
+  };
 
   const modal = document.createElement('div');
   modal.className = 'modal settings-modal';
@@ -203,23 +202,26 @@ function buildSetupModal(opts: {
 
     const setupId = opts.setupId;
     const plansStore = usePlansStore();
-    plansStore.ensureLoaded().then(() => {
-      const using = plansStore.plansUsingSetup(setupId);
-      if (using.length > 0) {
-        plansSection.classList.remove('hidden');
-        plansList.innerHTML = '';
-        for (const p of using) {
-          const li = document.createElement('li');
-          li.textContent = p.name;
-          plansList.appendChild(li);
+    plansStore
+      .ensureLoaded()
+      .then(() => {
+        const using = plansStore.plansUsingSetup(setupId);
+        if (using.length > 0) {
+          plansSection.classList.remove('hidden');
+          plansList.innerHTML = '';
+          for (const p of using) {
+            const li = document.createElement('li');
+            li.textContent = p.name;
+            plansList.appendChild(li);
+          }
+          deleteBtn!.disabled = true;
+          deleteBtn!.title = t('fovOverlay.deleteSetupDisabledTooltip');
+        } else {
+          deleteBtn!.disabled = false;
+          deleteBtn!.title = '';
         }
-        deleteBtn!.disabled = true;
-        deleteBtn!.title = t('fovOverlay.deleteSetupDisabledTooltip');
-      } else {
-        deleteBtn!.disabled = false;
-        deleteBtn!.title = '';
-      }
-    }).catch(err => reportUnknownRendererError('fov_setup_plans', err));
+      })
+      .catch((err) => reportUnknownRendererError('fov_setup_plans', err));
 
     deleteBtn.addEventListener('click', async () => {
       if (deleteBtn!.disabled) return;
@@ -230,7 +232,11 @@ function buildSetupModal(opts: {
         close();
         opts.onDeleted?.();
       } catch (err) {
-        showToast({ message: String((err as Error)?.message ?? err), type: 'error', duration: 3500 });
+        showToast({
+          message: String((err as Error)?.message ?? err),
+          type: 'error',
+          duration: 3500,
+        });
         deleteBtn!.disabled = false;
       }
     });
@@ -276,19 +282,24 @@ function buildSetupModal(opts: {
   document.body.appendChild(backdrop);
 
   // Load gear section
-  Promise.all([getTelescopes(), getCameras()]).then(([telescopes, cameras]) => {
-    if (!currentPrefs.telescopeId && telescopes.length > 0) currentPrefs.telescopeId = telescopes[0].id;
-    if (!currentPrefs.cameraId && cameras.length > 0) currentPrefs.cameraId = cameras[0].id;
-    const rebuild = (container: HTMLElement) => {
-      buildGearSectionContent(container, currentPrefs, {
-        onPrefsChange: (partial) => { Object.assign(currentPrefs, partial); },
-        onRebuild: rebuild,
-      });
-    };
-    rebuild(gearContainer);
-  }).catch(err => {
-    reportUnknownRendererError('fov_load_gear', err);
-  });
+  Promise.all([getTelescopes(), getCameras()])
+    .then(([telescopes, cameras]) => {
+      if (!currentPrefs.telescopeId && telescopes.length > 0)
+        currentPrefs.telescopeId = telescopes[0].id;
+      if (!currentPrefs.cameraId && cameras.length > 0) currentPrefs.cameraId = cameras[0].id;
+      const rebuild = (container: HTMLElement) => {
+        buildGearSectionContent(container, currentPrefs, {
+          onPrefsChange: (partial) => {
+            Object.assign(currentPrefs, partial);
+          },
+          onRebuild: rebuild,
+        });
+      };
+      rebuild(gearContainer);
+    })
+    .catch((err) => {
+      reportUnknownRendererError('fov_load_gear', err);
+    });
 
   // Focus the name input after a tick
   requestAnimationFrame(() => nameInput.focus());
@@ -362,15 +373,28 @@ export function openEditSetupModal(
  * When `excludeSmart` is set, smart-telescope setups are filtered out (they have
  * their own mosaic mode) — used by the "add mosaic" flow.
  */
-export function openSetupPicker(onPick: (setupId: string) => void, opts: { excludeSmart?: boolean } = {}): void {
+export function openSetupPicker(
+  onPick: (setupId: string) => void,
+  opts: { excludeSmart?: boolean } = {},
+): void {
   Promise.all([getGearSetups(), opts.excludeSmart ? getTelescopes() : Promise.resolve([])])
     .then(([setups, tels]) => {
-      const smartIds = new Set((tels as Array<{ id: string; is_smart_telescope?: boolean }>).filter(t => t.is_smart_telescope).map(t => t.id));
-      const list = opts.excludeSmart ? setups.filter(s => !smartIds.has(s.telescopeId)) : setups;
+      const smartIds = new Set(
+        (tels as Array<{ id: string; is_smart_telescope?: boolean }>)
+          .filter((t) => t.is_smart_telescope)
+          .map((t) => t.id),
+      );
+      const list = opts.excludeSmart ? setups.filter((s) => !smartIds.has(s.telescopeId)) : setups;
       // After creating a fresh setup, resolve its spec before picking it (so the
       // new frame/mosaic can size immediately).
-      const pickNew = (created: FovSetup) => useFovFramesStore().loadSpecs().then(() => onPick(created.id));
-      if (list.length === 0) { openAddSetupModal(pickNew); return; }
+      const pickNew = (created: FovSetup) =>
+        useFovFramesStore()
+          .loadSpecs()
+          .then(() => onPick(created.id));
+      if (list.length === 0) {
+        openAddSetupModal(pickNew);
+        return;
+      }
 
       const backdrop = document.createElement('div');
       backdrop.className = 'modal-backdrop';
@@ -381,9 +405,12 @@ export function openSetupPicker(onPick: (setupId: string) => void, opts: { exclu
       const h2 = document.createElement('h2');
       h2.textContent = t('fovOverlay.pickSetup');
       const x = document.createElement('button');
-      x.type = 'button'; x.className = 'modal-close'; x.textContent = '×';
+      x.type = 'button';
+      x.className = 'modal-close';
+      x.textContent = '×';
       x.addEventListener('click', () => backdrop.remove());
-      head.appendChild(h2); head.appendChild(x);
+      head.appendChild(h2);
+      head.appendChild(x);
       const bodyM = document.createElement('div');
       bodyM.className = 'modal-body modal-form-body';
       for (const s of list) {
@@ -392,7 +419,10 @@ export function openSetupPicker(onPick: (setupId: string) => void, opts: { exclu
         b.className = 'btn-action';
         b.style.width = '100%';
         b.textContent = s.name;
-        b.addEventListener('click', () => { backdrop.remove(); onPick(s.id); });
+        b.addEventListener('click', () => {
+          backdrop.remove();
+          onPick(s.id);
+        });
         bodyM.appendChild(b);
       }
       const foot = document.createElement('div');
@@ -401,13 +431,18 @@ export function openSetupPicker(onPick: (setupId: string) => void, opts: { exclu
       newSetupBtn.type = 'button';
       newSetupBtn.className = 'btn-cancel';
       newSetupBtn.textContent = t('fovOverlay.addSetup');
-      newSetupBtn.addEventListener('click', () => { backdrop.remove(); openAddSetupModal(pickNew); });
+      newSetupBtn.addEventListener('click', () => {
+        backdrop.remove();
+        openAddSetupModal(pickNew);
+      });
       foot.appendChild(newSetupBtn);
-      modal.appendChild(head); modal.appendChild(bodyM); modal.appendChild(foot);
+      modal.appendChild(head);
+      modal.appendChild(bodyM);
+      modal.appendChild(foot);
       backdrop.appendChild(modal);
       document.body.appendChild(backdrop);
     })
-    .catch(err => reportUnknownRendererError('fov_pick_setup', err));
+    .catch((err) => reportUnknownRendererError('fov_pick_setup', err));
 }
 
 /**
@@ -435,21 +470,38 @@ export function openFramePicker(
     plansStore.ensureLoaded(),
     getGearSetups(),
     kind === 'mosaic' ? getTelescopes() : Promise.resolve([]),
-  ]).then(([, setups, tels]) => {
-    const smartTelIds = new Set((tels as Array<{ id: string; is_smart_telescope?: boolean }>).filter(t => t.is_smart_telescope).map(t => t.id));
-    const setupIsSmart = (setupId: string | null): boolean =>
-      !!setupId && smartTelIds.has(setups.find(s => s.id === setupId)?.telescopeId ?? '');
+  ])
+    .then(([, setups, tels]) => {
+      const smartTelIds = new Set(
+        (tels as Array<{ id: string; is_smart_telescope?: boolean }>)
+          .filter((t) => t.is_smart_telescope)
+          .map((t) => t.id),
+      );
+      const setupIsSmart = (setupId: string | null): boolean =>
+        !!setupId && smartTelIds.has(setups.find((s) => s.id === setupId)?.telescopeId ?? '');
 
-    // Smart scopes have their own single-frame mosaic mode, so mosaics exclude
-    // them from both sections; plans with no setup at all stay eligible either
-    // way (the graceful single-tile fallback handles that case).
-    const freeSetups = kind === 'mosaic' ? setups.filter(s => !smartTelIds.has(s.telescopeId)) : setups;
-    const eligiblePlans = kind === 'mosaic'
-      ? plansStore.plans.filter(p => !p.setupId || !setupIsSmart(p.setupId))
-      : plansStore.plans;
+      // Smart scopes have their own single-frame mosaic mode, so mosaics exclude
+      // them from both sections; plans with no setup at all stay eligible either
+      // way (the graceful single-tile fallback handles that case).
+      const freeSetups =
+        kind === 'mosaic' ? setups.filter((s) => !smartTelIds.has(s.telescopeId)) : setups;
+      const eligiblePlans =
+        kind === 'mosaic'
+          ? plansStore.plans.filter((p) => !p.setupId || !setupIsSmart(p.setupId))
+          : plansStore.plans;
 
-    buildFramePickerModal(kind, dso, eligiblePlans, freeSetups, fovStore, plansStore, onSetupPick, onDone);
-  }).catch(err => reportUnknownRendererError('fov_pick_frame_target', err));
+      buildFramePickerModal(
+        kind,
+        dso,
+        eligiblePlans,
+        freeSetups,
+        fovStore,
+        plansStore,
+        onSetupPick,
+        onDone,
+      );
+    })
+    .catch((err) => reportUnknownRendererError('fov_pick_frame_target', err));
 }
 
 function buildFramePickerModal(
@@ -471,18 +523,27 @@ function buildFramePickerModal(
   const head = document.createElement('div');
   head.className = 'modal-header';
   const h2 = document.createElement('h2');
-  h2.textContent = t(kind === 'frame' ? 'fovOverlay.createFrameTitle' : 'fovOverlay.createMosaicTitle');
+  h2.textContent = t(
+    kind === 'frame' ? 'fovOverlay.createFrameTitle' : 'fovOverlay.createMosaicTitle',
+  );
   const x = document.createElement('button');
-  x.type = 'button'; x.className = 'modal-close'; x.textContent = '×';
+  x.type = 'button';
+  x.className = 'modal-close';
+  x.textContent = '×';
   x.addEventListener('click', close);
-  head.appendChild(h2); head.appendChild(x);
+  head.appendChild(h2);
+  head.appendChild(x);
 
   const bodyM = document.createElement('div');
   bodyM.className = 'modal-body modal-form-body';
   const gridClass = 'grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2';
 
   function defaultPlanName(): string {
-    const nice = new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    const nice = new Date().toLocaleDateString([], {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
     return t('targets.plan.defaultName', { date: nice });
   }
 
@@ -509,7 +570,10 @@ function buildFramePickerModal(
     b.type = 'button';
     b.className = 'btn-action';
     b.textContent = plan.name;
-    b.addEventListener('click', () => { close(); doPlanAction(plan.id).then(onDone); });
+    b.addEventListener('click', () => {
+      close();
+      doPlanAction(plan.id).then(onDone);
+    });
     planGridEl.appendChild(b);
   }
   planSection.appendChild(planGridEl);
@@ -541,7 +605,10 @@ function buildFramePickerModal(
     b.type = 'button';
     b.className = 'btn-action';
     b.textContent = setup.name;
-    b.addEventListener('click', () => { close(); onSetupPick(setup.id); });
+    b.addEventListener('click', () => {
+      close();
+      onSetupPick(setup.id);
+    });
     freeGridEl.appendChild(b);
   }
   freeSection.appendChild(freeGridEl);
@@ -551,12 +618,17 @@ function buildFramePickerModal(
   addSetupBtn.textContent = '+ ' + t('fovOverlay.newSetup');
   addSetupBtn.addEventListener('click', () => {
     close();
-    openAddSetupModal((created) => { useFovFramesStore().loadSpecs().then(() => onSetupPick(created.id)); });
+    openAddSetupModal((created) => {
+      useFovFramesStore()
+        .loadSpecs()
+        .then(() => onSetupPick(created.id));
+    });
   });
   freeSection.appendChild(addSetupBtn);
   bodyM.appendChild(freeSection);
 
-  modal.appendChild(head); modal.appendChild(bodyM);
+  modal.appendChild(head);
+  modal.appendChild(bodyM);
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }
@@ -599,7 +671,11 @@ export function buildSetupControls(opts: {
     e.stopPropagation();
     const setup = opts.getSelectedSetup();
     if (!setup) return;
-    openEditSetupModal(setup, () => opts.onMutated(), () => opts.onMutated());
+    openEditSetupModal(
+      setup,
+      () => opts.onMutated(),
+      () => opts.onMutated(),
+    );
   });
 
   const refresh = (): void => {
@@ -617,13 +693,19 @@ export function buildSetupControls(opts: {
  * name element; the sky-map popup has no such element (the plan lives in a
  * dropdown), so renaming happens through this dialog instead.
  */
-export function openRenamePlanModal(planId: string, currentName: string, onSaved?: () => void): void {
+export function openRenamePlanModal(
+  planId: string,
+  currentName: string,
+  onSaved?: () => void,
+): void {
   const uiStore = useUiStore();
   const plansStore = usePlansStore();
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
-  const close = (): void => { backdrop.remove(); };
+  const close = (): void => {
+    backdrop.remove();
+  };
 
   const modal = document.createElement('div');
   modal.className = 'modal settings-modal';
@@ -698,8 +780,13 @@ export function openRenamePlanModal(planId: string, currentName: string, onSaved
   };
   saveBtn.addEventListener('click', submit);
   nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); submit(); }
-    else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
   });
 
   footer.appendChild(cancelBtn);
@@ -709,7 +796,10 @@ export function openRenamePlanModal(planId: string, currentName: string, onSaved
   modal.appendChild(footer);
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
-  requestAnimationFrame(() => { nameInput.focus(); nameInput.select(); });
+  requestAnimationFrame(() => {
+    nameInput.focus();
+    nameInput.select();
+  });
 }
 
 // ─── FOV frame-manager popup ───────────────────────────────────────────────────
@@ -720,7 +810,10 @@ export function openRenamePlanModal(planId: string, currentName: string, onSaved
  * gear picker. Reactive to the fov-frames store; the returned element carries a
  * `__cleanup` hook the caller must invoke on close to stop the watcher.
  */
-export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLElement & { __cleanup?: () => void } {
+export function buildFovPopup(
+  onClose: () => void,
+  onReady?: () => void,
+): HTMLElement & { __cleanup?: () => void } {
   const fovStore = useFovFramesStore();
   const plansStore = usePlansStore();
   const uiStore = useUiStore();
@@ -802,7 +895,7 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     e.stopPropagation();
     const sel = fovStore.selection;
     if (sel.kind !== 'plan') return;
-    const plan = plansStore.plans.find(p => p.id === sel.planId);
+    const plan = plansStore.plans.find((p) => p.id === sel.planId);
     if (plan) openRenamePlanModal(plan.id, plan.name);
   });
 
@@ -827,8 +920,11 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   // Gear setups for the setup dropdown (resolved async; labels include FOV).
   let gearSetups: GearSetupData[] = [];
   const setupControls = buildSetupControls({
-    getSelectedSetup: () => gearSetups.find(s => s.id === setupSelect.value),
-    onMutated: () => { fovStore.loadSpecs(); loadPopupSetups(); },
+    getSelectedSetup: () => gearSetups.find((s) => s.id === setupSelect.value),
+    onMutated: () => {
+      fovStore.loadSpecs();
+      loadPopupSetups();
+    },
   });
 
   setupRow.appendChild(setupSelect);
@@ -843,12 +939,12 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     Promise.all([getGearSetups(), getTelescopes()])
       .then(([s, tels]) => {
         gearSetups = s;
-        const smartTel = new Set(tels.filter(t => t.is_smart_telescope).map(t => t.id));
+        const smartTel = new Set(tels.filter((t) => t.is_smart_telescope).map((t) => t.id));
         setupIsSmart.clear();
         for (const setup of s) setupIsSmart.set(setup.id, smartTel.has(setup.telescopeId));
         renderAll();
       })
-      .catch(err => reportUnknownRendererError('fov_popup_load_setups', err));
+      .catch((err) => reportUnknownRendererError('fov_popup_load_setups', err));
   }
   loadPopupSetups();
 
@@ -857,7 +953,7 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   function canAddMosaic(): boolean {
     const sel = fovStore.selection;
     if (sel.kind !== 'plan') return false;
-    const plan = plansStore.plans.find(p => p.id === sel.planId);
+    const plan = plansStore.plans.find((p) => p.id === sel.planId);
     if (!plan?.setupId) return false;
     return !setupIsSmart.get(plan.setupId);
   }
@@ -883,10 +979,11 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     if (!fovStore.framesVisible) return; // disabled while frames are hidden
     const sel = fovStore.selection;
     if (sel.kind === 'plan') addPlanFrameToCenter(sel.planId);
-    else openSetupPicker((setupId) => {
-      useCanvasStore().skyMap?.pinActiveIfFloating();
-      fovStore.addAdhocFrame(setupId);
-    });
+    else
+      openSetupPicker((setupId) => {
+        useCanvasStore().skyMap?.pinActiveIfFloating();
+        fovStore.addAdhocFrame(setupId);
+      });
   });
   footer.appendChild(addBtn);
 
@@ -902,7 +999,10 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     const sel = fovStore.selection;
     if (sel.kind === 'plan') openMosaicModal(sel.planId);
     // Free mode: pick a (non-smart) setup, then build a free mosaic via the modal.
-    else openSetupPicker((setupId) => buildMosaicModal({ kind: 'free', setupId }), { excludeSmart: true });
+    else
+      openSetupPicker((setupId) => buildMosaicModal({ kind: 'free', setupId }), {
+        excludeSmart: true,
+      });
   });
   footer.appendChild(addMosaicBtn);
 
@@ -933,7 +1033,11 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   }
 
   function defaultPlanName(): string {
-    const nice = new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    const nice = new Date().toLocaleDateString([], {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
     return t('targets.plan.defaultName', { date: nice });
   }
 
@@ -957,7 +1061,8 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     // The footer row is always present; individual actions show per selection.
     // "Add frame" is offered for free frames, and for a plan once it has a gear
     // setup (without one a plan can't size — and therefore can't render — frames).
-    const plan = sel.kind === 'plan' ? plansStore.plans.find(p => p.id === sel.planId) : undefined;
+    const plan =
+      sel.kind === 'plan' ? plansStore.plans.find((p) => p.id === sel.planId) : undefined;
     const canAddFrame = sel.kind === 'free' || !!plan?.setupId;
     addBtn.classList.toggle('hidden', !canAddFrame);
     // Mosaic is offered in free mode (the picker asks for a non-smart setup) and
@@ -969,13 +1074,17 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
 
   function onSelectChange() {
     const v = select.value;
-    if (v === FREE_VALUE) { fovStore.setSelection({ kind: 'free' }); return; }
+    if (v === FREE_VALUE) {
+      fovStore.setSelection({ kind: 'free' });
+      return;
+    }
     if (v.startsWith('plan:')) fovStore.setSelection({ kind: 'plan', planId: v.slice(5) });
   }
 
   function renderSetupSelect() {
     const sel = fovStore.selection;
-    const plan = sel.kind === 'plan' ? plansStore.plans.find(p => p.id === sel.planId) : undefined;
+    const plan =
+      sel.kind === 'plan' ? plansStore.plans.find((p) => p.id === sel.planId) : undefined;
     // Setup dropdown + its controls are only meaningful for a plan.
     setupRow.style.display = plan ? '' : 'none';
     if (!plan) return;
@@ -1004,10 +1113,12 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   async function onSetupChange() {
     const sel = fovStore.selection;
     if (sel.kind !== 'plan') return;
-    const plan = plansStore.plans.find(p => p.id === sel.planId);
+    const plan = plansStore.plans.find((p) => p.id === sel.planId);
     if (!plan) return;
     await requestSetupSwitch(plan, setupSelect.value || null, {
-      onRevert: () => { setupSelect.value = plan.setupId ?? ''; },
+      onRevert: () => {
+        setupSelect.value = plan.setupId ?? '';
+      },
       onApplied: () => renderAll(),
     });
   }
@@ -1015,7 +1126,11 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   // Modal listing every plan a free frame/mosaic could be moved into. Only plans
   // with the same gear setup are pickable; the rest are shown disabled with a
   // tooltip explaining the mismatch (different setup, or no setup at all).
-  function openPlanPicker(header: { name: string; setupLabel: string }, freeSetupId: string | null, onPick: (planId: string) => void): void {
+  function openPlanPicker(
+    header: { name: string; setupLabel: string },
+    freeSetupId: string | null,
+    onPick: (planId: string) => void,
+  ): void {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     const modal = document.createElement('div');
@@ -1025,9 +1140,12 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     const h2 = document.createElement('h2');
     h2.textContent = t('fovOverlay.moveToPlan');
     const x = document.createElement('button');
-    x.type = 'button'; x.className = 'modal-close'; x.textContent = '×';
+    x.type = 'button';
+    x.className = 'modal-close';
+    x.textContent = '×';
     x.addEventListener('click', () => backdrop.remove());
-    head.appendChild(h2); head.appendChild(x);
+    head.appendChild(h2);
+    head.appendChild(x);
     const bodyM = document.createElement('div');
     bodyM.className = 'modal-body modal-form-body';
     // Sub-header: what's being moved + the gear setup it uses.
@@ -1052,7 +1170,10 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       b.style.width = '100%';
       b.textContent = p.name;
       if (compatible) {
-        b.addEventListener('click', () => { backdrop.remove(); onPick(p.id); });
+        b.addEventListener('click', () => {
+          backdrop.remove();
+          onPick(p.id);
+        });
         bodyM.appendChild(b);
       } else {
         // Genuinely disabled: the button takes no hover/active/click. A disabled
@@ -1070,7 +1191,8 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
         bodyM.appendChild(wrap);
       }
     }
-    modal.appendChild(head); modal.appendChild(bodyM);
+    modal.appendChild(head);
+    modal.appendChild(bodyM);
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
   }
@@ -1081,7 +1203,9 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
 
     if (fovStore.selection.kind === 'plan' && frames.length === 0) {
       // A plan with no gear setup can't size its frames.
-      const plan = plansStore.plans.find(p => fovStore.selection.kind === 'plan' && p.id === fovStore.selection.planId);
+      const plan = plansStore.plans.find(
+        (p) => fovStore.selection.kind === 'plan' && p.id === fovStore.selection.planId,
+      );
       if (plan && !plan.setupId) {
         const hint = document.createElement('p');
         hint.style.color = 'var(--text-muted)';
@@ -1107,8 +1231,8 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
 
     // Free mode: tristate "select all" controlling frame visibility on the map.
     if (!isPlanMode) {
-      const anyHidden = frames.some(f => f.visible === false);
-      const anyVisible = frames.some(f => f.visible !== false);
+      const anyHidden = frames.some((f) => f.visible === false);
+      const anyVisible = frames.some((f) => f.visible !== false);
       const allVisible = !anyHidden;
 
       const selectAllRow = document.createElement('label');
@@ -1118,7 +1242,9 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       selectAllBox.className = 'shrink-0';
       selectAllBox.checked = allVisible;
       selectAllBox.indeterminate = anyVisible && anyHidden;
-      selectAllBox.addEventListener('change', () => fovStore.setAllAdhocVisible(selectAllBox.checked));
+      selectAllBox.addEventListener('change', () =>
+        fovStore.setAllAdhocVisible(selectAllBox.checked),
+      );
       const selectAllLabel = document.createElement('span');
       selectAllLabel.textContent = t('display.selectAll');
       selectAllRow.appendChild(selectAllBox);
@@ -1142,14 +1268,20 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       const mosaicData = isPlanMosaic
         ? (() => {
             const [, mPlanId, mMosaicId] = f.id.split(':');
-            return plansStore.plans.find(p => p.id === mPlanId)?.mosaics.find(m => m.id === mMosaicId) ?? null;
+            return (
+              plansStore.plans
+                .find((p) => p.id === mPlanId)
+                ?.mosaics.find((m) => m.id === mMosaicId) ?? null
+            );
           })()
         : null;
-      const freeMosaic = isFreeMosaic ? (fovStore.adhocMosaics.find(m => m.id === f.id.split(':')[2]) ?? null) : null;
+      const freeMosaic = isFreeMosaic
+        ? (fovStore.adhocMosaics.find((m) => m.id === f.id.split(':')[2]) ?? null)
+        : null;
       // Gear setup of a free item — a plan is a compatible migration target only
       // if it uses the same setup (the picker shows the rest disabled).
       const freeSetupId = isFreeFrame
-        ? (fovStore.adhoc.find(a => a.id === f.id)?.setupId ?? null)
+        ? (fovStore.adhoc.find((a) => a.id === f.id)?.setupId ?? null)
         : (freeMosaic?.setupId ?? null);
 
       // Free frames + free mosaics: a leading checkbox shows/hides them on the map.
@@ -1181,7 +1313,8 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       const nameSpan = document.createElement('span');
       // Active frame's name is emphasised + accent-coloured to match the canvas.
       nameSpan.className = f.active ? 'font-semibold text-[var(--accent-color)]' : 'text-primary';
-      const baseName = (isPlan || isMosaic) ? (f.anchorLabel ?? t('fovOverlay.customLocation')) : f.label;
+      const baseName =
+        isPlan || isMosaic ? (f.anchorLabel ?? t('fovOverlay.customLocation')) : f.label;
       // Mosaics carry a "Mosaic" suffix so they read distinctly from single frames.
       nameSpan.textContent = isMosaic ? `${baseName} · ${t('targets.plan.mosaicLabel')}` : baseName;
       labelEl.appendChild(nameSpan);
@@ -1197,7 +1330,9 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       if (f.anchorKind === 'screen') {
         parts.push(t('fovOverlay.floating'));
       } else if (isFreeFrame) {
-        parts.push(f.anchorLabel ? `${t('fovOverlay.pinnedTo')} ${f.anchorLabel}` : t('fovOverlay.pinned'));
+        parts.push(
+          f.anchorLabel ? `${t('fovOverlay.pinnedTo')} ${f.anchorLabel}` : t('fovOverlay.pinned'),
+        );
       }
       // Show the mosaic grid size (cols×rows) alongside the angle readout.
       const gridData = mosaicData ?? freeMosaic;
@@ -1267,8 +1402,10 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
           // disabled, mismatched plans make sense).
           const base = f.anchorLabel ?? (isFreeMosaic ? t('fovOverlay.customLocation') : f.label);
           const itemName = isFreeMosaic ? `${base} · ${t('targets.plan.mosaicLabel')}` : base;
-          const setupLabel = (freeSetupId && fovStore.specs.get(freeSetupId)?.label)
-            || gearSetups.find(s => s.id === freeSetupId)?.name || '';
+          const setupLabel =
+            (freeSetupId && fovStore.specs.get(freeSetupId)?.label) ||
+            gearSetups.find((s) => s.id === freeSetupId)?.name ||
+            '';
           openPlanPicker({ name: itemName, setupLabel }, freeSetupId, migrate);
         });
         actions.appendChild(toPlanBtn);
@@ -1334,28 +1471,36 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
   // ── "Edit mosaic" modal ───────────────────────────────────────────────────
   // Re-opens the same modal pre-filled with the mosaic's current settings.
   function openEditMosaicModal(planId: string, mosaicId: string): void {
-    const plan = plansStore.plans.find(p => p.id === planId);
-    const mosaic = plan?.mosaics.find(m => m.id === mosaicId);
+    const plan = plansStore.plans.find((p) => p.id === planId);
+    const mosaic = plan?.mosaics.find((m) => m.id === mosaicId);
     if (!plan?.setupId || !mosaic) return;
     // Seed the target chip from the single stored DSO (a multi-DSO mosaic has
     // dsoId null and so opens with no chips — clearing/keeping the centre).
     const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : null;
-    buildMosaicModal({ kind: 'plan', planId }, {
-      mosaicId,
-      name: mosaic.name,
-      dsoId: mosaic.dsoId,
-      overlapPct: mosaic.overlapPct,
-      cols: mosaic.cols,
-      rows: mosaic.rows,
-      centerRa: mosaic.centerRa,
-      centerDec: mosaic.centerDec,
-      paDeg: mosaic.paDeg,
-    }, dso ? [dso] : []);
+    buildMosaicModal(
+      { kind: 'plan', planId },
+      {
+        mosaicId,
+        name: mosaic.name,
+        dsoId: mosaic.dsoId,
+        overlapPct: mosaic.overlapPct,
+        cols: mosaic.cols,
+        rows: mosaic.rows,
+        centerRa: mosaic.centerRa,
+        centerDec: mosaic.centerDec,
+        paDeg: mosaic.paDeg,
+      },
+      dso ? [dso] : [],
+    );
   }
 
-  function buildMosaicModal(dest: MosaicDest, edit?: MosaicEditDefaults, seedDsos: DSO[] = []): void {
+  function buildMosaicModal(
+    dest: MosaicDest,
+    edit?: MosaicEditDefaults,
+    seedDsos: DSO[] = [],
+  ): void {
     // Plan destinations need a sized plan; free destinations carry the setup id.
-    const plan = dest.kind === 'plan' ? plansStore.plans.find(p => p.id === dest.planId) : null;
+    const plan = dest.kind === 'plan' ? plansStore.plans.find((p) => p.id === dest.planId) : null;
     const setupId = dest.kind === 'plan' ? plan?.setupId : dest.setupId;
     if (dest.kind === 'plan' && !plan?.setupId) return;
     if (!setupId) return;
@@ -1377,7 +1522,9 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     let region = { wDeg: 0, hDeg: 0, paDeg };
     if (selected.length > 0) {
       const res = autoRegionForDsos(selected, 20);
-      center = res.center; region = res.region; paDeg = region.paDeg;
+      center = res.center;
+      region = res.region;
+      paDeg = region.paDeg;
     }
     let auto = planGrid(tileW, tileH, region.wDeg, region.hDeg, initialOverlap);
 
@@ -1386,16 +1533,21 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     const modal = document.createElement('div');
     modal.className = 'modal settings-modal';
 
-    const close = (): void => { backdrop.remove(); };
+    const close = (): void => {
+      backdrop.remove();
+    };
 
     const head = document.createElement('div');
     head.className = 'modal-header';
     const h2 = document.createElement('h2');
     h2.textContent = t(edit ? 'fovOverlay.editMosaicTitle' : 'fovOverlay.mosaicTitle');
     const x = document.createElement('button');
-    x.type = 'button'; x.className = 'modal-close'; x.textContent = '×';
+    x.type = 'button';
+    x.className = 'modal-close';
+    x.textContent = '×';
     x.addEventListener('click', close);
-    head.appendChild(h2); head.appendChild(x);
+    head.appendChild(h2);
+    head.appendChild(x);
 
     const bodyM = document.createElement('div');
     bodyM.className = 'modal-body modal-form-body flex flex-col gap-3';
@@ -1472,7 +1624,12 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     /** A labelled number input as one grid row (label cell + input cell). The
      * `<label class="contents">` promotes its span + input into the grid so they
      * fall into the shared columns. */
-    function numberField(labelKey: string, value: number, min: number, max?: number): { input: HTMLInputElement } {
+    function numberField(
+      labelKey: string,
+      value: number,
+      min: number,
+      max?: number,
+    ): { input: HTMLInputElement } {
       const lbl = document.createElement('label');
       lbl.className = 'contents';
       const span = document.createElement('span');
@@ -1523,7 +1680,9 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     function recomputePlacement(): void {
       if (selected.length > 0) {
         const res = autoRegionForDsos(selected, 20);
-        center = res.center; region = res.region; paDeg = region.paDeg;
+        center = res.center;
+        region = res.region;
+        paDeg = region.paDeg;
       } else if (edit) {
         center = { ra: edit.centerRa, dec: edit.centerDec };
         paDeg = edit.paDeg;
@@ -1564,9 +1723,12 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
         chips.appendChild(chip);
       }
     }
-    function closeDropdown(): void { dropdown.classList.remove('!block'); dropdown.innerHTML = ''; }
+    function closeDropdown(): void {
+      dropdown.classList.remove('!block');
+      dropdown.innerHTML = '';
+    }
     function addDso(d: DSO): void {
-      if (selected.some(s => s.id === d.id)) return;
+      if (selected.some((s) => s.id === d.id)) return;
       selected.push(d);
       searchInput.value = '';
       closeDropdown();
@@ -1577,9 +1739,15 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     }
     function runSearch(): void {
       const q = searchInput.value.trim();
-      if (!q) { closeDropdown(); return; }
-      const results = searchDSOs(q, 8).filter(r => !selected.some(s => s.id === r.dso.id));
-      if (results.length === 0) { closeDropdown(); return; }
+      if (!q) {
+        closeDropdown();
+        return;
+      }
+      const results = searchDSOs(q, 8).filter((r) => !selected.some((s) => s.id === r.dso.id));
+      if (results.length === 0) {
+        closeDropdown();
+        return;
+      }
       dropdown.innerHTML = '';
       for (const r of results) {
         const item = document.createElement('div');
@@ -1632,11 +1800,13 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     const foot = document.createElement('div');
     foot.className = 'modal-footer';
     const cancel = document.createElement('button');
-    cancel.type = 'button'; cancel.className = 'btn-cancel';
+    cancel.type = 'button';
+    cancel.className = 'btn-cancel';
     cancel.textContent = t('targets.gear.cancel');
     cancel.addEventListener('click', close);
     const create = document.createElement('button');
-    create.type = 'button'; create.className = 'btn-confirm';
+    create.type = 'button';
+    create.className = 'btn-confirm';
     create.textContent = edit ? t('targets.gear.save') : t('fovOverlay.mosaicCreate');
     create.addEventListener('click', async () => {
       const name = nameInput.value.trim();
@@ -1644,8 +1814,16 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       // may leave it empty to keep the stored centre.
       const targetMissing = selected.length === 0 && !edit;
       let invalid = false;
-      if (!name) { nameInput.classList.add('input-error'); nameError.classList.remove('hidden'); invalid = true; }
-      if (targetMissing) { searchInput.classList.add('input-error'); targetError.classList.remove('hidden'); invalid = true; }
+      if (!name) {
+        nameInput.classList.add('input-error');
+        nameError.classList.remove('hidden');
+        invalid = true;
+      }
+      if (targetMissing) {
+        searchInput.classList.add('input-error');
+        targetError.classList.remove('hidden');
+        invalid = true;
+      }
       if (invalid) return;
 
       recomputePlacement();
@@ -1654,16 +1832,26 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       const r = readInt(rows.input, auto.rows);
       // One DSO stays anchored to it; several (or none) un-anchor to the centre.
       const dsoId = selected.length === 1 ? selected[0].id : null;
-      const tiles = tileCenters(center, paDeg, c, r, tileW, tileH, overlapPct)
-        .map(tl => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
+      const tiles = tileCenters(center, paDeg, c, r, tileW, tileH, overlapPct).map((tl) => ({
+        ra: tl.ra,
+        dec: tl.dec,
+        paDeg: tl.paDeg,
+      }));
       create.disabled = true;
 
       // Free destination: create an ad-hoc mosaic (local, no plan) and select it.
       if (dest.kind === 'free') {
         fovStore.createAdhocMosaic({
-          setupId: dest.setupId, dsoId, name,
-          centerRa: center.ra, centerDec: center.dec, paDeg,
-          overlapPct, cols: c, rows: r, tiles,
+          setupId: dest.setupId,
+          dsoId,
+          name,
+          centerRa: center.ra,
+          centerDec: center.dec,
+          paDeg,
+          overlapPct,
+          cols: c,
+          rows: r,
+          tiles,
         });
         close();
         return;
@@ -1676,8 +1864,15 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
       if (edit) {
         // Re-tile the existing mosaic around the (possibly retargeted) centre/PA.
         await plansStore.updateMosaic(planId, edit.mosaicId, {
-          dsoId, name, centerRa: center.ra, centerDec: center.dec, paDeg,
-          overlapPct, cols: c, rows: r, tiles,
+          dsoId,
+          name,
+          centerRa: center.ra,
+          centerDec: center.dec,
+          paDeg,
+          overlapPct,
+          cols: c,
+          rows: r,
+          tiles,
         });
       } else {
         // Standalone frames this mosaic stands in for: the same target, or any
@@ -1685,26 +1880,39 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
         // deleted with the mosaic creation so only the mosaic remains.
         const f2 = 1 - overlapPct / 100;
         const reach = Math.max((c - 1) * tileW * f2 + tileW, (r - 1) * tileH * f2 + tileH) / 2;
-        const replaceEntryIds = plan!.entries.filter(e => {
-          if (e.mosaicId) return false;
-          if (dsoId && e.dsoId === dsoId) return true;
-          const ed = e.dsoId ? getDSOById(e.dsoId) : null;
-          const era = e.ra ?? ed?.ra;
-          const edec = e.dec ?? ed?.dec;
-          if (era == null || edec == null) return false;
-          return angularDistDeg(center.ra, center.dec, era, edec) <= reach;
-        }).map(e => e.id);
+        const replaceEntryIds = plan!.entries
+          .filter((e) => {
+            if (e.mosaicId) return false;
+            if (dsoId && e.dsoId === dsoId) return true;
+            const ed = e.dsoId ? getDSOById(e.dsoId) : null;
+            const era = e.ra ?? ed?.ra;
+            const edec = e.dec ?? ed?.dec;
+            if (era == null || edec == null) return false;
+            return angularDistDeg(center.ra, center.dec, era, edec) <= reach;
+          })
+          .map((e) => e.id);
         const params: MosaicParams = {
-          dsoId, name, centerRa: center.ra, centerDec: center.dec, paDeg,
-          overlapPct, cols: c, rows: r, tiles, replaceEntryIds,
+          dsoId,
+          name,
+          centerRa: center.ra,
+          centerDec: center.dec,
+          paDeg,
+          overlapPct,
+          cols: c,
+          rows: r,
+          tiles,
+          replaceEntryIds,
         };
         await plansStore.createMosaic(planId, params);
       }
       close();
     });
-    foot.appendChild(cancel); foot.appendChild(create);
+    foot.appendChild(cancel);
+    foot.appendChild(create);
 
-    modal.appendChild(head); modal.appendChild(bodyM); modal.appendChild(foot);
+    modal.appendChild(head);
+    modal.appendChild(bodyM);
+    modal.appendChild(foot);
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
     nameInput.focus();
@@ -1721,7 +1929,10 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
     // Hidden frames can't be added to / extended — disable the footer actions and
     // explain (via tooltip) that frames must be shown again to re-enable them.
     // Pointer events stay on so the native title tooltip surfaces on hover.
-    for (const [btn, label] of [[addBtn, t('fovOverlay.addFrame')], [addMosaicBtn, t('fovOverlay.addMosaic')]] as const) {
+    for (const [btn, label] of [
+      [addBtn, t('fovOverlay.addFrame')],
+      [addMosaicBtn, t('fovOverlay.addMosaic')],
+    ] as const) {
       btn.classList.toggle('opacity-50', framesHidden);
       btn.classList.toggle('cursor-not-allowed', framesHidden);
       btn.title = framesHidden ? t('fovOverlay.framesHiddenHint') : label;
@@ -1730,13 +1941,23 @@ export function buildFovPopup(onClose: () => void, onReady?: () => void): HTMLEl
 
   // React to store changes; clean up on close. The dropdowns depend on the plan
   // list + selection + each plan's setup; the body depends on the resolved frames.
-  const stopFrames = watch(() => fovStore.renderables, () => renderBody(), { deep: true });
+  const stopFrames = watch(
+    () => fovStore.renderables,
+    () => renderBody(),
+    { deep: true },
+  );
   const stopSelect = watch(
-    () => [fovStore.selection, plansStore.plans.map(p => `${p.id}:${p.name}:${p.setupId}`).join(',')],
+    () => [
+      fovStore.selection,
+      plansStore.plans.map((p) => `${p.id}:${p.name}:${p.setupId}`).join(','),
+    ],
     () => renderAll(),
     { deep: true },
   );
-  const stopVisible = watch(() => fovStore.framesVisible, () => renderAll());
+  const stopVisible = watch(
+    () => fovStore.framesVisible,
+    () => renderAll(),
+  );
   renderAll();
 
   popup.__cleanup = () => {

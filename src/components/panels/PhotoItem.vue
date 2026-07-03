@@ -5,7 +5,8 @@
         class="photo-item-name cursor-pointer"
         :title="placed.photo.originalName"
         @click.stop="$emit('name-click')"
-      >{{ placed.photo.originalName }}</span>
+        >{{ placed.photo.originalName }}</span
+      >
       <div class="photo-item-controls">
         <EyeToggleButton
           class="btn-icon"
@@ -18,7 +19,9 @@
           class="btn-icon btn-gear"
           :title="t('photos.settings')"
           @click.stop="$emit('gear', $event)"
-        >⚙</button>
+        >
+          ⚙
+        </button>
       </div>
     </div>
     <div v-if="dsoChips.length > 0 || labelChips.length > 0" class="photo-item-chips">
@@ -46,11 +49,14 @@ import PhotoChip from './PhotoChip.vue';
 import EyeToggleButton from '../base/EyeToggleButton.vue';
 import type { PlacedPhoto } from '../../photo-overlay';
 
-const props = withDefaults(defineProps<{
-  placed: PlacedPhoto;
-  dsoChips?: string[];
-  labelChips?: string[];
-}>(), { dsoChips: () => [], labelChips: () => [] });
+const props = withDefaults(
+  defineProps<{
+    placed: PlacedPhoto;
+    dsoChips?: string[];
+    labelChips?: string[];
+  }>(),
+  { dsoChips: () => [], labelChips: () => [] },
+);
 
 defineEmits<{
   'name-click': [];

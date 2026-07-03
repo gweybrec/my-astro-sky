@@ -17,8 +17,13 @@
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-*::-webkit-scrollbar       { width: 10px; height: 10px; }
-*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
 
 *::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
@@ -26,9 +31,12 @@
   border: 2px solid var(--scrollbar-track);
 }
 
-*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
-*::-webkit-scrollbar-corner      { background: var(--scrollbar-track); }
-
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
 
 /* ── Sky tooltip text selection ────────────────────────────────────────────── */
 /* While a text-selection drag started inside the sky tooltip is in progress, make
@@ -43,7 +51,6 @@ body.tooltip-selecting #tooltip * {
   user-select: text;
 }
 
-
 /* ── Sky map / photo layer ─────────────────────────────────────────────────── */
 
 #sky-canvas {
@@ -52,7 +59,9 @@ body.tooltip-selecting #tooltip * {
   display: block;
   cursor: default;
 }
-#sky-canvas:active { cursor: grabbing; }
+#sky-canvas:active {
+  cursor: grabbing;
+}
 
 #photo-layer {
   position: absolute;
@@ -79,7 +88,9 @@ body.tooltip-selecting #tooltip * {
   image-rendering: auto;
 }
 
-#photo-layer.photos-frozen .photo-overlay-img { visibility: hidden; }
+#photo-layer.photos-frozen .photo-overlay-img {
+  visibility: hidden;
+}
 
 /* accent-color drives the range input thumb — no UnoCSS equivalent */
 .photo-opacity-slider {
@@ -88,7 +99,6 @@ body.tooltip-selecting #tooltip * {
   margin-top: var(--space-2);
   accent-color: var(--accent-color);
 }
-
 
 /* ── ::before / ::after pseudo-elements ────────────────────────────────────── */
 
@@ -119,7 +129,9 @@ body.tooltip-selecting #tooltip * {
   transition: transform 0.15s;
   flex-shrink: 0;
 }
-.modal-panel-header.open::before { transform: rotate(90deg); }
+.modal-panel-header.open::before {
+  transform: rotate(90deg);
+}
 
 /* Collapsible chevron ▶ — inline metadata editor */
 .metadata-toggle::before {
@@ -127,7 +139,9 @@ body.tooltip-selecting #tooltip * {
   font-size: var(--font-size-micro);
   transition: transform 0.15s;
 }
-.metadata-toggle.open::before { transform: rotate(90deg); }
+.metadata-toggle.open::before {
+  transform: rotate(90deg);
+}
 
 /* Collapsible chevron ▶ — batch upload metadata panel */
 .batch-meta-toggle::before {
@@ -135,7 +149,9 @@ body.tooltip-selecting #tooltip * {
   font-size: var(--font-size-nano);
   transition: transform 0.15s;
 }
-.batch-meta-toggle.open::before { transform: rotate(90deg); }
+.batch-meta-toggle.open::before {
+  transform: rotate(90deg);
+}
 
 /* Gallery chip overflow fade */
 .gallery-item-chips--overflows::after {
@@ -156,42 +172,60 @@ body.tooltip-selecting #tooltip * {
   transition: transform 0.2s;
   color: var(--text-muted);
 }
-details.targets-form-details[open] .targets-form-summary::before { transform: rotate(90deg); }
+details.targets-form-details[open] .targets-form-summary::before {
+  transform: rotate(90deg);
+}
 
 /* Collapsible chevron ▶ — target card <details> */
-.target-details > summary::-webkit-details-marker { display: none; }
+.target-details > summary::-webkit-details-marker {
+  display: none;
+}
 .target-details > summary::before {
   content: '\25B6';
   font-size: var(--font-size-pico);
   display: inline-block;
   transition: transform 0.15s;
 }
-.target-details[open] > summary::before { transform: rotate(90deg); }
-
+.target-details[open] > summary::before {
+  transform: rotate(90deg);
+}
 
 /* ── @keyframes ────────────────────────────────────────────────────────────── */
 
 @keyframes loading-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes toast-out {
-  from { opacity: 1; transform: translateY(0); }
-  to   { opacity: 0; transform: translateY(10px); }
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
-
 
 /* ── Interactive element cursors ────────────────────────────────────────────── */
 
 /* Browsers don't set pointer on checkboxes/radios/file inputs by default */
-input[type="checkbox"],
-input[type="radio"],
-input[type="file"],
+input[type='checkbox'],
+input[type='radio'],
+input[type='file'],
 label[for],
 select {
   cursor: pointer;
@@ -259,11 +293,16 @@ input:focus-visible {
 
 /* Default POI types show a type icon (asteroid/comet/satellite/ISS) instead of the
    plain colour dot. The icon is tinted with the type colour via currentColor. */
-.poi-chip--icon::before { display: none; }
+.poi-chip--icon::before {
+  display: none;
+}
 .poi-marker {
   display: inline-flex;
   align-items: center;
   color: var(--poi-color, var(--text-dim));
   flex: none;
 }
-.poi-marker svg { width: 0.95rem; height: 0.95rem; }
+.poi-marker svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}

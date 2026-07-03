@@ -60,9 +60,7 @@ describe('detectStars()', () => {
     }
 
     // Ensure one of the spots is close to the brightest injected blob center
-    const nearBright = out.spots.some(
-      (s) => Math.abs(s.x - 60) < 2 && Math.abs(s.y - 70) < 2,
-    );
+    const nearBright = out.spots.some((s) => Math.abs(s.x - 60) < 2 && Math.abs(s.y - 70) < 2);
     expect(nearBright).toBe(true);
   });
 

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeContext, MAX_SANITIZE_VALUE_LENGTH, MAX_SANITIZE_DEPTH } from '../../electron/sanitize-context';
+import {
+  sanitizeContext,
+  MAX_SANITIZE_VALUE_LENGTH,
+  MAX_SANITIZE_DEPTH,
+} from '../../electron/sanitize-context';
 
 describe('sanitizeContext', () => {
   describe('primitive passthrough', () => {
@@ -87,7 +91,10 @@ describe('sanitizeContext', () => {
     });
 
     it('is case-insensitive for key matching', () => {
-      const result = sanitizeContext({ Password: 'secret', TOKEN: 'xyz' }) as Record<string, unknown>;
+      const result = sanitizeContext({ Password: 'secret', TOKEN: 'xyz' }) as Record<
+        string,
+        unknown
+      >;
       expect(result.Password).toBe('[redacted]');
       expect(result.TOKEN).toBe('[redacted]');
     });

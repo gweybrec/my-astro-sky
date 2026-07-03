@@ -1,10 +1,18 @@
 import type { DSO, DSOType, DSOUserOverride } from './types';
 import { upsertDsoOverride, deleteDsoOverride } from './api';
-import { applyAndStoreSingleOverride, resetDsoToBaseValues, getDSOCatalogBaseValues, getUserOverride } from './dso-catalog';
+import {
+  applyAndStoreSingleOverride,
+  resetDsoToBaseValues,
+  getDSOCatalogBaseValues,
+  getUserOverride,
+} from './dso-catalog';
 import { t, getLang } from './i18n';
 import { showToast } from './toast';
 
-interface ConstellationOption { id: string; name: string; }
+interface ConstellationOption {
+  id: string;
+  name: string;
+}
 
 /**
  * Returns true when a dropdown selection should be persisted as an override.
@@ -18,29 +26,25 @@ export function shouldOverrideConstellation(
   return !!selected && selected !== (baseConstellation ?? '');
 }
 
-export function shouldOverrideType(
-  selected: string,
-  baseType: string | null | undefined,
-): boolean {
+export function shouldOverrideType(selected: string, baseType: string | null | undefined): boolean {
   return !!selected && selected !== (baseType ?? '');
 }
 
 // Pre-load constellation list at module init so the data is ready before the user opens the modal.
-const constellationListPromise: Promise<ConstellationOption[]> =
-  fetch('/data/constellations.json')
-    .then(r => r.json())
-    .then(json => {
-      const lang = getLang();
-      const seen = new Set<string>();
-      return (json.features as any[])
-        .filter(f => !seen.has(f.id) && seen.add(f.id)) // deduplicate Serpens (two features, same id)
-        .map(f => ({
-          id: f.id as string,
-          name: (f.properties[lang] ?? f.properties.name ?? f.id) as string,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-    })
-    .catch(() => [] as ConstellationOption[]);
+const constellationListPromise: Promise<ConstellationOption[]> = fetch('/data/constellations.json')
+  .then((r) => r.json())
+  .then((json) => {
+    const lang = getLang();
+    const seen = new Set<string>();
+    return (json.features as any[])
+      .filter((f) => !seen.has(f.id) && seen.add(f.id)) // deduplicate Serpens (two features, same id)
+      .map((f) => ({
+        id: f.id as string,
+        name: (f.properties[lang] ?? f.properties.name ?? f.id) as string,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  })
+  .catch(() => [] as ConstellationOption[]);
 
 /**
  * Opens a modal for editing DSO metadata at runtime.
@@ -171,7 +175,20 @@ export async function openDSOEditModal(dso: DSO, onSaved?: () => void): Promise<
   typeSelect.className = 'tag-input';
 
   const baseType = base?.type ?? null;
-  const DSO_TYPE_OPTIONS: DSOType[] = ['Gx', 'GxS', 'GxE', 'GxI', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?'];
+  const DSO_TYPE_OPTIONS: DSOType[] = [
+    'Gx',
+    'GxS',
+    'GxE',
+    'GxI',
+    'OC',
+    'GC',
+    'EN',
+    'RN',
+    'PN',
+    'SNR',
+    'DN',
+    '?',
+  ];
   for (const code of DSO_TYPE_OPTIONS) {
     const opt = document.createElement('option');
     opt.value = code;
@@ -305,7 +322,8 @@ export async function openDSOEditModal(dso: DSO, onSaved?: () => void): Promise<
       const rating = parseInt(ratingInput.value, 10);
       if (!isNaN(rating) && rating >= 1 && rating <= 5) override.rating = rating;
       const difficulty = parseInt(diffInput.value, 10);
-      if (!isNaN(difficulty) && difficulty >= 1 && difficulty <= 5) override.difficulty = difficulty;
+      if (!isNaN(difficulty) && difficulty >= 1 && difficulty <= 5)
+        override.difficulty = difficulty;
       if (shouldOverrideType(typeSelect.value, baseType)) {
         override.type = typeSelect.value as DSOType;
       }

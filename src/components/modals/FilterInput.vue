@@ -8,8 +8,11 @@
           :title="tooltip"
           class="cursor-pointer"
           @click="enterEditMode"
-        >{{ selectedValue }}</span>
-        <button type="button" class="integration-filter-clear" @mousedown.prevent="clearValue">×</button>
+          >{{ selectedValue }}</span
+        >
+        <button type="button" class="integration-filter-clear" @mousedown.prevent="clearValue">
+          ×
+        </button>
       </span>
     </template>
 
@@ -23,7 +26,10 @@
         :title="tooltip"
         v-model="inputText"
         @input="onInput"
-        @focus="isEditing = true; showSuggestions = true"
+        @focus="
+          isEditing = true;
+          showSuggestions = true;
+        "
         @blur="onBlur"
         @keydown="onKeydown"
       />
@@ -72,11 +78,14 @@ const isEditing = ref(false);
 
 // Handle external value updates (e.g., when v-for recycles row by index).
 // Skip while the user is actively typing to avoid switching to badge mode mid-input.
-watch(() => props.modelValue, (newVal) => {
-  if (isEditing.value) return;
-  selectedValue.value = newVal || '';
-  if (!selectedValue.value) inputText.value = '';
-});
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (isEditing.value) return;
+    selectedValue.value = newVal || '';
+    if (!selectedValue.value) inputText.value = '';
+  },
+);
 
 const badgeClass = computed(() => getBadgeClass(selectedValue.value));
 
@@ -120,7 +129,9 @@ function onBlur() {
     selectedValue.value = trimmed;
     emit('update:modelValue', trimmed);
   }
-  setTimeout(() => { showSuggestions.value = false; }, 150);
+  setTimeout(() => {
+    showSuggestions.value = false;
+  }, 150);
 }
 
 function onKeydown(e: KeyboardEvent) {

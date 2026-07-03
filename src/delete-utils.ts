@@ -8,7 +8,6 @@ export interface DeleteOptions {
   totalPhotos: number;
 }
 
-
 export function buildDeleteSummaryLines(
   opts: DeleteOptions,
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -35,9 +34,7 @@ export function buildDeleteSummaryLines(
     const n = opts.photoIds.length;
     const total = opts.totalPhotos;
     if (n >= total && total > 0) {
-      lines.push(
-        t('settings.deleteSummaryPhotosAll').replace('{n}', String(n)),
-      );
+      lines.push(t('settings.deleteSummaryPhotosAll').replace('{n}', String(n)));
     } else {
       lines.push(
         t('settings.deleteSummaryPhotosPartial')

@@ -3,7 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { calibrationToCorrespondences } from '../../server/astrometry';
-import { parseFITSHeader, extractFITSHeaderFromFITS, wcsToCorrespondences } from '../../server/wcs-reader';
+import {
+  parseFITSHeader,
+  extractFITSHeaderFromFITS,
+  wcsToCorrespondences,
+} from '../../server/wcs-reader';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(__dirname, '../fixtures');
@@ -17,7 +21,7 @@ beforeAll(() => {
 describe('calibrationToCorrespondences', () => {
   it('returns correspondences from real astrometry.net calibration (job 10796000 — M13 field)', () => {
     const cal = JSON.parse(
-      fs.readFileSync(path.join(FIXTURES, 'astrometry/10796000-calibration.json'), 'utf8')
+      fs.readFileSync(path.join(FIXTURES, 'astrometry/10796000-calibration.json'), 'utf8'),
     );
     // Real calibration: ra=250.3, dec=36.4, pixscale=2.977 arcsec/px, 3840×2160
     const imageWidth = 3840;
@@ -32,8 +36,9 @@ describe('calibrationToCorrespondences', () => {
 
   it('returns array (possibly empty) without throwing for valid calibration data', () => {
     const cal = {
-      ra: 84.05, dec: -1.2,       // Orion Nebula area
-      pixscale: 1.5,               // arcsec/pixel
+      ra: 84.05,
+      dec: -1.2, // Orion Nebula area
+      pixscale: 1.5, // arcsec/pixel
       orientation: 0,
       parity: 1.0,
       radius: 0.5,
@@ -97,7 +102,7 @@ describe('astrometry.net WCS file pipeline (job 10796000 — M13 field)', () => 
 
     // Star 99004 is placed at exactly CRVAL1/CRVAL2 in our test catalog
     const corrs = wcsToCorrespondences(wcs, 3840, 2160, false);
-    const refStar = corrs.find(c => c.starHip === 99004);
+    const refStar = corrs.find((c) => c.starHip === 99004);
 
     if (refStar) {
       // The star at CRVAL should map to pixel ≈ (CRPIX1-1, CRPIX2-1)

@@ -36,23 +36,88 @@ export interface ShortcutAction {
 
 /** Ordered registry — drives both dispatch and the cheat-sheet UI. */
 export const SHORTCUT_ACTIONS: ShortcutAction[] = [
-  { id: 'toggleStars',              category: 'toggles',    defaultKeys: ['s'],          labelKey: 'display.showStars' },
-  { id: 'toggleConstellationLines', category: 'toggles',    defaultKeys: ['c'],          labelKey: 'display.constellationLines' },
-  { id: 'toggleConstellationNames', category: 'toggles',    defaultKeys: ['v'],          labelKey: 'display.constellationNames' },
-  { id: 'toggleDSOs',               category: 'toggles',    defaultKeys: ['d'],          labelKey: 'dso.showDSOs' },
-  { id: 'toggleDSOLabels',          category: 'toggles',    defaultKeys: ['shift+d'],    labelKey: 'display.dsoLabels' },
-  { id: 'toggleStarLabels',         category: 'toggles',    defaultKeys: ['shift+s'],    labelKey: 'display.starLabels' },
-  { id: 'toggleGrid',               category: 'toggles',    defaultKeys: ['e'],          labelKey: 'display.raDecGrid' },
-  { id: 'togglePhotos',             category: 'toggles',    defaultKeys: ['p'],          labelKey: 'display.showPhotos' },
-  { id: 'togglePhotoOutlines',      category: 'toggles',    defaultKeys: ['shift+p'],    labelKey: 'display.photoOutlines' },
-  { id: 'togglePanel',              category: 'navigation', defaultKeys: ['h'],          labelKey: 'shortcuts.action.togglePanel' },
-  { id: 'zoomIn',                   category: 'navigation', defaultKeys: ['+', '='],     labelKey: 'shortcuts.action.zoomIn' },
-  { id: 'zoomOut',                  category: 'navigation', defaultKeys: ['-'],          labelKey: 'shortcuts.action.zoomOut' },
-  { id: 'panLeft',                  category: 'navigation', defaultKeys: ['arrowleft'],  labelKey: 'shortcuts.action.panLeft' },
-  { id: 'panRight',                 category: 'navigation', defaultKeys: ['arrowright'], labelKey: 'shortcuts.action.panRight' },
-  { id: 'panUp',                    category: 'navigation', defaultKeys: ['arrowup'],    labelKey: 'shortcuts.action.panUp' },
-  { id: 'panDown',                  category: 'navigation', defaultKeys: ['arrowdown'],  labelKey: 'shortcuts.action.panDown' },
-  { id: 'openShortcuts',            category: 'navigation', defaultKeys: ['?'],          labelKey: 'shortcuts.action.openShortcuts' },
+  { id: 'toggleStars', category: 'toggles', defaultKeys: ['s'], labelKey: 'display.showStars' },
+  {
+    id: 'toggleConstellationLines',
+    category: 'toggles',
+    defaultKeys: ['c'],
+    labelKey: 'display.constellationLines',
+  },
+  {
+    id: 'toggleConstellationNames',
+    category: 'toggles',
+    defaultKeys: ['v'],
+    labelKey: 'display.constellationNames',
+  },
+  { id: 'toggleDSOs', category: 'toggles', defaultKeys: ['d'], labelKey: 'dso.showDSOs' },
+  {
+    id: 'toggleDSOLabels',
+    category: 'toggles',
+    defaultKeys: ['shift+d'],
+    labelKey: 'display.dsoLabels',
+  },
+  {
+    id: 'toggleStarLabels',
+    category: 'toggles',
+    defaultKeys: ['shift+s'],
+    labelKey: 'display.starLabels',
+  },
+  { id: 'toggleGrid', category: 'toggles', defaultKeys: ['e'], labelKey: 'display.raDecGrid' },
+  { id: 'togglePhotos', category: 'toggles', defaultKeys: ['p'], labelKey: 'display.showPhotos' },
+  {
+    id: 'togglePhotoOutlines',
+    category: 'toggles',
+    defaultKeys: ['shift+p'],
+    labelKey: 'display.photoOutlines',
+  },
+  {
+    id: 'togglePanel',
+    category: 'navigation',
+    defaultKeys: ['h'],
+    labelKey: 'shortcuts.action.togglePanel',
+  },
+  {
+    id: 'zoomIn',
+    category: 'navigation',
+    defaultKeys: ['+', '='],
+    labelKey: 'shortcuts.action.zoomIn',
+  },
+  {
+    id: 'zoomOut',
+    category: 'navigation',
+    defaultKeys: ['-'],
+    labelKey: 'shortcuts.action.zoomOut',
+  },
+  {
+    id: 'panLeft',
+    category: 'navigation',
+    defaultKeys: ['arrowleft'],
+    labelKey: 'shortcuts.action.panLeft',
+  },
+  {
+    id: 'panRight',
+    category: 'navigation',
+    defaultKeys: ['arrowright'],
+    labelKey: 'shortcuts.action.panRight',
+  },
+  {
+    id: 'panUp',
+    category: 'navigation',
+    defaultKeys: ['arrowup'],
+    labelKey: 'shortcuts.action.panUp',
+  },
+  {
+    id: 'panDown',
+    category: 'navigation',
+    defaultKeys: ['arrowdown'],
+    labelKey: 'shortcuts.action.panDown',
+  },
+  {
+    id: 'openShortcuts',
+    category: 'navigation',
+    defaultKeys: ['?'],
+    labelKey: 'shortcuts.action.openShortcuts',
+  },
 ];
 
 const ACTION_IDS = SHORTCUT_ACTIONS.map((a) => a.id);
@@ -66,7 +131,13 @@ export type Bindings = Record<ShortcutActionId, string[]>;
  * and digits the produced character already reflects the shift state ("+" vs "="). Bare
  * modifier presses (Shift/Ctrl/Alt/Meta alone) return "".
  */
-export function normalizeKey(e: { key: string; shiftKey?: boolean; ctrlKey?: boolean; altKey?: boolean; metaKey?: boolean }): string {
+export function normalizeKey(e: {
+  key: string;
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+}): string {
   const raw = e.key;
   if (raw === 'Shift' || raw === 'Control' || raw === 'Alt' || raw === 'Meta') return '';
   const base = raw.length === 1 ? raw.toLowerCase() : raw.toLowerCase();
@@ -85,7 +156,10 @@ export function formatKey(key: string): string {
   if (!key) return '';
   if (key === '+') return '+'; // the standalone "+" key collides with the modifier separator
   const arrows: Record<string, string> = {
-    arrowleft: '←', arrowright: '→', arrowup: '↑', arrowdown: '↓',
+    arrowleft: '←',
+    arrowright: '→',
+    arrowup: '↑',
+    arrowdown: '↓',
   };
   const parts = key.split('+');
   return parts
@@ -165,7 +239,9 @@ export function loadBindings(): Bindings {
   try {
     const raw = localStorage.getItem(SHORTCUTS_KEY);
     if (raw) return mergeBindings(JSON.parse(raw));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return defaultBindings();
 }
 

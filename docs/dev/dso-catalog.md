@@ -22,39 +22,41 @@ node scripts/validate-simbad.mjs --scope lbn --deg 1.0 --out scripts/report-lbn.
 ```
 
 Checks performed:
+
 - **coord_drift** — angular separation between our RA/Dec and SIMBAD's (flags > threshold)
 - **name_mismatch** — our `nameEn` distinctive core word not found in SIMBAD's aliases for that object
-- **name_wrong_object** — Phase 2: proper name resolves in SIMBAD to a *different* object than our ID
+- **name_wrong_object** — Phase 2: proper name resolves in SIMBAD to a _different_ object than our ID
 - **not_found** — SIMBAD doesn't recognise the identifier at all (may indicate a normalisation issue)
 
 After fixing coordinates, always recompute constellations:
+
 ```bash
 node scripts/add-constellations.mjs
 ```
 
 ### Known OpenNGC issues (fixed in dso.json)
 
-| Object | Issue | Fix applied |
-|---|---|---|
-| **SH2-147** | Was wrongly named "Simeis 147 Nebula" — that name belongs to Sh2-240 in Taurus | Cleared nameEn/nameFr |
-| **SH2-240** | Wrong coordinates (RA 97°, Gem) and wrong name ("Pencil Nebula") | Corrected to SIMBAD coords RA=85.275°, Dec=28.083° (Tau); renamed Spaghetti Nebula; added "Simeis 147" & "LBN822" as catalog aliases |
-| **SH2-1 … SH2-49** | Systematic OpenNGC coordinate errors up to 22° in the Galactic-centre SH2 region | All 96 coord_drift objects updated from SIMBAD |
-| **SH2-171 … SH2-220** | Systematic drift (3–15°) in the Perseus/Cassiopeia SH2 region | Included in the 96-object batch fix |
-| **SH2-238, SH2-239, SH2-245** | Large drifts (26–41°) in the Taurus/Orion fringe | Included in batch fix |
-| **IC443** | Missing name | Added: nameEn "Jellyfish Nebula", nameFr "Nébuleuse de la Méduse" |
-| **LPN-Abell*** (PNe) | SIMBAD resolves "Abell N" to galaxy clusters (ACO N); script now uses "PN A66 N" | Coordinates verified correct via PN G identifiers |
+| Object                        | Issue                                                                            | Fix applied                                                                                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **SH2-147**                   | Was wrongly named "Simeis 147 Nebula" — that name belongs to Sh2-240 in Taurus   | Cleared nameEn/nameFr                                                                                                                |
+| **SH2-240**                   | Wrong coordinates (RA 97°, Gem) and wrong name ("Pencil Nebula")                 | Corrected to SIMBAD coords RA=85.275°, Dec=28.083° (Tau); renamed Spaghetti Nebula; added "Simeis 147" & "LBN822" as catalog aliases |
+| **SH2-1 … SH2-49**            | Systematic OpenNGC coordinate errors up to 22° in the Galactic-centre SH2 region | All 96 coord_drift objects updated from SIMBAD                                                                                       |
+| **SH2-171 … SH2-220**         | Systematic drift (3–15°) in the Perseus/Cassiopeia SH2 region                    | Included in the 96-object batch fix                                                                                                  |
+| **SH2-238, SH2-239, SH2-245** | Large drifts (26–41°) in the Taurus/Orion fringe                                 | Included in batch fix                                                                                                                |
+| **IC443**                     | Missing name                                                                     | Added: nameEn "Jellyfish Nebula", nameFr "Nébuleuse de la Méduse"                                                                    |
+| **LPN-Abell*** (PNe)          | SIMBAD resolves "Abell N" to galaxy clusters (ACO N); script now uses "PN A66 N" | Coordinates verified correct via PN G identifiers                                                                                    |
 
 ### SIMBAD identifier normalisation (for the validation script)
 
-| Our format | SIMBAD query format |
-|---|---|
-| `SH2-240` | `Sh2-240` (hyphen, not space) |
-| `LBN873` | `LBN 873` |
-| `NGC7009` | `NGC 7009` |
-| `IC1805` | `IC 1805` |
-| `M31` | `M 31` |
+| Our format    | SIMBAD query format                        |
+| ------------- | ------------------------------------------ |
+| `SH2-240`     | `Sh2-240` (hyphen, not space)              |
+| `LBN873`      | `LBN 873`                                  |
+| `NGC7009`     | `NGC 7009`                                 |
+| `IC1805`      | `IC 1805`                                  |
+| `M31`         | `M 31`                                     |
 | `LPN-Abell36` | `PN A66 36` (avoids galaxy cluster ACO 36) |
-| `vdB107` | `vdB 107` |
+| `vdB107`      | `vdB 107`                                  |
 
 ### Rules when adding new catalog objects
 
@@ -93,7 +95,8 @@ node scripts/add-ratings.mjs
 ### Rating (photographic interest 1–5)
 
 Blended from three sources (weights in parentheses):
-- **Source A** — *The 750 Best DSOs* PDF data (`scripts/data-750-best-dsos.json`) — curated imaging scores (weight 3)
+
+- **Source A** — _The 750 Best DSOs_ PDF data (`scripts/data-750-best-dsos.json`) — curated imaging scores (weight 3)
 - **Source B** — Astrogenerator SQLite DB (`/home/gweybrec/workspace/other/astrogenerator/dbastrogenerator`) — `interet` field 1–4 mapped to 1–5 (weight 2)
 - **Heuristic fallback** — Messier objects get a floor of 3; objects in both A+B use a weighted blend
 
@@ -101,13 +104,13 @@ Blended from three sources (weights in parentheses):
 
 Computed by `computeDifficulty()` in `scripts/add-ratings.mjs`. The scale is intended to reflect practical imaging effort — i.e. how quickly a target shows up in integration and how much total time is needed for a good result:
 
-| Difficulty | Meaning |
-|---|---|
-| 1 | Trivially easy — shows up in seconds (open clusters, globulars, bright nebulae, very bright galaxies) |
-| 2 | Easy — visible in < 1 hour, beginner-friendly |
-| 3 | Moderate — needs 2–4 hours, some technique |
-| 4 | Hard — needs many hours, dark skies, good tracking |
-| 5 | Expert — LSB objects, huge mosaics, requires many nights |
+| Difficulty | Meaning                                                                                               |
+| ---------- | ----------------------------------------------------------------------------------------------------- |
+| 1          | Trivially easy — shows up in seconds (open clusters, globulars, bright nebulae, very bright galaxies) |
+| 2          | Easy — visible in < 1 hour, beginner-friendly                                                         |
+| 3          | Moderate — needs 2–4 hours, some technique                                                            |
+| 4          | Hard — needs many hours, dark skies, good tracking                                                    |
+| 5          | Expert — LSB objects, huge mosaics, requires many nights                                              |
 
 **Galaxy difficulty** uses OpenNGC mean surface brightness (SB, mag/arcsec²) as the primary metric, with two corrections:
 
@@ -119,25 +122,26 @@ Computed by `computeDifficulty()` in `scripts/add-ratings.mjs`. The scale is int
 SB thresholds (after applying the magnitude cap):
 
 | Surface brightness | Raw difficulty |
-|---|---|
-| ≤ 21.0 | 1 |
-| ≤ 22.5 | 2 |
-| ≤ 23.5 | 3 |
-| ≤ 24.5 | 4 |
-| > 24.5 | 5 |
+| ------------------ | -------------- |
+| ≤ 21.0             | 1              |
+| ≤ 22.5             | 2              |
+| ≤ 23.5             | 3              |
+| ≤ 24.5             | 4              |
+| > 24.5             | 5              |
 
 **Non-galaxy difficulty** uses astrogenerator `difficulte` (1–4) as the base, with adjustments:
+
 - Size > 300' → 5 (impossible to image as a single frame)
 - Size > 120' → +1 (low surface brightness from sheer extent)
 - Type RN or DN → +1 (reflection/dark nebulae are harder)
 - Has emission lines → −1 (narrowband filters make it easier)
 - Messier cap at 2 applies here as well
 
-**Key design decision:** difficulty reflects how quickly a target *appears* in an image, not how impressive the final result can be. A galaxy that needs 5 hours to show fine spiral structure but appears in 20 minutes is still difficulty 2.
+**Key design decision:** difficulty reflects how quickly a target _appears_ in an image, not how impressive the final result can be. A galaxy that needs 5 hours to show fine spiral structure but appears in 20 minutes is still difficulty 2.
 
 ### Render priority (spatial spread)
 
-`priority` is an integer **render order** (lower = drawn first) computed by `computeRenderPriority()` in `scripts/add-ratings.mjs`. It is *precomputed* because it is view-independent: the on-map selection at runtime is simply "take the lowest-`priority` objects currently in the viewport, up to the budget" (see [architecture.md → DSO render selection](/dev/architecture.md#dso-render-selection-priority--spread--container-gating)). Baking the spread in here keeps the runtime selection to a sort + slice, with no per-frame spatial computation.
+`priority` is an integer **render order** (lower = drawn first) computed by `computeRenderPriority()` in `scripts/add-ratings.mjs`. It is _precomputed_ because it is view-independent: the on-map selection at runtime is simply "take the lowest-`priority` objects currently in the viewport, up to the budget" (see [architecture.md → DSO render selection](/dev/architecture.md#dso-render-selection-priority--spread--container-gating)). Baking the spread in here keeps the runtime selection to a sort + slice, with no per-frame spatial computation.
 
 **Why it matters:** when zoomed out, dense regions (Orion, Sagittarius) used to consume the whole `maxDSOCount` budget while the rest of the sky stayed empty, and low-interest objects (vdB reflection nebulae, etc.) cluttered the view. `priority` fixes both: high-rating objects come first, and they are spread evenly over the sky.
 
@@ -145,20 +149,20 @@ SB thresholds (after applying the magnitude cap):
 
 1. **Importance** per object = `rating` descending (null → 0), then `mag` ascending. This is what demotes minor objects — vdB and other rating-1/unrated objects rank last.
 2. **Equal-area sky coords** `x = RA/360`, `y = (sin(dec)+1)/2`, so grid cells cover equal solid angle (uniform angular spread).
-3. **Hierarchical grid tiers** — walking objects in importance order, each object claims the coarsest still-free cell from level 0 (whole sky) down to level `PRIORITY_MAX_LEVEL` (= 13, i.e. 2¹³ cells/axis). The level it lands at is its *spread tier*: the most important object in each coarse region surfaces first, finer detail fills in progressively.
-4. **Final `priority`** = sort by `(tier asc, importance asc)`. Any prefix (top-N) is therefore well-distributed over the sky for *any* render budget. O(n·levels), integer cell ops only (~20 ms for 14 k objects).
+3. **Hierarchical grid tiers** — walking objects in importance order, each object claims the coarsest still-free cell from level 0 (whole sky) down to level `PRIORITY_MAX_LEVEL` (= 13, i.e. 2¹³ cells/axis). The level it lands at is its _spread tier_: the most important object in each coarse region surfaces first, finer detail fills in progressively.
+4. **Final `priority`** = sort by `(tier asc, importance asc)`. Any prefix (top-N) is therefore well-distributed over the sky for _any_ render budget. O(n·levels), integer cell ops only (~20 ms for 14 k objects).
 
 To re-tune spread density, adjust `PRIORITY_MAX_LEVEL` (finer = denser allowed clustering) and regenerate.
 
 ### Containment (`containerId`)
 
-`containerId` links a DSO to the **dominant object of its region** — the larger, *more important* DSO whose ellipse encloses it (or `null`). It powers zoom-gated inner objects on the map: a minor inner object (e.g. the NGC knots and M43 inside the Orion Nebula) is hidden until its container renders large enough on screen, so the container stays clean and clickable when zoomed out (the on-screen size gate lives at runtime in `sky-map.ts`, `DSO_CONTAINER_VISIBLE_RADIUS_PX`).
+`containerId` links a DSO to the **dominant object of its region** — the larger, _more important_ DSO whose ellipse encloses it (or `null`). It powers zoom-gated inner objects on the map: a minor inner object (e.g. the NGC knots and M43 inside the Orion Nebula) is hidden until its container renders large enough on screen, so the container stays clean and clickable when zoomed out (the on-screen size gate lives at runtime in `sky-map.ts`, `DSO_CONTAINER_VISIBLE_RADIUS_PX`).
 
 Computed by `computeContainers()` in `scripts/add-ratings.mjs` — it lives there (not `generate-dso.mjs`) because the dominance test needs `rating`:
 
 - **Container candidates** = objects with `majAxis ≥ LARGE_CONTAINER_ARCMIN` (30′), binned into a coarse RA/Dec grid (`CONTAINER_GRID_DEG` = 5°), each inserted into every cell its bounding circle overlaps.
 - For each object, test only the candidates in its cell. A candidate is a valid container only if it is (a) **substantially larger** — `container.majAxis / inner.majAxis ≥ CONTAINER_SIZE_RATIO` (2.5), (b) **strictly more important** — `dsoImportance` (rating, then magnitude) higher than the inner object, and (c) its **ellipse encloses** the inner centre (offset decomposed onto major/minor axes via `pa`). The most important qualifying candidate wins.
-- **Why importance, not just size:** an iconic object that merely overlaps a larger *faint* backdrop must not be hidden behind it. The rule keeps M42 visible (it sits inside Barnard's Loop, rating 3 < M42's 5), M17 visible (inside SH2-45, rating 2), and M11 visible (over a dark nebula), while still gating genuine minor inner objects (NGC1973/5/7, M43) behind their dominant parent (M42). It also removes the need for a maximum-size cap: a genuinely important giant (a future LMC-type object) *should* gate its own clutter. No rating-5 object is ever gated.
+- **Why importance, not just size:** an iconic object that merely overlaps a larger _faint_ backdrop must not be hidden behind it. The rule keeps M42 visible (it sits inside Barnard's Loop, rating 3 < M42's 5), M17 visible (inside SH2-45, rating 2), and M11 visible (over a dark nebula), while still gating genuine minor inner objects (NGC1973/5/7, M43) behind their dominant parent (M42). It also removes the need for a maximum-size cap: a genuinely important giant (a future LMC-type object) _should_ gate its own clutter. No rating-5 object is ever gated.
 
 ---
 
@@ -168,24 +172,24 @@ Computed by `computeContainers()` in `scripts/add-ratings.mjs` — it lives ther
 
 ### Override entry fields
 
-| Field | Type | Purpose |
-|---|---|---|
-| `id` | string | Primary DSO identifier (e.g. `"M31"`, `"NGC6523"`, `"SH2-101"`) |
-| `catalogs` | string[] | All known aliases — used to resolve lookups by secondary IDs |
-| `constellation` | string \| null | Override the constellation assignment |
-| `rating` | number \| null | Override the photographic interest score (1–5) |
-| `difficulty` | number \| null | Override the imaging difficulty score (1–5) |
-| `names.fr` | string | French common name |
-| `names.en` | string | English common name |
-| `names.es` | string | Spanish common name |
-| `names.de` | string | German common name |
-| `type` | string | Override the DSO type code (e.g. `"EN"`, `"RN"`, `"SNR"`) when OpenNGC records it as `"?"` or generic `"Neb"` |
-| `ra` | number | Override right ascension (degrees) — used for SIMBAD-corrected coordinates |
-| `dec` | number | Override declination (degrees) |
-| `majAxis` | number | Override the angular major-axis size (arcmin) — for correcting a wrong/missing diameter |
-| `minAxis` | number | Override the angular minor-axis size (arcmin) |
-| `pa` | number | Override the position angle (degrees, E of celestial north) — OpenNGC leaves this blank (defaults to 0) for most nebulae; derive a real value from a plate-solved photo when the default orientation is visibly wrong |
-| `mag` | number | Override or fill in the apparent magnitude |
+| Field           | Type           | Purpose                                                                                                                                                                                                               |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | string         | Primary DSO identifier (e.g. `"M31"`, `"NGC6523"`, `"SH2-101"`)                                                                                                                                                       |
+| `catalogs`      | string[]       | All known aliases — used to resolve lookups by secondary IDs                                                                                                                                                          |
+| `constellation` | string \| null | Override the constellation assignment                                                                                                                                                                                 |
+| `rating`        | number \| null | Override the photographic interest score (1–5)                                                                                                                                                                        |
+| `difficulty`    | number \| null | Override the imaging difficulty score (1–5)                                                                                                                                                                           |
+| `names.fr`      | string         | French common name                                                                                                                                                                                                    |
+| `names.en`      | string         | English common name                                                                                                                                                                                                   |
+| `names.es`      | string         | Spanish common name                                                                                                                                                                                                   |
+| `names.de`      | string         | German common name                                                                                                                                                                                                    |
+| `type`          | string         | Override the DSO type code (e.g. `"EN"`, `"RN"`, `"SNR"`) when OpenNGC records it as `"?"` or generic `"Neb"`                                                                                                         |
+| `ra`            | number         | Override right ascension (degrees) — used for SIMBAD-corrected coordinates                                                                                                                                            |
+| `dec`           | number         | Override declination (degrees)                                                                                                                                                                                        |
+| `majAxis`       | number         | Override the angular major-axis size (arcmin) — for correcting a wrong/missing diameter                                                                                                                               |
+| `minAxis`       | number         | Override the angular minor-axis size (arcmin)                                                                                                                                                                         |
+| `pa`            | number         | Override the position angle (degrees, E of celestial north) — OpenNGC leaves this blank (defaults to 0) for most nebulae; derive a real value from a plate-solved photo when the default orientation is visibly wrong |
+| `mag`           | number         | Override or fill in the apparent magnitude                                                                                                                                                                            |
 
 All fields except `id` and `catalogs` are optional. `applyMetadataOverrides()` only writes non-null values, so omitting a field leaves the source-catalog value intact.
 
@@ -209,15 +213,15 @@ Two one-shot scripts were used to populate the file from previously hardcoded da
 
 ### Why SH2_DATA stays in generate-dso.mjs
 
-`SH2_DATA` is a *primary source catalog*, not an override. It defines the existence of Sharpless H-II region objects that do not appear in any downloadable machine-readable catalog used by the pipeline. `dso-metadata-overrides.json` can only override fields on objects that already exist — it cannot create new objects. SH2 object names and coordinates come from Sharpless 1959 (ApJS 4, 257) with SIMBAD corrections applied via `scripts/fix-sh2-coords.mjs`.
+`SH2_DATA` is a _primary source catalog_, not an override. It defines the existence of Sharpless H-II region objects that do not appear in any downloadable machine-readable catalog used by the pipeline. `dso-metadata-overrides.json` can only override fields on objects that already exist — it cannot create new objects. SH2 object names and coordinates come from Sharpless 1959 (ApJS 4, 257) with SIMBAD corrections applied via `scripts/fix-sh2-coords.mjs`.
 
 ### SH2 angular sizes — sourced from Sharpless VII/20
 
-The hand-entered `majAxis` values in `SH2_DATA` diverged from the authoritative Sharpless diameters for ~113 of ~313 entries (in *both* directions — some 10× too small, some 10× too big, including default `10′` placeholders). The pipeline now corrects these: in Step 5 it loads **`scripts/sharpless-diam.json`** (`SHARPLESS_DIAM`, the `Diam` column of Vizier `VII/20`) and, when a hand value diverges from Sharpless by **>3×**, substitutes the Sharpless diameter. Values already within 3× are left untouched.
+The hand-entered `majAxis` values in `SH2_DATA` diverged from the authoritative Sharpless diameters for ~113 of ~313 entries (in _both_ directions — some 10× too small, some 10× too big, including default `10′` placeholders). The pipeline now corrects these: in Step 5 it loads **`scripts/sharpless-diam.json`** (`SHARPLESS_DIAM`, the `Diam` column of Vizier `VII/20`) and, when a hand value diverges from Sharpless by **>3×**, substitutes the Sharpless diameter. Values already within 3× are left untouched.
 
 Per-object exceptions are corrected with a **`majAxis`/`minAxis` override** in `dso-metadata-overrides.json` (these fields are now supported by `applyMetadataOverrides`): SH2-312 → 720′×180′, NGC 7822 / SH2-171 region → 180′, IC 1805 / Heart → 150′, NGC 6357 / SH2-11 region → 90′.
 
-> **Caution — `SH2_DATA`'s 5th field is unused and unreliable.** It holds a stray French label that the pipeline does **not** read (display names come from the overrides file). Several are wrong; do not promote one into a real name without verifying. Notably **SH2-147 is *not* Simeis 147** — it is a small (~2′) HII region in Cepheus. Simeis 147 / the Spaghetti Nebula is **SH2-240** (SNR G180.0-01.7), which is named and sized correctly via its own override.
+> **Caution — `SH2_DATA`'s 5th field is unused and unreliable.** It holds a stray French label that the pipeline does **not** read (display names come from the overrides file). Several are wrong; do not promote one into a real name without verifying. Notably **SH2-147 is _not_ Simeis 147** — it is a small (~2′) HII region in Cepheus. Simeis 147 / the Spaghetti Nebula is **SH2-240** (SNR G180.0-01.7), which is named and sized correctly via its own override.
 
 Regenerate `sharpless-diam.json`: `SELECT "Sh2", Diam FROM "VII/20/catalog"` on the Vizier TAP service (`tapvizier.cds.unistra.fr`), written as `{ "<n>": <diam>, ... }`.
 
@@ -227,7 +231,7 @@ Regenerate `sharpless-diam.json`: `SELECT "Sh2", Diam FROM "VII/20/catalog"` on 
 >
 > Note: the **Heart Nebula is IC 1805 / SH2-190** (SH2-198 is a small separate region near the Soul Nebula, not the Heart — an earlier mislabel that has been corrected), and there is no "Starfish Nebula" (vestigial bad name, removed). **Sh2-142 is the Wizard Nebula, not "Spider Nebula"** (a mislabel that was in the override file — corrected).
 >
-> **Alias-collision hazard:** `loadMetadataOverrides()` indexes every override entry by *each* of its own `catalogs[]` strings, last-write-wins. If object A's override entry lists object B's own id as one of its aliases (a copy-paste mistake), A's entry silently replaces B's in the lookup map — B's row then renders with A's name/size/rating instead of its own. This exact bug was found and fixed for **NGC 896 / IC 1805** (NGC 896 had wrongly claimed "IC1805" as its own alias, so the real IC 1805/Heart Nebula row was showing NGC 896's data — no name, wrong size, wrong rating). When adding or editing an override entry's `catalogs[]`, don't include another real object's own id unless they are in fact the same object (and if so, prefer registering the merge in `SH2_ALIASES`/`VDB_ALIASES`/etc. instead of hand-listing the alias).
+> **Alias-collision hazard:** `loadMetadataOverrides()` indexes every override entry by _each_ of its own `catalogs[]` strings, last-write-wins. If object A's override entry lists object B's own id as one of its aliases (a copy-paste mistake), A's entry silently replaces B's in the lookup map — B's row then renders with A's name/size/rating instead of its own. This exact bug was found and fixed for **NGC 896 / IC 1805** (NGC 896 had wrongly claimed "IC1805" as its own alias, so the real IC 1805/Heart Nebula row was showing NGC 896's data — no name, wrong size, wrong rating). When adding or editing an override entry's `catalogs[]`, don't include another real object's own id unless they are in fact the same object (and if so, prefer registering the merge in `SH2_ALIASES`/`VDB_ALIASES`/etc. instead of hand-listing the alias).
 >
 > **NGC 1499's position angle** was blank in OpenNGC (defaults to 0°, drawing the ellipse north-south), but the real nebula runs diagonally. Measured PA≈120° (E of N) from a user's plate-solved photo — see `pa` override above.
 
@@ -235,7 +239,7 @@ Regenerate `sharpless-diam.json`: `SELECT "Sh2", Diam FROM "VII/20/catalog"` on 
 
 The VII/21 van den Bergh (1966) catalog has **no NGC/IC column** and gives only galactic coordinates at 0.1° (~6′) precision, marking each nebula's **illuminating star**. The pipeline therefore handles vdB specially in `generate-dso.mjs`:
 
-- **`VDB_ALIASES`** — a curated map of vdB number → existing NGC/IC/M/SH2/LBN id, for nebulae that are the same physical object but were not auto-matched (OpenNGC's `Identifiers` column omits the vdB id). Each merged vdB id is appended to the target row's `catalogs[]` and its standalone row is suppressed, so it inherits the target's precise position. Distinct objects merely *near* a cluster (vdB 23 ≈ M45, vdB 6 ≈ NGC 654) are intentionally **not** merged. Every mapping was verified against SIMBAD.
+- **`VDB_ALIASES`** — a curated map of vdB number → existing NGC/IC/M/SH2/LBN id, for nebulae that are the same physical object but were not auto-matched (OpenNGC's `Identifiers` column omits the vdB id). Each merged vdB id is appended to the target row's `catalogs[]` and its standalone row is suppressed, so it inherits the target's precise position. Distinct objects merely _near_ a cluster (vdB 23 ≈ M45, vdB 6 ≈ NGC 654) are intentionally **not** merged. Every mapping was verified against SIMBAD.
 - **`scripts/vdb-coords.json`** (`VDB_COORDS`) — authoritative ICRS J2000 positions for standalone vdB rows, resolved from SIMBAD by illuminating star, replacing the coarse galactic→equatorial conversion (which was up to ~8′ off and skipped B1950→J2000 precession). Missing numbers fall back to the conversion.
 
 Regenerate `vdb-coords.json` from SIMBAD's TAP service:

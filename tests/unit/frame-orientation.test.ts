@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { paToCanvasRotationDeg, canvasRotationToPaDeg, formatPaDeg } from '../../src/frame-orientation';
+import {
+  paToCanvasRotationDeg,
+  canvasRotationToPaDeg,
+  formatPaDeg,
+} from '../../src/frame-orientation';
 
 /** Smallest signed difference between two angles, in (-180, 180]. */
 function angDiff(a: number, b: number): number {

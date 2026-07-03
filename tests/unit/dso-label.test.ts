@@ -3,7 +3,17 @@ import { isMessier, formatDsoLabel, dsoLabelVisible } from '../../src/dso-label'
 import type { DSO } from '../../src/types';
 
 function dso(id: string, over: Partial<DSO> = {}): DSO {
-  return { id, ra: 0, dec: 0, mag: 8, majAxis: 10, minAxis: 10, pa: 0, type: 'Gx', ...over } as unknown as DSO;
+  return {
+    id,
+    ra: 0,
+    dec: 0,
+    mag: 8,
+    majAxis: 10,
+    minAxis: 10,
+    pa: 0,
+    type: 'Gx',
+    ...over,
+  } as unknown as DSO;
 }
 
 describe('isMessier', () => {

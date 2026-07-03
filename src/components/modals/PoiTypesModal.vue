@@ -2,10 +2,7 @@
   <Teleport to="body">
     <!-- modal-backdrop (so it suppresses sky tooltips like every other modal); the
          !z override keeps it above the gallery meta-editor overlay (z-index 12000). -->
-    <div
-      class="modal-backdrop !z-[13000]"
-      @click.self="requestClose"
-    >
+    <div class="modal-backdrop !z-[13000]" @click.self="requestClose">
       <div class="modal" @click.stop>
         <div class="modal-header">
           <h2>{{ t('poi.typesTitle') }}</h2>
@@ -15,7 +12,9 @@
         <div class="modal-body modal-form-body--scroll">
           <p class="text-muted text-base mb-3">{{ t('poi.typesHint') }}</p>
 
-          <div v-if="draft.length === 0" class="px-6 py-3 text-muted text-base">{{ t('poi.noTypes') }}</div>
+          <div v-if="draft.length === 0" class="px-6 py-3 text-muted text-base">
+            {{ t('poi.noTypes') }}
+          </div>
 
           <div v-for="(cat, idx) in draft" :key="cat.id" class="flex items-center gap-2 mb-2">
             <span
@@ -55,11 +54,15 @@
               @keydown.enter.prevent="addType"
             />
           </div>
-          <button type="button" class="integration-add-btn" @click="addType">{{ t('poi.addType') }}</button>
+          <button type="button" class="integration-add-btn" @click="addType">
+            {{ t('poi.addType') }}
+          </button>
         </div>
 
         <div class="modal-footer">
-          <button class="btn-confirm" :disabled="saving" @click="save">{{ saving ? '…' : t('gallery.saveMetadata') }}</button>
+          <button class="btn-confirm" :disabled="saving" @click="save">
+            {{ saving ? '…' : t('gallery.saveMetadata') }}
+          </button>
         </div>
       </div>
     </div>
@@ -80,7 +83,13 @@ const emit = defineEmits<{ close: [] }>();
 
 const store = usePoiCategoriesStore();
 
-interface DraftType { id: string; name: string; color: string; position: number; isNew?: boolean }
+interface DraftType {
+  id: string;
+  name: string;
+  color: string;
+  position: number;
+  isNew?: boolean;
+}
 
 const draft = ref<DraftType[]>([]);
 let original = '';
@@ -91,12 +100,19 @@ const newColor = ref('#4ea1ff');
 const saving = ref(false);
 
 function snapshot(list: DraftType[]): string {
-  return JSON.stringify(list.map(c => ({ id: c.isNew ? 'new' : c.id, name: c.name.trim(), color: c.color })));
+  return JSON.stringify(
+    list.map((c) => ({ id: c.isNew ? 'new' : c.id, name: c.name.trim(), color: c.color })),
+  );
 }
 
 onMounted(async () => {
   await store.ensureLoaded();
-  draft.value = store.categories.map(c => ({ id: c.id, name: c.name, color: c.color, position: c.position }));
+  draft.value = store.categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    color: c.color,
+    position: c.position,
+  }));
   original = snapshot(draft.value);
 });
 
@@ -105,7 +121,13 @@ const dirty = computed(() => snapshot(draft.value) !== original);
 function addType() {
   const name = newName.value.trim();
   if (!name) return;
-  draft.value.push({ id: `tmp-${++tmpCounter}`, name, color: newColor.value, position: draft.value.length, isNew: true });
+  draft.value.push({
+    id: `tmp-${++tmpCounter}`,
+    name,
+    color: newColor.value,
+    position: draft.value.length,
+    isNew: true,
+  });
   newName.value = '';
 }
 
@@ -122,7 +144,7 @@ async function save() {
   saving.value = true;
   try {
     const existing = store.categories;
-    const keptIds = new Set(draft.value.filter(d => !d.isNew).map(d => d.id));
+    const keptIds = new Set(draft.value.filter((d) => !d.isNew).map((d) => d.id));
     // Deletions: original types no longer present in the draft.
     for (const c of existing) {
       if (!keptIds.has(c.id)) await deletePoiCategoryAPI(c.id);
@@ -134,7 +156,7 @@ async function save() {
       if (d.isNew) {
         await createPoiCategory({ name, color: d.color });
       } else {
-        const o = existing.find(c => c.id === d.id);
+        const o = existing.find((c) => c.id === d.id);
         if (o && (o.name !== name || o.color !== d.color)) {
           await updatePoiCategory(d.id, { name, color: d.color });
         }

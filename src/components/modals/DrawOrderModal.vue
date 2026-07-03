@@ -74,23 +74,21 @@ const filteredIds = computed(() => {
   if (!overlay || !skyMap) return new Set<string>();
   const quads = overlay.getPhotoCanvasQuads(skyMap.getView());
   const filtered = filterDrawOrderPhotos(
-    displayOrder.value.map(p => p.photo),
+    displayOrder.value.map((p) => p.photo),
     filterQuery.value,
     overlapOnly.value,
     props.photoId,
     quads,
   );
-  return new Set(filtered.map(p => p.id));
+  return new Set(filtered.map((p) => p.id));
 });
 
 const visibleItems = computed(() =>
-  displayOrder.value
-    .filter(p => filteredIds.value.has(p.photo.id))
-    .map(p => p.photo),
+  displayOrder.value.filter((p) => filteredIds.value.has(p.photo.id)).map((p) => p.photo),
 );
 
 const photoName = computed(() => {
-  const placed = photosStore.placedPhotos.find(p => p.photo.id === props.photoId);
+  const placed = photosStore.placedPhotos.find((p) => p.photo.id === props.photoId);
   return placed?.photo.originalName ?? '';
 });
 
@@ -179,7 +177,7 @@ function onMouseUp() {
   const items = Array.from(listEl.value.querySelectorAll('.zorder-item, .zorder-placeholder'));
   const displayIdx = items.indexOf(placeholderEl);
   const movedId = dragPhotoId!;
-  const visibleIds = visibleItems.value.map(p => p.id);
+  const visibleIds = visibleItems.value.map((p) => p.id);
   const fromIdx = visibleIds.indexOf(movedId);
 
   dragEl.classList.remove('zorder-dragging');
@@ -203,10 +201,10 @@ function onMouseUp() {
   nextVisibleIds.splice(fromIdx, 1);
   nextVisibleIds.splice(displayIdx, 0, movedId);
 
-  const displayById = new Map(displayOrder.value.map(p => [p.photo.id, p]));
+  const displayById = new Map(displayOrder.value.map((p) => [p.photo.id, p]));
   const filtered = filteredIds.value;
   let visibleIdx = 0;
-  const mergedDisplay = displayOrder.value.map(p => {
+  const mergedDisplay = displayOrder.value.map((p) => {
     if (!filtered.has(p.photo.id)) return p;
     const nextId = nextVisibleIds[visibleIdx++];
     return displayById.get(nextId) ?? p;
@@ -214,9 +212,9 @@ function onMouseUp() {
 
   const overlay = canvasStore.overlay;
   if (overlay) {
-    overlay.setPhotoOrder(mergedDisplay.reverse().map(p => p.photo.id));
+    overlay.setPhotoOrder(mergedDisplay.reverse().map((p) => p.photo.id));
     photosStore.syncFromOverlay();
-    const ids = overlay.getPlacedPhotos().map(p => p.photo.id);
+    const ids = overlay.getPlacedPhotos().map((p) => p.photo.id);
     void updatePhotoOrder(ids).catch(() => {
       showToast({ message: t('errors.updatePhoto'), type: 'error', duration: 3500 });
     });
@@ -235,16 +233,23 @@ function stopAutoScroll() {
 }
 
 function stepAutoScroll() {
-  if (!dragEl || !placeholderEl || !listEl.value) { dragAutoScrollRaf = null; return; }
+  if (!dragEl || !placeholderEl || !listEl.value) {
+    dragAutoScrollRaf = null;
+    return;
+  }
   const listRect = listEl.value.getBoundingClientRect();
   const topEdge = listRect.top + AUTO_SCROLL_EDGE_PX;
   const bottomEdge = listRect.bottom - AUTO_SCROLL_EDGE_PX;
   let delta = 0;
 
   if (dragLastClientY < topEdge) {
-    delta = -Math.ceil(AUTO_SCROLL_MAX_STEP * Math.min(1, (topEdge - dragLastClientY) / AUTO_SCROLL_EDGE_PX));
+    delta = -Math.ceil(
+      AUTO_SCROLL_MAX_STEP * Math.min(1, (topEdge - dragLastClientY) / AUTO_SCROLL_EDGE_PX),
+    );
   } else if (dragLastClientY > bottomEdge) {
-    delta = Math.ceil(AUTO_SCROLL_MAX_STEP * Math.min(1, (dragLastClientY - bottomEdge) / AUTO_SCROLL_EDGE_PX));
+    delta = Math.ceil(
+      AUTO_SCROLL_MAX_STEP * Math.min(1, (dragLastClientY - bottomEdge) / AUTO_SCROLL_EDGE_PX),
+    );
   }
 
   if (delta !== 0 && listEl.value) {

@@ -40,14 +40,16 @@ describe('Gallery', () => {
       </div>
     `;
 
-    mockBuildMetadataEditorPanel.mockImplementation((container: HTMLElement, photo: Photo, onSave: (p: Photo) => void) => {
-      const btn = document.createElement('button');
-      btn.className = 'mock-metadata-save';
-      btn.textContent = 'save-meta';
-      btn.addEventListener('click', () => onSave({ ...photo, notes: 'updated via metadata' }));
-      container.appendChild(btn);
-      return { teardown: vi.fn() };
-    });
+    mockBuildMetadataEditorPanel.mockImplementation(
+      (container: HTMLElement, photo: Photo, onSave: (p: Photo) => void) => {
+        const btn = document.createElement('button');
+        btn.className = 'mock-metadata-save';
+        btn.textContent = 'save-meta';
+        btn.addEventListener('click', () => onSave({ ...photo, notes: 'updated via metadata' }));
+        container.appendChild(btn);
+        return { teardown: vi.fn() };
+      },
+    );
   });
 
   it('show/hide toggles container visibility', () => {
@@ -69,7 +71,9 @@ describe('Gallery', () => {
       makePhoto({ id: 'c', originalName: 'M31', filename: 'c.jpg' }),
     ]);
 
-    const names = Array.from(document.querySelectorAll('.gallery-item-name')).map((n) => n.textContent);
+    const names = Array.from(document.querySelectorAll('.gallery-item-name')).map(
+      (n) => n.textContent,
+    );
     expect(names).toEqual(['M2', 'M31', 'M100']);
   });
 
@@ -85,8 +89,22 @@ describe('Gallery', () => {
   it('filters by search query against filename, dsoIds, labels, and notes', () => {
     const gallery = new Gallery();
     gallery.loadPhotos([
-      makePhoto({ id: 'a', originalName: 'M42 Orion', filename: 'a.jpg', dsoIds: ['M42'], labels: ['nebula'], notes: 'great target' }),
-      makePhoto({ id: 'b', originalName: 'NGC7000', filename: 'b.jpg', dsoIds: ['NGC7000'], labels: ['widefield'], notes: 'summer' }),
+      makePhoto({
+        id: 'a',
+        originalName: 'M42 Orion',
+        filename: 'a.jpg',
+        dsoIds: ['M42'],
+        labels: ['nebula'],
+        notes: 'great target',
+      }),
+      makePhoto({
+        id: 'b',
+        originalName: 'NGC7000',
+        filename: 'b.jpg',
+        dsoIds: ['NGC7000'],
+        labels: ['widefield'],
+        notes: 'summer',
+      }),
     ]);
 
     gallery.setSearchQuery('orion');
@@ -288,7 +306,9 @@ describe('Gallery', () => {
     // Add 'galaxy' → M42 + M31 shown
     gallery.setLabelFilter(['nebula', 'galaxy']);
     expect(document.querySelectorAll('.gallery-item').length).toBe(2);
-    const visibleNames = Array.from(document.querySelectorAll('.gallery-item-name')).map(n => n.textContent);
+    const visibleNames = Array.from(document.querySelectorAll('.gallery-item-name')).map(
+      (n) => n.textContent,
+    );
     expect(visibleNames).toContain('M42');
     expect(visibleNames).toContain('M31');
 
@@ -308,8 +328,18 @@ describe('Gallery', () => {
       { id: 'cat-asteroid', name: 'Asteroid', color: '#222', position: 1 },
     ]);
     gallery.loadPhotos([
-      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }] }),
-      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg', pointsOfInterest: [{ name: 'Vesta', categoryId: 'cat-asteroid' }] }),
+      makePhoto({
+        id: 'a',
+        originalName: 'M42',
+        filename: 'a.jpg',
+        pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
+      }),
+      makePhoto({
+        id: 'b',
+        originalName: 'M31',
+        filename: 'b.jpg',
+        pointsOfInterest: [{ name: 'Vesta', categoryId: 'cat-asteroid' }],
+      }),
       makePhoto({ id: 'c', originalName: 'NGC7000', filename: 'c.jpg', pointsOfInterest: [] }),
     ]);
 
@@ -336,7 +366,14 @@ describe('Gallery', () => {
     gallery.setPoiCategories([{ id: 'cat-comet', name: 'Comet', color: '#111', position: 0 }]);
     // No dsoIds, no labels — only a POI. The chip must still render.
     gallery.loadPhotos([
-      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', dsoIds: [], labels: [], pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }] }),
+      makePhoto({
+        id: 'a',
+        originalName: 'M42',
+        filename: 'a.jpg',
+        dsoIds: [],
+        labels: [],
+        pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
+      }),
     ]);
 
     const chips = document.querySelectorAll('.gallery-item .poi-chip');
@@ -346,7 +383,12 @@ describe('Gallery', () => {
 
   it('new labels from metadata edits do not auto-join an active filter (opt-in model)', () => {
     const gallery = new Gallery();
-    const photo = makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', labels: ['nebula'] });
+    const photo = makePhoto({
+      id: 'a',
+      originalName: 'M42',
+      filename: 'a.jpg',
+      labels: ['nebula'],
+    });
     gallery.loadPhotos([photo]);
 
     // Active filter: only 'nebula' selected
@@ -362,7 +404,12 @@ describe('Gallery', () => {
 
     // The filter was NOT expanded to include 'deepsky' automatically
     // (a separate photo with only 'deepsky' would be hidden)
-    const photo2 = makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg', labels: ['deepsky'] });
+    const photo2 = makePhoto({
+      id: 'b',
+      originalName: 'M31',
+      filename: 'b.jpg',
+      labels: ['deepsky'],
+    });
     gallery['photos'].push(photo2);
     gallery['applyFilters']();
     expect(document.querySelectorAll('.gallery-item').length).toBe(1);
@@ -463,7 +510,9 @@ describe('Gallery', () => {
     gallery.loadPhotos([makePhoto({ id: 'a', filename: 'a.jpg', originalName: 'M42' })]);
 
     // Simulate onload for the first render
-    (document.querySelector('.gallery-item img') as HTMLImageElement).dispatchEvent(new Event('load'));
+    (document.querySelector('.gallery-item img') as HTMLImageElement).dispatchEvent(
+      new Event('load'),
+    );
     expect(document.querySelectorAll('.gallery-img-placeholder').length).toBe(0);
 
     // Re-render by applying a filter and clearing it
@@ -472,21 +521,28 @@ describe('Gallery', () => {
 
     // New render creates new shells — one placeholder per item, none carried over
     expect(document.querySelectorAll('.gallery-img-placeholder').length).toBe(1);
-    expect((document.querySelector('.gallery-item img') as HTMLImageElement).style.visibility).toBe('hidden');
+    expect((document.querySelector('.gallery-item img') as HTMLImageElement).style.visibility).toBe(
+      'hidden',
+    );
   });
 
   // ── Carousel auto-advance timer ───────────────────────────────────────────
 
   describe('carousel auto-advance timer', () => {
-    beforeEach(() => { vi.useFakeTimers(); });
-    afterEach(() => { vi.useRealTimers(); });
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
     const twoPhotos = () => [
       makePhoto({ id: 'a', filename: 'a.jpg', originalName: 'M42' }),
       makePhoto({ id: 'b', filename: 'b.jpg', originalName: 'M31' }),
     ];
 
-    const counterText = () => document.querySelector('.gallery-carousel-counter')?.textContent ?? '';
+    const counterText = () =>
+      document.querySelector('.gallery-carousel-counter')?.textContent ?? '';
 
     it('advances carousel after 20s when gallery is shown', () => {
       const gallery = new Gallery();

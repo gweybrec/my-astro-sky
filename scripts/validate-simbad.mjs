@@ -55,10 +55,17 @@ const row = (r) => ({
 let targets = dsoJson.data.map(row);
 
 switch (scope) {
-  case 'named': targets = targets.filter(t => t.nameEn); break;
-  case 'sh2':   targets = targets.filter(t => t.id.startsWith('SH2-')); break;
-  case 'lbn':   targets = targets.filter(t => t.id.startsWith('LBN')); break;
-  case 'all':   break;
+  case 'named':
+    targets = targets.filter((t) => t.nameEn);
+    break;
+  case 'sh2':
+    targets = targets.filter((t) => t.id.startsWith('SH2-'));
+    break;
+  case 'lbn':
+    targets = targets.filter((t) => t.id.startsWith('LBN'));
+    break;
+  case 'all':
+    break;
   default:
     console.error(`Unknown scope: ${scope}. Use named|sh2|lbn|all`);
     process.exit(1);
@@ -74,23 +81,23 @@ console.log('─'.repeat(70));
 // Some normalisation helps hit rate.
 function toSimbadId(id) {
   // SH2-240  → Sh2-240  (SIMBAD requires hyphen, not space)
-  if (/^SH2-/i.test(id))  return 'Sh2-' + id.slice(4);
+  if (/^SH2-/i.test(id)) return 'Sh2-' + id.slice(4);
   // LBN873   → LBN 873
-  if (/^LBN\d/.test(id))  return 'LBN ' + id.slice(3);
+  if (/^LBN\d/.test(id)) return 'LBN ' + id.slice(3);
   // LDN846   → LDN 846
-  if (/^LDN\d/.test(id))  return 'LDN ' + id.slice(3);
+  if (/^LDN\d/.test(id)) return 'LDN ' + id.slice(3);
   // vdB107   → vdB 107
-  if (/^vdB\d/.test(id))  return 'vdB ' + id.slice(3);
+  if (/^vdB\d/.test(id)) return 'vdB ' + id.slice(3);
   // NGC7009  → NGC 7009
-  if (/^NGC\d/.test(id))  return 'NGC ' + id.slice(3);
+  if (/^NGC\d/.test(id)) return 'NGC ' + id.slice(3);
   // IC1805   → IC 1805
-  if (/^IC\d/.test(id))   return 'IC ' + id.slice(2);
+  if (/^IC\d/.test(id)) return 'IC ' + id.slice(2);
   // M31      → M 31
-  if (/^M\d/.test(id))    return 'M ' + id.slice(1);
+  if (/^M\d/.test(id)) return 'M ' + id.slice(1);
   // LPN-Abell36 → PN A66 36  (avoids hitting galaxy clusters ACO N)
   if (/^LPN-Abell(\d+)$/.test(id)) return 'PN A66 ' + id.slice(9);
   // LPN-Sh2216  → Sh2-216
-  if (/^LPN-Sh2(\d+)$/.test(id))   return 'Sh2-' + id.slice(7);
+  if (/^LPN-Sh2(\d+)$/.test(id)) return 'Sh2-' + id.slice(7);
   // LPN-XXX — strip prefix and insert space before trailing number
   if (/^LPN-/.test(id)) {
     const name = id.slice(4);
@@ -115,11 +122,14 @@ function httpGet(urlStr) {
     };
     const req = https.request(options, (res) => {
       let body = '';
-      res.on('data', d => body += d);
+      res.on('data', (d) => (body += d));
       res.on('end', () => resolve(body));
     });
     req.on('error', reject);
-    req.setTimeout(30000, () => { req.destroy(); reject(new Error('timeout')); });
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error('timeout'));
+    });
     req.end();
   });
 }
@@ -157,16 +167,19 @@ async function querySimbadByName(name) {
 
 // ── Angular separation ────────────────────────────────────────────────────────
 function angSep(ra1, dec1, ra2, dec2) {
-  const toRad = d => d * Math.PI / 180;
-  const d1 = toRad(dec1), d2 = toRad(dec2);
+  const toRad = (d) => (d * Math.PI) / 180;
+  const d1 = toRad(dec1),
+    d2 = toRad(dec2);
   const dra = toRad(ra2 - ra1);
-  const cos = Math.sin(d1)*Math.sin(d2) + Math.cos(d1)*Math.cos(d2)*Math.cos(dra);
-  return Math.acos(Math.min(1, Math.max(-1, cos))) * 180 / Math.PI;
+  const cos = Math.sin(d1) * Math.sin(d2) + Math.cos(d1) * Math.cos(d2) * Math.cos(dra);
+  return (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI;
 }
 
 // ── Rate-limited queue ────────────────────────────────────────────────────────
 const DELAY_MS = 500; // 2 requests/sec — respectful to SIMBAD
-async function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+async function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 // ── Main validation loop ──────────────────────────────────────────────────────
 const issues = [];
@@ -182,7 +195,12 @@ for (const t of targets) {
 
   if (!result) {
     process.stdout.write('NOT FOUND\n');
-    issues.push({ id: t.id, type: 'not_found', simbadId, note: 'SIMBAD does not recognise this identifier' });
+    issues.push({
+      id: t.id,
+      type: 'not_found',
+      simbadId,
+      note: 'SIMBAD does not recognise this identifier',
+    });
     continue;
   }
 
@@ -198,7 +216,9 @@ for (const t of targets) {
   if (result.ra != null && result.dec != null) {
     const sep = angSep(t.ra, t.dec, result.ra, result.dec);
     if (sep > degThreshold) {
-      flags.push(`coord_drift: our (${t.ra.toFixed(3)}, ${t.dec.toFixed(3)}) vs SIMBAD (${Number(result.ra).toFixed(3)}, ${Number(result.dec).toFixed(3)}) — sep=${sep.toFixed(2)}°`);
+      flags.push(
+        `coord_drift: our (${t.ra.toFixed(3)}, ${t.dec.toFixed(3)}) vs SIMBAD (${Number(result.ra).toFixed(3)}, ${Number(result.dec).toFixed(3)}) — sep=${sep.toFixed(2)}°`,
+      );
     }
   }
 
@@ -206,24 +226,37 @@ for (const t of targets) {
   //    Strip common generic prefixes + trailing catalog IDs, then check the core name.
   if (t.nameEn) {
     const GENERIC_PREFIXES = [
-      'open cluster', 'globular cluster', 'spiral galaxy', 'elliptical galaxy',
-      'dwarf elliptical galaxy', 'reflection nebula', 'emission nebula',
-      'planetary nebula', 'asterism', 'galaxy cluster',
+      'open cluster',
+      'globular cluster',
+      'spiral galaxy',
+      'elliptical galaxy',
+      'dwarf elliptical galaxy',
+      'reflection nebula',
+      'emission nebula',
+      'planetary nebula',
+      'asterism',
+      'galaxy cluster',
     ];
     let coreName = t.nameEn.toLowerCase();
-    GENERIC_PREFIXES.forEach(p => { if (coreName.startsWith(p)) coreName = coreName.slice(p.length).trim(); });
+    GENERIC_PREFIXES.forEach((p) => {
+      if (coreName.startsWith(p)) coreName = coreName.slice(p.length).trim();
+    });
     // Strip trailing catalog ID (e.g. "m47", "ngc1234", "ic5146")
     coreName = coreName.replace(/\s+(m\s*\d+|ngc\s*\d+|ic\s*\d+|sh2-\d+|lbn\s*\d+)$/i, '').trim();
 
     // Only check if a non-trivial distinctive name remains
     if (coreName.length > 3 && !/^[a-z]?\d+$/.test(coreName)) {
-      const simbadNames = (result.ids || '').split('|').map(s => s.trim().toLowerCase());
+      const simbadNames = (result.ids || '').split('|').map((s) => s.trim().toLowerCase());
       // Check all SIMBAD ids + the raw simbad "name XXX" entries
-      const nameFound = simbadNames.some(n => n.includes(coreName) || coreName.includes(n.replace(/^name\s+/, '')));
+      const nameFound = simbadNames.some(
+        (n) => n.includes(coreName) || coreName.includes(n.replace(/^name\s+/, '')),
+      );
       if (!nameFound) {
         const mainIdLower = (result.main_id || '').toLowerCase();
         if (!mainIdLower.includes(coreName)) {
-          flags.push(`name_mismatch: core name "${coreName}" (from nameEn="${t.nameEn}") not found in SIMBAD ids for ${result.main_id}`);
+          flags.push(
+            `name_mismatch: core name "${coreName}" (from nameEn="${t.nameEn}") not found in SIMBAD ids for ${result.main_id}`,
+          );
         }
       }
     }
@@ -234,22 +267,35 @@ for (const t of targets) {
   const simbadMainLower = (result.main_id || '').toLowerCase();
   const ourIdLower = simbadId.toLowerCase();
   // Check each of our catalog IDs against SIMBAD's ids
-  const simbadIdSet = new Set((result.ids || '').split('|').map(s => s.trim().toLowerCase().replace(/\s+/g, '')));
+  const simbadIdSet = new Set(
+    (result.ids || '').split('|').map((s) => s.trim().toLowerCase().replace(/\s+/g, '')),
+  );
   for (const cat of t.catalogs) {
     const normCat = cat.toLowerCase().replace(/\s+/g, '');
     const normSimbad = toSimbadId(cat).toLowerCase().replace(/\s+/g, '');
     if (!simbadIdSet.has(normCat) && !simbadIdSet.has(normSimbad)) {
       // Catalog ID we claim but SIMBAD doesn't list for this object
-      if (cat !== t.id) { // skip the primary id itself (already looked it up)
-        flags.push(`catalog_id_missing: we list "${cat}" as an alias, but SIMBAD does not associate it with ${result.main_id}`);
+      if (cat !== t.id) {
+        // skip the primary id itself (already looked it up)
+        flags.push(
+          `catalog_id_missing: we list "${cat}" as an alias, but SIMBAD does not associate it with ${result.main_id}`,
+        );
       }
     }
   }
 
   if (flags.length > 0) {
     process.stdout.write(`⚠ ${flags.length} issue(s)\n`);
-    flags.forEach(f => process.stdout.write(`       → ${f}\n`));
-    issues.push({ id: t.id, simbadId, simbadMainId: result.main_id, ourCoords: [t.ra, t.dec], simbadCoords: [result.ra, result.dec], ourNameEn: t.nameEn, flags });
+    flags.forEach((f) => process.stdout.write(`       → ${f}\n`));
+    issues.push({
+      id: t.id,
+      simbadId,
+      simbadMainId: result.main_id,
+      ourCoords: [t.ra, t.dec],
+      simbadCoords: [result.ra, result.dec],
+      ourNameEn: t.nameEn,
+      flags,
+    });
   } else {
     process.stdout.write(`OK (${result.main_id})\n`);
   }
@@ -261,16 +307,23 @@ console.log('\n' + '─'.repeat(70));
 console.log('Phase 2: checking proper names resolve to the expected object in SIMBAD...');
 console.log('─'.repeat(70));
 
-const namedTargets = targets.filter(t => {
+const namedTargets = targets.filter((t) => {
   if (!t.nameEn) return false;
   // Skip generic descriptive labels — only query distinctive proper names
   const GENERIC_PREFIXES = [
-    'open cluster', 'globular cluster', 'spiral galaxy', 'elliptical galaxy',
-    'dwarf elliptical galaxy', 'reflection nebula', 'emission nebula',
-    'planetary nebula', 'asterism', 'galaxy cluster',
+    'open cluster',
+    'globular cluster',
+    'spiral galaxy',
+    'elliptical galaxy',
+    'dwarf elliptical galaxy',
+    'reflection nebula',
+    'emission nebula',
+    'planetary nebula',
+    'asterism',
+    'galaxy cluster',
   ];
   const lower = t.nameEn.toLowerCase();
-  return !GENERIC_PREFIXES.some(p => lower.startsWith(p));
+  return !GENERIC_PREFIXES.some((p) => lower.startsWith(p));
 });
 for (const t of namedTargets) {
   process.stdout.write(`[name] "${t.nameEn}" (expected: ${t.id}) ... `);
@@ -283,8 +336,17 @@ for (const t of namedTargets) {
   }
 
   // Check if SIMBAD's ids for this object include our expected ID
-  const simbadIdSet = new Set((result.ids || '').split('|').map(s => s.trim().toLowerCase().replace(/[-\s]+/g, '')));
-  const ourNormId = toSimbadId(t.id).toLowerCase().replace(/[-\s]+/g, '');
+  const simbadIdSet = new Set(
+    (result.ids || '').split('|').map((s) =>
+      s
+        .trim()
+        .toLowerCase()
+        .replace(/[-\s]+/g, ''),
+    ),
+  );
+  const ourNormId = toSimbadId(t.id)
+    .toLowerCase()
+    .replace(/[-\s]+/g, '');
   if (!simbadIdSet.has(ourNormId)) {
     const note = `"${t.nameEn}" resolves in SIMBAD to ${result.main_id}, but our catalog assigns this name to ${t.id} — possible wrong assignment`;
     process.stdout.write(`⚠ ${note}\n`);
@@ -296,12 +358,16 @@ for (const t of namedTargets) {
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + '═'.repeat(70));
-console.log(`VALIDATION COMPLETE — ${issues.length} issue(s) found across ${targets.length} objects`);
+console.log(
+  `VALIDATION COMPLETE — ${issues.length} issue(s) found across ${targets.length} objects`,
+);
 
 const byType = {};
-issues.forEach(i => {
-  const types = i.flags ? i.flags.map(f => f.split(':')[0]) : [i.type ?? 'unknown'];
-  types.forEach(t => { byType[t] = (byType[t] ?? 0) + 1; });
+issues.forEach((i) => {
+  const types = i.flags ? i.flags.map((f) => f.split(':')[0]) : [i.type ?? 'unknown'];
+  types.forEach((t) => {
+    byType[t] = (byType[t] ?? 0) + 1;
+  });
 });
 Object.entries(byType).forEach(([t, n]) => console.log(`  ${t}: ${n}`));
 

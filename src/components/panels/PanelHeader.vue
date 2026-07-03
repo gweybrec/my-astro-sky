@@ -1,7 +1,11 @@
 <template>
   <div class="panel-header">
-    <button class="panel-settings-btn" :title="t('shortcuts.title')" @click="openShortcuts">⌨</button>
-    <button class="panel-settings-btn" :title="t('settings.modalTitle')" @click="openSettings">⚙</button>
+    <button class="panel-settings-btn" :title="t('shortcuts.title')" @click="openShortcuts">
+      ⌨
+    </button>
+    <button class="panel-settings-btn" :title="t('settings.modalTitle')" @click="openSettings">
+      ⚙
+    </button>
   </div>
 </template>
 

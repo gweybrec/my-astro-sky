@@ -73,7 +73,7 @@ describe('getLang()', () => {
   it('caches the detected language on subsequent calls', async () => {
     localStorage.setItem('lang', 'en');
     const { getLang } = await import('../../src/i18n/index');
-    const first  = getLang();
+    const first = getLang();
     // Clear storage — should still return cached value
     localStorage.clear();
     const second = getLang();
@@ -274,7 +274,9 @@ describe('serverErrors.INVALID_IMAGE key', () => {
       vi.resetModules();
       const { t } = await import('../../src/i18n/index');
       const result = t('serverErrors.INVALID_IMAGE');
-      expect(result, `serverErrors.INVALID_IMAGE missing in ${lang}`).not.toBe('serverErrors.INVALID_IMAGE');
+      expect(result, `serverErrors.INVALID_IMAGE missing in ${lang}`).not.toBe(
+        'serverErrors.INVALID_IMAGE',
+      );
       expect(result.length).toBeGreaterThan(0);
     }
   });

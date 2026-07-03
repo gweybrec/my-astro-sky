@@ -20,10 +20,10 @@ let indexStars: Star[] | null = null;
  */
 function buildIndex(): void {
   const allStars = getStars();
-  indexStars = allStars.filter(s => s.mag < 5.5);
+  indexStars = allStars.filter((s) => s.mag < 5.5);
 
   // Precompute unit vectors on the celestial sphere
-  const vectors = indexStars.map(s => {
+  const vectors = indexStars.map((s) => {
     const raRad = s.ra * DEG2RAD;
     const decRad = s.dec * DEG2RAD;
     return {
@@ -39,15 +39,18 @@ function buildIndex(): void {
 
   for (let i = 0; i < vectors.length; i++) {
     for (let j = i + 1; j < vectors.length; j++) {
-      const dotIJ = vectors[i].x * vectors[j].x + vectors[i].y * vectors[j].y + vectors[i].z * vectors[j].z;
+      const dotIJ =
+        vectors[i].x * vectors[j].x + vectors[i].y * vectors[j].y + vectors[i].z * vectors[j].z;
       if (dotIJ < Math.cos(maxAngDist)) continue; // too far apart
       const distIJ = Math.acos(Math.min(1, Math.max(-1, dotIJ)));
 
       for (let k = j + 1; k < vectors.length; k++) {
-        const dotIK = vectors[i].x * vectors[k].x + vectors[i].y * vectors[k].y + vectors[i].z * vectors[k].z;
+        const dotIK =
+          vectors[i].x * vectors[k].x + vectors[i].y * vectors[k].y + vectors[i].z * vectors[k].z;
         if (dotIK < Math.cos(maxAngDist)) continue;
 
-        const dotJK = vectors[j].x * vectors[k].x + vectors[j].y * vectors[k].y + vectors[j].z * vectors[k].z;
+        const dotJK =
+          vectors[j].x * vectors[k].x + vectors[j].y * vectors[k].y + vectors[j].z * vectors[k].z;
         if (dotJK < Math.cos(maxAngDist)) continue;
 
         const distIK = Math.acos(Math.min(1, Math.max(-1, dotIK)));
@@ -189,7 +192,10 @@ export async function solvePlate(
   return { success: false, error: t('errors.noSolution') };
 }
 
-function buildResult(match: { correspondences: PhotoCorrespondence[]; verified: number }): PlateSolveResult {
+function buildResult(match: {
+  correspondences: PhotoCorrespondence[];
+  verified: number;
+}): PlateSolveResult {
   // Choose 3 well-separated correspondences (maximize triangle area)
   const corrs = match.correspondences;
   let bestArea = 0;
@@ -198,10 +204,11 @@ function buildResult(match: { correspondences: PhotoCorrespondence[]; verified: 
   for (let i = 0; i < corrs.length - 2; i++) {
     for (let j = i + 1; j < corrs.length - 1; j++) {
       for (let k = j + 1; k < corrs.length; k++) {
-        const area = Math.abs(
-          (corrs[j].photoX - corrs[i].photoX) * (corrs[k].photoY - corrs[i].photoY) -
-          (corrs[k].photoX - corrs[i].photoX) * (corrs[j].photoY - corrs[i].photoY)
-        ) / 2;
+        const area =
+          Math.abs(
+            (corrs[j].photoX - corrs[i].photoX) * (corrs[k].photoY - corrs[i].photoY) -
+              (corrs[k].photoX - corrs[i].photoX) * (corrs[j].photoY - corrs[i].photoY),
+          ) / 2;
         if (area > bestArea) {
           bestArea = area;
           bestTriple = [i, j, k];
@@ -231,17 +238,14 @@ function verifyMatch(
 ): { correspondences: PhotoCorrespondence[]; verified: number } | null {
   // Compute affine transform from 3 spot↔star pairs
   // spot pixel → projection coords
-  const photoPoints = spotIndices.map(si => ({ x: topSpots[si].x, y: topSpots[si].y }));
-  const projPoints = catStars.map(s => project(s.ra, s.dec));
+  const photoPoints = spotIndices.map((si) => ({ x: topSpots[si].x, y: topSpots[si].y }));
+  const projPoints = catStars.map((s) => project(s.ra, s.dec));
 
   // Solve affine: proj = M * photo
   const [p0, p1, p2] = photoPoints;
   const [c0, c1, c2] = projPoints;
 
-  const det =
-    p0.x * (p1.y - p2.y) -
-    p0.y * (p1.x - p2.x) +
-    (p1.x * p2.y - p2.x * p1.y);
+  const det = p0.x * (p1.y - p2.y) - p0.y * (p1.x - p2.x) + (p1.x * p2.y - p2.x * p1.y);
 
   if (Math.abs(det) < 1e-10) return null;
 
@@ -272,11 +276,11 @@ function verifyMatch(
   if (plateScale < 1e-6 || plateScale > 8e-4) return null;
 
   // Now verify: transform all spots and find matching catalog stars
-  const allCatalogStars = getStars().filter(s => s.mag < 8.0);
+  const allCatalogStars = getStars().filter((s) => s.mag < 8.0);
   const tolerance = 0.5 * DEG2RAD; // 0.5° tolerance for initial candidate search
 
   // Precompute projection coords for catalog stars
-  const catProjected = allCatalogStars.map(s => ({
+  const catProjected = allCatalogStars.map((s) => ({
     star: s,
     proj: project(s.ra, s.dec),
   }));
@@ -300,7 +304,7 @@ function verifyMatch(
   const spotsToCheck = allSpots.slice(0, 30);
   for (const spot of spotsToCheck) {
     // Skip if this is one of the anchor spots
-    if (spotIndices.some(si => topSpots[si] === spot)) continue;
+    if (spotIndices.some((si) => topSpots[si] === spot)) continue;
 
     // Transform spot to projection space
     const projX = a * spot.x + c * spot.y + e;

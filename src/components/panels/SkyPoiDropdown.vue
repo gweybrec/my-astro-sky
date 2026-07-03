@@ -12,7 +12,12 @@ import { ref, onMounted, watch } from 'vue';
 import PoiFilterDropdown from './PoiFilterDropdown.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { buildPoiFilterGroups, prunePoiSelection, poiSelectionsEqual, type PoiFilterGroup } from '../../poi';
+import {
+  buildPoiFilterGroups,
+  prunePoiSelection,
+  poiSelectionsEqual,
+  type PoiFilterGroup,
+} from '../../poi';
 
 const canvasStore = useCanvasStore();
 const categoriesStore = usePoiCategoriesStore();
@@ -22,8 +27,11 @@ const selected = ref<Map<string, Set<string>>>(new Map());
 
 function refresh() {
   const overlay = canvasStore.overlay;
-  if (!overlay) { groups.value = []; return; }
-  const photoPois = overlay.getPlacedPhotos().map(p => p.photo.pointsOfInterest ?? []);
+  if (!overlay) {
+    groups.value = [];
+    return;
+  }
+  const photoPois = overlay.getPlacedPhotos().map((p) => p.photo.pointsOfInterest ?? []);
   groups.value = buildPoiFilterGroups(photoPois, categoriesStore.categories);
   // Drop selections whose POIs/categories no longer exist, otherwise a stale filter
   // keeps hiding every photo. Re-apply to the overlay only when something changed.

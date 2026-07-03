@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { formatFov, formatGearFovLabel, computeFovTargetScale, type GearPreset } from '../../src/gear-presets';
+import {
+  formatFov,
+  formatGearFovLabel,
+  computeFovTargetScale,
+  type GearPreset,
+} from '../../src/gear-presets';
 
 const makePreset = (overrides: Partial<GearPreset> = {}): GearPreset => ({
   apertureMm: 102,
@@ -28,7 +33,12 @@ describe('formatFov', () => {
 
 describe('formatGearFovLabel', () => {
   it('contains focal length, FOV dimensions and pixel scale', () => {
-    const preset = makePreset({ focalLengthMm: 714, sensorWidthMm: 17.3, sensorHeightMm: 13.0, pixelSizeUm: 3.76 });
+    const preset = makePreset({
+      focalLengthMm: 714,
+      sensorWidthMm: 17.3,
+      sensorHeightMm: 13.0,
+      pixelSizeUm: 3.76,
+    });
     const label = formatGearFovLabel(preset);
     // Focal length
     expect(label).toContain('714 mm');
@@ -40,7 +50,12 @@ describe('formatGearFovLabel', () => {
 
   it('uses arcminutes for a narrow FOV preset', () => {
     // Very long focal length → sub-degree FOV
-    const preset = makePreset({ focalLengthMm: 3000, sensorWidthMm: 6.17, sensorHeightMm: 4.55, pixelSizeUm: 2.4 });
+    const preset = makePreset({
+      focalLengthMm: 3000,
+      sensorWidthMm: 6.17,
+      sensorHeightMm: 4.55,
+      pixelSizeUm: 2.4,
+    });
     const label = formatGearFovLabel(preset);
     // FOV should be in arcminutes (tiny sensor)
     expect(label).toMatch(/\d+'/);
@@ -48,7 +63,12 @@ describe('formatGearFovLabel', () => {
 
   it('uses degrees for a wide FOV preset', () => {
     // Short focal length → multi-degree FOV
-    const preset = makePreset({ focalLengthMm: 24, sensorWidthMm: 35.9, sensorHeightMm: 24.0, pixelSizeUm: 5.97 });
+    const preset = makePreset({
+      focalLengthMm: 24,
+      sensorWidthMm: 35.9,
+      sensorHeightMm: 24.0,
+      pixelSizeUm: 5.97,
+    });
     const label = formatGearFovLabel(preset);
     expect(label).toMatch(/\d+\.\d+°/);
   });
@@ -61,13 +81,13 @@ describe('computeFovTargetScale', () => {
     expect(scale).toBeGreaterThan(300);
     expect(scale).toBeLessThan(50000);
     // verify the frame actually fills ~33% of canvas at this scale
-    const cos2 = Math.cos((45 * Math.PI / 180) / 2) ** 2;
-    const halfWPx = (1 * Math.PI / 180) / (2 * cos2) * scale;
+    const cos2 = Math.cos((45 * Math.PI) / 180 / 2) ** 2;
+    const halfWPx = ((1 * Math.PI) / 180 / (2 * cos2)) * scale;
     expect(halfWPx * 2).toBeCloseTo(800 * 0.33, 0);
   });
 
   it('gives lower scale for wide FOV than narrow FOV', () => {
-    const wide   = computeFovTargetScale(10, 8, 45, 'north', 800);
+    const wide = computeFovTargetScale(10, 8, 45, 'north', 800);
     const narrow = computeFovTargetScale(1, 0.7, 45, 'north', 800);
     expect(wide).toBeLessThan(narrow);
   });
@@ -79,7 +99,7 @@ describe('computeFovTargetScale', () => {
 
   it('accounts for declination (equatorial vs polar)', () => {
     const polar = computeFovTargetScale(2, 1.5, 80, 'north', 800);
-    const equat = computeFovTargetScale(2, 1.5,  0, 'north', 800);
+    const equat = computeFovTargetScale(2, 1.5, 0, 'north', 800);
     // Objects near the pole have larger cos², needing higher scale
     expect(polar).toBeGreaterThan(equat);
   });
@@ -87,7 +107,7 @@ describe('computeFovTargetScale', () => {
   it('handles south hemisphere correctly (colatitude = 90 + dec)', () => {
     // dec=-45° south ≡ 45° from pole → same cos² as dec=+45° north
     const s = computeFovTargetScale(2, 1.5, -45, 'south', 800);
-    const n = computeFovTargetScale(2, 1.5,  45, 'north', 800);
+    const n = computeFovTargetScale(2, 1.5, 45, 'north', 800);
     expect(s).toBeCloseTo(n, 0);
   });
 });

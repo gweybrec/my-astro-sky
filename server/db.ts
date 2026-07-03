@@ -133,15 +133,15 @@ db.exec(`
 
 const insertPhoto = db.prepare(
   `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`,
 );
 const insertCorrespondence = db.prepare(
-  'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 );
-const selectPhotos = db.prepare('SELECT * FROM photos ORDER BY display_order ASC, created_at ASC, id ASC');
-const selectCorrespondences = db.prepare(
-  'SELECT * FROM star_correspondences ORDER BY point_index'
+const selectPhotos = db.prepare(
+  'SELECT * FROM photos ORDER BY display_order ASC, created_at ASC, id ASC',
 );
+const selectCorrespondences = db.prepare('SELECT * FROM star_correspondences ORDER BY point_index');
 const deletePhotoStmt = db.prepare('DELETE FROM photos WHERE id = ?');
 const selectFilename = db.prepare('SELECT filename FROM photos WHERE id = ?');
 const updatePhotoDisplayOrderStmt = db.prepare('UPDATE photos SET display_order = ? WHERE id = ?');
@@ -221,7 +221,11 @@ export function createPhoto(
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
   const run = db.transaction(() => {
     insertPhoto.run(
-      id, filename, originalName, width, height,
+      id,
+      filename,
+      originalName,
+      width,
+      height,
       manualPlacement ?? null,
       JSON.stringify(dsoIds ?? []),
       JSON.stringify(labels ?? []),
@@ -232,7 +236,16 @@ export function createPhoto(
       observationDate ?? null,
     );
     for (const c of correspondences) {
-      insertCorrespondence.run(id, c.pointIndex, c.photoX, c.photoY, c.starHip, c.starName, c.starRa ?? null, c.starDec ?? null);
+      insertCorrespondence.run(
+        id,
+        c.pointIndex,
+        c.photoX,
+        c.photoY,
+        c.starHip,
+        c.starName,
+        c.starRa ?? null,
+        c.starDec ?? null,
+      );
     }
   });
   run();
@@ -242,7 +255,7 @@ export function getAllPhotos() {
   const photos = selectPhotos.all() as any[];
   const allCorr = selectCorrespondences.all() as any[];
 
-  return photos.map(p => ({
+  return photos.map((p) => ({
     id: p.id,
     filename: p.filename,
     originalName: p.original_name,
@@ -258,8 +271,8 @@ export function getAllPhotos() {
     observationDate: p.observation_date ?? null,
     thumbFilename: p.thumb_filename ?? null,
     correspondences: allCorr
-      .filter(c => c.photo_id === p.id)
-      .map(c => ({
+      .filter((c) => c.photo_id === p.id)
+      .map((c) => ({
         pointIndex: c.point_index,
         photoX: c.photo_x,
         photoY: c.photo_y,
@@ -282,13 +295,10 @@ export function getPhotoFilename(id: string): string | undefined {
 }
 
 const updatePhotoManualPlacementStmt = db.prepare(
-  'UPDATE photos SET manual_placement = ? WHERE id = ?'
+  'UPDATE photos SET manual_placement = ? WHERE id = ?',
 );
 
-export function updatePhotoManualPlacement(
-  id: string,
-  manualPlacement: string | null
-): boolean {
+export function updatePhotoManualPlacement(id: string, manualPlacement: string | null): boolean {
   const result = updatePhotoManualPlacementStmt.run(manualPlacement, id);
   return result.changes > 0;
 }
@@ -314,11 +324,11 @@ function parseIntegrationRows(val: any): IntegrationInput[] {
 }
 
 const updatePhotoMetadataStmt = db.prepare(
-  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ? WHERE id = ?'
+  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ? WHERE id = ?',
 );
 
 const updatePhotoMetadataWithNameStmt = db.prepare(
-  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, original_name = ? WHERE id = ?'
+  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, original_name = ? WHERE id = ?',
 );
 
 export function updatePhotoMetadata(
@@ -333,9 +343,10 @@ export function updatePhotoMetadata(
 ): boolean {
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
   const pois = JSON.stringify(sanitizePois(pointsOfInterest ?? []));
-  const obsDate = typeof observationDate === 'string' && observationDate.length > 0
-    ? observationDate.slice(0, 50)
-    : null;
+  const obsDate =
+    typeof observationDate === 'string' && observationDate.length > 0
+      ? observationDate.slice(0, 50)
+      : null;
   if (originalName !== undefined) {
     const result = updatePhotoMetadataWithNameStmt.run(
       JSON.stringify(dsoIds),
@@ -363,7 +374,7 @@ export function updatePhotoMetadata(
 
 const insertPhotoWithId = db.prepare(
   `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`,
 );
 const deletePhotoForReplace = db.prepare('DELETE FROM photos WHERE id = ?');
 
@@ -397,7 +408,11 @@ export function createPhotoWithId(
       deletePhotoForReplace.run(id);
     }
     const result = insertPhotoWithId.run(
-      id, filename, originalName, width, height,
+      id,
+      filename,
+      originalName,
+      width,
+      height,
       createdAt ?? new Date().toISOString(),
       manualPlacement ?? null,
       JSON.stringify(dsoIds ?? []),
@@ -410,7 +425,16 @@ export function createPhotoWithId(
     );
     if (result.changes === 0) return 'skipped';
     for (const c of correspondences) {
-      insertCorrespondence.run(id, c.pointIndex, c.photoX, c.photoY, c.starHip, c.starName, c.starRa ?? null, c.starDec ?? null);
+      insertCorrespondence.run(
+        id,
+        c.pointIndex,
+        c.photoX,
+        c.photoY,
+        c.starHip,
+        c.starName,
+        c.starRa ?? null,
+        c.starDec ?? null,
+      );
     }
     return 'imported';
   });
@@ -433,7 +457,7 @@ const checkExistStmt = db.prepare('SELECT id FROM photos WHERE id = ?');
 
 /** Returns the subset of provided IDs that already exist in the database. */
 export function checkPhotosExist(ids: string[]): string[] {
-  return ids.filter(id => checkExistStmt.get(id) != null);
+  return ids.filter((id) => checkExistStmt.get(id) != null);
 }
 
 const checkExistByNameStmt = db.prepare('SELECT id FROM photos WHERE original_name = ?');
@@ -545,20 +569,30 @@ export function closeDatabase(): void {
 
 const getDsoOverrideStmt = db.prepare('SELECT data FROM dso_overrides WHERE id = ?');
 const getAllDsoOverridesStmt = db.prepare('SELECT id, data FROM dso_overrides');
-const upsertDsoOverrideStmt = db.prepare('INSERT OR REPLACE INTO dso_overrides (id, data) VALUES (?, ?)');
+const upsertDsoOverrideStmt = db.prepare(
+  'INSERT OR REPLACE INTO dso_overrides (id, data) VALUES (?, ?)',
+);
 const deleteDsoOverrideByIdStmt = db.prepare('DELETE FROM dso_overrides WHERE id = ?');
 
 export function getDsoOverride(id: string): object | undefined {
   const row = getDsoOverrideStmt.get(id) as { data: string } | undefined;
   if (!row) return undefined;
-  try { return JSON.parse(row.data); } catch { return undefined; }
+  try {
+    return JSON.parse(row.data);
+  } catch {
+    return undefined;
+  }
 }
 
 export function getAllDsoOverrides(): Record<string, object> {
   const rows = getAllDsoOverridesStmt.all() as { id: string; data: string }[];
   const result: Record<string, object> = {};
   for (const row of rows) {
-    try { result[row.id] = JSON.parse(row.data); } catch { /* skip invalid */ }
+    try {
+      result[row.id] = JSON.parse(row.data);
+    } catch {
+      /* skip invalid */
+    }
   }
   return result;
 }
@@ -574,7 +608,9 @@ export function deleteDsoOverride(id: string): void {
 // ─── Custom gear ───────────────────────────────────────────────────────────────
 
 const getAllCustomGearStmt = db.prepare('SELECT id, type, data FROM custom_gear');
-const upsertCustomGearStmt = db.prepare('INSERT OR REPLACE INTO custom_gear (id, type, data) VALUES (?, ?, ?)');
+const upsertCustomGearStmt = db.prepare(
+  'INSERT OR REPLACE INTO custom_gear (id, type, data) VALUES (?, ?, ?)',
+);
 const deleteCustomGearStmt = db.prepare('DELETE FROM custom_gear WHERE id = ?');
 const getCustomGearByTypeStmt = db.prepare('SELECT id, type, data FROM custom_gear WHERE type = ?');
 
@@ -592,7 +628,11 @@ export function getCustomGearByType(type: 'telescope' | 'camera' | 'accessory'):
   return getCustomGearByTypeStmt.all(type) as CustomGearRow[];
 }
 
-export function upsertCustomGear(id: string, type: 'telescope' | 'camera' | 'accessory', data: object): void {
+export function upsertCustomGear(
+  id: string,
+  type: 'telescope' | 'camera' | 'accessory',
+  data: object,
+): void {
   upsertCustomGearStmt.run(id, type, JSON.stringify(data));
 }
 
@@ -612,14 +652,14 @@ export interface GearSetupRow {
   enabled: number; // 0 | 1
 }
 
-const getAllGearSetupsStmt        = db.prepare('SELECT * FROM gear_setups ORDER BY rowid ASC');
-const upsertGearSetupStmt         = db.prepare(
+const getAllGearSetupsStmt = db.prepare('SELECT * FROM gear_setups ORDER BY rowid ASC');
+const upsertGearSetupStmt = db.prepare(
   `INSERT OR REPLACE INTO gear_setups (id, name, telescope_id, camera_id, accessory_id, enabled)
    VALUES (?, ?, ?, ?, ?, ?)`,
 );
-const updateGearSetupEnabledStmt  = db.prepare('UPDATE gear_setups SET enabled = ? WHERE id = ?');
-const deleteGearSetupStmt         = db.prepare('DELETE FROM gear_setups WHERE id = ?');
-const deleteAllGearSetupsStmt     = db.prepare('DELETE FROM gear_setups');
+const updateGearSetupEnabledStmt = db.prepare('UPDATE gear_setups SET enabled = ? WHERE id = ?');
+const deleteGearSetupStmt = db.prepare('DELETE FROM gear_setups WHERE id = ?');
+const deleteAllGearSetupsStmt = db.prepare('DELETE FROM gear_setups');
 
 export function getAllGearSetups(): GearSetupRow[] {
   return getAllGearSetupsStmt.all() as GearSetupRow[];
@@ -627,8 +667,12 @@ export function getAllGearSetups(): GearSetupRow[] {
 
 export function upsertGearSetup(row: GearSetupRow): void {
   upsertGearSetupStmt.run(
-    row.id, row.name, row.telescope_id, row.camera_id,
-    row.accessory_id ?? null, row.enabled,
+    row.id,
+    row.name,
+    row.telescope_id,
+    row.camera_id,
+    row.accessory_id ?? null,
+    row.enabled,
   );
 }
 
@@ -655,13 +699,15 @@ export interface PoiCategoryRow {
   position: number;
 }
 
-const getAllPoiCategoriesStmt    = db.prepare('SELECT * FROM poi_categories ORDER BY position ASC, rowid ASC');
-const upsertPoiCategoryStmt      = db.prepare(
+const getAllPoiCategoriesStmt = db.prepare(
+  'SELECT * FROM poi_categories ORDER BY position ASC, rowid ASC',
+);
+const upsertPoiCategoryStmt = db.prepare(
   'INSERT OR REPLACE INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)',
 );
-const deletePoiCategoryStmt      = db.prepare('DELETE FROM poi_categories WHERE id = ?');
+const deletePoiCategoryStmt = db.prepare('DELETE FROM poi_categories WHERE id = ?');
 const deleteAllPoiCategoriesStmt = db.prepare('DELETE FROM poi_categories');
-const countPoiCategoriesStmt     = db.prepare('SELECT COUNT(*) AS cnt FROM poi_categories');
+const countPoiCategoriesStmt = db.prepare('SELECT COUNT(*) AS cnt FROM poi_categories');
 
 export function getAllPoiCategories(): PoiCategoryRow[] {
   return getAllPoiCategoriesStmt.all() as PoiCategoryRow[];
@@ -685,13 +731,15 @@ export function deleteAllPoiCategories(): number {
   const cnt = (countPoiCategoriesStmt.get() as { cnt: number }).cnt;
   if (cnt === 0) {
     const defaults: PoiCategoryRow[] = [
-      { id: 'cat-comet',     name: 'Comet',     color: '#4ea1ff', position: 0 },
-      { id: 'cat-asteroid',  name: 'Asteroid',  color: '#c9a227', position: 1 },
+      { id: 'cat-comet', name: 'Comet', color: '#4ea1ff', position: 0 },
+      { id: 'cat-asteroid', name: 'Asteroid', color: '#c9a227', position: 1 },
       { id: 'cat-satellite', name: 'Satellite', color: '#7bd88f', position: 2 },
-      { id: 'cat-iss',       name: 'ISS',       color: '#cbd5e1', position: 3 },
+      { id: 'cat-iss', name: 'ISS', color: '#cbd5e1', position: 3 },
       { id: 'cat-supernova', name: 'Supernova', color: '#ff5a5a', position: 4 },
     ];
-    const seed = db.transaction(() => { for (const c of defaults) upsertPoiCategory(c); });
+    const seed = db.transaction(() => {
+      for (const c of defaults) upsertPoiCategory(c);
+    });
     seed();
   }
 }
@@ -742,33 +790,45 @@ export interface PlanMosaicRow {
   position: number;
 }
 
-const getPlansStmt              = db.prepare('SELECT * FROM plans ORDER BY position ASC, rowid ASC');
-const getPlanStmt               = db.prepare('SELECT * FROM plans WHERE id = ?');
-const insertPlanStmt            = db.prepare(
+const getPlansStmt = db.prepare('SELECT * FROM plans ORDER BY position ASC, rowid ASC');
+const getPlanStmt = db.prepare('SELECT * FROM plans WHERE id = ?');
+const insertPlanStmt = db.prepare(
   'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 );
-const renamePlanStmt            = db.prepare('UPDATE plans SET name = ? WHERE id = ?');
-const updatePlanSettingsStmt    = db.prepare('UPDATE plans SET night_of = ?, setup_id = ?, lat = ?, lon = ? WHERE id = ?');
-const updatePlanPositionStmt    = db.prepare('UPDATE plans SET position = ? WHERE id = ?');
-const deletePlanStmt            = db.prepare('DELETE FROM plans WHERE id = ?');
-const deleteAllPlansStmt        = db.prepare('DELETE FROM plans');
+const renamePlanStmt = db.prepare('UPDATE plans SET name = ? WHERE id = ?');
+const updatePlanSettingsStmt = db.prepare(
+  'UPDATE plans SET night_of = ?, setup_id = ?, lat = ?, lon = ? WHERE id = ?',
+);
+const updatePlanPositionStmt = db.prepare('UPDATE plans SET position = ? WHERE id = ?');
+const deletePlanStmt = db.prepare('DELETE FROM plans WHERE id = ?');
+const deleteAllPlansStmt = db.prepare('DELETE FROM plans');
 
-const getPlanEntriesStmt        = db.prepare('SELECT * FROM plan_entries WHERE plan_id = ? ORDER BY position ASC, rowid ASC');
-const getAllPlanEntriesStmt     = db.prepare('SELECT * FROM plan_entries ORDER BY position ASC, rowid ASC');
-const planEntryExistsStmt       = db.prepare('SELECT 1 FROM plan_entries WHERE plan_id = ? AND dso_id = ?');
-const insertPlanEntryStmt       = db.prepare(
+const getPlanEntriesStmt = db.prepare(
+  'SELECT * FROM plan_entries WHERE plan_id = ? ORDER BY position ASC, rowid ASC',
+);
+const getAllPlanEntriesStmt = db.prepare(
+  'SELECT * FROM plan_entries ORDER BY position ASC, rowid ASC',
+);
+const planEntryExistsStmt = db.prepare(
+  'SELECT 1 FROM plan_entries WHERE plan_id = ? AND dso_id = ?',
+);
+const insertPlanEntryStmt = db.prepare(
   'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes, mosaic_id, mosaic_w_deg, mosaic_h_deg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 );
-const deletePlanEntryStmt       = db.prepare('DELETE FROM plan_entries WHERE id = ?');
-const deletePlanEntriesStmt     = db.prepare('DELETE FROM plan_entries WHERE plan_id = ?');
+const deletePlanEntryStmt = db.prepare('DELETE FROM plan_entries WHERE id = ?');
+const deletePlanEntriesStmt = db.prepare('DELETE FROM plan_entries WHERE plan_id = ?');
 
-const getPlanMosaicStmt         = db.prepare('SELECT * FROM plan_mosaics WHERE id = ?');
-const getPlanMosaicsStmt        = db.prepare('SELECT * FROM plan_mosaics WHERE plan_id = ? ORDER BY position ASC, rowid ASC');
-const getAllPlanMosaicsStmt     = db.prepare('SELECT * FROM plan_mosaics ORDER BY position ASC, rowid ASC');
-const insertPlanMosaicStmt      = db.prepare(
+const getPlanMosaicStmt = db.prepare('SELECT * FROM plan_mosaics WHERE id = ?');
+const getPlanMosaicsStmt = db.prepare(
+  'SELECT * FROM plan_mosaics WHERE plan_id = ? ORDER BY position ASC, rowid ASC',
+);
+const getAllPlanMosaicsStmt = db.prepare(
+  'SELECT * FROM plan_mosaics ORDER BY position ASC, rowid ASC',
+);
+const insertPlanMosaicStmt = db.prepare(
   'INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec, pa_deg, overlap_pct, cols, rows, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 );
-const updatePlanMosaicStmt      = db.prepare(
+const updatePlanMosaicStmt = db.prepare(
   'UPDATE plan_mosaics SET dso_id = ?, center_ra = ?, center_dec = ?, pa_deg = ?, overlap_pct = ?, cols = ?, rows = ? WHERE id = ?',
 );
 // As the photo-metadata statements do (`updatePhotoMetadataWithNameStmt`), a
@@ -777,14 +837,18 @@ const updatePlanMosaicStmt      = db.prepare(
 const updatePlanMosaicWithNameStmt = db.prepare(
   'UPDATE plan_mosaics SET dso_id = ?, name = ?, center_ra = ?, center_dec = ?, pa_deg = ?, overlap_pct = ?, cols = ?, rows = ? WHERE id = ?',
 );
-const deletePlanMosaicStmt      = db.prepare('DELETE FROM plan_mosaics WHERE id = ?');
-const deletePlanMosaicsStmt     = db.prepare('DELETE FROM plan_mosaics WHERE plan_id = ?');
-const deleteMosaicTilesStmt     = db.prepare('DELETE FROM plan_entries WHERE mosaic_id = ?');
+const deletePlanMosaicStmt = db.prepare('DELETE FROM plan_mosaics WHERE id = ?');
+const deletePlanMosaicsStmt = db.prepare('DELETE FROM plan_mosaics WHERE plan_id = ?');
+const deleteMosaicTilesStmt = db.prepare('DELETE FROM plan_entries WHERE mosaic_id = ?');
 // A mosaic represents its whole target, so it replaces any standalone frame for
 // the same DSO (mosaic tiles carry a mosaic_id; standalone entries don't).
-const deleteStandaloneEntryByDsoStmt = db.prepare('DELETE FROM plan_entries WHERE plan_id = ? AND dso_id = ? AND mosaic_id IS NULL');
-const updatePlanEntryPositionStmt = db.prepare('UPDATE plan_entries SET position = ? WHERE id = ? AND plan_id = ?');
-const updatePlanEntryPaStmt       = db.prepare('UPDATE plan_entries SET pa_deg = ? WHERE id = ?');
+const deleteStandaloneEntryByDsoStmt = db.prepare(
+  'DELETE FROM plan_entries WHERE plan_id = ? AND dso_id = ? AND mosaic_id IS NULL',
+);
+const updatePlanEntryPositionStmt = db.prepare(
+  'UPDATE plan_entries SET position = ? WHERE id = ? AND plan_id = ?',
+);
+const updatePlanEntryPaStmt = db.prepare('UPDATE plan_entries SET pa_deg = ? WHERE id = ?');
 
 export function getPlans(): PlanRow[] {
   return getPlansStmt.all() as PlanRow[];
@@ -803,14 +867,29 @@ export function getAllPlanEntries(): PlanEntryRow[] {
 }
 
 export function createPlan(row: PlanRow): void {
-  insertPlanStmt.run(row.id, row.name, row.position, row.created_at, row.night_of ?? null, row.setup_id ?? null, row.lat ?? null, row.lon ?? null);
+  insertPlanStmt.run(
+    row.id,
+    row.name,
+    row.position,
+    row.created_at,
+    row.night_of ?? null,
+    row.setup_id ?? null,
+    row.lat ?? null,
+    row.lon ?? null,
+  );
 }
 
 export function renamePlan(id: string, name: string): boolean {
   return renamePlanStmt.run(name, id).changes > 0;
 }
 
-export function updatePlanSettings(id: string, nightOf: string | null, setupId: string | null, lat: number | null, lon: number | null): boolean {
+export function updatePlanSettings(
+  id: string,
+  nightOf: string | null,
+  setupId: string | null,
+  lat: number | null,
+  lon: number | null,
+): boolean {
   return updatePlanSettingsStmt.run(nightOf, setupId, lat, lon, id).changes > 0;
 }
 
@@ -845,7 +924,9 @@ export function getPlanMosaic(mosaicId: string): PlanMosaicRow | undefined {
 }
 
 function nextPlanMosaicPosition(planId: string): number {
-  const r = db.prepare('SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM plan_mosaics WHERE plan_id = ?').get(planId) as { pos: number };
+  const r = db
+    .prepare('SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM plan_mosaics WHERE plan_id = ?')
+    .get(planId) as { pos: number };
   return r.pos;
 }
 
@@ -875,14 +956,30 @@ export function createPlanMosaic(
     for (const id of replaceEntryIds) deletePlanEntryStmt.run(id);
     const position = row.position ?? nextPlanMosaicPosition(row.plan_id);
     insertPlanMosaicStmt.run(
-      row.id, row.plan_id, row.dso_id ?? null, row.name ?? null, row.center_ra, row.center_dec,
-      row.pa_deg, row.overlap_pct, row.cols, row.rows, position,
+      row.id,
+      row.plan_id,
+      row.dso_id ?? null,
+      row.name ?? null,
+      row.center_ra,
+      row.center_dec,
+      row.pa_deg,
+      row.overlap_pct,
+      row.cols,
+      row.rows,
+      position,
     );
     let pos = nextPlanEntryPosition(row.plan_id);
     for (const t of tiles) {
       addPlanEntry({
-        id: `tile-${row.id}-${pos}`, plan_id: row.plan_id, dso_id: row.dso_id ?? null,
-        position: pos++, pa_deg: t.paDeg ?? null, ra: t.ra, dec: t.dec, notes: null, mosaic_id: row.id,
+        id: `tile-${row.id}-${pos}`,
+        plan_id: row.plan_id,
+        dso_id: row.dso_id ?? null,
+        position: pos++,
+        pa_deg: t.paDeg ?? null,
+        ra: t.ra,
+        dec: t.dec,
+        notes: null,
+        mosaic_id: row.id,
       });
     }
     return row.id;
@@ -896,12 +993,22 @@ export function createPlanMosaic(
  */
 export function updatePlanMosaic(
   mosaicId: string,
-  fields: { dsoId: string | null; name?: string; centerRa: number; centerDec: number; paDeg: number; overlapPct: number; cols: number; rows: number },
+  fields: {
+    dsoId: string | null;
+    name?: string;
+    centerRa: number;
+    centerDec: number;
+    paDeg: number;
+    overlapPct: number;
+    cols: number;
+    rows: number;
+  },
   tiles: MosaicTileInput[],
   replaceEntryIds: string[] = [],
 ): boolean {
   return db.transaction(() => {
-    const m = db.prepare('SELECT plan_id FROM plan_mosaics WHERE id = ?').get(mosaicId) as { plan_id: string } | undefined;
+    const m = db.prepare('SELECT plan_id FROM plan_mosaics WHERE id = ?').get(mosaicId) as
+      { plan_id: string } | undefined;
     if (!m) return false;
     // Absorb standalone frames merged into this mosaic.
     for (const id of replaceEntryIds) deletePlanEntryStmt.run(id);
@@ -909,21 +1016,41 @@ export function updatePlanMosaic(
     // background tile drags / transforms omit it and must not clobber it.
     if (fields.name !== undefined) {
       updatePlanMosaicWithNameStmt.run(
-        fields.dsoId ?? null, fields.name, fields.centerRa, fields.centerDec, fields.paDeg,
-        fields.overlapPct, fields.cols, fields.rows, mosaicId,
+        fields.dsoId ?? null,
+        fields.name,
+        fields.centerRa,
+        fields.centerDec,
+        fields.paDeg,
+        fields.overlapPct,
+        fields.cols,
+        fields.rows,
+        mosaicId,
       );
     } else {
       updatePlanMosaicStmt.run(
-        fields.dsoId ?? null, fields.centerRa, fields.centerDec, fields.paDeg,
-        fields.overlapPct, fields.cols, fields.rows, mosaicId,
+        fields.dsoId ?? null,
+        fields.centerRa,
+        fields.centerDec,
+        fields.paDeg,
+        fields.overlapPct,
+        fields.cols,
+        fields.rows,
+        mosaicId,
       );
     }
     deleteMosaicTilesStmt.run(mosaicId);
     let pos = nextPlanEntryPosition(m.plan_id);
     for (const t of tiles) {
       addPlanEntry({
-        id: `tile-${mosaicId}-${pos}`, plan_id: m.plan_id, dso_id: fields.dsoId ?? null,
-        position: pos++, pa_deg: t.paDeg ?? null, ra: t.ra, dec: t.dec, notes: null, mosaic_id: mosaicId,
+        id: `tile-${mosaicId}-${pos}`,
+        plan_id: m.plan_id,
+        dso_id: fields.dsoId ?? null,
+        position: pos++,
+        pa_deg: t.paDeg ?? null,
+        ra: t.ra,
+        dec: t.dec,
+        notes: null,
+        mosaic_id: mosaicId,
       });
     }
     return true;
@@ -945,8 +1072,17 @@ export function deletePlanMosaic(mosaicId: string): boolean {
  */
 export function addPlanMosaic(row: PlanMosaicRow): void {
   insertPlanMosaicStmt.run(
-    row.id, row.plan_id, row.dso_id ?? null, row.name ?? null, row.center_ra, row.center_dec,
-    row.pa_deg, row.overlap_pct, row.cols, row.rows, row.position,
+    row.id,
+    row.plan_id,
+    row.dso_id ?? null,
+    row.name ?? null,
+    row.center_ra,
+    row.center_dec,
+    row.pa_deg,
+    row.overlap_pct,
+    row.cols,
+    row.rows,
+    row.position,
   );
 }
 
@@ -962,14 +1098,24 @@ export function planEntryExists(planId: string, dsoId: string): boolean {
 
 export function addPlanEntry(row: PlanEntryRow): void {
   insertPlanEntryStmt.run(
-    row.id, row.plan_id, row.dso_id ?? null, row.position, row.pa_deg ?? null,
-    row.ra ?? null, row.dec ?? null, row.notes ?? null, row.mosaic_id ?? null,
-    row.mosaic_w_deg ?? null, row.mosaic_h_deg ?? null,
+    row.id,
+    row.plan_id,
+    row.dso_id ?? null,
+    row.position,
+    row.pa_deg ?? null,
+    row.ra ?? null,
+    row.dec ?? null,
+    row.notes ?? null,
+    row.mosaic_id ?? null,
+    row.mosaic_w_deg ?? null,
+    row.mosaic_h_deg ?? null,
   );
 }
 
 export function nextPlanEntryPosition(planId: string): number {
-  const r = db.prepare('SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM plan_entries WHERE plan_id = ?').get(planId) as { pos: number };
+  const r = db
+    .prepare('SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM plan_entries WHERE plan_id = ?')
+    .get(planId) as { pos: number };
   return r.pos;
 }
 
@@ -988,19 +1134,46 @@ export function updatePlanEntryPA(entryId: string, paDeg: number | null): boolea
  */
 export function updatePlanEntryFrame(
   entryId: string,
-  fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null },
+  fields: {
+    ra?: number | null;
+    dec?: number | null;
+    paDeg?: number | null;
+    dsoId?: string | null;
+    mosaicWDeg?: number | null;
+    mosaicHDeg?: number | null;
+  },
 ): boolean {
   const sets: string[] = [];
   const vals: Array<number | string | null> = [];
-  if ('ra' in fields) { sets.push('ra = ?'); vals.push(fields.ra ?? null); }
-  if ('dec' in fields) { sets.push('dec = ?'); vals.push(fields.dec ?? null); }
-  if ('paDeg' in fields) { sets.push('pa_deg = ?'); vals.push(fields.paDeg ?? null); }
-  if ('dsoId' in fields) { sets.push('dso_id = ?'); vals.push(fields.dsoId ?? null); }
-  if ('mosaicWDeg' in fields) { sets.push('mosaic_w_deg = ?'); vals.push(fields.mosaicWDeg ?? null); }
-  if ('mosaicHDeg' in fields) { sets.push('mosaic_h_deg = ?'); vals.push(fields.mosaicHDeg ?? null); }
+  if ('ra' in fields) {
+    sets.push('ra = ?');
+    vals.push(fields.ra ?? null);
+  }
+  if ('dec' in fields) {
+    sets.push('dec = ?');
+    vals.push(fields.dec ?? null);
+  }
+  if ('paDeg' in fields) {
+    sets.push('pa_deg = ?');
+    vals.push(fields.paDeg ?? null);
+  }
+  if ('dsoId' in fields) {
+    sets.push('dso_id = ?');
+    vals.push(fields.dsoId ?? null);
+  }
+  if ('mosaicWDeg' in fields) {
+    sets.push('mosaic_w_deg = ?');
+    vals.push(fields.mosaicWDeg ?? null);
+  }
+  if ('mosaicHDeg' in fields) {
+    sets.push('mosaic_h_deg = ?');
+    vals.push(fields.mosaicHDeg ?? null);
+  }
   if (sets.length === 0) return false;
   vals.push(entryId);
-  return db.prepare(`UPDATE plan_entries SET ${sets.join(', ')} WHERE id = ?`).run(...vals).changes > 0;
+  return (
+    db.prepare(`UPDATE plan_entries SET ${sets.join(', ')} WHERE id = ?`).run(...vals).changes > 0
+  );
 }
 
 export function reorderPlanEntries(planId: string, ids: string[]): void {

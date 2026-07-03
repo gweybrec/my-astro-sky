@@ -1,5 +1,10 @@
 <template>
-  <BaseModal :title="t('shortcuts.title')" bodyClass="modal-form-body--scroll" modalClass="!w-fit !max-w-[90vw]" @close="emit('close')">
+  <BaseModal
+    :title="t('shortcuts.title')"
+    bodyClass="modal-form-body--scroll"
+    modalClass="!w-fit !max-w-[90vw]"
+    @close="emit('close')"
+  >
     <!-- w-0 + min-w-full lets the intro fill (and wrap to) the content width without
          widening the modal — the two columns alone drive the overall width. -->
     <p class="w-0 min-w-full text-dim text-small mb-5">{{ t('shortcuts.intro') }}</p>
@@ -22,7 +27,8 @@
                 class="w-[1.3em] shrink-0 text-center"
                 :class="{ invisible: !conflicts.has(action.id) }"
                 aria-hidden="true"
-              >⚠</span>
+                >⚠</span
+              >
               {{ t(action.labelKey) }}
             </span>
 
@@ -35,15 +41,23 @@
                 :key="key"
                 class="px-3 py-1 rounded-sm border font-mono text-small"
                 :class="[
-                  conflicts.has(action.id) ? 'border-[var(--status-warn-border)] bg-[var(--status-warn-bg)] text-[var(--status-warn-text)]' : 'border-subtle bg-app text-primary',
+                  conflicts.has(action.id)
+                    ? 'border-[var(--status-warn-border)] bg-[var(--status-warn-bg)] text-[var(--status-warn-text)]'
+                    : 'border-subtle bg-app text-primary',
                   capturingId === action.id ? 'invisible' : '',
                 ]"
-              >{{ formatKey(key) }}</kbd>
-              <span v-if="bindings[action.id].length === 0 && capturingId !== action.id" class="text-muted text-small">—</span>
+                >{{ formatKey(key) }}</kbd
+              >
+              <span
+                v-if="bindings[action.id].length === 0 && capturingId !== action.id"
+                class="text-muted text-small"
+                >—</span
+              >
               <span
                 v-if="capturingId === action.id"
                 class="absolute right-0 whitespace-nowrap px-3 py-1 rounded-sm border border-focus bg-app text-secondary text-small italic"
-              >{{ t('shortcuts.pressAKey') }}</span>
+                >{{ t('shortcuts.pressAKey') }}</span
+              >
             </span>
 
             <span class="flex items-center gap-1">
@@ -52,12 +66,16 @@
                 :class="{ 'btn-icon--active': capturingId === action.id }"
                 :title="t('shortcuts.rebind')"
                 @click="startCapture(action.id)"
-              >✎</button>
+              >
+                ✎
+              </button>
               <button
                 class="btn-icon"
                 :title="t('shortcuts.resetOne')"
                 @click="resetOne(action.id)"
-              >↺</button>
+              >
+                ↺
+              </button>
             </span>
           </template>
         </div>

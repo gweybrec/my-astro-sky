@@ -9,9 +9,7 @@ try {
 } catch (_) {}
 
 const isTargetFile =
-  filePath &&
-  /[/\\](src|server)[/\\].+\.ts$/.test(filePath) &&
-  !filePath.endsWith('.d.ts');
+  filePath && /[/\\](src|server)[/\\].+\.ts$/.test(filePath) && !filePath.endsWith('.d.ts');
 
 if (!isTargetFile) process.exit(0);
 

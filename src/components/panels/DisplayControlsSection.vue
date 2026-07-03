@@ -1,7 +1,11 @@
 <template>
   <CollapsibleSection :title="t('display.section')" :default-open="true">
     <!-- Show photos -->
-    <CheckRow :label="t('display.showPhotos')" :model-value="displayStore.showPhotos" @update:model-value="displayStore.setShowPhotos" />
+    <CheckRow
+      :label="t('display.showPhotos')"
+      :model-value="displayStore.showPhotos"
+      @update:model-value="displayStore.setShowPhotos"
+    />
 
     <!-- Labels dropdown (must be first after show-photos, per original DOM insertion order) -->
     <LabelsDropdown />
@@ -10,7 +14,11 @@
     <SkyPoiDropdown />
 
     <!-- Show DSOs -->
-    <CheckRow :label="t('dso.showDSOs')" :model-value="displayStore.showDSOs" @update:model-value="displayStore.setShowDSOs($event)" />
+    <CheckRow
+      :label="t('dso.showDSOs')"
+      :model-value="displayStore.showDSOs"
+      @update:model-value="displayStore.setShowDSOs($event)"
+    />
 
     <!-- Types dropdown -->
     <div class="display-controls-mag-row" :style="{ opacity: displayStore.showDSOs ? '1' : '0.4' }">
@@ -20,7 +28,10 @@
         class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
         :disabled="!displayStore.showDSOs"
         @click.stop="typeOpen = !typeOpen"
-      >{{ t('gallery.filterTypes') }}{{ displayStore.dsoTypes.length > 0 ? ` (${displayStore.dsoTypes.length})` : '' }}</button>
+      >
+        {{ t('gallery.filterTypes')
+        }}{{ displayStore.dsoTypes.length > 0 ? ` (${displayStore.dsoTypes.length})` : '' }}
+      </button>
       <DropdownPanel v-model="typeOpen" :anchor-el="typeBtnRef" min-width="240px">
         <label class="labels-select-all-row">
           <input
@@ -54,7 +65,10 @@
         class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
         :disabled="!displayStore.showDSOs"
         @click.stop="catalogOpen = !catalogOpen"
-      >{{ t('gallery.filterCatalogs') }}{{ displayStore.dsoCatalogs.length > 0 ? ` (${displayStore.dsoCatalogs.length})` : '' }}</button>
+      >
+        {{ t('gallery.filterCatalogs')
+        }}{{ displayStore.dsoCatalogs.length > 0 ? ` (${displayStore.dsoCatalogs.length})` : '' }}
+      </button>
       <DropdownPanel v-model="catalogOpen" :anchor-el="catalogBtnRef" min-width="240px">
         <label class="labels-select-all-row">
           <input
@@ -88,12 +102,16 @@
           class="hemisphere-btn"
           :class="{ 'hemisphere-btn--active': displayStore.hemisphere === 'north' }"
           @click="displayStore.setHemisphere('north')"
-        >{{ t('display.hemisphereNorth') }}</button>
+        >
+          {{ t('display.hemisphereNorth') }}
+        </button>
         <button
           class="hemisphere-btn"
           :class="{ 'hemisphere-btn--active': displayStore.hemisphere === 'south' }"
           @click="displayStore.setHemisphere('south')"
-        >{{ t('display.hemisphereSouth') }}</button>
+        >
+          {{ t('display.hemisphereSouth') }}
+        </button>
       </div>
     </div>
 
@@ -105,18 +123,25 @@
           class="hemisphere-btn"
           :class="{ 'hemisphere-btn--active': !fisheyeStore.active }"
           @click="fisheyeStore.setActive(false)"
-        >{{ t('display.projStereo') }}</button>
+        >
+          {{ t('display.projStereo') }}
+        </button>
         <button
           class="hemisphere-btn"
           :class="{ 'hemisphere-btn--active': fisheyeStore.active }"
           @click="fisheyeStore.setActive(true)"
-        >{{ t('display.projFisheye') }}</button>
+        >
+          {{ t('display.projFisheye') }}
+        </button>
       </div>
     </div>
 
     <!-- Border latitude slider -->
     <div class="display-controls-mag-row mt-6 mb-3">
-      <label class="display-controls-mag-label border-slider-label" :title="t('display.borderLatTooltip')">
+      <label
+        class="display-controls-mag-label border-slider-label"
+        :title="t('display.borderLatTooltip')"
+      >
         {{ t('display.borderLatDeg') }}
       </label>
       <input
@@ -132,8 +157,16 @@
     </div>
 
     <!-- Checkboxes -->
-    <CheckRow :label="t('display.showStars')" :model-value="displayStore.showStars" @update:model-value="displayStore.setShowStars" />
-    <CheckRow :label="t('display.constellationLines')" :model-value="displayStore.showConstellationLines" @update:model-value="displayStore.setShowConstellationLines" />
+    <CheckRow
+      :label="t('display.showStars')"
+      :model-value="displayStore.showStars"
+      @update:model-value="displayStore.setShowStars"
+    />
+    <CheckRow
+      :label="t('display.constellationLines')"
+      :model-value="displayStore.showConstellationLines"
+      @update:model-value="displayStore.setShowConstellationLines"
+    />
     <CheckRow
       :label="t('display.constellationNames')"
       :model-value="namesChecked"
@@ -157,10 +190,26 @@
       </select>
     </div>
 
-    <CheckRow :label="t('display.starLabels')" :model-value="displayStore.showStarLabels" @update:model-value="displayStore.setShowStarLabels" />
-    <CheckRow :label="t('display.dsoLabels')" :model-value="displayStore.showDSOLabels" @update:model-value="displayStore.setShowDSOLabels" />
-    <CheckRow :label="t('display.raDecGrid')" :model-value="displayStore.showGrid" @update:model-value="displayStore.setShowGrid" />
-    <CheckRow :label="t('display.photoOutlines')" :model-value="displayStore.showPhotoOutlines" @update:model-value="displayStore.setShowPhotoOutlines" />
+    <CheckRow
+      :label="t('display.starLabels')"
+      :model-value="displayStore.showStarLabels"
+      @update:model-value="displayStore.setShowStarLabels"
+    />
+    <CheckRow
+      :label="t('display.dsoLabels')"
+      :model-value="displayStore.showDSOLabels"
+      @update:model-value="displayStore.setShowDSOLabels"
+    />
+    <CheckRow
+      :label="t('display.raDecGrid')"
+      :model-value="displayStore.showGrid"
+      @update:model-value="displayStore.setShowGrid"
+    />
+    <CheckRow
+      :label="t('display.photoOutlines')"
+      :model-value="displayStore.showPhotoOutlines"
+      @update:model-value="displayStore.setShowPhotoOutlines"
+    />
 
     <!-- Opacity sliders -->
     <SliderRow
@@ -181,9 +230,21 @@
     />
 
     <!-- Tooltip toggles -->
-    <CheckRow :label="t('display.showStarTooltips')" :model-value="displayStore.showStarTooltips" @update:model-value="displayStore.setShowStarTooltips" />
-    <CheckRow :label="t('display.showDSOTooltips')" :model-value="displayStore.showDSOTooltips" @update:model-value="displayStore.setShowDSOTooltips" />
-    <CheckRow :label="t('display.simplifiedDSOTooltips')" :model-value="displayStore.simplifiedDSOTooltips" @update:model-value="displayStore.setSimplifiedDSOTooltips" />
+    <CheckRow
+      :label="t('display.showStarTooltips')"
+      :model-value="displayStore.showStarTooltips"
+      @update:model-value="displayStore.setShowStarTooltips"
+    />
+    <CheckRow
+      :label="t('display.showDSOTooltips')"
+      :model-value="displayStore.showDSOTooltips"
+      @update:model-value="displayStore.setShowDSOTooltips"
+    />
+    <CheckRow
+      :label="t('display.simplifiedDSOTooltips')"
+      :model-value="displayStore.simplifiedDSOTooltips"
+      @update:model-value="displayStore.setSimplifiedDSOTooltips"
+    />
   </CollapsibleSection>
 </template>
 
@@ -208,7 +269,7 @@ const displayStore = useDisplayStore();
 const fisheyeStore = useFisheyeStore();
 
 const namesChecked = computed(() =>
-  isIAUStyle(displayStore.constellationStyle) ? displayStore.showConstellationNames : false
+  isIAUStyle(displayStore.constellationStyle) ? displayStore.showConstellationNames : false,
 );
 
 function onBorderLatInput(e: Event) {
@@ -225,8 +286,12 @@ const typeBtnRef = ref<HTMLButtonElement>();
 const typeSelectAllRef = ref<HTMLInputElement>();
 const typeOpen = ref(false);
 
-const allTypesChecked = computed(() => DSO_TYPES_ALL.every(ty => displayStore.dsoTypes.includes(ty)));
-const someTypesChecked = computed(() => DSO_TYPES_ALL.some(ty => displayStore.dsoTypes.includes(ty)));
+const allTypesChecked = computed(() =>
+  DSO_TYPES_ALL.every((ty) => displayStore.dsoTypes.includes(ty)),
+);
+const someTypesChecked = computed(() =>
+  DSO_TYPES_ALL.some((ty) => displayStore.dsoTypes.includes(ty)),
+);
 
 watch([allTypesChecked, someTypesChecked], () => {
   if (typeSelectAllRef.value) {
@@ -245,7 +310,9 @@ watch(typeOpen, (open) => {
 });
 
 function toggleType(type: string, checked: boolean) {
-  const next = DSO_TYPES_ALL.filter(ty => ty === type ? checked : displayStore.dsoTypes.includes(ty));
+  const next = DSO_TYPES_ALL.filter((ty) =>
+    ty === type ? checked : displayStore.dsoTypes.includes(ty),
+  );
   displayStore.setDsoTypes(next);
 }
 
@@ -258,12 +325,17 @@ const catalogBtnRef = ref<HTMLButtonElement>();
 const catalogSelectAllRef = ref<HTMLInputElement>();
 const catalogOpen = ref(false);
 
-const allCatalogsChecked = computed(() => DSO_CATALOGS_ALL.every(c => displayStore.dsoCatalogs.includes(c)));
-const someCatalogsChecked = computed(() => DSO_CATALOGS_ALL.some(c => displayStore.dsoCatalogs.includes(c)));
+const allCatalogsChecked = computed(() =>
+  DSO_CATALOGS_ALL.every((c) => displayStore.dsoCatalogs.includes(c)),
+);
+const someCatalogsChecked = computed(() =>
+  DSO_CATALOGS_ALL.some((c) => displayStore.dsoCatalogs.includes(c)),
+);
 
 watch([allCatalogsChecked, someCatalogsChecked], () => {
   if (catalogSelectAllRef.value) {
-    catalogSelectAllRef.value.indeterminate = someCatalogsChecked.value && !allCatalogsChecked.value;
+    catalogSelectAllRef.value.indeterminate =
+      someCatalogsChecked.value && !allCatalogsChecked.value;
   }
 });
 
@@ -272,13 +344,16 @@ watch(catalogOpen, (open) => {
     typeOpen.value = false;
     nextTick(() => {
       if (catalogSelectAllRef.value)
-        catalogSelectAllRef.value.indeterminate = someCatalogsChecked.value && !allCatalogsChecked.value;
+        catalogSelectAllRef.value.indeterminate =
+          someCatalogsChecked.value && !allCatalogsChecked.value;
     });
   }
 });
 
 function toggleCatalog(cat: string, checked: boolean) {
-  const next = DSO_CATALOGS_ALL.filter(c => c === cat ? checked : displayStore.dsoCatalogs.includes(c));
+  const next = DSO_CATALOGS_ALL.filter((c) =>
+    c === cat ? checked : displayStore.dsoCatalogs.includes(c),
+  );
   displayStore.setDsoCatalogs(next);
 }
 

@@ -1,18 +1,65 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse, idsToReplaceByName } from '../../server/import-utils';
+import {
+  isValidZipEntryPath,
+  parseManifestPhotos,
+  validateDsoOverrideCoords,
+  inspectZipContents,
+  buildZipPreviewResponse,
+  idsToReplaceByName,
+} from '../../server/import-utils';
 import type { ZipEntry, ZipInspectResult } from '../../server/import-utils';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const CORRS_A = [
-  { pointIndex: 0, photoX: 100, photoY: 200, starHip: 27989, starName: 'Betelgeuse', starRa: 88.7929, starDec: 7.4071 },
-  { pointIndex: 1, photoX: 400, photoY: 600, starHip: 32349, starName: 'Rigel',      starRa: 78.6345, starDec: -8.2016 },
-  { pointIndex: 2, photoX: 700, photoY: 100, starHip: 24436, starName: 'Bellatrix',  starRa: 81.2827, starDec:  6.3497 },
+  {
+    pointIndex: 0,
+    photoX: 100,
+    photoY: 200,
+    starHip: 27989,
+    starName: 'Betelgeuse',
+    starRa: 88.7929,
+    starDec: 7.4071,
+  },
+  {
+    pointIndex: 1,
+    photoX: 400,
+    photoY: 600,
+    starHip: 32349,
+    starName: 'Rigel',
+    starRa: 78.6345,
+    starDec: -8.2016,
+  },
+  {
+    pointIndex: 2,
+    photoX: 700,
+    photoY: 100,
+    starHip: 24436,
+    starName: 'Bellatrix',
+    starRa: 81.2827,
+    starDec: 6.3497,
+  },
 ];
 
 const CORRS_B = [
-  { pointIndex: 0, photoX:  50, photoY:  75, starHip: 3179, starName: 'Mirach',     starRa: 17.4330, starDec: 35.6202 },
-  { pointIndex: 1, photoX: 600, photoY: 400, starHip: 5447, starName: 'Alpheratz',  starRa:  0.1397, starDec: 29.0904 },
+  {
+    pointIndex: 0,
+    photoX: 50,
+    photoY: 75,
+    starHip: 3179,
+    starName: 'Mirach',
+    starRa: 17.433,
+    starDec: 35.6202,
+  },
+  {
+    pointIndex: 1,
+    photoX: 600,
+    photoY: 400,
+    starHip: 5447,
+    starName: 'Alpheratz',
+    starRa: 0.1397,
+    starDec: 29.0904,
+  },
 ];
 
 /** A minimal Photo[] that covers all fields (correspondences, dsoIds, labels, notes, manualPlacement). */
@@ -160,7 +207,11 @@ describe('DB import/export round-trip', () => {
     const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
 
     const result = createPhotoWithId(
-      'test-id-1', 'test-id-1.jpg', 'M101.jpg', 1920, 1080,
+      'test-id-1',
+      'test-id-1.jpg',
+      'M101.jpg',
+      1920,
+      1080,
       CORRS_A,
       '2026-01-15T08:00:00.000Z',
       null,
@@ -197,11 +248,17 @@ describe('DB import/export round-trip', () => {
     const mp = { ra: 83.82, dec: -5.39, projPerPx: 0.002, rotDeg: 0 };
 
     createPhotoWithId(
-      'mp-test', 'mp-test.jpg', 'Orion.jpg', 800, 600,
+      'mp-test',
+      'mp-test.jpg',
+      'Orion.jpg',
+      800,
+      600,
       CORRS_A,
       null,
       JSON.stringify(mp),
-      [], [], '',
+      [],
+      [],
+      '',
       'skip',
     );
 
@@ -214,13 +271,55 @@ describe('DB import/export round-trip', () => {
   it('strategy=skip returns "skipped" and leaves existing photo unchanged', async () => {
     const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
     const minCorrs = [
-      { pointIndex: 0, photoX: 1, photoY: 2, starHip: 1, starName: 'A', starRa: null, starDec: null },
-      { pointIndex: 1, photoX: 3, photoY: 4, starHip: 2, starName: 'B', starRa: null, starDec: null },
+      {
+        pointIndex: 0,
+        photoX: 1,
+        photoY: 2,
+        starHip: 1,
+        starName: 'A',
+        starRa: null,
+        starDec: null,
+      },
+      {
+        pointIndex: 1,
+        photoX: 3,
+        photoY: 4,
+        starHip: 2,
+        starName: 'B',
+        starRa: null,
+        starDec: null,
+      },
     ];
 
-    createPhotoWithId('dup-id', 'original.jpg', 'original.jpg', 100, 100, minCorrs, null, null, [], [], 'original note', 'skip');
+    createPhotoWithId(
+      'dup-id',
+      'original.jpg',
+      'original.jpg',
+      100,
+      100,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      'original note',
+      'skip',
+    );
 
-    const r2 = createPhotoWithId('dup-id', 'updated.jpg', 'updated.jpg', 999, 999, minCorrs, null, null, ['M1'], [], 'new note', 'skip');
+    const r2 = createPhotoWithId(
+      'dup-id',
+      'updated.jpg',
+      'updated.jpg',
+      999,
+      999,
+      minCorrs,
+      null,
+      null,
+      ['M1'],
+      [],
+      'new note',
+      'skip',
+    );
     expect(r2).toBe('skipped');
 
     const all = getAllPhotos();
@@ -234,13 +333,57 @@ describe('DB import/export round-trip', () => {
   it('strategy=replace returns "imported" and overwrites the existing photo', async () => {
     const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
     const minCorrs = [
-      { pointIndex: 0, photoX: 1, photoY: 2, starHip: 1, starName: 'A', starRa: null, starDec: null },
-      { pointIndex: 1, photoX: 3, photoY: 4, starHip: 2, starName: 'B', starRa: null, starDec: null },
+      {
+        pointIndex: 0,
+        photoX: 1,
+        photoY: 2,
+        starHip: 1,
+        starName: 'A',
+        starRa: null,
+        starDec: null,
+      },
+      {
+        pointIndex: 1,
+        photoX: 3,
+        photoY: 4,
+        starHip: 2,
+        starName: 'B',
+        starRa: null,
+        starDec: null,
+      },
     ];
 
-    createPhotoWithId('rep-id', 'original.jpg', 'original.jpg', 100, 100, minCorrs, null, null, [], [], 'old', 'skip', [{ frames: 1, seconds: 30, filter: 'R' }]);
+    createPhotoWithId(
+      'rep-id',
+      'original.jpg',
+      'original.jpg',
+      100,
+      100,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      'old',
+      'skip',
+      [{ frames: 1, seconds: 30, filter: 'R' }],
+    );
 
-    const r2 = createPhotoWithId('rep-id', 'replaced.jpg', 'replaced.jpg', 800, 600, minCorrs, null, null, ['M42'], ['nebula'], 'updated', 'replace', [{ frames: 12, seconds: 180, filter: 'Halpha' }]);
+    const r2 = createPhotoWithId(
+      'rep-id',
+      'replaced.jpg',
+      'replaced.jpg',
+      800,
+      600,
+      minCorrs,
+      null,
+      null,
+      ['M42'],
+      ['nebula'],
+      'updated',
+      'replace',
+      [{ frames: 12, seconds: 180, filter: 'Halpha' }],
+    );
     expect(r2).toBe('imported');
 
     const all = getAllPhotos();
@@ -256,12 +399,32 @@ describe('DB import/export round-trip', () => {
   it('createPhotoWithId/getAllPhotos sanitizes invalid integrations on read', async () => {
     const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
     const minCorrs = [
-      { pointIndex: 0, photoX: 1, photoY: 2, starHip: 1, starName: 'A', starRa: null, starDec: null },
-      { pointIndex: 1, photoX: 3, photoY: 4, starHip: 2, starName: 'B', starRa: null, starDec: null },
+      {
+        pointIndex: 0,
+        photoX: 1,
+        photoY: 2,
+        starHip: 1,
+        starName: 'A',
+        starRa: null,
+        starDec: null,
+      },
+      {
+        pointIndex: 1,
+        photoX: 3,
+        photoY: 4,
+        starHip: 2,
+        starName: 'B',
+        starRa: null,
+        starDec: null,
+      },
     ];
 
     createPhotoWithId(
-      'int-invalid', 'invalid.jpg', 'invalid.jpg', 100, 100,
+      'int-invalid',
+      'invalid.jpg',
+      'invalid.jpg',
+      100,
+      100,
       minCorrs,
       null,
       null,
@@ -285,12 +448,54 @@ describe('DB import/export round-trip', () => {
   it('checkPhotosExist returns only IDs present in the DB', async () => {
     const { createPhotoWithId, checkPhotosExist } = await import('../../server/db.js');
     const minCorrs = [
-      { pointIndex: 0, photoX: 0, photoY: 0, starHip: 1, starName: 'X', starRa: null, starDec: null },
-      { pointIndex: 1, photoX: 1, photoY: 1, starHip: 2, starName: 'Y', starRa: null, starDec: null },
+      {
+        pointIndex: 0,
+        photoX: 0,
+        photoY: 0,
+        starHip: 1,
+        starName: 'X',
+        starRa: null,
+        starDec: null,
+      },
+      {
+        pointIndex: 1,
+        photoX: 1,
+        photoY: 1,
+        starHip: 2,
+        starName: 'Y',
+        starRa: null,
+        starDec: null,
+      },
     ];
 
-    createPhotoWithId('exists-1', 'f1.jpg', 'f1.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('exists-2', 'f2.jpg', 'f2.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'exists-1',
+      'f1.jpg',
+      'f1.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    createPhotoWithId(
+      'exists-2',
+      'f2.jpg',
+      'f2.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     const result = checkPhotosExist(['exists-1', 'ghost-a', 'exists-2', 'ghost-b']);
     expect(result).toHaveLength(2);
@@ -308,18 +513,60 @@ describe('DB import/export round-trip', () => {
   it('checkPhotosExistByName returns entries whose original_name matches', async () => {
     const { createPhotoWithId, checkPhotosExistByName } = await import('../../server/db.js');
     const minCorrs = [
-      { pointIndex: 0, photoX: 0, photoY: 0, starHip: 1, starName: 'X', starRa: null, starDec: null },
-      { pointIndex: 1, photoX: 1, photoY: 1, starHip: 2, starName: 'Y', starRa: null, starDec: null },
+      {
+        pointIndex: 0,
+        photoX: 0,
+        photoY: 0,
+        starHip: 1,
+        starName: 'X',
+        starRa: null,
+        starDec: null,
+      },
+      {
+        pointIndex: 1,
+        photoX: 1,
+        photoY: 1,
+        starHip: 2,
+        starName: 'Y',
+        starRa: null,
+        starDec: null,
+      },
     ];
 
-    createPhotoWithId('byname-id-1', 'uuid-a.jpg', 'M42.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('byname-id-2', 'uuid-b.jpg', 'M31.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'byname-id-1',
+      'uuid-a.jpg',
+      'M42.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    createPhotoWithId(
+      'byname-id-2',
+      'uuid-b.jpg',
+      'M31.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     const result = checkPhotosExistByName(['M42.jpg', 'ghost.jpg', 'M31.jpg']);
     expect(result).toHaveLength(2);
     expect(result).toContainEqual({ originalName: 'M42.jpg', id: 'byname-id-1' });
     expect(result).toContainEqual({ originalName: 'M31.jpg', id: 'byname-id-2' });
-    expect(result.map(r => r.originalName)).not.toContain('ghost.jpg');
+    expect(result.map((r) => r.originalName)).not.toContain('ghost.jpg');
   });
 
   it('checkPhotosExistByName returns empty array when no names match', async () => {
@@ -330,10 +577,31 @@ describe('DB import/export round-trip', () => {
   it('checkPhotosExistByName matches on original_name, not id or filename column', async () => {
     const { createPhotoWithId, checkPhotosExistByName } = await import('../../server/db.js');
     const minCorrs = [
-      { pointIndex: 0, photoX: 0, photoY: 0, starHip: 1, starName: 'X', starRa: null, starDec: null },
+      {
+        pointIndex: 0,
+        photoX: 0,
+        photoY: 0,
+        starHip: 1,
+        starName: 'X',
+        starRa: null,
+        starDec: null,
+      },
     ];
     // Insert with id='the-uuid', filename='the-uuid.jpg', originalName='original.jpg'
-    createPhotoWithId('the-uuid', 'the-uuid.jpg', 'original.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'the-uuid',
+      'the-uuid.jpg',
+      'original.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     // Should NOT match by id or filename column value
     expect(checkPhotosExistByName(['the-uuid'])).toEqual([]);
@@ -350,11 +618,17 @@ describe('DB import/export round-trip', () => {
     // Simulate the server-side import loop
     for (const p of MANIFEST_FIXTURE) {
       const result = createPhotoWithId(
-        p.id, p.filename, p.originalName, p.width, p.height,
+        p.id,
+        p.filename,
+        p.originalName,
+        p.width,
+        p.height,
         p.correspondences,
         p.createdAt,
         (p as any).manualPlacement ? JSON.stringify((p as any).manualPlacement) : null,
-        p.dsoIds, p.labels, p.notes,
+        p.dsoIds,
+        p.labels,
+        p.notes,
         'skip',
         (p as any).integrations,
       );
@@ -365,7 +639,7 @@ describe('DB import/export round-trip', () => {
     expect(exported).toHaveLength(2);
 
     // Photo A
-    const eA = exported.find(p => p.id === 'aaa-111-aaa')!;
+    const eA = exported.find((p) => p.id === 'aaa-111-aaa')!;
     expect(eA).toBeDefined();
     expect(eA.originalName).toBe('M1_crab.jpg');
     expect(eA.width).toBe(1024);
@@ -383,7 +657,7 @@ describe('DB import/export round-trip', () => {
     expect(eA.correspondences[1].starName).toBe('Rigel');
 
     // Photo B — with manualPlacement
-    const eB = exported.find(p => p.id === 'bbb-222-bbb')!;
+    const eB = exported.find((p) => p.id === 'bbb-222-bbb')!;
     expect(eB).toBeDefined();
     expect(eB.dsoIds).toEqual(['M31']);
     expect(eB.labels).toEqual([]);
@@ -433,33 +707,82 @@ describe('Plan + mosaic export/import round-trip', () => {
 
     // ── Seed: a plan with a 2-tile mosaic plus a standalone smart-scope frame. ──
     db.createPlan({
-      id: 'plan-1', name: 'Night A', position: 0, created_at: '2026-01-01T00:00:00.000Z',
-      night_of: '2026-06-20', setup_id: null, lat: 48.85, lon: 2.35,
+      id: 'plan-1',
+      name: 'Night A',
+      position: 0,
+      created_at: '2026-01-01T00:00:00.000Z',
+      night_of: '2026-06-20',
+      setup_id: null,
+      lat: 48.85,
+      lon: 2.35,
     });
     db.createPlanMosaic(
       {
-        id: 'mo-1', plan_id: 'plan-1', dso_id: 'M31', name: 'Andromeda mosaic',
-        center_ra: 10.68, center_dec: 41.27, pa_deg: 15, overlap_pct: 20, cols: 2, rows: 1,
+        id: 'mo-1',
+        plan_id: 'plan-1',
+        dso_id: 'M31',
+        name: 'Andromeda mosaic',
+        center_ra: 10.68,
+        center_dec: 41.27,
+        pa_deg: 15,
+        overlap_pct: 20,
+        cols: 2,
+        rows: 1,
       },
-      [{ ra: 10.4, dec: 41.27, paDeg: 15 }, { ra: 10.9, dec: 41.27, paDeg: 15 }],
+      [
+        { ra: 10.4, dec: 41.27, paDeg: 15 },
+        { ra: 10.9, dec: 41.27, paDeg: 15 },
+      ],
     );
     db.addPlanEntry({
-      id: 'pe-smart', plan_id: 'plan-1', dso_id: 'M42', position: 99, pa_deg: null,
-      ra: null, dec: null, notes: null, mosaic_id: null, mosaic_w_deg: 3.25, mosaic_h_deg: 3.25,
+      id: 'pe-smart',
+      plan_id: 'plan-1',
+      dso_id: 'M42',
+      position: 99,
+      pa_deg: null,
+      ra: null,
+      dec: null,
+      notes: null,
+      mosaic_id: null,
+      mosaic_w_deg: 3.25,
+      mosaic_h_deg: 3.25,
     });
 
     // ── Export (mirrors the /api/export plan mapping). ──
     const allEntries = db.getAllPlanEntries();
-    const exported = db.getPlans().map(p => ({
-      id: p.id, name: p.name, position: p.position, nightOf: p.night_of, setupId: p.setup_id,
-      lat: p.lat, lon: p.lon,
-      entries: allEntries.filter(e => e.plan_id === p.id).map(e => ({
-        id: e.id, dsoId: e.dso_id, position: e.position, paDeg: e.pa_deg, ra: e.ra, dec: e.dec,
-        notes: e.notes, mosaicId: e.mosaic_id, mosaicWDeg: e.mosaic_w_deg, mosaicHDeg: e.mosaic_h_deg,
-      })),
-      mosaics: db.getPlanMosaics(p.id).map(m => ({
-        id: m.id, dsoId: m.dso_id, name: m.name, centerRa: m.center_ra, centerDec: m.center_dec,
-        paDeg: m.pa_deg, overlapPct: m.overlap_pct, cols: m.cols, rows: m.rows, position: m.position,
+    const exported = db.getPlans().map((p) => ({
+      id: p.id,
+      name: p.name,
+      position: p.position,
+      nightOf: p.night_of,
+      setupId: p.setup_id,
+      lat: p.lat,
+      lon: p.lon,
+      entries: allEntries
+        .filter((e) => e.plan_id === p.id)
+        .map((e) => ({
+          id: e.id,
+          dsoId: e.dso_id,
+          position: e.position,
+          paDeg: e.pa_deg,
+          ra: e.ra,
+          dec: e.dec,
+          notes: e.notes,
+          mosaicId: e.mosaic_id,
+          mosaicWDeg: e.mosaic_w_deg,
+          mosaicHDeg: e.mosaic_h_deg,
+        })),
+      mosaics: db.getPlanMosaics(p.id).map((m) => ({
+        id: m.id,
+        dsoId: m.dso_id,
+        name: m.name,
+        centerRa: m.center_ra,
+        centerDec: m.center_dec,
+        paDeg: m.pa_deg,
+        overlapPct: m.overlap_pct,
+        cols: m.cols,
+        rows: m.rows,
+        position: m.position,
       })),
     }));
     const bundle = JSON.parse(JSON.stringify(exported)); // survives JSON serialization
@@ -471,21 +794,43 @@ describe('Plan + mosaic export/import round-trip', () => {
 
     for (const p of bundle) {
       db.createPlan({
-        id: p.id, name: p.name, position: p.position, created_at: '2026-02-02T00:00:00.000Z',
-        night_of: p.nightOf, setup_id: p.setupId, lat: p.lat, lon: p.lon,
+        id: p.id,
+        name: p.name,
+        position: p.position,
+        created_at: '2026-02-02T00:00:00.000Z',
+        night_of: p.nightOf,
+        setup_id: p.setupId,
+        lat: p.lat,
+        lon: p.lon,
       });
       for (const e of p.entries) {
         db.addPlanEntry({
-          id: e.id, plan_id: p.id, dso_id: e.dsoId, position: e.position, pa_deg: e.paDeg,
-          ra: e.ra, dec: e.dec, notes: e.notes, mosaic_id: e.mosaicId,
-          mosaic_w_deg: e.mosaicWDeg, mosaic_h_deg: e.mosaicHDeg,
+          id: e.id,
+          plan_id: p.id,
+          dso_id: e.dsoId,
+          position: e.position,
+          pa_deg: e.paDeg,
+          ra: e.ra,
+          dec: e.dec,
+          notes: e.notes,
+          mosaic_id: e.mosaicId,
+          mosaic_w_deg: e.mosaicWDeg,
+          mosaic_h_deg: e.mosaicHDeg,
         });
       }
       for (const m of p.mosaics) {
         db.addPlanMosaic({
-          id: m.id, plan_id: p.id, dso_id: m.dsoId, name: m.name, center_ra: m.centerRa,
-          center_dec: m.centerDec, pa_deg: m.paDeg, overlap_pct: m.overlapPct,
-          cols: m.cols, rows: m.rows, position: m.position,
+          id: m.id,
+          plan_id: p.id,
+          dso_id: m.dsoId,
+          name: m.name,
+          center_ra: m.centerRa,
+          center_dec: m.centerDec,
+          pa_deg: m.paDeg,
+          overlap_pct: m.overlapPct,
+          cols: m.cols,
+          rows: m.rows,
+          position: m.position,
         });
       }
     }
@@ -499,11 +844,11 @@ describe('Plan + mosaic export/import round-trip', () => {
 
     // ── Its two tiles stayed grouped (mosaic_id preserved, not nulled). ──
     const entries = db.getAllPlanEntries();
-    const tiles = entries.filter(e => e.mosaic_id === 'mo-1');
+    const tiles = entries.filter((e) => e.mosaic_id === 'mo-1');
     expect(tiles).toHaveLength(2);
 
     // ── The standalone smart-scope frame kept its single-frame size. ──
-    const smart = entries.find(e => e.id === 'pe-smart')!;
+    const smart = entries.find((e) => e.id === 'pe-smart')!;
     expect(smart.mosaic_id).toBeNull();
     expect(smart.mosaic_w_deg).toBe(3.25);
     expect(smart.mosaic_h_deg).toBe(3.25);
@@ -533,13 +878,31 @@ describe('Name-based override on import (replace, else add)', () => {
   it('plan with a colliding name replaces the existing one (by name, not id)', async () => {
     const db = await import('../../server/db.js');
     // User hand-created a plan named "Winter" with its own id.
-    db.createPlan({ id: 'local-id', name: 'Winter', position: 0, created_at: 'x', night_of: null, setup_id: null, lat: null, lon: null });
+    db.createPlan({
+      id: 'local-id',
+      name: 'Winter',
+      position: 0,
+      created_at: 'x',
+      night_of: null,
+      setup_id: null,
+      lat: null,
+      lon: null,
+    });
 
     // Import a backup plan also named "Winter" but with a different (bundle) id.
     const importedName = 'Winter';
     idsToReplaceByName(db.getPlans(), importedName).forEach(db.deletePlan);
     db.deletePlan('bundle-id');
-    db.createPlan({ id: 'bundle-id', name: importedName, position: 0, created_at: 'y', night_of: '2026-06-24', setup_id: null, lat: null, lon: null });
+    db.createPlan({
+      id: 'bundle-id',
+      name: importedName,
+      position: 0,
+      created_at: 'y',
+      night_of: '2026-06-24',
+      setup_id: null,
+      lat: null,
+      lon: null,
+    });
 
     const plans = db.getPlans();
     expect(plans).toHaveLength(1);
@@ -549,24 +912,59 @@ describe('Name-based override on import (replace, else add)', () => {
 
   it('plan with no name match is added alongside existing plans', async () => {
     const db = await import('../../server/db.js');
-    db.createPlan({ id: 'local-id', name: 'Winter', position: 0, created_at: 'x', night_of: null, setup_id: null, lat: null, lon: null });
+    db.createPlan({
+      id: 'local-id',
+      name: 'Winter',
+      position: 0,
+      created_at: 'x',
+      night_of: null,
+      setup_id: null,
+      lat: null,
+      lon: null,
+    });
 
     const importedName = 'Summer';
     idsToReplaceByName(db.getPlans(), importedName).forEach(db.deletePlan);
     db.deletePlan('bundle-id');
-    db.createPlan({ id: 'bundle-id', name: importedName, position: 1, created_at: 'y', night_of: null, setup_id: null, lat: null, lon: null });
+    db.createPlan({
+      id: 'bundle-id',
+      name: importedName,
+      position: 1,
+      created_at: 'y',
+      night_of: null,
+      setup_id: null,
+      lat: null,
+      lon: null,
+    });
 
-    const names = db.getPlans().map(p => p.name).sort();
+    const names = db
+      .getPlans()
+      .map((p) => p.name)
+      .sort();
     expect(names).toEqual(['Summer', 'Winter']);
   });
 
   it('gear setup with a colliding name replaces the existing one', async () => {
     const db = await import('../../server/db.js');
-    db.upsertGearSetup({ id: 'local-id', name: 'Main rig', telescope_id: 't1', camera_id: 'c1', accessory_id: null, enabled: 1 });
+    db.upsertGearSetup({
+      id: 'local-id',
+      name: 'Main rig',
+      telescope_id: 't1',
+      camera_id: 'c1',
+      accessory_id: null,
+      enabled: 1,
+    });
 
     const importedName = 'Main rig';
     idsToReplaceByName(db.getAllGearSetups(), importedName).forEach(db.deleteGearSetup);
-    db.upsertGearSetup({ id: 'bundle-id', name: importedName, telescope_id: 't2', camera_id: 'c2', accessory_id: null, enabled: 1 });
+    db.upsertGearSetup({
+      id: 'bundle-id',
+      name: importedName,
+      telescope_id: 't2',
+      camera_id: 'c2',
+      accessory_id: null,
+      enabled: 1,
+    });
 
     const setups = db.getAllGearSetups();
     expect(setups).toHaveLength(1);
@@ -582,15 +980,16 @@ describe('Name-based override on import (replace, else add)', () => {
 
     // Import a telescope also named "Vega" → replaces only the telescope.
     const importedName = 'Vega';
-    const sameType = db.getAllCustomGear()
-      .filter(r => r.type === 'telescope')
-      .map(r => ({ id: r.id, name: JSON.parse(r.data).name as string }));
+    const sameType = db
+      .getAllCustomGear()
+      .filter((r) => r.type === 'telescope')
+      .map((r) => ({ id: r.id, name: JSON.parse(r.data).name as string }));
     idsToReplaceByName(sameType, importedName).forEach(db.deleteCustomGear);
     db.upsertCustomGear('scope-bundle', 'telescope', { id: 'scope-bundle', name: importedName });
 
     const all = db.getAllCustomGear();
-    const scopes = all.filter(r => r.type === 'telescope');
-    const accessories = all.filter(r => r.type === 'accessory');
+    const scopes = all.filter((r) => r.type === 'telescope');
+    const accessories = all.filter((r) => r.type === 'accessory');
     expect(scopes).toHaveLength(1);
     expect(scopes[0].id).toBe('scope-bundle');
     expect(accessories).toHaveLength(1); // untouched
@@ -602,8 +1001,24 @@ describe('Name-based override on import (replace, else add)', () => {
 
 describe('updatePhotoMetadata', () => {
   const minCorrs = [
-    { pointIndex: 0, photoX: 10, photoY: 20, starHip: 1, starName: 'A', starRa: null, starDec: null },
-    { pointIndex: 1, photoX: 30, photoY: 40, starHip: 2, starName: 'B', starRa: null, starDec: null },
+    {
+      pointIndex: 0,
+      photoX: 10,
+      photoY: 20,
+      starHip: 1,
+      starName: 'A',
+      starRa: null,
+      starDec: null,
+    },
+    {
+      pointIndex: 1,
+      photoX: 30,
+      photoY: 40,
+      starHip: 2,
+      starName: 'B',
+      starRa: null,
+      starDec: null,
+    },
   ];
 
   beforeEach(() => {
@@ -616,11 +1031,32 @@ describe('updatePhotoMetadata', () => {
   });
 
   it('updates dsoIds, labels and notes without touching originalName', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } = await import('../../server/db.js');
+    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
+      await import('../../server/db.js');
 
-    createPhotoWithId('upd-1', 'upd-1.jpg', 'Orion.jpg', 800, 600, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'upd-1',
+      'upd-1.jpg',
+      'Orion.jpg',
+      800,
+      600,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
-    const changed = updatePhotoMetadata('upd-1', ['M42', 'NGC1977'], ['narrowband'], 'Test note', undefined, [{ frames: 10, seconds: 180, filter: 'Halpha' }]);
+    const changed = updatePhotoMetadata(
+      'upd-1',
+      ['M42', 'NGC1977'],
+      ['narrowband'],
+      'Test note',
+      undefined,
+      [{ frames: 10, seconds: 180, filter: 'Halpha' }],
+    );
     expect(changed).toBe(true);
 
     const p = getAllPhotos()[0];
@@ -632,9 +1068,23 @@ describe('updatePhotoMetadata', () => {
   });
 
   it('drops invalid integrations during metadata update', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } = await import('../../server/db.js');
+    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
+      await import('../../server/db.js');
 
-    createPhotoWithId('upd-int', 'upd-int.jpg', 'Integration.jpg', 800, 600, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'upd-int',
+      'upd-int.jpg',
+      'Integration.jpg',
+      800,
+      600,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     const changed = updatePhotoMetadata('upd-int', [], [], '', undefined, [
       { frames: 18, seconds: 240, filter: 'OIII' },
@@ -649,9 +1099,23 @@ describe('updatePhotoMetadata', () => {
   });
 
   it('updates originalName when provided', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } = await import('../../server/db.js');
+    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
+      await import('../../server/db.js');
 
-    createPhotoWithId('upd-2', 'upd-2.jpg', 'M42 original.jpg', 800, 600, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'upd-2',
+      'upd-2.jpg',
+      'M42 original.jpg',
+      800,
+      600,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     const changed = updatePhotoMetadata('upd-2', ['M42'], [], 'some notes', 'M42 renamed.jpg');
     expect(changed).toBe(true);
@@ -677,15 +1141,42 @@ describe('updatePhotoMetadata', () => {
   });
 
   it('does not affect other photos when updating one', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } = await import('../../server/db.js');
+    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
+      await import('../../server/db.js');
 
-    createPhotoWithId('photo-a', 'a.jpg', 'PhotoA.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('photo-b', 'b.jpg', 'PhotoB.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'photo-a',
+      'a.jpg',
+      'PhotoA.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    createPhotoWithId(
+      'photo-b',
+      'b.jpg',
+      'PhotoB.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     updatePhotoMetadata('photo-a', ['M1'], ['red'], 'note a', 'PhotoA renamed.jpg');
 
     const all = getAllPhotos();
-    const b = all.find(p => p.id === 'photo-b')!;
+    const b = all.find((p) => p.id === 'photo-b')!;
     expect(b.originalName).toBe('PhotoB.jpg');
     expect(b.dsoIds).toEqual([]);
     expect(b.labels).toEqual([]);
@@ -696,8 +1187,24 @@ describe('updatePhotoMetadata', () => {
 
 describe('updatePhotoDrawOrder', () => {
   const minCorrs = [
-    { pointIndex: 0, photoX: 10, photoY: 20, starHip: 1, starName: 'A', starRa: null, starDec: null },
-    { pointIndex: 1, photoX: 30, photoY: 40, starHip: 2, starName: 'B', starRa: null, starDec: null },
+    {
+      pointIndex: 0,
+      photoX: 10,
+      photoY: 20,
+      starHip: 1,
+      starName: 'A',
+      starRa: null,
+      starDec: null,
+    },
+    {
+      pointIndex: 1,
+      photoX: 30,
+      photoY: 40,
+      starHip: 2,
+      starName: 'B',
+      starRa: null,
+      starDec: null,
+    },
   ];
 
   beforeEach(() => {
@@ -710,7 +1217,8 @@ describe('updatePhotoDrawOrder', () => {
   });
 
   it('persists explicit draw order and getAllPhotos returns photos in that order', async () => {
-    const { createPhotoWithId, updatePhotoDrawOrder, getAllPhotos } = await import('../../server/db.js');
+    const { createPhotoWithId, updatePhotoDrawOrder, getAllPhotos } =
+      await import('../../server/db.js');
 
     createPhotoWithId('ord-a', 'a.jpg', 'A.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
     createPhotoWithId('ord-b', 'b.jpg', 'B.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
@@ -719,7 +1227,7 @@ describe('updatePhotoDrawOrder', () => {
     const changed = updatePhotoDrawOrder(['ord-b', 'ord-c', 'ord-a']);
     expect(changed).toBe(true);
 
-    const ordered = getAllPhotos().map(p => p.id);
+    const ordered = getAllPhotos().map((p) => p.id);
     expect(ordered).toEqual(['ord-b', 'ord-c', 'ord-a']);
   });
 
@@ -809,7 +1317,7 @@ describe('Export filtering with stale IDs', () => {
     const { getAllPhotos } = await import('../../server/db.js');
     const staleIds = ['deleted-a', 'deleted-b'];
     // No photos inserted — simulates post-deletion state
-    const selected = getAllPhotos().filter(p => staleIds.includes(p.id));
+    const selected = getAllPhotos().filter((p) => staleIds.includes(p.id));
     expect(selected).toEqual([]);
     // The manifest written to ZIP would be [] — the source of the bug
     expect(JSON.stringify(selected)).toBe('[]');
@@ -818,20 +1326,59 @@ describe('Export filtering with stale IDs', () => {
   it('returns only the photos whose IDs still exist in the DB', async () => {
     const { createPhotoWithId, deletePhoto, getAllPhotos } = await import('../../server/db.js');
 
-    createPhotoWithId('keep-1', 'k1.jpg', 'Keep1.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('deleted-1', 'd1.jpg', 'Deleted1.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('keep-2', 'k2.jpg', 'Keep2.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
+    createPhotoWithId(
+      'keep-1',
+      'k1.jpg',
+      'Keep1.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    createPhotoWithId(
+      'deleted-1',
+      'd1.jpg',
+      'Deleted1.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    createPhotoWithId(
+      'keep-2',
+      'k2.jpg',
+      'Keep2.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     // Simulate user deleting one photo between export-button click and server handling
     deletePhoto('deleted-1');
 
     const requestedIds = ['keep-1', 'deleted-1', 'keep-2']; // stale: still includes deleted-1
-    const selected = getAllPhotos().filter(p => requestedIds.includes(p.id));
+    const selected = getAllPhotos().filter((p) => requestedIds.includes(p.id));
 
     expect(selected).toHaveLength(2);
-    expect(selected.map(p => p.id)).toContain('keep-1');
-    expect(selected.map(p => p.id)).toContain('keep-2');
-    expect(selected.map(p => p.id)).not.toContain('deleted-1');
+    expect(selected.map((p) => p.id)).toContain('keep-1');
+    expect(selected.map((p) => p.id)).toContain('keep-2');
+    expect(selected.map((p) => p.id)).not.toContain('deleted-1');
   });
 
   it('exports all photos when ids array is empty (backup-button behaviour)', async () => {
@@ -842,9 +1389,10 @@ describe('Export filtering with stale IDs', () => {
 
     const ids: string[] = [];
     // Server logic: if ids is empty → export everything
-    const selected = Array.isArray(ids) && ids.length > 0
-      ? getAllPhotos().filter(p => ids.includes(p.id))
-      : getAllPhotos();
+    const selected =
+      Array.isArray(ids) && ids.length > 0
+        ? getAllPhotos().filter((p) => ids.includes(p.id))
+        : getAllPhotos();
 
     expect(selected).toHaveLength(2);
   });
@@ -854,8 +1402,22 @@ describe('Export filtering with stale IDs', () => {
 
 describe('parseManifestPhotos — manifest format compatibility', () => {
   const PHOTOS = [
-    { id: 'a', filename: 'a.jpg', originalName: 'A.jpg', width: 100, height: 100, correspondences: [] },
-    { id: 'b', filename: 'b.jpg', originalName: 'B.jpg', width: 200, height: 200, correspondences: [] },
+    {
+      id: 'a',
+      filename: 'a.jpg',
+      originalName: 'A.jpg',
+      width: 100,
+      height: 100,
+      correspondences: [],
+    },
+    {
+      id: 'b',
+      filename: 'b.jpg',
+      originalName: 'B.jpg',
+      width: 200,
+      height: 200,
+      correspondences: [],
+    },
   ];
 
   it('accepts legacy format: plain JSON array', () => {
@@ -992,8 +1554,23 @@ function mockEntry(filePath: string, content: string, size?: number): ZipEntry {
 const MANIFEST_WITH_THUMBS = JSON.stringify({
   manifestVersion: 1,
   photos: [
-    { id: 'ph1', filename: 'ph1.jpg', originalName: 'Orion.jpg', width: 800, height: 600, correspondences: [] },
-    { id: 'ph2', filename: 'ph2.jpg', originalName: 'M31.jpg', width: 1024, height: 768, correspondences: [], thumbFilename: 'ph2_thumb.jpg' },
+    {
+      id: 'ph1',
+      filename: 'ph1.jpg',
+      originalName: 'Orion.jpg',
+      width: 800,
+      height: 600,
+      correspondences: [],
+    },
+    {
+      id: 'ph2',
+      filename: 'ph2.jpg',
+      originalName: 'M31.jpg',
+      width: 1024,
+      height: 768,
+      correspondences: [],
+      thumbFilename: 'ph2_thumb.jpg',
+    },
   ],
 });
 
@@ -1022,7 +1599,14 @@ describe('inspectZipContents — ZIP content inspection', () => {
 
   it('detects manifest.json and parses photos (legacy array format)', async () => {
     const manifest = JSON.stringify([
-      { id: 'a', filename: 'a.jpg', originalName: 'A.jpg', width: 100, height: 100, correspondences: [] },
+      {
+        id: 'a',
+        filename: 'a.jpg',
+        originalName: 'A.jpg',
+        width: 100,
+        height: 100,
+        correspondences: [],
+      },
     ]);
     const result = await inspectZipContents([mockEntry('manifest.json', manifest)]);
     expect(result.hasMetadata).toBe(true);
@@ -1046,7 +1630,7 @@ describe('inspectZipContents — ZIP content inspection', () => {
   });
 
   it('detects dso-overrides.json with entries → hasDsoOverrides true', async () => {
-    const dso = JSON.stringify({ 'NGC1952': { name_en: 'Crab Nebula' } });
+    const dso = JSON.stringify({ NGC1952: { name_en: 'Crab Nebula' } });
     const result = await inspectZipContents([mockEntry('dso-overrides.json', dso)]);
     expect(result.hasDsoOverrides).toBe(true);
     expect(result.hasCustomGear).toBe(false);
@@ -1079,7 +1663,9 @@ describe('inspectZipContents — ZIP content inspection', () => {
   });
 
   it('detects gear-setups.json with entries → hasSetups true + setupItems', async () => {
-    const setups = JSON.stringify([{ id: 's1', telescopeId: 't1', cameraId: 'c1', name: 'Setup A', enabled: true }]);
+    const setups = JSON.stringify([
+      { id: 's1', telescopeId: 't1', cameraId: 'c1', name: 'Setup A', enabled: true },
+    ]);
     const result = await inspectZipContents([mockEntry('gear-setups.json', setups)]);
     expect(result.hasSetups).toBe(true);
     expect(result.setupItems).toEqual([{ id: 's1', name: 'Setup A' }]);
@@ -1115,9 +1701,9 @@ describe('inspectZipContents — ZIP content inspection', () => {
       mockEntry('images/another.png', 'pngdata', 8000),
     ]);
     expect(result.imageEntries).toHaveLength(2);
-    expect(result.imageEntries.map(e => e.filename)).toContain('photo.jpg');
-    expect(result.imageEntries.map(e => e.filename)).toContain('another.png');
-    expect(result.imageEntries.find(e => e.filename === 'photo.jpg')!.size).toBe(5000);
+    expect(result.imageEntries.map((e) => e.filename)).toContain('photo.jpg');
+    expect(result.imageEntries.map((e) => e.filename)).toContain('another.png');
+    expect(result.imageEntries.find((e) => e.filename === 'photo.jpg')!.size).toBe(5000);
   });
 
   it('excludes thumbnails (listed in manifest thumbFilename) from imageEntries', async () => {
@@ -1128,9 +1714,9 @@ describe('inspectZipContents — ZIP content inspection', () => {
       mockEntry('images/ph2_thumb.jpg', 'thumbdata', 1000),
     ]);
     expect(result.imageEntries).toHaveLength(2);
-    expect(result.imageEntries.map(e => e.filename)).toContain('ph1.jpg');
-    expect(result.imageEntries.map(e => e.filename)).toContain('ph2.jpg');
-    expect(result.imageEntries.map(e => e.filename)).not.toContain('ph2_thumb.jpg');
+    expect(result.imageEntries.map((e) => e.filename)).toContain('ph1.jpg');
+    expect(result.imageEntries.map((e) => e.filename)).toContain('ph2.jpg');
+    expect(result.imageEntries.map((e) => e.filename)).not.toContain('ph2_thumb.jpg');
   });
 
   it('images-only ZIP (no manifest): imageEntries lists all images, hasMetadata false', async () => {
@@ -1145,7 +1731,14 @@ describe('inspectZipContents — ZIP content inspection', () => {
 
   it('metadata-only ZIP (manifest, no images/): imageEntries empty', async () => {
     const manifest = JSON.stringify([
-      { id: 'x', filename: 'x.jpg', originalName: 'X.jpg', width: 1, height: 1, correspondences: [] },
+      {
+        id: 'x',
+        filename: 'x.jpg',
+        originalName: 'X.jpg',
+        width: 1,
+        height: 1,
+        correspondences: [],
+      },
     ]);
     const result = await inspectZipContents([mockEntry('manifest.json', manifest)]);
     expect(result.hasMetadata).toBe(true);
@@ -1153,9 +1746,11 @@ describe('inspectZipContents — ZIP content inspection', () => {
   });
 
   it('full ZIP with all sections → all flags true, images list correct', async () => {
-    const dso = JSON.stringify({ 'M1': { name_en: 'Crab Nebula' } });
+    const dso = JSON.stringify({ M1: { name_en: 'Crab Nebula' } });
     const gear = JSON.stringify([{ id: 'custom-t1', type: 'telescope', name: 'RC8' }]);
-    const setups = JSON.stringify([{ id: 's1', telescopeId: 'custom-t1', cameraId: 'c1', name: 'Main', enabled: true }]);
+    const setups = JSON.stringify([
+      { id: 's1', telescopeId: 'custom-t1', cameraId: 'c1', name: 'Main', enabled: true },
+    ]);
     const result = await inspectZipContents([
       mockEntry('manifest.json', MANIFEST_WITH_THUMBS),
       mockEntry('dso-overrides.json', dso),
@@ -1171,7 +1766,7 @@ describe('inspectZipContents — ZIP content inspection', () => {
     expect(result.hasSetups).toBe(true);
     expect(result.photos).toHaveLength(2);
     expect(result.imageEntries).toHaveLength(2);
-    expect(result.imageEntries.map(e => e.filename)).not.toContain('ph2_thumb.jpg');
+    expect(result.imageEntries.map((e) => e.filename)).not.toContain('ph2_thumb.jpg');
   });
 
   it('skips image entries with disallowed extensions', async () => {
@@ -1224,7 +1819,14 @@ describe('buildZipPreviewResponse', () => {
     gearItems: [{ id: 'gear-1', type: 'telescope', name: 'RC8' }],
     imageEntries: [{ filename: 'a.jpg', size: 5000 }],
   };
-  const noExtra = { hasShortcuts: false, shortcuts: undefined, images: [], plans: [], setups: [], gear: [] };
+  const noExtra = {
+    hasShortcuts: false,
+    shortcuts: undefined,
+    images: [],
+    plans: [],
+    setups: [],
+    gear: [],
+  };
 
   it('forwards every has* flag from the inspect result (regression: hasPlans was dropped)', () => {
     const res = buildZipPreviewResponse(fullInspect, noExtra);
@@ -1244,7 +1846,14 @@ describe('buildZipPreviewResponse', () => {
   it('reports the photo count and passes through shortcuts + images', () => {
     const images = [{ filename: 'a.jpg', originalName: 'A.jpg', size: 5000, exists: false }];
     const shortcuts = { save: 'ctrl+s' };
-    const res = buildZipPreviewResponse(fullInspect, { hasShortcuts: true, shortcuts, images, plans: [], setups: [], gear: [] });
+    const res = buildZipPreviewResponse(fullInspect, {
+      hasShortcuts: true,
+      shortcuts,
+      images,
+      plans: [],
+      setups: [],
+      gear: [],
+    });
     expect(res.photos).toBe(1);
     expect(res.hasShortcuts).toBe(true);
     expect(res.shortcuts).toEqual(shortcuts);
@@ -1255,7 +1864,13 @@ describe('buildZipPreviewResponse', () => {
     const plans = [{ id: 'plan-1', name: 'Night A', exists: true }];
     const setups = [{ id: 'setup-1', name: 'Main rig', exists: false }];
     const gear = [{ id: 'gear-1', type: 'telescope', name: 'RC8', exists: true }];
-    const res = buildZipPreviewResponse(fullInspect, { hasShortcuts: false, images: [], plans, setups, gear });
+    const res = buildZipPreviewResponse(fullInspect, {
+      hasShortcuts: false,
+      images: [],
+      plans,
+      setups,
+      gear,
+    });
     expect(res.plans).toEqual(plans);
     expect(res.setups).toEqual(setups);
     expect(res.gear).toEqual(gear);

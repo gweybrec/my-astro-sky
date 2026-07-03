@@ -10,11 +10,7 @@
         v-model="searchQuery"
         @input="onSearchInput"
       />
-      <button
-        v-if="searchQuery"
-        class="search-clear-btn"
-        @click="clearSearch"
-      >&times;</button>
+      <button v-if="searchQuery" class="search-clear-btn" @click="clearSearch">&times;</button>
     </div>
 
     <!-- Labels dropdown -->
@@ -24,16 +20,25 @@
         type="button"
         class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
         @click.stop="labelOpen = !labelOpen"
-      >{{ t('gallery.filterLabels') }}{{ selectedLabels.length > 0 ? ` (${selectedLabels.length})` : '' }}</button>
+      >
+        {{ t('gallery.filterLabels')
+        }}{{ selectedLabels.length > 0 ? ` (${selectedLabels.length})` : '' }}
+      </button>
       <DropdownPanel v-model="labelOpen" :anchor-el="labelBtnRef" min-width="220px">
         <div class="labels-select-all-row justify-between">
-          <span class="labels-select-all-label text-muted">{{ selectedLabels.length === 0 ? t('gallery.showingAll') : `${selectedLabels.length} ${t('gallery.selected')}` }}</span>
+          <span class="labels-select-all-label text-muted">{{
+            selectedLabels.length === 0
+              ? t('gallery.showingAll')
+              : `${selectedLabels.length} ${t('gallery.selected')}`
+          }}</span>
           <button
             type="button"
             class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
             :disabled="selectedLabels.length === 0"
             @click="clearLabels"
-          >✕ {{ t('display.clear') }}</button>
+          >
+            ✕ {{ t('display.clear') }}
+          </button>
         </div>
         <div v-if="availableLabels.length === 0" class="px-6 py-3 text-muted text-base">—</div>
         <label
@@ -47,7 +52,9 @@
               :checked="selectedLabels.includes(item.label)"
               @change="(e) => toggleLabel(item.label, (e.target as HTMLInputElement).checked)"
             />
-            <span class="tag-chip label-chip tag-chip-sm ml-4">{{ item.label === '(no label)' ? t('display.noLabel') : item.label }}</span>
+            <span class="tag-chip label-chip tag-chip-sm ml-4">{{
+              item.label === '(no label)' ? t('display.noLabel') : item.label
+            }}</span>
           </div>
           <span class="labels-count-span">{{ item.count }}</span>
         </label>
@@ -69,16 +76,25 @@
         type="button"
         class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
         @click.stop="typeOpen = !typeOpen"
-      >{{ t('gallery.filterTypes') }}{{ selectedTypes.length > 0 ? ` (${selectedTypes.length})` : '' }}</button>
+      >
+        {{ t('gallery.filterTypes')
+        }}{{ selectedTypes.length > 0 ? ` (${selectedTypes.length})` : '' }}
+      </button>
       <DropdownPanel v-model="typeOpen" :anchor-el="typeBtnRef" min-width="240px">
         <div class="labels-select-all-row justify-between">
-          <span class="labels-select-all-label text-muted">{{ selectedTypes.length === 0 ? t('gallery.showingAll') : `${selectedTypes.length} ${t('gallery.selected')}` }}</span>
+          <span class="labels-select-all-label text-muted">{{
+            selectedTypes.length === 0
+              ? t('gallery.showingAll')
+              : `${selectedTypes.length} ${t('gallery.selected')}`
+          }}</span>
           <button
             type="button"
             class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
             :disabled="selectedTypes.length === 0"
             @click="clearTypes"
-          >✕ {{ t('display.clear') }}</button>
+          >
+            ✕ {{ t('display.clear') }}
+          </button>
         </div>
         <label
           v-for="type in DSO_TYPES_ALL"
@@ -102,16 +118,25 @@
         type="button"
         class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
         @click.stop="catalogOpen = !catalogOpen"
-      >{{ t('gallery.filterCatalogs') }}{{ selectedCatalogs.length > 0 ? ` (${selectedCatalogs.length})` : '' }}</button>
+      >
+        {{ t('gallery.filterCatalogs')
+        }}{{ selectedCatalogs.length > 0 ? ` (${selectedCatalogs.length})` : '' }}
+      </button>
       <DropdownPanel v-model="catalogOpen" :anchor-el="catalogBtnRef" min-width="240px">
         <div class="labels-select-all-row justify-between">
-          <span class="labels-select-all-label text-muted">{{ selectedCatalogs.length === 0 ? t('gallery.showingAll') : `${selectedCatalogs.length} ${t('gallery.selected')}` }}</span>
+          <span class="labels-select-all-label text-muted">{{
+            selectedCatalogs.length === 0
+              ? t('gallery.showingAll')
+              : `${selectedCatalogs.length} ${t('gallery.selected')}`
+          }}</span>
           <button
             type="button"
             class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
             :disabled="selectedCatalogs.length === 0"
             @click="clearCatalogs"
-          >✕ {{ t('display.clear') }}</button>
+          >
+            ✕ {{ t('display.clear') }}
+          </button>
         </div>
         <label
           v-for="cat in DSO_CATALOGS_ALL"
@@ -151,7 +176,12 @@ import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import PoiFilterDropdown from './PoiFilterDropdown.vue';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { buildPoiFilterGroups, prunePoiSelection, poiSelectionsEqual, type PoiFilterGroup } from '../../poi';
+import {
+  buildPoiFilterGroups,
+  prunePoiSelection,
+  poiSelectionsEqual,
+  type PoiFilterGroup,
+} from '../../poi';
 import { showToast } from '../../toast';
 import { downloadBlob } from '../../file-utils';
 import { renderGalleryPdf } from '../../export-render';
@@ -230,7 +260,7 @@ function refreshLabels() {
 function toggleLabel(label: string, checked: boolean) {
   selectedLabels.value = checked
     ? [...selectedLabels.value, label]
-    : selectedLabels.value.filter(l => l !== label);
+    : selectedLabels.value.filter((l) => l !== label);
   canvasStore.gallery?.setLabelFilter(selectedLabels.value);
 }
 
@@ -240,7 +270,9 @@ function clearLabels() {
 }
 
 // DropdownPanel closes any other open dropdown itself, so we only refresh here.
-watch(labelOpen, (open) => { if (open) refreshLabels(); });
+watch(labelOpen, (open) => {
+  if (open) refreshLabels();
+});
 
 // ── DSO Types ─────────────────────────────────────────────────────────────────
 const typeBtnRef = ref<HTMLButtonElement>();
@@ -251,7 +283,7 @@ const selectedTypes = ref<string[]>([]);
 function toggleType(type: string, checked: boolean) {
   selectedTypes.value = checked
     ? [...selectedTypes.value, type]
-    : selectedTypes.value.filter(t => t !== type);
+    : selectedTypes.value.filter((t) => t !== type);
   canvasStore.gallery?.setDSOTypeFilter(selectedTypes.value);
 }
 
@@ -269,7 +301,7 @@ const selectedCatalogs = ref<string[]>([]);
 function toggleCatalog(cat: string, checked: boolean) {
   selectedCatalogs.value = checked
     ? [...selectedCatalogs.value, cat]
-    : selectedCatalogs.value.filter(c => c !== cat);
+    : selectedCatalogs.value.filter((c) => c !== cat);
   canvasStore.gallery?.setDSOCatalogFilter(selectedCatalogs.value);
 }
 

@@ -1,11 +1,6 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="modelValue"
-      ref="panelRef"
-      class="dropdown-panel"
-      @click.stop
-    >
+    <div v-if="modelValue" ref="panelRef" class="dropdown-panel" @click.stop>
       <slot />
     </div>
   </Teleport>
@@ -36,7 +31,9 @@ const emit = defineEmits<{ 'update:modelValue': [v: boolean] }>();
 const panelRef = ref<HTMLElement>();
 let cleanup: (() => void) | null = null;
 
-function close() { emit('update:modelValue', false); }
+function close() {
+  emit('update:modelValue', false);
+}
 
 function teardown() {
   cleanup?.();
@@ -44,25 +41,28 @@ function teardown() {
   document.removeEventListener('click', close);
 }
 
-watch(() => props.modelValue, (open) => {
-  if (open) {
-    // Close any other open dropdown before showing this one.
-    if (closeActivePanel && closeActivePanel !== close) closeActivePanel();
-    closeActivePanel = close;
-    nextTick(() => {
-      if (!panelRef.value || !props.anchorEl) return;
-      cleanup = attachAnchoredPanel(panelRef.value, props.anchorEl, {
-        alignRight: props.alignRight,
-        minWidth: props.minWidth,
-        onAnchorOutOfView: close,
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) {
+      // Close any other open dropdown before showing this one.
+      if (closeActivePanel && closeActivePanel !== close) closeActivePanel();
+      closeActivePanel = close;
+      nextTick(() => {
+        if (!panelRef.value || !props.anchorEl) return;
+        cleanup = attachAnchoredPanel(panelRef.value, props.anchorEl, {
+          alignRight: props.alignRight,
+          minWidth: props.minWidth,
+          onAnchorOutOfView: close,
+        });
       });
-    });
-    document.addEventListener('click', close);
-  } else {
-    if (closeActivePanel === close) closeActivePanel = null;
-    teardown();
-  }
-});
+      document.addEventListener('click', close);
+    } else {
+      if (closeActivePanel === close) closeActivePanel = null;
+      teardown();
+    }
+  },
+);
 
 onBeforeUnmount(() => {
   if (closeActivePanel === close) closeActivePanel = null;

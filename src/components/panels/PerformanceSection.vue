@@ -12,7 +12,12 @@
         step="1"
         :disabled="displayStore.autoStarDensity"
         :value="budgetToSliderPos(displayStore.maxStarCount, STAR_DENSITY_MAX)"
-        @input="(e) => displayStore.setMaxStarCount(sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), STAR_DENSITY_MAX))"
+        @input="
+          (e) =>
+            displayStore.setMaxStarCount(
+              sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), STAR_DENSITY_MAX),
+            )
+        "
       />
     </div>
     <CheckRow
@@ -33,7 +38,12 @@
         step="1"
         :disabled="displayStore.autoDSODensity"
         :value="budgetToSliderPos(displayStore.maxDSOCount, DSO_DENSITY_MAX)"
-        @input="(e) => displayStore.setMaxDSOCount(sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), DSO_DENSITY_MAX))"
+        @input="
+          (e) =>
+            displayStore.setMaxDSOCount(
+              sliderPosToBudget(parseInt((e.target as HTMLInputElement).value), DSO_DENSITY_MAX),
+            )
+        "
       />
     </div>
     <CheckRow
@@ -58,8 +68,11 @@ import CheckRow from '../base/CheckRow.vue';
 import { useDisplayStore } from '../../stores/display';
 import { useI18n } from '../../composables/useI18n';
 import {
-  sliderPosToBudget, budgetToSliderPos,
-  STAR_DENSITY_MAX, DSO_DENSITY_MAX, SLIDER_STEPS,
+  sliderPosToBudget,
+  budgetToSliderPos,
+  STAR_DENSITY_MAX,
+  DSO_DENSITY_MAX,
+  SLIDER_STEPS,
 } from '../../density-slider';
 
 const { t } = useI18n();

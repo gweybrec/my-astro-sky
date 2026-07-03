@@ -76,10 +76,10 @@ export const SKY_THEME: SkyThemeConfig = {
   // Deep blue-black base — already has a hint of atmosphere, never pure black
   baseFill: '#040810',
   bgStops: [
-    [0.0, 'rgba(26, 38, 66, 0.55)'],   // soft deep-blue atmospheric glow at center
-    [0.45, 'rgba(14, 22, 44, 0.5)'],   // fading blue twilight
-    [0.8, 'rgba(7, 12, 26, 0.55)'],    // deepening toward the edge
-    [1.0, 'rgba(3, 5, 12, 0.6)'],      // near-black blue at the far corner
+    [0.0, 'rgba(26, 38, 66, 0.55)'], // soft deep-blue atmospheric glow at center
+    [0.45, 'rgba(14, 22, 44, 0.5)'], // fading blue twilight
+    [0.8, 'rgba(7, 12, 26, 0.55)'], // deepening toward the edge
+    [1.0, 'rgba(3, 5, 12, 0.6)'], // near-black blue at the far corner
   ],
   // Gentle vignette to seat photos without killing the atmospheric blue
   vignette: { color: 'rgba(1, 2, 6, 0.55)', innerStop: 0.6 },
@@ -91,11 +91,11 @@ export const SKY_THEME: SkyThemeConfig = {
   radiusScale: 1.1,
   // Bright stars stay prominent when zooming in (the brightest grow most).
   brightZoomBoost: 0.28,
-  glowThresholdMag: 3.6,   // many stars earn a halo → dense, alive field
-  glowRadiusMul: 1.7,      // small halo that hugs the star — barely there, just noticed
-  glowOpacity: 0.55,       // opacity tapers with brightness (set in renderStars)
-  glowSaturation: 1.45,    // halo is strongly tinted (orange/blue) even though the dot is white
-  glowZoomSpread: 1.4,     // glow blooms obviously around bright stars when zoomed in
+  glowThresholdMag: 3.6, // many stars earn a halo → dense, alive field
+  glowRadiusMul: 1.7, // small halo that hugs the star — barely there, just noticed
+  glowOpacity: 0.55, // opacity tapers with brightness (set in renderStars)
+  glowSaturation: 1.45, // halo is strongly tinted (orange/blue) even though the dot is white
+  glowZoomSpread: 1.4, // glow blooms obviously around bright stars when zoomed in
   // Grid + constellation lines in a soft blue family
   gridColor: 'rgba(90, 130, 200, 0.35)',
   gridEquatorColor: 'rgba(120, 165, 235, 0.65)',

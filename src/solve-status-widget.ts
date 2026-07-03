@@ -1,7 +1,8 @@
 import { t } from './i18n';
 import closeXSvg from './icons/close-x.svg?raw';
 
-export type SharedSolveState = 'solving' | 'success' | 'failed' | 'canceled' | 'waiting' | 'wcs-ready';
+export type SharedSolveState =
+  'solving' | 'success' | 'failed' | 'canceled' | 'waiting' | 'wcs-ready';
 
 interface RenderSharedSolveStatusOptions {
   container: HTMLElement;
@@ -9,14 +10,24 @@ interface RenderSharedSolveStatusOptions {
   message: string;
   subMessage?: string;
   detailsHtml?: string;
-  diagnostics?: string;       // raw solver output — shown as collapsible <details> on failure
+  diagnostics?: string; // raw solver output — shown as collapsible <details> on failure
   showCancel?: boolean;
   onCancel?: () => void;
   mode: 'single' | 'batch';
 }
 
 export function renderSharedSolveStatus(options: RenderSharedSolveStatusOptions): void {
-  const { container, state, message, subMessage, detailsHtml, diagnostics, showCancel, onCancel, mode } = options;
+  const {
+    container,
+    state,
+    message,
+    subMessage,
+    detailsHtml,
+    diagnostics,
+    showCancel,
+    onCancel,
+    mode,
+  } = options;
 
   container.innerHTML = '';
 

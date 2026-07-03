@@ -10,14 +10,86 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename, updatePhotoManualPlacement, updatePhotoMetadata, updatePhotoDrawOrder, createPhotoWithId, checkPhotosExist, checkPhotosExistByName, getSetting, setSetting, deleteSetting, getAllDsoOverrides, upsertDsoOverride as upsertDsoOverrideDB, deleteDsoOverride as deleteDsoOverrideDB, getAllCustomGear, upsertCustomGear as upsertCustomGearDB, deleteCustomGear as deleteCustomGearDB, deleteAllPhotoMetadata as deleteAllPhotoMetadataDB, deleteAllDsoOverrides as deleteAllDsoOverridesDB, deleteAllCustomGear as deleteAllCustomGearDB, getAllGearSetups, upsertGearSetup, updateGearSetupEnabled, deleteGearSetup, deleteAllGearSetups, sanitizePois, getAllPoiCategories, upsertPoiCategory, deletePoiCategory, deleteAllPoiCategories, type PointOfInterestInput, type PoiCategoryRow, getPlans, getPlan, getAllPlanEntries, createPlan, renamePlan, updatePlanSettings, deletePlan, reorderPlans, planEntryExists, addPlanEntry, nextPlanEntryPosition, removePlanEntry, reorderPlanEntries, updatePlanEntryFrame, getAllPlanMosaics, getPlanMosaic, createPlanMosaic, updatePlanMosaic, deletePlanMosaic, addPlanMosaic, type PlanEntryRow, type PlanMosaicRow, type MosaicTileInput } from './db.js';
+import {
+  createPhoto,
+  getAllPhotos,
+  deletePhoto,
+  getPhotoFilename,
+  updatePhotoManualPlacement,
+  updatePhotoMetadata,
+  updatePhotoDrawOrder,
+  createPhotoWithId,
+  checkPhotosExist,
+  checkPhotosExistByName,
+  getSetting,
+  setSetting,
+  deleteSetting,
+  getAllDsoOverrides,
+  upsertDsoOverride as upsertDsoOverrideDB,
+  deleteDsoOverride as deleteDsoOverrideDB,
+  getAllCustomGear,
+  upsertCustomGear as upsertCustomGearDB,
+  deleteCustomGear as deleteCustomGearDB,
+  deleteAllPhotoMetadata as deleteAllPhotoMetadataDB,
+  deleteAllDsoOverrides as deleteAllDsoOverridesDB,
+  deleteAllCustomGear as deleteAllCustomGearDB,
+  getAllGearSetups,
+  upsertGearSetup,
+  updateGearSetupEnabled,
+  deleteGearSetup,
+  deleteAllGearSetups,
+  sanitizePois,
+  getAllPoiCategories,
+  upsertPoiCategory,
+  deletePoiCategory,
+  deleteAllPoiCategories,
+  type PointOfInterestInput,
+  type PoiCategoryRow,
+  getPlans,
+  getPlan,
+  getAllPlanEntries,
+  createPlan,
+  renamePlan,
+  updatePlanSettings,
+  deletePlan,
+  reorderPlans,
+  planEntryExists,
+  addPlanEntry,
+  nextPlanEntryPosition,
+  removePlanEntry,
+  reorderPlanEntries,
+  updatePlanEntryFrame,
+  getAllPlanMosaics,
+  getPlanMosaic,
+  createPlanMosaic,
+  updatePlanMosaic,
+  deletePlanMosaic,
+  addPlanMosaic,
+  type PlanEntryRow,
+  type PlanMosaicRow,
+  type MosaicTileInput,
+} from './db.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 const _require = createRequire(import.meta.url);
 const unzipper = _require('unzipper') as typeof import('unzipper');
-import { isValidZipEntryPath, parseManifestPhotos, validateDsoOverrideCoords, inspectZipContents, buildZipPreviewResponse, idsToReplaceByName } from './import-utils.js';
+import {
+  isValidZipEntryPath,
+  parseManifestPhotos,
+  validateDsoOverrideCoords,
+  inspectZipContents,
+  buildZipPreviewResponse,
+  idsToReplaceByName,
+} from './import-utils.js';
 import { extractWCS, wcsToCorrespondences, loadServerCatalog } from './wcs-reader.js';
-import { submitJob, getJobStatus, isConfigured as isAstrometryConfigured, listUserSubmissions, reuseSubmission, resetSession as resetAstrometrySession } from './astrometry.js';
+import {
+  submitJob,
+  getJobStatus,
+  isConfigured as isAstrometryConfigured,
+  listUserSubmissions,
+  reuseSubmission,
+  resetSession as resetAstrometrySession,
+} from './astrometry.js';
 import { solveWithASTAP } from './astap.js';
 import { solveWithSolveField } from './solve-field.js';
 import { createJob, getJob, updateJob, cancelJob } from './solve-queue.js';
@@ -33,9 +105,15 @@ const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '..', 'uploa
 const RESOURCES_DIR = process.env.RESOURCES_DIR || path.join(__dirname, '..', 'resources');
 
 // Built-in gear catalogs — loaded once at startup
-const builtInTelescopes: object[] = JSON.parse(fs.readFileSync(path.join(RESOURCES_DIR, 'telescopes.json'), 'utf-8'));
-const builtInCameras: object[]    = JSON.parse(fs.readFileSync(path.join(RESOURCES_DIR, 'cameras.json'), 'utf-8'));
-const builtInAccessories: object[] = JSON.parse(fs.readFileSync(path.join(RESOURCES_DIR, 'accessories.json'), 'utf-8'));
+const builtInTelescopes: object[] = JSON.parse(
+  fs.readFileSync(path.join(RESOURCES_DIR, 'telescopes.json'), 'utf-8'),
+);
+const builtInCameras: object[] = JSON.parse(
+  fs.readFileSync(path.join(RESOURCES_DIR, 'cameras.json'), 'utf-8'),
+);
+const builtInAccessories: object[] = JSON.parse(
+  fs.readFileSync(path.join(RESOURCES_DIR, 'accessories.json'), 'utf-8'),
+);
 
 const byBrandModel = (a: any, b: any) =>
   `${a.brand ?? ''} ${a.model ?? ''}`.localeCompare(`${b.brand ?? ''} ${b.model ?? ''}`);
@@ -52,8 +130,14 @@ interface IntegrationRow {
 function sanitizeIntegrationRows(input: unknown): IntegrationRow[] {
   if (!Array.isArray(input)) return [];
   return input.map((entry: any) => ({
-    frames: Number.isInteger(Number(entry?.frames)) && Number(entry?.frames) >= 1 ? Number(entry.frames) : 0,
-    seconds: Number.isInteger(Number(entry?.seconds)) && Number(entry?.seconds) >= 1 ? Number(entry.seconds) : 0,
+    frames:
+      Number.isInteger(Number(entry?.frames)) && Number(entry?.frames) >= 1
+        ? Number(entry.frames)
+        : 0,
+    seconds:
+      Number.isInteger(Number(entry?.seconds)) && Number(entry?.seconds) >= 1
+        ? Number(entry.seconds)
+        : 0,
     filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
   }));
 }
@@ -78,7 +162,7 @@ import { rawToBrowserCoords } from './exif-utils.js';
 // In case we need to clear the cache during development, we can do it from the main process before loading the app.
 // import { app as electronApp, session } from 'electron';
 // electronApp.whenReady().then(async () => {
-  // await session.defaultSession.clearCache();
+// await session.defaultSession.clearCache();
 // });
 
 // In Electron the server runs inside the Electron main process (process.versions.electron is set).
@@ -88,8 +172,8 @@ const isElectron = !!process.versions.electron;
 // Simple in-memory rate limiter
 const rateLimits = new Map<string, number[]>();
 const RATE_WINDOW_MS = 60_000;
-const UPLOAD_LIMIT = 200;  // uploads per minute
-const API_LIMIT = 300;    // API requests per minute — sized for batch status polling (every 2s per active solve)
+const UPLOAD_LIMIT = 200; // uploads per minute
+const API_LIMIT = 300; // API requests per minute — sized for batch status polling (every 2s per active solve)
 
 function checkRateLimit(ip: string, limit: number): boolean {
   const now = Date.now();
@@ -119,7 +203,8 @@ if (!isElectron && (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY =
   app.set('trust proxy', 1);
 }
 
-const enableSwagger = process.env.NODE_ENV !== 'production' && process.env.ENABLE_SWAGGER !== 'false';
+const enableSwagger =
+  process.env.NODE_ENV !== 'production' && process.env.ENABLE_SWAGGER !== 'false';
 
 // All non-CSP helmet protections (X-Content-Type-Options, X-Frame-Options, etc.).
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -152,8 +237,12 @@ app.use((req, res, next) => (req.path.startsWith('/api/docs') ? next() : csp(req
 app.use(compression());
 app.use(express.json()); // Parse JSON request bodies
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/tiff',
-  'image/gif', 'image/webp', 'image/bmp',
+  'image/jpeg',
+  'image/png',
+  'image/tiff',
+  'image/gif',
+  'image/webp',
+  'image/bmp',
 ]);
 
 const upload = multer({
@@ -184,15 +273,21 @@ const uploadBundle = multer({
 const DIST_DIR = process.env.DIST_DIR || path.join(__dirname, '..', 'dist');
 if (fs.existsSync(DIST_DIR)) {
   // Long cache for hashed assets and catalog data, no cache for index.html
-  app.use('/assets', express.static(path.join(DIST_DIR, 'assets'), {
-    etag: true,
-    lastModified: true,
-  }));
-  app.use('/data', express.static(path.join(DIST_DIR, 'data'), {
-    etag: true,
-    lastModified: true,
-    // maxAge defaults to 0, which means "always revalidate"
-  }));
+  app.use(
+    '/assets',
+    express.static(path.join(DIST_DIR, 'assets'), {
+      etag: true,
+      lastModified: true,
+    }),
+  );
+  app.use(
+    '/data',
+    express.static(path.join(DIST_DIR, 'data'), {
+      etag: true,
+      lastModified: true,
+      // maxAge defaults to 0, which means "always revalidate"
+    }),
+  );
   app.use(express.static(DIST_DIR, { maxAge: 0 }));
 }
 
@@ -201,10 +296,15 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Rate limiting on /api routes — skipped in Electron (single-user local app)
 app.use('/api', (req, res, next) => {
-  if (isElectron) { next(); return; }
+  if (isElectron) {
+    next();
+    return;
+  }
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   if (!checkRateLimit(ip, API_LIMIT)) {
-    res.status(429).json({ error: 'Trop de requêtes, réessayez dans un instant', code: 'RATE_LIMIT' });
+    res
+      .status(429)
+      .json({ error: 'Trop de requêtes, réessayez dans un instant', code: 'RATE_LIMIT' });
     return;
   }
   next();
@@ -227,7 +327,9 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     if (!isElectron) {
       const ip = req.ip || req.socket.remoteAddress || 'unknown';
       if (!checkRateLimit(ip + ':upload', UPLOAD_LIMIT)) {
-        res.status(429).json({ error: 'Trop d\'uploads, réessayez dans un instant', code: 'UPLOAD_RATE_LIMIT' });
+        res
+          .status(429)
+          .json({ error: "Trop d'uploads, réessayez dans un instant", code: 'UPLOAD_RATE_LIMIT' });
         return;
       }
     }
@@ -241,13 +343,17 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     // Validate file extension
     const fileExt = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_PHOTO_EXTENSIONS.has(fileExt)) {
-      res.status(400).json({ error: `Extension non autorisée : ${fileExt}`, code: 'INVALID_EXTENSION' });
+      res
+        .status(400)
+        .json({ error: `Extension non autorisée : ${fileExt}`, code: 'INVALID_EXTENSION' });
       return;
     }
 
     const corrJson = req.body?.correspondences;
     if (!corrJson) {
-      res.status(400).json({ error: 'Correspondances manquantes', code: 'MISSING_CORRESPONDENCES' });
+      res
+        .status(400)
+        .json({ error: 'Correspondances manquantes', code: 'MISSING_CORRESPONDENCES' });
       return;
     }
 
@@ -259,37 +365,57 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       return;
     }
     if (!Array.isArray(correspondences) || correspondences.length < 2) {
-      res.status(400).json({ error: 'Au moins 2 correspondances requises', code: 'MIN_CORRESPONDENCES' });
+      res
+        .status(400)
+        .json({ error: 'Au moins 2 correspondances requises', code: 'MIN_CORRESPONDENCES' });
       return;
     }
     if (correspondences.length > MAX_CORRESPONDENCES) {
-      res.status(400).json({ error: `Trop de correspondances (max ${MAX_CORRESPONDENCES})`, code: 'MAX_CORRESPONDENCES' });
+      res.status(400).json({
+        error: `Trop de correspondances (max ${MAX_CORRESPONDENCES})`,
+        code: 'MAX_CORRESPONDENCES',
+      });
       return;
     }
 
     // Validate each correspondence field
     for (const c of correspondences) {
       if (!Number.isInteger(c.pointIndex) || c.pointIndex < 0) {
-        res.status(400).json({ error: 'pointIndex invalide (entier >= 0 attendu)', code: 'INVALID_POINT_INDEX' });
+        res.status(400).json({
+          error: 'pointIndex invalide (entier >= 0 attendu)',
+          code: 'INVALID_POINT_INDEX',
+        });
         return;
       }
       if (typeof c.photoX !== 'number' || !Number.isFinite(c.photoX) || c.photoX < 0) {
-        res.status(400).json({ error: 'photoX invalide (nombre positif attendu)', code: 'INVALID_PHOTO_X' });
+        res
+          .status(400)
+          .json({ error: 'photoX invalide (nombre positif attendu)', code: 'INVALID_PHOTO_X' });
         return;
       }
       if (typeof c.photoY !== 'number' || !Number.isFinite(c.photoY) || c.photoY < 0) {
-        res.status(400).json({ error: 'photoY invalide (nombre positif attendu)', code: 'INVALID_PHOTO_Y' });
+        res
+          .status(400)
+          .json({ error: 'photoY invalide (nombre positif attendu)', code: 'INVALID_PHOTO_Y' });
         return;
       }
       // starHip=0 is allowed when starRa/starDec are provided (direct RA/Dec input)
       if (c.starHip === 0) {
-        if (typeof c.starRa !== 'number' || !Number.isFinite(c.starRa) ||
-            typeof c.starDec !== 'number' || !Number.isFinite(c.starDec)) {
-          res.status(400).json({ error: 'starRa/starDec requis quand starHip=0', code: 'INVALID_STAR_HIP' });
+        if (
+          typeof c.starRa !== 'number' ||
+          !Number.isFinite(c.starRa) ||
+          typeof c.starDec !== 'number' ||
+          !Number.isFinite(c.starDec)
+        ) {
+          res
+            .status(400)
+            .json({ error: 'starRa/starDec requis quand starHip=0', code: 'INVALID_STAR_HIP' });
           return;
         }
       } else if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
-        res.status(400).json({ error: 'starHip invalide (entier positif attendu)', code: 'INVALID_STAR_HIP' });
+        res
+          .status(400)
+          .json({ error: 'starHip invalide (entier positif attendu)', code: 'INVALID_STAR_HIP' });
         return;
       }
     }
@@ -310,10 +436,11 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
 
     // Browser shows images with EXIF rotation applied, so naturalWidth/Height reflect rotated dimensions
     // Orientations 5, 6, 7, 8 involve 90° rotation which swaps width and height
-    const needsSwap = metadata.orientation && metadata.orientation >= 5 && metadata.orientation <= 8;
+    const needsSwap =
+      metadata.orientation && metadata.orientation >= 5 && metadata.orientation <= 8;
     const browserWidth = needsSwap ? origHeight : origWidth;
     const browserHeight = needsSwap ? origWidth : origHeight;
-    
+
     console.log('[Upload] Browser showed dimensions:', browserWidth, 'x', browserHeight);
 
     // Apply EXIF rotation to bake orientation into file (keeps coordinate space consistent)
@@ -327,11 +454,23 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     try {
       await resized.toFile(path.join(UPLOADS_DIR, filename));
     } catch {
-      res.status(400).json({ error: 'Impossible de traiter l\'image (format non supporté ou fichier corrompu)', code: 'INVALID_IMAGE' });
+      res.status(400).json({
+        error: "Impossible de traiter l'image (format non supporté ou fichier corrompu)",
+        code: 'INVALID_IMAGE',
+      });
       return;
     }
 
-    console.log('[Upload] Scaling correspondences from browser', browserWidth, 'x', browserHeight, 'to final', newWidth, 'x', newHeight);
+    console.log(
+      '[Upload] Scaling correspondences from browser',
+      browserWidth,
+      'x',
+      browserHeight,
+      'to final',
+      newWidth,
+      'x',
+      newHeight,
+    );
 
     // Scale correspondences from browser dimensions to final dimensions
     const scaleX = newWidth / browserWidth;
@@ -359,7 +498,14 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
           ...placement,
           projPerPx: placement.projPerPx / avgScale,
         };
-        console.log('[Upload] Scaling projPerPx from', placement.projPerPx, 'by 1/', avgScale.toFixed(4), '=', scaledPlacement.projPerPx);
+        console.log(
+          '[Upload] Scaling projPerPx from',
+          placement.projPerPx,
+          'by 1/',
+          avgScale.toFixed(4),
+          '=',
+          scaledPlacement.projPerPx,
+        );
         scaledManualPlacement = JSON.stringify(scaledPlacement);
       } catch {
         // Invalid JSON, ignore
@@ -371,10 +517,24 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     let labels: string[] = [];
     let integrations: IntegrationRow[] = [];
     let notes = '';
-    try { dsoIds = JSON.parse(req.body?.dsoIds || '[]'); if (!Array.isArray(dsoIds)) dsoIds = []; } catch { dsoIds = []; }
-    try { labels = JSON.parse(req.body?.labels || '[]'); if (!Array.isArray(labels)) labels = []; } catch { labels = []; }
+    try {
+      dsoIds = JSON.parse(req.body?.dsoIds || '[]');
+      if (!Array.isArray(dsoIds)) dsoIds = [];
+    } catch {
+      dsoIds = [];
+    }
+    try {
+      labels = JSON.parse(req.body?.labels || '[]');
+      if (!Array.isArray(labels)) labels = [];
+    } catch {
+      labels = [];
+    }
     let pointsOfInterest: PointOfInterestInput[] = [];
-    try { pointsOfInterest = sanitizePois(JSON.parse(req.body?.pointsOfInterest || '[]')); } catch { pointsOfInterest = []; }
+    try {
+      pointsOfInterest = sanitizePois(JSON.parse(req.body?.pointsOfInterest || '[]'));
+    } catch {
+      pointsOfInterest = [];
+    }
     try {
       integrations = sanitizeIntegrationRows(JSON.parse(req.body?.integrations || '[]'));
     } catch {
@@ -387,9 +547,10 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     }
 
     // Allow caller to override the display name
-    const displayName = typeof req.body?.displayName === 'string' && req.body.displayName.trim()
-      ? req.body.displayName.trim().slice(0, 255)
-      : file.originalname;
+    const displayName =
+      typeof req.body?.displayName === 'string' && req.body.displayName.trim()
+        ? req.body.displayName.trim().slice(0, 255)
+        : file.originalname;
 
     // Generate low-res thumbnail (400px on longest side, JPEG q75)
     const THUMB_SIZE = 400;
@@ -398,13 +559,31 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       const thumbScale = Math.min(1, THUMB_SIZE / Math.max(newWidth, newHeight));
       const thumbW = Math.max(1, Math.round(newWidth * thumbScale));
       const thumbH = Math.max(1, Math.round(newHeight * thumbScale));
-      await sharp(path.join(UPLOADS_DIR, filename)).resize(thumbW, thumbH).jpeg({ quality: 75 }).toFile(path.join(UPLOADS_DIR, thumbFilename));
+      await sharp(path.join(UPLOADS_DIR, filename))
+        .resize(thumbW, thumbH)
+        .jpeg({ quality: 75 })
+        .toFile(path.join(UPLOADS_DIR, thumbFilename));
     } catch (thumbErr) {
       console.warn('[Upload] Thumbnail generation failed:', thumbErr);
     }
 
     // Store in database
-    createPhoto(id, filename, displayName, newWidth, newHeight, scaledCorrespondences, scaledManualPlacement, dsoIds, labels, notes, integrations, thumbFilename, observationDate, pointsOfInterest);
+    createPhoto(
+      id,
+      filename,
+      displayName,
+      newWidth,
+      newHeight,
+      scaledCorrespondences,
+      scaledManualPlacement,
+      dsoIds,
+      labels,
+      notes,
+      integrations,
+      thumbFilename,
+      observationDate,
+      pointsOfInterest,
+    );
 
     res.json({
       id,
@@ -510,7 +689,12 @@ app.get('/api/config', (_req, res) => {
 });
 
 // User-configurable solver / API settings
-const EDITABLE_STRING_SETTINGS = ['ASTAP_PATH', 'SOLVE_FIELD_PATH', 'ASTROMETRY_DATA_DIR', 'MAX_PARALLEL_SOLVES'] as const;
+const EDITABLE_STRING_SETTINGS = [
+  'ASTAP_PATH',
+  'SOLVE_FIELD_PATH',
+  'ASTROMETRY_DATA_DIR',
+  'MAX_PARALLEL_SOLVES',
+] as const;
 const EDITABLE_BOOLEAN_SETTINGS = ['USE_WSL_FOR_SOLVE_FIELD', 'USE_WSL_FOR_ASTAP'] as const;
 
 /**
@@ -662,10 +846,14 @@ app.post('/api/settings/probe-data-dir', async (req, res) => {
 app.get('/api/photos', (_req, res) => {
   try {
     const photos = getAllPhotos();
-    const photosWithSize = photos.map(p => {
+    const photosWithSize = photos.map((p) => {
       const filePath = path.join(UPLOADS_DIR, p.filename);
       let fileSize: number | null = null;
-      try { fileSize = fs.statSync(filePath).size; } catch { /* file missing */ }
+      try {
+        fileSize = fs.statSync(filePath).size;
+      } catch {
+        /* file missing */
+      }
       return { ...p, fileSize };
     });
     res.json(photosWithSize);
@@ -688,8 +876,14 @@ app.patch('/api/photos/order', (req, res) => {
   try {
     const { photoIds } = req.body as { photoIds?: unknown };
 
-    if (!Array.isArray(photoIds) || photoIds.some(id => typeof id !== 'string' || id.length === 0)) {
-      res.status(400).json({ error: 'photoIds must be a non-empty array of strings', code: 'INVALID_PHOTO_ORDER' });
+    if (
+      !Array.isArray(photoIds) ||
+      photoIds.some((id) => typeof id !== 'string' || id.length === 0)
+    ) {
+      res.status(400).json({
+        error: 'photoIds must be a non-empty array of strings',
+        code: 'INVALID_PHOTO_ORDER',
+      });
       return;
     }
 
@@ -700,15 +894,20 @@ app.patch('/api/photos/order', (req, res) => {
     }
 
     const allPhotos = getAllPhotos();
-    const allIds = new Set(allPhotos.map(p => p.id));
-    if (photoIds.length !== allIds.size || photoIds.some(id => !allIds.has(id))) {
-      res.status(400).json({ error: 'photoIds must include all existing photos exactly once', code: 'INVALID_PHOTO_ORDER' });
+    const allIds = new Set(allPhotos.map((p) => p.id));
+    if (photoIds.length !== allIds.size || photoIds.some((id) => !allIds.has(id))) {
+      res.status(400).json({
+        error: 'photoIds must include all existing photos exactly once',
+        code: 'INVALID_PHOTO_ORDER',
+      });
       return;
     }
 
     const ok = updatePhotoDrawOrder(photoIds);
     if (!ok && photoIds.length > 0) {
-      res.status(500).json({ error: 'Failed to persist photo order', code: 'PHOTO_ORDER_UPDATE_FAILED' });
+      res
+        .status(500)
+        .json({ error: 'Failed to persist photo order', code: 'PHOTO_ORDER_UPDATE_FAILED' });
       return;
     }
 
@@ -888,8 +1087,8 @@ app.delete('/api/dso-overrides', (_req, res) => {
 app.get('/api/telescopes', (_req, res) => {
   try {
     const custom = getAllCustomGear()
-      .filter(g => g.type === 'telescope')
-      .map(g => JSON.parse(g.data));
+      .filter((g) => g.type === 'telescope')
+      .map((g) => JSON.parse(g.data));
     res.json([...builtInTelescopes, ...custom].sort(byBrandModel));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -917,8 +1116,8 @@ app.get('/api/telescopes', (_req, res) => {
 app.get('/api/cameras', (_req, res) => {
   try {
     const custom = getAllCustomGear()
-      .filter(g => g.type === 'camera')
-      .map(g => JSON.parse(g.data));
+      .filter((g) => g.type === 'camera')
+      .map((g) => JSON.parse(g.data));
     res.json([...builtInCameras, ...custom].sort(byBrandModel));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -946,8 +1145,8 @@ app.get('/api/cameras', (_req, res) => {
 app.get('/api/accessories', (_req, res) => {
   try {
     const custom = getAllCustomGear()
-      .filter(g => g.type === 'accessory')
-      .map(g => JSON.parse(g.data));
+      .filter((g) => g.type === 'accessory')
+      .map((g) => JSON.parse(g.data));
     res.json([...builtInAccessories, ...custom].sort(byBrandModel));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1129,14 +1328,16 @@ app.delete('/api/custom-gear', (_req, res) => {
 app.get('/api/gear-setups', (_req, res) => {
   try {
     const rows = getAllGearSetups();
-    res.json(rows.map(r => ({
-      id: r.id,
-      name: r.name,
-      telescopeId: r.telescope_id,
-      cameraId: r.camera_id,
-      accessoryId: r.accessory_id ?? null,
-      enabled: r.enabled === 1,
-    })));
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        telescopeId: r.telescope_id,
+        cameraId: r.camera_id,
+        accessoryId: r.accessory_id ?? null,
+        enabled: r.enabled === 1,
+      })),
+    );
   } catch (err: any) {
     console.error('[GearSetups] Failed to list setups', err);
     res.status(500).json({ error: err.message });
@@ -1194,18 +1395,25 @@ app.post('/api/gear-setups', (req, res) => {
   try {
     const { name, telescopeId, cameraId, accessoryId, enabled } = req.body as any;
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' }); return;
+      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' });
+      return;
     }
     if (!telescopeId || typeof telescopeId !== 'string') {
-      res.status(400).json({ error: 'telescopeId is required', code: 'MISSING_TELESCOPE' }); return;
+      res.status(400).json({ error: 'telescopeId is required', code: 'MISSING_TELESCOPE' });
+      return;
     }
     if (!cameraId || typeof cameraId !== 'string') {
-      res.status(400).json({ error: 'cameraId is required', code: 'MISSING_CAMERA' }); return;
+      res.status(400).json({ error: 'cameraId is required', code: 'MISSING_CAMERA' });
+      return;
     }
     const id = `setup-${uuidv4()}`;
     upsertGearSetup({
-      id, name: name.trim(), telescope_id: telescopeId, camera_id: cameraId,
-      accessory_id: accessoryId ?? null, enabled: enabled !== false ? 1 : 0,
+      id,
+      name: name.trim(),
+      telescope_id: telescopeId,
+      camera_id: cameraId,
+      accessory_id: accessoryId ?? null,
+      enabled: enabled !== false ? 1 : 0,
     });
     res.json({ id });
   } catch (err: any) {
@@ -1262,12 +1470,23 @@ app.put('/api/gear-setups/:id', (req, res) => {
   try {
     const { id } = req.params;
     const { name, telescopeId, cameraId, accessoryId, enabled } = req.body as any;
-    if (!name || typeof name !== 'string' || name.trim().length === 0 || !telescopeId || !cameraId) {
-      res.status(400).json({ error: 'name, telescopeId, and cameraId are required' }); return;
+    if (
+      !name ||
+      typeof name !== 'string' ||
+      name.trim().length === 0 ||
+      !telescopeId ||
+      !cameraId
+    ) {
+      res.status(400).json({ error: 'name, telescopeId, and cameraId are required' });
+      return;
     }
     upsertGearSetup({
-      id, name: name.trim(), telescope_id: telescopeId, camera_id: cameraId,
-      accessory_id: accessoryId ?? null, enabled: enabled !== false ? 1 : 0,
+      id,
+      name: name.trim(),
+      telescope_id: telescopeId,
+      camera_id: cameraId,
+      accessory_id: accessoryId ?? null,
+      enabled: enabled !== false ? 1 : 0,
     });
     res.json({ ok: true });
   } catch (err: any) {
@@ -1329,10 +1548,14 @@ app.patch('/api/gear-setups/:id/enabled', (req, res) => {
     const { id } = req.params;
     const { enabled } = req.body as any;
     if (typeof enabled !== 'boolean') {
-      res.status(400).json({ error: 'enabled must be boolean' }); return;
+      res.status(400).json({ error: 'enabled must be boolean' });
+      return;
     }
     const ok = updateGearSetupEnabled(id, enabled);
-    if (!ok) { res.status(404).json({ error: 'Setup not found' }); return; }
+    if (!ok) {
+      res.status(404).json({ error: 'Setup not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[GearSetups] Failed to update enabled state', err);
@@ -1375,7 +1598,10 @@ app.delete('/api/gear-setups/:id', (req, res) => {
   try {
     const { id } = req.params;
     const ok = deleteGearSetup(id);
-    if (!ok) { res.status(404).json({ error: 'Setup not found' }); return; }
+    if (!ok) {
+      res.status(404).json({ error: 'Setup not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[GearSetups] Failed to delete setup', err);
@@ -1481,12 +1707,14 @@ app.post('/api/poi-categories', (req, res) => {
   try {
     const { name, color } = req.body as any;
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' }); return;
+      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' });
+      return;
     }
     const id = `cat-${uuidv4()}`;
     const position = getAllPoiCategories().length;
     upsertPoiCategory({
-      id, name: name.trim(),
+      id,
+      name: name.trim(),
       color: typeof color === 'string' && color.trim() ? color.trim() : '#888888',
       position,
     });
@@ -1534,8 +1762,11 @@ app.post('/api/poi-categories', (req, res) => {
 app.patch('/api/poi-categories/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const existing = getAllPoiCategories().find(c => c.id === id);
-    if (!existing) { res.status(404).json({ error: 'Category not found' }); return; }
+    const existing = getAllPoiCategories().find((c) => c.id === id);
+    if (!existing) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
     const { name, color, position } = req.body as any;
     upsertPoiCategory({
       id,
@@ -1580,7 +1811,10 @@ app.patch('/api/poi-categories/:id', (req, res) => {
 app.delete('/api/poi-categories/:id', (req, res) => {
   try {
     const ok = deletePoiCategory(req.params.id);
-    if (!ok) { res.status(404).json({ error: 'Category not found' }); return; }
+    if (!ok) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[PoiCategories] Failed to delete category', err);
@@ -1620,16 +1854,31 @@ app.delete('/api/poi-categories', (_req, res) => {
 
 function planEntryToApi(e: PlanEntryRow) {
   return {
-    id: e.id, dsoId: e.dso_id ?? null, position: e.position, paDeg: e.pa_deg ?? null,
-    ra: e.ra ?? null, dec: e.dec ?? null, notes: e.notes ?? null, mosaicId: e.mosaic_id ?? null,
-    mosaicWDeg: e.mosaic_w_deg ?? null, mosaicHDeg: e.mosaic_h_deg ?? null,
+    id: e.id,
+    dsoId: e.dso_id ?? null,
+    position: e.position,
+    paDeg: e.pa_deg ?? null,
+    ra: e.ra ?? null,
+    dec: e.dec ?? null,
+    notes: e.notes ?? null,
+    mosaicId: e.mosaic_id ?? null,
+    mosaicWDeg: e.mosaic_w_deg ?? null,
+    mosaicHDeg: e.mosaic_h_deg ?? null,
   };
 }
 
 function planMosaicToApi(m: PlanMosaicRow) {
   return {
-    id: m.id, dsoId: m.dso_id ?? null, name: m.name ?? null, centerRa: m.center_ra, centerDec: m.center_dec,
-    paDeg: m.pa_deg, overlapPct: m.overlap_pct, cols: m.cols, rows: m.rows, position: m.position,
+    id: m.id,
+    dsoId: m.dso_id ?? null,
+    name: m.name ?? null,
+    centerRa: m.center_ra,
+    centerDec: m.center_dec,
+    paDeg: m.pa_deg,
+    overlapPct: m.overlap_pct,
+    cols: m.cols,
+    rows: m.rows,
+    position: m.position,
   };
 }
 
@@ -1679,17 +1928,19 @@ app.get('/api/plans', (_req, res) => {
       list.push(m);
       mosaicsByPlan.set(m.plan_id, list);
     }
-    res.json(getPlans().map(p => ({
-      id: p.id,
-      name: p.name,
-      position: p.position,
-      nightOf: p.night_of ?? null,
-      setupId: p.setup_id ?? null,
-      lat: p.lat ?? null,
-      lon: p.lon ?? null,
-      entries: (byPlan.get(p.id) ?? []).map(planEntryToApi),
-      mosaics: (mosaicsByPlan.get(p.id) ?? []).map(planMosaicToApi),
-    })));
+    res.json(
+      getPlans().map((p) => ({
+        id: p.id,
+        name: p.name,
+        position: p.position,
+        nightOf: p.night_of ?? null,
+        setupId: p.setup_id ?? null,
+        lat: p.lat ?? null,
+        lon: p.lon ?? null,
+        entries: (byPlan.get(p.id) ?? []).map(planEntryToApi),
+        mosaics: (mosaicsByPlan.get(p.id) ?? []).map(planMosaicToApi),
+      })),
+    );
   } catch (err: any) {
     console.error('[Plans] Failed to list plans', err);
     res.status(500).json({ error: err.message });
@@ -1736,11 +1987,21 @@ app.post('/api/plans', (req, res) => {
   try {
     const { name } = req.body as any;
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'name is required' }); return;
+      res.status(400).json({ error: 'name is required' });
+      return;
     }
     const id = `plan-${uuidv4()}`;
     const position = getPlans().length;
-    createPlan({ id, name: name.trim(), position, created_at: new Date().toISOString(), night_of: null, setup_id: null, lat: null, lon: null });
+    createPlan({
+      id,
+      name: name.trim(),
+      position,
+      created_at: new Date().toISOString(),
+      night_of: null,
+      setup_id: null,
+      lat: null,
+      lon: null,
+    });
     res.json({ id });
   } catch (err: any) {
     console.error('[Plans] Failed to create plan', err);
@@ -1788,7 +2049,10 @@ app.post('/api/plans', (req, res) => {
 app.put('/api/plans/order', (req, res) => {
   try {
     const { ids } = req.body as any;
-    if (!Array.isArray(ids)) { res.status(400).json({ error: 'ids must be an array' }); return; }
+    if (!Array.isArray(ids)) {
+      res.status(400).json({ error: 'ids must be an array' });
+      return;
+    }
     reorderPlans(ids);
     res.json({ ok: true });
   } catch (err: any) {
@@ -1855,27 +2119,36 @@ app.put('/api/plans/:id', (req, res) => {
     const hasName = 'name' in body;
     const hasSettings = 'nightOf' in body || 'setupId' in body || 'lat' in body || 'lon' in body;
     if (!hasName && !hasSettings) {
-      res.status(400).json({ error: 'name or settings (nightOf/setupId/lat/lon) required' }); return;
+      res.status(400).json({ error: 'name or settings (nightOf/setupId/lat/lon) required' });
+      return;
     }
     const existing = getPlan(id);
-    if (!existing) { res.status(404).json({ error: 'Plan not found' }); return; }
+    if (!existing) {
+      res.status(404).json({ error: 'Plan not found' });
+      return;
+    }
     if (hasName) {
       const { name } = body;
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        res.status(400).json({ error: 'name is required' }); return;
+        res.status(400).json({ error: 'name is required' });
+        return;
       }
       renamePlan(id, name.trim());
     }
     if (hasSettings) {
-      const nightOf = 'nightOf' in body ? (body.nightOf || null) : (existing.night_of ?? null);
-      const setupId = 'setupId' in body ? (body.setupId || null) : (existing.setup_id ?? null);
-      const lat = 'lat' in body ? (typeof body.lat === 'number' ? body.lat : null) : (existing.lat ?? null);
-      const lon = 'lon' in body ? (typeof body.lon === 'number' ? body.lon : null) : (existing.lon ?? null);
+      const nightOf = 'nightOf' in body ? body.nightOf || null : (existing.night_of ?? null);
+      const setupId = 'setupId' in body ? body.setupId || null : (existing.setup_id ?? null);
+      const lat =
+        'lat' in body ? (typeof body.lat === 'number' ? body.lat : null) : (existing.lat ?? null);
+      const lon =
+        'lon' in body ? (typeof body.lon === 'number' ? body.lon : null) : (existing.lon ?? null);
       if (lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) {
-        res.status(400).json({ error: 'lat must be between -90 and 90' }); return;
+        res.status(400).json({ error: 'lat must be between -90 and 90' });
+        return;
       }
       if (lon !== null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) {
-        res.status(400).json({ error: 'lon must be between -180 and 180' }); return;
+        res.status(400).json({ error: 'lon must be between -180 and 180' });
+        return;
       }
       updatePlanSettings(id, nightOf, setupId, lat, lon);
     }
@@ -1920,7 +2193,10 @@ app.put('/api/plans/:id', (req, res) => {
 app.delete('/api/plans/:id', (req, res) => {
   try {
     const { id } = req.params;
-    if (!deletePlan(id)) { res.status(404).json({ error: 'Plan not found' }); return; }
+    if (!deletePlan(id)) {
+      res.status(404).json({ error: 'Plan not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[Plans] Failed to delete plan', err);
@@ -1992,23 +2268,37 @@ app.post('/api/plans/:id/entries', (req, res) => {
   try {
     const { id } = req.params;
     const { dsoId, ra, dec, paDeg } = req.body as any;
-    if (!getPlan(id)) { res.status(404).json({ error: 'Plan not found' }); return; }
+    if (!getPlan(id)) {
+      res.status(404).json({ error: 'Plan not found' });
+      return;
+    }
     if (dsoId == null) {
       // Custom-location entry (framed on empty sky): no DSO, ra/dec required.
       if (typeof ra !== 'number' || typeof dec !== 'number') {
-        res.status(400).json({ error: 'dsoId or ra/dec is required' }); return;
+        res.status(400).json({ error: 'dsoId or ra/dec is required' });
+        return;
       }
     } else {
-      if (typeof dsoId !== 'string') { res.status(400).json({ error: 'dsoId must be a string' }); return; }
+      if (typeof dsoId !== 'string') {
+        res.status(400).json({ error: 'dsoId must be a string' });
+        return;
+      }
       if (planEntryExists(id, dsoId)) {
-        res.status(409).json({ error: 'Target already in plan', code: 'DUPLICATE_ENTRY' }); return;
+        res.status(409).json({ error: 'Target already in plan', code: 'DUPLICATE_ENTRY' });
+        return;
       }
     }
     const entryId = `pe-${uuidv4()}`;
     addPlanEntry({
-      id: entryId, plan_id: id, dso_id: dsoId ?? null, position: nextPlanEntryPosition(id),
+      id: entryId,
+      plan_id: id,
+      dso_id: dsoId ?? null,
+      position: nextPlanEntryPosition(id),
       pa_deg: typeof paDeg === 'number' ? paDeg : null,
-      ra: typeof ra === 'number' ? ra : null, dec: typeof dec === 'number' ? dec : null, notes: null, mosaic_id: null,
+      ra: typeof ra === 'number' ? ra : null,
+      dec: typeof dec === 'number' ? dec : null,
+      notes: null,
+      mosaic_id: null,
     });
     res.json({ id: entryId });
   } catch (err: any) {
@@ -2064,7 +2354,10 @@ app.put('/api/plans/:id/entries/order', (req, res) => {
   try {
     const { id } = req.params;
     const { ids } = req.body as any;
-    if (!Array.isArray(ids)) { res.status(400).json({ error: 'ids must be an array' }); return; }
+    if (!Array.isArray(ids)) {
+      res.status(400).json({ error: 'ids must be an array' });
+      return;
+    }
     reorderPlanEntries(id, ids);
     res.json({ ok: true });
   } catch (err: any) {
@@ -2112,7 +2405,10 @@ app.put('/api/plans/:id/entries/order', (req, res) => {
 app.delete('/api/plans/:id/entries/:entryId', (req, res) => {
   try {
     const { entryId } = req.params;
-    if (!removePlanEntry(entryId)) { res.status(404).json({ error: 'Entry not found' }); return; }
+    if (!removePlanEntry(entryId)) {
+      res.status(404).json({ error: 'Entry not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[Plans] Failed to remove entry', err);
@@ -2203,49 +2499,66 @@ app.patch('/api/plans/:id/entries/:entryId', (req, res) => {
   try {
     const { entryId } = req.params;
     const body = req.body as Record<string, unknown>;
-    const fields: { ra?: number | null; dec?: number | null; paDeg?: number | null; dsoId?: string | null; mosaicWDeg?: number | null; mosaicHDeg?: number | null } = {};
+    const fields: {
+      ra?: number | null;
+      dec?: number | null;
+      paDeg?: number | null;
+      dsoId?: string | null;
+      mosaicWDeg?: number | null;
+      mosaicHDeg?: number | null;
+    } = {};
 
     if ('paDeg' in body) {
       if (body.paDeg !== null && typeof body.paDeg !== 'number') {
-        res.status(400).json({ error: 'paDeg must be a number or null' }); return;
+        res.status(400).json({ error: 'paDeg must be a number or null' });
+        return;
       }
       fields.paDeg = body.paDeg as number | null;
     }
     if ('ra' in body) {
       if (body.ra !== null && typeof body.ra !== 'number') {
-        res.status(400).json({ error: 'ra must be a number or null' }); return;
+        res.status(400).json({ error: 'ra must be a number or null' });
+        return;
       }
       fields.ra = body.ra as number | null;
     }
     if ('dec' in body) {
       if (body.dec !== null && typeof body.dec !== 'number') {
-        res.status(400).json({ error: 'dec must be a number or null' }); return;
+        res.status(400).json({ error: 'dec must be a number or null' });
+        return;
       }
       fields.dec = body.dec as number | null;
     }
     if ('dsoId' in body) {
       if (body.dsoId !== null && typeof body.dsoId !== 'string') {
-        res.status(400).json({ error: 'dsoId must be a string or null' }); return;
+        res.status(400).json({ error: 'dsoId must be a string or null' });
+        return;
       }
       fields.dsoId = body.dsoId as string | null;
     }
     if ('mosaicWDeg' in body) {
       if (body.mosaicWDeg !== null && typeof body.mosaicWDeg !== 'number') {
-        res.status(400).json({ error: 'mosaicWDeg must be a number or null' }); return;
+        res.status(400).json({ error: 'mosaicWDeg must be a number or null' });
+        return;
       }
       fields.mosaicWDeg = body.mosaicWDeg as number | null;
     }
     if ('mosaicHDeg' in body) {
       if (body.mosaicHDeg !== null && typeof body.mosaicHDeg !== 'number') {
-        res.status(400).json({ error: 'mosaicHDeg must be a number or null' }); return;
+        res.status(400).json({ error: 'mosaicHDeg must be a number or null' });
+        return;
       }
       fields.mosaicHDeg = body.mosaicHDeg as number | null;
     }
 
     if (Object.keys(fields).length === 0) {
-      res.status(400).json({ error: 'No updatable fields provided' }); return;
+      res.status(400).json({ error: 'No updatable fields provided' });
+      return;
     }
-    if (!updatePlanEntryFrame(entryId, fields)) { res.status(404).json({ error: 'Entry not found' }); return; }
+    if (!updatePlanEntryFrame(entryId, fields)) {
+      res.status(404).json({ error: 'Entry not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[Plans] Failed to update entry PA', err);
@@ -2254,30 +2567,57 @@ app.patch('/api/plans/:id/entries/:entryId', (req, res) => {
 });
 
 /** Validate and coerce a mosaic request body (shared by POST and PUT). */
-function parseMosaicBody(body: Record<string, unknown>): { error: string } | {
-  dsoId: string | null; name: string | undefined; centerRa: number; centerDec: number; paDeg: number;
-  overlapPct: number; cols: number; rows: number; tiles: MosaicTileInput[]; replaceEntryIds: string[];
-} {
-  const { dsoId, name, centerRa, centerDec, paDeg, overlapPct, cols, rows, tiles, replaceEntryIds } = body as any;
-  if (typeof centerRa !== 'number' || typeof centerDec !== 'number') return { error: 'centerRa/centerDec must be numbers' };
-  if (!Array.isArray(tiles) || tiles.length === 0) return { error: 'tiles must be a non-empty array' };
+function parseMosaicBody(body: Record<string, unknown>):
+  | { error: string }
+  | {
+      dsoId: string | null;
+      name: string | undefined;
+      centerRa: number;
+      centerDec: number;
+      paDeg: number;
+      overlapPct: number;
+      cols: number;
+      rows: number;
+      tiles: MosaicTileInput[];
+      replaceEntryIds: string[];
+    } {
+  const {
+    dsoId,
+    name,
+    centerRa,
+    centerDec,
+    paDeg,
+    overlapPct,
+    cols,
+    rows,
+    tiles,
+    replaceEntryIds,
+  } = body as any;
+  if (typeof centerRa !== 'number' || typeof centerDec !== 'number')
+    return { error: 'centerRa/centerDec must be numbers' };
+  if (!Array.isArray(tiles) || tiles.length === 0)
+    return { error: 'tiles must be a non-empty array' };
   const cleanTiles: MosaicTileInput[] = [];
   for (const t of tiles) {
-    if (typeof t?.ra !== 'number' || typeof t?.dec !== 'number') return { error: 'each tile needs numeric ra/dec' };
+    if (typeof t?.ra !== 'number' || typeof t?.dec !== 'number')
+      return { error: 'each tile needs numeric ra/dec' };
     cleanTiles.push({ ra: t.ra, dec: t.dec, paDeg: typeof t.paDeg === 'number' ? t.paDeg : null });
   }
   return {
     dsoId: typeof dsoId === 'string' ? dsoId : null,
     // undefined → "don't touch the stored name" (background drags/transforms).
     name: typeof name === 'string' ? name : undefined,
-    centerRa, centerDec,
+    centerRa,
+    centerDec,
     paDeg: typeof paDeg === 'number' ? paDeg : 0,
     // Clamp to the same sane ranges mosaic.ts enforces at compute time.
     overlapPct: typeof overlapPct === 'number' ? Math.min(90, Math.max(0, overlapPct)) : 20,
     cols: Number.isInteger(cols) ? Math.max(1, cols) : Math.max(1, cleanTiles.length),
     rows: Number.isInteger(rows) ? Math.max(1, rows) : 1,
     tiles: cleanTiles,
-    replaceEntryIds: Array.isArray(replaceEntryIds) ? replaceEntryIds.filter((x: unknown): x is string => typeof x === 'string') : [],
+    replaceEntryIds: Array.isArray(replaceEntryIds)
+      ? replaceEntryIds.filter((x: unknown): x is string => typeof x === 'string')
+      : [],
   };
 }
 
@@ -2337,15 +2677,32 @@ function parseMosaicBody(body: Record<string, unknown>): { error: string } | {
 app.post('/api/plans/:id/mosaics', (req, res) => {
   try {
     const { id } = req.params;
-    if (!getPlan(id)) { res.status(404).json({ error: 'Plan not found' }); return; }
+    if (!getPlan(id)) {
+      res.status(404).json({ error: 'Plan not found' });
+      return;
+    }
     const parsed = parseMosaicBody(req.body as Record<string, unknown>);
-    if ('error' in parsed) { res.status(400).json({ error: parsed.error }); return; }
+    if ('error' in parsed) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
     const mosaicId = `mo-${uuidv4()}`;
-    createPlanMosaic({
-      id: mosaicId, plan_id: id, dso_id: parsed.dsoId, name: parsed.name ?? null, center_ra: parsed.centerRa,
-      center_dec: parsed.centerDec, pa_deg: parsed.paDeg, overlap_pct: parsed.overlapPct,
-      cols: parsed.cols, rows: parsed.rows,
-    }, parsed.tiles, parsed.replaceEntryIds);
+    createPlanMosaic(
+      {
+        id: mosaicId,
+        plan_id: id,
+        dso_id: parsed.dsoId,
+        name: parsed.name ?? null,
+        center_ra: parsed.centerRa,
+        center_dec: parsed.centerDec,
+        pa_deg: parsed.paDeg,
+        overlap_pct: parsed.overlapPct,
+        cols: parsed.cols,
+        rows: parsed.rows,
+      },
+      parsed.tiles,
+      parsed.replaceEntryIds,
+    );
     res.json({ id: mosaicId });
   } catch (err: any) {
     console.error('[Plans] Failed to create mosaic', err);
@@ -2408,14 +2765,34 @@ app.put('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
   try {
     const { id, mosaicId } = req.params;
     const existing = getPlanMosaic(mosaicId);
-    if (!existing || existing.plan_id !== id) { res.status(404).json({ error: 'Mosaic not found' }); return; }
+    if (!existing || existing.plan_id !== id) {
+      res.status(404).json({ error: 'Mosaic not found' });
+      return;
+    }
     const parsed = parseMosaicBody(req.body as Record<string, unknown>);
-    if ('error' in parsed) { res.status(400).json({ error: parsed.error }); return; }
-    const ok = updatePlanMosaic(mosaicId, {
-      dsoId: parsed.dsoId, name: parsed.name, centerRa: parsed.centerRa, centerDec: parsed.centerDec,
-      paDeg: parsed.paDeg, overlapPct: parsed.overlapPct, cols: parsed.cols, rows: parsed.rows,
-    }, parsed.tiles, parsed.replaceEntryIds);
-    if (!ok) { res.status(404).json({ error: 'Mosaic not found' }); return; }
+    if ('error' in parsed) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+    const ok = updatePlanMosaic(
+      mosaicId,
+      {
+        dsoId: parsed.dsoId,
+        name: parsed.name,
+        centerRa: parsed.centerRa,
+        centerDec: parsed.centerDec,
+        paDeg: parsed.paDeg,
+        overlapPct: parsed.overlapPct,
+        cols: parsed.cols,
+        rows: parsed.rows,
+      },
+      parsed.tiles,
+      parsed.replaceEntryIds,
+    );
+    if (!ok) {
+      res.status(404).json({ error: 'Mosaic not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[Plans] Failed to update mosaic', err);
@@ -2448,8 +2825,14 @@ app.delete('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
   try {
     const { id, mosaicId } = req.params;
     const existing = getPlanMosaic(mosaicId);
-    if (!existing || existing.plan_id !== id) { res.status(404).json({ error: 'Mosaic not found' }); return; }
-    if (!deletePlanMosaic(mosaicId)) { res.status(404).json({ error: 'Mosaic not found' }); return; }
+    if (!existing || existing.plan_id !== id) {
+      res.status(404).json({ error: 'Mosaic not found' });
+      return;
+    }
+    if (!deletePlanMosaic(mosaicId)) {
+      res.status(404).json({ error: 'Mosaic not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err: any) {
     console.error('[Plans] Failed to delete mosaic', err);
@@ -2473,7 +2856,16 @@ app.post('/api/export', (req, res) => {
   try {
     const body = req.body as {
       mode?: string;
-      options?: { includeImages?: boolean; includeMetadata?: boolean; includeDsoOverrides?: boolean; includeCustomGear?: boolean; includeSetups?: boolean; includePlans?: boolean; includeShortcuts?: boolean; includePoiCategories?: boolean };
+      options?: {
+        includeImages?: boolean;
+        includeMetadata?: boolean;
+        includeDsoOverrides?: boolean;
+        includeCustomGear?: boolean;
+        includeSetups?: boolean;
+        includePlans?: boolean;
+        includeShortcuts?: boolean;
+        includePoiCategories?: boolean;
+      };
       ids?: string[];
       // Keyboard-shortcut bindings live in the client's localStorage; the client sends
       // them here so they can be bundled into the backup ZIP as shortcuts.json.
@@ -2483,7 +2875,7 @@ app.post('/api/export', (req, res) => {
     // Support legacy mode='metadata' for backward compat with backup button
     const legacyMetadataOnly = body.mode === 'metadata';
     const options = body.options ?? {};
-    const includeImages = legacyMetadataOnly ? false : (options.includeImages !== false);
+    const includeImages = legacyMetadataOnly ? false : options.includeImages !== false;
     const includeMetadata = options.includeMetadata !== false;
     const includeDsoOverrides = options.includeDsoOverrides === true;
     const includeCustomGear = options.includeCustomGear === true;
@@ -2494,9 +2886,10 @@ app.post('/api/export', (req, res) => {
 
     const { ids } = body;
     const allPhotos = getAllPhotos();
-    const selected = Array.isArray(ids) && ids.length > 0
-      ? allPhotos.filter(p => ids.includes(p.id))
-      : allPhotos;
+    const selected =
+      Array.isArray(ids) && ids.length > 0
+        ? allPhotos.filter((p) => ids.includes(p.id))
+        : allPhotos;
 
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '-');
@@ -2513,7 +2906,9 @@ app.post('/api/export', (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="sky-export-${dateStr}.zip"`);
 
     const archive = new ZipArchive({ zlib: { level: 1 } });
-    archive.on('error', (err) => { console.error('[Export] archiver error:', err); });
+    archive.on('error', (err) => {
+      console.error('[Export] archiver error:', err);
+    });
     archive.pipe(res);
 
     if (includeMetadata) {
@@ -2536,14 +2931,22 @@ app.post('/api/export', (req, res) => {
     }
     if (includeDsoOverrides) {
       const overrides = getAllDsoOverrides();
-      archive.append(Buffer.from(JSON.stringify(overrides, null, 2)), { name: 'dso-overrides.json' });
+      archive.append(Buffer.from(JSON.stringify(overrides, null, 2)), {
+        name: 'dso-overrides.json',
+      });
     }
     if (includeCustomGear) {
-      const customGear = getAllCustomGear().map(g => ({ id: g.id, type: g.type, ...JSON.parse(g.data) }));
-      archive.append(Buffer.from(JSON.stringify(customGear, null, 2)), { name: 'custom-gear.json' });
+      const customGear = getAllCustomGear().map((g) => ({
+        id: g.id,
+        type: g.type,
+        ...JSON.parse(g.data),
+      }));
+      archive.append(Buffer.from(JSON.stringify(customGear, null, 2)), {
+        name: 'custom-gear.json',
+      });
     }
     if (includeSetups) {
-      const setups = getAllGearSetups().map(r => ({
+      const setups = getAllGearSetups().map((r) => ({
         id: r.id,
         name: r.name,
         telescopeId: r.telescope_id,
@@ -2570,7 +2973,7 @@ app.post('/api/export', (req, res) => {
         list.push(m);
         mosaicsByPlan.set(m.plan_id, list);
       }
-      const plans = getPlans().map(p => ({
+      const plans = getPlans().map((p) => ({
         id: p.id,
         name: p.name,
         position: p.position,
@@ -2585,7 +2988,9 @@ app.post('/api/export', (req, res) => {
       archive.append(Buffer.from(JSON.stringify(plans, null, 2)), { name: 'plans.json' });
     }
     if (includeShortcuts && body.shortcuts && typeof body.shortcuts === 'object') {
-      archive.append(Buffer.from(JSON.stringify(body.shortcuts, null, 2)), { name: 'shortcuts.json' });
+      archive.append(Buffer.from(JSON.stringify(body.shortcuts, null, 2)), {
+        name: 'shortcuts.json',
+      });
     }
 
     archive.finalize();
@@ -2609,7 +3014,10 @@ app.post('/api/export', (req, res) => {
 app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) => {
   try {
     const file = req.file;
-    if (!file) { res.status(400).json({ error: 'Aucun fichier fourni' }); return; }
+    if (!file) {
+      res.status(400).json({ error: 'Aucun fichier fourni' });
+      return;
+    }
 
     const ext = path.extname(file.originalname).toLowerCase();
 
@@ -2617,15 +3025,17 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
       const zipDir = await unzipper.Open.buffer(file.buffer);
       const inspect = await inspectZipContents(zipDir.files as any);
 
-      const filenameToOriginalName = new Map(inspect.photos.map(p => [p.filename, p.originalName]));
-      const originalNames = inspect.photos.map(p => p.originalName).filter(Boolean);
+      const filenameToOriginalName = new Map(
+        inspect.photos.map((p) => [p.filename, p.originalName]),
+      );
+      const originalNames = inspect.photos.map((p) => p.originalName).filter(Boolean);
       const existingSet = new Set(
         originalNames.length > 0
-          ? checkPhotosExistByName(originalNames).map(r => r.originalName)
-          : []
+          ? checkPhotosExistByName(originalNames).map((r) => r.originalName)
+          : [],
       );
 
-      const images = inspect.imageEntries.map(entry => ({
+      const images = inspect.imageEntries.map((entry) => ({
         filename: entry.filename,
         originalName: filenameToOriginalName.get(entry.filename) ?? entry.filename,
         size: entry.size,
@@ -2636,7 +3046,7 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
       // we return the parsed bundle and the client applies it to localStorage.
       let hasShortcuts = false;
       let shortcuts: unknown;
-      const shortcutsEntry = zipDir.files.find(f => f.path === 'shortcuts.json');
+      const shortcutsEntry = zipDir.files.find((f) => f.path === 'shortcuts.json');
       if (shortcutsEntry) {
         try {
           const parsed = JSON.parse((await shortcutsEntry.buffer()).toString('utf8'));
@@ -2644,29 +3054,47 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
             hasShortcuts = true;
             shortcuts = parsed;
           }
-        } catch { /* ignore invalid shortcuts.json */ }
+        } catch {
+          /* ignore invalid shortcuts.json */
+        }
       }
 
       // Resolve name-based conflicts: a plan/setup/gear whose name already exists
       // will be replaced (not duplicated) if the user selects it for import.
-      const existingPlanNames = new Set(getPlans().map(p => p.name));
-      const existingSetupNames = new Set(getAllGearSetups().map(s => s.name));
+      const existingPlanNames = new Set(getPlans().map((p) => p.name));
+      const existingSetupNames = new Set(getAllGearSetups().map((s) => s.name));
       const existingGearKeys = new Set(
-        getAllCustomGear().map(g => {
+        getAllCustomGear().map((g) => {
           let name = g.id;
-          try { const d = JSON.parse(g.data); if (typeof d?.name === 'string') name = d.name; } catch { /* ignore */ }
+          try {
+            const d = JSON.parse(g.data);
+            if (typeof d?.name === 'string') name = d.name;
+          } catch {
+            /* ignore */
+          }
           return `${g.type}\u001f${name}`;
-        })
+        }),
       );
 
-      const plans = inspect.planItems.map(p => ({ ...p, exists: existingPlanNames.has(p.name) }));
-      const setups = inspect.setupItems.map(s => ({ ...s, exists: existingSetupNames.has(s.name) }));
-      const gear = inspect.gearItems.map(g => ({ ...g, exists: existingGearKeys.has(`${g.type}\u001f${g.name}`) }));
+      const plans = inspect.planItems.map((p) => ({ ...p, exists: existingPlanNames.has(p.name) }));
+      const setups = inspect.setupItems.map((s) => ({
+        ...s,
+        exists: existingSetupNames.has(s.name),
+      }));
+      const gear = inspect.gearItems.map((g) => ({
+        ...g,
+        exists: existingGearKeys.has(`${g.type}\u001f${g.name}`),
+      }));
 
-      res.json(buildZipPreviewResponse(inspect, { hasShortcuts, shortcuts, images, plans, setups, gear }));
+      res.json(
+        buildZipPreviewResponse(inspect, { hasShortcuts, shortcuts, images, plans, setups, gear }),
+      );
     } else if (ext === '.json') {
       const photos = JSON.parse(file.buffer.toString('utf8'));
-      if (!Array.isArray(photos)) { res.status(400).json({ error: 'Format de manifeste invalide' }); return; }
+      if (!Array.isArray(photos)) {
+        res.status(400).json({ error: 'Format de manifeste invalide' });
+        return;
+      }
       res.json({
         hasMetadata: photos.length > 0,
         photos: photos.length,
@@ -2682,7 +3110,8 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         gear: [],
       });
     } else {
-      res.status(400).json({ error: 'Format non supporté (.zip ou .json attendu)' }); return;
+      res.status(400).json({ error: 'Format non supporté (.zip ou .json attendu)' });
+      return;
     }
   } catch (err: any) {
     res.status(500).json({ error: err?.message ?? String(err) });
@@ -2706,7 +3135,10 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
 app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
   try {
     const file = req.file;
-    if (!file) { res.status(400).json({ error: 'Aucun fichier fourni' }); return; }
+    if (!file) {
+      res.status(400).json({ error: 'Aucun fichier fourni' });
+      return;
+    }
 
     const importMetadata = req.body?.importMetadata === '1';
     const importDsoOverrides = req.body?.importDsoOverrides === '1';
@@ -2736,19 +3168,28 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
       // Security: validate all entry paths before extraction
       for (const entry of zipDir.files) {
         if (!isValidZipEntryPath(entry.path)) {
-          res.status(400).json({ error: `Chemin invalide dans le ZIP : ${entry.path}` }); return;
+          res.status(400).json({ error: `Chemin invalide dans le ZIP : ${entry.path}` });
+          return;
         }
       }
 
-      const manifestEntry = zipDir.files.find(f => f.path === 'manifest.json');
-      const dsoOverridesEntry = zipDir.files.find(f => f.path === 'dso-overrides.json');
-      const customGearEntry = zipDir.files.find(f => f.path === 'custom-gear.json');
-      const gearSetupsEntry = zipDir.files.find(f => f.path === 'gear-setups.json');
-      const poiCategoriesEntry = zipDir.files.find(f => f.path === 'poi-categories.json');
-      const plansEntry = zipDir.files.find(f => f.path === 'plans.json');
+      const manifestEntry = zipDir.files.find((f) => f.path === 'manifest.json');
+      const dsoOverridesEntry = zipDir.files.find((f) => f.path === 'dso-overrides.json');
+      const customGearEntry = zipDir.files.find((f) => f.path === 'custom-gear.json');
+      const gearSetupsEntry = zipDir.files.find((f) => f.path === 'gear-setups.json');
+      const poiCategoriesEntry = zipDir.files.find((f) => f.path === 'poi-categories.json');
+      const plansEntry = zipDir.files.find((f) => f.path === 'plans.json');
 
-      if (!manifestEntry && !dsoOverridesEntry && !customGearEntry && !gearSetupsEntry && !poiCategoriesEntry && !plansEntry) {
-        res.status(400).json({ error: 'Aucun contenu reconnu dans le ZIP' }); return;
+      if (
+        !manifestEntry &&
+        !dsoOverridesEntry &&
+        !customGearEntry &&
+        !gearSetupsEntry &&
+        !poiCategoriesEntry &&
+        !plansEntry
+      ) {
+        res.status(400).json({ error: 'Aucun contenu reconnu dans le ZIP' });
+        return;
       }
 
       if (manifestEntry) {
@@ -2762,13 +3203,21 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
           const dsoOverrides = JSON.parse((await dsoOverridesEntry.buffer()).toString('utf8'));
           if (typeof dsoOverrides === 'object' && !Array.isArray(dsoOverrides)) {
             for (const [id, data] of Object.entries(dsoOverrides)) {
-              if (typeof id === 'string' && id.length <= 100 && typeof data === 'object' && data !== null && !Array.isArray(data)) {
+              if (
+                typeof id === 'string' &&
+                id.length <= 100 &&
+                typeof data === 'object' &&
+                data !== null &&
+                !Array.isArray(data)
+              ) {
                 upsertDsoOverrideDB(id, data as object);
                 dsoOverridesImported++;
               }
             }
           }
-        } catch { /* ignore invalid dso-overrides.json */ }
+        } catch {
+          /* ignore invalid dso-overrides.json */
+        }
       }
 
       // Import custom gear (only the ids the user selected). Name-based override:
@@ -2781,19 +3230,36 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
             // Snapshot existing gear once, before importing, so name-based replacement
             // targets only pre-import rows — two same-type+name items within this bundle
             // must not delete each other.
-            const existingGear = getAllCustomGear()
-              .map(r => { let n = r.id; try { const d = JSON.parse(r.data); if (typeof d?.name === 'string') n = d.name; } catch { /* ignore */ } return { id: r.id, type: r.type, name: n }; });
+            const existingGear = getAllCustomGear().map((r) => {
+              let n = r.id;
+              try {
+                const d = JSON.parse(r.data);
+                if (typeof d?.name === 'string') n = d.name;
+              } catch {
+                /* ignore */
+              }
+              return { id: r.id, type: r.type, name: n };
+            });
             for (const g of rawGear) {
-              if (typeof g.id === 'string' && selectedGear.has(g.id) && ['telescope', 'camera', 'accessory'].includes(g.type)) {
+              if (
+                typeof g.id === 'string' &&
+                selectedGear.has(g.id) &&
+                ['telescope', 'camera', 'accessory'].includes(g.type)
+              ) {
                 const { id, type, ...data } = g;
                 const name = typeof data.name === 'string' ? data.name : id;
-                const sameType = existingGear.filter(r => r.type === type);
+                const sameType = existingGear.filter((r) => r.type === type);
                 idsToReplaceByName(sameType, name).forEach(deleteCustomGearDB);
-                upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory', { ...data, id });
+                upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory', {
+                  ...data,
+                  id,
+                });
               }
             }
           }
-        } catch { /* ignore invalid custom-gear.json */ }
+        } catch {
+          /* ignore invalid custom-gear.json */
+        }
       }
 
       // Import gear setups (only the ids the user selected). Name-based override:
@@ -2809,7 +3275,12 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
             // re-imports are still handled by upsertGearSetup.
             const existingSetups = getAllGearSetups();
             for (const s of rawSetups) {
-              if (typeof s.id === 'string' && selectedSetups.has(s.id) && typeof s.telescopeId === 'string' && typeof s.cameraId === 'string') {
+              if (
+                typeof s.id === 'string' &&
+                selectedSetups.has(s.id) &&
+                typeof s.telescopeId === 'string' &&
+                typeof s.cameraId === 'string'
+              ) {
                 const name = typeof s.name === 'string' ? s.name : '';
                 if (name) idsToReplaceByName(existingSetups, name).forEach(deleteGearSetup);
                 upsertGearSetup({
@@ -2823,7 +3294,9 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
               }
             }
           }
-        } catch { /* ignore invalid gear-setups.json */ }
+        } catch {
+          /* ignore invalid gear-setups.json */
+        }
       }
 
       // Import POI categories (id-based upsert: a re-imported category with the same
@@ -2842,7 +3315,9 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
               });
             });
           }
-        } catch { /* ignore invalid poi-categories.json */ }
+        } catch {
+          /* ignore invalid poi-categories.json */
+        }
       }
 
       // Import night plans (only the ids the user selected). Name-based override:
@@ -2917,7 +3392,9 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
               }
             });
           }
-        } catch { /* ignore invalid plans.json */ }
+        } catch {
+          /* ignore invalid plans.json */
+        }
       }
 
       // Flush libvips handle cache before writing to avoid Windows sharing violations
@@ -2925,7 +3402,9 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
       sharp.cache(false);
 
       // Extract selected image files to UPLOADS_DIR (always overwrite)
-      const imageEntries = zipDir.files.filter(f => f.path.startsWith('images/') && f.type === 'File');
+      const imageEntries = zipDir.files.filter(
+        (f) => f.path.startsWith('images/') && f.type === 'File',
+      );
       writtenFiles = new Set<string>();
       for (const entry of imageEntries) {
         const baseName = path.basename(entry.path);
@@ -2944,10 +3423,14 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
     } else if (ext === '.json') {
       photos = JSON.parse(file.buffer.toString('utf8'));
     } else {
-      res.status(400).json({ error: 'Format non supporté (.zip ou .json attendu)' }); return;
+      res.status(400).json({ error: 'Format non supporté (.zip ou .json attendu)' });
+      return;
     }
 
-    if (!Array.isArray(photos)) { res.status(400).json({ error: 'Format de manifeste invalide' }); return; }
+    if (!Array.isArray(photos)) {
+      res.status(400).json({ error: 'Format de manifeste invalide' });
+      return;
+    }
 
     let imported = 0;
     let skipped = 0;
@@ -2955,11 +3438,14 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
     if (importMetadata && photos.length > 0) {
       const allNames = photos.map((p: any) => p.originalName ?? p.filename ?? p.id).filter(Boolean);
       const existingByName = new Map(
-        checkPhotosExistByName(allNames).map(r => [r.originalName, r.id])
+        checkPhotosExistByName(allNames).map((r) => [r.originalName, r.id]),
       );
 
       for (const p of photos) {
-        if (!p.id || typeof p.id !== 'string') { skipped++; continue; }
+        if (!p.id || typeof p.id !== 'string') {
+          skipped++;
+          continue;
+        }
         const origName: string = p.originalName ?? p.filename ?? p.id;
 
         // Skip photos whose image file was not written (not selected, or write failed)
@@ -2972,7 +3458,8 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         if (existingId) deletePhoto(existingId);
 
         const corrs = Array.isArray(p.correspondences) ? p.correspondences : [];
-        const thumbFilename = typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null;
+        const thumbFilename =
+          typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null;
         const result = createPhotoWithId(
           p.id,
           p.filename ?? `${p.id}.jpg`,
@@ -2991,7 +3478,8 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
           typeof p.observationDate === 'string' ? p.observationDate : null,
           sanitizePois(p.pointsOfInterest),
         );
-        if (result === 'imported') imported++; else skipped++;
+        if (result === 'imported') imported++;
+        else skipped++;
       }
     }
 
@@ -3348,7 +3836,8 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
       return;
     }
 
-    let { dsoIds, labels, integrations, notes, originalName, observationDate, pointsOfInterest } = req.body;
+    let { dsoIds, labels, integrations, notes, originalName, observationDate, pointsOfInterest } =
+      req.body;
     if (!Array.isArray(dsoIds)) dsoIds = [];
     if (!Array.isArray(labels)) labels = [];
     pointsOfInterest = sanitizePois(pointsOfInterest);
@@ -3364,8 +3853,20 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
         ? observationDate.trim().slice(0, 50)
         : null;
 
-    updatePhotoMetadata(id, dsoIds, labels, notes, resolvedOriginalName, integrations, resolvedObsDate, pointsOfInterest);
-    res.json({ ok: true, ...(resolvedOriginalName !== undefined ? { originalName: resolvedOriginalName } : {}) });
+    updatePhotoMetadata(
+      id,
+      dsoIds,
+      labels,
+      notes,
+      resolvedOriginalName,
+      integrations,
+      resolvedObsDate,
+      pointsOfInterest,
+    );
+    res.json({
+      ok: true,
+      ...(resolvedOriginalName !== undefined ? { originalName: resolvedOriginalName } : {}),
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -3412,8 +3913,10 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
 app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
   try {
     // Get language from request (default to 'en')
-    const lang = ((req.body.lang === 'fr' || req.body.lang === 'en') ? req.body.lang : 'en') as ServerLang;
-    
+    const lang = (
+      req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en'
+    ) as ServerLang;
+
     const file = req.file;
     if (!file) {
       res.status(400).json({ success: false, error: msg.api.noFile(lang), code: 'NO_FILE' });
@@ -3422,7 +3925,11 @@ app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
 
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_WCS_EXTENSIONS.has(ext)) {
-      res.status(400).json({ success: false, error: msg.api.unsupportedWcsFormat(lang), code: 'UNSUPPORTED_FORMAT' });
+      res.status(400).json({
+        success: false,
+        error: msg.api.unsupportedWcsFormat(lang),
+        code: 'UNSUPPORTED_FORMAT',
+      });
       return;
     }
 
@@ -3448,7 +3955,11 @@ app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
     }
 
     if (!imageWidth || !imageHeight) {
-      res.json({ success: false, error: msg.api.noImageDimensions(lang), code: 'NO_IMAGE_DIMENSIONS' });
+      res.json({
+        success: false,
+        error: msg.api.noImageDimensions(lang),
+        code: 'NO_IMAGE_DIMENSIONS',
+      });
       return;
     }
 
@@ -3460,7 +3971,11 @@ app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
     const correspondences = wcsToCorrespondences(wcs, imageWidth, imageHeight, true);
 
     if (correspondences.length < 3) {
-      res.json({ success: false, error: msg.api.notEnoughCatalogStars(lang), code: 'NOT_ENOUGH_CATALOG_STARS' });
+      res.json({
+        success: false,
+        error: msg.api.notEnoughCatalogStars(lang),
+        code: 'NOT_ENOUGH_CATALOG_STARS',
+      });
       return;
     }
 
@@ -3469,24 +3984,44 @@ app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
     const targetHeight = parseInt(req.body.targetHeight || '0', 10);
 
     let finalCorrespondences = correspondences;
-    let dimensionWarning: { sourceW: number; sourceH: number; targetW: number; targetH: number; aspectMismatch: boolean } | undefined;
+    let dimensionWarning:
+      | {
+          sourceW: number;
+          sourceH: number;
+          targetW: number;
+          targetH: number;
+          aspectMismatch: boolean;
+        }
+      | undefined;
 
-    if (targetWidth > 0 && targetHeight > 0 && (targetWidth !== imageWidth || targetHeight !== imageHeight)) {
+    if (
+      targetWidth > 0 &&
+      targetHeight > 0 &&
+      (targetWidth !== imageWidth || targetHeight !== imageHeight)
+    ) {
       const sourceAspect = imageWidth / imageHeight;
       const targetAspect = targetWidth / targetHeight;
       const aspectDiff = Math.abs(sourceAspect - targetAspect) / sourceAspect;
       const aspectMismatch = aspectDiff > 0.01; // >1% aspect ratio difference
 
-      dimensionWarning = { sourceW: imageWidth, sourceH: imageHeight, targetW: targetWidth, targetH: targetHeight, aspectMismatch };
+      dimensionWarning = {
+        sourceW: imageWidth,
+        sourceH: imageHeight,
+        targetW: targetWidth,
+        targetH: targetHeight,
+        aspectMismatch,
+      };
 
       const scaleX = targetWidth / imageWidth;
       const scaleY = targetHeight / imageHeight;
-      finalCorrespondences = correspondences.map(c => ({
+      finalCorrespondences = correspondences.map((c) => ({
         ...c,
         photoX: c.photoX * scaleX,
         photoY: c.photoY * scaleY,
       }));
-      console.log(`[WCS] Rescaled correspondences: source ${imageWidth}x${imageHeight} → target ${targetWidth}x${targetHeight} (aspectMismatch=${aspectMismatch})`);
+      console.log(
+        `[WCS] Rescaled correspondences: source ${imageWidth}x${imageHeight} → target ${targetWidth}x${targetHeight} (aspectMismatch=${aspectMismatch})`,
+      );
     }
 
     res.json({
@@ -3546,10 +4081,14 @@ app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
  */
 // --- ASTAP local plate solve route ---
 app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
-  const lang = ((req.body.lang === 'fr' || req.body.lang === 'en') ? req.body.lang : 'en') as ServerLang;
+  const lang = (
+    req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en'
+  ) as ServerLang;
 
   if (!req.file) {
-    res.status(400).json({ error: lang === 'fr' ? 'Fichier manquant' : 'Missing file', code: 'MISSING_FILE' });
+    res
+      .status(400)
+      .json({ error: lang === 'fr' ? 'Fichier manquant' : 'Missing file', code: 'MISSING_FILE' });
     return;
   }
 
@@ -3592,7 +4131,10 @@ app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
       updateJob(job.id, { status: 'running' });
       try {
         const result = await solveWithASTAP(
-          fileBuffer, ext, width, height,
+          fileBuffer,
+          ext,
+          width,
+          height,
           Object.keys(hints).length > 0 ? hints : undefined,
           lang,
           job.abortController.signal,
@@ -3603,12 +4145,16 @@ app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
           return;
         }
         if (result.success && result.correspondences && orientation && orientation !== 1) {
-          result.correspondences = result.correspondences.map(c => {
+          result.correspondences = result.correspondences.map((c) => {
             const { x, y } = rawToBrowserCoords(c.photoX, c.photoY, width, height, orientation);
             return { ...c, photoX: x, photoY: y };
           });
         }
-        updateJob(job.id, { status: result.success ? 'success' : 'failed', result, error: result.error });
+        updateJob(job.id, {
+          status: result.success ? 'success' : 'failed',
+          result,
+          error: result.error,
+        });
       } catch (err: any) {
         if (err?.code === 'SOLVE_CANCELED') {
           updateJob(job.id, { status: 'canceled' });
@@ -3777,7 +4323,9 @@ app.delete('/api/solve-astap/:jobId', (req, res) => {
  */
 // --- solve-field local plate solve route ---
 app.post('/api/solve-field', upload.single('photo'), async (req, res) => {
-  const lang = ((req.body.lang === 'fr' || req.body.lang === 'en') ? req.body.lang : 'en') as ServerLang;
+  const lang = (
+    req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en'
+  ) as ServerLang;
 
   if (!req.file) {
     res.status(400).json({ error: msg.api.missingFile(lang), code: 'MISSING_FILE' });
@@ -3823,7 +4371,10 @@ app.post('/api/solve-field', upload.single('photo'), async (req, res) => {
       updateJob(job.id, { status: 'running' });
       try {
         const result = await solveWithSolveField(
-          fileBuffer, ext, width, height,
+          fileBuffer,
+          ext,
+          width,
+          height,
           Object.keys(hints).length > 0 ? hints : undefined,
           lang,
           job.abortController.signal,
@@ -3834,18 +4385,25 @@ app.post('/api/solve-field', upload.single('photo'), async (req, res) => {
           return;
         }
         if (result.success && result.correspondences && orientation && orientation !== 1) {
-          result.correspondences = result.correspondences.map(c => {
+          result.correspondences = result.correspondences.map((c) => {
             const { x, y } = rawToBrowserCoords(c.photoX, c.photoY, width, height, orientation);
             return { ...c, photoX: x, photoY: y };
           });
         }
-        updateJob(job.id, { status: result.success ? 'success' : 'failed', result, error: result.error });
+        updateJob(job.id, {
+          status: result.success ? 'success' : 'failed',
+          result,
+          error: result.error,
+        });
       } catch (err: any) {
         if (err?.code === 'SOLVE_CANCELED') {
           updateJob(job.id, { status: 'canceled' });
         } else {
           console.error('[SolveField] Background solve error:', err);
-          updateJob(job.id, { status: 'failed', error: err.message || 'Unknown solve-field error' });
+          updateJob(job.id, {
+            status: 'failed',
+            error: err.message || 'Unknown solve-field error',
+          });
         }
       }
     })();
@@ -3982,16 +4540,25 @@ app.delete('/api/solve-field/:jobId', (req, res) => {
 app.post('/api/solve-plate', upload.single('photo'), async (req, res) => {
   try {
     // Get language from request (default to 'en')
-    const lang = (req.body.lang === 'fr' || req.body.lang === 'en') ? req.body.lang : 'en';
-    
+    const lang = req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en';
+
     if (!isAstrometryConfigured()) {
-      res.status(400).json({ error: lang === 'fr' ? 'ASTROMETRY_API_KEY non configurée sur le serveur' : 'ASTROMETRY_API_KEY not configured on server', code: 'ASTROMETRY_NOT_CONFIGURED' });
+      res.status(400).json({
+        error:
+          lang === 'fr'
+            ? 'ASTROMETRY_API_KEY non configurée sur le serveur'
+            : 'ASTROMETRY_API_KEY not configured on server',
+        code: 'ASTROMETRY_NOT_CONFIGURED',
+      });
       return;
     }
 
     const file = req.file;
     if (!file) {
-      res.status(400).json({ error: lang === 'fr' ? 'Aucun fichier fourni' : 'No file provided', code: 'NO_FILE' });
+      res.status(400).json({
+        error: lang === 'fr' ? 'Aucun fichier fourni' : 'No file provided',
+        code: 'NO_FILE',
+      });
       return;
     }
 
@@ -4015,19 +4582,37 @@ app.post('/api/solve-plate', upload.single('photo'), async (req, res) => {
     }
 
     if (!imageWidth || !imageHeight) {
-      res.status(400).json({ error: lang === 'fr' ? 'Impossible de déterminer les dimensions de l\'image' : 'Cannot determine image dimensions', code: 'CANNOT_DETERMINE_DIMENSIONS' });
+      res.status(400).json({
+        error:
+          lang === 'fr'
+            ? "Impossible de déterminer les dimensions de l'image"
+            : 'Cannot determine image dimensions',
+        code: 'CANNOT_DETERMINE_DIMENSIONS',
+      });
       return;
     }
 
     // Parse optional hints from request body
-    const hints: { ra?: number; dec?: number; radius?: number; scale_lower?: number; scale_upper?: number } = {};
+    const hints: {
+      ra?: number;
+      dec?: number;
+      radius?: number;
+      scale_lower?: number;
+      scale_upper?: number;
+    } = {};
     if (req.body.ra !== undefined) hints.ra = parseFloat(req.body.ra);
     if (req.body.dec !== undefined) hints.dec = parseFloat(req.body.dec);
     if (req.body.radius !== undefined) hints.radius = parseFloat(req.body.radius);
     if (req.body.scale_lower !== undefined) hints.scale_lower = parseFloat(req.body.scale_lower);
     if (req.body.scale_upper !== undefined) hints.scale_upper = parseFloat(req.body.scale_upper);
 
-    const jobId = await submitJob(file.buffer, file.originalname, imageWidth, imageHeight, Object.keys(hints).length > 0 ? hints : undefined);
+    const jobId = await submitJob(
+      file.buffer,
+      file.originalname,
+      imageWidth,
+      imageHeight,
+      Object.keys(hints).length > 0 ? hints : undefined,
+    );
     res.json({ jobId });
   } catch (err: any) {
     console.error('Plate solve submit error:', err);
@@ -4116,7 +4701,9 @@ app.get('/api/solve-plate/:id', (req, res) => {
 app.get('/api/astrometry/submissions', async (req, res) => {
   try {
     if (!isAstrometryConfigured()) {
-      res.status(400).json({ error: 'ASTROMETRY_API_KEY not configured', code: 'ASTROMETRY_NOT_CONFIGURED' });
+      res
+        .status(400)
+        .json({ error: 'ASTROMETRY_API_KEY not configured', code: 'ASTROMETRY_NOT_CONFIGURED' });
       return;
     }
 
@@ -4142,22 +4729,32 @@ app.get('/api/astrometry/submissions', async (req, res) => {
 // --- Reuse existing astrometry.net submission ---
 app.post('/api/astrometry/reuse', upload.single('photo'), async (req, res) => {
   try {
-    const lang = (req.body.lang === 'fr' || req.body.lang === 'en') ? req.body.lang : 'en';
-    
+    const lang = req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en';
+
     if (!isAstrometryConfigured()) {
-      res.status(400).json({ error: lang === 'fr' ? 'ASTROMETRY_API_KEY non configurée' : 'ASTROMETRY_API_KEY not configured', code: 'ASTROMETRY_NOT_CONFIGURED' });
+      res.status(400).json({
+        error:
+          lang === 'fr' ? 'ASTROMETRY_API_KEY non configurée' : 'ASTROMETRY_API_KEY not configured',
+        code: 'ASTROMETRY_NOT_CONFIGURED',
+      });
       return;
     }
 
     const file = req.file;
     if (!file) {
-      res.status(400).json({ error: lang === 'fr' ? 'Aucun fichier fourni' : 'No file provided', code: 'NO_FILE' });
+      res.status(400).json({
+        error: lang === 'fr' ? 'Aucun fichier fourni' : 'No file provided',
+        code: 'NO_FILE',
+      });
       return;
     }
 
     const jobId = parseInt(req.body.jobId, 10);
     if (!jobId || isNaN(jobId)) {
-      res.status(400).json({ error: lang === 'fr' ? 'Job ID invalide' : 'Invalid job ID', code: 'INVALID_JOB_ID' });
+      res.status(400).json({
+        error: lang === 'fr' ? 'Job ID invalide' : 'Invalid job ID',
+        code: 'INVALID_JOB_ID',
+      });
       return;
     }
 
@@ -4180,12 +4777,18 @@ app.post('/api/astrometry/reuse', upload.single('photo'), async (req, res) => {
     }
 
     if (!imageWidth || !imageHeight) {
-      res.status(400).json({ error: lang === 'fr' ? 'Impossible de déterminer les dimensions' : 'Cannot determine image dimensions', code: 'CANNOT_DETERMINE_DIMENSIONS' });
+      res.status(400).json({
+        error:
+          lang === 'fr'
+            ? 'Impossible de déterminer les dimensions'
+            : 'Cannot determine image dimensions',
+        code: 'CANNOT_DETERMINE_DIMENSIONS',
+      });
       return;
     }
 
     const result = await reuseSubmission(jobId, imageWidth, imageHeight);
-    
+
     if (result.success) {
       res.json({ success: true, correspondences: result.correspondences });
     } else {
@@ -4234,7 +4837,7 @@ app.get('/api/stars/nearby', (req, res) => {
     const radius = parseFloat(String(req.query.radius || '5'));
     const magLimit = parseFloat(String(req.query.magLimit || '10'));
     const limit = Math.min(Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20), 100);
-    
+
     const results = searchStarsByPosition(ra, dec, radius, magLimit, limit);
     res.json(results);
   } catch (err: any) {
@@ -4292,10 +4895,15 @@ async function startServer() {
         });
         console.log('[Swagger] API docs enabled at /api/docs');
       } catch (err: any) {
-        console.warn('[Swagger] dev docs disabled; swagger-ui-express unavailable.', err?.message ?? err);
+        console.warn(
+          '[Swagger] dev docs disabled; swagger-ui-express unavailable.',
+          err?.message ?? err,
+        );
       }
     } else {
-      console.warn('[Swagger] dev docs disabled; public/swagger.json not found. Run npm run swagger:generate.');
+      console.warn(
+        '[Swagger] dev docs disabled; public/swagger.json not found. Run npm run swagger:generate.',
+      );
     }
   }
 
@@ -4304,7 +4912,10 @@ async function startServer() {
   // by this catch-all even if a future refactor breaks the ordering again.
   if (fs.existsSync(DIST_DIR)) {
     app.get('/{*splat}', (req, res, next) => {
-      if (req.path.startsWith('/api')) { next(); return; }
+      if (req.path.startsWith('/api')) {
+        next();
+        return;
+      }
       res.sendFile(path.join(DIST_DIR, 'index.html'));
     });
   }

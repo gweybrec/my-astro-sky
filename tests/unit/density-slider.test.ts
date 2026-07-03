@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  sliderPosToBudget, budgetToSliderPos, SLIDER_STEPS,
+  sliderPosToBudget,
+  budgetToSliderPos,
+  SLIDER_STEPS,
   estimateInitialDensity,
-  STAR_DENSITY_MAX, DSO_DENSITY_MAX,
+  STAR_DENSITY_MAX,
+  DSO_DENSITY_MAX,
 } from '../../src/density-slider';
 
 const MAX = 5000;
@@ -25,7 +28,8 @@ describe('sliderPosToBudget()', () => {
   it('is coarse near the max and fine near 0 (ease-in)', () => {
     // Equal slider steps produce a large budget jump near the max and a small one near 0.
     const stepLow = sliderPosToBudget(100, MAX) - sliderPosToBudget(0, MAX);
-    const stepHigh = sliderPosToBudget(SLIDER_STEPS, MAX) - sliderPosToBudget(SLIDER_STEPS - 100, MAX);
+    const stepHigh =
+      sliderPosToBudget(SLIDER_STEPS, MAX) - sliderPosToBudget(SLIDER_STEPS - 100, MAX);
     expect(stepHigh).toBeGreaterThan(stepLow);
   });
 

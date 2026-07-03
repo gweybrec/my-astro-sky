@@ -17,7 +17,9 @@
         class="search-clear-btn"
         :style="{ display: query ? 'flex' : 'none' }"
         @click="onClear"
-      >&times;</button>
+      >
+        &times;
+      </button>
       <div
         v-if="viewMode === 'skymap' && showDropdown"
         class="search-dropdown !block"
@@ -63,7 +65,9 @@
         :key="star.hip"
         class="dso-nearby-star"
         @click="navigateToStar(star)"
-      >{{ starDisplayName(star) }} (mag {{ star.mag.toFixed(1) }})</div>
+      >
+        {{ starDisplayName(star) }} (mag {{ star.mag.toFixed(1) }})
+      </div>
     </div>
   </div>
 </template>
@@ -78,10 +82,19 @@ import type { UnifiedSearchResult } from '../../search';
 import { getDSOById } from '../../dso-catalog';
 import { getStars } from '../../star-catalog';
 import { openDSOEditModal } from '../../dso-editor';
-import { buildFallbackDSOResult, findChipDSOResult, normalizeChipKey, shouldApplyChipSearchResults } from '../../dso-chip-search';
+import {
+  buildFallbackDSOResult,
+  findChipDSOResult,
+  normalizeChipKey,
+  shouldApplyChipSearchResults,
+} from '../../dso-chip-search';
 import type { Star, DSO } from '../../types';
 import type { StarSearchResult } from '../../api';
-import { setDSOHighlight, setSelectDSOInSearchHandler, setClearDSOSelectionHandler } from '../../ui';
+import {
+  setDSOHighlight,
+  setSelectDSOInSearchHandler,
+  setClearDSOSelectionHandler,
+} from '../../ui';
 import StarInfoPanel from './StarInfoPanel.vue';
 import DSOInfoPanel from './DSOInfoPanel.vue';
 
@@ -169,7 +182,9 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function scheduleHideDropdown() {
-  setTimeout(() => { showDropdown.value = false; }, 200);
+  setTimeout(() => {
+    showDropdown.value = false;
+  }, 200);
 }
 
 function onFocus() {
@@ -238,7 +253,7 @@ async function selectDSOById(dsoId: string) {
 function loadNearbyStars(ra: number, dec: number) {
   const toRad = Math.PI / 180;
   nearbyStars.value = getStars()
-    .filter(s => {
+    .filter((s) => {
       if (s.mag > 6) return false;
       const d1 = dec * toRad;
       const d2 = s.dec * toRad;

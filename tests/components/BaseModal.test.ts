@@ -3,7 +3,11 @@ import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import BaseModal from '../../src/components/base/BaseModal.vue';
 
-vi.mock('../../src/i18n', () => ({ t: (key: string) => key, getLang: () => 'fr', setLang: vi.fn() }));
+vi.mock('../../src/i18n', () => ({
+  t: (key: string) => key,
+  getLang: () => 'fr',
+  setLang: vi.fn(),
+}));
 
 // BaseModal uses <Teleport to="body">. Its DOM lands in document.body, not
 // inside the wrapper root. All selectors must target document.body directly.

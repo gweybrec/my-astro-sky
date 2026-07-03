@@ -15,12 +15,20 @@ const DEG2RAD = Math.PI / 180;
  */
 
 /** Canvas rotation (deg) that displays PA `paDeg` at `raDeg` under map rotation `viewRotationDeg`. */
-export function paToCanvasRotationDeg(paDeg: number, raDeg: number, viewRotationDeg: number): number {
+export function paToCanvasRotationDeg(
+  paDeg: number,
+  raDeg: number,
+  viewRotationDeg: number,
+): number {
   return dsoCanvasAngleForHighlight(paDeg, raDeg, viewRotationDeg) / DEG2RAD + 90;
 }
 
 /** Inverse of {@link paToCanvasRotationDeg}: recover PA (°E of N, normalised [0,360)). */
-export function canvasRotationToPaDeg(rotDeg: number, raDeg: number, viewRotationDeg: number): number {
+export function canvasRotationToPaDeg(
+  rotDeg: number,
+  raDeg: number,
+  viewRotationDeg: number,
+): number {
   return canvasAngleToPADeg((rotDeg - 90) * DEG2RAD, raDeg, viewRotationDeg);
 }
 

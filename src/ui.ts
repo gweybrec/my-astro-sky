@@ -5,13 +5,33 @@ import { useSettingsStore } from './stores/settings';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
 import { loadSettings, saveSettings, normalizeRotationDeg } from './display-settings';
-import type { Star, DSO, ViewMode, Photo, PlateSolveResult, PhotoCorrespondence, PhotoIntegration, ConstellationStyle } from './types';
+import type {
+  Star,
+  DSO,
+  ViewMode,
+  Photo,
+  PlateSolveResult,
+  PhotoCorrespondence,
+  PhotoIntegration,
+  ConstellationStyle,
+} from './types';
 import { isIAUStyle } from './types';
 import { SkyMap } from './sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery, smartSortPhotos } from './gallery';
 import { getDSOTypeName, searchUnified, searchDSOs } from './search';
-import { uploadPhoto, solveWithSolveField, solveWithASTAP, submitPlateSolve, pollPlateSolve, solveWCS, updatePhotoMetadata, updatePhotoOrder, getPhotos, reuseAstrometrySubmission } from './api';
+import {
+  uploadPhoto,
+  solveWithSolveField,
+  solveWithASTAP,
+  submitPlateSolve,
+  pollPlateSolve,
+  solveWCS,
+  updatePhotoMetadata,
+  updatePhotoOrder,
+  getPhotos,
+  reuseAstrometrySubmission,
+} from './api';
 import type { ServerSettings, SolverAvailability } from './api';
 import { getSolverAvailability } from './api';
 import { DSO_CATALOGS_ALL, findDSOsInImage, getDSOById } from './dso-catalog';
@@ -26,7 +46,6 @@ import { buildPhotoQueryMatches } from './photo-search';
 import { filterDrawOrderPhotos } from './photo-draw-order';
 import { computeDSOHighlightShape } from './dso-highlight';
 import { confirmPhotoDelete } from './photo-delete-confirm';
-
 
 function angularDistance(ra1: number, dec1: number, ra2: number, dec2: number): number {
   const toRad = Math.PI / 180;
@@ -71,7 +90,6 @@ function formatDifficulty(difficulty: number | null): string {
   if (difficulty === null) return '';
   return '◆'.repeat(difficulty) + '◇'.repeat(5 - difficulty);
 }
-
 
 export { positionPopup } from './popup-utils';
 import { positionPopup } from './popup-utils';
@@ -147,12 +165,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   overlay.addOnPhotosChanged(() => {
     skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
     skyMap.render();
-    gallery.loadPhotos(overlay.getPlacedPhotos().map(p => p.photo));
+    gallery.loadPhotos(overlay.getPlacedPhotos().map((p) => p.photo));
   });
 
   // Clicking a photo on the sky map selects it in the photos panel
   skyMap.setOnPhotoClick((photoName) => {
-    const placed = overlay.getPlacedPhotos().find(p => p.photo.originalName === photoName);
+    const placed = overlay.getPlacedPhotos().find((p) => p.photo.originalName === photoName);
     if (placed) usePhotosStore(pinia).selectPhoto(placed.photo.id);
   });
 
@@ -184,8 +202,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       type: 'undo',
       duration: 5000,
       actionLabel: t('photos.undo'),
-      onAction: () => { overlay.unhidePhoto(photo.id); },
-      onExpire: () => { overlay.removePhoto(photo.id); },
+      onAction: () => {
+        overlay.unhidePhoto(photo.id);
+      },
+      onExpire: () => {
+        overlay.removePhoto(photo.id);
+      },
     });
   };
 
@@ -196,7 +218,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   };
 
   // Wire callbacks for Vue photo panel
-  triggerSelectDSOForPhotoChip = (dsoId) => { _selectDSOInSearch(dsoId); };
+  triggerSelectDSOForPhotoChip = (dsoId) => {
+    _selectDSOInSearch(dsoId);
+  };
   triggerBatchModal = (files) => {
     useUiStore(pinia).pendingBatchFiles = files;
     openVueModal('batchUpload');
@@ -215,10 +239,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       return;
     }
     const starMainName = (s: Star) =>
-      s.name
-      || (s.bayer && s.constellation ? `${s.bayer} ${s.constellation}` : null)
-      || (s.flam  && s.constellation ? `${s.flam} ${s.constellation}`  : null)
-      || `HIP ${s.hip}`;
+      s.name ||
+      (s.bayer && s.constellation ? `${s.bayer} ${s.constellation}` : null) ||
+      (s.flam && s.constellation ? `${s.flam} ${s.constellation}` : null) ||
+      `HIP ${s.hip}`;
     let html: string;
     if (ds.simplifiedDSOTooltips) {
       html = `<div class="dso-info-name">${starMainName(star)}</div><div class="tooltip-mag">${t('stars.magnitude')} ${star.mag.toFixed(2)}</div>`;
@@ -228,11 +252,15 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       if (star.flam && star.constellation) desigParts.push(`${star.flam} ${star.constellation}`);
       if (star.bayer && star.constellation) desigParts.push(`${star.bayer} ${star.constellation}`);
       if (star.desig && !star.flam) desigParts.push(star.desig);
-      if (desigParts.length) rows.push(`<tr><td>${t('stars.designation')}</td><td>${desigParts.join(' · ')}</td></tr>`);
+      if (desigParts.length)
+        rows.push(`<tr><td>${t('stars.designation')}</td><td>${desigParts.join(' · ')}</td></tr>`);
       rows.push(`<tr><td>HIP</td><td>${star.hip}</td></tr>`);
       rows.push(`<tr><td>${t('stars.magnitude')}</td><td>${star.mag.toFixed(2)}</td></tr>`);
-      if (star.constellation) rows.push(`<tr><td>${t('stars.constellation')}</td><td>${star.constellation}</td></tr>`);
-      rows.push(`<tr><td>${t('dso.raDec')}</td><td>${formatRA(star.ra)} / ${formatDec(star.dec)}</td></tr>`);
+      if (star.constellation)
+        rows.push(`<tr><td>${t('stars.constellation')}</td><td>${star.constellation}</td></tr>`);
+      rows.push(
+        `<tr><td>${t('dso.raDec')}</td><td>${formatRA(star.ra)} / ${formatDec(star.dec)}</td></tr>`,
+      );
       html = `<div class="dso-info-name">${starMainName(star)}</div><table class="dso-info-table">${rows.join('')}</table>`;
     }
     ui.setSkyTooltip(html, x, y);
@@ -259,16 +287,32 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       const bestId = dso.catalogs[0] ?? dso.id;
       const stripWs = (s: string) => s.replace(/\s+/g, '');
       const headerStr = dso.displayName
-        ? (isLPN || stripWs(dso.displayName).includes(stripWs(bestId)) ? dso.displayName : `${dso.displayName} – ${bestId}`)
-        : (isLPN ? bestId.replace(/^LPN-/, '') : bestId);
+        ? isLPN || stripWs(dso.displayName).includes(stripWs(bestId))
+          ? dso.displayName
+          : `${dso.displayName} – ${bestId}`
+        : isLPN
+          ? bestId.replace(/^LPN-/, '')
+          : bestId;
       const nameStr = `<div class="dso-info-name">${headerStr}</div>`;
-      const sizeRow = sizeStr !== '–' ? `<tr><td>${t('dso.size')}</td><td>${sizeStr}</td></tr>` : '';
+      const sizeRow =
+        sizeStr !== '–' ? `<tr><td>${t('dso.size')}</td><td>${sizeStr}</td></tr>` : '';
       const raDec = `${formatRA(dso.ra)} / ${formatDec(dso.dec)}`;
-      const ratingRow = dso.rating !== null ? `<tr><td>${t('targets.ratingFilter')}</td><td>${formatRating(dso.rating)}</td></tr>` : '';
-      const difficultyRow = dso.difficulty !== null ? `<tr><td>${t('targets.sort.difficulty')}</td><td>${formatDifficulty(dso.difficulty)}</td></tr>` : '';
-      const crossRefs = dso.catalogs.slice(1).filter(c => !c.startsWith('LPN-'));
-      const crossRefRow = crossRefs.length > 0 ? `<tr><td>${t('dso.alsoKnownAs')}</td><td>${crossRefs.join('<br>')}</td></tr>` : '';
-      const emissionLinesRow = dso.emissionLines ? `<tr><td>${t('dso.emissionLines')}</td><td>${dso.emissionLines}</td></tr>` : '';
+      const ratingRow =
+        dso.rating !== null
+          ? `<tr><td>${t('targets.ratingFilter')}</td><td>${formatRating(dso.rating)}</td></tr>`
+          : '';
+      const difficultyRow =
+        dso.difficulty !== null
+          ? `<tr><td>${t('targets.sort.difficulty')}</td><td>${formatDifficulty(dso.difficulty)}</td></tr>`
+          : '';
+      const crossRefs = dso.catalogs.slice(1).filter((c) => !c.startsWith('LPN-'));
+      const crossRefRow =
+        crossRefs.length > 0
+          ? `<tr><td>${t('dso.alsoKnownAs')}</td><td>${crossRefs.join('<br>')}</td></tr>`
+          : '';
+      const emissionLinesRow = dso.emissionLines
+        ? `<tr><td>${t('dso.emissionLines')}</td><td>${dso.emissionLines}</td></tr>`
+        : '';
       html = `${nameStr}<table class="dso-info-table"><tr><td>${t('dso.type')}</td><td>${typeName}</td></tr><tr><td>${t('stars.magnitude')}</td><td>${magStr}</td></tr>${sizeRow}<tr><td>${t('dso.raDec')}</td><td>${raDec}</td></tr>${ratingRow}${difficultyRow}${emissionLinesRow}${crossRefRow}</table>`;
     }
     // Only full-mode tooltips carry the DSO (and thus the interactive action buttons);
@@ -292,7 +336,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setShowStars(settings.showStars);
   skyMap.setShowConstellationLines(settings.showConstellationLines);
   skyMap.setShowConstellationNames(
-    isIAUStyle(settings.constellationStyle) ? settings.showConstellationNames : false
+    isIAUStyle(settings.constellationStyle) ? settings.showConstellationNames : false,
   );
   if (settings.constellationStyle !== 'western') {
     skyMap.setConstellationStyle(settings.constellationStyle);
@@ -339,5 +383,4 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
 
   // ─── Initialise section visibility for current view mode ─────────────────
   uiStore.switchView(uiStore.currentViewMode);
-
 }

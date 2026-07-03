@@ -5,7 +5,17 @@ import { filterFilterCandidates } from './autocomplete-utils';
  * "Suggested filters" section of Targets result cards.
  * The CSS class `filter-{name}` drives the color (e.g. filter-ha, filter-oiii).
  */
-const KNOWN_FILTER_CSS_KEYS = new Set(['ha', 'oiii', 'sii', 'l', 'r', 'g', 'b', 'rgb', 'dual-band']);
+const KNOWN_FILTER_CSS_KEYS = new Set([
+  'ha',
+  'oiii',
+  'sii',
+  'l',
+  'r',
+  'g',
+  'b',
+  'rgb',
+  'dual-band',
+]);
 
 export function createFilterBadge(name: string): HTMLSpanElement {
   const badge = document.createElement('span');
@@ -161,9 +171,14 @@ type TargetsChipOptions = {
   title?: string;
 };
 
-export function createTargetsChip(label: string, options: TargetsChipOptions = {}): HTMLLabelElement {
+export function createTargetsChip(
+  label: string,
+  options: TargetsChipOptions = {},
+): HTMLLabelElement {
   const chip = document.createElement('label');
-  chip.className = options.extraClass ? `targets-type-chip ${options.extraClass}` : 'targets-type-chip';
+  chip.className = options.extraClass
+    ? `targets-type-chip ${options.extraClass}`
+    : 'targets-type-chip';
   if (options.title) chip.title = options.title;
 
   // Always include the checkbox so :has(input:checked) fires for the active color.

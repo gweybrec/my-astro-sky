@@ -34,11 +34,11 @@ Tests live in `tests/unit/`. Run with `npm test`.
 
 The same field must appear in all three:
 
-| Context | File | Pattern |
-|---|---|---|
-| Single-photo upload modal | `src/photo-overlay.ts` | closure-scoped `let pending<Field>` + direct `input` ref |
-| Batch upload cards | `src/ui.ts` | `BatchItem` interface + `(card as any)._<field>Input` ref |
-| Gallery left-panel editor | `src/metadata-editor.ts` | `let edit<Field>` state + direct `input` ref |
+| Context                   | File                     | Pattern                                                   |
+| ------------------------- | ------------------------ | --------------------------------------------------------- |
+| Single-photo upload modal | `src/photo-overlay.ts`   | closure-scoped `let pending<Field>` + direct `input` ref  |
+| Batch upload cards        | `src/ui.ts`              | `BatchItem` interface + `(card as any)._<field>Input` ref |
+| Gallery left-panel editor | `src/metadata-editor.ts` | `let edit<Field>` state + direct `input` ref              |
 
 **Do not skip any context.** They are easy to forget because they are three
 separate files with no shared abstraction.
@@ -67,7 +67,11 @@ astrometry.net polling route will return the value (see Step 8).
 ### Migration (add column to existing databases)
 
 ```typescript
-try { db.exec('ALTER TABLE photos ADD COLUMN my_field TEXT'); } catch { /* column exists */ }
+try {
+  db.exec('ALTER TABLE photos ADD COLUMN my_field TEXT');
+} catch {
+  /* column exists */
+}
 ```
 
 Add this block after the existing migration block (around line 87).
@@ -104,6 +108,7 @@ in both `.run()` calls (same order as the SET clause).
 ### Upload route `POST /api/photos`
 
 Extract from `req.body` and pass to `createPhoto()`:
+
 ```typescript
 const myField = typeof req.body.myField === 'string' ? req.body.myField.trim().slice(0, 100) : null;
 ```
@@ -115,8 +120,9 @@ Same extraction + sanitization; pass to `updatePhotoMetadata()`.
 ### Import route (search for `createPhotoWithId`)
 
 Pass the value from the manifest:
+
 ```typescript
-typeof p.myField === 'string' ? p.myField : null
+typeof p.myField === 'string' ? p.myField : null;
 ```
 
 ### Swagger annotations
@@ -129,6 +135,7 @@ solver route that returns the new field. Run `npm run swagger:generate` after.
 ## Step 4 — `src/api.ts`
 
 Add `myField?: string | null` to the metadata parameter type of:
+
 - `updatePhotoMetadata()`
 - `uploadPhoto()` — also append to `FormData` when present:
   ```typescript
@@ -154,6 +161,7 @@ metadataMyFieldPlaceholder: 'Placeholder or tooltip text',
 ### State variable
 
 Declare near `pendingNotes` (around line 1170):
+
 ```typescript
 let pendingMyField = '';
 ```
@@ -167,6 +175,7 @@ Use `dialog-input` class. For `datetime-local` inputs, see the CSS pitfall below
 
 This helper (defined around line 2455) is called in the WCS success handler.
 Add the new field there:
+
 ```typescript
 if (result.myField && !pendingMyField) {
   pendingMyField = result.myField;
@@ -180,6 +189,7 @@ accessible — no ref storage is needed here.
 ### `prefillWCSMeta` call sites
 
 The function is called in **two** places in `solveWCS()`'s success path:
+
 1. The normal path (around line 2941): `prefillWCSMeta(result);`
 2. The dimension-mismatch `continueBtn` click handler (around line 2915): same call.
 
@@ -223,6 +233,7 @@ line 4769).
 ### WCS prefill in the `wcsInput` change handler
 
 Read the stored ref and update it:
+
 ```typescript
 if (result.myField && !item.myField) {
   item.myField = result.myField;
@@ -247,6 +258,7 @@ Pass `myField: item.myField || null` to `uploadPhoto()`.
 ### State variable
 
 Add near `editNotes`:
+
 ```typescript
 let editMyField = photo.myField ?? '';
 ```
@@ -268,13 +280,16 @@ When the user uploads a `.wcs`, `.tiff`, or `.fit` WCS companion file:
 
 1. `server/wcs-reader.ts` — `parseFITSHeader()` reads the raw header.
    Add the new keyword to `extractWCS()`:
+
    ```typescript
    const rawVal = parsed['MY-KEY'];
    if (typeof rawVal === 'string') wcs.myField = rawVal;
    ```
+
    Extend the `WCSData` interface with the new optional field.
 
 2. `server/index.ts` — `POST /api/solve-wcs` spreads the field into the response:
+
    ```typescript
    ...(wcs.myField ? { myField: wcs.myField } : {}),
    ```
@@ -290,10 +305,10 @@ When the user uploads a `.wcs`, `.tiff`, or `.fit` WCS companion file:
 
 Astrometry.net has **two** result paths, both returning `PlateSolveResult`:
 
-| Path | API call | Server route |
-|---|---|---|
-| New submission | `submitPlateSolve` + `pollPlateSolve` | `POST /api/solve-plate` + `GET /api/solve-plate/:id` |
-| Reuse existing job | `reuseAstrometrySubmission` | `POST /api/astrometry/reuse` |
+| Path               | API call                              | Server route                                         |
+| ------------------ | ------------------------------------- | ---------------------------------------------------- |
+| New submission     | `submitPlateSolve` + `pollPlateSolve` | `POST /api/solve-plate` + `GET /api/solve-plate/:id` |
+| Reuse existing job | `reuseAstrometrySubmission`           | `POST /api/astrometry/reuse`                         |
 
 ### Current state
 
@@ -321,7 +336,7 @@ comes from the original image, not from the solver's output. Astrometry.net
 solves the geometry only and does not copy instrument headers into its WCS
 file. There is nothing to extract.
 
-If a future metadata field *is* derivable from the astrometry.net WCS output
+If a future metadata field _is_ derivable from the astrometry.net WCS output
 (e.g. pixel scale, orientation angle), follow the steps above.
 
 ---
@@ -333,8 +348,9 @@ route writes the full `Photo` object to `manifest.json`.
 
 Import requires an explicit change: in the import route in `server/index.ts`,
 find the `createPhotoWithId()` call and pass the value from the manifest:
+
 ```typescript
-typeof p.myField === 'string' ? p.myField : null
+typeof p.myField === 'string' ? p.myField : null;
 ```
 
 ---
@@ -370,6 +386,7 @@ appear white. The `.dialog-input` class already sets this. Do **not** create a
 new input class or inline style for datetime fields — just use `.dialog-input`.
 
 If you observe a black calendar icon in a dark panel, it means either:
+
 - The input is missing the `dialog-input` class, OR
 - `color-scheme: dark` was removed from `.dialog-input` in `src/style.css`.
 
@@ -384,6 +401,7 @@ to inputs created inside `buildCard()`. The handler fires asynchronously after
 ```
 
 Then read them back in the handler:
+
 ```typescript
 const inp = (card as any)._myFieldInput as HTMLInputElement | undefined;
 if (inp) inp.value = formattedValue;

@@ -80,7 +80,10 @@ describe('recommendRecipe()', () => {
   });
 
   it('still treats "Nebula" displayName as emission when type is not emission', () => {
-    const recipe = recommendRecipe(dso({ type: 'RN', displayName: 'Reflection Nebula Test' }), preset());
+    const recipe = recommendRecipe(
+      dso({ type: 'RN', displayName: 'Reflection Nebula Test' }),
+      preset(),
+    );
 
     expect(recipe.filters.map((f) => f.name)).toEqual(['Ha', 'OIII', 'SII']);
   });
@@ -103,8 +106,14 @@ describe('recommendRecipe()', () => {
   });
 
   it('scales integration with aperture and clamps to bounds', () => {
-    const tinyScope = recommendRecipe(dso({ difficulty: 5, type: 'GxS' }), preset({ apertureMm: 40 }));
-    const hugeScope = recommendRecipe(dso({ difficulty: 1, type: 'GxS' }), preset({ apertureMm: 1000 }));
+    const tinyScope = recommendRecipe(
+      dso({ difficulty: 5, type: 'GxS' }),
+      preset({ apertureMm: 40 }),
+    );
+    const hugeScope = recommendRecipe(
+      dso({ difficulty: 1, type: 'GxS' }),
+      preset({ apertureMm: 1000 }),
+    );
 
     expect(tinyScope.totalHours).toBeLessThanOrEqual(12);
     expect(hugeScope.totalHours).toBeGreaterThanOrEqual(0.15);
@@ -172,16 +181,28 @@ describe('recommendRecipe()', () => {
 
   it('large diffuse nebula (RN/EN) at any aperture never exceeds 6 h', () => {
     // NGC7023 (RN, diff 5, mag null) was hitting the absolute 12 h ceiling.
-    const rn = recommendRecipe(dso({ type: 'RN', difficulty: 5, mag: null }), preset({ apertureMm: 50 }));
-    const en = recommendRecipe(dso({ type: 'EN', difficulty: 4, mag: 8 }), preset({ apertureMm: 50 }));
+    const rn = recommendRecipe(
+      dso({ type: 'RN', difficulty: 5, mag: null }),
+      preset({ apertureMm: 50 }),
+    );
+    const en = recommendRecipe(
+      dso({ type: 'EN', difficulty: 4, mag: 8 }),
+      preset({ apertureMm: 50 }),
+    );
     expect(rn.totalHours).toBeLessThanOrEqual(6);
     expect(en.totalHours).toBeLessThanOrEqual(6);
   });
 
   it('PN at 50 mm stays within reasonable bounds (≤ 1.5 h)', () => {
     // Without the PN correction, M57 (diff 2) and M97 (diff 2) returned 6 h on a Vespera/S50.
-    const m57 = recommendRecipe(dso({ type: 'PN', difficulty: 2, mag: 8.8 }), preset({ apertureMm: 50 }));
-    const m97 = recommendRecipe(dso({ type: 'PN', difficulty: 2, mag: 9.9 }), preset({ apertureMm: 50 }));
+    const m57 = recommendRecipe(
+      dso({ type: 'PN', difficulty: 2, mag: 8.8 }),
+      preset({ apertureMm: 50 }),
+    );
+    const m97 = recommendRecipe(
+      dso({ type: 'PN', difficulty: 2, mag: 9.9 }),
+      preset({ apertureMm: 50 }),
+    );
 
     expect(m57.totalHours).toBeLessThanOrEqual(1.5);
     expect(m97.totalHours).toBeLessThanOrEqual(1.5);
@@ -199,16 +220,28 @@ describe('recommendRecipe()', () => {
   it('GC at 50 mm stays within reasonable bounds (≤ 1.5 h)', () => {
     // Vespera / S50 aperture. Without the cluster correction this returned 2 h for diff-1
     // and 6 h for diff-2 (M2), which is unrealistic for a compact bright globular.
-    const m13 = recommendRecipe(dso({ type: 'GC', difficulty: 1, mag: 5.8 }), preset({ apertureMm: 50 }));
-    const m2 = recommendRecipe(dso({ type: 'GC', difficulty: 2, mag: 6.25 }), preset({ apertureMm: 50 }));
+    const m13 = recommendRecipe(
+      dso({ type: 'GC', difficulty: 1, mag: 5.8 }),
+      preset({ apertureMm: 50 }),
+    );
+    const m2 = recommendRecipe(
+      dso({ type: 'GC', difficulty: 2, mag: 6.25 }),
+      preset({ apertureMm: 50 }),
+    );
 
     expect(m13.totalHours).toBeLessThanOrEqual(1.5);
     expect(m2.totalHours).toBeLessThanOrEqual(1.5);
   });
 
   it('OC recommendations are shorter than GC at the same difficulty and aperture', () => {
-    const gc = recommendRecipe(dso({ type: 'GC', difficulty: 2, mag: 6 }), preset({ apertureMm: 80 }));
-    const oc = recommendRecipe(dso({ type: 'OC', difficulty: 2, mag: 6 }), preset({ apertureMm: 80 }));
+    const gc = recommendRecipe(
+      dso({ type: 'GC', difficulty: 2, mag: 6 }),
+      preset({ apertureMm: 80 }),
+    );
+    const oc = recommendRecipe(
+      dso({ type: 'OC', difficulty: 2, mag: 6 }),
+      preset({ apertureMm: 80 }),
+    );
 
     expect(oc.totalHours).toBeLessThan(gc.totalHours);
   });

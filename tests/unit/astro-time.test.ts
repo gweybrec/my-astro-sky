@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { dateToJD, gmstHours, lstHours, sunAltDeg, twilightWindow, jdToDate, moonRaDecDeg, moonPhase } from '../../src/astro-time';
+import {
+  dateToJD,
+  gmstHours,
+  lstHours,
+  sunAltDeg,
+  twilightWindow,
+  jdToDate,
+  moonRaDecDeg,
+  moonPhase,
+} from '../../src/astro-time';
 
 describe('dateToJD', () => {
   // Meeus, Astronomical Algorithms, Table 7.a
@@ -52,7 +61,7 @@ describe('lstHours', () => {
     const lon = 30; // 30° East = +2h
     const gmst = gmstHours(jd);
     const lst = lstHours(jd, lon);
-    const expected = ((gmst + lon / 15) + 24) % 24;
+    const expected = (gmst + lon / 15 + 24) % 24;
     expect(lst).toBeCloseTo(expected, 6);
   });
 

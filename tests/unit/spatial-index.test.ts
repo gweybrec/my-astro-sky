@@ -22,8 +22,8 @@ describe('SpatialIndex', () => {
 
     it('returns the nearest of two candidates', () => {
       const idx = new SpatialIndex<string>(1);
-      idx.insert('near', 1, 0);   // distance = 1
-      idx.insert('far', 10, 0);   // distance = 10
+      idx.insert('near', 1, 0); // distance = 1
+      idx.insert('far', 10, 0); // distance = 10
       expect(idx.findNearest(0, 0, 20)).toBe('near');
     });
 
@@ -44,7 +44,7 @@ describe('SpatialIndex', () => {
 
     it('returns only items within radius', () => {
       const idx = new SpatialIndex<string>(1);
-      idx.insert('in', 3, 0);   // distance = 3
+      idx.insert('in', 3, 0); // distance = 3
       idx.insert('out', 10, 0); // distance = 10
       const result = idx.findAll(0, 0, 5);
       expect(result).toContain('in');
@@ -81,9 +81,9 @@ describe('SpatialIndex', () => {
 
     it('returns exactly the items within radius (any order), including the boundary', () => {
       const idx = new SpatialIndex<string>(1);
-      idx.insert('in', 3, 0);    // distance = 3
-      idx.insert('edge', 5, 0);  // distance = 5 (collect uses <=)
-      idx.insert('out', 10, 0);  // distance = 10
+      idx.insert('in', 3, 0); // distance = 3
+      idx.insert('edge', 5, 0); // distance = 5 (collect uses <=)
+      idx.insert('out', 10, 0); // distance = 10
       const result = idx.collect(0, 0, 5);
       expect(new Set(result)).toEqual(new Set(['in', 'edge']));
     });
@@ -91,7 +91,7 @@ describe('SpatialIndex', () => {
     it('matches findAll as a set (collect is just findAll without the sort)', () => {
       const idx = new SpatialIndex<string>(2);
       idx.insert('A', 1, 0);
-      idx.insert('B', 4, 3);   // distance = 5
+      idx.insert('B', 4, 3); // distance = 5
       idx.insert('C', 7, 0);
       idx.insert('D', 20, 20); // far outside
       const r = 8;

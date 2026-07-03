@@ -21,9 +21,14 @@ vi.mock('../../server/wcs-reader', () => ({
   loadServerCatalog: vi.fn(),
   wcsToCorrespondences: vi.fn(() => []),
   parseFITSHeader: vi.fn(() => ({
-    CRPIX1: 960, CRPIX2: 540,
-    CRVAL1: 84.05, CRVAL2: -1.2,
-    CD1_1: -0.001, CD1_2: 0, CD2_1: 0, CD2_2: 0.001,
+    CRPIX1: 960,
+    CRPIX2: 540,
+    CRVAL1: 84.05,
+    CRVAL2: -1.2,
+    CD1_1: -0.001,
+    CD1_2: 0,
+    CD2_1: 0,
+    CD2_2: 0.001,
   })),
   extractFITSHeaderFromFITS: vi.fn(() => ''),
 }));
@@ -43,11 +48,11 @@ import {
   reuseSubmission,
 } from '../../server/astrometry';
 
-const mockGetSetting      = vi.mocked(getSetting);
-const mockWcsCorrs        = vi.mocked(wcsToCorrespondences);
+const mockGetSetting = vi.mocked(getSetting);
+const mockWcsCorrs = vi.mocked(wcsToCorrespondences);
 const mockParseFITSHeader = vi.mocked(parseFITSHeader);
 
-const API_BASE  = 'https://nova.astrometry.net/api';
+const API_BASE = 'https://nova.astrometry.net/api';
 const LOGIN_URL = `${API_BASE}/login`;
 const UPLOAD_URL = `${API_BASE}/upload`;
 
@@ -152,9 +157,7 @@ describe('login — response handling', () => {
 
   it('throws when API returns status != success', async () => {
     mockGetSetting.mockReturnValue('bad-key');
-    fetchMock.mockResolvedValueOnce(
-      jsonResp({ status: 'error', errormessage: 'bad apikey' }),
-    );
+    fetchMock.mockResolvedValueOnce(jsonResp({ status: 'error', errormessage: 'bad apikey' }));
     await expect(submitJob(Buffer.from('img'), 'test.jpg', 100, 100)).rejects.toThrow('bad apikey');
   });
 
@@ -167,7 +170,9 @@ describe('login — response handling', () => {
   it('propagates network error from login', async () => {
     mockGetSetting.mockReturnValue('some-key');
     fetchMock.mockRejectedValueOnce(new Error('DNS failure'));
-    await expect(submitJob(Buffer.from('img'), 'test.jpg', 100, 100)).rejects.toThrow('DNS failure');
+    await expect(submitJob(Buffer.from('img'), 'test.jpg', 100, 100)).rejects.toThrow(
+      'DNS failure',
+    );
   });
 });
 
@@ -208,7 +213,11 @@ describe('submitJob — upload request payload', () => {
 
   it('includes center_ra/center_dec/radius when position hints provided', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
-    await submitJob(Buffer.from('img'), 'photo.jpg', 1920, 1080, { ra: 84.05, dec: -1.2, radius: 1.5 });
+    await submitJob(Buffer.from('img'), 'photo.jpg', 1920, 1080, {
+      ra: 84.05,
+      dec: -1.2,
+      radius: 1.5,
+    });
 
     const body: string = (fetchMock.mock.calls[1][1].body as Buffer).toString('utf8');
     expect(body).toContain('"center_ra":84.05');
@@ -226,7 +235,10 @@ describe('submitJob — upload request payload', () => {
 
   it('uses explicit scale hints without auto-estimation', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
-    await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600, { scale_lower: 0.5, scale_upper: 1.5 });
+    await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600, {
+      scale_lower: 0.5,
+      scale_upper: 1.5,
+    });
 
     const body: string = (fetchMock.mock.calls[1][1].body as Buffer).toString('utf8');
     expect(body).toContain('"scale_lower":0.5');
@@ -253,7 +265,9 @@ describe('submitJob — upload response handling', () => {
   });
 
   it('job.status becomes "failed" when API rejects upload', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResp({ status: 'error', errormessage: 'bad image format' }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResp({ status: 'error', errormessage: 'bad image format' }),
+    );
     const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
 
     const job = getJobStatus(localId);
@@ -288,7 +302,7 @@ describe('submitJob — upload response handling', () => {
       .mockResolvedValue(jsonResp({ jobs: [null] }));
 
     const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
-  await vi.advanceTimersByTimeAsync(200000);
+    await vi.advanceTimersByTimeAsync(200000);
 
     const job = getJobStatus(localId);
     expect(job).toBeDefined();
@@ -309,7 +323,7 @@ describe('submitJob — upload response handling', () => {
       .mockResolvedValueOnce(jsonResp({ status: 'failure' }));
 
     const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
-  await vi.advanceTimersByTimeAsync(200000);
+    await vi.advanceTimersByTimeAsync(200000);
 
     const job = getJobStatus(localId);
     expect(job).toBeDefined();
@@ -353,7 +367,7 @@ describe('submitJob — upload response handling', () => {
       .mockResolvedValueOnce(jsonResp({ objects_in_field: ['M 42'] }));
 
     const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
-  await vi.advanceTimersByTimeAsync(200000);
+    await vi.advanceTimersByTimeAsync(200000);
 
     const job = getJobStatus(localId);
     expect(job).toBeDefined();
@@ -394,12 +408,14 @@ describe('submitJob — upload response handling', () => {
       // wcs_file/<id>
       .mockResolvedValueOnce(textResp('CRPIX1 = 960\nCRPIX2 = 540'))
       // jobs/<id>/calibration
-      .mockResolvedValueOnce(jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1 }))
+      .mockResolvedValueOnce(
+        jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1 }),
+      )
       // objects_in_field
       .mockResolvedValueOnce(jsonResp({ objects_in_field: ['NGC 1976'] }));
 
     const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
-  await vi.advanceTimersByTimeAsync(200000);
+    await vi.advanceTimersByTimeAsync(200000);
 
     const job = getJobStatus(localId);
     expect(job).toBeDefined();
@@ -479,9 +495,33 @@ describe('reuseSubmission()', () => {
 
   it('returns success via WCS file path when correspondences found', async () => {
     const THREE_CORRS = [
-      { pointIndex: 0, photoX: 100, photoY: 200, starHip: 1, starName: 'A', starRa: 10, starDec: 20 },
-      { pointIndex: 1, photoX: 300, photoY: 400, starHip: 2, starName: 'B', starRa: 15, starDec: 25 },
-      { pointIndex: 2, photoX: 500, photoY: 600, starHip: 3, starName: 'C', starRa: 20, starDec: 30 },
+      {
+        pointIndex: 0,
+        photoX: 100,
+        photoY: 200,
+        starHip: 1,
+        starName: 'A',
+        starRa: 10,
+        starDec: 20,
+      },
+      {
+        pointIndex: 1,
+        photoX: 300,
+        photoY: 400,
+        starHip: 2,
+        starName: 'B',
+        starRa: 15,
+        starDec: 25,
+      },
+      {
+        pointIndex: 2,
+        photoX: 500,
+        photoY: 600,
+        starHip: 3,
+        starName: 'C',
+        starRa: 20,
+        starDec: 30,
+      },
     ];
     mockWcsCorrs.mockReturnValueOnce(THREE_CORRS as any);
 
@@ -500,9 +540,33 @@ describe('reuseSubmission()', () => {
 
   it('falls back to calibration when WCS text has no CRPIX1', async () => {
     const THREE_CORRS = [
-      { pointIndex: 0, photoX: 100, photoY: 200, starHip: 1, starName: 'A', starRa: 10, starDec: 20 },
-      { pointIndex: 1, photoX: 300, photoY: 400, starHip: 2, starName: 'B', starRa: 15, starDec: 25 },
-      { pointIndex: 2, photoX: 500, photoY: 600, starHip: 3, starName: 'C', starRa: 20, starDec: 30 },
+      {
+        pointIndex: 0,
+        photoX: 100,
+        photoY: 200,
+        starHip: 1,
+        starName: 'A',
+        starRa: 10,
+        starDec: 20,
+      },
+      {
+        pointIndex: 1,
+        photoX: 300,
+        photoY: 400,
+        starHip: 2,
+        starName: 'B',
+        starRa: 15,
+        starDec: 25,
+      },
+      {
+        pointIndex: 2,
+        photoX: 500,
+        photoY: 600,
+        starHip: 3,
+        starName: 'C',
+        starRa: 20,
+        starDec: 30,
+      },
     ];
     mockWcsCorrs.mockReturnValueOnce(THREE_CORRS as any);
 
@@ -512,7 +576,9 @@ describe('reuseSubmission()', () => {
       // WCS file — no CRPIX1, so fallback triggers
       .mockResolvedValueOnce(textResp('SIMPLE = T / no WCS keywords here'))
       // calibration endpoint
-      .mockResolvedValueOnce(jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1.0 }))
+      .mockResolvedValueOnce(
+        jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1.0 }),
+      )
       // objects_in_field
       .mockResolvedValueOnce(jsonResp({ objects_in_field: ['M42'] }));
 
@@ -526,7 +592,9 @@ describe('reuseSubmission()', () => {
     fetchMock
       .mockResolvedValueOnce(jsonResp({ status: 'success' }))
       .mockResolvedValueOnce(textResp('SIMPLE = T'))
-      .mockResolvedValueOnce(jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1.0 }));
+      .mockResolvedValueOnce(
+        jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1.0 }),
+      );
 
     const result = await reuseSubmission(10003, 1920, 1080);
     expect(result.success).toBe(false);
@@ -553,7 +621,9 @@ describe('reuseSubmission()', () => {
     fetchMock
       .mockResolvedValueOnce(jsonResp({ status: 'success' }))
       .mockResolvedValueOnce(textResp('CRPIX1 = 960'))
-      .mockResolvedValueOnce(jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1 }))
+      .mockResolvedValueOnce(
+        jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1 }),
+      )
       .mockResolvedValueOnce(jsonResp({ objects_in_field: ['M 42'] }));
 
     const result = await reuseSubmission(10004, 1920, 1080);

@@ -35,6 +35,9 @@ export interface SelectableDSO {
  * preserved (no sort), and the test is per-candidate, so the result for a given
  * candidate never depends on what else is in view.
  */
-export function selectDSOsToRender<T extends SelectableDSO>(candidates: T[], priorityThreshold: number): T[] {
-  return candidates.filter(c => c.isHighlighted || c.priority < priorityThreshold);
+export function selectDSOsToRender<T extends SelectableDSO>(
+  candidates: T[],
+  priorityThreshold: number,
+): T[] {
+  return candidates.filter((c) => c.isHighlighted || c.priority < priorityThreshold);
 }

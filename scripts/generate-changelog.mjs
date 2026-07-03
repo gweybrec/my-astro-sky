@@ -93,7 +93,9 @@ function rangeForMajor(major, isCurrent) {
   return `${lower}..${upper}`;
 }
 
-console.log(`Current major series: v${currentMajor}.x` + (tags.length ? '' : ' (no tags — assuming v0.0.0)'));
+console.log(
+  `Current major series: v${currentMajor}.x` + (tags.length ? '' : ' (no tags — assuming v0.0.0)'),
+);
 
 // Current major -> CHANGELOG.md
 runCliff('CHANGELOG.md', rangeForMajor(currentMajor, true));

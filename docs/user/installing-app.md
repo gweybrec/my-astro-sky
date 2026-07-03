@@ -11,13 +11,13 @@ No terminal, no Docker — download an installer and double-click it.
 1. Go to the [GitHub Releases](https://github.com/gweybrec/my-astro-sky/releases) page.
 2. Download the file for your operating system:
 
-| OS | File | Notes |
-|---|---|---|
-| Windows | `MyAstroSkySetup.exe` | Installer — adds MyAstroSky to the Start Menu |
-| macOS (Apple Silicon: M1/M2/M3+) | `MyAstroSky-arm64.dmg` | Drag-to-Applications disk image |
-| macOS (Intel) | `MyAstroSky-x64.dmg` | Drag-to-Applications disk image |
-| Linux (Debian/Ubuntu) | `my-astro-sky_<version>_amd64.deb` | Install with `sudo dpkg -i my-astro-sky_*.deb` |
-| Any platform | the `.zip` for your OS | Portable — extract and run, no installation |
+| OS                               | File                               | Notes                                          |
+| -------------------------------- | ---------------------------------- | ---------------------------------------------- |
+| Windows                          | `MyAstroSkySetup.exe`              | Installer — adds MyAstroSky to the Start Menu  |
+| macOS (Apple Silicon: M1/M2/M3+) | `MyAstroSky-arm64.dmg`             | Drag-to-Applications disk image                |
+| macOS (Intel)                    | `MyAstroSky-x64.dmg`               | Drag-to-Applications disk image                |
+| Linux (Debian/Ubuntu)            | `my-astro-sky_<version>_amd64.deb` | Install with `sudo dpkg -i my-astro-sky_*.deb` |
+| Any platform                     | the `.zip` for your OS             | Portable — extract and run, no installation    |
 
 3. Run the installer (Windows: double-click the `.exe`; macOS: open the `.dmg` and drag MyAstroSky into Applications; Linux: install the `.deb` and launch **MyAstroSky** from your application menu).
 
@@ -25,20 +25,20 @@ No terminal, no Docker — download an installer and double-click it.
 
 ### Uninstalling
 
-| OS | How |
-|---|---|
-| Windows | **Settings → Apps → MyAstroSky → Uninstall** |
-| macOS | Drag `MyAstroSky.app` to the Trash |
-| Linux (.deb) | `sudo apt remove my-astro-sky` |
-| Portable `.zip` (any OS) | Delete the extracted folder |
+| OS                       | How                                          |
+| ------------------------ | -------------------------------------------- |
+| Windows                  | **Settings → Apps → MyAstroSky → Uninstall** |
+| macOS                    | Drag `MyAstroSky.app` to the Trash           |
+| Linux (.deb)             | `sudo apt remove my-astro-sky`               |
+| Portable `.zip` (any OS) | Delete the extracted folder                  |
 
 Your photos, database, and settings live separately from the app and aren't removed automatically. To delete them too:
 
-| OS | Path |
-|---|---|
-| Windows | `%APPDATA%\MyAstroSky\` |
-| macOS | `~/Library/Application Support/MyAstroSky/` |
-| Linux | `~/.config/MyAstroSky/` |
+| OS      | Path                                        |
+| ------- | ------------------------------------------- |
+| Windows | `%APPDATA%\MyAstroSky\`                     |
+| macOS   | `~/Library/Application Support/MyAstroSky/` |
+| Linux   | `~/.config/MyAstroSky/`                     |
 
 ---
 

@@ -19,7 +19,9 @@ export function smartSortPhotos(photos: Photo[]): Photo[] {
     const nameB = b.originalName;
 
     // Extract catalog prefix and number if present
-    const parseFilename = (name: string): { catalog: string; number: number | null; rest: string } => {
+    const parseFilename = (
+      name: string,
+    ): { catalog: string; number: number | null; rest: string } => {
       // Match patterns like M31, NGC224, IC1805, SH2-106, Sh2-106, etc.
       const match = name.match(/^([A-Za-z]+)[\s-]?(\d+)/);
       if (match) {
@@ -57,7 +59,6 @@ export function smartSortPhotos(photos: Photo[]): Photo[] {
     return nameA.localeCompare(nameB);
   });
 }
-
 
 export class Gallery {
   private container: HTMLElement;
@@ -111,7 +112,7 @@ export class Gallery {
   }
 
   setLabelFilter(labels: string[] | null) {
-    this.filterByLabels = (labels && labels.length > 0) ? labels : null;
+    this.filterByLabels = labels && labels.length > 0 ? labels : null;
     this.applyFilters();
   }
 
@@ -134,7 +135,10 @@ export class Gallery {
 
   /** POI filter groups (category → distinct names with per-photo counts). */
   getAllPois(): PoiFilterGroup[] {
-    return buildPoiFilterGroups(this.photos.map(p => p.pointsOfInterest ?? []), this.poiCategories);
+    return buildPoiFilterGroups(
+      this.photos.map((p) => p.pointsOfInterest ?? []),
+      this.poiCategories,
+    );
   }
 
   /** The photos currently passing the active filters, in display (smart-sorted) order. */
@@ -159,34 +163,36 @@ export class Gallery {
     // Filter by search query — filename, dsoIds, labels, notes
     if (this.searchQuery) {
       const q = this.searchQuery;
-      filtered = filtered.filter(photo =>
-        photo.originalName.toLowerCase().includes(q) ||
-        photo.dsoIds.some(id => id.toLowerCase().includes(q)) ||
-        photo.labels.some(l => l.toLowerCase().includes(q)) ||
-        (photo.pointsOfInterest ?? []).some(p => p.name.toLowerCase().includes(q)) ||
-        photo.notes.toLowerCase().includes(q)
+      filtered = filtered.filter(
+        (photo) =>
+          photo.originalName.toLowerCase().includes(q) ||
+          photo.dsoIds.some((id) => id.toLowerCase().includes(q)) ||
+          photo.labels.some((l) => l.toLowerCase().includes(q)) ||
+          (photo.pointsOfInterest ?? []).some((p) => p.name.toLowerCase().includes(q)) ||
+          photo.notes.toLowerCase().includes(q),
       );
     }
 
     // Filter by labels — null means no filter; (no label) sentinel controls unlabelled photos
     if (this.filterByLabels !== null) {
       const sel = this.filterByLabels;
-      filtered = filtered.filter(photo =>
+      filtered = filtered.filter((photo) =>
         photo.labels.length === 0
           ? sel.includes('(no label)')
-          : photo.labels.some(l => sel.includes(l))
+          : photo.labels.some((l) => sel.includes(l)),
       );
     }
 
     // Filter by DSO types — photos with no DSO always pass; others need at least one match
     if (this.filterByDSOTypes && this.filterByDSOTypes.length > 0) {
       const sel = this.filterByDSOTypes;
-      filtered = filtered.filter(photo =>
-        photo.dsoIds.length === 0 ||
-        photo.dsoIds.some(id => {
-          const dso = getDSOById(id);
-          return dso && sel.includes(dso.type);
-        })
+      filtered = filtered.filter(
+        (photo) =>
+          photo.dsoIds.length === 0 ||
+          photo.dsoIds.some((id) => {
+            const dso = getDSOById(id);
+            return dso && sel.includes(dso.type);
+          }),
       );
     }
 
@@ -195,25 +201,27 @@ export class Gallery {
       const sel = this.filterByDSOCatalogs;
       const matchesCatalog = (name: string): boolean => {
         const upper = name.toUpperCase();
-        return sel.some(cat => {
+        return sel.some((cat) => {
           const p = cat.toUpperCase();
-          return upper.startsWith(p + ' ') ||
+          return (
+            upper.startsWith(p + ' ') ||
             upper.startsWith(p + '-') ||
             upper === p ||
-            (upper.startsWith(p) && upper.length > p.length && /[\d\s\-]/.test(upper[p.length]));
+            (upper.startsWith(p) && upper.length > p.length && /[\d\s\-]/.test(upper[p.length]))
+          );
         });
       };
-      filtered = filtered.filter(photo =>
+      filtered = filtered.filter((photo) =>
         photo.dsoIds.length > 0
-          ? photo.dsoIds.some(id => matchesCatalog(id))
-          : matchesCatalog(photo.originalName)
+          ? photo.dsoIds.some((id) => matchesCatalog(id))
+          : matchesCatalog(photo.originalName),
       );
     }
 
     // Two-level POI filter — only photos with ≥1 selected POI pass (positive selection).
     if (this.filterByPois) {
-      filtered = filtered.filter(photo =>
-        poisMatchFilter(photo.pointsOfInterest ?? [], this.poiCategories, this.filterByPois)
+      filtered = filtered.filter((photo) =>
+        poisMatchFilter(photo.pointsOfInterest ?? [], this.poiCategories, this.filterByPois),
       );
     }
 
@@ -221,11 +229,15 @@ export class Gallery {
     this.renderMosaic();
   }
 
-  private buildChips(dsoIds: string[], labels: string[], pois: import('./types').PointOfInterest[] = []): HTMLElement {
+  private buildChips(
+    dsoIds: string[],
+    labels: string[],
+    pois: import('./types').PointOfInterest[] = [],
+  ): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'gallery-item-chips';
     for (const poi of pois) {
-      const cat = this.poiCategories.find(c => c.id === poi.categoryId);
+      const cat = this.poiCategories.find((c) => c.id === poi.categoryId);
       const icon = poiTypeIcon(poi.categoryId);
       const chip = document.createElement('span');
       chip.className = icon ? 'tag-chip poi-chip poi-chip--icon' : 'tag-chip poi-chip';
@@ -267,7 +279,8 @@ export class Gallery {
       title.textContent = t('gallery.noPhotos') || 'No photos yet';
       const sub = document.createElement('div');
       sub.className = 'gallery-empty-sub';
-      sub.textContent = t('gallery.noPhotosHint') || 'Add your first astrophoto from the Sky Map panel';
+      sub.textContent =
+        t('gallery.noPhotosHint') || 'Add your first astrophoto from the Sky Map panel';
       empty.appendChild(title);
       empty.appendChild(sub);
       this.hero.appendChild(empty);
@@ -315,7 +328,10 @@ export class Gallery {
       const placeholder = document.createElement('div');
       placeholder.className = 'gallery-img-placeholder';
 
-      img.onload = () => { img.style.visibility = ''; placeholder.remove(); };
+      img.onload = () => {
+        img.style.visibility = '';
+        placeholder.remove();
+      };
 
       const caption = document.createElement('div');
       caption.className = 'gallery-item-caption';
@@ -325,8 +341,14 @@ export class Gallery {
       nameEl.textContent = photo.originalName;
       caption.appendChild(nameEl);
 
-      if (photo.dsoIds.length > 0 || photo.labels.length > 0 || (photo.pointsOfInterest?.length ?? 0) > 0) {
-        caption.appendChild(this.buildChips(photo.dsoIds, photo.labels, photo.pointsOfInterest ?? []));
+      if (
+        photo.dsoIds.length > 0 ||
+        photo.labels.length > 0 ||
+        (photo.pointsOfInterest?.length ?? 0) > 0
+      ) {
+        caption.appendChild(
+          this.buildChips(photo.dsoIds, photo.labels, photo.pointsOfInterest ?? []),
+        );
       }
 
       item.appendChild(img);
@@ -354,8 +376,11 @@ export class Gallery {
     this.grid.appendChild(mosaic);
 
     const checkChipOverflow = () => {
-      mosaic.querySelectorAll<HTMLElement>('.gallery-item-chips').forEach(chips => {
-        chips.classList.toggle('gallery-item-chips--overflows', chips.scrollHeight > chips.clientHeight);
+      mosaic.querySelectorAll<HTMLElement>('.gallery-item-chips').forEach((chips) => {
+        chips.classList.toggle(
+          'gallery-item-chips--overflows',
+          chips.scrollHeight > chips.clientHeight,
+        );
       });
     };
     requestAnimationFrame(() => requestAnimationFrame(checkChipOverflow));
@@ -437,13 +462,21 @@ export class Gallery {
       prevBtn.className = 'gallery-carousel-btn gallery-carousel-prev';
       prevBtn.innerHTML = '&#8249;';
       prevBtn.title = 'Previous';
-      prevBtn.addEventListener('click', (e) => { e.stopPropagation(); goTo(index - 1); this.resetCarouselTimer(); });
+      prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        goTo(index - 1);
+        this.resetCarouselTimer();
+      });
 
       const nextBtn = document.createElement('button');
       nextBtn.className = 'gallery-carousel-btn gallery-carousel-next';
       nextBtn.innerHTML = '&#8250;';
       nextBtn.title = 'Next';
-      nextBtn.addEventListener('click', (e) => { e.stopPropagation(); goTo(index + 1); this.resetCarouselTimer(); });
+      nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        goTo(index + 1);
+        this.resetCarouselTimer();
+      });
 
       counterEl = document.createElement('div');
       counterEl.className = 'gallery-carousel-counter';
@@ -455,8 +488,16 @@ export class Gallery {
 
       wrap.setAttribute('tabindex', '0');
       wrap.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(index - 1); this.resetCarouselTimer(); }
-        if (e.key === 'ArrowRight') { e.preventDefault(); goTo(index + 1); this.resetCarouselTimer(); }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          goTo(index - 1);
+          this.resetCarouselTimer();
+        }
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          goTo(index + 1);
+          this.resetCarouselTimer();
+        }
       });
 
       this._carouselAdvance = () => goTo(index + 1);
@@ -502,13 +543,13 @@ export class Gallery {
     const navigate = async (delta: number) => {
       // Navigate within the active filtered list when the photo belongs to it,
       // otherwise fall back to the full set (e.g. opened from the carousel).
-      const list = this.filteredPhotos.some(p => p.id === photo.id)
+      const list = this.filteredPhotos.some((p) => p.id === photo.id)
         ? this.filteredPhotos
         : this.photos;
       if (list.length < 2) return;
-      const curIdx = list.findIndex(p => p.id === photo.id);
+      const curIdx = list.findIndex((p) => p.id === photo.id);
       if (curIdx === -1) return;
-      const next = list[((curIdx + delta) % list.length + list.length) % list.length];
+      const next = list[(((curIdx + delta) % list.length) + list.length) % list.length];
       if (next.id === photo.id) return;
       if (metaPanelIsDirty?.()) {
         const discard = await confirmUnsavedChanges();
@@ -519,19 +560,34 @@ export class Gallery {
     };
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { close(); return; }
+      if (e.key === 'Escape') {
+        close();
+        return;
+      }
       // Don't hijack arrow keys while typing in the metadata editor fields.
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' || target.isContentEditable)) return;
-      if (e.key === 'ArrowLeft') { e.preventDefault(); navigate(-1); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); navigate(1); }
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      )
+        return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigate(1);
+      }
     };
     document.addEventListener('keydown', onKey);
 
     // ── Image ────────────────────────────────────────────────────────────────
     const imgWrap = document.createElement('div');
-    imgWrap.style.cssText = 'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;padding-right:340px;box-sizing:border-box;';
+    imgWrap.style.cssText =
+      'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;padding-right:340px;box-sizing:border-box;';
 
     const img = document.createElement('img');
     img.src = `/uploads/${photo.filename}`;
@@ -585,15 +641,24 @@ export class Gallery {
 
     const formContainer = document.createElement('div');
     formContainer.className = 'gallery-detail-form';
-    const metaPanel = buildMetadataEditorPanel(formContainer, photo, (updated) => {
-      const idx = this.photos.findIndex(p => p.id === updated.id);
-      if (idx !== -1) this.photos[idx] = updated;
-      this.renderCarousel();
-      this.applyFilters();
-      this.onPhotoMetadataUpdated?.(updated);
-    }, rawClose,
-    [...new Set(this.photos.flatMap(p => p.labels))],
-    [...new Set(this.photos.flatMap(p => (p.integrations ?? []).map(r => r.filter)).filter(Boolean))]);
+    const metaPanel = buildMetadataEditorPanel(
+      formContainer,
+      photo,
+      (updated) => {
+        const idx = this.photos.findIndex((p) => p.id === updated.id);
+        if (idx !== -1) this.photos[idx] = updated;
+        this.renderCarousel();
+        this.applyFilters();
+        this.onPhotoMetadataUpdated?.(updated);
+      },
+      rawClose,
+      [...new Set(this.photos.flatMap((p) => p.labels))],
+      [
+        ...new Set(
+          this.photos.flatMap((p) => (p.integrations ?? []).map((r) => r.filter)).filter(Boolean),
+        ),
+      ],
+    );
     metaPanelTeardown = metaPanel.teardown;
     metaPanelIsDirty = metaPanel.isDirty;
     meta.appendChild(formContainer);
@@ -629,9 +694,15 @@ export class Gallery {
     const zoomControls = zoom.controls;
 
     imgWrap.style.cursor = 'grab';
-    imgWrap.addEventListener('pointerdown', () => { imgWrap.style.cursor = 'grabbing'; });
-    imgWrap.addEventListener('pointerup',   () => { imgWrap.style.cursor = 'grab'; });
-    imgWrap.addEventListener('pointercancel', () => { imgWrap.style.cursor = 'grab'; });
+    imgWrap.addEventListener('pointerdown', () => {
+      imgWrap.style.cursor = 'grabbing';
+    });
+    imgWrap.addEventListener('pointerup', () => {
+      imgWrap.style.cursor = 'grab';
+    });
+    imgWrap.addEventListener('pointercancel', () => {
+      imgWrap.style.cursor = 'grab';
+    });
 
     // ── Auto-hide zoom controls after 3s of inactivity ───────────────────────
     const scheduleHide = () => {

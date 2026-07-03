@@ -1,7 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  project, unproject, borderRadiusPU,
-  setProjectionMode, getProjectionMode, setHemisphere,
+  project,
+  unproject,
+  borderRadiusPU,
+  setProjectionMode,
+  getProjectionMode,
+  setHemisphere,
 } from '../../src/projection';
 
 const DEG2RAD = Math.PI / 180;
@@ -124,7 +128,7 @@ describe('borderRadiusPU', () => {
   it('returns stereo formula in stereo mode', () => {
     setProjectionMode('stereo');
     expect(borderRadiusPU(0)).toBeCloseTo(1.0, 12); // tan(45°) = 1
-    expect(borderRadiusPU(45)).toBeCloseTo(Math.tan((90 + 45) / 2 * Math.PI / 180), 12);
+    expect(borderRadiusPU(45)).toBeCloseTo(Math.tan((((90 + 45) / 2) * Math.PI) / 180), 12);
   });
 });
 

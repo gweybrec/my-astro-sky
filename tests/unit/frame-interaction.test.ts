@@ -1,17 +1,37 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { findMergeTarget, resizeRegionFromDraft, type ResizeDraft } from '../../src/frame-interaction';
+import {
+  findMergeTarget,
+  resizeRegionFromDraft,
+  type ResizeDraft,
+} from '../../src/frame-interaction';
 import { fromCanvas, unproject, setHemisphere } from '../../src/projection';
 import type { RenderableFrame } from '../../src/sky-map';
 import type { ViewState } from '../../src/types';
 
-const view: ViewState = { centerX: 0, centerY: 0, scale: 600, rotationDeg: 0, width: 800, height: 600 };
+const view: ViewState = {
+  centerX: 0,
+  centerY: 0,
+  scale: 600,
+  rotationDeg: 0,
+  width: 800,
+  height: 600,
+};
 
 /** A screen-anchored frame at a given viewport fraction (deterministic geometry). */
 function frame(id: string, over: Partial<RenderableFrame> = {}): RenderableFrame {
   return {
-    id, name: id, label: id, wDeg: 4, hDeg: 4,
-    active: false, movable: true, anchorKind: 'screen', nx: 0.5, ny: 0.5,
-    screenRotationDeg: 0, ...over,
+    id,
+    name: id,
+    label: id,
+    wDeg: 4,
+    hDeg: 4,
+    active: false,
+    movable: true,
+    anchorKind: 'screen',
+    nx: 0.5,
+    ny: 0.5,
+    screenRotationDeg: 0,
+    ...over,
   };
 }
 
@@ -45,8 +65,8 @@ describe('findMergeTarget', () => {
   it('skips tiles, hidden frames, and the moved frame itself', () => {
     const frames = [
       frame('plan:A:1', { nx: 0.5, ny: 0.5 }),
-      frame('plan:A:2', { nx: 0.5, ny: 0.5, mosaicId: 'm1' }),   // a tile → skipped
-      frame('plan:A:3', { nx: 0.5, ny: 0.5, visible: false }),   // hidden → skipped
+      frame('plan:A:2', { nx: 0.5, ny: 0.5, mosaicId: 'm1' }), // a tile → skipped
+      frame('plan:A:3', { nx: 0.5, ny: 0.5, visible: false }), // hidden → skipped
     ];
     expect(findMergeTarget('plan:A:1', frames, view)).toBeNull();
   });

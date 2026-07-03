@@ -42,10 +42,10 @@ describe('applyZoomToward', () => {
     const result = applyZoomToward(state, cursor, factor, MIN, MAX);
 
     // The point under the cursor in image space = (cursor - tx) / scale
-    const imgXBefore = (cursor.cx - state.tx)  / state.scale;
-    const imgYBefore = (cursor.cy - state.ty)  / state.scale;
-    const imgXAfter  = (cursor.cx - result.tx) / result.scale;
-    const imgYAfter  = (cursor.cy - result.ty) / result.scale;
+    const imgXBefore = (cursor.cx - state.tx) / state.scale;
+    const imgYBefore = (cursor.cy - state.ty) / state.scale;
+    const imgXAfter = (cursor.cx - result.tx) / result.scale;
+    const imgYAfter = (cursor.cy - result.ty) / result.scale;
 
     expect(imgXAfter).toBeCloseTo(imgXBefore, 8);
     expect(imgYAfter).toBeCloseTo(imgYBefore, 8);
@@ -57,10 +57,10 @@ describe('applyZoomToward', () => {
     const factor = 0.9;
     const result = applyZoomToward(state, cursor, factor, MIN, MAX);
 
-    const imgXBefore = (cursor.cx - state.tx)  / state.scale;
-    const imgYBefore = (cursor.cy - state.ty)  / state.scale;
-    const imgXAfter  = (cursor.cx - result.tx) / result.scale;
-    const imgYAfter  = (cursor.cy - result.ty) / result.scale;
+    const imgXBefore = (cursor.cx - state.tx) / state.scale;
+    const imgYBefore = (cursor.cy - state.ty) / state.scale;
+    const imgXAfter = (cursor.cx - result.tx) / result.scale;
+    const imgYAfter = (cursor.cy - result.ty) / result.scale;
 
     expect(imgXAfter).toBeCloseTo(imgXBefore, 8);
     expect(imgYAfter).toBeCloseTo(imgYBefore, 8);

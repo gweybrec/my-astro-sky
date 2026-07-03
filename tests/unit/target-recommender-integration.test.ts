@@ -64,20 +64,20 @@ function loadCatalog(): DSO[] {
   const fields = raw.fields;
   const fi = (n: string): number => fields.indexOf(n);
   return raw.data.map((r) => ({
-    id:            r[fi('id')],
-    ra:            r[fi('ra')],
-    dec:           r[fi('dec')],
-    type:          r[fi('type')],
-    majAxis:       r[fi('majAxis')],
-    minAxis:       r[fi('minAxis')],
-    pa:            r[fi('pa')],
-    mag:           r[fi('mag')],
-    displayName:   r[fi('nameEn')] ?? null,
-    catalogs:      r[fi('catalogs')],
+    id: r[fi('id')],
+    ra: r[fi('ra')],
+    dec: r[fi('dec')],
+    type: r[fi('type')],
+    majAxis: r[fi('majAxis')],
+    minAxis: r[fi('minAxis')],
+    pa: r[fi('pa')],
+    mag: r[fi('mag')],
+    displayName: r[fi('nameEn')] ?? null,
+    catalogs: r[fi('catalogs')],
     emissionLines: r[fi('emissionLines')],
     constellation: r[fi('constellation')],
-    rating:        r[fi('rating')],
-    difficulty:    r[fi('difficulty')],
+    rating: r[fi('rating')],
+    difficulty: r[fi('difficulty')],
   }));
 }
 
@@ -88,27 +88,40 @@ function loadCatalog(): DSO[] {
 const c8Preset: GearPreset = {
   id: 'c8-integration-test',
   nameKey: 'c8-integration-test',
-  apertureMm:      203,
-  focalLengthMm:   945,
-  sensorWidthMm:   22.3,
-  sensorHeightMm:  14.9,
-  pixelSizeUm:     4.3,
-  mono:            false,
-  builtIn:         false,
+  apertureMm: 203,
+  focalLengthMm: 945,
+  sensorWidthMm: 22.3,
+  sensorHeightMm: 14.9,
+  pixelSizeUm: 4.3,
+  mono: false,
+  builtIn: false,
 };
 
 const june12location = { latDeg: 45.17, lonDeg: 5.0 };
-const june12night    = new Date('2026-06-12T12:00:00Z');
+const june12night = new Date('2026-06-12T12:00:00Z');
 
-const ALL_TYPES = new Set(['GxS', 'GxE', 'GxI', 'Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?']);
-const ALL_CATS  = new Set(['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN']);
-const ALL_RATS  = new Set([1, 2, 3, 4, 5]);
+const ALL_TYPES = new Set([
+  'GxS',
+  'GxE',
+  'GxI',
+  'Gx',
+  'OC',
+  'GC',
+  'EN',
+  'RN',
+  'PN',
+  'SNR',
+  'DN',
+  '?',
+]);
+const ALL_CATS = new Set(['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN']);
+const ALL_RATS = new Set([1, 2, 3, 4, 5]);
 const ALL_DIFFS = new Set([1, 2, 3, 4, 5]);
 
 const baseOpts: Omit<DSOFilterOptions, 'enabledTypes' | 'enabledCatalogs'> = {
-  enabledRatings:        ALL_RATS,
-  enabledDifficulties:   ALL_DIFFS,
-  photographedIds:       null,
+  enabledRatings: ALL_RATS,
+  enabledDifficulties: ALL_DIFFS,
+  photographedIds: null,
   enabledConstellations: null,
 };
 
@@ -133,7 +146,7 @@ describe('integration — Messier GC filter, lat=45.17°N, June 12 2026', () => 
     const catalog = loadCatalog();
     mesGCs = filterTargetDSOs(catalog, {
       ...baseOpts,
-      enabledTypes:   new Set(['GC']),
+      enabledTypes: new Set(['GC']),
       enabledCatalogs: new Set(['M']),
     });
   });
@@ -148,29 +161,33 @@ describe('integration — Messier GC filter, lat=45.17°N, June 12 2026', () => 
 
   it('M10 (transit 40.7°) appears with maxAlt=90', () => {
     const ids = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20, maxAltDeg: 90,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    }).map((r) => r.dso.id);
     expect(ids).toContain('M10');
   });
 
   it('M12 (transit 43.1°) appears with maxAlt=90', () => {
     const ids = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20, maxAltDeg: 90,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    }).map((r) => r.dso.id);
     expect(ids).toContain('M12');
   });
 
   it('M13 (transit 81.3°) appears with maxAlt=90', () => {
     const ids = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20, maxAltDeg: 90,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    }).map((r) => r.dso.id);
     expect(ids).toContain('M13');
   });
 
   it('M10, M12, M13 all appear together with maxAlt=90', () => {
     const ids = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20, maxAltDeg: 90,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    }).map((r) => r.dso.id);
     expect(ids, 'M10 missing').toContain('M10');
     expect(ids, 'M12 missing').toContain('M12');
     expect(ids, 'M13 missing').toContain('M13');
@@ -178,9 +195,10 @@ describe('integration — Messier GC filter, lat=45.17°N, June 12 2026', () => 
 
   it('M13 (transit 81.3°) is excluded by maxAlt=80 — and only M13', () => {
     const results = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20, maxAltDeg: 80,
+      minAltDeg: 20,
+      maxAltDeg: 80,
     });
-    const ids = results.map(r => r.dso.id);
+    const ids = results.map((r) => r.dso.id);
     expect(ids, 'M13 should be excluded when maxAlt=80').not.toContain('M13');
     expect(ids, 'M10 should still appear when maxAlt=80').toContain('M10');
     expect(ids, 'M12 should still appear when maxAlt=80').toContain('M12');
@@ -188,16 +206,18 @@ describe('integration — Messier GC filter, lat=45.17°N, June 12 2026', () => 
 
   it('M92 (transit 87.9°) is excluded by maxAlt=80', () => {
     const ids = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20, maxAltDeg: 80,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 80,
+    }).map((r) => r.dso.id);
     expect(ids).not.toContain('M92');
   });
 
   it('M13 rank is 1st or 2nd among Messier GCs when maxAlt=90 (rating=5, best fov-fit)', () => {
     const results = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20, maxAltDeg: 90,
+      minAltDeg: 20,
+      maxAltDeg: 90,
     });
-    const idx = results.findIndex(r => r.dso.id === 'M13');
+    const idx = results.findIndex((r) => r.dso.id === 'M13');
     expect(idx, 'M13 should rank in the top 2').toBeLessThanOrEqual(1);
   });
 });
@@ -213,7 +233,7 @@ describe('integration — all-catalog GC filter, lat=45.17°N, June 12 2026', ()
     const catalog = loadCatalog();
     allGCs = filterTargetDSOs(catalog, {
       ...baseOpts,
-      enabledTypes:    new Set(['GC']),
+      enabledTypes: new Set(['GC']),
       enabledCatalogs: ALL_CATS,
     });
     // Sanity: expect several hundred GCs
@@ -222,38 +242,43 @@ describe('integration — all-catalog GC filter, lat=45.17°N, June 12 2026', ()
 
   it('M10 appears in top 20 all-catalog GC results with maxAlt=90', () => {
     const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 20, {
-      minAltDeg: 20, maxAltDeg: 90,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    }).map((r) => r.dso.id);
     expect(ids).toContain('M10');
   });
 
   it('M12 appears in top 20 all-catalog GC results with maxAlt=90', () => {
     const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 20, {
-      minAltDeg: 20, maxAltDeg: 90,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 90,
+    }).map((r) => r.dso.id);
     expect(ids).toContain('M12');
   });
 
   it('M13 (rating=5) ranks in top 3 among all GCs with maxAlt=90', () => {
     const results = recommendTargets(allGCs, c8Preset, june12location, june12night, 20, {
-      minAltDeg: 20, maxAltDeg: 90,
+      minAltDeg: 20,
+      maxAltDeg: 90,
     });
-    const idx = results.findIndex(r => r.dso.id === 'M13');
+    const idx = results.findIndex((r) => r.dso.id === 'M13');
     expect(idx, 'M13 should rank in the top 3 GCs').toBeGreaterThanOrEqual(0);
     expect(idx, 'M13 should rank in the top 3 GCs').toBeLessThanOrEqual(2);
   });
 
   it('M13 excluded by maxAlt=80 even in all-catalog GC pool', () => {
     const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 50, {
-      minAltDeg: 20, maxAltDeg: 80,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 80,
+    }).map((r) => r.dso.id);
     expect(ids).not.toContain('M13');
   });
 
   it('M10 and M12 still appear in top 20 with maxAlt=80', () => {
     const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 20, {
-      minAltDeg: 20, maxAltDeg: 80,
-    }).map(r => r.dso.id);
+      minAltDeg: 20,
+      maxAltDeg: 80,
+    }).map((r) => r.dso.id);
     expect(ids, 'M10 missing with maxAlt=80').toContain('M10');
     expect(ids, 'M12 missing with maxAlt=80').toContain('M12');
   });
@@ -264,27 +289,67 @@ describe('integration — all-catalog GC filter, lat=45.17°N, June 12 2026', ()
 describe('integration — score ranking regression with C8 CLC preset', () => {
   const mesGCSubset = [
     // Real catalog values
-    { id: 'M13', ra: 250.423, dec: 36.461, type: 'GC', majAxis: 16.5, mag: 5.80, rating: 5, difficulty: 1 },
-    { id: 'M92', ra: 259.28,  dec: 43.137, type: 'GC', majAxis: 14.4, mag: 6.52, rating: 4, difficulty: 1 },
-    { id: 'M10', ra: 254.287, dec: -4.099, type: 'GC', majAxis: 9.3,  mag: 4.98, rating: 4, difficulty: 2 },
-    { id: 'M12', ra: 251.811, dec: -1.948, type: 'GC', majAxis: 11.1, mag: 6.07, rating: 4, difficulty: 2 },
-  ].map((o) => ({
-    ...o,
-    type:          o.type as any,
-    minAxis:       null,
-    pa:            0,
-    displayName:   o.id,
-    catalogs:      [o.id],
-    emissionLines: null,
-    constellation: o.id === 'M13' || o.id === 'M92' ? 'Her' : 'Oph',
-  } as DSO));
+    {
+      id: 'M13',
+      ra: 250.423,
+      dec: 36.461,
+      type: 'GC',
+      majAxis: 16.5,
+      mag: 5.8,
+      rating: 5,
+      difficulty: 1,
+    },
+    {
+      id: 'M92',
+      ra: 259.28,
+      dec: 43.137,
+      type: 'GC',
+      majAxis: 14.4,
+      mag: 6.52,
+      rating: 4,
+      difficulty: 1,
+    },
+    {
+      id: 'M10',
+      ra: 254.287,
+      dec: -4.099,
+      type: 'GC',
+      majAxis: 9.3,
+      mag: 4.98,
+      rating: 4,
+      difficulty: 2,
+    },
+    {
+      id: 'M12',
+      ra: 251.811,
+      dec: -1.948,
+      type: 'GC',
+      majAxis: 11.1,
+      mag: 6.07,
+      rating: 4,
+      difficulty: 2,
+    },
+  ].map(
+    (o) =>
+      ({
+        ...o,
+        type: o.type as any,
+        minAxis: null,
+        pa: 0,
+        displayName: o.id,
+        catalogs: [o.id],
+        emissionLines: null,
+        constellation: o.id === 'M13' || o.id === 'M92' ? 'Her' : 'Oph',
+      }) as DSO,
+  );
 
   it('M13 scores higher than M92 (rating=5 vs 4, both high altitude)', () => {
     const results = recommendTargets(mesGCSubset, c8Preset, june12location, june12night, 4, {
-      minAltDeg: 20, maxAltDeg: 90,
+      minAltDeg: 20,
+      maxAltDeg: 90,
     });
-    const m13 = results.find(r => r.dso.id === 'M13');
-    const m92 = results.find(r => r.dso.id === 'M92');
+    const m13 = results.find((r) => r.dso.id === 'M13');
+    const m92 = results.find((r) => r.dso.id === 'M92');
     expect(m13).toBeDefined();
     expect(m92).toBeDefined();
     expect(m13!.score).toBeGreaterThan(m92!.score);
@@ -292,10 +357,11 @@ describe('integration — score ranking regression with C8 CLC preset', () => {
 
   it('M12 scores higher than M10 (larger angular size → better FOV fit)', () => {
     const results = recommendTargets(mesGCSubset, c8Preset, june12location, june12night, 4, {
-      minAltDeg: 20, maxAltDeg: 90,
+      minAltDeg: 20,
+      maxAltDeg: 90,
     });
-    const m10 = results.find(r => r.dso.id === 'M10');
-    const m12 = results.find(r => r.dso.id === 'M12');
+    const m10 = results.find((r) => r.dso.id === 'M10');
+    const m12 = results.find((r) => r.dso.id === 'M12');
     expect(m10).toBeDefined();
     expect(m12).toBeDefined();
     expect(m12!.score).toBeGreaterThan(m10!.score);
@@ -303,9 +369,10 @@ describe('integration — score ranking regression with C8 CLC preset', () => {
 
   it('altScore for M10 (transit 40.7°, minAlt=20) ≈ 0.42 ± 0.05', () => {
     const results = recommendTargets(mesGCSubset, c8Preset, june12location, june12night, 4, {
-      minAltDeg: 20, maxAltDeg: 90,
+      minAltDeg: 20,
+      maxAltDeg: 90,
     });
-    const m10 = results.find(r => r.dso.id === 'M10');
+    const m10 = results.find((r) => r.dso.id === 'M10');
     expect(m10).toBeDefined();
     expect(m10!.altScore).toBeGreaterThan(0.35);
     expect(m10!.altScore).toBeLessThan(0.55);
@@ -313,9 +380,10 @@ describe('integration — score ranking regression with C8 CLC preset', () => {
 
   it('M13 altScore = 1 (transit 81.3° is above the 70° cap)', () => {
     const results = recommendTargets(mesGCSubset, c8Preset, june12location, june12night, 4, {
-      minAltDeg: 20, maxAltDeg: 90,
+      minAltDeg: 20,
+      maxAltDeg: 90,
     });
-    const m13 = results.find(r => r.dso.id === 'M13');
+    const m13 = results.find((r) => r.dso.id === 'M13');
     expect(m13).toBeDefined();
     expect(m13!.altScore).toBe(1);
   });

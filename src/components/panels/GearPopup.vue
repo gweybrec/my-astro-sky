@@ -59,18 +59,19 @@ const photosStore = usePhotosStore();
 const popupEl = ref<HTMLElement | null>(null);
 
 const currentOpacity = computed(() => {
-  const placed = photosStore.placedPhotos.find(p => p.photo.id === props.photoId);
+  const placed = photosStore.placedPhotos.find((p) => p.photo.id === props.photoId);
   return placed?.opacity ?? 1;
 });
 
 const photoName = computed(() => {
-  const placed = photosStore.placedPhotos.find(p => p.photo.id === props.photoId);
+  const placed = photosStore.placedPhotos.find((p) => p.photo.id === props.photoId);
   return placed?.photo.originalName ?? '';
 });
 
 function onOpacityInput(e: Event) {
   const overlay = canvasStore.overlay;
-  if (overlay) overlay.setPhotoOpacity(props.photoId, parseFloat((e.target as HTMLInputElement).value));
+  if (overlay)
+    overlay.setPhotoOpacity(props.photoId, parseFloat((e.target as HTMLInputElement).value));
 }
 
 function onReposition() {
@@ -87,15 +88,26 @@ function onEditMeta() {
   emit('close');
   const overlay = canvasStore.overlay;
   if (!overlay) return;
-  const ph = overlay.getPlacedPhotos().find(p => p.photo.id === props.photoId)?.photo;
+  const ph = overlay.getPlacedPhotos().find((p) => p.photo.id === props.photoId)?.photo;
   if (!ph) return;
-  const allLabels = [...new Set(overlay.getPlacedPhotos().flatMap(p => p.photo.labels))];
-  const allFilters = [...new Set(overlay.getPlacedPhotos().flatMap(p =>
-    (p.photo.integrations ?? []).map(row => row.filter)).filter(Boolean))];
-  showMetadataEditor(ph, (updated) => {
-    overlay.updatePhotoData(updated);
-    photosStore.syncFromOverlay();
-  }, allLabels, allFilters);
+  const allLabels = [...new Set(overlay.getPlacedPhotos().flatMap((p) => p.photo.labels))];
+  const allFilters = [
+    ...new Set(
+      overlay
+        .getPlacedPhotos()
+        .flatMap((p) => (p.photo.integrations ?? []).map((row) => row.filter))
+        .filter(Boolean),
+    ),
+  ];
+  showMetadataEditor(
+    ph,
+    (updated) => {
+      overlay.updatePhotoData(updated);
+      photosStore.syncFromOverlay();
+    },
+    allLabels,
+    allFilters,
+  );
 }
 
 async function onDelete() {
@@ -111,8 +123,12 @@ async function onDelete() {
     type: 'undo',
     duration: 5000,
     actionLabel: t('photos.undo'),
-    onAction: () => { overlay.unhidePhoto(props.photoId); },
-    onExpire: () => { overlay.removePhoto(props.photoId); },
+    onAction: () => {
+      overlay.unhidePhoto(props.photoId);
+    },
+    onExpire: () => {
+      overlay.removePhoto(props.photoId);
+    },
   });
 }
 

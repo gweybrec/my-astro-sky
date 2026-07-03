@@ -11,7 +11,12 @@ import type { StarPaint } from './star-render-math';
  * else an opaque core with a soft rim. Used both to fill a sprite (cx=cy=half) and to
  * draw the highlighted / glow stars live.
  */
-export function paintStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, p: StarPaint): void {
+export function paintStar(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  p: StarPaint,
+): void {
   if (p.glowAlpha > 0.01) {
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, p.glowR);
     grad.addColorStop(0, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
@@ -38,7 +43,7 @@ export function paintStar(ctx: CanvasRenderingContext2D, cx: number, cy: number,
 /** Render one star's sprite (centred) into an offscreen canvas sized to its extent. */
 export function buildStarSprite(paint: StarPaint): { canvas: HTMLCanvasElement; half: number } {
   const extent = paint.glowAlpha > 0.01 ? paint.glowR : paint.radius;
-  const half = Math.ceil(extent) + 1;   // +1px so the soft rim isn't clipped
+  const half = Math.ceil(extent) + 1; // +1px so the soft rim isn't clipped
   const canvas = document.createElement('canvas');
   canvas.width = half * 2;
   canvas.height = half * 2;

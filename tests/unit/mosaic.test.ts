@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { planGrid, tileCenters, mosaicBounds, autoRegionForDso, autoRegionForDsos, framePointToSky, skyToFrameOffset, mosaicShapeFromOffsets, addCandidateOffsets, smartMosaicEnvelope, clampSmartMosaicSize, outlineFromGrid, transformMosaicToSetup } from '../../src/mosaic';
+import {
+  planGrid,
+  tileCenters,
+  mosaicBounds,
+  autoRegionForDso,
+  autoRegionForDsos,
+  framePointToSky,
+  skyToFrameOffset,
+  mosaicShapeFromOffsets,
+  addCandidateOffsets,
+  smartMosaicEnvelope,
+  clampSmartMosaicSize,
+  outlineFromGrid,
+  transformMosaicToSetup,
+} from '../../src/mosaic';
 
 /** True if a list of offsets contains one ≈(gx, gy). */
 function hasOffset(list: Array<{ gx: number; gy: number }>, gx: number, gy: number): boolean {
-  return list.some(o => Math.abs(o.gx - gx) < 1e-9 && Math.abs(o.gy - gy) < 1e-9);
+  return list.some((o) => Math.abs(o.gx - gx) < 1e-9 && Math.abs(o.gy - gy) < 1e-9);
 }
 
 /** Angular separation (deg) between two sky points, via the haversine formula. */
@@ -14,7 +28,7 @@ function sep(a: { ra: number; dec: number }, b: { ra: number; dec: number }): nu
   const la1 = a.dec * d2r;
   const la2 = b.dec * d2r;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
-  return 2 * Math.asin(Math.min(1, Math.sqrt(h))) / d2r;
+  return (2 * Math.asin(Math.min(1, Math.sqrt(h)))) / d2r;
 }
 
 describe('planGrid', () => {
@@ -47,13 +61,13 @@ describe('tileCenters', () => {
   it('produces cols×rows tiles each carrying the mosaic PA and grid cell', () => {
     const tiles = tileCenters(center, 0, 3, 2, 1, 1, 20);
     expect(tiles).toHaveLength(6);
-    expect(tiles.every(t => t.paDeg === 0)).toBe(true);
-    expect(new Set(tiles.map(t => `${t.row},${t.col}`)).size).toBe(6);
+    expect(tiles.every((t) => t.paDeg === 0)).toBe(true);
+    expect(new Set(tiles.map((t) => `${t.row},${t.col}`)).size).toBe(6);
   });
 
   it('places the grid centre tile at the mosaic centre for an odd grid', () => {
     const tiles = tileCenters(center, 0, 3, 3, 1, 1, 0);
-    const mid = tiles.find(t => t.row === 1 && t.col === 1)!;
+    const mid = tiles.find((t) => t.row === 1 && t.col === 1)!;
     expect(sep(mid, center)).toBeLessThan(1e-6);
   });
 
@@ -61,7 +75,7 @@ describe('tileCenters', () => {
     const overlap = 20;
     const step = 1 * (1 - overlap / 100); // 0.8°
     const tiles = tileCenters(center, 0, 3, 3, 1, 1, overlap);
-    const at = (r: number, c: number) => tiles.find(t => t.row === r && t.col === c)!;
+    const at = (r: number, c: number) => tiles.find((t) => t.row === r && t.col === c)!;
     // Horizontal neighbours (same row) — separation ≈ step.
     expect(sep(at(1, 0), at(1, 1))).toBeCloseTo(step, 2);
     // Vertical neighbours (same col) — separation ≈ step.
@@ -71,8 +85,14 @@ describe('tileCenters', () => {
   it('rotating the mosaic by PA keeps tile separations identical', () => {
     const flat = tileCenters(center, 0, 2, 2, 1, 1, 10);
     const rot = tileCenters(center, 35, 2, 2, 1, 1, 10);
-    const sFlat = sep(flat.find(t => t.row === 0 && t.col === 0)!, flat.find(t => t.row === 0 && t.col === 1)!);
-    const sRot = sep(rot.find(t => t.row === 0 && t.col === 0)!, rot.find(t => t.row === 0 && t.col === 1)!);
+    const sFlat = sep(
+      flat.find((t) => t.row === 0 && t.col === 0)!,
+      flat.find((t) => t.row === 0 && t.col === 1)!,
+    );
+    const sRot = sep(
+      rot.find((t) => t.row === 0 && t.col === 0)!,
+      rot.find((t) => t.row === 0 && t.col === 1)!,
+    );
     expect(sRot).toBeCloseTo(sFlat, 4);
   });
 
@@ -95,15 +115,23 @@ describe('mosaicBounds', () => {
 
   it('spans (n−1)·step + tile across the grid', () => {
     const tiles = [
-      { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 },
-      { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 },
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
     ];
     // 1° tiles, 20% overlap → step 0.8. cols span 2 → 2*0.8 + 1 = 2.6; rows span 1 → 1*0.8 + 1 = 1.8.
     expect(mosaicBounds(tiles, 1, 1, 20)).toEqual({ wDeg: 2.6, hDeg: 1.8 });
   });
 
   it('uses the bounding cells of a non-rectangular union', () => {
-    const tiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }];
+    const tiles = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 1, col: 0 },
+    ];
     const b = mosaicBounds(tiles, 1, 1, 0);
     expect(b).toEqual({ wDeg: 2, hDeg: 2 });
   });
@@ -153,14 +181,20 @@ describe('autoRegionForDsos', () => {
   });
 
   it('grows the region to enclose each target plus its angular size', () => {
-    const small = autoRegionForDsos([
-      { ra: 10, dec: 30, majAxis: null, minAxis: null, pa: 0 },
-      { ra: 10.5, dec: 30, majAxis: null, minAxis: null, pa: 0 },
-    ], 0);
-    const big = autoRegionForDsos([
-      { ra: 10, dec: 30, majAxis: 120, minAxis: 120, pa: 0 },
-      { ra: 10.5, dec: 30, majAxis: 120, minAxis: 120, pa: 0 },
-    ], 0);
+    const small = autoRegionForDsos(
+      [
+        { ra: 10, dec: 30, majAxis: null, minAxis: null, pa: 0 },
+        { ra: 10.5, dec: 30, majAxis: null, minAxis: null, pa: 0 },
+      ],
+      0,
+    );
+    const big = autoRegionForDsos(
+      [
+        { ra: 10, dec: 30, majAxis: 120, minAxis: 120, pa: 0 },
+        { ra: 10.5, dec: 30, majAxis: 120, minAxis: 120, pa: 0 },
+      ],
+      0,
+    );
     expect(big.region.wDeg).toBeGreaterThan(small.region.wDeg);
   });
 });
@@ -176,14 +210,14 @@ describe('framePointToSky', () => {
 
   it('moves "up" (gy) toward the north at PA 0', () => {
     const p = framePointToSky(center, 0, 0, 1);
-    expect(p.dec).toBeCloseTo(1, 3);          // +1° north
-    expect(p.ra).toBeCloseTo(80, 3);          // RA unchanged on the meridian
+    expect(p.dec).toBeCloseTo(1, 3); // +1° north
+    expect(p.ra).toBeCloseTo(80, 3); // RA unchanged on the meridian
     expect(sep(p, center)).toBeCloseTo(1, 3); // 1° away
   });
 
   it('moves "right" (gx) toward the east at PA 0', () => {
     const p = framePointToSky(center, 0, 1, 0);
-    expect(p.ra).toBeGreaterThan(80);         // toward increasing RA (east)
+    expect(p.ra).toBeGreaterThan(80); // toward increasing RA (east)
     expect(p.dec).toBeCloseTo(0, 3);
     expect(sep(p, center)).toBeCloseTo(1, 3);
   });
@@ -203,7 +237,7 @@ describe('framePointToSky', () => {
   it('places the centre of a tile at its grid offset', () => {
     // 3×1 grid, 0% overlap, 1° tiles, PA 0: the right tile centre sits +1° east.
     const tiles = tileCenters(center, 0, 3, 1, 1, 1, 0);
-    const right = tiles.find(t => t.col === 2 && t.row === 0)!;
+    const right = tiles.find((t) => t.col === 2 && t.row === 0)!;
     const expected = framePointToSky(center, 0, 1, 0); // col offset = +1 step
     expect(sep(right, expected)).toBeLessThan(1e-9);
   });
@@ -211,10 +245,22 @@ describe('framePointToSky', () => {
 
 describe('skyToFrameOffset', () => {
   it('round-trips with framePointToSky for many offsets, centres and PAs', () => {
-    const centres = [{ ra: 80, dec: 0 }, { ra: 10.68, dec: 41.27 }, { ra: 200, dec: -60 }, { ra: 0, dec: 80 }];
+    const centres = [
+      { ra: 80, dec: 0 },
+      { ra: 10.68, dec: 41.27 },
+      { ra: 200, dec: -60 },
+      { ra: 0, dec: 80 },
+    ];
     for (const center of centres) {
       for (const paDeg of [0, 35, 90, -120, 200]) {
-        for (const [gx, gy] of [[0, 0], [1, 0], [0, 1.5], [-2, 1], [1.3, -0.7], [-1.8, -2.4]]) {
+        for (const [gx, gy] of [
+          [0, 0],
+          [1, 0],
+          [0, 1.5],
+          [-2, 1],
+          [1.3, -0.7],
+          [-1.8, -2.4],
+        ]) {
           const s = framePointToSky(center, paDeg, gx, gy);
           const back = skyToFrameOffset(center, paDeg, s.ra, s.dec);
           expect(back.gx).toBeCloseTo(gx, 6);
@@ -235,9 +281,12 @@ describe('mosaicShapeFromOffsets', () => {
   it('measures the tight grid and centroid of a centred set', () => {
     // 2 cols × 3 rows on a 0.8 step lattice, centred on the origin.
     const offs = [
-      { gx: -0.4, gy: -0.8 }, { gx: 0.4, gy: -0.8 },
-      { gx: -0.4, gy: 0 }, { gx: 0.4, gy: 0 },
-      { gx: -0.4, gy: 0.8 }, { gx: 0.4, gy: 0.8 },
+      { gx: -0.4, gy: -0.8 },
+      { gx: 0.4, gy: -0.8 },
+      { gx: -0.4, gy: 0 },
+      { gx: 0.4, gy: 0 },
+      { gx: -0.4, gy: 0.8 },
+      { gx: 0.4, gy: 0.8 },
     ];
     const s = mosaicShapeFromOffsets(offs, 0.8, 0.8);
     expect(s.cols).toBe(2);
@@ -250,8 +299,10 @@ describe('mosaicShapeFromOffsets', () => {
     // Drop the top row of the set above → 2×2 remains, its centre shifts down by
     // half a step (so the mosaic centre must move there to stay aligned).
     const offs = [
-      { gx: -0.4, gy: 0 }, { gx: 0.4, gy: 0 },
-      { gx: -0.4, gy: 0.8 }, { gx: 0.4, gy: 0.8 },
+      { gx: -0.4, gy: 0 },
+      { gx: 0.4, gy: 0 },
+      { gx: -0.4, gy: 0.8 },
+      { gx: 0.4, gy: 0.8 },
     ];
     const s = mosaicShapeFromOffsets(offs, 0.8, 0.8);
     expect(s.cols).toBe(2);
@@ -266,7 +317,12 @@ describe('mosaicShapeFromOffsets', () => {
   });
 
   it('returns a zero shape for no offsets', () => {
-    expect(mosaicShapeFromOffsets([], 0.8, 0.8)).toEqual({ centerGx: 0, centerGy: 0, cols: 0, rows: 0 });
+    expect(mosaicShapeFromOffsets([], 0.8, 0.8)).toEqual({
+      centerGx: 0,
+      centerGy: 0,
+      cols: 0,
+      rows: 0,
+    });
   });
 });
 
@@ -282,8 +338,10 @@ describe('addCandidateOffsets', () => {
 
   it('a 2×2 block exposes its 8 perimeter neighbours and no interior duplicates', () => {
     const block = [
-      { gx: 0, gy: 0 }, { gx: 0.8, gy: 0 },
-      { gx: 0, gy: 0.8 }, { gx: 0.8, gy: 0.8 },
+      { gx: 0, gy: 0 },
+      { gx: 0.8, gy: 0 },
+      { gx: 0, gy: 0.8 },
+      { gx: 0.8, gy: 0.8 },
     ];
     const c = addCandidateOffsets(block, 0.8, 0.8);
     expect(c).toHaveLength(8);
@@ -297,7 +355,11 @@ describe('addCandidateOffsets', () => {
 
   it('offers the gap of an L-shape (re-fill a removed corner)', () => {
     // Full 2×2 minus the top-right corner → the gap at (0.8, 0.8) is a candidate.
-    const lshape = [{ gx: 0, gy: 0 }, { gx: 0.8, gy: 0 }, { gx: 0, gy: 0.8 }];
+    const lshape = [
+      { gx: 0, gy: 0 },
+      { gx: 0.8, gy: 0 },
+      { gx: 0, gy: 0.8 },
+    ];
     expect(hasOffset(addCandidateOffsets(lshape, 0.8, 0.8), 0.8, 0.8)).toBe(true);
   });
 
@@ -349,7 +411,8 @@ describe('clampSmartMosaicSize', () => {
 
   // Vespera II envelope: square (3.25²) and rectangle (4.33×2.43) both fit.
   const AREA = 10.56;
-  const vesperaII = () => smartMosaicEnvelope({ max_long_edge_deg: 4.33, max_area_deg2: AREA }, 2.5, 1.4)!;
+  const vesperaII = () =>
+    smartMosaicEnvelope({ max_long_edge_deg: 4.33, max_area_deg2: AREA }, 2.5, 1.4)!;
 
   it('allows a square mosaic that stays within the area cap', () => {
     const r = clampSmartMosaicSize(3.0, 3.0, 2.5, 1.4, vesperaII());
@@ -360,8 +423,8 @@ describe('clampSmartMosaicSize', () => {
   it('shrinks the perpendicular axis when one edge is pushed past the square (area cap)', () => {
     // Drag the width out to the long edge: height collapses to hold the area.
     const r = clampSmartMosaicSize(4.33, 3.0, 2.5, 1.4, vesperaII());
-    expect(r.wDeg).toBeCloseTo(4.33, 6);          // dragged (larger) axis kept
-    expect(r.hDeg).toBeCloseTo(AREA / 4.33, 6);   // ≈ 2.44° — perpendicular shrunk
+    expect(r.wDeg).toBeCloseTo(4.33, 6); // dragged (larger) axis kept
+    expect(r.hDeg).toBeCloseTo(AREA / 4.33, 6); // ≈ 2.44° — perpendicular shrunk
     expect(r.wDeg * r.hDeg).toBeLessThanOrEqual(AREA + 1e-9);
   });
 
@@ -396,7 +459,12 @@ describe('outlineFromGrid', () => {
   it('inverts planGrid up to a one-tile rounding margin (closest whole-tile match)', () => {
     // Re-gridding an outline onto the same tile size recovers the grid, give or
     // take a single tile where the span lands exactly on a ceil() boundary (FP).
-    for (const [cols, rows, overlap] of [[3, 2, 20], [4, 4, 0], [2, 5, 50], [1, 3, 30]]) {
+    for (const [cols, rows, overlap] of [
+      [3, 2, 20],
+      [4, 4, 0],
+      [2, 5, 50],
+      [1, 3, 30],
+    ]) {
       const o = outlineFromGrid(cols, rows, 1.3, 0.9, overlap);
       const g = planGrid(1.3, 0.9, o.wDeg, o.hDeg, overlap);
       expect(g.cols).toBeGreaterThanOrEqual(cols);
@@ -409,10 +477,17 @@ describe('outlineFromGrid', () => {
 
 describe('transformMosaicToSetup', () => {
   const seestar = smartMosaicEnvelope({ scale: 2 }, 1.28, 0.73)!;
-  const classical = (wDeg: number, hDeg: number): Parameters<typeof transformMosaicToSetup>[3] =>
-    ({ wDeg, hDeg, envelope: null, tileable: true });
-  const smart = (wDeg: number, hDeg: number, envelope = seestar): Parameters<typeof transformMosaicToSetup>[3] =>
-    ({ wDeg, hDeg, envelope, tileable: false });
+  const classical = (wDeg: number, hDeg: number): Parameters<typeof transformMosaicToSetup>[3] => ({
+    wDeg,
+    hDeg,
+    envelope: null,
+    tileable: true,
+  });
+  const smart = (
+    wDeg: number,
+    hDeg: number,
+    envelope = seestar,
+  ): Parameters<typeof transformMosaicToSetup>[3] => ({ wDeg, hDeg, envelope, tileable: false });
 
   it('classical → classical: re-grids the outline keeping overlap, outline ≈ preserved', () => {
     // Source outline of a 3×2 mosaic at 1°/20% overlap = 2.6° × 1.8°.
@@ -450,7 +525,11 @@ describe('transformMosaicToSetup', () => {
   });
 
   it('smart → smart: re-clamps the outline into the new envelope', () => {
-    const vespera = smartMosaicEnvelope({ max_long_edge_deg: 4.33, max_area_deg2: 10.56 }, 2.5, 1.4)!;
+    const vespera = smartMosaicEnvelope(
+      { max_long_edge_deg: 4.33, max_area_deg2: 10.56 },
+      2.5,
+      1.4,
+    )!;
     const r = transformMosaicToSetup(2.56, 1.46, 20, smart(2.5, 1.4, vespera));
     expect(r.kind).toBe('single');
     if (r.kind !== 'single') return;
@@ -459,7 +538,12 @@ describe('transformMosaicToSetup', () => {
   });
 
   it('target smart scope with no mosaic mode → a single native frame', () => {
-    const r = transformMosaicToSetup(3, 3, 20, { wDeg: 1.4, hDeg: 0.8, envelope: null, tileable: false });
+    const r = transformMosaicToSetup(3, 3, 20, {
+      wDeg: 1.4,
+      hDeg: 0.8,
+      envelope: null,
+      tileable: false,
+    });
     expect(r).toEqual({ kind: 'single', wDeg: 1.4, hDeg: 0.8 });
   });
 

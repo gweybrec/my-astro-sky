@@ -19,10 +19,13 @@ describe('SkyMap overlay canvas', () => {
 
   beforeEach(() => {
     originalGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-      setTransform: vi.fn(),
-      clearRect: vi.fn(),
-    } as unknown as CanvasRenderingContext2D));
+    HTMLCanvasElement.prototype.getContext = vi.fn(
+      () =>
+        ({
+          setTransform: vi.fn(),
+          clearRect: vi.fn(),
+        }) as unknown as CanvasRenderingContext2D,
+    );
 
     vi.spyOn(SkyMap.prototype, 'render').mockImplementation(() => {});
   });
@@ -38,8 +41,15 @@ describe('SkyMap overlay canvas', () => {
     const canvas = document.createElement('canvas');
     Object.defineProperty(canvas, 'getBoundingClientRect', {
       value: () => ({
-        left: 0, top: 0, width: 800, height: 600,
-        right: 800, bottom: 600, x: 0, y: 0, toJSON: () => ({}),
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
       }),
     });
     const map = new SkyMap(canvas);

@@ -25,7 +25,10 @@ describe('buildPathAnonymizer', () => {
     });
 
     it('ignores blank paths in the known-paths list', () => {
-      const anon = buildPathAnonymizer([['', '<nothing>'], ['/real/path', '<real>']]);
+      const anon = buildPathAnonymizer([
+        ['', '<nothing>'],
+        ['/real/path', '<real>'],
+      ]);
       expect(anon('/real/path/file')).toBe('<real>/file');
     });
 
@@ -54,8 +57,9 @@ describe('buildPathAnonymizer', () => {
   describe('Windows fallback regex', () => {
     it('replaces C:\\Users\\<name> paths not matched by known paths', () => {
       const anon = buildPathAnonymizer([]);
-      expect(anon('Error at C:\\Users\\bob\\AppData\\Roaming\\MyApp\\db.sqlite'))
-        .toBe('Error at <user-path>');
+      expect(anon('Error at C:\\Users\\bob\\AppData\\Roaming\\MyApp\\db.sqlite')).toBe(
+        'Error at <user-path>',
+      );
     });
 
     it('replaces different drive letters', () => {
@@ -79,8 +83,7 @@ describe('buildPathAnonymizer', () => {
   describe('Unix fallback regex', () => {
     it('replaces /home/<name> paths not matched by known paths', () => {
       const anon = buildPathAnonymizer([]);
-      expect(anon('Error reading /home/frank/pictures/M42.fit'))
-        .toBe('Error reading <user-path>');
+      expect(anon('Error reading /home/frank/pictures/M42.fit')).toBe('Error reading <user-path>');
     });
 
     it('replaces multiple /home paths in a single string', () => {

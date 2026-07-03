@@ -27,7 +27,10 @@ beforeAll(() => {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Build a minimal FITS binary buffer (80-char records, 2880-byte blocks). */
-function makeFITSBuffer(keywords: Record<string, number | string | boolean>, includeEND = true): Buffer {
+function makeFITSBuffer(
+  keywords: Record<string, number | string | boolean>,
+  includeEND = true,
+): Buffer {
   const records: string[] = [];
 
   for (const [kw, val] of Object.entries(keywords)) {
@@ -74,16 +77,16 @@ function makeTIFFBuffer(description: string, bigEndian = false): Buffer {
   const writeU32 = (off: number, v: number) =>
     le ? buf.writeUInt32LE(v, off) : buf.writeUInt32BE(v, off);
 
-  buf.write(enc, 0, 'ascii');        // byte order
-  writeU16(2, 42);                   // TIFF magic
-  writeU32(4, 8);                    // IFD offset
+  buf.write(enc, 0, 'ascii'); // byte order
+  writeU16(2, 42); // TIFF magic
+  writeU32(4, 8); // IFD offset
 
-  writeU16(8, 1);                    // 1 IFD entry
-  writeU16(10, 270);                 // tag: ImageDescription
-  writeU16(12, 2);                   // type: ASCII
-  writeU32(14, count);               // count
-  writeU32(18, dataOffset);          // data offset
-  writeU32(22, 0);                   // next IFD = 0 (end)
+  writeU16(8, 1); // 1 IFD entry
+  writeU16(10, 270); // tag: ImageDescription
+  writeU16(12, 2); // type: ASCII
+  writeU32(14, count); // count
+  writeU32(18, dataOffset); // data offset
+  writeU32(22, 0); // next IFD = 0 (end)
 
   descBytes.copy(buf, dataOffset);
   return buf;
@@ -93,7 +96,7 @@ function makeTIFFBuffer(description: string, bigEndian = false): Buffer {
 
 describe('extractFITSHeaderFromTIFF()', () => {
   it('returns null for buffer shorter than 8 bytes', () => {
-    expect(extractFITSHeaderFromTIFF(Buffer.from([0x49, 0x49, 0x2A, 0x00]))).toBeNull();
+    expect(extractFITSHeaderFromTIFF(Buffer.from([0x49, 0x49, 0x2a, 0x00]))).toBeNull();
   });
 
   it('returns null for invalid byte-order marker', () => {
@@ -131,12 +134,12 @@ describe('extractFITSHeaderFromTIFF()', () => {
     buf.write('II', 0, 'ascii');
     buf.writeUInt16LE(42, 2);
     buf.writeUInt32LE(8, 4);
-    buf.writeUInt16LE(1, 8);      // 1 entry
-    buf.writeUInt16LE(256, 10);   // tag: ImageWidth (not 270)
-    buf.writeUInt16LE(3, 12);     // type: SHORT
-    buf.writeUInt32LE(1, 14);     // count
-    buf.writeUInt32LE(1920, 18);  // value
-    buf.writeUInt32LE(0, 22);     // next IFD
+    buf.writeUInt16LE(1, 8); // 1 entry
+    buf.writeUInt16LE(256, 10); // tag: ImageWidth (not 270)
+    buf.writeUInt16LE(3, 12); // type: SHORT
+    buf.writeUInt32LE(1, 14); // count
+    buf.writeUInt32LE(1920, 18); // value
+    buf.writeUInt32LE(0, 22); // next IFD
     expect(extractFITSHeaderFromTIFF(buf)).toBeNull();
   });
 
@@ -203,7 +206,7 @@ describe('extractWCS() — CDELT+PC matrix form', () => {
       CRPIX2: 540.0,
       CRVAL1: 83.82,
       CRVAL2: -5.39,
-      CDELT1: -0.000277778,  // ≈ 1 arcsec/px
+      CDELT1: -0.000277778, // ≈ 1 arcsec/px
       CDELT2: 0.000277778,
       NAXIS1: 1920,
       NAXIS2: 1080,
@@ -212,7 +215,7 @@ describe('extractWCS() — CDELT+PC matrix form', () => {
     expect(wcs).not.toBeNull();
     // With identity PC (default), CD1_1 = CDELT1 * PC1_1 = CDELT1 * 1
     expect(wcs!.CD1_1).toBeCloseTo(-0.000277778, 8);
-    expect(wcs!.CD2_2).toBeCloseTo( 0.000277778, 8);
+    expect(wcs!.CD2_2).toBeCloseTo(0.000277778, 8);
     // Off-diagonal should be zero (identity PC)
     expect(wcs!.CD1_2).toBeCloseTo(0, 10);
     expect(wcs!.CD2_1).toBeCloseTo(0, 10);
@@ -238,13 +241,15 @@ describe('extractWCS() — CDELT+PC matrix form', () => {
     expect(wcs).not.toBeNull();
     // CD1_1 = CDELT1 * PC1_1
     expect(wcs!.CD1_1).toBeCloseTo(-0.000277778 * cos45, 8);
-    expect(wcs!.CD1_2).toBeCloseTo(-0.000277778 * (-cos45), 8);
+    expect(wcs!.CD1_2).toBeCloseTo(-0.000277778 * -cos45, 8);
   });
 
   it('returns null when neither CD nor CDELT form is present', () => {
     const buf = makeFITSBuffer({
-      CRPIX1: 960.0, CRPIX2: 540.0,
-      CRVAL1: 83.82, CRVAL2: -5.39,
+      CRPIX1: 960.0,
+      CRPIX2: 540.0,
+      CRVAL1: 83.82,
+      CRVAL2: -5.39,
       // No CD, no CDELT
     });
     expect(extractWCS(buf, '.fits')).toBeNull();
@@ -253,8 +258,11 @@ describe('extractWCS() — CDELT+PC matrix form', () => {
   it('returns null when required CRPIX/CRVAL keys are missing', () => {
     const buf = makeFITSBuffer({
       // CRPIX1 missing
-      CRPIX2: 540.0, CRVAL1: 83.82, CRVAL2: -5.39,
-      CDELT1: -0.000278, CDELT2: 0.000278,
+      CRPIX2: 540.0,
+      CRVAL1: 83.82,
+      CRVAL2: -5.39,
+      CDELT1: -0.000278,
+      CDELT2: 0.000278,
     });
     expect(extractWCS(buf, '.fits')).toBeNull();
   });

@@ -6,16 +6,19 @@ All workflows live in `.github/workflows/`. They are independent — each serves
 
 ## CI (`ci.yml`)
 
-**Trigger:** push or PR to `master`
+**Trigger:** push or PR to `master` or `dev` (the `dev` trigger means lint/typecheck/build run before a PR is opened against `master`)
 
 **Runner:** `ubuntu-latest`
 
 **Steps:**
+
 1. `npm run typecheck:client` (`vue-tsc --noEmit`) — type-checks the frontend, including inside `.vue` SFCs (plain `tsc` treats `.vue` files as opaque via the shim and does not check their `<script>` blocks)
 2. `npm run typecheck:server` (`tsc --noEmit -p tsconfig.server.json`) — type-checks the Express backend
-3. `npx vite build` — verifies the frontend bundles without errors
+3. `npm run lint` (`eslint .`) — **warn-only**: every rule is `warn`, so ESLint exits 0 and this step surfaces issues in the log without failing the build (see `eslint.config.js` and `CLAUDE.md`)
+4. `npm run format:check` (`prettier --check .`) — **blocking**: fails if any file isn't Prettier-formatted. This is the one hard lint/format gate
+5. `npx vite build` — verifies the frontend bundles without errors
 
-This workflow does **not** build or run Electron — it only validates that the TypeScript compiles and Vite produces a valid bundle.
+This workflow does **not** build or run Electron — it only validates that the TypeScript compiles, the code is lint-clean/formatted, and Vite produces a valid bundle.
 
 ---
 
@@ -26,6 +29,7 @@ This workflow does **not** build or run Electron — it only validates that the 
 **Runner:** `ubuntu-latest`, Node.js 24
 
 **Steps:**
+
 1. `npm ci` — install dependencies
 2. `npm test` — runs the full Vitest suite (`tests/unit/` + `tests/components/`)
 3. Coverage artifacts uploaded to GitHub (`coverage/`, retained 7 days)
@@ -39,12 +43,13 @@ This workflow does **not** build or run Electron — it only validates that the 
 **Runner:** `ubuntu-latest`
 
 **Steps:**
+
 1. `docker/setup-buildx-action` + `docker/build-push-action` — build the image (`load: true`) with GitHub Actions layer cache (`cache-from`/`cache-to: type=gha`). Cold builds take a few minutes (two `npm ci` passes + native `better-sqlite3`/`sharp` rebuild + `vite build`); cached runs are much faster.
 2. **Smoke test** — `docker run` the image, poll `GET /api/config` until healthy, then hit `GET /api/telescopes`. `/api/config` proves the server booted; `/api/telescopes` returns the built-in gear catalog read from `resources/*.json` at startup, proving the Dockerfile wired up `RESOURCES_DIR` (and, alongside `PUBLIC_DATA_DIR` / `STAR_CATALOG_PATH`, the catalog assets). On failure the container logs are dumped.
 
 This guards the **recommended self-hosting path** (walkthrough in [installing-app.md](/user/installing-app.md#self-hosting-for-a-group-docker), operator reference in [distribution.md](/dev/distribution.md#option-4--self-hosted-docker-share-via-url)). It exists because the Dockerfile previously rotted unnoticed — nothing in CI ever built it.
 
-> **TODO — publish to GHCR (deferred).** This workflow only *builds and smoke-tests* the image; it does not publish it. A future enhancement will push the image to `ghcr.io/gweybrec/my-astro-sky` on tag/release (add `permissions: packages: write`, `docker/login-action` against `ghcr.io`, and `push: true` with versioned + `latest` tags) so users can `docker pull` instead of `docker compose up --build`.
+> **TODO — publish to GHCR (deferred).** This workflow only _builds and smoke-tests_ the image; it does not publish it. A future enhancement will push the image to `ghcr.io/gweybrec/my-astro-sky` on tag/release (add `permissions: packages: write`, `docker/login-action` against `ghcr.io`, and `push: true` with versioned + `latest` tags) so users can `docker pull` instead of `docker compose up --build`.
 
 ---
 
@@ -61,6 +66,7 @@ An Actions-based deployment (`actions/upload-pages-artifact` + `actions/deploy-p
 ## Release (`release.yml`)
 
 **Trigger:**
+
 - Push a tag matching `v*` (e.g. `v1.0.0`) — automatic
 - Manual via the "Run workflow" button in the Actions tab (`workflow_dispatch`), with an optional `tag_name` input
 
@@ -110,9 +116,9 @@ Runs after all three build jobs succeed. Steps:
 
 1. **Checkout** the default branch with `fetch-depth: 0` (full history + tags are required for the changelog, and the regenerated changelog files are committed back to the branch — not the detached tag).
 2. **Setup Node + `npm ci`** — installs the `git-cliff` devDependency used by the changelog script.
-3. **Generate changelog files** — `npm run changelog` runs [`scripts/generate-changelog.mjs`](../../scripts/generate-changelog.mjs), which calls [git-cliff](https://git-cliff.org) (config `cliff.toml`) once per major version series (see *Changelog scoping* below).
+3. **Generate changelog files** — `npm run changelog` runs [`scripts/generate-changelog.mjs`](../../scripts/generate-changelog.mjs), which calls [git-cliff](https://git-cliff.org) (config `cliff.toml`) once per major version series (see _Changelog scoping_ below).
 4. **Build release notes** — `npx git-cliff --latest --strip header --output RELEASE_BODY.md`; that file becomes the GitHub Release body (the latest version's section only). `RELEASE_BODY.md` is gitignored and never committed.
-5. **Commit the regenerated changelog file(s)** (`CHANGELOG.md` + any `CHANGELOG.v*.md`) back to the default branch with a `chore: update changelog … [skip ci]` message — `chore:` is skipped by `cliff.toml`, so this auto-commit never pollutes the next release's changelog; `[skip ci]` keeps it from re-triggering CI/test. This commit lands *after* the tag, since tags are immutable.
+5. **Commit the regenerated changelog file(s)** (`CHANGELOG.md` + any `CHANGELOG.v*.md`) back to the default branch with a `chore: update changelog … [skip ci]` message — `chore:` is skipped by `cliff.toml`, so this auto-commit never pollutes the next release's changelog; `[skip ci]` keeps it from re-triggering CI/test. This commit lands _after_ the tag, since tags are immutable.
 6. **Download every artifact** (Windows + Linux + the two macOS arch legs, merged via `pattern: macos-artifacts-*`) and **publish the GitHub Release** with the git-cliff changelog as the body (`body_path: RELEASE_BODY.md`).
 
 #### Changelog scoping (per major version series)

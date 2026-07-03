@@ -46,7 +46,7 @@ describe('PhotoOverlay label filtering', () => {
   beforeEach(() => {
     container = document.createElement('div');
     // getView stub not used by visibility logic
-    overlay = new PhotoOverlay(container, () => ({} as any));
+    overlay = new PhotoOverlay(container, () => ({}) as any);
   });
 
   it('shows all photos when no visibleLabels filters are set', () => {
@@ -58,8 +58,12 @@ describe('PhotoOverlay label filtering', () => {
     overlay.setVisibleLabels({});
     const placed = overlay.getPlacedPhotos();
     expect(placed.length).toBe(2);
-    expect(placed[0].imgEl.style.display === 'block' || placed[0].imgEl.style.display === '').toBe(true);
-    expect(placed[1].imgEl.style.display === 'block' || placed[1].imgEl.style.display === '').toBe(true);
+    expect(placed[0].imgEl.style.display === 'block' || placed[0].imgEl.style.display === '').toBe(
+      true,
+    );
+    expect(placed[1].imgEl.style.display === 'block' || placed[1].imgEl.style.display === '').toBe(
+      true,
+    );
   });
 
   it('hides photos whose labels are turned off', () => {
@@ -67,10 +71,10 @@ describe('PhotoOverlay label filtering', () => {
     const p2 = makePhoto('2', ['B']);
     overlay.loadPhotos([p1, p2]);
 
-    overlay.setVisibleLabels({ 'A': true, 'B': false });
+    overlay.setVisibleLabels({ A: true, B: false });
     const placed = overlay.getPlacedPhotos();
-    const a = placed.find(p => p.photo.id === '1')!;
-    const b = placed.find(p => p.photo.id === '2')!;
+    const a = placed.find((p) => p.photo.id === '1')!;
+    const b = placed.find((p) => p.photo.id === '2')!;
     expect(a.imgEl.style.display === 'block' || a.imgEl.style.display === '').toBe(true);
     expect(b.imgEl.style.display).toBe('none');
   });
@@ -85,14 +89,14 @@ describe('PhotoOverlay label filtering', () => {
     const b = makePlacedPhoto('2', ['B']);
     overlay.loadPhotos([a, b]);
 
-    overlay.setVisibleLabels({ 'A': true, 'B': false });
+    overlay.setVisibleLabels({ A: true, B: false });
 
     // Simulate a pan/zoom which recomputes every photo's transform.
     overlay.updateTransforms();
 
     const placed = overlay.getPlacedPhotos();
-    const pa = placed.find(p => p.photo.id === '1')!;
-    const pb = placed.find(p => p.photo.id === '2')!;
+    const pa = placed.find((p) => p.photo.id === '1')!;
+    const pb = placed.find((p) => p.photo.id === '2')!;
     expect(pa.imgEl.style.display).toBe('block');
     expect(pb.imgEl.style.display).toBe('none');
   });
@@ -102,10 +106,10 @@ describe('PhotoOverlay label filtering', () => {
     const p2 = makePhoto('2', ['X']);
     overlay.loadPhotos([p1, p2]);
 
-    overlay.setVisibleLabels({ '(no label)': false, 'X': true });
+    overlay.setVisibleLabels({ '(no label)': false, X: true });
     const placed = overlay.getPlacedPhotos();
-    const unl = placed.find(p => p.photo.id === '1')!;
-    const x = placed.find(p => p.photo.id === '2')!;
+    const unl = placed.find((p) => p.photo.id === '1')!;
+    const x = placed.find((p) => p.photo.id === '2')!;
     expect(unl.imgEl.style.display).toBe('none');
     expect(x.imgEl.style.display === 'block' || x.imgEl.style.display === '').toBe(true);
   });

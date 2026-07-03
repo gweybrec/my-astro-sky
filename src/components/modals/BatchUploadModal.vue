@@ -10,7 +10,8 @@
             class="hints-info-icon"
             :title="t('batch.infoTitle')"
             @click.stop="toggleInfoTooltip"
-          >ℹ</span>
+            >ℹ</span
+          >
         </div>
         <button class="modal-close" :title="t('batch.closeTitle')" @click="close">&times;</button>
       </div>
@@ -23,7 +24,9 @@
             <div v-if="batchLabels.length > 0" class="tag-chips">
               <span v-for="lbl in batchLabels" :key="lbl" class="tag-chip label-chip">
                 {{ lbl }}
-                <button type="button" class="tag-chip-remove" @click="removeBatchLabel(lbl)">×</button>
+                <button type="button" class="tag-chip-remove" @click="removeBatchLabel(lbl)">
+                  ×
+                </button>
               </span>
             </div>
             <div class="tag-input-wrap relative">
@@ -42,7 +45,9 @@
                   :key="suggestion"
                   class="tag-suggest-item"
                   @mousedown.prevent="selectBatchLabelSuggestion(suggestion)"
-                >{{ suggestion }}</div>
+                >
+                  {{ suggestion }}
+                </div>
               </div>
             </div>
           </div>
@@ -85,23 +90,25 @@
         <div class="batch-footer-actions">
           <CheckRow :label="t('batch.autoPlace')" v-model="autoPlace" :disabled="isStarting" />
           <div class="batch-footer-buttons">
-            <button
-              class="btn-danger"
-              :disabled="!isStarting"
-              @click="cancelAllSolving"
-            >{{ t('batch.cancelAll') }}</button>
+            <button class="btn-danger" :disabled="!isStarting" @click="cancelAllSolving">
+              {{ t('batch.cancelAll') }}
+            </button>
             <button
               class="btn-action"
               :disabled="isStarting || allSolversDisabled"
               :title="allSolversDisabled ? t('batch.noSolverConfigured') : undefined"
               @click="startSolving"
-            >{{ startBtnText }}</button>
+            >
+              {{ startBtnText }}
+            </button>
             <button
               class="btn-confirm"
               :disabled="!canPlace || autoPlace"
               :title="autoPlace ? t('batch.autoPlaceDisabledTooltip') : undefined"
               @click="placeAll"
-            >{{ t('batch.placeButton') }}</button>
+            >
+              {{ t('batch.placeButton') }}
+            </button>
           </div>
         </div>
       </div>
@@ -110,12 +117,7 @@
 
   <!-- Info tooltip (teleported to body to avoid overflow clipping) -->
   <Teleport to="body">
-    <div
-      v-if="infoTooltipVisible"
-      class="hints-info-tooltip"
-      :style="infoTooltipStyle"
-      @click.stop
-    >
+    <div v-if="infoTooltipVisible" class="hints-info-tooltip" :style="infoTooltipStyle" @click.stop>
       <button class="hints-info-close" @click.stop="infoTooltipVisible = false">&times;</button>
       <h3>{{ t('batch.infoTitle') }}</h3>
       <p>{{ t('batch.infoIntro') }}</p>
@@ -140,15 +142,23 @@ import { useCanvasStore } from '../../stores/canvas';
 import { useSettingsStore } from '../../stores/settings';
 import { useUiStore } from '../../stores/ui';
 import {
-  submitPlateSolve, pollPlateSolve,
-  submitLocalSolveJob, pollLocalSolveJob, cancelLocalSolveJob,
-  uploadPhoto, getSolverAvailability,
+  submitPlateSolve,
+  pollPlateSolve,
+  submitLocalSolveJob,
+  pollLocalSolveJob,
+  cancelLocalSolveJob,
+  uploadPhoto,
+  getSolverAvailability,
 } from '../../api';
 import type { SolverAvailability } from '../../api';
 import { reportUnknownRendererError } from '../../error-reporter';
 import { findDSOIdsFromCorrespondences } from '../../dso-catalog';
 import { stripExtension } from '../../file-utils';
-import { sanitizeIntegrationRows, DEFAULT_INTEGRATION_FILTERS, normalizeIntegrationFilterKey } from '../../batch-utils';
+import {
+  sanitizeIntegrationRows,
+  DEFAULT_INTEGRATION_FILTERS,
+  normalizeIntegrationFilterKey,
+} from '../../batch-utils';
 import { filterLabelCandidates } from '../../autocomplete-utils';
 import { placeBatchItem } from '../../batch-place';
 import { confirmDiscardUnsavedSolves } from '../../photo-delete-confirm';
@@ -209,7 +219,9 @@ function rememberFilters(filters: string[]) {
 }
 rememberFilters(DEFAULT_INTEGRATION_FILTERS);
 rememberFilters(
-  canvasStore.overlay?.getPlacedPhotos().flatMap(p => (p.photo.integrations ?? []).map(r => r.filter)) ?? [],
+  canvasStore.overlay
+    ?.getPlacedPhotos()
+    .flatMap((p) => (p.photo.integrations ?? []).map((r) => r.filter)) ?? [],
 );
 
 const pendingFiles = uiStore.pendingBatchFiles ?? [];
@@ -262,7 +274,7 @@ function addMorePhotos() {
   input.onchange = () => {
     if (!input.files || input.files.length === 0) return;
     const selected = Array.from(input.files);
-    const valid = selected.filter(f => allowedExt.test(f.name));
+    const valid = selected.filter((f) => allowedExt.test(f.name));
     if (valid.length === 0) {
       showToast({ message: t('errors.invalidPhotoFormat'), type: 'error', duration: 3500 });
       return;
@@ -285,14 +297,20 @@ let activeSolveRun = 0;
 
 async function close() {
   // Warn before discarding photos that solved but were never saved/placed.
-  const unsavedSolved = items.filter(i => i.status === 'success').length;
+  const unsavedSolved = items.filter((i) => i.status === 'success').length;
   if (unsavedSolved > 0 && !(await confirmDiscardUnsavedSolves(unsavedSolved))) return;
   emit('close');
 }
 
 function cleanupItem(item: BatchItem) {
-  if (item.solveTimer !== null) { clearInterval(item.solveTimer); item.solveTimer = null; }
-  if (item.pollingTimer !== null) { clearInterval(item.pollingTimer); item.pollingTimer = null; }
+  if (item.solveTimer !== null) {
+    clearInterval(item.solveTimer);
+    item.solveTimer = null;
+  }
+  if (item.pollingTimer !== null) {
+    clearInterval(item.pollingTimer);
+    item.pollingTimer = null;
+  }
   item.solveAbort = null;
 }
 
@@ -314,27 +332,38 @@ function removeItem(item: BatchItem) {
 // ─── Footer computed ──────────────────────────────────────────────────────────
 const isPlacing = ref(false);
 const autoPlace = ref(localStorage.getItem('batch-auto-place') === 'true');
-watch(autoPlace, v => localStorage.setItem('batch-auto-place', String(v)));
+watch(autoPlace, (v) => localStorage.setItem('batch-auto-place', String(v)));
 
-const solvedCount = computed(() => items.filter(i => i.status === 'success' || i.status === 'placing' || i.status === 'placed').length);
-const placedCount = computed(() => items.filter(i => i.status === 'placed').length);
-const canPlace = computed(() => items.some(i => i.status === 'success') && !isPlacing.value);
-const isUploading = computed(() => isPlacing.value || items.some(i => i.status === 'placing'));
+const solvedCount = computed(
+  () =>
+    items.filter((i) => i.status === 'success' || i.status === 'placing' || i.status === 'placed')
+      .length,
+);
+const placedCount = computed(() => items.filter((i) => i.status === 'placed').length);
+const canPlace = computed(() => items.some((i) => i.status === 'success') && !isPlacing.value);
+const isUploading = computed(() => isPlacing.value || items.some((i) => i.status === 'placing'));
 const progressText = computed(() =>
   t('batch.progress', { solved: String(solvedCount.value), total: String(items.length) }),
 );
-const placedText = computed(() =>
-  t('batch.progressPlaced', { placed: String(placedCount.value) }),
-);
+const placedText = computed(() => t('batch.progressPlaced', { placed: String(placedCount.value) }));
 
 const isStarting = ref(false);
-const startBtnText = computed(() => isStarting.value ? t('batch.startingLabel') : t('batch.startButton'));
+const startBtnText = computed(() =>
+  isStarting.value ? t('batch.startingLabel') : t('batch.startButton'),
+);
 
 // ─── Solving logic ─────────────────────────────────────────────────────────────
-async function pollUntilDone(item: BatchItem, jobId: string, signal: AbortSignal): Promise<PlateSolveResult> {
+async function pollUntilDone(
+  item: BatchItem,
+  jobId: string,
+  signal: AbortSignal,
+): Promise<PlateSolveResult> {
   return new Promise((resolve, reject) => {
     const stopPolling = () => {
-      if (item.pollingTimer !== null) { clearInterval(item.pollingTimer); item.pollingTimer = null; }
+      if (item.pollingTimer !== null) {
+        clearInterval(item.pollingTimer);
+        item.pollingTimer = null;
+      }
       signal.removeEventListener('abort', onAbort);
     };
     const onAbort = () => {
@@ -343,7 +372,10 @@ async function pollUntilDone(item: BatchItem, jobId: string, signal: AbortSignal
       reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
     };
 
-    if (signal.aborted) { onAbort(); return; }
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
     signal.addEventListener('abort', onAbort, { once: true });
 
     item.pollingTimer = setInterval(async () => {
@@ -359,7 +391,11 @@ async function pollUntilDone(item: BatchItem, jobId: string, signal: AbortSignal
         if (signal.aborted) return;
         if (status.status === 'solved' && status.correspondences) {
           stopPolling();
-          resolve({ success: true, correspondences: status.correspondences, dsoIds: status.dsoIds });
+          resolve({
+            success: true,
+            correspondences: status.correspondences,
+            dsoIds: status.dsoIds,
+          });
         } else if (status.status === 'failed' || status.status === 'timeout') {
           stopPolling();
           reject(new Error(status.error || t('modal.solveFailed')));
@@ -380,22 +416,33 @@ async function pollUntilLocalDone(
 ): Promise<PlateSolveResult> {
   return new Promise((resolve, reject) => {
     const stopPolling = (err?: unknown) => {
-      if (item.pollingTimer !== null) { clearInterval(item.pollingTimer); item.pollingTimer = null; }
+      if (item.pollingTimer !== null) {
+        clearInterval(item.pollingTimer);
+        item.pollingTimer = null;
+      }
       signal.removeEventListener('abort', onAbort);
       if (err !== undefined) reject(err);
     };
 
     const onAbort = () => {
       stopPolling();
-      cancelLocalSolveJob(endpoint, jobId).catch(e => reportUnknownRendererError('batch-solve', e));
+      cancelLocalSolveJob(endpoint, jobId).catch((e) =>
+        reportUnknownRendererError('batch-solve', e),
+      );
       reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
     };
 
-    if (signal.aborted) { onAbort(); return; }
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
     signal.addEventListener('abort', onAbort, { once: true });
 
     item.pollingTimer = setInterval(async () => {
-      if (cancelled) { stopPolling(new Error('cancelled')); return; }
+      if (cancelled) {
+        stopPolling(new Error('cancelled'));
+        return;
+      }
       try {
         const status = await pollLocalSolveJob(endpoint, jobId);
         if (status.status === 'success') {
@@ -405,7 +452,9 @@ async function pollUntilLocalDone(
           // Resolve (don't reject) with the result so its diagnostics survive into
           // solveItem's failure branch and populate the error-details collapsible.
           stopPolling();
-          resolve(status.result ?? { success: false, error: status.error || t('modal.solveFailed') });
+          resolve(
+            status.result ?? { success: false, error: status.error || t('modal.solveFailed') },
+          );
         } else if (status.status === 'canceled') {
           stopPolling();
           reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
@@ -461,22 +510,38 @@ async function solveItem(item: BatchItem) {
     let result: PlateSolveResult;
     const hints = item.hintCoords
       ? { ra: item.hintCoords.ra, dec: item.hintCoords.dec, fov: item.fovDeg ?? undefined }
-      : (item.fovDeg != null ? { fov: item.fovDeg } : undefined);
+      : item.fovDeg != null
+        ? { fov: item.fovDeg }
+        : undefined;
 
     if (item.solver === 'solve-field' || item.solver === 'astap') {
       const endpoint = item.solver === 'solve-field' ? '/api/solve-field' : '/api/solve-astap';
       item.solveAbort = new AbortController();
-      const { jobId } = await submitLocalSolveJob(endpoint, item.file, hints, item.solveAbort.signal);
+      const { jobId } = await submitLocalSolveJob(
+        endpoint,
+        item.file,
+        hints,
+        item.solveAbort.signal,
+      );
       item.localJobId = jobId;
       result = await pollUntilLocalDone(item, endpoint, jobId, item.solveAbort.signal);
     } else {
       item.solveAbort = new AbortController();
-      if (cancelled) { cleanupItem(item); return; }
-      const { jobId } = await submitPlateSolve(item.file, hints ? { ra: hints.ra!, dec: hints.dec!, radius: 2.0 } : undefined);
+      if (cancelled) {
+        cleanupItem(item);
+        return;
+      }
+      const { jobId } = await submitPlateSolve(
+        item.file,
+        hints ? { ra: hints.ra!, dec: hints.dec!, radius: 2.0 } : undefined,
+      );
       result = await pollUntilDone(item, jobId, item.solveAbort.signal);
     }
 
-    if (cancelled) { cleanupItem(item); return; }
+    if (cancelled) {
+      cleanupItem(item);
+      return;
+    }
 
     if (result.success && result.correspondences && result.correspondences.length >= 1) {
       await handleSolveSuccess(item, result);
@@ -495,7 +560,7 @@ async function solveItem(item: BatchItem) {
     if (!cancelled) {
       const wasCanceled = err?.name === 'AbortError' || err?.code === 'SOLVE_CANCELED';
       item.status = wasCanceled ? 'canceled' : 'failed';
-      item.error = wasCanceled ? '' : (err.message || t('batch.statusFailed'));
+      item.error = wasCanceled ? '' : err.message || t('batch.statusFailed');
       if (wasCanceled) item.diagnostics = undefined;
     }
   } finally {
@@ -507,7 +572,9 @@ async function runWcsItem(item: BatchItem) {
   item.solveAbort = null;
   item.status = 'solving';
   item.elapsedSeconds = 0;
-  item.solveTimer = setInterval(() => { item.elapsedSeconds++; }, 1000);
+  item.solveTimer = setInterval(() => {
+    item.elapsedSeconds++;
+  }, 1000);
   try {
     await handleSolveSuccess(item, item.wcsResult!);
   } catch (err: any) {
@@ -533,7 +600,8 @@ function startSolving() {
   isStarting.value = true;
 
   const maxParallel = Math.max(
-    1, parseInt(settingsStore.serverSettings?.MAX_PARALLEL_SOLVES || '4', 10) || 4,
+    1,
+    parseInt(settingsStore.serverSettings?.MAX_PARALLEL_SOLVES || '4', 10) || 4,
   );
   let localActiveSlots = 0;
   let onlineActiveCount = 0;
@@ -542,8 +610,12 @@ function startSolving() {
 
   for (const item of items) {
     if (cancelled) break;
-    if (item.status === 'success' || item.status === 'placing' || item.status === 'placed') continue;
-    if (item.status === 'failed') { item.error = ''; item.diagnostics = undefined; }
+    if (item.status === 'success' || item.status === 'placing' || item.status === 'placed')
+      continue;
+    if (item.status === 'failed') {
+      item.error = '';
+      item.diagnostics = undefined;
+    }
     if (item.solver === 'astrometry' && item.wcsResult == null) {
       onlineQueue.push(item);
     } else {
@@ -556,7 +628,13 @@ function startSolving() {
   }
 
   function checkAllDone() {
-    if (!cancelled && runId === activeSolveRun && localActiveSlots === 0 && localQueue.length === 0 && onlineActiveCount === 0) {
+    if (
+      !cancelled &&
+      runId === activeSolveRun &&
+      localActiveSlots === 0 &&
+      localQueue.length === 0 &&
+      onlineActiveCount === 0
+    ) {
       isStarting.value = false;
     }
   }
@@ -582,7 +660,10 @@ function startSolving() {
   onlineQueue.forEach((item, idx) => {
     onlineActiveCount++;
     setTimeout(() => {
-      if (cancelled || runId !== activeSolveRun) { onlineActiveCount--; return; }
+      if (cancelled || runId !== activeSolveRun) {
+        onlineActiveCount--;
+        return;
+      }
       void solveItem(item).finally(() => {
         onlineActiveCount--;
         if (!cancelled && runId === activeSolveRun) checkAllDone();
@@ -614,22 +695,34 @@ function cancelAllSolving() {
 
 // ─── Place all solved photos ───────────────────────────────────────────────────
 async function placeAll() {
-  const toPlace = items.filter(i => i.status === 'success');
+  const toPlace = items.filter((i) => i.status === 'success');
   if (toPlace.length === 0 || isPlacing.value) return;
   isPlacing.value = true;
   for (const item of toPlace) {
-    await placeBatchItem(item, batchLabels.value, uploadPhoto, photo => {
-      canvasStore.overlay?.placeUploadedPhoto(photo);
-    }, t);
+    await placeBatchItem(
+      item,
+      batchLabels.value,
+      uploadPhoto,
+      (photo) => {
+        canvasStore.overlay?.placeUploadedPhoto(photo);
+      },
+      t,
+    );
   }
   isPlacing.value = false;
 }
 
 // ─── Auto-place a single item after it succeeds ────────────────────────────────
 function autoPlaceItem(item: BatchItem) {
-  placeBatchItem(item, batchLabels.value, uploadPhoto, photo => {
-    canvasStore.overlay?.placeUploadedPhoto(photo);
-  }, t);
+  placeBatchItem(
+    item,
+    batchLabels.value,
+    uploadPhoto,
+    (photo) => {
+      canvasStore.overlay?.placeUploadedPhoto(photo);
+    },
+    t,
+  );
 }
 
 // ─── Retry failed upload (emitted from BatchCard) ─────────────────────────────
@@ -647,7 +740,7 @@ const batchLabels = ref<string[]>([]);
 const batchLabelInput = ref('');
 const showBatchLabelSuggest = ref(false);
 const localKnownBatchLabels = ref<string[]>([
-  ...new Set(canvasStore.overlay?.getPlacedPhotos().flatMap(p => p.photo.labels) ?? []),
+  ...new Set(canvasStore.overlay?.getPlacedPhotos().flatMap((p) => p.photo.labels) ?? []),
 ]);
 
 const batchLabelSuggestions = computed(() =>
@@ -681,11 +774,13 @@ function onBatchLabelKeydown(e: KeyboardEvent) {
 function onBatchLabelBlur() {
   commitBatchLabel(batchLabelInput.value);
   batchLabelInput.value = '';
-  setTimeout(() => { showBatchLabelSuggest.value = false; }, 150);
+  setTimeout(() => {
+    showBatchLabelSuggest.value = false;
+  }, 150);
 }
 
 function removeBatchLabel(lbl: string) {
-  batchLabels.value = batchLabels.value.filter(l => l !== lbl);
+  batchLabels.value = batchLabels.value.filter((l) => l !== lbl);
 }
 
 // ─── Info tooltip ─────────────────────────────────────────────────────────────
@@ -732,7 +827,8 @@ async function toggleInfoTooltip() {
     let left = rect.right + 10;
     if (left + tipRect.width > window.innerWidth - 20) left = rect.left - tipRect.width - 10;
     let top = rect.top;
-    if (top + tipRect.height > window.innerHeight - 20) top = window.innerHeight - tipRect.height - 20;
+    if (top + tipRect.height > window.innerHeight - 20)
+      top = window.innerHeight - tipRect.height - 20;
     infoTooltipStyle.value = { position: 'fixed', left: `${left}px`, top: `${top}px` };
   }
 }

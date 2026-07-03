@@ -18,14 +18,18 @@ export function easeInOutCubic(t: number): number {
  * clamped to 1200ms. Mirrors the original formula exactly.
  */
 export function navigateDurationMs(normalizedDist: number, zoomRatio: number): number {
-  return Math.max(300, Math.min(1200,
-    300 + normalizedDist * 600 + Math.log2(Math.max(1, zoomRatio)) * 200,
-  ));
+  return Math.max(
+    300,
+    Math.min(1200, 300 + normalizedDist * 600 + Math.log2(Math.max(1, zoomRatio)) * 200),
+  );
 }
 
 /** Distance/zoom inputs for {@link navigateDurationMs} from a start view + target. */
 export function navigateProfile(
-  view: ViewState, targetX: number, targetY: number, targetScale: number,
+  view: ViewState,
+  targetX: number,
+  targetY: number,
+  targetScale: number,
 ): { normalizedDist: number; zoomRatio: number } {
   const dx = targetX - view.centerX;
   const dy = targetY - view.centerY;
@@ -39,7 +43,12 @@ export function navigateProfile(
 /** New scale + centre after a zoom by `factor` that keeps the projection point under
  * (mx, my) anchored beneath the cursor. Scale is clamped to [minScale, maxScale]. */
 export function zoomAboutPoint(
-  view: ViewState, mx: number, my: number, factor: number, minScale: number, maxScale: number,
+  view: ViewState,
+  mx: number,
+  my: number,
+  factor: number,
+  minScale: number,
+  maxScale: number,
 ): { scale: number; centerX: number; centerY: number } {
   const before = fromCanvas(mx, my, view);
   const scale = Math.max(minScale, Math.min(maxScale, view.scale * factor));

@@ -3,7 +3,8 @@ import { redactSecrets } from './secret-redaction.js';
 export const MAX_SANITIZE_VALUE_LENGTH = 4096;
 export const MAX_SANITIZE_DEPTH = 5;
 
-const REDACT_KEY_RE = /(password|passwd|secret|token|api[-_]?key|authorization|cookie|set-cookie|session|jwt)/i;
+const REDACT_KEY_RE =
+  /(password|passwd|secret|token|api[-_]?key|authorization|cookie|set-cookie|session|jwt)/i;
 
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 

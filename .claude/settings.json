@@ -43,9 +43,7 @@
       "Bash(git diff *)",
       "Read(//tmp/**)"
     ],
-    "enabledMcpjsonServers": [
-      "playwright"
-    ]
+    "enabledMcpjsonServers": ["playwright"]
   },
   "hooks": {
     "PostToolUse": [

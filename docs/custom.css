@@ -9,67 +9,67 @@
 
 /* ── Cold-blue-v2 (default) ─────────────────────────────────────────────── */
 :root {
-  --bg-app:        #0a0e14;
-  --bg-deep:       #0f1419;
-  --bg-modal:      #0c0f16;
-  --bg-panel:      rgba(12, 15, 22, 0.98);
-  --bg-card:       rgba(14, 18, 28, 0.9);
-  --bg-input:      rgba(16, 20, 32, 0.85);
-  --bg-code:       rgba(14, 18, 28, 0.85);
+  --bg-app: #0a0e14;
+  --bg-deep: #0f1419;
+  --bg-modal: #0c0f16;
+  --bg-panel: rgba(12, 15, 22, 0.98);
+  --bg-card: rgba(14, 18, 28, 0.9);
+  --bg-input: rgba(16, 20, 32, 0.85);
+  --bg-code: rgba(14, 18, 28, 0.85);
 
-  --text-primary:   #d4e0f0;
+  --text-primary: #d4e0f0;
   --text-secondary: #8a9fb0;
-  --text-label:     #6b7d8f;
-  --text-bright:    #e8f0ff;
+  --text-label: #6b7d8f;
+  --text-bright: #e8f0ff;
 
-  --accent-color:   rgba(100, 150, 220, 0.92);
-  --accent-raw:     #6496dc;
-  --accent-hover:   rgba(120, 170, 240, 0.95);
+  --accent-color: rgba(100, 150, 220, 0.92);
+  --accent-raw: #6496dc;
+  --accent-hover: rgba(120, 170, 240, 0.95);
   --accent-fill-sm: rgba(100, 150, 220, 0.12);
   --accent-fill-md: rgba(100, 150, 220, 0.22);
 
-  --border-panel:  rgba(255, 255, 255, 0.07);
-  --border-accent: rgba(100, 150, 220, 0.40);
-  --border-focus:  rgba(120, 170, 240, 0.65);
+  --border-panel: rgba(255, 255, 255, 0.07);
+  --border-accent: rgba(100, 150, 220, 0.4);
+  --border-focus: rgba(120, 170, 240, 0.65);
 
-  --scrollbar-track:       rgba(14, 18, 28, 0.5);
-  --scrollbar-thumb:       rgba(100, 150, 220, 0.45);
+  --scrollbar-track: rgba(14, 18, 28, 0.5);
+  --scrollbar-thumb: rgba(100, 150, 220, 0.45);
   --scrollbar-thumb-hover: rgba(120, 170, 240, 0.7);
 
   --sky-bg-inner: #0d1a2e;
 
   --font-display: 'Cormorant Garamond', Georgia, serif;
-  --font-ui:      'Outfit', system-ui, sans-serif;
-  --font-mono:    'DM Mono', 'Consolas', 'Monaco', monospace;
+  --font-ui: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'Consolas', 'Monaco', monospace;
 }
 
 /* ── Warm (amber) ────────────────────────────────────────────────────────── */
-[data-theme="warm"] {
-  --bg-app:        #080808;
-  --bg-deep:       #111111;
-  --bg-modal:      #0e0c0a;
-  --bg-panel:      rgba(14, 12, 10, 0.98);
-  --bg-card:       rgba(20, 18, 14, 0.9);
-  --bg-input:      rgba(22, 20, 16, 0.85);
-  --bg-code:       rgba(30, 28, 22, 0.70);
+[data-theme='warm'] {
+  --bg-app: #080808;
+  --bg-deep: #111111;
+  --bg-modal: #0e0c0a;
+  --bg-panel: rgba(14, 12, 10, 0.98);
+  --bg-card: rgba(20, 18, 14, 0.9);
+  --bg-input: rgba(22, 20, 16, 0.85);
+  --bg-code: rgba(30, 28, 22, 0.7);
 
-  --text-primary:   #e0d8cf;
+  --text-primary: #e0d8cf;
   --text-secondary: #a09080;
-  --text-label:     #7a7068;
-  --text-bright:    #f0e8df;
+  --text-label: #7a7068;
+  --text-bright: #f0e8df;
 
-  --accent-color:   rgba(192, 120, 48, 0.92);
-  --accent-raw:     #c07830;
-  --accent-hover:   rgba(210, 135, 55, 0.95);
+  --accent-color: rgba(192, 120, 48, 0.92);
+  --accent-raw: #c07830;
+  --accent-hover: rgba(210, 135, 55, 0.95);
   --accent-fill-sm: rgba(192, 120, 48, 0.12);
   --accent-fill-md: rgba(192, 120, 48, 0.22);
 
-  --border-panel:  rgba(255, 255, 255, 0.07);
-  --border-accent: rgba(192, 120, 48, 0.40);
-  --border-focus:  rgba(192, 120, 48, 0.65);
+  --border-panel: rgba(255, 255, 255, 0.07);
+  --border-accent: rgba(192, 120, 48, 0.4);
+  --border-focus: rgba(192, 120, 48, 0.65);
 
-  --scrollbar-track:       rgba(20, 18, 14, 0.5);
-  --scrollbar-thumb:       rgba(192, 120, 48, 0.45);
+  --scrollbar-track: rgba(20, 18, 14, 0.5);
+  --scrollbar-thumb: rgba(192, 120, 48, 0.45);
   --scrollbar-thumb-hover: rgba(210, 135, 55, 0.7);
 
   --sky-bg-inner: #1e1c2a;
@@ -79,7 +79,11 @@
    Base reset & layout
    ═══════════════════════════════════════════════════════════════════════════ */
 
-*, *::before, *::after { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
 body {
   background: var(--bg-app);
@@ -172,7 +176,10 @@ body {
   color: var(--text-secondary) !important;
   text-decoration: none !important;
   border-left: 2px solid transparent !important;
-  transition: color 0.15s, border-color 0.15s, background 0.15s !important;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s !important;
   line-height: 1.4 !important;
 }
 
@@ -206,10 +213,19 @@ body {
 }
 
 /* Scrollbar in sidebar */
-.sidebar-nav::-webkit-scrollbar { width: 4px; }
-.sidebar-nav::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-.sidebar-nav::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 2px; }
-.sidebar-nav::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 2px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
 
 /* ── Main content area ───────────────────────────────────────────────────── */
 
@@ -250,7 +266,7 @@ body {
   --heading-h2: #a8d0ff;
   --heading-h3: #b8c8da;
 }
-[data-theme="warm"] {
+[data-theme='warm'] {
   --heading-h1: #f5e6d2;
   --heading-h2: #ffd9a0;
   --heading-h3: #d4c0a8;
@@ -318,7 +334,9 @@ body {
   color: var(--accent-raw) !important;
   text-decoration: none !important;
   border-bottom: 1px solid var(--accent-fill-md) !important;
-  transition: border-color 0.15s, color 0.15s !important;
+  transition:
+    border-color 0.15s,
+    color 0.15s !important;
 }
 
 .markdown-section a:hover {
@@ -416,8 +434,8 @@ body {
   background-color: var(--bg-code) !important;
 }
 
-.markdown-section tr:nth-child(2n+1) td,
-.markdown-section tr:nth-child(2n+1) {
+.markdown-section tr:nth-child(2n + 1) td,
+.markdown-section tr:nth-child(2n + 1) {
   background-color: transparent !important;
 }
 
@@ -482,7 +500,7 @@ body {
   background: var(--bg-modal) !important;
   border: 1px solid var(--border-panel) !important;
   border-radius: 6px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
 }
 
 .search .matching-post {
@@ -505,10 +523,20 @@ body {
 
 /* ── Global scrollbar ────────────────────────────────────────────────────── */
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
 
 /* ── Theme toggle button (lives at top of sidebar, above search) ─────────── */
 
@@ -526,7 +554,10 @@ body {
   padding: 6px 12px !important;
   border-radius: 20px !important;
   cursor: pointer !important;
-  transition: color 0.15s, border-color 0.15s, background 0.15s !important;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s !important;
   white-space: nowrap !important;
   text-align: center !important;
 }
@@ -542,9 +573,15 @@ body {
 /* Sections are tagged data-mode="user"/"dev" by JS (see index.html); show
    only the active one so both link sets are never visible together. The
    divider <hr> between them is redundant once one side is hidden. */
-:root[data-doc-mode="user"] .sidebar-nav > [data-mode="dev"] { display: none !important; }
-:root[data-doc-mode="dev"] .sidebar-nav > [data-mode="user"] { display: none !important; }
-.sidebar-nav > hr { display: none !important; }
+:root[data-doc-mode='user'] .sidebar-nav > [data-mode='dev'] {
+  display: none !important;
+}
+:root[data-doc-mode='dev'] .sidebar-nav > [data-mode='user'] {
+  display: none !important;
+}
+.sidebar-nav > hr {
+  display: none !important;
+}
 
 .mode-toggle {
   display: flex !important;
@@ -569,7 +606,9 @@ body {
   padding: 6px 10px !important;
   border-radius: 16px !important;
   cursor: pointer !important;
-  transition: color 0.15s, background 0.15s !important;
+  transition:
+    color 0.15s,
+    background 0.15s !important;
 }
 
 .mode-toggle button:hover {
@@ -609,7 +648,7 @@ body {
   width: 80px;
   border-radius: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .home-hero h1 {
@@ -643,7 +682,10 @@ body {
   text-align: center;
   text-decoration: none !important;
   border-bottom: none !important;
-  transition: border-color 0.2s, background 0.2s, transform 0.15s !important;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.15s !important;
 }
 
 .cta-card:hover {

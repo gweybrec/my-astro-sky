@@ -1,13 +1,32 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
-import { project, projectCached, getProjectionGeneration, toCanvas, fromCanvas, unproject, setHemisphere, getHemisphere, fitScaleForBorderCircle, borderRadiusPU, getProjectionMode } from './projection';
+import {
+  project,
+  projectCached,
+  getProjectionGeneration,
+  toCanvas,
+  fromCanvas,
+  unproject,
+  setHemisphere,
+  getHemisphere,
+  fitScaleForBorderCircle,
+  borderRadiusPU,
+  getProjectionMode,
+} from './projection';
 import { clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getStarMagsSorted, loadConstellationStyle, normalizeRA } from './star-catalog';
 import { getDSOs, getDSOById } from './dso-catalog';
-import { selectDSOsToRender, DSO_CONTAINER_VISIBLE_RADIUS_PX, type SelectableDSO } from './dso-selection';
 import {
-  targetRenderCount, magThresholdForCount,
-  STAR_DENSITY_K, DSO_DENSITY_K, MIN_BUDGET_MULT,
+  selectDSOsToRender,
+  DSO_CONTAINER_VISIBLE_RADIUS_PX,
+  type SelectableDSO,
+} from './dso-selection';
+import {
+  targetRenderCount,
+  magThresholdForCount,
+  STAR_DENSITY_K,
+  DSO_DENSITY_K,
+  MIN_BUDGET_MULT,
 } from './render-budget';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
@@ -20,11 +39,14 @@ import {
 } from './fov-frame-geometry';
 import { computeFovTargetScale } from './gear-presets';
 import { SKY_THEME } from './sky-themes';
-import {
-  computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint,
-} from './star-render-math';
+import { computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint } from './star-render-math';
 import { paintStar, buildStarSprite } from './star-draw';
-import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle, DSO_GIANT_BODY_PU } from './dso-render-math';
+import {
+  angularSizeToCanvasPx,
+  dsoSizeCos2,
+  dsoCanvasAngle,
+  DSO_GIANT_BODY_PU,
+} from './dso-render-math';
 import { InteractionLod } from './interaction-lod';
 import {
   pointInConvexPolygon,
@@ -45,16 +67,41 @@ import {
   type FrameGeometry,
 } from './frame-geometry';
 import { findMergeTarget, resizeRegionFromDraft, type ResizeDraft } from './frame-interaction';
-import { easeInOutCubic, navigateDurationMs, navigateProfile, zoomAboutPoint } from './sky-view-math';
+import {
+  easeInOutCubic,
+  navigateDurationMs,
+  navigateProfile,
+  zoomAboutPoint,
+} from './sky-view-math';
 import { pickDsoAtCursor } from './hover-hit-test';
 import {
-  drawBackground, drawFisheyeGrid, drawGrid, drawConstellationLines, drawConstellationNames,
-  drawTileTrash, drawTileAdd, TILE_TRASH_R,
+  drawBackground,
+  drawFisheyeGrid,
+  drawGrid,
+  drawConstellationLines,
+  drawConstellationNames,
+  drawTileTrash,
+  drawTileAdd,
+  TILE_TRASH_R,
 } from './sky-draw';
-import { FONTS, FRAME, BORDER_RING, HIGHLIGHT_RING, PHOTO_OUTLINE, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR } from './canvas-theme';
+import {
+  FONTS,
+  FRAME,
+  BORDER_RING,
+  HIGHLIGHT_RING,
+  PHOTO_OUTLINE,
+  DSO_LABEL_COLORS,
+  DEFAULT_DSO_LABEL_COLOR,
+} from './canvas-theme';
 import { drawDsoMarker, drawDsoHighlightRing } from './dso-draw';
 import { formatDsoLabel, dsoLabelVisible } from './dso-label';
-import { drawFramePolyline, drawEdgeLabel, drawFrameHandles, drawResizeDraftRect, drawElasticSnapLine } from './frame-draw';
+import {
+  drawFramePolyline,
+  drawEdgeLabel,
+  drawFrameHandles,
+  drawResizeDraftRect,
+  drawElasticSnapLine,
+} from './frame-draw';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -207,7 +254,20 @@ export class SkyMap {
   private showConstellationLines = true;
   private showConstellationNames = true;
   private constellationStyle: ConstellationStyle = 'western';
-  private visibleDSOTypes: Set<string> = new Set(['GxS', 'GxE', 'GxI', 'Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?']);
+  private visibleDSOTypes: Set<string> = new Set([
+    'GxS',
+    'GxE',
+    'GxI',
+    'Gx',
+    'OC',
+    'GC',
+    'EN',
+    'RN',
+    'PN',
+    'SNR',
+    'DN',
+    '?',
+  ]);
   private visibleDSOCatalogs: Set<string> = new Set(['M', 'NGC', 'IC', 'SH2']);
   private showGrid = true;
   private showStarLabels = true;
@@ -248,7 +308,8 @@ export class SkyMap {
   private fovInstances: RenderableFrame[] = [];
   private onFovInstanceSelect: ((id: string | null) => void) | null = null;
   private onFovInstanceChange: ((id: string, change: FovFrameChange) => void) | null = null;
-  private frameDrag: { id: string; mode: 'move' | 'rotate' | 'resize'; corner?: number } | null = null;
+  private frameDrag: { id: string; mode: 'move' | 'rotate' | 'resize'; corner?: number } | null =
+    null;
   // Transient rubber-band rectangle shown while a resize drag is in progress.
   private resizeDraft: ResizeDraft | null = null;
   // DSO the active move-drag will snap to on release; drives the elastic overlay.
@@ -274,7 +335,7 @@ export class SkyMap {
   // selectRenderedDSOs. Positions change only with the projection generation, so this
   // is rebuilt once per hemisphere/mode change (or DSO coordinate override), not per frame.
   private dsoAllIndex = new SpatialIndex<DSO>(0.02);
-  private dsoGiants: DSO[] = [];   // bodies larger than the query margin; always considered
+  private dsoGiants: DSO[] = []; // bodies larger than the query margin; always considered
   private dsoAllIndexGen = -1;
   private dsoMaxBodyPU = 0; // largest indexed (non-giant) body radius (projection units)
 
@@ -365,9 +426,18 @@ export class SkyMap {
     this.requestRender();
   }
 
-  setShowStars(show: boolean) { this.showStars = show; this.requestRender(); }
-  setShowConstellationLines(show: boolean) { this.showConstellationLines = show; this.requestRender(); }
-  setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.requestRender(); }
+  setShowStars(show: boolean) {
+    this.showStars = show;
+    this.requestRender();
+  }
+  setShowConstellationLines(show: boolean) {
+    this.showConstellationLines = show;
+    this.requestRender();
+  }
+  setShowConstellationNames(show: boolean) {
+    this.showConstellationNames = show;
+    this.requestRender();
+  }
 
   async setConstellationStyle(style: ConstellationStyle): Promise<void> {
     await loadConstellationStyle(style);
@@ -393,53 +463,145 @@ export class SkyMap {
   getOverlayCanvas(): HTMLCanvasElement | null {
     return this.overlayCanvas;
   }
-  setMaxStarCount(count: number) { this.maxStarCount = count; this.requestRenderInteractive(); }
-  setMaxDSOCount(count: number) { this.maxDSOCount = count; this.requestRenderInteractive(); }
+  setMaxStarCount(count: number) {
+    this.maxStarCount = count;
+    this.requestRenderInteractive();
+  }
+  setMaxDSOCount(count: number) {
+    this.maxDSOCount = count;
+    this.requestRenderInteractive();
+  }
   /** Fix the star budget (constellations + bright stars) and stop motion-throttling it. */
-  setAutoStarDensity(v: boolean) { this.lod.autoStarDensity = v; if (v) this.requestRender(); }
+  setAutoStarDensity(v: boolean) {
+    this.lod.autoStarDensity = v;
+    if (v) this.requestRender();
+  }
   /** Enable/disable performance-driven real-time auto-tuning of the DSO density budget.
    * Enabling kicks off a one-shot calibration so the slider snaps to the right value now. */
-  setAutoDSODensity(v: boolean) { this.lod.autoDSODensity = v; if (v) this.lod.dsoCalibrating = true; this.requestRender(); }
+  setAutoDSODensity(v: boolean) {
+    this.lod.autoDSODensity = v;
+    if (v) this.lod.dsoCalibrating = true;
+    this.requestRender();
+  }
   /** Notified with the new DSO budget whenever auto-tuning changes it, so the UI can track it. */
-  setOnAutoDensityChange(cb: (dso: number) => void) { this.onAutoDensityChange = cb; }
+  setOnAutoDensityChange(cb: (dso: number) => void) {
+    this.onAutoDensityChange = cb;
+  }
   /** Enable/disable the motion LOD (detail reduction while panning/zooming). */
-  setMotionLOD(v: boolean) { this.lod.motionLOD = v; this.requestRender(); }
-  setHighlightedDSO(dsoId: string | null) { this.highlightedDSO = dsoId; this.dsoIndexMaxMag = -99999; this.requestRender(); }
-  setHighlightedStar(hip: number | null) { this.highlightedStar = hip; this.starIndexMaxMag = -1; this.requestRender(); }
-  setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.dsoIndexMaxMag = -99999; this.requestRender(); }
-  setVisibleDSOCatalogs(catalogs: Set<string>) { this.visibleDSOCatalogs = catalogs; this.dsoIndexMaxMag = -99999; this.requestRender(); }
-  setShowGrid(show: boolean) { this.showGrid = show; this.requestRender(); }
-  setShowStarLabels(show: boolean) { this.showStarLabels = show; this.requestRender(); }
-  setShowDSOLabels(show: boolean) { this.showDSOLabels = show; this.requestRender(); }
-  setSkyOpacity(v: number) { this.skyOpacity = v; this.requestRender(); }
-  setBackgroundOpacity(v: number) { this.backgroundOpacity = v; this.requestRender(); }
-  setPhotoOutlines(outlines: PhotoOutline[]) { this.photoOutlines = outlines; }
-  setShowPhotoOutlines(show: boolean) { this.showPhotoOutlines = show; this.requestRender(); }
-  setFovFrames(frames: FovFrameSpec[]) { this.fovFrameSpecs = frames; this.requestRender(); }
-  setFovRotationDeg(deg: number) { this.fovRotationDeg = deg; this.requestRender(); }
+  setMotionLOD(v: boolean) {
+    this.lod.motionLOD = v;
+    this.requestRender();
+  }
+  setHighlightedDSO(dsoId: string | null) {
+    this.highlightedDSO = dsoId;
+    this.dsoIndexMaxMag = -99999;
+    this.requestRender();
+  }
+  setHighlightedStar(hip: number | null) {
+    this.highlightedStar = hip;
+    this.starIndexMaxMag = -1;
+    this.requestRender();
+  }
+  setVisibleDSOTypes(types: Set<string>) {
+    this.visibleDSOTypes = types;
+    this.dsoIndexMaxMag = -99999;
+    this.requestRender();
+  }
+  setVisibleDSOCatalogs(catalogs: Set<string>) {
+    this.visibleDSOCatalogs = catalogs;
+    this.dsoIndexMaxMag = -99999;
+    this.requestRender();
+  }
+  setShowGrid(show: boolean) {
+    this.showGrid = show;
+    this.requestRender();
+  }
+  setShowStarLabels(show: boolean) {
+    this.showStarLabels = show;
+    this.requestRender();
+  }
+  setShowDSOLabels(show: boolean) {
+    this.showDSOLabels = show;
+    this.requestRender();
+  }
+  setSkyOpacity(v: number) {
+    this.skyOpacity = v;
+    this.requestRender();
+  }
+  setBackgroundOpacity(v: number) {
+    this.backgroundOpacity = v;
+    this.requestRender();
+  }
+  setPhotoOutlines(outlines: PhotoOutline[]) {
+    this.photoOutlines = outlines;
+  }
+  setShowPhotoOutlines(show: boolean) {
+    this.showPhotoOutlines = show;
+    this.requestRender();
+  }
+  setFovFrames(frames: FovFrameSpec[]) {
+    this.fovFrameSpecs = frames;
+    this.requestRender();
+  }
+  setFovRotationDeg(deg: number) {
+    this.fovRotationDeg = deg;
+    this.requestRender();
+  }
 
   /** Replace the interactive frame instances and re-render. */
-  setFovInstances(frames: RenderableFrame[]) { this.fovInstances = frames; this.requestRender(); }
+  setFovInstances(frames: RenderableFrame[]) {
+    this.fovInstances = frames;
+    this.requestRender();
+  }
   /** Current interactive frame instances (for save/restore around off-screen renders). */
-  getFovInstances(): RenderableFrame[] { return this.fovInstances; }
-  setOnFovInstanceSelect(cb: (id: string | null) => void) { this.onFovInstanceSelect = cb; }
-  setOnFovInstanceChange(cb: (id: string, change: FovFrameChange) => void) { this.onFovInstanceChange = cb; }
-  setOnFovFrameResize(cb: (id: string, region: FovFrameResizeRegion) => void) { this.onFovFrameResize = cb; }
-  setOnMosaicTileRemove(cb: (tileId: string) => void) { this.onMosaicTileRemove = cb; }
-  setOnMosaicTileAdd(cb: (ra: number, dec: number) => void) { this.onMosaicTileAdd = cb; }
-  setMosaicAddCandidates(c: Array<{ ra: number; dec: number }>) { this.mosaicAddCandidates = c; this.requestRender(); }
-  setOnFrameMerge(cb: (movedId: string, targetId: string) => void) { this.onFrameMerge = cb; }
-  setOnPhotoClick(cb: (photoName: string) => void) { this.onPhotoClick = cb; }
-  setOnDSOClick(cb: (dso: DSO) => void) { this.onDSOClick = cb; }
-  setOnClearSelection(cb: () => void) { this.onClearSelection = cb; }
+  getFovInstances(): RenderableFrame[] {
+    return this.fovInstances;
+  }
+  setOnFovInstanceSelect(cb: (id: string | null) => void) {
+    this.onFovInstanceSelect = cb;
+  }
+  setOnFovInstanceChange(cb: (id: string, change: FovFrameChange) => void) {
+    this.onFovInstanceChange = cb;
+  }
+  setOnFovFrameResize(cb: (id: string, region: FovFrameResizeRegion) => void) {
+    this.onFovFrameResize = cb;
+  }
+  setOnMosaicTileRemove(cb: (tileId: string) => void) {
+    this.onMosaicTileRemove = cb;
+  }
+  setOnMosaicTileAdd(cb: (ra: number, dec: number) => void) {
+    this.onMosaicTileAdd = cb;
+  }
+  setMosaicAddCandidates(c: Array<{ ra: number; dec: number }>) {
+    this.mosaicAddCandidates = c;
+    this.requestRender();
+  }
+  setOnFrameMerge(cb: (movedId: string, targetId: string) => void) {
+    this.onFrameMerge = cb;
+  }
+  setOnPhotoClick(cb: (photoName: string) => void) {
+    this.onPhotoClick = cb;
+  }
+  setOnDSOClick(cb: (dso: DSO) => void) {
+    this.onDSOClick = cb;
+  }
+  setOnClearSelection(cb: () => void) {
+    this.onClearSelection = cb;
+  }
 
   /** The currently selected/highlighted DSO id on the map, or null. */
-  getHighlightedDSOId(): string | null { return this.highlightedDSO; }
+  getHighlightedDSOId(): string | null {
+    return this.highlightedDSO;
+  }
   /** Arm a one-shot picker: the next DSO the user clicks is passed to `cb` (in
    * addition to the normal selection action). Used to choose a mosaic target. */
-  armDSOPick(cb: (dso: DSO) => void) { this.onNextDSOPick = cb; }
+  armDSOPick(cb: (dso: DSO) => void) {
+    this.onNextDSOPick = cb;
+  }
   /** Cancel a pending one-shot DSO pick (e.g. the user dismissed the prompt). */
-  cancelDSOPick() { this.onNextDSOPick = null; }
+  cancelDSOPick() {
+    this.onNextDSOPick = null;
+  }
 
   /** Switch hemisphere, reset view to pole origin at fit-equator scale, and redraw. */
   setHemisphere(h: 'north' | 'south', borderLatDeg?: number) {
@@ -479,7 +641,7 @@ export class SkyMap {
     this.view.centerY = 0;
     this.view.rotationDeg = 0;
     if (this.view.width > 0) {
-      this.view.scale = Math.min(this.view.width, this.view.height) / 2 * 0.90;
+      this.view.scale = (Math.min(this.view.width, this.view.height) / 2) * 0.9;
     }
     this.onViewChange?.();
     this.requestRender();
@@ -518,7 +680,9 @@ export class SkyMap {
     this.requestRender();
   }
 
-  getShowGrid() { return this.showGrid; }
+  getShowGrid() {
+    return this.showGrid;
+  }
   /**
    * Effective star magnitude cutoff for the current zoom + canvas. A star renders iff
    * `star.mag <= this`. Two limits, both pan-invariant, combined by taking the brighter:
@@ -540,8 +704,13 @@ export class SkyMap {
     // (not a count cap) decides how faint we go.
     const budget = this.lod.effectiveStarBudget(this.maxStarCount);
     const count = targetRenderCount(
-      budget, scale, width, height, STAR_DENSITY_K,
-      budget * MIN_BUDGET_MULT, mags.length,
+      budget,
+      scale,
+      width,
+      height,
+      STAR_DENSITY_K,
+      budget * MIN_BUDGET_MULT,
+      mags.length,
     );
     const densityMag = magThresholdForCount(mags, count);
     return Math.min(computeMaxMag(scale), densityMag);
@@ -558,8 +727,13 @@ export class SkyMap {
     // the field of view bound how many actually draw when zoomed in.
     const budget = this.lod.effectiveDSOBudget(this.maxDSOCount);
     return targetRenderCount(
-      budget, scale, width, height, DSO_DENSITY_K,
-      budget * MIN_BUDGET_MULT, getDSOs().length,
+      budget,
+      scale,
+      width,
+      height,
+      DSO_DENSITY_K,
+      budget * MIN_BUDGET_MULT,
+      getDSOs().length,
     );
   }
 
@@ -591,7 +765,12 @@ export class SkyMap {
     const startTime = performance.now();
 
     // Adaptive duration based on distance and zoom ratio.
-    const { normalizedDist, zoomRatio } = navigateProfile(this.view, target.x, target.y, targetScale);
+    const { normalizedDist, zoomRatio } = navigateProfile(
+      this.view,
+      target.x,
+      target.y,
+      targetScale,
+    );
     const duration = navigateDurationMs(normalizedDist, zoomRatio);
 
     const step = (now: number) => {
@@ -616,7 +795,10 @@ export class SkyMap {
         this.animationId = requestAnimationFrame(step);
       } else {
         // Final frame: clear interaction state and paint full detail immediately.
-        if (this.settleTimer !== null) { clearTimeout(this.settleTimer); this.settleTimer = null; }
+        if (this.settleTimer !== null) {
+          clearTimeout(this.settleTimer);
+          this.settleTimer = null;
+        }
         this.lod.endInteraction();
         this.render();
       }
@@ -696,10 +878,14 @@ export class SkyMap {
   }
 
   /** Current FOV frame rotation in degrees (screen-relative). */
-  getFovRotationDeg(): number { return this.fovRotationDeg; }
+  getFovRotationDeg(): number {
+    return this.fovRotationDeg;
+  }
 
   /** Current FOV frame specs (for save/restore around off-screen renders). */
-  getFovFrames(): FovFrameSpec[] { return this.fovFrameSpecs; }
+  getFovFrames(): FovFrameSpec[] {
+    return this.fovFrameSpecs;
+  }
 
   enterPickingMode(callback: StarPickedCallback) {
     this.pickingMode = true;
@@ -759,7 +945,7 @@ export class SkyMap {
     this.dsoIndex.clear();
     for (const dso of getDSOs()) {
       const isHighlighted = this.highlightedDSO === dso.id;
-      
+
       if (!isHighlighted) {
         if (!this.visibleDSOTypes.has(dso.type)) continue;
         const cat = dso.catalog;
@@ -783,33 +969,43 @@ export class SkyMap {
     return this.starIndex.findNearest(projPt.x, projPt.y, threshold);
   }
 
-  private addEvent(target: EventTarget, event: string, handler: EventListener, options?: AddEventListenerOptions) {
+  private addEvent(
+    target: EventTarget,
+    event: string,
+    handler: EventListener,
+    options?: AddEventListenerOptions,
+  ) {
     target.addEventListener(event, handler, options);
     this.boundHandlers.push({ target, event, handler });
   }
 
   private setupEvents() {
     // Zoom with mouse wheel
-    this.addEvent(this.canvas, 'wheel', ((e: WheelEvent) => {
-      e.preventDefault();
-      this.cancelAnimation();
-      // A wheel gesture takes over from hovering: hide any tooltip so it doesn't
-      // linger over the moving map while the user zooms.
-      this.dismissTooltip();
-      const rect = this.canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
+    this.addEvent(
+      this.canvas,
+      'wheel',
+      ((e: WheelEvent) => {
+        e.preventDefault();
+        this.cancelAnimation();
+        // A wheel gesture takes over from hovering: hide any tooltip so it doesn't
+        // linger over the moving map while the user zooms.
+        this.dismissTooltip();
+        const rect = this.canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
 
-      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      // Keep the projection point under the cursor anchored across the zoom.
-      const z = zoomAboutPoint(this.view, mx, my, factor, 50, 1000000);
-      this.view.scale = z.scale;
-      this.view.centerX = z.centerX;
-      this.view.centerY = z.centerY;
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        // Keep the projection point under the cursor anchored across the zoom.
+        const z = zoomAboutPoint(this.view, mx, my, factor, 50, 1000000);
+        this.view.scale = z.scale;
+        this.view.centerX = z.centerX;
+        this.view.centerY = z.centerY;
 
-      this.onViewChange?.();
-      this.requestRenderInteractive();
-    }) as EventListener, { passive: false });
+        this.onViewChange?.();
+        this.requestRenderInteractive();
+      }) as EventListener,
+      { passive: false },
+    );
 
     // Pan with mouse drag
     this.addEvent(this.canvas, 'mousedown', ((e: MouseEvent) => {
@@ -872,8 +1068,10 @@ export class SkyMap {
 
         // Check if mouse is over the side panel by checking if it's on the right side
         const sidePanel = document.getElementById('side-panel');
-        const isOverPanel = sidePanel && !sidePanel.classList.contains('collapsed') && 
-                            e.clientX > window.innerWidth - 280; // Panel is 280px wide on the right
+        const isOverPanel =
+          sidePanel &&
+          !sidePanel.classList.contains('collapsed') &&
+          e.clientX > window.innerWidth - 280; // Panel is 280px wide on the right
 
         if (mx >= 0 && my >= 0 && mx <= this.view.width && my <= this.view.height && !isOverPanel) {
           this.requestHover(mx, my, e.clientX, e.clientY);
@@ -951,7 +1149,7 @@ export class SkyMap {
       if (e.key !== 'Escape') return;
       if (this.pickingMode) {
         this.exitPickingMode();
-      } else if (this.fovInstances.some(f => f.active)) {
+      } else if (this.fovInstances.some((f) => f.active)) {
         // Abandon any in-progress snap drag/animation so deselecting can't leave
         // a dangling elastic overlay or running rAF.
         this.frameDrag = null;
@@ -1026,7 +1224,11 @@ export class SkyMap {
     const projCenter = fromCanvas(cx, cy, this.view);
     // Collect candidates around the frame centre out to its half-diagonal (+margin).
     const radiusPx = Math.hypot(halfW, halfH) + 4;
-    const candidates = this.dsoIndex.findAll(projCenter.x, projCenter.y, radiusPx / this.view.scale);
+    const candidates = this.dsoIndex.findAll(
+      projCenter.x,
+      projCenter.y,
+      radiusPx / this.view.scale,
+    );
 
     const inside: Array<{ dso: DSO; dist: number }> = [];
     for (const dso of candidates) {
@@ -1037,7 +1239,7 @@ export class SkyMap {
       }
     }
     inside.sort((a, b) => a.dist - b.dist);
-    return inside.map(e => e.dso);
+    return inside.map((e) => e.dso);
   }
 
   /**
@@ -1098,11 +1300,11 @@ export class SkyMap {
     const starRendered = closestStar ? this.isStarRendered(closestStar) : false;
     const dsoRendered = closestDSO ? this.isDSORendered(closestDSO) : false;
 
-    this.hoveredDSO = (closestDSO && dsoRendered) ? closestDSO : null;
+    this.hoveredDSO = closestDSO && dsoRendered ? closestDSO : null;
 
     // Find which rendered object is actually closest to the mouse cursor
     const projPt = fromCanvas(mx, my, this.view);
-    
+
     let starDist = Infinity;
     if (closestStar && starRendered) {
       const starProj = project(closestStar.ra, closestStar.dec);
@@ -1110,7 +1312,7 @@ export class SkyMap {
       const dy = starProj.y - projPt.y;
       starDist = Math.sqrt(dx * dx + dy * dy);
     }
-    
+
     let dsoDist = Infinity;
     if (closestDSO && dsoRendered) {
       const dsoProj = project(closestDSO.ra, closestDSO.dec);
@@ -1118,7 +1320,7 @@ export class SkyMap {
       const dy = dsoProj.y - projPt.y;
       dsoDist = Math.sqrt(dx * dx + dy * dy);
     }
-    
+
     // Show tooltip for the closest rendered object
     if (starRendered && dsoRendered) {
       // Both found and rendered - show the closest one
@@ -1219,7 +1421,12 @@ export class SkyMap {
 
     ctx.globalAlpha = this.skyOpacity;
     if (this.showConstellationLines) {
-      drawConstellationLines(ctx, view, this.constellationStyle, this.skyTheme.constellationLineColor);
+      drawConstellationLines(
+        ctx,
+        view,
+        this.constellationStyle,
+        this.skyTheme.constellationLineColor,
+      );
     }
     if (this.showDSOs) {
       this.renderDSOs();
@@ -1350,7 +1557,7 @@ export class SkyMap {
     // Resolve CSS token values from computed style (canvas does not support CSS vars directly)
     const cs = getComputedStyle(this.canvas);
     const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || FRAME.strokeFallback;
-    const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || FRAME.labelFallback;
+    const labelColor = cs.getPropertyValue('--fov-frame-label').trim() || FRAME.labelFallback;
 
     for (const spec of this.fovFrameSpecs) {
       const halfWPx = angularSizeToCanvasPx(spec.wDeg * 30, dec, view.scale);
@@ -1395,11 +1602,13 @@ export class SkyMap {
     const { ctx } = this;
     const cs = getComputedStyle(this.canvas);
     const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || FRAME.strokeFallback;
-    const labelColor  = cs.getPropertyValue('--fov-frame-label').trim()  || FRAME.labelFallback;
+    const labelColor = cs.getPropertyValue('--fov-frame-label').trim() || FRAME.labelFallback;
     const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
     const dangerColor = cs.getPropertyValue('--color-danger').trim() || FRAME.dangerFallback;
     // The selected mosaic's tiles each get a delete button (per-tile editing).
-    const activeMosaicId = this.fovInstances.find(f => f.active && f.isMosaicOutline)?.id.split(':')[2];
+    const activeMosaicId = this.fovInstances
+      .find((f) => f.active && f.isMosaicOutline)
+      ?.id.split(':')[2];
 
     for (const f of this.fovInstances) {
       if (f.visible === false) continue; // hidden via the manager checkbox
@@ -1419,7 +1628,11 @@ export class SkyMap {
 
       if (isTile) {
         // Border tiles of the selected mosaic carry a delete button (large tiles only).
-        if (f.mosaicId === activeMosaicId && f.mosaicIsBorderTile && this.tileTrashVisible(halfW, halfH)) {
+        if (
+          f.mosaicId === activeMosaicId &&
+          f.mosaicIsBorderTile &&
+          this.tileTrashVisible(halfW, halfH)
+        ) {
           ctx.globalAlpha = 1;
           drawTileTrash(ctx, { x: cx, y: cy }, dangerColor);
         }
@@ -1442,7 +1655,12 @@ export class SkyMap {
         drawFrameHandles(
           ctx,
           { corners, cx, cy, rotDeg, halfH },
-          { movable: f.movable, pinnable: !!f.pinnable, resizable: !!f.resizable, anchorSky: f.anchorKind === 'sky' },
+          {
+            movable: f.movable,
+            pinnable: !!f.pinnable,
+            resizable: !!f.resizable,
+            anchorSky: f.anchorKind === 'sky',
+          },
           activeColor,
           this.framePinGlyphPos(corners[1], rotDeg),
         );
@@ -1453,7 +1671,11 @@ export class SkyMap {
     // Rubber-band preview of a drag-to-extend in progress.
     if (this.resizeDraft) {
       const d = this.resizeDraft;
-      drawResizeDraftRect(ctx, computeFovFrameCorners(d.halfW, d.halfH, d.cx, d.cy, d.rotDeg), activeColor);
+      drawResizeDraftRect(
+        ctx,
+        computeFovFrameCorners(d.halfW, d.halfH, d.cx, d.cy, d.rotDeg),
+        activeColor,
+      );
     }
 
     // Elastic line: while moving a frame whose anchor will snap, a taut line runs
@@ -1461,7 +1683,7 @@ export class SkyMap {
     // (brighter + thicker) as the frame nears the break threshold, signalling the
     // snap-back that fires on release; it vanishes when the elastic "breaks".
     if (this.snapCandidate && this.frameDrag?.mode === 'move') {
-      const f = this.fovInstances.find(x => x.id === this.frameDrag!.id);
+      const f = this.fovInstances.find((x) => x.id === this.frameDrag!.id);
       if (f) {
         const snap = this.snapCandidate;
         const { cx, cy } = this.frameAnchorCanvas(f);
@@ -1476,9 +1698,14 @@ export class SkyMap {
     }
 
     // Add ("+") buttons at the empty neighbour cells of the selected mosaic.
-    if (activeMosaicId && this.mosaicAddCandidates.length && this.mosaicEditButtonsVisible(activeMosaicId)) {
+    if (
+      activeMosaicId &&
+      this.mosaicAddCandidates.length &&
+      this.mosaicEditButtonsVisible(activeMosaicId)
+    ) {
       const avoid = this.activeOutlineRotateAvoid();
-      for (const c of this.mosaicAddCandidates) drawTileAdd(ctx, this.candidateCanvasPoint(c, avoid), activeColor);
+      for (const c of this.mosaicAddCandidates)
+        drawTileAdd(ctx, this.candidateCanvasPoint(c, avoid), activeColor);
     }
   }
 
@@ -1496,7 +1723,7 @@ export class SkyMap {
   /** Whether the selected mosaic's tiles are large enough to host their edit
    * buttons (delete / add), and the canvas point of an add candidate. */
   private mosaicEditButtonsVisible(mosaicId: string): boolean {
-    const t = this.fovInstances.find(f => f.mosaicId === mosaicId);
+    const t = this.fovInstances.find((f) => f.mosaicId === mosaicId);
     if (!t) return false;
     const g = this.frameGeometry(t);
     return this.tileTrashVisible(g.halfW, g.halfH);
@@ -1505,22 +1732,32 @@ export class SkyMap {
   /** The selected mosaic outline's rotate-handle position + centre, so add ("+")
    * buttons can be nudged clear of the rotation needle. Null when not applicable. */
   private activeOutlineRotateAvoid(): { handle: Point; center: Point } | null {
-    const outline = this.fovInstances.find(f => f.active && f.isMosaicOutline);
+    const outline = this.fovInstances.find((f) => f.active && f.isMosaicOutline);
     if (!outline) return null;
     const geo = this.frameGeometry(outline);
     if (!this.frameHandlesVisible(geo.halfW, geo.halfH)) return null;
-    return { handle: rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24), center: { x: geo.cx, y: geo.cy } };
+    return {
+      handle: rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24),
+      center: { x: geo.cx, y: geo.cy },
+    };
   }
 
   /** Canvas point of an add candidate. If it would sit on the rotate needle, push
    * it outward (away from the mosaic centre) past the handle so it stays clickable. */
-  private candidateCanvasPoint(c: { ra: number; dec: number }, avoid?: { handle: Point; center: Point } | null): Point {
+  private candidateCanvasPoint(
+    c: { ra: number; dec: number },
+    avoid?: { handle: Point; center: Point } | null,
+  ): Point {
     const p = project(c.ra, c.dec);
     let pt = toCanvas(p.x, p.y, this.view);
     if (avoid && Math.hypot(pt.x - avoid.handle.x, pt.y - avoid.handle.y) < TILE_TRASH_R * 2 + 4) {
-      const dx = pt.x - avoid.center.x, dy = pt.y - avoid.center.y;
+      const dx = pt.x - avoid.center.x,
+        dy = pt.y - avoid.center.y;
       const len = Math.hypot(dx, dy) || 1;
-      const newDist = Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) + TILE_TRASH_R + 14;
+      const newDist =
+        Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) +
+        TILE_TRASH_R +
+        14;
       pt = { x: avoid.center.x + (dx / len) * newDist, y: avoid.center.y + (dy / len) * newDist };
     }
     return pt;
@@ -1528,9 +1765,10 @@ export class SkyMap {
 
   /** Hit-test the active/instance frames on mousedown. Returns true if the event was consumed (no pan). */
   private handleFrameMouseDown(mx: number, my: number): boolean {
-    if (!this.interactionEnabled || this.pickingMode || this.fovInstances.length === 0) return false;
+    if (!this.interactionEnabled || this.pickingMode || this.fovInstances.length === 0)
+      return false;
 
-    const active = this.fovInstances.find(f => f.active);
+    const active = this.fovInstances.find((f) => f.active);
     if (active && active.visible !== false) {
       const geo = this.frameGeometry(active);
       const handlesVisible = this.frameHandlesVisible(geo.halfW, geo.halfH);
@@ -1542,7 +1780,10 @@ export class SkyMap {
         }
         if (active.pinnable) {
           const pinPos = this.framePinGlyphPos(geo.corners[1], geo.rotDeg);
-          if (isNearHandle(mx, my, pinPos, 10)) { this.toggleFramePin(active); return true; }
+          if (isNearHandle(mx, my, pinPos, 10)) {
+            this.toggleFramePin(active);
+            return true;
+          }
         }
         // Corner resize handles (drag-to-extend into a mosaic) take priority over
         // the centre move dot and border move.
@@ -1608,7 +1849,7 @@ export class SkyMap {
 
   /** Toggle the pin state of a frame by id (used by the frame-manager popup). */
   toggleFramePinById(id: string): void {
-    const f = this.fovInstances.find(x => x.id === id);
+    const f = this.fovInstances.find((x) => x.id === id);
     if (f && f.pinnable) this.toggleFramePin(f);
   }
 
@@ -1622,7 +1863,7 @@ export class SkyMap {
   /** Pin the currently-active frame if it is still floating (used when the
    * selection changes — only the selected frame stays free to move). */
   pinActiveIfFloating(): void {
-    const active = this.fovInstances.find(f => f.active);
+    const active = this.fovInstances.find((f) => f.active);
     if (active && active.pinnable && active.anchorKind === 'screen') this.toggleFramePin(active);
   }
 
@@ -1668,16 +1909,20 @@ export class SkyMap {
     const near = snap ? this.findClosestDSO(cx, cy) : null;
     if (near) {
       // Anchored: the snapped object sits at the centre, so it is the target.
-      ra = near.ra; dec = near.dec; dsoId = near.id;
+      ra = near.ra;
+      dec = near.dec;
+      dsoId = near.id;
     } else {
       const proj = fromCanvas(cx, cy, this.view);
       const u = unproject(proj.x, proj.y);
-      ra = u.ra; dec = u.dec; dsoId = null;
+      ra = u.ra;
+      dec = u.dec;
+      dsoId = null;
       // A plan frame placed freely takes the DSO nearest its centre that falls
       // inside it (custom location if none).
       if (f.derivesTargetFromContent) {
         const moved: RenderableFrame = { ...f, anchorKind: 'sky', ra, dec };
-        dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
+        dsoId = frameTargetDso(this.dsosInFrame(moved).map((d) => d.id));
       }
     }
     const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
@@ -1703,7 +1948,7 @@ export class SkyMap {
    * DSO is close enough (the frame keeps its current position and target).
    */
   resnapFrame(id: string): void {
-    const f = this.fovInstances.find(x => x.id === id);
+    const f = this.fovInstances.find((x) => x.id === id);
     if (!f || !f.pinnable || f.anchorKind !== 'sky') return;
     const { cx, cy } = this.frameAnchorCanvas(f);
     const near = this.findClosestDSO(cx, cy);
@@ -1734,7 +1979,7 @@ export class SkyMap {
    */
   private animateSnapToDso(id: string, snap: { id: string; ra: number; dec: number }): void {
     this.cancelSnapAnim();
-    const f = this.fovInstances.find(x => x.id === id);
+    const f = this.fovInstances.find((x) => x.id === id);
     if (!f || f.anchorKind !== 'sky') return;
     const startRa = f.ra ?? snap.ra;
     const startDec = f.dec ?? snap.dec;
@@ -1758,7 +2003,12 @@ export class SkyMap {
       // Keep the DSO target bound for every frame of the spring (it's known the
       // whole time); a null mid-flight would flip a mosaic's name to the gear spec.
       this.onFovInstanceChange?.(id, {
-        anchor: { kind: 'sky', ra: done ? snap.ra : ra, dec: done ? snap.dec : dec, dsoId: snap.id },
+        anchor: {
+          kind: 'sky',
+          ra: done ? snap.ra : ra,
+          dec: done ? snap.dec : dec,
+          dsoId: snap.id,
+        },
         paDeg,
       });
       if (done) {
@@ -1776,7 +2026,7 @@ export class SkyMap {
    * snaps its own screen anchor back to the viewport centre.
    */
   centerFrameInView(id: string): void {
-    const f = this.fovInstances.find(x => x.id === id);
+    const f = this.fovInstances.find((x) => x.id === id);
     if (!f) return;
     if (f.anchorKind === 'sky') {
       // Same framing zoom the targets "view on map" button uses.
@@ -1791,8 +2041,11 @@ export class SkyMap {
   /** Apply a frame move/rotate drag for the current cursor position. */
   private handleFrameDragMove(mx: number, my: number): void {
     if (!this.frameDrag) return;
-    const f = this.fovInstances.find(x => x.id === this.frameDrag!.id);
-    if (!f) { this.frameDrag = null; return; }
+    const f = this.fovInstances.find((x) => x.id === this.frameDrag!.id);
+    if (!f) {
+      this.frameDrag = null;
+      return;
+    }
 
     if (this.frameDrag.mode === 'resize') {
       // Recompute the rubber-band rectangle from the (unchanged) frame geometry's
@@ -1806,7 +2059,13 @@ export class SkyMap {
       if (f.smartMosaic) {
         const reqWDeg = f.wDeg * (r.halfW / Math.max(1e-6, geo.halfW));
         const reqHDeg = f.hDeg * (r.halfH / Math.max(1e-6, geo.halfH));
-        const c = clampSmartMosaicSize(reqWDeg, reqHDeg, f.smartMosaic.nativeWDeg, f.smartMosaic.nativeHDeg, f.smartMosaic.env);
+        const c = clampSmartMosaicSize(
+          reqWDeg,
+          reqHDeg,
+          f.smartMosaic.nativeWDeg,
+          f.smartMosaic.nativeHDeg,
+          f.smartMosaic.env,
+        );
         halfW = (c.wDeg / Math.max(1e-6, f.wDeg)) * geo.halfW;
         halfH = (c.hDeg / Math.max(1e-6, f.hDeg)) * geo.halfH;
       }
@@ -1837,14 +2096,20 @@ export class SkyMap {
         // happens on mouse-up via animateSnapToDso.
         const proj = fromCanvas(mx, my, this.view);
         const u = unproject(proj.x, proj.y);
-        const ra = u.ra, dec = u.dec;
+        const ra = u.ra,
+          dec = u.dec;
         let dsoId: string | null = null;
         const near = f.anchorSnap !== false ? this.findClosestDSO(mx, my) : null;
         // Recompute the PA so the frame keeps the same on-screen angle at the
         // new position.
         const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
         if (near) {
-          this.snapCandidate = { id: near.id, ra: near.ra, dec: near.dec, majAxis: near.majAxis ?? 1 };
+          this.snapCandidate = {
+            id: near.id,
+            ra: near.ra,
+            dec: near.dec,
+            majAxis: near.majAxis ?? 1,
+          };
           // Keep the pending target *bound* while the elastic is shown. The centre
           // still follows the cursor (it springs to the DSO only on release), but
           // nulling the target here would, for a mosaic, drop its dsoId — flipping
@@ -1857,7 +2122,7 @@ export class SkyMap {
           // its centre that falls inside it (custom location if none).
           if (f.derivesTargetFromContent) {
             const moved: RenderableFrame = { ...f, ra, dec, paDeg };
-            dsoId = frameTargetDso(this.dsosInFrame(moved).map(d => d.id));
+            dsoId = frameTargetDso(this.dsosInFrame(moved).map((d) => d.id));
           }
         }
         // Emitting the change drives the re-render (via the store watch →
@@ -1866,7 +2131,9 @@ export class SkyMap {
         // line from the frame's stale (pre-change) position and flicker.
         this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
       } else {
-        this.onFovInstanceChange?.(f.id, { anchor: { kind: 'screen', nx: mx / this.view.width, ny: my / this.view.height } });
+        this.onFovInstanceChange?.(f.id, {
+          anchor: { kind: 'screen', nx: mx / this.view.width, ny: my / this.view.height },
+        });
       }
     }
   }
@@ -1889,8 +2156,11 @@ export class SkyMap {
   private finalizeResize(frameId: string): void {
     const draft = this.resizeDraft;
     this.resizeDraft = null;
-    const f = draft ? this.fovInstances.find(x => x.id === frameId) : undefined;
-    if (!draft || !f) { this.render(); return; }
+    const f = draft ? this.fovInstances.find((x) => x.id === frameId) : undefined;
+    if (!draft || !f) {
+      this.render();
+      return;
+    }
     const region = resizeRegionFromDraft(f, draft, this.view, fromCanvas, unproject);
     this.render();
     this.onFovFrameResize?.(f.id, region);
@@ -1926,7 +2196,8 @@ export class SkyMap {
     const atlasStale = atlasScale !== this.starSpriteScale || atlasMaxMag !== this.starSpriteMaxMag;
     // How much the frozen sprites would be scaled to track the current zoom.
     const liveRatio = this.starSpriteScale > 0 ? Math.sqrt(view.scale / this.starSpriteScale) : 1;
-    const drifted = liveRatio > SkyMap.ATLAS_REBUILD_RATIO || liveRatio < 1 / SkyMap.ATLAS_REBUILD_RATIO;
+    const drifted =
+      liveRatio > SkyMap.ATLAS_REBUILD_RATIO || liveRatio < 1 / SkyMap.ATLAS_REBUILD_RATIO;
     if (atlasStale && (!this.lod.interacting || this.starSprites.size === 0 || drifted)) {
       this.starSprites.clear();
       this.starSpriteScale = atlasScale;
@@ -1936,9 +2207,8 @@ export class SkyMap {
     // frozen sprites by the radius ratio (≈ √ of the scale ratio, matching starRadius'
     // curve). At rest and during pan the bucket matches, so this stays 1.
     const frozenScale = this.starSpriteScale !== atlasScale;
-    const spriteScale = frozenScale && this.starSpriteScale > 0
-      ? Math.sqrt(view.scale / this.starSpriteScale)
-      : 1;
+    const spriteScale =
+      frozenScale && this.starSpriteScale > 0 ? Math.sqrt(view.scale / this.starSpriteScale) : 1;
 
     for (const star of stars) {
       // Always include the highlighted star.
@@ -1995,7 +2265,14 @@ export class SkyMap {
       if (sprite === undefined) {
         // Build at the atlas's frozen scale/maxMag so a sprite minted mid-gesture (a
         // newly-appeared bucket) matches the rest of the atlas and scales identically.
-        const paint = computeStarPaint(star.mag, star.bv, this.starSpriteScale, this.starSpriteMaxMag, theme, false);
+        const paint = computeStarPaint(
+          star.mag,
+          star.bv,
+          this.starSpriteScale,
+          this.starSpriteMaxMag,
+          theme,
+          false,
+        );
         sprite = buildStarSprite(paint);
         this.starSprites.set(key, sprite);
       }
@@ -2003,7 +2280,13 @@ export class SkyMap {
         ctx.drawImage(sprite.canvas, c.x - sprite.half, c.y - sprite.half);
       } else {
         const h = sprite.half * spriteScale;
-        ctx.drawImage(sprite.canvas, c.x - h, c.y - h, sprite.canvas.width * spriteScale, sprite.canvas.height * spriteScale);
+        ctx.drawImage(
+          sprite.canvas,
+          c.x - h,
+          c.y - h,
+          sprite.canvas.width * spriteScale,
+          sprite.canvas.height * spriteScale,
+        );
       }
     }
 
@@ -2063,7 +2346,7 @@ export class SkyMap {
       // very large objects (Barnard's Loop, big LBN/LDN clouds) would force a wide query
       // margin for everyone, so they bypass the index and are always considered.
       const near = dso._px! * dso._px! + dso._py! * dso._py! < 4; // exclude far hemisphere
-      const body = near ? ((dso.majAxis ?? 1) / 2 / 60) * DEG2RAD / (2 * dsoSizeCos2(dso)) : 0;
+      const body = near ? (((dso.majAxis ?? 1) / 2 / 60) * DEG2RAD) / (2 * dsoSizeCos2(dso)) : 0;
       if (body > DSO_GIANT_BODY_PU) {
         this.dsoGiants.push(dso);
       } else {
@@ -2084,53 +2367,72 @@ export class SkyMap {
     // This replaces a full scan of all ~12k DSOs every frame with a bounded query —
     // a big win when zoomed in (small viewport), a no-op cost when zoomed out.
     this.ensureDsoAllIndex();
-    const queryR = Math.hypot(view.width / 2, view.height / 2) / view.scale
-      + this.dsoMaxBodyPU + 20 / view.scale;
+    const queryR =
+      Math.hypot(view.width / 2, view.height / 2) / view.scale +
+      this.dsoMaxBodyPU +
+      20 / view.scale;
     const nearby = this.dsoAllIndex.collect(view.centerX, view.centerY, queryR);
 
     const candidates: (SelectableDSO & { dso: DSO })[] = [];
     // The spatial query covers normal-sized objects; the few giant DSOs (body larger
     // than the query margin) live outside the index and are always considered, so the
     // margin can stay tight without ever missing a large object near the edge.
-    for (const src of [nearby, this.dsoGiants]) for (const dso of src) {
-      const isHighlighted = this.highlightedDSO === dso.id;
+    for (const src of [nearby, this.dsoGiants])
+      for (const dso of src) {
+        const isHighlighted = this.highlightedDSO === dso.id;
 
-      if (!isHighlighted) {
-        if (!this.visibleDSOTypes.has(dso.type)) continue;
-        const cat = dso.catalog;
-        if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
-        // Dec pre-filter: skip objects clearly outside the border (stereo only — in
-        // fisheye the far hemisphere is clipped by project() returning off-canvas).
-        if (!this.fisheyeMode) {
-          if (this.hemisphere === 'north' && dso.dec < -(this.borderLatDeg + 2)) continue;
-          if (this.hemisphere === 'south' && dso.dec > +(this.borderLatDeg + 2)) continue;
-        }
-        // Container gate: hide an inner object until its container renders large
-        // enough on screen (so the container stays clean and clickable when zoomed out).
-        if (dso.containerId && dso.containerId !== this.highlightedDSO) {
-          const container = getDSOById(dso.containerId);
-          if (container) {
-            const cRx = Math.max(2, angularSizeToCanvasPx((container.majAxis ?? 1) / 2, container.dec, view.scale, dsoSizeCos2(container)));
-            if (cRx < DSO_CONTAINER_VISIBLE_RADIUS_PX) continue;
+        if (!isHighlighted) {
+          if (!this.visibleDSOTypes.has(dso.type)) continue;
+          const cat = dso.catalog;
+          if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
+          // Dec pre-filter: skip objects clearly outside the border (stereo only — in
+          // fisheye the far hemisphere is clipped by project() returning off-canvas).
+          if (!this.fisheyeMode) {
+            if (this.hemisphere === 'north' && dso.dec < -(this.borderLatDeg + 2)) continue;
+            if (this.hemisphere === 'south' && dso.dec > +(this.borderLatDeg + 2)) continue;
+          }
+          // Container gate: hide an inner object until its container renders large
+          // enough on screen (so the container stays clean and clickable when zoomed out).
+          if (dso.containerId && dso.containerId !== this.highlightedDSO) {
+            const container = getDSOById(dso.containerId);
+            if (container) {
+              const cRx = Math.max(
+                2,
+                angularSizeToCanvasPx(
+                  (container.majAxis ?? 1) / 2,
+                  container.dec,
+                  view.scale,
+                  dsoSizeCos2(container),
+                ),
+              );
+              if (cRx < DSO_CONTAINER_VISIBLE_RADIUS_PX) continue;
+            }
           }
         }
+
+        projectCached(dso);
+        const c = toCanvas(dso._px!, dso._py!, view);
+        const majorArcmin = dso.majAxis ?? 1;
+        const rx = Math.max(
+          2,
+          angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, dsoSizeCos2(dso)),
+        );
+        const margin = rx + 20;
+        if (
+          c.x < -margin ||
+          c.x > view.width + margin ||
+          c.y < -margin ||
+          c.y > view.height + margin
+        ) {
+          continue;
+        }
+
+        candidates.push({ id: dso.id, priority: dso.priority, isHighlighted, dso });
       }
 
-      projectCached(dso);
-      const c = toCanvas(dso._px!, dso._py!, view);
-      const majorArcmin = dso.majAxis ?? 1;
-      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, dsoSizeCos2(dso)));
-      const margin = rx + 20;
-      if (c.x < -margin || c.x > view.width + margin || c.y < -margin || c.y > view.height + margin) {
-        continue;
-      }
-
-      candidates.push({ id: dso.id, priority: dso.priority, isHighlighted, dso });
-    }
-
-    const selected = selectDSOsToRender(candidates, this.dsoPriorityThreshold()).map(s => s.dso);
+    const selected = selectDSOsToRender(candidates, this.dsoPriorityThreshold()).map((s) => s.dso);
     this.cachedSelectedDSOs = selected;
-    this.cachedSelectedDSOIds = new Set(selected.map(d => d.id));
+    this.cachedSelectedDSOIds = new Set(selected.map((d) => d.id));
     return selected;
   }
 
@@ -2189,5 +2491,4 @@ export class SkyMap {
 
     ctx.textBaseline = 'alphabetic';
   }
-
 }

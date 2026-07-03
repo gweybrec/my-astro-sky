@@ -57,15 +57,12 @@ const config: ForgeConfig = {
     // `/.vite` and strips everything else. That breaks native modules
     // (sharp, better-sqlite3) and the static frontend output in `dist/`.
     ignore: (file) => {
-      if (!file)
-        return false;
+      if (!file) return false;
       // Exclude swagger.json from production builds (dev-only file)
-      if (file === '/public/swagger.json')
-        return true;
+      if (file === '/public/swagger.json') return true;
       // Vite copies public/data/* into dist/data/ at build time — exclude the
       // originals so they are not bundled twice in the asar archive.
-      if (file === '/public/data' || file.startsWith('/public/data/'))
-        return true;
+      if (file === '/public/data' || file.startsWith('/public/data/')) return true;
       return !(
         file === '/package.json' ||
         file === '/node_modules' ||
@@ -88,14 +85,18 @@ const config: ForgeConfig = {
     force: true,
   },
   makers: [
-    new MakerSquirrel({
-      // Produces MyAstroSkySetup.exe in out/make/squirrel.windows/x64/.
-      // Run `npm run electron:make` on Windows to build.
-      name: 'MyAstroSky',
-      setupExe: 'MyAstroSkySetup.exe',
-      setupIcon: 'build/icons/icon.ico',
-      description: 'Overlay astrophotos onto an interactive sky map with automatic plate solving.',
-    }, ['win32']),
+    new MakerSquirrel(
+      {
+        // Produces MyAstroSkySetup.exe in out/make/squirrel.windows/x64/.
+        // Run `npm run electron:make` on Windows to build.
+        name: 'MyAstroSky',
+        setupExe: 'MyAstroSkySetup.exe',
+        setupIcon: 'build/icons/icon.ico',
+        description:
+          'Overlay astrophotos onto an interactive sky map with automatic plate solving.',
+      },
+      ['win32'],
+    ),
     new MakerZIP({}, ['win32']),
     new MakerZIP({}, ['linux']),
     // macOS: zip the .app (universal-safe, no extra tooling) and a drag-to-install DMG.
@@ -112,7 +113,8 @@ const config: ForgeConfig = {
         bin: 'MyAstroSky',
         icon: 'build/icons/icon.png',
         categories: ['Education', 'Science'],
-        description: 'Overlay astrophotos onto an interactive sky map with automatic plate solving.',
+        description:
+          'Overlay astrophotos onto an interactive sky map with automatic plate solving.',
       },
     }),
   ],

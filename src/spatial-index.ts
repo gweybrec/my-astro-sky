@@ -121,6 +121,6 @@ export class SpatialIndex<T> {
     }
 
     results.sort((a, b) => a.dist2 - b.dist2);
-    return results.map(r => r.item);
+    return results.map((r) => r.item);
   }
 }

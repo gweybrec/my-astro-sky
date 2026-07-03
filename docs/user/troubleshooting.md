@@ -69,6 +69,7 @@ This is expected. solve-field has no native Windows build. Use ASTAP (native) or
 ### Settings I changed were lost after reload
 
 Display settings and theme preference are stored in your browser's local storage. They will be lost if you:
+
 - Clear browser data / cache
 - Use a private/incognito window
 - Switch to a different browser or device
@@ -95,6 +96,7 @@ Each file is named `my-astro-sky-error-<timestamp>.json`. Attach the most recent
 ## Reporting a bug
 
 Open an issue on [GitHub](https://github.com/gweybrec/my-astro-sky/issues) and include:
+
 - What you were doing when the problem occurred
 - The browser and OS you are using
 - Any error messages from the browser console (F12 → Console)

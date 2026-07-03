@@ -44,12 +44,12 @@ Most processing software (PixInsight, Siril, Astro Pixel Processor) can embed ca
 
 ## Choosing a plate-solving method
 
-| Situation | Best method |
-|---|---|
-| FITS file from your processing software | **WCS metadata** — instant, no setup |
-| JPEG/PNG, first time using the app | **Online (astrometry.net)** — no install |
-| You've installed ASTAP | **ASTAP** — fastest, works offline |
-| Solving keeps failing | **Manual placement** — always works |
+| Situation                               | Best method                              |
+| --------------------------------------- | ---------------------------------------- |
+| FITS file from your processing software | **WCS metadata** — instant, no setup     |
+| JPEG/PNG, first time using the app      | **Online (astrometry.net)** — no install |
+| You've installed ASTAP                  | **ASTAP** — fastest, works offline       |
+| Solving keeps failing                   | **Manual placement** — always works      |
 
 > **Tip for ASTAP:** Type the object name (`M31`, `NGC 7000`, `Orion Nebula`) in the "Target object" field before solving. This dramatically improves reliability.
 
@@ -57,12 +57,12 @@ Most processing software (PixInsight, Siril, Astro Pixel Processor) can embed ca
 
 ## Navigating the sky map
 
-| Action | How |
-|---|---|
-| Pan | Click and drag |
-| Zoom | Mouse wheel |
-| Jump to an object | Type its name in the Search box |
-| Switch to Gallery | Click **Gallery** in the top nav bar |
+| Action                   | How                                  |
+| ------------------------ | ------------------------------------ |
+| Pan                      | Click and drag                       |
+| Zoom                     | Mouse wheel                          |
+| Jump to an object        | Type its name in the Search box      |
+| Switch to Gallery        | Click **Gallery** in the top nav bar |
 | Open the Targets planner | Click **Targets** in the top nav bar |
 
 ---

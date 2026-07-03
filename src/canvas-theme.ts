@@ -54,24 +54,49 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
   // Spiral / unclassified galaxy: filled ellipse, golden gradient.
   Gx: {
     shape: 'ellipse',
-    fill: { stops: [[0, 'rgba(220, 180, 100, 0.8)'], [0.5, 'rgba(180, 140, 70, 0.5)'], [1, 'rgba(150, 100, 40, 0)']] },
+    fill: {
+      stops: [
+        [0, 'rgba(220, 180, 100, 0.8)'],
+        [0.5, 'rgba(180, 140, 70, 0.5)'],
+        [1, 'rgba(150, 100, 40, 0)'],
+      ],
+    },
     stroke: { color: 'rgba(220, 180, 100, 0.6)', lineWidth: 0.8 },
   },
   GxS: {
     shape: 'ellipse',
-    fill: { stops: [[0, 'rgba(220, 180, 100, 0.8)'], [0.5, 'rgba(180, 140, 70, 0.5)'], [1, 'rgba(150, 100, 40, 0)']] },
+    fill: {
+      stops: [
+        [0, 'rgba(220, 180, 100, 0.8)'],
+        [0.5, 'rgba(180, 140, 70, 0.5)'],
+        [1, 'rgba(150, 100, 40, 0)'],
+      ],
+    },
     stroke: { color: 'rgba(220, 180, 100, 0.6)', lineWidth: 0.8 },
   },
   // Elliptical galaxy: rounder, bluer-white gradient (gradient spans the larger axis).
   GxE: {
     shape: 'ellipse',
-    fill: { stops: [[0, 'rgba(210, 210, 255, 0.8)'], [0.5, 'rgba(160, 160, 220, 0.4)'], [1, 'rgba(120, 120, 180, 0)']], radiusMode: 'max' },
+    fill: {
+      stops: [
+        [0, 'rgba(210, 210, 255, 0.8)'],
+        [0.5, 'rgba(160, 160, 220, 0.4)'],
+        [1, 'rgba(120, 120, 180, 0)'],
+      ],
+      radiusMode: 'max',
+    },
     stroke: { color: 'rgba(180, 180, 240, 0.5)', lineWidth: 0.8 },
   },
   // Irregular galaxy: greenish/teal, amorphous (circular, no rotation).
   GxI: {
     shape: 'circle',
-    fill: { stops: [[0, 'rgba(140, 230, 180, 0.7)'], [0.5, 'rgba(100, 180, 140, 0.35)'], [1, 'rgba(60, 140, 100, 0)']] },
+    fill: {
+      stops: [
+        [0, 'rgba(140, 230, 180, 0.7)'],
+        [0.5, 'rgba(100, 180, 140, 0.35)'],
+        [1, 'rgba(60, 140, 100, 0)'],
+      ],
+    },
     stroke: { color: 'rgba(100, 200, 150, 0.5)', lineWidth: 0.8 },
   },
   // Open cluster: dashed circle, warm neutral.
@@ -82,20 +107,38 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
   // Globular cluster: filled circle with gradient + cross.
   GC: {
     shape: 'circle',
-    fill: { stops: [[0, 'rgba(255, 220, 100, 0.7)'], [0.6, 'rgba(220, 160, 60, 0.4)'], [1, 'rgba(180, 120, 30, 0)']] },
+    fill: {
+      stops: [
+        [0, 'rgba(255, 220, 100, 0.7)'],
+        [0.6, 'rgba(220, 160, 60, 0.4)'],
+        [1, 'rgba(180, 120, 30, 0)'],
+      ],
+    },
     stroke: { color: 'rgba(255, 200, 80, 0.6)', lineWidth: 0.7 },
     cross: true,
   },
   // Emission nebula: reddish ellipse gradient.
   EN: {
     shape: 'ellipse',
-    fill: { stops: [[0, 'rgba(255, 80, 80, 0.4)'], [0.5, 'rgba(200, 50, 80, 0.2)'], [1, 'rgba(180, 30, 60, 0)']] },
+    fill: {
+      stops: [
+        [0, 'rgba(255, 80, 80, 0.4)'],
+        [0.5, 'rgba(200, 50, 80, 0.2)'],
+        [1, 'rgba(180, 30, 60, 0)'],
+      ],
+    },
     stroke: { color: 'rgba(220, 80, 80, 0.4)', lineWidth: 0.7 },
   },
   // Reflection nebula: cool neutral ellipse.
   RN: {
     shape: 'ellipse',
-    fill: { stops: [[0, 'rgba(100, 115, 140, 0.35)'], [0.5, 'rgba(80, 95, 120, 0.15)'], [1, 'rgba(60, 75, 100, 0)']] },
+    fill: {
+      stops: [
+        [0, 'rgba(100, 115, 140, 0.35)'],
+        [0.5, 'rgba(80, 95, 120, 0.15)'],
+        [1, 'rgba(60, 75, 100, 0)'],
+      ],
+    },
     stroke: { color: 'rgba(160, 175, 185, 0.45)', lineWidth: 0.7 },
   },
   // Planetary nebula: double circle, blue-cyan.
@@ -107,7 +150,14 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
   // Supernova remnant: green-teal ellipse, hollow centre (inner-radius gradient).
   SNR: {
     shape: 'ellipse',
-    fill: { stops: [[0, 'rgba(80, 200, 150, 0)'], [0.7, 'rgba(80, 200, 150, 0.2)'], [1, 'rgba(60, 180, 120, 0.5)']], innerRatio: 0.6 },
+    fill: {
+      stops: [
+        [0, 'rgba(80, 200, 150, 0)'],
+        [0.7, 'rgba(80, 200, 150, 0.2)'],
+        [1, 'rgba(60, 180, 120, 0.5)'],
+      ],
+      innerRatio: 0.6,
+    },
     stroke: { color: 'rgba(80, 200, 150, 0.5)', lineWidth: 0.8 },
   },
   // Dark nebula: simple dark outline ellipse.
@@ -139,7 +189,11 @@ export const DEFAULT_DSO_LABEL_COLOR = 'rgba(160, 160, 160, 0.7)';
 
 // ── Highlights & misc sky overlays ───────────────────────────────────────────
 /** Ring drawn around a searched/highlighted DSO or star (shared accent orange). */
-export const HIGHLIGHT_RING = { color: 'rgba(192, 120, 48, 0.85)', lineWidth: 2, padPx: 4 } as const;
+export const HIGHLIGHT_RING = {
+  color: 'rgba(192, 120, 48, 0.85)',
+  lineWidth: 2,
+  padPx: 4,
+} as const;
 
 /** Astrophoto outline + its edge label (same accent orange, softer stroke). */
 export const PHOTO_OUTLINE = {

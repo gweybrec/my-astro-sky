@@ -31,7 +31,11 @@ function buildDiagnostics(output: string | undefined, command?: string): string 
 }
 
 const loggedVersions = new Set<string>();
-async function logSolverVersion(bin: string, versionArgs: string[], useWSL: boolean): Promise<void> {
+async function logSolverVersion(
+  bin: string,
+  versionArgs: string[],
+  useWSL: boolean,
+): Promise<void> {
   if (loggedVersions.has(bin)) return;
   loggedVersions.add(bin);
   try {
@@ -91,66 +95,72 @@ export async function solveWithSolveField(
     // Write the original buffer to temp file WITHOUT rotation
     // solve-field will solve it in its original orientation
     await fsp.writeFile(imgPath, buffer);
-    
+
     console.log(`[solve-field] Image dimensions: ${width}×${height}`);
 
     // Build solve-field command
     const imgArg = wslPath(imgPath, useWSL);
     const args = [
       imgArg,
-      '--overwrite',           // Allow overwriting output files
-      '--no-plots',            // Skip visualization generation for speed
-      '--crpix-center',        // Use image center as reference pixel
-      '--no-verify',           // Skip verification plots
-      '--no-remove-lines',     // Don't remove temp files (we do it)
-      '--uniformize', '0',     // Disable Python uniformize step (requires pyfits/astropy)
-      '--dir', wslPath(tmpDir, useWSL), // Output directory
+      '--overwrite', // Allow overwriting output files
+      '--no-plots', // Skip visualization generation for speed
+      '--crpix-center', // Use image center as reference pixel
+      '--no-verify', // Skip verification plots
+      '--no-remove-lines', // Don't remove temp files (we do it)
+      '--uniformize',
+      '0', // Disable Python uniformize step (requires pyfits/astropy)
+      '--dir',
+      wslPath(tmpDir, useWSL), // Output directory
     ];
-    
+
     // Add scale hints if FOV is provided
     if (hints?.fov !== undefined && hints.fov > 0) {
       // Calculate arcsec/pixel scale from FOV
       const fovDegrees = hints.fov;
       const arcsecPerPixel = (fovDegrees * 3600) / width;
-      
+
       // Set scale bounds with 20% tolerance
       const scaleLow = arcsecPerPixel * 0.8;
       const scaleHigh = arcsecPerPixel * 1.2;
-      
+
       args.push('--scale-low', String(scaleLow));
       args.push('--scale-high', String(scaleHigh));
       args.push('--scale-units', 'arcsecperpix');
-      
-      console.log(`[solve-field] Using FOV hint: ${fovDegrees}° → scale ${scaleLow.toFixed(2)}-${scaleHigh.toFixed(2)} arcsec/px`);
+
+      console.log(
+        `[solve-field] Using FOV hint: ${fovDegrees}° → scale ${scaleLow.toFixed(2)}-${scaleHigh.toFixed(2)} arcsec/px`,
+      );
     } else {
       // Estimate scale from image dimensions (typical DSLR/CCD range)
       const estimatedScale = 2.0; // arcsec/pixel (typical for 50mm lens on APS-C)
-      args.push('--scale-low', String(estimatedScale * 0.2));  // 0.4 arcsec/px
+      args.push('--scale-low', String(estimatedScale * 0.2)); // 0.4 arcsec/px
       args.push('--scale-high', String(estimatedScale * 5.0)); // 10 arcsec/px
       args.push('--scale-units', 'arcsecperpix');
       console.log('[solve-field] No FOV hint, using wide scale range: 0.4-10 arcsec/px');
     }
-    
+
     // Add position hints if provided
     if (hints?.ra !== undefined && hints?.dec !== undefined) {
       args.push('--ra', String(hints.ra));
       args.push('--dec', String(hints.dec));
-      
+
       // Calculate search radius
       const radius = hints?.radius || (hints.fov ? hints.fov * 1.5 : 10);
       args.push('--radius', String(radius));
-      
-      console.log(`[solve-field] Using position hints: RA=${hints.ra}°, Dec=${hints.dec}°, radius=${radius}°`);
+
+      console.log(
+        `[solve-field] Using position hints: RA=${hints.ra}°, Dec=${hints.dec}°, radius=${radius}°`,
+      );
     } else {
       console.log('[solve-field] No position hints, searching entire sky');
     }
-    
+
     // Downsample large images for speed
     if (width > 2048 || height > 2048) {
       args.push('--downsample', '2');
       console.log('[solve-field] Image is large, downsampling by 2x for speed');
     }
-    
+
     // Add data directory if specified
     const dataDir = getAstrometryDataDir();
     if (dataDir) {
@@ -163,7 +173,8 @@ export async function solveWithSolveField(
     // Human-readable command for the error-details collapsible: substitute the
     // temp input path with the user's original filename so it's recognizable.
     const solveCommand = `${exec.cmd} ${exec.args.join(' ')}`
-      .split(imgArg).join(originalName || path.basename(imgArg));
+      .split(imgArg)
+      .join(originalName || path.basename(imgArg));
 
     let solveStdout = '';
     // Combined solver output retained at function scope so any failure return
@@ -181,7 +192,6 @@ export async function solveWithSolveField(
       solveOutput = [solveStdout, String(stderr ?? '')].filter(Boolean).join('\n').trim();
       console.log('[solve-field] stdout:', stdout);
       if (stderr) console.log('[solve-field] stderr:', stderr);
-      
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.code === 'ABORT_ERR' || signal?.aborted) {
         const abortErr = new Error('SOLVE_CANCELED');
@@ -203,12 +213,12 @@ export async function solveWithSolveField(
         solveOutput = fullOutput;
 
         console.log('[solve-field] Full output:', fullOutput);
-        
+
         // Parse output for diagnostics
         let noSolution = false;
         let fieldsExamined = 0;
         let matchesFound = 0;
-        
+
         for (const line of fullOutput.split('\n')) {
           if (line.includes('Field: examined')) {
             const match = line.match(/examined (\d+)/);
@@ -222,16 +232,24 @@ export async function solveWithSolveField(
             noSolution = true;
           }
         }
-        
+
         // Check for missing index files
         if (fullOutput.includes('no index files') || fullOutput.includes('Could not find index')) {
-          return { success: false, error: msg.solveField.noIndexFiles(lang), diagnostics: buildDiagnostics(fullOutput, solveCommand) };
+          return {
+            success: false,
+            error: msg.solveField.noIndexFiles(lang),
+            diagnostics: buildDiagnostics(fullOutput, solveCommand),
+          };
         }
 
         // Python uniformize dependency missing — this is handled by --uniformize 0 but
         // catch it explicitly in case another Python step fails in the future
         if (fullOutput.includes('NoPyfits') || fullOutput.includes('astrometry.util.uniformize')) {
-          return { success: false, error: msg.solveField.noPyfits(lang), diagnostics: buildDiagnostics(fullOutput, solveCommand) };
+          return {
+            success: false,
+            error: msg.solveField.noPyfits(lang),
+            diagnostics: buildDiagnostics(fullOutput, solveCommand),
+          };
         }
 
         // Collect raw output as diagnostics for the collapsible details section
@@ -241,7 +259,7 @@ export async function solveWithSolveField(
         if (noSolution) {
           let errorMsg = msg.solveField.noSolution(lang, fieldsExamined, matchesFound);
           errorMsg += msg.solveField.noSolutionCauses(lang);
-          
+
           if (!hints?.ra && !hints?.fov) {
             errorMsg += msg.solveField.noSolutionHintNone(lang);
           } else if (!hints?.fov) {
@@ -249,10 +267,10 @@ export async function solveWithSolveField(
           } else {
             errorMsg += msg.solveField.noSolutionHintFull(lang);
           }
-          
+
           return { success: false, error: errorMsg, diagnostics };
         }
-        
+
         return {
           success: false,
           error: msg.solveField.failed(lang, fieldsExamined),
@@ -262,7 +280,11 @@ export async function solveWithSolveField(
     }
 
     if (!existsSync(wcsPath)) {
-      return { success: false, error: msg.solveField.noWcsFile(lang), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+      return {
+        success: false,
+        error: msg.solveField.noWcsFile(lang),
+        diagnostics: buildDiagnostics(solveOutput, solveCommand),
+      };
     }
 
     const wcsText = await fsp.readFile(wcsPath, 'utf-8');
@@ -271,7 +293,11 @@ export async function solveWithSolveField(
     const required = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'];
     for (const key of required) {
       if (typeof parsed[key] !== 'number') {
-        return { success: false, error: msg.solveField.missingWcsKey(lang, key), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+        return {
+          success: false,
+          error: msg.solveField.missingWcsKey(lang, key),
+          diagnostics: buildDiagnostics(solveOutput, solveCommand),
+        };
       }
     }
 
@@ -288,13 +314,15 @@ export async function solveWithSolveField(
       NAXIS2: height,
     };
 
-    console.log(`[solve-field] Solution found: RA=${wcs.CRVAL1.toFixed(4)}°, Dec=${wcs.CRVAL2.toFixed(4)}°`);
+    console.log(
+      `[solve-field] Solution found: RA=${wcs.CRVAL1.toFixed(4)}°, Dec=${wcs.CRVAL2.toFixed(4)}°`,
+    );
 
     // Generate correspondences from catalog stars.
     // solve-field receives a JPEG/PNG (screen/display convention): pixel (1,1) = upper-left,
     // Y increases downward → fitsYConvention=false.
     const correspondences = wcsToCorrespondences(wcs, width, height, false);
-    
+
     if (correspondences.length < 3) {
       return {
         success: false,
@@ -313,17 +341,21 @@ export async function solveWithSolveField(
       correspondences,
       dsoIds,
     };
-
   } catch (err: any) {
-    if (err?.name === 'AbortError' || err?.code === 'ABORT_ERR' || err?.code === 'SOLVE_CANCELED' || signal?.aborted) {
+    if (
+      err?.name === 'AbortError' ||
+      err?.code === 'ABORT_ERR' ||
+      err?.code === 'SOLVE_CANCELED' ||
+      signal?.aborted
+    ) {
       const abortErr = new Error('SOLVE_CANCELED');
       (abortErr as any).code = 'SOLVE_CANCELED';
       throw abortErr;
     }
     console.error('[solve-field] Unexpected error:', err);
-    return { 
-      success: false, 
-      error: err.message || 'solve-field error'
+    return {
+      success: false,
+      error: err.message || 'solve-field error',
     };
   } finally {
     // Clean up temp directory
@@ -348,7 +380,10 @@ export function parseSolveFieldDSOs(
   const lines = stdout.split('\n');
   let inSection = false;
   for (const line of lines) {
-    if (line.trim() === 'Your field contains:') { inSection = true; continue; }
+    if (line.trim() === 'Your field contains:') {
+      inSection = true;
+      continue;
+    }
     if (!inSection) continue;
     const trimmed = line.trim();
     if (!trimmed) break; // blank line ends the section

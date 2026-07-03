@@ -9,11 +9,7 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 //   out   — Forge's packaged app + installers
 // The node_modules/.vite and .cache entries are dev-server / transpile caches
 // that vite build does not use, so clearing them has no effect on the package.
-const targets = [
-  '.vite',
-  'dist',
-  'out',
-];
+const targets = ['.vite', 'dist', 'out'];
 
 for (const target of targets) {
   const fullPath = path.join(rootDir, '..', target);

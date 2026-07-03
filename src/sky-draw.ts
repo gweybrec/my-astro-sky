@@ -19,7 +19,10 @@ const DEG2RAD = Math.PI / 180;
 // ── Background ───────────────────────────────────────────────────────────────
 
 export function drawBackground(
-  ctx: CanvasRenderingContext2D, view: ViewState, theme: SkyTheme, backgroundOpacity: number,
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  theme: SkyTheme,
+  backgroundOpacity: number,
 ): void {
   const cx = view.width / 2;
   const cy = view.height / 2;
@@ -55,14 +58,18 @@ export function drawBackground(
 
 // ── Coordinate grids ─────────────────────────────────────────────────────────
 
-export function drawFisheyeGrid(ctx: CanvasRenderingContext2D, view: ViewState, theme: SkyTheme): void {
+export function drawFisheyeGrid(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  theme: SkyTheme,
+): void {
   const origin = toCanvas(0, 0, view);
   const hem = getHemisphere();
 
   // Orthographic dome: equatorial RA/Dec grid, pole at centre, equator (r = 1)
   // at the outer edge. Declination circles every 10° from the pole to the equator.
   const decStart = hem === 'south' ? -80 : 80;
-  const decStep  = hem === 'south' ? 10 : -10;
+  const decStep = hem === 'south' ? 10 : -10;
   for (let dec = decStart; hem === 'south' ? dec <= 0 : dec >= 0; dec += decStep) {
     const r = Math.cos(dec * DEG2RAD) * view.scale;
     ctx.beginPath();
@@ -102,7 +109,10 @@ export function drawFisheyeGrid(ctx: CanvasRenderingContext2D, view: ViewState, 
 }
 
 export function drawGrid(
-  ctx: CanvasRenderingContext2D, view: ViewState, theme: SkyTheme, borderLatDeg: number,
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  theme: SkyTheme,
+  borderLatDeg: number,
 ): void {
   const origin = toCanvas(0, 0, view);
   const hem = getHemisphere();
@@ -110,11 +120,11 @@ export function drawGrid(
   // Declination circles every 10°
   // North: from +80° outward to -borderLatDeg (the clip edge); South: from -80° to +borderLatDeg
   const decStart = hem === 'south' ? -80 : 80;
-  const decEnd   = hem === 'south' ? borderLatDeg : -borderLatDeg;
-  const decStep  = hem === 'south' ? 10 : -10;
+  const decEnd = hem === 'south' ? borderLatDeg : -borderLatDeg;
+  const decStep = hem === 'south' ? 10 : -10;
 
   for (let dec = decStart; hem === 'south' ? dec <= decEnd : dec >= decEnd; dec += decStep) {
-    const r = Math.tan((90 + (hem === 'south' ? dec : -dec)) / 2 * DEG2RAD) * view.scale;
+    const r = Math.tan(((90 + (hem === 'south' ? dec : -dec)) / 2) * DEG2RAD) * view.scale;
     ctx.beginPath();
     ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
     ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
@@ -131,10 +141,14 @@ export function drawGrid(
 
   // RA lines every 2h (30°)
   // borderRProj = projection radius of the border dec circle
-  const borderRProj = Math.tan((90 + borderLatDeg) / 2 * DEG2RAD);
+  const borderRProj = Math.tan(((90 + borderLatDeg) / 2) * DEG2RAD);
   for (let raH = 0; raH < 24; raH += 2) {
     const raRad = raH * 15 * DEG2RAD;
-    const borderCanvas = toCanvas(borderRProj * Math.sin(raRad), borderRProj * Math.cos(raRad), view);
+    const borderCanvas = toCanvas(
+      borderRProj * Math.sin(raRad),
+      borderRProj * Math.cos(raRad),
+      view,
+    );
 
     ctx.beginPath();
     ctx.moveTo(origin.x, origin.y);
@@ -158,7 +172,10 @@ export function drawGrid(
 // ── Constellations ───────────────────────────────────────────────────────────
 
 export function drawConstellationLines(
-  ctx: CanvasRenderingContext2D, view: ViewState, style: ConstellationStyle, color: string,
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  style: ConstellationStyle,
+  color: string,
 ): void {
   const lines = getConstellationLines(style);
   ctx.strokeStyle = color;
@@ -174,7 +191,10 @@ export function drawConstellationLines(
       let penDown = false;
       for (let i = 0; i < segment.length; i++) {
         const p = project(segment[i][0], segment[i][1]);
-        if (p.x >= 1e5) { penDown = false; continue; }
+        if (p.x >= 1e5) {
+          penDown = false;
+          continue;
+        }
         const c = toCanvas(p.x, p.y, view);
         if (penDown) {
           ctx.lineTo(c.x, c.y);
@@ -189,7 +209,11 @@ export function drawConstellationLines(
   }
 }
 
-export function drawConstellationNames(ctx: CanvasRenderingContext2D, view: ViewState, theme: SkyTheme): void {
+export function drawConstellationNames(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  theme: SkyTheme,
+): void {
   const infos = getConstellationInfos();
 
   ctx.font = FONTS.constellationName;
@@ -233,7 +257,12 @@ function getTrashPath(): Path2D {
 export const TILE_TRASH_R = TILE_BUTTON.radius;
 
 /** Draw the pushpin glyph centred at `at`, filled when pinned. Source path is a 24×24 box. */
-export function drawPinGlyph(ctx: CanvasRenderingContext2D, at: Point, filled: boolean, color: string): void {
+export function drawPinGlyph(
+  ctx: CanvasRenderingContext2D,
+  at: Point,
+  filled: boolean,
+  color: string,
+): void {
   const size = 16;
   ctx.save();
   ctx.translate(at.x - size / 2, at.y - size / 2);
@@ -279,8 +308,10 @@ export function drawTileAdd(ctx: CanvasRenderingContext2D, at: Point, color: str
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(at.x - 5, at.y); ctx.lineTo(at.x + 5, at.y);
-  ctx.moveTo(at.x, at.y - 5); ctx.lineTo(at.x, at.y + 5);
+  ctx.moveTo(at.x - 5, at.y);
+  ctx.lineTo(at.x + 5, at.y);
+  ctx.moveTo(at.x, at.y - 5);
+  ctx.lineTo(at.x, at.y + 5);
   ctx.stroke();
   ctx.restore();
 }

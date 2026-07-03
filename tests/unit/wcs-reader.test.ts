@@ -2,7 +2,12 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { parseFITSHeader, extractFITSHeaderFromFITS, wcsToCorrespondences, normalizeDateObs } from '../../server/wcs-reader';
+import {
+  parseFITSHeader,
+  extractFITSHeaderFromFITS,
+  wcsToCorrespondences,
+  normalizeDateObs,
+} from '../../server/wcs-reader';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(__dirname, '../fixtures');
@@ -96,7 +101,9 @@ describe('parseFITSHeader — 80-char fixed-width format (FITS binary)', () => {
 
 describe('parseFITSHeader — observation metadata keywords', () => {
   it('parses DATE-OBS string with hyphenated keyword', () => {
-    const h = parseFITSHeader("DATE-OBS= '2026-03-17T20:38:44' / YYYY-MM-DDThh:mm:ss observation start, UT");
+    const h = parseFITSHeader(
+      "DATE-OBS= '2026-03-17T20:38:44' / YYYY-MM-DDThh:mm:ss observation start, UT",
+    );
     expect(h['DATE-OBS']).toBe('2026-03-17T20:38:44');
   });
 
@@ -174,8 +181,8 @@ describe('wcsToCorrespondences', () => {
     CRVAL1: 330.212173031,
     CRVAL2: 73.0817794918,
     CD1_1: -0.000661648450496,
-    CD1_2: -4.24673765053e-05,
-    CD2_1: -4.23038812204e-05,
+    CD1_2: -4.24673765053e-5,
+    CD2_1: -4.23038812204e-5,
     CD2_2: 0.000661238355384,
     NAXIS1: 5760,
     NAXIS2: 3239,
@@ -199,7 +206,7 @@ describe('wcsToCorrespondences', () => {
   it('reference star near CRVAL maps to pixel near CRPIX (fitsYConvention=false)', () => {
     // Star 99001 is at exactly CRVAL coordinates in our test catalog
     const corrs = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
-    const refStar = corrs.find(c => c.starHip === 99001);
+    const refStar = corrs.find((c) => c.starHip === 99001);
     expect(refStar).toBeDefined();
     // Display pixel = CRPIX - 1 (convert FITS 1-indexed to 0-indexed)
     expect(refStar!.photoX).toBeCloseTo(ldn1235Wcs.CRPIX1 - 1, 0);
@@ -209,13 +216,13 @@ describe('wcsToCorrespondences', () => {
   describe('fitsYConvention regression — false vs true produce different Y coordinates', () => {
     it('fitsYConvention=false and fitsYConvention=true produce DIFFERENT pixel positions', () => {
       const corrsFalse = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
-      const corrsTrue  = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, true);
+      const corrsTrue = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, true);
 
       // Find corresponding entries by starHip
       const hip = corrsFalse[0]?.starHip;
       if (!hip) return;
-      const cf = corrsFalse.find(c => c.starHip === hip);
-      const ct = corrsTrue.find(c => c.starHip === hip);
+      const cf = corrsFalse.find((c) => c.starHip === hip);
+      const ct = corrsTrue.find((c) => c.starHip === hip);
       if (!cf || !ct) return;
 
       // X should be the same, Y should differ (Y-axis flip)
@@ -232,14 +239,18 @@ describe('wcsToCorrespondences', () => {
       // The two sets of correspondences must not be identical
       let anyDiff = false;
       for (let i = 0; i < Math.min(corrsF.length, corrsT.length); i++) {
-        if (Math.abs(corrsF[i].photoY - corrsT[i].photoY) > 1) { anyDiff = true; break; }
+        if (Math.abs(corrsF[i].photoY - corrsT[i].photoY) > 1) {
+          anyDiff = true;
+          break;
+        }
       }
       expect(anyDiff).toBe(true);
     });
   });
 
   it('photoX/photoY are within image bounds', () => {
-    const w = 5760, h = 3239;
+    const w = 5760,
+      h = 3239;
     const corrs = wcsToCorrespondences(ldn1235Wcs, w, h, false);
     for (const c of corrs) {
       expect(c.photoX).toBeGreaterThanOrEqual(0);

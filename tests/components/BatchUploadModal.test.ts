@@ -10,7 +10,10 @@ const state = vi.hoisted(() => ({
   availability: { solveField: true, astap: true, astrometry: true },
   jobSeq: 0,
   // Per-test poll behaviour, keyed by jobId. Default: still running.
-  pollResponder: (_jobId: string) => ({ status: 'running' as string, result: undefined as unknown }),
+  pollResponder: (_jobId: string) => ({
+    status: 'running' as string,
+    result: undefined as unknown,
+  }),
 }));
 
 // ─── Module mocks ───────────────────────────────────────────────────────────────
@@ -20,7 +23,9 @@ vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn()
 vi.mock('../../src/batch-place', () => ({ placeBatchItem: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../src/autocomplete-utils', () => ({ filterLabelCandidates: () => [] }));
 vi.mock('../../src/dso-catalog', () => ({ findDSOIdsFromCorrespondences: () => [] }));
-vi.mock('../../src/file-utils', () => ({ stripExtension: (s: string) => s.replace(/\.[^.]+$/, '') }));
+vi.mock('../../src/file-utils', () => ({
+  stripExtension: (s: string) => s.replace(/\.[^.]+$/, ''),
+}));
 vi.mock('../../src/icons/add-photo.svg?raw', () => ({ default: '<svg/>' }));
 vi.mock('../../src/batch-utils', () => ({
   sanitizeIntegrationRows: (rows: unknown) => rows,
@@ -28,7 +33,9 @@ vi.mock('../../src/batch-utils', () => ({
   normalizeIntegrationFilterKey: (s: string) => s.toLowerCase(),
 }));
 
-vi.mock('../../src/stores/canvas', () => ({ useCanvasStore: () => ({ overlay: null, gallery: null }) }));
+vi.mock('../../src/stores/canvas', () => ({
+  useCanvasStore: () => ({ overlay: null, gallery: null }),
+}));
 vi.mock('../../src/stores/settings', () => ({
   useSettingsStore: () => ({
     serverSettings: { MAX_PARALLEL_SOLVES: state.maxParallel },
@@ -40,7 +47,9 @@ vi.mock('../../src/stores/ui', () => ({
 }));
 
 const submitLocalSolveJob = vi.fn(async () => ({ jobId: `job-${state.jobSeq++}` }));
-const pollLocalSolveJob = vi.fn(async (_endpoint: string, jobId: string) => state.pollResponder(jobId));
+const pollLocalSolveJob = vi.fn(async (_endpoint: string, jobId: string) =>
+  state.pollResponder(jobId),
+);
 const cancelLocalSolveJob = vi.fn(async () => {});
 vi.mock('../../src/api', () => ({
   getSolverAvailability: () => state.availability,
@@ -66,7 +75,7 @@ function mountModal() {
 
 // The card components are stubbed, so read status straight off the reactive items.
 function statuses(wrapper: ReturnType<typeof mountModal>): string[] {
-  return (wrapper.vm as unknown as { items: { status: string }[] }).items.map(i => i.status);
+  return (wrapper.vm as unknown as { items: { status: string }[] }).items.map((i) => i.status);
 }
 
 beforeEach(() => {
@@ -117,7 +126,10 @@ describe('BatchUploadModal — cancel all solving', () => {
     // First job solves; the others keep running.
     state.pollResponder = (jobId: string) =>
       jobId === 'job-0'
-        ? { status: 'success', result: { success: true, correspondences: [{ pointIndex: 0 }], dsoIds: ['M1'] } }
+        ? {
+            status: 'success',
+            result: { success: true, correspondences: [{ pointIndex: 0 }], dsoIds: ['M1'] },
+          }
         : { status: 'running', result: undefined };
 
     const wrapper = mountModal();

@@ -35,7 +35,7 @@ describe('plans store · plansUsingSetup', () => {
     store.plans = [makePlan('a', 's1'), makePlan('b', 's2'), makePlan('c', 's1')];
 
     const using = store.plansUsingSetup('s1');
-    expect(using.map(p => p.id)).toEqual(['a', 'c']);
+    expect(using.map((p) => p.id)).toEqual(['a', 'c']);
   });
 
   it('returns an empty array when no plan uses the setup', () => {

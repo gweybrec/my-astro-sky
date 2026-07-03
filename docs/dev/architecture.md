@@ -128,29 +128,29 @@ The app ships in two forms: a **web app** (`npm run dev` / Docker) and an **Elec
 
 ### Detection mechanism
 
-| Context | How detected |
-|---|---|
+| Context                        | How detected                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | Electron (renderer / frontend) | `(window as any).electronAPI` is defined — set by `contextBridge.exposeInMainWorld` in `electron/preload.ts` |
-| Electron (Express / backend) | `!!process.versions.electron` is `true` — set automatically by the Electron runtime |
-| Web / dev mode | Both are absent / falsy |
+| Electron (Express / backend)   | `!!process.versions.electron` is `true` — set automatically by the Electron runtime                          |
+| Web / dev mode                 | Both are absent / falsy                                                                                      |
 
 ### Features visible only in Electron
 
-| Feature | Where | Details |
-|---|---|---|
-| **IP-based geolocation hint** | Targets tab, location row | A `<span class="targets-loc-hint">` reading `"IP-based (ip-api.com)"` is appended next to the location button only when `window.electronAPI` is set. In web mode the button shows alone. |
-| **Privacy modal geolocation block** | Settings → Privacy | A second warning block ("Exception : géolocalisation par adresse IP") is injected only in Electron, explaining that ip-api.com is called for location. Absent in web mode where `navigator.geolocation` is used instead. |
+| Feature                             | Where                     | Details                                                                                                                                                                                                                  |
+| ----------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **IP-based geolocation hint**       | Targets tab, location row | A `<span class="targets-loc-hint">` reading `"IP-based (ip-api.com)"` is appended next to the location button only when `window.electronAPI` is set. In web mode the button shows alone.                                 |
+| **Privacy modal geolocation block** | Settings → Privacy        | A second warning block ("Exception : géolocalisation par adresse IP") is injected only in Electron, explaining that ip-api.com is called for location. Absent in web mode where `navigator.geolocation` is used instead. |
 
 ### Behaviour differences between Electron and web
 
-| Area | Electron | Web (`npm run dev` / Docker) |
-|---|---|---|
-| **Geolocation** | `window.electronAPI.getLocation()` → IPC → main process → `fetch('http://ip-api.com/json/')`. `navigator.geolocation` is not used (no Google Maps key / no real browser engine in Electron). | `navigator.geolocation.getCurrentPosition()` — uses the browser's native geolocation. |
-| **Rate limiting** | Disabled (`isElectron` guard in `server/index.ts`). Single-user local app; limits would only hurt the user. | Active. Global limiter + stricter per-upload limiter. |
+| Area                        | Electron                                                                                                                                                                                      | Web (`npm run dev` / Docker)                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Geolocation**             | `window.electronAPI.getLocation()` → IPC → main process → `fetch('http://ip-api.com/json/')`. `navigator.geolocation` is not used (no Google Maps key / no real browser engine in Electron).  | `navigator.geolocation.getCurrentPosition()` — uses the browser's native geolocation.                                       |
+| **Rate limiting**           | Disabled (`isElectron` guard in `server/index.ts`). Single-user local app; limits would only hurt the user.                                                                                   | Active. Global limiter + stricter per-upload limiter.                                                                       |
 | **Settings encryption key** | Auto-provisioned via `electron.safeStorage`: generated once, encrypted with the OS keychain, stored in `userData/settings-encryption-key.bin`. Available on every launch without user action. | Must be injected as `SETTINGS_ENCRYPTION_KEY` env var (Docker secret / `.env`). If absent, settings are stored unencrypted. |
-| **Data directories** | `UPLOADS_DIR` and `DB_PATH` point to `app.getPath('userData')` (OS user-data folder). Data survives app updates because it lives outside the `.asar` archive. | Defaults: `./uploads/` and `./data.db` relative to the process working directory (or overridden via env vars). |
-| **Express port** | `findFreePort(3001)` scans for the first free TCP port ≥ 3001. The `BrowserWindow` loads `http://localhost:{port}`. Port 3001 is not guaranteed. | Fixed at `3001` (or `PORT` env var). |
-| **Application menu** | Removed with `Menu.setApplicationMenu(null)`. | N/A (browser chrome). |
+| **Data directories**        | `UPLOADS_DIR` and `DB_PATH` point to `app.getPath('userData')` (OS user-data folder). Data survives app updates because it lives outside the `.asar` archive.                                 | Defaults: `./uploads/` and `./data.db` relative to the process working directory (or overridden via env vars).              |
+| **Express port**            | `findFreePort(3001)` scans for the first free TCP port ≥ 3001. The `BrowserWindow` loads `http://localhost:{port}`. Port 3001 is not guaranteed.                                              | Fixed at `3001` (or `PORT` env var).                                                                                        |
+| **Application menu**        | Removed with `Menu.setApplicationMenu(null)`.                                                                                                                                                 | N/A (browser chrome).                                                                                                       |
 
 ### Electron startup sequence
 
@@ -167,10 +167,12 @@ The Electron entry point (`electron/main.ts`) runs as follows:
 ### Dependency note: archiver
 
 `archiver` is pinned to `^7.0.1`. archiver v8.0.0 (May 2026) is a breaking major release:
+
 - Package became **ESM-only** (`"type": "module"`) — cannot be loaded via `createRequire`
 - Callable API `archiver('zip', options)` replaced by named classes: `new ZipArchive(options)`
 
 To migrate to v8 when `@types/archiver` publishes v8 types:
+
 1. Remove the `createRequire` block and add `import { ZipArchive } from 'archiver'`
 2. Replace `archiver('zip', { zlib: { level: 1 } })` with `new ZipArchive({ zlib: { level: 1 } })`
 3. Bump `"archiver"` to `"^8.0.0"` and drop `@types/archiver` (types will be bundled)
@@ -209,7 +211,7 @@ The selection is:
 2. **Container gate** — an object with a `containerId` (see [dso-catalog.md](/dev/dso-catalog.md#containment-containerid)) is skipped while its container renders smaller than `DSO_CONTAINER_VISIBLE_RADIUS_PX` (18 px radius). This hides inner objects (e.g. those inside the Orion complex) until the container is large enough on screen to be clean and clickable. Bypassed when the object — or its container — is the highlighted/searched DSO.
 3. **Budget** — the remaining candidates are sorted by the precomputed `priority` (rating-weighted blue-noise spread, baked into the catalog at build time — see [dso-catalog.md → Render priority](/dev/dso-catalog.md#render-priority-spatial-spread)), highlighted pinned first, then sliced to `maxDSOCount`. This is `selectDSOsToRender()` in `src/dso-selection.ts` (pure, unit-tested). No per-frame spatial computation: the spread is precomputed, so this is just a sort + slice.
 
-**Why the container gate can't be precomputed:** unlike `priority`/`containerId`, it depends on the container's *current on-screen pixel size* (zoom), so it is evaluated each frame.
+**Why the container gate can't be precomputed:** unlike `priority`/`containerId`, it depends on the container's _current on-screen pixel size_ (zoom), so it is evaluated each frame.
 
 **Caching:** the result is cached on the instance and invalidated at the top of `render()` (every state change calls `render()`), so the three consumers within a frame share one computation. Hover, which fires between frames against an unchanged view, reuses the cache (rebuilding lazily if absent). This is a net reduction vs. the old code, where `isDSORendered` re-scanned all DSOs on every hover.
 

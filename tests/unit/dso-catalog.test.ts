@@ -32,59 +32,257 @@ import {
 //         catalogs, emissionLines, constellation, rating, difficulty
 const FIXTURE = {
   fields: [
-    'id', 'ra', 'dec', 'type', 'majAxis', 'minAxis', 'pa', 'mag',
-    'nameFr', 'nameEn', 'nameEs', 'nameDe',
-    'catalogs', 'emissionLines', 'constellation', 'rating', 'difficulty',
-    'containerId', 'priority',
+    'id',
+    'ra',
+    'dec',
+    'type',
+    'majAxis',
+    'minAxis',
+    'pa',
+    'mag',
+    'nameFr',
+    'nameEn',
+    'nameEs',
+    'nameDe',
+    'catalogs',
+    'emissionLines',
+    'constellation',
+    'rating',
+    'difficulty',
+    'containerId',
+    'priority',
   ],
   data: [
     // M1 / NGC1952 — SNR in Taurus
-    ['M1', 83.63, 22.01, 'SNR', 7, 5, 0, 8.4,
-      'Nébuleuse du Crabe', 'Crab Nebula', null, null,
-      ['M1', 'NGC1952'], 'Hα', 'Tau', 4, 3, null, 1],
+    [
+      'M1',
+      83.63,
+      22.01,
+      'SNR',
+      7,
+      5,
+      0,
+      8.4,
+      'Nébuleuse du Crabe',
+      'Crab Nebula',
+      null,
+      null,
+      ['M1', 'NGC1952'],
+      'Hα',
+      'Tau',
+      4,
+      3,
+      null,
+      1,
+    ],
     // M42 / NGC1976 — EN in Orion  (close to M1 for angular-distance tests). A container.
-    ['M42', 83.82, -5.39, 'EN', 65, 60, 0, 4.0,
-      "Nébuleuse d'Orion", 'Orion Nebula', null, null,
-      ['M42', 'NGC1976'], 'Hα', 'Ori', 5, 1, null, 0],
+    [
+      'M42',
+      83.82,
+      -5.39,
+      'EN',
+      65,
+      60,
+      0,
+      4.0,
+      "Nébuleuse d'Orion",
+      'Orion Nebula',
+      null,
+      null,
+      ['M42', 'NGC1976'],
+      'Hα',
+      'Ori',
+      5,
+      1,
+      null,
+      0,
+    ],
     // IC434 — EN in Orion (Horsehead region, near M42). Inner object of M42.
-    ['IC434', 84.05, -2.45, 'EN', 60, 10, 0, null,
-      'Nébuleuse de la Tête de Cheval', 'Horsehead Nebula', null, null,
-      ['IC434'], 'Hα', 'Ori', 5, 4, 'M42', 5],
+    [
+      'IC434',
+      84.05,
+      -2.45,
+      'EN',
+      60,
+      10,
+      0,
+      null,
+      'Nébuleuse de la Tête de Cheval',
+      'Horsehead Nebula',
+      null,
+      null,
+      ['IC434'],
+      'Hα',
+      'Ori',
+      5,
+      4,
+      'M42',
+      5,
+    ],
     // SH2-106 — remote field
-    ['SH2-106', 308.76, 37.38, 'EN', 3, 2, 0, null,
-      null, null, null, null,
-      ['SH2-106'], 'Hα', 'Cyg', 3, 4, null, 7],
+    [
+      'SH2-106',
+      308.76,
+      37.38,
+      'EN',
+      3,
+      2,
+      0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      ['SH2-106'],
+      'Hα',
+      'Cyg',
+      3,
+      4,
+      null,
+      7,
+    ],
     // LBN object
-    ['LBN254', 83.00, -6.00, 'EN', 120, 90, 0, null,
-      null, null, null, null,
-      ['LBN254'], null, 'Ori', 2, 3, null, 9],
+    [
+      'LBN254',
+      83.0,
+      -6.0,
+      'EN',
+      120,
+      90,
+      0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      ['LBN254'],
+      null,
+      'Ori',
+      2,
+      3,
+      null,
+      9,
+    ],
     // LDN object
-    ['LDN1622', 84.75, 1.75, 'DN', 40, 30, 0, null,
-      null, null, null, null,
-      ['LDN1622'], null, 'Ori', 2, 4, null, 8],
+    [
+      'LDN1622',
+      84.75,
+      1.75,
+      'DN',
+      40,
+      30,
+      0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      ['LDN1622'],
+      null,
+      'Ori',
+      2,
+      4,
+      null,
+      8,
+    ],
     // vdB object
-    ['vdB141', 315.22, 63.02, 'RN', 5, 5, 0, null,
-      null, null, null, null,
-      ['vdB141'], null, 'Cep', 3, 5, null, 6],
+    [
+      'vdB141',
+      315.22,
+      63.02,
+      'RN',
+      5,
+      5,
+      0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      ['vdB141'],
+      null,
+      'Cep',
+      3,
+      5,
+      null,
+      6,
+    ],
     // Abell
-    ['Abell21', 112.54, 20.56, 'PN', 10, 8, 0, 9.8,
-      null, 'Medusa Nebula', null, null,
-      ['Abell21', 'PK205+14.1'], null, 'Gem', 3, 4, null, 3],
+    [
+      'Abell21',
+      112.54,
+      20.56,
+      'PN',
+      10,
+      8,
+      0,
+      9.8,
+      null,
+      'Medusa Nebula',
+      null,
+      null,
+      ['Abell21', 'PK205+14.1'],
+      null,
+      'Gem',
+      3,
+      4,
+      null,
+      3,
+    ],
     // LPN
-    ['LPN-1', 10.00, 10.00, 'PN', 2, 2, 0, 12.0,
-      null, null, null, null,
-      ['LPN-1'], null, 'And', 1, 5, null, 4],
+    [
+      'LPN-1',
+      10.0,
+      10.0,
+      'PN',
+      2,
+      2,
+      0,
+      12.0,
+      null,
+      null,
+      null,
+      null,
+      ['LPN-1'],
+      null,
+      'And',
+      1,
+      5,
+      null,
+      4,
+    ],
     // Origin DSO — at ra=0, dec=0 for findDSOsInImage geometry tests
-    ['TESTOBJ', 0.0, 0.0, 'PN', 1, 1, 0, 10.0,
-      null, 'Test Object', null, null,
-      ['TESTOBJ'], null, 'And', 1, 5, null, 2],
+    [
+      'TESTOBJ',
+      0.0,
+      0.0,
+      'PN',
+      1,
+      1,
+      0,
+      10.0,
+      null,
+      'Test Object',
+      null,
+      null,
+      ['TESTOBJ'],
+      null,
+      'And',
+      1,
+      5,
+      null,
+      2,
+    ],
   ],
 };
 
 beforeAll(async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    json: async () => FIXTURE,
-  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      json: async () => FIXTURE,
+    }),
+  );
   await loadDSOCatalog();
 });
 
@@ -121,8 +319,8 @@ describe('getDSOById()', () => {
   });
 
   it('finds M42 via its NGC alias', () => {
-    const byM42   = getDSOById('M42');
-    const byNGC   = getDSOById('NGC1976');
+    const byM42 = getDSOById('M42');
+    const byNGC = getDSOById('NGC1976');
     expect(byM42).toBeDefined();
     expect(byNGC).toBeDefined();
     expect(byNGC).toStrictEqual(byM42);
@@ -162,7 +360,7 @@ describe('getDSOsNear()', () => {
     // Query near M42 (83.82, -5.39) with 10° radius
     // Should include M42, IC434, LBN254 but NOT M1 (dec=22) or SH2-106 (far)
     const results = getDSOsNear(83.82, -5.39, 10);
-    const ids = results.map(d => d.id);
+    const ids = results.map((d) => d.id);
     expect(ids).toContain('M42');
     expect(ids).toContain('IC434');
     expect(ids).not.toContain('SH2-106');
@@ -172,7 +370,7 @@ describe('getDSOsNear()', () => {
   it('excludes DSOs outside radius', () => {
     // SH2-106 is at RA=308, Dec=37 — far from M42
     const results = getDSOsNear(83.82, -5.39, 5);
-    expect(results.some(d => d.id === 'SH2-106')).toBe(false);
+    expect(results.some((d) => d.id === 'SH2-106')).toBe(false);
   });
 
   it('returns empty array when nothing is nearby', () => {
@@ -190,16 +388,16 @@ describe('getDSOsNear()', () => {
 
 describe('getDSOCatalog()', () => {
   it.each([
-    ['M1',      'M'],
-    ['NGC224',  'NGC'],
-    ['IC434',   'IC'],
+    ['M1', 'M'],
+    ['NGC224', 'NGC'],
+    ['IC434', 'IC'],
     ['SH2-106', 'SH2'],
-    ['LBN254',  'LBN'],
+    ['LBN254', 'LBN'],
     ['LDN1622', 'LDN'],
-    ['vdB141',  'vdB'],
-    ['Abell21',    'Abell'],
-    ['LPN-1',      'LPN'],
-    ['Barnard33',  'Barnard'],
+    ['vdB141', 'vdB'],
+    ['Abell21', 'Abell'],
+    ['LPN-1', 'LPN'],
+    ['Barnard33', 'Barnard'],
     ['Barnard67a', 'Barnard'],
   ])('getDSOCatalog(%s) === %s', (id, expected) => {
     expect(getDSOCatalog(id)).toBe(expected);
@@ -224,13 +422,13 @@ describe('findDSOsInImage()', () => {
 
   it('returns DSOs whose projected center falls within the image', () => {
     const inside = findDSOsInImage(IDENTITY, 10, 10);
-    expect(inside.some(d => d.id === 'TESTOBJ')).toBe(true);
+    expect(inside.some((d) => d.id === 'TESTOBJ')).toBe(true);
   });
 
   it('excludes DSOs outside the image bounds', () => {
     const inside = findDSOsInImage(IDENTITY, 10, 10);
     // M42 projects to (83.82/360, -5.39/90) ≈ (0.233, -0.060) — py < 0 → outside
-    expect(inside.some(d => d.id === 'M42')).toBe(false);
+    expect(inside.some((d) => d.id === 'M42')).toBe(false);
   });
 
   it('returns empty array when affine determinant is near zero (singular matrix)', () => {
@@ -263,15 +461,25 @@ describe('findDSOIdsFromCorrespondences()', () => {
   // photo→projection transform — so this mirrors the findDSOsInImage identity case:
   // TESTOBJ (ra=0, dec=0) → pixel (0, 0), inside a 10×10 image.
   const corr = (
-    pointIndex: number, photoX: number, photoY: number, starRa: number, starDec: number,
+    pointIndex: number,
+    photoX: number,
+    photoY: number,
+    starRa: number,
+    starDec: number,
   ): PhotoCorrespondence => ({
-    pointIndex, photoX, photoY, starHip: 0, starName: `s${pointIndex}`, starRa, starDec,
+    pointIndex,
+    photoX,
+    photoY,
+    starHip: 0,
+    starName: `s${pointIndex}`,
+    starRa,
+    starDec,
   });
 
   const identityCorrespondences: PhotoCorrespondence[] = [
-    corr(0, 0, 0, 0, 0),       // → projection (0, 0)
-    corr(1, 0.5, 0, 180, 0),   // → projection (0.5, 0)
-    corr(2, 0, 1, 0, 90),      // → projection (0, 1)
+    corr(0, 0, 0, 0, 0), // → projection (0, 0)
+    corr(1, 0.5, 0, 180, 0), // → projection (0.5, 0)
+    corr(2, 0, 1, 0, 90), // → projection (0, 1)
   ];
 
   it('derives DSO ids inside the solved field', () => {
@@ -410,9 +618,9 @@ describe('DSO override system', () => {
       const origRa = dso.ra;
       const origType = dso.type;
       applyAndStoreSingleOverride('M1', { rating: 2 });
-      expect(dso.ra).toBe(origRa);     // unaffected
+      expect(dso.ra).toBe(origRa); // unaffected
       expect(dso.type).toBe(origType); // unaffected
-      expect(dso.rating).toBe(2);      // changed
+      expect(dso.rating).toBe(2); // changed
     });
 
     it('second call replaces the first override entirely', () => {

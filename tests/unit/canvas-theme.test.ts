@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DSO_MARKER_STYLES, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR, FONTS } from '../../src/canvas-theme';
+import {
+  DSO_MARKER_STYLES,
+  DSO_LABEL_COLORS,
+  DEFAULT_DSO_LABEL_COLOR,
+  FONTS,
+} from '../../src/canvas-theme';
 import { DSO_TYPES_ALL } from '../../src/display-settings';
 import type { DSOType } from '../../src/types';
 

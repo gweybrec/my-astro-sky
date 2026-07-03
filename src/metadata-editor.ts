@@ -14,9 +14,11 @@ function normalizeFilterKey(value: string): string {
 }
 
 function sanitizeIntegrations(rows: PhotoIntegration[]): PhotoIntegration[] {
-  return rows.map(row => ({
-    frames: Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
-    seconds: Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
+  return rows.map((row) => ({
+    frames:
+      Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
+    seconds:
+      Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
     filter: row.filter.trim(),
   }));
 }
@@ -43,7 +45,7 @@ export function buildMetadataEditorPanel(
     displayName: photo.originalName,
     dsoIds: [...photo.dsoIds],
     labels: [...photo.labels],
-    pointsOfInterest: (photo.pointsOfInterest ?? []).map(p => ({ ...p })),
+    pointsOfInterest: (photo.pointsOfInterest ?? []).map((p) => ({ ...p })),
     integrations: sanitizeIntegrations(photo.integrations ?? []),
     observationDate: photo.observationDate ?? '',
     notes: photo.notes ?? '',
@@ -53,8 +55,8 @@ export function buildMetadataEditorPanel(
     displayName: original.displayName,
     dsoIds: [...original.dsoIds],
     labels: [...original.labels],
-    pointsOfInterest: original.pointsOfInterest.map(p => ({ ...p })),
-    integrations: original.integrations.map(r => ({ ...r })),
+    pointsOfInterest: original.pointsOfInterest.map((p) => ({ ...p })),
+    integrations: original.integrations.map((r) => ({ ...r })),
     observationDate: original.observationDate,
     notes: original.notes,
   });
@@ -63,13 +65,29 @@ export function buildMetadataEditorPanel(
     if (state.displayName !== original.displayName) return true;
     if (state.observationDate !== original.observationDate) return true;
     if (state.notes !== original.notes) return true;
-    if (state.dsoIds.length !== original.dsoIds.length || state.dsoIds.some((v, i) => v !== original.dsoIds[i])) return true;
-    if (state.labels.length !== original.labels.length || state.labels.some((v, i) => v !== original.labels[i])) return true;
-    if (state.pointsOfInterest.length !== original.pointsOfInterest.length
-      || state.pointsOfInterest.some((v, i) => v.name !== original.pointsOfInterest[i].name || v.categoryId !== original.pointsOfInterest[i].categoryId)) return true;
+    if (
+      state.dsoIds.length !== original.dsoIds.length ||
+      state.dsoIds.some((v, i) => v !== original.dsoIds[i])
+    )
+      return true;
+    if (
+      state.labels.length !== original.labels.length ||
+      state.labels.some((v, i) => v !== original.labels[i])
+    )
+      return true;
+    if (
+      state.pointsOfInterest.length !== original.pointsOfInterest.length ||
+      state.pointsOfInterest.some(
+        (v, i) =>
+          v.name !== original.pointsOfInterest[i].name ||
+          v.categoryId !== original.pointsOfInterest[i].categoryId,
+      )
+    )
+      return true;
     if (state.integrations.length !== original.integrations.length) return true;
     for (let i = 0; i < state.integrations.length; i++) {
-      const a = state.integrations[i], b = original.integrations[i];
+      const a = state.integrations[i],
+        b = original.integrations[i];
       if (a.frames !== b.frames || a.seconds !== b.seconds || a.filter !== b.filter) return true;
     }
     return false;
@@ -86,31 +104,46 @@ export function buildMetadataEditorPanel(
   };
   rememberFilters(DEFAULT_INTEGRATION_FILTERS);
   rememberFilters(knownFilters ?? []);
-  rememberFilters(state.integrations.map(row => row.filter));
+  rememberFilters(state.integrations.map((row) => row.filter));
 
   // Mount the shared MetadataEditorPanel Vue component for form fields
   const panelEl = document.createElement('div');
   container.appendChild(panelEl);
 
   let app: App | null = createApp({
-    render: () => h(MetadataEditorPanel, {
-      displayName: state.displayName,
-      dsoIds: state.dsoIds,
-      labels: state.labels,
-      pointsOfInterest: state.pointsOfInterest,
-      integrations: state.integrations,
-      observationDate: state.observationDate,
-      notes: state.notes,
-      knownFilterMap,
-      knownLabels: knownLabels ?? [],
-      'onUpdate:displayName': (v: string) => { state.displayName = v; },
-      'onUpdate:dsoIds': (v: string[]) => { state.dsoIds = v; },
-      'onUpdate:labels': (v: string[]) => { state.labels = v; },
-      'onUpdate:pointsOfInterest': (v: PointOfInterest[]) => { state.pointsOfInterest = v; },
-      'onUpdate:integrations': (v: PhotoIntegration[]) => { state.integrations = v; },
-      'onUpdate:observationDate': (v: string) => { state.observationDate = v; },
-      'onUpdate:notes': (v: string) => { state.notes = v; },
-    }),
+    render: () =>
+      h(MetadataEditorPanel, {
+        displayName: state.displayName,
+        dsoIds: state.dsoIds,
+        labels: state.labels,
+        pointsOfInterest: state.pointsOfInterest,
+        integrations: state.integrations,
+        observationDate: state.observationDate,
+        notes: state.notes,
+        knownFilterMap,
+        knownLabels: knownLabels ?? [],
+        'onUpdate:displayName': (v: string) => {
+          state.displayName = v;
+        },
+        'onUpdate:dsoIds': (v: string[]) => {
+          state.dsoIds = v;
+        },
+        'onUpdate:labels': (v: string[]) => {
+          state.labels = v;
+        },
+        'onUpdate:pointsOfInterest': (v: PointOfInterest[]) => {
+          state.pointsOfInterest = v;
+        },
+        'onUpdate:integrations': (v: PhotoIntegration[]) => {
+          state.integrations = v;
+        },
+        'onUpdate:observationDate': (v: string) => {
+          state.observationDate = v;
+        },
+        'onUpdate:notes': (v: string) => {
+          state.notes = v;
+        },
+      }),
   });
   // PoiEditor (inside MetadataEditorPanel) reads the POI-categories / ui Pinia stores,
   // so this imperatively-mounted app needs the shared pinia instance installed.
@@ -172,7 +205,10 @@ export function buildMetadataEditorPanel(
 
   return {
     teardown: () => {
-      if (app) { app.unmount(); app = null; }
+      if (app) {
+        app.unmount();
+        app = null;
+      }
     },
     isDirty,
   };
@@ -182,20 +218,27 @@ export function buildMetadataEditorPanel(
  * Open a standalone modal to edit dsoIds, labels and notes for a photo.
  * Calls onSaved with the updated Photo object after a successful PATCH.
  */
-export function showMetadataEditor(photo: Photo, onSaved: (updated: Photo) => void, knownLabels?: string[], knownFilters?: string[]): void {
+export function showMetadataEditor(
+  photo: Photo,
+  onSaved: (updated: Photo) => void,
+  knownLabels?: string[],
+  knownFilters?: string[],
+): void {
   // ── Overlay ──────────────────────────────────────────────────────────────
   const overlay = document.createElement('div');
   overlay.className = 'meta-editor-overlay';
 
   const modal = document.createElement('div');
   modal.className = 'meta-editor-modal';
-  modal.addEventListener('click', e => e.stopPropagation());
+  modal.addEventListener('click', (e) => e.stopPropagation());
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
   // Trap Escape key
-  const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') close();
+  };
   document.addEventListener('keydown', onKey);
 
   let teardown: (() => void) | null = null;

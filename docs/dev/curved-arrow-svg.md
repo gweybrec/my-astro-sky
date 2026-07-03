@@ -27,7 +27,7 @@ A point on the arc at angle θ measured clockwise from 12 o'clock:
 P(θ) = ( 18 + 8·sin θ,  12 − 8·cos θ )
 ```
 
-Verification: θ=0 → (18, 4) ✓   θ=90° → (26, 12) ✓   θ=180° → (18, 20) ✓
+Verification: θ=0 → (18, 4) ✓ θ=90° → (26, 12) ✓ θ=180° → (18, 20) ✓
 
 ---
 
@@ -104,14 +104,17 @@ M {Wing1.x},{Wing1.y} L {T.x},{T.y} L {Wing2.x},{Wing2.y}
 **Parameters:** Δθ = 25°, W = 2.5, T = (26, 12) (θ_end = 90°)
 
 **Step 1 — find M** (θ_M = 65°):
+
 ```
 M = ( 18 + 8·sin 65°,  12 − 8·cos 65° )
   = ( 18 + 7.250,  12 − 3.381 )
   = ( 25.25,  8.62 )
 ```
+
 Check: `|(25.25−18, 8.62−12)| = |(7.25, −3.38)| = √(52.56+11.43) = √64.0 = 8` ✓
 
 **Step 2 — axis direction:**
+
 ```
 a = (26−25.25, 12−8.62) = (0.75, 3.38)
 |a| = √(0.56+11.42) = 3.46
@@ -119,11 +122,13 @@ a = (26−25.25, 12−8.62) = (0.75, 3.38)
 ```
 
 **Step 3 — perpendicular:**
+
 ```
 p̂ = (−0.976, 0.217)
 ```
 
 **Step 4 — wings (W = 2.5):**
+
 ```
 Wing1 = (25.25 − 2.44,  8.62 + 0.54) = (22.8, 9.2)
 Wing2 = (25.25 + 2.44,  8.62 − 0.54) = (27.7, 8.1)
@@ -137,12 +142,12 @@ Wing2 = (25.25 + 2.44,  8.62 − 0.54) = (27.7, 8.1)
 
 The icons use **Δθ = 25°** and **W = 2.5**, giving:
 
-| Quantity | Value |
-|---|---|
-| Arc-chord depth `\|M−T\|` | ≈ 3.5 px (for r = 8) |
-| Half-width W | 2.5 px |
-| Wing-to-tip distance | √(3.5²+2.5²) ≈ 4.3 px |
-| Opening half-angle | arctan(2.5/3.5) ≈ 35° |
+| Quantity                  | Value                 |
+| ------------------------- | --------------------- |
+| Arc-chord depth `\|M−T\|` | ≈ 3.5 px (for r = 8)  |
+| Half-width W              | 2.5 px                |
+| Wing-to-tip distance      | √(3.5²+2.5²) ≈ 4.3 px |
+| Opening half-angle        | arctan(2.5/3.5) ≈ 35° |
 
 For a different circle radius r, scale Δθ or W proportionally to keep the arrowhead visually balanced relative to the arc.
 
@@ -150,12 +155,12 @@ For a different circle radius r, scale Δθ or W proportionally to keep the arro
 
 ## All computed endpoints
 
-| File | θ_end | θ_M | T | M | Wing1 | Wing2 |
-|---|---|---|---|---|---|---|
-| `rotate-p1` | 40° | 15° | (23.1, 5.9) | (20.1, 4.3) | (18.9, 6.5) | (21.3, 2.1) |
-| `rotate-p5` | 90° | 65° | (26.0, 12.0) | (25.3, 8.6) | (22.8, 9.2) | (27.7, 8.1) |
-| `rotate-p15` | 150° | 125° | (22.0, 18.9) | (24.6, 16.6) | (22.9, 14.7) | (26.2, 18.4) |
-| `rotate-p45` | 240° | 215° | (11.1, 16.0) | (13.4, 18.6) | (15.3, 16.9) | (11.6, 20.2) |
+| File         | θ_end | θ_M  | T            | M            | Wing1        | Wing2        |
+| ------------ | ----- | ---- | ------------ | ------------ | ------------ | ------------ |
+| `rotate-p1`  | 40°   | 15°  | (23.1, 5.9)  | (20.1, 4.3)  | (18.9, 6.5)  | (21.3, 2.1)  |
+| `rotate-p5`  | 90°   | 65°  | (26.0, 12.0) | (25.3, 8.6)  | (22.8, 9.2)  | (27.7, 8.1)  |
+| `rotate-p15` | 150°  | 125° | (22.0, 18.9) | (24.6, 16.6) | (22.9, 14.7) | (26.2, 18.4) |
+| `rotate-p45` | 240°  | 215° | (11.1, 16.0) | (13.4, 18.6) | (15.3, 16.9) | (11.6, 20.2) |
 
 The `rotate-m*` icons mirror each `rotate-p*` icon with `transform="matrix(-1,0,0,1,36,0)"` and use identical arrowhead coordinates inside the group.
 

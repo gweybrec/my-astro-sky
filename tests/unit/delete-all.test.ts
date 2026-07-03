@@ -53,10 +53,7 @@ describe('buildDeleteSummaryLines', () => {
   });
 
   it('returns "N of total" when only some photos selected', () => {
-    const lines = buildDeleteSummaryLines(
-      opts({ photoIds: ['a', 'b'], totalPhotos: 5 }),
-      t,
-    );
+    const lines = buildDeleteSummaryLines(opts({ photoIds: ['a', 'b'], totalPhotos: 5 }), t);
     expect(lines).toEqual(['2 of 5 photo(s)']);
   });
 
@@ -80,10 +77,7 @@ describe('buildDeleteSummaryLines', () => {
 
   it('treats photoIds.length >= totalPhotos as "all" even when totalPhotos is 0', () => {
     // edge: no photos on map, nothing selected in list → no photo line
-    const lines = buildDeleteSummaryLines(
-      opts({ photoIds: [], totalPhotos: 0 }),
-      t,
-    );
+    const lines = buildDeleteSummaryLines(opts({ photoIds: [], totalPhotos: 0 }), t);
     expect(lines).toEqual([]);
   });
 });

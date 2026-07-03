@@ -56,7 +56,11 @@ export function photoLabelTransform(
 }
 
 /** Topmost (last-drawn) photo whose outline contains (px, py), or null. */
-export function findTopPhotoOutlineAtPoint(px: number, py: number, outlines: PhotoOutline[]): string | null {
+export function findTopPhotoOutlineAtPoint(
+  px: number,
+  py: number,
+  outlines: PhotoOutline[],
+): string | null {
   for (let i = outlines.length - 1; i >= 0; i--) {
     if (pointInConvexPolygon(px, py, outlines[i].corners)) {
       return outlines[i].name;

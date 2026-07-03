@@ -64,9 +64,13 @@ export function budgetToSliderPos(budget: number, max: number): number {
  *
  * Pure (no `navigator`) so it is unit-testable; see {@link detectInitialDensity}.
  */
-export function estimateInitialDensity(cores: number, memGB: number, mobile: boolean): { star: number; dso: number } {
+export function estimateInitialDensity(
+  cores: number,
+  memGB: number,
+  mobile: boolean,
+): { star: number; dso: number } {
   const coreScore = clamp01((cores - 2) / (12 - 2)); // 2 cores → 0, 12+ → 1
-  const memScore = clamp01((memGB - 2) / (16 - 2));   // 2 GB → 0, 16+ → 1
+  const memScore = clamp01((memGB - 2) / (16 - 2)); // 2 GB → 0, 16+ → 1
   let score = 0.5 * coreScore + 0.5 * memScore;
   if (mobile) score *= 0.4;
   const lerp = (lo: number, hi: number) => Math.round(lo + (hi - lo) * score);

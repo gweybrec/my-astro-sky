@@ -30,11 +30,15 @@
         <span class="batch-status-text batch-status-success">{{ t('batch.statusSuccess') }}</span>
       </div>
       <div class="batch-status-dso-line">
-        {{ item.dsoIds.length > 0 ? t('batch.dsosFound', { count: String(item.dsoIds.length) }) : '' }}
+        {{
+          item.dsoIds.length > 0 ? t('batch.dsosFound', { count: String(item.dsoIds.length) }) : ''
+        }}
       </div>
       <div v-if="item.uploadError" class="shared-solve-status-row batch-status-upload-error">
         <span>{{ item.uploadError }}</span>
-        <button type="button" class="batch-retry-btn" @click="$emit('retry-upload')">{{ t('batch.retryButton') }}</button>
+        <button type="button" class="batch-retry-btn" @click="$emit('retry-upload')">
+          {{ t('batch.retryButton') }}
+        </button>
       </div>
     </template>
 
@@ -46,8 +50,12 @@
 
     <template v-else-if="item.status === 'failed'">
       <div class="shared-solve-status-row">
-        <span class="batch-status-text batch-status-error">✗ {{ item.error || t('batch.statusFailed') }}</span>
-        <button type="button" class="batch-retry-btn" @click="$emit('retry')">{{ t('batch.retryButton') }}</button>
+        <span class="batch-status-text batch-status-error"
+          >✗ {{ item.error || t('batch.statusFailed') }}</span
+        >
+        <button type="button" class="batch-retry-btn" @click="$emit('retry')">
+          {{ t('batch.retryButton') }}
+        </button>
       </div>
       <details v-if="item.diagnostics">
         <summary class="solve-error-summary">{{ t('modal.errorDetailsSummary') }}</summary>
@@ -58,7 +66,9 @@
     <template v-else-if="item.status === 'canceled'">
       <div class="shared-solve-status-row">
         <span class="batch-status-text batch-status-error">{{ t('batch.statusCanceled') }}</span>
-        <button type="button" class="batch-retry-btn" @click="$emit('retry')">{{ t('batch.retryButton') }}</button>
+        <button type="button" class="batch-retry-btn" @click="$emit('retry')">
+          {{ t('batch.retryButton') }}
+        </button>
       </div>
     </template>
 
@@ -70,7 +80,9 @@
 
     <template v-else-if="item.status === 'waiting'">
       <div class="shared-solve-status-row">
-        <span class="batch-status-text">{{ t('batch.statusWaiting', { max: String(maxParallel) }) }}</span>
+        <span class="batch-status-text">{{
+          t('batch.statusWaiting', { max: String(maxParallel) })
+        }}</span>
       </div>
     </template>
   </div>

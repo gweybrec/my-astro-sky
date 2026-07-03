@@ -21,7 +21,9 @@
         class="search-clear-btn"
         :style="{ display: searchInput ? 'flex' : 'none' }"
         @click="clearSearch"
-      >&times;</button>
+      >
+        &times;
+      </button>
       <!-- Search dropdown -->
       <div
         class="search-dropdown photo-search-dropdown"
@@ -54,10 +56,7 @@
     </div>
 
     <!-- Selected card -->
-    <div
-      v-if="selectedPlaced"
-      class="photo-list-item photo-selected-card"
-    >
+    <div v-if="selectedPlaced" class="photo-list-item photo-selected-card">
       <PhotoItem
         :placed="selectedPlaced"
         :dso-chips="selectedPlaced.photo.dsoIds"
@@ -116,7 +115,7 @@ const drawOrderPhotoId = ref<string | null>(null);
 
 const selectedPlaced = computed(() =>
   photosStore.selectedPhotoId
-    ? photosStore.placedPhotos.find(p => p.photo.id === photosStore.selectedPhotoId) ?? null
+    ? (photosStore.placedPhotos.find((p) => p.photo.id === photosStore.selectedPhotoId) ?? null)
     : null,
 );
 
@@ -125,26 +124,33 @@ const searchMatches = computed(() => {
   const query = searchInput.value.trim().toLowerCase();
   if (!query) return [];
   const all = photosStore.placedPhotos;
-  const matches = buildPhotoQueryMatches(all.map(p => p.photo), query);
-  const sorted = smartSortPhotos(matches.map(m => m.photo));
-  const matchById = new Map(matches.map(m => [m.photo.id, m]));
-  const placedById = new Map(all.map(p => [p.photo.id, p]));
+  const matches = buildPhotoQueryMatches(
+    all.map((p) => p.photo),
+    query,
+  );
+  const sorted = smartSortPhotos(matches.map((m) => m.photo));
+  const matchById = new Map(matches.map((m) => [m.photo.id, m]));
+  const placedById = new Map(all.map((p) => [p.photo.id, p]));
   return sorted
-    .map(photo => {
+    .map((photo) => {
       const match = matchById.get(photo.id)!;
       const placed = placedById.get(photo.id)!;
       return { placed, matchingDsoIds: match.matchingDsoIds, matchingLabels: match.matchingLabels };
     })
-    .filter(m => m.placed);
+    .filter((m) => m.placed);
 });
 
 function onSearchInput() {
   if (searchDebounce) clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(() => { showDropdown.value = true; }, 250);
+  searchDebounce = setTimeout(() => {
+    showDropdown.value = true;
+  }, 250);
 }
 
 function scheduleHideDropdown() {
-  setTimeout(() => { showDropdown.value = false; }, 120);
+  setTimeout(() => {
+    showDropdown.value = false;
+  }, 120);
 }
 
 function clearSearch() {
@@ -154,7 +160,7 @@ function clearSearch() {
 }
 
 function selectFromDropdown(photoId: string) {
-  const placed = photosStore.placedPhotos.find(p => p.photo.id === photoId);
+  const placed = photosStore.placedPhotos.find((p) => p.photo.id === photoId);
   if (!placed) return;
   photosStore.selectPhoto(photoId);
   searchInput.value = placed.photo.originalName;
@@ -200,7 +206,7 @@ function onAddPhoto() {
   input.onchange = () => {
     if (!input.files || input.files.length === 0) return;
     const selected = Array.from(input.files);
-    const valid = selected.filter(f => allowedExt.test(f.name));
+    const valid = selected.filter((f) => allowedExt.test(f.name));
     if (valid.length === 0) {
       showToast({ message: t('errors.invalidPhotoFormat'), type: 'error', duration: 3500 });
       return;
@@ -213,4 +219,3 @@ function onAddPhoto() {
   input.click();
 }
 </script>
-

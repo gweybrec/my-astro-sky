@@ -43,11 +43,11 @@ export function computeFovFrameCorners(
   const sinA = Math.sin(angle);
   const raw: Point[] = [
     { x: -halfWPx, y: -halfHPx },
-    { x:  halfWPx, y: -halfHPx },
-    { x:  halfWPx, y:  halfHPx },
-    { x: -halfWPx, y:  halfHPx },
+    { x: halfWPx, y: -halfHPx },
+    { x: halfWPx, y: halfHPx },
+    { x: -halfWPx, y: halfHPx },
   ];
-  return raw.map(p => ({
+  return raw.map((p) => ({
     x: cx + p.x * cosA - p.y * sinA,
     y: cy + p.x * sinA + p.y * cosA,
   }));
@@ -95,7 +95,8 @@ export function frameGeometry(f: RenderableFrame, view: ViewState): FrameGeometr
     if (g) return g;
   }
   const { cx, cy } = frameAnchorCanvas(f, view);
-  const decForSize = f.anchorKind === 'sky' ? (f.dec ?? 0) : unproject(view.centerX, view.centerY).dec;
+  const decForSize =
+    f.anchorKind === 'sky' ? (f.dec ?? 0) : unproject(view.centerX, view.centerY).dec;
   const halfW = angularSizeToCanvasPx(f.wDeg * 30, decForSize, view.scale);
   const halfH = angularSizeToCanvasPx(f.hDeg * 30, decForSize, view.scale);
   const rotDeg = frameCanvasRotationDeg(f, view);
@@ -109,7 +110,8 @@ export function frameGeometry(f: RenderableFrame, view: ViewState): FrameGeometr
  * screen rotation there — so the gnomonic geometry is continuous as the pin toggles.
  */
 export function mosaicCenterPa(
-  f: RenderableFrame, view: ViewState,
+  f: RenderableFrame,
+  view: ViewState,
 ): { center: { ra: number; dec: number }; paDeg: number } | null {
   if (f.anchorKind === 'sky') {
     if (f.ra == null || f.dec == null) return null;
@@ -129,7 +131,8 @@ export function mosaicCenterPa(
 export function mosaicOutlineGeometry(f: RenderableFrame, view: ViewState): FrameGeometry | null {
   const cp = mosaicCenterPa(f, view);
   if (!cp) return null;
-  const halfW = f.wDeg / 2, halfH = f.hDeg / 2;
+  const halfW = f.wDeg / 2,
+    halfH = f.hDeg / 2;
   const corner = (gx: number, gy: number): Point => {
     const s = framePointToSky(cp.center, cp.paDeg, gx, gy);
     const p = project(s.ra, s.dec);
@@ -137,16 +140,29 @@ export function mosaicOutlineGeometry(f: RenderableFrame, view: ViewState): Fram
   };
   // gy+ is "up" (frame north), which is computeFovFrameCorners' −y, so these map
   // to its clockwise-from-top-left corner order.
-  const corners = [corner(-halfW, halfH), corner(halfW, halfH), corner(halfW, -halfH), corner(-halfW, -halfH)];
+  const corners = [
+    corner(-halfW, halfH),
+    corner(halfW, halfH),
+    corner(halfW, -halfH),
+    corner(-halfW, -halfH),
+  ];
   const cx = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4;
   const cy = (corners[0].y + corners[1].y + corners[2].y + corners[3].y) / 4;
   const rotDeg = frameCanvasRotationDeg(f, view);
-  const a = rotDeg * DEG2RAD, cos = Math.cos(a), sin = Math.sin(a);
-  let minL = Infinity, maxL = -Infinity, minM = Infinity, maxM = -Infinity;
+  const a = rotDeg * DEG2RAD,
+    cos = Math.cos(a),
+    sin = Math.sin(a);
+  let minL = Infinity,
+    maxL = -Infinity,
+    minM = Infinity,
+    maxM = -Infinity;
   for (const p of corners) {
-    const l = p.x * cos + p.y * sin, m = -p.x * sin + p.y * cos;
-    minL = Math.min(minL, l); maxL = Math.max(maxL, l);
-    minM = Math.min(minM, m); maxM = Math.max(maxM, m);
+    const l = p.x * cos + p.y * sin,
+      m = -p.x * sin + p.y * cos;
+    minL = Math.min(minL, l);
+    maxL = Math.max(maxL, l);
+    minM = Math.min(minM, m);
+    maxM = Math.max(maxM, m);
   }
   return { corners, cx, cy, rotDeg, halfW: (maxL - minL) / 2, halfH: (maxM - minM) / 2 };
 }
@@ -161,7 +177,8 @@ export function mosaicOutlinePath(f: RenderableFrame, view: ViewState): Point[] 
   const cp = mosaicCenterPa(f, view);
   if (!cp) return null;
   const { center, paDeg } = cp;
-  const halfW = f.wDeg / 2, halfH = f.hDeg / 2;
+  const halfW = f.wDeg / 2,
+    halfH = f.hDeg / 2;
   const N = 16; // samples per edge — enough to render the curvature smoothly
   const pts: Point[] = [];
   const add = (gx: number, gy: number) => {
@@ -169,10 +186,10 @@ export function mosaicOutlinePath(f: RenderableFrame, view: ViewState): Point[] 
     const p = project(s.ra, s.dec);
     pts.push(toCanvas(p.x, p.y, view));
   };
-  for (let i = 0; i <= N; i++) add(-halfW + (2 * halfW * i) / N, halfH);   // top
-  for (let i = 1; i <= N; i++) add(halfW, halfH - (2 * halfH * i) / N);    // right
-  for (let i = 1; i <= N; i++) add(halfW - (2 * halfW * i) / N, -halfH);   // bottom
-  for (let i = 1; i < N; i++) add(-halfW, -halfH + (2 * halfH * i) / N);   // left
+  for (let i = 0; i <= N; i++) add(-halfW + (2 * halfW * i) / N, halfH); // top
+  for (let i = 1; i <= N; i++) add(halfW, halfH - (2 * halfH * i) / N); // right
+  for (let i = 1; i <= N; i++) add(halfW - (2 * halfW * i) / N, -halfH); // bottom
+  for (let i = 1; i < N; i++) add(-halfW, -halfH + (2 * halfH * i) / N); // left
   return pts;
 }
 

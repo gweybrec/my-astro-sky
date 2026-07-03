@@ -25,7 +25,12 @@ export function drawFramePolyline(ctx: CanvasRenderingContext2D, points: Point[]
 }
 
 /** Draw a name label along the longest edge of a rectangle, kept upright. */
-export function drawEdgeLabel(ctx: CanvasRenderingContext2D, corners: Point[], text: string, color: string): void {
+export function drawEdgeLabel(
+  ctx: CanvasRenderingContext2D,
+  corners: Point[],
+  text: string,
+  color: string,
+): void {
   ctx.setLineDash([]);
   ctx.font = FONTS.frameLabel;
   ctx.fillStyle = color;
@@ -56,7 +61,11 @@ export interface FrameHandleGeometry {
 
 /** Draw the active frame's handles: rotate needle + dot, move dot, pin glyph, corner squares. */
 export function drawFrameHandles(
-  ctx: CanvasRenderingContext2D, geo: FrameHandleGeometry, flags: HandleFlags, color: string, pinPos: Point,
+  ctx: CanvasRenderingContext2D,
+  geo: FrameHandleGeometry,
+  flags: HandleFlags,
+  color: string,
+  pinPos: Point,
 ): void {
   const ang = geo.rotDeg * DEG2RAD;
   const topMidX = geo.cx + geo.halfH * Math.sin(ang);
@@ -85,12 +94,22 @@ export function drawFrameHandles(
   if (flags.resizable) {
     // Corner resize handles (small squares) — drag to extend into a mosaic.
     ctx.fillStyle = color;
-    for (const c of geo.corners) ctx.fillRect(c.x - FRAME.cornerHalf, c.y - FRAME.cornerHalf, FRAME.cornerHalf * 2, FRAME.cornerHalf * 2);
+    for (const c of geo.corners)
+      ctx.fillRect(
+        c.x - FRAME.cornerHalf,
+        c.y - FRAME.cornerHalf,
+        FRAME.cornerHalf * 2,
+        FRAME.cornerHalf * 2,
+      );
   }
 }
 
 /** Rubber-band preview of a drag-to-extend resize in progress. */
-export function drawResizeDraftRect(ctx: CanvasRenderingContext2D, corners: Point[], color: string): void {
+export function drawResizeDraftRect(
+  ctx: CanvasRenderingContext2D,
+  corners: Point[],
+  color: string,
+): void {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.lineWidth = FRAME.lineWidth;
@@ -105,7 +124,11 @@ export function drawResizeDraftRect(ctx: CanvasRenderingContext2D, corners: Poin
  * and a ring marks the snap target.
  */
 export function drawElasticSnapLine(
-  ctx: CanvasRenderingContext2D, from: Point, to: Point, tension: number, color: string,
+  ctx: CanvasRenderingContext2D,
+  from: Point,
+  to: Point,
+  tension: number,
+  color: string,
 ): void {
   ctx.save();
   ctx.strokeStyle = color;

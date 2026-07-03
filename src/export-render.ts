@@ -16,7 +16,12 @@ import { moonDangerLevel, type AltSample } from './sky-geometry';
 // ─── Affine helpers (pure, unit-tested) ─────────────────────────────────────
 
 export interface AffineCoeffs {
-  a: number; b: number; c: number; d: number; e: number; f: number;
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
 }
 
 /**
@@ -39,9 +44,9 @@ export interface GalleryLayout {
   rowsPerPage: number;
   perPage: number;
   pages: number;
-  cellW: number;   // full cell width (image area width)
-  cellH: number;   // full cell height (image area + caption)
-  imgH: number;    // image area height (cellH minus caption)
+  cellW: number; // full cell width (image area width)
+  cellH: number; // full cell height (image area + caption)
+  imgH: number; // image area height (cellH minus caption)
 }
 
 /** Compute the contact-sheet grid for `count` photos on the given page. */
@@ -167,7 +172,12 @@ export async function renderMapToCanvas(
       const transform = getComputedStyle(placed.imgEl).transform;
       if (!transform || transform === 'none') continue;
       const dm = new DOMMatrix(transform);
-      await drawPlacedPhoto(ctx, placed, { a: dm.a, b: dm.b, c: dm.c, d: dm.d, e: dm.e, f: dm.f }, dpr);
+      await drawPlacedPhoto(
+        ctx,
+        placed,
+        { a: dm.a, b: dm.b, c: dm.c, d: dm.d, e: dm.e, f: dm.f },
+        dpr,
+      );
     }
 
     // 3. Draw overlay canvas (FOV frames) on top of photos.
@@ -180,17 +190,29 @@ export async function renderMapToCanvas(
 }
 
 /** Render the chosen part of the map (sky + placed photos) as a PNG blob. */
-export async function renderMapToBlob(skyMap: SkyMap, overlay: PhotoOverlay, scope: MapExportScope = 'view'): Promise<Blob> {
+export async function renderMapToBlob(
+  skyMap: SkyMap,
+  overlay: PhotoOverlay,
+  scope: MapExportScope = 'view',
+): Promise<Blob> {
   const out = await renderMapToCanvas(skyMap, overlay, scope);
   return canvasToBlob(out, 'image/png');
 }
 
 /** Render the chosen part of the map as a single-page PDF blob sized to the image. */
-export async function renderMapToPdfBlob(skyMap: SkyMap, overlay: PhotoOverlay, scope: MapExportScope = 'view'): Promise<Blob> {
+export async function renderMapToPdfBlob(
+  skyMap: SkyMap,
+  overlay: PhotoOverlay,
+  scope: MapExportScope = 'view',
+): Promise<Blob> {
   const out = await renderMapToCanvas(skyMap, overlay, scope);
   const w = out.width;
   const h = out.height;
-  const doc = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'px', format: [w, h] });
+  const doc = new jsPDF({
+    orientation: w >= h ? 'landscape' : 'portrait',
+    unit: 'px',
+    format: [w, h],
+  });
   doc.addImage(out.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, w, h);
   return doc.output('blob');
 }
@@ -310,7 +332,9 @@ function drawOverviewFrames(
 ): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const stroke = getComputedStyle(styleEl).getPropertyValue('--fov-frame-stroke').trim() || 'rgba(220,60,60,0.85)';
+  const stroke =
+    getComputedStyle(styleEl).getPropertyValue('--fov-frame-stroke').trim() ||
+    'rgba(220,60,60,0.85)';
   ctx.save();
   ctx.strokeStyle = stroke;
   ctx.fillStyle = stroke;
@@ -326,8 +350,14 @@ function drawOverviewFrames(
     const sizeW = tgt.mosaic ? tgt.mosaic.wDeg : spec?.wDeg;
     const sizeH = tgt.mosaic ? tgt.mosaic.hDeg : spec?.hDeg;
     if (sizeW != null && sizeH != null) {
-      halfW = Math.max(angularSizeToCanvasPxForDSO(sizeW * 30, tgt.dso.dec, view.scale) * dpr, 3 * dpr);
-      halfH = Math.max(angularSizeToCanvasPxForDSO(sizeH * 30, tgt.dso.dec, view.scale) * dpr, 3 * dpr);
+      halfW = Math.max(
+        angularSizeToCanvasPxForDSO(sizeW * 30, tgt.dso.dec, view.scale) * dpr,
+        3 * dpr,
+      );
+      halfH = Math.max(
+        angularSizeToCanvasPxForDSO(sizeH * 30, tgt.dso.dec, view.scale) * dpr,
+        3 * dpr,
+      );
     }
     // A mosaic envelope is oriented by the mosaic PA (per its RA); standalone
     // targets use the shared FOV-frame rotation.
@@ -358,7 +388,7 @@ function fmtArcmin(v: number | null): string {
 /** Full constellation name from its 3-letter IAU abbreviation (falls back to the abbr). */
 function constellationFullName(abbr: string | null): string {
   if (!abbr) return '';
-  const info = getConstellationInfos().find(c => c.id === abbr);
+  const info = getConstellationInfos().find((c) => c.id === abbr);
   const name = info?.displayName || abbr.toUpperCase();
   // The catalog uses wide Unicode spaces (e.g. U+2005 in "Hunting Dogs") which
   // render with broken spacing in the PDF — normalise them to plain spaces.
@@ -375,16 +405,23 @@ function drawStarGlyph(doc: jsPDF, cx: number, cy: number, r: number, filled: bo
     pts.push([cx + r * 0.42 * Math.cos(ia), cy + r * 0.42 * Math.sin(ia)]);
   }
   const rel: [number, number][] = [];
-  for (let i = 1; i < pts.length; i++) rel.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+  for (let i = 1; i < pts.length; i++)
+    rel.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
   (doc as any).lines(rel, pts[0][0], pts[0][1], [1, 1], filled ? 'F' : 'S', true);
 }
 
 /** Draw a filled or outlined diamond centred at (cx, cy) with vertical half-height r. */
 function drawDiamondGlyph(doc: jsPDF, cx: number, cy: number, r: number, filled: boolean): void {
   const w = r * 0.72;
-  const pts: [number, number][] = [[cx, cy - r], [cx + w, cy], [cx, cy + r], [cx - w, cy]];
+  const pts: [number, number][] = [
+    [cx, cy - r],
+    [cx + w, cy],
+    [cx, cy + r],
+    [cx - w, cy],
+  ];
   const rel: [number, number][] = [];
-  for (let i = 1; i < pts.length; i++) rel.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+  for (let i = 1; i < pts.length; i++)
+    rel.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
   (doc as any).lines(rel, pts[0][0], pts[0][1], [1, 1], filled ? 'F' : 'S', true);
 }
 
@@ -424,7 +461,12 @@ function drawMetaColumn(doc: jsPDF, label: string, valueW: number, x: number, to
 }
 
 /** Draw a row of label/value pairs (micro uppercase label above a bold value), returning the end x cursor. */
-function drawMetaRow(doc: jsPDF, items: { label: string; value: string; color?: [number, number, number] }[], x: number, top: number): number {
+function drawMetaRow(
+  doc: jsPDF,
+  items: { label: string; value: string; color?: [number, number, number] }[],
+  x: number,
+  top: number,
+): number {
   let cx = x;
   for (const it of items) {
     doc.setFont(undefined as any, 'bold');
@@ -440,7 +482,9 @@ function drawMetaRow(doc: jsPDF, items: { label: string; value: string; color?: 
 
 /** PDF RGB colour for a moon-distance value, by danger level (matches the UI tokens). */
 function moonSepColor(sepDeg: number, illum: number): [number, number, number] {
-  return { danger: [204, 119, 119], warn: [202, 164, 74], ok: [106, 157, 106] }[moonDangerLevel(sepDeg, illum)] as [number, number, number];
+  return { danger: [204, 119, 119], warn: [202, 164, 74], ok: [106, 157, 106] }[
+    moonDangerLevel(sepDeg, illum)
+  ] as [number, number, number];
 }
 
 /**
@@ -451,8 +495,11 @@ function moonSepColor(sepDeg: number, illum: number): [number, number, number] {
  */
 function drawMoonPhaseToCanvas(
   ctx: CanvasRenderingContext2D,
-  cx: number, cy: number, r: number,
-  phaseIndex: number, dpr: number,
+  cx: number,
+  cy: number,
+  r: number,
+  phaseIndex: number,
+  dpr: number,
 ): void {
   const f = [0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25][phaseIndex] ?? 0.5;
   const waning = phaseIndex >= 5;
@@ -460,7 +507,8 @@ function drawMoonPhaseToCanvas(
   // On the light PDF page the convention is inverted vs. the dark UI: the unlit
   // (shadow) disk is grey and the illuminated portion is paper-white, so a full
   // moon reads as a bright (empty) disk and a new moon as a filled grey one.
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(120,128,150,0.9)';
   ctx.fill();
   ctx.lineWidth = Math.max(0.75 * dpr, 0.5);
@@ -485,7 +533,8 @@ function drawMoonPhaseToCanvas(
     ctx.restore();
   }
   // Outline last, so the white lit fill never paints over the disk edge.
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
@@ -514,7 +563,7 @@ function drawAltChartToCanvas(
 
   const padY = (7 / 53) * h;
   const usableH = h - 2 * padY;
-  const span = (win.end.getTime() - win.start.getTime()) || 1;
+  const span = win.end.getTime() - win.start.getTime() || 1;
 
   // Left gutter reserved for the axis-label graduations (outside the plot);
   // right gutter reserved for the min/max altitude value labels (mirrors the
@@ -525,12 +574,12 @@ function drawAltChartToCanvas(
   const gutter = (moonStrip ? 28 : 18) * dpr;
   const rGutter = 22 * dpr;
   const plotW = w - gutter - rGutter;
-  const plotR = gutter + plotW;          // right edge of the plot area
+  const plotR = gutter + plotW; // right edge of the plot area
 
   const xAt = (d: Date) => gutter + ((d.getTime() - win.start.getTime()) / span) * plotW;
   const yAt = (alt: number) => padY + (1 - Math.max(0, Math.min(90, alt)) / 90) * usableH;
 
-  const alts = curve.map(s => s.altDeg);
+  const alts = curve.map((s) => s.altDeg);
   const objLo = Math.max(0, Math.min(...alts));
   const objHi = Math.max(...alts);
 
@@ -541,13 +590,19 @@ function drawAltChartToCanvas(
   ctx.lineWidth = Math.max(1, 0.5 * dpr);
   for (const deg of AXIS_TICKS) {
     const gy = yAt(deg);
-    ctx.beginPath(); ctx.moveTo(gutter, gy); ctx.lineTo(plotR, gy); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(gutter, gy);
+    ctx.lineTo(plotR, gy);
+    ctx.stroke();
   }
 
   // Left vertical axis — always present, for a consistent frame.
   ctx.strokeStyle = 'rgba(150,150,150,0.6)';
   ctx.lineWidth = dpr;
-  ctx.beginPath(); ctx.moveTo(gutter, padY); ctx.lineTo(gutter, h - padY); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(gutter, padY);
+  ctx.lineTo(gutter, h - padY);
+  ctx.stroke();
 
   // Reference lines at object's actual min/max altitude.
   ctx.strokeStyle = 'rgba(100,100,100,0.5)';
@@ -555,14 +610,17 @@ function drawAltChartToCanvas(
   ctx.setLineDash([3 * dpr, 3 * dpr]);
   for (const refAlt of [objLo, objHi]) {
     const ry = yAt(refAlt);
-    ctx.beginPath(); ctx.moveTo(gutter, ry); ctx.lineTo(plotR, ry); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(gutter, ry);
+    ctx.lineTo(plotR, ry);
+    ctx.stroke();
   }
   ctx.setLineDash([]);
 
   // Moon trajectory — drawn before the object curve so the blue object line
   // stays dominant. Thin, dashed, muted grey. A phase icon marks culmination.
   if (moonCurve && moonCurve.length > 0) {
-    const mPts = moonCurve.map(s => ({ px: xAt(s.time), py: yAt(s.altDeg) }));
+    const mPts = moonCurve.map((s) => ({ px: xAt(s.time), py: yAt(s.altDeg) }));
     ctx.strokeStyle = 'rgba(120,128,150,0.8)';
     ctx.lineWidth = dpr;
     ctx.lineJoin = 'round';
@@ -577,11 +635,18 @@ function drawAltChartToCanvas(
     // trajectory meets the left edge (a fixed spot, matching the on-screen chart).
     // Centre sits moonR + ~2.5px left of the axis so it isn't flush against it.
     const moonR = 4.5 * dpr;
-    drawMoonPhaseToCanvas(ctx, gutter - moonR - 2.5 * dpr, yAt(moonCurve[0].altDeg), moonR, moonPhaseIndex ?? 4, dpr);
+    drawMoonPhaseToCanvas(
+      ctx,
+      gutter - moonR - 2.5 * dpr,
+      yAt(moonCurve[0].altDeg),
+      moonR,
+      moonPhaseIndex ?? 4,
+      dpr,
+    );
   }
 
   // Area fill under trajectory.
-  const pts = curve.map(s => ({ px: xAt(s.time), py: yAt(s.altDeg) }));
+  const pts = curve.map((s) => ({ px: xAt(s.time), py: yAt(s.altDeg) }));
   const yMin = yAt(objLo);
   ctx.fillStyle = 'rgba(59,130,246,0.15)';
   ctx.beginPath();
@@ -608,7 +673,10 @@ function drawAltChartToCanvas(
     ctx.strokeStyle = 'rgba(120,120,120,0.7)';
     ctx.lineWidth = dpr;
     ctx.setLineDash([2 * dpr, 2 * dpr]);
-    ctx.beginPath(); ctx.moveTo(tx, padY); ctx.lineTo(tx, h - padY); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx, padY);
+    ctx.lineTo(tx, h - padY);
+    ctx.stroke();
     ctx.setLineDash([]);
 
     const fmtTime = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -656,7 +724,12 @@ function drawAltChartToCanvas(
 
 /** Draw stacked label→value rows (label left grey, value right bold). Returns the y past the last row. */
 function drawKeyValueTable(
-  doc: jsPDF, rows: [string, string][], x: number, y: number, width: number, rowH: number,
+  doc: jsPDF,
+  rows: [string, string][],
+  x: number,
+  y: number,
+  width: number,
+  rowH: number,
 ): number {
   doc.setFontSize(10.5);
   for (const [k, v] of rows) {
@@ -684,14 +757,17 @@ function drawMosaicTiles(
 ): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const stroke = getComputedStyle(styleEl).getPropertyValue('--fov-frame-stroke').trim() || 'rgba(220,60,60,0.85)';
+  const stroke =
+    getComputedStyle(styleEl).getPropertyValue('--fov-frame-stroke').trim() ||
+    'rgba(220,60,60,0.85)';
   ctx.save();
   ctx.strokeStyle = stroke;
   ctx.lineWidth = 1.2 * dpr;
   for (const tile of tiles) {
     const p = project(tile.ra, tile.dec);
     const c = toCanvas(p.x, p.y, view);
-    const cx = c.x * dpr, cy = c.y * dpr;
+    const cx = c.x * dpr,
+      cy = c.y * dpr;
     const halfW = angularSizeToCanvasPxForDSO(tileWDeg * 30, tile.dec, view.scale) * dpr;
     const halfH = angularSizeToCanvasPxForDSO(tileHDeg * 30, tile.dec, view.scale) * dpr;
     // Each tile shares the mosaic PA, but its on-screen rotation depends on where
@@ -744,12 +820,12 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
   // of leaving a white gap.
   const contentW = pageW - margin * 2;
   const availH = pageH - margin * 2;
-  const infoBandH = 112;          // compact header height (px)
-  const frameH = availH / 3;      // bottom third for the framed sky view
+  const infoBandH = 112; // compact header height (px)
+  const frameH = availH / 3; // bottom third for the framed sky view
   const imgTop = pageH - margin - frameH;
   const chartTop = margin + infoBandH;
   const chartGap = 16;
-  const chartH = imgTop - chartTop - chartGap;  // chart fills the middle band
+  const chartH = imgTop - chartTop - chartGap; // chart fills the middle band
 
   // Chip / meta palette (PDF is on a white background, unlike the dark app theme).
   const typeFill: [number, number, number] = [238, 240, 242];
@@ -781,7 +857,11 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       doc.text(`${t('targets.plan.pdf.nightOf')}: ${nightLabel}`, margin, y);
       y += 16;
       if (opts.header.latDeg != null && opts.header.lonDeg != null) {
-        doc.text(`${t('targets.plan.pdf.location')}: ${opts.header.latDeg.toFixed(3)}°, ${opts.header.lonDeg.toFixed(3)}°`, margin, y);
+        doc.text(
+          `${t('targets.plan.pdf.location')}: ${opts.header.latDeg.toFixed(3)}°, ${opts.header.lonDeg.toFixed(3)}°`,
+          margin,
+          y,
+        );
         y += 16;
       }
       if (opts.setup) {
@@ -874,19 +954,30 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       chipX += drawChip(doc, chipX, chipY, chipH, typeLabel, typeFill, typeText, typeBorder) + 6;
       const constName = constellationFullName(dso.constellation);
       if (constName) {
-        chipX += drawChip(doc, chipX, chipY, chipH, constName, constFill, constText, constBorder) + 6;
+        chipX +=
+          drawChip(doc, chipX, chipY, chipH, constName, constFill, constText, constBorder) + 6;
       }
 
       // Metadata row: label/value pairs.
       const metaTop = chipY + chipH + 22;
       const metaItems: { label: string; value: string; color?: [number, number, number] }[] = [];
       if (dso.mag !== null) metaItems.push({ label: 'Mag', value: dso.mag.toFixed(1) });
-      if (dso.majAxis) metaItems.push({ label: t('targets.results.size'), value: fmtArcmin(dso.majAxis) });
+      if (dso.majAxis)
+        metaItems.push({ label: t('targets.results.size'), value: fmtArcmin(dso.majAxis) });
       metaItems.push({ label: t('targets.results.bestTime'), value: fmtTime(tgt.bestTimeUtc) });
-      metaItems.push({ label: t('targets.results.maxAlt'), value: `${Math.round(tgt.maxAltDeg)}°` });
+      metaItems.push({
+        label: t('targets.results.maxAlt'),
+        value: `${Math.round(tgt.maxAltDeg)}°`,
+      });
       if (tgt.moonSepDeg != null) {
         const level = moonDangerLevel(tgt.moonSepDeg, tgt.moonIllum ?? 1);
-        const adj = t({ danger: 'targets.plan.moonClose', warn: 'targets.plan.moonModerate', ok: 'targets.plan.moonFar' }[level]);
+        const adj = t(
+          {
+            danger: 'targets.plan.moonClose',
+            warn: 'targets.plan.moonModerate',
+            ok: 'targets.plan.moonFar',
+          }[level],
+        );
         metaItems.push({
           label: t('targets.plan.moonSeparation'),
           value: `${adj} (${Math.round(tgt.moonSepDeg)}°)`,
@@ -925,9 +1016,19 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       chartCtx.fillStyle = '#f8f8f8';
       chartCtx.fillRect(0, 0, chartOff.width, chartOff.height);
       if (tgt.curve.length > 0) {
-        drawAltChartToCanvas(chartCtx, tgt.curve, tgt.nightWin, tgt.bestTimeUtc,
-          0, 0, chartOff.width, chartOff.height, chartDpr,
-          tgt.moonCurve, tgt.moonPhaseIndex);
+        drawAltChartToCanvas(
+          chartCtx,
+          tgt.curve,
+          tgt.nightWin,
+          tgt.bestTimeUtc,
+          0,
+          0,
+          chartOff.width,
+          chartOff.height,
+          chartDpr,
+          tgt.moonCurve,
+          tgt.moonPhaseIndex,
+        );
       }
       doc.addImage(chartOff.toDataURL('image/png'), 'PNG', margin, chartTop, contentW, chartH);
 
@@ -942,15 +1043,31 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       // standalone targets frame the native FOV via the live single frame.
       const viewW = tgt.mosaic ? tgt.mosaic.wDeg : spec?.wDeg;
       const viewH = tgt.mosaic ? tgt.mosaic.hDeg : spec?.hDeg;
-      const scale = (viewW != null && viewH != null)
-        ? computeFramedViewScale(viewW, viewH, dso.dec, imgW, imgH, 0.55)
-        : baseView.scale * 4;
-      const view: ViewState = { centerX: p.x, centerY: p.y, scale, rotationDeg: baseView.rotationDeg, width: imgW, height: imgH };
+      const scale =
+        viewW != null && viewH != null
+          ? computeFramedViewScale(viewW, viewH, dso.dec, imgW, imgH, 0.55)
+          : baseView.scale * 4;
+      const view: ViewState = {
+        centerX: p.x,
+        centerY: p.y,
+        scale,
+        rotationDeg: baseView.rotationDeg,
+        width: imgW,
+        height: imgH,
+      };
       skyMap.setFovFrames(tgt.mosaic ? [] : opts.fovSpecs);
       skyMap.renderToCanvas(off, view, dpr);
       if (tgt.mosaic && spec) {
-        drawMosaicTiles(off, view, dpr, tgt.mosaic.tiles, spec.wDeg, spec.hDeg,
-          tgt.mosaic.paDeg, skyMap.getCanvas());
+        drawMosaicTiles(
+          off,
+          view,
+          dpr,
+          tgt.mosaic.tiles,
+          spec.wDeg,
+          spec.hDeg,
+          tgt.mosaic.paDeg,
+          skyMap.getCanvas(),
+        );
       }
       doc.addImage(off.toDataURL('image/jpeg', 0.95), 'JPEG', margin, imgTop, imgW, imgH);
     }
@@ -967,10 +1084,23 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
     off.height = Math.round(ovH * dpr);
     const fullView = skyMap.getFullMapView(ovW, ovH);
     skyMap.renderToCanvas(off, fullView, dpr, {
-      showStars: false, showDSOs: false, showConstellationNames: false,
-      showGrid: false, showStarLabels: false, showDSOLabels: false, showConstellationLines: true,
+      showStars: false,
+      showDSOs: false,
+      showConstellationNames: false,
+      showGrid: false,
+      showStarLabels: false,
+      showDSOLabels: false,
+      showConstellationLines: true,
     });
-    drawOverviewFrames(off, fullView, dpr, opts.targets, spec, skyMap.getFovRotationDeg(), skyMap.getCanvas());
+    drawOverviewFrames(
+      off,
+      fullView,
+      dpr,
+      opts.targets,
+      spec,
+      skyMap.getFovRotationDeg(),
+      skyMap.getCanvas(),
+    );
     doc.addImage(off.toDataURL('image/jpeg', 0.9), 'JPEG', margin, margin, ovW, ovH);
   } finally {
     skyMap.setFovFrames(savedFrames);

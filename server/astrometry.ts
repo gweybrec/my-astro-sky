@@ -52,7 +52,9 @@ async function login(): Promise<string> {
 
   const data = await res.json();
   if (data.status !== 'success') {
-    throw new Error(`Échec de l'authentification astrometry.net: ${data.errormessage || 'unknown'}`);
+    throw new Error(
+      `Échec de l'authentification astrometry.net: ${data.errormessage || 'unknown'}`,
+    );
   }
 
   sessionKey = data.session;
@@ -73,7 +75,13 @@ export async function submitJob(
   filename: string,
   imageWidth: number,
   imageHeight: number,
-  hints?: { ra?: number; dec?: number; radius?: number; scale_lower?: number; scale_upper?: number },
+  hints?: {
+    ra?: number;
+    dec?: number;
+    radius?: number;
+    scale_lower?: number;
+    scale_upper?: number;
+  },
 ): Promise<string> {
   const session = await getSession();
   const localId = crypto.randomUUID();
@@ -96,14 +104,14 @@ export async function submitJob(
     allow_modifications: 'n',
     allow_commercial_use: 'n',
   };
-  
+
   // Add position hints if provided
   if (hints?.ra !== undefined && hints?.dec !== undefined) {
     requestData.center_ra = hints.ra;
     requestData.center_dec = hints.dec;
     requestData.radius = hints.radius || 2.0; // Search within 2 degrees by default
   }
-  
+
   // Add scale hints if provided
   if (hints?.scale_lower !== undefined) {
     requestData.scale_lower = hints.scale_lower;
@@ -111,7 +119,7 @@ export async function submitJob(
   if (hints?.scale_upper !== undefined) {
     requestData.scale_upper = hints.scale_upper;
   }
-  
+
   // Estimate scale from image dimensions if not provided
   if (!requestData.scale_lower && !requestData.scale_upper) {
     // Assume typical DSLR/CCD field of view: 1-3 degrees for smaller dimension
@@ -129,18 +137,23 @@ export async function submitJob(
   const parts: Buffer[] = [];
 
   // request-json part
-  parts.push(Buffer.from(
-    `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="request-json"\r\n\r\n` +
-    requestJson + `\r\n`
-  ));
+  parts.push(
+    Buffer.from(
+      `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="request-json"\r\n\r\n` +
+        requestJson +
+        `\r\n`,
+    ),
+  );
 
   // file part
-  parts.push(Buffer.from(
-    `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n` +
-    `Content-Type: application/octet-stream\r\n\r\n`
-  ));
+  parts.push(
+    Buffer.from(
+      `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n` +
+        `Content-Type: application/octet-stream\r\n\r\n`,
+    ),
+  );
   parts.push(imageBuffer);
   parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
 
@@ -227,17 +240,29 @@ async function pollJob(localId: string) {
           console.log(`[Astrometry] Fetching WCS file from ${wcsUrl}`);
           const wcsRes = await fetch(wcsUrl);
           const wcsText = await wcsRes.text();
-          
+
           console.log('[Astrometry] WCS file response length:', wcsText.length);
-          
+
           if (wcsText && wcsText.includes('CRPIX1')) {
             // Parse WCS file
             const parsed = parseFITSHeader(wcsText);
-            const required = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'];
-            const hasAll = required.every(key => typeof parsed[key] === 'number');
-            
-            console.log('[Astrometry] Parsed WCS keys:', Object.keys(parsed).filter(k => required.includes(k)));
-            
+            const required = [
+              'CRPIX1',
+              'CRPIX2',
+              'CRVAL1',
+              'CRVAL2',
+              'CD1_1',
+              'CD1_2',
+              'CD2_1',
+              'CD2_2',
+            ];
+            const hasAll = required.every((key) => typeof parsed[key] === 'number');
+
+            console.log(
+              '[Astrometry] Parsed WCS keys:',
+              Object.keys(parsed).filter((k) => required.includes(k)),
+            );
+
             if (hasAll) {
               const wcs: any = {
                 CRPIX1: parsed.CRPIX1 as number,
@@ -251,7 +276,7 @@ async function pollJob(localId: string) {
                 NAXIS1: job.imageWidth,
                 NAXIS2: job.imageHeight,
               };
-              
+
               // Include SIP distortion coefficients if present
               if (parsed.AP_ORDER) {
                 wcs.AP_ORDER = parsed.AP_ORDER;
@@ -271,9 +296,14 @@ async function pollJob(localId: string) {
                   }
                 }
               }
-              
-              console.log('[Astrometry] Got WCS from astrometry.net with SIP order:', parsed.AP_ORDER || 0, '/', parsed.BP_ORDER || 0);
-              
+
+              console.log(
+                '[Astrometry] Got WCS from astrometry.net with SIP order:',
+                parsed.AP_ORDER || 0,
+                '/',
+                parsed.BP_ORDER || 0,
+              );
+
               const correspondences = wcsToCorrespondences(wcs, job.imageWidth, job.imageHeight);
               if (correspondences.length >= 3) {
                 job.status = 'solved';
@@ -286,7 +316,7 @@ async function pollJob(localId: string) {
         } catch (e) {
           console.log('[Astrometry] Failed to get WCS file:', e);
         }
-        
+
         // Fallback: Get calibration
         const calRes = await fetch(`${API_BASE}/jobs/${job.jobId}/calibration/`);
         const cal = await calRes.json();
@@ -317,13 +347,9 @@ async function pollJob(localId: string) {
   job.error = 'Timeout: résolution trop longue';
 }
 
-export function calibrationToCorrespondences(
-  cal: any,
-  imageWidth: number,
-  imageHeight: number,
-) {
+export function calibrationToCorrespondences(cal: any, imageWidth: number, imageHeight: number) {
   console.log('[Astrometry] Calibration:', JSON.stringify(cal, null, 2));
-  
+
   // astrometry.net calibration gives: ra, dec, radius, pixscale, orientation, parity
   // NOTE: astrometry.net uses IMAGE coordinates (0,0 at top-left, Y down)
   // We need to construct WCS in FITS convention (1,1 at bottom-left, Y up)
@@ -344,10 +370,10 @@ export function calibrationToCorrespondences(
   // Convert to FITS coords (1-indexed, bottom-left origin):
   //   FITS_X = pixel_X + 1
   //   FITS_Y = H - pixel_Y
-  const centerPixelX = imageWidth / 2;  // 2769.5
+  const centerPixelX = imageWidth / 2; // 2769.5
   const centerPixelY = imageHeight / 2; // 2166
   const wcs = {
-    CRPIX1: centerPixelX + 1,        // 2770.5
+    CRPIX1: centerPixelX + 1, // 2770.5
     CRPIX2: imageHeight - centerPixelY, // 4332 - 2166 = 2166
     CRVAL1: cal.ra,
     CRVAL2: cal.dec,
@@ -367,9 +393,11 @@ export function calibrationToCorrespondences(
   const correspondences = wcsToCorrespondences(wcs, imageWidth, imageHeight);
   console.log('[Astrometry] Found correspondences:', correspondences.length);
   for (const c of correspondences.slice(0, 3)) {
-    console.log(`  [${c.pointIndex}] ${c.starName} at pixel (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)})`);
+    console.log(
+      `  [${c.pointIndex}] ${c.starName} at pixel (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)})`,
+    );
   }
-  
+
   return correspondences;
 }
 
@@ -405,17 +433,30 @@ function extractImageDimensionsFromJobInfo(info: any): { width?: number; height?
   return { width, height };
 }
 
-function extractImageDimensionsFromParsedWcsHeader(parsed: Record<string, any>): { width?: number; height?: number } {
+function extractImageDimensionsFromParsedWcsHeader(parsed: Record<string, any>): {
+  width?: number;
+  height?: number;
+} {
   const width = asPositiveNumber(parsed.IMAGEW) ?? asPositiveNumber(parsed.NAXIS1);
   const height = asPositiveNumber(parsed.IMAGEH) ?? asPositiveNumber(parsed.NAXIS2);
   return { width, height };
 }
 
 // List recent user submissions from astrometry.net
-export async function listUserSubmissions(): Promise<Array<{ submissionId: number; jobId?: number; status: string; timestamp?: string; filename?: string; width?: number; height?: number }>> {
+export async function listUserSubmissions(): Promise<
+  Array<{
+    submissionId: number;
+    jobId?: number;
+    status: string;
+    timestamp?: string;
+    filename?: string;
+    width?: number;
+    height?: number;
+  }>
+> {
   try {
     const session = await getSession();
-    
+
     console.log('[Astrometry] Fetching user submissions...');
     const res = await fetch(`${API_BASE}/myjobs/`, {
       method: 'POST',
@@ -430,7 +471,7 @@ export async function listUserSubmissions(): Promise<Array<{ submissionId: numbe
 
     const data = await res.json();
     console.log('[Astrometry] myjobs response:', JSON.stringify(data).substring(0, 200));
-    
+
     if (!data || !data.jobs) {
       console.log('[Astrometry] No jobs field in response');
       return [];
@@ -440,9 +481,17 @@ export async function listUserSubmissions(): Promise<Array<{ submissionId: numbe
     console.log(`[Astrometry] Found ${jobIds.length} jobs`);
 
     // Fetch job details in batches to get filename and status
-    const submissions: Array<{ submissionId: number; jobId?: number; status: string; timestamp?: string; filename?: string; width?: number; height?: number }> = [];
+    const submissions: Array<{
+      submissionId: number;
+      jobId?: number;
+      status: string;
+      timestamp?: string;
+      filename?: string;
+      width?: number;
+      height?: number;
+    }> = [];
     const batchSize = 5;
-    
+
     for (let i = 0; i < jobIds.length; i += batchSize) {
       const batch = jobIds.slice(i, i + batchSize);
       const batchPromises = batch.map(async (jobId: number) => {
@@ -459,7 +508,7 @@ export async function listUserSubmissions(): Promise<Array<{ submissionId: numbe
               height: undefined,
             };
           }
-          
+
           const info = await infoRes.json();
           let dims = extractImageDimensionsFromJobInfo(info);
 
@@ -505,16 +554,16 @@ export async function listUserSubmissions(): Promise<Array<{ submissionId: numbe
           };
         }
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
       submissions.push(...batchResults);
     }
 
     console.log(`[Astrometry] Returning ${submissions.length} submissions with details`);
-    
+
     // Sort by job ID descending (higher IDs = more recent)
     submissions.sort((a, b) => (b.jobId || 0) - (a.jobId || 0));
-    
+
     return submissions;
   } catch (err) {
     console.error('[Astrometry] Failed to list submissions:', err);
@@ -546,17 +595,28 @@ export async function reuseSubmission(
       console.log(`[Astrometry] Reusing job ${jobId}, fetching WCS from ${wcsUrl}`);
       const wcsRes = await fetch(wcsUrl);
       const wcsText = await wcsRes.text();
-      
+
       if (wcsText && wcsText.includes('CRPIX1')) {
         const parsed = parseFITSHeader(wcsText);
-        const required = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'];
-        const hasAll = required.every(key => typeof parsed[key] === 'number');
-        
+        const required = [
+          'CRPIX1',
+          'CRPIX2',
+          'CRVAL1',
+          'CRVAL2',
+          'CD1_1',
+          'CD1_2',
+          'CD2_1',
+          'CD2_2',
+        ];
+        const hasAll = required.every((key) => typeof parsed[key] === 'number');
+
         if (hasAll) {
           // Get original image dimensions from WCS
-          const originalWidth = (parsed.IMAGEW as number) || (parsed.NAXIS1 as number) || imageWidth;
-          const originalHeight = (parsed.IMAGEH as number) || (parsed.NAXIS2 as number) || imageHeight;
-          
+          const originalWidth =
+            (parsed.IMAGEW as number) || (parsed.NAXIS1 as number) || imageWidth;
+          const originalHeight =
+            (parsed.IMAGEH as number) || (parsed.NAXIS2 as number) || imageHeight;
+
           // Scale CRPIX if image dimensions changed
           const scaleX = imageWidth / originalWidth;
           const scaleY = imageHeight / originalHeight;
@@ -566,7 +626,8 @@ export async function reuseSubmission(
           // usually means the selected astrometry job belongs to another image.
           const originalAspect = originalWidth / originalHeight;
           const currentAspect = imageWidth / imageHeight;
-          const aspectDiff = Math.abs(currentAspect - originalAspect) / Math.max(1e-9, originalAspect);
+          const aspectDiff =
+            Math.abs(currentAspect - originalAspect) / Math.max(1e-9, originalAspect);
           const scaleSkew = Math.abs(scaleX - scaleY) / Math.max(1e-9, Math.max(scaleX, scaleY));
           const ASPECT_DIFF_LIMIT = 0.03;
           const SCALE_SKEW_LIMIT = 0.03;
@@ -577,9 +638,11 @@ export async function reuseSubmission(
               error: `Selected astrometry solution appears to be for a different image (solution ${originalWidth}x${originalHeight}, current ${imageWidth}x${imageHeight}).`,
             };
           }
-          
-          console.log(`[Astrometry] WCS original: ${originalWidth}×${originalHeight}, current: ${imageWidth}×${imageHeight}, scale: ${scaleX.toFixed(4)}×${scaleY.toFixed(4)}`);
-          
+
+          console.log(
+            `[Astrometry] WCS original: ${originalWidth}×${originalHeight}, current: ${imageWidth}×${imageHeight}, scale: ${scaleX.toFixed(4)}×${scaleY.toFixed(4)}`,
+          );
+
           // Scale CRPIX to match new image size, keep CD matrix as-is
           const wcs: any = {
             CRPIX1: (parsed.CRPIX1 as number) * scaleX,
@@ -593,7 +656,7 @@ export async function reuseSubmission(
             NAXIS1: imageWidth,
             NAXIS2: imageHeight,
           };
-          
+
           // Include SIP distortion if present
           if (parsed.AP_ORDER) {
             wcs.AP_ORDER = parsed.AP_ORDER;
@@ -613,12 +676,14 @@ export async function reuseSubmission(
               }
             }
           }
-          
+
           loadServerCatalog();
           const correspondences = wcsToCorrespondences(wcs, imageWidth, imageHeight);
-          
+
           if (correspondences.length >= 3) {
-            console.log(`[Astrometry] Reused job ${jobId} with ${correspondences.length} correspondences`);
+            console.log(
+              `[Astrometry] Reused job ${jobId} with ${correspondences.length} correspondences`,
+            );
             const dsoIds = await fetchObjectsInField(jobId);
             return { success: true, correspondences, dsoIds };
           }
@@ -627,20 +692,22 @@ export async function reuseSubmission(
     } catch (err) {
       console.log('[Astrometry] Failed to get WCS file for reuse:', err);
     }
-    
+
     // Fallback: Get calibration
     const calRes = await fetch(`${API_BASE}/jobs/${jobId}/calibration/`);
     const cal = await calRes.json();
-    
+
     loadServerCatalog();
     const correspondences = calibrationToCorrespondences(cal, imageWidth, imageHeight);
-    
+
     if (correspondences.length >= 3) {
-      console.log(`[Astrometry] Reused job ${jobId} via calibration with ${correspondences.length} correspondences`);
+      console.log(
+        `[Astrometry] Reused job ${jobId} via calibration with ${correspondences.length} correspondences`,
+      );
       const dsoIds = await fetchObjectsInField(jobId);
       return { success: true, correspondences, dsoIds };
     }
-    
+
     return {
       success: false,
       error: 'No correspondences found',
@@ -655,7 +722,7 @@ export async function reuseSubmission(
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

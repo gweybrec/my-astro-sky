@@ -6,15 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Project-specific skills live in `.claude/skills/`. The harness auto-invokes them on matching trigger phrases.
 
-| Skill | When to invoke |
-|---|---|
-| `frontend-feature` | Adding or changing purely frontend UI (panels, modals, widgets, CSS) |
-| `fullstack-feature` | Adding or changing API routes together with frontend UI |
-| `add-photo-metadata` | Adding a new optional field to photo metadata (DB, all 3 UI editors, export/import, WCS/astrometry pre-fill) |
-| `add-dso-catalog` | Integrating a new DSO catalog (RCW, Barnard, Abell…) |
-| `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog |
-| `test-placement` | Testing astrophoto upload, plate solving, and sky-map placement |
-| `profile-performance` | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark |
+| Skill                   | When to invoke                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `frontend-feature`      | Adding or changing purely frontend UI (panels, modals, widgets, CSS)                                               |
+| `fullstack-feature`     | Adding or changing API routes together with frontend UI                                                            |
+| `add-photo-metadata`    | Adding a new optional field to photo metadata (DB, all 3 UI editors, export/import, WCS/astrometry pre-fill)       |
+| `add-dso-catalog`       | Integrating a new DSO catalog (RCW, Barnard, Abell…)                                                               |
+| `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog                                         |
+| `test-placement`        | Testing astrophoto upload, plate solving, and sky-map placement                                                    |
+| `profile-performance`   | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark |
 
 ---
 
@@ -61,7 +61,25 @@ fs.writeFileSync(path,JSON.stringify(d));
 node scripts/add-ratings.mjs
 ```
 
-No linter is configured.
+### Linting & formatting
+
+ESLint (flat config, `eslint.config.js`) + Prettier (`.prettierrc.json`).
+
+```bash
+npm run lint          # ESLint over the repo (warn-only — never fails)
+npm run lint:fix      # ESLint with --fix
+npm run format        # Prettier --write (format everything)
+npm run format:check  # Prettier --check (CI gate; must pass)
+```
+
+**Warn-only convention:** every ESLint rule is set to `warn`, so `npm run lint` exits 0
+and never blocks CI — it's a guardrail against _new_ issues, not a mandate to fix the
+~750 existing warnings. The `ci.yml` **Lint** step surfaces them; the **Prettier check**
+step is the only hard gate. Promote a rule from `warn` to `error` in `eslint.config.js`
+once its existing warnings have been paid down. Highest-value rules already on:
+`@typescript-eslint/no-floating-promises`, `no-unused-vars`, `no-explicit-any`,
+`no-console` (allows `warn`/`error`). Prettier owns all formatting (no ESLint stylistic
+rules — `eslint-config-prettier` disables them).
 
 ## Unit Tests
 
@@ -74,6 +92,7 @@ Before finishing any edit to a `.ts` file in `src/` or `server/`, check `tests/u
 A PostToolUse hook (`.claude/hooks/vitest-on-ts-edit.js`) runs `npx vitest run` automatically after any Edit or Write to `src/**/*.ts` or `server/**/*.ts`, so regressions surface immediately.
 
 Fixtures in `tests/fixtures/`:
+
 - `solve-field/LDN1235.wcs` and `M1_CCD_siril.wcs` — real WCS files from local solve-field runs
 - `astrometry/10796000-*.json` and `10796000-wcs.fits` — real data from nova.astrometry.net job 10796000 (M13 field)
 - `stars.test.json` — minimal 6-star catalog for deterministic WCS tests
@@ -110,25 +129,26 @@ CI runs the full suite on every push/PR via `.github/workflows/test.yml` (Node.j
 
 This repository has two doc audiences with separate folders. **Never mix them.**
 
-| File | Audience | Owns |
-|---|---|---|
-| `docs/user/getting-started.md` | Astronomers / end users | First-run walkthrough: uploading and placing your first photo, navigating the sky map |
-| `docs/user/installing-app.md` | Astronomers / end users | Getting the app running: desktop app download/install/uninstall, self-hosting via Docker, LAN sharing |
-| `docs/user/user-guide.md` | Astronomers / end users | Features, UI, plate solving methods, solver installation, how to access the running app |
-| `docs/user/installing-solvers.md` | Astronomers / end users | Installing ASTAP, solve-field, and astrometry.net API key setup, per OS |
-| `docs/user/troubleshooting.md` | Astronomers / end users | Common problems and fixes: plate solving, photo placement, UI, desktop app logs |
-| `docs/dev/architecture.md` | Developers | Module descriptions (frontend + backend), data flows, key types |
-| `docs/dev/dso-catalog.md` | Developers | SIMBAD validation, known OpenNGC data quality issues, rating/difficulty field docs |
-| `docs/dev/distribution.md` | Developers / maintainers | Building/running from source, Electron packaging internals, env var & CSP config reference |
-| `docs/dev/solve-field-placement.md` | Developers | Y-axis convention, EXIF orientation correction, plate solving diagnostic checklist |
-| `docs/dev/ui-guidelines.md` | Developers | CSS colour tokens, typography, component class inventory, known CSS issues |
-| `docs/dev/curved-arrow-svg.md` | Developers | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows |
-| `docs/dev/imaging-recipe.md` | Developers | Integration time algorithm, filter selection logic, type-family constants, tuning guide |
-| `docs/dev/target-recommender.md` | Developers | Target recommender pipeline: filters, scoring formula, diversity cap, altitude preferences, known constraints |
-| `docs/dev/render-performance.md` | Developers | Transferable canvas-perf techniques from the sky-map render loop: profiling, hoisting per-frame invariants, sprite atlas, input coalescing, cache-key bucketing/drift |
-| `docs/dev/ci.md` | Developers | GitHub Actions workflows: CI, tests, Docker image build/smoke-test, Electron release builds; also documents the (workflow-free) GitHub Pages docs deployment |
+| File                                | Audience                 | Owns                                                                                                                                                                  |
+| ----------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/user/getting-started.md`      | Astronomers / end users  | First-run walkthrough: uploading and placing your first photo, navigating the sky map                                                                                 |
+| `docs/user/installing-app.md`       | Astronomers / end users  | Getting the app running: desktop app download/install/uninstall, self-hosting via Docker, LAN sharing                                                                 |
+| `docs/user/user-guide.md`           | Astronomers / end users  | Features, UI, plate solving methods, solver installation, how to access the running app                                                                               |
+| `docs/user/installing-solvers.md`   | Astronomers / end users  | Installing ASTAP, solve-field, and astrometry.net API key setup, per OS                                                                                               |
+| `docs/user/troubleshooting.md`      | Astronomers / end users  | Common problems and fixes: plate solving, photo placement, UI, desktop app logs                                                                                       |
+| `docs/dev/architecture.md`          | Developers               | Module descriptions (frontend + backend), data flows, key types                                                                                                       |
+| `docs/dev/dso-catalog.md`           | Developers               | SIMBAD validation, known OpenNGC data quality issues, rating/difficulty field docs                                                                                    |
+| `docs/dev/distribution.md`          | Developers / maintainers | Building/running from source, Electron packaging internals, env var & CSP config reference                                                                            |
+| `docs/dev/solve-field-placement.md` | Developers               | Y-axis convention, EXIF orientation correction, plate solving diagnostic checklist                                                                                    |
+| `docs/dev/ui-guidelines.md`         | Developers               | CSS colour tokens, typography, component class inventory, known CSS issues                                                                                            |
+| `docs/dev/curved-arrow-svg.md`      | Developers               | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows                                                                                           |
+| `docs/dev/imaging-recipe.md`        | Developers               | Integration time algorithm, filter selection logic, type-family constants, tuning guide                                                                               |
+| `docs/dev/target-recommender.md`    | Developers               | Target recommender pipeline: filters, scoring formula, diversity cap, altitude preferences, known constraints                                                         |
+| `docs/dev/render-performance.md`    | Developers               | Transferable canvas-perf techniques from the sky-map render loop: profiling, hoisting per-frame invariants, sprite atlas, input coalescing, cache-key bucketing/drift |
+| `docs/dev/ci.md`                    | Developers               | GitHub Actions workflows: CI, tests, Docker image build/smoke-test, Electron release builds; also documents the (workflow-free) GitHub Pages docs deployment          |
 
 **Rules:**
+
 - User-facing content (features, how to use, how to install a solver) → `docs/user/`
 - Technical content (implementation, deployment, architecture, build steps) → `docs/dev/`
 - `CLAUDE.md` itself holds only AI-agent guidance (commands, conventions, brief pointers) — it does not duplicate the content of the doc files
@@ -147,6 +167,7 @@ See [docs/dev/ui-guidelines.md](docs/dev/ui-guidelines.md) for CSS colour tokens
 See [docs/dev/distribution.md](docs/dev/distribution.md) for deployment options (Docker, Node.js) and the planned Electron desktop packaging.
 
 See [docs/dev/solve-field-placement.md](docs/dev/solve-field-placement.md) for:
+
 - Y-axis convention (`fitsYConvention`) and why it is always `false` for JPEG/PNG input
 - EXIF orientation correction (`rawToBrowserCoords`) and the correct formula for each orientation value
 - Diagnostic checklist when a newly solved image appears misaligned
@@ -156,6 +177,7 @@ See [docs/dev/solve-field-placement.md](docs/dev/solve-field-placement.md) for:
 `public/data/dso.json` — 12,000+ objects, columnar JSON, 15 fields.
 
 See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
+
 - SIMBAD validation workflow and known OpenNGC errors (including the SH2 systematic coordinate drift)
 - Rating and difficulty field documentation and regeneration commands
 
@@ -171,19 +193,19 @@ See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
 
 Use **[Conventional Commits](https://www.conventionalcommits.org)** — the release changelog is generated by parsing them (`cliff.toml` + git-cliff). Accepted types and their changelog sections:
 
-| Type | Section | Use for |
-|---|---|---|
-| `feat:` | Features | A brand-new feature/capability |
-| `improvement:` | Improvements | An enhancement to an existing feature (custom type) |
-| `fix:` | Bug Fixes | A bug fix |
-| `perf:` | Performance | A speed/efficiency change with no behavior change |
-| `refactor:` | Refactor | Internal restructuring, no observable change |
-| `docs:` | Documentation | Docs only |
-| `test:` | Testing | Tests only |
-| `style:`, `build:` | Styling / Build System | Formatting, build tooling |
-| `chore:`, `ci:` | *(hidden)* | Skipped from the changelog |
+| Type               | Section                | Use for                                             |
+| ------------------ | ---------------------- | --------------------------------------------------- |
+| `feat:`            | Features               | A brand-new feature/capability                      |
+| `improvement:`     | Improvements           | An enhancement to an existing feature (custom type) |
+| `fix:`             | Bug Fixes              | A bug fix                                           |
+| `perf:`            | Performance            | A speed/efficiency change with no behavior change   |
+| `refactor:`        | Refactor               | Internal restructuring, no observable change        |
+| `docs:`            | Documentation          | Docs only                                           |
+| `test:`            | Testing                | Tests only                                          |
+| `style:`, `build:` | Styling / Build System | Formatting, build tooling                           |
+| `chore:`, `ci:`    | _(hidden)_             | Skipped from the changelog                          |
 
-Append `!` (e.g. `feat!:`) or a `BREAKING CHANGE:` footer for breaking changes. Preview the *unreleased* section (since the last tag) to the console with `npm run changelog:preview`; regenerate the actual files with `npm run changelog` (runs `scripts/generate-changelog.mjs`). `CHANGELOG.md` is scoped to the **current major version series**; completed majors are frozen into `CHANGELOG.v<n>.md` archives automatically at the next major release. See [docs/dev/ci.md](docs/dev/ci.md#release-release-yml) for how the release pipeline consumes commits.
+Append `!` (e.g. `feat!:`) or a `BREAKING CHANGE:` footer for breaking changes. Preview the _unreleased_ section (since the last tag) to the console with `npm run changelog:preview`; regenerate the actual files with `npm run changelog` (runs `scripts/generate-changelog.mjs`). `CHANGELOG.md` is scoped to the **current major version series**; completed majors are frozen into `CHANGELOG.v<n>.md` archives automatically at the next major release. See [docs/dev/ci.md](docs/dev/ci.md#release-release-yml) for how the release pipeline consumes commits.
 
 ### Before adding CSS
 

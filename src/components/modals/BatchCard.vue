@@ -1,11 +1,14 @@
 <template>
   <div
     ref="cardEl"
-    :class="['batch-item-card', {
-      'status-success': item.status === 'success' || item.status === 'placing',
-      'status-placed': item.status === 'placed',
-      'status-failed': item.status === 'failed' || item.status === 'canceled',
-    }]"
+    :class="[
+      'batch-item-card',
+      {
+        'status-success': item.status === 'success' || item.status === 'placing',
+        'status-placed': item.status === 'placed',
+        'status-failed': item.status === 'failed' || item.status === 'canceled',
+      },
+    ]"
     :data-item-id="item.id"
   >
     <!-- Trash button (absolute corner) -->
@@ -31,11 +34,35 @@
         <!-- Solver select -->
         <div class="batch-item-controls">
           <span class="batch-solver-label">{{ t('batch.solverLabel') }}</span>
-          <select class="batch-solver-select" v-model="solverModel" :disabled="allSolversDisabled || isBusy">
-            <option v-if="allSolversDisabled" value="" disabled>{{ t('batch.noSolverConfigured') }}</option>
-            <option value="solve-field" :disabled="!solverAvailability.solveField" :title="t('modal.solverNoPath')">{{ t('modal.solveFieldButton') }}</option>
-            <option value="astap" :disabled="!solverAvailability.astap" :title="t('modal.solverNoPath')">{{ t('modal.astapButton') }}</option>
-            <option value="astrometry" :disabled="!solverAvailability.astrometry" :title="t('modal.solverNoApiKey')">{{ t('modal.onlineButton') }}</option>
+          <select
+            class="batch-solver-select"
+            v-model="solverModel"
+            :disabled="allSolversDisabled || isBusy"
+          >
+            <option v-if="allSolversDisabled" value="" disabled>
+              {{ t('batch.noSolverConfigured') }}
+            </option>
+            <option
+              value="solve-field"
+              :disabled="!solverAvailability.solveField"
+              :title="t('modal.solverNoPath')"
+            >
+              {{ t('modal.solveFieldButton') }}
+            </option>
+            <option
+              value="astap"
+              :disabled="!solverAvailability.astap"
+              :title="t('modal.solverNoPath')"
+            >
+              {{ t('modal.astapButton') }}
+            </option>
+            <option
+              value="astrometry"
+              :disabled="!solverAvailability.astrometry"
+              :title="t('modal.solverNoApiKey')"
+            >
+              {{ t('modal.onlineButton') }}
+            </option>
           </select>
         </div>
 
@@ -46,7 +73,9 @@
           :disabled="!solverAvailability.astrometry || reuseLoading || isBusy"
           :title="!solverAvailability.astrometry ? t('modal.solverNoApiKey') : undefined"
           @click="handleReuse"
-        >{{ reuseLoaded ? t('batch.reuseLoaded') : (reuseLoading ? '…' : t('batch.reuseOnline')) }}</button>
+        >
+          {{ reuseLoaded ? t('batch.reuseLoaded') : reuseLoading ? '…' : t('batch.reuseOnline') }}
+        </button>
       </div>
     </div>
 
@@ -57,22 +86,40 @@
         :class="['batch-wcs-btn', { 'wcs-loaded': manualLoaded }]"
         :disabled="manualBusy || isBusy"
         @click="openManual"
-      >{{ manualLoaded ? t('batch.manualDone') : t('batch.manualButton') }}</button>
+      >
+        {{ manualLoaded ? t('batch.manualDone') : t('batch.manualButton') }}
+      </button>
       <button
         type="button"
-        :class="['batch-wcs-btn', { 'wcs-loaded': wcsLoaded && !wcsWarning, 'wcs-warning': wcsWarning }]"
+        :class="[
+          'batch-wcs-btn',
+          { 'wcs-loaded': wcsLoaded && !wcsWarning, 'wcs-warning': wcsWarning },
+        ]"
         :disabled="wcsLoading || isBusy"
         @click="triggerWcsFile"
-      >{{ wcsLoaded ? `✓ ${wcsFileName}` : (wcsLoading ? '…' : t('modal.wcsButton')) }}</button>
+      >
+        {{ wcsLoaded ? `✓ ${wcsFileName}` : wcsLoading ? '…' : t('modal.wcsButton') }}
+      </button>
       <button
-        v-if="wcsLoaded && item.status !== 'solving' && item.status !== 'placing' && item.status !== 'placed'"
+        v-if="
+          wcsLoaded &&
+          item.status !== 'solving' &&
+          item.status !== 'placing' &&
+          item.status !== 'placed'
+        "
         type="button"
         class="integration-row-trash"
         :title="t('modal.wcsRemove')"
         v-html="trashSvg"
         @click="clearWcs"
       ></button>
-      <input ref="wcsInputEl" type="file" accept=".fit,.fits,.tif,.tiff" class="hidden" @change="handleWcsFile" />
+      <input
+        ref="wcsInputEl"
+        type="file"
+        accept=".fit,.fits,.tif,.tiff"
+        class="hidden"
+        @change="handleWcsFile"
+      />
     </div>
 
     <!-- WCS / manual error message (inline, full single-modal parity) -->
@@ -89,7 +136,9 @@
           class="hints-clear-btn"
           :title="t('modal.hintsClear')"
           @click="clearHint"
-        >×</button>
+        >
+          ×
+        </button>
       </div>
 
       <div class="relative">
@@ -101,7 +150,10 @@
           @input="onHintInput"
           @keydown.enter.prevent="selectFirstHintResult"
         />
-        <div v-if="showHintDropdown && hintResults.length" class="search-results-dropdown batch-hint-dropdown">
+        <div
+          v-if="showHintDropdown && hintResults.length"
+          class="search-results-dropdown batch-hint-dropdown"
+        >
           <div
             v-for="r in hintResults"
             :key="r.label"
@@ -132,7 +184,12 @@
     </div>
 
     <!-- Status area -->
-    <BatchSolveStatus :item="item" @cancel="onCancel" @retry="$emit('retry')" @retry-upload="$emit('retry-upload')" />
+    <BatchSolveStatus
+      :item="item"
+      @cancel="onCancel"
+      @retry="$emit('retry')"
+      @retry-upload="$emit('retry-upload')"
+    />
 
     <!-- Collapsible metadata section -->
     <div class="batch-item-meta">
@@ -140,7 +197,9 @@
         type="button"
         :class="['batch-meta-toggle', { open: item.metaOpen }]"
         @click="item.metaOpen = !item.metaOpen"
-      >{{ t('modal.metadataToggle') }}</button>
+      >
+        {{ t('modal.metadataToggle') }}
+      </button>
 
       <div v-show="item.metaOpen" class="batch-meta-body">
         <MetadataEditorPanel
@@ -230,19 +289,27 @@ onUnmounted(() => {
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const displayName = computed(() => props.item.customName || stripExtension(props.item.file.name));
 
-const allSolversDisabled = computed(() =>
-  !props.solverAvailability.solveField && !props.solverAvailability.astap && !props.solverAvailability.astrometry,
+const allSolversDisabled = computed(
+  () =>
+    !props.solverAvailability.solveField &&
+    !props.solverAvailability.astap &&
+    !props.solverAvailability.astrometry,
 );
 
 // Solving/placing in progress — lock the solver choice and solution-input controls
 // so they can't be changed out from under a running solve.
-const isBusy = computed(() =>
-  props.item.status === 'solving' || props.item.status === 'placing' || props.item.status === 'placed',
+const isBusy = computed(
+  () =>
+    props.item.status === 'solving' ||
+    props.item.status === 'placing' ||
+    props.item.status === 'placed',
 );
 
 const solverModel = computed({
-  get: () => allSolversDisabled.value ? '' : props.item.solver,
-  set: (v: string) => { if (v) props.item.solver = v as SolverType; },
+  get: () => (allSolversDisabled.value ? '' : props.item.solver),
+  set: (v: string) => {
+    if (v) props.item.solver = v as SolverType;
+  },
 });
 
 // ─── WCS loading ──────────────────────────────────────────────────────────────
@@ -254,7 +321,10 @@ const wcsWarning = ref(false);
 const wcsError = ref('');
 
 function triggerWcsFile() {
-  if (wcsInputEl.value) { wcsInputEl.value.value = ''; wcsInputEl.value.click(); }
+  if (wcsInputEl.value) {
+    wcsInputEl.value.value = '';
+    wcsInputEl.value.click();
+  }
 }
 
 async function handleWcsFile(e: Event) {
@@ -270,8 +340,10 @@ async function handleWcsFile(e: Event) {
         const { sourceW, sourceH, targetW, targetH } = result.dimensionWarning;
         showToast({
           message: t('modal.wcsDimensionMismatchBody', {
-            fitsW: String(sourceW), fitsH: String(sourceH),
-            jpegW: String(targetW), jpegH: String(targetH),
+            fitsW: String(sourceW),
+            fitsH: String(sourceH),
+            jpegW: String(targetW),
+            jpegH: String(targetH),
           }),
           type: 'warning',
           duration: 6000,
@@ -283,14 +355,17 @@ async function handleWcsFile(e: Event) {
       props.item.status = 'success';
       // WCS solving doesn't return DSOs from the server; derive them from the
       // solved correspondences against the local catalog (like the async solvers).
-      props.item.dsoIds = (result.dsoIds && result.dsoIds.length > 0)
-        ? [...result.dsoIds]
-        : findDSOIdsFromCorrespondences(result.correspondences, imgWidth, imgHeight);
+      props.item.dsoIds =
+        result.dsoIds && result.dsoIds.length > 0
+          ? [...result.dsoIds]
+          : findDSOIdsFromCorrespondences(result.correspondences, imgWidth, imgHeight);
       if (result.dateObs && !props.item.observationDate) {
         props.item.observationDate = result.dateObs;
       }
       if (result.expTime && result.stackCnt && props.item.integrations.length === 0) {
-        props.item.integrations = [{ frames: Math.round(result.stackCnt), seconds: Math.round(result.expTime), filter: '' }];
+        props.item.integrations = [
+          { frames: Math.round(result.stackCnt), seconds: Math.round(result.expTime), filter: '' },
+        ];
       }
       wcsLoaded.value = true;
       wcsFileName.value = f.name;
@@ -300,7 +375,10 @@ async function handleWcsFile(e: Event) {
       wcsError.value = t(info.key, info.params);
     }
   } catch (err: any) {
-    wcsError.value = t('modal.wcsParseError', { filename: f.name, detail: err.message || 'unknown error' });
+    wcsError.value = t('modal.wcsParseError', {
+      filename: f.name,
+      detail: err.message || 'unknown error',
+    });
   } finally {
     wcsLoading.value = false;
   }
@@ -368,7 +446,11 @@ async function handleReuse() {
         props.item.dsoIds = result.dsoIds ?? [];
         reuseLoaded.value = true;
       } else {
-        showToast({ message: result.error || t('modal.reuseFailed'), type: 'error', duration: 3000 });
+        showToast({
+          message: result.error || t('modal.reuseFailed'),
+          type: 'error',
+          duration: 3000,
+        });
       }
     }
   } catch (err: any) {
@@ -387,13 +469,18 @@ let hintDebounce: ReturnType<typeof setTimeout> | null = null;
 function onHintInput() {
   if (hintDebounce) clearTimeout(hintDebounce);
   const q = hintQuery.value.trim();
-  if (q.length < 2) { showHintDropdown.value = false; return; }
+  if (q.length < 2) {
+    showHintDropdown.value = false;
+    return;
+  }
   hintDebounce = setTimeout(async () => {
     try {
       const results = await searchUnified(q, 5);
       hintResults.value = results;
       showHintDropdown.value = results.length > 0;
-    } catch { showHintDropdown.value = false; }
+    } catch {
+      showHintDropdown.value = false;
+    }
   }, 400);
 }
 
@@ -443,7 +530,7 @@ async function flushMetaSave() {
   const payload = {
     dsoIds: [...props.item.dsoIds],
     labels: [...props.item.labels],
-    pointsOfInterest: props.item.pointsOfInterest.map(p => ({ ...p })),
+    pointsOfInterest: props.item.pointsOfInterest.map((p) => ({ ...p })),
     integrations: sanitizeIntegrationRows(props.item.integrations),
     observationDate: props.item.observationDate || null,
     notes: props.item.notes,
@@ -455,9 +542,11 @@ async function flushMetaSave() {
     props.item.photo = updated;
     const canvas = useCanvasStore();
     canvas.overlay?.updatePhotoData(updated);
-    const photos = canvas.overlay?.getPlacedPhotos().map(p => p.photo) ?? [];
+    const photos = canvas.overlay?.getPlacedPhotos().map((p) => p.photo) ?? [];
     canvas.gallery?.loadPhotos(photos);
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }
 
 onBeforeUnmount(() => {

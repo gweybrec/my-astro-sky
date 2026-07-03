@@ -1,4 +1,8 @@
-export interface ZoomPanState { scale: number; tx: number; ty: number; }
+export interface ZoomPanState {
+  scale: number;
+  tx: number;
+  ty: number;
+}
 
 export interface ZoomPanOptions {
   minScale?: number;
@@ -39,8 +43,13 @@ export function createImageZoomPan(
   const MIN_SCALE = opts?.minScale ?? 0.2;
   const MAX_SCALE = opts?.maxScale ?? 6;
 
-  let scale = 1, tx = 0, ty = 0;
-  let dragging = false, lastX = 0, lastY = 0, dragDist = 0;
+  let scale = 1,
+    tx = 0,
+    ty = 0;
+  let dragging = false,
+    lastX = 0,
+    lastY = 0,
+    dragDist = 0;
   let _wasDrag = false;
   const listeners: Array<() => void> = [];
 
@@ -59,8 +68,8 @@ export function createImageZoomPan(
   }
 
   const zoomOutBtn = makeBtn('−', 'Zoom out');
-  const resetBtn   = makeBtn('⟲', 'Reset', 'gallery-zoom-reset');
-  const zoomInBtn  = makeBtn('+', 'Zoom in');
+  const resetBtn = makeBtn('⟲', 'Reset', 'gallery-zoom-reset');
+  const zoomInBtn = makeBtn('+', 'Zoom in');
   controls.append(zoomOutBtn, resetBtn, zoomInBtn);
 
   // ── Transform ───────────────────────────────────────────────────────────────
@@ -87,7 +96,11 @@ export function createImageZoomPan(
   // ── Pointer drag ─────────────────────────────────────────────────────────────
   function onPointerDown(ev: PointerEvent) {
     if ((ev.target as HTMLElement).closest('.gallery-zoom-controls')) return;
-    try { container.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
+    try {
+      container.setPointerCapture(ev.pointerId);
+    } catch {
+      /* ignore */
+    }
     dragging = true;
     dragDist = 0;
     lastX = ev.clientX;
@@ -107,11 +120,17 @@ export function createImageZoomPan(
   }
 
   function onPointerUp(ev: PointerEvent) {
-    try { container.releasePointerCapture(ev.pointerId); } catch { /* ignore */ }
+    try {
+      container.releasePointerCapture(ev.pointerId);
+    } catch {
+      /* ignore */
+    }
     _wasDrag = dragDist > 5;
     dragging = false;
     // Reset after click handler has had a chance to read wasDrag
-    setTimeout(() => { _wasDrag = false; }, 0);
+    setTimeout(() => {
+      _wasDrag = false;
+    }, 0);
   }
 
   function onPointerCancel(ev: PointerEvent) {
@@ -120,20 +139,36 @@ export function createImageZoomPan(
 
   // ── Double-click reset ──────────────────────────────────────────────────────
   function onDblClick() {
-    scale = 1; tx = 0; ty = 0;
+    scale = 1;
+    tx = 0;
+    ty = 0;
     applyTransform();
   }
 
   // ── Button handlers ─────────────────────────────────────────────────────────
-  zoomInBtn.addEventListener('click',  (e) => { e.stopPropagation(); scale = Math.min(MAX_SCALE, scale * 1.25); applyTransform(); });
-  zoomOutBtn.addEventListener('click', (e) => { e.stopPropagation(); scale = Math.max(MIN_SCALE, scale * 0.8);  applyTransform(); });
-  resetBtn.addEventListener('click',   (e) => { e.stopPropagation(); scale = 1; tx = 0; ty = 0; applyTransform(); });
+  zoomInBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    scale = Math.min(MAX_SCALE, scale * 1.25);
+    applyTransform();
+  });
+  zoomOutBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    scale = Math.max(MIN_SCALE, scale * 0.8);
+    applyTransform();
+  });
+  resetBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    scale = 1;
+    tx = 0;
+    ty = 0;
+    applyTransform();
+  });
 
   // ── Attach listeners ────────────────────────────────────────────────────────
-  container.addEventListener('wheel',         onWheel, { passive: false });
-  container.addEventListener('pointerdown',   onPointerDown);
-  container.addEventListener('pointermove',   onPointerMove);
-  container.addEventListener('pointerup',     onPointerUp);
+  container.addEventListener('wheel', onWheel, { passive: false });
+  container.addEventListener('pointerdown', onPointerDown);
+  container.addEventListener('pointermove', onPointerMove);
+  container.addEventListener('pointerup', onPointerUp);
   container.addEventListener('pointercancel', onPointerCancel);
   img.addEventListener('dblclick', onDblClick);
 
@@ -147,13 +182,20 @@ export function createImageZoomPan(
         if (i !== -1) listeners.splice(i, 1);
       };
     },
-    get wasDrag() { return _wasDrag; },
-    reset() { scale = 1; tx = 0; ty = 0; applyTransform(); },
+    get wasDrag() {
+      return _wasDrag;
+    },
+    reset() {
+      scale = 1;
+      tx = 0;
+      ty = 0;
+      applyTransform();
+    },
     destroy() {
-      container.removeEventListener('wheel',         onWheel);
-      container.removeEventListener('pointerdown',   onPointerDown);
-      container.removeEventListener('pointermove',   onPointerMove);
-      container.removeEventListener('pointerup',     onPointerUp);
+      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener('pointerdown', onPointerDown);
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerup', onPointerUp);
       container.removeEventListener('pointercancel', onPointerCancel);
       img.removeEventListener('dblclick', onDblClick);
       controls.remove();

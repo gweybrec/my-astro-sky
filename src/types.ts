@@ -1,7 +1,7 @@
 export interface Star {
   hip: number;
-  ra: number;   // degrees [0, 360)
-  dec: number;  // degrees [-90, 90]
+  ra: number; // degrees [0, 360)
+  dec: number; // degrees [-90, 90]
   mag: number;
   bv: number;
   name?: string;
@@ -42,8 +42,8 @@ export interface PhotoCorrespondence {
   photoY: number;
   starHip: number;
   starName: string;
-  starRa?: number;   // direct RA (degrees) when starHip=0
-  starDec?: number;  // direct Dec (degrees) when starHip=0
+  starRa?: number; // direct RA (degrees) when starHip=0
+  starDec?: number; // direct Dec (degrees) when starHip=0
 }
 
 export interface PhotoIntegration {
@@ -109,10 +109,10 @@ export interface ViewState {
 }
 
 export interface DetectedSpot {
-  x: number;           // pixel X (in the downscaled image)
-  y: number;           // pixel Y
-  brightness: number;  // sum of intensities in the component
-  size: number;        // number of pixels
+  x: number; // pixel X (in the downscaled image)
+  y: number; // pixel Y
+  brightness: number; // sum of intensities in the component
+  size: number; // number of pixels
 }
 
 export interface StarDetectionResult {
@@ -150,9 +150,9 @@ export interface PlateSolveResult {
   sourceHeight?: number;
   dimensionWarning?: WCSDimensionWarning;
   dsoIds?: string[]; // DSOs detected in the field (populated by server-side solvers)
-  dateObs?: string;   // DATE-OBS from WCS header (UTC ISO 8601)
-  expTime?: number;   // EXPTIME from WCS header (seconds)
-  stackCnt?: number;  // STACKCNT from WCS header (frame count)
+  dateObs?: string; // DATE-OBS from WCS header (UTC ISO 8601)
+  expTime?: number; // EXPTIME from WCS header (seconds)
+  stackCnt?: number; // STACKCNT from WCS header (frame count)
 }
 
 export interface AstrometrySolveStatus {
@@ -163,31 +163,32 @@ export interface AstrometrySolveStatus {
   dsoIds?: string[];
 }
 
-export type DSOType = 'GxS' | 'GxE' | 'GxI' | 'Gx' | 'OC' | 'GC' | 'EN' | 'RN' | 'PN' | 'SNR' | 'DN' | '?';
+export type DSOType =
+  'GxS' | 'GxE' | 'GxI' | 'Gx' | 'OC' | 'GC' | 'EN' | 'RN' | 'PN' | 'SNR' | 'DN' | '?';
 
 export interface DSO {
-  id: string;           // display ID (highest priority: M > NGC > IC > SH2 > LBN > LDN)
-  ra: number;           // degrés [0, 360)
-  dec: number;          // degrés [-90, 90]
+  id: string; // display ID (highest priority: M > NGC > IC > SH2 > LBN > LDN)
+  ra: number; // degrés [0, 360)
+  dec: number; // degrés [-90, 90]
   type: DSOType;
-  majAxis: number | null;   // arcminutes
-  minAxis: number | null;   // arcminutes (null → même que majAxis)
-  pa: number;           // angle de position, degrés E du nord
+  majAxis: number | null; // arcminutes
+  minAxis: number | null; // arcminutes (null → même que majAxis)
+  pa: number; // angle de position, degrés E du nord
   mag: number | null;
   displayName: string | null;
-  catalogs: string[];   // all catalog IDs: ["M42", "NGC1976", "LBN974"]
-  emissionLines: string | null;  // e.g. "OIII > HD", "mostly NII"
-  constellation: string | null;  // 3-letter IAU abbreviation, e.g. "Lyr"
-  rating: number | null;         // photographic interest 1–5 (null if missing from catalog)
-  difficulty: number | null;     // imaging difficulty 1–5 (null if missing from catalog)
-  containerId: string | null;    // id of the smallest larger DSO enclosing this one (zoom-gated inner objects), null if none
-  priority: number;              // precomputed render order (lower = drawn first); spatial-spread blue-noise rank
-  catalog?: string | null;       // precomputed catalog prefix at load (see getDSOCatalog), null if none
+  catalogs: string[]; // all catalog IDs: ["M42", "NGC1976", "LBN974"]
+  emissionLines: string | null; // e.g. "OIII > HD", "mostly NII"
+  constellation: string | null; // 3-letter IAU abbreviation, e.g. "Lyr"
+  rating: number | null; // photographic interest 1–5 (null if missing from catalog)
+  difficulty: number | null; // imaging difficulty 1–5 (null if missing from catalog)
+  containerId: string | null; // id of the smallest larger DSO enclosing this one (zoom-gated inner objects), null if none
+  priority: number; // precomputed render order (lower = drawn first); spatial-spread blue-noise rank
+  catalog?: string | null; // precomputed catalog prefix at load (see getDSOCatalog), null if none
   // ── render cache (see projectCached / dsoSizeCos2) ──
   _px?: number;
   _py?: number;
   _pg?: number;
-  _cos2?: number;  // cached angular-size dec factor for angularSizeToCanvasPx
+  _cos2?: number; // cached angular-size dec factor for angularSizeToCanvasPx
   _cos2g?: number; // projection generation _cos2 was computed for
 }
 
@@ -201,7 +202,7 @@ export interface ManualPlacement {
   centerRa: number;
   centerDec: number;
   rotationDeg: number;
-  projPerPx: number;   // unités de projection par pixel photo
+  projPerPx: number; // unités de projection par pixel photo
   mirrorX: boolean;
   mirrorY: boolean;
 }

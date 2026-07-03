@@ -115,7 +115,7 @@ The gear section has three separate dropdowns:
 
 - **Telescope** — choose from the built-in catalog or a custom entry you added. The field of view (FOV) and recommended targets are computed from the telescope's focal length and aperture.
 - **Camera** — choose the sensor attached to the telescope. Used to compute FOV and pixel scale.
-- **Accessory** — optional. Select a focal reducer, barlow, or field flattener to adjust the effective focal length. Choose *None (no accessory)* to use the telescope's native focal length.
+- **Accessory** — optional. Select a focal reducer, barlow, or field flattener to adjust the effective focal length. Choose _None (no accessory)_ to use the telescope's native focal length.
 
 The **ℹ** icon next to each dropdown shows a popup with the selected item's key specifications (sensor size, focal length, magnification factor, etc.).
 
@@ -129,16 +129,16 @@ For integrated (smart) telescopes such as the Seestar S50 or Vespera, the camera
 
 Below the gear section you can narrow down which objects are recommended:
 
-| Filter | Description |
-|---|---|
-| **Observing location** | Latitude and longitude. Click *Use my location* for automatic geolocation, or type coordinates manually (decimal or DMS). |
-| **Date** | Night to plan for. Defaults to today. |
-| **Object types** | Toggle which DSO categories are included (spiral galaxy, elliptical galaxy, open cluster, globular cluster, emission nebula, reflection nebula, planetary nebula, supernova remnant, dark nebula). |
-| **Horizon** | Block objects that will be above the N/S/E/W horizon during the night — useful if a wall or mountain obstructs part of your sky. |
-| **DSO interest** | Filter by interest rating (1–5 stars, as assigned in the catalog). |
-| **Difficulty** | Filter by imaging difficulty (1–5 diamonds). |
-| **Catalogs** | Limit results to specific catalogs (Messier, NGC, IC, Sharpless 2, …). |
-| **Include oversized objects** | When enabled, objects whose angular size significantly exceeds the FOV are included in results (they score lower by default). |
+| Filter                        | Description                                                                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Observing location**        | Latitude and longitude. Click _Use my location_ for automatic geolocation, or type coordinates manually (decimal or DMS).                                                                          |
+| **Date**                      | Night to plan for. Defaults to today.                                                                                                                                                              |
+| **Object types**              | Toggle which DSO categories are included (spiral galaxy, elliptical galaxy, open cluster, globular cluster, emission nebula, reflection nebula, planetary nebula, supernova remnant, dark nebula). |
+| **Horizon**                   | Block objects that will be above the N/S/E/W horizon during the night — useful if a wall or mountain obstructs part of your sky.                                                                   |
+| **DSO interest**              | Filter by interest rating (1–5 stars, as assigned in the catalog).                                                                                                                                 |
+| **Difficulty**                | Filter by imaging difficulty (1–5 diamonds).                                                                                                                                                       |
+| **Catalogs**                  | Limit results to specific catalogs (Messier, NGC, IC, Sharpless 2, …).                                                                                                                             |
+| **Include oversized objects** | When enabled, objects whose angular size significantly exceeds the FOV are included in results (they score lower by default).                                                                      |
 
 ### Generating recommendations
 
@@ -169,7 +169,7 @@ A modal opens with a form:
 - **Required fields** are marked with `*` and must be filled in — these are the values needed to compute FOV and pixel scale (aperture, focal length, sensor dimensions, pixel size, magnification factor).
 - **Optional fields** (optical design, mount interface, notes, thread specifications) can be left blank.
 - Each field has an **ℹ** icon that explains what value is expected, with an example from an existing catalog item.
-- If you try to save with a required field empty, that field is highlighted in red with a *Required* message.
+- If you try to save with a required field empty, that field is highlighted in red with a _Required_ message.
 
 Once saved, the new item appears immediately at the bottom of the relevant dropdown and is selected automatically.
 
@@ -183,7 +183,7 @@ Observing plans let you build a target list for a specific night, linked to a ge
 
 ### Creating a plan
 
-Click **+ New plan** in the My plans tab. A plan is named after the night by default (e.g. *Night of 2026-06-17*) and can be renamed at any time with the pencil icon.
+Click **+ New plan** in the My plans tab. A plan is named after the night by default (e.g. _Night of 2026-06-17_) and can be renamed at any time with the pencil icon.
 
 Each plan has two optional settings, editable from the plan header:
 
@@ -234,6 +234,7 @@ All settings are saved in the browser and persist across sessions.
 **Toggles**: stars, DSOs, constellation lines, constellation names, star labels, DSO labels, coordinate grid, photo outlines, star tooltips, DSO tooltips.
 
 **Sliders**:
+
 - Magnitude limit (6–11 or ∞, with auto-adjust by zoom level)
 - Max star count / max DSO count
 - Sky opacity, background gradient opacity

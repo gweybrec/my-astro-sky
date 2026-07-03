@@ -14,8 +14,9 @@ function pointInPolygon(point: Point, polygon: Point[]): boolean {
     const yi = polygon[i].y;
     const xj = polygon[j].x;
     const yj = polygon[j].y;
-    const intersects = ((yi > point.y) !== (yj > point.y))
-      && (point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || Number.EPSILON) + xi);
+    const intersects =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi || Number.EPSILON) + xi;
     if (intersects) inside = !inside;
   }
   return inside;
@@ -26,10 +27,12 @@ function orientation(a: Point, b: Point, c: Point): number {
 }
 
 function onSegment(a: Point, b: Point, p: Point): boolean {
-  return Math.min(a.x, b.x) <= p.x
-    && p.x <= Math.max(a.x, b.x)
-    && Math.min(a.y, b.y) <= p.y
-    && p.y <= Math.max(a.y, b.y);
+  return (
+    Math.min(a.x, b.x) <= p.x &&
+    p.x <= Math.max(a.x, b.x) &&
+    Math.min(a.y, b.y) <= p.y &&
+    p.y <= Math.max(a.y, b.y)
+  );
 }
 
 function segmentsIntersect(a1: Point, a2: Point, b1: Point, b2: Point): boolean {
@@ -38,7 +41,7 @@ function segmentsIntersect(a1: Point, a2: Point, b1: Point, b2: Point): boolean 
   const o3 = orientation(b1, b2, a1);
   const o4 = orientation(b1, b2, a2);
 
-  if ((o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0)) {
+  if (o1 > 0 !== o2 > 0 && o3 > 0 !== o4 > 0) {
     return true;
   }
 
@@ -66,7 +69,10 @@ export function polygonsOverlap(a: Point[], b: Point[]): boolean {
   return pointInPolygon(a[0], b) || pointInPolygon(b[0], a);
 }
 
-export function findOverlappingPhotoIds(currentPhotoId: string, quads: PhotoCanvasQuad[]): Set<string> {
+export function findOverlappingPhotoIds(
+  currentPhotoId: string,
+  quads: PhotoCanvasQuad[],
+): Set<string> {
   const current = quads.find((quad) => quad.id === currentPhotoId);
   const overlappingIds = new Set<string>([currentPhotoId]);
   if (!current) return overlappingIds;

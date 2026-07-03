@@ -44,7 +44,9 @@ function mockIO() {
     unobserve,
     disconnect,
     fire: (entries: Partial<IntersectionObserverEntry>[]) => capturedCallback(entries),
-    get options() { return capturedOptions; },
+    get options() {
+      return capturedOptions;
+    },
   };
 }
 

@@ -1,14 +1,23 @@
 <template>
-  <BaseModal :title="t('update.title')" body-class="modal-form-body--loose" modal-class="!w-fit !max-w-[90vw]" @close="dismiss">
+  <BaseModal
+    :title="t('update.title')"
+    body-class="modal-form-body--loose"
+    modal-class="!w-fit !max-w-[90vw]"
+    @close="dismiss"
+  >
     <p class="text-para">{{ t('update.body') }}</p>
     <div class="flex items-center justify-center gap-6 py-2">
       <div class="flex flex-col items-center gap-1">
-        <span class="text-muted text-small uppercase tracking-wide">{{ t('update.currentLabel') }}</span>
+        <span class="text-muted text-small uppercase tracking-wide">{{
+          t('update.currentLabel')
+        }}</span>
         <span class="text-secondary text-body">{{ current }}</span>
       </div>
       <span class="text-dim text-large" aria-hidden="true">→</span>
       <div class="flex flex-col items-center gap-1">
-        <span class="text-muted text-small uppercase tracking-wide">{{ t('update.latestLabel') }}</span>
+        <span class="text-muted text-small uppercase tracking-wide">{{
+          t('update.latestLabel')
+        }}</span>
         <span class="text-bright text-body font-medium">{{ latest }}</span>
       </div>
     </div>
@@ -20,7 +29,8 @@
         rel="noopener noreferrer"
         class="btn-action no-underline"
         @click="dismiss"
-      >{{ t('update.viewRelease') }}</a>
+        >{{ t('update.viewRelease') }}</a
+      >
     </template>
   </BaseModal>
 </template>
@@ -42,7 +52,9 @@ const uiStore = useUiStore();
 const withV = (v: string) => (/^v/i.test(v) ? v : `v${v}`);
 const current = withV(__APP_VERSION__);
 const latest = computed(() => withV(uiStore.pendingUpdate?.latest ?? ''));
-const url = computed(() => uiStore.pendingUpdate?.url || `https://github.com/gweybrec/my-astro-sky/releases`);
+const url = computed(
+  () => uiStore.pendingUpdate?.url || `https://github.com/gweybrec/my-astro-sky/releases`,
+);
 
 // Remember the announced version so it is not shown again on the next launch.
 function dismiss() {

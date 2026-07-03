@@ -5,17 +5,25 @@
       type="button"
       class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
       @click.stop="toggleOpen"
-    >{{ t('gallery.filterPoi') }}{{ selectedCount > 0 ? ` (${selectedCount})` : '' }}</button>
+    >
+      {{ t('gallery.filterPoi') }}{{ selectedCount > 0 ? ` (${selectedCount})` : '' }}
+    </button>
 
     <DropdownPanel v-model="isOpen" :anchor-el="btnRef" :align-right="alignRight" min-width="240px">
       <div class="labels-select-all-row justify-between">
-        <span class="labels-select-all-label text-muted">{{ selectedCount === 0 ? t('gallery.showingAll') : `${selectedCount} ${t('gallery.selected')}` }}</span>
+        <span class="labels-select-all-label text-muted">{{
+          selectedCount === 0
+            ? t('gallery.showingAll')
+            : `${selectedCount} ${t('gallery.selected')}`
+        }}</span>
         <button
           type="button"
           class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
           :disabled="selectedCount === 0"
           @click="clearAll"
-        >✕ {{ t('display.clear') }}</button>
+        >
+          ✕ {{ t('display.clear') }}
+        </button>
       </div>
       <div v-if="groups.length === 0" class="px-6 py-3 text-muted text-base">—</div>
 
@@ -33,7 +41,11 @@
               :class="{ 'poi-chip--icon': poiTypeIcon(group.category.id) }"
               :style="{ '--poi-color': group.category.color }"
             >
-              <span v-if="poiTypeIcon(group.category.id)" class="poi-marker" v-html="poiTypeIcon(group.category.id)"></span>
+              <span
+                v-if="poiTypeIcon(group.category.id)"
+                class="poi-marker"
+                v-html="poiTypeIcon(group.category.id)"
+              ></span>
               {{ group.category.name }}
             </span>
           </div>
@@ -48,7 +60,13 @@
             <input
               type="checkbox"
               :checked="isNameChecked(group.category.id, item.name)"
-              @change="toggleName(group.category.id, item.name, ($event.target as HTMLInputElement).checked)"
+              @change="
+                toggleName(
+                  group.category.id,
+                  item.name,
+                  ($event.target as HTMLInputElement).checked,
+                )
+              "
             />
             <span class="ml-4">{{ item.name }}</span>
           </div>
@@ -99,7 +117,7 @@ function isNameChecked(catId: string, name: string): boolean {
 
 function isCatChecked(group: PoiFilterGroup): boolean {
   const set = props.selected.get(group.category.id);
-  return !!set && group.names.length > 0 && group.names.every(n => set.has(n.name));
+  return !!set && group.names.length > 0 && group.names.every((n) => set.has(n.name));
 }
 
 function isCatIndeterminate(group: PoiFilterGroup): boolean {
@@ -117,8 +135,12 @@ function clone(): Map<string, Set<string>> {
 function toggleName(catId: string, name: string, checked: boolean) {
   const m = clone();
   let set = m.get(catId);
-  if (!set) { set = new Set(); m.set(catId, set); }
-  if (checked) set.add(name); else set.delete(name);
+  if (!set) {
+    set = new Set();
+    m.set(catId, set);
+  }
+  if (checked) set.add(name);
+  else set.delete(name);
   if (set.size === 0) m.delete(catId);
   emit('update:selected', m);
 }
@@ -126,7 +148,7 @@ function toggleName(catId: string, name: string, checked: boolean) {
 function toggleCat(group: PoiFilterGroup, checked: boolean) {
   const m = clone();
   if (checked) {
-    m.set(group.category.id, new Set(group.names.map(n => n.name)));
+    m.set(group.category.id, new Set(group.names.map((n) => n.name)));
   } else {
     m.delete(group.category.id);
   }

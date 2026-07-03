@@ -13,9 +13,11 @@ let anchorNameCounter = 0;
 
 /** Whether the browser supports CSS Anchor Positioning (Chromium 125+, not Firefox yet). */
 function cssAnchorSupported(): boolean {
-  return typeof CSS !== 'undefined'
-    && typeof CSS.supports === 'function'
-    && CSS.supports('anchor-name', '--a');
+  return (
+    typeof CSS !== 'undefined' &&
+    typeof CSS.supports === 'function' &&
+    CSS.supports('anchor-name', '--a')
+  );
 }
 
 /**
@@ -55,12 +57,17 @@ export function attachAnchoredPanel(
     panel.style.left = 'anchor(left)';
     panel.style.right = 'auto';
   }
-  panel.style.setProperty('position-try-fallbacks', 'flip-block, flip-inline, flip-block flip-inline');
+  panel.style.setProperty(
+    'position-try-fallbacks',
+    'flip-block, flip-inline, flip-block flip-inline',
+  );
   // Hide the panel when the anchor is scrolled out of view (native equivalent of
   // the fallback's onAnchorOutOfView close).
   panel.style.setProperty('position-visibility', 'anchors-visible');
 
-  return () => { anchorEl.style.removeProperty('anchor-name'); };
+  return () => {
+    anchorEl.style.removeProperty('anchor-name');
+  };
 }
 
 /**
@@ -80,8 +87,12 @@ export function trackAnchoredPosition(
   const reposition = (): void => {
     const rect = anchorEl.getBoundingClientRect();
     // Discard once the anchor is scrolled fully out of (or off) the viewport.
-    if (rect.bottom <= 0 || rect.top >= window.innerHeight
-        || rect.right <= 0 || rect.left >= window.innerWidth) {
+    if (
+      rect.bottom <= 0 ||
+      rect.top >= window.innerHeight ||
+      rect.right <= 0 ||
+      rect.left >= window.innerWidth
+    ) {
       opts.onAnchorOutOfView?.();
       return;
     }
@@ -92,9 +103,8 @@ export function trackAnchoredPosition(
     const left = Math.max(8, Math.min(rawLeft, window.innerWidth - w - 8));
     // Vertical: below the anchor, or above it when there isn't room below.
     const below = rect.bottom + gap;
-    const top = (below + h <= window.innerHeight - 8 || rect.top < h)
-      ? below
-      : Math.max(8, rect.top - gap - h);
+    const top =
+      below + h <= window.innerHeight - 8 || rect.top < h ? below : Math.max(8, rect.top - gap - h);
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
     panel.style.right = 'auto';

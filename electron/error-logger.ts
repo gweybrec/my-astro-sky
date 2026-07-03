@@ -92,13 +92,27 @@ function getAnonymizePaths(): (s: string) => string {
     // Most specific first. App install paths are nested (app.asar ⊂ resources ⊂ install
     // root), and stack traces reference them, so redact the deepest first. userData is
     // under home, so it must precede home too.
-    try { pairs.push([app.getAppPath(), '<app>']); } catch {}
-    try { if (process.resourcesPath) pairs.push([process.resourcesPath, '<resources>']); } catch {}
-    try { pairs.push([path.dirname(process.execPath), '<appRoot>']); } catch {}
-    try { pairs.push([app.getPath('userData'), '<userData>']); } catch {}
-    try { pairs.push([os.tmpdir(), '<tmp>']); } catch {}
-    try { pairs.push([app.getPath('temp'), '<tmp>']); } catch {}
-    try { pairs.push([app.getPath('home'), '<home>']); } catch {}
+    try {
+      pairs.push([app.getAppPath(), '<app>']);
+    } catch {}
+    try {
+      if (process.resourcesPath) pairs.push([process.resourcesPath, '<resources>']);
+    } catch {}
+    try {
+      pairs.push([path.dirname(process.execPath), '<appRoot>']);
+    } catch {}
+    try {
+      pairs.push([app.getPath('userData'), '<userData>']);
+    } catch {}
+    try {
+      pairs.push([os.tmpdir(), '<tmp>']);
+    } catch {}
+    try {
+      pairs.push([app.getPath('temp'), '<tmp>']);
+    } catch {}
+    try {
+      pairs.push([app.getPath('home'), '<home>']);
+    } catch {}
     _anonymizePaths = buildPathAnonymizer(pairs);
   }
   return _anonymizePaths;
@@ -120,8 +134,8 @@ function initCurrentLogFile(dir: string, stream: LogStream): void {
   }
 
   const candidates = entries
-    .filter(e => e.isFile() && !e.isSymbolicLink() && stream.re.test(e.name))
-    .map(e => e.name)
+    .filter((e) => e.isFile() && !e.isSymbolicLink() && stream.re.test(e.name))
+    .map((e) => e.name)
     .sort()
     .reverse();
 
@@ -129,7 +143,7 @@ function initCurrentLogFile(dir: string, stream: LogStream): void {
     const filePath = path.join(dir, name);
     try {
       const content = fs.readFileSync(filePath, 'utf8');
-      const count = content.split('\n').filter(l => l.trim().length > 0).length;
+      const count = content.split('\n').filter((l) => l.trim().length > 0).length;
       if (count < MAX_RECORDS_PER_FILE) {
         stream.currentFile = filePath;
         stream.currentCount = count;
@@ -155,7 +169,13 @@ function writeRecord(record: ErrorLogRecord, stream: LogStream): void {
   stream.currentCount += 1;
 }
 
-function toRecord(processType: 'main' | 'renderer', category: string, message: string, stack?: string, context?: unknown): ErrorLogRecord {
+function toRecord(
+  processType: 'main' | 'renderer',
+  category: string,
+  message: string,
+  stack?: string,
+  context?: unknown,
+): ErrorLogRecord {
   const anonymize = getAnonymizePaths();
   return {
     timestamp: new Date().toISOString(),
@@ -171,21 +191,41 @@ function toRecord(processType: 'main' | 'renderer', category: string, message: s
   };
 }
 
-export function logMainError(category: string, error: unknown, context?: Record<string, unknown>): void {
+export function logMainError(
+  category: string,
+  error: unknown,
+  context?: Record<string, unknown>,
+): void {
   const err = error instanceof Error ? error : new Error(String(error));
-  const record = toRecord('main', category, err.message || 'Unknown main-process error', err.stack, context);
+  const record = toRecord(
+    'main',
+    category,
+    err.message || 'Unknown main-process error',
+    err.stack,
+    context,
+  );
   writeRecord(record, errorStream);
 }
 
 /** Log a crash (process gone, unresponsive window, native minidump) to the separate crash stream. */
-export function logCrash(category: string, error: unknown, context?: Record<string, unknown>): void {
+export function logCrash(
+  category: string,
+  error: unknown,
+  context?: Record<string, unknown>,
+): void {
   const err = error instanceof Error ? error : new Error(String(error));
   const record = toRecord('main', category, err.message || 'Unknown crash', err.stack, context);
   writeRecord(record, crashStream);
 }
 
 function logRendererPayload(payload: RendererErrorPayload): void {
-  const record = toRecord('renderer', payload.category, payload.message, payload.stack, payload.context);
+  const record = toRecord(
+    'renderer',
+    payload.category,
+    payload.message,
+    payload.stack,
+    payload.context,
+  );
   writeRecord(record, errorStream);
 }
 
@@ -234,7 +274,8 @@ function reportNewNativeCrashes(): void {
   try {
     const raw = fs.readFileSync(seenPath, 'utf8');
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) previousSeen = parsed.filter((x): x is string => typeof x === 'string');
+    if (Array.isArray(parsed))
+      previousSeen = parsed.filter((x): x is string => typeof x === 'string');
   } catch {
     // No marker yet, or unreadable — treat as nothing seen.
   }

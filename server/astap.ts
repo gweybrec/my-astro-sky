@@ -52,7 +52,11 @@ function buildDiagnostics(output: string | undefined, command?: string): string 
 }
 
 const loggedVersions = new Set<string>();
-async function logSolverVersion(bin: string, versionArgs: string[], useWSL: boolean): Promise<void> {
+async function logSolverVersion(
+  bin: string,
+  versionArgs: string[],
+  useWSL: boolean,
+): Promise<void> {
   if (loggedVersions.has(bin)) return;
   loggedVersions.add(bin);
   try {
@@ -110,28 +114,30 @@ export async function solveWithASTAP(
     // Build ASTAP command with optional hints
     const imgArg = wslPath(imgPath, useWSL);
     const args = ['-f', imgArg, '-wcs', '-z', '0'];
-    
+
     // Add position hints if provided
     if (hints?.ra !== undefined && hints?.dec !== undefined) {
       const raHours = hints.ra / 15;
       const spd = 90 + hints.dec;
-      console.log(`[ASTAP] Using hints: RA=${hints.ra}° (${raHours}h), Dec=${hints.dec}°, SPD=${spd}`);
+      console.log(
+        `[ASTAP] Using hints: RA=${hints.ra}° (${raHours}h), Dec=${hints.dec}°, SPD=${spd}`,
+      );
       args.push('-ra', String(raHours)); // Convert degrees to hours
       // SPD (South Pole Distance) = 90 + Dec (works for both hemispheres)
       args.push('-spd', String(spd));
     } else {
       console.log('[ASTAP] No hints provided, solving entire sky');
     }
-    
+
     // Add FOV hint if provided
     if (hints?.fov !== undefined && hints.fov > 0) {
       args.push('-fov', String(hints.fov));
     }
-    
+
     // Add search radius (smaller if we have hints, larger otherwise)
     const searchRadius = hints?.radius || (hints?.ra !== undefined ? 10 : 180);
     args.push('-r', String(searchRadius));
-    
+
     // Use a thorough search (more stars, slow speed) to maximize solve success on
     // sparse / heavily-processed fields. We deliberately do NOT relax the quad
     // tolerance (`-t`): a loose tolerance combined with this thorough search makes
@@ -156,7 +162,8 @@ export async function solveWithASTAP(
     // Human-readable command for the error-details collapsible: substitute the
     // temp input path with the user's original filename so it's recognizable.
     const solveCommand = `${exec.cmd} ${exec.args.join(' ')}`
-      .split(imgArg).join(originalName || path.basename(imgArg));
+      .split(imgArg)
+      .join(originalName || path.basename(imgArg));
 
     // Combined solver output retained at function scope so any failure return
     // (including the success-exit path that never enters the catch below) can
@@ -176,7 +183,10 @@ export async function solveWithASTAP(
         throw abortErr;
       }
       if (err.killed || err.signal === 'SIGTERM' || err.code === 'ETIMEDOUT') {
-        return { success: false, error: msg.astap.timeout(lang, Math.round(solveTimeoutMs / 1000), hinted) };
+        return {
+          success: false,
+          error: msg.astap.timeout(lang, Math.round(solveTimeoutMs / 1000), hinted),
+        };
       }
       // ASTAP may return non-zero even on success; check if .wcs was produced
       if (!existsSync(wcsPath)) {
@@ -187,14 +197,14 @@ export async function solveWithASTAP(
 
         // Log full output for debugging
         console.log('[ASTAP] Full output:', fullOutput);
-        
+
         // Extract key information from ASTAP output
         const lines = fullOutput.split('\n');
         let starsFound = 0;
         let quadsFound = 0;
         let fovTried = '';
         let noSolution = false;
-        
+
         for (const line of lines) {
           if (line.includes('stars,') && line.includes('quads selected')) {
             const match = line.match(/(\d+) stars, (\d+) quads selected/);
@@ -211,10 +221,18 @@ export async function solveWithASTAP(
             noSolution = true;
           }
         }
-        
+
         // Check if it's likely a missing database issue
-        if (fullOutput.includes('h18 not found') || fullOutput.includes('database not found') || (!stderr && !stdout)) {
-          return { success: false, error: msg.astap.noDatabase(lang, path.dirname(bin)), diagnostics: buildDiagnostics(fullOutput, solveCommand) };
+        if (
+          fullOutput.includes('h18 not found') ||
+          fullOutput.includes('database not found') ||
+          (!stderr && !stdout)
+        ) {
+          return {
+            success: false,
+            error: msg.astap.noDatabase(lang, path.dirname(bin)),
+            diagnostics: buildDiagnostics(fullOutput, solveCommand),
+          };
         }
 
         // Provide informative error message with explanations
@@ -229,13 +247,17 @@ export async function solveWithASTAP(
             : msg.astap.noSolutionHintNone(lang);
           return { success: false, error: errorMsg, diagnostics };
         }
-        
+
         return { success: false, error: msg.astap.failed(lang, starsFound), diagnostics };
       }
     }
 
     if (!existsSync(wcsPath)) {
-      return { success: false, error: msg.astap.noWcsFile(lang), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+      return {
+        success: false,
+        error: msg.astap.noWcsFile(lang),
+        diagnostics: buildDiagnostics(solveOutput, solveCommand),
+      };
     }
 
     const wcsText = await fsp.readFile(wcsPath, 'utf-8');
@@ -244,7 +266,11 @@ export async function solveWithASTAP(
     const required = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'];
     for (const key of required) {
       if (typeof parsed[key] !== 'number') {
-        return { success: false, error: msg.astap.missingWcsKey(lang, key), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+        return {
+          success: false,
+          error: msg.astap.missingWcsKey(lang, key),
+          diagnostics: buildDiagnostics(solveOutput, solveCommand),
+        };
       }
     }
 
@@ -260,20 +286,28 @@ export async function solveWithASTAP(
       NAXIS1: width,
       NAXIS2: height,
     };
-    
+
     // Validate solution if hints were provided
     if (hints?.ra !== undefined && hints?.dec !== undefined) {
       const deltaRA = Math.abs(wcs.CRVAL1 - hints.ra);
       const deltaDec = Math.abs(wcs.CRVAL2 - hints.dec);
       const distance = Math.sqrt(deltaRA * deltaRA + deltaDec * deltaDec);
       const maxDistance = searchRadius * 1.5; // Allow some margin
-      
+
       if (distance > maxDistance) {
-        console.log(`[ASTAP] Solution rejected: too far from hint. Expected RA=${hints.ra}°, Dec=${hints.dec}°, got RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance=${distance.toFixed(1)}° > ${maxDistance}°)`);
-        return { success: false, error: msg.astap.badSolution(lang, distance.toFixed(1)), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+        console.log(
+          `[ASTAP] Solution rejected: too far from hint. Expected RA=${hints.ra}°, Dec=${hints.dec}°, got RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance=${distance.toFixed(1)}° > ${maxDistance}°)`,
+        );
+        return {
+          success: false,
+          error: msg.astap.badSolution(lang, distance.toFixed(1)),
+          diagnostics: buildDiagnostics(solveOutput, solveCommand),
+        };
       }
-      
-      console.log(`[ASTAP] Solution validated: RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance from hint: ${distance.toFixed(1)}°)`);
+
+      console.log(
+        `[ASTAP] Solution validated: RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance from hint: ${distance.toFixed(1)}°)`,
+      );
     }
 
     // Conformality guard: a genuine TAN-projection plate solution is conformal —
@@ -285,8 +319,14 @@ export async function solveWithASTAP(
     // false matches here measured 40–130°.
     const skew = cdMatrixSkewDeg(wcs);
     if (skew > MAX_CD_SKEW_DEG) {
-      console.log(`[ASTAP] Solution rejected: CD matrix shear ${skew.toFixed(1)}° exceeds ${MAX_CD_SKEW_DEG}° (false match, likely wrong scale).`);
-      return { success: false, error: msg.astap.distortedSolution(lang, skew.toFixed(1)), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+      console.log(
+        `[ASTAP] Solution rejected: CD matrix shear ${skew.toFixed(1)}° exceeds ${MAX_CD_SKEW_DEG}° (false match, likely wrong scale).`,
+      );
+      return {
+        success: false,
+        error: msg.astap.distortedSolution(lang, skew.toFixed(1)),
+        diagnostics: buildDiagnostics(solveOutput, solveCommand),
+      };
     }
 
     // Try to generate correspondences from catalog stars.
@@ -295,16 +335,22 @@ export async function solveWithASTAP(
     // metadata path passes fitsYConvention=true (and places correctly), so ASTAP must
     // too. (solve-field and astrometry.net emit display-convention WCS and stay false.)
     let correspondences = wcsToCorrespondences(wcs, width, height, true);
-    
+
     // If not enough catalog stars match (e.g., image has faint stars),
     // generate synthetic correspondences from WCS corners
     if (correspondences.length < 3) {
-      console.log(`[ASTAP] Only ${correspondences.length} catalog matches, generating synthetic correspondences from WCS`);
+      console.log(
+        `[ASTAP] Only ${correspondences.length} catalog matches, generating synthetic correspondences from WCS`,
+      );
       correspondences = generateSyntheticCorrespondences(wcs, width, height);
     }
-    
+
     if (correspondences.length < 3) {
-      return { success: false, error: msg.astap.notEnoughCatalogStars(lang), diagnostics: buildDiagnostics(solveOutput, solveCommand) };
+      return {
+        success: false,
+        error: msg.astap.notEnoughCatalogStars(lang),
+        diagnostics: buildDiagnostics(solveOutput, solveCommand),
+      };
     }
 
     return { success: true, correspondences };
@@ -320,67 +366,67 @@ export async function solveWithASTAP(
 function generateSyntheticCorrespondences(wcs: WCSData, width: number, height: number) {
   const DEG2RAD = Math.PI / 180;
   const correspondences = [];
-  
+
   // Use 3 well-separated points near image center (not corners - projection breaks down far from CRPIX)
   // Use 20% and 80% positions to stay well within image bounds
   const points = [
-    { px: width * 0.2, py: height * 0.2 },   // Top-left quadrant
-    { px: width * 0.8, py: height * 0.2 },   // Top-right quadrant  
-    { px: width * 0.5, py: height * 0.8 },   // Bottom center
+    { px: width * 0.2, py: height * 0.2 }, // Top-left quadrant
+    { px: width * 0.8, py: height * 0.2 }, // Top-right quadrant
+    { px: width * 0.5, py: height * 0.8 }, // Bottom center
   ];
-  
+
   const ra0Rad = wcs.CRVAL1 * DEG2RAD;
   const dec0Rad = wcs.CRVAL2 * DEG2RAD;
   const cosDec0 = Math.cos(dec0Rad);
   const sinDec0 = Math.sin(dec0Rad);
-  
+
   for (let i = 0; i < points.length; i++) {
     const point = points[i];
-    
+
     // Convert display coordinates to FITS pixel coordinates
     // Display: (0,0) at top-left, FITS: (1,1) at bottom-left
     const fitsPx = point.px + 1;
     const fitsPy = height - point.py;
-    
+
     // Pixel offset from reference pixel (in FITS coordinates)
     const dx = fitsPx - wcs.CRPIX1;
     const dy = fitsPy - wcs.CRPIX2;
-    
+
     // Apply CD matrix to get standard coordinates (degrees)
     const xi = wcs.CD1_1 * dx + wcs.CD1_2 * dy;
     const eta = wcs.CD2_1 * dx + wcs.CD2_2 * dy;
-    
+
     // TAN (gnomonic) deprojection: standard coords → celestial coords
     // Standard formulas from FITS WCS Paper II
     const xiRad = xi * DEG2RAD;
     const etaRad = eta * DEG2RAD;
-    
+
     // RA calculation
     const raRad = ra0Rad + Math.atan2(xiRad, cosDec0 - etaRad * sinDec0);
-    
-    // Dec calculation  
+
+    // Dec calculation
     const rTheta = Math.sqrt(xiRad * xiRad + etaRad * etaRad);
     const sinDec = (sinDec0 + etaRad * cosDec0) / Math.sqrt(1 + xiRad * xiRad + etaRad * etaRad);
     const decRad = Math.asin(Math.max(-1, Math.min(1, sinDec)));
-    
+
     const ra = (raRad / DEG2RAD + 360) % 360;
     const dec = decRad / DEG2RAD;
-    
+
     const raHours = Math.floor(ra / 15);
     const raMin = Math.floor((ra / 15 - raHours) * 60);
     const decDeg = Math.floor(Math.abs(dec));
     const decSign = dec >= 0 ? '+' : '-';
-    
+
     correspondences.push({
       pointIndex: i,
       photoX: point.px,
       photoY: point.py,
-      starHip: 0,  // Synthetic point
+      starHip: 0, // Synthetic point
       starName: `${raHours}h${raMin}m ${decSign}${decDeg}°`,
-      starRa: ra,    // RA in degrees
-      starDec: dec,  // Dec in degrees
+      starRa: ra, // RA in degrees
+      starDec: dec, // Dec in degrees
     });
   }
-  
+
   return correspondences;
 }

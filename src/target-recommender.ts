@@ -55,8 +55,12 @@ export function recommendTargets(
     windowEnd = tw.end;
   } else {
     // Fallback: 8pm to 6am UTC
-    windowStart = new Date(Date.UTC(dateNight.getFullYear(), dateNight.getMonth(), dateNight.getDate(), 20, 0, 0));
-    windowEnd = new Date(Date.UTC(dateNight.getFullYear(), dateNight.getMonth(), dateNight.getDate() + 1, 6, 0, 0));
+    windowStart = new Date(
+      Date.UTC(dateNight.getFullYear(), dateNight.getMonth(), dateNight.getDate(), 20, 0, 0),
+    );
+    windowEnd = new Date(
+      Date.UTC(dateNight.getFullYear(), dateNight.getMonth(), dateNight.getDate() + 1, 6, 0, 0),
+    );
   }
 
   const candidates: TargetSuggestion[] = [];
@@ -95,7 +99,7 @@ export function recommendTargets(
     // ─ Brightness score (0-1) ─
     const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
 
-    const score = 0.45 * altScore + 0.35 * fovFitScore + 0.20 * brightnessScore;
+    const score = 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
 
     candidates.push({
       dso,
@@ -155,9 +159,9 @@ export function scoreDso(
 
   const altScore = altitudeScore(maxAltDeg, minAlt);
   const objDeg = (dso.majAxis ?? 0) / 60;
-  const fovFitScore = options.ignoreFovFit ? 1.0 : (objDeg > 0 ? fovFit(objDeg, minFovDeg) : 0);
+  const fovFitScore = options.ignoreFovFit ? 1.0 : objDeg > 0 ? fovFit(objDeg, minFovDeg) : 0;
   const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
-  const score = 0.45 * altScore + 0.35 * fovFitScore + 0.20 * brightnessScore;
+  const score = 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
   return { score, fovFitScore, altScore, brightnessScore };
 }
 
@@ -177,10 +181,10 @@ function altitudeScore(altDeg: number, minAlt: number): number {
 function fovFit(objDeg: number, minFovDeg: number): number {
   if (minFovDeg <= 0) return 0;
   const ratio = objDeg / minFovDeg;
-  if (ratio < 0.03) return ratio / 0.03 * 0.3;   // tiny object: 0→0.3
-  if (ratio <= 0.15) return 0.3 + (ratio - 0.03) / (0.15 - 0.03) * 0.4; // small: 0.3→0.7
-  if (ratio <= 0.70) return 0.7 + (ratio - 0.15) / (0.70 - 0.15) * 0.3; // sweet spot: 0.7→1.0
-  if (ratio <= 1.00) return 1.0 - (ratio - 0.70) / (1.00 - 0.70) * 0.3;  // slightly large: 1→0.7
+  if (ratio < 0.03) return (ratio / 0.03) * 0.3; // tiny object: 0→0.3
+  if (ratio <= 0.15) return 0.3 + ((ratio - 0.03) / (0.15 - 0.03)) * 0.4; // small: 0.3→0.7
+  if (ratio <= 0.7) return 0.7 + ((ratio - 0.15) / (0.7 - 0.15)) * 0.3; // sweet spot: 0.7→1.0
+  if (ratio <= 1.0) return 1.0 - ((ratio - 0.7) / (1.0 - 0.7)) * 0.3; // slightly large: 1→0.7
   // Too large — cut off gradually
   return Math.max(0, 0.7 - (ratio - 1.0) * 0.7);
 }

@@ -12,7 +12,11 @@
         :style="{ '--poi-color': resolveCategory(poi.categoryId, categories).color }"
         :title="resolveCategory(poi.categoryId, categories).name"
       >
-        <span v-if="poiTypeIcon(poi.categoryId)" class="poi-marker" v-html="poiTypeIcon(poi.categoryId)"></span>
+        <span
+          v-if="poiTypeIcon(poi.categoryId)"
+          class="poi-marker"
+          v-html="poiTypeIcon(poi.categoryId)"
+        ></span>
         {{ poi.name }}
         <button type="button" class="tag-chip-remove" @click="removePoi(idx)">×</button>
       </span>
@@ -79,16 +83,20 @@ const categorySelect = ref<HTMLSelectElement | null>(null);
 const nameInputEl = ref<HTMLInputElement | null>(null);
 
 // Default the type select to the first type once loaded / on changes.
-watch(categories, (cats) => {
-  if (!categoryInput.value || !cats.some(c => c.id === categoryInput.value)) {
-    categoryInput.value = cats[0]?.id ?? '';
-  }
-}, { immediate: true });
+watch(
+  categories,
+  (cats) => {
+    if (!categoryInput.value || !cats.some((c) => c.id === categoryInput.value)) {
+      categoryInput.value = cats[0]?.id ?? '';
+    }
+  },
+  { immediate: true },
+);
 
 function addPoi() {
   const name = nameInput.value.trim();
   if (!name || !categoryInput.value) return;
-  if (props.pois.some(p => p.name === name && p.categoryId === categoryInput.value)) {
+  if (props.pois.some((p) => p.name === name && p.categoryId === categoryInput.value)) {
     nameInput.value = '';
     return;
   }
@@ -119,6 +127,9 @@ function onCategoryBlur(e: FocusEvent) {
 }
 
 function removePoi(idx: number) {
-  emit('update:pois', props.pois.filter((_, i) => i !== idx));
+  emit(
+    'update:pois',
+    props.pois.filter((_, i) => i !== idx),
+  );
 }
 </script>

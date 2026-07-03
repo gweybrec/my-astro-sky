@@ -58,10 +58,12 @@ Take a screenshot or snapshot right after placement. Look for:
 Use the sky map's pan/zoom (scroll wheel / drag) to center the photo on the canvas. Or use the sidebar to click the photo name — it should pan to the photo location.
 
 Zoom in until:
+
 - Individual stars in the photo are visible and can be compared to catalog stars on the canvas.
 - DSO placeholders (ellipses/circles for nebulae, galaxies, clusters) align with the bright regions in the photo.
 
 Key checks:
+
 - **Messier / NGC / IC objects**: find the DSO label on the map, confirm it sits on the corresponding bright region in the photo.
 - **Named stars**: e.g. Tejat, Elnath, Betelgeuse — they should sit exactly on the bright star in the photo.
 - **Rotation**: the orientation of bright nebulae or galaxy shapes should match the map's orientation at that zoom.
@@ -84,6 +86,7 @@ Call `browser_console_messages` and check for errors or warnings introduced by t
 ## Step 9 — Report result
 
 Summarize:
+
 - Which file was placed.
 - Which solver succeeded.
 - What DSO/star anchors were checked and whether they aligned.

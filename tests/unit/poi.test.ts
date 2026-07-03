@@ -34,8 +34,8 @@ describe('groupPoisByCategory', () => {
       { name: 'Ceres', categoryId: 'cat-asteroid' },
     ];
     const groups = groupPoisByCategory(pois, cats);
-    expect(groups.map(g => g.category.id)).toEqual(['cat-comet', 'cat-asteroid']);
-    expect(groups[1].pois.map(p => p.name).sort()).toEqual(['Ceres', 'Vesta']);
+    expect(groups.map((g) => g.category.id)).toEqual(['cat-comet', 'cat-asteroid']);
+    expect(groups[1].pois.map((p) => p.name).sort()).toEqual(['Ceres', 'Vesta']);
   });
 
   it('places orphan POIs in an Uncategorized bucket, last', () => {
@@ -51,12 +51,18 @@ describe('groupPoisByCategory', () => {
 describe('buildPoiFilterGroups', () => {
   it('counts distinct names per category across photos (deduped per photo)', () => {
     const photoPois: PointOfInterest[][] = [
-      [{ name: 'Vesta', categoryId: 'cat-asteroid' }, { name: 'Vesta', categoryId: 'cat-asteroid' }],
-      [{ name: 'Vesta', categoryId: 'cat-asteroid' }, { name: 'C/2023 A3', categoryId: 'cat-comet' }],
+      [
+        { name: 'Vesta', categoryId: 'cat-asteroid' },
+        { name: 'Vesta', categoryId: 'cat-asteroid' },
+      ],
+      [
+        { name: 'Vesta', categoryId: 'cat-asteroid' },
+        { name: 'C/2023 A3', categoryId: 'cat-comet' },
+      ],
     ];
     const groups = buildPoiFilterGroups(photoPois, cats);
-    const asteroid = groups.find(g => g.category.id === 'cat-asteroid')!;
-    const vesta = asteroid.names.find(n => n.name === 'Vesta')!;
+    const asteroid = groups.find((g) => g.category.id === 'cat-asteroid')!;
+    const vesta = asteroid.names.find((n) => n.name === 'Vesta')!;
     expect(vesta.count).toBe(2); // counted once per photo, both photos have it
   });
 });
@@ -65,7 +71,10 @@ describe('prunePoiSelection', () => {
   const groups = buildPoiFilterGroups(
     [
       [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
-      [{ name: 'Vesta', categoryId: 'cat-asteroid' }, { name: 'Ceres', categoryId: 'cat-asteroid' }],
+      [
+        { name: 'Vesta', categoryId: 'cat-asteroid' },
+        { name: 'Ceres', categoryId: 'cat-asteroid' },
+      ],
     ],
     cats,
   );
@@ -109,8 +118,14 @@ describe('prunePoiSelection', () => {
 
 describe('poiSelectionsEqual', () => {
   it('is true for structurally identical selections', () => {
-    const a = new Map([['cat-comet', new Set(['X'])], ['cat-asteroid', new Set<string>()]]);
-    const b = new Map([['cat-comet', new Set(['X'])], ['cat-asteroid', new Set<string>()]]);
+    const a = new Map([
+      ['cat-comet', new Set(['X'])],
+      ['cat-asteroid', new Set<string>()],
+    ]);
+    const b = new Map([
+      ['cat-comet', new Set(['X'])],
+      ['cat-asteroid', new Set<string>()],
+    ]);
     expect(poiSelectionsEqual(a, b)).toBe(true);
   });
 
@@ -122,7 +137,10 @@ describe('poiSelectionsEqual', () => {
 
   it('is false when category sets differ in size', () => {
     const a = new Map([['cat-comet', new Set(['X'])]]);
-    const b = new Map([['cat-comet', new Set(['X'])], ['cat-asteroid', new Set(['Y'])]]);
+    const b = new Map([
+      ['cat-comet', new Set(['X'])],
+      ['cat-asteroid', new Set(['Y'])],
+    ]);
     expect(poiSelectionsEqual(a, b)).toBe(false);
   });
 });

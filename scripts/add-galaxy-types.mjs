@@ -17,7 +17,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DSO_JSON_PATH = path.join(__dirname, '..', 'public/data/dso.json');
-const OPENGC_URL = 'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv';
+const OPENGC_URL =
+  'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv';
 
 // ─── Hubble type → galaxy subtype ────────────────────────────────────────────
 
@@ -49,11 +50,15 @@ function classifyHubble(hubble) {
 
 function fetchCSV(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, res => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => resolve(data));
-    }).on('error', reject);
+    https
+      .get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => resolve(data));
+      })
+      .on('error', reject);
   });
 }
 
@@ -64,9 +69,9 @@ async function main() {
   const csv = await fetchCSV(OPENGC_URL);
   const lines = csv.split('\n');
   const header = lines[0].split(';');
-  const colName    = header.indexOf('Name');
-  const colHubble  = header.indexOf('Hubble');
-  const colType    = header.indexOf('Type');
+  const colName = header.indexOf('Name');
+  const colHubble = header.indexOf('Hubble');
+  const colType = header.indexOf('Type');
 
   // Build map: "NGC1234" / "IC1234" → galaxy subtype
   const hubbleMap = new Map();
@@ -75,7 +80,7 @@ async function main() {
     if (parts.length < 3) continue;
     const rawType = parts[colType]?.trim();
     if (rawType !== 'G' && rawType !== 'G?') continue; // only galaxies
-    const name   = parts[colName]?.trim();   // e.g. "NGC1234" or "IC0001"
+    const name = parts[colName]?.trim(); // e.g. "NGC1234" or "IC0001"
     const hubble = parts[colHubble]?.trim(); // e.g. "Sb", "E3", "Irr"
     if (!name) continue;
 
@@ -89,11 +94,12 @@ async function main() {
 
   // ─── Patch dso.json ─────────────────────────────────────────────────────────
   const dsoJson = JSON.parse(fs.readFileSync(DSO_JSON_PATH, 'utf8'));
-  const fields   = dsoJson.fields;
-  const idxType  = fields.indexOf('type');
-  const idxCats  = fields.indexOf('catalogs');
+  const fields = dsoJson.fields;
+  const idxType = fields.indexOf('type');
+  const idxCats = fields.indexOf('catalogs');
 
-  let nPatched = 0, nUnknown = 0;
+  let nPatched = 0,
+    nUnknown = 0;
   const subtypeCounts = { GxS: 0, GxE: 0, GxI: 0, Gx: 0 };
 
   for (const row of dsoJson.data) {
@@ -106,7 +112,10 @@ async function main() {
       if (!m) continue;
       const key = m[1].toUpperCase() + m[2];
       const mapped = hubbleMap.get(key);
-      if (mapped) { subtype = mapped; break; }
+      if (mapped) {
+        subtype = mapped;
+        break;
+      }
     }
 
     row[idxType] = subtype;
@@ -126,4 +135,7 @@ async function main() {
   console.log(`\n✓ Patched ${DSO_JSON_PATH}`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

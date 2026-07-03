@@ -13,7 +13,17 @@ const OUT_PATH = path.join(__dirname, 'data-750-best-dsos.json');
 
 // Catalog prefixes that are followed by a second token (e.g. "NGC 1234")
 const TWO_TOKEN_PREFIXES = new Set([
-  'NGC', 'IC', 'M', 'LDN', 'LBN', 'Abell', 'Melotte', 'HDW', 'Cederblad', 'Barnard', 'vdB',
+  'NGC',
+  'IC',
+  'M',
+  'LDN',
+  'LBN',
+  'Abell',
+  'Melotte',
+  'HDW',
+  'Cederblad',
+  'Barnard',
+  'vdB',
 ]);
 
 // Normalize a parsed object name to the catalog ID used in dso.json
@@ -123,7 +133,7 @@ for (let i = 0; i < lines.length; i++) {
 fs.writeFileSync(OUT_PATH, JSON.stringify(result, null, 2));
 
 const entries = Object.entries(result);
-const byScore = [1, 2, 3, 4, 5].map(s => [s, entries.filter(([, v]) => v === s).length]);
+const byScore = [1, 2, 3, 4, 5].map((s) => [s, entries.filter(([, v]) => v === s).length]);
 console.log(`Extracted ${parsed} entries, skipped ${skipped}`);
 console.log('Score distribution:', Object.fromEntries(byScore));
 console.log('Sample entries:', entries.slice(0, 10));

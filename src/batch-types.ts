@@ -1,7 +1,22 @@
-import type { PlateSolveResult, PhotoCorrespondence, PhotoIntegration, PointOfInterest, Photo } from './types';
+import type {
+  PlateSolveResult,
+  PhotoCorrespondence,
+  PhotoIntegration,
+  PointOfInterest,
+  Photo,
+} from './types';
 
 export type SolverType = 'solve-field' | 'astap' | 'astrometry';
-export type BatchItemStatus = 'pending' | 'wcs-ready' | 'solving' | 'success' | 'failed' | 'waiting' | 'canceled' | 'placing' | 'placed';
+export type BatchItemStatus =
+  | 'pending'
+  | 'wcs-ready'
+  | 'solving'
+  | 'success'
+  | 'failed'
+  | 'waiting'
+  | 'canceled'
+  | 'placing'
+  | 'placed';
 
 export interface BatchItem {
   id: string;

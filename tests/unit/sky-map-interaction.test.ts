@@ -35,10 +35,10 @@ describe('InteractionLod', () => {
     it('backs off faster than it ramps up (asymmetric rates)', () => {
       const lod = new InteractionLod();
       lod.interactionQuality = 0.5;
-      lod.adaptInteractionQuality(2);   // fast → +0.05
+      lod.adaptInteractionQuality(2); // fast → +0.05
       expect(lod.interactionQuality).toBeCloseTo(0.55, 5);
-      lod.adaptInteractionQuality(25);  // slow → -0.15
-      expect(lod.interactionQuality).toBeCloseTo(0.40, 5);
+      lod.adaptInteractionQuality(25); // slow → -0.15
+      expect(lod.interactionQuality).toBeCloseTo(0.4, 5);
     });
   });
 

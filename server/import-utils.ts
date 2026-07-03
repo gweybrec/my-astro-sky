@@ -125,8 +125,11 @@ export function buildZipPreviewResponse(
  * Custom-gear callers pre-filter `existing` to the same `type` before calling,
  * since a telescope and an accessory may legitimately share a name.
  */
-export function idsToReplaceByName(existing: { id: string; name: string }[], name: string): string[] {
-  return existing.filter(e => e.name === name).map(e => e.id);
+export function idsToReplaceByName(
+  existing: { id: string; name: string }[],
+  name: string,
+): string[] {
+  return existing.filter((e) => e.name === name).map((e) => e.id);
 }
 
 const ALLOWED_IMG_EXT = new Set(['.jpg', '.jpeg', '.png', '.fits', '.webp']);
@@ -161,10 +164,16 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
     } else if (entry.path === 'dso-overrides.json') {
       try {
         const overrides = JSON.parse((await entry.buffer()).toString('utf8'));
-        if (typeof overrides === 'object' && !Array.isArray(overrides) && Object.keys(overrides).length > 0) {
+        if (
+          typeof overrides === 'object' &&
+          !Array.isArray(overrides) &&
+          Object.keys(overrides).length > 0
+        ) {
           result.hasDsoOverrides = true;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (entry.path === 'custom-gear.json') {
       try {
         const gear = JSON.parse((await entry.buffer()).toString('utf8'));
@@ -172,11 +181,17 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
           result.hasCustomGear = true;
           for (const g of gear) {
             if (typeof g?.id === 'string' && typeof g?.type === 'string') {
-              result.gearItems.push({ id: g.id, type: g.type, name: typeof g.name === 'string' ? g.name : g.id });
+              result.gearItems.push({
+                id: g.id,
+                type: g.type,
+                name: typeof g.name === 'string' ? g.name : g.id,
+              });
             }
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (entry.path === 'gear-setups.json') {
       try {
         const setups = JSON.parse((await entry.buffer()).toString('utf8'));
@@ -184,16 +199,23 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
           result.hasSetups = true;
           for (const s of setups) {
             if (typeof s?.id === 'string') {
-              result.setupItems.push({ id: s.id, name: typeof s.name === 'string' ? s.name : s.id });
+              result.setupItems.push({
+                id: s.id,
+                name: typeof s.name === 'string' ? s.name : s.id,
+              });
             }
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (entry.path === 'poi-categories.json') {
       try {
         const cats = JSON.parse((await entry.buffer()).toString('utf8'));
         if (Array.isArray(cats) && cats.length > 0) result.hasPoiCategories = true;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (entry.path === 'plans.json') {
       try {
         const plans = JSON.parse((await entry.buffer()).toString('utf8'));
@@ -205,7 +227,9 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
             }
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (entry.path.startsWith('images/')) {
       const baseName = path.basename(entry.path);
       if (ALLOWED_IMG_EXT.has(path.extname(baseName).toLowerCase())) {
@@ -224,11 +248,14 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
         result.photos.push({
           filename: p.filename ?? '',
           originalName: p.originalName ?? p.filename ?? p.id ?? '',
-          thumbFilename: typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null,
+          thumbFilename:
+            typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null,
         });
       }
-      result.imageEntries = rawImageEntries.filter(e => !thumbSet.has(e.filename));
-    } catch { /* ignore invalid manifest */ }
+      result.imageEntries = rawImageEntries.filter((e) => !thumbSet.has(e.filename));
+    } catch {
+      /* ignore invalid manifest */
+    }
   } else {
     result.imageEntries = rawImageEntries;
   }

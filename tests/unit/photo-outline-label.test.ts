@@ -7,7 +7,12 @@ const DEG = Math.PI / 180;
 
 /** Axis-aligned rectangle corners in clockwise order. */
 function axisRect(x0: number, y0: number, x1: number, y1: number): Point[] {
-  return [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+  return [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ];
 }
 
 /** Rotate a set of corners around (0, 0) by angleDeg. */
@@ -60,7 +65,12 @@ describe('photoLabelTransform', () => {
 
   it('anchors at p0 for a downward-right diagonal (angle < 90°)', () => {
     // Edge from (0,0) to (100,50): angle ≈ 26.6° — readable as-is
-    const corners: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 50 }, { x: 90, y: 70 }, { x: -10, y: 20 }];
+    const corners: Point[] = [
+      { x: 0, y: 0 },
+      { x: 100, y: 50 },
+      { x: 90, y: 70 },
+      { x: -10, y: 20 },
+    ];
     const result = photoLabelTransform(corners, 0);
     expect(result.x).toBeCloseTo(0);
     expect(result.y).toBeCloseTo(0);
@@ -69,26 +79,41 @@ describe('photoLabelTransform', () => {
 
   it('flips anchor to p1 when edge points left (angle = π → normalized to 0)', () => {
     // Edge from (100,0) to (0,0): angle = π → flip → π+π = 2π → normalized to 0
-    const corners: Point[] = [{ x: 100, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 20 }, { x: 100, y: 20 }];
+    const corners: Point[] = [
+      { x: 100, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 20 },
+      { x: 100, y: 20 },
+    ];
     const result = photoLabelTransform(corners, 0);
-    expect(result.x).toBeCloseTo(0);   // p1
+    expect(result.x).toBeCloseTo(0); // p1
     expect(result.y).toBeCloseTo(0);
     expect(result.angle).toBeCloseTo(0); // normalized: 2π - 2π = 0
   });
 
   it('flips anchor to p1 when edge goes up-left (angle < -π/2)', () => {
     // Edge from (100,50) to (0,0): atan2(-50,-100) ≈ -2.678 rad (< -π/2) → flip
-    const corners: Point[] = [{ x: 100, y: 50 }, { x: 0, y: 0 }, { x: -10, y: 20 }, { x: 90, y: 70 }];
+    const corners: Point[] = [
+      { x: 100, y: 50 },
+      { x: 0, y: 0 },
+      { x: -10, y: 20 },
+      { x: 90, y: 70 },
+    ];
     const result = photoLabelTransform(corners, 0);
     const rawAngle = Math.atan2(0 - 50, 0 - 100); // ≈ -2.678 rad
-    expect(result.x).toBeCloseTo(0);   // p1
+    expect(result.x).toBeCloseTo(0); // p1
     expect(result.y).toBeCloseTo(0);
     expect(result.angle).toBeCloseTo(rawAngle + Math.PI); // ≈ 0.464 rad — already in range
   });
 
   it('flips anchor to p1 when edge goes down-left (angle > π/2 → normalized)', () => {
     // Edge from (0,0) to (-100, 10): atan2(10,-100) ≈ 3.042 rad > π/2 → flip → normalize
-    const corners: Point[] = [{ x: 0, y: 0 }, { x: -100, y: 10 }, { x: -100, y: 30 }, { x: 0, y: 20 }];
+    const corners: Point[] = [
+      { x: 0, y: 0 },
+      { x: -100, y: 10 },
+      { x: -100, y: 30 },
+      { x: 0, y: 20 },
+    ];
     const result = photoLabelTransform(corners, 0);
     const rawAngle = Math.atan2(10, -100); // ≈ 3.042 rad
     const expected = rawAngle + Math.PI - 2 * Math.PI; // normalize: ≈ -0.1 rad

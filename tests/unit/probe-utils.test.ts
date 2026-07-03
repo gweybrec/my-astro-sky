@@ -7,7 +7,8 @@ import type { ExecAsync } from '../../server/probe-utils';
 describe('probeAstap', () => {
   it('returns ok with first 2 lines of output on rc=0', async () => {
     const exec = vi.fn<ExecAsync>().mockResolvedValue({
-      stdout: 'ASTAP astrometric solver version CLI-2026.02.09\n(C) 2018, 2025 by Han Kleijn.\nExtra line that should be discarded.\n',
+      stdout:
+        'ASTAP astrometric solver version CLI-2026.02.09\n(C) 2018, 2025 by Han Kleijn.\nExtra line that should be discarded.\n',
       stderr: '',
     });
     const result = await probeAstap('/opt/astap/astap_cli', false, exec);
@@ -86,7 +87,9 @@ describe('probeSolveField', () => {
   it('wraps the command with wsl when useWSL=true', async () => {
     const exec = vi.fn<ExecAsync>().mockResolvedValue({ stdout: '0.89', stderr: '' });
     await probeSolveField('/usr/bin/solve-field', true, exec);
-    expect(exec).toHaveBeenCalledWith('wsl', ['/usr/bin/solve-field', '--version'], { timeout: 5_000 });
+    expect(exec).toHaveBeenCalledWith('wsl', ['/usr/bin/solve-field', '--version'], {
+      timeout: 5_000,
+    });
   });
 
   it('returns error when exec rejects (binary not found)', async () => {
@@ -104,7 +107,12 @@ describe('probeSolveField', () => {
     });
     const exec = vi.fn<ExecAsync>().mockRejectedValue(err);
     const result = await probeSolveField('/usr/bin/solve-field', false, exec);
-    expect(result).toEqual({ ok: false, code: 1, stdout: 'usage: solve-field ...', stderr: 'error: bad arg' });
+    expect(result).toEqual({
+      ok: false,
+      code: 1,
+      stdout: 'usage: solve-field ...',
+      stderr: 'error: bad arg',
+    });
   });
 
   it('returns error without calling exec when path is empty', async () => {
@@ -119,14 +127,18 @@ describe('probeSolveField', () => {
 
 describe('probeDataDir', () => {
   it('calls ls -1 on Linux (non-WSL)', async () => {
-    const exec = vi.fn<ExecAsync>().mockResolvedValue({ stdout: 'index-4200.fits\nindex-4201.fits\n', stderr: '' });
+    const exec = vi
+      .fn<ExecAsync>()
+      .mockResolvedValue({ stdout: 'index-4200.fits\nindex-4201.fits\n', stderr: '' });
     const result = await probeDataDir('/var/lib/astrometry/data', false, 'linux', exec);
     expect(exec).toHaveBeenCalledWith('ls', ['-1', '/var/lib/astrometry/data'], { timeout: 5_000 });
     expect(result).toEqual({ ok: true, output: 'index-4200.fits\nindex-4201.fits\n' });
   });
 
   it('calls cmd /c dir /b on Windows (non-WSL)', async () => {
-    const exec = vi.fn<ExecAsync>().mockResolvedValue({ stdout: 'index-4200.fits\nindex-4201.fits\n', stderr: '' });
+    const exec = vi
+      .fn<ExecAsync>()
+      .mockResolvedValue({ stdout: 'index-4200.fits\nindex-4201.fits\n', stderr: '' });
     const result = await probeDataDir('C:\\astro', false, 'win32', exec);
     expect(exec).toHaveBeenCalledWith('cmd', ['/c', 'dir', '/b', 'C:\\astro'], { timeout: 5_000 });
     expect(result).toEqual({ ok: true, output: 'index-4200.fits\nindex-4201.fits\n' });

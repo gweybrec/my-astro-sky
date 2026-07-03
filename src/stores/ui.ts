@@ -21,9 +21,14 @@ export const SKY_TOOLTIP_SAFE_MARGIN = 16;
 // `margin`. This is purely positional: unlike a velocity test, a jittery frame that
 // momentarily points away can't dismiss it.
 export function tooltipSafeZoneContains(
-  x: number, y: number,
-  anchorX: number, anchorY: number,
-  tipLeft: number, tipTop: number, tipRight: number, tipBottom: number,
+  x: number,
+  y: number,
+  anchorX: number,
+  anchorY: number,
+  tipLeft: number,
+  tipTop: number,
+  tipRight: number,
+  tipBottom: number,
   margin: number,
 ): boolean {
   const minX = Math.min(anchorX, tipLeft) - margin;
@@ -44,8 +49,9 @@ export const useUiStore = defineStore('ui', () => {
   // new modal style block tooltips + shortcuts, give it one of these classes.
   const MODAL_OVERLAY_SELECTOR = '.modal-backdrop, .meta-editor-overlay, .dialog-overlay';
   function isModalOpen(): boolean {
-    return typeof document !== 'undefined'
-      && document.querySelector(MODAL_OVERLAY_SELECTOR) !== null;
+    return (
+      typeof document !== 'undefined' && document.querySelector(MODAL_OVERLAY_SELECTOR) !== null
+    );
   }
 
   // Non-modal floating popups that sit over the map (appended to <body> via
@@ -113,9 +119,22 @@ export const useUiStore = defineStore('ui', () => {
     const el = typeof document !== 'undefined' ? document.getElementById('tooltip') : null;
     if (el) {
       const r = el.getBoundingClientRect();
-      tipLeft = r.left; tipTop = r.top; tipRight = r.right; tipBottom = r.bottom;
+      tipLeft = r.left;
+      tipTop = r.top;
+      tipRight = r.right;
+      tipBottom = r.bottom;
     }
-    return tooltipSafeZoneContains(x, y, ax, ay, tipLeft, tipTop, tipRight, tipBottom, SKY_TOOLTIP_SAFE_MARGIN);
+    return tooltipSafeZoneContains(
+      x,
+      y,
+      ax,
+      ay,
+      tipLeft,
+      tipTop,
+      tipRight,
+      tipBottom,
+      SKY_TOOLTIP_SAFE_MARGIN,
+    );
   }
 
   function showSkyTooltip(html: string, x: number, y: number, dso: DSO | null = null) {
@@ -233,10 +252,25 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     isModalOpen,
-    panelCollapsed, currentViewMode, setPanelCollapsed, switchView,
-    pendingBatchFiles, pendingUpdate, pendingPlanFocusId,
-    skyTooltipHtml, skyTooltipX, skyTooltipY, skyTooltipDSO, skyTooltipPinned,
-    isSkyTooltipSuppressed, setSkyTooltip, showSkyTooltip, requestHideSkyTooltip,
-    hideSkyTooltipNow, setSkyTooltipPinned, setSkyTooltipSelecting, setForceSuppressTooltip,
+    panelCollapsed,
+    currentViewMode,
+    setPanelCollapsed,
+    switchView,
+    pendingBatchFiles,
+    pendingUpdate,
+    pendingPlanFocusId,
+    skyTooltipHtml,
+    skyTooltipX,
+    skyTooltipY,
+    skyTooltipDSO,
+    skyTooltipPinned,
+    isSkyTooltipSuppressed,
+    setSkyTooltip,
+    showSkyTooltip,
+    requestHideSkyTooltip,
+    hideSkyTooltipNow,
+    setSkyTooltipPinned,
+    setSkyTooltipSelecting,
+    setForceSuppressTooltip,
   };
 });

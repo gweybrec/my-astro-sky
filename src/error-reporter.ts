@@ -25,7 +25,11 @@ export function reportRendererError(payload: RendererErrorPayload): void {
   }
 }
 
-export function reportUnknownRendererError(category: string, error: unknown, context?: Record<string, unknown>): void {
+export function reportUnknownRendererError(
+  category: string,
+  error: unknown,
+  context?: Record<string, unknown>,
+): void {
   const normalized = normalizeUnknownError(error);
   reportRendererError({
     category,

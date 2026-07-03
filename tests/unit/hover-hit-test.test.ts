@@ -3,7 +3,14 @@ import { pickDsoAtCursor } from '../../src/hover-hit-test';
 import { project, toCanvas, setHemisphere } from '../../src/projection';
 import type { DSO, ViewState } from '../../src/types';
 
-const view: ViewState = { centerX: 0, centerY: 0, scale: 600, rotationDeg: 0, width: 800, height: 600 };
+const view: ViewState = {
+  centerX: 0,
+  centerY: 0,
+  scale: 600,
+  rotationDeg: 0,
+  width: 800,
+  height: 600,
+};
 
 function dso(id: string, ra: number, dec: number, majAxis: number): DSO {
   return { id, ra, dec, mag: 8, majAxis, minAxis: majAxis, pa: 0, type: 'Gx' } as unknown as DSO;

@@ -15,7 +15,11 @@ export function angularSizeToCanvasPxForDSO(arcmin: number, decDeg: number, scal
 }
 
 /** Same PA-to-canvas angle transform used in sky-map DSO rendering. */
-export function dsoCanvasAngleForHighlight(paDeg: number | null, raDeg: number, viewRotationDeg: number): number {
+export function dsoCanvasAngleForHighlight(
+  paDeg: number | null,
+  raDeg: number,
+  viewRotationDeg: number,
+): number {
   const raRad = raDeg * DEG2RAD;
   const northAngle = Math.atan2(Math.cos(raRad), -Math.sin(raRad));
   return northAngle - (paDeg ?? 0) * DEG2RAD + viewRotationDeg * DEG2RAD;
@@ -26,7 +30,11 @@ export function dsoCanvasAngleForHighlight(paDeg: number | null, raDeg: number, 
  * angle of a frame anchored at `raDeg` under map rotation `viewRotationDeg`, recover the
  * celestial position angle in degrees east of north, normalised to [0, 360).
  */
-export function canvasAngleToPADeg(canvasAngle: number, raDeg: number, viewRotationDeg: number): number {
+export function canvasAngleToPADeg(
+  canvasAngle: number,
+  raDeg: number,
+  viewRotationDeg: number,
+): number {
   const raRad = raDeg * DEG2RAD;
   const northAngle = Math.atan2(Math.cos(raRad), -Math.sin(raRad));
   let pa = (northAngle + viewRotationDeg * DEG2RAD - canvasAngle) / DEG2RAD;

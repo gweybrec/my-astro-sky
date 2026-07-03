@@ -39,7 +39,6 @@ export function setLang(lang: Lang): void {
   location.reload();
 }
 
-
 function getNestedValue(obj: any, path: string): string | undefined {
   const parts = path.split('.');
   let current = obj;

@@ -5,16 +5,13 @@
       type="button"
       class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
       @click.stop="isOpen = !isOpen"
-    >{{ t('gallery.filterLabels') }}{{ labelItems.length > 0 ? ` (${selectedCount})` : '' }}</button>
+    >
+      {{ t('gallery.filterLabels') }}{{ labelItems.length > 0 ? ` (${selectedCount})` : '' }}
+    </button>
 
     <DropdownPanel v-model="isOpen" :anchor-el="btnRef" align-right min-width="220px">
       <label class="labels-select-all-row">
-        <input
-          ref="selectAllRef"
-          type="checkbox"
-          :checked="allChecked"
-          @change="toggleAll"
-        />
+        <input ref="selectAllRef" type="checkbox" :checked="allChecked" @change="toggleAll" />
         <span class="labels-select-all-label">{{ t('display.selectAll') }}</span>
       </label>
 
@@ -29,7 +26,9 @@
             :checked="isLabelVisible(item.label)"
             @change="(e) => toggleLabel(item.label, e)"
           />
-          <span class="tag-chip label-chip tag-chip-sm ml-4">{{ item.label === '(no label)' ? t('display.noLabel') : item.label }}</span>
+          <span class="tag-chip label-chip tag-chip-sm ml-4">{{
+            item.label === '(no label)' ? t('display.noLabel') : item.label
+          }}</span>
         </div>
         <span class="labels-count-span">{{ item.count }} photos</span>
       </label>
@@ -48,7 +47,10 @@ const { t } = useI18n();
 const displayStore = useDisplayStore();
 const canvasStore = useCanvasStore();
 
-interface LabelItem { label: string; count: number }
+interface LabelItem {
+  label: string;
+  count: number;
+}
 
 const isOpen = ref(false);
 const btnRef = ref<HTMLButtonElement>();
@@ -74,17 +76,15 @@ function isLabelVisible(label: string): boolean {
   return label in v ? v[label] : true;
 }
 
-const selectedCount = computed(() =>
-  labelItems.value.filter(item => isLabelVisible(item.label)).length
+const selectedCount = computed(
+  () => labelItems.value.filter((item) => isLabelVisible(item.label)).length,
 );
 
-const allChecked = computed(() =>
-  labelItems.value.length > 0 && labelItems.value.every(item => isLabelVisible(item.label))
+const allChecked = computed(
+  () => labelItems.value.length > 0 && labelItems.value.every((item) => isLabelVisible(item.label)),
 );
 
-const someChecked = computed(() =>
-  labelItems.value.some(item => isLabelVisible(item.label))
-);
+const someChecked = computed(() => labelItems.value.some((item) => isLabelVisible(item.label)));
 
 watch([allChecked, someChecked], () => {
   if (selectAllRef.value) {
@@ -98,7 +98,7 @@ function toggleLabel(label: string, e: Event) {
 
 function toggleAll(e: Event) {
   displayStore.setAllLabels(
-    labelItems.value.map(i => i.label),
+    labelItems.value.map((i) => i.label),
     (e.target as HTMLInputElement).checked,
   );
 }

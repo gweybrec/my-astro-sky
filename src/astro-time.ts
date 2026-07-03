@@ -40,7 +40,7 @@ export function gmstHours(jd: number): number {
 
 /** Local Sidereal Time in hours for longitude lon (degrees, East positive) */
 export function lstHours(jd: number, lonDeg: number): number {
-  return ((gmstHours(jd) + lonDeg / 15 + 24) % 24);
+  return (gmstHours(jd) + lonDeg / 15 + 24) % 24;
 }
 
 // ─── Sun position ──────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ export function lstHours(jd: number, lonDeg: number): number {
 function sunEclipticLongDeg(jd: number): number {
   // Low-precision sun longitude, Meeus ch. 25 simplified
   const n = jd - 2451545.0;
-  const L = (280.460 + 0.9856474 * n) % 360;
+  const L = (280.46 + 0.9856474 * n) % 360;
   const g = ((357.528 + 0.9856003 * n) % 360) * DEG;
   const lambda = L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
   return ((lambda % 360) + 360) % 360;
@@ -85,11 +85,35 @@ function moonArgs(jd: number) {
   const norm = (x: number) => ((x % 360) + 360) % 360;
   return {
     T,
-    Lp: norm(218.3164477 + 481267.88123421 * T - 0.0015786 * T * T + (T * T * T) / 538841 - (T * T * T * T) / 65194000), // mean longitude
-    D: norm(297.8501921 + 445267.1114034 * T - 0.0018819 * T * T + (T * T * T) / 545868 - (T * T * T * T) / 113065000), // mean elongation
-    M: norm(357.5291092 + 35999.0502909 * T - 0.0001536 * T * T + (T * T * T) / 24490000),                              // sun mean anomaly
-    Mp: norm(134.9633964 + 477198.8675055 * T + 0.0087414 * T * T + (T * T * T) / 69699 - (T * T * T * T) / 14712000),  // moon mean anomaly
-    F: norm(93.2720950 + 483202.0175233 * T - 0.0036539 * T * T - (T * T * T) / 3526000 + (T * T * T * T) / 863310000), // argument of latitude
+    Lp: norm(
+      218.3164477 +
+        481267.88123421 * T -
+        0.0015786 * T * T +
+        (T * T * T) / 538841 -
+        (T * T * T * T) / 65194000,
+    ), // mean longitude
+    D: norm(
+      297.8501921 +
+        445267.1114034 * T -
+        0.0018819 * T * T +
+        (T * T * T) / 545868 -
+        (T * T * T * T) / 113065000,
+    ), // mean elongation
+    M: norm(357.5291092 + 35999.0502909 * T - 0.0001536 * T * T + (T * T * T) / 24490000), // sun mean anomaly
+    Mp: norm(
+      134.9633964 +
+        477198.8675055 * T +
+        0.0087414 * T * T +
+        (T * T * T) / 69699 -
+        (T * T * T * T) / 14712000,
+    ), // moon mean anomaly
+    F: norm(
+      93.272095 +
+        483202.0175233 * T -
+        0.0036539 * T * T -
+        (T * T * T) / 3526000 +
+        (T * T * T * T) / 863310000,
+    ), // argument of latitude
   };
 }
 
@@ -102,28 +126,50 @@ function moonArgs(jd: number) {
  */
 export function moonRaDecDeg(jd: number): { raDeg: number; decDeg: number } {
   const { T, Lp, D, M, Mp, F } = moonArgs(jd);
-  const d = D * DEG, m = M * DEG, mp = Mp * DEG, f = F * DEG;
+  const d = D * DEG,
+    m = M * DEG,
+    mp = Mp * DEG,
+    f = F * DEG;
   // Eccentricity correction for terms involving the Sun's anomaly M.
   const E = 1 - 0.002516 * T - 0.0000074 * T * T;
 
   // Longitude terms Σl (coefficients in 1e-6 deg), args [D, M, M', F].
   const lonTerms: [number, number, number, number, number][] = [
-    [6288774, 0, 0, 1, 0], [1274027, 2, 0, -1, 0], [658314, 2, 0, 0, 0],
-    [213618, 0, 0, 2, 0], [-185116, 0, 1, 0, 0], [-114332, 0, 0, 0, 2],
-    [58793, 2, 0, -2, 0], [57066, 2, -1, -1, 0], [53322, 2, 0, 1, 0],
-    [45758, 2, -1, 0, 0], [-40923, 0, 1, -1, 0], [-34720, 1, 0, 0, 0],
-    [-30383, 0, 1, 1, 0], [15327, 2, 0, 0, -2], [-12528, 0, 0, 1, 2],
+    [6288774, 0, 0, 1, 0],
+    [1274027, 2, 0, -1, 0],
+    [658314, 2, 0, 0, 0],
+    [213618, 0, 0, 2, 0],
+    [-185116, 0, 1, 0, 0],
+    [-114332, 0, 0, 0, 2],
+    [58793, 2, 0, -2, 0],
+    [57066, 2, -1, -1, 0],
+    [53322, 2, 0, 1, 0],
+    [45758, 2, -1, 0, 0],
+    [-40923, 0, 1, -1, 0],
+    [-34720, 1, 0, 0, 0],
+    [-30383, 0, 1, 1, 0],
+    [15327, 2, 0, 0, -2],
+    [-12528, 0, 0, 1, 2],
     [10980, 0, 0, 1, -2],
   ];
   // Latitude terms Σb.
   const latTerms: [number, number, number, number, number][] = [
-    [5128122, 0, 0, 0, 1], [280602, 0, 0, 1, 1], [277693, 0, 0, 1, -1],
-    [173237, 2, 0, 0, -1], [55413, 2, 0, -1, 1], [46271, 2, 0, -1, -1],
-    [32573, 2, 0, 0, 1], [17198, 0, 0, 2, 1], [9266, 2, 0, 1, -1],
-    [8822, 0, 0, 2, -1], [8216, 2, -1, 0, -1], [4324, 2, 0, -2, -1],
+    [5128122, 0, 0, 0, 1],
+    [280602, 0, 0, 1, 1],
+    [277693, 0, 0, 1, -1],
+    [173237, 2, 0, 0, -1],
+    [55413, 2, 0, -1, 1],
+    [46271, 2, 0, -1, -1],
+    [32573, 2, 0, 0, 1],
+    [17198, 0, 0, 2, 1],
+    [9266, 2, 0, 1, -1],
+    [8822, 0, 0, 2, -1],
+    [8216, 2, -1, 0, -1],
+    [4324, 2, 0, -2, -1],
   ];
 
-  let sumL = 0, sumB = 0;
+  let sumL = 0,
+    sumB = 0;
   for (const [c, cd, cm, cmp, cf] of lonTerms) {
     const e = cm === 0 ? 1 : Math.abs(cm) === 1 ? E : E * E;
     sumL += c * e * Math.sin(cd * d + cm * m + cmp * mp + cf * f);
@@ -133,8 +179,8 @@ export function moonRaDecDeg(jd: number): { raDeg: number; decDeg: number } {
     sumB += c * e * Math.sin(cd * d + cm * m + cmp * mp + cf * f);
   }
 
-  const lambda = (Lp + sumL / 1e6) * DEG;   // ecliptic longitude
-  const beta = (sumB / 1e6) * DEG;          // ecliptic latitude
+  const lambda = (Lp + sumL / 1e6) * DEG; // ecliptic longitude
+  const beta = (sumB / 1e6) * DEG; // ecliptic latitude
   const eps = (23.439291 - 0.0130042 * T) * DEG; // mean obliquity
 
   const ra = Math.atan2(
@@ -144,7 +190,7 @@ export function moonRaDecDeg(jd: number): { raDeg: number; decDeg: number } {
   const dec = Math.asin(
     Math.sin(beta) * Math.cos(eps) + Math.cos(beta) * Math.sin(eps) * Math.sin(lambda),
   );
-  return { raDeg: ((ra / DEG) % 360 + 360) % 360, decDeg: dec / DEG };
+  return { raDeg: (((ra / DEG) % 360) + 360) % 360, decDeg: dec / DEG };
 }
 
 /**
@@ -157,16 +203,19 @@ export function moonRaDecDeg(jd: number): { raDeg: number; decDeg: number } {
  */
 export function moonPhase(jd: number): { illum: number; waxing: boolean; phaseIndex: number } {
   const { D, M, Mp } = moonArgs(jd);
-  const d = D * DEG, m = M * DEG, mp = Mp * DEG;
+  const d = D * DEG,
+    m = M * DEG,
+    mp = Mp * DEG;
   // Phase angle i (Sun–Moon–Earth), Meeus eq. 48.4.
   const i =
-    180 - D
-    - 6.289 * Math.sin(mp)
-    + 2.100 * Math.sin(m)
-    - 1.274 * Math.sin(2 * d - mp)
-    - 0.658 * Math.sin(2 * d)
-    - 0.214 * Math.sin(2 * mp)
-    - 0.110 * Math.sin(d);
+    180 -
+    D -
+    6.289 * Math.sin(mp) +
+    2.1 * Math.sin(m) -
+    1.274 * Math.sin(2 * d - mp) -
+    0.658 * Math.sin(2 * d) -
+    0.214 * Math.sin(2 * mp) -
+    0.11 * Math.sin(d);
   const illum = (1 + Math.cos(i * DEG)) / 2;
   const waxing = D % 360 < 180; // elongation 0–180° → Moon east of Sun → waxing
 
@@ -188,13 +237,13 @@ export function moonPhase(jd: number): { illum: number; waxing: boolean; phaseIn
  * If the sun never sets (polar day), returns null.
  */
 export interface TwilightWindow {
-  start: Date;   // astronomical dusk (or best available)
-  end: Date;     // astronomical dawn (or best available)
+  start: Date; // astronomical dusk (or best available)
+  end: Date; // astronomical dawn (or best available)
   limitDeg: number; // actual sun elevation used (−18, −12, or −6)
 }
 
 export function twilightWindow(
-  date: Date,   // any moment on the night's date (local)
+  date: Date, // any moment on the night's date (local)
   latDeg: number,
   lonDeg: number,
 ): TwilightWindow | null {

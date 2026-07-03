@@ -18,14 +18,23 @@ import { updatePlanEntryPositionAPI } from './api';
  */
 
 /** Sky centre of a plan entry: its explicit frame centre, else its DSO position. */
-function entryCenter(e: { ra: number | null; dec: number | null; dsoId: string | null }): { ra: number; dec: number } | null {
+function entryCenter(e: {
+  ra: number | null;
+  dec: number | null;
+  dsoId: string | null;
+}): { ra: number; dec: number } | null {
   if (e.ra != null && e.dec != null) return { ra: e.ra, dec: e.dec };
   const dso = e.dsoId ? getDSOById(e.dsoId) : undefined;
   return dso ? { ra: dso.ra, dec: dso.dec } : null;
 }
 
 /** Resolved angular size + envelope for a setup, read from the fov-frames store. */
-export type SetupSpecLite = { wDeg: number; hDeg: number; smart: boolean; mosaic: TargetFov['envelope'] };
+export type SetupSpecLite = {
+  wDeg: number;
+  hDeg: number;
+  smart: boolean;
+  mosaic: TargetFov['envelope'];
+};
 
 /** A mosaic (tile grid or enlarged smart frame) that doesn't map cleanly onto a
  * new setup: its proposed best transformation, plus the actions to commit or
@@ -53,17 +62,33 @@ export type SetupSwitchHooks = {
  * classical target, clamp-to-envelope for a smart one) and the apply/drop ops.
  * Plain native-FOV single frames re-fit silently, so they're excluded.
  */
-export function collectSwitchItems(plan: Plan, oldSpec: SetupSpecLite, newSpec: SetupSpecLite): SwitchItem[] {
+export function collectSwitchItems(
+  plan: Plan,
+  oldSpec: SetupSpecLite,
+  newSpec: SetupSpecLite,
+): SwitchItem[] {
   const plansStore = usePlansStore();
   const planId = plan.id;
-  const target: TargetFov = { wDeg: newSpec.wDeg, hDeg: newSpec.hDeg, envelope: newSpec.mosaic, tileable: !newSpec.smart };
-  const newW = newSpec.wDeg, newH = newSpec.hDeg;
+  const target: TargetFov = {
+    wDeg: newSpec.wDeg,
+    hDeg: newSpec.hDeg,
+    envelope: newSpec.mosaic,
+    tileable: !newSpec.smart,
+  };
+  const newW = newSpec.wDeg,
+    newH = newSpec.hDeg;
   // A transformed size within 1% of the new native FOV renders un-enlarged.
   const nearNative = (w: number, h: number): boolean => w <= newW * 1.01 && h <= newH * 1.01;
   const items: SwitchItem[] = [];
 
   for (const mosaic of plan.mosaics ?? []) {
-    const outline = outlineFromGrid(mosaic.cols, mosaic.rows, oldSpec.wDeg, oldSpec.hDeg, mosaic.overlapPct);
+    const outline = outlineFromGrid(
+      mosaic.cols,
+      mosaic.rows,
+      oldSpec.wDeg,
+      oldSpec.hDeg,
+      mosaic.overlapPct,
+    );
     const transform = transformMosaicToSetup(outline.wDeg, outline.hDeg, mosaic.overlapPct, target);
     const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
     items.push({
@@ -74,11 +99,25 @@ export function collectSwitchItems(plan: Plan, oldSpec: SetupSpecLite, newSpec: 
       apply: async () => {
         if (transform.kind === 'grid') {
           // Re-tile the same centre/PA/overlap with the new gear FOV.
-          const tiles = tileCenters({ ra: mosaic.centerRa, dec: mosaic.centerDec }, mosaic.paDeg, transform.cols, transform.rows, newW, newH, mosaic.overlapPct)
-            .map(tl => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
+          const tiles = tileCenters(
+            { ra: mosaic.centerRa, dec: mosaic.centerDec },
+            mosaic.paDeg,
+            transform.cols,
+            transform.rows,
+            newW,
+            newH,
+            mosaic.overlapPct,
+          ).map((tl) => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
           await plansStore.updateMosaic(planId, mosaic.id, {
-            dsoId: mosaic.dsoId, name: mosaic.name ?? undefined, centerRa: mosaic.centerRa, centerDec: mosaic.centerDec,
-            paDeg: mosaic.paDeg, overlapPct: mosaic.overlapPct, cols: transform.cols, rows: transform.rows, tiles,
+            dsoId: mosaic.dsoId,
+            name: mosaic.name ?? undefined,
+            centerRa: mosaic.centerRa,
+            centerDec: mosaic.centerDec,
+            paDeg: mosaic.paDeg,
+            overlapPct: mosaic.overlapPct,
+            cols: transform.cols,
+            rows: transform.rows,
+            tiles,
           });
         } else {
           // Collapse to a single (smart-enlarged or native) frame on the target.
@@ -87,8 +126,10 @@ export function collectSwitchItems(plan: Plan, oldSpec: SetupSpecLite, newSpec: 
           if (newId) {
             const native = nearNative(transform.wDeg, transform.hDeg);
             await updatePlanEntryPositionAPI(planId, newId, {
-              dsoId: mosaic.dsoId, paDeg: mosaic.paDeg,
-              mosaicWDeg: native ? null : transform.wDeg, mosaicHDeg: native ? null : transform.hDeg,
+              dsoId: mosaic.dsoId,
+              paDeg: mosaic.paDeg,
+              mosaicWDeg: native ? null : transform.wDeg,
+              mosaicHDeg: native ? null : transform.hDeg,
             });
           }
         }
@@ -112,16 +153,31 @@ export function collectSwitchItems(plan: Plan, oldSpec: SetupSpecLite, newSpec: 
           // Re-clamp (or clear) the single-frame enlargement for the new scope.
           const native = transform.kind === 'single' && !nearNative(transform.wDeg, transform.hDeg);
           await updatePlanEntryPositionAPI(planId, entry.id, {
-            mosaicWDeg: native ? transform.wDeg : null, mosaicHDeg: native ? transform.hDeg : null,
+            mosaicWDeg: native ? transform.wDeg : null,
+            mosaicHDeg: native ? transform.hDeg : null,
           });
         } else {
           // Classical target: tile the enlarged frame into a mosaic.
           const paDeg = entry.paDeg ?? 0;
-          const tiles = tileCenters(center, paDeg, transform.cols, transform.rows, newW, newH, 20)
-            .map(tl => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
+          const tiles = tileCenters(
+            center,
+            paDeg,
+            transform.cols,
+            transform.rows,
+            newW,
+            newH,
+            20,
+          ).map((tl) => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
           await plansStore.createMosaic(planId, {
-            dsoId: entry.dsoId, centerRa: center.ra, centerDec: center.dec, paDeg,
-            overlapPct: 20, cols: transform.cols, rows: transform.rows, tiles, replaceEntryIds: [entry.id],
+            dsoId: entry.dsoId,
+            centerRa: center.ra,
+            centerDec: center.dec,
+            paDeg,
+            overlapPct: 20,
+            cols: transform.cols,
+            rows: transform.rows,
+            tiles,
+            replaceEntryIds: [entry.id],
           });
         }
       },
@@ -135,7 +191,11 @@ export function collectSwitchItems(plan: Plan, oldSpec: SetupSpecLite, newSpec: 
  * one, resolves both specs, and either commits the switch directly (no mosaics
  * to reconcile, or clearing the setup) or opens the confirmation modal.
  */
-export async function requestSetupSwitch(plan: Plan, newSetupId: string | null, hooks: SetupSwitchHooks): Promise<void> {
+export async function requestSetupSwitch(
+  plan: Plan,
+  newSetupId: string | null,
+  hooks: SetupSwitchHooks,
+): Promise<void> {
   const plansStore = usePlansStore();
   const fovStore = useFovFramesStore();
   const oldSetupId = plan.setupId;
@@ -152,7 +212,10 @@ export async function requestSetupSwitch(plan: Plan, newSetupId: string | null, 
   const oldSpec = oldSetupId ? fovStore.specs.get(oldSetupId) : undefined;
   const newSpec = newSetupId ? fovStore.specs.get(newSetupId) : undefined;
   const items = newSpec && oldSpec ? collectSwitchItems(plan, oldSpec, newSpec) : [];
-  if (items.length === 0 || !newSetupId) { proceed(); return; }
+  if (items.length === 0 || !newSetupId) {
+    proceed();
+    return;
+  }
   openSetupSwitchModal(plan, oldSetupId, newSetupId, items, hooks);
 }
 
@@ -162,7 +225,13 @@ export async function requestSetupSwitch(plan: Plan, newSetupId: string | null, 
  * Apply/Drop choice. OK (enabled once every row is decided) commits the switch
  * then each decision; Cancel reverts the host dropdown to the previous setup.
  */
-export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newSetupId: string, items: SwitchItem[], hooks: SetupSwitchHooks): void {
+export function openSetupSwitchModal(
+  plan: Plan,
+  oldSetupId: string | null,
+  newSetupId: string,
+  items: SwitchItem[],
+  hooks: SetupSwitchHooks,
+): void {
   const plansStore = usePlansStore();
   const fovStore = useFovFramesStore();
   const decisions = new Map<string, 'apply' | 'drop'>();
@@ -189,9 +258,12 @@ export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newS
   const h2 = document.createElement('h2');
   h2.textContent = t('fovOverlay.switchSetupTitle');
   const x = document.createElement('button');
-  x.type = 'button'; x.className = 'modal-close'; x.textContent = '×';
+  x.type = 'button';
+  x.className = 'modal-close';
+  x.textContent = '×';
   x.addEventListener('click', () => close(true));
-  head.appendChild(h2); head.appendChild(x);
+  head.appendChild(h2);
+  head.appendChild(x);
 
   const bodyM = document.createElement('div');
   bodyM.className = 'modal-body modal-form-body flex flex-col gap-3';
@@ -203,11 +275,13 @@ export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newS
   const foot = document.createElement('div');
   foot.className = 'modal-footer';
   const cancel = document.createElement('button');
-  cancel.type = 'button'; cancel.className = 'btn-cancel';
+  cancel.type = 'button';
+  cancel.className = 'btn-cancel';
   cancel.textContent = t('targets.gear.cancel');
   cancel.addEventListener('click', () => close(true));
   const ok = document.createElement('button');
-  ok.type = 'button'; ok.className = 'btn-confirm';
+  ok.type = 'button';
+  ok.className = 'btn-confirm';
   ok.textContent = t('fovOverlay.switchConfirm');
   // Look disabled (and explain via tooltip) until every mosaic is decided, but
   // keep the button enabled so the native title surfaces on hover; the click
@@ -237,16 +311,28 @@ export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newS
     const toggle = document.createElement('div');
     toggle.className = 'flex gap-1 shrink-0';
     const applyBtn = document.createElement('button');
-    applyBtn.type = 'button'; applyBtn.className = 'btn-icon'; applyBtn.textContent = t('fovOverlay.switchApply');
+    applyBtn.type = 'button';
+    applyBtn.className = 'btn-icon';
+    applyBtn.textContent = t('fovOverlay.switchApply');
     const dropBtn = document.createElement('button');
-    dropBtn.type = 'button'; dropBtn.className = 'btn-icon'; dropBtn.textContent = t('fovOverlay.switchDrop');
+    dropBtn.type = 'button';
+    dropBtn.className = 'btn-icon';
+    dropBtn.textContent = t('fovOverlay.switchDrop');
     const paint = (): void => {
       const d = decisions.get(item.id);
       applyBtn.className = d === 'apply' ? 'btn-icon--active' : 'btn-icon';
       dropBtn.className = d === 'drop' ? 'btn-icon--danger-active' : 'btn-icon';
     };
-    applyBtn.addEventListener('click', () => { decisions.set(item.id, 'apply'); paint(); refreshOk(); });
-    dropBtn.addEventListener('click', () => { decisions.set(item.id, 'drop'); paint(); refreshOk(); });
+    applyBtn.addEventListener('click', () => {
+      decisions.set(item.id, 'apply');
+      paint();
+      refreshOk();
+    });
+    dropBtn.addEventListener('click', () => {
+      decisions.set(item.id, 'drop');
+      paint();
+      refreshOk();
+    });
     toggle.append(applyBtn, dropBtn);
 
     row.append(info, toggle);
@@ -255,7 +341,8 @@ export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newS
 
   ok.addEventListener('click', async () => {
     if (incomplete()) return; // still looks disabled — wait for every decision
-    ok.disabled = true; cancel.disabled = true;
+    ok.disabled = true;
+    cancel.disabled = true;
     try {
       // Persist the new setup first so the spec context matches the new gear.
       await plansStore.updatePlanSettings(plan.id, plan.nightOf, newSetupId, plan.lat, plan.lon);
@@ -275,7 +362,9 @@ export function openSetupSwitchModal(plan: Plan, oldSetupId: string | null, newS
 
   refreshOk();
   foot.append(cancel, ok);
-  modal.appendChild(head); modal.appendChild(bodyM); modal.appendChild(foot);
+  modal.appendChild(head);
+  modal.appendChild(bodyM);
+  modal.appendChild(foot);
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }

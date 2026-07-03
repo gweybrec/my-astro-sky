@@ -6,11 +6,30 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Greek letter mapping for Latin input (alpha -> α, beta -> β, etc.)
 const greekLetterMap: Record<string, string> = {
-  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
-  zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ',
-  lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', omicron: 'ο',
-  pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ',
-  phi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω'
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ε',
+  zeta: 'ζ',
+  eta: 'η',
+  theta: 'θ',
+  iota: 'ι',
+  kappa: 'κ',
+  lambda: 'λ',
+  mu: 'μ',
+  nu: 'ν',
+  xi: 'ξ',
+  omicron: 'ο',
+  pi: 'π',
+  rho: 'ρ',
+  sigma: 'σ',
+  tau: 'τ',
+  upsilon: 'υ',
+  phi: 'φ',
+  chi: 'χ',
+  psi: 'ψ',
+  omega: 'ω',
 };
 
 /**
@@ -162,9 +181,7 @@ export function searchDeepStars(query: string, limit = 10): StarSearchResult[] {
     // Match by Bayer designation
     if (score === 0 && star.desig) {
       const d = star.desig.toLowerCase();
-      const full = star.constellation
-        ? `${star.desig} ${star.constellation}`.toLowerCase()
-        : d;
+      const full = star.constellation ? `${star.desig} ${star.constellation}`.toLowerCase() : d;
 
       if (full.startsWith(q) || d.startsWith(q)) score = 50;
       else if (full.includes(q) || d.includes(q)) score = 30;
@@ -214,28 +231,28 @@ export function searchStarsByPosition(
   dec: number,
   radius: number,
   magLimit: number = 10,
-  limit: number = 20
+  limit: number = 20,
 ): StarSearchResult[] {
   loadDeepCatalog();
   if (!deepStars) return [];
 
   const results: StarSearchResult[] = [];
-  const radiusRad = radius * Math.PI / 180;
-  const raRad = ra * Math.PI / 180;
-  const decRad = dec * Math.PI / 180;
+  const radiusRad = (radius * Math.PI) / 180;
+  const raRad = (ra * Math.PI) / 180;
+  const decRad = (dec * Math.PI) / 180;
 
   // Calculate angular distance using haversine formula
   for (const star of deepStars) {
     if (star.mag > magLimit) continue;
 
-    const starRaRad = star.ra * Math.PI / 180;
-    const starDecRad = star.dec * Math.PI / 180;
+    const starRaRad = (star.ra * Math.PI) / 180;
+    const starDecRad = (star.dec * Math.PI) / 180;
 
     // Haversine formula for angular distance
     const dRa = starRaRad - raRad;
     const dDec = starDecRad - decRad;
-    const a = Math.sin(dDec / 2) ** 2 + 
-              Math.cos(decRad) * Math.cos(starDecRad) * Math.sin(dRa / 2) ** 2;
+    const a =
+      Math.sin(dDec / 2) ** 2 + Math.cos(decRad) * Math.cos(starDecRad) * Math.sin(dRa / 2) ** 2;
     const angularDistance = 2 * Math.asin(Math.sqrt(a));
 
     if (angularDistance <= radiusRad) {
@@ -251,7 +268,7 @@ export function searchStarsByPosition(
         constellation: star.constellation,
         desig: star.desig,
         label: starLabel(star),
-        score: 0
+        score: 0,
       });
     }
   }

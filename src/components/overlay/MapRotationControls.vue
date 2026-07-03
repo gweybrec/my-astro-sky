@@ -6,27 +6,39 @@
       :title="t('display.rotateLeft')"
       :aria-label="t('display.rotateLeft')"
       @click="rotate(-STEP)"
-      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
-      @focus="suppress(true)" @blur="suppress(false)"
-    >↺</button>
+      @mouseenter="suppress(true)"
+      @mouseleave="suppress(false)"
+      @focus="suppress(true)"
+      @blur="suppress(false)"
+    >
+      ↺
+    </button>
     <button
       type="button"
       class="sky-rotation-btn sky-rotation-btn-reset"
       :title="t('display.rotateReset')"
       :aria-label="t('display.rotateReset')"
       @click="rotate(0)"
-      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
-      @focus="suppress(true)" @blur="suppress(false)"
-    >◎</button>
+      @mouseenter="suppress(true)"
+      @mouseleave="suppress(false)"
+      @focus="suppress(true)"
+      @blur="suppress(false)"
+    >
+      ◎
+    </button>
     <button
       type="button"
       class="sky-rotation-btn"
       :title="t('display.rotateRight')"
       :aria-label="t('display.rotateRight')"
       @click="rotate(STEP)"
-      @mouseenter="suppress(true)" @mouseleave="suppress(false)"
-      @focus="suppress(true)" @blur="suppress(false)"
-    >↻</button>
+      @mouseenter="suppress(true)"
+      @mouseleave="suppress(false)"
+      @focus="suppress(true)"
+      @blur="suppress(false)"
+    >
+      ↻
+    </button>
   </div>
 </template>
 

@@ -13,10 +13,10 @@ describe('dso highlight geometry', () => {
     expect(base).toBeCloseTo(Math.PI / 2, 12);
 
     const withPa = dsoCanvasAngleForHighlight(30, 0, 0);
-    expect(withPa).toBeCloseTo(base - (30 * Math.PI / 180), 12);
+    expect(withPa).toBeCloseTo(base - (30 * Math.PI) / 180, 12);
 
     const withRotation = dsoCanvasAngleForHighlight(30, 0, 15);
-    expect(withRotation).toBeCloseTo(withPa + (15 * Math.PI / 180), 12);
+    expect(withRotation).toBeCloseTo(withPa + (15 * Math.PI) / 180, 12);
   });
 
   it('round-trips canvasAngleToPADeg against dsoCanvasAngleForHighlight', () => {
@@ -74,9 +74,9 @@ describe('dso highlight geometry', () => {
     const dec = 10;
     const scale = 1200;
 
-    const theta = (90 - dec) * Math.PI / 180;
+    const theta = ((90 - dec) * Math.PI) / 180;
     const cos2 = Math.cos(theta / 2) ** 2;
-    const rad = (arcmin / 60) * Math.PI / 180;
+    const rad = ((arcmin / 60) * Math.PI) / 180;
     const expected = (rad / (2 * cos2)) * scale;
 
     expect(angularSizeToCanvasPxForDSO(arcmin, dec, scale)).toBeCloseTo(expected, 12);

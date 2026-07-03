@@ -131,7 +131,14 @@ describe('solveWithSolveField()', () => {
   });
 
   it('returns success with correspondences and parsed DSO IDs', async () => {
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(true);
     expect(result.correspondences).toHaveLength(3);
@@ -173,7 +180,14 @@ describe('solveWithSolveField()', () => {
       message: 'exit 1',
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/index|install-solve-field/i);
@@ -187,7 +201,14 @@ describe('solveWithSolveField()', () => {
       message: 'exit 1',
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('No solution found');
@@ -202,7 +223,14 @@ describe('solveWithSolveField()', () => {
       message: 'exit 1',
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
     expect(result.success).toBe(false);
     expect(result.error).toContain('solve-field failed');
     expect(result.error).toContain('5');
@@ -225,7 +253,14 @@ describe('solveWithSolveField()', () => {
   it('returns error when WCS file is not produced even on successful command exit', async () => {
     mockExistsSync.mockReturnValue(false);
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('did not produce a WCS file');
@@ -239,7 +274,14 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en', undefined, 'Andromeda.jpg',
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+      undefined,
+      'Andromeda.jpg',
     );
 
     expect(result.success).toBe(false);
@@ -265,7 +307,14 @@ describe('solveWithSolveField()', () => {
       // CD2_2 missing
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Missing WCS key: CD2_2');
@@ -288,7 +337,14 @@ describe('solveWithSolveField()', () => {
       message: 'exit 1',
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.diagnostics).toBeDefined();
@@ -306,7 +362,14 @@ describe('solveWithSolveField()', () => {
       message: 'exit 1',
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.diagnostics).toContain('detail line A');
@@ -322,7 +385,14 @@ describe('solveWithSolveField()', () => {
       message: 'exit 1',
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/index|install-solve-field/i);
@@ -331,12 +401,20 @@ describe('solveWithSolveField()', () => {
   it('returns noPyfits error when uniformize Python dependency is missing', async () => {
     mockExistsSync.mockReturnValue(false);
     mockExecFileAsync.mockRejectedValue({
-      stdout: "AttributeError: 'NoPyfits' object has no attribute 'open'\naugment-xylist.c: Failed to run command: python3 -m astrometry.util.uniformize\n",
+      stdout:
+        "AttributeError: 'NoPyfits' object has no attribute 'open'\naugment-xylist.c: Failed to run command: python3 -m astrometry.util.uniformize\n",
       stderr: '',
       message: 'exit 1',
     });
 
-    const result = await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithSolveField(
+      Buffer.from('img'),
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/pyfits|astropy/i);

@@ -24,7 +24,10 @@ interface DeleteFrameOptions {
  * Shared by the sky-map FOV popup and the plan-details list so both behave
  * identically. Whole-plan deletes (and mosaic deletes) are handled separately.
  */
-export function deleteFrameWithUndo(target: FrameDeleteTarget, opts: DeleteFrameOptions = {}): void {
+export function deleteFrameWithUndo(
+  target: FrameDeleteTarget,
+  opts: DeleteFrameOptions = {},
+): void {
   const fovStore = useFovFramesStore(pinia);
   const plansStore = usePlansStore(pinia);
 
@@ -32,17 +35,26 @@ export function deleteFrameWithUndo(target: FrameDeleteTarget, opts: DeleteFrame
 
   if (target.kind === 'adhoc') {
     // Snapshot the frame so undo can re-insert the exact same instance.
-    const snapshot = fovStore.adhoc.find(f => f.id === target.id);
+    const snapshot = fovStore.adhoc.find((f) => f.id === target.id);
     const frame: AdhocFrame | undefined = snapshot ? { ...snapshot } : undefined;
     fovStore.removeFrame(target.id);
-    restore = () => { if (frame) fovStore.restoreAdhocFrame(frame); };
+    restore = () => {
+      if (frame) fovStore.restoreAdhocFrame(frame);
+    };
   } else {
     // Snapshot the entry's framing before removal; undo re-creates it (a new id is
     // assigned, which is fine — the frame reappears with the same target/framing).
-    const plan = plansStore.plans.find(p => p.id === target.planId);
-    const entry = plan?.entries.find(e => e.id === target.entryId);
+    const plan = plansStore.plans.find((p) => p.id === target.planId);
+    const entry = plan?.entries.find((e) => e.id === target.entryId);
     const snap = entry
-      ? { dsoId: entry.dsoId, ra: entry.ra, dec: entry.dec, paDeg: entry.paDeg, mosaicWDeg: entry.mosaicWDeg ?? null, mosaicHDeg: entry.mosaicHDeg ?? null }
+      ? {
+          dsoId: entry.dsoId,
+          ra: entry.ra,
+          dec: entry.dec,
+          paDeg: entry.paDeg,
+          mosaicWDeg: entry.mosaicWDeg ?? null,
+          mosaicHDeg: entry.mosaicHDeg ?? null,
+        }
       : null;
     // Route through the store so floating/active state is cleared too (same as the
     // FOV popup's own delete path).
@@ -52,16 +64,19 @@ export function deleteFrameWithUndo(target: FrameDeleteTarget, opts: DeleteFrame
       let newId: string | null = null;
       if (snap.dsoId) {
         await plansStore.addEntry(target.planId, snap.dsoId);
-        const p = plansStore.plans.find(pl => pl.id === target.planId);
+        const p = plansStore.plans.find((pl) => pl.id === target.planId);
         // The re-added DSO entry is the last matching one.
-        newId = [...(p?.entries ?? [])].reverse().find(e => e.dsoId === snap.dsoId)?.id ?? null;
+        newId = [...(p?.entries ?? [])].reverse().find((e) => e.dsoId === snap.dsoId)?.id ?? null;
       } else if (snap.ra != null && snap.dec != null) {
         newId = await plansStore.addCustomEntry(target.planId, snap.ra, snap.dec);
       }
       if (newId) {
         plansStore.setEntryPosition(target.planId, newId, {
-          ra: snap.ra, dec: snap.dec, paDeg: snap.paDeg,
-          mosaicWDeg: snap.mosaicWDeg, mosaicHDeg: snap.mosaicHDeg,
+          ra: snap.ra,
+          dec: snap.dec,
+          paDeg: snap.paDeg,
+          mosaicWDeg: snap.mosaicWDeg,
+          mosaicHDeg: snap.mosaicHDeg,
         });
       }
     };

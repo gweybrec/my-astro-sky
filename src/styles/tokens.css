@@ -4,74 +4,74 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
   /* Backgrounds */
-  --bg-app:        #080808;
-  --bg-deep:       #111111;
-  --bg-modal:      #0e0c0a;
-  --bg-panel:      rgba(14, 12, 10, 0.96);
-  --bg-card:       rgba(20, 18, 14, 0.9);
-  --bg-input:      rgba(22, 20, 16, 0.85);
-  --bg-surface:    rgba(22, 20, 16, 0.45);
-  --bg-hover:      rgba(192, 120, 48, 0.08);
+  --bg-app: #080808;
+  --bg-deep: #111111;
+  --bg-modal: #0e0c0a;
+  --bg-panel: rgba(14, 12, 10, 0.96);
+  --bg-card: rgba(20, 18, 14, 0.9);
+  --bg-input: rgba(22, 20, 16, 0.85);
+  --bg-surface: rgba(22, 20, 16, 0.45);
+  --bg-hover: rgba(192, 120, 48, 0.08);
 
   /* Borders */
-  --border-panel:  rgba(255, 255, 255, 0.07);
-  --border-input:  rgba(255, 255, 255, 0.09);
+  --border-panel: rgba(255, 255, 255, 0.07);
+  --border-input: rgba(255, 255, 255, 0.09);
   --border-subtle: rgba(255, 255, 255, 0.04);
   --border-accent: rgba(192, 120, 48, 0.45);
-  --border-focus:  rgba(192, 120, 48, 0.65);
+  --border-focus: rgba(192, 120, 48, 0.65);
 
   /* Text */
-  --text-primary:   #e0d8cf;
+  --text-primary: #e0d8cf;
   --text-secondary: #a09080;
-  --text-label:     #7a7068;
-  --text-dim:       #5a5048;
-  --text-muted:     #4a4038;
-  --text-bright:    #f0e8df;
-  --text-hint:      #88a;   /* empty-state / no-results hint text */
+  --text-label: #7a7068;
+  --text-dim: #5a5048;
+  --text-muted: #4a4038;
+  --text-bright: #f0e8df;
+  --text-hint: #88a; /* empty-state / no-results hint text */
 
   /* Brand accent (amber) */
-  --accent-bg:       rgba(192, 120, 48, 0.55);
+  --accent-bg: rgba(192, 120, 48, 0.55);
   --accent-bg-hover: rgba(210, 135, 55, 0.75);
-  --accent-border:   var(--accent-fill-xl);
-  --accent-color:    rgba(192, 120, 48, 0.9);  /* accent-color for inputs */
-  --accent-danger:   rgba(200,  70,  70, 0.85); /* accent-color for danger/destructive inputs */
-  --color-danger:    #c77; /* icon/text color for destructive actions */
+  --accent-border: var(--accent-fill-xl);
+  --accent-color: rgba(192, 120, 48, 0.9); /* accent-color for inputs */
+  --accent-danger: rgba(200, 70, 70, 0.85); /* accent-color for danger/destructive inputs */
+  --color-danger: #c77; /* icon/text color for destructive actions */
 
   /* Status */
   --status-success-border: rgba(50, 120, 60, 0.3);
-  --status-success-bg:     rgba(30, 80, 40, 0.3);
-  --status-success-text:   #8c8;
-  --status-error-bg:       rgba(100, 30, 30, 0.3);
-  --status-error-border:   rgba(140, 50, 50, 0.3);
-  --status-error-text:     #c88;
-  --status-info-bg:        rgba(60, 45, 15, 0.40);
-  --status-info-border:    rgba(130, 95, 35, 0.40);
-  --status-info-text:      #c9a;
-  --status-warn-bg:        rgba(80, 60, 10, 0.3);
-  --status-warn-border:    rgba(200, 150, 30, 0.3);
-  --status-warn-text:      #fd9;
+  --status-success-bg: rgba(30, 80, 40, 0.3);
+  --status-success-text: #8c8;
+  --status-error-bg: rgba(100, 30, 30, 0.3);
+  --status-error-border: rgba(140, 50, 50, 0.3);
+  --status-error-text: #c88;
+  --status-info-bg: rgba(60, 45, 15, 0.4);
+  --status-info-border: rgba(130, 95, 35, 0.4);
+  --status-info-text: #c9a;
+  --status-warn-bg: rgba(80, 60, 10, 0.3);
+  --status-warn-border: rgba(200, 150, 30, 0.3);
+  --status-warn-text: #fd9;
 
   /* Overlay backgrounds */
-  --bg-overlay:       rgba(0, 0, 0, 0.7);
+  --bg-overlay: rgba(0, 0, 0, 0.7);
   --bg-overlay-heavy: rgba(0, 0, 0, 0.88);
 
   /* Astrophotography filter chip colours */
-  --filter-l:      rgba(200, 200, 200, 0.15);
-  --filter-r:      rgba(200,  60,  60, 0.3);
-  --filter-g:      rgba( 50, 180,  80, 0.3);
-  --filter-b:      rgba( 40,  80, 200, 0.3);
-  --filter-rgb:    rgba(190, 190, 210, 0.25);
-  --filter-ha:     rgba(180,  40,  40, 0.4);
-  --filter-oiii:   rgba( 30, 100, 200, 0.4);
-  --filter-sii:    rgba(160,  60, 160, 0.4);
-  --filter-custom:     rgba( 40,  80, 160, 0.5);
-  --filter-dual-band:  rgba( 80,  30, 150, 0.55);
+  --filter-l: rgba(200, 200, 200, 0.15);
+  --filter-r: rgba(200, 60, 60, 0.3);
+  --filter-g: rgba(50, 180, 80, 0.3);
+  --filter-b: rgba(40, 80, 200, 0.3);
+  --filter-rgb: rgba(190, 190, 210, 0.25);
+  --filter-ha: rgba(180, 40, 40, 0.4);
+  --filter-oiii: rgba(30, 100, 200, 0.4);
+  --filter-sii: rgba(160, 60, 160, 0.4);
+  --filter-custom: rgba(40, 80, 160, 0.5);
+  --filter-dual-band: rgba(80, 30, 150, 0.55);
 
   /* Spacing scale */
-  --space-1:  2px;
-  --space-2:  4px;
-  --space-3:  6px;
-  --space-4:  8px;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
   --space-5: 10px;
   --space-6: 12px;
   --space-7: 16px;
@@ -81,32 +81,32 @@
   /* Typography scale */
   --font-size-micro: 10px;
   --font-size-small: 11px;
-  --font-size-base:  12px;
-  --font-size-body:  13px;
-  --font-size-sub:   14px;
+  --font-size-base: 12px;
+  --font-size-body: 13px;
+  --font-size-sub: 14px;
   --font-size-title: 15px;
-  --font-size-head:  16px;
+  --font-size-head: 16px;
   --font-size-large: 18px;
 
   /* Border-radius scale */
-  --radius-xs:   2px;
-  --radius-1h:   3px;
-  --radius-sm:   4px;
-  --radius-2h:   5px;
-  --radius-md:   6px;
-  --radius-lg:   8px;
-  --radius-xl:  10px;
+  --radius-xs: 2px;
+  --radius-1h: 3px;
+  --radius-sm: 4px;
+  --radius-2h: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
   --radius-2xl: 12px;
   --radius-pill: 999px;
 
   /* Z-index scale */
-  --z-base:       1;
-  --z-panel:     10;
-  --z-toggle:    11;
-  --z-sidebar:   20;
-  --z-modal:    200;
-  --z-meta:     210;
-  --z-gallery:  220;
+  --z-base: 1;
+  --z-panel: 10;
+  --z-toggle: 11;
+  --z-sidebar: 20;
+  --z-modal: 200;
+  --z-meta: 210;
+  --z-gallery: 220;
   --z-tooltip: 10000;
 
   /* Layout */
@@ -114,24 +114,24 @@
 
   /* Typography families */
   --font-display: 'Cormorant Garamond', Georgia, serif;
-  --font-mono:    'DM Mono', 'Consolas', 'Monaco', monospace;
-  --font-ui:      'Outfit', system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'Consolas', 'Monaco', monospace;
+  --font-ui: 'Outfit', system-ui, sans-serif;
 
   /* Extended type scale */
   --font-size-display: 48px;
-  --font-size-xl:      24px;
+  --font-size-xl: 24px;
 
   /* Gallery layout */
   --gallery-hero-max-h: 70vh;
-  --gallery-card-gap:   40px;
+  --gallery-card-gap: 40px;
 
   /* FOV frame overlay */
   --fov-frame-stroke: rgba(220, 60, 60, 0.85);
-  --fov-frame-label:  rgba(220, 90, 90, 0.9);
+  --fov-frame-label: rgba(220, 90, 90, 0.9);
 
   /* Moon trajectory overlay (plan altitude charts) */
   --moon-curve: rgba(180, 188, 210, 0.55); /* dashed moon path + phase-icon outline */
-  --moon-lit:   rgba(225, 230, 245, 0.92); /* illuminated portion of the phase icon */
+  --moon-lit: rgba(225, 230, 245, 0.92); /* illuminated portion of the phase icon */
 
   /* Sky map background gradient (read via getComputedStyle in sky-map.ts) */
   --sky-bg-inner: #1e1c2a;
@@ -146,194 +146,204 @@
   --targets-const-modal-body-max-height: 60vh;
 
   /* Scrollbar */
-  --scrollbar-track:        rgba(20, 18, 14, 0.5);
-  --scrollbar-thumb:        rgba(192, 120, 48, 0.45);
-  --scrollbar-thumb-hover:  rgba(210, 135, 55, 0.7);
+  --scrollbar-track: rgba(20, 18, 14, 0.5);
+  --scrollbar-thumb: rgba(192, 120, 48, 0.45);
+  --scrollbar-thumb-hover: rgba(210, 135, 55, 0.7);
 
   /* Amber fill scale (complements --bg-hover 8%, --accent-bg 55%) */
-  --accent-fill-sm:  rgba(192, 120, 48, 0.12);
-  --accent-fill-md:  rgba(192, 120, 48, 0.20);
-  --accent-fill-lg:  rgba(192, 120, 48, 0.35);
-  --accent-fill-xl:  rgba(192, 120, 48, 0.50);
-  --accent-fill-2xl: rgba(192, 120, 48, 0.60);
+  --accent-fill-sm: rgba(192, 120, 48, 0.12);
+  --accent-fill-md: rgba(192, 120, 48, 0.2);
+  --accent-fill-lg: rgba(192, 120, 48, 0.35);
+  --accent-fill-xl: rgba(192, 120, 48, 0.5);
+  --accent-fill-2xl: rgba(192, 120, 48, 0.6);
 
   /* Spinner */
-  --spinner-ring:   var(--accent-fill-md);
+  --spinner-ring: var(--accent-fill-md);
   --spinner-active: rgba(192, 120, 48, 0.8);
 
   /* Dark surface variants */
-  --bg-surface-lo:  rgba(22, 20, 16, 0.40);
-  --bg-surface-mid: rgba(22, 20, 16, 0.50);
-  --bg-dropdown:    rgba(12, 11, 9, 0.98);
-  --bg-panel-hdr:   rgba(18, 16, 12, 0.80);
-  --bg-warm-hover:  rgba(28, 26, 20, 0.90);
-  --bg-warm-hover2: rgba(35, 32, 26, 0.70);
+  --bg-surface-lo: rgba(22, 20, 16, 0.4);
+  --bg-surface-mid: rgba(22, 20, 16, 0.5);
+  --bg-dropdown: rgba(12, 11, 9, 0.98);
+  --bg-panel-hdr: rgba(18, 16, 12, 0.8);
+  --bg-warm-hover: rgba(28, 26, 20, 0.9);
+  --bg-warm-hover2: rgba(35, 32, 26, 0.7);
   --bg-warm-hover3: rgba(32, 30, 24, 0.85);
-  --bg-warm-btn:    rgba(22, 20, 16, 0.60);
-  --bg-overlay-72:  rgba(0, 0, 0, 0.72);
-  --bg-code:        rgba(30, 28, 22, 0.60);
-  --bg-code-dark:   rgba(0, 0, 0, 0.25);
-  --bg-clear-btn:   rgba(32, 28, 22, 0.80);
-  --bg-clear-hover: rgba(45, 40, 32, 0.80);
+  --bg-warm-btn: rgba(22, 20, 16, 0.6);
+  --bg-overlay-72: rgba(0, 0, 0, 0.72);
+  --bg-code: rgba(30, 28, 22, 0.6);
+  --bg-code-dark: rgba(0, 0, 0, 0.25);
+  --bg-clear-btn: rgba(32, 28, 22, 0.8);
+  --bg-clear-hover: rgba(45, 40, 32, 0.8);
 
   /* Border supplement */
-  --border-chrome:    #333;
-  --border-white-xs:  rgba(255, 255, 255, 0.06);
-  --border-white-sm:  rgba(255, 255, 255, 0.08);
-  --border-white-md:  rgba(255, 255, 255, 0.15);
-  --border-white-lg:  rgba(255, 255, 255, 0.20);
-  --border-white-xl:  rgba(255, 255, 255, 0.40);
+  --border-chrome: #333;
+  --border-white-xs: rgba(255, 255, 255, 0.06);
+  --border-white-sm: rgba(255, 255, 255, 0.08);
+  --border-white-md: rgba(255, 255, 255, 0.15);
+  --border-white-lg: rgba(255, 255, 255, 0.2);
+  --border-white-xl: rgba(255, 255, 255, 0.4);
 
   /* Shadow scale */
-  --shadow-sm:  rgba(0, 0, 0, 0.4);
-  --shadow-md:  rgba(0, 0, 0, 0.5);
-  --shadow-lg:  rgba(0, 0, 0, 0.6);
-  --shadow-xl:  rgba(0, 0, 0, 0.7);
+  --shadow-sm: rgba(0, 0, 0, 0.4);
+  --shadow-md: rgba(0, 0, 0, 0.5);
+  --shadow-lg: rgba(0, 0, 0, 0.6);
+  --shadow-xl: rgba(0, 0, 0, 0.7);
   --shadow-2xl: rgba(0, 0, 0, 0.8);
 
   /* Button semantic */
-  --btn-confirm-bg:          rgba(40, 120, 60, 0.70);
-  --btn-confirm-bg-hover:    rgba(50, 140, 70, 0.80);
-  --btn-confirm-border:      rgba(60, 150, 80, 0.50);
-  --btn-confirm-text:        #cdc;
-  --btn-cancel-bg-hover:     rgba(24, 22, 18, 0.40);
-  --btn-danger-bg:           rgba(140, 35, 35, 0.75);
-  --btn-danger-bg-hover:     rgba(170, 40, 40, 0.90);
-  --btn-danger-border:       rgba(200, 70, 70, 0.65);
-  --btn-danger-border-hover: rgba(230, 90, 90, 0.80);
-  --btn-danger-text:         #ffe2e2;
-  --btn-danger-inline-bg:    rgba(100, 40, 40, 0.60);
-  --btn-danger-hover-bg:     rgba(180, 40, 40, 0.40);
-  --btn-danger-hover-border: rgba(200, 60, 60, 0.40);
-  --btn-danger-hover-text:   #e88;
-  --btn-solve-cancel-bg:           rgba(150, 60, 60, 0.18);
-  --btn-solve-cancel-border:       rgba(180, 80, 80, 0.38);
-  --btn-solve-cancel-text:         #d99;
-  --btn-solve-cancel-bg-hover:     rgba(180, 70, 70, 0.28);
+  --btn-confirm-bg: rgba(40, 120, 60, 0.7);
+  --btn-confirm-bg-hover: rgba(50, 140, 70, 0.8);
+  --btn-confirm-border: rgba(60, 150, 80, 0.5);
+  --btn-confirm-text: #cdc;
+  --btn-cancel-bg-hover: rgba(24, 22, 18, 0.4);
+  --btn-danger-bg: rgba(140, 35, 35, 0.75);
+  --btn-danger-bg-hover: rgba(170, 40, 40, 0.9);
+  --btn-danger-border: rgba(200, 70, 70, 0.65);
+  --btn-danger-border-hover: rgba(230, 90, 90, 0.8);
+  --btn-danger-text: #ffe2e2;
+  --btn-danger-inline-bg: rgba(100, 40, 40, 0.6);
+  --btn-danger-hover-bg: rgba(180, 40, 40, 0.4);
+  --btn-danger-hover-border: rgba(200, 60, 60, 0.4);
+  --btn-danger-hover-text: #e88;
+  --btn-solve-cancel-bg: rgba(150, 60, 60, 0.18);
+  --btn-solve-cancel-border: rgba(180, 80, 80, 0.38);
+  --btn-solve-cancel-text: #d99;
+  --btn-solve-cancel-bg-hover: rgba(180, 70, 70, 0.28);
   --btn-solve-cancel-border-hover: rgba(210, 95, 95, 0.52);
-  --btn-solve-cancel-text-hover:   #f5b0b0;
-  --btn-icon-danger-hover:   rgba(180, 50, 50, 0.25);
-  --btn-trash-bg:            rgba(120, 45, 45, 0.15);
-  --btn-trash-border:        rgba(170, 70, 70, 0.35);
-  --btn-trash-text:          #c88;
-  --btn-trash-bg-hover:      rgba(170, 60, 60, 0.25);
-  --btn-trash-border-hover:  rgba(220, 90, 90, 0.50);
-  --btn-trash-text-hover:    #f99;
-  --btn-popup-delete-bg:           rgba(120, 30, 30, 0.30);
-  --btn-popup-delete-border:       rgba(180, 50, 50, 0.30);
-  --btn-popup-delete-bg-hover:     rgba(160, 40, 40, 0.40);
-  --btn-popup-delete-disabled-bg:  rgba(180, 60, 60, 0.30);
-  --btn-retry-bg:       rgba(160, 80, 40, 0.30);
-  --btn-retry-border:   rgba(180, 100, 60, 0.50);
-  --btn-retry-text:     #fa9;
-  --btn-retry-bg-hover: rgba(180, 100, 60, 0.40);
-  --btn-batch-trash-border:       rgba(160, 60, 60, 0.30);
-  --btn-batch-trash-bg-hover:     rgba(160, 60, 60, 0.20);
-  --btn-batch-trash-border-hover: rgba(200, 80, 80, 0.50);
+  --btn-solve-cancel-text-hover: #f5b0b0;
+  --btn-icon-danger-hover: rgba(180, 50, 50, 0.25);
+  --btn-trash-bg: rgba(120, 45, 45, 0.15);
+  --btn-trash-border: rgba(170, 70, 70, 0.35);
+  --btn-trash-text: #c88;
+  --btn-trash-bg-hover: rgba(170, 60, 60, 0.25);
+  --btn-trash-border-hover: rgba(220, 90, 90, 0.5);
+  --btn-trash-text-hover: #f99;
+  --btn-popup-delete-bg: rgba(120, 30, 30, 0.3);
+  --btn-popup-delete-border: rgba(180, 50, 50, 0.3);
+  --btn-popup-delete-bg-hover: rgba(160, 40, 40, 0.4);
+  --btn-popup-delete-disabled-bg: rgba(180, 60, 60, 0.3);
+  --btn-retry-bg: rgba(160, 80, 40, 0.3);
+  --btn-retry-border: rgba(180, 100, 60, 0.5);
+  --btn-retry-text: #fa9;
+  --btn-retry-bg-hover: rgba(180, 100, 60, 0.4);
+  --btn-batch-trash-border: rgba(160, 60, 60, 0.3);
+  --btn-batch-trash-bg-hover: rgba(160, 60, 60, 0.2);
+  --btn-batch-trash-border-hover: rgba(200, 80, 80, 0.5);
 
   /* Chip tokens */
-  --chip-label-bg:          rgba(80, 160, 80, 0.10);
-  --chip-label-border:      rgba(80, 160, 80, 0.35);
-  --chip-label-text:        rgba(140, 200, 140, 0.80);
-  --chip-label-bg-edit:     rgba(60, 120, 60, 0.45);
-  --chip-label-border-edit: rgba(80, 180, 80, 0.40);
-  --chip-label-text-edit:   #afa;
-  --chip-gallery-border:    rgba(192, 120, 48, 0.30);
+  --chip-label-bg: rgba(80, 160, 80, 0.1);
+  --chip-label-border: rgba(80, 160, 80, 0.35);
+  --chip-label-text: rgba(140, 200, 140, 0.8);
+  --chip-label-bg-edit: rgba(60, 120, 60, 0.45);
+  --chip-label-border-edit: rgba(80, 180, 80, 0.4);
+  --chip-label-text-edit: #afa;
+  --chip-gallery-border: rgba(192, 120, 48, 0.3);
 
   /* Toast / card status */
-  --toast-error-border:  rgba(200, 60, 60, 0.50);
-  --card-status-success: rgba(50, 160, 80, 0.50);
-  --card-status-placed:  rgba(40, 160, 120, 0.60);
-  --card-status-failed:  rgba(200, 60, 60, 0.50);
+  --toast-error-border: rgba(200, 60, 60, 0.5);
+  --card-status-success: rgba(50, 160, 80, 0.5);
+  --card-status-placed: rgba(40, 160, 120, 0.6);
+  --card-status-failed: rgba(200, 60, 60, 0.5);
 
   /* WCS info (blue is intentional — scientific instrument color) */
-  --wcs-info-border: rgba(80, 120, 200, 0.40);
-  --wcs-info-bg:     rgba(20, 30, 80, 0.50);
-  --wcs-info-text:   #aad;
+  --wcs-info-border: rgba(80, 120, 200, 0.4);
+  --wcs-info-bg: rgba(20, 30, 80, 0.5);
+  --wcs-info-text: #aad;
 
   /* Search result type badges */
-  --search-star-bg:     rgba(200, 170, 50, 0.25);
-  --search-star-text:   #ddc060;
+  --search-star-bg: rgba(200, 170, 50, 0.25);
+  --search-star-text: #ddc060;
   --search-star-border: rgba(200, 170, 50, 0.35);
-  --search-dso-bg:      rgba(60, 100, 200, 0.25);
-  --search-dso-text:    #80b0ff;
-  --search-dso-border:  rgba(60, 100, 200, 0.35);
+  --search-dso-bg: rgba(60, 100, 200, 0.25);
+  --search-dso-text: #80b0ff;
+  --search-dso-border: rgba(60, 100, 200, 0.35);
 
   /* Hints section */
   --hints-info-icon-border: #88a;
-  --hints-bg:               rgba(100, 100, 100, 0.15);
-  --hints-border:           rgba(120, 120, 140, 0.20);
-  --hints-confirmed-bg:     rgba(50, 150, 50, 0.10);
-  --hints-confirmed-text:   #6c6;
-  --hints-close-bg:         rgba(30, 28, 22, 0.80);
-  --hints-close-bg-hover:   rgba(180, 100, 100, 0.40);
+  --hints-bg: rgba(100, 100, 100, 0.15);
+  --hints-border: rgba(120, 120, 140, 0.2);
+  --hints-confirmed-bg: rgba(50, 150, 50, 0.1);
+  --hints-confirmed-text: #6c6;
+  --hints-close-bg: rgba(30, 28, 22, 0.8);
+  --hints-close-bg-hover: rgba(180, 100, 100, 0.4);
   --hints-close-text-hover: #faa;
 
   /* Gallery cinematic */
-  --gallery-cinematic-bg:          #000;
-  --gallery-carousel-btn-bg:       rgba(5, 4, 3, 0.55);
-  --gallery-carousel-counter-bg:   rgba(5, 4, 3, 0.60);
-  --gallery-cinematic-close-dim:   rgba(255, 255, 255, 0.25);
-  --gallery-cinematic-close-lit:   rgba(255, 255, 255, 0.85);
-  --gallery-cinematic-meta-bg:     rgba(14, 12, 10, 0.93);
-  --gallery-cinematic-title:       rgba(224, 216, 207, 0.65);
-  --gallery-zoom-btn-bg:           rgba(14, 12, 10, 0.80);
+  --gallery-cinematic-bg: #000;
+  --gallery-carousel-btn-bg: rgba(5, 4, 3, 0.55);
+  --gallery-carousel-counter-bg: rgba(5, 4, 3, 0.6);
+  --gallery-cinematic-close-dim: rgba(255, 255, 255, 0.25);
+  --gallery-cinematic-close-lit: rgba(255, 255, 255, 0.85);
+  --gallery-cinematic-meta-bg: rgba(14, 12, 10, 0.93);
+  --gallery-cinematic-title: rgba(224, 216, 207, 0.65);
+  --gallery-zoom-btn-bg: rgba(14, 12, 10, 0.8);
 
   /* Target card semantic colors */
-  --target-rating-text:            #f0c040;
-  --target-difficulty-text:        #e07040;
-  --target-rating-chip-bg:         rgba(60, 45, 0, 0.60);
-  --target-rating-chip-border:     rgba(240, 192, 64, 0.55);
-  --target-difficulty-chip-bg:     rgba(60, 25, 0, 0.60);
+  --target-rating-text: #f0c040;
+  --target-difficulty-text: #e07040;
+  --target-rating-chip-bg: rgba(60, 45, 0, 0.6);
+  --target-rating-chip-border: rgba(240, 192, 64, 0.55);
+  --target-difficulty-chip-bg: rgba(60, 25, 0, 0.6);
   --target-difficulty-chip-border: rgba(224, 112, 64, 0.55);
-  --target-const-bg:     rgba(30, 80, 50, 0.30);
+  --target-const-bg: rgba(30, 80, 50, 0.3);
   --target-const-border: rgba(50, 120, 70, 0.35);
-  --target-const-text:   #6a8;
-  --target-type-bg:      rgba(20, 18, 14, 0.80);
-  --target-type-border:  rgba(192, 120, 48, 0.20);
-  --target-fov-fill-start: rgba(192, 120, 48, 0.60);
-  --target-fov-fill-end:   rgba(150, 100, 40, 0.60);
-  --target-recipe-bg:    rgba(14, 12, 10, 0.60);
+  --target-const-text: #6a8;
+  --target-type-bg: rgba(20, 18, 14, 0.8);
+  --target-type-border: rgba(192, 120, 48, 0.2);
+  --target-fov-fill-start: rgba(192, 120, 48, 0.6);
+  --target-fov-fill-end: rgba(150, 100, 40, 0.6);
+  --target-recipe-bg: rgba(14, 12, 10, 0.6);
 
   /* Batch */
-  --batch-placed-text:        #6c9;
-  --batch-status-wcs:         #7ae;
-  --batch-wcs-loaded-border:  rgba(50, 160, 80, 0.50);
-  --upload-fill:              rgba(60, 180, 80, 0.80);
+  --batch-placed-text: #6c9;
+  --batch-status-wcs: #7ae;
+  --batch-wcs-loaded-border: rgba(50, 160, 80, 0.5);
+  --upload-fill: rgba(60, 180, 80, 0.8);
 
   /* Misc semantic */
-  --loading-error-text:     #e55;
-  --privacy-warning-bg:     rgba(180, 120, 40, 0.12);
-  --privacy-warning-border: rgba(200, 140, 50, 0.30);
-  --privacy-warning-title:  #ca8;
-  --settings-link-color:    #8af;
-  --settings-mono-hint:     #c7cde1;
-  --text-warning-sm:        #cc9;
-  --draw-order-title:        #dde6ff;
-  --draw-order-subtitle:     #8e9acc;
-  --submission-item-title:   #eef;
-  --submission-badge-success-bg:   rgba(60, 200, 60, 0.20);
+  --loading-error-text: #e55;
+  --privacy-warning-bg: rgba(180, 120, 40, 0.12);
+  --privacy-warning-border: rgba(200, 140, 50, 0.3);
+  --privacy-warning-title: #ca8;
+  --settings-link-color: #8af;
+  --settings-mono-hint: #c7cde1;
+  --text-warning-sm: #cc9;
+  --draw-order-title: #dde6ff;
+  --draw-order-subtitle: #8e9acc;
+  --submission-item-title: #eef;
+  --submission-badge-success-bg: rgba(60, 200, 60, 0.2);
   --submission-badge-success-text: #6f6;
-  --submission-badge-pending-bg:   rgba(40, 36, 28, 0.60);
-  --solve-error-summary:     #f4caca;
-  --solve-error-pre-text:    #f6d5d5;
-  --solve-error-pre-border:  rgba(220, 120, 120, 0.28);
+  --submission-badge-pending-bg: rgba(40, 36, 28, 0.6);
+  --solve-error-summary: #f4caca;
+  --solve-error-pre-text: #f6d5d5;
+  --solve-error-pre-border: rgba(220, 120, 120, 0.28);
 
   /* Point-entry completion state */
-  --point-complete-border: rgba(60, 120, 80, 0.40);
-  --point-complete-bg:     rgba(20, 40, 30, 0.40);
+  --point-complete-border: rgba(60, 120, 80, 0.4);
+  --point-complete-bg: rgba(20, 40, 30, 0.4);
 
   /* Filter badge text colors (per-filter semantic) */
-  --filter-ha-text:     #f99;   --filter-ha-border:     rgba(200, 60, 60, 0.4);
-  --filter-oiii-text:   #8cf;   --filter-oiii-border:   rgba(50, 130, 220, 0.4);
-  --filter-sii-text:    #e9e;   --filter-sii-border:    rgba(180, 80, 180, 0.4);
-  --filter-l-text:      #dde;   --filter-l-border:      rgba(180, 180, 200, 0.3);
-  --filter-r-text:      #f88;   --filter-r-border:      rgba(200, 80, 80, 0.4);
-  --filter-g-text:      #8e8;   --filter-g-border:      rgba(60, 200, 90, 0.4);
-  --filter-b-text:      #88f;   --filter-b-border:      rgba(60, 100, 220, 0.4);
-  --filter-rgb-text:       #dde;   --filter-rgb-border:       rgba(160, 160, 190, 0.35);
-  --filter-custom-text:    #adf;   --filter-custom-border:    rgba(80, 120, 220, 0.4);
-  --filter-dual-band-text: #baf;   --filter-dual-band-border: rgba(100, 50, 190, 0.5);
+  --filter-ha-text: #f99;
+  --filter-ha-border: rgba(200, 60, 60, 0.4);
+  --filter-oiii-text: #8cf;
+  --filter-oiii-border: rgba(50, 130, 220, 0.4);
+  --filter-sii-text: #e9e;
+  --filter-sii-border: rgba(180, 80, 180, 0.4);
+  --filter-l-text: #dde;
+  --filter-l-border: rgba(180, 180, 200, 0.3);
+  --filter-r-text: #f88;
+  --filter-r-border: rgba(200, 80, 80, 0.4);
+  --filter-g-text: #8e8;
+  --filter-g-border: rgba(60, 200, 90, 0.4);
+  --filter-b-text: #88f;
+  --filter-b-border: rgba(60, 100, 220, 0.4);
+  --filter-rgb-text: #dde;
+  --filter-rgb-border: rgba(160, 160, 190, 0.35);
+  --filter-custom-text: #adf;
+  --filter-custom-border: rgba(80, 120, 220, 0.4);
+  --filter-dual-band-text: #baf;
+  --filter-dual-band-border: rgba(100, 50, 190, 0.5);
 
   /* Extended spacing scale */
   --space-10: 28px;
@@ -343,14 +353,14 @@
   --space-14: 48px;
 
   /* Fine-grained spacing (half-steps and uncommon values) */
-  --space-px:  1px;
-  --space-1h:  3px;
-  --space-2h:  5px;
-  --space-3h:  7px;
-  --space-4h:  9px;
-  --space-6h:  14px;
-  --space-7h:  18px;
-  --space-8h:  22px;
+  --space-px: 1px;
+  --space-1h: 3px;
+  --space-2h: 5px;
+  --space-3h: 7px;
+  --space-4h: 9px;
+  --space-6h: 14px;
+  --space-7h: 18px;
+  --space-8h: 22px;
   --space-10h: 30px;
 
   /* Large layout spacing */
@@ -366,8 +376,8 @@
   --targets-gear-label-offset: 130px;
 
   /* Extended font sizes */
-  --font-size-pico:    8px;
-  --font-size-nano:    9px;
+  --font-size-pico: 8px;
+  --font-size-nano: 9px;
   --font-size-section: 20px;
-  --font-size-symbol:  28px;
+  --font-size-symbol: 28px;
 }

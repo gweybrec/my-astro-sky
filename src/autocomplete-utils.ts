@@ -32,6 +32,6 @@ export function filterLabelCandidates(
   const excluded = new Set(currentLabels);
   const q = query.trim().toLowerCase();
   return knownLabels
-    .filter(l => !excluded.has(l) && (!q || l.toLowerCase().includes(q)))
+    .filter((l) => !excluded.has(l) && (!q || l.toLowerCase().includes(q)))
     .slice(0, maxResults);
 }

@@ -30,7 +30,7 @@ export function bvToRgb(bv: number): [number, number, number] {
     const t = (bv - 0.8) / 0.4;
     r = 1.0;
     g = 0.88 - 0.13 * t;
-    b = 0.68 - 0.20 * t;
+    b = 0.68 - 0.2 * t;
   } else {
     const t = Math.min((bv - 1.2) / 0.8, 1);
     r = 1.0;
@@ -78,18 +78,26 @@ export function atlasScaleBucket(scale: number): number {
 // share one sprite (see renderStars' atlas).
 export interface StarPaint {
   radius: number;
-  r: number; g: number; b: number;   // dot colour
-  soft: number;                       // soft-rim fraction of the radius
+  r: number;
+  g: number;
+  b: number; // dot colour
+  soft: number; // soft-rim fraction of the radius
   glowAlpha: number;
-  glowR: number;                      // glow extent in px (0 when no glow)
+  glowR: number; // glow extent in px (0 when no glow)
   coreEdge: number;
   solidUntil: number;
-  gr: number; gg: number; gb: number; // glow colour
+  gr: number;
+  gg: number;
+  gb: number; // glow colour
 }
 
 export function computeStarPaint(
-  mag: number, bv: number, scale: number, maxMag: number,
-  theme: typeof SKY_THEME, established = false,
+  mag: number,
+  bv: number,
+  scale: number,
+  maxMag: number,
+  theme: typeof SKY_THEME,
+  established = false,
 ): StarPaint {
   const radius = starRadius(mag, scale, theme.brightZoomBoost) * theme.radiusScale;
   const spectral = bvToRgb(bv);
@@ -97,18 +105,27 @@ export function computeStarPaint(
   // 1 when well below the limit, ramping to 0 right at it (just-appearing stars).
   const estab = established ? 1 : Math.min(1, Math.max(0, (maxMag - mag) / 1.5));
   const soft = 0.3 + 0.4 * (1 - estab);
-  const glowBright = mag < theme.glowThresholdMag
-    ? Math.min(1, Math.max(0, (theme.glowThresholdMag - mag) / theme.glowThresholdMag))
-    : 0;
+  const glowBright =
+    mag < theme.glowThresholdMag
+      ? Math.min(1, Math.max(0, (theme.glowThresholdMag - mag) / theme.glowThresholdMag))
+      : 0;
   const glowAlpha = theme.glowOpacity * glowBright;
-  let glowR = 0, coreEdge = 0, solidUntil = 0, gr = r, gg = g, gb = b;
+  let glowR = 0,
+    coreEdge = 0,
+    solidUntil = 0,
+    gr = r,
+    gg = g,
+    gb = b;
   if (glowAlpha > 0.01) {
     const glow = applyStarColor(spectral, theme, theme.glowSaturation);
-    gr = glow[0]; gg = glow[1]; gb = glow[2];
-    const glowZoom = 1 + theme.glowZoomSpread * Math.max(0, Math.min(3, Math.sqrt(scale / 400)) - 1);
+    gr = glow[0];
+    gg = glow[1];
+    gb = glow[2];
+    const glowZoom =
+      1 + theme.glowZoomSpread * Math.max(0, Math.min(3, Math.sqrt(scale / 400)) - 1);
     glowR = radius * theme.glowRadiusMul * glowZoom;
-    coreEdge = radius / glowR;            // dot edge as a fraction of glowR
-    solidUntil = coreEdge * (1 - soft);   // fully opaque out to here
+    coreEdge = radius / glowR; // dot edge as a fraction of glowR
+    solidUntil = coreEdge * (1 - soft); // fully opaque out to here
   }
   return { radius, r, g, b, soft, glowAlpha, glowR, coreEdge, solidUntil, gr, gg, gb };
 }

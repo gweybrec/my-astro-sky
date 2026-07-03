@@ -49,7 +49,10 @@ describe('cleanupOldLogsSafely', () => {
     const recentMs = now - 2 * 24 * 60 * 60 * 1000;
 
     const oldManagedLog = path.join(logsDir, 'my-astro-sky-error-20260101-010203-123-a1b2c3.json');
-    const recentManagedLog = path.join(logsDir, 'my-astro-sky-error-20260101-010203-124-d4e5f6.json');
+    const recentManagedLog = path.join(
+      logsDir,
+      'my-astro-sky-error-20260101-010203-124-d4e5f6.json',
+    );
     const oldGenericLog = path.join(logsDir, 'error-legacy.json');
     const oldOther = path.join(logsDir, 'notes-old.txt');
 

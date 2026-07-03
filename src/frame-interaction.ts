@@ -29,7 +29,7 @@ export function findMergeTarget(
   frames: RenderableFrame[],
   view: ViewState,
 ): string | null {
-  const moved = frames.find(f => f.id === movedId);
+  const moved = frames.find((f) => f.id === movedId);
   if (!moved) return null;
   const movedPlan = movedId.split(':')[1];
   const movedCorners = frameGeometry(moved, view).corners;

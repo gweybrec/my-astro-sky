@@ -15,7 +15,12 @@ import { DSO_MARKER_STYLES, HIGHLIGHT_RING } from './canvas-theme';
 const TWO_PI = Math.PI * 2;
 
 /** Draw a DSO marker of the given type at the origin (caller has translated/rotated). */
-export function drawDsoMarker(ctx: CanvasRenderingContext2D, type: DSOType, rx: number, ry: number): void {
+export function drawDsoMarker(
+  ctx: CanvasRenderingContext2D,
+  type: DSOType,
+  rx: number,
+  ry: number,
+): void {
   const s = DSO_MARKER_STYLES[type] ?? DSO_MARKER_STYLES['?'];
   const ellipse = s.shape === 'ellipse';
 
@@ -47,8 +52,10 @@ export function drawDsoMarker(ctx: CanvasRenderingContext2D, type: DSOType, rx: 
   // Globular-cluster cross, drawn with the current (stroke) style.
   if (s.cross) {
     ctx.beginPath();
-    ctx.moveTo(-rx, 0); ctx.lineTo(rx, 0);
-    ctx.moveTo(0, -rx); ctx.lineTo(0, rx);
+    ctx.moveTo(-rx, 0);
+    ctx.lineTo(rx, 0);
+    ctx.moveTo(0, -rx);
+    ctx.lineTo(0, rx);
     ctx.stroke();
   }
 
