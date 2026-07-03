@@ -71,6 +71,8 @@ import {
 } from './db.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
+// unzipper is CommonJS-only and has no ESM export, so it can't be `import`ed under
+// "type": "module" — createRequire is a permanent interop shim for it, unrelated to archiver.
 const _require = createRequire(import.meta.url);
 const unzipper = _require('unzipper') as typeof import('unzipper');
 import {

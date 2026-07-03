@@ -1,5 +1,5 @@
 <template>
-  <label class="dso-toggle-label" :style="disabled ? { opacity: '0.4' } : {}">
+  <label class="dso-toggle-label" :class="{ 'opacity-40': disabled }">
     <input type="checkbox" :checked="modelValue" :disabled="disabled" @change="onChange" />
     {{ ' ' + label }}
   </label>

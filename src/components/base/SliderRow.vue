@@ -1,5 +1,5 @@
 <template>
-  <div class="display-controls-mag-row" :style="wrapperStyle">
+  <div class="display-controls-mag-row" :class="{ 'opacity-40': disabled }">
     <label class="display-controls-mag-label">{{ label }} </label>
     <input
       type="range"
@@ -38,8 +38,6 @@ const emit = defineEmits<{ 'update:modelValue': [value: number] }>();
 const displayValue = computed(() =>
   props.formatValue ? props.formatValue(props.modelValue) : props.modelValue.toFixed(2),
 );
-
-const wrapperStyle = computed(() => (props.disabled ? { opacity: '0.4' } : {}));
 
 function onInput(e: Event) {
   emit('update:modelValue', parseFloat((e.target as HTMLInputElement).value));

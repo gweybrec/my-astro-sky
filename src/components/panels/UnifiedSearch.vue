@@ -13,11 +13,7 @@
         @blur="scheduleHideDropdown"
         @focus="onFocus"
       />
-      <button
-        class="search-clear-btn"
-        :style="{ display: query ? 'flex' : 'none' }"
-        @click="onClear"
-      >
+      <button class="search-clear-btn" :class="{ '!hidden': !query }" @click="onClear">
         &times;
       </button>
       <div

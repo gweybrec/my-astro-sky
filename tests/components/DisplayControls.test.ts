@@ -92,12 +92,12 @@ describe('SliderRow', () => {
     expect(wrapper.find('.display-controls-mag-value').text()).toBe('∞');
   });
 
-  it('applies 0.4 opacity when disabled', () => {
+  it('applies the opacity-40 class when disabled', () => {
     const wrapper = mount(SliderRow, {
       props: { label: 'X', min: 0, max: 10, step: 1, modelValue: 5, disabled: true },
     });
     const row = wrapper.find('.display-controls-mag-row');
-    expect((row.element as HTMLElement).style.opacity).toBe('0.4');
+    expect(row.classes()).toContain('opacity-40');
   });
 
   it('disables the input when disabled prop is true', () => {
@@ -141,9 +141,9 @@ describe('CheckRow', () => {
     );
   });
 
-  it('applies 0.4 opacity when disabled', () => {
+  it('applies the opacity-40 class when disabled', () => {
     const wrapper = mount(CheckRow, { props: { label: 'X', modelValue: true, disabled: true } });
-    expect((wrapper.find('label').element as HTMLElement).style.opacity).toBe('0.4');
+    expect(wrapper.find('label').classes()).toContain('opacity-40');
   });
 });
 

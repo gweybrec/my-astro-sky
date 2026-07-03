@@ -164,18 +164,15 @@ The Electron entry point (`electron/main.ts`) runs as follows:
 6. `waitForPort(port)` — poll until Express accepts connections.
 7. Open `BrowserWindow` and load `http://localhost:{port}`.
 
-### Dependency note: archiver
+### Dependency note: mixed ESM/CJS interop
 
-`archiver` is pinned to `^7.0.1`. archiver v8.0.0 (May 2026) is a breaking major release:
+`archiver` is on v8 (`^8.0.0`), which is ESM-only and exposes its zip writer as a named
+class rather than a callable factory: `server/index.ts` does
+`import { ZipArchive } from 'archiver'` and `new ZipArchive({ zlib: { level: 1 } })`.
 
-- Package became **ESM-only** (`"type": "module"`) — cannot be loaded via `createRequire`
-- Callable API `archiver('zip', options)` replaced by named classes: `new ZipArchive(options)`
-
-To migrate to v8 when `@types/archiver` publishes v8 types:
-
-1. Remove the `createRequire` block and add `import { ZipArchive } from 'archiver'`
-2. Replace `archiver('zip', { zlib: { level: 1 } })` with `new ZipArchive({ zlib: { level: 1 } })`
-3. Bump `"archiver"` to `"^8.0.0"` and drop `@types/archiver` (types will be bundled)
+`unzipper` (used for import) is still CommonJS-only, so it can't be `import`ed directly
+under `"type": "module"`. It's loaded via `createRequire(import.meta.url)` instead — this
+is a permanent interop shim for `unzipper`, not a leftover from an older archiver API.
 
 ## Performance Architecture
 

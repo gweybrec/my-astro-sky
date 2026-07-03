@@ -21,7 +21,7 @@
     />
 
     <!-- Types dropdown -->
-    <div class="display-controls-mag-row" :style="{ opacity: displayStore.showDSOs ? '1' : '0.4' }">
+    <div class="display-controls-mag-row" :class="{ 'opacity-40': !displayStore.showDSOs }">
       <button
         ref="typeBtnRef"
         type="button"
@@ -58,7 +58,7 @@
     </div>
 
     <!-- Catalogs dropdown -->
-    <div class="display-controls-mag-row" :style="{ opacity: displayStore.showDSOs ? '1' : '0.4' }">
+    <div class="display-controls-mag-row" :class="{ 'opacity-40': !displayStore.showDSOs }">
       <button
         ref="catalogBtnRef"
         type="button"

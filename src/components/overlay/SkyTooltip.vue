@@ -2,8 +2,8 @@
   <div
     v-if="uiStore.skyTooltipHtml"
     id="tooltip"
+    class="!block"
     :style="{
-      display: 'block',
       left: uiStore.skyTooltipX + SKY_TOOLTIP_OFFSET + 'px',
       top: uiStore.skyTooltipY + SKY_TOOLTIP_OFFSET + 'px',
     }"

@@ -17,17 +17,13 @@
         @input="onSearchInput"
         @blur="scheduleHideDropdown"
       />
-      <button
-        class="search-clear-btn"
-        :style="{ display: searchInput ? 'flex' : 'none' }"
-        @click="clearSearch"
-      >
+      <button class="search-clear-btn" :class="{ '!hidden': !searchInput }" @click="clearSearch">
         &times;
       </button>
       <!-- Search dropdown -->
       <div
         class="search-dropdown photo-search-dropdown"
-        :style="{ display: showDropdown && searchInput ? 'block' : 'none' }"
+        :class="{ '!block': showDropdown && searchInput }"
         @mousedown.prevent
       >
         <div v-if="searchMatches.length === 0" class="search-item">
