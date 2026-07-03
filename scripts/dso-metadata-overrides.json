@@ -21,7 +21,8 @@
       "en": "Antares Nebula",
       "es": "Nebulosa de Antares",
       "de": "Antaresnebel"
-    }
+    },
+    "majAxis": 165
   },
   {
     "id": "NGC1980",
@@ -33,7 +34,8 @@
       "LBN977",
       "Collinder 72"
     ],
-    "type": "EN"
+    "type": "OC",
+    "majAxis": 14
   },
   {
     "id": "vdB5",
@@ -112,7 +114,8 @@
       "en": "Ptolemy's Cluster",
       "es": "Cúmulo de Ptolomeo",
       "de": "Ptolemäus-Haufen"
-    }
+    },
+    "majAxis": 80
   },
   {
     "id": "M31",
@@ -230,7 +233,9 @@
       "es": "Cúmulo del Árbol de Navidad",
       "de": "Weihnachtsbaumhaufen"
     },
-    "type": "OC"
+    "type": "OC",
+    "majAxis": 120,
+    "minAxis": 60
   },
   {
     "id": "M42",
@@ -248,7 +253,8 @@
       "es": "Nebulosa de Orión",
       "de": "Orionnebel"
     },
-    "type": "EN"
+    "type": "EN",
+    "pa": 90
   },
   {
     "id": "vdB100",
@@ -288,7 +294,8 @@
       "IC4665",
       "Cr 349",
       "Mel 179"
-    ]
+    ],
+    "majAxis": 60
   },
   {
     "id": "NGC1981",
@@ -299,7 +306,8 @@
       "NGC1981",
       "Collinder 73"
     ],
-    "type": "OC"
+    "type": "OC",
+    "majAxis": 25
   },
   {
     "id": "M6",
@@ -392,7 +400,8 @@
     "catalogs": [
       "M41",
       "NGC2287"
-    ]
+    ],
+    "majAxis": 38
   },
   {
     "id": "vdB49",
@@ -423,7 +432,8 @@
       "Cr 382",
       "C 1828–192",
       "Mel 204"
-    ]
+    ],
+    "majAxis": 26
   },
   {
     "id": "IC4756",
@@ -434,7 +444,8 @@
       "IC4756",
       "Cr 386",
       "Mel 210"
-    ]
+    ],
+    "majAxis": 52
   },
   {
     "id": "NGC6530",
@@ -445,7 +456,8 @@
       "NGC6530",
       "Cr 362"
     ],
-    "type": "OC"
+    "type": "OC",
+    "majAxis": 14
   },
   {
     "id": "NGC6633",
@@ -456,7 +468,8 @@
       "NGC6633",
       "Cr 380",
       "Mel 201"
-    ]
+    ],
+    "majAxis": 25
   },
   {
     "id": "M39",
@@ -522,7 +535,8 @@
     "catalogs": [
       "M10",
       "NGC6254"
-    ]
+    ],
+    "majAxis": 15
   },
   {
     "id": "M35",
@@ -555,7 +569,8 @@
     "difficulty": 1,
     "catalogs": [
       "NGC6871"
-    ]
+    ],
+    "majAxis": 30
   },
   {
     "id": "vdB109",
@@ -774,7 +789,10 @@
       "es": "Nebulosa de la Laguna",
       "de": "Lagunennebel"
     },
-    "type": "EN"
+    "type": "EN",
+    "majAxis": 90,
+    "minAxis": 40,
+    "pa": 90
   },
   {
     "id": "M11",
@@ -846,7 +864,8 @@
       "en": "Open Cluster M21",
       "es": "Cúmulo abierto M21",
       "de": "Offener Sternhaufen M21"
-    }
+    },
+    "majAxis": 14
   },
   {
     "id": "M5",
@@ -979,7 +998,8 @@
     "difficulty": 1,
     "catalogs": [
       "NGC1746"
-    ]
+    ],
+    "majAxis": 45
   },
   {
     "id": "M46",
@@ -1040,7 +1060,8 @@
       "en": "Sagittarius Globular Cluster",
       "es": "Cúmulo globular del Sagitario",
       "de": "Schützenkugelhaufen"
-    }
+    },
+    "majAxis": 24
   },
   {
     "id": "vdB133",
@@ -1102,7 +1123,8 @@
     "catalogs": [
       "NGC6940",
       "Melotte 232"
-    ]
+    ],
+    "majAxis": 25
   },
   {
     "id": "M15",
@@ -1155,7 +1177,8 @@
       "Caldwell 13",
       "Cr 12",
       "Mel 7"
-    ]
+    ],
+    "majAxis": 17
   },
   {
     "id": "NGC1528",
@@ -1165,7 +1188,8 @@
     "catalogs": [
       "NGC1528",
       "Cr 47"
-    ]
+    ],
+    "majAxis": 24
   },
   {
     "id": "NGC1647",
@@ -1209,7 +1233,8 @@
       "NGC7243",
       "Caldwell 16",
       "Cr 448"
-    ]
+    ],
+    "majAxis": 30
   },
   {
     "id": "vdB140",
@@ -1408,7 +1433,8 @@
       "en": "Open Cluster M29",
       "es": "Cúmulo abierto M29",
       "de": "Offener Sternhaufen M29"
-    }
+    },
+    "majAxis": 10
   },
   {
     "id": "NGC1027",
@@ -1483,7 +1509,8 @@
       "en": "Caroline's Rose Cluster",
       "es": "Cúmulo de la Rosa de Carolina",
       "de": "Carolines Rosenhaufen"
-    }
+    },
+    "majAxis": 25
   },
   {
     "id": "NGC2175",
@@ -1608,7 +1635,8 @@
       "en": "Globular Cluster M28",
       "es": "Cúmulo globular M28",
       "de": "Kugelsternhaufen M28"
-    }
+    },
+    "majAxis": 11.2
   },
   {
     "id": "M52",
@@ -1624,7 +1652,8 @@
     "names": {
       "fr": "Amas Sel et Poivre",
       "en": "Salt and Pepper Cluster"
-    }
+    },
+    "majAxis": 16
   },
   {
     "id": "M81",
@@ -1745,7 +1774,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB12"
-    ]
+    ],
+    "majAxis": 10
   },
   {
     "id": "NGC663",
@@ -1756,7 +1786,8 @@
       "NGC663",
       "Caldwell 10",
       "Cr 20"
-    ]
+    ],
+    "majAxis": 15
   },
   {
     "id": "NGC2353",
@@ -2026,7 +2057,8 @@
       "en": "Globular Cluster M62",
       "es": "Cúmulo globular M62",
       "de": "Kugelsternhaufen M62"
-    }
+    },
+    "majAxis": 14
   },
   {
     "id": "M103",
@@ -2359,7 +2391,8 @@
       "en": "Globular Cluster M54",
       "es": "Cúmulo globular M54",
       "de": "Kugelsternhaufen M54"
-    }
+    },
+    "majAxis": 12
   },
   {
     "id": "NGC7209",
@@ -2436,7 +2469,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB47"
-    ]
+    ],
+    "majAxis": 10
   },
   {
     "id": "vdB136",
@@ -2445,7 +2479,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB136"
-    ]
+    ],
+    "majAxis": 8.6
   },
   {
     "id": "vdB157",
@@ -2572,7 +2607,8 @@
       "en": "Globular Cluster M68",
       "es": "Cúmulo globular M68",
       "de": "Kugelsternhaufen M68"
-    }
+    },
+    "majAxis": 11
   },
   {
     "id": "M78",
@@ -2590,7 +2626,9 @@
       "es": "Nebulosa de reflexión M78",
       "de": "Reflexionsnebel M78"
     },
-    "type": "RN"
+    "type": "RN",
+    "majAxis": 8,
+    "minAxis": 6
   },
   {
     "id": "NGC2374",
@@ -2816,7 +2854,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB37"
-    ]
+    ],
+    "majAxis": 15
   },
   {
     "id": "vdB86",
@@ -3087,7 +3126,8 @@
       "en": "Crab Nebula",
       "es": "Nebulosa del Cangrejo",
       "de": "Krebsnebel"
-    }
+    },
+    "pa": 130
   },
   {
     "id": "NGC2324",
@@ -3419,7 +3459,9 @@
     "difficulty": 5,
     "catalogs": [
       "vdB80"
-    ]
+    ],
+    "ra": 97.70755,
+    "dec": -9.65411
   },
   {
     "id": "vdB135",
@@ -3472,7 +3514,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB35"
-    ]
+    ],
+    "majAxis": 4
   },
   {
     "id": "vdB55",
@@ -3617,7 +3660,9 @@
     "difficulty": 5,
     "catalogs": [
       "vdB87"
-    ]
+    ],
+    "ra": 105.11921,
+    "dec": -8.86602
   },
   {
     "id": "vdB120",
@@ -3752,7 +3797,8 @@
       "es": "Asterismo M73",
       "de": "Asterismus M73"
     },
-    "type": "OC"
+    "type": "OC",
+    "majAxis": 2.8
   },
   {
     "id": "vdB154",
@@ -4101,7 +4147,9 @@
     "difficulty": 5,
     "catalogs": [
       "vdB114"
-    ]
+    ],
+    "ra": 272.125,
+    "dec": -18.38333
   },
   {
     "id": "vdB117",
@@ -4222,7 +4270,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB6"
-    ]
+    ],
+    "majAxis": 5
   },
   {
     "id": "vdB63",
@@ -4634,7 +4683,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB141"
-    ]
+    ],
+    "majAxis": 8.4
   },
   {
     "id": "vdB146",
@@ -4697,7 +4747,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB121"
-    ]
+    ],
+    "majAxis": 7
   },
   {
     "id": "IC418",
@@ -4891,7 +4942,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB58"
-    ]
+    ],
+    "majAxis": 1.2
   },
   {
     "id": "vdB60",
@@ -4972,7 +5024,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB130"
-    ]
+    ],
+    "majAxis": 1.2
   },
   {
     "id": "vdB147",
@@ -5331,7 +5384,8 @@
     "difficulty": 5,
     "catalogs": [
       "vdB74"
-    ]
+    ],
+    "majAxis": 2
   },
   {
     "id": "NGC4125",
@@ -5810,7 +5864,10 @@
       "es": "Galaxia del Surf",
       "de": "Surfbrettgalaxie"
     },
-    "type": "GxS"
+    "type": "GxS",
+    "majAxis": 8.7,
+    "minAxis": 2.2,
+    "pa": 80
   },
   {
     "id": "NGC5634",
@@ -5909,7 +5966,9 @@
       "en": "Little Dumbbell Nebula",
       "es": "Pequeña Nebulosa de la Mancuerna",
       "de": "Kleiner Hantelnebel"
-    }
+    },
+    "majAxis": 2.9,
+    "minAxis": 1.8
   },
   {
     "id": "NGC1931",
@@ -6150,7 +6209,8 @@
     "names": {
       "es": "Nebulosa Medusa",
       "de": "Medusanebel"
-    }
+    },
+    "type": "PN"
   },
   {
     "id": "NGC4278",
@@ -7861,7 +7921,7 @@
     "names": {
       "en": "Skull Nebula"
     },
-    "mag": 8
+    "mag": 10.9
   },
   {
     "id": "NGC2192",
@@ -29425,7 +29485,8 @@
     "difficulty": 1,
     "catalogs": [
       "NGC6882"
-    ]
+    ],
+    "majAxis": 20
   },
   {
     "id": "NGC2830",
@@ -33536,7 +33597,8 @@
       "IC59",
       "LBN620"
     ],
-    "type": "EN"
+    "type": "RN",
+    "majAxis": 10
   },
   {
     "id": "IC60",
@@ -35777,7 +35839,9 @@
       "C 0341+321",
       "Collinder 41"
     ],
-    "mag": 7.3
+    "mag": 7.3,
+    "type": "OC",
+    "majAxis": 10
   },
   {
     "id": "IC349",
@@ -44243,7 +44307,9 @@
       "LBN451",
       "LBN452"
     ],
-    "type": "EN"
+    "type": "EN",
+    "majAxis": 170,
+    "minAxis": 140
   },
   {
     "id": "IC1397",
@@ -73102,7 +73168,8 @@
     "type": "EN",
     "names": {
       "en": "Fossil Footprint Nebula"
-    }
+    },
+    "pa": 90
   },
   {
     "id": "NGC1497",
@@ -74111,7 +74178,8 @@
     "difficulty": 1,
     "catalogs": [
       "NGC1750"
-    ]
+    ],
+    "majAxis": 20
   },
   {
     "id": "NGC1753",
@@ -74138,7 +74206,8 @@
     "difficulty": 1,
     "catalogs": [
       "NGC1758"
-    ]
+    ],
+    "majAxis": 9
   },
   {
     "id": "NGC1780",
@@ -74403,8 +74472,10 @@
       "es": "Nebulosa del Corredor",
       "de": "Running-Man-Nebel"
     },
-    "type": "EN",
-    "mag": 7
+    "type": "RN",
+    "mag": 7,
+    "majAxis": 40,
+    "minAxis": 25
   },
   {
     "id": "NGC1979",
@@ -74711,7 +74782,7 @@
     "catalogs": [
       "NGC2149"
     ],
-    "type": "EN"
+    "type": "RN"
   },
   {
     "id": "NGC2163",
@@ -74722,7 +74793,7 @@
       "NGC2163",
       "LBN855"
     ],
-    "type": "EN"
+    "type": "RN"
   },
   {
     "id": "NGC2165",
@@ -74970,7 +75041,7 @@
       "NGC2245",
       "LBN904"
     ],
-    "type": "EN"
+    "type": "RN"
   },
   {
     "id": "NGC2246",
@@ -98162,7 +98233,7 @@
       "NGC6590",
       "LBN46"
     ],
-    "type": "EN"
+    "type": "RN"
   },
   {
     "id": "NGC6591",
@@ -98938,7 +99009,8 @@
     ],
     "names": {
       "en": "Ruprecht 147"
-    }
+    },
+    "majAxis": 78
   },
   {
     "id": "NGC6775",
@@ -99391,7 +99463,9 @@
       "LBN274",
       "LBN 280"
     ],
-    "type": "EN"
+    "type": "EN",
+    "majAxis": 5,
+    "minAxis": 5
   },
   {
     "id": "NGC6915",
@@ -99733,7 +99807,8 @@
     "difficulty": 1,
     "catalogs": [
       "NGC6991"
-    ]
+    ],
+    "majAxis": 25
   },
   {
     "id": "NGC6992",
@@ -99753,7 +99828,10 @@
       "de": "Östlicher Schleiernebel"
     },
     "type": "SNR",
-    "mag": 7
+    "mag": 7,
+    "majAxis": 75,
+    "minAxis": 25,
+    "pa": 135
   },
   {
     "id": "NGC6993",
@@ -104345,7 +104423,8 @@
       "LBN1124"
     ],
     "ra": 266.655,
-    "dec": -29.385277777777777
+    "dec": -29.385277777777777,
+    "majAxis": 20
   },
   {
     "id": "SH2-17",
@@ -104451,7 +104530,8 @@
       "de": "Zeta-Ophiuchi-Nebel"
     },
     "ra": 248.98666666666665,
-    "dec": -12.718055555555555
+    "dec": -12.718055555555555,
+    "majAxis": 480
   },
   {
     "id": "SH2-28",
@@ -104475,7 +104555,8 @@
       "fr": "Nébuleuse de W28"
     },
     "ra": 272.65000000000003,
-    "dec": -23.983333333333334
+    "dec": -23.983333333333334,
+    "majAxis": 60
   },
   {
     "id": "SH2-31",
@@ -104586,7 +104667,8 @@
     "catalogs": [
       "SH2-41",
       "LBN51"
-    ]
+    ],
+    "majAxis": 105
   },
   {
     "id": "SH2-42",
@@ -104697,7 +104779,8 @@
       "fr": "Nébuleuse de W35"
     },
     "ra": 274.4686514044545,
-    "dec": -11.682771604945053
+    "dec": -11.682771604945053,
+    "majAxis": 140
   },
   {
     "id": "SH2-55",
@@ -104812,7 +104895,8 @@
       "fr": "Nébuleuse de W29",
       "en": "Westerhout 40",
       "es": "W40 (región de formación estelar)"
-    }
+    },
+    "majAxis": 20
   },
   {
     "id": "SH2-65",
@@ -104855,7 +104939,8 @@
       "PN G030.6+06.2"
     ],
     "ra": 276.24345600621,
-    "dec": 0.86000590252
+    "dec": 0.86000590252,
+    "type": "PN"
   },
   {
     "id": "SH2-69",
@@ -104885,7 +104970,8 @@
     "catalogs": [
       "SH2-71",
       "LBN103"
-    ]
+    ],
+    "type": "PN"
   },
   {
     "id": "SH2-72",
@@ -104953,7 +105039,8 @@
       "SH2-78",
       "CTSS 3",
       "PN G046.8+03.8"
-    ]
+    ],
+    "type": "PN"
   },
   {
     "id": "SH2-79",
@@ -105181,7 +105268,8 @@
       "en": "Cygnus Loop",
       "es": "Bucle del Cisne",
       "de": "Cygnus-Schleife"
-    }
+    },
+    "type": "SNR"
   },
   {
     "id": "SH2-104",
@@ -105824,7 +105912,8 @@
     "catalogs": [
       "SH2-173",
       "LBN593"
-    ]
+    ],
+    "majAxis": 30
   },
   {
     "id": "SH2-174",
@@ -105840,7 +105929,8 @@
       "fr": "Nébuleuse SH2-174"
     },
     "ra": 356.25944999999996,
-    "dec": 80.94989444444444
+    "dec": 80.94989444444444,
+    "type": "PN"
   },
   {
     "id": "SH2-175",
@@ -105868,7 +105958,8 @@
       "fr": "Nébuleuse SH2-176"
     },
     "ra": 7.952499999999998,
-    "dec": 57.382880555555545
+    "dec": 57.382880555555545,
+    "type": "PN"
   },
   {
     "id": "SH2-177",
@@ -105942,7 +106033,9 @@
     ],
     "names": {
       "fr": "Nébuleuse SH2-188"
-    }
+    },
+    "type": "PN",
+    "majAxis": 9
   },
   {
     "id": "SH2-198",
@@ -105970,7 +106063,8 @@
       "fr": "Nébuleuse SH2-200"
     },
     "ra": 47.74525,
-    "dec": 62.79858333333333
+    "dec": 62.79858333333333,
+    "type": "PN"
   },
   {
     "id": "SH2-201",
@@ -106607,7 +106701,8 @@
     ],
     "names": {
       "fr": "Nébuleuse SH2-284"
-    }
+    },
+    "majAxis": 80
   },
   {
     "id": "SH2-285",
@@ -106701,7 +106796,8 @@
       "en": "Octopus Nebula"
     },
     "ra": 109.14770320136259,
-    "dec": -9.42848379149853
+    "dec": -9.42848379149853,
+    "majAxis": 7
   },
   {
     "id": "SH2-295",
@@ -106924,7 +107020,8 @@
       "en": "Skull and Crossbones Nebula"
     },
     "ra": 118.077,
-    "dec": -26.428
+    "dec": -26.428,
+    "majAxis": 16
   },
   {
     "id": "SH2-312",
@@ -110007,7 +110104,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN437"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN438",
@@ -110043,7 +110141,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN441"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN442",
@@ -110538,7 +110637,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN508"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN510",
@@ -110673,7 +110773,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN534"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN535",
@@ -111204,7 +111305,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN610"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN611",
@@ -111816,7 +111918,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN688"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN690",
@@ -112185,7 +112288,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN737"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN738",
@@ -112698,7 +112802,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN812"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN814",
@@ -113913,7 +114018,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN990"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN991",
@@ -114138,7 +114244,8 @@
     "difficulty": 3,
     "catalogs": [
       "LBN1022"
-    ]
+    ],
+    "type": "RN"
   },
   {
     "id": "LBN1023",
@@ -127086,7 +127193,10 @@
     "type": "EN",
     "names": {
       "fr": "Nébuleuse de la Patte de Chat"
-    }
+    },
+    "majAxis": 35,
+    "minAxis": 20,
+    "pa": 40
   },
   {
     "id": "NGC261",
@@ -127554,7 +127664,7 @@
     "catalogs": [
       "NGC6726"
     ],
-    "type": "EN"
+    "type": "RN"
   },
   {
     "id": "NGC6727",
@@ -127655,7 +127765,8 @@
       "NGC2451",
       "Cr 161"
     ],
-    "mag": 2.8
+    "mag": 2.8,
+    "majAxis": 45
   },
   {
     "id": "NGC37",
@@ -128086,7 +128197,8 @@
     "catalogs": [
       "NGC2546",
       "Cr 178"
-    ]
+    ],
+    "majAxis": 27
   },
   {
     "id": "NGC2547",
@@ -128139,7 +128251,8 @@
     "catalogs": [
       "NGC3114",
       "Cr 215"
-    ]
+    ],
+    "majAxis": 35
   },
   {
     "id": "NGC3132",
@@ -128204,7 +128317,8 @@
       "Cr 238",
       "Mel 103",
       "C 1104-584"
-    ]
+    ],
+    "majAxis": 50
   },
   {
     "id": "NGC3576",
@@ -128424,7 +128538,8 @@
       "Cr 301",
       "Mel 145",
       "C 1622-405"
-    ]
+    ],
+    "majAxis": 29
   },
   {
     "id": "NGC6134",
@@ -128484,7 +128599,6 @@
     "id": "NGC6231",
     "catalogs": [
       "NGC6231",
-      "NGC 6171",
       "Caldwell 76",
       "Collinder 315",
       "Melotte 153"
@@ -128513,7 +128627,8 @@
     "catalogs": [
       "NGC6397",
       "Caldwell 86"
-    ]
+    ],
+    "majAxis": 26
   },
   {
     "id": "NGC6400",
@@ -128558,7 +128673,8 @@
       "Caldwell 85",
       "Cr 191",
       "C 0838-528"
-    ]
+    ],
+    "majAxis": 60
   },
   {
     "id": "IC2395",
@@ -128610,5 +128726,89 @@
       "PK 002-52 1",
       "PN G002.7-52.4"
     ]
+  },
+  {
+    "id": "Abell42",
+    "catalogs": [
+      "Abell42"
+    ],
+    "majAxis": 1
+  },
+  {
+    "id": "Abell47",
+    "catalogs": [
+      "Abell47"
+    ],
+    "majAxis": 0.3
+  },
+  {
+    "id": "Abell49",
+    "catalogs": [
+      "Abell49"
+    ],
+    "majAxis": 0.6
+  },
+  {
+    "id": "Abell52",
+    "catalogs": [
+      "Abell52"
+    ],
+    "majAxis": 0.6
+  },
+  {
+    "id": "Abell56",
+    "catalogs": [
+      "Abell56"
+    ],
+    "majAxis": 3
+  },
+  {
+    "id": "Abell57",
+    "catalogs": [
+      "Abell57"
+    ],
+    "majAxis": 0.6
+  },
+  {
+    "id": "Abell58",
+    "catalogs": [
+      "Abell58"
+    ],
+    "majAxis": 0.7
+  },
+  {
+    "id": "Abell61",
+    "catalogs": [
+      "Abell61"
+    ],
+    "majAxis": 3.3
+  },
+  {
+    "id": "Abell63",
+    "catalogs": [
+      "Abell63"
+    ],
+    "majAxis": 0.7
+  },
+  {
+    "id": "Abell68",
+    "catalogs": [
+      "Abell68"
+    ],
+    "majAxis": 0.6
+  },
+  {
+    "id": "Barnard43",
+    "catalogs": [
+      "Barnard43"
+    ],
+    "majAxis": 80
+  },
+  {
+    "id": "Barnard44",
+    "catalogs": [
+      "Barnard44"
+    ],
+    "majAxis": 42
   }
 ]

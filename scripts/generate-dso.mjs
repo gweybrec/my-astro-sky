@@ -304,7 +304,7 @@ const SH2_DATA = [
   ['SH2-169', 358.5, 60.37, 10, null],
   ['SH2-170', 0.37, 64.651, 15.0, null],
   ['SH2-171', 353.68, 66.56, 30.0, null],
-  ['SH2-173', 4.37, 61.75, 15.0, null],
+  ['SH2-173', 5.317, 61.725, 15.0, null],
   ['SH2-174', 12.0, 74.25, 30.0, null],
   ['SH2-175', 14.78, 62.36, 6.0, null],
   ['SH2-176', 20.25, 62.04, 30.0, null],
@@ -313,7 +313,7 @@ const SH2_DATA = [
   ['SH2-183', 21.07, 68.08, 10.0, null],
   ['SH2-184', 14.24, 56.01, 3.0, null],
   ['SH2-185', 14.49, 60.78, 120.0, 'Nébuleuse IC 59/63'],
-  ['SH2-188', 22.81, 58.85, 8.0, null],
+  ['SH2-188', 22.638, 58.414, 8.0, null],
   ['SH2-190', 23.98, 61.87, 20.0, 'Nébuleuse de l\'Étoile de mer'],
   ['SH2-198', 27.61, 60.54, 90.0, 'Nébuleuse du Cœur IC 1805'],
   ['SH2-199', 34.36, 60.58, 150.0, 'Nébuleuse de l\'Âme IC 1848'],
@@ -328,7 +328,7 @@ const SH2_DATA = [
   ['SH2-210', 53.72, 58.92, 30.0, null],
   ['SH2-211', 54.12, 60.11, 10.0, null],
   ['SH2-212', 73.86, 47.8, 10.0, null],
-  ['SH2-219', 74.91, 47.77, 5.0, null],
+  ['SH2-219', 74.023, 47.376, 5.0, null],
   ['SH2-220', 76.16, 46.16, 5.0, null],
   ['SH2-221', 77.0, 47.4, 8.0, null],
   ['SH2-224', 78.57, 37.25, 5.0, null],
@@ -365,7 +365,7 @@ const SH2_DATA = [
   ['SH2-276', 83.78, -5.42, 180.0, 'Grande Nébuleuse d\'Orion étendue'],
   ['SH2-277', 81.76, -5.98, 20.0, null],
   ['SH2-278', 80.89, 4.07, 10.0, null],
-  ['SH2-279', 83.73, -5.42, 20.0, 'Nébuleuse de Running Man'],
+  ['SH2-279', 83.817, -4.821, 20.0, 'Nébuleuse de Running Man'],
   ['SH2-280', 98.592, 2.468, 30.0, null],
   ['SH2-281', 83.81, -5.375, 5.0, null],
   ['SH2-282', 99.533, 1.42, 15.0, null],
@@ -543,25 +543,29 @@ async function fetchLDN() {
   return await res.text();
 }
 
-// Parse LDN catalog (B1950 coords).
-// Returns array of: { ldn, ra50, dec50, area, opacity }
+// Parse LDN catalog (B1950 coords) using the VII/7A ReadMe's fixed-width byte
+// layout (bytes 1-4 LDN, 6-7 RAh, 9-12 RAm, 16 DE sign, 17-18 DEd, 20-21 DEm,
+// 37-43 Area, 45 Opacity — see cdsarc.cds.unistra.fr/ftp/VII/7A/ReadMe).
+// Whitespace-splitting instead of byte offsets breaks on the 4 trailing
+// entries the ReadMe documents as having no LDN number: the blank field
+// shifts every subsequent whitespace-split token left by one, so RAh (e.g.
+// "10") gets misread as the LDN catalog number, producing a bogus duplicate
+// "LDN10"/"LDN23" row with garbage coordinates. Fixed-width extraction reads
+// each field from its documented column regardless of which optional fields
+// are blank.
 function parseLDN(text) {
   const entries = [];
   for (const line of text.split('\n')) {
-    const t = line.trim();
-    if (!t) continue;
-    const p = t.split(/\s+/);
-    if (p.length < 9) continue;
-    const ldn    = parseInt(p[0]);
-    const rah    = parseInt(p[1]);
-    const ram    = parseFloat(p[2]);
-    const deSign = p[3].startsWith('-') ? -1 : 1;
-    const deAbs  = Math.abs(parseFloat(p[3]));
-    const deMin  = parseFloat(p[4]);
-    // p[5]=GLON, p[6]=GLAT (skip)
-    const area    = parseFloat(p[7]);   // square degrees
-    const opacity = parseInt(p[8]);
-    if (isNaN(ldn) || ldn === 0) continue;   // skip unnumbered entries
+    if (line.length < 45) continue;
+    const ldn     = parseInt(line.substring(0, 4).trim());
+    const rah     = parseInt(line.substring(5, 7).trim());
+    const ram     = parseFloat(line.substring(8, 12).trim());
+    const deSign  = line.charAt(15) === '-' ? -1 : 1;
+    const deAbs   = parseFloat(line.substring(16, 18).trim());
+    const deMin   = parseFloat(line.substring(19, 21).trim());
+    const area    = parseFloat(line.substring(36, 43).trim());
+    const opacity = parseInt(line.substring(44, 45).trim());
+    if (isNaN(ldn) || ldn === 0) continue;   // skip the 4 unnumbered trailing entries
     if (isNaN(rah) || isNaN(ram) || isNaN(deAbs) || isNaN(deMin) || isNaN(area)) continue;
     const ra50  = (rah + ram / 60) * 15;
     const dec50 = deSign * (deAbs + deMin / 60);
@@ -663,6 +667,95 @@ const SH2_ALIASES = {
   'SH2-298': 'NGC2359',  // Thor's Helmet
   'SH2-311': 'NGC2467',  // Skull and Crossbones Nebula
   'SH2-313': 'Abell35',  // planetary nebula
+};
+
+// ─── Curated cross-catalog duplicate merges (generic) ───────────────────────
+// Objects that are the same physical target under two different designations,
+// discovered via a systematic multi-source comparison (SIMBAD/VizieR/OpenNGC/
+// Stellarium cross-references + Wikipedia designations, each candidate then
+// re-verified against raw SIMBAD coordinates before inclusion — see
+// other-resources/dso-duplicates.md for the evidence and other-resources/
+// verify-merge-pairs.mjs for the position-based false-positive filter).
+// Unlike SH2_ALIASES/VDB_ALIASES/BARNARD_ALIASES (which route one specific
+// source catalog into an NGC/IC-centric target), this map is catalog-agnostic:
+// keys and values are exact `data[i][0]` ids of any type, resolved once all
+// rows exist (see the merge step after the SH2_ALIASES suppression below).
+// A pair deliberately NOT here despite superficial similarity (e.g. NGC 6590
+// vs the SH2-37/IC1283/IC1284 emission cloud, or M8 vs its embedded cluster
+// NGC 6530) means the two are related but physically distinct objects.
+const DUPLICATE_MERGE_ALIASES = {
+  "NGC6526": "M8", "IC4703": "M16", "NGC72": "NGC70", "NGC547": "NGC545",
+  "NGC601": "NGC599", "NGC756": "NGC734", "NGC751": "NGC750", "NGC895": "NGC894",
+  "NGC932": "NGC930", "IC240": "NGC999", "IC254": "NGC1065", "NGC1295": "NGC1290",
+  "IC1988": "NGC1425", "IC2111": "NGC1722", "NGC1855": "NGC1854", "vdB36": "NGC1909",
+  "SH2-237": "NGC1931", "NGC1973": "NGC1977", "NGC1975": "NGC1977", "SH2-279": "NGC1977",
+  "IC2137": "NGC1979", "NGC2069": "NGC2070", "IC2145": "NGC2086", "NGC2238": "NGC2237",
+  "NGC2246": "NGC2237", "SH2-273": "NGC2264", "NGC2361": "NGC2359", "NGC2445": "NGC2444",
+  "NGC2530": "NGC2529", "NGC2531": "NGC2529", "NGC2606": "NGC2603", "NGC2631": "NGC2630",
+  "NGC2875": "NGC2874", "IC543": "NGC2902", "NGC3184": "NGC3180", "NGC3193": "NGC3187",
+  "IC2599": "NGC3324", "NGC3387": "NGC3386", "NGC3396": "NGC3395", "NGC3500": "NGC3465",
+  "NGC3579": "NGC3576", "NGC3581": "NGC3576", "NGC3582": "NGC3576", "NGC3584": "NGC3576",
+  "NGC3586": "NGC3576", "IC738": "NGC3915", "IC2983": "NGC4006", "IC2997": "NGC4090",
+  "IC3329": "NGC4393", "IC3708": "NGC4654", "IC3834": "NGC4726", "NGC4776": "NGC4759",
+  "NGC4778": "NGC4761", "IC839": "NGC4851", "NGC4896": "NGC4895", "NGC4914": "NGC4912",
+  "NGC5545": "NGC5544", "NGC5869": "NGC5865", "IC1122": "NGC5931", "IC4588": "NGC6051",
+  "IC1190": "NGC6061", "NGC6147": "NGC6141", "NGC6165": "NGC6164", "NGC6248": "NGC6237",
+  "NGC6286": "NGC6285", "NGC6474": "NGC6473", "IC4677": "NGC6543", "IC1283": "IC1284",
+  "SH2-37": "IC1284", "NGC6727": "NGC6726", "IC1316": "NGC6901", "LBN280": "NGC6914",
+  "vdB146": "NGC7129", "NGC7237": "NGC7236", "NGC7304": "NGC7303", "SH2-158": "NGC7538",
+  "NGC7551": "NGC7540", "NGC7753": "NGC7752", "LBN582": "NGC7822", "LBN583": "NGC7822",
+  "LBN591": "IC10", "IC257": "IC256", "IC296": "IC294", "LBN773": "IC336",
+  "SH2-234": "IC417", "IC444": "SH2-249", "vdB75": "SH2-249", "LBN845": "SH2-249",
+  "SH2-288": "IC466", "LBN1040": "IC468", "SH2-131": "IC1396", "LBN455": "IC1396",
+  "SH2-156": "IC1470", "SH2-201": "IC1871", "SH2-255": "IC2162", "IC2948": "IC2944",
+  "IC3719": "IC3716", "IC3881": "IC3877", "IC4068": "IC4067", "IC4462": "IC4461",
+  "vdB100": "IC4592", "LBN1107": "IC4606", "SH2-44": "IC4701", "IC5067": "IC5070",
+  "LBN353": "IC5070", "vdB104": "SH2-9", "LBN1104": "SH2-9", "LBN96": "SH2-68",
+  "LBN104": "SH2-72", "LBN129": "SH2-82", "LBN168": "SH2-101", "LBN337": "SH2-112",
+  "LBN669": "SH2-198", "LBN710": "SH2-209", "vdB88": "SH2-293", "vdB94": "SH2-297",
+  "LBN1039": "SH2-297", "LBN134": "vdB126", "LBN241": "LBN240", "LBN349": "LBN348",
+  "LBN368": "LBN367", "LBN504": "vdB143", "LBN523": "vdB154", "LBN531": "vdB152",
+  "LBN624": "LPN-EGB1", "LBN682": "vdB15", "LBN734": "vdB12", "LBN744": "LPN-Sh2216",
+  "LBN746": "vdB16", "LBN772": "LBN770", "LBN785": "vdB27", "LBN823": "vdB65",
+  "LBN832": "LBN831", "LBN848": "vdB35", "LBN850": "vdB37", "LBN851": "vdB37",
+  "LBN866": "vdB38", "LBN874": "LBN873", "LBN926": "LPN-Ko2-2", "LBN972": "LBN971",
+  "LBN973": "LBN971", "LBN995": "vdB69", "LBN1000": "vdB74", "LBN1023": "vdB87",
+  "LBN1062": "vdB98", "LBN1108": "vdB107", "LDN11": "Barnard57", "LDN14": "Barnard260",
+  "LDN15": "Barnard51", "LDN35": "Barnard289", "LDN36": "Barnard267", "LDN42": "Barnard78",
+  "LDN53": "Barnard71", "LDN54": "Barnard70", "LDN55": "Barnard69", "LDN57": "Barnard68",
+  "LDN66": "Barnard72", "LDN85": "Barnard261", "LDN93": "Barnard86", "LDN100": "Barnard62",
+  "LDN108": "Barnard90", "LDN109": "Barnard83", "LDN111": "Barnard61", "LDN112": "Barnard75",
+  "LDN144": "Barnard277", "LDN173": "Barnard64", "LDN177": "Barnard259", "LDN178": "Barnard268",
+  "LDN210": "Barnard303", "LDN213": "Barnard302", "LDN216": "Barnard79", "LDN219": "Barnard276",
+  "LDN227": "Barnard91", "LDN235": "Barnard84", "LDN239": "Barnard98", "LDN323": "Barnard92",
+  "LDN327": "Barnard93", "LDN330": "Barnard284", "LDN356": "Barnard311", "LDN379": "Barnard312",
+  "LDN401": "Barnard102", "LDN406": "Barnard95", "LDN647": "Barnard330", "LDN663": "Barnard335",
+  "LDN688": "Barnard142", "LDN694": "Barnard143", "LDN701": "Barnard334", "LDN702": "Barnard336",
+  "LDN705": "Barnard337", "LDN707": "Barnard340", "LDN853": "Barnard147", "LDN860": "Barnard146",
+  "LDN865": "Barnard145", "LDN880": "Barnard343", "LDN885": "Barnard342", "LDN889": "Barnard347",
+  "LDN941": "Barnard352", "LDN950": "Barnard356", "LDN970": "Barnard361", "LDN973": "Barnard159",
+  "LDN1017": "Barnard362", "LDN1053": "Barnard357", "Barnard360": "Barnard151", "LDN1063": "Barnard151",
+  "LDN1065": "Barnard151", "LDN1068": "Barnard359", "LDN1070": "Barnard164", "LDN1071": "Barnard354",
+  "LDN1075": "Barnard157", "LDN1080": "Barnard154", "LDN1082": "Barnard150", "LDN1088": "Barnard160",
+  "LDN1090": "Barnard365", "LDN1095": "Barnard162", "LDN1106": "Barnard163", "LDN1113": "Barnard367",
+  "LDN1125": "Barnard152", "LDN1137": "Barnard368", "LDN1144": "Barnard166", "LDN1149": "Barnard170",
+  "LDN1153": "Barnard171", "LDN1164": "Barnard174", "LDN1165": "Barnard174", "LDN1169": "Barnard173",
+  "LDN1387": "Barnard6", "LDN1406": "Barnard21", "LDN1407": "Barnard12", "LDN1445": "Barnard15",
+  "LDN1448": "Barnard203", "LDN1450": "Barnard205", "LDN1451": "Barnard202", "LDN1455": "Barnard204",
+  "LDN1470": "Barnard4", "LDN1471": "Barnard5", "LDN1495": "Barnard211", "LDN1503": "Barnard23",
+  "LDN1507": "Barnard24", "LDN1517": "Barnard27", "LDN1521": "Barnard19", "LDN1522": "Barnard222",
+  "LDN1523": "Barnard29", "LDN1529": "Barnard18", "LDN1570": "Barnard227", "LDN1577": "Barnard30",
+  "LDN1582": "Barnard32", "LDN1596": "Barnard35", "LDN1599": "Barnard36", "LDN1605": "Barnard37",
+  "LDN1610": "Barnard39", "LDN1682": "Barnard55", "LDN1685": "Barnard56", "LDN1698": "Barnard252",
+  "LDN1712": "Barnard44", "LDN1725": "Barnard254", "LDN1727": "Barnard249", "LDN1733": "Barnard248",
+  "LDN1736": "Barnard244", "LDN1737": "Barnard244", "LDN1742": "Barnard250", "LDN1744": "Barnard45",
+  "LDN1746": "Barnard59", "LDN1749": "Barnard256", "LDN1752": "Barnard43", "LDN1759": "Barnard238",
+  "LDN1768": "Barnard66", "LDN1771": "Barnard87", "LDN1772": "Barnard65", "LDN1773": "Barnard67",
+  "LDN1775": "Barnard46", "LDN1786": "Barnard300", "LDN1791": "Barnard47", "LDN1798": "Barnard295",
+  "LBN1117": "SH2-12", "LBN449": "SH2-129", "LBN471": "SH2-132", "LBN540": "SH2-157",
+  "LBN696": "SH2-205", "LBN796": "SH2-230", "LBN864": "SH2-261", "LBN865": "SH2-264",
+  "LBN986": "SH2-284", "LBN218": "vdB133", "LBN541": "vdB149", "LBN578": "vdB1",
+  "LBN680": "vdB10", "LBN721": "vdB18", "LDN102": "Barnard67a", "LDN302": "Barnard84a",
 };
 
 async function fetchBarnard() {
@@ -1576,6 +1669,30 @@ async function main() {
   data.length = 0;
   data.push(...keptRows);
   console.log(`Merged ${sh2Merged} SH2 aliases into existing objects`);
+
+  // ── Curated cross-catalog duplicate merges (generic, DUPLICATE_MERGE_ALIASES) ──
+  // Same suppress-and-rebuild pattern as the SH2 merge above, generalized to any
+  // source/target catalog pair. Runs after SH2_ALIASES so a row already merged
+  // above (e.g. an SH2 id folded into an NGC target) is looked up by its final
+  // post-merge identity.
+  const rowByIdDup = new Map(data.map(r => [String(r[0]).toUpperCase(), r]));
+  const dupSuppress = new Set();
+  let dupMerged = 0;
+  for (const [srcId, targetId] of Object.entries(DUPLICATE_MERGE_ALIASES)) {
+    const target = rowByIdDup.get(String(targetId).toUpperCase());
+    if (!target) { console.warn(`Warning: duplicate-merge target ${targetId} not found for ${srcId}`); continue; }
+    const srcRow = rowByIdDup.get(srcId.toUpperCase());
+    const carried = srcRow ? srcRow[12] : [srcId];
+    for (const c of carried) {
+      if (c && !target[12].some(x => String(x).toLowerCase() === String(c).toLowerCase())) target[12].push(c);
+    }
+    dupSuppress.add(srcId.toUpperCase());
+    dupMerged++;
+  }
+  const keptRows2 = data.filter(r => !dupSuppress.has(String(r[0]).toUpperCase()));
+  data.length = 0;
+  data.push(...keptRows2);
+  console.log(`Merged ${dupMerged} cross-catalog duplicate aliases into existing objects`);
 
   const metadataOverrides = loadMetadataOverrides();
   if (metadataOverrides.size > 0) {
