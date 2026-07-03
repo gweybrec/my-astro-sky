@@ -64,7 +64,7 @@ import {
   type AltSample,
 } from './sky-geometry';
 import { outlineFromGrid } from './mosaic';
-import { renderPlanPdf, type PlanPdfTarget } from './export-render';
+import type { PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
 import { confirmPlanDelete, confirmPlanEntryDelete } from './photo-delete-confirm';
@@ -3578,6 +3578,7 @@ export class TargetsView {
         // Transit-ordered like the on-screen list.
         targets.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
 
+        const { renderPlanPdf } = await import('./export-render');
         const blob = await renderPlanPdf(this.skyMap, {
           planName: plan.name,
           targets,

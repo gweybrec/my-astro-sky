@@ -60,7 +60,7 @@ import { useUiStore } from '../../stores/ui';
 import { useCanvasStore } from '../../stores/canvas';
 import { showToast } from '../../toast';
 import { downloadBlob } from '../../file-utils';
-import { renderMapToBlob, renderMapToPdfBlob, type MapExportScope } from '../../export-render';
+import type { MapExportScope } from '../../export-render';
 import { reportUnknownRendererError } from '../../error-reporter';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import exportSvg from '../../icons/export.svg?raw';
@@ -83,6 +83,7 @@ async function run(scope: MapExportScope, format: 'png' | 'pdf') {
 
   showToast({ message: t('settings.exportView.rendering'), type: 'info', duration: 2000 });
   try {
+    const { renderMapToBlob, renderMapToPdfBlob } = await import('../../export-render');
     const blob =
       format === 'png'
         ? await renderMapToBlob(skyMap, overlay, scope)

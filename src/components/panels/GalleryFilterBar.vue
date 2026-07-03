@@ -184,7 +184,6 @@ import {
 } from '../../poi';
 import { showToast } from '../../toast';
 import { downloadBlob } from '../../file-utils';
-import { renderGalleryPdf } from '../../export-render';
 import { reportUnknownRendererError } from '../../error-reporter';
 import exportSvg from '../../icons/export.svg?raw';
 
@@ -237,6 +236,7 @@ async function onExport() {
   }
   showToast({ message: t('settings.exportView.rendering'), type: 'info', duration: 2000 });
   try {
+    const { renderGalleryPdf } = await import('../../export-render');
     const blob = await renderGalleryPdf(photos);
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     downloadBlob(blob, `myastrosky-gallery-${ts}.pdf`);
