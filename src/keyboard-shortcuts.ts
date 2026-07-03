@@ -4,7 +4,7 @@
 
 export const SHORTCUTS_KEY = 'keyboard-shortcuts';
 
-export type ShortcutCategory = 'toggles' | 'navigation';
+export type ShortcutCategory = 'toggles' | 'navigation' | 'time';
 
 export type ShortcutActionId =
   | 'toggleStars'
@@ -23,7 +23,13 @@ export type ShortcutActionId =
   | 'panRight'
   | 'panUp'
   | 'panDown'
-  | 'openShortcuts';
+  | 'openShortcuts'
+  | 'toggleDateMode'
+  | 'toggleMoon'
+  | 'timeSpeedForward'
+  | 'timeSpeedBackward'
+  | 'timeStop'
+  | 'jumpToEvening';
 
 export interface ShortcutAction {
   id: ShortcutActionId;
@@ -117,6 +123,32 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
     category: 'navigation',
     defaultKeys: ['?'],
     labelKey: 'shortcuts.action.openShortcuts',
+  },
+  {
+    id: 'toggleDateMode',
+    category: 'time',
+    defaultKeys: ['t'],
+    labelKey: 'shortcuts.action.toggleDateMode',
+  },
+  { id: 'toggleMoon', category: 'time', defaultKeys: ['m'], labelKey: 'shortcuts.action.toggleMoon' },
+  {
+    id: 'timeSpeedForward',
+    category: 'time',
+    defaultKeys: ['l'],
+    labelKey: 'shortcuts.action.timeSpeedForward',
+  },
+  {
+    id: 'timeSpeedBackward',
+    category: 'time',
+    defaultKeys: ['j'],
+    labelKey: 'shortcuts.action.timeSpeedBackward',
+  },
+  { id: 'timeStop', category: 'time', defaultKeys: ['k'], labelKey: 'shortcuts.action.timeStop' },
+  {
+    id: 'jumpToEvening',
+    category: 'time',
+    defaultKeys: ['end'],
+    labelKey: 'shortcuts.action.jumpToEvening',
   },
 ];
 

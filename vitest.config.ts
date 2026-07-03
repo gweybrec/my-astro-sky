@@ -24,6 +24,7 @@ export default defineConfig({
         'src/dso-draw.ts',
         'src/star-draw.ts',
         'src/frame-draw.ts',
+        'src/moon-draw.ts',
         'src/targets-view.ts',
         'src/metadata-editor.ts',
         'src/toast.ts',

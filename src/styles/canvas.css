@@ -262,6 +262,93 @@ input:focus-visible {
   height: 16px;
 }
 
+/* ── Sky-time control (top-right, left of the export button, tracks side-panel collapse) ──
+   A row of small buttons. The Moon toggle and mode toggle are the LAST two DOM
+   children, so — since the row is right-edge-anchored — they always sit flush
+   against that fixed edge and never move. The date-mode-only controls (date/time
+   readout, location, azimuth grid) are earlier DOM children, so they grow into the
+   space to the left of Moon/mode-toggle without shifting them. The readout/location
+   buttons each open a DropdownPanel *below* them for the actual editable fields, so
+   the row itself never has to grow wide enough to collide with the top view-tabs. */
+
+.sky-time-control {
+  position: absolute;
+  top: var(--space-8);
+  right: 340px;
+  z-index: var(--z-toggle);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+#side-panel.collapsed ~ .sky-time-control {
+  right: 76px;
+}
+
+.sky-time-control .sky-rotation-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sky-time-control .sky-rotation-btn.active {
+  background: var(--accent-bg-hover);
+  border-color: var(--border-focus);
+}
+
+.sky-time-readout {
+  height: 34px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-panel);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.sky-time-readout:hover {
+  background: var(--accent-bg-hover);
+  border-color: var(--border-focus);
+}
+
+.sky-time-rate-steppers {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sky-time-rate-label {
+  color: var(--text-label);
+  min-width: 2.5em;
+}
+
+/* Pushed flush to the row's end, with the ordinary steppers gap before it — reads as a
+   separate action rather than a fourth speed stepper. */
+.sky-time-reset {
+  margin-left: auto;
+}
+
+/* The location DropdownPanel is teleported to <body>, so this can't be scoped via a
+   .sky-time-control ancestor selector — target the button's own class instead. */
+.sky-time-use-location {
+  width: 100%;
+  font-size: var(--font-size-small);
+}
+
+@media (max-width: 768px) {
+  .sky-time-control {
+    right: 332px;
+  }
+
+  #side-panel.collapsed ~ .sky-time-control {
+    right: 72px;
+  }
+}
+
 /* ── Import modal: full-height vertical divider between adjacent columns ──────
    The columns live in a `flex items-stretch` row, so every column is laid out
    at the height of the tallest list. A `top:0; bottom:0` pseudo-element on each

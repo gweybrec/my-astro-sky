@@ -206,6 +206,9 @@ export const PHOTO_OUTLINE = {
 /** The border ring around the visible hemisphere disc. */
 export const BORDER_RING = { color: 'rgba(200, 185, 168, 0.3)', lineWidth: 1.5 } as const;
 
+/** The horizon curve drawn in date mode when an observer location is set. */
+export const HORIZON_LINE = { lineWidth: 1.5 } as const;
+
 /** Circular background disc + radius for a mosaic tile's delete/add button. */
 export const TILE_BUTTON = { bg: 'rgba(15, 15, 18, 0.78)', radius: 11 } as const;
 

@@ -61,7 +61,7 @@ export const useUiStore = defineStore('ui', () => {
   // open map (e.g. after "add frame" auto-opens the frame manager). Hit-testing the
   // live cursor with elementFromPoint is leak-proof: unlike an enter/leave flag,
   // there is nothing to get stuck if the popup is removed mid-hover.
-  const TOOLTIP_POPUP_SELECTOR = '.fov-popup, .photo-gear-popup';
+  const TOOLTIP_POPUP_SELECTOR = '.fov-popup, .photo-gear-popup, .dropdown-panel';
   function cursorOverPopup(clientX: number, clientY: number): boolean {
     if (typeof document === 'undefined') return false;
     return document.elementFromPoint(clientX, clientY)?.closest(TOOLTIP_POPUP_SELECTOR) != null;

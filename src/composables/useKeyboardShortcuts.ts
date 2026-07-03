@@ -3,6 +3,7 @@ import { useCanvasStore } from '../stores/canvas';
 import { useDisplayStore } from '../stores/display';
 import { useUiStore } from '../stores/ui';
 import { useShortcutsStore } from '../stores/shortcuts';
+import { useSkyTimeStore } from '../stores/sky-time';
 import { openVueModal } from '../modal-host';
 import { normalizeKey, type ShortcutActionId } from '../keyboard-shortcuts';
 
@@ -11,6 +12,7 @@ export function useKeyboardShortcuts() {
   const displayStore = useDisplayStore();
   const uiStore = useUiStore();
   const shortcutsStore = useShortcutsStore();
+  const skyTimeStore = useSkyTimeStore();
 
   function runAction(id: ShortcutActionId): boolean {
     // Opening the cheat-sheet works regardless of the active view.
@@ -71,6 +73,24 @@ export function useKeyboardShortcuts() {
         return true;
       case 'panDown':
         sm.panBy(0, view.height * 0.1);
+        return true;
+      case 'toggleDateMode':
+        skyTimeStore.toggleMode();
+        return true;
+      case 'toggleMoon':
+        skyTimeStore.setShowMoon(!skyTimeStore.showMoon);
+        return true;
+      case 'timeSpeedForward':
+        skyTimeStore.stepRateForward();
+        return true;
+      case 'timeSpeedBackward':
+        skyTimeStore.stepRateBackward();
+        return true;
+      case 'timeStop':
+        skyTimeStore.stopTime();
+        return true;
+      case 'jumpToEvening':
+        skyTimeStore.jumpToEvening();
         return true;
       default:
         return false;

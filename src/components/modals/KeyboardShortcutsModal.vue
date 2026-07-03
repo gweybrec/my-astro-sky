@@ -109,10 +109,11 @@ const store = useShortcutsStore();
 // no save button — just the ✕ to close and ↺ to revert.
 const { bindings, conflicts } = storeToRefs(store);
 
-const categories: ShortcutCategory[] = ['toggles', 'navigation'];
+const categories: ShortcutCategory[] = ['toggles', 'navigation', 'time'];
 const actionsByCategory = computed(() => ({
   toggles: SHORTCUT_ACTIONS.filter((a) => a.category === 'toggles'),
   navigation: SHORTCUT_ACTIONS.filter((a) => a.category === 'navigation'),
+  time: SHORTCUT_ACTIONS.filter((a) => a.category === 'time'),
 }));
 
 const capturingId = ref<ShortcutActionId | null>(null);

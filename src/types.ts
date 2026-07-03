@@ -13,6 +13,10 @@ export interface Star {
   _px?: number;
   _py?: number;
   _pg?: number;
+  // ── horizon-visibility cache (see isBelowHorizonCached) ──
+  _altDeg?: number;
+  _belowHorizon?: boolean;
+  _ag?: number;
 }
 
 export type ConstellationStyle = 'western' | 'stellarium' | 'rey' | 'chinese' | 'arabic';
@@ -190,6 +194,10 @@ export interface DSO {
   _pg?: number;
   _cos2?: number; // cached angular-size dec factor for angularSizeToCanvasPx
   _cos2g?: number; // projection generation _cos2 was computed for
+  // ── horizon-visibility cache (see isBelowHorizonCached) ──
+  _altDeg?: number;
+  _belowHorizon?: boolean;
+  _ag?: number;
 }
 
 export interface DSOSearchResult {

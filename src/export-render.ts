@@ -12,6 +12,7 @@ import { formatAlt } from './format-utils';
 import { buildSetupInfoRows } from './setup-info';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import { moonDangerLevel, type AltSample } from './sky-geometry';
+import { drawMoonMarker } from './moon-draw';
 
 // ─── Affine helpers (pure, unit-tested) ─────────────────────────────────────
 
@@ -501,42 +502,18 @@ function drawMoonPhaseToCanvas(
   phaseIndex: number,
   dpr: number,
 ): void {
-  const f = [0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25][phaseIndex] ?? 0.5;
-  const waning = phaseIndex >= 5;
-  ctx.save();
   // On the light PDF page the convention is inverted vs. the dark UI: the unlit
   // (shadow) disk is grey and the illuminated portion is paper-white, so a full
   // moon reads as a bright (empty) disk and a new moon as a filled grey one.
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(120,128,150,0.9)';
-  ctx.fill();
-  ctx.lineWidth = Math.max(0.75 * dpr, 0.5);
-  ctx.strokeStyle = 'rgba(90,98,120,0.9)';
-  // Illuminated portion (paper-white).
-  if (f > 0.001) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    if (waning) ctx.scale(-1, 1); // mirror to put the lit limb on the left
-    ctx.beginPath();
-    ctx.fillStyle = '#f8f8f8';
-    if (f >= 0.999) {
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-    } else {
-      const b = r * (1 - 2 * f); // terminator x-radius (signed)
-      ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false); // right limb, top→bottom
-      // terminator ellipse, bottom→top
-      ctx.ellipse(0, 0, Math.abs(b), r, 0, Math.PI / 2, -Math.PI / 2, b > 0);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-  // Outline last, so the white lit fill never paints over the disk edge.
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+  drawMoonMarker(
+    ctx,
+    cx,
+    cy,
+    r,
+    phaseIndex,
+    { shadowFill: 'rgba(120,128,150,0.9)', litFill: '#f8f8f8', outline: 'rgba(90,98,120,0.9)' },
+    Math.max(0.75 * dpr, 0.5),
+  );
 }
 
 /**

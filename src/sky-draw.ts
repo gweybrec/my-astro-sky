@@ -9,8 +9,9 @@
 import type { Point, ViewState, ConstellationStyle } from './types';
 import { project, toCanvas, getHemisphere } from './projection';
 import { getConstellationLines, getConstellationInfos } from './star-catalog';
+import { raDecFromAltAz } from './sky-geometry';
 import type { SKY_THEME } from './sky-themes';
-import { FONTS, GRID, TILE_BUTTON } from './canvas-theme';
+import { FONTS, GRID, TILE_BUTTON, HORIZON_LINE } from './canvas-theme';
 import pinSvgRaw from './icons/pin.svg?raw';
 
 type SkyTheme = typeof SKY_THEME;
@@ -206,6 +207,113 @@ export function drawConstellationLines(
 
       ctx.stroke();
     }
+  }
+}
+
+// ── Horizon line + azimuth (alt-az) grid (date mode) ─────────────────────────
+// The RA/Dec grid's declination circles are closed-form (centred on the celestial
+// pole), but a curve of constant altitude or constant azimuth, for an arbitrary
+// lat/LST, is generally NOT centred on the projection origin — so both are stepped
+// and stitched the same way as `drawConstellationLines`: walk the varying
+// coordinate in small increments, convert each point to RA/Dec via the inverse
+// alt-az transform, project, and connect with lineTo (lifting the pen at
+// off-projection points, e.g. the far hemisphere in fisheye mode).
+
+const ALTAZ_STEP_DEG = 2;
+
+/** Strokes a curve of constant altitude (azimuth 0→360) — the horizon is alt=0. */
+function strokeAltCircle(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  altDeg: number,
+  lstH: number,
+  latDeg: number,
+): void {
+  ctx.beginPath();
+  let penDown = false;
+  for (let az = 0; az <= 360; az += ALTAZ_STEP_DEG) {
+    const { raDeg, decDeg } = raDecFromAltAz(altDeg, az, lstH, latDeg);
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) {
+      penDown = false;
+      continue;
+    }
+    const c = toCanvas(p.x, p.y, view);
+    if (penDown) {
+      ctx.lineTo(c.x, c.y);
+    } else {
+      ctx.moveTo(c.x, c.y);
+      penDown = true;
+    }
+  }
+  ctx.stroke();
+}
+
+/** Strokes a curve of constant azimuth (altitude 0→90, horizon to zenith). */
+function strokeAzMeridian(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  azDeg: number,
+  lstH: number,
+  latDeg: number,
+): void {
+  ctx.beginPath();
+  let penDown = false;
+  for (let alt = 0; alt <= 90; alt += ALTAZ_STEP_DEG) {
+    const { raDeg, decDeg } = raDecFromAltAz(alt, azDeg, lstH, latDeg);
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) {
+      penDown = false;
+      continue;
+    }
+    const c = toCanvas(p.x, p.y, view);
+    if (penDown) {
+      ctx.lineTo(c.x, c.y);
+    } else {
+      ctx.moveTo(c.x, c.y);
+      penDown = true;
+    }
+  }
+  ctx.stroke();
+}
+
+/**
+ * Draw the horizon (alt = 0) as a curve across the sky. `color` is normally the
+ * live `--accent-color` CSS var (resolved by the caller) so it tracks the current
+ * warm/cold UI theme instead of a fixed hardcoded hue.
+ */
+export function drawHorizonLine(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  color: string,
+): void {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = HORIZON_LINE.lineWidth;
+  strokeAltCircle(ctx, view, 0, lstH, latDeg);
+}
+
+/**
+ * Draw the alt-az grid: altitude rings every 20° (20-80, the horizon itself is
+ * drawn separately by drawHorizonLine) and azimuth meridians every 30° from the
+ * horizon to the zenith. Uses a distinct hue from the RA/Dec grid so both read
+ * separately when shown together.
+ */
+export function drawAzimuthGrid(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  theme: SkyTheme,
+): void {
+  ctx.strokeStyle = theme.azGridColor;
+  ctx.lineWidth = GRID.lineWidth;
+  for (let alt = 20; alt <= 80; alt += 20) {
+    strokeAltCircle(ctx, view, alt, lstH, latDeg);
+  }
+  for (let az = 0; az < 360; az += 30) {
+    strokeAzMeridian(ctx, view, az, lstH, latDeg);
   }
 }
 

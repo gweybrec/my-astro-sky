@@ -66,6 +66,25 @@ export interface SkyThemeConfig {
   constellationNameColor: string;
   /** Color of the bright-star name labels. */
   starLabelColor: string;
+
+  // ── Moon marker (date-mode / live Moon overlay) ──
+  /** Illuminated portion of the Moon disk. */
+  moonLitColor: string;
+  /** Unlit (shadowed) portion of the Moon disk. */
+  moonShadowColor: string;
+  /** Outline stroke around the Moon disk. */
+  moonOutlineColor: string;
+
+  // ── Horizon line (date mode, when an observer location is set) ──
+  /** Fallback only — SkyMap prefers the live `--accent-color` CSS var so the horizon
+   * line matches the current warm/cold UI theme instead of a fixed hardcoded hue. */
+  horizonLineColorFallback: string;
+
+  // ── Azimuth (alt-az) grid (date mode, when an observer location is set) ──
+  /** A distinct hue from gridColor's blue family so both grids read separately when
+   * shown together. */
+  azGridColor: string;
+  azGridLabelColor: string;
 }
 
 /**
@@ -103,6 +122,14 @@ export const SKY_THEME: SkyThemeConfig = {
   constellationLineColor: 'rgba(140, 165, 220, 0.5)',
   constellationNameColor: 'rgba(185, 170, 155, 0.4)',
   starLabelColor: 'rgba(195, 180, 160, 0.55)',
+  // Matches --moon-lit (tokens.css) for visual consistency with the Targets-view glyph.
+  moonLitColor: 'rgba(225, 230, 245, 0.92)',
+  moonShadowColor: 'rgba(30, 34, 48, 0.9)',
+  moonOutlineColor: 'rgba(190, 195, 215, 0.7)',
+  horizonLineColorFallback: 'rgba(192, 120, 48, 0.65)',
+  // Soft green, well clear of the grid's blue family.
+  azGridColor: 'rgba(110, 200, 140, 0.35)',
+  azGridLabelColor: 'rgba(150, 220, 175, 0.85)',
 };
 
 const clamp255 = (n: number): number => Math.max(0, Math.min(255, Math.round(n)));

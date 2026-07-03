@@ -1,4 +1,5 @@
 import type { Point, ViewState } from './types';
+import { altAzFromRaDec } from './sky-geometry';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -121,6 +122,54 @@ export function projectCached(o: ProjCacheHost): void {
     o._py = p.y;
     o._pg = _projGeneration;
   }
+}
+
+// ─── Observer/time generation (date-mode horizon visibility) ──────────────────
+// Separate from _projGeneration: hemisphere/mode changes affect every projected
+// point, but a simulated-date/location change only affects horizon visibility
+// (altitude), so it gets its own counter — bumping it never invalidates _px/_py.
+
+let _obsGeneration = 0;
+
+/** Current observer/time generation; see {@link isBelowHorizonCached}. */
+export function getObsGeneration(): number {
+  return _obsGeneration;
+}
+
+/**
+ * Call when the simulated date/time or observer lat/lon actually changes (from
+ * SkyMap's setSkyTimeMode/setSimDate/setObserverLocation) — never on pan/zoom/render.
+ */
+export function bumpObsGeneration(): void {
+  _obsGeneration++;
+}
+
+/**
+ * Object whose below-horizon state can be memoised across frames (stars, DSOs).
+ * Mirrors {@link ProjCacheHost}'s generation-stamped cache idiom.
+ */
+export interface ObsCacheHost {
+  ra: number;
+  dec: number;
+  _altDeg?: number;
+  _belowHorizon?: boolean;
+  _ag?: number; // observer generation the cache was computed for
+}
+
+/**
+ * Below-horizon test for a fixed-position object (star/DSO), memoised per observer
+ * generation. altAzFromRaDec does several trig calls; recomputing it for ~118k stars
+ * every frame (including pan/zoom animation frames) would be a real cost, so — exactly
+ * like {@link projectCached} — the result is cached on the object and only recomputed
+ * when `_obsGeneration` has moved since the last call.
+ */
+export function isBelowHorizonCached(o: ObsCacheHost, lstH: number, latDeg: number): boolean {
+  if (o._ag !== _obsGeneration) {
+    o._altDeg = altAzFromRaDec(o.ra, o.dec, lstH, latDeg).altDeg;
+    o._belowHorizon = o._altDeg < 0;
+    o._ag = _obsGeneration;
+  }
+  return o._belowHorizon!;
 }
 
 /** Inverse projection: projection (x, y) → { ra°, dec° } */

@@ -38,6 +38,10 @@ describe('normalizeKey', () => {
     expect(normalizeKey({ key: 'ArrowDown' })).toBe('arrowdown');
   });
 
+  it('lowercases the End key', () => {
+    expect(normalizeKey({ key: 'End' })).toBe('end');
+  });
+
   it('orders modifiers deterministically', () => {
     expect(normalizeKey({ key: 'K', ctrlKey: true, shiftKey: true })).toBe('ctrl+shift+k');
   });
@@ -84,6 +88,41 @@ describe('defaults & merge', () => {
   it('mergeBindings handles junk input', () => {
     expect(mergeBindings(null)).toEqual(defaultBindings());
     expect(mergeBindings('nope')).toEqual(defaultBindings());
+  });
+});
+
+describe('date-mode / time-warp shortcuts', () => {
+  it('registers t/m/j/k/l/end as the default keys, with no conflicts', () => {
+    const b = defaultBindings();
+    expect(b.toggleDateMode).toEqual(['t']);
+    expect(b.toggleMoon).toEqual(['m']);
+    expect(b.timeSpeedForward).toEqual(['l']);
+    expect(b.timeSpeedBackward).toEqual(['j']);
+    expect(b.timeStop).toEqual(['k']);
+    expect(b.jumpToEvening).toEqual(['end']);
+    const conflicts = findConflicts(b);
+    for (const id of [
+      'toggleDateMode',
+      'toggleMoon',
+      'timeSpeedForward',
+      'timeSpeedBackward',
+      'timeStop',
+      'jumpToEvening',
+    ] as const) {
+      expect(conflicts.has(id)).toBe(false);
+    }
+  });
+
+  it('groups the new actions under the "time" category', () => {
+    const timeIds = SHORTCUT_ACTIONS.filter((a) => a.category === 'time').map((a) => a.id);
+    expect(timeIds).toEqual([
+      'toggleDateMode',
+      'toggleMoon',
+      'timeSpeedForward',
+      'timeSpeedBackward',
+      'timeStop',
+      'jumpToEvening',
+    ]);
   });
 });
 

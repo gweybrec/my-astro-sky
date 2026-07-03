@@ -5,6 +5,7 @@ import { useSettingsStore } from './stores/settings';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
 import { loadSettings, saveSettings, normalizeRotationDeg } from './display-settings';
+import { loadSkyTimeSettings } from './sky-time-settings';
 import type {
   Star,
   DSO,
@@ -363,6 +364,14 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setAutoDSODensity(settings.autoDSODensity);
   skyMap.setMotionLOD(settings.reduceDetailWhileMoving);
   overlay.setDefaultOpacity(1.0);
+
+  // ─── Apply initial sky-time settings (date mode / Moon / horizon location) ──────
+  const skyTimeSettings = loadSkyTimeSettings();
+  skyMap.setSkyTimeMode(skyTimeSettings.mode);
+  skyMap.setSimDate(new Date(skyTimeSettings.simDateISO));
+  skyMap.setObserverLocation(skyTimeSettings.lat, skyTimeSettings.lon);
+  skyMap.setShowMoon(skyTimeSettings.showMoon);
+  skyMap.setShowAzimuthGrid(skyTimeSettings.showAzimuthGrid);
 
   // ─── Hook into view change (dismiss tooltip, persist rotation, sync store) ──────────────
   const origOnViewChange = (skyMap as any)['onViewChange'] as (() => void) | null;

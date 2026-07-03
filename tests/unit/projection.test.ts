@@ -12,7 +12,11 @@ import {
   setProjectionMode,
   borderRadiusPU,
   fitScaleForBorderCircle,
+  getObsGeneration,
+  bumpObsGeneration,
+  isBelowHorizonCached,
 } from '../../src/projection';
+import { altAzFromRaDec } from '../../src/sky-geometry';
 
 const EPSILON = 1e-9;
 
@@ -247,5 +251,42 @@ describe('projectCached / projection generation', () => {
     setProjectionMode('fisheye'); // real change
     expect(getProjectionGeneration()).toBe(gen + 1);
     setProjectionMode('stereo'); // restore for other tests
+  });
+});
+
+describe('isBelowHorizonCached / observer generation', () => {
+  it('matches altAzFromRaDec and stamps the current observer generation', () => {
+    bumpObsGeneration();
+    const lstH = 5;
+    const latDeg = 40;
+    const o = { ra: 30, dec: 60, _altDeg: undefined, _belowHorizon: undefined, _ag: undefined };
+    const below = isBelowHorizonCached(o, lstH, latDeg);
+    const expected = altAzFromRaDec(o.ra, o.dec, lstH, latDeg).altDeg < 0;
+    expect(below).toBe(expected);
+    expect(o._ag).toBe(getObsGeneration());
+  });
+
+  it('does not recompute until the observer generation moves', () => {
+    bumpObsGeneration();
+    const o = { ra: 10, dec: -80, _altDeg: undefined, _belowHorizon: undefined, _ag: undefined };
+    isBelowHorizonCached(o, 5, 40);
+    // Tamper with the cache: a no-op call must leave the stale value untouched.
+    o._belowHorizon = !o._belowHorizon;
+    const tampered = o._belowHorizon;
+    const result = isBelowHorizonCached(o, 5, 40);
+    expect(result).toBe(tampered);
+  });
+
+  it('recomputes once the observer generation bumps again', () => {
+    bumpObsGeneration();
+    const o = { ra: 200, dec: 10, _altDeg: undefined, _belowHorizon: undefined, _ag: undefined };
+    isBelowHorizonCached(o, 5, 40);
+    const gen = getObsGeneration();
+    bumpObsGeneration();
+    expect(getObsGeneration()).toBe(gen + 1);
+    const expected = altAzFromRaDec(o.ra, o.dec, 12, -20).altDeg < 0;
+    const result = isBelowHorizonCached(o, 12, -20);
+    expect(result).toBe(expected);
+    expect(o._ag).toBe(getObsGeneration());
   });
 });

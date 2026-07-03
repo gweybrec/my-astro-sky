@@ -11,7 +11,12 @@ import {
   fitScaleForBorderCircle,
   borderRadiusPU,
   getProjectionMode,
+  bumpObsGeneration,
+  isBelowHorizonCached,
 } from './projection';
+import { dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
+import { altAzFromRaDec } from './sky-geometry';
+import { drawMoonMarker } from './moon-draw';
 import { clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getStarMagsSorted, loadConstellationStyle, normalizeRA } from './star-catalog';
@@ -80,6 +85,8 @@ import {
   drawGrid,
   drawConstellationLines,
   drawConstellationNames,
+  drawHorizonLine,
+  drawAzimuthGrid,
   drawTileTrash,
   drawTileAdd,
   TILE_TRASH_R,
@@ -277,6 +284,16 @@ export class SkyMap {
   // The app's single sky theme (background, stars, glow, grid tint).
   private readonly skyTheme = SKY_THEME;
 
+  // ── Date mode: Moon overlay + horizon simulation ────────────────────────────
+  private showMoon = false;
+  private showAzimuthGrid = false;
+  private skyTimeMode: 'live' | 'date' = 'live';
+  private simDate: Date = new Date();
+  private obsLat: number | null = null;
+  private obsLon: number | null = null;
+  // Below-horizon objects are dimmed (not hidden) to this alpha, in date mode only.
+  private static readonly BELOW_HORIZON_ALPHA = 0.18;
+
   // ── Star sprite atlas ──────────────────────────────────────────────────────
   // Distinct quantized (mag, bv) sprites pre-rendered for the current zoom. Keyed
   // by an integer bucket; rebuilt only when scale or the mag limit changes, so a
@@ -436,6 +453,40 @@ export class SkyMap {
   }
   setShowConstellationNames(show: boolean) {
     this.showConstellationNames = show;
+    this.requestRender();
+  }
+
+  /** Independent of live/date mode — shows the Moon's real position in live mode. */
+  setShowMoon(show: boolean) {
+    this.showMoon = show;
+    this.requestRender();
+  }
+
+  /** The alt-az grid — only drawn in date mode once an observer location is set. */
+  setShowAzimuthGrid(show: boolean) {
+    this.showAzimuthGrid = show;
+    this.requestRender();
+  }
+
+  /** Switches between today's always-full-sky view and the date-driven horizon simulation. */
+  setSkyTimeMode(mode: 'live' | 'date') {
+    this.skyTimeMode = mode;
+    bumpObsGeneration();
+    this.requestRender();
+  }
+
+  /** The simulated instant used for horizon visibility and the Moon while in date mode. */
+  setSimDate(date: Date) {
+    this.simDate = date;
+    bumpObsGeneration();
+    this.requestRender();
+  }
+
+  /** Observer lat/lon for horizon visibility; null disables horizon masking/line. */
+  setObserverLocation(lat: number | null, lon: number | null) {
+    this.obsLat = lat;
+    this.obsLon = lon;
+    bumpObsGeneration();
     this.requestRender();
   }
 
@@ -1403,6 +1454,10 @@ export class SkyMap {
     this.cachedSelectedDSOs = null;
     this.cachedSelectedDSOIds = null;
 
+    // Horizon params (LST + latitude), computed once per frame — null outside date mode
+    // or before an observer location is set, in which case no dimming/line is drawn.
+    const horizon = this.skyTimeMode === 'date' ? this.computeHorizonParams() : null;
+
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
@@ -1429,10 +1484,13 @@ export class SkyMap {
       );
     }
     if (this.showDSOs) {
-      this.renderDSOs();
+      this.renderDSOs(horizon);
+    }
+    if (this.showMoon) {
+      this.renderMoon(horizon);
     }
     if (this.showStars) {
-      this.renderStars();
+      this.renderStars(horizon);
       if (this.showStarLabels) {
         this.renderStarLabels();
       }
@@ -1451,6 +1509,17 @@ export class SkyMap {
       } else {
         drawGrid(ctx, view, this.skyTheme, this.borderLatDeg);
       }
+    }
+    if (horizon) {
+      if (this.showAzimuthGrid) {
+        drawAzimuthGrid(ctx, view, horizon.lstH, horizon.latDeg, this.skyTheme);
+      }
+      // --accent-color tracks the current warm/cold UI theme, so the horizon line
+      // reads well regardless of theme instead of a fixed hardcoded hue.
+      const cs = getComputedStyle(this.canvas);
+      const horizonColor =
+        cs.getPropertyValue('--accent-color').trim() || this.skyTheme.horizonLineColorFallback;
+      drawHorizonLine(ctx, view, horizon.lstH, horizon.latDeg, horizonColor);
     }
     if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
       this.renderPhotoOutlines();
@@ -2166,7 +2235,14 @@ export class SkyMap {
     this.onFovFrameResize?.(f.id, region);
   }
 
-  private renderStars() {
+  /** Observer/time parameters for horizon visibility this frame — null when not applicable. */
+  private computeHorizonParams(): { lstH: number; latDeg: number } | null {
+    if (this.obsLat === null || this.obsLon === null) return null;
+    const jd = dateToJD(this.simDate);
+    return { lstH: lstHours(jd, this.obsLon), latDeg: this.obsLat };
+  }
+
+  private renderStars(horizon: { lstH: number; latDeg: number } | null) {
     const { ctx, view } = this;
     // Stars render at full opacity (not dimmed by skyOpacity like the rest of the
     // sky), so their opaque cores fully occlude constellation/grid lines behind
@@ -2231,6 +2307,13 @@ export class SkyMap {
       if (c.x < -20 || c.x > view.width + 20 || c.y < -20 || c.y > view.height + 20) {
         continue;
       }
+
+      // Below-horizon stars are dimmed (not hidden) in date mode, once a location is set.
+      // The highlighted star stays at full brightness regardless (it's actively selected).
+      ctx.globalAlpha =
+        horizon && !isHighlighted && isBelowHorizonCached(star, horizon.lstH, horizon.latDeg)
+          ? SkyMap.BELOW_HORIZON_ALPHA
+          : 1;
 
       if (isHighlighted) {
         // Drawn live (not via the atlas): rare, uses estab=1, and gets a ring.
@@ -2436,7 +2519,7 @@ export class SkyMap {
     return selected;
   }
 
-  private renderDSOs() {
+  private renderDSOs(horizon: { lstH: number; latDeg: number } | null) {
     const { ctx, view } = this;
 
     // Render the selected DSOs
@@ -2454,21 +2537,71 @@ export class SkyMap {
       // Opacity based on magnitude
       const mag = dso.mag ?? 10;
       const opacity = Math.min(1, Math.max(0.3, 1 - (mag - 4) * 0.07));
+      // Below-horizon DSOs are dimmed (not hidden) in date mode, once a location is set.
+      // The highlighted DSO stays at full brightness regardless (it's actively selected).
+      const isHighlighted = dso.id === this.highlightedDSO;
+      const horizonMul =
+        horizon && !isHighlighted && isBelowHorizonCached(dso, horizon.lstH, horizon.latDeg)
+          ? SkyMap.BELOW_HORIZON_ALPHA
+          : 1;
 
       ctx.save();
-      ctx.globalAlpha = opacity * this.skyOpacity;
+      ctx.globalAlpha = opacity * this.skyOpacity * horizonMul;
       ctx.translate(c.x, c.y);
       ctx.rotate(angle);
 
       drawDsoMarker(ctx, dso.type, rx, ry);
 
       // Highlight indicator for searched DSO
-      if (dso.id === this.highlightedDSO) {
+      if (isHighlighted) {
         drawDsoHighlightRing(ctx, rx, ry);
       }
 
       ctx.restore();
     }
+  }
+
+  /**
+   * Draws the Moon at its position for the current instant: real "now" in live mode
+   * (so the Moon toggle works even outside date mode), or the simulated date/time in
+   * date mode. Below-horizon dimming only applies in date mode with a location set —
+   * `horizon` is always null in live mode, so the Moon simply never dims there.
+   */
+  private renderMoon(horizon: { lstH: number; latDeg: number } | null) {
+    const { ctx, view } = this;
+    const date = this.skyTimeMode === 'live' ? new Date() : this.simDate;
+    const jd = dateToJD(date);
+    const { raDeg, decDeg } = moonRaDecDeg(jd);
+    const { phaseIndex } = moonPhase(jd);
+
+    // Dec pre-filter, same convention as stars/DSOs (stereo only — fisheye clips via project()).
+    if (!this.fisheyeMode) {
+      if (this.hemisphere === 'north' && decDeg < -(this.borderLatDeg + 2)) return;
+      if (this.hemisphere === 'south' && decDeg > +(this.borderLatDeg + 2)) return;
+    }
+
+    // The Moon's RA/Dec changes continuously, so it's projected directly (not via
+    // projectCached, which is keyed on the hemisphere/mode generation and would go stale).
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) return; // far hemisphere (fisheye)
+    const c = toCanvas(p.x, p.y, view);
+    if (c.x < -50 || c.x > view.width + 50 || c.y < -50 || c.y > view.height + 50) return;
+
+    // 15 arcmin ≈ half the Moon's true ~30' diameter; floored so it reads as a disk
+    // (not a speck) at typical zoom levels, same floor pattern as DSO marker sizing.
+    const r = Math.max(7, angularSizeToCanvasPx(15, decDeg, view.scale));
+
+    const belowHorizon =
+      horizon && altAzFromRaDec(raDeg, decDeg, horizon.lstH, horizon.latDeg).altDeg < 0;
+
+    ctx.save();
+    ctx.globalAlpha = belowHorizon ? SkyMap.BELOW_HORIZON_ALPHA : 1;
+    drawMoonMarker(ctx, c.x, c.y, r, phaseIndex, {
+      litFill: this.skyTheme.moonLitColor,
+      shadowFill: this.skyTheme.moonShadowColor,
+      outline: this.skyTheme.moonOutlineColor,
+    });
+    ctx.restore();
   }
 
   private renderDSOLabels() {
