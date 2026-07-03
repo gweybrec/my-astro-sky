@@ -646,16 +646,28 @@ async function main() {
     );
   }
 
-  // Load and validate dso.json
+  // Load dso.json
   const dsoJson = JSON.parse(fs.readFileSync(DSO_JSON_PATH, 'utf8'));
-  const fields = dsoJson.fields;
 
-  if (fields.includes('rating')) {
-    console.error(
-      'ERROR: dso.json already has "rating" field. Run without the field or reset dso.json first.',
+  // Idempotent: strip any derived columns from a previous run (in whatever order/
+  // position they were in) before recomputing, so re-running this script — or
+  // chaining it after `dso:generate` — always works without a manual reset step.
+  const DERIVED_FIELDS = ['rating', 'difficulty', 'containerId', 'priority'];
+  const toStrip = DERIVED_FIELDS.map((f) => dsoJson.fields.indexOf(f))
+    .filter((i) => i >= 0)
+    .sort((a, b) => b - a);
+  if (toStrip.length > 0) {
+    console.log(
+      `Stripping previously-computed derived field(s): ${DERIVED_FIELDS.filter((f) => dsoJson.fields.includes(f)).join(', ')}`,
     );
-    process.exit(1);
+    dsoJson.fields = dsoJson.fields.filter((f) => !DERIVED_FIELDS.includes(f));
+    dsoJson.data = dsoJson.data.map((row) => {
+      const copy = [...row];
+      toStrip.forEach((i) => copy.splice(i, 1));
+      return copy;
+    });
   }
+  const fields = dsoJson.fields;
 
   const idxId = fields.indexOf('id');
   const idxRa = fields.indexOf('ra');

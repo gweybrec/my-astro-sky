@@ -35,7 +35,7 @@
     "electron:make": "npm run clean && npm run build && electron-rebuild && electron-forge make",
     "electron:package": "npm run clean && npm run build && electron-rebuild && electron-forge package",
     "swagger:generate": "node scripts/swagger-docs.mjs",
-    "dso:generate": "node scripts/generate-dso.mjs && node scripts/add-constellations.mjs",
+    "dso:generate": "node scripts/generate-dso.mjs && node scripts/add-constellations.mjs && node scripts/add-ratings.mjs",
     "docs:serve": "docsify serve docs"
   },
   "devDependencies": {

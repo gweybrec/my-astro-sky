@@ -43,23 +43,20 @@ npm run docs:serve        # Serve docs/ locally with docsify (live-reload) to pr
 After editing `scripts/dso-metadata-overrides.json` or `scripts/generate-dso.mjs`:
 
 ```bash
-npm run dso:generate   # Rebuilds public/data/dso.json + recomputes constellations
+npm run dso:generate   # generate-dso.mjs && add-constellations.mjs && add-ratings.mjs
 ```
 
-After changing rating/difficulty/containment/priority logic in `scripts/add-ratings.mjs`, strip and rebuild those derived columns (the script recomputes all four together):
+This single command rebuilds `public/data/dso.json`, recomputes constellations, and
+(re)computes the four derived columns — `rating`, `difficulty`, `containerId`,
+`priority` — via `scripts/add-ratings.mjs`. `priority` gates whether a DSO renders at
+all (`src/dso-selection.ts`), so a run that skips this last step produces a catalog
+that loads without error but silently draws nothing — `tests/unit/dso-json-schema.test.ts`
+asserts the committed `dso.json` always has these columns fully populated, so CI catches
+it if the chain is ever broken apart again.
 
-```bash
-node -e "
-const fs = require('fs'), path = 'public/data/dso.json';
-const d = JSON.parse(fs.readFileSync(path,'utf8'));
-const DERIVED = ['rating','difficulty','containerId','priority'];
-const toRemove = DERIVED.map(f=>d.fields.indexOf(f)).filter(i=>i>=0).sort((a,b)=>b-a);
-d.fields = d.fields.filter(f=>!DERIVED.includes(f));
-d.data = d.data.map(r=>{const a=[...r];toRemove.forEach(i=>a.splice(i,1));return a;});
-fs.writeFileSync(path,JSON.stringify(d));
-"
-node scripts/add-ratings.mjs
-```
+`add-ratings.mjs` is idempotent: it strips any derived columns from a prior run before
+recomputing, so it's also safe to run standalone (`node scripts/add-ratings.mjs`) after
+changing its rating/difficulty/containment/priority logic, without a manual reset step.
 
 ### Linting & formatting
 

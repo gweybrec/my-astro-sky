@@ -76,21 +76,17 @@ node scripts/add-constellations.mjs
 - `containerId` (zoom-gated inner objects) — `scripts/add-ratings.mjs` (needs `rating`); see [Containment](#containment-containerid) below
 - `priority` (render order, spatial spread) — `scripts/add-ratings.mjs` (needs `rating`); see [Render priority](#render-priority-spatial-spread) below
 
-All four derived fields are produced together by `add-ratings.mjs`. **To regenerate:** rebuild the base catalog with `npm run dso:generate`, then strip the four derived columns and re-run the rating script:
+All four derived fields are produced together by `add-ratings.mjs`, and `npm run dso:generate`
+chains it in automatically (`generate-dso.mjs && add-constellations.mjs && add-ratings.mjs`), so
+a single command always regenerates a complete catalog — no manual reset step needed.
+`add-ratings.mjs` is idempotent: it strips any derived columns left by a previous run before
+recomputing, so it's also safe to run standalone (`node scripts/add-ratings.mjs`) after changing
+its rating/difficulty/containment/priority logic without touching the base catalog.
 
-```bash
-# Strip the derived columns, then re-add (add-ratings.mjs recomputes all four)
-node -e "
-const fs = require('fs'), path = 'public/data/dso.json';
-const d = JSON.parse(fs.readFileSync(path,'utf8'));
-const DERIVED = ['rating','difficulty','containerId','priority'];
-const toRemove = DERIVED.map(f=>d.fields.indexOf(f)).filter(i=>i>=0).sort((a,b)=>b-a);
-d.fields = d.fields.filter(f=>!DERIVED.includes(f));
-d.data = d.data.map(r=>{const a=[...r];toRemove.forEach(i=>a.splice(i,1));return a;});
-fs.writeFileSync(path,JSON.stringify(d));
-"
-node scripts/add-ratings.mjs
-```
+`priority` gates whether a DSO renders at all (see [Render priority](#render-priority-spatial-spread)
+below) — a catalog missing it loads without error but silently draws no DSOs. `tests/unit/dso-json-schema.test.ts`
+asserts the committed `dso.json` always has `rating`/`difficulty`/`containerId`/`priority` fully
+populated, so CI catches it if this chain is ever split apart again.
 
 ### Rating (photographic interest 1–5)
 
@@ -201,7 +197,10 @@ All fields except `id` and `catalogs` are optional. `applyMetadataOverrides()` o
    ```bash
    npm run dso:generate
    ```
-   This runs `generate-dso.mjs` (rebuilds `public/data/dso.json`) followed by `add-constellations.mjs` (recomputes the `constellation` field, which is needed whenever coordinates change).
+   This runs `generate-dso.mjs` (rebuilds `public/data/dso.json`), `add-constellations.mjs`
+   (recomputes the `constellation` field, needed whenever coordinates change), and
+   `add-ratings.mjs` (recomputes `rating`/`difficulty`/`containerId`/`priority` — see
+   [Rating, Difficulty, Priority, and Containment Fields](#rating-difficulty-priority-and-containment-fields) above).
 4. **If you changed coordinates**, verify the result against SIMBAD using the validation script (see [Validation tool](#validation-tool) above).
 
 ### Migration scripts
