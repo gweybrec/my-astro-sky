@@ -65,6 +65,7 @@ const de: Translations = {
     type: 'Typ',
     size: 'Größe',
     raDec: 'RA / Dekl.',
+    altitude: 'Höhe',
     object: 'Objekt',
     catalogs: 'Kataloge',
     alsoKnownAs: 'Auch bekannt als',

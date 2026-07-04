@@ -1,8 +1,9 @@
 <template>
   <div class="sky-time-control" :class="{ 'date-mode': store.mode === 'date' }">
-    <!-- Conditional/expanding controls come first in DOM order so they grow into the
-         space to the LEFT of the moon/mode-toggle buttons, which stay last and never
-         move when entering/leaving date mode. -->
+    <!-- Conditional/expanding controls (including the moon toggle, which only makes
+         sense in date mode) come first in DOM order so they grow into the space to the
+         LEFT of the mode-toggle button, which stays last and never moves when
+         entering/leaving date mode. -->
     <template v-if="store.mode === 'date'">
       <button
         ref="readoutBtnRef"
@@ -132,21 +133,21 @@
         @blur="suppress(false)"
         v-html="azimuthGridSvg"
       ></button>
-    </template>
 
-    <button
-      type="button"
-      class="sky-rotation-btn"
-      :class="{ active: store.showMoon }"
-      :title="t('skyTime.moonButton')"
-      :aria-label="t('skyTime.moonButton')"
-      @click="store.setShowMoon(!store.showMoon)"
-      @mouseenter="suppress(true)"
-      @mouseleave="suppress(false)"
-      @focus="suppress(true)"
-      @blur="suppress(false)"
-      v-html="moonSvg"
-    ></button>
+      <button
+        type="button"
+        class="sky-rotation-btn"
+        :class="{ active: store.showMoon }"
+        :title="t('skyTime.moonButton')"
+        :aria-label="t('skyTime.moonButton')"
+        @click="store.setShowMoon(!store.showMoon)"
+        @mouseenter="suppress(true)"
+        @mouseleave="suppress(false)"
+        @focus="suppress(true)"
+        @blur="suppress(false)"
+        v-html="moonSvg"
+      ></button>
+    </template>
 
     <button
       type="button"

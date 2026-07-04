@@ -4,6 +4,9 @@ import { useDisplayStore } from './stores/display';
 import { useSettingsStore } from './stores/settings';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
+import { useSkyTimeStore } from './stores/sky-time';
+import { altitudeAtDeg } from './sky-geometry';
+import { formatAlt } from './format-utils';
 import { loadSettings, saveSettings, normalizeRotationDeg } from './display-settings';
 import { loadSkyTimeSettings } from './sky-time-settings';
 import type {
@@ -239,6 +242,11 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       ui.setSkyTooltip(null, x, y);
       return;
     }
+    const st = useSkyTimeStore(pinia);
+    const showAltitude = st.mode === 'date' && st.lat !== null && st.lon !== null;
+    const altStr = showAltitude
+      ? formatAlt(altitudeAtDeg(star.ra, star.dec, st.lat!, st.lon!, st.simDate))
+      : null;
     const starMainName = (s: Star) =>
       s.name ||
       (s.bayer && s.constellation ? `${s.bayer} ${s.constellation}` : null) ||
@@ -246,7 +254,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       `HIP ${s.hip}`;
     let html: string;
     if (ds.simplifiedDSOTooltips) {
-      html = `<div class="dso-info-name">${starMainName(star)}</div><div class="tooltip-mag">${t('stars.magnitude')} ${star.mag.toFixed(2)}</div>`;
+      const altitudeLine = altStr
+        ? `<div class="tooltip-mag">${t('dso.altitude')} ${altStr}</div>`
+        : '';
+      html = `<div class="dso-info-name">${starMainName(star)}</div><div class="tooltip-mag">${t('stars.magnitude')} ${star.mag.toFixed(2)}</div>${altitudeLine}`;
     } else {
       const rows: string[] = [];
       const desigParts: string[] = [];
@@ -262,6 +273,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       rows.push(
         `<tr><td>${t('dso.raDec')}</td><td>${formatRA(star.ra)} / ${formatDec(star.dec)}</td></tr>`,
       );
+      if (altStr) rows.push(`<tr><td>${t('dso.altitude')}</td><td>${altStr}</td></tr>`);
       html = `<div class="dso-info-name">${starMainName(star)}</div><table class="dso-info-table">${rows.join('')}</table>`;
     }
     ui.setSkyTooltip(html, x, y);
@@ -275,11 +287,19 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       ui.setSkyTooltip(null, x, y);
       return;
     }
+    const st = useSkyTimeStore(pinia);
+    const showAltitude = st.mode === 'date' && st.lat !== null && st.lon !== null;
+    const altStr = showAltitude
+      ? formatAlt(altitudeAtDeg(dso.ra, dso.dec, st.lat!, st.lon!, st.simDate))
+      : null;
     let html: string;
     if (ds.simplifiedDSOTooltips) {
       const mainName = dso.displayName || dso.id;
       const magStr = dso.mag !== null ? dso.mag.toFixed(1) : '–';
-      html = `<div class="dso-info-name">${mainName}</div><div class="tooltip-mag">${t('stars.magnitude')} ${magStr}</div>`;
+      const altitudeLine = altStr
+        ? `<div class="tooltip-mag">${t('dso.altitude')} ${altStr}</div>`
+        : '';
+      html = `<div class="dso-info-name">${mainName}</div><div class="tooltip-mag">${t('stars.magnitude')} ${magStr}</div>${altitudeLine}`;
     } else {
       const typeName = getDSOTypeName(dso.type);
       const magStr = dso.mag !== null ? dso.mag.toFixed(1) : '–';
@@ -298,6 +318,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       const sizeRow =
         sizeStr !== '–' ? `<tr><td>${t('dso.size')}</td><td>${sizeStr}</td></tr>` : '';
       const raDec = `${formatRA(dso.ra)} / ${formatDec(dso.dec)}`;
+      const altitudeRow = altStr
+        ? `<tr><td>${t('dso.altitude')}</td><td>${altStr}</td></tr>`
+        : '';
       const ratingRow =
         dso.rating !== null
           ? `<tr><td>${t('targets.ratingFilter')}</td><td>${formatRating(dso.rating)}</td></tr>`
@@ -314,7 +337,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       const emissionLinesRow = dso.emissionLines
         ? `<tr><td>${t('dso.emissionLines')}</td><td>${dso.emissionLines}</td></tr>`
         : '';
-      html = `${nameStr}<table class="dso-info-table"><tr><td>${t('dso.type')}</td><td>${typeName}</td></tr><tr><td>${t('stars.magnitude')}</td><td>${magStr}</td></tr>${sizeRow}<tr><td>${t('dso.raDec')}</td><td>${raDec}</td></tr>${ratingRow}${difficultyRow}${emissionLinesRow}${crossRefRow}</table>`;
+      html = `${nameStr}<table class="dso-info-table"><tr><td>${t('dso.type')}</td><td>${typeName}</td></tr><tr><td>${t('stars.magnitude')}</td><td>${magStr}</td></tr>${sizeRow}<tr><td>${t('dso.raDec')}</td><td>${raDec}</td></tr>${altitudeRow}${ratingRow}${difficultyRow}${emissionLinesRow}${crossRefRow}</table>`;
     }
     // Only full-mode tooltips carry the DSO (and thus the interactive action buttons);
     // simplified tooltips stay minimal.

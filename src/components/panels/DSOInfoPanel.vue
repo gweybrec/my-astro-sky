@@ -30,6 +30,10 @@
           <td>{{ t('dso.raDec') }}</td>
           <td>{{ raDecStr }}</td>
         </tr>
+        <tr v-if="showAltitude">
+          <td>{{ t('dso.altitude') }}</td>
+          <td>{{ altitudeStr }}</td>
+        </tr>
         <tr v-if="dso.rating !== null">
           <td>{{ t('targets.ratingFilter') }}</td>
           <td>{{ ratingStr }}</td>
@@ -67,17 +71,36 @@ import {
   formatDifficulty,
   formatRA,
   formatDec,
+  formatAlt,
 } from '../../format-utils';
+import { altitudeAtDeg } from '../../sky-geometry';
+import { useSkyTimeStore } from '../../stores/sky-time';
 import DSOActions from './DSOActions.vue';
 
 const props = defineProps<{ dso: DSO }>();
 defineEmits<{ recenter: []; edit: [] }>();
+
+const skyTimeStore = useSkyTimeStore();
 
 const isLPN = computed(() => props.dso.id.startsWith('LPN-'));
 const typeName = computed(() => getDSOTypeName(props.dso.type));
 const magStr = computed(() => (props.dso.mag !== null ? props.dso.mag.toFixed(1) : '—'));
 const sizeStr = computed(() => formatSize(props.dso.majAxis, props.dso.minAxis));
 const raDecStr = computed(() => `${formatRA(props.dso.ra)} / ${formatDec(props.dso.dec)}`);
+const showAltitude = computed(
+  () => skyTimeStore.mode === 'date' && skyTimeStore.lat !== null && skyTimeStore.lon !== null,
+);
+const altitudeStr = computed(() =>
+  formatAlt(
+    altitudeAtDeg(
+      props.dso.ra,
+      props.dso.dec,
+      skyTimeStore.lat!,
+      skyTimeStore.lon!,
+      skyTimeStore.simDate,
+    ),
+  ),
+);
 const ratingStr = computed(() => formatRating(props.dso.rating));
 const difficultyStr = computed(() => formatDifficulty(props.dso.difficulty));
 const crossRefs = computed(() =>

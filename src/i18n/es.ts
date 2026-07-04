@@ -65,6 +65,7 @@ const es: Translations = {
     type: 'Tipo',
     size: 'Tamaño',
     raDec: 'AR / Dec',
+    altitude: 'Altitud',
     object: 'Objeto',
     catalogs: 'Catálogos',
     alsoKnownAs: 'También conocido como',

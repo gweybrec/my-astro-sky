@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   altAzFromRaDec,
+  altitudeAtDeg,
   transitLstHours,
   maxAltDuringWindow,
   mightBeVisible,
@@ -38,6 +39,37 @@ describe('altAzFromRaDec', () => {
     const lst = (raDeg + 12 * 15) / 15; // opposite side: set LST 12h away from transit
     const { altDeg } = altAzFromRaDec(raDeg, decDeg, lst, latDeg);
     expect(altDeg).toBeLessThan(0);
+  });
+});
+
+describe('altitudeAtDeg', () => {
+  it('matches altAzFromRaDec at the same instant', () => {
+    const raDeg = 84,
+      decDeg = -1.2,
+      latDeg = 48.85,
+      lonDeg = 2.35;
+    const date = new Date('2024-01-15T22:00:00Z');
+    const lst = lstHours(dateToJD(date), lonDeg);
+    const expected = altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg;
+    expect(altitudeAtDeg(raDeg, decDeg, latDeg, lonDeg, date)).toBeCloseTo(expected, 6);
+  });
+
+  it('matches the peak found by maxAltDuringWindow at that peak instant', () => {
+    const raDeg = 84,
+      decDeg = -1.2,
+      latDeg = 48.85,
+      lonDeg = 2.35;
+    const windowStart = new Date('2024-01-15T19:00:00Z');
+    const windowEnd = new Date('2024-01-16T05:00:00Z');
+    const { maxAltDeg, atDate } = maxAltDuringWindow(
+      raDeg,
+      decDeg,
+      latDeg,
+      lonDeg,
+      windowStart,
+      windowEnd,
+    );
+    expect(altitudeAtDeg(raDeg, decDeg, latDeg, lonDeg, atDate)).toBeCloseTo(maxAltDeg, 6);
   });
 });
 

@@ -1486,7 +1486,10 @@ export class SkyMap {
     if (this.showDSOs) {
       this.renderDSOs(horizon);
     }
-    if (this.showMoon) {
+    // Gated on date mode (not just showMoon) so the toggle's on/off state survives
+    // switching in/out of date mode without the Moon reappearing in live/full mode,
+    // where its position relative to "now" wouldn't be meaningful to show.
+    if (this.showMoon && this.skyTimeMode === 'date') {
       this.renderMoon(horizon);
     }
     if (this.showStars) {

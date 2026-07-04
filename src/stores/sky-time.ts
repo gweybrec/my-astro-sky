@@ -90,9 +90,11 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   function setMode(next: 'live' | 'date') {
     if (next === mode.value) return;
     mode.value = next;
-    // simDate is intentionally left as-is: switching back to live and then back to
-    // date within the same session should find the date/time exactly where it was
-    // left, not reset to "now" — use resetToNow() for that explicitly.
+    // simDate, showMoon and showAzimuthGrid are intentionally left as-is: switching
+    // back to live and then back to date within the same session should find these
+    // exactly where they were left, not reset — the sky-map render loop is what hides
+    // the moon/azimuth grid while in live mode (they only make sense relative to a
+    // simulated date/time), not this store.
     canvasStore.skyMap?.setSkyTimeMode(mode.value);
     updateTicker();
     persist();

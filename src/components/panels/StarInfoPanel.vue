@@ -31,6 +31,10 @@
           <td>{{ t('stars.dec') }}</td>
           <td>{{ decStr }}</td>
         </tr>
+        <tr v-if="showAltitude">
+          <td>{{ t('dso.altitude') }}</td>
+          <td>{{ altitudeStr }}</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -40,9 +44,27 @@
 import { computed } from 'vue';
 import { t } from '../../i18n';
 import type { StarSearchResult } from '../../api';
-import { formatRA, formatDec } from '../../format-utils';
+import { formatRA, formatDec, formatAlt } from '../../format-utils';
+import { altitudeAtDeg } from '../../sky-geometry';
+import { useSkyTimeStore } from '../../stores/sky-time';
 
 const props = defineProps<{ star: StarSearchResult }>();
+
+const skyTimeStore = useSkyTimeStore();
+const showAltitude = computed(
+  () => skyTimeStore.mode === 'date' && skyTimeStore.lat !== null && skyTimeStore.lon !== null,
+);
+const altitudeStr = computed(() =>
+  formatAlt(
+    altitudeAtDeg(
+      props.star.ra,
+      props.star.dec,
+      skyTimeStore.lat!,
+      skyTimeStore.lon!,
+      skyTimeStore.simDate,
+    ),
+  ),
+);
 
 const headerName = computed(() => {
   const s = props.star;

@@ -157,6 +157,22 @@ describe('sky-time store', () => {
     expect(JSON.parse(raw!).showMoon).toBe(true);
   });
 
+  it('remembers showMoon and showAzimuthGrid across mode switches, like simDate', () => {
+    const store = useSkyTimeStore();
+    store.toggleMode(); // -> date
+    store.setShowMoon(true);
+    store.setShowAzimuthGrid(true);
+
+    store.toggleMode(); // -> live
+    expect(store.mode).toBe('live');
+    expect(store.showMoon).toBe(true);
+    expect(store.showAzimuthGrid).toBe(true);
+
+    store.toggleMode(); // -> date again, same session
+    expect(store.showMoon).toBe(true);
+    expect(store.showAzimuthGrid).toBe(true);
+  });
+
   it('setShowAzimuthGrid toggles and persists', () => {
     const store = useSkyTimeStore();
     store.setShowAzimuthGrid(true);

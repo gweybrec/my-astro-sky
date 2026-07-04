@@ -33,6 +33,19 @@ export function transitLstHours(raDeg: number): number {
   return raDeg / 15;
 }
 
+/** Altitude of an object above the horizon at a single instant. */
+export function altitudeAtDeg(
+  raDeg: number,
+  decDeg: number,
+  latDeg: number,
+  lonDeg: number,
+  date: Date,
+): number {
+  const jd = dateToJD(date);
+  const lst = lstHours(jd, lonDeg);
+  return altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg;
+}
+
 /**
  * Great-circle angular separation in degrees between two equatorial points.
  * Uses the haversine / atan2 form (numerically stable at small angles, which

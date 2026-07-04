@@ -64,6 +64,7 @@ const fr = {
     type: 'Type',
     size: 'Taille',
     raDec: 'RA / Déc',
+    altitude: 'Altitude',
     object: 'Objet',
     catalogs: 'Catalogues',
     alsoKnownAs: 'Aussi connu sous',
