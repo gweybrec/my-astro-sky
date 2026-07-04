@@ -371,26 +371,86 @@ Five semantic roles. Map your intent to a role, then use the corresponding class
 > and the old classes removed, keep using the existing class for the component you are editing.
 > Do **not** introduce new button class variants.
 
-#### Icon button active / toggle state
+#### Icon button states — the one canonical scale
 
-An icon-only button that toggles a persistent state (e.g. the **anchor** button in the
-_Field of View Frames_ popup) has an official pressed/on look:
+**Every icon-only button in the app shares one state scale. Do not invent per-button colours.**
+The single source of truth is the `btn-icon` / `btn-icon--active` shortcut family in
+`uno.config.ts`; a handful of pre-existing bespoke classes (listed below) hand-roll the same
+values in CSS and **must be kept in lock-step** with it.
 
-| State   | Class                       | Appearance                                                                                              |
-| ------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Off** | `btn-icon`                  | The plain icon button                                                                                   |
-| **On**  | `btn-icon btn-icon--active` | Amber tint fill (`--accent-fill-lg`) + accent border (`--border-focus`) + bright icon (`--text-bright`) |
+The rule that keeps it coherent: **background fill increases monotonically across states, and a
+mere hover must never look as "on" as a selected button.** Selected is a persistent, meaningful
+state; hover is transient feedback. If a hovered-but-unselected button looks more filled than a
+selected one, the scale is inverted — that is a bug.
+
+| State                | Background fill                     | Border                | Icon colour      |
+| -------------------- | ----------------------------------- | --------------------- | ---------------- |
+| **Off / rest**       | transparent                         | `--border-white-md`   | `--text-primary` |
+| **Off / hover**      | `--accent-fill-lg` (35 %)           | `--border-focus`      | `--text-bright`  |
+| **Selected / rest**  | `--accent-bg` (55 %)                | `--border-focus`      | `--text-bright`  |
+| **Selected / hover** | `--accent-bg-hover` (75 %)          | `--border-focus`      | `--text-bright`  |
+
+Fill progression is therefore **0 → 35 → 55 → 75 %** and must stay in that order. Selected (55 %)
+is deliberately stronger than an off-hover (35 %).
+
+**Classes that implement this scale** (touch _all_ of them together, never just one):
+
+- `btn-icon`, `btn-icon--active` (and `--danger` / `--danger-active`) — `uno.config.ts`. The
+  default for per-item and modal icon controls.
+- `.sky-rotation-btn` — `src/style.css`. The shared base for **every** floating map control
+  (rotation, FOV telescope/eye, export, and the sky-time toggle row — see §2.25). Its `.active`
+  toggle state lives in `src/styles/canvas.css` (`.sky-time-control .sky-rotation-btn.active`).
+- Bespoke momentary icon buttons that predate the shortcut and reuse the same tokens:
+  `.panel-settings-btn`, `.modal-close`, `.hints-clear-btn`, `.search-clear-btn`,
+  `.gallery-carousel-btn`, `.gallery-zoom-btn` — all in `src/style.css`.
 
 Rules:
 
-- **Never** dim the off state with `opacity-*` to signal "off" — off is simply the normal
-  button. The on state is what carries the visual cue.
-- The icon SVG must use `currentColor` so `--active` recolors it via `text-bright`.
-- Reflect the state with `aria-pressed="true|false"` on the button.
+- **Never** dim the off state with `opacity-*` to signal "off" — off is simply the normal button
+  at rest. The _on_ state carries the visual cue.
+- The icon SVG must use `stroke="currentColor"` (or `fill="currentColor"`) so every state recolours
+  it automatically. No hardcoded hex/`white` in the SVG.
+- Reflect toggle state with `aria-pressed="true|false"` on the button.
 
-This reuses the same amber-tint-fill + `--border-focus` active convention already used by the
-`.active` modifiers on pagination, language, hemisphere, and mirror buttons — keeping every
-toggle in the app visually consistent.
+This is the same amber-fill + `--border-focus` convention used by the `.active` modifiers on
+pagination, language, hemisphere, and mirror buttons — keeping every toggle in the app consistent.
+
+#### Icon SVG stroke weight — normalise for the render size, not the viewBox
+
+An icon's on-screen stroke thickness is `stroke-width × (renderPx / viewBoxSize)`. Two icons with
+the **same colour** look nothing alike if one renders a 1.2 px stroke and the other a 0.5 px
+hairline — the hairline antialiases to dim grey and reads as a _wrong colour_ even though
+`currentColor` is identical. This has bitten us: the 64-unit-viewBox `telescope`/`eye` icons at
+`stroke-width="2"` rendered ~0.5 px next to the 24-unit-viewBox `map-pin` at ~1.3 px.
+
+**Target ~1.0–1.3 px on-screen stroke** for all outline icons in floating/panel controls. Compute
+the needed `stroke-width` from the icon's viewBox and its render size:
+
+| viewBox | render size | `stroke-width` for ~1.2 px |
+| ------- | ----------- | --------------------------- |
+| 16      | 16 px       | 1.5                         |
+| 24      | 16 px       | 2                           |
+| 36      | 18 px       | 2                           |
+| 64      | 16–18 px    | 4–5                         |
+
+Do not "fix" a thin icon by brightening its colour — match the stroke weight instead, so it stays
+consistent with its neighbours in every state.
+
+#### Verifying icon-button colours — theme-token trap
+
+`src/theme.ts` `loadTheme()` defaults to the **`cold-blue-v2`** theme when `localStorage` has no
+`app-theme` key. A fresh browser (including a clean Playwright profile) therefore renders the
+steel-blue theme, whose `[data-theme='cold-blue-v2']` block in `src/style.css` overrides
+`--accent-*`, `--border-focus`, and the `--text-*` tokens. Amber-token edits then appear to do
+nothing. Before verifying icon colours, pin the theme:
+
+```js
+localStorage.setItem('app-theme', 'warm');
+location.reload();
+```
+
+Confirm the change with the element's computed `backgroundColor` / `color`, not by screenshot
+alone — the four states must read as four distinct fills (see the scale above).
 
 ---
 
@@ -1058,9 +1118,11 @@ shown while the map view is active.
 
 **Shared base class — `.sky-rotation-btn`.** _Every_ floating map-overlay button reuses this single
 base: 34 × 34 px, `display: inline-flex`, content centred, `var(--radius-lg)`, `var(--bg-card)`
-fill, `var(--accent-border)` border. **Never create a new button variant for a floating control** —
-the rotation buttons (§2.23), the FOV ribbon/telescope buttons (§2.23/§2.24), and the export button
-all share it. Disabled styling (`opacity: 0.35; cursor: not-allowed`) is built into the base.
+card fill, `var(--border-white-md)` neutral border, `var(--text-primary)` icon. Its hover and
+`.active` (selected) states follow the **canonical icon-button scale in §2.1** — do not give it a
+bespoke hover/selected colour. **Never create a new button variant for a floating control** — the
+rotation buttons (§2.23), the FOV ribbon/telescope buttons (§2.23/§2.24), and the export button all
+share it. Disabled styling (`opacity: 0.35; cursor: not-allowed`) is built into the base.
 
 **Positioning rules:**
 

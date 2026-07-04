@@ -493,7 +493,7 @@ body {
 .panel-settings-btn {
   background: transparent;
   border: 1px solid var(--border-white-md);
-  color: var(--text-label);
+  color: var(--text-primary);
   padding: var(--space-1) var(--space-3h);
   font-size: var(--font-size-body);
   cursor: pointer;
@@ -501,11 +501,13 @@ body {
   line-height: 1.4;
   transition:
     color 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    background 0.15s;
 }
 .panel-settings-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--border-white-xl);
+  color: var(--text-bright);
+  border-color: var(--border-focus);
+  background: var(--accent-fill-lg);
 }
 .lang-btn {
   background: transparent;
@@ -680,9 +682,9 @@ body {
   width: 34px;
   height: 34px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border-white-md);
   background: var(--bg-card);
-  color: var(--text-bright);
+  color: var(--text-primary);
   font-size: var(--font-size-large);
   line-height: 1;
   cursor: pointer;
@@ -692,12 +694,14 @@ body {
   transition:
     transform 0.14s ease,
     background 0.14s ease,
-    border-color 0.14s ease;
+    border-color 0.14s ease,
+    color 0.14s ease;
 }
 
 .sky-rotation-btn:hover {
-  background: var(--accent-bg-hover);
+  background: var(--accent-fill-lg);
   border-color: var(--border-focus);
+  color: var(--text-bright);
 }
 
 .sky-rotation-btn:active {
@@ -969,32 +973,10 @@ body {
   gap: var(--space-3);
 }
 
-.btn-icon {
-  background: none;
-  border: 1px solid var(--border-white-sm);
-  color: var(--text-label);
-  cursor: pointer;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-body);
-}
-
-.btn-icon:hover {
-  background: var(--accent-fill-sm);
-}
-
 .btn-icon svg {
   width: 1em;
   height: 1em;
   vertical-align: middle;
-}
-
-.btn-icon--danger {
-  color: var(--color-danger);
-}
-
-.btn-icon--danger:hover {
-  background: var(--btn-icon-danger-hover);
 }
 
 .btn-zorder {
@@ -1106,16 +1088,21 @@ body {
 .modal-close {
   background: none;
   border: none;
-  color: var(--text-dim);
+  color: var(--text-primary);
   font-size: var(--font-size-xl);
   cursor: pointer;
   padding: 0 var(--space-2);
   line-height: 1;
   flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .modal-close:hover {
-  color: var(--text-primary);
+  color: var(--text-bright);
+  background: var(--accent-fill-lg);
 }
 
 .modal-body {
@@ -1335,7 +1322,7 @@ body {
   background: var(--bg-clear-btn);
   border: none;
   border-radius: 50%;
-  color: var(--text-dim);
+  color: var(--text-primary);
   font-size: var(--font-size-head);
   line-height: 1;
   cursor: pointer;
@@ -1343,12 +1330,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .search-clear-btn:hover {
   background: var(--bg-clear-hover);
-  color: var(--text-primary);
+  color: var(--text-bright);
 }
 
 .star-search-input:focus {
@@ -1687,22 +1676,27 @@ body {
   width: 18px;
   height: 18px;
   padding: 0;
-  border: 1px solid var(--border-chrome);
+  border: 1px solid var(--border-white-md);
   border-radius: 50%;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--text-primary);
   font-size: var(--font-size-small);
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
   transition:
     background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+  transition:
+    background 0.15s,
     color 0.15s;
 }
 
 .hints-clear-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--accent-fill-lg);
+  color: var(--text-bright);
+  border-color: var(--border-focus);
 }
 
 .solve-hints-section.has-hint .hints-clear-btn {
@@ -2160,10 +2154,11 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-dim);
+  color: var(--text-primary);
   font-size: var(--font-size-body);
   padding: 0;
   line-height: 1;
+  transition: color 0.15s;
 }
 .tag-chip-remove:hover {
   color: var(--btn-danger-hover-text);
@@ -2344,16 +2339,17 @@ body {
 .integration-filter-clear {
   background: none;
   border: none;
-  color: var(--text-label);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: var(--font-size-sub);
   padding: 0 var(--space-1);
   line-height: 1;
   flex-shrink: 0;
+  transition: color 0.15s;
 }
 
 .integration-filter-clear:hover {
-  color: var(--text-primary);
+  color: var(--text-bright);
 }
 
 .integration-filter-selected {
@@ -2366,16 +2362,17 @@ body {
 .integration-filter-clear {
   background: none;
   border: none;
-  color: var(--text-label);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: var(--font-size-sub);
   padding: 0 var(--space-1);
   line-height: 1;
   flex-shrink: 0;
+  transition: color 0.15s;
 }
 
 .integration-filter-clear:hover {
-  color: var(--text-primary);
+  color: var(--text-bright);
 }
 
 /* ─── Manual placement toolbar ─── */
@@ -3148,8 +3145,8 @@ input:focus-visible {
   transform: translateY(-50%);
   z-index: 2;
   background: var(--gallery-carousel-btn-bg);
-  border: 1px solid var(--border-white-sm);
-  color: var(--text-secondary);
+  border: 1px solid var(--border-white-md);
+  color: var(--text-primary);
   font-size: 2.4rem;
   line-height: 1;
   padding: var(--space-5) var(--space-7h) var(--space-6h);
@@ -3533,8 +3530,8 @@ input:focus-visible {
 
 .gallery-zoom-btn {
   background: var(--gallery-zoom-btn-bg);
-  border: 1px solid var(--border-panel);
-  color: var(--text-secondary);
+  border: 1px solid var(--border-white-md);
+  color: var(--text-primary);
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
@@ -3547,8 +3544,8 @@ input:focus-visible {
   backdrop-filter: blur(4px);
 }
 .gallery-zoom-btn:hover {
-  background: var(--accent-fill-md);
-  color: var(--text-primary);
+  background: var(--accent-fill-lg);
+  color: var(--text-bright);
   border-color: var(--border-accent);
 }
 .gallery-zoom-reset {

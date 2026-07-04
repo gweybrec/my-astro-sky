@@ -291,8 +291,13 @@ input:focus-visible {
 }
 
 .sky-time-control .sky-rotation-btn.active {
-  background: var(--accent-bg-hover);
+  background: var(--accent-bg);
   border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+
+.sky-time-control .sky-rotation-btn.active:hover {
+  background: var(--accent-bg-hover);
 }
 
 .sky-time-readout {

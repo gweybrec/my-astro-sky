@@ -152,29 +152,38 @@ export default defineConfig({
       'disabled:opacity-40 disabled:cursor-not-allowed',
     ].join(' '),
 
+    // Icon-only button. Off/rest = ghost (transparent, neutral border, legible
+    // icon). Hover = a moderate amber tint (`--accent-fill-lg`) — clearly visible
+    // transient feedback, but deliberately LIGHTER than the selected state below
+    // so hovering a normal button never looks "more on" than a selected one.
+    // Fill scale across states: rest 0% → hover 35% → selected 55% → selected-hover
+    // 75%. See docs/dev/ui-guidelines.md §2.1.
     'btn-icon': [
-      'bg-transparent border border-[var(--border-white-sm)] text-label',
+      'bg-transparent border border-[var(--border-white-md)] text-primary',
       'cursor-pointer py-2 px-4 rounded-sm text-body',
-      'hover:bg-[var(--accent-fill-sm)]',
+      'transition-colors duration-150',
+      'hover:bg-[var(--accent-fill-lg)] hover:border-[var(--border-focus)] hover:text-bright',
     ].join(' '),
 
     'btn-icon--danger': [
       'btn-icon',
       'text-[var(--color-danger)]',
-      'hover:bg-[var(--btn-icon-danger-hover)]',
+      'hover:bg-[var(--btn-danger-hover-bg)] hover:border-[var(--btn-danger-hover-border)]',
     ].join(' '),
 
     // Pressed/on state for an icon toggle button. Off = plain `btn-icon`
-    // (never dim with opacity). On = amber tint fill + accent border + bright
-    // icon — the same active convention used by pagination/language/mirror
-    // buttons. See docs/dev/ui-guidelines.md §2.1.
-    // Overrides are marked important so the active state always wins over the
-    // base `.btn-icon` rule when both classes are applied (`btn-icon
-    // btn-icon--active`), regardless of generated CSS rule order.
+    // (never dim with opacity). On = a strong amber fill (`--accent-bg`, 55%) +
+    // accent border + bright icon — deliberately MORE prominent than the 35%
+    // hover of an off button, so selected always reads as the stronger state.
+    // On-hover goes stronger still (`--accent-bg-hover`, 75%). Same active
+    // convention used by pagination/language/mirror buttons. See
+    // docs/dev/ui-guidelines.md §2.1. Overrides are marked important so the
+    // active state always wins over the base `.btn-icon` rule when both classes
+    // are applied (`btn-icon btn-icon--active`), regardless of CSS rule order.
     'btn-icon--active': [
       'btn-icon',
-      '!bg-[var(--accent-fill-lg)] !border-[var(--border-focus)] !text-bright',
-      'hover:!bg-[var(--accent-fill-xl)]',
+      '!bg-[var(--accent-bg)] !border-[var(--border-focus)] !text-bright',
+      'hover:!bg-[var(--accent-bg-hover)]',
     ].join(' '),
 
     // Selected/on state for a destructive icon toggle (e.g. a "Drop" choice):
