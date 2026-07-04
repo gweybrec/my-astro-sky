@@ -71,9 +71,26 @@ export const useUiStore = defineStore('ui', () => {
   const currentViewMode = ref<ViewMode>('skymap');
   const pendingBatchFiles = ref<File[] | null>(null);
 
-  // Set before switchView('targets') to make the Targets view open the "My plans"
-  // tab and expand/scroll to this plan. Consumed (and cleared) on render.
+  // Set before switchView('plans') to make the Plans view expand/scroll to this
+  // plan. Consumed (and cleared) on render.
   const pendingPlanFocusId = ref<string | null>(null);
+
+  // Whether the "Find targets" recommender overlay is open. It is orthogonal to
+  // currentViewMode — it can be summoned over either the Sky map or Plans, and
+  // closing it simply hides the overlay (the underlying view is untouched).
+  const targetsOverlayOpen = ref(false);
+  // The plan a "Find targets" pick should be added to, if opened from a specific
+  // plan's context. Null when opened generically (e.g. from the Sky map).
+  const targetsOverlayPlanId = ref<string | null>(null);
+
+  function openTargetsOverlay(planId: string | null = null): void {
+    targetsOverlayPlanId.value = planId;
+    targetsOverlayOpen.value = true;
+  }
+
+  function closeTargetsOverlay(): void {
+    targetsOverlayOpen.value = false;
+  }
 
   // Update-available info, set by the startup version check and read by UpdateAvailableModal.
   const pendingUpdate = ref<{ latest: string; url: string } | null>(null);
@@ -224,7 +241,7 @@ export const useUiStore = defineStore('ui', () => {
 
     document.getElementById('tab-skymap')?.classList.toggle('active', mode === 'skymap');
     document.getElementById('tab-gallery')?.classList.toggle('active', mode === 'gallery');
-    document.getElementById('tab-targets')?.classList.toggle('active', mode === 'targets');
+    document.getElementById('tab-plans')?.classList.toggle('active', mode === 'plans');
 
     const mapContainer = document.getElementById('map-container');
     if (mapContainer) mapContainer.style.display = mode === 'skymap' ? 'block' : 'none';
@@ -234,7 +251,7 @@ export const useUiStore = defineStore('ui', () => {
     if (mode === 'gallery') {
       canvasStore.gallery?.show();
       canvasStore.targetsView?.hide();
-    } else if (mode === 'targets') {
+    } else if (mode === 'plans') {
       canvasStore.gallery?.hide();
       canvasStore.targetsView?.show();
     } else {
@@ -259,6 +276,10 @@ export const useUiStore = defineStore('ui', () => {
     pendingBatchFiles,
     pendingUpdate,
     pendingPlanFocusId,
+    targetsOverlayOpen,
+    targetsOverlayPlanId,
+    openTargetsOverlay,
+    closeTargetsOverlay,
     skyTooltipHtml,
     skyTooltipX,
     skyTooltipY,

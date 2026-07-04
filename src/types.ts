@@ -227,4 +227,4 @@ export interface DSOUserOverride {
   type?: DSOType;
 }
 
-export type ViewMode = 'skymap' | 'gallery' | 'targets';
+export type ViewMode = 'skymap' | 'gallery' | 'plans';

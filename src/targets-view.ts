@@ -47,6 +47,7 @@ import trashSvg from './icons/trash.svg?raw';
 import penSvg from './icons/pen.svg?raw';
 import mapPinSvg from './icons/map-pin.svg?raw';
 import listPlusSvg from './icons/list-plus.svg?raw';
+import targetSvg from './icons/target.svg?raw';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
 import { usePlansStore } from './stores/plans';
@@ -1241,7 +1242,10 @@ export class TargetsView {
   private randomBtn: HTMLButtonElement | null = null;
   private dateInput: HTMLInputElement | null = null;
 
-  private planMode: 'recommend' | 'plans' = 'recommend';
+  /** Recommend surface (gear/location/date/filters + results), built once and
+   * reparented into the "Find targets" overlay on first mount. Persists across
+   * open/close so filters and results survive being hidden. */
+  private recommendRoot: HTMLElement | null = null;
   private plansStore = usePlansStore(pinia);
   private fovFramesStore = useFovFramesStore(pinia);
   private uiStore = useUiStore(pinia);
@@ -1260,16 +1264,13 @@ export class TargetsView {
     this.skyMap = skyMap;
     this.onNavigate = onNavigate;
     this.prefs = loadPrefs();
-    this.container = document.getElementById('targets-container')!;
+    this.container = document.getElementById('plans-container')!;
     this.render();
     // Keep plan-row PA readouts in sync when a frame is rotated on the map
     // (frame rotation writes paDeg back through the plans store).
     this.plansStore.$subscribe(() => this.refreshPaReadouts());
-    // Load plans in the background; refresh the badge / plans view when ready.
-    this.plansStore.ensureLoaded().then(() => {
-      if (this.planMode === 'plans') this.render();
-      else this.updatePlanBadge();
-    });
+    // Load plans in the background; refresh the plans view when ready.
+    this.plansStore.ensureLoaded().then(() => this.render());
   }
 
   /** Update the live position-angle spans from current plan-entry values. */
@@ -1296,12 +1297,8 @@ export class TargetsView {
     const focusPlanId = this.uiStore.pendingPlanFocusId;
     this.render();
     this.plansStore.ensureLoaded().then(() => {
-      if (this.planMode === 'plans') {
-        if (focusPlanId) this.uiStore.pendingPlanFocusId = focusPlanId;
-        this.render();
-      } else {
-        this.updatePlanBadge();
-      }
+      if (focusPlanId) this.uiStore.pendingPlanFocusId = focusPlanId;
+      this.render();
     });
   }
 
@@ -1309,66 +1306,37 @@ export class TargetsView {
     this.container.style.display = 'none';
   }
 
+  /**
+   * Lazily build the "Find targets" recommend surface (gear/location/date/
+   * filters + results) and return its root element. Built exactly once — the
+   * caller (TargetsOverlay.vue) mounts this element into the overlay on first
+   * open and never rebuilds it, so all filter/result state survives repeated
+   * open/close within the session.
+   */
+  getRecommendElement(): HTMLElement {
+    if (!this.recommendRoot) {
+      const root = document.createElement('div');
+      root.className = 'targets-recommend-root';
+      root.appendChild(this.buildForm());
+      const resultsEl = document.createElement('div');
+      resultsEl.className = 'targets-results';
+      resultsEl.id = 'targets-results';
+      root.appendChild(resultsEl);
+      this.recommendRoot = root;
+    }
+    return this.recommendRoot;
+  }
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   private render(): void {
-    // A pending plan-focus (from the FOV popup) forces the "My plans" tab so the
-    // requested plan is on screen to expand/scroll to.
-    if (this.uiStore.pendingPlanFocusId) this.planMode = 'plans';
     this.container.innerHTML = '';
     this.paSpans.clear();
     this.container.className = 'targets-view';
     const inner = document.createElement('div');
     inner.className = 'targets-inner';
     this.container.appendChild(inner);
-    inner.appendChild(this.buildModeToggle());
-    if (this.planMode === 'plans') {
-      inner.appendChild(this.buildPlansView());
-    } else {
-      inner.appendChild(this.buildForm());
-      const resultsEl = document.createElement('div');
-      resultsEl.className = 'targets-results';
-      resultsEl.id = 'targets-results';
-      inner.appendChild(resultsEl);
-    }
-  }
-
-  // ─── Recommend / My Plans sub-mode toggle ───────────────────────────────────
-
-  private buildModeToggle(): HTMLElement {
-    const row = document.createElement('div');
-    row.className =
-      'targets-mode-toggle inline-flex gap-1 mb-4 p-1 bg-card border border-subtle rounded-md';
-
-    const SEG_BASE =
-      'px-5 py-2 rounded-sm text-body font-medium cursor-pointer border-0 transition-colors';
-    const SEG_ACTIVE = ' bg-[var(--accent-bg)] text-bright';
-    const SEG_IDLE = ' bg-transparent text-secondary hover:text-bright';
-
-    const mkSeg = (mode: 'recommend' | 'plans', label: string): HTMLButtonElement => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = SEG_BASE + (this.planMode === mode ? SEG_ACTIVE : SEG_IDLE);
-      btn.textContent = label;
-      btn.addEventListener('click', () => {
-        if (this.planMode === mode) return;
-        this.planMode = mode;
-        this.render();
-      });
-      return btn;
-    };
-
-    row.appendChild(mkSeg('recommend', t('targets.plan.tabRecommend')));
-
-    const plansBtn = mkSeg('plans', t('targets.plan.tabPlans'));
-    const badge = document.createElement('span');
-    badge.className = 'targets-mode-badge opacity-80';
-    this.planBadgeEl = badge;
-    plansBtn.appendChild(badge);
-    row.appendChild(plansBtn);
-    this.updatePlanBadge();
-
-    return row;
+    inner.appendChild(this.buildPlansView());
   }
 
   private updatePlanBadge(): void {
@@ -1591,6 +1559,13 @@ export class TargetsView {
   }
 
   private buildForm(): HTMLElement {
+    // One "search settings" area (old layout + label) holding everything — setup,
+    // location, date and all filters — laid out in two columns:
+    //   left  = observing context + what to look for (setup, location, date,
+    //           object types, constellations)
+    //   right = filter refinements (sky direction, altitude, rating, difficulty,
+    //           catalogue, exclusions)
+    // Primary actions sit on a full-width row at the bottom.
     const details = document.createElement('details');
     details.className = 'targets-form-details';
     details.open = true;
@@ -1601,20 +1576,42 @@ export class TargetsView {
 
     const form = document.createElement('div');
     form.className = 'targets-form';
+    details.appendChild(form);
 
-    // ── Gear section (async: populated after catalogs load) ──────────────────
-    const gearSection = document.createElement('div');
-    form.appendChild(gearSection);
-    this.buildGearSection(gearSection);
+    const filterCols = document.createElement('div');
+    filterCols.className = 'grid grid-cols-2 gap-x-10 gap-y-6 items-start';
+    const filterColL = document.createElement('div');
+    filterColL.className = 'flex flex-col gap-6 min-w-0';
+    const filterColR = document.createElement('div');
+    filterColR.className = 'flex flex-col gap-6 min-w-0';
+    filterCols.appendChild(filterColL);
+    filterCols.appendChild(filterColR);
+    form.appendChild(filterCols);
 
-    // ── Location ─────────────────────────────────────────────────────────────
-    const locSection = document.createElement('div');
-    locSection.className = 'targets-form-row';
-    const locLabel = document.createElement('div');
-    locLabel.className = 'targets-label';
-    locLabel.textContent = t('targets.location.label');
-    locSection.appendChild(locLabel);
-    locSection.appendChild(
+    // Filter change-handlers call this; the section title is static, so it's a
+    // no-op kept for call-site compatibility.
+    const updateFiltersSummary = (): void => {};
+
+    // Label-left form row helper (matches the filter rows).
+    const formRow = (labelText: string, control: HTMLElement): HTMLElement => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'targets-form-row';
+      const lbl = document.createElement('div');
+      lbl.className = 'targets-label';
+      lbl.textContent = labelText;
+      rowEl.appendChild(lbl);
+      rowEl.appendChild(control);
+      return rowEl;
+    };
+
+    // ── Setup (gear) — the FOV summary hint renders directly beneath it. ──
+    const gearField = document.createElement('div');
+    this.buildGearSection(gearField);
+    filterColL.appendChild(gearField);
+
+    // ── Location ──
+    const locControl = document.createElement('div');
+    locControl.appendChild(
       this.buildLocationWidget({
         getLat: () => this.prefs.lat,
         getLon: () => this.prefs.lon,
@@ -1625,26 +1622,19 @@ export class TargetsView {
         },
       }),
     );
-    form.appendChild(locSection);
+    filterColL.appendChild(formRow(t('targets.location.label'), locControl));
 
-    // ── Date ─────────────────────────────────────────────────────────────────
-    const dateRow = document.createElement('div');
-    dateRow.className = 'targets-form-row';
-    const dateLabel = document.createElement('label');
-    dateLabel.className = 'targets-label';
-    dateLabel.textContent = t('targets.date.label');
+    // ── Date ──
     this.dateInput = document.createElement('input');
     const dateInput = this.dateInput;
     dateInput.type = 'date';
-    dateInput.className = 'targets-coord-input';
+    dateInput.className = 'targets-coord-input !min-w-0 !max-w-none !flex-none w-auto';
     dateInput.value = this.prefs.lastDateISO ?? todayISO();
     dateInput.addEventListener('change', () => {
       this.prefs.lastDateISO = dateInput.value;
       savePrefs(this.prefs);
     });
-    dateRow.appendChild(dateLabel);
-    dateRow.appendChild(dateInput);
-    form.appendChild(dateRow);
+    filterColL.appendChild(formRow(t('targets.date.label'), dateInput));
 
     // ── DSO type filter ──────────────────────────────────────────────────────
     const typeRow = document.createElement('div');
@@ -1664,12 +1654,13 @@ export class TargetsView {
         else enabledTypeSet.delete(type);
         this.prefs.enabledTypes = [...enabledTypeSet];
         savePrefs(this.prefs);
+        updateFiltersSummary();
       });
       typeFilters.appendChild(chip);
     }
     typeRow.appendChild(typeLabel);
     typeRow.appendChild(typeFilters);
-    form.appendChild(typeRow);
+    filterColL.appendChild(typeRow);
 
     // ── Horizon direction filter ─────────────────────────────────────────────
     const horizonRow = document.createElement('div');
@@ -1703,7 +1694,7 @@ export class TargetsView {
     }
     horizonRow.appendChild(horizonLabel);
     horizonRow.appendChild(compassEl);
-    form.appendChild(horizonRow);
+    filterColR.appendChild(horizonRow);
 
     // ── Altitude range filter ─────────────────────────────────────────────────
     const altRow = document.createElement('div');
@@ -1753,6 +1744,7 @@ export class TargetsView {
       if (!isNaN(v)) {
         this.prefs.minAltDeg = v;
         savePrefs(this.prefs);
+        updateFiltersSummary();
       }
     });
     maxAltInput.addEventListener('change', () => {
@@ -1760,12 +1752,13 @@ export class TargetsView {
       if (!isNaN(v)) {
         this.prefs.maxAltDeg = v;
         savePrefs(this.prefs);
+        updateFiltersSummary();
       }
     });
 
     altRow.appendChild(altLabel);
     altRow.appendChild(altEntry);
-    form.appendChild(altRow);
+    filterColR.appendChild(altRow);
 
     // ── Constellation filter ─────────────────────────────────────────────────
     // Deduplicate by IAU id (Serpens appears twice in the data as Caput + Cauda)
@@ -1882,7 +1875,7 @@ export class TargetsView {
     constRow.appendChild(constLabel);
     constRow.appendChild(constSelectBtn);
     constRow.appendChild(constCountEl);
-    form.appendChild(constRow);
+    filterColL.appendChild(constRow);
 
     // ── Rating filter ────────────────────────────────────────────────────────
     const ratingRow = document.createElement('div');
@@ -1902,12 +1895,13 @@ export class TargetsView {
         else enabledRatingSet.delete(r);
         this.prefs.enabledRatings = [...enabledRatingSet];
         savePrefs(this.prefs);
+        updateFiltersSummary();
       });
       ratingFilters.appendChild(chip);
     }
     ratingRow.appendChild(ratingLabel);
     ratingRow.appendChild(ratingFilters);
-    form.appendChild(ratingRow);
+    filterColR.appendChild(ratingRow);
 
     // ── Difficulty filter ────────────────────────────────────────────────────
     const diffRow = document.createElement('div');
@@ -1932,7 +1926,7 @@ export class TargetsView {
     }
     diffRow.appendChild(diffLabel);
     diffRow.appendChild(diffFilters);
-    form.appendChild(diffRow);
+    filterColR.appendChild(diffRow);
 
     // ── Catalog filter ───────────────────────────────────────────────────────
     const catRow = document.createElement('div');
@@ -1952,12 +1946,13 @@ export class TargetsView {
         else enabledCatSet.delete(cat);
         this.prefs.enabledCatalogs = [...enabledCatSet];
         savePrefs(this.prefs);
+        updateFiltersSummary();
       });
       catFilters.appendChild(chip);
     }
     catRow.appendChild(catLabel);
     catRow.appendChild(catFilters);
-    form.appendChild(catRow);
+    filterColR.appendChild(catRow);
 
     // ── Include oversized / Exclude photographed ─────────────────────────────
     const oversizedRow = document.createElement('div');
@@ -1986,9 +1981,9 @@ export class TargetsView {
     });
     oversizedRow.appendChild(excludePhotographedChip);
 
-    form.appendChild(oversizedRow);
+    filterColR.appendChild(oversizedRow);
 
-    // ── Generate buttons ─────────────────────────────────────────────────────
+    // ── Primary actions — old placement + style: full-width row at the bottom. ─
     const btnRow = document.createElement('div');
     btnRow.className = 'targets-btn-row';
     this.generateBtn = document.createElement('button');
@@ -2007,14 +2002,15 @@ export class TargetsView {
     btnRow.appendChild(this.randomBtn);
     form.appendChild(btnRow);
 
-    details.appendChild(form);
+    updateFiltersSummary();
     return details;
   }
 
   // ─── Gear section (async, setup-based) ────────────────────────────────────
 
-  private buildGearSection(container: HTMLElement): void {
+  private buildGearSection(container: HTMLElement, hintContainer?: HTMLElement): void {
     container.innerHTML = '';
+    if (hintContainer) hintContainer.innerHTML = '';
 
     // ── Row: label (with info icon inside) + select + edit + delete ────────────
     const row = document.createElement('div');
@@ -2032,12 +2028,14 @@ export class TargetsView {
     label.appendChild(infoIcon);
 
     const select = document.createElement('select');
-    select.className = 'targets-select';
+    // Cap the width so a short setup name doesn't stretch a giant dropdown
+    // across the header column.
+    select.className = 'targets-select !max-w-sm';
 
     let allSetups: GearSetupData[] = [];
 
     const rebuildSection = () => {
-      this.buildGearSection(container);
+      this.buildGearSection(container, hintContainer);
     };
 
     // Unified [+] create / [edit] (edit owns deletion) controls, shared with the
@@ -2061,10 +2059,11 @@ export class TargetsView {
     row.appendChild(editBtn);
     container.appendChild(row);
 
-    // ── FOV hint below ────────────────────────────────────────────────────────
+    // ── FOV summary caption. Routed to hintContainer (a full-width line below
+    //    the header grid) so it never stretches the setup cell. ───────────────
     const fovHintEl = document.createElement('div');
     fovHintEl.className = 'targets-fov-hint';
-    container.appendChild(fovHintEl);
+    (hintContainer ?? container).appendChild(fovHintEl);
 
     const updateGearInfo = (setup: GearSetupData | undefined) => {
       fovHintEl.textContent = '';
@@ -2184,12 +2183,14 @@ export class TargetsView {
       return;
     }
 
-    const allGenBtns = document.querySelectorAll<HTMLButtonElement>('.targets-generate-btn');
+    const allGenBtns = [this.generateBtn, this.randomBtn].filter(
+      (b): b is HTMLButtonElement => !!b,
+    );
     allGenBtns.forEach((b) => {
       b.disabled = true;
     });
     btn.textContent = t('targets.generating');
-    const savedScroll = this.container.scrollTop;
+    const savedScroll = resultsEl.scrollTop;
     resultsEl.innerHTML = `<div class="targets-spinner"></div>`;
 
     await new Promise((r) => setTimeout(r, 10));
@@ -2310,7 +2311,7 @@ export class TargetsView {
       this.lastSuggestions = this.lastPool;
       this.lastPreset = preset;
       this.renderResults(resultsEl);
-      this.container.scrollTop = savedScroll;
+      resultsEl.scrollTop = savedScroll;
     } catch (err: any) {
       allGenBtns.forEach((b) => {
         b.disabled = false;
@@ -2456,6 +2457,7 @@ export class TargetsView {
     const titleEl = document.createElement('div');
     titleEl.className = 'target-card-title';
     const bestName = dso.displayName || dso.catalogs[0] || dso.id;
+    let fullVisibleName = bestName;
     if (dso.displayName) {
       titleEl.appendChild(
         Object.assign(document.createElement('span'), { textContent: dso.displayName }),
@@ -2465,11 +2467,17 @@ export class TargetsView {
       idSpan.className = 'target-card-catalog-id';
       idSpan.textContent = ' ' + primaryId;
       titleEl.appendChild(idSpan);
+      fullVisibleName = `${dso.displayName} ${primaryId}`;
     } else {
       titleEl.textContent = bestName;
     }
+    // Lead with the full (untruncated) visible name — the title/id can be cut
+    // by the card's ellipsis — then the "also known as" cross-references.
     const otherNames = dso.catalogs.slice(dso.displayName ? 1 : 1);
-    if (otherNames.length > 0) titleEl.title = `${t('dso.alsoKnownAs')}: ${otherNames.join(' · ')}`;
+    titleEl.title =
+      otherNames.length > 0
+        ? `${fullVisibleName}\n${t('dso.alsoKnownAs')}: ${otherNames.join(' · ')}`
+        : fullVisibleName;
     titleRow.appendChild(titleEl);
     if (dso.rating !== null) {
       const ratingEl = document.createElement('div');
@@ -2585,6 +2593,7 @@ export class TargetsView {
     const navBtnEl = this.iconActionBtn(mapPinSvg, t('targets.results.openOnMap'));
     navBtnEl.addEventListener('click', () => {
       this.onNavigate(dso.ra, dso.dec, this.prefs.setupId);
+      this.uiStore.closeTargetsOverlay();
     });
 
     const editBtn = this.iconActionBtn(penSvg, t('dso.edit'));
@@ -2596,7 +2605,26 @@ export class TargetsView {
     planBtn.setAttribute('data-plan-dso', dso.id);
     this.refreshPlanBtnState(planBtn, dso.id);
     planBtn.addEventListener('click', () => {
-      this.openPlanPicker(planBtn, dso.id);
+      // Opened from a specific plan's "Find targets" button: add/remove straight
+      // from that plan, no picker needed. Opened generically (e.g. from the Sky
+      // map, no plan context) falls back to the full plan picker.
+      const ctxPlanId = this.uiStore.targetsOverlayPlanId;
+      const ctxPlan = ctxPlanId ? this.plansStore.plans.find((p) => p.id === ctxPlanId) : null;
+      if (ctxPlan) {
+        const wasIn = this.plansStore.isInPlan(dso.id, ctxPlan.id);
+        this.plansStore.toggleEntry(ctxPlan.id, dso.id).then(() => {
+          this.refreshPlanBtnState(planBtn, dso.id);
+          showToast({
+            message: t(wasIn ? 'targets.plan.removedFromPlan' : 'targets.plan.addedToPlan', {
+              name: ctxPlan.name,
+            }),
+            type: 'info',
+            duration: 2000,
+          });
+        });
+      } else {
+        this.openPlanPicker(planBtn, dso.id);
+      }
     });
 
     actionsDiv.appendChild(navBtnEl);
@@ -2616,6 +2644,24 @@ export class TargetsView {
     btn.setAttribute('aria-label', title);
     btn.innerHTML = svg;
     return btn;
+  }
+
+  /** Empty-target-list state for a plan: message + a "Find targets" CTA that
+   * opens the overlay scoped to this plan. */
+  private buildPlanEmptyState(plan: Plan): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'targets-empty flex flex-col items-center gap-3';
+    const msg = document.createElement('div');
+    msg.textContent = t('targets.plan.empty');
+    wrap.appendChild(msg);
+    const cta = document.createElement('button');
+    cta.type = 'button';
+    cta.className = 'btn-action inline-flex items-center gap-2';
+    cta.innerHTML = `<span class="w-4 h-4 inline-flex">${targetSvg}</span>`;
+    cta.appendChild(document.createTextNode(t('targets.findTargets')));
+    cta.addEventListener('click', () => this.uiStore.openTargetsOverlay(plan.id));
+    wrap.appendChild(cta);
+    return wrap;
   }
 
   /** Highlight the plan-list button when the DSO is already in at least one plan. */
@@ -3041,8 +3087,17 @@ export class TargetsView {
 
     if (plans.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'targets-empty';
-      empty.textContent = t('targets.plan.noPlans');
+      empty.className = 'targets-empty flex flex-col items-center gap-3';
+      const msg = document.createElement('div');
+      msg.textContent = t('targets.plan.noPlans');
+      empty.appendChild(msg);
+      const cta = document.createElement('button');
+      cta.type = 'button';
+      cta.className = 'btn-action inline-flex items-center gap-2';
+      cta.innerHTML = `<span class="w-4 h-4 inline-flex">${targetSvg}</span>`;
+      cta.appendChild(document.createTextNode(t('targets.findTargets')));
+      cta.addEventListener('click', () => this.uiStore.openTargetsOverlay(null));
+      empty.appendChild(cta);
       wrap.appendChild(empty);
     } else {
       const accordion = document.createElement('div');
@@ -3073,19 +3128,36 @@ export class TargetsView {
     const summary = document.createElement('summary');
     summary.className = 'flex items-center gap-2 px-4 py-3 cursor-pointer select-none';
 
+    const nameWrap = document.createElement('span');
+    nameWrap.className = 'flex-1 min-w-0 flex items-baseline gap-2';
+
     const nameEl = document.createElement('span');
-    nameEl.className = 'flex-1 min-w-0 text-bright text-sub font-medium truncate';
+    nameEl.className = 'min-w-0 text-bright text-sub font-medium truncate';
     nameEl.textContent = plan.name;
 
     const count = document.createElement('span');
     count.className = 'text-dim text-small shrink-0';
     const setCount = (n: number) => {
-      count.textContent = `(${n})`;
+      count.textContent = `(${t('targets.plan.itemCount', { n })})`;
     };
     // A mosaic counts as one item (its tiles aren't listed individually).
     const itemCount = () =>
       plan.entries.filter((e) => !e.mosaicId).length + (plan.mosaics?.length ?? 0);
     setCount(itemCount());
+
+    nameWrap.appendChild(nameEl);
+    nameWrap.appendChild(count);
+
+    // "Find targets" — summoned overlay, above the target list so it's reachable
+    // without scrolling. Opened with this plan's id as context: picks made in the
+    // overlay add straight into this plan.
+    const findTargetsBtn = this.iconActionBtn(targetSvg, t('targets.findTargets'));
+    findTargetsBtn.classList.add('shrink-0');
+    findTargetsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.uiStore.openTargetsOverlay(plan.id);
+    });
 
     const showOnMapBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
     showOnMapBtn.classList.add('shrink-0');
@@ -3112,8 +3184,8 @@ export class TargetsView {
     const deleteBtn = this.iconActionBtn(trashSvg, t('targets.plan.delete'));
     deleteBtn.classList.add('shrink-0', 'btn-icon--danger');
 
-    summary.appendChild(nameEl);
-    summary.appendChild(count);
+    summary.appendChild(nameWrap);
+    summary.appendChild(findTargetsBtn);
     summary.appendChild(showOnMapBtn);
     summary.appendChild(renameBtn);
     summary.appendChild(exportBtn);
@@ -3224,7 +3296,7 @@ export class TargetsView {
       }
       const hasStandalone = plan.entries.some((e) => !e.mosaicId);
       if (!hasStandalone && (plan.mosaics?.length ?? 0) === 0) {
-        trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
+        trajWrap.appendChild(this.buildPlanEmptyState(plan));
         return;
       }
       const win = this.nightWindow(observer.loc, observer.dateNight);
@@ -3260,7 +3332,8 @@ export class TargetsView {
                   setCount(itemCount());
                   this.updatePlanBadge();
                   if (!plan.entries.some((e) => !e.mosaicId) && (plan.mosaics?.length ?? 0) === 0) {
-                    trajWrap.innerHTML = `<div class="targets-empty">${t('targets.plan.empty')}</div>`;
+                    trajWrap.innerHTML = '';
+                    trajWrap.appendChild(this.buildPlanEmptyState(plan));
                   }
                 },
                 // Restore re-creates the entry in the store (fresh objects), so re-render
@@ -4369,11 +4442,10 @@ export class TargetsView {
     }
   }
 
-  /** Refresh every card's plan-list button highlight + the mode badge. */
+  /** Refresh every result card's plan-list button highlight. */
   private refreshAllPlanButtons(): void {
-    this.updatePlanBadge();
-    this.container
-      .querySelectorAll<HTMLButtonElement>('.target-card [data-plan-dso]')
+    this.recommendRoot
+      ?.querySelectorAll<HTMLButtonElement>('.target-card [data-plan-dso]')
       .forEach((btn) => {
         this.refreshPlanBtnState(btn, btn.getAttribute('data-plan-dso')!);
       });

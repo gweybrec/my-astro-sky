@@ -166,7 +166,7 @@ async function init() {
   // Setup view tab labels
   document.getElementById('tab-skymap')!.textContent = t('app.viewModeSkymap') || 'Sky Map';
   document.getElementById('tab-gallery')!.textContent = t('app.viewModeGallery') || 'Gallery';
-  document.getElementById('tab-targets')!.textContent = t('targets.viewMode') || 'Targets';
+  document.getElementById('tab-plans')!.textContent = t('targets.viewMode') || 'Plans';
 
   document
     .getElementById('tab-skymap')!
@@ -175,8 +175,8 @@ async function init() {
     .getElementById('tab-gallery')!
     .addEventListener('click', () => uiStore.switchView('gallery'));
   document
-    .getElementById('tab-targets')!
-    .addEventListener('click', () => uiStore.switchView('targets'));
+    .getElementById('tab-plans')!
+    .addEventListener('click', () => uiStore.switchView('plans'));
 
   // Allow other modules to switch to skymap programmatically
   window.addEventListener('switchToSkymap', () => uiStore.switchView('skymap'));

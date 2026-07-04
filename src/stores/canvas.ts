@@ -11,6 +11,12 @@ export interface ShowHide {
   hide(): void;
 }
 
+/** Extended interface for the Plans/Targets view, exposing the "Find targets"
+ * recommend surface so the TargetsOverlay Vue component can mount it. */
+export interface TargetsViewInterface extends ShowHide {
+  getRecommendElement(): HTMLElement;
+}
+
 /** Extended interface for the Gallery, exposing filter methods to Vue components. */
 export interface GalleryInterface extends ShowHide {
   loadPhotos(photos: Photo[]): void;
@@ -28,11 +34,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   const skyMap = shallowRef<SkyMap | null>(null);
   const overlay = shallowRef<PhotoOverlay | null>(null);
   const gallery = shallowRef<GalleryInterface | null>(null);
-  const targetsView = shallowRef<ShowHide | null>(null);
+  const targetsView = shallowRef<TargetsViewInterface | null>(null);
   // Consumed once by FOVRibbon.onMounted to override the DB-loaded frame state.
   const pendingFovOverride = shallowRef<FovFrameSpec[] | null>(null);
 
-  function init(sm: SkyMap, ov: PhotoOverlay, gal?: GalleryInterface, tv?: ShowHide) {
+  function init(sm: SkyMap, ov: PhotoOverlay, gal?: GalleryInterface, tv?: TargetsViewInterface) {
     skyMap.value = sm;
     overlay.value = ov;
     if (gal) gallery.value = gal;

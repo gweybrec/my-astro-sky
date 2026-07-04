@@ -25,7 +25,7 @@ import { onMounted, onUnmounted, computed } from 'vue';
 const props = withDefaults(
   defineProps<{
     title?: string;
-    size?: 'default' | 'wide' | 'flex';
+    size?: 'default' | 'wide' | 'flex' | 'sheet';
     bodyClass?: string;
     modalClass?: string;
   }>(),
@@ -42,6 +42,7 @@ const emit = defineEmits<{ close: [] }>();
 const sizeClass = computed(() => ({
   'settings-modal': props.size === 'wide',
   'modal-flex': props.size === 'flex',
+  'modal-sheet': props.size === 'sheet',
 }));
 
 function close() {

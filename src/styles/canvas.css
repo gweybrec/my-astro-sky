@@ -262,6 +262,23 @@ input:focus-visible {
   height: 16px;
 }
 
+/* ── Find-targets floating control (top-left, free corner — #view-tabs is
+   top-center and the other three corners are taken by the export/rotation/FOV
+   clusters). Left-anchored, so it never needs the side-panel-collapse
+   combinator that the right-anchored controls above use. ─────────────────── */
+
+.find-targets-control {
+  position: absolute;
+  top: var(--space-8);
+  left: var(--space-8);
+  z-index: var(--z-toggle);
+}
+
+.find-targets-control .sky-rotation-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* ── Sky-time control (top-right, left of the export button, tracks side-panel collapse) ──
    A row of small buttons. The Moon toggle and mode toggle are the LAST two DOM
    children, so — since the row is right-edge-anchored — they always sit flush

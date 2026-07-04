@@ -5,6 +5,7 @@
       <FOVRibbon />
       <SkyTimeControl />
       <MapExportButton />
+      <FindTargetsButton />
     </template>
   </Teleport>
 </template>
@@ -16,6 +17,7 @@ import MapRotationControls from './MapRotationControls.vue';
 import FOVRibbon from './FOVRibbon.vue';
 import SkyTimeControl from './SkyTimeControl.vue';
 import MapExportButton from './MapExportButton.vue';
+import FindTargetsButton from './FindTargetsButton.vue';
 
 const uiStore = useUiStore();
 const viewMode = computed(() => uiStore.currentViewMode);

@@ -165,6 +165,7 @@ Add one sizing class alongside `.modal` to constrain width and height. Never set
 | `.import-modal`           | 400 px    | —          | Import / export                              |
 | `.missing-modal`          | 420 px    | 70 vh      | Missing-files report                         |
 | `.gear-custom-modal`      | 440 px    | 90 vh      | Gear preset editor                           |
+| `.modal-sheet`            | 95 vw     | 90 vh      | Large summoned surfaces needing room for a wide filter bar + grid (Find-targets overlay). Defined as a `uno.config.ts` shortcut (`!`-marked to win over `.modal`'s own max-width/max-height — `virtual:uno.css` loads before `style.css`), not in `style.css` — new size variants go there per the CSS decision tree. Selectable via `BaseModal`'s `size="sheet"`. |
 
 #### Modal body layout variants
 
@@ -609,6 +610,7 @@ btn.innerHTML = trashSvg;
 | `src/icons/export.svg`    | Box with outgoing up-right arrow                       | `.sky-export-control .sky-rotation-btn`, gallery filter-bar button | 16 px                                                      |
 | `src/icons/eye.svg`       | Eye (shown)                                            | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`)    | 16 px / `1em`                                              |
 | `src/icons/eye-off.svg`   | Eye with slash (hidden)                                | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`)    | 16 px / `1em`                                              |
+| `src/icons/target.svg`    | Reticle: circle + crosshair ticks + filled center dot  | `.find-targets-control .sky-rotation-btn` (map), plan-header `.btn-icon`, empty-state `.btn-action` | 16 px |
 
 One additional SVG lives as a `data:image/svg+xml` URI in `src/style.css` on `.targets-sort-select` (dropdown caret). It is a pure CSS concern — no TypeScript import needed.
 

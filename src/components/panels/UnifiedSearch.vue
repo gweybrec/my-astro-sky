@@ -1,5 +1,5 @@
 <template>
-  <div v-show="viewMode !== 'targets'" class="search-section">
+  <div v-show="viewMode !== 'plans'" class="search-section">
     <div class="dso-search-wrapper">
       <input
         ref="searchInputEl"

@@ -205,6 +205,17 @@ export default defineConfig({
       'w-full',
     ].join(' '),
 
+    // ── Modal sizing variants ───────────────────────────────────────────────────
+    // Pairs with the base `.modal` class (src/style.css) the same way the legacy
+    // `.settings-modal` / `.import-modal` / … variants do — see
+    // docs/dev/ui/components.md §2.2. New variants go here (UnoCSS shortcut),
+    // not into style.css, per the CSS decision tree in the UI guidelines hub.
+    // `!` is required: virtual:uno.css loads before style.css, so an
+    // unmarked utility of equal specificity would lose to `.modal`'s own
+    // max-width/max-height (see docs/dev/ui/components.md §2.1 for the same
+    // `!` pattern used by `btn-icon--active`).
+    'modal-sheet': '!w-[95vw] !max-w-[95vw] !max-h-[90vh] flex flex-col',
+
     // ── Chips ─────────────────────────────────────────────────────────────────
     'tag-chip': 'inline-flex items-center gap-1 px-2 py-1h rounded-sm text-micro border',
     'tag-chip-sm':

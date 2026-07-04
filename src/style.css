@@ -3555,7 +3555,7 @@ input:focus-visible {
 /* ═══════════════════════════════════════════════════════════════════════════
    ─── Targets view ───────────────────────────────────────────────────────── */
 
-#targets-container {
+#plans-container {
   position: absolute;
   inset: 0;
   overflow-y: auto;
@@ -4149,7 +4149,7 @@ details.targets-form-details[open] .targets-form-summary::before {
 /* ─── Results ─── */
 .targets-results {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-6);
   align-items: start;
 }

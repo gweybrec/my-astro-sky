@@ -1017,7 +1017,7 @@ export function buildFovPopup(
     const sel = fovStore.selection;
     if (sel.kind !== 'plan') return;
     uiStore.pendingPlanFocusId = sel.planId;
-    uiStore.switchView('targets');
+    uiStore.switchView('plans');
     onClose();
   });
   footer.appendChild(planDetailsBtn);
