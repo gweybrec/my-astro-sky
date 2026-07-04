@@ -1,5 +1,5 @@
 import type { Point, ViewState } from './types';
-import { altAzFromRaDec } from './sky-geometry';
+import { altAzFromRaDec, raDecFromAltAz } from './sky-geometry';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -17,9 +17,26 @@ let _hemisphere: 'north' | 'south' = 'north';
 export type ProjectionMode = 'stereo' | 'fisheye';
 let _projectionMode: ProjectionMode = 'stereo';
 
-// Bumped whenever hemisphere or projection mode changes. project() output for a
-// fixed (ra, dec) depends only on these two globals (pan/zoom/rotation are applied
-// later by toCanvas), so cached projections are valid until this generation moves.
+// ─── Center mode ────────────────────────────────────────────────────────────────
+// 'pole' (default) = today's celestial-pole-centered map (RA/Dec native, observer-
+// independent). 'zenith' = the "local sky" view: altitude 90° (zenith) at the
+// origin, azimuth grid drawn as concentric rings — requires an observer LST/latitude
+// (see setProjectionObserver) to convert RA/Dec to alt/az before applying the same
+// radial formula _projectionMode already selects. Orthogonal to _projectionMode:
+// stereo/fisheye still choose the radial falloff, just now centered on zenith.
+// _hemisphere is meaningless while this is 'zenith' (zenith has no north/south).
+
+export type CenterMode = 'pole' | 'zenith';
+let _centerMode: CenterMode = 'pole';
+
+// Observer LST (hours) / latitude (degrees) used only while _centerMode === 'zenith'.
+let _obsLstH = 0;
+let _obsLatDeg = 0;
+
+// Bumped whenever hemisphere, projection mode, or center mode changes. project()
+// output for a fixed (ra, dec) depends only on these globals (pan/zoom/rotation are
+// applied later by toCanvas), so cached projections are valid until this generation
+// moves.
 let _projGeneration = 0;
 
 /** Current projection generation; see {@link projectCached}. */
@@ -57,6 +74,28 @@ export function getHemisphere(): 'north' | 'south' {
   return _hemisphere;
 }
 
+export function setCenterMode(mode: CenterMode): void {
+  if (mode === _centerMode) return;
+  _centerMode = mode;
+  _projGeneration++;
+}
+
+export function getCenterMode(): CenterMode {
+  return _centerMode;
+}
+
+/**
+ * Observer LST/latitude for the zenith-centered ("local sky") projection. Always
+ * stored (harmless while centerMode is 'pole'); only bumps _projGeneration — and
+ * thus invalidates projectCached()'s memo — while zenith mode is active, so the
+ * pole-centered modes never pay this cost on every simulated-time tick.
+ */
+export function setProjectionObserver(lstH: number, latDeg: number): void {
+  _obsLstH = lstH;
+  _obsLatDeg = latDeg;
+  if (_centerMode === 'zenith') _projGeneration++;
+}
+
 /**
  * Stereographic polar projection: (RA°, Dec°) → projection (x, y).
  *
@@ -77,6 +116,17 @@ export function getHemisphere(): 'north' | 'south' {
  *   The far hemisphere folds back onto the near one, so it is clipped off-canvas.
  */
 export function project(raDeg: number, decDeg: number): Point {
+  if (_centerMode === 'zenith') {
+    const { altDeg, azDeg } = altAzFromRaDec(raDeg, decDeg, _obsLstH, _obsLatDeg);
+    const azRad = azDeg * DEG2RAD;
+    if (_projectionMode === 'fisheye') {
+      if (altDeg < 0) return { x: 1e6, y: 1e6 }; // below horizon, clipped
+      const r = Math.cos(altDeg * DEG2RAD);
+      return { x: r * Math.sin(azRad), y: r * Math.cos(azRad) };
+    }
+    const r = Math.tan(((90 - altDeg) / 2) * DEG2RAD);
+    return { x: r * Math.sin(azRad), y: r * Math.cos(azRad) };
+  }
   if (_projectionMode === 'fisheye') {
     const decN = _hemisphere === 'south' ? -decDeg : decDeg;
     if (decN < 0) return { x: 1e6, y: 1e6 }; // far hemisphere, clipped
@@ -174,6 +224,17 @@ export function isBelowHorizonCached(o: ObsCacheHost, lstH: number, latDeg: numb
 
 /** Inverse projection: projection (x, y) → { ra°, dec° } */
 export function unproject(x: number, y: number): { ra: number; dec: number } {
+  if (_centerMode === 'zenith') {
+    const r = Math.sqrt(x * x + y * y);
+    const altDeg =
+      _projectionMode === 'fisheye'
+        ? 90 - Math.asin(Math.min(1, r)) * RAD2DEG
+        : 90 - 2 * Math.atan(r) * RAD2DEG;
+    let azDeg = Math.atan2(x, y) * RAD2DEG;
+    if (azDeg < 0) azDeg += 360;
+    const { raDeg, decDeg } = raDecFromAltAz(altDeg, azDeg, _obsLstH, _obsLatDeg);
+    return { ra: raDeg, dec: decDeg };
+  }
   if (_projectionMode === 'fisheye') {
     const r = Math.sqrt(x * x + y * y);
     const p = Math.asin(Math.min(1, r)) * RAD2DEG; // pole angle (orthographic inverse)
@@ -193,11 +254,14 @@ export function unproject(x: number, y: number): { ra: number; dec: number } {
 
 /**
  * Projection-unit radius of the border circle for a given border latitude.
+ * In zenith mode: the border is the horizon (alt=0), always r = 1.0 for either
+ * radial form.
  * In fisheye mode: the border is the equator circle (r = 1.0), the outer edge
  * of the visible hemisphere.
  * In stereo mode: r = tan((90 + lat) / 2).
  */
 export function borderRadiusPU(borderLatDeg: number): number {
+  if (_centerMode === 'zenith') return 1.0; // horizon — both radial forms give exactly 1.0 at alt=0
   if (_projectionMode === 'fisheye') return 1.0;
   return Math.tan(((90 + borderLatDeg) / 2) * DEG2RAD);
 }

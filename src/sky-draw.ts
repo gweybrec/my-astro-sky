@@ -277,6 +277,79 @@ function strokeAzMeridian(
   ctx.stroke();
 }
 
+// ── RA/Dec grid in zenith ("local sky") mode ──────────────────────────────────
+// The roles are reversed from pole-centered mode: RA/Dec circles are no longer
+// closed-form around the origin (only alt/az circles are, since the projection is
+// now zenith-centered), so they're stepped the same way strokeAltCircle/
+// strokeAzMeridian step alt/az above — but project() already converts RA/Dec to
+// alt/az internally while zenith mode is active, so these can call project()
+// directly with no alt/az round-trip in this file.
+
+/** Strokes a declination circle (RA 0→360) in zenith mode. */
+function strokeDecCircle(ctx: CanvasRenderingContext2D, view: ViewState, decDeg: number): void {
+  ctx.beginPath();
+  let penDown = false;
+  for (let ra = 0; ra <= 360; ra += ALTAZ_STEP_DEG) {
+    const p = project(ra, decDeg);
+    if (p.x >= 1e5) {
+      penDown = false;
+      continue;
+    }
+    const c = toCanvas(p.x, p.y, view);
+    if (penDown) {
+      ctx.lineTo(c.x, c.y);
+    } else {
+      ctx.moveTo(c.x, c.y);
+      penDown = true;
+    }
+  }
+  ctx.stroke();
+}
+
+/** Strokes a right-ascension meridian (Dec -90→90) in zenith mode. */
+function strokeRaMeridian(ctx: CanvasRenderingContext2D, view: ViewState, raDeg: number): void {
+  ctx.beginPath();
+  let penDown = false;
+  for (let dec = -90; dec <= 90; dec += ALTAZ_STEP_DEG) {
+    const p = project(raDeg, dec);
+    if (p.x >= 1e5) {
+      penDown = false;
+      continue;
+    }
+    const c = toCanvas(p.x, p.y, view);
+    if (penDown) {
+      ctx.lineTo(c.x, c.y);
+    } else {
+      ctx.moveTo(c.x, c.y);
+      penDown = true;
+    }
+  }
+  ctx.stroke();
+}
+
+/**
+ * RA/Dec grid for zenith-centered ("local sky") mode: dec circles every 10°
+ * (skipping the poles) and RA meridians every 2h, all stepped through project()
+ * since none of them are circles/lines around the zenith origin. Replaces
+ * `drawGrid`/`drawFisheyeGrid` while local-sky mode is active.
+ */
+export function drawGridZenith(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  theme: SkyTheme,
+): void {
+  for (let dec = -80; dec <= 80; dec += 10) {
+    ctx.strokeStyle = dec === 0 ? theme.gridEquatorColor : theme.gridColor;
+    ctx.lineWidth = dec === 0 ? GRID.equatorLineWidth : GRID.lineWidth;
+    strokeDecCircle(ctx, view, dec);
+  }
+  ctx.strokeStyle = theme.gridColor;
+  ctx.lineWidth = GRID.lineWidth;
+  for (let raH = 0; raH < 24; raH += 2) {
+    strokeRaMeridian(ctx, view, raH * 15);
+  }
+}
+
 /**
  * Draw the horizon (alt = 0) as a curve across the sky. `color` is normally the
  * live `--accent-color` CSS var (resolved by the caller) so it tracks the current

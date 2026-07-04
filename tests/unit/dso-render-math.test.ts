@@ -1,6 +1,6 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle } from '../../src/dso-render-math';
-import { setHemisphere, getProjectionGeneration } from '../../src/projection';
+import { setHemisphere, getProjectionGeneration, setCenterMode } from '../../src/projection';
 import type { DSO } from '../../src/types';
 
 /** Minimal DSO for the cos² cache test. */
@@ -68,6 +68,37 @@ describe('dsoSizeCos2', () => {
     setHemisphere('south');
     const south = dsoSizeCos2(dso);
     expect(south).not.toBeCloseTo(north, 6);
+  });
+
+  describe('in zenith ("local sky") mode', () => {
+    afterEach(() => setCenterMode('pole'));
+
+    it('uses 90-altitude (not dec/hemisphere) when an altitude is supplied', () => {
+      setCenterMode('zenith');
+      const dso = makeDso(30); // dec is irrelevant here — only altDeg should matter
+      const altDeg = 50;
+      const expected = Math.cos(((90 - altDeg) * Math.PI) / 180 / 2) ** 2;
+      expect(dsoSizeCos2(dso, altDeg)).toBeCloseTo(expected, 9);
+    });
+
+    it('falls back to the dec/hemisphere formula when no altitude is supplied', () => {
+      setCenterMode('zenith');
+      setHemisphere('north');
+      const dso = makeDso(30);
+      const expected = Math.cos(((90 - 30) * Math.PI) / 180 / 2) ** 2;
+      expect(dsoSizeCos2(dso)).toBeCloseTo(expected, 9);
+    });
+
+    it('does not let an altitude-less call poison the altitude-based cache slot', () => {
+      setCenterMode('zenith');
+      const dso = makeDso(30);
+      // Simulates ensureDsoAllIndex's bucketing call (no altitude on hand) running
+      // in the same generation as the render path's altitude-aware call.
+      dsoSizeCos2(dso);
+      const altDeg = 70;
+      const expected = Math.cos(((90 - altDeg) * Math.PI) / 180 / 2) ** 2;
+      expect(dsoSizeCos2(dso, altDeg)).toBeCloseTo(expected, 9);
+    });
   });
 });
 

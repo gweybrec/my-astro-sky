@@ -226,4 +226,60 @@ describe('sky-time store', () => {
     vi.advanceTimersByTime(2000);
     expect(store.simDate.getTime()).toBe(frozen);
   });
+
+  describe('setLocalSkyMode', () => {
+    it('defaults to false', () => {
+      const store = useSkyTimeStore();
+      expect(store.localSkyMode).toBe(false);
+    });
+
+    it('rejects enabling outside date mode', () => {
+      const store = useSkyTimeStore();
+      store.setLocation(45, 4);
+      store.setLocalSkyMode(true);
+      expect(store.localSkyMode).toBe(false);
+    });
+
+    it('rejects enabling without an observer location', () => {
+      const store = useSkyTimeStore();
+      store.toggleMode(); // -> date
+      store.setLocalSkyMode(true);
+      expect(store.localSkyMode).toBe(false);
+    });
+
+    it('enables once date mode + location are both set', () => {
+      const store = useSkyTimeStore();
+      store.toggleMode(); // -> date
+      store.setLocation(45, 4);
+      store.setLocalSkyMode(true);
+      expect(store.localSkyMode).toBe(true);
+    });
+
+    it('auto-disables when leaving date mode', () => {
+      const store = useSkyTimeStore();
+      store.toggleMode(); // -> date
+      store.setLocation(45, 4);
+      store.setLocalSkyMode(true);
+      store.toggleMode(); // -> live
+      expect(store.localSkyMode).toBe(false);
+    });
+
+    it('auto-disables when the observer location is cleared', () => {
+      const store = useSkyTimeStore();
+      store.toggleMode(); // -> date
+      store.setLocation(45, 4);
+      store.setLocalSkyMode(true);
+      store.setLocation(null, null);
+      expect(store.localSkyMode).toBe(false);
+    });
+
+    it('persists', () => {
+      const store = useSkyTimeStore();
+      store.toggleMode(); // -> date
+      store.setLocation(45, 4);
+      store.setLocalSkyMode(true);
+      const raw = localStorage.getItem(SKY_TIME_SETTINGS_KEY);
+      expect(JSON.parse(raw!).localSkyMode).toBe(true);
+    });
+  });
 });

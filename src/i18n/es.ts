@@ -220,6 +220,7 @@ const es: Translations = {
     speedBackward: 'Más rápido (atrás)',
     stop: 'Pausar el tiempo',
     resetToNow: 'Volver a ahora',
+    localSkyButton: 'Cielo local (vista de horizonte)',
     azimuthGridButton: 'Cuadrícula azimutal (alt-az)',
   },
   settings: {

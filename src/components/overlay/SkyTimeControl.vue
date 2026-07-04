@@ -123,6 +123,21 @@
       <button
         type="button"
         class="sky-rotation-btn"
+        :class="{ active: store.localSkyMode }"
+        :disabled="store.lat === null || store.lon === null"
+        :title="t('skyTime.localSkyButton')"
+        :aria-label="t('skyTime.localSkyButton')"
+        @click="store.setLocalSkyMode(!store.localSkyMode)"
+        @mouseenter="suppress(true)"
+        @mouseleave="suppress(false)"
+        @focus="suppress(true)"
+        @blur="suppress(false)"
+        v-html="localSkySvg"
+      ></button>
+
+      <button
+        type="button"
+        class="sky-rotation-btn"
         :class="{ active: store.showAzimuthGrid }"
         :title="t('skyTime.azimuthGridButton')"
         :aria-label="t('skyTime.azimuthGridButton')"
@@ -177,6 +192,7 @@ import calendarSvg from '../../icons/calendar.svg?raw';
 import moonSvg from '../../icons/moon.svg?raw';
 import mapPinSvg from '../../icons/map-pin.svg?raw';
 import azimuthGridSvg from '../../icons/azimuth-grid.svg?raw';
+import localSkySvg from '../../icons/local-sky.svg?raw';
 
 const store = useSkyTimeStore();
 const uiStore = useUiStore();

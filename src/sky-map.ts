@@ -13,6 +13,8 @@ import {
   getProjectionMode,
   bumpObsGeneration,
   isBelowHorizonCached,
+  setCenterMode,
+  setProjectionObserver,
 } from './projection';
 import { dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
 import { altAzFromRaDec } from './sky-geometry';
@@ -83,6 +85,7 @@ import {
   drawBackground,
   drawFisheyeGrid,
   drawGrid,
+  drawGridZenith,
   drawConstellationLines,
   drawConstellationNames,
   drawHorizonLine,
@@ -412,6 +415,9 @@ export class SkyMap {
   // Fisheye mode
   private fisheyeMode = false;
 
+  // Local sky (zenith-centered) mode — date mode + observer location only
+  private localSkyMode = false;
+
   // Overlay canvas — sits above the photo layer in the DOM, used to draw frames on top of photos
   private overlayCanvas: HTMLCanvasElement | null = null;
   private overlayCtx: CanvasRenderingContext2D | null = null;
@@ -470,6 +476,7 @@ export class SkyMap {
 
   /** Switches between today's always-full-sky view and the date-driven horizon simulation. */
   setSkyTimeMode(mode: 'live' | 'date') {
+    if (mode !== 'date' && this.localSkyMode) this.setLocalSkyMode(false);
     this.skyTimeMode = mode;
     bumpObsGeneration();
     this.requestRender();
@@ -479,6 +486,7 @@ export class SkyMap {
   setSimDate(date: Date) {
     this.simDate = date;
     bumpObsGeneration();
+    this.refreshLocalSkyObserver();
     this.requestRender();
   }
 
@@ -487,7 +495,63 @@ export class SkyMap {
     this.obsLat = lat;
     this.obsLon = lon;
     bumpObsGeneration();
+    if ((lat === null || lon === null) && this.localSkyMode) {
+      this.setLocalSkyMode(false);
+    } else {
+      this.refreshLocalSkyObserver();
+    }
     this.requestRender();
+  }
+
+  /**
+   * Switch to/from the zenith-centered "local sky" (horizon-to-horizon dome) view —
+   * altitude 90° (zenith) at the origin, azimuth grid drawn as concentric rings.
+   * Requires date mode + an observer location already set; no-ops (stays disabled)
+   * if computeHorizonParams() can't resolve, so projection.ts's observer state is
+   * never left stale/meaningless.
+   */
+  setLocalSkyMode(v: boolean): void {
+    if (v) {
+      const h = this.computeHorizonParams();
+      if (!h) return;
+      this.localSkyMode = true;
+      setCenterMode('zenith');
+      setProjectionObserver(h.lstH, h.latDeg);
+    } else {
+      this.localSkyMode = false;
+      setCenterMode('pole');
+    }
+    this.invalidateSpatialIndexes();
+    this.cancelAnimation();
+    this.view.centerX = 0;
+    this.view.centerY = 0;
+    this.view.rotationDeg = 0;
+    if (this.view.width > 0) {
+      this.view.scale = (Math.min(this.view.width, this.view.height) / 2) * 0.9;
+    }
+    this.onViewChange?.();
+    this.requestRender();
+  }
+
+  getLocalSkyMode(): boolean {
+    return this.localSkyMode;
+  }
+
+  /**
+   * Re-syncs projection.ts's zenith observer state + hit-test indexes + photo
+   * overlay after a simulated-date/location change, but only while local-sky mode
+   * is active — pole-centered modes never pay this per-tick cost. Hit-test indexes
+   * (buildStarIndex/buildDSOIndex) are keyed only on maxMag, not on projection
+   * generation, so they need an explicit invalidation here or hover/click would
+   * silently target stale screen positions as simulated time advances.
+   */
+  private refreshLocalSkyObserver(): void {
+    if (!this.localSkyMode) return;
+    const h = this.computeHorizonParams();
+    if (!h) return;
+    setProjectionObserver(h.lstH, h.latDeg);
+    this.invalidateSpatialIndexes();
+    this.onViewChange?.();
   }
 
   async setConstellationStyle(style: ConstellationStyle): Promise<void> {
@@ -1507,7 +1571,9 @@ export class SkyMap {
 
     ctx.globalAlpha = 1;
     if (this.showGrid) {
-      if (this.fisheyeMode) {
+      if (this.localSkyMode) {
+        drawGridZenith(ctx, view, this.skyTheme);
+      } else if (this.fisheyeMode) {
         drawFisheyeGrid(ctx, view, this.skyTheme);
       } else {
         drawGrid(ctx, view, this.skyTheme, this.borderLatDeg);
@@ -2295,9 +2361,13 @@ export class SkyMap {
 
       if (!isHighlighted) {
         if (star.mag > maxMag) continue;
-        // Dec pre-filter: skip objects clearly outside the border (stereo only — in
-        // fisheye the far hemisphere is clipped by project() returning off-canvas).
-        if (!this.fisheyeMode) {
+        if (this.localSkyMode) {
+          // Below-horizon stars are already hidden by the horizon-circle canvas
+          // clip; this just skips the projection/bbox work for them earlier.
+          if (horizon && isBelowHorizonCached(star, horizon.lstH, horizon.latDeg)) continue;
+        } else if (!this.fisheyeMode) {
+          // Dec pre-filter: skip objects clearly outside the border (stereo only —
+          // in fisheye the far hemisphere is clipped by project() returning off-canvas).
           if (this.hemisphere === 'north' && star.dec < -(this.borderLatDeg + 2)) continue;
           if (this.hemisphere === 'south' && star.dec > +(this.borderLatDeg + 2)) continue;
         }
@@ -2448,6 +2518,16 @@ export class SkyMap {
     if (this.cachedSelectedDSOs) return this.cachedSelectedDSOs;
     const { view } = this;
 
+    // In zenith ("local sky") mode, DSO angular size must scale with altitude (the
+    // projection's pole), not dec — see dsoSizeCos2. isBelowHorizonCached also
+    // stamps _altDeg as a side effect, so this doubles as the altitude source.
+    const horizon = this.localSkyMode ? this.computeHorizonParams() : null;
+    const dsoAltDeg = (d: DSO): number | undefined => {
+      if (!horizon) return undefined;
+      isBelowHorizonCached(d, horizon.lstH, horizon.latDeg);
+      return d._altDeg;
+    };
+
     // Viewport cull: query the position index for DSOs whose centre is within the
     // visible disc plus a margin for the largest body and the off-screen render margin.
     // This replaces a full scan of all ~12k DSOs every frame with a bounded query —
@@ -2471,9 +2551,14 @@ export class SkyMap {
           if (!this.visibleDSOTypes.has(dso.type)) continue;
           const cat = dso.catalog;
           if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
-          // Dec pre-filter: skip objects clearly outside the border (stereo only — in
-          // fisheye the far hemisphere is clipped by project() returning off-canvas).
-          if (!this.fisheyeMode) {
+          if (this.localSkyMode) {
+            // Below-horizon DSOs are already hidden by the horizon-circle canvas
+            // clip; this just skips the size/bbox work for them earlier.
+            if (horizon && isBelowHorizonCached(dso, horizon.lstH, horizon.latDeg)) continue;
+          } else if (!this.fisheyeMode) {
+            // Dec pre-filter: skip objects clearly outside the border (stereo only
+            // — in fisheye the far hemisphere is clipped by project() returning
+            // off-canvas).
             if (this.hemisphere === 'north' && dso.dec < -(this.borderLatDeg + 2)) continue;
             if (this.hemisphere === 'south' && dso.dec > +(this.borderLatDeg + 2)) continue;
           }
@@ -2488,7 +2573,7 @@ export class SkyMap {
                   (container.majAxis ?? 1) / 2,
                   container.dec,
                   view.scale,
-                  dsoSizeCos2(container),
+                  dsoSizeCos2(container, dsoAltDeg(container)),
                 ),
               );
               if (cRx < DSO_CONTAINER_VISIBLE_RADIUS_PX) continue;
@@ -2501,7 +2586,12 @@ export class SkyMap {
         const majorArcmin = dso.majAxis ?? 1;
         const rx = Math.max(
           2,
-          angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, dsoSizeCos2(dso)),
+          angularSizeToCanvasPx(
+            majorArcmin / 2,
+            dso.dec,
+            view.scale,
+            dsoSizeCos2(dso, dsoAltDeg(dso)),
+          ),
         );
         const margin = rx + 20;
         if (
@@ -2530,9 +2620,15 @@ export class SkyMap {
       projectCached(dso);
       const c = toCanvas(dso._px!, dso._py!, view);
 
+      // Compute below-horizon state (and, as a side effect, _altDeg) before the size
+      // calc: in zenith ("local sky") mode, angular size must scale with altitude
+      // (the projection's pole), not dec — see dsoSizeCos2.
+      const isHighlighted = dso.id === this.highlightedDSO;
+      const isBelowHorizon = !!horizon && isBelowHorizonCached(dso, horizon.lstH, horizon.latDeg);
+
       const majorArcmin = dso.majAxis ?? 1;
       const minorArcmin = dso.minAxis ?? majorArcmin;
-      const cos2 = dsoSizeCos2(dso);
+      const cos2 = dsoSizeCos2(dso, this.localSkyMode ? dso._altDeg : undefined);
       const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, cos2));
       const ry = Math.max(2, angularSizeToCanvasPx(minorArcmin / 2, dso.dec, view.scale, cos2));
       const angle = dsoCanvasAngle(dso.pa, dso.ra, view.rotationDeg);
@@ -2542,11 +2638,7 @@ export class SkyMap {
       const opacity = Math.min(1, Math.max(0.3, 1 - (mag - 4) * 0.07));
       // Below-horizon DSOs are dimmed (not hidden) in date mode, once a location is set.
       // The highlighted DSO stays at full brightness regardless (it's actively selected).
-      const isHighlighted = dso.id === this.highlightedDSO;
-      const horizonMul =
-        horizon && !isHighlighted && isBelowHorizonCached(dso, horizon.lstH, horizon.latDeg)
-          ? SkyMap.BELOW_HORIZON_ALPHA
-          : 1;
+      const horizonMul = !isHighlighted && isBelowHorizon ? SkyMap.BELOW_HORIZON_ALPHA : 1;
 
       ctx.save();
       ctx.globalAlpha = opacity * this.skyOpacity * horizonMul;
@@ -2577,8 +2669,20 @@ export class SkyMap {
     const { raDeg, decDeg } = moonRaDecDeg(jd);
     const { phaseIndex } = moonPhase(jd);
 
-    // Dec pre-filter, same convention as stars/DSOs (stereo only — fisheye clips via project()).
-    if (!this.fisheyeMode) {
+    // Computed once up front (rather than after sizing, as before) because in
+    // zenith ("local sky") mode the altitude both gates visibility and drives the
+    // apparent-size formula below — see dsoSizeCos2's doc comment for why altitude
+    // (not dec) is the correct colatitude input while the projection is zenith-centred.
+    const moonAltDeg = horizon
+      ? altAzFromRaDec(raDeg, decDeg, horizon.lstH, horizon.latDeg).altDeg
+      : null;
+
+    if (this.localSkyMode) {
+      // Below-horizon is already hidden by the horizon-circle canvas clip; this
+      // just skips the projection/size work for it earlier.
+      if (moonAltDeg !== null && moonAltDeg < 0) return;
+    } else if (!this.fisheyeMode) {
+      // Dec pre-filter, same convention as stars/DSOs (stereo only — fisheye clips via project()).
       if (this.hemisphere === 'north' && decDeg < -(this.borderLatDeg + 2)) return;
       if (this.hemisphere === 'south' && decDeg > +(this.borderLatDeg + 2)) return;
     }
@@ -2586,16 +2690,19 @@ export class SkyMap {
     // The Moon's RA/Dec changes continuously, so it's projected directly (not via
     // projectCached, which is keyed on the hemisphere/mode generation and would go stale).
     const p = project(raDeg, decDeg);
-    if (p.x >= 1e5) return; // far hemisphere (fisheye)
+    if (p.x >= 1e5) return; // far hemisphere (fisheye) / below horizon (zenith fisheye)
     const c = toCanvas(p.x, p.y, view);
     if (c.x < -50 || c.x > view.width + 50 || c.y < -50 || c.y > view.height + 50) return;
 
+    const cos2 =
+      this.localSkyMode && moonAltDeg !== null
+        ? Math.cos(((90 - moonAltDeg) * DEG2RAD) / 2) ** 2
+        : undefined;
     // 15 arcmin ≈ half the Moon's true ~30' diameter; floored so it reads as a disk
     // (not a speck) at typical zoom levels, same floor pattern as DSO marker sizing.
-    const r = Math.max(7, angularSizeToCanvasPx(15, decDeg, view.scale));
+    const r = Math.max(7, angularSizeToCanvasPx(15, decDeg, view.scale, cos2));
 
-    const belowHorizon =
-      horizon && altAzFromRaDec(raDeg, decDeg, horizon.lstH, horizon.latDeg).altDeg < 0;
+    const belowHorizon = moonAltDeg !== null && moonAltDeg < 0;
 
     ctx.save();
     ctx.globalAlpha = belowHorizon ? SkyMap.BELOW_HORIZON_ALPHA : 1;
@@ -2612,9 +2719,17 @@ export class SkyMap {
     ctx.textBaseline = 'middle';
 
     // Render labels for exactly the DSOs drawn this frame (shared selection).
+    // In zenith mode, _altDeg is already fresh here — renderDSOs (or
+    // selectRenderedDSOs' own pre-filter) already ran isBelowHorizonCached on
+    // every one of these DSOs earlier in this same render pass.
     for (const dso of this.selectRenderedDSOs()) {
       const majorArcmin = dso.majAxis ?? 1;
-      const rx = angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, dsoSizeCos2(dso));
+      const rx = angularSizeToCanvasPx(
+        majorArcmin / 2,
+        dso.dec,
+        view.scale,
+        dsoSizeCos2(dso, this.localSkyMode ? dso._altDeg : undefined),
+      );
       if (!dsoLabelVisible(dso, rx, view)) continue;
 
       projectCached(dso);

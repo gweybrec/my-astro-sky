@@ -94,13 +94,17 @@
       </DropdownPanel>
     </div>
 
-    <!-- Hemisphere picker -->
-    <div class="display-controls-mag-row hemisphere-row">
+    <!-- Hemisphere picker (meaningless once centered on zenith instead of a pole) -->
+    <div
+      class="display-controls-mag-row hemisphere-row"
+      :class="{ 'opacity-40': skyTimeStore.localSkyMode }"
+    >
       <span class="display-controls-mag-label flex-1">{{ t('display.hemisphere') }}</span>
       <div class="hemisphere-pill">
         <button
           class="hemisphere-btn"
           :class="{ 'hemisphere-btn--active': displayStore.hemisphere === 'north' }"
+          :disabled="skyTimeStore.localSkyMode"
           @click="displayStore.setHemisphere('north')"
         >
           {{ t('display.hemisphereNorth') }}
@@ -108,6 +112,7 @@
         <button
           class="hemisphere-btn"
           :class="{ 'hemisphere-btn--active': displayStore.hemisphere === 'south' }"
+          :disabled="skyTimeStore.localSkyMode"
           @click="displayStore.setHemisphere('south')"
         >
           {{ t('display.hemisphereSouth') }}
@@ -136,8 +141,12 @@
       </div>
     </div>
 
-    <!-- Border latitude slider -->
-    <div class="display-controls-mag-row mt-6 mb-3">
+    <!-- Border latitude slider (no effect once centered on zenith — the border is
+         always the horizon there) -->
+    <div
+      class="display-controls-mag-row mt-6 mb-3"
+      :class="{ 'opacity-40': skyTimeStore.localSkyMode }"
+    >
       <label
         class="display-controls-mag-label border-slider-label"
         :title="t('display.borderLatTooltip')"
@@ -151,6 +160,7 @@
         step="1"
         class="display-controls-mag-slider flex-1 min-w-[60px]"
         :value="displayStore.borderLatDeg"
+        :disabled="skyTimeStore.localSkyMode"
         @input="onBorderLatInput"
       />
       <span class="border-slider-value">{{ displayStore.borderLatDeg }}°</span>
@@ -258,6 +268,7 @@ import LabelsDropdown from './LabelsDropdown.vue';
 import SkyPoiDropdown from './SkyPoiDropdown.vue';
 import { useDisplayStore } from '../../stores/display';
 import { useFisheyeStore } from '../../stores/fisheye';
+import { useSkyTimeStore } from '../../stores/sky-time';
 import { useI18n } from '../../composables/useI18n';
 import { isIAUStyle } from '../../types';
 import type { ConstellationStyle } from '../../types';
@@ -267,6 +278,7 @@ import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 const { t } = useI18n();
 const displayStore = useDisplayStore();
 const fisheyeStore = useFisheyeStore();
+const skyTimeStore = useSkyTimeStore();
 
 const namesChecked = computed(() =>
   isIAUStyle(displayStore.constellationStyle) ? displayStore.showConstellationNames : false,

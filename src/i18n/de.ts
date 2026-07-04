@@ -221,6 +221,7 @@ const de: Translations = {
     speedBackward: 'Schneller (rückwärts)',
     stop: 'Zeit anhalten',
     resetToNow: 'Auf jetzt zurücksetzen',
+    localSkyButton: 'Lokaler Himmel (Horizontansicht)',
     azimuthGridButton: 'Azimutgitter (Alt-Az)',
   },
   settings: {

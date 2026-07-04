@@ -23,9 +23,8 @@
       @mouseleave="suppress(false)"
       @focus="suppress(true)"
       @blur="suppress(false)"
-    >
-      ◎
-    </button>
+      v-html="rotationResetSvg"
+    ></button>
     <button
       type="button"
       class="sky-rotation-btn"
@@ -46,6 +45,7 @@
 import { t } from '../../i18n';
 import { useDisplayStore } from '../../stores/display';
 import { useUiStore } from '../../stores/ui';
+import rotationResetSvg from '../../icons/rotation-reset.svg?raw';
 
 const STEP = 5;
 const displayStore = useDisplayStore();

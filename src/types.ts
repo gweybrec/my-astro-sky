@@ -194,6 +194,8 @@ export interface DSO {
   _pg?: number;
   _cos2?: number; // cached angular-size dec factor for angularSizeToCanvasPx
   _cos2g?: number; // projection generation _cos2 was computed for
+  _cos2z?: number; // cached angular-size altitude factor (zenith/local-sky mode)
+  _cos2zg?: number; // projection generation _cos2z was computed for
   // ── horizon-visibility cache (see isBelowHorizonCached) ──
   _altDeg?: number;
   _belowHorizon?: boolean;

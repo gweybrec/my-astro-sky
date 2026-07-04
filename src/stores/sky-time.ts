@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useCanvasStore } from './canvas';
+import { useDisplayStore } from './display';
 import {
   loadSkyTimeSettings,
   saveSkyTimeSettings,
@@ -44,6 +45,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   const timeRateSign = ref<1 | -1>(s.timeRateSign);
   const showMoon = ref(s.showMoon);
   const showAzimuthGrid = ref(s.showAzimuthGrid);
+  const localSkyMode = ref(s.localSkyMode);
 
   let hasSeededLocation = lat.value !== null || lon.value !== null;
   let tickHandle: ReturnType<typeof setInterval> | null = null;
@@ -64,6 +66,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
       timeRateSign: timeRateSign.value,
       showMoon: showMoon.value,
       showAzimuthGrid: showAzimuthGrid.value,
+      localSkyMode: localSkyMode.value,
     };
   }
 
@@ -89,6 +92,9 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
 
   function setMode(next: 'live' | 'date') {
     if (next === mode.value) return;
+    // Local-sky mode needs date mode + a location; leaving date mode breaks that
+    // precondition, so disable it first (updates the persisted flag too).
+    if (next !== 'date' && localSkyMode.value) setLocalSkyMode(false);
     mode.value = next;
     // simDate, showMoon and showAzimuthGrid are intentionally left as-is: switching
     // back to live and then back to date within the same session should find these
@@ -111,10 +117,31 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   }
 
   function setLocation(newLat: number | null, newLon: number | null) {
+    if ((newLat === null || newLon === null) && localSkyMode.value) setLocalSkyMode(false);
     lat.value = newLat;
     lon.value = newLon;
     hasSeededLocation = true;
     canvasStore.skyMap?.setObserverLocation(newLat, newLon);
+    persist();
+  }
+
+  /**
+   * The zenith-centered "local sky" view — only meaningful in date mode with an
+   * observer location set (alt/az is undefined otherwise); rejected otherwise.
+   * Hemisphere/border-lat have no effect while this is active (see
+   * DisplayControlsSection.vue), but the Stereo/Fisheye radial-style pill stays
+   * independent — it now picks the radial falloff around the zenith instead of
+   * the celestial pole.
+   */
+  function setLocalSkyMode(v: boolean) {
+    if (v && !(mode.value === 'date' && lat.value !== null && lon.value !== null)) return;
+    localSkyMode.value = v;
+    const sm = canvasStore.skyMap;
+    const ov = canvasStore.overlay;
+    const displayStore = useDisplayStore();
+    sm?.setLocalSkyMode(v);
+    ov?.setBorderParams(displayStore.hemisphere, displayStore.borderLatDeg);
+    ov?.updateTransforms();
     persist();
   }
 
@@ -235,6 +262,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     timeRateSign,
     showMoon,
     showAzimuthGrid,
+    localSkyMode,
     effectiveRate,
     // actions
     setMode,
@@ -244,6 +272,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     seedLocationIfNeeded,
     setShowMoon,
     setShowAzimuthGrid,
+    setLocalSkyMode,
     stepRateForward,
     stepRateBackward,
     stopTime,

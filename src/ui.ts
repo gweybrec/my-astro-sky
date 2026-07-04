@@ -318,9 +318,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       const sizeRow =
         sizeStr !== '–' ? `<tr><td>${t('dso.size')}</td><td>${sizeStr}</td></tr>` : '';
       const raDec = `${formatRA(dso.ra)} / ${formatDec(dso.dec)}`;
-      const altitudeRow = altStr
-        ? `<tr><td>${t('dso.altitude')}</td><td>${altStr}</td></tr>`
-        : '';
+      const altitudeRow = altStr ? `<tr><td>${t('dso.altitude')}</td><td>${altStr}</td></tr>` : '';
       const ratingRow =
         dso.rating !== null
           ? `<tr><td>${t('targets.ratingFilter')}</td><td>${formatRating(dso.rating)}</td></tr>`
@@ -395,6 +393,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setObserverLocation(skyTimeSettings.lat, skyTimeSettings.lon);
   skyMap.setShowMoon(skyTimeSettings.showMoon);
   skyMap.setShowAzimuthGrid(skyTimeSettings.showAzimuthGrid);
+  skyMap.setLocalSkyMode(skyTimeSettings.localSkyMode);
 
   // ─── Hook into view change (dismiss tooltip, persist rotation, sync store) ──────────────
   const origOnViewChange = (skyMap as any)['onViewChange'] as (() => void) | null;

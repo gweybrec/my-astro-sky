@@ -714,9 +714,9 @@ body {
   cursor: not-allowed;
 }
 
-.sky-rotation-btn-reset {
-  font-size: var(--font-size-sub);
-  font-weight: 700;
+.sky-rotation-btn-reset svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* ─── Canonical button hierarchy (see docs/dev/ui-guidelines.md §2.1) ─── */

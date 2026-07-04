@@ -18,6 +18,7 @@ export interface SkyTimeSettings {
   timeRateSign: 1 | -1;
   showMoon: boolean;
   showAzimuthGrid: boolean;
+  localSkyMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: SkyTimeSettings = {
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: SkyTimeSettings = {
   timeRateSign: 1,
   showMoon: false,
   showAzimuthGrid: false,
+  localSkyMode: false,
 };
 
 export function loadSkyTimeSettings(): SkyTimeSettings {

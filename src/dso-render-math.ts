@@ -4,7 +4,7 @@
  * These depend only on the projection's hemisphere/generation, not on a canvas.
  */
 import type { DSO } from './types';
-import { getHemisphere, getProjectionGeneration } from './projection';
+import { getHemisphere, getProjectionGeneration, getCenterMode } from './projection';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -15,10 +15,11 @@ export function angularSizeToCanvasPx(
   scale: number,
   cos2?: number,
 ): number {
-  // cos2 depends only on dec + hemisphere; hot per-DSO callers pass a cached value
-  // (see dsoSizeCos2) so the trig runs once per object per hemisphere change instead
-  // of 2–3× per object every frame. Same formula either way, so hit-testing (which
-  // omits the arg) and rendering stay pixel-identical.
+  // cos2 depends only on dec + hemisphere (or, in zenith mode, altitude); hot
+  // per-DSO callers pass a cached value (see dsoSizeCos2) so the trig runs once per
+  // object per projection-generation change instead of 2–3× per object every frame.
+  // Same formula either way, so hit-testing (which omits the arg) and rendering
+  // stay pixel-identical.
   if (cos2 === undefined) {
     const colatitude = getHemisphere() === 'south' ? 90 + decDeg : 90 - decDeg;
     const theta = (colatitude * Math.PI) / 180;
@@ -39,13 +40,32 @@ export const DSO_GIANT_BODY_PU = 0.04;
  * Cached `cos²((90∓dec)/2)` factor for a DSO's angular-size conversion. Invalidated
  * by the projection generation (hemisphere change), matching the formula in
  * {@link angularSizeToCanvasPx}.
+ *
+ * In zenith ("local sky") mode the projection's pole is the observer's zenith, not
+ * the celestial pole, so the correct colatitude input is `90 − altitude`, not dec —
+ * pass `altDeg` (from the caller's already-computed `isBelowHorizonCached`/altAz
+ * result) whenever `getCenterMode() === 'zenith'`. This uses a *separate* cache slot
+ * (`_cos2z`/`_cos2zg`) from the dec-based one: some callers in the same generation
+ * (e.g. `ensureDsoAllIndex`'s giant-DSO bucketing, hover-hit-test's fine-grained
+ * pick) don't have an altitude on hand and fall back to the dec/hemisphere formula
+ * — sharing one cache slot would let whichever call happens first silently poison
+ * the result for the other.
  */
-export function dsoSizeCos2(dso: DSO): number {
-  if (dso._cos2g !== getProjectionGeneration()) {
+export function dsoSizeCos2(dso: DSO, altDeg?: number): number {
+  const gen = getProjectionGeneration();
+  if (getCenterMode() === 'zenith' && altDeg !== undefined) {
+    if (dso._cos2zg !== gen) {
+      const theta = ((90 - altDeg) * Math.PI) / 180;
+      dso._cos2z = Math.cos(theta / 2) ** 2;
+      dso._cos2zg = gen;
+    }
+    return dso._cos2z!;
+  }
+  if (dso._cos2g !== gen) {
     const colatitude = getHemisphere() === 'south' ? 90 + dso.dec : 90 - dso.dec;
     const theta = (colatitude * Math.PI) / 180;
     dso._cos2 = Math.cos(theta / 2) ** 2;
-    dso._cos2g = getProjectionGeneration();
+    dso._cos2g = gen;
   }
   return dso._cos2!;
 }

@@ -220,6 +220,7 @@ const fr = {
     speedBackward: 'Plus rapide (arrière)',
     stop: 'Mettre le temps en pause',
     resetToNow: 'Revenir à maintenant',
+    localSkyButton: 'Ciel local (vue horizon)',
     azimuthGridButton: 'Grille azimutale (alt-az)',
   },
   settings: {

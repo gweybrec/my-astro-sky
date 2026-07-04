@@ -219,6 +219,7 @@ const en: Translations = {
     speedBackward: 'Faster (backward)',
     stop: 'Pause time',
     resetToNow: 'Reset to now',
+    localSkyButton: 'Local sky (horizon view)',
     azimuthGridButton: 'Azimuth (alt-az) grid',
   },
   settings: {

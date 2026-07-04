@@ -21,6 +21,7 @@ describe('sky-time-settings', () => {
     expect(s.timeRateIndex).toBe(0);
     expect(s.showMoon).toBe(false);
     expect(s.showAzimuthGrid).toBe(false);
+    expect(s.localSkyMode).toBe(false);
     // simDateISO must be a valid, parseable ISO date close to "now".
     expect(new Date(s.simDateISO).getTime()).not.toBeNaN();
   });
@@ -35,6 +36,7 @@ describe('sky-time-settings', () => {
       timeRateSign: -1,
       showMoon: true,
       showAzimuthGrid: true,
+      localSkyMode: true,
     };
     saveSkyTimeSettings(settings);
     const loaded = loadSkyTimeSettings();
