@@ -5,6 +5,7 @@ import { useUiStore } from '../stores/ui';
 import { useShortcutsStore } from '../stores/shortcuts';
 import { useSkyTimeStore } from '../stores/sky-time';
 import { openVueModal } from '../modal-host';
+import { focusSearchInput } from '../ui';
 import { normalizeKey, type ShortcutActionId } from '../keyboard-shortcuts';
 
 export function useKeyboardShortcuts() {
@@ -15,9 +16,13 @@ export function useKeyboardShortcuts() {
   const skyTimeStore = useSkyTimeStore();
 
   function runAction(id: ShortcutActionId): boolean {
-    // Opening the cheat-sheet works regardless of the active view.
+    // Opening the cheat-sheet and focusing search work regardless of the active view.
     if (id === 'openShortcuts') {
       openVueModal('shortcuts');
+      return true;
+    }
+    if (id === 'focusSearch') {
+      focusSearchInput();
       return true;
     }
 

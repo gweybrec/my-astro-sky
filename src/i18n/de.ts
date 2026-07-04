@@ -200,6 +200,7 @@ const de: Translations = {
       panUp: 'Nach oben verschieben',
       panDown: 'Nach unten verschieben',
       openShortcuts: 'Tastenkürzel öffnen',
+      focusSearch: 'Zum Suchfeld springen',
       toggleDateMode: 'Datum-/Live-Himmel-Modus umschalten',
       toggleMoon: 'Mond ein-/ausblenden',
       timeSpeedForward: 'Zeit beschleunigen (vorwärts)',

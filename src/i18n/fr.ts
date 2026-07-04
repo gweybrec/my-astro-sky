@@ -199,6 +199,7 @@ const fr = {
       panUp: 'Déplacer vers le haut',
       panDown: 'Déplacer vers le bas',
       openShortcuts: 'Ouvrir les raccourcis clavier',
+      focusSearch: 'Aller au champ de recherche',
       toggleDateMode: 'Basculer mode date / ciel en direct',
       toggleMoon: 'Afficher/masquer la Lune',
       timeSpeedForward: 'Accélérer le temps (avant)',

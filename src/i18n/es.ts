@@ -199,6 +199,7 @@ const es: Translations = {
       panUp: 'Desplazar hacia arriba',
       panDown: 'Desplazar hacia abajo',
       openShortcuts: 'Abrir atajos de teclado',
+      focusSearch: 'Ir al campo de búsqueda',
       toggleDateMode: 'Alternar modo fecha / cielo en vivo',
       toggleMoon: 'Mostrar/ocultar la Luna',
       timeSpeedForward: 'Acelerar el tiempo (adelante)',

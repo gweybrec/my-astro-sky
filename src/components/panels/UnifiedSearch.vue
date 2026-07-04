@@ -90,6 +90,7 @@ import {
   setDSOHighlight,
   setSelectDSOInSearchHandler,
   setClearDSOSelectionHandler,
+  setFocusSearchInputHandler,
 } from '../../ui';
 import StarInfoPanel from './StarInfoPanel.vue';
 import DSOInfoPanel from './DSOInfoPanel.vue';
@@ -293,11 +294,13 @@ function editDSO() {
 onMounted(() => {
   setSelectDSOInSearchHandler(selectDSOById);
   setClearDSOSelectionHandler(() => clearState(true));
+  setFocusSearchInputHandler(() => searchInputEl.value?.focus());
 });
 
 onUnmounted(() => {
   setSelectDSOInSearchHandler(() => {});
   setClearDSOSelectionHandler(() => {});
+  setFocusSearchInputHandler(() => {});
   if (searchDebounce) clearTimeout(searchDebounce);
 });
 </script>

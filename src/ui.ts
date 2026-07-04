@@ -109,6 +109,13 @@ let _clearDSOSelection: () => void = () => {};
 export function setClearDSOSelectionHandler(fn: () => void) {
   _clearDSOSelection = fn;
 }
+let _focusSearchInput: () => void = () => {};
+export function setFocusSearchInputHandler(fn: () => void) {
+  _focusSearchInput = fn;
+}
+export function focusSearchInput() {
+  _focusSearchInput();
+}
 
 export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery) {
   const panel = document.getElementById('side-panel')!;

@@ -24,6 +24,7 @@ export type ShortcutActionId =
   | 'panUp'
   | 'panDown'
   | 'openShortcuts'
+  | 'focusSearch'
   | 'toggleDateMode'
   | 'toggleMoon'
   | 'timeSpeedForward'
@@ -123,6 +124,12 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
     category: 'navigation',
     defaultKeys: ['?'],
     labelKey: 'shortcuts.action.openShortcuts',
+  },
+  {
+    id: 'focusSearch',
+    category: 'navigation',
+    defaultKeys: ['f3'],
+    labelKey: 'shortcuts.action.focusSearch',
   },
   {
     id: 'toggleDateMode',

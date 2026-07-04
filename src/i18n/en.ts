@@ -198,6 +198,7 @@ const en: Translations = {
       panUp: 'Pan up',
       panDown: 'Pan down',
       openShortcuts: 'Open keyboard shortcuts',
+      focusSearch: 'Jump to the search field',
       toggleDateMode: 'Toggle date / live sky mode',
       toggleMoon: 'Show/hide the Moon',
       timeSpeedForward: 'Speed up time (forward)',
