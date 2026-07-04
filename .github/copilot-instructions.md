@@ -13,7 +13,7 @@ Copilot instructions and skills must never duplicate knowledge — they always r
 | [`docs/user/user-guide.md`](../docs/user/user-guide.md)                                             | User manual: features, plate solving, installation, how to access the app                                                                                   |
 | [`docs/user/installing-app.md`](../docs/user/installing-app.md)                                     | End-user install paths: desktop app download/install/uninstall, self-hosting via Docker, LAN sharing                                                        |
 | [`docs/dev/distribution.md`](../docs/dev/distribution.md)                                           | Building/running from source, Electron packaging internals, env var & CSP config reference                                                                  |
-| [`docs/dev/ui-guidelines.md`](../docs/dev/ui-guidelines.md)                                         | CSS colour tokens, typography, component class inventory, known CSS issues                                                                                  |
+| [`docs/dev/ui-guidelines.md`](../docs/dev/ui-guidelines.md)                                         | UI hub: CSS architecture + shortcuts, linking to chapters under `docs/dev/ui/` (`tokens.md` colour/spacing/type tokens, `components.md` component catalog, `patterns.md` layout & known issues) |
 | [`docs/dev/curved-arrow-svg.md`](../docs/dev/curved-arrow-svg.md)                                   | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows                                                                                 |
 | [`docs/dev/target-recommender.md`](../docs/dev/target-recommender.md)                               | Target recommender pipeline: filters, scoring, diversity cap, altitude preferences, known constraints                                                       |
 | [`docs/dev/imaging-recipe.md`](../docs/dev/imaging-recipe.md)                                       | Integration time algorithm, filter selection logic, type-family constants, tuning guide                                                                     |
@@ -35,7 +35,7 @@ When asked about any of the following topics, **read the corresponding Claude fi
 - **Building from source, Electron packaging internals, deployment config reference** → read `docs/dev/distribution.md`
 - **GitHub Actions workflows, CI, release builds, docs deployment** → read `docs/dev/ci.md`
 - **Canvas/render performance, per-frame loop optimisation, profiling traces** → read `docs/dev/render-performance.md`
-- **CSS classes, colour palette, component patterns, UI red flags** → read `docs/dev/ui-guidelines.md`
+- **CSS classes, colour palette, component patterns, UI red flags** → start at the `docs/dev/ui-guidelines.md` hub, then its chapter under `docs/dev/ui/` (`tokens.md`, `components.md`, or `patterns.md`)
 - **Curved-arc SVG arrows, arrowhead geometry** → read `docs/dev/curved-arrow-svg.md`
 - **Imaging recipe / integration time / filter selection logic** → read `docs/dev/imaging-recipe.md`
 - **Adding a new DSO catalog** → read `.claude/skills/add-dso-catalog/SKILL.md`

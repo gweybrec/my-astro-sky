@@ -34,11 +34,11 @@ Tests live in `tests/unit/`. Run with `npm test`.
 
 ## Part A — Frontend rules
 
-Follow all steps from `[[frontend-feature]]` for any UI work:
+Follow all steps from `[[frontend-feature]]` for any UI work. In brief:
 
-1. **Search before you write** — grep `src/ui.ts` and `src/style.css` for reusable widgets and classes
-2. **CSS tokens only** — `--bg-*`, `--text-*`, `--border-*`, `--accent-*` from `:root` in `src/style.css`; never raw hex/rgba
-3. **Reuse component classes** — buttons (`.btn-primary`, `.btn-icon`, `.modal-submit`, `.modal-cancel`), inputs (`.dialog-input`, `.star-search-input`), modals (`.modal-backdrop`, `.modal`, `.modal-header`, `.modal-body`), chips (`.tag-chip`), collapsibles (`.sidebar-section`, `<details>`)
+1. **Search before you write** — grep `src/ui.ts` and `uno.config.ts` for reusable widgets and shortcut classes
+2. **CSS tokens only** — every token lives in `src/styles/tokens.css` (mirrored into the `uno.config.ts` theme); reference via UnoCSS utilities/shortcuts or `var(--…)`, never raw hex/rgba/px
+3. **Reuse component classes** — buttons (`btn-action`, `btn-confirm`, `btn-cancel`, `btn-danger`, `btn-icon` shortcuts), inputs (`input-base`, `.dialog-input`, `.star-search-input`), modals (`.modal-backdrop`, `.modal`, `.modal-header`, `.modal-body`), chips (`tag-chip`), collapsibles (`.sidebar-section`, `<details>`) — full inventory in `docs/dev/ui/components.md`
 4. **i18n** — every user-facing string via `t('key')`; add to all four files: `src/i18n/fr.ts`, `src/i18n/en.ts`, `src/i18n/de.ts`, `src/i18n/es.ts`
 5. **Frontend error logging** — all caught errors call `reportUnknownRendererError(category, err, context?)` from `src/error-reporter.ts`; never silently swallow
 

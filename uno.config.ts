@@ -103,7 +103,7 @@ export default defineConfig({
 
   shortcuts: {
     // ── Buttons ──────────────────────────────────────────────────────────────
-    // See docs/dev/ui-guidelines.md §2.1 for the canonical button hierarchy.
+    // See docs/dev/ui/components.md §2.1 for the canonical button hierarchy.
     'btn-action': [
       'py-5 px-8',
       'bg-[var(--accent-bg)] text-bright',
@@ -157,7 +157,7 @@ export default defineConfig({
     // transient feedback, but deliberately LIGHTER than the selected state below
     // so hovering a normal button never looks "more on" than a selected one.
     // Fill scale across states: rest 0% → hover 35% → selected 55% → selected-hover
-    // 75%. See docs/dev/ui-guidelines.md §2.1.
+    // 75%. See docs/dev/ui/components.md §2.1.
     'btn-icon': [
       'bg-transparent border border-[var(--border-white-md)] text-primary',
       'cursor-pointer py-2 px-4 rounded-sm text-body',
@@ -177,7 +177,7 @@ export default defineConfig({
     // hover of an off button, so selected always reads as the stronger state.
     // On-hover goes stronger still (`--accent-bg-hover`, 75%). Same active
     // convention used by pagination/language/mirror buttons. See
-    // docs/dev/ui-guidelines.md §2.1. Overrides are marked important so the
+    // docs/dev/ui/components.md §2.1. Overrides are marked important so the
     // active state always wins over the base `.btn-icon` rule when both classes
     // are applied (`btn-icon btn-icon--active`), regardless of CSS rule order.
     'btn-icon--active': [

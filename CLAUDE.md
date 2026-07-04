@@ -137,7 +137,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 | `docs/dev/dso-catalog.md`           | Developers               | SIMBAD validation, known OpenNGC data quality issues, rating/difficulty field docs                                                                                    |
 | `docs/dev/distribution.md`          | Developers / maintainers | Building/running from source, Electron packaging internals, env var & CSP config reference                                                                            |
 | `docs/dev/solve-field-placement.md` | Developers               | Y-axis convention, EXIF orientation correction, plate solving diagnostic checklist                                                                                    |
-| `docs/dev/ui-guidelines.md`         | Developers               | CSS colour tokens, typography, component class inventory, known CSS issues                                                                                            |
+| `docs/dev/ui-guidelines.md`         | Developers               | UI reference **hub**: CSS architecture + shortcuts cheat-sheet, linking to chunked chapters under `docs/dev/ui/` (`tokens.md`, `components.md`, `patterns.md`)          |
 | `docs/dev/curved-arrow-svg.md`      | Developers               | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows                                                                                           |
 | `docs/dev/imaging-recipe.md`        | Developers               | Integration time algorithm, filter selection logic, type-family constants, tuning guide                                                                               |
 | `docs/dev/target-recommender.md`    | Developers               | Target recommender pipeline: filters, scoring formula, diversity cap, altitude preferences, known constraints                                                         |
@@ -150,6 +150,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 - Technical content (implementation, deployment, architecture, build steps) → `docs/dev/`
 - `CLAUDE.md` itself holds only AI-agent guidance (commands, conventions, brief pointers) — it does not duplicate the content of the doc files
 - Do not create new doc files without updating this table and the Copilot instructions (`.github/copilot-instructions.md`)
+- The `docs/dev/ui/` chapters (`tokens.md`, `components.md`, `patterns.md`) are children of the `ui-guidelines.md` hub — reached via its Contents links, intentionally **not** listed separately in `docs/_sidebar.md` or in this table
 
 ---
 
@@ -159,7 +160,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 
 See [docs/dev/architecture.md](docs/dev/architecture.md) for full module descriptions (frontend + backend), data flows, and key types.
 
-See [docs/dev/ui-guidelines.md](docs/dev/ui-guidelines.md) for CSS colour tokens, typography scale, component class inventory, and known CSS issues to address.
+See [docs/dev/ui-guidelines.md](docs/dev/ui-guidelines.md) — the UI hub — for the CSS architecture and shortcuts cheat-sheet, then its chapters under `docs/dev/ui/` for design tokens, the component catalog, and layout patterns / known issues.
 
 See [docs/dev/distribution.md](docs/dev/distribution.md) for deployment options (Docker, Node.js) and the planned Electron desktop packaging.
 
