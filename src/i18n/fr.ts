@@ -875,6 +875,12 @@ const fr = {
     maxAlt: 'Max',
     altRangeTooltip:
       "Exclure les objets dont l'altitude au transit est inférieure à l'altitude minimale ou supérieure à l'altitude maximale.",
+    timeWindowLabel: "Fenêtre d'observation",
+    timeWindowStart: 'De',
+    timeWindowEnd: 'à',
+    timeWindowTooltip:
+      "Ne rechercher que dans cette plage horaire (laisser vide pour toute la nuit). Restreint la portion de la fenêtre de ciel noir échantillonnée — l'heure de transit affichée s'y trouvera aussi.",
+    timeWindowNotSet: 'Non défini',
     constellationFilter: 'Constellations',
     constellationSelect: 'Sélectionner les constellations',
     constellationSelectAll: 'Tout sélectionner',
@@ -911,6 +917,7 @@ const fr = {
         'Aucune cible trouvée pour ces paramètres. Essayez une autre date ou un autre équipement.',
       noDarkNight:
         'Pas de nuit astronomique ce soir à cette latitude (soleil trop haut). Les résultats sont basés sur une fenêtre nautique.',
+      noWindowOverlap: 'Pas de ciel noir pendant la fenêtre horaire sélectionnée.',
       maxAlt: 'Alt. max',
       bestTime: 'Transit',
       size: 'Taille',

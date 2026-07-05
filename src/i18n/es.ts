@@ -876,6 +876,12 @@ const es: Translations = {
     maxAlt: 'Máx.',
     altRangeTooltip:
       'Excluir objetos cuya altitud en el tránsito sea inferior al mínimo o superior al máximo.',
+    timeWindowLabel: 'Ventana de observación',
+    timeWindowStart: 'Desde',
+    timeWindowEnd: 'Hasta',
+    timeWindowTooltip:
+      'Buscar solo dentro de este rango horario (dejar vacío para usar toda la noche). Restringe la parte de la ventana de cielo oscuro que se muestrea — la hora de tránsito mostrada también estará dentro de ella.',
+    timeWindowNotSet: 'No definido',
     constellationFilter: 'Constelaciones',
     constellationSelect: 'Seleccionar constelaciones',
     constellationSelectAll: 'Seleccionar todo',
@@ -911,6 +917,7 @@ const es: Translations = {
       empty: 'No se encontraron objetivos para estos parámetros. Prueba con otra fecha o equipo.',
       noDarkNight:
         'Esta noche no hay noche astronómica en esta latitud (Sol demasiado alto). Los resultados se basan en la ventana de crepúsculo náutico.',
+      noWindowOverlap: 'No hay cielo oscuro durante la ventana horaria seleccionada.',
       maxAlt: 'Alt. máx.',
       bestTime: 'Tránsito',
       size: 'Tamaño',

@@ -3843,6 +3843,95 @@ details.targets-form-details[open] .targets-form-summary::before {
   -moz-appearance: textfield;
 }
 
+.targets-time-field {
+  position: relative;
+}
+
+.targets-time-input {
+  /* No explicit width: every value ("HH:MM" or the "--:--" placeholder) is
+     exactly 5 characters, so the button sizes to its own content + padding. */
+  padding: var(--space-2h) var(--space-3);
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.targets-time-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.targets-time-menu {
+  /* Measured rendered heights at font-size-base (12px) with space-2 vertical
+     padding — used below so 5 rows (the "Non défini" clear row + 4 times)
+     are visible before scrolling, instead of an arbitrary max-height guess.
+     The clear row is 0.8px taller: it has a border-bottom the time rows don't. */
+  --targets-time-menu-item-height: 23.2px;
+  --targets-time-menu-clear-height: 24px;
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 50;
+  /* width: max-content (not the item's own width:100%) so the menu sizes to
+     its widest item ("Non défini") instead of an undefined/circular width —
+     flex's stretch fills items to that width without the sizing feeding
+     back into itself the way a plain block + width:100% child would. */
+  width: max-content;
+  /* box-sizing here is border-box (global reset), so the 1px top + 1px
+     bottom border below must be added on top of the row heights, or it eats
+     into the content area and clips the 5th row. */
+  max-height: calc(
+    var(--targets-time-menu-clear-height) + 4 * var(--targets-time-menu-item-height) + 2px
+  );
+  /* Only the vertical axis should ever scroll. Leaving overflow-x unset here
+     computes to "auto" (CSS forces a non-visible overflow-y to pull the other
+     axis out of "visible" too), which can show a horizontal scrollbar/arrows
+     the moment content is even a hair wider than the container — e.g. in a
+     locale (English "Not set") whose clear-row label is shorter than others
+     ("Non défini"), leaving less width buffer once the vertical scrollbar
+     itself eats into the content box. Since this menu never needs to scroll
+     sideways, disable that axis outright instead of chasing an exact width. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px var(--shadow-lg);
+}
+
+.targets-time-menu.open {
+  display: flex;
+}
+
+.targets-time-menu-item {
+  min-width: 4em;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.targets-time-menu-item:hover {
+  background: var(--accent-fill-md);
+}
+
+.targets-time-menu-clear {
+  color: var(--text-muted);
+  font-style: italic;
+  border-bottom: 1px solid var(--border-input);
+}
+
 /* ─── DSO type filter chips ─── */
 .targets-type-filter-row {
   align-items: flex-start;

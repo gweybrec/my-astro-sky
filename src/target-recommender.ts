@@ -37,7 +37,12 @@ export function recommendTargets(
   location: ObserverLocation,
   dateNight: Date,
   limit = MAX_RESULTS,
-  options: { ignoreFovFit?: boolean; minAltDeg?: number; maxAltDeg?: number } = {},
+  options: {
+    ignoreFovFit?: boolean;
+    minAltDeg?: number;
+    maxAltDeg?: number;
+    timeWindow?: { start: Date; end: Date };
+  } = {},
 ): TargetSuggestion[] {
   const { latDeg, lonDeg } = location;
   const fov = fovDeg(preset);
@@ -61,6 +66,12 @@ export function recommendTargets(
     windowEnd = new Date(
       Date.UTC(dateNight.getFullYear(), dateNight.getMonth(), dateNight.getDate() + 1, 6, 0, 0),
     );
+  }
+
+  // Narrow to the user's observation window, if any (intersection with the dark window).
+  if (options.timeWindow) {
+    windowStart = new Date(Math.max(windowStart.getTime(), options.timeWindow.start.getTime()));
+    windowEnd = new Date(Math.min(windowEnd.getTime(), options.timeWindow.end.getTime()));
   }
 
   const candidates: TargetSuggestion[] = [];

@@ -876,6 +876,12 @@ const de: Translations = {
     maxAlt: 'Max.',
     altRangeTooltip:
       'Objekte ausschließen, deren Transitalhöhe unter dem Minimum oder über dem Maximum liegt.',
+    timeWindowLabel: 'Beobachtungsfenster',
+    timeWindowStart: 'Von',
+    timeWindowEnd: 'Bis',
+    timeWindowTooltip:
+      'Nur in diesem Zeitfenster suchen (leer lassen für die ganze Nacht). Schränkt ein, welcher Teil des dunklen Fensters abgetastet wird — die angezeigte Transitzeit liegt ebenfalls darin.',
+    timeWindowNotSet: 'Nicht festgelegt',
     constellationFilter: 'Sternbilder',
     constellationSelect: 'Sternbilder auswählen',
     constellationSelectAll: 'Alle auswählen',
@@ -912,6 +918,7 @@ const de: Translations = {
         'Keine Ziele für diese Parameter gefunden. Versuche ein anderes Datum oder andere Ausrüstung.',
       noDarkNight:
         'Heute Nacht keine astronomische Nacht bei dieser Breite (Sonne zu hoch). Ergebnisse basieren auf dem nautischen Dämmerfenster.',
+      noWindowOverlap: 'Kein dunkler Himmel während des gewählten Zeitfensters.',
       maxAlt: 'Max. Höhe',
       bestTime: 'Transit',
       size: 'Größe',

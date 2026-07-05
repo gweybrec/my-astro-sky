@@ -105,6 +105,8 @@ interface TargetsPrefs {
   minAltDeg?: number;
   maxAltDeg?: number;
   showMoon?: boolean;
+  obsStartTime?: string | null;
+  obsEndTime?: string | null;
 }
 
 function loadPrefs(): TargetsPrefs {
@@ -251,6 +253,45 @@ function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+const DAY_START_MIN = 8 * 60; // 08:00 — start of excluded daytime range
+const DAY_END_MIN = 18 * 60; // 18:00 — end of excluded daytime range
+
+function minutesToHHMM(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Snap a `HH:MM` time to the nearest 30-minute step, then push it out of
+ * daytime hours (08:00–18:00, exclusive) to the nearer night boundary.
+ *
+ * Used only to self-heal a pre-existing persisted value (e.g. from an older
+ * app version) on load — new selections always come from {@link NIGHT_TIME_OPTIONS}
+ * via a custom dropdown, not a native `<input type="time">`, whose own
+ * picker/step/min-max handling turned out to be unreliable across
+ * interaction paths (its scroll-wheel popup ignores `step` entirely, and
+ * opening it on an empty field can commit the literal current wall-clock
+ * time unaligned to any step).
+ */
+export function snapToObservationTime(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  let total = (((h * 60 + m) % 1440) + 1440) % 1440;
+  total = (Math.round(total / 30) * 30) % 1440;
+  if (total > DAY_START_MIN && total < DAY_END_MIN) {
+    total = total - DAY_START_MIN <= DAY_END_MIN - total ? DAY_START_MIN : DAY_END_MIN;
+  }
+  return minutesToHHMM(total);
+}
+
+/** All valid observation-window times: 18:00–23:30, then 00:00–08:00, every 30 min. */
+export const NIGHT_TIME_OPTIONS: string[] = [
+  ...Array.from({ length: (1440 - DAY_END_MIN) / 30 }, (_, i) =>
+    minutesToHHMM(DAY_END_MIN + i * 30),
+  ),
+  ...Array.from({ length: DAY_START_MIN / 30 + 1 }, (_, i) => minutesToHHMM(i * 30)),
+];
 
 // ─── Sort/pagination helpers ──────────────────────────────────────────────────
 
@@ -1636,6 +1677,106 @@ export class TargetsView {
     });
     filterColL.appendChild(formRow(t('targets.date.label'), dateInput));
 
+    // ── Observation time window ──────────────────────────────────────────────
+    const timeWindowRow = document.createElement('div');
+    timeWindowRow.className = 'targets-form-row';
+    const timeWindowLabel = document.createElement('div');
+    timeWindowLabel.className = 'targets-label';
+    timeWindowLabel.textContent = t('targets.timeWindowLabel');
+    timeWindowLabel.title = t('targets.timeWindowTooltip') ?? '';
+
+    const timeWindowEntry = document.createElement('div');
+    timeWindowEntry.className = 'targets-coord-entry';
+
+    // Custom dropdown (not a native <input type="time">): the native picker's
+    // scroll-wheel ignores `step`, and its own min/max rendering for a wrapped
+    // night range can't be verified reliably — so it only ever offers the
+    // exact valid options from NIGHT_TIME_OPTIONS, nothing else is selectable.
+    const closeAllTimeMenus = (except?: HTMLElement): void => {
+      timeWindowEntry.querySelectorAll<HTMLElement>('.targets-time-menu.open').forEach((el) => {
+        if (el !== except) el.classList.remove('open');
+      });
+    };
+
+    const makeTimeDropdown = (
+      labelKey: string,
+      defaultVal: string,
+      onChange: (value: string) => void,
+    ): void => {
+      const group = document.createElement('div');
+      group.className = 'targets-dms-group targets-time-field';
+
+      const lbl = document.createElement('span');
+      lbl.className = 'targets-dms-label';
+      lbl.textContent = t(`targets.${labelKey}`);
+
+      // Self-heal a value from before this dropdown existed (e.g. a stray
+      // unaligned/daytime value a native <input type="time"> once allowed).
+      const initial = defaultVal ? snapToObservationTime(defaultVal) : '';
+      if (initial && initial !== defaultVal) onChange(initial);
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'targets-time-input';
+      toggle.setAttribute('aria-label', t(`targets.${labelKey}`));
+      toggle.textContent = initial || '--:--';
+
+      const menu = document.createElement('div');
+      menu.className = 'targets-time-menu';
+
+      const selectValue = (value: string): void => {
+        toggle.textContent = value || '--:--';
+        menu.classList.remove('open');
+        onChange(value);
+      };
+
+      const clearItem = document.createElement('button');
+      clearItem.type = 'button';
+      clearItem.className = 'targets-time-menu-item targets-time-menu-clear';
+      clearItem.textContent = t('targets.timeWindowNotSet');
+      clearItem.addEventListener('click', () => selectValue(''));
+      menu.appendChild(clearItem);
+
+      for (const time of NIGHT_TIME_OPTIONS) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'targets-time-menu-item';
+        item.textContent = time;
+        item.addEventListener('click', () => selectValue(time));
+        menu.appendChild(item);
+      }
+
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = !menu.classList.contains('open');
+        closeAllTimeMenus();
+        if (willOpen) menu.classList.add('open');
+      });
+
+      group.appendChild(lbl);
+      group.appendChild(toggle);
+      group.appendChild(menu);
+      timeWindowEntry.appendChild(group);
+    };
+
+    makeTimeDropdown('timeWindowStart', this.prefs.obsStartTime ?? '', (value) => {
+      this.prefs.obsStartTime = value || null;
+      savePrefs(this.prefs);
+    });
+    makeTimeDropdown('timeWindowEnd', this.prefs.obsEndTime ?? '', (value) => {
+      this.prefs.obsEndTime = value || null;
+      savePrefs(this.prefs);
+    });
+
+    document.addEventListener('click', () => closeAllTimeMenus());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeAllTimeMenus();
+    });
+
+    timeWindowRow.appendChild(timeWindowLabel);
+    timeWindowRow.appendChild(timeWindowEntry);
+    filterColL.appendChild(timeWindowRow);
+
     // ── DSO type filter ──────────────────────────────────────────────────────
     const typeRow = document.createElement('div');
     typeRow.className = 'targets-form-row targets-type-filter-row';
@@ -1661,104 +1802,6 @@ export class TargetsView {
     typeRow.appendChild(typeLabel);
     typeRow.appendChild(typeFilters);
     filterColL.appendChild(typeRow);
-
-    // ── Horizon direction filter ─────────────────────────────────────────────
-    const horizonRow = document.createElement('div');
-    horizonRow.className = 'targets-form-row targets-type-filter-row';
-    const horizonLabel = document.createElement('div');
-    horizonLabel.className = 'targets-label';
-    horizonLabel.textContent = t('targets.horizon.label');
-    horizonLabel.title = t('targets.horizon.tooltip') ?? '';
-    const compassEl = document.createElement('div');
-    compassEl.className = 'targets-type-filters';
-    const enabledDirSet = new Set(this.prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
-    const DIR_DEFS: [string, 'north' | 'south' | 'east' | 'west', string][] = [
-      ['N', 'north', '↑'],
-      ['S', 'south', '↓'],
-      ['E', 'east', '→'],
-      ['W', 'west', '←'],
-    ];
-    for (const [key, i18nKey, arrow] of DIR_DEFS) {
-      const chip = createTargetsChip(`${arrow} ${t(`targets.horizon.${i18nKey}`)}`, {
-        title: t(`targets.horizon.${i18nKey}Tooltip`) ?? key,
-      });
-      const cb = chip.querySelector('input')!;
-      cb.checked = enabledDirSet.has(key);
-      cb.addEventListener('change', () => {
-        if (cb.checked) enabledDirSet.add(key);
-        else enabledDirSet.delete(key);
-        this.prefs.horizonDirs = [...enabledDirSet];
-        savePrefs(this.prefs);
-      });
-      compassEl.appendChild(chip);
-    }
-    horizonRow.appendChild(horizonLabel);
-    horizonRow.appendChild(compassEl);
-    filterColR.appendChild(horizonRow);
-
-    // ── Altitude range filter ─────────────────────────────────────────────────
-    const altRow = document.createElement('div');
-    altRow.className = 'targets-form-row';
-    const altLabel = document.createElement('div');
-    altLabel.className = 'targets-label';
-    altLabel.textContent = t('targets.altRangeLabel');
-    altLabel.title = t('targets.altRangeTooltip') ?? '';
-
-    const altEntry = document.createElement('div');
-    altEntry.className = 'targets-coord-entry';
-
-    const makeAltGroup = (
-      labelKey: string,
-      defaultVal: number,
-      min: number,
-      max: number,
-    ): HTMLInputElement => {
-      const group = document.createElement('div');
-      group.className = 'targets-dms-group';
-      const lbl = document.createElement('span');
-      lbl.className = 'targets-dms-label';
-      lbl.textContent = t(`targets.${labelKey}`);
-      const inp = document.createElement('input');
-      inp.type = 'number';
-      inp.className = 'targets-dms-input';
-      inp.setAttribute('aria-label', t(`targets.${labelKey}`) + ' °');
-      inp.min = String(min);
-      inp.max = String(max);
-      inp.step = '1';
-      inp.value = String(defaultVal);
-      const unit = document.createElement('span');
-      unit.className = 'targets-dms-sep';
-      unit.textContent = '°';
-      group.appendChild(lbl);
-      group.appendChild(inp);
-      group.appendChild(unit);
-      altEntry.appendChild(group);
-      return inp;
-    };
-
-    const minAltInput = makeAltGroup('minAlt', this.prefs.minAltDeg ?? 20, 0, 89);
-    const maxAltInput = makeAltGroup('maxAlt', this.prefs.maxAltDeg ?? 80, 1, 90);
-
-    minAltInput.addEventListener('change', () => {
-      const v = parseInt(minAltInput.value, 10);
-      if (!isNaN(v)) {
-        this.prefs.minAltDeg = v;
-        savePrefs(this.prefs);
-        updateFiltersSummary();
-      }
-    });
-    maxAltInput.addEventListener('change', () => {
-      const v = parseInt(maxAltInput.value, 10);
-      if (!isNaN(v)) {
-        this.prefs.maxAltDeg = v;
-        savePrefs(this.prefs);
-        updateFiltersSummary();
-      }
-    });
-
-    altRow.appendChild(altLabel);
-    altRow.appendChild(altEntry);
-    filterColR.appendChild(altRow);
 
     // ── Constellation filter ─────────────────────────────────────────────────
     // Deduplicate by IAU id (Serpens appears twice in the data as Caput + Cauda)
@@ -1875,7 +1918,105 @@ export class TargetsView {
     constRow.appendChild(constLabel);
     constRow.appendChild(constSelectBtn);
     constRow.appendChild(constCountEl);
-    filterColL.appendChild(constRow);
+    filterColR.appendChild(constRow);
+
+    // ── Horizon direction filter ─────────────────────────────────────────────
+    const horizonRow = document.createElement('div');
+    horizonRow.className = 'targets-form-row targets-type-filter-row';
+    const horizonLabel = document.createElement('div');
+    horizonLabel.className = 'targets-label';
+    horizonLabel.textContent = t('targets.horizon.label');
+    horizonLabel.title = t('targets.horizon.tooltip') ?? '';
+    const compassEl = document.createElement('div');
+    compassEl.className = 'targets-type-filters';
+    const enabledDirSet = new Set(this.prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
+    const DIR_DEFS: [string, 'north' | 'south' | 'east' | 'west', string][] = [
+      ['N', 'north', '↑'],
+      ['S', 'south', '↓'],
+      ['E', 'east', '→'],
+      ['W', 'west', '←'],
+    ];
+    for (const [key, i18nKey, arrow] of DIR_DEFS) {
+      const chip = createTargetsChip(`${arrow} ${t(`targets.horizon.${i18nKey}`)}`, {
+        title: t(`targets.horizon.${i18nKey}Tooltip`) ?? key,
+      });
+      const cb = chip.querySelector('input')!;
+      cb.checked = enabledDirSet.has(key);
+      cb.addEventListener('change', () => {
+        if (cb.checked) enabledDirSet.add(key);
+        else enabledDirSet.delete(key);
+        this.prefs.horizonDirs = [...enabledDirSet];
+        savePrefs(this.prefs);
+      });
+      compassEl.appendChild(chip);
+    }
+    horizonRow.appendChild(horizonLabel);
+    horizonRow.appendChild(compassEl);
+    filterColR.appendChild(horizonRow);
+
+    // ── Altitude range filter ─────────────────────────────────────────────────
+    const altRow = document.createElement('div');
+    altRow.className = 'targets-form-row';
+    const altLabel = document.createElement('div');
+    altLabel.className = 'targets-label';
+    altLabel.textContent = t('targets.altRangeLabel');
+    altLabel.title = t('targets.altRangeTooltip') ?? '';
+
+    const altEntry = document.createElement('div');
+    altEntry.className = 'targets-coord-entry';
+
+    const makeAltGroup = (
+      labelKey: string,
+      defaultVal: number,
+      min: number,
+      max: number,
+    ): HTMLInputElement => {
+      const group = document.createElement('div');
+      group.className = 'targets-dms-group';
+      const lbl = document.createElement('span');
+      lbl.className = 'targets-dms-label';
+      lbl.textContent = t(`targets.${labelKey}`);
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.className = 'targets-dms-input';
+      inp.setAttribute('aria-label', t(`targets.${labelKey}`) + ' °');
+      inp.min = String(min);
+      inp.max = String(max);
+      inp.step = '1';
+      inp.value = String(defaultVal);
+      const unit = document.createElement('span');
+      unit.className = 'targets-dms-sep';
+      unit.textContent = '°';
+      group.appendChild(lbl);
+      group.appendChild(inp);
+      group.appendChild(unit);
+      altEntry.appendChild(group);
+      return inp;
+    };
+
+    const minAltInput = makeAltGroup('minAlt', this.prefs.minAltDeg ?? 20, 0, 89);
+    const maxAltInput = makeAltGroup('maxAlt', this.prefs.maxAltDeg ?? 80, 1, 90);
+
+    minAltInput.addEventListener('change', () => {
+      const v = parseInt(minAltInput.value, 10);
+      if (!isNaN(v)) {
+        this.prefs.minAltDeg = v;
+        savePrefs(this.prefs);
+        updateFiltersSummary();
+      }
+    });
+    maxAltInput.addEventListener('change', () => {
+      const v = parseInt(maxAltInput.value, 10);
+      if (!isNaN(v)) {
+        this.prefs.maxAltDeg = v;
+        savePrefs(this.prefs);
+        updateFiltersSummary();
+      }
+    });
+
+    altRow.appendChild(altLabel);
+    altRow.appendChild(altEntry);
+    filterColR.appendChild(altRow);
 
     // ── Rating filter ────────────────────────────────────────────────────────
     const ratingRow = document.createElement('div');
@@ -2278,10 +2419,28 @@ export class TargetsView {
       const enabledDirs = new Set(this.prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
       const dirFilterActive = enabledDirs.size < 4;
 
+      const timeWindow = this.timeWindowFor(dateStr);
+      if (timeWindow) {
+        const dark = this.nightWindow(location, dateNight);
+        const overlapStart = Math.max(dark.start.getTime(), timeWindow.start.getTime());
+        const overlapEnd = Math.min(dark.end.getTime(), timeWindow.end.getTime());
+        if (overlapEnd <= overlapStart) {
+          resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.noWindowOverlap')}</div>`;
+          allGenBtns.forEach((b) => {
+            b.disabled = false;
+          });
+          btn.textContent = t(
+            mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest',
+          );
+          return;
+        }
+      }
+
       const rawSuggestions = recommendTargets(filteredDSOs, preset, location, dateNight, 5000, {
         ignoreFovFit: this.prefs.includeOversized ?? false,
         minAltDeg: this.prefs.minAltDeg ?? 20,
         maxAltDeg: this.prefs.maxAltDeg ?? 80,
+        timeWindow: timeWindow ?? undefined,
       });
 
       let suggestions: TargetSuggestion[];
@@ -2862,6 +3021,33 @@ export class TargetsView {
         ),
       ),
     };
+  }
+
+  /**
+   * User-configured observation window (`obsStartTime`/`obsEndTime`, HH:MM in the
+   * browser's local time) for the given night, or null if not set — both fields
+   * must be filled in for the window to be active.
+   *
+   * "Night of `dateStr`" spans that evening through the following morning, so a
+   * pre-noon clock time (e.g. "01:00") is anchored to the calendar day *after*
+   * `dateStr`, while a PM/noon time is anchored to `dateStr` itself — matching
+   * dusk (evening of `dateStr`) / dawn (morning of `dateStr`+1) from
+   * `twilightWindow`. Without this, "01:00" would resolve to the night before
+   * the one actually being searched.
+   */
+  private timeWindowFor(dateStr: string): { start: Date; end: Date } | null {
+    const startStr = this.prefs.obsStartTime;
+    const endStr = this.prefs.obsEndTime;
+    if (!startStr || !endStr) return null;
+    const anchor = (hhmm: string): Date => {
+      const d = new Date(`${dateStr}T${hhmm}:00`);
+      if (parseInt(hhmm.slice(0, 2), 10) < 12) d.setDate(d.getDate() + 1);
+      return d;
+    };
+    const start = anchor(startStr);
+    let end = anchor(endStr);
+    if (end.getTime() <= start.getTime()) end = new Date(end.getTime() + 24 * 3600 * 1000);
+    return { start, end };
   }
 
   /** Moon–target angular separation (°) at a given UTC instant. */

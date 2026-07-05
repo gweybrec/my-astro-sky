@@ -18,7 +18,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { recommendTargets } from '../../src/target-recommender';
-import { filterTargetDSOs } from '../../src/targets-view';
+import {
+  filterTargetDSOs,
+  snapToObservationTime,
+  NIGHT_TIME_OPTIONS,
+} from '../../src/targets-view';
 import type { DSOFilterOptions } from '../../src/targets-view';
 import type { DSO } from '../../src/types';
 import type { GearPreset } from '../../src/gear-presets';
@@ -386,5 +390,64 @@ describe('integration — score ranking regression with C8 CLC preset', () => {
     const m13 = results.find((r) => r.dso.id === 'M13');
     expect(m13).toBeDefined();
     expect(m13!.altScore).toBe(1);
+  });
+});
+
+describe('snapToObservationTime', () => {
+  // Native <input type="time"> doesn't reliably self-enforce step/min/max on every
+  // interaction path (e.g. opening an empty picker can commit the literal current
+  // wall-clock time) — this pure function is the actual, deterministic enforcement.
+  it('rounds an off-step night time to the nearest 30-minute mark', () => {
+    expect(snapToObservationTime('21:07')).toBe('21:00');
+    expect(snapToObservationTime('23:15')).toBe('23:30');
+    expect(snapToObservationTime('00:07')).toBe('00:00');
+  });
+
+  it('leaves an already-aligned night time unchanged', () => {
+    expect(snapToObservationTime('22:30')).toBe('22:30');
+    expect(snapToObservationTime('03:00')).toBe('03:00');
+  });
+
+  it('pushes a daytime time out to the nearer night boundary', () => {
+    expect(snapToObservationTime('12:15')).toBe('08:00'); // closer to 08:00 than 18:00
+    expect(snapToObservationTime('16:00')).toBe('18:00'); // closer to 18:00 than 08:00
+  });
+
+  it('treats the day/night boundaries themselves as valid (inclusive)', () => {
+    expect(snapToObservationTime('18:00')).toBe('18:00');
+    expect(snapToObservationTime('08:00')).toBe('08:00');
+  });
+
+  it('wraps midnight correctly', () => {
+    expect(snapToObservationTime('23:50')).toBe('00:00');
+  });
+});
+
+describe('NIGHT_TIME_OPTIONS', () => {
+  // The custom time-window dropdown only ever renders these — no native
+  // <input type="time"> involved, so there is nothing else a user could pick.
+  it('starts at 18:00, ends at 08:00, every entry 30 minutes apart', () => {
+    expect(NIGHT_TIME_OPTIONS[0]).toBe('18:00');
+    expect(NIGHT_TIME_OPTIONS[NIGHT_TIME_OPTIONS.length - 1]).toBe('08:00');
+    expect(NIGHT_TIME_OPTIONS).toContain('23:30');
+    expect(NIGHT_TIME_OPTIONS).toContain('00:00');
+  });
+
+  it('contains no daytime entries (08:00 and 18:00 themselves are the valid edges)', () => {
+    for (const hhmm of NIGHT_TIME_OPTIONS) {
+      const [h, m] = hhmm.split(':').map(Number);
+      const isValidEdge = (h === 8 && m === 0) || (h === 18 && m === 0);
+      expect(h < 8 || h >= 18 || isValidEdge).toBe(true);
+    }
+  });
+
+  it('has exactly 29 entries (14h of night, every 30 min, both ends inclusive)', () => {
+    expect(NIGHT_TIME_OPTIONS.length).toBe(29);
+  });
+
+  it('every entry is itself a fixed point of snapToObservationTime', () => {
+    for (const hhmm of NIGHT_TIME_OPTIONS) {
+      expect(snapToObservationTime(hhmm)).toBe(hhmm);
+    }
   });
 });

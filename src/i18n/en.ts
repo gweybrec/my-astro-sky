@@ -870,6 +870,12 @@ const en: Translations = {
     maxAlt: 'Max',
     altRangeTooltip:
       'Exclude objects whose transit altitude is below the minimum or above the maximum.',
+    timeWindowLabel: 'Observation window',
+    timeWindowStart: 'From',
+    timeWindowEnd: 'To',
+    timeWindowTooltip:
+      'Only search within this time range (leave empty to use the whole night). Restricts which part of the dark sky window is sampled — the reported transit time will fall inside it too.',
+    timeWindowNotSet: 'Not set',
     constellationFilter: 'Constellations',
     constellationSelect: 'Select constellations',
     constellationSelectAll: 'Select all',
@@ -905,6 +911,7 @@ const en: Translations = {
       empty: 'No targets found for these parameters. Try a different date or equipment.',
       noDarkNight:
         'No astronomical night tonight at this latitude (sun too high). Results based on nautical twilight window.',
+      noWindowOverlap: 'No dark sky during the selected time window.',
       maxAlt: 'Max alt.',
       bestTime: 'Transit',
       size: 'Size',

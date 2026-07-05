@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { recommendTargets, scoreDso } from '../../src/target-recommender';
 import { mightBeVisible, maxAltDuringWindow } from '../../src/sky-geometry';
+import { twilightWindow } from '../../src/astro-time';
 import type { DSO } from '../../src/types';
 import type { GearPreset } from '../../src/gear-presets';
 
@@ -134,6 +135,50 @@ describe('recommendTargets scoring — individual scores via TargetSuggestion ou
       expect(r.brightnessScore).toBeGreaterThanOrEqual(0);
       expect(r.brightnessScore).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe('recommendTargets — options.timeWindow', () => {
+  // Object transits near midnight UTC from Paris on this night (see altScore=1 test above).
+  const highObj = makeDSO({ id: 'HIGH', ra: 120, dec: 45, mag: 5.0, majAxis: 30 });
+
+  it('narrowing the window to exclude the transit lowers the sampled max altitude', () => {
+    const full = recommendTargets([highObj], testPreset, testLocation, winterNight);
+    expect(full.length).toBe(1);
+
+    const tw = twilightWindow(winterNight, testLocation.latDeg, testLocation.lonDeg);
+    expect(tw).not.toBeNull();
+
+    // Restrict sampling to the first hour of the dark window — well before the
+    // near-midnight transit — so the sampled peak altitude must be lower.
+    const narrowStart = tw!.start;
+    const narrowEnd = new Date(tw!.start.getTime() + 60 * 60 * 1000);
+    const narrowed = recommendTargets([highObj], testPreset, testLocation, winterNight, 8, {
+      timeWindow: { start: narrowStart, end: narrowEnd },
+    });
+
+    if (narrowed.length > 0) {
+      expect(narrowed[0].maxAltDeg).toBeLessThan(full[0].maxAltDeg);
+      expect(narrowed[0].bestTimeUtc.getTime()).toBeGreaterThanOrEqual(narrowStart.getTime());
+      expect(narrowed[0].bestTimeUtc.getTime()).toBeLessThanOrEqual(narrowEnd.getTime());
+    } else {
+      // The window was narrow enough to push the object below minAltDeg entirely.
+      expect(narrowed.length).toBe(0);
+    }
+  });
+
+  it('a time window disjoint from the dark-sky window yields zero results', () => {
+    const tw = twilightWindow(winterNight, testLocation.latDeg, testLocation.lonDeg);
+    expect(tw).not.toBeNull();
+
+    // A window entirely before dusk (broad daylight) never overlaps the dark window.
+    const daytimeStart = new Date(tw!.start.getTime() - 5 * 60 * 60 * 1000);
+    const daytimeEnd = new Date(tw!.start.getTime() - 3 * 60 * 60 * 1000);
+
+    const results = recommendTargets([highObj], testPreset, testLocation, winterNight, 8, {
+      timeWindow: { start: daytimeStart, end: daytimeEnd },
+    });
+    expect(results.length).toBe(0);
   });
 });
 
