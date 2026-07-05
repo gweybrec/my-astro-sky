@@ -310,6 +310,15 @@ export class SkyMap {
   // star/DSO indexes + rebuilds the DSO selection. Coalesce to one test per frame.
   private pendingHover: { mx: number; my: number; clientX: number; clientY: number } | null = null;
   private hoverRaf: number | null = null;
+  // Anchor of the currently-shown hover tooltip: the canvas coords and simDate at the
+  // moment it was last shown for an object. Used to keep the tooltip alive while the
+  // clock is advancing (date mode): the sky rotates and the object drifts out from
+  // under a stationary cursor, so the next mousemove/jitter hit-tests empty sky and
+  // would dismiss it. We only dismiss on real cursor movement, not object drift — see
+  // handleHover(). null when no tooltip is shown.
+  private hoverAnchor: { mx: number; my: number; simMs: number } | null = null;
+  // A stationary-cursor jitter is a move under this many canvas px from the anchor.
+  private static readonly HOVER_DRIFT_GRACE_PX = 6;
   private maxStarCount = 2000;
   private maxDSOCount = 500;
   // Per-frame cache of the DSO render selection — single source of truth shared by
@@ -1192,9 +1201,8 @@ export class SkyMap {
           this.requestHover(mx, my, e.clientX, e.clientY);
         } else if (isOverPanel) {
           // Hide tooltips when mouse is over side panel
-          if (this.onStarHover) {
-            this.onStarHover(null, e.clientX, e.clientY);
-          }
+          this.hoverAnchor = null;
+          this.onStarHover?.(null, e.clientX, e.clientY);
         }
       }
     }) as EventListener);
@@ -1307,6 +1315,7 @@ export class SkyMap {
   /** Hide any visible hover tooltip (DSO or star) and clear the hovered DSO. */
   private dismissTooltip(): void {
     this.hoveredDSO = null;
+    this.hoverAnchor = null;
     this.onStarHover?.(null, 0, 0);
     this.onDSOHover?.(null, 0, 0);
   }
@@ -1440,27 +1449,31 @@ export class SkyMap {
     if (starRendered && dsoRendered) {
       // Both found and rendered - show the closest one
       if (starDist < dsoDist) {
-        if (this.onStarHover) {
-          this.onStarHover(closestStar, clientX, clientY);
-        }
+        this.onStarHover?.(closestStar, clientX, clientY);
       } else {
-        if (this.onDSOHover) {
-          this.onDSOHover(closestDSO, clientX, clientY);
-        }
+        this.onDSOHover?.(closestDSO, clientX, clientY);
       }
+      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
     } else if (dsoRendered) {
-      if (this.onDSOHover) {
-        this.onDSOHover(closestDSO, clientX, clientY);
-      }
+      this.onDSOHover?.(closestDSO, clientX, clientY);
+      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
     } else if (starRendered) {
-      if (this.onStarHover) {
-        this.onStarHover(closestStar, clientX, clientY);
-      }
+      this.onStarHover?.(closestStar, clientX, clientY);
+      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
     } else {
-      // No rendered object found, hide tooltip
-      if (this.onStarHover) {
-        this.onStarHover(null, clientX, clientY);
-      }
+      // No rendered object under the cursor. Normally this dismisses the tooltip, but
+      // while the clock is running the object may simply have drifted away from a
+      // still cursor (the whole sky rotates as simDate advances). In that case a tiny
+      // mousemove/jitter must NOT dismiss it — only a deliberate move does. So keep the
+      // tooltip when the sky has advanced since it was shown AND the cursor is still
+      // within jitter range of the anchor; dismiss otherwise.
+      const a = this.hoverAnchor;
+      const skyMoved = a !== null && this.simDate.getTime() !== a.simMs;
+      const cursorStill =
+        a !== null && Math.hypot(mx - a.mx, my - a.my) <= SkyMap.HOVER_DRIFT_GRACE_PX;
+      if (skyMoved && cursorStill) return; // object drifted, cursor didn't — hold
+      this.hoverAnchor = null;
+      this.onStarHover?.(null, clientX, clientY);
     }
   }
 
