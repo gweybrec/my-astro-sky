@@ -38,6 +38,10 @@ npm run electron:make     # Package desktop app (runs clean + build + electron-f
 npm run docs:serve        # Serve docs/ locally with docsify (live-reload) to preview before pushing
 ```
 
+### Stopping a dev server you started
+
+`npm run dev` is `concurrently "vite" "tsx watch server/index.ts"` — a process tree (npm → concurrently → vite/tsx). Killing only the port-holding leaf (e.g. `kill-port`) orphans the rest, which accumulate across a session and can eventually lock native modules like `better-sqlite3` (breaking the next `predev`/`npm rebuild`). To stop a server you started, kill its full process tree (record the PID at launch, then tree-kill it), and verify with `netstat`/`Get-NetTCPConnection` afterward — don't trust "port freed" or "process killed" output alone. Never kill a dev server you didn't start yourself in this session — check the process's command line/working directory first, since the user may already have one running.
+
 ### DSO catalog regeneration
 
 After editing `scripts/dso-metadata-overrides.json` or `scripts/generate-dso.mjs`:
