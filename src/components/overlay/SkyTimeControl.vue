@@ -14,7 +14,7 @@
         @mouseenter="suppress(true)"
         @mouseleave="suppress(false)"
       >
-        {{ dateStr }} {{ timeStr }}<span v-if="rateLabel"> · {{ rateLabel }}</span>
+        {{ dateStr }} {{ timeStr }} · {{ rateLabel }}<span v-if="store.paused"> ⏸</span>
       </button>
       <DropdownPanel
         v-model="dateTimeOpen"
@@ -43,10 +43,19 @@
             <button
               type="button"
               class="btn-icon"
-              :title="t('skyTime.stop')"
-              @click="store.stopTime()"
+              :title="t('skyTime.setNormalSpeed')"
+              @click="store.setRateNormal()"
             >
-              ▪
+              ×1
+            </button>
+            <button
+              type="button"
+              class="btn-icon"
+              :class="{ 'btn-icon--active': store.paused }"
+              :title="store.paused ? t('skyTime.play') : t('skyTime.stop')"
+              @click="store.togglePaused()"
+            >
+              {{ store.paused ? '▶' : '⏸' }}
             </button>
             <button
               type="button"
@@ -56,7 +65,6 @@
             >
               »
             </button>
-            <span v-if="rateLabel" class="sky-time-rate-label text-micro">{{ rateLabel }}</span>
             <button
               type="button"
               class="btn-icon sky-time-reset"
@@ -64,6 +72,14 @@
               @click="store.resetToNow()"
             >
               ↺
+            </button>
+            <button
+              type="button"
+              class="btn-icon"
+              :title="t('skyTime.jumpToEvening')"
+              @click="store.jumpToEvening()"
+            >
+              🌆
             </button>
           </div>
         </div>
@@ -243,11 +259,9 @@ const timeStr = computed({
 });
 
 // store.effectiveRate is already signed (negative while running backward), so this
-// naturally renders e.g. "×-10" when time is going into the past.
-const rateLabel = computed(() => {
-  const r = store.effectiveRate;
-  return r === 0 ? '' : `×${r}`;
-});
+// naturally renders e.g. "×-10" when time is going into the past. It's never 0 — the
+// dial's resting pivot is 1x, not a stop (see stores/sky-time.ts) — so always show it.
+const rateLabel = computed(() => `×${store.effectiveRate}`);
 
 // Vue's v-model on <input type="number"> coerces the bound value to a `number`
 // once non-empty (via its built-in looseToNumber), so these refs are a string

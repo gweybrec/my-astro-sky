@@ -13,17 +13,20 @@ describe('sky-time-settings', () => {
     localStorage.clear();
   });
 
-  it('returns defaults (live mode, no location, stopped) with no stored value', () => {
+  it('returns defaults (live mode, no location, 1x baseline, unpaused) with no stored value', () => {
     const s = loadSkyTimeSettings();
     expect(s.mode).toBe('live');
     expect(s.lat).toBeNull();
     expect(s.lon).toBeNull();
     expect(s.timeRateIndex).toBe(0);
+    expect(s.timeRateSign).toBe(1);
+    expect(s.paused).toBe(false);
     expect(s.showMoon).toBe(false);
     expect(s.showAzimuthGrid).toBe(false);
     expect(s.localSkyMode).toBe(false);
     // simDateISO must be a valid, parseable ISO date close to "now".
     expect(new Date(s.simDateISO).getTime()).not.toBeNaN();
+    expect(Math.abs(s.lastSyncEpochMs - Date.now())).toBeLessThan(1000);
   });
 
   it('round-trips a saved settings object', () => {
@@ -34,6 +37,8 @@ describe('sky-time-settings', () => {
       lon: -73.6,
       timeRateIndex: 3,
       timeRateSign: -1,
+      paused: true,
+      lastSyncEpochMs: 1700000000000,
       showMoon: true,
       showAzimuthGrid: true,
       localSkyMode: true,

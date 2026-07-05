@@ -13,9 +13,15 @@ export interface SkyTimeSettings {
   simDateISO: string;
   lat: number | null;
   lon: number | null;
-  /** 0 = stopped; otherwise an index into RATE_LADDER (1-based: index 1 = ladder[0]). */
+  /** 0 = the 1x baseline; otherwise an index into RATE_LADDER (1-based: index 1 = ladder[0]). */
   timeRateIndex: number;
   timeRateSign: 1 | -1;
+  /** Explicit play/pause, independent of timeRateIndex/timeRateSign — see stores/sky-time.ts. */
+  paused: boolean;
+  /** Wall-clock ms at which simDateISO was last known-accurate; used to fast-forward simDate
+   *  by the elapsed real time (at the persisted rate) when date mode is re-entered after being
+   *  left running in the background — including across an app close/reopen. */
+  lastSyncEpochMs: number;
   showMoon: boolean;
   showAzimuthGrid: boolean;
   localSkyMode: boolean;
@@ -28,6 +34,8 @@ export const DEFAULT_SETTINGS: SkyTimeSettings = {
   lon: null,
   timeRateIndex: 0,
   timeRateSign: 1,
+  paused: false,
+  lastSyncEpochMs: Date.now(),
   showMoon: false,
   showAzimuthGrid: false,
   localSkyMode: false,

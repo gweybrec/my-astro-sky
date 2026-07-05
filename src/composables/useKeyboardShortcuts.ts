@@ -92,7 +92,7 @@ export function useKeyboardShortcuts() {
         skyTimeStore.stepRateBackward();
         return true;
       case 'timeStop':
-        skyTimeStore.stopTime();
+        skyTimeStore.togglePaused();
         return true;
       case 'jumpToEvening':
         skyTimeStore.jumpToEvening();

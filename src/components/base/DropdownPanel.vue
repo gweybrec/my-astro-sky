@@ -62,6 +62,13 @@ watch(
       teardown();
     }
   },
+  // `immediate: true` matters when a caller mounts this component with modelValue
+  // already `true` in the same tick the anchor button itself first renders (e.g.
+  // toggling into a mode that both shows the anchor and opens its panel at once) —
+  // a plain `watch()` only fires on a *change*, so that initial `true` would never
+  // attach the positioning/outside-click listeners, leaving an unpositioned panel
+  // that only a second toggle (a real change from false) would actually open.
+  { immediate: true },
 );
 
 onBeforeUnmount(() => {

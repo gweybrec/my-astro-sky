@@ -43,15 +43,23 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   const lon = ref<number | null>(s.lon);
   const timeRateIndex = ref(s.timeRateIndex);
   const timeRateSign = ref<1 | -1>(s.timeRateSign);
+  const paused = ref(s.paused);
+  const lastSyncEpochMs = ref(s.lastSyncEpochMs);
   const showMoon = ref(s.showMoon);
   const showAzimuthGrid = ref(s.showAzimuthGrid);
   const localSkyMode = ref(s.localSkyMode);
 
   let hasSeededLocation = lat.value !== null || lon.value !== null;
+  // Reset every fresh page load/app launch (module-scope-per-store-instance, not persisted) —
+  // see activateDateMode() below for why the very first date-mode activation of a session is
+  // special-cased to a clean "now, 1x" baseline rather than resuming stale persisted state.
+  let hasActivatedDateModeThisSession = false;
   let tickHandle: ReturnType<typeof setInterval> | null = null;
 
-  const effectiveRate = computed(() =>
-    timeRateIndex.value === 0 ? 0 : timeRateSign.value * RATE_LADDER[timeRateIndex.value - 1],
+  // Index 0 is the dial's resting pivot — 1x, not a stop. Explicit pause/resume is the
+  // separate `paused` flag below, so the dial itself never needs a "stopped" rung.
+  const effectiveRate = computed(
+    () => timeRateSign.value * (timeRateIndex.value === 0 ? 1 : RATE_LADDER[timeRateIndex.value - 1]),
   );
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -64,6 +72,8 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
       lon: lon.value,
       timeRateIndex: timeRateIndex.value,
       timeRateSign: timeRateSign.value,
+      paused: paused.value,
+      lastSyncEpochMs: lastSyncEpochMs.value,
       showMoon: showMoon.value,
       showAzimuthGrid: showAzimuthGrid.value,
       localSkyMode: localSkyMode.value,
@@ -75,10 +85,11 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   }
 
   function updateTicker() {
-    const shouldTick = mode.value === 'date' && effectiveRate.value !== 0;
+    const shouldTick = mode.value === 'date' && !paused.value;
     if (shouldTick && tickHandle === null) {
       tickHandle = setInterval(() => {
         simDate.value = new Date(simDate.value.getTime() + effectiveRate.value * TICK_MS);
+        lastSyncEpochMs.value = Date.now();
         canvasStore.skyMap?.setSimDate(simDate.value);
         persist();
       }, TICK_MS);
@@ -88,6 +99,36 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     }
   }
 
+  /**
+   * Runs whenever date mode becomes active (entering it this session, or the store
+   * booting up already persisted into it). The very first activation of a session
+   * discards whatever was persisted and starts clean at "now", 1x, unpaused — so
+   * reopening the app days later never resumes a stale warped clock unexpectedly.
+   * Every later activation instead fast-forwards simDate by the real time elapsed
+   * since it was last known-accurate, at the persisted rate — so leaving date mode
+   * (or closing the app) doesn't freeze the clock, it keeps flowing in the background
+   * exactly as if the session had stayed on this whole time, unless explicitly paused.
+   */
+  function activateDateMode() {
+    const now = Date.now();
+    if (!hasActivatedDateModeThisSession) {
+      hasActivatedDateModeThisSession = true;
+      simDate.value = new Date(now);
+      timeRateIndex.value = 0;
+      timeRateSign.value = 1;
+      paused.value = false;
+    } else if (!paused.value) {
+      const elapsedMs = now - lastSyncEpochMs.value;
+      if (elapsedMs > 0) {
+        simDate.value = new Date(simDate.value.getTime() + elapsedMs * effectiveRate.value);
+      }
+    }
+    lastSyncEpochMs.value = now;
+    canvasStore.skyMap?.setSimDate(simDate.value);
+  }
+
+  if (mode.value === 'date') activateDateMode();
+
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
   function setMode(next: 'live' | 'date') {
@@ -96,10 +137,11 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     // precondition, so disable it first (updates the persisted flag too).
     if (next !== 'date' && localSkyMode.value) setLocalSkyMode(false);
     mode.value = next;
-    // simDate, showMoon and showAzimuthGrid are intentionally left as-is: switching
-    // back to live and then back to date within the same session should find these
-    // exactly where they were left, not reset — the sky-map render loop is what hides
-    // the moon/azimuth grid while in live mode (they only make sense relative to a
+    if (next === 'date') activateDateMode();
+    // showMoon and showAzimuthGrid are intentionally left as-is: switching back to
+    // live and then back to date within the same session should find these exactly
+    // where they were left, not reset — the sky-map render loop is what hides the
+    // moon/azimuth grid while in live mode (they only make sense relative to a
     // simulated date/time), not this store.
     canvasStore.skyMap?.setSkyTimeMode(mode.value);
     updateTicker();
@@ -112,6 +154,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
 
   function setSimDate(date: Date) {
     simDate.value = date;
+    lastSyncEpochMs.value = Date.now();
     canvasStore.skyMap?.setSimDate(date);
     persist();
   }
@@ -178,9 +221,10 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
    * The rate is a single signed dial: forward (l) always moves it one ladder step
    * toward +∞, backward (j) always moves it one step toward -∞ — so from +10,
    * pressing backward slows to +5 (not an immediate reverse-to--1), and continuing
-   * to press the same key climbs the ladder in that direction. The very first press
-   * from a stop jumps straight to the first ladder rung (±2), skipping ±1 — that's
-   * what live mode already looks like, so warping at 1x wouldn't feel like anything.
+   * to press the same key climbs the ladder in that direction. Index 0 is the dial's
+   * resting pivot (1x, not a stop — see `paused` for that), so the very first press
+   * from rest jumps straight to the first ladder rung (±2), skipping ±1 entirely —
+   * that's what the 1x baseline already looks like, so warping to it would be a no-op.
    */
   function stepRateForward() {
     if (mode.value !== 'date') setMode('date');
@@ -208,18 +252,37 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     persist();
   }
 
-  /** Freezes simDate where it currently is — does NOT reset to "now". */
-  function stopTime() {
+  /** The "x1" button: resets the dial to the 1x baseline and unpauses, regardless of
+   *  wherever the dial/pause state was left — a one-click way back to normal playback. */
+  function setRateNormal() {
     if (mode.value !== 'date') setMode('date');
     timeRateIndex.value = 0;
+    timeRateSign.value = 1;
+    paused.value = false;
     updateTicker();
     persist();
   }
 
-  /** Jumps the simulated date/time back to "now", independent of the rate/pause state. */
+  /** Video-player-style play/pause: freezes/resumes simDate in place without touching
+   *  the selected rate, so resuming continues at whatever speed was already dialed in. */
+  function togglePaused() {
+    if (mode.value !== 'date') setMode('date');
+    paused.value = !paused.value;
+    // Resuming re-syncs to "now" so a later mode switch doesn't treat the paused
+    // interval itself as elapsed time to catch up on (see activateDateMode()).
+    if (!paused.value) lastSyncEpochMs.value = Date.now();
+    updateTicker();
+    persist();
+  }
+
+  /** Jumps the simulated date/time back to "now" and resets the dial to the 1x
+   *  baseline, unpaused — a full reset of both the clock and its playback state. */
   function resetToNow() {
     simDate.value = new Date();
     timeRateIndex.value = 0;
+    timeRateSign.value = 1;
+    paused.value = false;
+    lastSyncEpochMs.value = Date.now();
     canvasStore.skyMap?.setSimDate(simDate.value);
     updateTicker();
     persist();
@@ -248,6 +311,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
       evening = defaultEveningTime(simDate.value);
     }
     simDate.value = evening;
+    lastSyncEpochMs.value = Date.now();
     canvasStore.skyMap?.setSimDate(evening);
     persist();
   }
@@ -260,6 +324,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     lon,
     timeRateIndex,
     timeRateSign,
+    paused,
     showMoon,
     showAzimuthGrid,
     localSkyMode,
@@ -275,7 +340,8 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     setLocalSkyMode,
     stepRateForward,
     stepRateBackward,
-    stopTime,
+    setRateNormal,
+    togglePaused,
     resetToNow,
     jumpToEvening,
   };

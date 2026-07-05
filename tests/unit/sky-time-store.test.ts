@@ -14,30 +14,76 @@ describe('sky-time store', () => {
     vi.useRealTimers();
   });
 
-  it('starts in live mode with time stopped', () => {
+  it('starts in live mode at the 1x baseline, unpaused', () => {
     const store = useSkyTimeStore();
     expect(store.mode).toBe('live');
-    expect(store.effectiveRate).toBe(0);
+    expect(store.effectiveRate).toBe(1);
+    expect(store.paused).toBe(false);
     expect(store.showMoon).toBe(false);
     expect(store.showAzimuthGrid).toBe(false);
   });
 
-  it('toggleMode switches live <-> date without touching simDate', () => {
+  it('the first time date mode is entered this session, simDate resets to "now" at 1x unpaused', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2020-06-15T10:00:00.000Z'));
     const store = useSkyTimeStore();
-    const frozen = new Date('2020-06-15T10:00:00.000Z');
-    store.setSimDate(frozen);
+    // Set while still in live mode — the UI never exposes this, but a keyboard shortcut
+    // could reach here; the first date-mode activation must still win over it.
+    store.setSimDate(new Date('1999-01-01T00:00:00.000Z'));
 
     store.toggleMode();
+
     expect(store.mode).toBe('date');
-    expect(store.simDate.getTime()).toBe(frozen.getTime());
+    expect(store.simDate.getTime()).toBe(new Date('2020-06-15T10:00:00.000Z').getTime());
+    expect(store.effectiveRate).toBe(1);
+    expect(store.paused).toBe(false);
+  });
+
+  it('after the first activation, toggling live <-> date preserves simDate (no elapsed time)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2020-06-15T10:00:00.000Z'));
+    const store = useSkyTimeStore();
+    store.toggleMode(); // -> date, first activation this session
+    const activated = store.simDate.getTime();
 
     store.toggleMode();
     expect(store.mode).toBe('live');
-    expect(store.simDate.getTime()).toBe(frozen.getTime());
+    expect(store.simDate.getTime()).toBe(activated);
 
-    // Switching back to date within the same session finds the same date/time again.
+    // Switching back to date within the same session, with no real time elapsed
+    // (fake timers), finds the same date/time again.
     store.toggleMode();
-    expect(store.simDate.getTime()).toBe(frozen.getTime());
+    expect(store.simDate.getTime()).toBe(activated);
+  });
+
+  it('re-entering date mode fast-forwards simDate by the real time elapsed while away, at the persisted rate', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2020-06-15T10:00:00.000Z'));
+    const store = useSkyTimeStore();
+    store.stepRateForward(); // first activation + jump to the first rung
+    store.setSimDate(new Date('2026-01-01T00:00:00.000Z'));
+    const rate = store.effectiveRate;
+
+    store.toggleMode(); // -> live
+    vi.advanceTimersByTime(10_000);
+    store.toggleMode(); // -> date again
+
+    expect(store.simDate.getTime()).toBe(new Date('2026-01-01T00:00:00.000Z').getTime() + rate * 10_000);
+  });
+
+  it('does not fast-forward on re-entry while paused', () => {
+    vi.useFakeTimers();
+    const store = useSkyTimeStore();
+    store.stepRateForward();
+    store.setSimDate(new Date('2026-01-01T00:00:00.000Z'));
+    store.togglePaused();
+    const frozen = store.simDate.getTime();
+
+    store.toggleMode(); // -> live
+    vi.advanceTimersByTime(10_000);
+    store.toggleMode(); // -> date again, still paused
+
+    expect(store.simDate.getTime()).toBe(frozen);
   });
 
   it('stepRateForward auto-switches to date mode and jumps straight to the first rung (not 1x)', () => {
@@ -74,10 +120,10 @@ describe('sky-time store', () => {
     store.stepRateBackward(); // ladder[0]
     expect(store.effectiveRate).toBe(RATE_LADDER[0]);
 
-    store.stepRateBackward(); // reaches a full stop
-    expect(store.effectiveRate).toBe(0);
+    store.stepRateBackward(); // reaches the pivot, now facing backward: 1x reverse
+    expect(store.effectiveRate).toBe(-1);
 
-    store.stepRateBackward(); // now starts climbing backward from the stop
+    store.stepRateBackward(); // now starts climbing backward from -1x
     expect(store.effectiveRate).toBe(-RATE_LADDER[0]);
   });
 
@@ -91,37 +137,60 @@ describe('sky-time store', () => {
     expect(store.effectiveRate).toBe(-RATE_LADDER[0]);
 
     store.stepRateForward();
-    expect(store.effectiveRate).toBe(0);
+    expect(store.effectiveRate).toBe(1);
 
     store.stepRateForward();
     expect(store.effectiveRate).toBe(RATE_LADDER[0]);
   });
 
-  it('stopTime freezes simDate where it is, without resetting to "now"', () => {
+  it('setRateNormal resets the dial to 1x and unpauses, from any state', () => {
+    const store = useSkyTimeStore();
+    store.stepRateBackward();
+    store.stepRateBackward();
+    store.togglePaused();
+
+    store.setRateNormal();
+
+    expect(store.effectiveRate).toBe(1);
+    expect(store.paused).toBe(false);
+  });
+
+  it('togglePaused freezes simDate where it is, without resetting to "now" or touching the rate', () => {
     const store = useSkyTimeStore();
     store.toggleMode();
     const frozen = new Date('2020-01-01T00:00:00.000Z');
     store.setSimDate(frozen);
     store.stepRateForward();
-    store.stopTime();
-    expect(store.effectiveRate).toBe(0);
+    const rateBefore = store.effectiveRate;
+
+    store.togglePaused();
+
+    expect(store.paused).toBe(true);
+    expect(store.effectiveRate).toBe(rateBefore);
     expect(store.simDate.getTime()).toBe(frozen.getTime());
+
+    store.togglePaused();
+    expect(store.paused).toBe(false);
+    expect(store.effectiveRate).toBe(rateBefore);
   });
 
-  it('resetToNow jumps simDate back to "now" and stops the rate', () => {
+  it('resetToNow jumps simDate back to "now" and resets the dial to 1x, unpaused', () => {
     const store = useSkyTimeStore();
     store.setSimDate(new Date('2020-01-01T00:00:00.000Z'));
     store.stepRateForward();
+    store.togglePaused();
     const before = Date.now();
 
     store.resetToNow();
 
-    expect(store.effectiveRate).toBe(0);
+    expect(store.effectiveRate).toBe(1);
+    expect(store.paused).toBe(false);
     expect(Math.abs(store.simDate.getTime() - before)).toBeLessThan(1000);
   });
 
   it('jumpToEvening keeps the calendar day and moves to a default hour without a location', () => {
     const store = useSkyTimeStore();
+    store.toggleMode(); // consume the session's first-activation reset first
     const base = new Date(2026, 5, 15, 3, 30, 0); // 03:30 local — the small hours
     store.setSimDate(base);
 
@@ -138,6 +207,7 @@ describe('sky-time store', () => {
 
   it('jumpToEvening uses the real astronomical dusk once an observer location is set', () => {
     const store = useSkyTimeStore();
+    store.toggleMode(); // consume the session's first-activation reset first
     const base = new Date(2026, 5, 15, 3, 30, 0);
     store.setSimDate(base);
     store.setLocation(45.5, 4.8);
@@ -208,20 +278,20 @@ describe('sky-time store', () => {
   it('ticks simDate forward at the effective rate while in date mode', () => {
     vi.useFakeTimers();
     const store = useSkyTimeStore();
+    store.stepRateForward(); // first activation (jumps to "now") + first rung
     store.setSimDate(new Date('2026-01-01T00:00:00.000Z'));
-    store.stepRateForward(); // first rung
     const start = store.simDate.getTime();
 
     vi.advanceTimersByTime(500);
     expect(store.simDate.getTime()).toBe(start + RATE_LADDER[0] * 500);
   });
 
-  it('stops ticking once stopTime is called', () => {
+  it('stops ticking once paused', () => {
     vi.useFakeTimers();
     const store = useSkyTimeStore();
     store.stepRateForward();
     vi.advanceTimersByTime(500);
-    store.stopTime();
+    store.togglePaused();
     const frozen = store.simDate.getTime();
     vi.advanceTimersByTime(2000);
     expect(store.simDate.getTime()).toBe(frozen);
