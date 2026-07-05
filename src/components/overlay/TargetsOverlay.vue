@@ -1,5 +1,10 @@
 <template>
-  <BaseModal size="sheet" :title="t('targets.findTargets')" body-class="p-8 flex-col" @close="close">
+  <BaseModal
+    size="sheet"
+    :title="t('targets.findTargets')"
+    body-class="p-8 flex-col"
+    @close="close"
+  >
     <div ref="mountEl" class="w-full"></div>
   </BaseModal>
 </template>

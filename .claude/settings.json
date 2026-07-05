@@ -52,6 +52,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node .claude/hooks/prettier-on-edit.js"
+          },
+          {
+            "type": "command",
             "command": "node .claude/hooks/vitest-on-ts-edit.js"
           }
         ]

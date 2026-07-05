@@ -68,7 +68,9 @@ describe('sky-time store', () => {
     vi.advanceTimersByTime(10_000);
     store.toggleMode(); // -> date again
 
-    expect(store.simDate.getTime()).toBe(new Date('2026-01-01T00:00:00.000Z').getTime() + rate * 10_000);
+    expect(store.simDate.getTime()).toBe(
+      new Date('2026-01-01T00:00:00.000Z').getTime() + rate * 10_000,
+    );
   });
 
   it('does not fast-forward on re-entry while paused', () => {

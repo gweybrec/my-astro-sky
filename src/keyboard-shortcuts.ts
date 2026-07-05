@@ -137,7 +137,12 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
     defaultKeys: ['t'],
     labelKey: 'shortcuts.action.toggleDateMode',
   },
-  { id: 'toggleMoon', category: 'time', defaultKeys: ['m'], labelKey: 'shortcuts.action.toggleMoon' },
+  {
+    id: 'toggleMoon',
+    category: 'time',
+    defaultKeys: ['m'],
+    labelKey: 'shortcuts.action.toggleMoon',
+  },
   {
     id: 'timeSpeedForward',
     category: 'time',

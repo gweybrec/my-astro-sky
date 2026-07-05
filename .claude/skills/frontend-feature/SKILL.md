@@ -86,7 +86,9 @@ src/i18n/es.ts
 
 ```typescript
 // fr.ts
-mySection: { myKey: 'Texte en français' }
+mySection: {
+  myKey: 'Texte en français';
+}
 
 // component
 import { t } from './i18n';
@@ -124,8 +126,9 @@ try {
 Ask first: _"Should I run Playwright browser tests to verify the UI, or will you test it yourself?"_
 
 **If automated:** `npm run dev` → `browser_navigate` to `http://localhost:5173` → `browser_snapshot`
-+ `browser_take_screenshot` → exercise the golden path → `browser_console_messages` (zero unhandled
-errors). Note the theme trap: a fresh profile loads `cold-blue-v2`; pin `localStorage['app-theme'] =
+
+- `browser_take_screenshot` → exercise the golden path → `browser_console_messages` (zero unhandled
+  errors). Note the theme trap: a fresh profile loads `cold-blue-v2`; pin `localStorage['app-theme'] =
 'warm'` before verifying amber-token colours (see `docs/dev/ui/components.md` §2.1).
 
 **If manual:** summarise what to test in 3–5 bullets.

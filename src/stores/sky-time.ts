@@ -59,7 +59,8 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   // Index 0 is the dial's resting pivot — 1x, not a stop. Explicit pause/resume is the
   // separate `paused` flag below, so the dial itself never needs a "stopped" rung.
   const effectiveRate = computed(
-    () => timeRateSign.value * (timeRateIndex.value === 0 ? 1 : RATE_LADDER[timeRateIndex.value - 1]),
+    () =>
+      timeRateSign.value * (timeRateIndex.value === 0 ? 1 : RATE_LADDER[timeRateIndex.value - 1]),
   );
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────

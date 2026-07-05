@@ -55,12 +55,12 @@ mere hover must never look as "on" as a selected button.** Selected is a persist
 state; hover is transient feedback. If a hovered-but-unselected button looks more filled than a
 selected one, the scale is inverted — that is a bug.
 
-| State                | Background fill                     | Border                | Icon colour      |
-| -------------------- | ----------------------------------- | --------------------- | ---------------- |
-| **Off / rest**       | transparent                         | `--border-white-md`   | `--text-primary` |
-| **Off / hover**      | `--accent-fill-lg` (35 %)           | `--border-focus`      | `--text-bright`  |
-| **Selected / rest**  | `--accent-bg` (55 %)                | `--border-focus`      | `--text-bright`  |
-| **Selected / hover** | `--accent-bg-hover` (75 %)          | `--border-focus`      | `--text-bright`  |
+| State                | Background fill            | Border              | Icon colour      |
+| -------------------- | -------------------------- | ------------------- | ---------------- |
+| **Off / rest**       | transparent                | `--border-white-md` | `--text-primary` |
+| **Off / hover**      | `--accent-fill-lg` (35 %)  | `--border-focus`    | `--text-bright`  |
+| **Selected / rest**  | `--accent-bg` (55 %)       | `--border-focus`    | `--text-bright`  |
+| **Selected / hover** | `--accent-bg-hover` (75 %) | `--border-focus`    | `--text-bright`  |
 
 Fill progression is therefore **0 → 35 → 55 → 75 %** and must stay in that order. Selected (55 %)
 is deliberately stronger than an off-hover (35 %).
@@ -99,11 +99,11 @@ hairline — the hairline antialiases to dim grey and reads as a _wrong colour_ 
 the needed `stroke-width` from the icon's viewBox and its render size:
 
 | viewBox | render size | `stroke-width` for ~1.2 px |
-| ------- | ----------- | --------------------------- |
-| 16      | 16 px       | 1.5                         |
-| 24      | 16 px       | 2                           |
-| 36      | 18 px       | 2                           |
-| 64      | 16–18 px    | 4–5                         |
+| ------- | ----------- | -------------------------- |
+| 16      | 16 px       | 1.5                        |
+| 24      | 16 px       | 2                          |
+| 36      | 18 px       | 2                          |
+| 64      | 16–18 px    | 4–5                        |
 
 Do not "fix" a thin icon by brightening its colour — match the stroke weight instead, so it stays
 consistent with its neighbours in every state.
@@ -156,15 +156,15 @@ attention. Use when the interaction cannot fit in a small floating panel.
 
 Add one sizing class alongside `.modal` to constrain width and height. Never set `max-width` or `max-height` inline.
 
-| Class                     | Max-width | Max-height | Use                                          |
-| ------------------------- | --------- | ---------- | -------------------------------------------- |
-| _(none)_                  | 960 px    | 85 vh      | Full-size modals (batch upload, light-solve) |
-| `.settings-modal`         | 460 px    | —          | Settings, solver config                      |
-| `.settings-modal--flex`   | 460 px    | 85 vh      | Settings with a scrollable body section      |
-| `.settings-modal--scroll` | 460 px    | 80 vh      | Settings with very long scrollable content   |
-| `.import-modal`           | 400 px    | —          | Import / export                              |
-| `.missing-modal`          | 420 px    | 70 vh      | Missing-files report                         |
-| `.gear-custom-modal`      | 440 px    | 90 vh      | Gear preset editor                           |
+| Class                     | Max-width | Max-height | Use                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| _(none)_                  | 960 px    | 85 vh      | Full-size modals (batch upload, light-solve)                                                                                                                                                                                                                                                                                                                       |
+| `.settings-modal`         | 460 px    | —          | Settings, solver config                                                                                                                                                                                                                                                                                                                                            |
+| `.settings-modal--flex`   | 460 px    | 85 vh      | Settings with a scrollable body section                                                                                                                                                                                                                                                                                                                            |
+| `.settings-modal--scroll` | 460 px    | 80 vh      | Settings with very long scrollable content                                                                                                                                                                                                                                                                                                                         |
+| `.import-modal`           | 400 px    | —          | Import / export                                                                                                                                                                                                                                                                                                                                                    |
+| `.missing-modal`          | 420 px    | 70 vh      | Missing-files report                                                                                                                                                                                                                                                                                                                                               |
+| `.gear-custom-modal`      | 440 px    | 90 vh      | Gear preset editor                                                                                                                                                                                                                                                                                                                                                 |
 | `.modal-sheet`            | 95 vw     | 90 vh      | Large summoned surfaces needing room for a wide filter bar + grid (Find-targets overlay). Defined as a `uno.config.ts` shortcut (`!`-marked to win over `.modal`'s own max-width/max-height — `virtual:uno.css` loads before `style.css`), not in `style.css` — new size variants go there per the CSS decision tree. Selectable via `BaseModal`'s `size="sheet"`. |
 
 #### Modal body layout variants
@@ -599,18 +599,18 @@ btn.innerHTML = trashSvg;
 
 **SVG icon inventory:**
 
-| File                      | Visual                                                 | Container class(es)                                                | CSS size                                                   |
-| ------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `src/icons/trash.svg`     | Trash can                                              | `.integration-row-trash`, `.batch-trash-btn`                       | 12 px / 14 px (set per class)                              |
-| `src/icons/close-x.svg`   | × (crossing lines)                                     | `.solve-cancel-btn`                                                | 12 px                                                      |
-| `src/icons/about.svg`     | Five-pointed star                                      | `.settings-legal-btn`                                              | 16 px                                                      |
-| `src/icons/privacy.svg`   | Padlock                                                | `.settings-legal-btn`                                              | 16 px                                                      |
-| `src/icons/credits.svg`   | Database cylinder                                      | `.settings-legal-btn`                                              | 16 px                                                      |
-| `src/icons/telescope.svg` | Line-art telescope (tube + eyepiece + finder + tripod) | `.fov-telescope-btn`                                               | `var(--font-size-large)` (set by `.fov-telescope-btn svg`) |
-| `src/icons/export.svg`    | Box with outgoing up-right arrow                       | `.sky-export-control .sky-rotation-btn`, gallery filter-bar button | 16 px                                                      |
-| `src/icons/eye.svg`       | Eye (shown)                                            | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`)    | 16 px / `1em`                                              |
-| `src/icons/eye-off.svg`   | Eye with slash (hidden)                                | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`)    | 16 px / `1em`                                              |
-| `src/icons/target.svg`    | Reticle: circle + crosshair ticks + filled center dot  | `.find-targets-control .sky-rotation-btn` (map), plan-header `.btn-icon`, empty-state `.btn-action` | 16 px |
+| File                      | Visual                                                 | Container class(es)                                                                                 | CSS size                                                   |
+| ------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `src/icons/trash.svg`     | Trash can                                              | `.integration-row-trash`, `.batch-trash-btn`                                                        | 12 px / 14 px (set per class)                              |
+| `src/icons/close-x.svg`   | × (crossing lines)                                     | `.solve-cancel-btn`                                                                                 | 12 px                                                      |
+| `src/icons/about.svg`     | Five-pointed star                                      | `.settings-legal-btn`                                                                               | 16 px                                                      |
+| `src/icons/privacy.svg`   | Padlock                                                | `.settings-legal-btn`                                                                               | 16 px                                                      |
+| `src/icons/credits.svg`   | Database cylinder                                      | `.settings-legal-btn`                                                                               | 16 px                                                      |
+| `src/icons/telescope.svg` | Line-art telescope (tube + eyepiece + finder + tripod) | `.fov-telescope-btn`                                                                                | `var(--font-size-large)` (set by `.fov-telescope-btn svg`) |
+| `src/icons/export.svg`    | Box with outgoing up-right arrow                       | `.sky-export-control .sky-rotation-btn`, gallery filter-bar button                                  | 16 px                                                      |
+| `src/icons/eye.svg`       | Eye (shown)                                            | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`)                                     | 16 px / `1em`                                              |
+| `src/icons/eye-off.svg`   | Eye with slash (hidden)                                | `.fov-visibility-btn`, photo-list `.btn-icon` (`PhotoItem.vue`)                                     | 16 px / `1em`                                              |
+| `src/icons/target.svg`    | Reticle: circle + crosshair ticks + filled center dot  | `.find-targets-control .sky-rotation-btn` (map), plan-header `.btn-icon`, empty-state `.btn-action` | 16 px                                                      |
 
 One additional SVG lives as a `data:image/svg+xml` URI in `src/style.css` on `.targets-sort-select` (dropdown caret). It is a pure CSS concern — no TypeScript import needed.
 

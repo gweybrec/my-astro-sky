@@ -83,19 +83,19 @@ near-void black; the `cold-blue-v2` theme re-tints most of these tokens.
 The `--accent-fill-*` family is an intentional **opacity ramp** (subtle → bold) of the same accent
 hue — pick by strength, not by colour.
 
-| Token               | Use                                      |
-| ------------------- | ---------------------------------------- |
-| `--accent-bg`       | Primary action button fills              |
-| `--accent-bg-hover` | Primary action button hover              |
+| Token               | Use                                                  |
+| ------------------- | ---------------------------------------------------- |
+| `--accent-bg`       | Primary action button fills                          |
+| `--accent-bg-hover` | Primary action button hover                          |
 | `--accent-border`   | Accent-coloured border (alias of `--accent-fill-xl`) |
-| `--accent-color`    | `accent-color` on checkboxes/ranges      |
-| `--accent-danger`   | `accent-color` for destructive inputs    |
-| `--color-danger`    | Icon/text colour for destructive actions |
-| `--accent-fill-sm`  | Subtle amber tint                        |
-| `--accent-fill-md`  | Light amber fill                         |
-| `--accent-fill-lg`  | Medium amber fill                        |
-| `--accent-fill-xl`  | Strong amber fill                        |
-| `--accent-fill-2xl` | Bold amber fill                          |
+| `--accent-color`    | `accent-color` on checkboxes/ranges                  |
+| `--accent-danger`   | `accent-color` for destructive inputs                |
+| `--color-danger`    | Icon/text colour for destructive actions             |
+| `--accent-fill-sm`  | Subtle amber tint                                    |
+| `--accent-fill-md`  | Light amber fill                                     |
+| `--accent-fill-lg`  | Medium amber fill                                    |
+| `--accent-fill-xl`  | Strong amber fill                                    |
+| `--accent-fill-2xl` | Bold amber fill                                      |
 
 #### Shadows
 

@@ -78,6 +78,12 @@ once its existing warnings have been paid down. Highest-value rules already on:
 `no-console` (allows `warn`/`error`). Prettier owns all formatting (no ESLint stylistic
 rules — `eslint-config-prettier` disables them).
 
+`endOfLine: "auto"` in `.prettierrc.json` keeps Windows CRLF checkouts from mass-flagging
+under `"lf"`. Always use `npm run format` / `format:check`, not raw `npx prettier`.
+
+A PostToolUse hook (`.claude/hooks/prettier-on-edit.js`) runs `prettier --write` on the
+edited file after any Edit or Write, so formatting issues never reach CI.
+
 ## Unit Tests
 
 The test suite uses **Vitest 3** + **happy-dom**. Tests live under `tests/` (mainly `tests/unit/`, plus `tests/components/`). Run with `npm test`. To count the test files: `git ls-files 'tests/**/*.test.ts' | wc -l`.
@@ -137,7 +143,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 | `docs/dev/dso-catalog.md`           | Developers               | SIMBAD validation, known OpenNGC data quality issues, rating/difficulty field docs                                                                                    |
 | `docs/dev/distribution.md`          | Developers / maintainers | Building/running from source, Electron packaging internals, env var & CSP config reference                                                                            |
 | `docs/dev/solve-field-placement.md` | Developers               | Y-axis convention, EXIF orientation correction, plate solving diagnostic checklist                                                                                    |
-| `docs/dev/ui-guidelines.md`         | Developers               | UI reference **hub**: CSS architecture + shortcuts cheat-sheet, linking to chunked chapters under `docs/dev/ui/` (`tokens.md`, `components.md`, `patterns.md`)          |
+| `docs/dev/ui-guidelines.md`         | Developers               | UI reference **hub**: CSS architecture + shortcuts cheat-sheet, linking to chunked chapters under `docs/dev/ui/` (`tokens.md`, `components.md`, `patterns.md`)        |
 | `docs/dev/curved-arrow-svg.md`      | Developers               | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows                                                                                           |
 | `docs/dev/imaging-recipe.md`        | Developers               | Integration time algorithm, filter selection logic, type-family constants, tuning guide                                                                               |
 | `docs/dev/target-recommender.md`    | Developers               | Target recommender pipeline: filters, scoring formula, diversity cap, altitude preferences, known constraints                                                         |
