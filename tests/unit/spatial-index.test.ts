@@ -108,4 +108,62 @@ describe('SpatialIndex', () => {
       expect(idx.findAll(1, 1, 10)).toEqual([]);
     });
   });
+
+  // The query loops clamp their cell range to the index's populated bounds so a query
+  // radius far larger than the data extent (e.g. the 1/scale viewport radius when zoomed
+  // way out) costs O(occupied cells), not O(radius²). These assert the clamp changes cost
+  // only — never the returned results.
+  describe('bounds clamp (huge query radius)', () => {
+    it('a giant radius returns the same set as a radius that already covers all items', () => {
+      const idx = new SpatialIndex<string>(0.02); // same tiny cell size as the DSO index
+      const pts: [string, number, number][] = [
+        ['A', 0, 0],
+        ['B', 1, -1],
+        ['C', -1.5, 0.5],
+        ['D', 0.3, 1.8],
+      ];
+      for (const [name, x, y] of pts) idx.insert(name, x, y);
+      // radius 5 already covers every point; 1e9 is the pathological zoomed-out case.
+      const tight = new Set(idx.collect(0, 0, 5));
+      const huge = new Set(idx.collect(0, 0, 1e9));
+      expect(huge).toEqual(tight);
+      expect(huge).toEqual(new Set(['A', 'B', 'C', 'D']));
+    });
+
+    it('findAll with a giant radius still returns every item in correct distance order', () => {
+      const idx = new SpatialIndex<string>(0.02);
+      idx.insert('B', 4, 0);
+      idx.insert('A', 1, 0);
+      idx.insert('C', 7, 0);
+      expect(idx.findAll(0, 0, 1e9)).toEqual(['A', 'B', 'C']);
+    });
+
+    it('findNearest with a giant radius still returns the true nearest', () => {
+      const idx = new SpatialIndex<string>(0.02);
+      idx.insert('near', 1, 0);
+      idx.insert('far', 10, 0);
+      expect(idx.findNearest(0, 0, 1e9)).toBe('near');
+    });
+
+    it('a query box entirely outside the populated bounds returns nothing (loop clamps empty)', () => {
+      const idx = new SpatialIndex<string>(1);
+      idx.insert('A', 0, 0);
+      idx.insert('B', 1, 1);
+      // Query centred far from the data with a radius too small to reach it.
+      expect(idx.collect(1000, 1000, 5)).toEqual([]);
+      expect(idx.findAll(1000, 1000, 5)).toEqual([]);
+      expect(idx.findNearest(1000, 1000, 5)).toBeNull();
+    });
+
+    it('recomputes bounds after clear + re-insert (no stale over/under-scan)', () => {
+      const idx = new SpatialIndex<string>(1);
+      idx.insert('old', 100, 100);
+      idx.clear();
+      idx.insert('new', 2, 2);
+      // A huge query must find only the re-inserted item, and a query near the old
+      // location must find nothing (stale bounds would let the loop over-scan there).
+      expect(new Set(idx.collect(0, 0, 1e9))).toEqual(new Set(['new']));
+      expect(idx.findNearest(100, 100, 3)).toBeNull();
+    });
+  });
 });

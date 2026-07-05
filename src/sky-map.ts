@@ -2530,13 +2530,29 @@ export class SkyMap {
 
     // Viewport cull: query the position index for DSOs whose centre is within the
     // visible disc plus a margin for the largest body and the off-screen render margin.
-    // This replaces a full scan of all ~12k DSOs every frame with a bounded query —
-    // a big win when zoomed in (small viewport), a no-op cost when zoomed out.
+    // This replaces a full scan of all ~12k DSOs every frame with a bounded query — a big
+    // win when zoomed in (small viewport).
     this.ensureDsoAllIndex();
-    const queryR =
+    // The raw viewport radius grows as 1/scale, so zooming *out* makes it enormous and the
+    // spatial query degenerates into a scan of a huge, mostly-empty region (it was 75% of
+    // CPU in a zoom-out trace — see render-performance.md T5 addendum). But every DSO that
+    // can actually be drawn lies within the border radius of the projection origin: objects
+    // past it are unconditionally culled by the dec pre-filter below (and in stereo they
+    // project to huge radii — dec −89° → r≈114 — so they can never be near the visible
+    // sky). By the triangle inequality they all sit within (viewCentre→origin distance +
+    // border radius) of the query centre, so capping queryR there never drops a drawable
+    // object while keeping the query bounded when zoomed out. (+2° matches the pre-filter
+    // margin; borderRadiusPU returns 1.0 in fisheye/zenith, where the far side is clipped.)
+    const capR =
+      Math.hypot(view.centerX, view.centerY) +
+      borderRadiusPU(this.borderLatDeg + 2) +
+      this.dsoMaxBodyPU;
+    const queryR = Math.min(
       Math.hypot(view.width / 2, view.height / 2) / view.scale +
-      this.dsoMaxBodyPU +
-      20 / view.scale;
+        this.dsoMaxBodyPU +
+        20 / view.scale,
+      capR,
+    );
     const nearby = this.dsoAllIndex.collect(view.centerX, view.centerY, queryR);
 
     const candidates: (SelectableDSO & { dso: DSO })[] = [];

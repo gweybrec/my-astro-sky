@@ -177,6 +177,72 @@ Two details made it correct and effective:
 >
 > **Pattern / when to stop.** Once the profile is _flat_ — top items are irreducible drawing plus `(program)`/`(garbage collector)` native overhead, with no single function dominating — you've hit diminishing returns. Further "optimisations" the profile lists at low single-digit percentages will measure as noise. The right move is to A/B them honestly and report that they don't move frame time, rather than shipping complexity for an imagined win. Keep such a change only for a secondary reason (scalability, battery, correctness), and say so.
 
+### Addendum — cap a scale-derived query radius at the drawable region
+
+Technique 5's "viewport-bounded, not O(catalog)" claim is true for the object _count_ it
+returns, but it quietly assumed the _cell scan_ was cheap. It isn't. `SpatialIndex.collect`
+loops every cell in the query box `[center ± queryR]²`, so its cost is
+`O((queryR / cellSize)²)` in **cell lookups** — mostly on _empty_ cells — independent of how
+many items it finds.
+
+The query radius is the viewport half-diagonal in projection units, `queryR ∝ 1 / scale`.
+Zooming _in_ shrinks it (the intended win); zooming _out_ grows it without bound. A
+zoom-out trace showed the damage starkly — `collect` at **~75–79 % of active CPU**, one
+function, with GC churn from the throwaway `"${cx},${cy}"` key strings. With
+`cellSize = 0.02` and `queryR ≈ 145`, that's ~14 500 × 14 500 ≈ **2×10⁸ cell lookups per
+call**, ~6 s _per frame_. The old code comment called this "a no-op cost when zoomed out" —
+exactly backwards; it is the _most_ expensive case, and counter-intuitively the frame
+collapses precisely when _less_ is on screen.
+
+**The false start worth remembering.** The intuitive fix — "the data is bounded, so clamp
+the scan to the index's populated cell bounds" — _does not work here_, and measuring
+honestly is what caught it. In the stereographic projection `r = tan((90 − dec)/2)`, so
+far-hemisphere objects project to **huge radii** (dec −89° → r ≈ 114; a full-sphere catalog
+reaches ~300+ projection units). `ensureDsoAllIndex` inserts _every_ non-giant DSO, so the
+index's populated bounds are ~±300, not ±2 — clamping the loop to them removes nothing for a
+`queryR ≈ 145` query. A first microbenchmark that placed all points within radius ≲ 2 hid
+this and _looked_ like a 6914× win; a second benchmark with points spread over the whole
+sphere (matching the real projection) showed the clamp doing nothing. **If a fix's benchmark
+doesn't reproduce the real data distribution, it isn't measuring the fix.**
+
+**The real fix — cap the radius at the drawable region** (`sky-map.ts`,
+`selectRenderedDSOs`). Every DSO that can actually be drawn lies within the border radius of
+the projection _origin_: anything past it is unconditionally culled by the dec pre-filter
+(and projects far away anyway). By the triangle inequality, all drawable objects sit within
+`hypot(viewCentre) + borderRadiusPU(borderLatDeg + 2)` of the query centre, so
+
+```ts
+const queryR = Math.min(viewportRadius /* ∝ 1/scale */, capR);
+```
+
+never drops a drawable object yet stays bounded (~2.5 projection units) no matter how far
+out you zoom. `borderRadiusPU` returns 1.0 in fisheye/zenith (far side clipped), so it is
+mode-correct; it is read live each frame, so a `borderLatDeg` change (which does _not_ bump
+the projection generation) can't leave it stale.
+
+**A/B (faithful `collect` microbenchmark — 12k DSOs spread over the whole sphere so far
+objects reach ~322 units, cellSize 0.02, zoomed far out):**
+
+| query radius           |    time | notes                                      |
+| ---------------------- | ------: | ------------------------------------------ |
+| raw `queryR ≈ 145`     | 6494 ms | one call — the frozen frame                |
+| capped `queryR ≈ 2.58` |  5.9 ms | **1099×**; drops **zero** drawable objects |
+
+Zoomed-in behaviour is untouched (`Math.min` picks the small viewport radius there). The
+per-candidate loop that runs _after_ the query (~10k near-hemisphere candidates when fully
+zoomed out, then thinned by the priority budget) becomes the next item in the profile — an
+order of magnitude smaller and always present, not a new regression.
+
+> **Pattern.** A query radius derived from zoom/scale (`1/scale`, viewport size) can grow
+> unboundedly and turn a "cull" into the hottest function in the trace. Bounding the _index_
+> by its data only helps if the data is actually compact — verify that with a
+> distribution-faithful benchmark. When the projection scatters culled objects to large
+> coordinates, bound the _query_ instead: cap it at the region that can actually be drawn.
+
+The `spatial-index.ts` query loops also clamp to the index's populated cell bounds — a cheap,
+general safety net (and a real win for any _compactly_-populated index, e.g. the hover
+hit-test indices) — but it is the query cap above, not the clamp, that fixes this symptom.
+
 ---
 
 ## Results
