@@ -18,7 +18,7 @@ const isTargetFile =
 if (!isTargetFile) process.exit(0);
 
 try {
-  const output = execSync('npx vitest run --reporter=dot', {
+  const output = execSync('npm run test:dot', {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });

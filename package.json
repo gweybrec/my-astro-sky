@@ -27,6 +27,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:dot": "vitest run --reporter=dot",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "generate-icons": "node scripts/generate-icons.mjs",
