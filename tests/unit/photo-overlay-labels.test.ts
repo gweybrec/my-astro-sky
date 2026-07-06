@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PhotoOverlay } from '../../src/photo-overlay';
+import { setHemisphere, setProjectionMode, setCenterMode } from '../../src/projection';
 
 // Minimal Photo shape for the tests
 function makePhoto(id: string, labels: string[] | undefined) {
@@ -99,6 +100,62 @@ describe('PhotoOverlay label filtering', () => {
     const pb = placed.find((p) => p.photo.id === '2')!;
     expect(pa.imgEl.style.display).toBe('block');
     expect(pb.imgEl.style.display).toBe('none');
+  });
+
+  // Photo with manual placement at an explicit sky position (helper above pins
+  // centerDec to 60; here we need to choose the dec per-test).
+  function makePlacedPhotoAt(id: string, centerRa: number, centerDec: number) {
+    return {
+      ...makePhoto(id, undefined),
+      manualPlacement: {
+        centerRa,
+        centerDec,
+        rotationDeg: 0,
+        projPerPx: 0.002,
+        mirrorX: false,
+        mirrorY: false,
+      },
+    } as any;
+  }
+
+  describe('projection-change cull invalidation', () => {
+    // The viewport-cull fast path in updateTransforms() caches each photo's
+    // projection-space centroid. A hemisphere/mode/center change remaps every
+    // RA/Dec to a *different* projection-space point, so the cached centroid is
+    // stale afterwards. Regression: the cull used the stale centroid and, because
+    // a culled photo skips applyTransform(), a photo that becomes on-screen in the
+    // new projection stayed hidden forever (until its visibility was toggled).
+    afterEach(() => {
+      // Restore the module-global projection state for any later test.
+      setCenterMode('pole');
+      setProjectionMode('stereo');
+      setHemisphere('north');
+    });
+
+    it('re-shows a photo that moves on-screen after a hemisphere switch', () => {
+      setCenterMode('pole');
+      setProjectionMode('stereo');
+      setHemisphere('south');
+
+      const container = document.createElement('div');
+      const overlay = new PhotoOverlay(container, () => VIEW as any);
+
+      // dec=+80: stereo-SOUTH r = tan(85°) ≈ 11.4 → far off-screen (culled);
+      //          stereo-NORTH r = tan(5°) ≈ 0.09 → near centre (on-screen).
+      const p = makePlacedPhotoAt('1', 0, 80);
+      overlay.loadPhotos([p]);
+      const placed = overlay.getPlacedPhotos()[0];
+
+      // First pass sets the centroid; second pass applies the viewport cull.
+      overlay.updateTransforms();
+      overlay.updateTransforms();
+      expect(placed.imgEl.style.display).toBe('none'); // genuinely off-screen in south
+
+      // Switch hemisphere → the photo is now on-screen; it must reappear.
+      setHemisphere('north');
+      overlay.updateTransforms();
+      expect(placed.imgEl.style.display).toBe('block');
+    });
   });
 
   it('respects the (no label) special key for unlabeled photos', () => {

@@ -12,7 +12,14 @@ import type {
   AffineMatrix,
 } from './types';
 import { poisMatchFilter } from './poi';
-import { project, toCanvas, fromCanvas, unproject, borderRadiusPU } from './projection';
+import {
+  project,
+  toCanvas,
+  fromCanvas,
+  unproject,
+  borderRadiusPU,
+  getProjectionGeneration,
+} from './projection';
 import { reportUnknownRendererError } from './error-reporter';
 import {
   computeAffineTransform,
@@ -161,6 +168,13 @@ export interface PlacedPhoto {
   projCentroid: { x: number; y: number } | null;
   /** Max distance from centroid to any correspondence point in projection space; used for cull margin. */
   projHalfDiag: number;
+  /**
+   * Projection generation (see projection.ts) the cached projCentroid/projHalfDiag were
+   * computed under. The centroid is only valid for the fast viewport cull while this
+   * matches the current generation; a hemisphere/mode/center change bumps the generation
+   * and forces a full applyTransform recompute (otherwise photos stay stuck culled).
+   */
+  projGen: number;
 }
 
 function starDisplayLabel(star: Star): string {
@@ -574,6 +588,7 @@ export class PhotoOverlay {
   /** Recalculate all photo transforms (call on zoom/pan/resize) */
   updateTransforms() {
     const view = this.getView();
+    const gen = getProjectionGeneration();
     for (const placed of this.placedPhotos) {
       if (!placed.visible) continue;
 
@@ -581,7 +596,12 @@ export class PhotoOverlay {
       // could possibly overlap the canvas before doing the full transform.
       // Margin = 2× the photo's sky footprint radius in canvas pixels, so a photo
       // that extends past its correspondence points is never incorrectly hidden.
-      if (placed.projCentroid !== null) {
+      // Only trust the cache when it was computed under the current projection
+      // generation — a hemisphere/mode/center switch remaps every RA/Dec to a new
+      // projection-space point, so a stale centroid would cull against the wrong
+      // coordinates and, because a culled photo skips applyTransform, never refresh
+      // (the photo stays hidden until forced, e.g. by toggling its visibility).
+      if (placed.projCentroid !== null && placed.projGen === gen) {
         const cc = toCanvas(placed.projCentroid.x, placed.projCentroid.y, view);
         const margin = placed.projHalfDiag * view.scale * 2;
         if (
@@ -1032,6 +1052,7 @@ export class PhotoOverlay {
       viewportCulled: false,
       projCentroid: null,
       projHalfDiag: 0,
+      projGen: -1,
     };
     this.placedPhotos.push(placed);
 
@@ -1066,6 +1087,7 @@ export class PhotoOverlay {
     if (photo.manualPlacement) {
       const cp = project(photo.manualPlacement.centerRa, photo.manualPlacement.centerDec);
       placed.projCentroid = cp;
+      placed.projGen = getProjectionGeneration();
       const halfDiagPx = Math.sqrt((photo.width / 2) ** 2 + (photo.height / 2) ** 2);
       placed.projHalfDiag = halfDiagPx * photo.manualPlacement.projPerPx;
       imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
@@ -1096,6 +1118,7 @@ export class PhotoOverlay {
     const cx = projPoints.reduce((s, p) => s + p.x, 0) / projPoints.length;
     const cy = projPoints.reduce((s, p) => s + p.y, 0) / projPoints.length;
     placed.projCentroid = { x: cx, y: cy };
+    placed.projGen = getProjectionGeneration();
     placed.projHalfDiag = projPoints.reduce(
       (m, p) => Math.max(m, Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2)),
       0,
