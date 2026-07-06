@@ -13,6 +13,8 @@ import { buildSetupInfoRows } from './setup-info';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import { moonDangerLevel, type AltSample } from './sky-geometry';
 import { drawMoonMarker } from './moon-draw';
+import { resolveWindowColor, toBandFill } from './observation-windows';
+import type { ObservationWindow } from './api';
 
 // ─── Affine helpers (pure, unit-tested) ─────────────────────────────────────
 
@@ -282,6 +284,8 @@ export interface PlanPdfTarget {
     paDeg: number;
     tiles: { ra: number; dec: number }[];
   } | null;
+  /** User-drawn observation windows on this target's trajectory (may be empty). */
+  observationWindows?: ObservationWindow[];
   /** Moon overlay (identical across pages); omitted when the moon toggle is off. */
   moonCurve?: AltSample[];
   moonPhaseIndex?: number;
@@ -533,6 +537,7 @@ function drawAltChartToCanvas(
   dpr: number,
   moonCurve?: AltSample[],
   moonPhaseIndex?: number,
+  observationWindows?: ObservationWindow[],
 ): void {
   if (curve.length === 0) return;
   ctx.save();
@@ -593,6 +598,42 @@ function drawAltChartToCanvas(
     ctx.stroke();
   }
   ctx.setLineDash([]);
+
+  // Observation windows — shaded time bands under the curve. Positions are
+  // fractions of the night window; colour derives from the filter token (or an
+  // explicit override). Drawn before the curve so the trajectory stays dominant.
+  if (observationWindows && observationWindows.length > 0) {
+    const readVar = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v);
+    const fontSize = 8 * dpr;
+    for (const w of observationWindows) {
+      const x0 = gutter + Math.max(0, Math.min(1, w.startFrac)) * plotW;
+      const x1 = gutter + Math.max(0, Math.min(1, w.endFrac)) * plotW;
+      const bandW = Math.max(0, x1 - x0);
+      if (bandW <= 0) continue;
+      const color = resolveWindowColor(w, readVar);
+      // Keep the interior translucent so the curve shows through — token colours
+      // already carry alpha; an opaque user hex is converted to rgba by toBandFill.
+      ctx.fillStyle = toBandFill(color, 0.3);
+      ctx.fillRect(x0, padY, bandW, h - 2 * padY);
+      // Solid edge lines for definition.
+      ctx.strokeStyle = color;
+      ctx.lineWidth = dpr;
+      ctx.beginPath();
+      ctx.moveTo(x0, padY);
+      ctx.lineTo(x0, h - padY);
+      ctx.moveTo(x1, padY);
+      ctx.lineTo(x1, h - padY);
+      ctx.stroke();
+      if (w.filter) {
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.fillStyle = 'rgba(60,60,60,0.9)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(w.filter, x0 + bandW / 2, padY + 1 * dpr);
+      }
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
 
   // Moon trajectory — drawn before the object curve so the blue object line
   // stays dominant. Thin, dashed, muted grey. A phase icon marks culmination.
@@ -1005,6 +1046,7 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
           chartDpr,
           tgt.moonCurve,
           tgt.moonPhaseIndex,
+          tgt.observationWindows,
         );
       }
       doc.addImage(chartOff.toDataURL('image/png'), 'PNG', margin, chartTop, contentW, chartH);

@@ -723,6 +723,18 @@ const fr = {
       empty: 'Aucune cible dans ce plan. Ajoutez-en depuis les suggestions ou la recherche.',
       noPlans: "Aucun plan pour l'instant",
       transit: 'Transit',
+      obsWindowAdd: "+ Fenêtre d'observation",
+      obsWindowRemove: "Supprimer la fenêtre d'observation",
+      obsWindowTitle: "Fenêtre d'observation",
+      obsWindowFilter: 'Filtre',
+      obsWindowColor: 'Couleur de la fenêtre',
+      obsWindowFrom: 'de',
+      obsWindowTo: 'à',
+      obsWindowDuration: 'Durée de la fenêtre',
+      obsWindowFrame: 'Durée de pose unitaire en secondes',
+      obsWindowFrameUnit: 's',
+      obsWindowSnap:
+        'Contraindre la durée de la fenêtre à des multiples entiers de la pose unitaire',
       exportPdf: 'Exporter en PDF',
       pdf: {
         summary: 'Résumé',

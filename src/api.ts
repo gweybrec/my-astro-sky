@@ -883,6 +883,31 @@ export async function deletePoiCategoryAPI(id: string): Promise<void> {
 
 // ─── Night plans ───────────────────────────────────────────────────────────
 
+/**
+ * A user-drawn observation window on a plan entry's night trajectory: a time
+ * region (two draggable edges) during which the target will be imaged, with an
+ * optional imaging filter and colour. Positions are stored as fractions of the
+ * plotted night window so they render identically on the interactive chart and
+ * the exported PDF (both map the same `win` via the chart's `xAt`).
+ */
+export interface ObservationWindow {
+  id: string;
+  /** Start position within the night window, [0,1] (win.start → win.end). */
+  startFrac: number;
+  /** End position within the night window, [0,1]; always > startFrac. */
+  endFrac: number;
+  /** Imaging filter name (e.g. 'Ha'), or null for no filter. */
+  filter: string | null;
+  /** Explicit CSS colour when the user overrides; null ⇒ derive from the filter. */
+  color: string | null;
+  /** Single-frame (sub) exposure in seconds; null ⇒ unset. Also the optional
+   * drag snap-step when the window's step mode is enabled. */
+  frameSeconds: number | null;
+  /** When true, dragging snaps to whole single-frame steps (the "link" toggle).
+   * Defaults on for newly created windows. */
+  snap: boolean;
+}
+
 export interface PlanEntry {
   id: string;
   /** Target DSO id, or null for a custom location (framed on empty sky). */
@@ -898,6 +923,8 @@ export interface PlanEntry {
   /** Smart-scope single-frame mosaic size (deg); null ⇒ render at native FOV. */
   mosaicWDeg: number | null;
   mosaicHDeg: number | null;
+  /** User-drawn observation windows on the night trajectory (may be empty). */
+  observationWindows: ObservationWindow[];
 }
 
 /** A mosaic: a group of tile entries covering one target. Tiles are the plan
@@ -1165,6 +1192,7 @@ export async function updatePlanEntryPositionAPI(
     dsoId?: string | null;
     mosaicWDeg?: number | null;
     mosaicHDeg?: number | null;
+    observationWindows?: ObservationWindow[];
   },
 ): Promise<void> {
   const res = await fetch(

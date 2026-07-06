@@ -59,6 +59,7 @@ import {
   removePlanEntry,
   reorderPlanEntries,
   updatePlanEntryFrame,
+  sanitizeObservationWindows,
   getAllPlanMosaics,
   getPlanMosaic,
   createPlanMosaic,
@@ -1855,6 +1856,12 @@ app.delete('/api/poi-categories', (_req, res) => {
 // ─── Night plans ──────────────────────────────────────────────────────────────
 
 function planEntryToApi(e: PlanEntryRow) {
+  let observationWindows: unknown = [];
+  try {
+    observationWindows = JSON.parse(e.observation_windows ?? '[]');
+  } catch {
+    observationWindows = [];
+  }
   return {
     id: e.id,
     dsoId: e.dso_id ?? null,
@@ -1866,6 +1873,7 @@ function planEntryToApi(e: PlanEntryRow) {
     mosaicId: e.mosaic_id ?? null,
     mosaicWDeg: e.mosaic_w_deg ?? null,
     mosaicHDeg: e.mosaic_h_deg ?? null,
+    observationWindows,
   };
 }
 
@@ -2508,6 +2516,7 @@ app.patch('/api/plans/:id/entries/:entryId', (req, res) => {
       dsoId?: string | null;
       mosaicWDeg?: number | null;
       mosaicHDeg?: number | null;
+      observationWindows?: unknown;
     } = {};
 
     if ('paDeg' in body) {
@@ -2551,6 +2560,14 @@ app.patch('/api/plans/:id/entries/:entryId', (req, res) => {
         return;
       }
       fields.mosaicHDeg = body.mosaicHDeg as number | null;
+    }
+    if ('observationWindows' in body) {
+      if (!Array.isArray(body.observationWindows)) {
+        res.status(400).json({ error: 'observationWindows must be an array' });
+        return;
+      }
+      // Re-validated and serialised inside updatePlanEntryFrame via sanitizeObservationWindows.
+      fields.observationWindows = body.observationWindows;
     }
 
     if (Object.keys(fields).length === 0) {
@@ -3370,6 +3387,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
                     mosaic_id: typeof e.mosaicId === 'string' ? e.mosaicId : null,
                     mosaic_w_deg: typeof e.mosaicWDeg === 'number' ? e.mosaicWDeg : null,
                     mosaic_h_deg: typeof e.mosaicHDeg === 'number' ? e.mosaicHDeg : null,
+                    observation_windows: sanitizeObservationWindows(e.observationWindows),
                   });
                 });
               }

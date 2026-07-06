@@ -114,7 +114,8 @@ db.exec(`
     notes     TEXT,
     mosaic_id TEXT,
     mosaic_w_deg REAL,
-    mosaic_h_deg REAL
+    mosaic_h_deg REAL,
+    observation_windows TEXT NOT NULL DEFAULT '[]'
   );
   CREATE TABLE IF NOT EXISTS plan_mosaics (
     id          TEXT PRIMARY KEY,
@@ -774,6 +775,9 @@ export interface PlanEntryRow {
    * Optional on construction (tile/custom inserts omit it); always present on reads. */
   mosaic_w_deg?: number | null;
   mosaic_h_deg?: number | null;
+  /** JSON array of observation windows (see ObservationWindow). Optional on
+   * construction (defaults to '[]'); a JSON string on reads. */
+  observation_windows?: string | null;
 }
 
 export interface PlanMosaicRow {
@@ -813,7 +817,7 @@ const planEntryExistsStmt = db.prepare(
   'SELECT 1 FROM plan_entries WHERE plan_id = ? AND dso_id = ?',
 );
 const insertPlanEntryStmt = db.prepare(
-  'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes, mosaic_id, mosaic_w_deg, mosaic_h_deg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes, mosaic_id, mosaic_w_deg, mosaic_h_deg, observation_windows) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 );
 const deletePlanEntryStmt = db.prepare('DELETE FROM plan_entries WHERE id = ?');
 const deletePlanEntriesStmt = db.prepare('DELETE FROM plan_entries WHERE plan_id = ?');
@@ -1096,6 +1100,49 @@ export function planEntryExists(planId: string, dsoId: string): boolean {
   return planEntryExistsStmt.get(planId, dsoId) !== undefined;
 }
 
+/**
+ * Validate/coerce a raw value into a well-formed observation-window array, then
+ * serialise it to a JSON string for storage. Mirrors the client-side
+ * `sanitizeObservationWindows` in `src/observation-windows.ts`; kept independent
+ * so untrusted PATCH/import payloads are re-checked server-side.
+ */
+export function sanitizeObservationWindows(raw: any): string {
+  if (!Array.isArray(raw)) return '[]';
+  const MIN = 0.02;
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rawStart = Number(item.startFrac);
+    const rawEnd = Number(item.endFrac);
+    if (!Number.isFinite(rawStart) || !Number.isFinite(rawEnd)) continue;
+    let start = clamp01(rawStart);
+    let end = clamp01(rawEnd);
+    if (end < start) [start, end] = [end, start];
+    if (end - start < MIN) {
+      end = Math.min(1, start + MIN);
+      if (end - start < MIN) start = Math.max(0, end - MIN);
+    }
+    const filter =
+      typeof item.filter === 'string' && item.filter.trim()
+        ? item.filter.trim().slice(0, 40)
+        : null;
+    const color =
+      typeof item.color === 'string' && item.color.trim() ? item.color.trim().slice(0, 64) : null;
+    const frameSeconds =
+      Number.isFinite(Number(item.frameSeconds)) && Number(item.frameSeconds) > 0
+        ? Number(item.frameSeconds)
+        : null;
+    const snap = typeof item.snap === 'boolean' ? item.snap : false;
+    const id =
+      typeof item.id === 'string' && item.id.trim()
+        ? item.id.trim().slice(0, 64)
+        : `ow-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    out.push({ id, startFrac: start, endFrac: end, filter, color, frameSeconds, snap });
+  }
+  return JSON.stringify(out);
+}
+
 export function addPlanEntry(row: PlanEntryRow): void {
   insertPlanEntryStmt.run(
     row.id,
@@ -1109,6 +1156,7 @@ export function addPlanEntry(row: PlanEntryRow): void {
     row.mosaic_id ?? null,
     row.mosaic_w_deg ?? null,
     row.mosaic_h_deg ?? null,
+    row.observation_windows ?? '[]',
   );
 }
 
@@ -1141,6 +1189,7 @@ export function updatePlanEntryFrame(
     dsoId?: string | null;
     mosaicWDeg?: number | null;
     mosaicHDeg?: number | null;
+    observationWindows?: unknown;
   },
 ): boolean {
   const sets: string[] = [];
@@ -1168,6 +1217,10 @@ export function updatePlanEntryFrame(
   if ('mosaicHDeg' in fields) {
     sets.push('mosaic_h_deg = ?');
     vals.push(fields.mosaicHDeg ?? null);
+  }
+  if ('observationWindows' in fields) {
+    sets.push('observation_windows = ?');
+    vals.push(sanitizeObservationWindows(fields.observationWindows));
   }
   if (sets.length === 0) return false;
   vals.push(entryId);
