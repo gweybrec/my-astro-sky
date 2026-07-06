@@ -11,7 +11,6 @@ import type {
   PoiCategory,
   AffineMatrix,
 } from './types';
-import { poisMatchFilter } from './poi';
 import {
   project,
   toCanvas,
@@ -21,13 +20,26 @@ import {
   getProjectionGeneration,
 } from './projection';
 import { reportUnknownRendererError } from './error-reporter';
+import { affineToCSS } from './affine';
 import {
-  computeAffineTransform,
-  computeAffineLSQ,
-  computeSimilarityTransform,
-  affineToCSS,
-} from './affine';
-import { getStarByHip, getStars } from './star-catalog';
+  fitPhotoAffine,
+  buildPhotoPoints,
+  projCentroidAndHalfDiag,
+  isCentroidInsideBorder,
+  isCentroidViewportCulled,
+  computePhotoQuadCorners,
+  computePhotoMatrixForView,
+  computePhotoCenterAndScale,
+  computePhotoCenter,
+  isLabelAllowed as labelAllowed,
+  isPoiAllowed as poiAllowed,
+  manualPlacementCentroid,
+  computeManualMatrix,
+  buildSyntheticCorrespondences,
+  extractMatrixFromTransform,
+  derivePlacementFromCorrespondences,
+  derivePlacementFromMatrix,
+} from './photo-placement';
 import {
   uploadPhoto,
   deletePhotoAPI,
@@ -135,24 +147,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-/** Get RA/Dec for a correspondence: use star catalog if starHip > 0, else use stored starRa/starDec */
-function getCorrRaDec(corr: PhotoCorrespondence): { ra: number; dec: number } | null {
-  // Try to use stored RA/Dec first (always available for plate-solved photos).
-  // Match both undefined and null — the upload response serializes missing values as null
-  // (server/index.ts scaledCorrespondences uses `?? null`), while the DB reload path omits
-  // them. Without this, main-point correspondences (starHip>0, no RA/Dec) would resolve to
-  // {ra: null, dec: null} post-upload and collapse the affine fit.
-  if (corr.starRa != null && corr.starDec != null) {
-    return { ra: corr.starRa, dec: corr.starDec };
-  }
-  // Fall back to client catalog lookup (for manually picked stars)
-  if (corr.starHip > 0) {
-    const star = getStarByHip(corr.starHip);
-    return star ? { ra: star.ra, dec: star.dec } : null;
-  }
-  return null;
 }
 
 export interface PlacedPhoto {
@@ -527,21 +521,12 @@ export class PhotoOverlay {
 
   /** True when the photo passes the current label filter (no filter ⇒ allowed). */
   private isLabelAllowed(placed: PlacedPhoto): boolean {
-    const filterKeys = Object.keys(this.visibleLabels || {});
-    if (filterKeys.length === 0) return true;
-    if (!placed.photo.labels || placed.photo.labels.length === 0) {
-      return this.visibleLabels['(no label)'] !== false;
-    }
-    return placed.photo.labels.some((l) => this.visibleLabels[l] !== false);
+    return labelAllowed(placed.photo, this.visibleLabels);
   }
 
   /** True when the photo passes the current POI filter (no filter ⇒ allowed). */
   private isPoiAllowed(placed: PlacedPhoto): boolean {
-    return poisMatchFilter(
-      placed.photo.pointsOfInterest ?? [],
-      this.poiCategories,
-      this.visiblePois,
-    );
+    return poiAllowed(placed.photo, this.poiCategories, this.visiblePois);
   }
 
   private applyPhotoVisibility() {
@@ -601,19 +586,14 @@ export class PhotoOverlay {
       // projection-space point, so a stale centroid would cull against the wrong
       // coordinates and, because a culled photo skips applyTransform, never refresh
       // (the photo stays hidden until forced, e.g. by toggling its visibility).
-      if (placed.projCentroid !== null && placed.projGen === gen) {
-        const cc = toCanvas(placed.projCentroid.x, placed.projCentroid.y, view);
-        const margin = placed.projHalfDiag * view.scale * 2;
-        if (
-          cc.x + margin < 0 ||
-          cc.x - margin > view.width ||
-          cc.y + margin < 0 ||
-          cc.y - margin > view.height
-        ) {
-          placed.viewportCulled = true;
-          placed.imgEl.style.display = 'none';
-          continue;
-        }
+      if (
+        placed.projCentroid !== null &&
+        placed.projGen === gen &&
+        isCentroidViewportCulled(placed.projCentroid, placed.projHalfDiag, view)
+      ) {
+        placed.viewportCulled = true;
+        placed.imgEl.style.display = 'none';
+        continue;
       }
       placed.viewportCulled = false;
 
@@ -633,49 +613,7 @@ export class PhotoOverlay {
    * other than the live one.
    */
   computeMatrixForView(placed: PlacedPhoto, view: ViewState): AffineMatrix | null {
-    const { photo } = placed;
-
-    if (photo.manualPlacement) {
-      const cp = project(photo.manualPlacement.centerRa, photo.manualPlacement.centerDec);
-      if (Math.sqrt(cp.x * cp.x + cp.y * cp.y) > this.borderRadiusPU) return null;
-      return computeManualMatrix(photo.manualPlacement, view, photo.width, photo.height);
-    }
-
-    if (photo.correspondences.length < 2) return null;
-
-    const photoPoints: Point[] = [];
-    const canvasPoints: Point[] = [];
-    const projPoints: { x: number; y: number }[] = [];
-    for (const corr of photo.correspondences) {
-      const raDec = getCorrRaDec(corr);
-      if (!raDec) continue;
-      const proj = project(raDec.ra, raDec.dec);
-      projPoints.push(proj);
-      photoPoints.push({ x: corr.photoX, y: corr.photoY });
-      canvasPoints.push(toCanvas(proj.x, proj.y, view));
-    }
-    if (photoPoints.length < 2) return null;
-
-    const cx = projPoints.reduce((s, p) => s + p.x, 0) / projPoints.length;
-    const cy = projPoints.reduce((s, p) => s + p.y, 0) / projPoints.length;
-    if (Math.sqrt(cx * cx + cy * cy) > this.borderRadiusPU) return null;
-
-    try {
-      if (photoPoints.length === 2) {
-        return computeSimilarityTransform(
-          photoPoints as [Point, Point],
-          canvasPoints as [Point, Point],
-        );
-      } else if (photoPoints.length === 3) {
-        return computeAffineTransform(
-          photoPoints as [Point, Point, Point],
-          canvasPoints as [Point, Point, Point],
-        );
-      }
-      return computeAffineLSQ(photoPoints, canvasPoints);
-    } catch {
-      return null;
-    }
+    return computePhotoMatrixForView(placed.photo, view, this.borderRadiusPU);
   }
 
   /**
@@ -702,64 +640,12 @@ export class PhotoOverlay {
     const results: PhotoCanvasQuad[] = [];
 
     for (const placed of this.placedPhotos) {
-      if (
-        !placed.visible ||
-        placed.borderHidden ||
-        placed.viewportCulled ||
-        placed.photo.correspondences.length < 2
-      )
-        continue;
+      if (!placed.visible || placed.borderHidden || placed.viewportCulled) continue;
 
-      const photoPoints: Point[] = [];
-      const canvasPoints: Point[] = [];
-
-      for (const corr of placed.photo.correspondences) {
-        const raDec = getCorrRaDec(corr);
-        if (!raDec) continue;
-        const proj = project(raDec.ra, raDec.dec);
-        const canvasPt = toCanvas(proj.x, proj.y, view);
-        photoPoints.push({ x: corr.photoX, y: corr.photoY });
-        canvasPoints.push(canvasPt);
-      }
-
-      if (photoPoints.length < 2) continue;
-
-      try {
-        let matrix;
-        if (photoPoints.length === 2) {
-          matrix = computeSimilarityTransform(
-            photoPoints as [Point, Point],
-            canvasPoints as [Point, Point],
-          );
-        } else if (photoPoints.length === 3) {
-          matrix = computeAffineTransform(
-            photoPoints as [Point, Point, Point],
-            canvasPoints as [Point, Point, Point],
-          );
-        } else {
-          matrix = computeAffineLSQ(photoPoints, canvasPoints);
-        }
-
-        // Always use stored dimensions so outlines are correct even when a thumbnail is loaded
-        const w = placed.photo.width;
-        const h = placed.photo.height;
-
-        const photoCorners = [
-          { x: 0, y: 0 },
-          { x: w, y: 0 },
-          { x: w, y: h },
-          { x: 0, y: h },
-        ];
-
-        const corners = photoCorners.map((p) => ({
-          x: matrix.a * p.x + matrix.c * p.y + matrix.e,
-          y: matrix.b * p.x + matrix.d * p.y + matrix.f,
-        }));
-
-        results.push({ id: placed.photo.id, name: placed.photo.originalName, corners });
-      } catch {
-        // colinear points - skip
-      }
+      // Always uses stored dimensions so outlines are correct even when a thumbnail is loaded.
+      const corners = computePhotoQuadCorners(placed.photo, view);
+      if (!corners) continue; // < 2 correspondences or colinear points
+      results.push({ id: placed.photo.id, name: placed.photo.originalName, corners });
     }
 
     return results;
@@ -777,99 +663,15 @@ export class PhotoOverlay {
     viewHeight: number,
   ): { ra: number; dec: number; scale: number } | null {
     const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
-    if (!placed || placed.photo.correspondences.length < 2) return null;
-
-    const photoPoints: Point[] = [];
-    const projPoints: Point[] = [];
-
-    for (const corr of placed.photo.correspondences) {
-      const raDec = getCorrRaDec(corr);
-      if (!raDec) continue;
-      const proj = project(raDec.ra, raDec.dec);
-      photoPoints.push({ x: corr.photoX, y: corr.photoY });
-      projPoints.push(proj);
-    }
-
-    if (photoPoints.length < 2) return null;
-
-    try {
-      let matrix;
-      if (photoPoints.length === 2) {
-        matrix = computeSimilarityTransform(
-          photoPoints as [Point, Point],
-          projPoints as [Point, Point],
-        );
-      } else if (photoPoints.length === 3) {
-        matrix = computeAffineTransform(
-          photoPoints as [Point, Point, Point],
-          projPoints as [Point, Point, Point],
-        );
-      } else {
-        matrix = computeAffineLSQ(photoPoints, projPoints);
-      }
-
-      const w = placed.photo.width;
-      const h = placed.photo.height;
-
-      const photoCorners = [
-        { x: 0, y: 0 },
-        { x: w, y: 0 },
-        { x: w, y: h },
-        { x: 0, y: h },
-      ];
-
-      const projCorners = photoCorners.map((p) => ({
-        x: matrix.a * p.x + matrix.c * p.y + matrix.e,
-        y: matrix.b * p.x + matrix.d * p.y + matrix.f,
-      }));
-
-      // Bounding box in projection space
-      let minX = Infinity,
-        maxX = -Infinity,
-        minY = Infinity,
-        maxY = -Infinity;
-      for (const c of projCorners) {
-        if (c.x < minX) minX = c.x;
-        if (c.x > maxX) maxX = c.x;
-        if (c.y < minY) minY = c.y;
-        if (c.y > maxY) maxY = c.y;
-      }
-
-      const centerProj = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-      const center = unproject(centerProj.x, centerProj.y);
-
-      // Scale to fit: projection extent * scale = viewport pixels
-      // Add 20% margin
-      const extentX = maxX - minX;
-      const extentY = maxY - minY;
-      const scale = Math.min(viewWidth / extentX, viewHeight / extentY) * 0.8;
-
-      return { ra: center.ra, dec: center.dec, scale };
-    } catch {
-      return null;
-    }
+    if (!placed) return null;
+    return computePhotoCenterAndScale(placed.photo, viewWidth, viewHeight);
   }
 
   /** Compute the average RA/Dec center of a photo from its star correspondences */
   getPhotoCenter(photoId: string): { ra: number; dec: number } | null {
     const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
-    if (!placed || placed.photo.correspondences.length === 0) return null;
-
-    let sumX = 0,
-      sumY = 0,
-      count = 0;
-    for (const corr of placed.photo.correspondences) {
-      const raDec = getCorrRaDec(corr);
-      if (!raDec) continue;
-      const p = project(raDec.ra, raDec.dec);
-      sumX += p.x;
-      sumY += p.y;
-      count++;
-    }
-    if (count === 0) return null;
-
-    const avg = unproject(sumX / count, sumY / count);
-    return { ra: avg.ra, dec: avg.dec };
+    if (!placed) return null;
+    return computePhotoCenter(placed.photo);
   }
 
   setPhotoOpacity(photoId: string, opacity: number) {
@@ -1085,11 +887,14 @@ export class PhotoOverlay {
 
     // If this photo has manual placement params, use them directly to compute the transform
     if (photo.manualPlacement) {
-      const cp = project(photo.manualPlacement.centerRa, photo.manualPlacement.centerDec);
-      placed.projCentroid = cp;
+      const { centroid, halfDiag } = manualPlacementCentroid(
+        photo.manualPlacement,
+        photo.width,
+        photo.height,
+      );
+      placed.projCentroid = centroid;
       placed.projGen = getProjectionGeneration();
-      const halfDiagPx = Math.sqrt((photo.width / 2) ** 2 + (photo.height / 2) ** 2);
-      placed.projHalfDiag = halfDiagPx * photo.manualPlacement.projPerPx;
+      placed.projHalfDiag = halfDiag;
       imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
       applyManualTransform(imgEl, photo.manualPlacement, view, photo.width, photo.height);
       return;
@@ -1097,35 +902,17 @@ export class PhotoOverlay {
 
     if (photo.correspondences.length < 2) return;
 
-    const photoPoints: Point[] = [];
-    const canvasPoints: Point[] = [];
-    const projPoints: { x: number; y: number }[] = [];
-
-    for (const corr of photo.correspondences) {
-      const raDec = getCorrRaDec(corr);
-      if (!raDec) continue;
-
-      const proj = project(raDec.ra, raDec.dec);
-      projPoints.push(proj);
-      const canvasPt = toCanvas(proj.x, proj.y, view);
-      photoPoints.push({ x: corr.photoX, y: corr.photoY });
-      canvasPoints.push(canvasPt);
-    }
-
+    const { photoPoints, projPoints, canvasPoints } = buildPhotoPoints(photo, view);
     if (photoPoints.length < 2) return;
 
     // Compute centroid in projection space and cache it for viewport culling.
-    const cx = projPoints.reduce((s, p) => s + p.x, 0) / projPoints.length;
-    const cy = projPoints.reduce((s, p) => s + p.y, 0) / projPoints.length;
-    placed.projCentroid = { x: cx, y: cy };
+    const { centroid, halfDiag } = projCentroidAndHalfDiag(projPoints);
+    placed.projCentroid = centroid;
     placed.projGen = getProjectionGeneration();
-    placed.projHalfDiag = projPoints.reduce(
-      (m, p) => Math.max(m, Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2)),
-      0,
-    );
+    placed.projHalfDiag = halfDiag;
 
     // Check if photo centroid is inside the border circle
-    if (Math.sqrt(cx * cx + cy * cy) > this.borderRadiusPU) {
+    if (!isCentroidInsideBorder(centroid, this.borderRadiusPU)) {
       placed.borderHidden = true;
       imgEl.style.display = 'none';
       return;
@@ -1134,20 +921,7 @@ export class PhotoOverlay {
     imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
 
     try {
-      let matrix;
-      if (photoPoints.length === 2) {
-        matrix = computeSimilarityTransform(
-          photoPoints as [Point, Point],
-          canvasPoints as [Point, Point],
-        );
-      } else if (photoPoints.length === 3) {
-        matrix = computeAffineTransform(
-          photoPoints as [Point, Point, Point],
-          canvasPoints as [Point, Point, Point],
-        );
-      } else {
-        matrix = computeAffineLSQ(photoPoints, canvasPoints);
-      }
+      const matrix = fitPhotoAffine(photoPoints, canvasPoints);
       imgEl.style.transform = affineToCSS(matrix);
 
       // LOD: swap to thumbnail when the photo renders small on screen
@@ -2609,147 +2383,6 @@ export class PhotoOverlay {
     });
   }
 
-  /** Derive manual placement parameters from photo correspondences */
-  private derivePlacementFromCorrespondences(
-    photo: Photo,
-    view: ViewState,
-    naturalWidth: number,
-    naturalHeight: number,
-  ): ManualPlacement {
-    // Default fallback
-    const defaultPlacement: ManualPlacement = {
-      centerRa: 0,
-      centerDec: 60,
-      rotationDeg: 0,
-      projPerPx: 0.002,
-      mirrorX: false,
-      mirrorY: false,
-    };
-
-    if (photo.correspondences.length < 3) {
-      return defaultPlacement;
-    }
-
-    try {
-      // Build correspondence arrays in projection space (view-independent)
-      const photoPoints: Point[] = [];
-      const projPoints: Point[] = [];
-
-      for (const corr of photo.correspondences.slice(0, 3)) {
-        const raDec = getCorrRaDec(corr);
-        if (!raDec) continue;
-        const proj = project(raDec.ra, raDec.dec);
-        photoPoints.push({ x: corr.photoX, y: corr.photoY });
-        projPoints.push(proj);
-      }
-
-      if (photoPoints.length < 3) {
-        return defaultPlacement;
-      }
-
-      // Compute affine transform: photo pixels → projection space
-      const matrix = computeAffineTransform(
-        photoPoints as [Point, Point, Point],
-        projPoints as [Point, Point, Point],
-      );
-
-      // Transform photo center to projection space
-      const cx = naturalWidth / 2;
-      const cy = naturalHeight / 2;
-      const centerProjX = matrix.a * cx + matrix.c * cy + matrix.e;
-      const centerProjY = matrix.b * cx + matrix.d * cy + matrix.f;
-
-      // Unproject to RA/Dec
-      const centerSky = unproject(centerProjX, centerProjY);
-
-      // Extract rotation from matrix (atan2 of first column vector)
-      // matrix maps [1,0] to [a,b], so rotation is atan2(b, a)
-      const rotationRad = Math.atan2(matrix.b, matrix.a);
-      const rotationDeg = (rotationRad * 180) / Math.PI;
-
-      // Extract scale: average magnitude of column vectors in projection space
-      const scaleX = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
-      const scaleY = Math.sqrt(matrix.c * matrix.c + matrix.d * matrix.d);
-      const projPerPx = (scaleX + scaleY) / 2;
-
-      return {
-        centerRa: centerSky.ra,
-        centerDec: centerSky.dec,
-        rotationDeg,
-        projPerPx,
-        mirrorX: false,
-        mirrorY: false,
-      };
-    } catch (err) {
-      reportUnknownRendererError('derive_placement_error', err);
-      return defaultPlacement;
-    }
-  }
-
-  /** Extract matrix coefficients from CSS transform string */
-  private extractMatrixFromTransform(
-    transform: string,
-  ): { a: number; b: number; c: number; d: number; e: number; f: number } | null {
-    if (!transform || transform === 'none') return null;
-    const match = transform.match(/matrix\(([^)]+)\)/);
-    if (!match) return null;
-    const values = match[1].split(',').map((v) => parseFloat(v.trim()));
-    if (values.length !== 6) return null;
-    return { a: values[0], b: values[1], c: values[2], d: values[3], e: values[4], f: values[5] };
-  }
-
-  /** Derive ManualPlacement params from a CSS transform matrix */
-  private derivePlacementFromMatrix(
-    matrix: { a: number; b: number; c: number; d: number; e: number; f: number },
-    view: ViewState,
-    photoWidth: number,
-    photoHeight: number,
-  ): ManualPlacement {
-    // The matrix maps photo pixel (px, py) to canvas pixel (cx, cy):
-    // cx = a*px + c*py + e
-    // cy = b*px + d*py + f
-
-    // Photo center in photo coordinates
-    const photoCenterX = photoWidth / 2;
-    const photoCenterY = photoHeight / 2;
-
-    // Transform photo center to canvas coords
-    const canvasCenterX = matrix.a * photoCenterX + matrix.c * photoCenterY + matrix.e;
-    const canvasCenterY = matrix.b * photoCenterX + matrix.d * photoCenterY + matrix.f;
-
-    // Convert canvas coords to projection space
-    const projCenter = fromCanvas(canvasCenterX, canvasCenterY, view);
-
-    // Unproject to RA/Dec
-    const centerSky = unproject(projCenter.x, projCenter.y);
-
-    // Extract rotation from matrix
-    // The matrix has the form: a=cos*scale, b=sin*scale, c=-sin*scale, d=cos*scale
-    // So rotation = atan2(b, a)
-    const rotationRad = Math.atan2(matrix.b, matrix.a);
-    const rotationDeg = (rotationRad * 180) / Math.PI;
-
-    // Extract scale: magnitude of first column vector gives pxPerPx (canvas pixels per photo pixel)
-    const pxPerPx = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
-    // Convert to projPerPx: pxPerPx / view.scale
-    const projPerPx = pxPerPx / view.scale;
-
-    // Detect mirrors by checking if determinant is negative
-    const det = matrix.a * matrix.d - matrix.b * matrix.c;
-    // For now, assume no mirrors (detecting mirrors from matrix is complex)
-    const mirrorX = false;
-    const mirrorY = det < 0;
-
-    return {
-      centerRa: centerSky.ra,
-      centerDec: centerSky.dec,
-      rotationDeg,
-      projPerPx,
-      mirrorX,
-      mirrorY,
-    };
-  }
-
   /** Open repositioning mode for an existing photo */
   startRepositioning(photoId: string) {
     const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
@@ -2783,19 +2416,14 @@ export class PhotoOverlay {
     } else {
       // Extract placement from the current CSS transform matrix
       // This ensures the repositioned photo starts exactly where it currently is
-      const matrix = this.extractMatrixFromTransform(imgEl.style.transform);
+      const matrix = extractMatrixFromTransform(imgEl.style.transform);
       if (matrix) {
-        placement = this.derivePlacementFromMatrix(matrix, view, naturalWidth, naturalHeight);
+        placement = derivePlacementFromMatrix(matrix, view, naturalWidth, naturalHeight);
         // Round rotation to nearest degree for cleaner UI
         placement.rotationDeg = Math.round(placement.rotationDeg);
       } else {
         // Fallback: derive from correspondences (shouldn't normally happen)
-        placement = this.derivePlacementFromCorrespondences(
-          photo,
-          view,
-          naturalWidth,
-          naturalHeight,
-        );
+        placement = derivePlacementFromCorrespondences(photo, naturalWidth, naturalHeight);
         placement.rotationDeg = Math.round(placement.rotationDeg);
       }
     }
@@ -2970,48 +2598,7 @@ export class PhotoOverlay {
   }
 }
 
-/** Apply manual placement CSS transform to imgEl */
-/** Pure: the photo→canvas affine matrix for a manual placement at the given view. */
-function computeManualMatrix(
-  placement: ManualPlacement,
-  view: ViewState,
-  natW: number,
-  natH: number,
-): AffineMatrix {
-  // Center of photo in canvas coords
-  const centerProj = project(placement.centerRa, placement.centerDec);
-  const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
-
-  // Scale: projection units per pixel * view scale = canvas pixels per photo pixel
-  const pxPerPx = placement.projPerPx * view.scale;
-
-  // Mirror factors
-  const mx = placement.mirrorX ? -1 : 1;
-  const my = placement.mirrorY ? -1 : 1;
-
-  // Rotation angle (convert PA to canvas angle)
-  const rotRad = (placement.rotationDeg * Math.PI) / 180;
-
-  // CSS matrix to map photo pixel (0,0) to canvas
-  // The photo pixel (cx, cy) maps to center
-  const cx = natW / 2;
-  const cy = natH / 2;
-
-  const cosR = Math.cos(rotRad) * pxPerPx;
-  const sinR = Math.sin(rotRad) * pxPerPx;
-
-  // matrix(a, b, c, d, e, f): maps (photoX, photoY) → canvas
-  // Apply mirror before rotation: first mirror the photo coords, then rotate+scale
-  const a = cosR * mx;
-  const b = sinR * mx;
-  const c = -sinR * my;
-  const d = cosR * my;
-  const e = centerCanvas.x - a * cx - c * cy;
-  const f = centerCanvas.y - b * cx - d * cy;
-
-  return { a, b, c, d, e, f };
-}
-
+/** Apply a manual placement's CSS transform to imgEl (matrix math in photo-placement.ts). */
 function applyManualTransform(
   imgEl: HTMLImageElement,
   placement: ManualPlacement,
@@ -3020,77 +2607,4 @@ function applyManualTransform(
   natH: number,
 ): void {
   imgEl.style.transform = affineToCSS(computeManualMatrix(placement, view, natW, natH));
-}
-
-/** Build 3 synthetic PhotoCorrespondence from manual placement by using the view state */
-function buildSyntheticCorrespondences(
-  placement: ManualPlacement,
-  natW: number,
-  natH: number,
-  view: ViewState,
-): PhotoCorrespondence[] | null {
-  // Use 3 well-spaced points to capture the full transform including mirrors
-  const photoPoints: [number, number][] = [
-    [natW * 0.2, natH * 0.2],
-    [natW * 0.8, natH * 0.2],
-    [natW * 0.5, natH * 0.8],
-  ];
-
-  // Build the same CSS matrix that applyManualTransform uses
-  const centerProj = project(placement.centerRa, placement.centerDec);
-  const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
-  const pxPerPx = placement.projPerPx * view.scale;
-  const rotRad = (placement.rotationDeg * Math.PI) / 180;
-  const mx = placement.mirrorX ? -1 : 1;
-  const my = placement.mirrorY ? -1 : 1;
-  const cx = natW / 2;
-  const cy = natH / 2;
-
-  const cosR = Math.cos(rotRad) * pxPerPx;
-  const sinR = Math.sin(rotRad) * pxPerPx;
-  const a = cosR * mx;
-  const b = sinR * mx;
-  const c = -sinR * my;
-  const d = cosR * my;
-  const e = centerCanvas.x - a * cx - c * cy;
-  const f = centerCanvas.y - b * cx - d * cy;
-
-  const correspondences: PhotoCorrespondence[] = [];
-
-  for (let idx = 0; idx < photoPoints.length; idx++) {
-    const [px, py] = photoPoints[idx];
-
-    // Apply the CSS matrix to get canvas coordinates (same as applyManualTransform)
-    const canvasX = a * px + c * py + e;
-    const canvasY = b * px + d * py + f;
-
-    // Convert canvas → projection → celestial
-    const proj = fromCanvas(canvasX, canvasY, view);
-    const sky = unproject(proj.x, proj.y);
-
-    console.log(
-      `[buildSyntheticCorrespondences] Sample ${idx}: photo(${px.toFixed(1)}, ${py.toFixed(1)}) → canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → proj(${proj.x.toFixed(4)}, ${proj.y.toFixed(4)}) → sky(${sky.ra.toFixed(3)}, ${sky.dec.toFixed(3)})`,
-    );
-
-    // Verify round-trip: celestial back to canvas should give same result
-    const verifyProj = project(sky.ra, sky.dec);
-    const verifyCanvas = toCanvas(verifyProj.x, verifyProj.y, view);
-    console.log(
-      `[buildSyntheticCorrespondences] Round-trip check: canvas(${canvasX.toFixed(1)}, ${canvasY.toFixed(1)}) → celestial → canvas(${verifyCanvas.x.toFixed(1)}, ${verifyCanvas.y.toFixed(1)}) - diff: (${(verifyCanvas.x - canvasX).toFixed(3)}, ${(verifyCanvas.y - canvasY).toFixed(3)})`,
-    );
-
-    // Use exact celestial coordinates to preserve the manual transform
-    correspondences.push({
-      pointIndex: idx,
-      photoX: px,
-      photoY: py,
-      starHip: 0,
-      starRa: sky.ra,
-      starDec: sky.dec,
-      starName: `Manual point ${idx + 1}`,
-    });
-  }
-
-  console.log('[buildSyntheticCorrespondences] Final correspondences:', correspondences);
-  return correspondences;
 }

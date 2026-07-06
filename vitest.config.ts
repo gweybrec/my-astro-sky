@@ -17,8 +17,10 @@ export default defineConfig({
         // Type-only files
         'src/app-meta.d.ts',
         'src/types.ts',
-        // DOM/Canvas rendering — untestable in a unit env
-        'src/photo-overlay.ts',
+        // DOM/Canvas rendering — untestable in a unit env.
+        // NOTE: photo-overlay.ts is intentionally NOT excluded — its pure placement/
+        // geometry/visibility logic lives in the covered src/photo-placement.ts, and the
+        // thin DOM shell that remains reports honestly (low but real) rather than hidden.
         'src/sky-map.ts',
         'src/sky-draw.ts',
         'src/dso-draw.ts',

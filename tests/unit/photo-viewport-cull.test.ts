@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { PhotoOverlay } from '../../src/photo-overlay';
+import { getProjectionGeneration } from '../../src/projection';
+
+// The viewport cull only trusts a cached projCentroid when its projGen matches the
+// current projection generation (a hemisphere/mode/center switch remaps every point,
+// so a stale centroid must not be trusted). applyTransform always stamps both together;
+// these tests seed the cache by hand, so they must stamp projGen to match.
+const CURRENT_GEN = () => getProjectionGeneration();
 
 // Minimal Photo with no correspondences (applyTransform exits early — no side-effects
 // beyond what updateTransforms itself does, which is exactly what we want to test).
@@ -53,6 +60,7 @@ describe('PhotoOverlay viewport culling — updateTransforms()', () => {
     // canvasX = 700 + 0*500 = 700, canvasY = 450 — dead centre
     placed.projCentroid = { x: 0, y: 0 };
     placed.projHalfDiag = 0.1;
+    placed.projGen = CURRENT_GEN();
     overlay.updateTransforms();
 
     expect(placed.viewportCulled).toBe(false);
@@ -67,6 +75,7 @@ describe('PhotoOverlay viewport culling — updateTransforms()', () => {
     // canvasX = 700 + 5*500 = 3200; margin = 0.1*500*2 = 100; 3200-100=3100 > 1400 → cull
     placed.projCentroid = { x: 5, y: 0 };
     placed.projHalfDiag = 0.1;
+    placed.projGen = CURRENT_GEN();
     overlay.updateTransforms();
 
     expect(placed.viewportCulled).toBe(true);
@@ -81,6 +90,7 @@ describe('PhotoOverlay viewport culling — updateTransforms()', () => {
     // canvasX = 700 - 5*500 = -1800; margin=100; -1800+100=-1700 < 0 → cull
     placed.projCentroid = { x: -5, y: 0 };
     placed.projHalfDiag = 0.1;
+    placed.projGen = CURRENT_GEN();
     overlay.updateTransforms();
 
     expect(placed.viewportCulled).toBe(true);
@@ -95,6 +105,7 @@ describe('PhotoOverlay viewport culling — updateTransforms()', () => {
     // canvasY = 450 - 5*500 = -2050; margin=100; -2050+100=-1950 < 0 → cull
     placed.projCentroid = { x: 0, y: 5 };
     placed.projHalfDiag = 0.1;
+    placed.projGen = CURRENT_GEN();
     overlay.updateTransforms();
 
     expect(placed.viewportCulled).toBe(true);
@@ -109,6 +120,7 @@ describe('PhotoOverlay viewport culling — updateTransforms()', () => {
     // canvasY = 450 + 5*500 = 3000 (py negative → y increases); margin=100; 3000-100=2900 > 900 → cull
     placed.projCentroid = { x: 0, y: -5 };
     placed.projHalfDiag = 0.1;
+    placed.projGen = CURRENT_GEN();
     overlay.updateTransforms();
 
     expect(placed.viewportCulled).toBe(true);
@@ -124,6 +136,7 @@ describe('PhotoOverlay viewport culling — updateTransforms()', () => {
     // margin = 0.5*500*2 = 500; cull condition: 1450 - 500 = 950 > 1400? No → NOT culled
     placed.projCentroid = { x: 1.5, y: 0 };
     placed.projHalfDiag = 0.5;
+    placed.projGen = CURRENT_GEN();
     overlay.updateTransforms();
 
     expect(placed.viewportCulled).toBe(false);
@@ -137,6 +150,7 @@ describe('PhotoOverlay viewport culling — updateTransforms()', () => {
 
     placed.projCentroid = { x: 5, y: 0 };
     placed.projHalfDiag = 0.1;
+    placed.projGen = CURRENT_GEN();
 
     // First pass: centroid is off-screen → culled
     overlay.updateTransforms();
