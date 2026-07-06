@@ -54,10 +54,15 @@ describe('zenith mode: horizon radius', () => {
     setProjectionMode('stereo');
     setCenterMode('zenith');
     setProjectionObserver(LST_H, LAT_DEG);
-    const { raDeg, decDeg } = raDecFromAltAz(0, 120, LST_H, LAT_DEG);
+    // A hair above exactly 0: like the fisheye case below, both radial forms now clip
+    // alt<0 off-canvas, and the round trip through raDecFromAltAz → project()'s internal
+    // altAzFromRaDec can otherwise land a fraction on the negative side of an exact horizon.
+    // 4-digit tolerance (not 6): stereo's r = tan((90-alt)/2) is steeper near the
+    // horizon than fisheye's cos(alt), so the tiny 0.001° nudge moves r by ~1.7e-5.
+    const { raDeg, decDeg } = raDecFromAltAz(0.001, 120, LST_H, LAT_DEG);
     const p = project(raDeg, decDeg);
     const r = Math.sqrt(p.x * p.x + p.y * p.y);
-    expect(r).toBeCloseTo(1.0, 6);
+    expect(r).toBeCloseTo(1.0, 4);
   });
 
   it('an object at alt=0 has r=1.0 (fisheye)', () => {
@@ -105,15 +110,19 @@ describe('zenith mode: below-horizon clipping', () => {
     expect(p.y).toBe(1e6);
   });
 
-  it('stereo does not clip alt<0 (matches its pole-centred non-clipping precedent)', () => {
+  it('stereo also clips alt<0 off-canvas (the horizon is a real edge in zenith mode)', () => {
+    // Unlike pole-centred stereo (where the far hemisphere is a valid part of the
+    // map), zenith mode's horizon is a hard boundary: below-horizon points must clip
+    // to the same 1e6 sentinel as fisheye so the pen-lift logic in drawConstellationLines
+    // and the grid strokers lifts the pen instead of streaking a chord between two
+    // below-horizon stars across the visible sky.
     setProjectionMode('stereo');
     setCenterMode('zenith');
     setProjectionObserver(LST_H, LAT_DEG);
     const { raDeg, decDeg } = raDecFromAltAz(-10, 50, LST_H, LAT_DEG);
     const p = project(raDeg, decDeg);
-    const r = Math.sqrt(p.x * p.x + p.y * p.y);
-    expect(r).toBeGreaterThan(1);
-    expect(isFinite(r)).toBe(true);
+    expect(p.x).toBe(1e6);
+    expect(p.y).toBe(1e6);
   });
 });
 

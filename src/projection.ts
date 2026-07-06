@@ -119,8 +119,8 @@ export function project(raDeg: number, decDeg: number): Point {
   if (_centerMode === 'zenith') {
     const { altDeg, azDeg } = altAzFromRaDec(raDeg, decDeg, _obsLstH, _obsLatDeg);
     const azRad = azDeg * DEG2RAD;
+    if (altDeg < 0) return { x: 1e6, y: 1e6 }; // below horizon, clipped (both radial forms)
     if (_projectionMode === 'fisheye') {
-      if (altDeg < 0) return { x: 1e6, y: 1e6 }; // below horizon, clipped
       const r = Math.cos(altDeg * DEG2RAD);
       return { x: r * Math.sin(azRad), y: r * Math.cos(azRad) };
     }
