@@ -120,12 +120,16 @@ export function project(raDeg: number, decDeg: number): Point {
     const { altDeg, azDeg } = altAzFromRaDec(raDeg, decDeg, _obsLstH, _obsLatDeg);
     const azRad = azDeg * DEG2RAD;
     if (altDeg < 0) return { x: 1e6, y: 1e6 }; // below horizon, clipped (both radial forms)
+    // Negate x: azimuth increases clockwise-from-north (E=90°, W=270°), the opposite
+    // east-west sense to RA. Reusing the celestial x = r·sin(θ) form unflipped would
+    // mirror the dome (East on screen-right). Looking up at the sky with North at top,
+    // East belongs on the left and West on the right, so flip the azimuth component.
     if (_projectionMode === 'fisheye') {
       const r = Math.cos(altDeg * DEG2RAD);
-      return { x: r * Math.sin(azRad), y: r * Math.cos(azRad) };
+      return { x: -r * Math.sin(azRad), y: r * Math.cos(azRad) };
     }
     const r = Math.tan(((90 - altDeg) / 2) * DEG2RAD);
-    return { x: r * Math.sin(azRad), y: r * Math.cos(azRad) };
+    return { x: -r * Math.sin(azRad), y: r * Math.cos(azRad) };
   }
   if (_projectionMode === 'fisheye') {
     const decN = _hemisphere === 'south' ? -decDeg : decDeg;
@@ -230,7 +234,7 @@ export function unproject(x: number, y: number): { ra: number; dec: number } {
       _projectionMode === 'fisheye'
         ? 90 - Math.asin(Math.min(1, r)) * RAD2DEG
         : 90 - 2 * Math.atan(r) * RAD2DEG;
-    let azDeg = Math.atan2(x, y) * RAD2DEG;
+    let azDeg = Math.atan2(-x, y) * RAD2DEG; // matches the negated x in project()'s zenith branch
     if (azDeg < 0) azDeg += 360;
     const { raDeg, decDeg } = raDecFromAltAz(altDeg, azDeg, _obsLstH, _obsLatDeg);
     return { ra: raDeg, dec: decDeg };

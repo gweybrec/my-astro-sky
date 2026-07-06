@@ -141,6 +141,43 @@ describe('zenith mode: hemisphere is irrelevant', () => {
   });
 });
 
+// ── East/West handedness ─────────────────────────────────────────────────────
+// A looking-up dome with North at top must read East on the left (x<0) and West on
+// the right (x>0) — the mirror of a ground map. Azimuth is standard clockwise-from-
+// north (E=90°, W=270°), so project()'s zenith branch negates its x component. These
+// assertions pin that orientation; the pre-fix (un-negated) code had East on the right.
+
+describe('zenith mode: east-west handedness', () => {
+  for (const mode of ['stereo', 'fisheye'] as const) {
+    it(`North up, East left, South down, West right (${mode})`, () => {
+      setProjectionMode(mode);
+      setCenterMode('zenith');
+      setProjectionObserver(LST_H, LAT_DEG);
+
+      const proj = (alt: number, az: number) => {
+        const { raDeg, decDeg } = raDecFromAltAz(alt, az, LST_H, LAT_DEG);
+        return project(raDeg, decDeg);
+      };
+
+      // North (az=0): top — x≈0, y>0
+      const n = proj(45, 0);
+      expect(n.x).toBeCloseTo(0, 4);
+      expect(n.y).toBeGreaterThan(0);
+
+      // South (az=180): bottom — x≈0, y<0
+      const s = proj(45, 180);
+      expect(s.x).toBeCloseTo(0, 4);
+      expect(s.y).toBeLessThan(0);
+
+      // East (az=90): screen-left — x<0
+      expect(proj(45, 90).x).toBeLessThan(0);
+
+      // West (az=270): screen-right — x>0
+      expect(proj(45, 270).x).toBeGreaterThan(0);
+    });
+  }
+});
+
 // ── Roundtrip ────────────────────────────────────────────────────────────────
 
 describe('zenith mode: roundtrip project → unproject', () => {
