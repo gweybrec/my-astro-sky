@@ -9,6 +9,7 @@ import {
   getCenterMode,
   setProjectionObserver,
   getProjectionGeneration,
+  zenithHorizonCrossing,
 } from '../../src/projection';
 import { raDecFromAltAz } from '../../src/sky-geometry';
 
@@ -123,6 +124,62 @@ describe('zenith mode: below-horizon clipping', () => {
     const p = project(raDeg, decDeg);
     expect(p.x).toBe(1e6);
     expect(p.y).toBe(1e6);
+  });
+});
+
+describe('zenith mode: horizon crossing (edge clipping for constellation lines)', () => {
+  it('returns null when both points are above the horizon', () => {
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const a = raDecFromAltAz(30, 100, LST_H, LAT_DEG);
+    const b = raDecFromAltAz(50, 140, LST_H, LAT_DEG);
+    expect(zenithHorizonCrossing(a.raDeg, a.decDeg, b.raDeg, b.decDeg)).toBeNull();
+  });
+
+  it('returns null when both points are below the horizon', () => {
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const a = raDecFromAltAz(-30, 100, LST_H, LAT_DEG);
+    const b = raDecFromAltAz(-10, 140, LST_H, LAT_DEG);
+    expect(zenithHorizonCrossing(a.raDeg, a.decDeg, b.raDeg, b.decDeg)).toBeNull();
+  });
+
+  it('returns a point on the rim (r=1) when the edge straddles the horizon', () => {
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const above = raDecFromAltAz(20, 120, LST_H, LAT_DEG);
+    const below = raDecFromAltAz(-20, 120, LST_H, LAT_DEG);
+    const edge = zenithHorizonCrossing(above.raDeg, above.decDeg, below.raDeg, below.decDeg)!;
+    expect(edge).not.toBeNull();
+    const r = Math.sqrt(edge.x * edge.x + edge.y * edge.y);
+    expect(r).toBeCloseTo(1.0, 6);
+  });
+
+  it('the crossing matches project() at the exact alt=0 point along a constant-azimuth edge', () => {
+    // Two points at the same azimuth straddling the horizon: the crossing must land at
+    // alt=0 for that azimuth, i.e. exactly where project() maps an alt≈0 point.
+    setProjectionMode('stereo');
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const az = 200;
+    const above = raDecFromAltAz(15, az, LST_H, LAT_DEG);
+    const below = raDecFromAltAz(-15, az, LST_H, LAT_DEG);
+    const edge = zenithHorizonCrossing(above.raDeg, above.decDeg, below.raDeg, below.decDeg)!;
+    const onHorizon = raDecFromAltAz(0.0001, az, LST_H, LAT_DEG);
+    const expected = project(onHorizon.raDeg, onHorizon.decDeg);
+    expect(edge.x).toBeCloseTo(expected.x, 3);
+    expect(edge.y).toBeCloseTo(expected.y, 3);
+  });
+
+  it('is symmetric in argument order', () => {
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const above = raDecFromAltAz(25, 300, LST_H, LAT_DEG);
+    const below = raDecFromAltAz(-25, 300, LST_H, LAT_DEG);
+    const ab = zenithHorizonCrossing(above.raDeg, above.decDeg, below.raDeg, below.decDeg)!;
+    const ba = zenithHorizonCrossing(below.raDeg, below.decDeg, above.raDeg, above.decDeg)!;
+    expect(ba.x).toBeCloseTo(ab.x, 9);
+    expect(ba.y).toBeCloseTo(ab.y, 9);
   });
 });
 

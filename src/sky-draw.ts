@@ -7,7 +7,13 @@
  * shrinks the coordinator and makes the render pipeline easier to read.
  */
 import type { Point, ViewState, ConstellationStyle } from './types';
-import { project, toCanvas, getHemisphere } from './projection';
+import {
+  project,
+  toCanvas,
+  getHemisphere,
+  getCenterMode,
+  zenithHorizonCrossing,
+} from './projection';
 import { getConstellationLines, getConstellationInfos } from './star-catalog';
 import { raDecFromAltAz } from './sky-geometry';
 import type { SKY_THEME } from './sky-themes';
@@ -182,27 +188,66 @@ export function drawConstellationLines(
   ctx.strokeStyle = color;
   ctx.lineWidth = 1;
 
+  // In fisheye/zenith mode, off-projection points (far hemisphere, or below the
+  // horizon in local-sky mode) project to (1e6, 1e6); the pen is lifted there so a
+  // line doesn't streak across the sky. In zenith mode we additionally clip each
+  // horizon-straddling edge at the rim (alt=0) so the visible part of a line joining
+  // a star above the horizon to one below it is still drawn — up to the edge — rather
+  // than dropped entirely. (`prev*` track the previous vertex to find that crossing.)
+  const clipAtHorizon = getCenterMode() === 'zenith';
+
   for (const constellation of lines) {
     for (const segment of constellation.segments) {
       if (segment.length < 2) continue;
 
       ctx.beginPath();
-      // In fisheye mode, points below the horizon project to (1e6, 1e6).
-      // Lift the pen at those points so a line doesn't streak across the sky.
       let penDown = false;
+      let prevRa = 0;
+      let prevDec = 0;
+      let prevVisible = false;
       for (let i = 0; i < segment.length; i++) {
-        const p = project(segment[i][0], segment[i][1]);
-        if (p.x >= 1e5) {
-          penDown = false;
-          continue;
-        }
-        const c = toCanvas(p.x, p.y, view);
-        if (penDown) {
-          ctx.lineTo(c.x, c.y);
+        const ra = segment[i][0];
+        const dec = segment[i][1];
+        const p = project(ra, dec);
+        const visible = p.x < 1e5;
+
+        if (visible) {
+          const c = toCanvas(p.x, p.y, view);
+          if (penDown) {
+            ctx.lineTo(c.x, c.y);
+          } else {
+            // Entering the visible region from a below-horizon vertex: begin at the
+            // rim so the line re-enters from the edge rather than jumping to the star.
+            if (clipAtHorizon && i > 0 && !prevVisible) {
+              const edge = zenithHorizonCrossing(prevRa, prevDec, ra, dec);
+              if (edge) {
+                const e = toCanvas(edge.x, edge.y, view);
+                ctx.moveTo(e.x, e.y);
+                ctx.lineTo(c.x, c.y);
+                penDown = true;
+              }
+            }
+            if (!penDown) {
+              ctx.moveTo(c.x, c.y);
+              penDown = true;
+            }
+          }
         } else {
-          ctx.moveTo(c.x, c.y);
-          penDown = true;
+          // Leaving the visible region: extend the line to the rim before lifting, so
+          // the visible portion reaches the horizon edge instead of stopping short.
+          if (clipAtHorizon && penDown && prevVisible) {
+            const edge = zenithHorizonCrossing(prevRa, prevDec, ra, dec);
+            if (edge) {
+              const e = toCanvas(edge.x, edge.y, view);
+              ctx.lineTo(e.x, e.y);
+            }
+          }
+          penDown = false;
         }
+
+        prevRa = ra;
+        prevDec = dec;
+        prevVisible = visible;
       }
 
       ctx.stroke();

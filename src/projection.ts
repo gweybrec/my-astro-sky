@@ -150,6 +150,52 @@ export function project(raDeg: number, decDeg: number): Point {
 }
 
 /**
+ * Zenith ("local sky") mode only: given two sky points that straddle the horizon
+ * (one above, one below alt=0), return the projection-unit (x, y) of the alt=0 point
+ * between them, so a line joining a visible star to a below-horizon one can be clipped
+ * exactly at the rim (r=1) instead of vanishing entirely. See drawConstellationLines.
+ *
+ * Bisects on altitude along the great circle joining the two directions, in the
+ * horizontal frame (so no RA/360° wrap handling is needed). Returns null when both
+ * points are on the same side of the horizon (no crossing to find). At the horizon
+ * r=1 for both the stereo and fisheye radial forms, so only the azimuth matters here;
+ * x is negated to match project()'s dome handedness (East on screen-left).
+ */
+export function zenithHorizonCrossing(
+  raA: number,
+  decA: number,
+  raB: number,
+  decB: number,
+): Point | null {
+  const a = altAzFromRaDec(raA, decA, _obsLstH, _obsLatDeg);
+  const b = altAzFromRaDec(raB, decB, _obsLstH, _obsLatDeg);
+  if (a.altDeg >= 0 === b.altDeg >= 0) return null; // same side of horizon
+
+  const toVec = (altDeg: number, azDeg: number): [number, number, number] => {
+    const al = altDeg * DEG2RAD;
+    const az = azDeg * DEG2RAD;
+    const ca = Math.cos(al);
+    return [ca * Math.sin(az), ca * Math.cos(az), Math.sin(al)]; // z = up
+  };
+  // Keep `above` on the z≥0 side and `below` on the z<0 side for a clean bisection.
+  let above = toVec(a.altDeg, a.azDeg);
+  let below = toVec(b.altDeg, b.azDeg);
+  if (a.altDeg < 0) [above, below] = [below, above];
+
+  for (let i = 0; i < 24; i++) {
+    const mx = (above[0] + below[0]) / 2;
+    const my = (above[1] + below[1]) / 2;
+    const mz = (above[2] + below[2]) / 2;
+    const len = Math.hypot(mx, my, mz) || 1;
+    const mid: [number, number, number] = [mx / len, my / len, mz / len];
+    if (mid[2] >= 0) above = mid;
+    else below = mid;
+  }
+  const az = Math.atan2(above[0] + below[0], above[1] + below[1]);
+  return { x: -Math.sin(az), y: Math.cos(az) };
+}
+
+/**
  * Object whose sky position is fixed for the lifetime of the app (stars, DSOs) and
  * which carries slots to memoise its projection. See {@link projectCached}.
  */
