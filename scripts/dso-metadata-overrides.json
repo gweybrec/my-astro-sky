@@ -10335,6 +10335,14 @@
     "catalogs": ["NGC1265"]
   },
   {
+    "id": "NGC1269",
+    "constellation": "Eri",
+    "rating": 1,
+    "difficulty": 1,
+    "catalogs": ["NGC1269", "NGC1291"],
+    "type": "GxE"
+  },
+  {
     "id": "NGC1888",
     "constellation": "Lep",
     "rating": 2,
@@ -81455,7 +81463,8 @@
     "constellation": "Psc",
     "rating": 1,
     "difficulty": 3,
-    "catalogs": ["NGC7705"]
+    "catalogs": ["NGC7705"],
+    "type": "GxE"
   },
   {
     "id": "NGC7706",
@@ -83991,7 +84000,10 @@
     "difficulty": 4,
     "catalogs": ["SH2-296", "LBN1033"],
     "names": {
-      "fr": "Nébuleuse de la Méduse"
+      "fr": "Nébuleuse de la Mouette",
+      "en": "Seagull Nebula",
+      "es": "Nebulosa de la Gaviota",
+      "de": "Möwennebel"
     },
     "ra": 106.47500000000001,
     "dec": -11.216666666666667
