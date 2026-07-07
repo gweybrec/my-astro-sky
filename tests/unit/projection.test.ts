@@ -11,6 +11,7 @@ import {
   getHemisphere,
   setProjectionMode,
   borderRadiusPU,
+  isInsideBorderCircle,
   fitScaleForBorderCircle,
   getObsGeneration,
   bumpObsGeneration,
@@ -153,6 +154,33 @@ describe('toCanvas / fromCanvas roundtrip', () => {
 
     expect(c1.x).toBeCloseTo(baseline.width / 2, 10);
     expect(c1.y).toBeLessThan(c0.y);
+  });
+});
+
+describe('isInsideBorderCircle', () => {
+  // View centred on the projection origin, so the pole (0,0) maps to the canvas
+  // centre (500, 500) — the centre of the border circle.
+  const view = { centerX: 0, centerY: 0, scale: 100, rotationDeg: 0, width: 1000, height: 1000 };
+
+  it('stereo: distinguishes inside, on-rim, and outside the circle', () => {
+    setHemisphere('north');
+    setProjectionMode('stereo');
+    const r = borderRadiusPU(45) * view.scale; // tan(67.5°) * 100 ≈ 241.4 px
+
+    expect(isInsideBorderCircle(500, 500, view, 45)).toBe(true); // centre
+    expect(isInsideBorderCircle(500 + r * 0.5, 500, view, 45)).toBe(true); // well inside
+    expect(isInsideBorderCircle(500, 500 - (r - 1), view, 45)).toBe(true); // just inside rim
+    expect(isInsideBorderCircle(500 + r + 1, 500, view, 45)).toBe(false); // just outside rim
+    expect(isInsideBorderCircle(1000, 1000, view, 45)).toBe(false); // canvas corner
+  });
+
+  it('fisheye: border is the r=1 horizon circle regardless of borderLatDeg', () => {
+    setProjectionMode('fisheye');
+    const r = borderRadiusPU(45) * view.scale; // 1.0 * 100 = 100 px
+    expect(r).toBeCloseTo(100, 6);
+    expect(isInsideBorderCircle(500 + 90, 500, view, 45)).toBe(true);
+    expect(isInsideBorderCircle(500 + 110, 500, view, 45)).toBe(false);
+    setProjectionMode('stereo'); // restore global state for the rest of the suite
   });
 });
 

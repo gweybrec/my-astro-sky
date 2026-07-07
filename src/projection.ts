@@ -317,6 +317,26 @@ export function borderRadiusPU(borderLatDeg: number): number {
 }
 
 /**
+ * True when a screen-space point (canvas px) lies within the visible sky circle
+ * (the border ring). Mirrors the clip the render loop applies: centre is the
+ * projected pole `toCanvas(0, 0)`, radius is `borderRadiusPU(borderLatDeg) * scale`.
+ * Used to gate hover/hit-testing so a tooltip never fires for a cursor sitting in
+ * the black corners outside the rim. A non-finite border radius (no border set)
+ * means "no clipping" → always inside.
+ */
+export function isInsideBorderCircle(
+  mx: number,
+  my: number,
+  view: ViewState,
+  borderLatDeg: number,
+): boolean {
+  const r = borderRadiusPU(borderLatDeg) * view.scale;
+  if (!isFinite(r)) return true;
+  const origin = toCanvas(0, 0, view);
+  return Math.hypot(mx - origin.x, my - origin.y) <= r;
+}
+
+/**
  * View scale (canvas px per projection unit) that fits the whole border circle
  * into a cssW × cssH frame, leaving a small margin. Used by the "full sky map"
  * export to frame the entire projection regardless of the current zoom.

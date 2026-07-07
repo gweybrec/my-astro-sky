@@ -10,6 +10,7 @@ import {
   getHemisphere,
   fitScaleForBorderCircle,
   borderRadiusPU,
+  isInsideBorderCircle,
   getProjectionMode,
   bumpObsGeneration,
   isBelowHorizonCached,
@@ -1197,12 +1198,15 @@ export class SkyMap {
           !sidePanel.classList.contains('collapsed') &&
           e.clientX > window.innerWidth - 280; // Panel is 280px wide on the right
 
-        if (mx >= 0 && my >= 0 && mx <= this.view.width && my <= this.view.height && !isOverPanel) {
+        const inSky = !isOverPanel && isInsideBorderCircle(mx, my, this.view, this.borderLatDeg);
+        if (inSky) {
           this.requestHover(mx, my, e.clientX, e.clientY);
-        } else if (isOverPanel) {
-          // Hide tooltips when mouse is over side panel
-          this.hoverAnchor = null;
-          this.onStarHover?.(null, e.clientX, e.clientY);
+        } else {
+          // Cursor is over the side panel or outside the visible sky circle (in the
+          // black corners beyond the rim). Dismiss any tooltip so it never lingers or
+          // fires out there — the render loop clips objects to this same circle, so a
+          // rectangular hover gate would tooltip objects the user cannot see.
+          this.dismissTooltip();
         }
       }
     }) as EventListener);

@@ -574,6 +574,21 @@ export class PhotoOverlay {
   updateTransforms() {
     const view = this.getView();
     const gen = getProjectionGeneration();
+
+    // Clip the photo layer to the visible sky circle so a photo whose centroid sits
+    // just inside the rim can't bulge past the edge into the black. Mirrors the canvas
+    // ctx.clip() in SkyMap.render(): centre is the projected pole, radius is the border
+    // radius in screen px. Centroid-only culling above hides photos whose *centre* is
+    // outside; this clips the *body* of the ones kept. borderRadiusPU is Infinity when
+    // no border is set → no clip.
+    if (isFinite(this.borderRadiusPU)) {
+      const origin = toCanvas(0, 0, view);
+      const r = this.borderRadiusPU * view.scale;
+      this.container.style.clipPath = `circle(${r}px at ${origin.x}px ${origin.y}px)`;
+    } else {
+      this.container.style.clipPath = 'none';
+    }
+
     for (const placed of this.placedPhotos) {
       if (!placed.visible) continue;
 
