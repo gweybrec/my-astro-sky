@@ -10,7 +10,9 @@ import {
   setHemisphere,
   getHemisphere,
   setProjectionMode,
+  setCenterMode,
   borderRadiusPU,
+  projectionAreaFactor,
   isInsideBorderCircle,
   fitScaleForBorderCircle,
   getObsGeneration,
@@ -181,6 +183,44 @@ describe('isInsideBorderCircle', () => {
     expect(isInsideBorderCircle(500 + 90, 500, view, 45)).toBe(true);
     expect(isInsideBorderCircle(500 + 110, 500, view, 45)).toBe(false);
     setProjectionMode('stereo'); // restore global state for the rest of the suite
+  });
+});
+
+describe('projectionAreaFactor', () => {
+  it('stereo: 1 at the map centre and (1 + r²)² outward', () => {
+    setCenterMode('pole');
+    setProjectionMode('stereo');
+    expect(projectionAreaFactor(0, 0)).toBe(1); // pole / centre
+    // r = 1 (equator) → (1 + 1)² = 4
+    expect(projectionAreaFactor(1, 0)).toBeCloseTo(4, 12);
+    expect(projectionAreaFactor(0, 1)).toBeCloseTo(4, 12);
+    // Default Dec −45° rim: r = tan(67.5°) ≈ 2.4142 → ≈ 46.6
+    const rRim = Math.tan((((90 + 45) / 2) * Math.PI) / 180);
+    expect(projectionAreaFactor(rRim, 0)).toBeCloseTo((1 + rRim * rRim) ** 2, 9);
+    expect(projectionAreaFactor(rRim, 0)).toBeCloseTo(46.6, 1);
+  });
+
+  it('stereo: depends only on radius and increases monotonically outward', () => {
+    setCenterMode('pole');
+    setProjectionMode('stereo');
+    // Same radius, different angle → same factor.
+    expect(projectionAreaFactor(0.6, 0.8)).toBeCloseTo(projectionAreaFactor(1, 0), 12); // r=1 both
+    let prev = -Infinity;
+    for (const r of [0, 0.5, 1, 1.5, 2, 2.4]) {
+      const a = projectionAreaFactor(r, 0);
+      expect(a).toBeGreaterThan(prev);
+      prev = a;
+    }
+  });
+
+  it('fisheye (pole-centred): √(1 − r²), compressing toward the rim', () => {
+    setCenterMode('pole');
+    setProjectionMode('fisheye');
+    expect(projectionAreaFactor(0, 0)).toBe(1); // centre
+    expect(projectionAreaFactor(0.6, 0)).toBeCloseTo(Math.sqrt(1 - 0.36), 12);
+    expect(projectionAreaFactor(1, 0)).toBe(0); // rim (equator)
+    setProjectionMode('stereo'); // restore global state for the rest of the suite
+    setCenterMode('pole');
   });
 });
 

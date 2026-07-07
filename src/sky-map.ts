@@ -16,6 +16,7 @@ import {
   isBelowHorizonCached,
   setCenterMode,
   setProjectionObserver,
+  projectionAreaFactor,
 } from './projection';
 import { dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
 import { altAzFromRaDec } from './sky-geometry';
@@ -35,6 +36,9 @@ import {
   STAR_DENSITY_K,
   DSO_DENSITY_K,
   MIN_BUDGET_MULT,
+  STAR_BRIGHT_FLOOR_MAG,
+  areaNormForBorderRadius,
+  areaWeightedBudget,
 } from './render-budget';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
@@ -808,24 +812,23 @@ export class SkyMap {
   getShowGrid() {
     return this.showGrid;
   }
+
   /**
-   * Effective star magnitude cutoff for the current zoom + canvas. A star renders iff
-   * `star.mag <= this`. Two limits, both pan-invariant, combined by taking the brighter:
-   *
-   *   - the zoom magnitude gate `computeMaxMag(scale)` — a sane faint-limit curve;
-   *   - the density budget: the magnitude of the budget-th brightest star, derived from
-   *     the "star density" slider and the zoom/canvas (see render-budget.ts).
-   *
-   * Both depend only on zoom + canvas, never on what else is on screen, so stars never
-   * pop into a screen region that stays put while panning. The density budget replaces
-   * both the old viewport-relative top-N cap (which caused the popping) and the old
-   * manual "max magnitude" / "auto magnitude" controls.
+   * Shared budget context for the area-weighted star gate (see {@link renderStars} and
+   * {@link starFaintLimitAt}). `count` is the pan-invariant global eligible count; the
+   * per-star limit then scales it by the local projection area factor so on-screen star
+   * density is uniform despite the stereographic projection's area distortion.
    */
-  private starMagThreshold(): number {
+  private starAreaBudget(): {
+    mags: number[];
+    count: number;
+    aNorm: number;
+    edgeMag: number;
+  } {
     const { scale, width, height } = this.view;
     const mags = getStarMagsSorted();
     // Upper bound is the catalog length, not an artificial cap: on-screen count is
-    // already bounded by the field of view, so when zoomed in the magnitude gate below
+    // already bounded by the field of view, so when zoomed in the magnitude gate
     // (not a count cap) decides how faint we go.
     const budget = this.lod.effectiveStarBudget(this.maxStarCount);
     const count = targetRenderCount(
@@ -837,8 +840,44 @@ export class SkyMap {
       budget * MIN_BUDGET_MULT,
       mags.length,
     );
-    const densityMag = magThresholdForCount(mags, count);
-    return Math.min(computeMaxMag(scale), densityMag);
+    const aNorm = areaNormForBorderRadius(borderRadiusPU(this.borderLatDeg));
+    // Faintest limit anywhere on the map: at the rim the local area factor equals aNorm²
+    // so the local count is count·aNorm. Used as a cheap pre-filter before projecting, and
+    // as the single atlas/paint maxMag so edge-fill stars share sprites and don't fade.
+    // NOTE: no separate zoom/faintness cap (computeMaxMag) is applied. A single magnitude
+    // cap applied uniformly would clamp the edge — which needs *fainter* stars than the
+    // centre to reach the same on-screen density — long before the centre, so raising the
+    // density budget would pile new stars into the centre and never fill the edge
+    // ("outside-in", not uniform). The area-weighted count IS the cap, and it already
+    // scales with zoom because count ∝ scale² (targetRenderCount).
+    const edgeMag = magThresholdForCount(mags, Math.round(count * aNorm));
+    return { mags, count, aNorm, edgeMag };
+  }
+
+  /**
+   * Per-position faint magnitude limit for the area-weighted star gate: brighter (fewer
+   * stars) near the map centre, fainter (more) toward the edge, so on-screen star density
+   * stays uniform under the non-equal-area stereographic projection — at every density
+   * level. Floored at STAR_BRIGHT_FLOOR_MAG so the brightest anchor stars always render.
+   */
+  private starFaintLimitAt(
+    px: number,
+    py: number,
+    b: { mags: number[]; count: number; aNorm: number },
+  ): number {
+    const A = projectionAreaFactor(px, py);
+    const localCount = Math.round(areaWeightedBudget(b.count, A, b.aNorm));
+    return Math.max(magThresholdForCount(b.mags, localCount), STAR_BRIGHT_FLOOR_MAG);
+  }
+
+  /**
+   * Position-independent star magnitude limit (the un-weighted budget threshold). Used
+   * where a single scalar is enough — star-label gating. The precise per-position gate
+   * the render loop applies is {@link starFaintLimitAt}.
+   */
+  private starMagThreshold(): number {
+    const { mags, count } = this.starAreaBudget();
+    return Math.max(magThresholdForCount(mags, count), STAR_BRIGHT_FLOOR_MAG);
   }
 
   /**
@@ -1376,14 +1415,18 @@ export class SkyMap {
    */
   private isStarRendered(star: Star): boolean {
     const { view } = this;
+    const p = project(star.ra, star.dec);
 
-    // Same pan-invariant magnitude gate as renderStars (highlighted star always shows).
-    if (star.hip !== this.highlightedStar && star.mag > this.starMagThreshold()) {
+    // Same area-weighted per-position magnitude gate as renderStars (highlighted star
+    // always shows), so hover/click matches exactly what is drawn.
+    if (
+      star.hip !== this.highlightedStar &&
+      star.mag > this.starFaintLimitAt(p.x, p.y, this.starAreaBudget())
+    ) {
       return false;
     }
 
     // Check viewport bounds
-    const p = project(star.ra, star.dec);
     const c = toCanvas(p.x, p.y, view);
     if (c.x < -20 || c.x > view.width + 20 || c.y < -20 || c.y > view.height + 20) {
       return false;
@@ -2337,11 +2380,16 @@ export class SkyMap {
     ctx.globalAlpha = 1;
     const stars = getStars();
     const theme = this.skyTheme;
-    // Pan-invariant magnitude cutoff for this zoom + canvas (see render-budget.ts).
-    // A star renders iff its magnitude is at or below this threshold, regardless of what
-    // else is on screen — so panning never makes stars pop into the static part of the
-    // view.
-    const maxMag = this.starMagThreshold();
+    // Pan-invariant, area-weighted magnitude budget (see render-budget.ts). The precise
+    // cutoff is per-position (starFaintLimitAt) — brighter near the crowded map centre,
+    // fainter toward the edge — so on-screen star density stays uniform under the
+    // stereographic projection's area distortion. `maxMag` here is the faintest limit
+    // anywhere (the rim): it is the cheap pre-filter below and the single atlas/paint key
+    // (so edge-fill stars share sprites and don't fade), while starFaintLimitAt applies
+    // the exact per-star gate after projecting. Pan-invariant either way, so nothing pops
+    // into the static part of the view while panning.
+    const sb = this.starAreaBudget();
+    const maxMag = sb.edgeMag;
 
     // The sprite atlas (offscreen canvas per quantized mag/bv) is expensive to build, so
     // we don't rebuild it on every frame. A fast zoom changes scale by >1 bucket per
@@ -2391,6 +2439,14 @@ export class SkyMap {
       }
 
       projectCached(star);
+
+      // Area-weighted per-position gate: thin the crowded centre, keep the naked-eye
+      // floor everywhere, allow fainter fill toward the edge. Runs after projecting so
+      // it can read the local area factor from the cached _px/_py.
+      if (!isHighlighted && star.mag > this.starFaintLimitAt(star._px!, star._py!, sb)) {
+        continue;
+      }
+
       const c = toCanvas(star._px!, star._py!, view);
 
       // Skip if off-screen (with margin)
@@ -2572,6 +2628,11 @@ export class SkyMap {
     );
     const nearby = this.dsoAllIndex.collect(view.centerX, view.centerY, queryR);
 
+    // Area-normalisation for the area-weighted priority below (see render-budget.ts):
+    // the mean projection area factor over the visible cap, so weighting redistributes
+    // DSOs (thinner centre, denser edge) without changing the overall count.
+    const aNorm = areaNormForBorderRadius(borderRadiusPU(this.borderLatDeg));
+
     const candidates: (SelectableDSO & { dso: DSO })[] = [];
     // The spatial query covers normal-sized objects; the few giant DSOs (body larger
     // than the query margin) live outside the index and are always considered, so the
@@ -2636,7 +2697,13 @@ export class SkyMap {
           continue;
         }
 
-        candidates.push({ id: dso.id, priority: dso.priority, isHighlighted, dso });
+        // Screen-space (area-weighted) priority: scaling the rank by aNorm/A makes the
+        // priority gate draw uniformly per unit *screen* area — fewer DSOs near the
+        // crowded map centre (A≈1 → larger effective rank), more toward the edge
+        // (A large → smaller). A=0 at the exact fisheye rim → never render (off-screen).
+        const A = projectionAreaFactor(dso._px!, dso._py!);
+        const effPriority = A > 0 ? (dso.priority * aNorm) / A : Infinity;
+        candidates.push({ id: dso.id, priority: effPriority, isHighlighted, dso });
       }
 
     const selected = selectDSOsToRender(candidates, this.dsoPriorityThreshold()).map((s) => s.dso);

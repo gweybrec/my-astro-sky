@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { targetRenderCount, magThresholdForCount } from '../../src/render-budget';
+import {
+  targetRenderCount,
+  magThresholdForCount,
+  areaNormForBorderRadius,
+  areaWeightedBudget,
+} from '../../src/render-budget';
 
 // Generous clamps so the core formula is exercised, not the clamps, unless stated.
 const WIDE = { min: 0, max: 1e9 };
@@ -78,5 +83,54 @@ describe('magThresholdForCount()', () => {
 
   it('returns -Infinity for an empty catalog', () => {
     expect(magThresholdForCount([], 10)).toBe(-Infinity);
+  });
+});
+
+describe('areaNormForBorderRadius()', () => {
+  it('is 1 + r_border² (the cap-mean area factor for the stereographic form)', () => {
+    // Default border: borderRadiusPU(45) = tan(67.5°) ≈ 2.4142 → aNorm ≈ 6.83.
+    const rBorder = Math.tan((((90 + 45) / 2) * Math.PI) / 180);
+    expect(areaNormForBorderRadius(rBorder)).toBeCloseTo(1 + rBorder * rBorder, 12);
+    expect(areaNormForBorderRadius(rBorder)).toBeCloseTo(6.828, 2);
+  });
+
+  it('is 1 at the centre (r=0) and grows with the border radius', () => {
+    expect(areaNormForBorderRadius(0)).toBe(1);
+    expect(areaNormForBorderRadius(1)).toBe(2); // equator border
+    expect(areaNormForBorderRadius(3)).toBeGreaterThan(areaNormForBorderRadius(1));
+  });
+
+  it('falls back to 1 for a non-finite or non-positive radius', () => {
+    expect(areaNormForBorderRadius(Infinity)).toBe(1);
+    expect(areaNormForBorderRadius(0)).toBe(1);
+    expect(areaNormForBorderRadius(-2)).toBe(1);
+  });
+});
+
+describe('areaWeightedBudget()', () => {
+  it('equals the base when the area factor matches the normaliser (the cap mean)', () => {
+    expect(areaWeightedBudget(1000, 6.83, 6.83)).toBeCloseTo(1000, 6);
+  });
+
+  it('draws fewer near the centre (A<aNorm) and more toward the edge (A>aNorm)', () => {
+    const base = 1000;
+    const aNorm = 6.83;
+    const centre = areaWeightedBudget(base, 1, aNorm); // A=1 at the pole
+    const edge = areaWeightedBudget(base, 47, aNorm); // A≈47 at the Dec −45° rim
+    expect(centre).toBeLessThan(base);
+    expect(edge).toBeGreaterThan(base);
+    expect(centre).toBeCloseTo((base * 1) / aNorm, 6);
+    expect(edge).toBeCloseTo((base * 47) / aNorm, 6);
+  });
+
+  it('is linear in the area factor', () => {
+    const a = areaWeightedBudget(500, 2, 7);
+    const b = areaWeightedBudget(500, 4, 7);
+    expect(b / a).toBeCloseTo(2, 12);
+  });
+
+  it('falls back to the base for a non-positive normaliser', () => {
+    expect(areaWeightedBudget(500, 10, 0)).toBe(500);
+    expect(areaWeightedBudget(500, 10, -1)).toBe(500);
   });
 });

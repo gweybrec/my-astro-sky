@@ -303,6 +303,30 @@ export function unproject(x: number, y: number): { ra: number; dec: number } {
 }
 
 /**
+ * Local area scale of the ACTIVE projection at projection-unit (px, py), relative to
+ * the map centre (=1) — i.e. how much screen area one steradian of sky covers here
+ * versus at the centre. The render budget multiplies its per-object cutoff by this so
+ * that a set which is uniform per steradian draws uniformly per unit *screen* area
+ * (fewer objects near the centre, more toward the edge) — cancelling the projection's
+ * area distortion without touching project()/toCanvas() or the constellations.
+ *
+ * Derivations (r² = px² + py², since project() already stores _px/_py):
+ *   Stereo (pole or zenith): r = tan(θ/2) ⇒ area scale = sec⁴(θ/2) = (1 + r²)².
+ *     1 at the centre (r=0) → ~47 at the default Dec −45° rim (r ≈ 2.41).
+ *   Fisheye (orthographic, pole-centred): r = sin θ ⇒ area scale = cos θ = √(1 − r²).
+ *     The opposite sense (compresses the rim), so the same weighting flattens it too.
+ * Zenith mode uses the stereo radial form regardless of _projectionMode (its fisheye
+ * rim is r=1), so only pole-centred fisheye takes the orthographic branch.
+ */
+export function projectionAreaFactor(px: number, py: number): number {
+  const r2 = px * px + py * py;
+  if (_projectionMode === 'fisheye' && _centerMode !== 'zenith') {
+    return Math.sqrt(Math.max(0, 1 - r2));
+  }
+  return (1 + r2) * (1 + r2);
+}
+
+/**
  * Projection-unit radius of the border circle for a given border latitude.
  * In zenith mode: the border is the horizon (alt=0), always r = 1.0 for either
  * radial form.

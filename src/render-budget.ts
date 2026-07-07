@@ -35,9 +35,55 @@ export const DSO_DENSITY_K = 6;
  */
 export const MIN_BUDGET_MULT = 2;
 
+/**
+ * Bright-anchor magnitude floor for the area-weighted star gate: stars at least this
+ * bright are always drawn regardless of the position weighting, so the brightest,
+ * most-recognisable anchor stars never disappear from the thinned map centre. It is set
+ * low (only the ~brightest few hundred stars) on purpose — a high floor (e.g. the
+ * naked-eye limit ~6) would force the crowded centre to draw the whole naked-eye field
+ * and defeat the thinning, leaving the centre as dense as before. Constellation *lines*
+ * are drawn from RA/Dec independently of this loop, so they are unaffected either way;
+ * only the field-star dots between the anchors are redistributed toward the edge.
+ */
+export const STAR_BRIGHT_FLOOR_MAG = 3;
+
 /** Clamp helper. */
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
+}
+
+/**
+ * Area-normalisation for the area-weighted render budget (see {@link areaWeightedBudget}).
+ *
+ * project() is stereographic — conformal but NOT equal-area — so a set of objects that
+ * is uniform per steradian renders crowded at the map centre and near-empty at the rim.
+ * Multiplying each object's cutoff by `projectionAreaFactor(x,y) / AREA_NORM` instead
+ * draws uniformly per unit *screen* area (fewer near centre, more toward the edge),
+ * cancelling that distortion without touching the projection or the constellations.
+ *
+ * `AREA_NORM` is chosen as the mean area factor over the visible cap so the *total*
+ * on-screen count stays ≈ the un-weighted budget (centre thins, edge fills, sum
+ * preserved). For the stereographic factor (1+r²)² that cap-mean works out in closed
+ * form to `sec²(θmax/2) = 1 + r_border²`, where `r_border = borderRadiusPU(borderLatDeg)`
+ * — so it is exactly `1 + borderRadiusPU²` and auto-tracks the border slider. Its
+ * absolute value only sets the overall count level (which the density slider /
+ * auto-density absorb); the per-object factor is what makes the density uniform.
+ */
+export function areaNormForBorderRadius(borderRadiusPU: number): number {
+  if (!isFinite(borderRadiusPU) || borderRadiusPU <= 0) return 1;
+  return 1 + borderRadiusPU * borderRadiusPU;
+}
+
+/**
+ * Area-weighted local budget/threshold: scale a base render `count` / priority
+ * threshold by the local projection area factor, normalised by {@link areaNormForBorderRadius}.
+ * Returns a float — star callers round it for a `magThresholdForCount` index; DSO
+ * callers compare a priority against it directly. Falls back to `base` if `areaNorm`
+ * is non-positive.
+ */
+export function areaWeightedBudget(base: number, areaFactor: number, areaNorm: number): number {
+  if (areaNorm <= 0) return base;
+  return (base * areaFactor) / areaNorm;
 }
 
 /**
