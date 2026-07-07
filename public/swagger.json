@@ -1292,7 +1292,7 @@
     },
     "/api/plans/{id}": {
       "put": {
-        "summary": "Rename a night plan or update its settings (night/setup/location)",
+        "summary": "Rename a night plan or update its settings (night/setup/location/sort)",
         "parameters": [
           {
             "in": "path",
@@ -1329,6 +1329,20 @@
                   "lon": {
                     "type": "number",
                     "nullable": true
+                  },
+                  "sortBy": {
+                    "type": "string",
+                    "enum": [
+                      "transit",
+                      "altitude",
+                      "rating",
+                      "magnitude",
+                      "size",
+                      "name",
+                      "difficulty",
+                      "window"
+                    ],
+                    "description": "Objects-list sort key (drives the UI list and exported PDF order)"
                   }
                 }
               }

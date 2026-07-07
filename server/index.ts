@@ -51,6 +51,7 @@ import {
   createPlan,
   renamePlan,
   updatePlanSettings,
+  updatePlanSort,
   deletePlan,
   reorderPlans,
   planEntryExists,
@@ -1855,6 +1856,18 @@ app.delete('/api/poi-categories', (_req, res) => {
 
 // ─── Night plans ──────────────────────────────────────────────────────────────
 
+/** Allowed plan objects-list sort keys (mirrors client PlanSortKey). */
+const PLAN_SORT_KEYS = [
+  'transit',
+  'altitude',
+  'rating',
+  'magnitude',
+  'size',
+  'name',
+  'difficulty',
+  'window',
+] as const;
+
 function planEntryToApi(e: PlanEntryRow) {
   let observationWindows: unknown = [];
   try {
@@ -1947,6 +1960,7 @@ app.get('/api/plans', (_req, res) => {
         setupId: p.setup_id ?? null,
         lat: p.lat ?? null,
         lon: p.lon ?? null,
+        sortBy: p.sort_by ?? 'transit',
         entries: (byPlan.get(p.id) ?? []).map(planEntryToApi),
         mosaics: (mosaicsByPlan.get(p.id) ?? []).map(planMosaicToApi),
       })),
@@ -2075,7 +2089,7 @@ app.put('/api/plans/order', (req, res) => {
  * @swagger
  * /api/plans/{id}:
  *   put:
- *     summary: Rename a night plan or update its settings (night/setup/location)
+ *     summary: Rename a night plan or update its settings (night/setup/location/sort)
  *     parameters:
  *       - in: path
  *         name: id
@@ -2094,6 +2108,10 @@ app.put('/api/plans/order', (req, res) => {
  *               setupId: { type: string, nullable: true }
  *               lat: { type: number, nullable: true }
  *               lon: { type: number, nullable: true }
+ *               sortBy:
+ *                 type: string
+ *                 enum: [transit, altitude, rating, magnitude, size, name, difficulty, window]
+ *                 description: Objects-list sort key (drives the UI list and exported PDF order)
  *     responses:
  *       200:
  *         description: Plan renamed
@@ -2128,8 +2146,11 @@ app.put('/api/plans/:id', (req, res) => {
     const body = (req.body ?? {}) as any;
     const hasName = 'name' in body;
     const hasSettings = 'nightOf' in body || 'setupId' in body || 'lat' in body || 'lon' in body;
-    if (!hasName && !hasSettings) {
-      res.status(400).json({ error: 'name or settings (nightOf/setupId/lat/lon) required' });
+    const hasSort = 'sortBy' in body;
+    if (!hasName && !hasSettings && !hasSort) {
+      res
+        .status(400)
+        .json({ error: 'name, settings (nightOf/setupId/lat/lon), or sortBy required' });
       return;
     }
     const existing = getPlan(id);
@@ -2161,6 +2182,14 @@ app.put('/api/plans/:id', (req, res) => {
         return;
       }
       updatePlanSettings(id, nightOf, setupId, lat, lon);
+    }
+    if (hasSort) {
+      const sortBy = body.sortBy;
+      if (typeof sortBy !== 'string' || !PLAN_SORT_KEYS.includes(sortBy as any)) {
+        res.status(400).json({ error: `sortBy must be one of: ${PLAN_SORT_KEYS.join(', ')}` });
+        return;
+      }
+      updatePlanSort(id, sortBy);
     }
     res.json({ ok: true });
   } catch (err: any) {
@@ -3000,6 +3029,7 @@ app.post('/api/export', (req, res) => {
         setupId: p.setup_id ?? null,
         lat: p.lat ?? null,
         lon: p.lon ?? null,
+        sortBy: p.sort_by ?? 'transit',
         // planEntryToApi carries mosaicId/mosaicWDeg/mosaicHDeg so tiles re-group on import.
         entries: (entriesByPlan.get(p.id) ?? []).map(planEntryToApi),
         mosaics: (mosaicsByPlan.get(p.id) ?? []).map(planMosaicToApi),
@@ -3366,6 +3396,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
                 setup_id: typeof p.setupId === 'string' ? p.setupId : null,
                 lat: typeof p.lat === 'number' ? p.lat : null,
                 lon: typeof p.lon === 'number' ? p.lon : null,
+                sort_by: PLAN_SORT_KEYS.includes(p.sortBy) ? p.sortBy : 'transit',
               });
               if (Array.isArray(p.entries)) {
                 p.entries.forEach((e: any, ei: number) => {

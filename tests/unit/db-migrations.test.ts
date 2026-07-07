@@ -60,13 +60,13 @@ describe('applyMigrations — fresh database', () => {
   it('returns the latest schema version after first run', () => {
     const db = freshBaseDb();
     const version = applyMigrations(db);
-    expect(version).toBe(10);
+    expect(version).toBe(11);
   });
 
   it('schema_version table contains the latest version', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('adds star_ra and star_dec columns to star_correspondences', () => {
@@ -103,8 +103,8 @@ describe('applyMigrations — idempotency', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     const v = applyMigrations(db);
-    expect(v).toBe(10);
-    expect(schemaVersion(db)).toBe(10);
+    expect(v).toBe(11);
+    expect(schemaVersion(db)).toBe(11);
   });
 });
 
@@ -128,7 +128,7 @@ describe('applyMigrations — v2 per-plan night/setup', () => {
   it('is a no-op (no throw) when the plans table is absent', () => {
     const db = freshBaseDb();
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 });
 
@@ -172,7 +172,7 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
     expect(row.dso_id).toBe('M42');
     expect(row.pa_deg).toBe(142);
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('is idempotent on an already-migrated plan_entries table', () => {
@@ -201,7 +201,7 @@ describe('applyMigrations — existing database (simulates upgrade)', () => {
     db.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
 
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 });
 
@@ -226,7 +226,7 @@ describe('applyMigrations — v4 mosaics', () => {
     expect(mosaicCols).toContain('center_ra');
     expect(mosaicCols).toContain('overlap_pct');
     expect(mosaicCols).toContain('cols');
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('is idempotent — a second run does not duplicate mosaic_id', () => {
@@ -248,7 +248,7 @@ describe('applyMigrations — v5 mosaic name', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     expect(getColumns(db, 'plan_mosaics')).toContain('name');
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('round-trips a stored mosaic name', () => {
@@ -284,7 +284,7 @@ describe('applyMigrations — v6 smart-scope mosaic size', () => {
     const cols = getColumns(db, 'plan_entries');
     expect(cols).toContain('mosaic_w_deg');
     expect(cols).toContain('mosaic_h_deg');
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('round-trips a stored smart mosaic size and preserves existing rows', () => {
@@ -341,7 +341,7 @@ describe('applyMigrations — v7 per-plan observing location', () => {
     const cols = getColumns(db, 'plans');
     expect(cols).toContain('lat');
     expect(cols).toContain('lon');
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('round-trips a stored per-plan location', () => {
@@ -389,7 +389,7 @@ describe('applyMigrations — v8 points of interest', () => {
     expect(catCols).toContain('name');
     expect(catCols).toContain('color');
     expect(catCols).toContain('position');
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('defaults points_of_interest to an empty JSON array', () => {
@@ -502,7 +502,7 @@ describe('applyMigrations — v10 observation windows', () => {
       observation_windows: string;
     };
     expect(row.observation_windows).toBe('[]');
-    expect(schemaVersion(db)).toBe(10);
+    expect(schemaVersion(db)).toBe(11);
   });
 
   it('is idempotent — a second run keeps a single observation_windows column', () => {
@@ -513,6 +513,61 @@ describe('applyMigrations — v10 observation windows', () => {
     expect(getColumns(db, 'plan_entries').filter((c) => c === 'observation_windows').length).toBe(
       1,
     );
+  });
+});
+
+describe('applyMigrations — v11 per-plan objects-list sort', () => {
+  /** Pre-v11 plans table: has per-plan location but no sort_by column. */
+  function withPreV11Plans(db: Database.Database) {
+    db.exec(`
+      CREATE TABLE plans (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, position INTEGER NOT NULL,
+        created_at TEXT NOT NULL, night_of TEXT, setup_id TEXT, lat REAL, lon REAL
+      );
+    `);
+  }
+
+  it("adds the sort_by column (default 'transit') to an existing plans table", () => {
+    const db = freshBaseDb();
+    withPreV11Plans(db);
+    db.prepare('INSERT INTO plans (id, name, position, created_at) VALUES (?, ?, ?, ?)').run(
+      'p1',
+      'Tonight',
+      0,
+      '2026-07-07',
+    );
+    applyMigrations(db);
+    expect(getColumns(db, 'plans')).toContain('sort_by');
+    const row = db.prepare('SELECT sort_by FROM plans WHERE id = ?').get('p1') as {
+      sort_by: string;
+    };
+    expect(row.sort_by).toBe('transit');
+    expect(schemaVersion(db)).toBe(11);
+  });
+
+  it('round-trips a stored sort key', () => {
+    const db = freshBaseDb();
+    withPreV11Plans(db);
+    db.prepare('INSERT INTO plans (id, name, position, created_at) VALUES (?, ?, ?, ?)').run(
+      'p1',
+      'Tonight',
+      0,
+      '2026-07-07',
+    );
+    applyMigrations(db);
+    db.prepare('UPDATE plans SET sort_by = ? WHERE id = ?').run('window', 'p1');
+    const row = db.prepare('SELECT sort_by FROM plans WHERE id = ?').get('p1') as {
+      sort_by: string;
+    };
+    expect(row.sort_by).toBe('window');
+  });
+
+  it('is idempotent — a second run keeps a single sort_by column', () => {
+    const db = freshBaseDb();
+    withPreV11Plans(db);
+    applyMigrations(db);
+    expect(() => applyMigrations(db)).not.toThrow();
+    expect(getColumns(db, 'plans').filter((c) => c === 'sort_by').length).toBe(1);
   });
 });
 

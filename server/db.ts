@@ -101,7 +101,8 @@ db.exec(`
     night_of   TEXT,
     setup_id   TEXT,
     lat        REAL,
-    lon        REAL
+    lon        REAL,
+    sort_by    TEXT NOT NULL DEFAULT 'transit'
   );
   CREATE TABLE IF NOT EXISTS plan_entries (
     id        TEXT PRIMARY KEY,
@@ -758,6 +759,8 @@ export interface PlanRow {
   lat: number | null;
   /** Per-plan observing longitude (°E), or null to fall back to the global location. */
   lon: number | null;
+  /** Sort key for the plan's objects list + PDF order (see PlanSortKey). Defaults to 'transit'. */
+  sort_by?: string | null;
 }
 
 export interface PlanEntryRow {
@@ -797,12 +800,13 @@ export interface PlanMosaicRow {
 const getPlansStmt = db.prepare('SELECT * FROM plans ORDER BY position ASC, rowid ASC');
 const getPlanStmt = db.prepare('SELECT * FROM plans WHERE id = ?');
 const insertPlanStmt = db.prepare(
-  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
 );
 const renamePlanStmt = db.prepare('UPDATE plans SET name = ? WHERE id = ?');
 const updatePlanSettingsStmt = db.prepare(
   'UPDATE plans SET night_of = ?, setup_id = ?, lat = ?, lon = ? WHERE id = ?',
 );
+const updatePlanSortStmt = db.prepare('UPDATE plans SET sort_by = ? WHERE id = ?');
 const updatePlanPositionStmt = db.prepare('UPDATE plans SET position = ? WHERE id = ?');
 const deletePlanStmt = db.prepare('DELETE FROM plans WHERE id = ?');
 const deleteAllPlansStmt = db.prepare('DELETE FROM plans');
@@ -880,11 +884,17 @@ export function createPlan(row: PlanRow): void {
     row.setup_id ?? null,
     row.lat ?? null,
     row.lon ?? null,
+    row.sort_by ?? 'transit',
   );
 }
 
 export function renamePlan(id: string, name: string): boolean {
   return renamePlanStmt.run(name, id).changes > 0;
+}
+
+/** Update just a plan's objects-list sort key (does not touch other settings). */
+export function updatePlanSort(id: string, sortBy: string): boolean {
+  return updatePlanSortStmt.run(sortBy, id).changes > 0;
 }
 
 export function updatePlanSettings(

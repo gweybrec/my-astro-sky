@@ -5,11 +5,12 @@ import { setActivePinia, createPinia } from 'pinia';
 // never call them, but they must resolve as mocks so the module loads.
 vi.mock('../../src/api', () => ({
   getPlans: vi.fn().mockResolvedValue([]),
+  updatePlanSortAPI: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { usePlansStore } from '../../src/stores/plans';
-import type { Plan } from '../../src/api';
+import { updatePlanSortAPI, type Plan } from '../../src/api';
 
 function makePlan(id: string, setupId: string | null): Plan {
   return {
@@ -20,6 +21,7 @@ function makePlan(id: string, setupId: string | null): Plan {
     setupId,
     lat: null,
     lon: null,
+    sortBy: 'transit',
     entries: [],
     mosaics: [],
   };
@@ -43,5 +45,32 @@ describe('plans store · plansUsingSetup', () => {
     store.plans = [makePlan('a', 's1'), makePlan('b', null)];
 
     expect(store.plansUsingSetup('s2')).toEqual([]);
+  });
+});
+
+describe('plans store · setPlanSort', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(updatePlanSortAPI).mockClear();
+  });
+
+  it('updates the in-memory sort key immediately and persists it', () => {
+    const store = usePlansStore();
+    store.plans = [makePlan('a', 's1')];
+
+    store.setPlanSort('a', 'window');
+
+    expect(store.plans[0].sortBy).toBe('window');
+    expect(updatePlanSortAPI).toHaveBeenCalledWith('a', 'window');
+  });
+
+  it('is a no-op on the cache for an unknown plan id but still calls the API', () => {
+    const store = usePlansStore();
+    store.plans = [makePlan('a', 's1')];
+
+    store.setPlanSort('missing', 'altitude');
+
+    expect(store.plans[0].sortBy).toBe('transit');
+    expect(updatePlanSortAPI).toHaveBeenCalledWith('missing', 'altitude');
   });
 });

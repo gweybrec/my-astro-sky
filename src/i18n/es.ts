@@ -923,6 +923,7 @@ const es: Translations = {
       name: 'Nombre',
       rating: 'Interés fotográfico',
       difficulty: 'Dificultad',
+      window: 'Ventana de observación',
     },
     results: {
       empty: 'No se encontraron objetivos para estos parámetros. Prueba con otra fecha o equipo.',

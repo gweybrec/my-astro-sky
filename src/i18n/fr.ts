@@ -923,6 +923,7 @@ const fr = {
       name: 'Nom',
       rating: 'Intérêt photo',
       difficulty: 'Difficulté',
+      window: "Fenêtre d'observation",
     },
     results: {
       empty:

@@ -923,6 +923,7 @@ const de: Translations = {
       name: 'Name',
       rating: 'Fotografisches Interesse',
       difficulty: 'Schwierigkeit',
+      window: 'Beobachtungsfenster',
     },
     results: {
       empty:

@@ -968,6 +968,14 @@ export interface MosaicParams {
   replaceEntryIds?: string[];
 }
 
+/**
+ * Sort key for a plan's objects list (and its exported PDF). Mirrors the
+ * meaningful subset of the Targets-search sort values plus `window` (order by
+ * each entry's earliest observation window). `transit` is the default.
+ */
+export type PlanSortKey =
+  'transit' | 'altitude' | 'rating' | 'magnitude' | 'size' | 'name' | 'difficulty' | 'window';
+
 export interface Plan {
   id: string;
   name: string;
@@ -980,6 +988,8 @@ export interface Plan {
   lat: number | null;
   /** Observing longitude (°E), or null to fall back to the global location. */
   lon: number | null;
+  /** Objects-list sort key (drives the UI list and the exported PDF order). */
+  sortBy: PlanSortKey;
   entries: PlanEntry[];
   mosaics: PlanMosaic[];
 }
@@ -1033,6 +1043,19 @@ export async function updatePlanSettingsAPI(
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to update plan settings');
+  }
+}
+
+/** Persist just a plan's objects-list sort key (partial update of the plan). */
+export async function updatePlanSortAPI(id: string, sortBy: PlanSortKey): Promise<void> {
+  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sortBy }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update plan sort');
   }
 }
 

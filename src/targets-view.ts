@@ -34,6 +34,7 @@ import {
   type GearSetupData,
   type Plan,
   type PlanMosaic,
+  type PlanSortKey,
 } from './api';
 import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
@@ -79,6 +80,7 @@ import {
   type AltSample,
 } from './sky-geometry';
 import { outlineFromGrid } from './mosaic';
+import { sortPlanTargets, firstWindowFracByEntry } from './plan-sort';
 import type { PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
@@ -3459,11 +3461,27 @@ export class TargetsView {
       }
       const win = this.nightWindow(observer.loc, observer.dateNight);
       const moon = this.buildMoonOverlay(observer.loc, win);
-      const infos = this.computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false);
+      // computePlanTargets returns a transit-ordered baseline; re-order by the
+      // plan's chosen sort key (the exported PDF reads currentInfos, so both the
+      // list and the PDF inherit this order).
+      const sortKey = (plan.sortBy ?? 'transit') as PlanSortKey;
+      const infos = sortPlanTargets(
+        this.computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false),
+        sortKey,
+        firstWindowFracByEntry(plan.entries),
+      );
       currentInfos = infos;
       currentWin = win;
 
-      trajWrap.appendChild(this.buildMoonToggle(renderTrajectories));
+      // Sort dropdown (left) and Moon toggle (right) share one row to save space,
+      // using the same wide inter-group gap as the date/setup/location row above.
+      const controlsRow = document.createElement('div');
+      controlsRow.className = 'flex flex-wrap items-center gap-x-12 gap-y-2 mb-[var(--space-6h)]';
+      controlsRow.append(
+        this.buildPlanSortBar(plan, renderTrajectories),
+        this.buildMoonToggle(renderTrajectories),
+      );
+      trajWrap.appendChild(controlsRow);
       trajWrap.appendChild(this.buildTimelineHeader(win, observer.loc, moon));
       const list = document.createElement('div');
       list.className = 'flex flex-col divide-y divide-[var(--border-input)]';
@@ -3808,8 +3826,9 @@ export class TargetsView {
             });
           }
         }
-        // Transit-ordered like the on-screen list.
-        targets.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
+        // Order matches the on-screen list: standalone objects follow the plan's
+        // chosen sort (inherited from currentInfos above), then mosaic pages are
+        // appended after them.
 
         const { renderPlanPdf } = await import('./export-render');
         const blob = await renderPlanPdf(this.skyMap, {
@@ -3861,6 +3880,48 @@ export class TargetsView {
     txt.textContent = t('targets.plan.showMoon');
     wrap.append(cb, txt);
     return wrap;
+  }
+
+  /**
+   * "Sort by" dropdown for a plan's objects list. Reuses the Targets-search
+   * sort-bar styling and shared i18n labels; persists the choice per plan and
+   * re-renders so the list (and the exported PDF, which reads the same order)
+   * reflect it.
+   */
+  private buildPlanSortBar(plan: Plan, rerender: () => void): HTMLElement {
+    const bar = document.createElement('div');
+    // `!mb-0`: the shared .targets-sort-bar carries a bottom margin for the search
+    // grid; here the wrapping controls row owns that spacing instead.
+    bar.className = 'targets-sort-bar !mb-0';
+    const label = document.createElement('span');
+    label.className = 'targets-sort-label';
+    label.textContent = t('targets.sort.label');
+    const select = document.createElement('select');
+    select.className = 'targets-sort-select';
+    const opts: [PlanSortKey, () => string][] = [
+      ['transit', () => t('targets.sort.transit')],
+      ['altitude', () => t('targets.sort.altitude')],
+      ['rating', () => t('targets.sort.rating')],
+      ['magnitude', () => t('targets.sort.magnitude')],
+      ['size', () => t('targets.sort.size')],
+      ['name', () => t('targets.sort.name')],
+      ['difficulty', () => t('targets.sort.difficulty')],
+      ['window', () => t('targets.sort.window')],
+    ];
+    const current = (plan.sortBy ?? 'transit') as PlanSortKey;
+    for (const [value, labelFn] of opts) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = labelFn();
+      opt.selected = value === current;
+      select.appendChild(opt);
+    }
+    select.addEventListener('change', () => {
+      this.plansStore.setPlanSort(plan.id, select.value as PlanSortKey);
+      rerender();
+    });
+    bar.append(label, select);
+    return bar;
   }
 
   /** Moonrise/moonset crossings (alt = 0) within the night window, interpolated. */

@@ -917,6 +917,7 @@ const en: Translations = {
       name: 'Name',
       rating: 'DSO interest',
       difficulty: 'Difficulty',
+      window: 'Observation window',
     },
     results: {
       empty: 'No targets found for these parameters. Try a different date or equipment.',

@@ -5,6 +5,7 @@ import {
   createPlanAPI,
   renamePlanAPI,
   updatePlanSettingsAPI,
+  updatePlanSortAPI,
   deletePlanAPI,
   reorderPlansAPI,
   addPlanEntryAPI,
@@ -19,6 +20,7 @@ import {
   type Plan,
   type MosaicParams,
   type ObservationWindow,
+  type PlanSortKey,
 } from '../api';
 import { reportUnknownRendererError } from '../error-reporter';
 
@@ -111,6 +113,19 @@ export const usePlansStore = defineStore('plans', () => {
     } catch (err) {
       reportUnknownRendererError('plan_update_settings_failed', err, { id });
     }
+  }
+
+  /**
+   * Set a plan's objects-list sort key. Mutates the local cache immediately (so
+   * the list re-renders without a round-trip) then persists in the background —
+   * deliberately does NOT call load().
+   */
+  function setPlanSort(id: string, sortBy: PlanSortKey): void {
+    const plan = plans.value.find((p) => p.id === id);
+    if (plan) plan.sortBy = sortBy;
+    updatePlanSortAPI(id, sortBy).catch((err) => {
+      reportUnknownRendererError('plan_set_sort_failed', err, { id });
+    });
   }
 
   async function deletePlan(id: string): Promise<void> {
@@ -346,6 +361,7 @@ export const usePlansStore = defineStore('plans', () => {
     setEntryPA,
     setEntryPosition,
     setEntryObservationWindows,
+    setPlanSort,
     createMosaic,
     updateMosaic,
     deleteMosaic,
