@@ -264,7 +264,35 @@ export function applyMigrations(database: Database): number {
         }
       },
     },
-    // Future migrations: { version: 10, run(d) { ... } },
+    {
+      // v10: plan entries gain user-drawn observation windows on the night
+      // trajectory — a JSON array of {id, startFrac, endFrac, filter, color}.
+      // NULL/absent ⇒ no windows (column defaults to '[]').
+      version: 10,
+      run(d) {
+        try {
+          d.exec(
+            "ALTER TABLE plan_entries ADD COLUMN observation_windows TEXT NOT NULL DEFAULT '[]'",
+          );
+        } catch {
+          /* exists */
+        }
+      },
+    },
+    {
+      // v11: plans gain a per-plan objects-list sort key (drives both the UI
+      // list order and the exported PDF). NULL/absent ⇒ 'transit' (the previous
+      // hard-coded order).
+      version: 11,
+      run(d) {
+        try {
+          d.exec("ALTER TABLE plans ADD COLUMN sort_by TEXT NOT NULL DEFAULT 'transit'");
+        } catch {
+          /* exists */
+        }
+      },
+    },
+    // Future migrations: { version: 12, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

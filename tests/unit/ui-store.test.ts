@@ -316,3 +316,26 @@ describe('ui store — modal detection & tooltip suppression', () => {
     expect(ui.isSkyTooltipSuppressed(10, 10)).toBe(false);
   });
 });
+
+describe('ui store — targets overlay', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  // Regression: closing the overlay re-renders the Plans view, which rebuilds
+  // every plan's <details> collapsed unless pendingPlanFocusId names it.
+  it('opening the overlay from a specific plan marks that plan to stay expanded', () => {
+    const ui = useUiStore();
+    ui.openTargetsOverlay('plan-1');
+    expect(ui.targetsOverlayPlanId).toBe('plan-1');
+    expect(ui.pendingPlanFocusId).toBe('plan-1');
+  });
+
+  it('opening the overlay generically (no plan) leaves pendingPlanFocusId untouched', () => {
+    const ui = useUiStore();
+    ui.pendingPlanFocusId = 'plan-2'; // set by some earlier, unrelated action
+    ui.openTargetsOverlay();
+    expect(ui.targetsOverlayPlanId).toBeNull();
+    expect(ui.pendingPlanFocusId).toBe('plan-2');
+  });
+});

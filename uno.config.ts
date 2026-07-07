@@ -205,6 +205,61 @@ export default defineConfig({
       'w-full',
     ].join(' '),
 
+    // ── Observation windows (plan-detail trajectory annotations) ───────────────
+    // Draggable shaded time bands over the altitude sparkline, plus their editor
+    // rows. Band background/left/width are set inline (dynamic per window); these
+    // classes carry only the static frame, cursors, and edge handles.
+    'obs-window-layer': 'absolute left-0 right-0 pointer-events-none',
+    'obs-window-band': [
+      'absolute top-0 bottom-0 rounded-sm overflow-hidden pointer-events-auto',
+      'border border-[var(--border-white-md)] cursor-grab',
+    ].join(' '),
+    'obs-window-handle': [
+      'absolute top-0 bottom-0 w-[8px] cursor-ew-resize',
+      'bg-[var(--border-focus)] opacity-40 hover:opacity-90 transition-opacity',
+    ].join(' '),
+    'obs-window-handle-l': 'left-0',
+    'obs-window-handle-r': 'right-0',
+    // Editor grid: every field is its own column so colours, chips, from, to,
+    // duration, frame-count, sub, unit and the icon buttons all line up vertically
+    // across rows. Each row is `display:contents`, so its 11 cells flow into these
+    // columns in order. Controls are all 26px tall to match the icon buttons.
+    'obs-window-rows': [
+      'grid items-center gap-x-2 gap-y-1.5 min-w-0',
+      // Filter column grows to the longest filter name (min 104px); everything
+      // else is content-sized. All columns are shared across rows so fields align.
+      'grid-cols-[26px_minmax(104px,max-content)_max-content_max-content_max-content_max-content_max-content_58px_max-content_26px_26px]',
+    ].join(' '),
+    'obs-window-color': [
+      'w-[26px] h-[26px] p-0 cursor-pointer bg-transparent',
+      'border border-[var(--border-input)] rounded-sm',
+    ].join(' '),
+    // Filter picker: fills the shared filter column, chip left-aligned. The column
+    // grows to the longest name (see obs-window-rows) so a long custom filter is
+    // never clipped; clicking a chip swaps in an input that fills the whole column
+    // width. The redundant clear "×" is hidden (click the chip to edit).
+    'obs-window-filter': [
+      '!flex-none w-full h-[26px] flex items-center justify-start',
+      '[&_.integration-filter-clear]:hidden',
+      '[&_input]:w-full [&_input]:min-w-0 [&_input]:h-[26px]',
+    ].join(' '),
+    // Shared time-picker toggle, sized to match the row.
+    'obs-window-time-group': [
+      'flex items-center gap-1 whitespace-nowrap',
+      '[&_.targets-time-input]:h-[26px] [&_.targets-time-input]:px-2 [&_.targets-time-input]:py-0',
+      '[&_.targets-time-input]:inline-flex [&_.targets-time-input]:items-center',
+    ].join(' '),
+    // Single-frame seconds input: fills its column, left-aligned so the digits
+    // never collide with the native spinner arrows on the right.
+    'obs-window-frame': '!h-[26px] !w-full !text-left !pl-2 !pr-1',
+    // Link toggle + trash: square icon buttons at the row height.
+    'obs-window-iconbtn': [
+      '!h-[26px] !w-[26px] !p-0 inline-flex items-center justify-center',
+      '[&_svg]:w-[15px] [&_svg]:h-[15px]',
+    ].join(' '),
+    // "+ observation window": top-left, level with the first row, row height.
+    'obs-window-add': '!h-[26px] !text-micro inline-flex items-center shrink-0',
+
     // ── Modal sizing variants ───────────────────────────────────────────────────
     // Pairs with the base `.modal` class (src/style.css) the same way the legacy
     // `.settings-modal` / `.import-modal` / … variants do — see

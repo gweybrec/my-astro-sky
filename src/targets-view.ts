@@ -34,6 +34,7 @@ import {
   type GearSetupData,
   type Plan,
   type PlanMosaic,
+  type PlanSortKey,
 } from './api';
 import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
@@ -41,7 +42,21 @@ import { showToast } from './toast';
 import type { SkyMap } from './sky-map';
 import type { TargetSuggestion } from './target-recommender';
 import type { DSO } from './types';
-import { createTargetsChip, createFilterBadge } from './chip-utils';
+import { createTargetsChip, createFilterBadge, buildIntegrationFilterField } from './chip-utils';
+import {
+  newObservationWindow,
+  windowDurationMs,
+  framesInWindow,
+  windowTimeOptions,
+  formatWindowDuration,
+  fracToClock,
+  clockToFrac,
+  resolveWindowColor,
+  toBandFill,
+  cssColorToHex,
+  MIN_WINDOW_FRAC,
+} from './observation-windows';
+import type { ObservationWindow } from './api';
 import exportSvg from './icons/export.svg?raw';
 import trashSvg from './icons/trash.svg?raw';
 import penSvg from './icons/pen.svg?raw';
@@ -65,6 +80,7 @@ import {
   type AltSample,
 } from './sky-geometry';
 import { outlineFromGrid } from './mosaic';
+import { sortPlanTargets, firstWindowFracByEntry } from './plan-sort';
 import type { PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
@@ -1688,23 +1704,16 @@ export class TargetsView {
     const timeWindowEntry = document.createElement('div');
     timeWindowEntry.className = 'targets-coord-entry';
 
-    // Custom dropdown (not a native <input type="time">): the native picker's
-    // scroll-wheel ignores `step`, and its own min/max rendering for a wrapped
-    // night range can't be verified reliably — so it only ever offers the
-    // exact valid options from NIGHT_TIME_OPTIONS, nothing else is selectable.
-    const closeAllTimeMenus = (except?: HTMLElement): void => {
-      timeWindowEntry.querySelectorAll<HTMLElement>('.targets-time-menu.open').forEach((el) => {
-        if (el !== except) el.classList.remove('open');
-      });
-    };
-
+    // A labelled version of the shared time-picker (see buildTimeDropdown): the
+    // global observation window offers the full night grid (NIGHT_TIME_OPTIONS)
+    // with a "not set" clear entry.
     const makeTimeDropdown = (
       labelKey: string,
       defaultVal: string,
       onChange: (value: string) => void,
     ): void => {
       const group = document.createElement('div');
-      group.className = 'targets-dms-group targets-time-field';
+      group.className = 'targets-dms-group';
 
       const lbl = document.createElement('span');
       lbl.className = 'targets-dms-label';
@@ -1715,47 +1724,17 @@ export class TargetsView {
       const initial = defaultVal ? snapToObservationTime(defaultVal) : '';
       if (initial && initial !== defaultVal) onChange(initial);
 
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'targets-time-input';
-      toggle.setAttribute('aria-label', t(`targets.${labelKey}`));
-      toggle.textContent = initial || '--:--';
-
-      const menu = document.createElement('div');
-      menu.className = 'targets-time-menu';
-
-      const selectValue = (value: string): void => {
-        toggle.textContent = value || '--:--';
-        menu.classList.remove('open');
-        onChange(value);
-      };
-
-      const clearItem = document.createElement('button');
-      clearItem.type = 'button';
-      clearItem.className = 'targets-time-menu-item targets-time-menu-clear';
-      clearItem.textContent = t('targets.timeWindowNotSet');
-      clearItem.addEventListener('click', () => selectValue(''));
-      menu.appendChild(clearItem);
-
-      for (const time of NIGHT_TIME_OPTIONS) {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'targets-time-menu-item';
-        item.textContent = time;
-        item.addEventListener('click', () => selectValue(time));
-        menu.appendChild(item);
-      }
-
-      toggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const willOpen = !menu.classList.contains('open');
-        closeAllTimeMenus();
-        if (willOpen) menu.classList.add('open');
+      const dd = this.buildTimeDropdown({
+        value: initial,
+        options: NIGHT_TIME_OPTIONS,
+        ariaLabel: t(`targets.${labelKey}`),
+        includeClear: true,
+        clearLabel: t('targets.timeWindowNotSet'),
+        onSelect: onChange,
       });
 
       group.appendChild(lbl);
-      group.appendChild(toggle);
-      group.appendChild(menu);
+      group.appendChild(dd.el);
       timeWindowEntry.appendChild(group);
     };
 
@@ -1766,11 +1745,6 @@ export class TargetsView {
     makeTimeDropdown('timeWindowEnd', this.prefs.obsEndTime ?? '', (value) => {
       this.prefs.obsEndTime = value || null;
       savePrefs(this.prefs);
-    });
-
-    document.addEventListener('click', () => closeAllTimeMenus());
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeAllTimeMenus();
     });
 
     timeWindowRow.appendChild(timeWindowLabel);
@@ -3487,11 +3461,27 @@ export class TargetsView {
       }
       const win = this.nightWindow(observer.loc, observer.dateNight);
       const moon = this.buildMoonOverlay(observer.loc, win);
-      const infos = this.computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false);
+      // computePlanTargets returns a transit-ordered baseline; re-order by the
+      // plan's chosen sort key (the exported PDF reads currentInfos, so both the
+      // list and the PDF inherit this order).
+      const sortKey = (plan.sortBy ?? 'transit') as PlanSortKey;
+      const infos = sortPlanTargets(
+        this.computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false),
+        sortKey,
+        firstWindowFracByEntry(plan.entries),
+      );
       currentInfos = infos;
       currentWin = win;
 
-      trajWrap.appendChild(this.buildMoonToggle(renderTrajectories));
+      // Sort dropdown (left) and Moon toggle (right) share one row to save space,
+      // using the same wide inter-group gap as the date/setup/location row above.
+      const controlsRow = document.createElement('div');
+      controlsRow.className = 'flex flex-wrap items-center gap-x-12 gap-y-2 mb-[var(--space-6h)]';
+      controlsRow.append(
+        this.buildPlanSortBar(plan, renderTrajectories),
+        this.buildMoonToggle(renderTrajectories),
+      );
+      trajWrap.appendChild(controlsRow);
       trajWrap.appendChild(this.buildTimelineHeader(win, observer.loc, moon));
       const list = document.createElement('div');
       list.className = 'flex flex-col divide-y divide-[var(--border-input)]';
@@ -3788,6 +3778,8 @@ export class TargetsView {
           curve: i.curve,
           nightWin: win,
           mosaic: null,
+          observationWindows:
+            plan.entries.find((e) => e.id === i.entryId)?.observationWindows ?? [],
           ...moonShared,
           moonSepDeg: moon ? i.moonSepDeg : null,
         }));
@@ -3834,8 +3826,9 @@ export class TargetsView {
             });
           }
         }
-        // Transit-ordered like the on-screen list.
-        targets.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
+        // Order matches the on-screen list: standalone objects follow the plan's
+        // chosen sort (inherited from currentInfos above), then mosaic pages are
+        // appended after them.
 
         const { renderPlanPdf } = await import('./export-render');
         const blob = await renderPlanPdf(this.skyMap, {
@@ -3887,6 +3880,48 @@ export class TargetsView {
     txt.textContent = t('targets.plan.showMoon');
     wrap.append(cb, txt);
     return wrap;
+  }
+
+  /**
+   * "Sort by" dropdown for a plan's objects list. Reuses the Targets-search
+   * sort-bar styling and shared i18n labels; persists the choice per plan and
+   * re-renders so the list (and the exported PDF, which reads the same order)
+   * reflect it.
+   */
+  private buildPlanSortBar(plan: Plan, rerender: () => void): HTMLElement {
+    const bar = document.createElement('div');
+    // `!mb-0`: the shared .targets-sort-bar carries a bottom margin for the search
+    // grid; here the wrapping controls row owns that spacing instead.
+    bar.className = 'targets-sort-bar !mb-0';
+    const label = document.createElement('span');
+    label.className = 'targets-sort-label';
+    label.textContent = t('targets.sort.label');
+    const select = document.createElement('select');
+    select.className = 'targets-sort-select';
+    const opts: [PlanSortKey, () => string][] = [
+      ['transit', () => t('targets.sort.transit')],
+      ['altitude', () => t('targets.sort.altitude')],
+      ['rating', () => t('targets.sort.rating')],
+      ['magnitude', () => t('targets.sort.magnitude')],
+      ['size', () => t('targets.sort.size')],
+      ['name', () => t('targets.sort.name')],
+      ['difficulty', () => t('targets.sort.difficulty')],
+      ['window', () => t('targets.sort.window')],
+    ];
+    const current = (plan.sortBy ?? 'transit') as PlanSortKey;
+    for (const [value, labelFn] of opts) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = labelFn();
+      opt.selected = value === current;
+      select.appendChild(opt);
+    }
+    select.addEventListener('change', () => {
+      this.plansStore.setPlanSort(plan.id, select.value as PlanSortKey);
+      rerender();
+    });
+    bar.append(label, select);
+    return bar;
   }
 
   /** Moonrise/moonset crossings (alt = 0) within the night window, interpolated. */
@@ -4179,8 +4214,18 @@ export class TargetsView {
     filtersDetails.appendChild(filterList);
     left.appendChild(filtersDetails);
 
-    // ── Trajectory chart ──
+    // ── Trajectory chart + observation windows ──
     const chartWrap = this.buildPlanChart(info.curve, win, info.bestTimeUtc, moon);
+    const chartBox = chartWrap.querySelector<HTMLElement>('.plan-chart-box');
+
+    // Column wrapping the chart so the observation-window toolbar sits beneath it.
+    const chartCol = document.createElement('div');
+    chartCol.className = 'flex-1 min-w-0 flex flex-col';
+    chartCol.appendChild(chartWrap);
+    if (chartBox) {
+      const windowUi = this.buildObservationWindowUi(planId, info.entryId, chartBox, win);
+      chartCol.appendChild(windowUi.toolbar);
+    }
 
     // Show-on-map: same behaviour as the recommend card (free frame on target).
     const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
@@ -4199,7 +4244,7 @@ export class TargetsView {
     });
 
     row.appendChild(left);
-    row.appendChild(chartWrap);
+    row.appendChild(chartCol);
     row.appendChild(navBtn);
     row.appendChild(removeBtn);
 
@@ -4229,6 +4274,457 @@ export class TargetsView {
     };
 
     return { row, applyPreset };
+  }
+
+  /** Filters offered in the observation-window filter picker. */
+  private static readonly OBS_WINDOW_FILTERS = [
+    'L',
+    'R',
+    'G',
+    'B',
+    'RGB',
+    'Ha',
+    'OIII',
+    'SII',
+    'Dual-Band',
+  ];
+
+  /** Chain-link icon (like the width/height "link" constraint in photo editors),
+   * used for the observation-window "snap dragging to whole frames" toggle. */
+  private static readonly LINK_ICON_SVG =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6"/><path d="M10 7H7a5 5 0 0 0 0 10h3"/><path d="M14 7h3a5 5 0 0 1 0 10h-3"/></svg>';
+
+  /** Whether the one-time document handlers that close open time menus are wired. */
+  private timeMenusWired = false;
+
+  /** Close every open time-picker menu in the document (except `except`). */
+  private closeAllTimeMenus(except?: HTMLElement): void {
+    document.querySelectorAll<HTMLElement>('.targets-time-menu.open').forEach((el) => {
+      if (el !== except) el.classList.remove('open');
+    });
+  }
+
+  /**
+   * Reusable time picker: a styled button that opens a menu of valid HH:MM
+   * options. Not a native `<input type="time">` — its scroll-wheel picker
+   * ignores `step` and renders a wrapped night range unreliably. Shared by the
+   * targets-search observation window and the per-object observation windows, so
+   * the two never drift apart. `setValue` updates the shown time without firing
+   * `onSelect` (e.g. while a window is dragged on the chart).
+   */
+  private buildTimeDropdown(opts: {
+    value: string;
+    options: string[];
+    ariaLabel: string;
+    includeClear?: boolean;
+    clearLabel?: string;
+    onSelect: (value: string) => void;
+  }): { el: HTMLElement; setValue: (v: string) => void } {
+    if (!this.timeMenusWired) {
+      this.timeMenusWired = true;
+      document.addEventListener('click', () => this.closeAllTimeMenus());
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this.closeAllTimeMenus();
+      });
+    }
+
+    const group = document.createElement('div');
+    group.className = 'targets-time-field';
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'targets-time-input';
+    toggle.setAttribute('aria-label', opts.ariaLabel);
+    toggle.textContent = opts.value || '--:--';
+
+    const menu = document.createElement('div');
+    menu.className = 'targets-time-menu';
+
+    const selectValue = (value: string): void => {
+      toggle.textContent = value || '--:--';
+      menu.classList.remove('open');
+      opts.onSelect(value);
+    };
+
+    if (opts.includeClear) {
+      const clearItem = document.createElement('button');
+      clearItem.type = 'button';
+      clearItem.className = 'targets-time-menu-item targets-time-menu-clear';
+      clearItem.textContent = opts.clearLabel ?? '';
+      clearItem.addEventListener('click', () => selectValue(''));
+      menu.appendChild(clearItem);
+    }
+
+    for (const time of opts.options) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'targets-time-menu-item';
+      item.textContent = time;
+      item.addEventListener('click', () => selectValue(time));
+      menu.appendChild(item);
+    }
+
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = !menu.classList.contains('open');
+      this.closeAllTimeMenus();
+      if (willOpen) menu.classList.add('open');
+    });
+
+    group.appendChild(toggle);
+    group.appendChild(menu);
+    return {
+      el: group,
+      setValue: (v: string) => {
+        toggle.textContent = v || '--:--';
+      },
+    };
+  }
+
+  /**
+   * Interactive observation-window layer for a standalone plan row. Renders
+   * draggable shaded bands over the trajectory (inside `chartBox`) and a toolbar
+   * beneath it — an "add" button plus one editor row per window: colour swatch,
+   * filter picker, editable start/end clock times, read-only duration, editable
+   * single-frame duration, a snap-to-frame toggle, and a remove button. Window
+   * edges are stored as fractions of the night window; edits persist (debounced)
+   * via the plans store.
+   */
+  private buildObservationWindowUi(
+    planId: string,
+    entryId: string,
+    chartBox: HTMLElement,
+    win: { start: Date; end: Date },
+  ): { toolbar: HTMLElement } {
+    // Geometry must match buildAltChart's SVG viewBox (W×H, padX/padY insets).
+    const W = 120,
+      H = 53,
+      padX = 2,
+      padY = 7;
+    const nightSpanMs = win.end.getTime() - win.start.getTime() || 1;
+    const fracToPct = (f: number) => ((padX + f * (W - padX)) / W) * 100;
+    const readVar = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v);
+
+    const entry = () =>
+      this.plansStore.plans.find((p) => p.id === planId)?.entries.find((e) => e.id === entryId);
+    // Working copy (source of truth is the store cache, snapshotted on build).
+    const windows: ObservationWindow[] = (entry()?.observationWindows ?? []).map((w) => ({ ...w }));
+
+    const knownFilterMap = new Map<string, string>();
+    for (const name of TargetsView.OBS_WINDOW_FILTERS) knownFilterMap.set(name.toLowerCase(), name);
+
+    const persist = () => {
+      this.plansStore.setEntryObservationWindows(
+        planId,
+        entryId,
+        windows.map((w) => ({ ...w })),
+      );
+    };
+
+    // Snap step as a fraction of the night, or 0 when the window has no frame
+    // duration / snap is off (→ free drag).
+    const stepFrac = (w: ObservationWindow): number =>
+      w.snap && w.frameSeconds ? (w.frameSeconds * 1000) / nightSpanMs : 0;
+
+    const layer = document.createElement('div');
+    layer.className = 'obs-window-layer';
+    layer.style.top = `${(padY / H) * 100}%`;
+    layer.style.bottom = `${(padY / H) * 100}%`;
+    chartBox.appendChild(layer);
+
+    // Layout: the "+ window" button on the left, at the top level with the first
+    // row; the editor rows form a grid to its right so every field lines up in a
+    // column across rows (each row is `display:contents`, its cells flow into the
+    // shared grid columns).
+    const toolbar = document.createElement('div');
+    toolbar.className = 'obs-window-toolbar mt-2 flex items-start gap-2';
+    const rowsCol = document.createElement('div');
+    rowsCol.className = 'obs-window-rows';
+
+    const timeOptions = windowTimeOptions(win, 15);
+    const bandEls = new Map<string, HTMLElement>();
+    // Per-window row field refs, so a drag / time edit updates its counterparts.
+    const rowRefs = new Map<
+      string,
+      {
+        setStart: (v: string) => void;
+        setEnd: (v: string) => void;
+        dur: HTMLElement;
+        refreshFrames: () => void;
+      }
+    >();
+
+    const positionBand = (band: HTMLElement, w: ObservationWindow): void => {
+      band.style.left = `${fracToPct(w.startFrac)}%`;
+      band.style.width = `${fracToPct(w.endFrac) - fracToPct(w.startFrac)}%`;
+    };
+    const paintBand = (w: ObservationWindow): void => {
+      const band = bandEls.get(w.id);
+      if (band) band.style.background = toBandFill(resolveWindowColor(w, readVar));
+    };
+    // Push the window's current fracs into its row's time pickers + duration + frame count.
+    const syncRow = (w: ObservationWindow): void => {
+      const refs = rowRefs.get(w.id);
+      if (!refs) return;
+      refs.setStart(fracToClock(w.startFrac, win));
+      refs.setEnd(fracToClock(w.endFrac, win));
+      refs.dur.textContent = formatWindowDuration(windowDurationMs(w, nightSpanMs));
+      refs.refreshFrames();
+    };
+
+    // Pointer-drag on a band edge ('l'/'r') or the whole band ('move').
+    const wireDrag = (el: HTMLElement, w: ObservationWindow, mode: 'l' | 'r' | 'move'): void => {
+      el.addEventListener('pointerdown', (ev: PointerEvent) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const rect = chartBox.getBoundingClientRect();
+        if (rect.width === 0) return;
+        // px → time-fraction: the box spans W svg units, of which (W-padX) is plot.
+        const fracPerPx = W / ((W - padX) * rect.width);
+        const startX = ev.clientX;
+        const s0 = w.startFrac;
+        const e0 = w.endFrac;
+        const width = e0 - s0;
+        const band = bandEls.get(w.id);
+        el.setPointerCapture(ev.pointerId);
+        const onMove = (m: PointerEvent) => {
+          let dFrac = (m.clientX - startX) * fracPerPx;
+          const step = stepFrac(w);
+          if (step > 0) dFrac = Math.round(dFrac / step) * step; // snap to whole frames
+          if (mode === 'l') {
+            w.startFrac = Math.max(0, Math.min(e0 - MIN_WINDOW_FRAC, s0 + dFrac));
+          } else if (mode === 'r') {
+            w.endFrac = Math.min(1, Math.max(s0 + MIN_WINDOW_FRAC, e0 + dFrac));
+          } else {
+            const ns = Math.max(0, Math.min(1 - width, s0 + dFrac));
+            w.startFrac = ns;
+            w.endFrac = ns + width;
+          }
+          if (band) positionBand(band, w);
+          syncRow(w);
+        };
+        const onUp = (u: PointerEvent) => {
+          el.releasePointerCapture(u.pointerId);
+          el.removeEventListener('pointermove', onMove);
+          el.removeEventListener('pointerup', onUp);
+          persist();
+        };
+        el.addEventListener('pointermove', onMove);
+        el.addEventListener('pointerup', onUp);
+      });
+    };
+
+    const renderBands = (): void => {
+      layer.innerHTML = '';
+      bandEls.clear();
+      for (const w of windows) {
+        const band = document.createElement('div');
+        band.className = 'obs-window-band';
+        band.title = w.filter ? w.filter : t('targets.plan.obsWindowTitle');
+        bandEls.set(w.id, band);
+        positionBand(band, w);
+        band.style.background = toBandFill(resolveWindowColor(w, readVar));
+        const lh = document.createElement('div');
+        lh.className = 'obs-window-handle obs-window-handle-l';
+        const rh = document.createElement('div');
+        rh.className = 'obs-window-handle obs-window-handle-r';
+        band.append(lh, rh);
+        wireDrag(band, w, 'move');
+        wireDrag(lh, w, 'l');
+        wireDrag(rh, w, 'r');
+        layer.appendChild(band);
+      }
+    };
+
+    // A small labelled time picker (reuses the shared targets-search widget).
+    const timeGroup = (
+      labelKey: string,
+      value: string,
+      onPick: (f: number) => void,
+    ): { el: HTMLElement; setValue: (v: string) => void } => {
+      const group = document.createElement('div');
+      group.className = 'obs-window-time-group flex items-center gap-1 shrink-0';
+      const lbl = document.createElement('span');
+      lbl.className = 'obs-window-time-label text-micro text-dim';
+      lbl.textContent = t(labelKey);
+      const dd = this.buildTimeDropdown({
+        value,
+        options: timeOptions,
+        ariaLabel: t(labelKey),
+        onSelect: (v) => {
+          const f = clockToFrac(v, win);
+          if (f != null) onPick(f);
+        },
+      });
+      group.append(lbl, dd.el);
+      return { el: group, setValue: dd.setValue };
+    };
+
+    const renderRows = (): void => {
+      rowsCol.innerHTML = '';
+      rowRefs.clear();
+      for (const w of windows) {
+        // `contents` so the row's cells flow directly into the shared grid columns.
+        const rowEl = document.createElement('div');
+        rowEl.className = 'obs-window-row contents';
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.className = 'obs-window-color';
+        colorInput.title = t('targets.plan.obsWindowColor');
+        colorInput.value = cssColorToHex(resolveWindowColor(w, readVar));
+        colorInput.addEventListener('input', () => {
+          w.color = colorInput.value;
+          paintBand(w);
+          persist();
+        });
+
+        const field = buildIntegrationFilterField({
+          initialValue: w.filter ?? '',
+          knownFilterMap,
+          placeholder: t('targets.plan.obsWindowFilter'),
+          tooltip: t('targets.plan.obsWindowFilter'),
+          onSelect: (value: string) => {
+            const v = value.trim();
+            w.filter = v ? v : null;
+            // If the colour still derives from the filter, follow the new filter.
+            if (!w.color) {
+              paintBand(w);
+              colorInput.value = cssColorToHex(resolveWindowColor(w, readVar));
+            }
+            persist();
+          },
+        });
+        field.el.classList.add('obs-window-filter');
+
+        // Editable start / end clock times (shared time-picker widget), then the
+        // read-only duration kept next to the times.
+        const startG = timeGroup(
+          'targets.plan.obsWindowFrom',
+          fracToClock(w.startFrac, win),
+          (f) => {
+            w.startFrac = Math.min(f, w.endFrac - MIN_WINDOW_FRAC);
+            const band = bandEls.get(w.id);
+            if (band) positionBand(band, w);
+            syncRow(w);
+            persist();
+          },
+        );
+        const endG = timeGroup('targets.plan.obsWindowTo', fracToClock(w.endFrac, win), (f) => {
+          w.endFrac = Math.max(f, w.startFrac + MIN_WINDOW_FRAC);
+          const band = bandEls.get(w.id);
+          if (band) positionBand(band, w);
+          syncRow(w);
+          persist();
+        });
+
+        const dur = document.createElement('span');
+        dur.className =
+          'obs-window-duration text-micro text-dim justify-self-end whitespace-nowrap';
+        dur.title = t('targets.plan.obsWindowDuration');
+        dur.textContent = formatWindowDuration(windowDurationMs(w, nightSpanMs));
+
+        // Frames read like the photo metadata: "N × [sub] s". Each part is its own
+        // grid cell so the sub input (and the × and s) line up in columns across
+        // rows. N is derived from duration ÷ sub; the N and × cells are blank
+        // until a sub duration is entered.
+        const framesN = document.createElement('span');
+        framesN.className = 'text-micro text-dim justify-self-end whitespace-nowrap';
+        const oper = document.createElement('span');
+        oper.className = 'integration-operator justify-self-center';
+        const subInput = document.createElement('input');
+        subInput.type = 'number';
+        subInput.min = '1';
+        subInput.className = 'tag-input integration-input obs-window-frame';
+        subInput.title = t('targets.plan.obsWindowFrame');
+        subInput.value = w.frameSeconds != null ? String(w.frameSeconds) : '';
+        const unit = document.createElement('span');
+        unit.className = 'integration-unit';
+        unit.textContent = t('targets.plan.obsWindowFrameUnit');
+        const refreshFrames = (): void => {
+          const has = w.frameSeconds != null && w.frameSeconds > 0;
+          const n = framesInWindow(w, nightSpanMs);
+          framesN.textContent = has && n != null ? String(n) : '';
+          oper.textContent = has ? '×' : '';
+        };
+        subInput.addEventListener('change', () => {
+          const n = Number(subInput.value);
+          w.frameSeconds = Number.isFinite(n) && n > 0 ? n : null;
+          if (!w.frameSeconds) subInput.value = '';
+          refreshFrames();
+          persist();
+        });
+        refreshFrames();
+
+        rowRefs.set(w.id, {
+          setStart: startG.setValue,
+          setEnd: endG.setValue,
+          dur,
+          refreshFrames,
+        });
+
+        // Link/constraint toggle: when on, dragging snaps to whole single-frame steps.
+        const linkBtn = document.createElement('button');
+        linkBtn.type = 'button';
+        const setLinkClass = (): void => {
+          linkBtn.className = `${w.snap ? 'btn-icon--active' : 'btn-icon'} obs-window-iconbtn obs-window-link`;
+        };
+        setLinkClass();
+        linkBtn.title = t('targets.plan.obsWindowSnap');
+        linkBtn.innerHTML = TargetsView.LINK_ICON_SVG;
+        linkBtn.addEventListener('click', () => {
+          w.snap = !w.snap;
+          setLinkClass();
+          persist();
+        });
+
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'btn-icon btn-icon--danger obs-window-iconbtn';
+        rm.title = t('targets.plan.obsWindowRemove');
+        rm.innerHTML = trashSvg;
+        rm.addEventListener('click', () => {
+          const idx = windows.findIndex((x) => x.id === w.id);
+          if (idx >= 0) windows.splice(idx, 1);
+          renderBands();
+          renderRows();
+          persist();
+        });
+
+        // Order must match the grid columns in the `obs-window-rows` shortcut.
+        rowEl.append(
+          colorInput,
+          field.el,
+          startG.el,
+          endG.el,
+          dur,
+          framesN,
+          oper,
+          subInput,
+          unit,
+          linkBtn,
+          rm,
+        );
+        rowsCol.appendChild(rowEl);
+      }
+    };
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn-icon obs-window-add';
+    addBtn.textContent = t('targets.plan.obsWindowAdd');
+    addBtn.addEventListener('click', () => {
+      windows.push(newObservationWindow());
+      renderBands();
+      renderRows();
+      persist();
+    });
+    toolbar.append(addBtn, rowsCol);
+
+    renderBands();
+    renderRows();
+
+    return { toolbar };
   }
 
   /**
@@ -4264,7 +4760,7 @@ export class TargetsView {
     }
 
     const chartBox = document.createElement('div');
-    chartBox.className = 'relative flex-1 min-w-0';
+    chartBox.className = 'relative flex-1 min-w-0 plan-chart-box';
     chartBox.appendChild(chart.svg);
     // Moon-phase icon pinned just left of the axis (fixed x), at the moon's
     // altitude where its trajectory meets the left edge. Anchored to the axis

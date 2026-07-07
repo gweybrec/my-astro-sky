@@ -5,6 +5,7 @@ import {
   createPlanAPI,
   renamePlanAPI,
   updatePlanSettingsAPI,
+  updatePlanSortAPI,
   deletePlanAPI,
   reorderPlansAPI,
   addPlanEntryAPI,
@@ -18,6 +19,8 @@ import {
   deletePlanMosaicAPI,
   type Plan,
   type MosaicParams,
+  type ObservationWindow,
+  type PlanSortKey,
 } from '../api';
 import { reportUnknownRendererError } from '../error-reporter';
 
@@ -30,6 +33,10 @@ export const usePlansStore = defineStore('plans', () => {
   const loaded = ref(false);
   // Per-entry debounce timers for position-angle persistence (drag coalescing).
   const paWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Separate per-entry debounce timers for observation-window persistence, so a
+  // window drag never clears a pending framing write (they persist disjoint
+  // columns via independent partial PATCHes).
+  const windowWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   const planCount = computed(() => plans.value.length);
   const entryCount = computed(() => plans.value.reduce((n, p) => n + p.entries.length, 0));
@@ -106,6 +113,19 @@ export const usePlansStore = defineStore('plans', () => {
     } catch (err) {
       reportUnknownRendererError('plan_update_settings_failed', err, { id });
     }
+  }
+
+  /**
+   * Set a plan's objects-list sort key. Mutates the local cache immediately (so
+   * the list re-renders without a round-trip) then persists in the background —
+   * deliberately does NOT call load().
+   */
+  function setPlanSort(id: string, sortBy: PlanSortKey): void {
+    const plan = plans.value.find((p) => p.id === id);
+    if (plan) plan.sortBy = sortBy;
+    updatePlanSortAPI(id, sortBy).catch((err) => {
+      reportUnknownRendererError('plan_set_sort_failed', err, { id });
+    });
   }
 
   async function deletePlan(id: string): Promise<void> {
@@ -241,6 +261,37 @@ export const usePlansStore = defineStore('plans', () => {
   }
 
   /**
+   * Replace a plan entry's observation windows. Mutates the local cache
+   * immediately (so dragging a window edge re-renders without a round-trip) and
+   * debounces the background persist so a drag coalesces into one request —
+   * deliberately does NOT call load(). Reuses the same per-entry debounce map as
+   * the framing writes so window and framing edits can't drop each other.
+   */
+  function setEntryObservationWindows(
+    planId: string,
+    entryId: string,
+    windows: ObservationWindow[],
+  ): void {
+    const entry = plans.value.find((p) => p.id === planId)?.entries.find((e) => e.id === entryId);
+    if (entry) entry.observationWindows = windows;
+    const prev = windowWriteTimers.get(entryId);
+    if (prev) clearTimeout(prev);
+    windowWriteTimers.set(
+      entryId,
+      setTimeout(() => {
+        windowWriteTimers.delete(entryId);
+        const e = plans.value.find((p) => p.id === planId)?.entries.find((x) => x.id === entryId);
+        if (!e) return;
+        updatePlanEntryPositionAPI(planId, entryId, {
+          observationWindows: e.observationWindows,
+        }).catch((err) => {
+          reportUnknownRendererError('plan_set_entry_windows_failed', err, { planId, entryId });
+        });
+      }, 250),
+    );
+  }
+
+  /**
    * Create a mosaic in a plan from client-computed tiles. Returns the new mosaic
    * id, or null on failure. Refreshes the cache so the tiles appear.
    */
@@ -309,6 +360,8 @@ export const usePlansStore = defineStore('plans', () => {
     reorderEntries,
     setEntryPA,
     setEntryPosition,
+    setEntryObservationWindows,
+    setPlanSort,
     createMosaic,
     updateMosaic,
     deleteMosaic,

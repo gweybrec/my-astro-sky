@@ -86,6 +86,10 @@ export const useUiStore = defineStore('ui', () => {
   function openTargetsOverlay(planId: string | null = null): void {
     targetsOverlayPlanId.value = planId;
     targetsOverlayOpen.value = true;
+    // Closing the overlay re-renders the Plans view (to show newly picked
+    // targets), which rebuilds every plan's <details> collapsed by default.
+    // Keep the plan it was opened from expanded across that rebuild.
+    if (planId) pendingPlanFocusId.value = planId;
   }
 
   function closeTargetsOverlay(): void {

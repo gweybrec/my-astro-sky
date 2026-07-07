@@ -17,11 +17,19 @@ const KNOWN_FILTER_CSS_KEYS = new Set([
   'dual-band',
 ]);
 
+/**
+ * Maps a filter name to its CSS token key: a known filter → its own key
+ * (e.g. 'Ha' → 'ha'), anything else → 'custom'. Both `.filter-{key}` classes
+ * and the `--filter-{key}` colour tokens follow this key.
+ */
+export function filterCssKey(name: string | null | undefined): string {
+  const key = (name ?? '').toLowerCase();
+  return KNOWN_FILTER_CSS_KEYS.has(key) ? key : 'custom';
+}
+
 export function createFilterBadge(name: string): HTMLSpanElement {
   const badge = document.createElement('span');
-  const key = name.toLowerCase();
-  const colorClass = KNOWN_FILTER_CSS_KEYS.has(key) ? `filter-${key}` : 'filter-custom';
-  badge.className = `target-filter-badge ${colorClass}`;
+  badge.className = `target-filter-badge filter-${filterCssKey(name)}`;
   badge.textContent = name;
   return badge;
 }

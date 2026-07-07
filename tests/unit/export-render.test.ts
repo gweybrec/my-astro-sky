@@ -3,6 +3,7 @@ import {
   scaleMatrixForDpr,
   computeGalleryLayout,
   computeFramedViewScale,
+  computeLegendLayout,
 } from '../../src/export-render';
 import { angularSizeToCanvasPxForDSO } from '../../src/dso-highlight';
 
@@ -90,5 +91,41 @@ describe('computeFramedViewScale', () => {
 
   it('returns a positive finite scale for degenerate (zero) dimensions', () => {
     expect(computeFramedViewScale(0, 0, 0, 500, 500, 0.6)).toBe(1);
+  });
+});
+
+describe('computeLegendLayout', () => {
+  const ROW_H = 13;
+  const PAD_TOP = 8;
+  const CHART_MIN_H = 160;
+  const AVAILABLE_H = 400;
+
+  it('reserves no legend space and fills the full chart height when there are no windows', () => {
+    const layout = computeLegendLayout(0, ROW_H, PAD_TOP, CHART_MIN_H, AVAILABLE_H);
+    expect(layout).toEqual({ legendH: 0, chartH: AVAILABLE_H, overflow: false });
+  });
+
+  it('shrinks the chart by exactly the legend height when everything still fits', () => {
+    const count = 5;
+    const layout = computeLegendLayout(count, ROW_H, PAD_TOP, CHART_MIN_H, AVAILABLE_H);
+    const expectedLegendH = PAD_TOP + ROW_H * count;
+    expect(layout.legendH).toBe(expectedLegendH);
+    expect(layout.chartH).toBe(AVAILABLE_H - expectedLegendH);
+    expect(layout.overflow).toBe(false);
+  });
+
+  it('clamps the chart to its minimum height and flags overflow when the legend would breach it', () => {
+    // Enough windows that padTop + rowH*count exceeds availableH - chartMinH.
+    const count = 30;
+    const layout = computeLegendLayout(count, ROW_H, PAD_TOP, CHART_MIN_H, AVAILABLE_H);
+    expect(layout.legendH).toBe(PAD_TOP + ROW_H * count);
+    expect(layout.chartH).toBe(CHART_MIN_H);
+    expect(layout.overflow).toBe(true);
+  });
+
+  it('never truncates the legend height itself, even on overflow', () => {
+    const count = 50;
+    const layout = computeLegendLayout(count, ROW_H, PAD_TOP, CHART_MIN_H, AVAILABLE_H);
+    expect(layout.legendH).toBe(PAD_TOP + ROW_H * count);
   });
 });

@@ -794,6 +794,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
         mosaicId,
         mosaicWDeg: null,
         mosaicHDeg: null,
+        observationWindows: [],
       })),
     ];
     const prev = mosaicWriteTimers.get(mosaicId);
