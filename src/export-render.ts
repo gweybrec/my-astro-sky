@@ -13,8 +13,21 @@ import { buildSetupInfoRows } from './setup-info';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import { moonDangerLevel, type AltSample } from './sky-geometry';
 import { drawMoonMarker } from './moon-draw';
-import { resolveWindowColor, toBandFill } from './observation-windows';
+import {
+  resolveWindowColor,
+  toBandFill,
+  fracToClock,
+  windowDurationMs,
+  framesInWindow,
+  formatWindowDuration,
+  cssColorToHex,
+} from './observation-windows';
 import type { ObservationWindow } from './api';
+
+/** Read a CSS custom property off the document root (theme-aware colour lookup). */
+function readVar(cssVar: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(cssVar);
+}
 
 // ─── Affine helpers (pure, unit-tested) ─────────────────────────────────────
 
@@ -325,6 +338,37 @@ export function computeFramedViewScale(
   return isFinite(s) && s > 0 ? s : 1;
 }
 
+export interface LegendLayout {
+  /** Full height (px) of the legend block — one row per window, uncapped. */
+  legendH: number;
+  /** Height (px) to render the trajectory chart at for this target. */
+  chartH: number;
+  /** True when even the minimum chart height + full legend doesn't leave room
+   *  for the framed sky view in the normally-available band — it must move to
+   *  a continuation page. */
+  overflow: boolean;
+}
+
+/**
+ * Lay out the chart/legend band for one target's plan page: the chart takes
+ * all available slack above `chartMinH` after the legend's own height is
+ * reserved; if that still doesn't fit, the chart clamps to `chartMinH` and
+ * `overflow` signals the caller to move the framed sky view to a new page
+ * rather than shrinking or splitting the legend.
+ */
+export function computeLegendLayout(
+  windowCount: number,
+  rowH: number,
+  padTop: number,
+  chartMinH: number,
+  availableH: number,
+): LegendLayout {
+  if (windowCount <= 0) return { legendH: 0, chartH: availableH, overflow: false };
+  const legendH = padTop + rowH * windowCount;
+  const overflow = chartMinH + legendH > availableH;
+  return { legendH, chartH: overflow ? chartMinH : availableH - legendH, overflow };
+}
+
 /** Draw a rotated FOV rectangle + centre dot at each target on the overview canvas. */
 function drawOverviewFrames(
   canvas: HTMLCanvasElement,
@@ -603,8 +647,6 @@ function drawAltChartToCanvas(
   // fractions of the night window; colour derives from the filter token (or an
   // explicit override). Drawn before the curve so the trajectory stays dominant.
   if (observationWindows && observationWindows.length > 0) {
-    const readVar = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v);
-    const fontSize = 8 * dpr;
     for (const w of observationWindows) {
       const x0 = gutter + Math.max(0, Math.min(1, w.startFrac)) * plotW;
       const x1 = gutter + Math.max(0, Math.min(1, w.endFrac)) * plotW;
@@ -624,15 +666,7 @@ function drawAltChartToCanvas(
       ctx.moveTo(x1, padY);
       ctx.lineTo(x1, h - padY);
       ctx.stroke();
-      if (w.filter) {
-        ctx.font = `${fontSize}px sans-serif`;
-        ctx.fillStyle = 'rgba(60,60,60,0.9)';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        ctx.fillText(w.filter, x0 + bandW / 2, padY + 1 * dpr);
-      }
     }
-    ctx.textBaseline = 'alphabetic';
   }
 
   // Moon trajectory — drawn before the object curve so the blue object line
@@ -853,9 +887,35 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
   const constText: [number, number, number] = [60, 96, 170];
   const constBorder: [number, number, number] = [200, 214, 240];
 
-  // Deterministic page numbering: [1] summary, [2] contents, [3…] entries, [last] overview.
-  const entryPage = (i: number) => 3 + i;
-  const overviewPage = 3 + opts.targets.length;
+  // Observation-window legend geometry, and the chart/legend layout for each
+  // target — computed up front since an overflowing target (legend too tall
+  // even at the chart's minimum height) needs an extra page for the framed
+  // sky view, which shifts every following target's page number.
+  const legendRowH = 13;
+  const legendPadTop = 8;
+  const chartMinH = chartH * 0.4;
+  const targetLayouts = opts.targets.map((tgt) =>
+    computeLegendLayout(
+      tgt.observationWindows?.length ?? 0,
+      legendRowH,
+      legendPadTop,
+      chartMinH,
+      chartH,
+    ),
+  );
+
+  // Deterministic page numbering: [1] summary, [2] contents, [3…] entries
+  // (2 pages for an overflowing target, else 1), [last] overview.
+  const entryPageStarts: number[] = [];
+  {
+    let p = 3;
+    for (const layout of targetLayouts) {
+      entryPageStarts.push(p);
+      p += layout.overflow ? 2 : 1;
+    }
+  }
+  const entryPage = (i: number) => entryPageStarts[i];
+  const overviewPage = 3 + targetLayouts.reduce((sum, l) => sum + (l.overflow ? 2 : 1), 0);
 
   try {
     // ── Page 1: summary (plan header + setup details) ────────────────────────
@@ -1025,10 +1085,11 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
       // Supersample beyond the page dpr: the chart is pure thin-line/small-text
       // vector content (unlike the photographic sky view), so extra raster
       // resolution removes the visible pixelation of its lines and labels.
+      const layout = targetLayouts[i];
       const chartDpr = dpr * 2;
       const chartOff = document.createElement('canvas');
       chartOff.width = Math.round(contentW * chartDpr);
-      chartOff.height = Math.round(chartH * chartDpr);
+      chartOff.height = Math.round(layout.chartH * chartDpr);
       const chartCtx = chartOff.getContext('2d')!;
       // Light background matching PDF white background.
       chartCtx.fillStyle = '#f8f8f8';
@@ -1049,46 +1110,108 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
           tgt.observationWindows,
         );
       }
-      doc.addImage(chartOff.toDataURL('image/png'), 'PNG', margin, chartTop, contentW, chartH);
+      doc.addImage(
+        chartOff.toDataURL('image/png'),
+        'PNG',
+        margin,
+        chartTop,
+        contentW,
+        layout.chartH,
+      );
 
-      // ── Framed sky view (bottom third) ───────────────────────────────────────
-      const imgW = contentW;
-      const imgH = frameH;
-      const off = document.createElement('canvas');
-      off.width = Math.round(imgW * dpr);
-      off.height = Math.round(imgH * dpr);
-      const p = project(dso.ra, dso.dec);
-      // Mosaics frame their whole envelope and draw the tile grid themselves;
-      // standalone targets frame the native FOV via the live single frame.
-      const viewW = tgt.mosaic ? tgt.mosaic.wDeg : spec?.wDeg;
-      const viewH = tgt.mosaic ? tgt.mosaic.hDeg : spec?.hDeg;
-      const scale =
-        viewW != null && viewH != null
-          ? computeFramedViewScale(viewW, viewH, dso.dec, imgW, imgH, 0.55)
-          : baseView.scale * 4;
-      const view: ViewState = {
-        centerX: p.x,
-        centerY: p.y,
-        scale,
-        rotationDeg: baseView.rotationDeg,
-        width: imgW,
-        height: imgH,
-      };
-      skyMap.setFovFrames(tgt.mosaic ? [] : opts.fovSpecs);
-      skyMap.renderToCanvas(off, view, dpr);
-      if (tgt.mosaic && spec) {
-        drawMosaicTiles(
-          off,
-          view,
-          dpr,
-          tgt.mosaic.tiles,
-          spec.wDeg,
-          spec.hDeg,
-          tgt.mosaic.paDeg,
-          skyMap.getCanvas(),
-        );
+      // ── Observation-window legend (swatch, filter, start–end, total, N × sub s) ──
+      const windows = tgt.observationWindows ?? [];
+      if (windows.length > 0) {
+        const nightSpanMs = tgt.nightWin.end.getTime() - tgt.nightWin.start.getTime();
+        const swatchSize = 8;
+        let legendY = chartTop + layout.chartH + legendPadTop;
+        doc.setFontSize(7.5);
+        for (const w of windows) {
+          const hex = cssColorToHex(resolveWindowColor(w, readVar));
+          doc.setFillColor(
+            parseInt(hex.slice(1, 3), 16),
+            parseInt(hex.slice(3, 5), 16),
+            parseInt(hex.slice(5, 7), 16),
+          );
+          doc.rect(margin, legendY, swatchSize, swatchSize, 'F');
+          const textY = legendY + swatchSize - 1.5;
+
+          let lx = margin + swatchSize + 6;
+          (doc as any).setFont(undefined, 'bold');
+          doc.setTextColor(50, 50, 50);
+          const filterLabel = w.filter || '—';
+          doc.text(filterLabel, lx, textY);
+          lx += doc.getTextWidth(filterLabel) + 10;
+
+          (doc as any).setFont(undefined, 'normal');
+          doc.setTextColor(110, 110, 110);
+          const timeLabel = `${fracToClock(w.startFrac, tgt.nightWin)}–${fracToClock(w.endFrac, tgt.nightWin)}`;
+          doc.text(timeLabel, lx, textY);
+          lx += doc.getTextWidth(timeLabel) + 10;
+
+          const durLabel = formatWindowDuration(windowDurationMs(w, nightSpanMs));
+          doc.text(durLabel, lx, textY);
+          lx += doc.getTextWidth(durLabel) + 10;
+
+          if (w.frameSeconds) {
+            doc.text(`${framesInWindow(w, nightSpanMs)} × ${w.frameSeconds}s`, lx, textY);
+          }
+
+          legendY += legendRowH;
+        }
       }
-      doc.addImage(off.toDataURL('image/jpeg', 0.95), 'JPEG', margin, imgTop, imgW, imgH);
+
+      // ── Framed sky view (bottom third, or top of a continuation page) ───────
+      const drawFramedSkyView = (top: number) => {
+        const imgW = contentW;
+        const imgH = frameH;
+        const off = document.createElement('canvas');
+        off.width = Math.round(imgW * dpr);
+        off.height = Math.round(imgH * dpr);
+        const p = project(dso.ra, dso.dec);
+        // Mosaics frame their whole envelope and draw the tile grid themselves;
+        // standalone targets frame the native FOV via the live single frame.
+        const viewW = tgt.mosaic ? tgt.mosaic.wDeg : spec?.wDeg;
+        const viewH = tgt.mosaic ? tgt.mosaic.hDeg : spec?.hDeg;
+        const scale =
+          viewW != null && viewH != null
+            ? computeFramedViewScale(viewW, viewH, dso.dec, imgW, imgH, 0.55)
+            : baseView.scale * 4;
+        const view: ViewState = {
+          centerX: p.x,
+          centerY: p.y,
+          scale,
+          rotationDeg: baseView.rotationDeg,
+          width: imgW,
+          height: imgH,
+        };
+        skyMap.setFovFrames(tgt.mosaic ? [] : opts.fovSpecs);
+        skyMap.renderToCanvas(off, view, dpr);
+        if (tgt.mosaic && spec) {
+          drawMosaicTiles(
+            off,
+            view,
+            dpr,
+            tgt.mosaic.tiles,
+            spec.wDeg,
+            spec.hDeg,
+            tgt.mosaic.paDeg,
+            skyMap.getCanvas(),
+          );
+        }
+        doc.addImage(off.toDataURL('image/jpeg', 0.95), 'JPEG', margin, top, imgW, imgH);
+      };
+      // A legend too tall for the normal band (even at the chart's minimum
+      // height) pushes the framed sky view to a fresh continuation page
+      // instead of shrinking the chart further or splitting the legend. On
+      // that page the view sits near the top (not at its usual bottom-third
+      // spot) so the page doesn't open with a large empty gap above it.
+      if (layout.overflow) {
+        doc.addPage();
+        drawFramedSkyView(margin);
+      } else {
+        drawFramedSkyView(imgTop);
+      }
     }
 
     // Overview page: constellation lines + frame markers per target — no text.
