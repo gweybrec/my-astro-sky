@@ -8,6 +8,13 @@ import { getDsoOverrides } from './api';
 let dsos: DSO[] = [];
 const dsoById = new Map<string, DSO>();
 
+// Global importance rank (id → 0-based rank, most important first), built lazily from
+// `dsos` and cached. Invalidated when a rating override changes (see
+// invalidateDSOImportanceRank). Drives the area-weighted DSO density gate so on-screen
+// density tracks the true sky (Milky Way denser) instead of the blue-noise `priority`,
+// which evens that natural clustering out. See getDSOImportanceRank.
+let dsoImportanceRank: Map<string, number> | null = null;
+
 // ─── User override support ────────────────────────────────────────────────────
 
 export interface DSOBaseValues {
@@ -57,7 +64,10 @@ export function applyUserOverrideToDso(dso: DSO, override: DSOUserOverride, lang
     invalidateProjections();
   }
   if (override.constellation !== undefined) dso.constellation = override.constellation;
-  if (override.rating !== undefined) dso.rating = override.rating;
+  if (override.rating !== undefined) {
+    dso.rating = override.rating;
+    invalidateDSOImportanceRank(); // rating drives the importance rank / density gate
+  }
   if (override.difficulty !== undefined) dso.difficulty = override.difficulty;
   if (override.type !== undefined) dso.type = override.type;
 }
@@ -72,6 +82,7 @@ function resetDsoToBase(dso: DSO, lang: string): void {
   }
   dso.displayName = computeDisplayName(base.nameFr, base.nameEn, base.nameEs, base.nameDe, lang);
   dso.constellation = base.constellation;
+  if (dso.rating !== base.rating) invalidateDSOImportanceRank();
   dso.rating = base.rating;
   dso.difficulty = base.difficulty;
   dso.type = base.type;
@@ -244,6 +255,9 @@ export async function loadDSOCatalog(): Promise<void> {
     // Silently ignore if user overrides can't be loaded
   }
 
+  // Fresh catalog: drop any stale importance rank so it rebuilds from the new set.
+  invalidateDSOImportanceRank();
+
   // Already sorted by magnitude in the JSON (brightest first)
 }
 
@@ -253,6 +267,36 @@ export function getDSOs(): DSO[] {
 
 export function getDSOById(id: string): DSO | undefined {
   return dsoById.get(id.toUpperCase());
+}
+
+/**
+ * Intrinsic photographic importance of a DSO (higher = more important). Mirrors the
+ * build-time `dsoImportance` in scripts/add-ratings.mjs: photographic rating dominates,
+ * brightness (lower mag) breaks ties. Position-independent, so ranking by it and then
+ * area-weighting the count gate makes on-screen DSO density track the true sky density
+ * (dense regions keep proportionally more of the top-N) with the projection bias removed.
+ */
+export function dsoImportance(d: DSO): number {
+  return (d.rating ?? 0) * 100 - (d.mag ?? 99) * 0.01;
+}
+
+/**
+ * Global rank of every DSO by {@link dsoImportance} (0 = most important), keyed by id.
+ * Built lazily from the current catalog and cached until {@link invalidateDSOImportanceRank}.
+ * Used by the area-weighted DSO density gate (see SkyMap.selectRenderedDSOs).
+ */
+export function getDSOImportanceRank(): Map<string, number> {
+  if (!dsoImportanceRank) {
+    const sorted = [...dsos].sort((a, b) => dsoImportance(b) - dsoImportance(a));
+    dsoImportanceRank = new Map(sorted.map((d, i) => [d.id, i]));
+  }
+  return dsoImportanceRank;
+}
+
+/** Drop the cached importance rank so it rebuilds on next use — call whenever a DSO's
+ *  rating changes (user override) so the density gate re-ranks. */
+export function invalidateDSOImportanceRank(): void {
+  dsoImportanceRank = null;
 }
 
 /** Priority order for picking the best display catalog ID (lower = higher priority). */

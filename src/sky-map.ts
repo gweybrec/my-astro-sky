@@ -24,7 +24,7 @@ import { drawMoonMarker } from './moon-draw';
 import { clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getStarMagsSorted, loadConstellationStyle, normalizeRA } from './star-catalog';
-import { getDSOs, getDSOById } from './dso-catalog';
+import { getDSOs, getDSOById, getDSOImportanceRank } from './dso-catalog';
 import {
   selectDSOsToRender,
   DSO_CONTAINER_VISIBLE_RADIUS_PX,
@@ -2628,10 +2628,16 @@ export class SkyMap {
     );
     const nearby = this.dsoAllIndex.collect(view.centerX, view.centerY, queryR);
 
-    // Area-normalisation for the area-weighted priority below (see render-budget.ts):
-    // the mean projection area factor over the visible cap, so weighting redistributes
-    // DSOs (thinner centre, denser edge) without changing the overall count.
+    // Area-normalisation for the area-weighted gate below (see render-budget.ts): the mean
+    // projection area factor over the visible cap, so weighting compensates the projection
+    // (thinner centre, denser edge) without changing the overall count.
     const aNorm = areaNormForBorderRadius(borderRadiusPU(this.borderLatDeg));
+    // Rank DSOs by intrinsic quality (rating/brightness), NOT the blue-noise `priority`.
+    // Gating the top count·A/aNorm by intrinsic quality makes on-screen DSO density track
+    // the true sky (Milky Way / rich regions denser) with the projection bias removed —
+    // the exact analogue of the star magnitude gate. `priority` would instead even out
+    // that natural clustering.
+    const qRank = getDSOImportanceRank();
 
     const candidates: (SelectableDSO & { dso: DSO })[] = [];
     // The spatial query covers normal-sized objects; the few giant DSOs (body larger
@@ -2697,12 +2703,15 @@ export class SkyMap {
           continue;
         }
 
-        // Screen-space (area-weighted) priority: scaling the rank by aNorm/A makes the
-        // priority gate draw uniformly per unit *screen* area — fewer DSOs near the
-        // crowded map centre (A≈1 → larger effective rank), more toward the edge
-        // (A large → smaller). A=0 at the exact fisheye rim → never render (off-screen).
+        // Screen-space (area-weighted) importance rank: scaling the intrinsic-quality rank
+        // by aNorm/A removes the projection bias while preserving the true-sky distribution
+        // — fewer DSOs near the crowded map centre (A≈1 → larger effective rank), more
+        // toward the edge (A large → smaller). Because the rank is intrinsic (not spatially
+        // spread), dense regions keep proportionally more of the top-N → natural clustering
+        // survives. A=0 at the exact fisheye rim → never render (off-screen).
         const A = projectionAreaFactor(dso._px!, dso._py!);
-        const effPriority = A > 0 ? (dso.priority * aNorm) / A : Infinity;
+        const rank = qRank.get(dso.id) ?? Number.MAX_SAFE_INTEGER;
+        const effPriority = A > 0 ? (rank * aNorm) / A : Infinity;
         candidates.push({ id: dso.id, priority: effPriority, isHighlighted, dso });
       }
 

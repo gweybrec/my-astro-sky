@@ -52,11 +52,13 @@ npm run dso:generate   # generate-dso.mjs && add-constellations.mjs && add-ratin
 
 This single command rebuilds `public/data/dso.json`, recomputes constellations, and
 (re)computes the four derived columns — `rating`, `difficulty`, `containerId`,
-`priority` — via `scripts/add-ratings.mjs`. `priority` gates whether a DSO renders at
-all (`src/dso-selection.ts`), so a run that skips this last step produces a catalog
-that loads without error but silently draws nothing — `tests/unit/dso-json-schema.test.ts`
-asserts the committed `dso.json` always has these columns fully populated, so CI catches
-it if the chain is ever broken apart again.
+`priority` — via `scripts/add-ratings.mjs`. The runtime DSO density gate ranks by
+**intrinsic quality** (`dsoImportance` = rating/brightness, in `src/dso-catalog.ts`),
+area-weighted so on-screen density tracks the true sky (Milky Way denser) with the
+stereographic projection bias removed — it no longer uses the blue-noise `priority`
+column, which is retained but currently only informational. `tests/unit/dso-json-schema.test.ts`
+still asserts the committed `dso.json` has all these columns fully populated, so CI
+catches it if the generation chain is ever broken apart again.
 
 `add-ratings.mjs` is idempotent: it strips any derived columns from a prior run before
 recomputing, so it's also safe to run standalone (`node scripts/add-ratings.mjs`) after
