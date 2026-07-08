@@ -57,6 +57,17 @@ const es: Translations = {
     constellation: 'Constelación',
     dec: 'Dec',
     nearbyTitle: 'Estrellas cercanas (&lt; 5°)',
+    multiplicity: 'Estrella múltiple',
+    multiple: {
+      binary: 'Binaria',
+      triple: 'Triple',
+      quadruple: 'Cuádruple',
+      quintuple: 'Quíntuple',
+      sextuple: 'Séxtuple',
+      septuple: 'Séptuple',
+      octuple: 'Óctuple',
+      system: 'Sistema de {n} estrellas',
+    },
   },
   dso: {
     section: 'Objetos de cielo profundo',
@@ -112,6 +123,7 @@ const es: Translations = {
       PN: 'Nebulosas planetarias',
       SNR: 'Remanentes de supernova',
       DN: 'Nebulosas oscuras',
+      MS: 'Estrellas múltiples',
       '?': 'Objetos celestes',
     },
     types: {
@@ -126,6 +138,7 @@ const es: Translations = {
       PN: 'Nebulosa planetaria',
       SNR: 'Remanente de supernova',
       DN: 'Nebulosa oscura',
+      MS: 'Estrella múltiple',
       '?': 'Objeto celeste',
     },
   },
@@ -951,6 +964,8 @@ const es: Translations = {
       rating:
         'Valoración de interés fotográfico (1–5 estrellas): espectacularidad del objeto para fotografiar',
       difficulty: 'Dificultad de imagen (1–5 diamantes): equipo y calidad de cielo requeridos',
+      multipleUnresolvable:
+        'Este par es más estrecho de lo que tu equipo puede resolver (0 estrellas)',
     },
     recipe: {
       noteColorCamera: 'Cámara de color: sesiones en banda ancha RGB',

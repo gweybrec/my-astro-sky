@@ -57,6 +57,17 @@ const en: Translations = {
     constellation: 'Constellation',
     dec: 'Dec',
     nearbyTitle: 'Nearby stars (< 5°)',
+    multiplicity: 'Multiple star',
+    multiple: {
+      binary: 'Binary',
+      triple: 'Triple',
+      quadruple: 'Quadruple',
+      quintuple: 'Quintuple',
+      sextuple: 'Sextuple',
+      septuple: 'Septuple',
+      octuple: 'Octuple',
+      system: '{n}-star system',
+    },
   },
   dso: {
     section: 'Deep sky objects',
@@ -112,6 +123,7 @@ const en: Translations = {
       PN: 'Planetary nebulae',
       SNR: 'Supernova remnants',
       DN: 'Dark nebulae',
+      MS: 'Multiple stars',
       '?': 'Celestial objects',
     },
     types: {
@@ -126,6 +138,7 @@ const en: Translations = {
       PN: 'Planetary nebula',
       SNR: 'Supernova remnant',
       DN: 'Dark nebula',
+      MS: 'Multiple star',
       '?': 'Celestial object',
     },
   },
@@ -944,6 +957,7 @@ const en: Translations = {
       fov: 'How well the object fills the telescope field of view',
       rating: 'Photographic interest rating (1–5 stars): how spectacular this object is to image',
       difficulty: 'Imaging difficulty (1–5 diamonds): equipment and sky quality required',
+      multipleUnresolvable: 'This pair is tighter than your setup can resolve (0 stars)',
     },
     recipe: {
       noteColorCamera: 'Color camera: single broadband RGB sessions',

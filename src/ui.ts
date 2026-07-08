@@ -7,6 +7,7 @@ import { usePhotosStore } from './stores/photos';
 import { useSkyTimeStore } from './stores/sky-time';
 import { altitudeAtDeg } from './sky-geometry';
 import { formatAlt } from './format-utils';
+import { starDisplayName, formatMultiplicity } from './star-catalog';
 import { loadSettings, saveSettings, normalizeRotationDeg } from './display-settings';
 import { loadSkyTimeSettings } from './sky-time-settings';
 import type {
@@ -254,17 +255,15 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     const altStr = showAltitude
       ? formatAlt(altitudeAtDeg(star.ra, star.dec, st.lat!, st.lon!, st.simDate))
       : null;
-    const starMainName = (s: Star) =>
-      s.name ||
-      (s.bayer && s.constellation ? `${s.bayer} ${s.constellation}` : null) ||
-      (s.flam && s.constellation ? `${s.flam} ${s.constellation}` : null) ||
-      `HIP ${s.hip}`;
     let html: string;
     if (ds.simplifiedDSOTooltips) {
+      const multiLine = star.multiplicity
+        ? `<div class="tooltip-mag">${formatMultiplicity(star.multiplicity)}</div>`
+        : '';
       const altitudeLine = altStr
         ? `<div class="tooltip-mag">${t('dso.altitude')} ${altStr}</div>`
         : '';
-      html = `<div class="dso-info-name">${starMainName(star)}</div><div class="tooltip-mag">${t('stars.magnitude')} ${star.mag.toFixed(2)}</div>${altitudeLine}`;
+      html = `<div class="dso-info-name">${starDisplayName(star)}</div><div class="tooltip-mag">${t('stars.magnitude')} ${star.mag.toFixed(2)}</div>${multiLine}${altitudeLine}`;
     } else {
       const rows: string[] = [];
       const desigParts: string[] = [];
@@ -275,15 +274,21 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
         rows.push(`<tr><td>${t('stars.designation')}</td><td>${desigParts.join(' · ')}</td></tr>`);
       rows.push(`<tr><td>HIP</td><td>${star.hip}</td></tr>`);
       rows.push(`<tr><td>${t('stars.magnitude')}</td><td>${star.mag.toFixed(2)}</td></tr>`);
+      if (star.multiplicity)
+        rows.push(
+          `<tr><td>${t('stars.multiplicity')}</td><td>${formatMultiplicity(star.multiplicity)}</td></tr>`,
+        );
       if (star.constellation)
         rows.push(`<tr><td>${t('stars.constellation')}</td><td>${star.constellation}</td></tr>`);
       rows.push(
         `<tr><td>${t('dso.raDec')}</td><td>${formatRA(star.ra)} / ${formatDec(star.dec)}</td></tr>`,
       );
       if (altStr) rows.push(`<tr><td>${t('dso.altitude')}</td><td>${altStr}</td></tr>`);
-      html = `<div class="dso-info-name">${starMainName(star)}</div><table class="dso-info-table">${rows.join('')}</table>`;
+      html = `<div class="dso-info-name">${starDisplayName(star)}</div><table class="dso-info-table">${rows.join('')}</table>`;
     }
-    ui.setSkyTooltip(html, x, y);
+    // Only full-mode tooltips carry the star (and thus the Add Frame / Add Mosaic
+    // buttons); simplified tooltips stay minimal.
+    ui.setSkyTooltip(html, x, y, null, ds.simplifiedDSOTooltips ? null : star);
   });
 
   // ─── DSO tooltip ────────────────────────────────────────────────────────────

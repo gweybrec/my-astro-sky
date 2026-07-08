@@ -246,13 +246,17 @@ export function twilightWindow(
   date: Date, // any moment on the night's date (local)
   latDeg: number,
   lonDeg: number,
+  // Sun-elevation thresholds to try, widest-night-first: the first that yields a valid
+  // dusk/dawn wins. Default = astronomical → nautical → civil (for imaging). Pass e.g.
+  // [-6, 0] for a wider "visual" window (bright double stars are fine in twilight).
+  limits: number[] = [-18, -12, -6],
 ): TwilightWindow | null {
   // We sample the night bracketing local midnight (UTC).
   // Build a JD at noon UTC of the given date as starting point.
   const noon = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
   const jdNoon = dateToJD(noon);
 
-  for (const limitDeg of [-18, -12, -6]) {
+  for (const limitDeg of limits) {
     // Sample from noon to noon+24h in 5-min steps → find crossings
     const steps = 24 * 12; // every 5 min
     const dt = 5 / 1440; // 5 minutes in days

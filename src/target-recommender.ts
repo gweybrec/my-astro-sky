@@ -68,18 +68,32 @@ export function recommendTargets(
     );
   }
 
+  // Multiple/double stars are quick visual targets, observable well into twilight, so
+  // they get a wider "night" window (civil twilight, sun < −6°, falling back to sunset)
+  // instead of the narrow astronomical-dark window used for deep-sky imaging — otherwise
+  // few doubles qualify on short summer nights.
+  const starTw = twilightWindow(dateNight, latDeg, lonDeg, [-6, 0]);
+  let starStart = starTw ? starTw.start : windowStart;
+  let starEnd = starTw ? starTw.end : windowEnd;
+
   // Narrow to the user's observation window, if any (intersection with the dark window).
   if (options.timeWindow) {
     windowStart = new Date(Math.max(windowStart.getTime(), options.timeWindow.start.getTime()));
     windowEnd = new Date(Math.min(windowEnd.getTime(), options.timeWindow.end.getTime()));
+    starStart = new Date(Math.max(starStart.getTime(), options.timeWindow.start.getTime()));
+    starEnd = new Date(Math.min(starEnd.getTime(), options.timeWindow.end.getTime()));
   }
 
   const candidates: TargetSuggestion[] = [];
 
   for (const dso of dsos) {
-    // Skip objects without angular size (can't compute FOV fit)
+    // Multiple/double stars are point-like synthetic targets: they have no angular size
+    // and no FOV-fit, and are scored by altitude + their own (setup-aware) quality rating.
+    const isMultipleStar = dso.type === 'MS';
+
+    // Skip objects without angular size (can't compute FOV fit) — except point-like stars
     const majAxisArcmin = dso.majAxis;
-    if (!majAxisArcmin) continue;
+    if (!isMultipleStar && !majAxisArcmin) continue;
 
     // Skip objects that are too faint
     if (dso.mag !== null && dso.mag > magLimit) continue;
@@ -87,30 +101,37 @@ export function recommendTargets(
     // Quick declination pre-filter (avoids expensive sampling)
     if (!mightBeVisible(dso.dec, latDeg, minAlt)) continue;
 
-    // Compute max altitude during the dark window
+    // Compute max altitude during the observing window. Stars use the wider visual
+    // window and ignore the upper altitude cap (overhead is ideal for splitting doubles;
+    // the cap only exists to avoid meridian-flip trouble on tracked imaging).
     const { maxAltDeg, atDate } = maxAltDuringWindow(
       dso.ra,
       dso.dec,
       latDeg,
       lonDeg,
-      windowStart,
-      windowEnd,
+      isMultipleStar ? starStart : windowStart,
+      isMultipleStar ? starEnd : windowEnd,
       10,
     );
 
-    if (maxAltDeg < minAlt || maxAltDeg > maxAlt) continue;
+    const effectiveMaxAlt = isMultipleStar ? 90 : maxAlt;
+    if (maxAltDeg < minAlt || maxAltDeg > effectiveMaxAlt) continue;
 
     // ─ Altitude score (0-1): best at 70°, good above 50°, ok at minAlt ─
     const altScore = altitudeScore(maxAltDeg, minAlt);
 
-    // ─ FOV fit score (0-1) ─
-    const objDeg = majAxisArcmin / 60; // convert arcmin to deg
-    const fovFitScore = options.ignoreFovFit ? 1.0 : fovFit(objDeg, minFovDeg);
+    // ─ FOV fit score (0-1) ─ (point-like stars are FOV-neutral)
+    const objDeg = (majAxisArcmin ?? 0) / 60; // convert arcmin to deg
+    const fovFitScore = isMultipleStar || options.ignoreFovFit ? 1.0 : fovFit(objDeg, minFovDeg);
 
     // ─ Brightness score (0-1) ─
     const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
 
-    const score = 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
+    // Multiple stars: rank by altitude + their own quality rating (0★ = unresolvable by
+    // the setup, which sinks them). Everything else: altitude + FOV fit + brightness.
+    const score = isMultipleStar
+      ? 0.5 * altScore + 0.5 * ((dso.rating ?? 0) / 5)
+      : 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
 
     candidates.push({
       dso,

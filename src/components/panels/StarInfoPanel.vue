@@ -19,6 +19,10 @@
           <td>{{ t('stars.magnitude') }}</td>
           <td>{{ star.mag.toFixed(2) }}</td>
         </tr>
+        <tr v-if="star.multiplicity">
+          <td>{{ t('stars.multiplicity') }}</td>
+          <td>{{ formatMultiplicity(star.multiplicity) }}</td>
+        </tr>
         <tr v-if="star.constellation">
           <td>{{ t('stars.constellation') }}</td>
           <td>{{ star.constellation }}</td>
@@ -37,6 +41,7 @@
         </tr>
       </tbody>
     </table>
+    <StarActions :star="star" />
   </div>
 </template>
 
@@ -44,7 +49,9 @@
 import { computed } from 'vue';
 import { t } from '../../i18n';
 import type { StarSearchResult } from '../../api';
+import { formatMultiplicity } from '../../star-catalog';
 import { formatRA, formatDec, formatAlt } from '../../format-utils';
+import StarActions from './StarActions.vue';
 import { altitudeAtDeg } from '../../sky-geometry';
 import { useSkyTimeStore } from '../../stores/sky-time';
 

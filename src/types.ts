@@ -1,3 +1,12 @@
+/** Binary/multiple-star metadata, from the curated public/data/star-multiples.json. */
+export interface StarMultiplicity {
+  /** Number of known stars in the system (2 = binary … up to 8). Source of truth;
+   *  the display name (binary/triple/quadruple…) is derived from this count. */
+  components: number;
+  /** Separation of the primary pair, in arcseconds (string, e.g. "34.3"). */
+  sep?: string;
+}
+
 export interface Star {
   hip: number;
   ra: number; // degrees [0, 360)
@@ -9,6 +18,7 @@ export interface Star {
   flam?: string;
   constellation?: string;
   desig?: string;
+  multiplicity?: StarMultiplicity;
   // ── render cache (see projectCached) ──
   _px?: number;
   _py?: number;
@@ -168,7 +178,19 @@ export interface AstrometrySolveStatus {
 }
 
 export type DSOType =
-  'GxS' | 'GxE' | 'GxI' | 'Gx' | 'OC' | 'GC' | 'EN' | 'RN' | 'PN' | 'SNR' | 'DN' | '?';
+  | 'GxS'
+  | 'GxE'
+  | 'GxI'
+  | 'Gx'
+  | 'OC'
+  | 'GC'
+  | 'EN'
+  | 'RN'
+  | 'PN'
+  | 'SNR'
+  | 'DN'
+  | 'MS' // multiple/double star — synthetic recommender target only (see multiple-stars.ts)
+  | '?';
 
 export interface DSO {
   id: string; // display ID (highest priority: M > NGC > IC > SH2 > LBN > LDN)
@@ -188,6 +210,8 @@ export interface DSO {
   containerId: string | null; // id of the smallest larger DSO enclosing this one (zoom-gated inner objects), null if none
   priority: number; // precomputed render order (lower = drawn first); spatial-spread blue-noise rank
   catalog?: string | null; // precomputed catalog prefix at load (see getDSOCatalog), null if none
+  multiplicity?: StarMultiplicity; // set only on synthetic 'MS' (multiple-star) targets — drives the result-card chip
+
   // ── render cache (see projectCached / dsoSizeCos2) ──
   _px?: number;
   _py?: number;

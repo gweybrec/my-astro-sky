@@ -170,6 +170,12 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
     shape: 'circle',
     stroke: { color: 'rgba(160, 160, 160, 0.4)', lineWidth: 0.7 },
   },
+  // Multiple star: synthetic recommender-only target, never drawn on the map — this
+  // entry exists solely to satisfy the exhaustive Record<DSOType, …>.
+  MS: {
+    shape: 'circle',
+    stroke: { color: 'rgba(160, 160, 160, 0.4)', lineWidth: 0.7 },
+  },
 };
 
 /** DSO label text color per type. Galaxy subtypes (GxS/GxE/GxI) intentionally fall

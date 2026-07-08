@@ -1,0 +1,22 @@
+{
+  "95947": { "components": 2, "sep": "34.3", "members": [95951] },
+  "65378": { "components": 4, "sep": "14.4", "magB": 3.9, "bvB": 0.13 },
+  "65477": { "components": 2, "sep": "1.1", "magB": 8.8, "bvB": 1.5 },
+  "36850": { "components": 6, "sep": "5.4", "magB": 2.9, "bvB": 0.03 },
+  "9640": { "components": 4, "sep": "9.6", "magB": 5.0, "bvB": 0.02 },
+  "11767": { "components": 3, "sep": "18.2", "magB": 8.7, "bvB": 0.42 },
+  "24436": { "components": 4, "sep": "9.5", "magB": 6.7, "bvB": -0.03 },
+  "49669": { "components": 4, "sep": "177", "magB": 8.1, "bvB": 1.2 },
+  "50583": { "components": 2, "sep": "4.6", "magB": 3.5, "bvB": 1.15 },
+  "60718": { "components": 3, "sep": "4.0", "magB": 1.9, "bvB": -0.2 },
+  "61941": { "components": 2, "sep": "3.0", "magB": 3.5, "bvB": 0.36 },
+  "63125": { "components": 2, "sep": "19.3", "members": [63121] },
+  "72105": { "components": 2, "sep": "2.9", "magB": 4.8, "bvB": 0.0 },
+  "80763": { "components": 2, "sep": "2.6", "magB": 5.5, "bvB": 0.0 },
+  "84345": { "components": 2, "sep": "4.6", "magB": 5.4, "bvB": 0.65 },
+  "91919": { "components": 4, "sep": "208", "members": [91926] },
+  "32349": { "components": 2, "sep": "11.0", "magB": 8.44, "bvB": 0.0 },
+  "104214": { "components": 2, "sep": "31.6", "members": [104217] },
+  "43103": { "components": 2, "sep": "30.6", "members": [43100] },
+  "71683": { "components": 3, "sep": "4.9", "members": [71681] }
+}

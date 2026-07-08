@@ -180,4 +180,16 @@ describe('twilightWindow', () => {
     const durationMs = tw!.end.getTime() - tw!.start.getTime();
     expect(durationMs).toBeLessThan(24 * 60 * 60 * 1000);
   });
+
+  it('a custom limits list yields a wider window (civil > astronomical) — used for star targets', () => {
+    // Short summer night at mid-latitude: the civil window (sun < −6°) is wider than the
+    // astronomical one (sun < −18°), so more double stars qualify.
+    const summer = new Date('2024-06-21T00:00:00Z');
+    const astro = twilightWindow(summer, 45, 5, [-18]);
+    const civil = twilightWindow(summer, 45, 5, [-6, 0]);
+    expect(civil).not.toBeNull();
+    const dur = (w: NonNullable<typeof civil>) => w.end.getTime() - w.start.getTime();
+    if (astro) expect(dur(civil!)).toBeGreaterThan(dur(astro));
+    expect(civil!.limitDeg).toBe(-6);
+  });
 });

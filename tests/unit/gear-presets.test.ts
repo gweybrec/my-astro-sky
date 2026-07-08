@@ -3,6 +3,7 @@ import {
   formatFov,
   formatGearFovLabel,
   computeFovTargetScale,
+  resolvingLimitArcsec,
   type GearPreset,
 } from '../../src/gear-presets';
 
@@ -109,5 +110,28 @@ describe('computeFovTargetScale', () => {
     const s = computeFovTargetScale(2, 1.5, -45, 'south', 800);
     const n = computeFovTargetScale(2, 1.5, 45, 'north', 800);
     expect(s).toBeCloseTo(n, 0);
+  });
+});
+
+describe('resolvingLimitArcsec', () => {
+  it('is sampling-limited when the pixel scale is coarser than the aperture diffraction limit', () => {
+    // 102 mm f/7, 3.76 µm pixels → ~1.09″/px → 2× = ~2.17″ (> Dawes 116/102 = 1.14″)
+    const limit = resolvingLimitArcsec(makePreset());
+    expect(limit).toBeCloseTo(2.17, 1);
+  });
+
+  it('is diffraction-limited with a large aperture and fine sampling', () => {
+    // 200 mm, 2000 mm FL, 2.4 µm → ~0.25″/px → 2× = ~0.5″ < Dawes 116/200 = 0.58″
+    const limit = resolvingLimitArcsec(
+      makePreset({ apertureMm: 200, focalLengthMm: 2000, pixelSizeUm: 2.4 }),
+    );
+    expect(limit).toBeCloseTo(116 / 200, 2);
+  });
+
+  it('returns a large limit for a tiny wide-field scope (tight pairs unresolvable)', () => {
+    const limit = resolvingLimitArcsec(
+      makePreset({ apertureMm: 50, focalLengthMm: 250, pixelSizeUm: 2.9 }),
+    );
+    expect(limit).toBeGreaterThan(4); // ~4.8″ — a 3″ double would read as 0★
   });
 });

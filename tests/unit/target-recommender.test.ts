@@ -659,3 +659,46 @@ describe('scoreDso — standalone single-object scoring (used by plans)', () => 
     expect(scoreDso(dso, testPreset, 85).altScore).toBe(1); // ≥70 → clamped to 1
   });
 });
+
+describe('recommendTargets — multiple stars (type MS)', () => {
+  const nearZenith = { ra: 120, dec: 48, mag: 2.0 }; // transits ~89° from Paris, near midnight
+  const opts = { minAltDeg: 20, maxAltDeg: 80 };
+
+  it('recommends a point-like MS target that has no angular size', () => {
+    const ms = makeDSO({
+      id: 'MS1',
+      ra: 120,
+      dec: 20,
+      mag: 2,
+      majAxis: null,
+      minAxis: null,
+      rating: 3,
+      difficulty: null,
+      type: 'MS' as any,
+      multiplicity: { components: 2, sep: '30' } as any,
+    });
+    const res = recommendTargets([ms], testPreset, testLocation, winterNight, 5000, opts);
+    expect(res.length).toBe(1);
+  });
+
+  it('ignores the upper altitude cap that would exclude an equivalent near-zenith DSO', () => {
+    const asDso = makeDSO({ ...nearZenith, id: 'DSO', majAxis: 30 });
+    const asMs = makeDSO({
+      ...nearZenith,
+      id: 'MS2',
+      majAxis: null,
+      minAxis: null,
+      rating: 4,
+      difficulty: null,
+      type: 'MS' as any,
+      multiplicity: { components: 2, sep: '20' } as any,
+    });
+    // The DSO transits above the 80° cap → excluded; the star is kept (overhead is fine).
+    expect(
+      recommendTargets([asDso], testPreset, testLocation, winterNight, 5000, opts).length,
+    ).toBe(0);
+    expect(recommendTargets([asMs], testPreset, testLocation, winterNight, 5000, opts).length).toBe(
+      1,
+    );
+  });
+});

@@ -5,7 +5,7 @@
 
 import { t } from './i18n';
 import { getDSOs, getDSOCatalog, DSO_CATALOGS_ALL } from './dso-catalog';
-import { getConstellationInfos } from './star-catalog';
+import { getConstellationInfos, customLocationLabel, formatMultiplicity } from './star-catalog';
 import {
   getTelescopes,
   getCameras,
@@ -21,6 +21,7 @@ import { formatGearFovLabel, fovDeg, formatFov, computeFovTargetScale } from './
 import { getHemisphere } from './projection';
 import { buildSetupInfoRows } from './setup-info';
 import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
+import { buildMultipleStarTargets } from './multiple-stars';
 import { formatPaDeg } from './frame-orientation';
 import { formatRA, formatDec, formatAlt } from './format-utils';
 import { attachAnchoredPanel } from './popup-utils';
@@ -215,6 +216,7 @@ const ALL_DSO_TYPES = [
   'PN',
   'SNR',
   'DN',
+  'MS',
 ] as const;
 
 export interface DSOFilterOptions {
@@ -1295,6 +1297,8 @@ export class TargetsView {
   private lastPreset: ReturnType<typeof buildGearPreset> | null = null;
   private lastMode: 'best' | 'random' = 'best';
   private currentPage = 0;
+  private lastLocation: ObserverLocation | null = null;
+  private lastDateNight: Date | null = null;
   private generateBtn: HTMLButtonElement | null = null;
   private randomBtn: HTMLButtonElement | null = null;
   private dateInput: HTMLInputElement | null = null;
@@ -2410,7 +2414,12 @@ export class TargetsView {
         }
       }
 
-      const rawSuggestions = recommendTargets(filteredDSOs, preset, location, dateNight, 5000, {
+      // Multiple/double stars are synthetic point-like targets (not in the DSO catalog);
+      // inject them into the pool when their type chip is enabled.
+      const msTargets = enabledTypes.has('MS') ? buildMultipleStarTargets(preset) : [];
+      const pool = msTargets.length ? [...filteredDSOs, ...msTargets] : filteredDSOs;
+
+      const rawSuggestions = recommendTargets(pool, preset, location, dateNight, 5000, {
         ignoreFovFit: this.prefs.includeOversized ?? false,
         minAltDeg: this.prefs.minAltDeg ?? 20,
         maxAltDeg: this.prefs.maxAltDeg ?? 80,
@@ -2443,6 +2452,8 @@ export class TargetsView {
       this.currentPage = 0;
       this.lastSuggestions = this.lastPool;
       this.lastPreset = preset;
+      this.lastLocation = location;
+      this.lastDateNight = dateNight;
       this.renderResults(resultsEl);
       resultsEl.scrollTop = savedScroll;
     } catch (err: any) {
@@ -2529,6 +2540,9 @@ export class TargetsView {
     });
     toolbar.appendChild(pageSizeSelect);
 
+    const nightInfo = this.buildNightInfoBar();
+    if (nightInfo) toolbar.appendChild(nightInfo);
+
     const paginationEl = document.createElement('div');
     paginationEl.className = 'targets-pagination';
     const navBtn = (label: string, title: string, targetPage: number): HTMLButtonElement => {
@@ -2581,7 +2595,10 @@ export class TargetsView {
     const card = document.createElement('div');
     card.className = 'target-card';
     const { dso } = s;
-    const recipe = recommendRecipe(dso, preset);
+    // Multiple/double stars are point-like visual targets: no imaging recipe, no FOV fit,
+    // no difficulty — the type chip shows the multiplicity instead.
+    const isMS = dso.type === 'MS';
+    const recipe = isMS ? null : recommendRecipe(dso, preset);
 
     const header = document.createElement('div');
     header.className = 'target-card-header';
@@ -2615,7 +2632,11 @@ export class TargetsView {
     if (dso.rating !== null) {
       const ratingEl = document.createElement('div');
       ratingEl.className = 'target-card-rating';
-      ratingEl.title = t('targets.tooltips.rating');
+      // A multiple star at 0★ is unresolvable with the current setup — explain why.
+      ratingEl.title =
+        isMS && dso.rating === 0
+          ? t('targets.tooltips.multipleUnresolvable')
+          : t('targets.tooltips.rating');
       ratingEl.textContent = '★'.repeat(dso.rating) + '☆'.repeat(5 - dso.rating);
       titleRow.appendChild(ratingEl);
     }
@@ -2625,7 +2646,9 @@ export class TargetsView {
     chipsRow.className = 'target-card-chips';
     const typeEl = document.createElement('div');
     typeEl.className = 'target-card-type';
-    typeEl.textContent = dsoTypeLabel(dso.type);
+    // Multiple stars show their multiplicity (e.g. "Binary · 34.3″") in place of a type.
+    typeEl.textContent =
+      isMS && dso.multiplicity ? formatMultiplicity(dso.multiplicity) : dsoTypeLabel(dso.type);
     chipsRow.appendChild(typeEl);
     if (dso.constellation) {
       const constEl = document.createElement('div');
@@ -2685,40 +2708,46 @@ export class TargetsView {
         t('targets.tooltips.score'),
       ),
     );
-    meta2.appendChild(
-      this.metaItem(
-        t('targets.results.fov'),
-        `${Math.round(s.fovFitScore * 100)}%`,
-        t('targets.tooltips.fov'),
-      ),
-    );
+    // FOV fit is meaningless for a point-like star.
+    if (!isMS)
+      meta2.appendChild(
+        this.metaItem(
+          t('targets.results.fov'),
+          `${Math.round(s.fovFitScore * 100)}%`,
+          t('targets.tooltips.fov'),
+        ),
+      );
     card.appendChild(meta2);
 
-    const totalEl = document.createElement('div');
-    totalEl.className = 'target-integration-total';
-    totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
-    card.appendChild(totalEl);
+    // Imaging recipe (total integration + per-filter breakdown) — omitted for visual
+    // doubles, which have no recipe (`recipe` is null for multiple-star cards).
+    if (recipe) {
+      const totalEl = document.createElement('div');
+      totalEl.className = 'target-integration-total';
+      totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
+      card.appendChild(totalEl);
 
-    const details = document.createElement('details');
-    details.className = 'target-details';
-    const summary = document.createElement('summary');
-    summary.textContent = t('targets.results.filtersTitle');
-    details.appendChild(summary);
-    const filterList = document.createElement('div');
-    filterList.className = 'target-filter-list';
-    for (const f of recipe.filters) {
-      const row = document.createElement('div');
-      row.className = 'target-filter-row';
-      const badge = createFilterBadge(f.name);
-      const detail = document.createElement('span');
-      detail.className = 'target-filter-detail';
-      detail.textContent = `${f.count} × ${f.subSeconds}s = ${formatHours(f.hours)}`;
-      row.appendChild(badge);
-      row.appendChild(detail);
-      filterList.appendChild(row);
+      const details = document.createElement('details');
+      details.className = 'target-details';
+      const summary = document.createElement('summary');
+      summary.textContent = t('targets.results.filtersTitle');
+      details.appendChild(summary);
+      const filterList = document.createElement('div');
+      filterList.className = 'target-filter-list';
+      for (const f of recipe.filters) {
+        const row = document.createElement('div');
+        row.className = 'target-filter-row';
+        const badge = createFilterBadge(f.name);
+        const detail = document.createElement('span');
+        detail.className = 'target-filter-detail';
+        detail.textContent = `${f.count} × ${f.subSeconds}s = ${formatHours(f.hours)}`;
+        row.appendChild(badge);
+        row.appendChild(detail);
+        filterList.appendChild(row);
+      }
+      details.appendChild(filterList);
+      card.appendChild(details);
     }
-    details.appendChild(filterList);
-    card.appendChild(details);
 
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'target-actions-row';
@@ -2729,20 +2758,39 @@ export class TargetsView {
       this.uiStore.closeTargetsOverlay();
     });
 
-    const editBtn = this.iconActionBtn(penSvg, t('dso.edit'));
-    editBtn.addEventListener('click', () => {
+    // Editing applies only to catalogued DSOs, not synthetic multiple-star targets.
+    const editBtn = isMS ? null : this.iconActionBtn(penSvg, t('dso.edit'));
+    editBtn?.addEventListener('click', () => {
       this.onEditDSO?.(dso);
     });
 
     const planBtn = this.iconActionBtn(listPlusSvg, t('targets.plan.addToPlan'));
-    planBtn.setAttribute('data-plan-dso', dso.id);
-    this.refreshPlanBtnState(planBtn, dso.id);
+    if (!isMS) {
+      planBtn.setAttribute('data-plan-dso', dso.id);
+      this.refreshPlanBtnState(planBtn, dso.id);
+    }
     planBtn.addEventListener('click', () => {
       // Opened from a specific plan's "Find targets" button: add/remove straight
       // from that plan, no picker needed. Opened generically (e.g. from the Sky
       // map, no plan context) falls back to the full plan picker.
       const ctxPlanId = this.uiStore.targetsOverlayPlanId;
       const ctxPlan = ctxPlanId ? this.plansStore.plans.find((p) => p.id === ctxPlanId) : null;
+      if (isMS) {
+        // A multiple star isn't in the DSO catalog: add it as a custom-location entry at
+        // its coords (it then lists as the star's name via the nearest-named-star rule).
+        if (ctxPlan) {
+          this.plansStore.addCustomEntry(ctxPlan.id, dso.ra, dso.dec).then(() => {
+            showToast({
+              message: t('targets.plan.addedToPlan', { name: ctxPlan.name }),
+              type: 'info',
+              duration: 2000,
+            });
+          });
+        } else {
+          this.openPlanPicker(planBtn, dso.id, { ra: dso.ra, dec: dso.dec });
+        }
+        return;
+      }
       if (ctxPlan) {
         const wasIn = this.plansStore.isInPlan(dso.id, ctxPlan.id);
         this.plansStore.toggleEntry(ctxPlan.id, dso.id).then(() => {
@@ -2761,7 +2809,7 @@ export class TargetsView {
     });
 
     actionsDiv.appendChild(navBtnEl);
-    actionsDiv.appendChild(editBtn);
+    if (editBtn) actionsDiv.appendChild(editBtn);
     actionsDiv.appendChild(planBtn);
     card.appendChild(actionsDiv);
 
@@ -3100,7 +3148,7 @@ export class TargetsView {
       minAxis: null,
       pa: 0,
       mag: null,
-      displayName: t('fovOverlay.customLocation'),
+      displayName: customLocationLabel(ra, dec),
       catalogs: [`${ra.toFixed(1)}°, ${dec.toFixed(1)}°`],
       emissionLines: null,
       constellation: null,
@@ -3533,7 +3581,9 @@ export class TargetsView {
       for (const mosaic of plan.mosaics ?? []) {
         const tileCount = plan.entries.filter((e) => e.mosaicId === mosaic.id).length;
         const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : null;
-        const name = dso ? (dso.displayName ?? dso.id) : t('fovOverlay.customLocation');
+        const name = dso
+          ? (dso.displayName ?? dso.id)
+          : customLocationLabel(mosaic.centerRa, mosaic.centerDec);
 
         // Trajectory + altitude metadata are computed from the mosaic centre, so
         // they need no catalogue object (only computable values are shown).
@@ -3940,6 +3990,57 @@ export class TargetsView {
       events.push({ type: b.altDeg >= a.altDeg ? 'rise' : 'set', time: new Date(tMs) });
     }
     return events;
+  }
+
+  /**
+   * Toolbar strip showing the night window (start/end) and, when the Moon rises
+   * during that window, its rise time next to a phase icon matching the sky map's
+   * Moon marker. Null before any search has run (no location/date to anchor on).
+   */
+  private buildNightInfoBar(): HTMLElement | null {
+    if (!this.lastLocation || !this.lastDateNight) return null;
+    const win = this.nightWindow(this.lastLocation, this.lastDateNight);
+
+    const bar = document.createElement('div');
+    bar.className = 'flex items-center gap-8 ml-8';
+    bar.appendChild(this.inlineTimeStat(t('targets.plan.nightStart'), win.start));
+    bar.appendChild(this.inlineTimeStat(t('targets.plan.nightEnd'), win.end));
+
+    const riseEvent = this.moonEventsInWindow(this.lastLocation, win).find(
+      (e) => e.type === 'rise',
+    );
+    if (riseEvent) {
+      const midJd = dateToJD(new Date((win.start.getTime() + win.end.getTime()) / 2));
+      const { phaseIndex } = moonPhase(midJd);
+      const moonriseGroup = document.createElement('div');
+      moonriseGroup.className = 'flex items-center gap-2';
+      const icon = document.createElement('span');
+      icon.className = 'block shrink-0';
+      icon.innerHTML = moonPhaseIconSvg(phaseIndex);
+      moonriseGroup.appendChild(icon);
+      moonriseGroup.appendChild(this.inlineTimeStat(t('targets.plan.moonrise'), riseEvent.time));
+      bar.appendChild(moonriseGroup);
+    }
+
+    return bar;
+  }
+
+  /**
+   * A caption-then-time pair on one line (e.g. "Night start 22:14"), used in the
+   * search toolbar. Caption font size and caption-to-value gap match the
+   * "Sort by"/its dropdown (.targets-sort-label / .targets-sort-bar gap-4).
+   */
+  private inlineTimeStat(caption: string, time: Date): HTMLElement {
+    const box = document.createElement('div');
+    box.className = 'flex items-baseline gap-4';
+    const cap = document.createElement('span');
+    cap.className = 'text-base text-label';
+    cap.textContent = caption;
+    const tm = document.createElement('span');
+    tm.className = 'text-sub text-bright font-medium';
+    tm.textContent = formatTime(time);
+    box.append(cap, tm);
+    return box;
   }
 
   /** A caption-over-time stack (e.g. "Night start" / "22:14"), used in the header. */
@@ -5019,7 +5120,13 @@ export class TargetsView {
   }
 
   /** Imperative "add to plan" popover anchored to a button. */
-  private openPlanPicker(anchorEl: HTMLElement, dsoId: string): void {
+  private openPlanPicker(
+    anchorEl: HTMLElement,
+    dsoId: string,
+    // When set (a multiple star, not a catalogued DSO), rows add a custom-location entry
+    // at these coords instead of a DSO-anchored one — add-only, no membership toggle.
+    customCoords?: { ra: number; dec: number },
+  ): void {
     this.closePlanPicker();
 
     const picker = document.createElement('div');
@@ -5043,16 +5150,21 @@ export class TargetsView {
           'flex items-center gap-2 w-full text-left px-3 py-2 bg-transparent border-0 cursor-pointer text-primary hover:bg-[var(--accent-fill-sm)]';
         const check = document.createElement('span');
         check.className = 'w-4 shrink-0 text-bright';
-        check.textContent = this.plansStore.isInPlan(dsoId, plan.id) ? '✓' : '';
+        check.textContent = !customCoords && this.plansStore.isInPlan(dsoId, plan.id) ? '✓' : '';
         const label = document.createElement('span');
         label.className = 'flex-1 truncate';
         label.textContent = plan.name;
         rowBtn.appendChild(check);
         rowBtn.appendChild(label);
         rowBtn.addEventListener('click', async () => {
-          await this.plansStore.toggleEntry(plan.id, dsoId);
-          renderList();
-          this.refreshAllPlanButtons();
+          if (customCoords) {
+            await this.plansStore.addCustomEntry(plan.id, customCoords.ra, customCoords.dec);
+            this.closePlanPicker();
+          } else {
+            await this.plansStore.toggleEntry(plan.id, dsoId);
+            renderList();
+            this.refreshAllPlanButtons();
+          }
         });
         list.appendChild(rowBtn);
       }
@@ -5070,9 +5182,14 @@ export class TargetsView {
     newRow.textContent = '+ ' + t('targets.plan.newPlan');
     newRow.addEventListener('click', async () => {
       const id = await this.plansStore.createPlan(this.defaultPlanName());
-      if (id) await this.plansStore.addEntry(id, dsoId);
+      if (id) {
+        if (customCoords)
+          await this.plansStore.addCustomEntry(id, customCoords.ra, customCoords.dec);
+        else await this.plansStore.addEntry(id, dsoId);
+      }
       this.updatePlanBadge();
-      renderList();
+      if (customCoords) this.closePlanPicker();
+      else renderList();
       this.refreshAllPlanButtons();
     });
     picker.appendChild(newRow);

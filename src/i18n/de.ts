@@ -57,6 +57,17 @@ const de: Translations = {
     constellation: 'Sternbild',
     dec: 'Dekl.',
     nearbyTitle: 'Nahe Sterne (&lt; 5°)',
+    multiplicity: 'Mehrfachstern',
+    multiple: {
+      binary: 'Doppelstern',
+      triple: 'Dreifachstern',
+      quadruple: 'Vierfachstern',
+      quintuple: 'Fünffachstern',
+      sextuple: 'Sechsfachstern',
+      septuple: 'Siebenfachstern',
+      octuple: 'Achtfachstern',
+      system: '{n}-Sterne-System',
+    },
   },
   dso: {
     section: 'Deep-Sky-Objekte',
@@ -112,6 +123,7 @@ const de: Translations = {
       PN: 'Planetarische Nebel',
       SNR: 'Supernovaüberreste',
       DN: 'Dunkelnebel',
+      MS: 'Mehrfachsterne',
       '?': 'Himmelsobjekte',
     },
     types: {
@@ -126,6 +138,7 @@ const de: Translations = {
       PN: 'Planetarischer Nebel',
       SNR: 'Supernovaüberrest',
       DN: 'Dunkelnebel',
+      MS: 'Mehrfachstern',
       '?': 'Himmelsobjekt',
     },
   },
@@ -952,6 +965,7 @@ const de: Translations = {
       rating:
         'Fotografische Interessensbewertung (1–5 Sterne): wie spektakulär dieses Objekt zu fotografieren ist',
       difficulty: 'Aufnahmeschwierigkeit (1–5 Diamanten): benötigte Ausrüstung und Himmelsqualität',
+      multipleUnresolvable: 'Dieses Paar ist enger, als deine Ausrüstung auflösen kann (0 Sterne)',
     },
     recipe: {
       noteColorCamera: 'Farbkamera: einzelne Breitband-RGB-Sitzungen',

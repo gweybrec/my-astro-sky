@@ -12,6 +12,7 @@ import { useCanvasStore } from './stores/canvas';
 import { usePlansStore } from './stores/plans';
 import { useUiStore } from './stores/ui';
 import { getDSOById } from './dso-catalog';
+import { customLocationLabel } from './star-catalog';
 import { autoRegionForDsos, planGrid, tileCenters } from './mosaic';
 import { requestSetupSwitch } from './setup-switch';
 import { searchDSOs } from './search';
@@ -38,6 +39,16 @@ import { deleteFrameWithUndo } from './frame-delete';
 // ─── State ───────────────────────────────────────────────────────────────────
 
 export type FovSetup = GearSetupData;
+
+/**
+ * Display name for a custom-location frame (no target DSO): the nearest named star,
+ * else the generic "custom location" string. Display-only — never affects anchoring.
+ */
+function customFrameLabel(f: { ra?: number; dec?: number }): string {
+  return f.ra != null && f.dec != null
+    ? customLocationLabel(f.ra, f.dec)
+    : t('fovOverlay.customLocation');
+}
 
 /** Great-circle angular distance between two sky points, in degrees. */
 function angularDistDeg(ra1: number, dec1: number, ra2: number, dec2: number): number {
@@ -462,6 +473,9 @@ export function openFramePicker(
   dso: { id: string; ra: number; dec: number },
   onSetupPick: (setupId: string) => void,
   onDone: () => void,
+  // When the target is not a catalogued DSO (e.g. a star), plan entries are added as
+  // custom-location entries (dsoId null) instead of DSO-anchored ones.
+  custom = false,
 ): void {
   const fovStore = useFovFramesStore();
   const plansStore = usePlansStore();
@@ -499,6 +513,7 @@ export function openFramePicker(
         plansStore,
         onSetupPick,
         onDone,
+        custom,
       );
     })
     .catch((err) => reportUnknownRendererError('fov_pick_frame_target', err));
@@ -513,6 +528,7 @@ function buildFramePickerModal(
   plansStore: ReturnType<typeof usePlansStore>,
   onSetupPick: (setupId: string) => void,
   onDone: () => void,
+  custom = false,
 ): void {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -549,10 +565,13 @@ function buildFramePickerModal(
 
   async function doPlanAction(planId: string): Promise<void> {
     if (kind === 'frame') {
-      await plansStore.addEntry(planId, dso.id);
+      // A star (custom target) has no catalogued DSO, so it becomes a custom-location
+      // plan entry at its coords; the entry then displays as the nearest named star.
+      if (custom) await plansStore.addCustomEntry(planId, dso.ra, dso.dec);
+      else await plansStore.addEntry(planId, dso.id);
       fovStore.setSelection({ kind: 'plan', planId });
     } else {
-      await fovStore.addAdhocMosaicToPlan(planId, dso.ra, dso.dec, dso.id);
+      await fovStore.addAdhocMosaicToPlan(planId, dso.ra, dso.dec, custom ? null : dso.id);
     }
   }
 
@@ -1313,8 +1332,7 @@ export function buildFovPopup(
       const nameSpan = document.createElement('span');
       // Active frame's name is emphasised + accent-coloured to match the canvas.
       nameSpan.className = f.active ? 'font-semibold text-[var(--accent-color)]' : 'text-primary';
-      const baseName =
-        isPlan || isMosaic ? (f.anchorLabel ?? t('fovOverlay.customLocation')) : f.label;
+      const baseName = isPlan || isMosaic ? (f.anchorLabel ?? customFrameLabel(f)) : f.label;
       // Mosaics carry a "Mosaic" suffix so they read distinctly from single frames.
       nameSpan.textContent = isMosaic ? `${baseName} · ${t('targets.plan.mosaicLabel')}` : baseName;
       labelEl.appendChild(nameSpan);
@@ -1400,7 +1418,7 @@ export function buildFovPopup(
           };
           // Header context: what's being moved + the gear setup it uses (so the
           // disabled, mismatched plans make sense).
-          const base = f.anchorLabel ?? (isFreeMosaic ? t('fovOverlay.customLocation') : f.label);
+          const base = f.anchorLabel ?? (isFreeMosaic ? customFrameLabel(f) : f.label);
           const itemName = isFreeMosaic ? `${base} · ${t('targets.plan.mosaicLabel')}` : base;
           const setupLabel =
             (freeSetupId && fovStore.specs.get(freeSetupId)?.label) ||
@@ -1418,7 +1436,7 @@ export function buildFovPopup(
       deleteBtn.title = t('fovOverlay.deleteFrame');
       deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const name = f.anchorLabel ?? t('fovOverlay.customLocation');
+        const name = f.anchorLabel ?? customFrameLabel(f);
         if (isFreeMosaic) {
           if (await confirmPlanEntryDelete(name)) fovStore.removeAdhocMosaic(f.id.split(':')[2]);
         } else if (isMosaic) {

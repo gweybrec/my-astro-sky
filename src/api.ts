@@ -47,6 +47,11 @@ export async function getLatestVersion(): Promise<LatestRelease | null> {
   }
 }
 
+export interface StarMultiplicity {
+  components: number;
+  sep?: string;
+}
+
 export interface StarSearchResult {
   hip: number;
   ra: number;
@@ -58,6 +63,7 @@ export interface StarSearchResult {
   flam?: string;
   constellation?: string;
   desig?: string;
+  multiplicity?: StarMultiplicity;
   label: string;
   score: number;
 }

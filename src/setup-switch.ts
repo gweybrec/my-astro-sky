@@ -4,6 +4,7 @@ import { reportUnknownRendererError } from './error-reporter';
 import { useFovFramesStore } from './stores/fov-frames';
 import { usePlansStore } from './stores/plans';
 import { getDSOById } from './dso-catalog';
+import { customLocationLabel } from './star-catalog';
 import { tileCenters, outlineFromGrid, transformMosaicToSetup } from './mosaic';
 import type { TargetFov, MosaicTransform } from './mosaic';
 import type { Plan } from './api';
@@ -93,7 +94,11 @@ export function collectSwitchItems(
     const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
     items.push({
       id: `mosaic:${mosaic.id}`,
-      label: mosaic.name ?? (dso ? (dso.displayName ?? dso.id) : t('fovOverlay.customLocation')),
+      label:
+        mosaic.name ??
+        (dso
+          ? (dso.displayName ?? dso.id)
+          : customLocationLabel(mosaic.centerRa, mosaic.centerDec)),
       transform,
       drop: () => plansStore.deleteMosaic(planId, mosaic.id),
       apply: async () => {
@@ -145,7 +150,11 @@ export function collectSwitchItems(
     const center = entryCenter(entry);
     items.push({
       id: `entry:${entry.id}`,
-      label: dso ? (dso.displayName ?? dso.id) : t('fovOverlay.customLocation'),
+      label: dso
+        ? (dso.displayName ?? dso.id)
+        : center
+          ? customLocationLabel(center.ra, center.dec)
+          : t('fovOverlay.customLocation'),
       transform,
       drop: () => plansStore.removeEntry(planId, entry.id),
       apply: async () => {

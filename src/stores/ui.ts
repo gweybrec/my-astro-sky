@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { ViewMode, DSO } from '../types';
+import type { ViewMode, DSO, Star } from '../types';
 import { useCanvasStore } from './canvas';
 
 // Screen offset (px) of the tooltip from the cursor anchor; the tooltip is drawn
@@ -107,6 +107,9 @@ export const useUiStore = defineStore('ui', () => {
   // can render the interactive action buttons (edit / add-to-plan). Null for star
   // and simplified tooltips, which stay plain text.
   const skyTooltipDSO = ref<DSO | null>(null);
+  // Parallel to skyTooltipDSO: a hovered star in full-info mode, so SkyTooltip.vue can
+  // render the Add Frame / Add Mosaic actions. Null for DSO and simplified tooltips.
+  const skyTooltipStar = ref<Star | null>(null);
   // While the in-tooltip plan picker (teleported to <body>) is open, the tooltip is
   // pinned so the cursor leaving it for the picker doesn't dismiss it.
   const skyTooltipPinned = ref(false);
@@ -158,7 +161,13 @@ export const useUiStore = defineStore('ui', () => {
     );
   }
 
-  function showSkyTooltip(html: string, x: number, y: number, dso: DSO | null = null) {
+  function showSkyTooltip(
+    html: string,
+    x: number,
+    y: number,
+    dso: DSO | null = null,
+    star: Star | null = null,
+  ) {
     if (skyTooltipPinned.value) return; // frozen while the plan picker is open
     // Central suppression gate: never render a sky tooltip over an open modal, a
     // force-suppressing overlay control, or a floating popup — whichever caller
@@ -173,6 +182,7 @@ export const useUiStore = defineStore('ui', () => {
     const sameObject = html === skyTooltipHtml.value;
     skyTooltipHtml.value = html;
     skyTooltipDSO.value = dso;
+    skyTooltipStar.value = star;
     if (sameObject) {
       const tol = SKY_TOOLTIP_FOLLOW_TOLERANCE;
       const movingToward = x >= skyTooltipX.value - tol && y >= skyTooltipY.value - tol;
@@ -195,6 +205,7 @@ export const useUiStore = defineStore('ui', () => {
     if (skyTooltipHtml.value !== null && !cursorInSafeZone(x, y)) {
       skyTooltipHtml.value = null;
       skyTooltipDSO.value = null;
+      skyTooltipStar.value = null;
     }
   }
 
@@ -204,6 +215,7 @@ export const useUiStore = defineStore('ui', () => {
     skyTooltipSelecting.value = false;
     skyTooltipHtml.value = null;
     skyTooltipDSO.value = null;
+    skyTooltipStar.value = null;
   }
 
   function setSkyTooltipPinned(v: boolean) {
@@ -217,11 +229,17 @@ export const useUiStore = defineStore('ui', () => {
   // Entry point for the canvas hover callbacks in ui.ts: null requests a directional
   // hide, a non-null html shows/updates the tooltip (with an optional DSO for the
   // interactive action buttons).
-  function setSkyTooltip(html: string | null, x: number, y: number, dso: DSO | null = null) {
+  function setSkyTooltip(
+    html: string | null,
+    x: number,
+    y: number,
+    dso: DSO | null = null,
+    star: Star | null = null,
+  ) {
     if (html === null) {
       requestHideSkyTooltip(x, y);
     } else {
-      showSkyTooltip(html, x, y, dso);
+      showSkyTooltip(html, x, y, dso, star);
     }
   }
 
@@ -288,6 +306,7 @@ export const useUiStore = defineStore('ui', () => {
     skyTooltipX,
     skyTooltipY,
     skyTooltipDSO,
+    skyTooltipStar,
     skyTooltipPinned,
     isSkyTooltipSuppressed,
     setSkyTooltip,

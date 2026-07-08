@@ -46,6 +46,11 @@ function normalizeGreekLetters(query: string): string {
   return normalized;
 }
 
+export interface StarMultiplicity {
+  components: number;
+  sep?: string;
+}
+
 export interface DeepStar {
   hip: number;
   ra: number;
@@ -57,6 +62,7 @@ export interface DeepStar {
   flam?: string;
   constellation?: string;
   desig?: string;
+  multiplicity?: StarMultiplicity;
 }
 
 export interface StarSearchResult {
@@ -70,6 +76,7 @@ export interface StarSearchResult {
   flam?: string;
   constellation?: string;
   desig?: string;
+  multiplicity?: StarMultiplicity;
   label: string;
   score: number;
 }
@@ -93,11 +100,27 @@ export function loadDeepCatalog(): void {
     ? path.resolve(process.env.STAR_CATALOG_PATH)
     : path.join(publicDataDir, 'stars.14.json');
   const namesPath = path.join(publicDataDir, 'starnames.json');
+  const multiplesPath = path.join(publicDataDir, 'star-multiples.json');
 
   console.log(`Chargement du catalogue profond (${path.basename(catalogPath)})…`);
 
   const starsData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
   const namesData = JSON.parse(fs.readFileSync(namesPath, 'utf-8'));
+  // Optional curated binary/multiple-star metadata; absent in minimal data dirs.
+  // Each entry may list companion HIPs (`members`) that inherit the same metadata, so
+  // every present component of a system (e.g. Albireo β1 + β2 Cyg) surfaces it.
+  const multiplesRaw: Record<string, StarMultiplicity & { members?: number[] }> = fs.existsSync(
+    multiplesPath,
+  )
+    ? JSON.parse(fs.readFileSync(multiplesPath, 'utf-8'))
+    : {};
+  const multByHip = new Map<number, StarMultiplicity>();
+  for (const [hipStr, e] of Object.entries(multiplesRaw)) {
+    const meta: StarMultiplicity = { components: e.components };
+    if (e.sep) meta.sep = e.sep;
+    multByHip.set(Number(hipStr), meta);
+    for (const member of e.members ?? []) multByHip.set(member, meta);
+  }
 
   deepStars = [];
   starsByHip = new Map();
@@ -121,6 +144,7 @@ export function loadDeepCatalog(): void {
       flam: info?.flam || undefined,
       constellation: info?.c || undefined,
       desig: info?.desig || undefined,
+      multiplicity: multByHip.get(hip),
     };
 
     deepStars.push(star);
@@ -267,6 +291,7 @@ export function searchStarsByPosition(
         flam: star.flam,
         constellation: star.constellation,
         desig: star.desig,
+        multiplicity: star.multiplicity,
         label: starLabel(star),
         score: 0,
       });

@@ -17,6 +17,7 @@
       pins-tooltip
       @edit="onEdit"
     />
+    <StarActions v-else-if="uiStore.skyTooltipStar" :star="uiStore.skyTooltipStar" pins-tooltip />
   </div>
 </template>
 
@@ -25,6 +26,7 @@ import { useUiStore, SKY_TOOLTIP_OFFSET } from '../../stores/ui';
 import { useCanvasStore } from '../../stores/canvas';
 import { openDSOEditModal } from '../../dso-editor';
 import DSOActions from '../panels/DSOActions.vue';
+import StarActions from '../panels/StarActions.vue';
 
 const uiStore = useUiStore();
 const canvasStore = useCanvasStore();

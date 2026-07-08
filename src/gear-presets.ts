@@ -39,6 +39,16 @@ export function pixelScaleArcsec(p: GearPreset): number {
   return (p.pixelSizeUm / 1000 / p.focalLengthMm) * (180 / Math.PI) * 3600;
 }
 
+/**
+ * Smallest separation the setup can actually record, in arcseconds — the coarser of the
+ * aperture diffraction limit (Dawes, 116/D mm) and ~2× the pixel scale (need a couple of
+ * pixels across the gap to separate two stars). Used to gate double-star ratings.
+ */
+export function resolvingLimitArcsec(p: GearPreset): number {
+  const diffraction = p.apertureMm > 0 ? 116 / p.apertureMm : Infinity;
+  return Math.max(diffraction, 2 * pixelScaleArcsec(p));
+}
+
 /** Formats a FOV as "24'" or "1.5°", width × height */
 export function formatFov(wDeg: number, hDeg: number): string {
   const fmt = (d: number) => (d >= 1 ? `${d.toFixed(1)}°` : `${(d * 60).toFixed(0)}'`);

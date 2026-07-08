@@ -56,6 +56,17 @@ const fr = {
     constellation: 'Constellation',
     dec: 'Déc',
     nearbyTitle: 'Étoiles proches (< 5°)',
+    multiplicity: 'Étoile multiple',
+    multiple: {
+      binary: 'Binaire',
+      triple: 'Triple',
+      quadruple: 'Quadruple',
+      quintuple: 'Quintuple',
+      sextuple: 'Sextuple',
+      septuple: 'Septuple',
+      octuple: 'Octuple',
+      system: 'Système à {n} étoiles',
+    },
   },
   dso: {
     section: 'Objets du ciel profond',
@@ -111,6 +122,7 @@ const fr = {
       PN: 'Nébuleuses planétaires',
       SNR: 'Rémanents de supernova',
       DN: 'Nébuleuses sombres',
+      MS: 'Étoiles multiples',
       '?': 'Objets célestes',
     },
     types: {
@@ -125,6 +137,7 @@ const fr = {
       PN: 'Nébuleuse planétaire',
       SNR: 'Rémanent de supernova',
       DN: 'Nébuleuse sombre',
+      MS: 'Étoile multiple',
       '?': 'Objet céleste',
     },
   },
@@ -951,6 +964,8 @@ const fr = {
       fov: "Taux de remplissage du champ de vue du télescope par l'objet",
       rating: "Intérêt photographique (1–5 étoiles) : qualité de l'objet comme cible d'imagerie",
       difficulty: "Difficulté d'imagerie (1–5 losanges) : matériel et qualité de ciel requis",
+      multipleUnresolvable:
+        'Ce couple est plus serré que ne peut résoudre votre matériel (0 étoile)',
     },
     recipe: {
       noteColorCamera: 'Caméra couleur : poses en poses RGB uniques',
