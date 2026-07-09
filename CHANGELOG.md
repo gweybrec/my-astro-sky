@@ -4,6 +4,80 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.7.0] - 2026-07-09
+
+### Features
+
+- Add a button in the targets search results to see the trajectories ([9ee6d1f](https://github.com/gweybrec/my-astro-sky/commit/9ee6d1f8e26780e213280899d16c07a81aa5f829))
+
+- Add multiple stars to plans and targets ([817a7eb](https://github.com/gweybrec/my-astro-sky/commit/817a7eb0de61a2ed1744f4f95e6dbe4db4201632))
+
+- Ability to add obervations windows to the plans ([4997029](https://github.com/gweybrec/my-astro-sky/commit/4997029e056acd1ce5f0e101a6c0431438272f13))
+
+- Add a sort by dropdown in the plans ([ad3bd1c](https://github.com/gweybrec/my-astro-sky/commit/ad3bd1c99e0dbf5c097f14359a180c3d6a5937c9))
+
+- Add time window to target search ([430a7ea](https://github.com/gweybrec/my-astro-sky/commit/430a7eae31cfeaec2eeda1894d44a9593090e3cd))
+
+- Add F3 shortcut to search DSO/Stars ([a8db433](https://github.com/gweybrec/my-astro-sky/commit/a8db43318dcced103328af4b62df81b9f38e916e))
+
+- Add altitude value to DSO and stars tooltip when a date is selected" ([4b89425](https://github.com/gweybrec/my-astro-sky/commit/4b894259b576743a8cacac521b3db6a362d121ce))
+
+- Add date selection and sky navigation features to map ([3bc09c6](https://github.com/gweybrec/my-astro-sky/commit/3bc09c65053ed733d52baf6b1d47c2deeb8c5ee9))
+
+
+### Bug Fixes
+
+- Star/dso density too crowded towards the center of the sky ([a384e58](https://github.com/gweybrec/my-astro-sky/commit/a384e58b7c64605f38fb3ec3bb8fe34c63b25bc8))
+
+- Tooltips showing oustide the edge of the map ([01f20d0](https://github.com/gweybrec/my-astro-sky/commit/01f20d0fbf515a41504b3286f5a31a40446c65e4))
+
+
+### Performance
+
+- Fix fps drop when zooming out massively ([cbc68c7](https://github.com/gweybrec/my-astro-sky/commit/cbc68c7b0654c39c6dad137bd867c20022d9bb00))
+
+
+### Refactor
+
+- Rework the UX to access targets and make plans more easily accessible ([ca065d2](https://github.com/gweybrec/my-astro-sky/commit/ca065d29af7d46e69ea8de977cf1ac87e52a9517))
+
+- Align icon buttons colors ([7bdfcab](https://github.com/gweybrec/my-astro-sky/commit/7bdfcab3e12f2a24baf65eb8f19f98ed094ac269))
+
+
+### Documentation
+
+- Rework the UI guidelines of the app ([11447dd](https://github.com/gweybrec/my-astro-sky/commit/11447ddc8c5a8ed3267dd4628b06d50cb6960e49))
+
+
+### Build System
+
+- V0.7.0 ([ed88d3b](https://github.com/gweybrec/my-astro-sky/commit/ed88d3b0eff8d7e4f3a598f2d6813177a38e113c))
+
+
+### Other
+
+- Restore DSO natural uneven distribution ([ecbf046](https://github.com/gweybrec/my-astro-sky/commit/ecbf0465b2e4b478193b01ade349179680974bfe))
+
+- Opened plan stay opened after the targets menu closes ([7703d05](https://github.com/gweybrec/my-astro-sky/commit/7703d054e1de9b45c41e832233d8c9669ef9c0e9))
+
+- Fix plan pdf export ([d79a179](https://github.com/gweybrec/my-astro-sky/commit/d79a1795e6dedb95f3ddc626cd535d4bcb95c199))
+
+- Plan observation window ([d9d7ec8](https://github.com/gweybrec/my-astro-sky/commit/d9d7ec88dc89aa144d904ecd875e4964f9fa4d4d))
+
+- Fix photo culling after changing multiple projections ([1294149](https://github.com/gweybrec/my-astro-sky/commit/1294149041c4ac83f6280a0df6fc14cd94cace99))
+
+- Draw constellation line parts when one of the stars if outside the edge ([a857c80](https://github.com/gweybrec/my-astro-sky/commit/a857c8054b830199b54aacd8b7fd211b44f4ff9b))
+
+- Fix local sky projection orientation ([c2808d0](https://github.com/gweybrec/my-astro-sky/commit/c2808d09e70e5700abaec55a02ebac448f0f659e))
+
+- Fix a few DSO ([0f6b146](https://github.com/gweybrec/my-astro-sky/commit/0f6b146cbff139707e64a047a1c327086106e9db))
+
+- Fix local sky constellation line draw beow the horizonÃ ([05f7a22](https://github.com/gweybrec/my-astro-sky/commit/05f7a2206d1a362c3b02e7c0098c3bd05e293d91))
+
+- Fix tooltip dismissing every tick on local date projection ([f42f200](https://github.com/gweybrec/my-astro-sky/commit/f42f200c8e7802fb635febb7021d391c5836749c))
+
+- Improve the time management for local sky ([2f6f387](https://github.com/gweybrec/my-astro-sky/commit/2f6f387ea9fbd9cc943056e6b3e93f64e5af9374))
+
 ## [0.6.0] - 2026-07-03
 
 ### Features
