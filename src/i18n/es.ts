@@ -953,6 +953,9 @@ const es: Translations = {
       subs: 'tomas',
       openOnMap: 'Ver en el mapa',
       score: 'Puntuación',
+      trajectory: 'Ver trayectoria',
+      prevResult: 'Resultado anterior',
+      nextResult: 'Resultado siguiente',
     },
     tooltips: {
       maxAlt: 'Altitud máxima sobre el horizonte durante la ventana de observación',

@@ -64,6 +64,7 @@ import penSvg from './icons/pen.svg?raw';
 import mapPinSvg from './icons/map-pin.svg?raw';
 import listPlusSvg from './icons/list-plus.svg?raw';
 import targetSvg from './icons/target.svg?raw';
+import trajectorySvg from './icons/trajectory.svg?raw';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
 import { usePlansStore } from './stores/plans';
@@ -2581,19 +2582,30 @@ export class TargetsView {
     toolbar.appendChild(paginationEl);
     el.appendChild(toolbar);
 
-    for (const s of pageSlice) {
-      el.appendChild(this.buildTargetCard(s, this.lastPreset!));
-    }
+    pageSlice.forEach((s, i) => {
+      const absoluteIndex = this.currentPage * pageSize + i;
+      el.appendChild(
+        this.buildTargetCard(s, this.lastPreset!, sorted, absoluteIndex, pageSize, navigate),
+      );
+    });
   }
 
   // ─── Target card ───────────────────────────────────────────────────────────
 
-  private buildTargetCard(
+  /**
+   * Title/chips/rating + meta stats + integration recipe for a target
+   * suggestion — shared by the results-card (`moon: null`, unchanged look)
+   * Used by the results card. The trajectory popup uses its own
+   * `buildTrajectoryPopupMeta` instead — a wide one-line layout without the
+   * title (already in the popup's header) or max-altitude/transit (already
+   * shown on the chart), so the two intentionally diverge rather than share
+   * a single over-flagged method.
+   */
+  private buildTargetInfoBlock(
     s: TargetSuggestion,
     preset: ReturnType<typeof buildGearPreset>,
   ): HTMLElement {
-    const card = document.createElement('div');
-    card.className = 'target-card';
+    const block = document.createElement('div');
     const { dso } = s;
     // Multiple/double stars are point-like visual targets: no imaging recipe, no FOV fit,
     // no difficulty — the type chip shows the multiplicity instead.
@@ -2659,7 +2671,7 @@ export class TargetsView {
       chipsRow.appendChild(constEl);
     }
     header.appendChild(chipsRow);
-    card.appendChild(header);
+    block.appendChild(header);
 
     const meta = document.createElement('div');
     meta.className = 'target-card-meta';
@@ -2687,7 +2699,7 @@ export class TargetsView {
           t('targets.tooltips.size'),
         ),
       );
-    card.appendChild(meta);
+    block.appendChild(meta);
 
     const meta2 = document.createElement('div');
     meta2.className = 'target-card-meta';
@@ -2717,43 +2729,73 @@ export class TargetsView {
           t('targets.tooltips.fov'),
         ),
       );
-    card.appendChild(meta2);
+    block.appendChild(meta2);
 
     // Imaging recipe (total integration + per-filter breakdown) — omitted for visual
     // doubles, which have no recipe (`recipe` is null for multiple-star cards).
-    if (recipe) {
-      const totalEl = document.createElement('div');
-      totalEl.className = 'target-integration-total';
-      totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
-      card.appendChild(totalEl);
+    block.appendChild(this.buildRecipeBlock(recipe));
 
-      const details = document.createElement('details');
-      details.className = 'target-details';
-      const summary = document.createElement('summary');
-      summary.textContent = t('targets.results.filtersTitle');
-      details.appendChild(summary);
-      const filterList = document.createElement('div');
-      filterList.className = 'target-filter-list';
-      for (const f of recipe.filters) {
-        const row = document.createElement('div');
-        row.className = 'target-filter-row';
-        const badge = createFilterBadge(f.name);
-        const detail = document.createElement('span');
-        detail.className = 'target-filter-detail';
-        detail.textContent = `${f.count} × ${f.subSeconds}s = ${formatHours(f.hours)}`;
-        row.appendChild(badge);
-        row.appendChild(detail);
-        filterList.appendChild(row);
-      }
-      details.appendChild(filterList);
-      card.appendChild(details);
+    return block;
+  }
+
+  /**
+   * Indicative total integration time + collapsible per-filter breakdown.
+   * Returns an empty fragment when `recipe` is null (visual doubles have no
+   * recipe). Shared by the results card and the trajectory popup so the two
+   * don't duplicate this rendering.
+   */
+  private buildRecipeBlock(recipe: ReturnType<typeof recommendRecipe> | null): DocumentFragment {
+    const frag = document.createDocumentFragment();
+    if (!recipe) return frag;
+
+    const totalEl = document.createElement('div');
+    totalEl.className = 'target-integration-total';
+    totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
+    frag.appendChild(totalEl);
+
+    const details = document.createElement('details');
+    details.className = 'target-details';
+    const summary = document.createElement('summary');
+    summary.textContent = t('targets.results.filtersTitle');
+    details.appendChild(summary);
+    const filterList = document.createElement('div');
+    filterList.className = 'target-filter-list';
+    for (const f of recipe.filters) {
+      const row = document.createElement('div');
+      row.className = 'target-filter-row';
+      const badge = createFilterBadge(f.name);
+      const detail = document.createElement('span');
+      detail.className = 'target-filter-detail';
+      detail.textContent = `${f.count} × ${f.subSeconds}s = ${formatHours(f.hours)}`;
+      row.appendChild(badge);
+      row.appendChild(detail);
+      filterList.appendChild(row);
     }
+    details.appendChild(filterList);
+    frag.appendChild(details);
+    return frag;
+  }
 
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'target-actions-row';
-
-    const navBtnEl = this.iconActionBtn(mapPinSvg, t('targets.results.openOnMap'));
-    navBtnEl.addEventListener('click', () => {
+  /**
+   * The three per-target action buttons — open on map, edit (catalogued DSOs
+   * only, null for multiple stars), add to/remove from plan — shared by the
+   * results card and the trajectory popup. Callers that are themselves a
+   * modal (the trajectory popup) should chain an extra close on `navBtn`'s
+   * and `editBtn`'s click (both navigate away from the current view); the
+   * results card isn't a modal, so it doesn't need to. `planBtn` never closes
+   * anything here or on the card — it's a lightweight toggle with toast
+   * feedback, not a navigation.
+   */
+  private buildTargetActionButtons(
+    dso: DSO,
+    isMS: boolean,
+  ): {
+    navBtn: HTMLButtonElement;
+    editBtn: HTMLButtonElement | null;
+    planBtn: HTMLButtonElement;
+  } {
+    const navBtn = this.iconActionBtn(mapPinSvg, t('targets.results.openOnMap'));
+    navBtn.addEventListener('click', () => {
       this.onNavigate(dso.ra, dso.dec, this.prefs.setupId);
       this.uiStore.closeTargetsOverlay();
     });
@@ -2808,12 +2850,369 @@ export class TargetsView {
       }
     });
 
-    actionsDiv.appendChild(navBtnEl);
+    return { navBtn, editBtn, planBtn };
+  }
+
+  private buildTargetCard(
+    s: TargetSuggestion,
+    preset: ReturnType<typeof buildGearPreset>,
+    sorted: TargetSuggestion[],
+    absoluteIndex: number,
+    pageSize: number,
+    navigate: (page: number) => void,
+  ): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'target-card';
+    const { dso } = s;
+    const isMS = dso.type === 'MS';
+    card.appendChild(this.buildTargetInfoBlock(s, preset));
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'target-actions-row';
+
+    const trajBtn = this.iconActionBtn(trajectorySvg, t('targets.results.trajectory'));
+    trajBtn.addEventListener('click', () => {
+      this.openTrajectoryPopup(sorted, absoluteIndex, pageSize, navigate);
+    });
+
+    const { navBtn, editBtn, planBtn } = this.buildTargetActionButtons(dso, isMS);
+
+    actionsDiv.appendChild(navBtn);
     if (editBtn) actionsDiv.appendChild(editBtn);
     actionsDiv.appendChild(planBtn);
+    actionsDiv.appendChild(trajBtn);
     card.appendChild(actionsDiv);
 
     return card;
+  }
+
+  /**
+   * Stats row for the trajectory popup (plus an optional actions group
+   * pinned to the right — the popup passes its nav/edit/plan buttons here,
+   * matching the results card), followed by the integration recipe.
+   * Type/constellation chips and the rating now live in the popup's own
+   * header (beside the title), and there's no max-altitude/transit (already
+   * shown on the chart above/below this block) — this is deliberately not
+   * `buildTargetInfoBlock`, which is a narrow stacked column built for the
+   * results-card grid and doesn't fit a wide modal.
+   */
+  private buildTrajectoryPopupMeta(
+    s: TargetSuggestion,
+    preset: ReturnType<typeof buildGearPreset>,
+    moon: MoonOverlay | null,
+    actionsEl: HTMLElement | null,
+  ): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'flex flex-col gap-4';
+    const { dso } = s;
+    const isMS = dso.type === 'MS';
+    const recipe = isMS ? null : recommendRecipe(dso, preset);
+
+    // Stats can wrap onto a second line on their own; the actions group
+    // stays pinned to the right on the row's first line either way.
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between gap-6';
+    const statsGroup = document.createElement('div');
+    statsGroup.className = 'flex flex-wrap items-center gap-6 min-w-0';
+    row.appendChild(statsGroup);
+
+    if (dso.mag !== null)
+      statsGroup.appendChild(this.metaItem('Mag', dso.mag.toFixed(1), t('targets.tooltips.mag')));
+    if (dso.majAxis)
+      statsGroup.appendChild(
+        this.metaItem(
+          t('targets.results.size'),
+          formatArcmin(dso.majAxis),
+          t('targets.tooltips.size'),
+        ),
+      );
+    if (dso.difficulty !== null) {
+      const diffEl = this.metaItem(
+        t('targets.sort.difficulty'),
+        '◆'.repeat(dso.difficulty) + '◇'.repeat(5 - dso.difficulty),
+        t('targets.tooltips.difficulty'),
+      );
+      diffEl.querySelector('.target-meta-value')!.className =
+        'target-meta-value target-card-difficulty';
+      statsGroup.appendChild(diffEl);
+    }
+    statsGroup.appendChild(
+      this.metaItem(
+        t('targets.results.score'),
+        `${Math.round(s.score * 100)}%`,
+        t('targets.tooltips.score'),
+      ),
+    );
+    if (!isMS)
+      statsGroup.appendChild(
+        this.metaItem(
+          t('targets.results.fov'),
+          `${Math.round(s.fovFitScore * 100)}%`,
+          t('targets.tooltips.fov'),
+        ),
+      );
+    if (moon) {
+      const moonSep = this.moonSepMetaItem(
+        this.moonSeparationAt(dso.ra, dso.dec, s.bestTimeUtc),
+        moon.illum,
+      );
+      if (moonSep) statsGroup.appendChild(moonSep);
+    }
+
+    if (actionsEl) row.appendChild(actionsEl);
+
+    wrap.appendChild(row);
+    wrap.appendChild(this.buildRecipeBlock(recipe));
+    return wrap;
+  }
+
+  /**
+   * Trajectory popup for a results-list target: the same info block + chart
+   * as a plan-details row (view-only, one at a time so the chart can be
+   * taller), with prev/next stepping across the whole sorted result set
+   * (crossing result-page boundaries). Closing the popup pages the results
+   * list to whichever page the last-viewed result lives on.
+   */
+  private openTrajectoryPopup(
+    sorted: TargetSuggestion[],
+    absoluteIndex: number,
+    pageSize: number,
+    navigate: (page: number) => void,
+  ): void {
+    let idx = absoluteIndex;
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    // Wider than the default `.modal` (960px): the header now carries the
+    // title plus type/constellation chips and rating on one row, and the
+    // stats row below needs room too. Inline style, not a `max-w-[…]`
+    // utility class — `.modal`'s own `max-width` in the legacy style.css has
+    // equal specificity and wins the cascade depending on stylesheet load
+    // order, so a class-based override isn't reliable here (same reason the
+    // chart height below uses an inline style instead of an arbitrary-value
+    // class).
+    modal.style.maxWidth = '1100px';
+
+    const header = document.createElement('div');
+    header.className = 'modal-header';
+    // Title row (name + chips + rating, rebuilt each render) above the aka
+    // line (rebuilt each render, only present when other catalog ids exist).
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'flex flex-col gap-1 flex-1 min-w-0';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'modal-close';
+    closeBtn.innerHTML = '&times;';
+    header.appendChild(titleWrap);
+    header.appendChild(closeBtn);
+
+    const body = document.createElement('div');
+    body.className = 'modal-body flex flex-col gap-4 p-7';
+
+    const infoSlot = document.createElement('div');
+    infoSlot.className = 'flex flex-col gap-4';
+
+    // Arrows flank the chart specifically (not the whole info+chart stack) so
+    // they stay vertically centered on the thing being paged through, the
+    // same way the gallery carousel centers on its photo.
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'gallery-carousel-btn gallery-carousel-prev';
+    prevBtn.innerHTML = '&#8249;';
+    prevBtn.title = t('targets.results.prevResult');
+    prevBtn.setAttribute('aria-label', t('targets.results.prevResult'));
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'gallery-carousel-btn gallery-carousel-next';
+    nextBtn.innerHTML = '&#8250;';
+    nextBtn.title = t('targets.results.nextResult');
+    nextBtn.setAttribute('aria-label', t('targets.results.nextResult'));
+
+    const chartBox = document.createElement('div');
+    chartBox.className = 'relative';
+    // The arrows are absolutely positioned at left:16/right:16 of this box
+    // (the shared `.gallery-carousel-btn` rule — same as the gallery's own
+    // arrows). At ~50px wide that reaches to ~66px from each edge, which
+    // would sit on top of the chart's axis labels and curve if the chart
+    // filled the box edge-to-edge. Reserving 80px of blank padding here
+    // keeps the arrows over empty space instead of over plotted content.
+    chartBox.style.paddingLeft = '80px';
+    chartBox.style.paddingRight = '80px';
+    // In-flow children (unlike the absolutely-positioned arrows) share the
+    // 80px padding above, so the timeline row's start/end labels line up
+    // with the chart's x-axis ends below without any extra spacer math.
+    const timelineSlot = document.createElement('div');
+    const chartSlot = document.createElement('div');
+    chartBox.appendChild(prevBtn);
+    chartBox.appendChild(timelineSlot);
+    chartBox.appendChild(chartSlot);
+    chartBox.appendChild(nextBtn);
+
+    body.appendChild(infoSlot);
+    body.appendChild(chartBox);
+    modal.appendChild(header);
+    modal.appendChild(body);
+    backdrop.appendChild(modal);
+
+    const render = (): void => {
+      const s = sorted[idx];
+      const { dso } = s;
+      const isMS = dso.type === 'MS';
+
+      // Title + type/constellation chips + rating on one row, aka-line
+      // below — rebuilt fresh each render (same pattern as infoSlot/chartSlot
+      // below). `buildTrajectoryPopupMeta` never renders any of this.
+      titleWrap.innerHTML = '';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'flex items-center gap-3 flex-wrap';
+
+      const nameEl = document.createElement('h2');
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = dso.displayName || dso.catalogs[0] || dso.id;
+      nameEl.appendChild(nameSpan);
+      if (dso.displayName) {
+        const idSpan = document.createElement('span');
+        idSpan.className = 'target-card-catalog-id';
+        // Leading space: nameEl is a plain (non-flex) h2 now that it sits
+        // beside the type/constellation chips in a flex row of its own, so
+        // there's no flex `gap` to space these two inline spans apart.
+        idSpan.textContent = ' ' + (dso.catalogs[0] || dso.id);
+        nameEl.appendChild(idSpan);
+      }
+      titleRow.appendChild(nameEl);
+
+      const typeEl = document.createElement('div');
+      typeEl.className = 'target-card-type';
+      typeEl.textContent =
+        isMS && dso.multiplicity ? formatMultiplicity(dso.multiplicity) : dsoTypeLabel(dso.type);
+      titleRow.appendChild(typeEl);
+
+      if (dso.constellation) {
+        const constEl = document.createElement('div');
+        constEl.className = 'target-card-const';
+        constEl.textContent = dso.constellation.toUpperCase();
+        const constInfo = getConstellationInfos().find((c) => c.id === dso.constellation);
+        if (constInfo) constEl.title = constInfo.name;
+        titleRow.appendChild(constEl);
+      }
+
+      if (dso.rating !== null) {
+        const ratingEl = document.createElement('div');
+        ratingEl.className = 'target-card-rating';
+        ratingEl.title =
+          isMS && dso.rating === 0
+            ? t('targets.tooltips.multipleUnresolvable')
+            : t('targets.tooltips.rating');
+        ratingEl.textContent = '★'.repeat(dso.rating) + '☆'.repeat(5 - dso.rating);
+        titleRow.appendChild(ratingEl);
+      }
+
+      titleWrap.appendChild(titleRow);
+      const otherNames = dso.catalogs.slice(1);
+      if (otherNames.length > 0) {
+        const akaLine = document.createElement('div');
+        akaLine.className = 'text-small text-dim font-normal';
+        akaLine.textContent = `${t('dso.alsoKnownAs')}: ${otherNames.join(' · ')}`;
+        titleWrap.appendChild(akaLine);
+      }
+
+      const loc = this.lastLocation!;
+      const win = this.nightWindow(loc, this.lastDateNight!);
+      const curve = sampleAltCurve(dso.ra, dso.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
+      const moon = this.buildMoonOverlay(loc, win);
+
+      // Same three actions as the results card, on the right of the stats
+      // row. Nav/edit both navigate away from this view, so — unlike the
+      // card, which isn't a modal — they also close this popup; add-to-plan
+      // is a lightweight toggle and stays open, same as the card.
+      const {
+        navBtn: popupNavBtn,
+        editBtn: popupEditBtn,
+        planBtn: popupPlanBtn,
+      } = this.buildTargetActionButtons(dso, isMS);
+      popupNavBtn.addEventListener('click', close);
+      popupEditBtn?.addEventListener('click', close);
+      const actionsGroup = document.createElement('div');
+      actionsGroup.className = 'flex items-center gap-2 shrink-0';
+      actionsGroup.appendChild(popupNavBtn);
+      if (popupEditBtn) actionsGroup.appendChild(popupEditBtn);
+      actionsGroup.appendChild(popupPlanBtn);
+
+      infoSlot.innerHTML = '';
+      infoSlot.appendChild(this.buildTrajectoryPopupMeta(s, this.lastPreset!, moon, actionsGroup));
+      infoSlot.appendChild(this.buildMoonToggle(render));
+
+      // Night start/end + moon rise/set, aligned to the chart's x-axis —
+      // same row (and overlap-prevention via `spaceMoonMarkers`) as plan
+      // details, paired here with a gutter spacer instead of the plan row's
+      // own spacers so it lines up with this popup's chart layout.
+      timelineSlot.innerHTML = '';
+      const timelineRow = document.createElement('div');
+      timelineRow.className = 'flex items-end gap-3 pb-1';
+      const gutterSpacer = document.createElement('span');
+      gutterSpacer.className = `${TargetsView.axisGutterWidth(moon)} shrink-0`;
+      timelineRow.append(gutterSpacer, this.buildTimelineChartArea(win, loc, moon));
+      timelineSlot.appendChild(timelineRow);
+
+      chartSlot.innerHTML = '';
+      chartSlot.appendChild(this.buildPlanChart(curve, win, s.bestTimeUtc, moon, 340));
+
+      prevBtn.disabled = idx <= 0;
+      nextBtn.disabled = idx >= sorted.length - 1;
+    };
+
+    const step = (delta: number): void => {
+      const next = Math.max(0, Math.min(sorted.length - 1, idx + delta));
+      if (next === idx) return;
+      idx = next;
+      render();
+    };
+    prevBtn.addEventListener('click', () => step(-1));
+    nextBtn.addEventListener('click', () => step(1));
+
+    const close = (): void => {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKey);
+      const finalPage = Math.floor(idx / pageSize);
+      if (finalPage !== this.currentPage) navigate(finalPage);
+    };
+    closeBtn.addEventListener('click', close);
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) close();
+    });
+
+    const onKey = (e: KeyboardEvent): void => {
+      // Stop here — the underlying Targets overlay is itself a BaseModal.vue
+      // with its own window-level Escape handler; without this, closing the
+      // popup on Escape also closes the overlay behind it.
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        close();
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      )
+        return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        step(-1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        step(1);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+
+    render();
+    document.body.appendChild(backdrop);
   }
 
   /** A square icon-only action button (`btn-icon`) holding an inline SVG. */
@@ -4104,26 +4503,21 @@ export class TargetsView {
     ro.observe(container);
   }
 
-  private buildTimelineHeader(
+  /**
+   * The night-start/night-end/moon-rise-set label row aligned to a
+   * trajectory chart's x-axis: start (left), end (right), and moon markers
+   * positioned at their horizon-crossing x, nudged via `spaceMoonMarkers` to
+   * never overlap each other or the start/end labels. Returns the
+   * flex-1 chart-area only — callers pair it with a gutter spacer matching
+   * `axisGutterWidth(moon)` (and their own layout's other spacers) so it
+   * lines up with the actual chart below. Shared by the plan-row timeline
+   * header and the trajectory popup's timeline row.
+   */
+  private buildTimelineChartArea(
     win: { start: Date; end: Date },
     loc: ObserverLocation,
     moon: MoonOverlay | null,
   ): HTMLElement {
-    // Mirror the plan-row column layout so the night-start/end times sit exactly
-    // over the start/end of the sparkline (the flex-1 chart column), accounting
-    // for the axis-label gutter to the left of the plot.
-    const header = document.createElement('div');
-    header.className = 'flex items-end gap-3 pb-1';
-
-    const infoSpacer = document.createElement('span');
-    infoSpacer.className = `${TargetsView.PLAN_INFO_COL} shrink-0`;
-
-    const gutterSpacer = document.createElement('span');
-    gutterSpacer.className = `${TargetsView.axisGutterWidth(moon)} shrink-0`;
-
-    // Chart area: a single line holding night start (left), night end (right),
-    // and any moon rise/set marker(s) anchored at their horizon-crossing x — all
-    // aligned horizontally with the sparkline below.
     const chartArea = document.createElement('div');
     chartArea.className = 'flex-1 min-w-0 relative h-8';
 
@@ -4160,6 +4554,28 @@ export class TargetsView {
       // start/end labels (and from each other) instead of overlapping them.
       this.spaceMoonMarkers(chartArea, startEl, endEl, markers);
     }
+
+    return chartArea;
+  }
+
+  private buildTimelineHeader(
+    win: { start: Date; end: Date },
+    loc: ObserverLocation,
+    moon: MoonOverlay | null,
+  ): HTMLElement {
+    // Mirror the plan-row column layout so the night-start/end times sit exactly
+    // over the start/end of the sparkline (the flex-1 chart column), accounting
+    // for the axis-label gutter to the left of the plot.
+    const header = document.createElement('div');
+    header.className = 'flex items-end gap-3 pb-1';
+
+    const infoSpacer = document.createElement('span');
+    infoSpacer.className = `${TargetsView.PLAN_INFO_COL} shrink-0`;
+
+    const gutterSpacer = document.createElement('span');
+    gutterSpacer.className = `${TargetsView.axisGutterWidth(moon)} shrink-0`;
+
+    const chartArea = this.buildTimelineChartArea(win, loc, moon);
 
     // Invisible clones of the row's trailing buttons (show-on-map + remove), to
     // reserve the same width so the start/end times line up with the chart ends.
@@ -4839,10 +5255,11 @@ export class TargetsView {
     win: { start: Date; end: Date },
     bestTimeUtc: Date,
     moon: MoonOverlay | null,
+    heightPx = 180,
   ): HTMLElement {
     // Layout: [axis-label gutter] [plot]. The graduations live in the gutter,
     // to the left of the axis, so they never overlap the trajectory.
-    const chart = this.buildAltChart(curve, win, bestTimeUtc, moon);
+    const chart = this.buildAltChart(curve, win, bestTimeUtc, moon, heightPx);
     const chartWrap = document.createElement('div');
     chartWrap.className = 'flex-1 min-w-0 flex';
 
@@ -4939,6 +5356,7 @@ export class TargetsView {
     win: { start: Date; end: Date },
     transitTime: Date,
     moon: MoonOverlay | null,
+    heightPx = 180,
   ): {
     svg: SVGSVGElement;
     lo: number;
@@ -4957,7 +5375,8 @@ export class TargetsView {
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.setAttribute('preserveAspectRatio', 'none');
-    svg.setAttribute('class', 'block w-full h-[180px]');
+    svg.setAttribute('class', 'block w-full');
+    svg.style.height = `${heightPx}px`;
     if (curve.length === 0)
       return {
         svg,

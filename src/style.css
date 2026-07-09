@@ -4544,7 +4544,11 @@ details.targets-form-details[open] .targets-form-summary::before {
   user-select: none;
   list-style: none;
   padding: var(--space-2) 0;
-  display: flex;
+  /* inline-flex, not flex: a block-level summary stretches to its
+     container's full width, and clicking anywhere in a <summary> toggles
+     the <details> — that made the whole row (including empty space to the
+     right) clickable instead of just the "▶ Filtres suggérés" label. */
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
 }

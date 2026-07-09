@@ -947,6 +947,9 @@ const en: Translations = {
       subs: 'subs',
       openOnMap: 'Open on map',
       score: 'Score',
+      trajectory: 'View trajectory',
+      prevResult: 'Previous result',
+      nextResult: 'Next result',
     },
     tooltips: {
       maxAlt: 'Maximum altitude above the horizon during the observation window',

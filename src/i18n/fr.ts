@@ -954,6 +954,9 @@ const fr = {
       subs: 'poses',
       openOnMap: 'Voir sur la carte',
       score: 'Score',
+      trajectory: 'Voir la trajectoire',
+      prevResult: 'Résultat précédent',
+      nextResult: 'Résultat suivant',
     },
     tooltips: {
       maxAlt: "Altitude maximale au-dessus de l'horizon pendant la nuit d'observation",

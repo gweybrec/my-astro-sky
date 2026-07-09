@@ -38,6 +38,11 @@ Screenshot: `<component selector>` — browser_take_screenshot
 
 Gates — each ✅ with the measured evidence:
 
+- **No element overlap, unless the user explicitly required it** — for every new/moved element
+  that sits near other content (especially absolutely-positioned overlays on top of charts,
+  images, or text), compute actual bounding-box intersection against what's underneath
+  (`rect.right <= other.left || other.right <= rect.left || …`), not just center-alignment math.
+  Centered-on-a-box is not the same as not-overlapping-its-content — check both.
 - **Vertical stacks share a left edge** — equal `rect.left` across rows/items.
 - **Row controls share height; columns align** — equal `rect` height, equal per-column `left`.
 - **Colours correct** — icons/text legible on their background, incl. **active/hover** (icon not

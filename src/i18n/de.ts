@@ -954,6 +954,9 @@ const de: Translations = {
       subs: 'Aufnahmen',
       openOnMap: 'Auf Karte öffnen',
       score: 'Bewertung',
+      trajectory: 'Flugbahn anzeigen',
+      prevResult: 'Vorheriges Ergebnis',
+      nextResult: 'Nächstes Ergebnis',
     },
     tooltips: {
       maxAlt: 'Maximale Höhe über dem Horizont während des Beobachtungsfensters',
