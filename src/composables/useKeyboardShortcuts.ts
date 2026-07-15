@@ -52,6 +52,9 @@ export function useKeyboardShortcuts() {
       case 'toggleGrid':
         displayStore.setShowGrid(!displayStore.showGrid);
         return true;
+      case 'toggleCardinalPoints':
+        skyTimeStore.setShowCardinalPoints(!skyTimeStore.showCardinalPoints);
+        return true;
       case 'togglePhotos':
         displayStore.setShowPhotos(!displayStore.showPhotos);
         return true;

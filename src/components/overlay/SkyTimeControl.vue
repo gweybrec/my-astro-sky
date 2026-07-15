@@ -133,6 +133,51 @@
           >
             {{ locateLabel }}
           </button>
+
+          <!-- Terrain (mountain) horizon controls -->
+          <div class="border-t border-[var(--border-subtle)] mt-1 pt-2 flex flex-col gap-2">
+            <label class="text-micro uppercase text-[var(--text-label)]">
+              {{ t('horizon.eyeHeightLabel') }}
+            </label>
+            <input
+              v-model="eyeHeightInput"
+              type="number"
+              class="targets-coord-input"
+              step="1"
+              min="0"
+              placeholder="1.7"
+              @change="applyEyeHeight"
+            />
+            <button
+              type="button"
+              class="targets-loc-btn"
+              :disabled="horizon.loading || store.lat === null || store.lon === null"
+              @click="horizon.computeForCurrentLocation()"
+            >
+              {{ horizon.loading ? t('horizon.computing') : t('horizon.compute') }}
+            </button>
+            <button type="button" class="targets-loc-btn" @click="triggerImport">
+              {{ t('horizon.import') }}
+            </button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".txt,.csv,.hor,.dat"
+              class="hidden"
+              @change="onImportFile"
+            />
+            <button
+              v-if="horizon.profile"
+              type="button"
+              class="targets-loc-btn"
+              @click="horizon.clear()"
+            >
+              {{ t('horizon.clear') }}
+            </button>
+            <p v-if="horizon.error" class="text-micro text-[var(--color-danger)]">
+              {{ horizon.error }}
+            </p>
+          </div>
         </div>
       </DropdownPanel>
 
@@ -163,6 +208,21 @@
         @focus="suppress(true)"
         @blur="suppress(false)"
         v-html="azimuthGridSvg"
+      ></button>
+
+      <button
+        type="button"
+        class="sky-rotation-btn"
+        :class="{ active: horizon.enabled }"
+        :disabled="!horizon.profile"
+        :title="t('horizon.toggleButton')"
+        :aria-label="t('horizon.toggleButton')"
+        @click="horizon.setEnabled(!horizon.enabled)"
+        @mouseenter="suppress(true)"
+        @mouseleave="suppress(false)"
+        @focus="suppress(true)"
+        @blur="suppress(false)"
+        v-html="mountainSvg"
       ></button>
 
       <button
@@ -202,6 +262,7 @@
 import { ref, computed, watch } from 'vue';
 import { t } from '../../i18n';
 import { useSkyTimeStore } from '../../stores/sky-time';
+import { useHorizonStore } from '../../stores/horizon';
 import { useUiStore } from '../../stores/ui';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import calendarSvg from '../../icons/calendar.svg?raw';
@@ -209,8 +270,10 @@ import moonSvg from '../../icons/moon.svg?raw';
 import mapPinSvg from '../../icons/map-pin.svg?raw';
 import azimuthGridSvg from '../../icons/azimuth-grid.svg?raw';
 import localSkySvg from '../../icons/local-sky.svg?raw';
+import mountainSvg from '../../icons/mountain.svg?raw';
 
 const store = useSkyTimeStore();
+const horizon = useHorizonStore();
 const uiStore = useUiStore();
 
 const readoutBtnRef = ref<HTMLButtonElement>();
@@ -301,6 +364,34 @@ const locateLabel = computed(() => {
   if (locateStatus.value === 'error') return t('targets.location.error');
   return t('targets.location.useBrowser');
 });
+
+// ── Terrain (mountain) horizon ──────────────────────────────────────────────
+const fileInputRef = ref<HTMLInputElement>();
+const eyeHeightInput = ref<string | number>('');
+watch(
+  () => horizon.obsHeightM,
+  (h) => {
+    eyeHeightInput.value = h === null ? '' : h;
+  },
+  { immediate: true },
+);
+
+function applyEyeHeight() {
+  horizon.setObsHeight(toNullableNumber(eyeHeightInput.value));
+}
+
+function triggerImport() {
+  fileInputRef.value?.click();
+}
+
+async function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  horizon.importFromText(text);
+  input.value = ''; // allow re-importing the same file
+}
 
 function useMyLocation() {
   locateStatus.value = 'locating';

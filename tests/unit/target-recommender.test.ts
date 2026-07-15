@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { recommendTargets, scoreDso } from '../../src/target-recommender';
 import { mightBeVisible, maxAltDuringWindow } from '../../src/sky-geometry';
 import { twilightWindow } from '../../src/astro-time';
+import { densifyPoints } from '../../src/horizon-io';
 import type { DSO } from '../../src/types';
 import type { GearPreset } from '../../src/gear-presets';
 
@@ -81,6 +82,22 @@ describe('recommendTargets scoring — individual scores via TargetSuggestion ou
     const noSize = makeDSO({ id: 'NOSIZE', majAxis: null as any });
     const results = recommendTargets([noSize], testPreset, testLocation, winterNight);
     expect(results.length).toBe(0);
+  });
+
+  it('terrain horizon gate rejects targets blocked at their peak, keeps them otherwise', () => {
+    const high = makeDSO({ id: 'HIGH', ra: 120, dec: 45, mag: 5.0, majAxis: 30 });
+    // Passes with an open (floor) horizon…
+    const open = densifyPoints([{ azDeg: 0, altDeg: -5 }]);
+    const openResults = recommendTargets([high], testPreset, testLocation, winterNight, 8, {
+      horizonProfile: open,
+    });
+    expect(openResults.length).toBe(1);
+    // …and is blocked by a wall of terrain 89° high in every direction.
+    const wall = densifyPoints([{ azDeg: 0, altDeg: 89 }]);
+    const wallResults = recommendTargets([high], testPreset, testLocation, winterNight, 8, {
+      horizonProfile: wall,
+    });
+    expect(wallResults.length).toBe(0);
   });
 
   it('object too faint (mag > limit) is skipped', () => {

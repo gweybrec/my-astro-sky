@@ -70,6 +70,16 @@ db.exec(`
   );
 `);
 
+// Cached computed horizon profiles, keyed by rounded location + params (see
+// horizonCacheKey). Terrain doesn't move, so a computed skyline is reusable
+// indefinitely; recomputing means re-fetching DEM tiles and ray-tracing.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS horizon_profiles (
+    key  TEXT PRIMARY KEY,
+    json TEXT NOT NULL
+  );
+`);
+
 // User-created custom gear (telescopes, cameras, accessories)
 db.exec(`
   CREATE TABLE IF NOT EXISTS custom_gear (
@@ -565,6 +575,43 @@ export function deleteSetting(key: string): void {
 
 export function closeDatabase(): void {
   db.close();
+}
+
+// ─── Horizon profile cache ─────────────────────────────────────────────────────
+// A computed skyline for a location is expensive (DEM tile fetch + ray-trace) but
+// stable, so cache it keyed by rounded lat/lon + radius + eye height.
+
+const getHorizonStmt = db.prepare('SELECT json FROM horizon_profiles WHERE key = ?');
+const setHorizonStmt = db.prepare(
+  'INSERT OR REPLACE INTO horizon_profiles (key, json) VALUES (?, ?)',
+);
+
+// Bump when the computed profile's shape/content changes (e.g. summits added), so
+// stale entries from an older algorithm are bypassed rather than served forever.
+const HORIZON_CACHE_VERSION = 'v2';
+
+/** Cache key: version + 3-decimal lat/lon (~100 m) plus radius (km) and eye height (m). */
+export function horizonCacheKey(
+  lat: number,
+  lon: number,
+  radiusKm: number,
+  obsHeightM: number | null,
+): string {
+  return `${HORIZON_CACHE_VERSION}:${lat.toFixed(3)}:${lon.toFixed(3)}:${radiusKm}:${obsHeightM ?? 'auto'}`;
+}
+
+export function getCachedHorizon(key: string): object | undefined {
+  const row = getHorizonStmt.get(key) as { json: string } | undefined;
+  if (!row) return undefined;
+  try {
+    return JSON.parse(row.json);
+  } catch {
+    return undefined;
+  }
+}
+
+export function setCachedHorizon(key: string, profile: object): void {
+  setHorizonStmt.run(key, JSON.stringify(profile));
 }
 
 // ─── DSO user overrides ────────────────────────────────────────────────────────

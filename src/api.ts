@@ -13,6 +13,7 @@ import type {
 import { t, getLang } from './i18n';
 import { reportRendererError } from './error-reporter';
 import { downloadBlob } from './file-utils';
+import type { HorizonProfile } from './horizon-io';
 
 /** Translate a server error response using the `code` field when available. */
 export function parseServerError(
@@ -45,6 +46,32 @@ export async function getLatestVersion(): Promise<LatestRelease | null> {
     // Silent by design — a failed update check must never surface an error.
     return null;
   }
+}
+
+/**
+ * Fetch a computed terrain horizon profile for a location from the backend
+ * (which ray-traces open DEM tiles and caches the result). Throws on failure so
+ * the caller can surface a message; the UI's "Compute" button awaits this.
+ */
+export async function fetchHorizonProfile(
+  lat: number,
+  lon: number,
+  opts: { radiusKm?: number; obsHeightM?: number | null } = {},
+): Promise<HorizonProfile> {
+  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+  if (opts.radiusKm != null) params.set('radiusKm', String(opts.radiusKm));
+  if (opts.obsHeightM != null) params.set('obsHeightM', String(opts.obsHeightM));
+  const res = await fetch(`/api/horizon?${params.toString()}`);
+  if (!res.ok) {
+    let data: { error?: string; code?: string } = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(parseServerError(data, 'horizon.error.compute'));
+  }
+  return (await res.json()) as HorizonProfile;
 }
 
 export interface StarMultiplicity {

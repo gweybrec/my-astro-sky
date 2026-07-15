@@ -205,6 +205,7 @@ const fr = {
     },
     action: {
       togglePanel: 'Afficher/masquer le panneau latéral',
+      toggleCardinalPoints: 'Afficher/masquer les points cardinaux (N/E/S/O)',
       zoomIn: 'Zoom avant',
       zoomOut: 'Zoom arrière',
       panLeft: 'Déplacer vers la gauche',
@@ -239,6 +240,32 @@ const fr = {
     jumpToEvening: 'Aller à ce soir',
     localSkyButton: 'Ciel local (vue horizon)',
     azimuthGridButton: 'Grille azimutale (alt-az)',
+  },
+  horizon: {
+    toggleButton: "Afficher/masquer l'horizon du relief",
+    eyeHeightLabel: 'Hauteur des yeux au sol (m)',
+    compute: "Calculer l'horizon",
+    computing: 'Calcul…',
+    import: 'Importer un fichier horizon',
+    clear: "Effacer l'horizon",
+    respectHorizon: "Respecter l'horizon",
+    respectHorizonHint: 'Exclure les cibles cachées par le relief à leur culmination',
+    error: {
+      noLocation: "Définissez d'abord une position d'observation",
+      compute: "Impossible de calculer l'horizon à partir des données d'altitude",
+      parse: 'Fichier horizon illisible (paires « azimut altitude » attendues)',
+    },
+  },
+  cardinal: {
+    north: 'N',
+    east: 'E',
+    south: 'S',
+    west: 'O',
+  },
+  summit: {
+    elevation: 'Altitude',
+    metersUnit: 'm',
+    distance: 'Distance',
   },
   settings: {
     section: 'Réglages',

@@ -11,8 +11,9 @@
 import type { DSO } from './types';
 import type { GearPreset } from './gear-presets';
 import { fovDeg, limitingMag } from './gear-presets';
-import { twilightWindow } from './astro-time';
-import { maxAltDuringWindow, mightBeVisible } from './sky-geometry';
+import { twilightWindow, dateToJD, lstHours } from './astro-time';
+import { maxAltDuringWindow, mightBeVisible, altAzFromRaDec } from './sky-geometry';
+import { horizonAltAt, type HorizonProfile } from './horizon-io';
 
 export interface ObserverLocation {
   latDeg: number;
@@ -42,6 +43,9 @@ export function recommendTargets(
     minAltDeg?: number;
     maxAltDeg?: number;
     timeWindow?: { start: Date; end: Date };
+    /** Terrain skyline: reject targets whose peak sits below the horizon in that
+     *  direction ("how low not to go" made azimuth-dependent). */
+    horizonProfile?: HorizonProfile | null;
   } = {},
 ): TargetSuggestion[] {
   const { latDeg, lonDeg } = location;
@@ -116,6 +120,15 @@ export function recommendTargets(
 
     const effectiveMaxAlt = isMultipleStar ? 90 : maxAlt;
     if (maxAltDeg < minAlt || maxAltDeg > effectiveMaxAlt) continue;
+
+    // Terrain horizon gate: reject targets that never clear the real skyline in
+    // their direction. The peak-time azimuth is used as an MVP approximation — an
+    // object hidden behind terrain even at culmination is definitely blocked.
+    if (options.horizonProfile) {
+      const lst = lstHours(dateToJD(atDate), lonDeg);
+      const azDeg = altAzFromRaDec(dso.ra, dso.dec, lst, latDeg).azDeg;
+      if (maxAltDeg < horizonAltAt(options.horizonProfile, azDeg)) continue;
+    }
 
     // ─ Altitude score (0-1): best at 70°, good above 50°, ok at minAlt ─
     const altScore = altitudeScore(maxAltDeg, minAlt);

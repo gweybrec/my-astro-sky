@@ -16,6 +16,7 @@ MyAstroSky overlays your astrophotographs onto an interactive sky map using auto
 - [Photo organization](#photo-organization)
 - [Gallery mode](#gallery-mode)
 - [Targets tab](#targets-tab)
+- [Terrain horizon (mountains)](#terrain-horizon-mountains)
 - [Observing plans](#observing-plans)
 - [Search](#search)
 - [Display settings](#display-settings)
@@ -135,6 +136,7 @@ Below the gear section you can narrow down which objects are recommended:
 | **Date**                      | Night to plan for. Defaults to today.                                                                                                                                                              |
 | **Object types**              | Toggle which DSO categories are included (spiral galaxy, elliptical galaxy, open cluster, globular cluster, emission nebula, reflection nebula, planetary nebula, supernova remnant, dark nebula). |
 | **Horizon**                   | Block objects that will be above the N/S/E/W horizon during the night — useful if a wall or mountain obstructs part of your sky.                                                                   |
+| **Respect horizon**           | When enabled, excludes objects that stay hidden behind your computed/imported terrain horizon even at their highest point. See [Terrain horizon (mountains)](#terrain-horizon-mountains).          |
 | **DSO interest**              | Filter by interest rating (1–5 stars, as assigned in the catalog).                                                                                                                                 |
 | **Difficulty**                | Filter by imaging difficulty (1–5 diamonds).                                                                                                                                                       |
 | **Catalogs**                  | Limit results to specific catalogs (Messier, NGC, IC, Sharpless 2, …).                                                                                                                             |
@@ -174,6 +176,25 @@ A modal opens with a form:
 Once saved, the new item appears immediately at the bottom of the relevant dropdown and is selected automatically.
 
 Custom gear is stored on the server (in the app database) and persists across sessions. It can be exported together with your other data via **Settings → Export → Custom telescopes/cameras/accessories**.
+
+---
+
+## Terrain horizon (mountains)
+
+If mountains, hills, or buildings block part of your sky, you can overlay your **real skyline** on the sky map and have the target recommender respect it — so you don't plan a target that never clears a ridge.
+
+**Set it up** from the date-mode toolbar (switch the sky map to a date with the calendar button, then set your observing location via the map-pin button):
+
+1. Open the **location** popover (map-pin icon) and make sure your latitude/longitude are set.
+2. Optionally enter your **eye height above ground** (metres) — leave blank for a standard ~1.7 m.
+3. Click **Compute horizon**. The app works out your real skyline for that spot. This needs an internet connection and takes a few seconds; the result is saved, so the same site is instant next time. **Named nearby peaks appear automatically as dots on the skyline** — there's nothing extra to do.
+4. Alternatively, click **Import horizon file** to load a skyline you exported elsewhere — for example PeakFinder's **Export → Stellarium** file, or a simple text file of `azimuth altitude` pairs (one per line, degrees).
+
+Toggle the **mountain** button in the toolbar to show or hide the skyline on the sky map. In the local-sky (horizon) view the blocked ground is shaded and the jagged line follows the terrain height in each direction. **Hover a dot on the skyline to see that peak's name and height.**
+
+**In the Targets tab**, enable the **Respect horizon** filter to drop any object that stays hidden behind the terrain even at its highest point during the night.
+
+> The horizon is computed from open elevation data and works best in mountainous terrain; nearby buildings or very local obstructions may not appear. Use the import option for a hand-made or third-party profile when you need one.
 
 ---
 

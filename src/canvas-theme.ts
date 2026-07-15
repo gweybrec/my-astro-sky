@@ -215,6 +215,41 @@ export const BORDER_RING = { color: 'rgba(200, 185, 168, 0.3)', lineWidth: 1.5 }
 /** The horizon curve drawn in date mode when an observer location is set. */
 export const HORIZON_LINE = { lineWidth: 1.5 } as const;
 
+/**
+ * The terrain (mountain) horizon silhouette + fill, drawn in date mode when the
+ * user has computed/imported a horizon profile. A warm earthy stroke over a
+ * translucent fill so the blocked band reads as "ground" without fully hiding
+ * stars near the skyline. Canvas draw constants (not CSS), like BORDER_RING.
+ */
+export const MOUNTAIN_HORIZON = {
+  lineWidth: 2,
+  stroke: 'rgba(150, 110, 74, 0.95)',
+  fill: 'rgba(38, 28, 20, 0.5)',
+} as const;
+
+/**
+ * Cardinal-point labels (N/E/S/W) drawn in red at the horizon in date mode, to
+ * orient the local-sky view and check the terrain horizon against reality.
+ * `altDeg` lifts the labels just off the rim so they aren't clipped by the disc.
+ */
+export const CARDINAL_POINTS = {
+  color: '#ff4d4d',
+  font: 'bold 15px sans-serif',
+  altDeg: 2,
+} as const;
+
+/**
+ * Small "star-like" dots marking named summits on the terrain skyline. Filled in
+ * the mountain-line colour over a thin dark outline so they read against both the
+ * shaded ground band and the sky. Hover shows the peak's name + altitude.
+ */
+export const SUMMIT_DOT = {
+  radius: 3,
+  fill: MOUNTAIN_HORIZON.stroke,
+  outline: 'rgba(10, 8, 6, 0.9)',
+  outlineWidth: 1,
+} as const;
+
 /** Circular background disc + radius for a mosaic tile's delete/add button. */
 export const TILE_BUTTON = { bg: 'rgba(15, 15, 18, 0.78)', radius: 11 } as const;
 

@@ -16,8 +16,17 @@ import {
 } from './projection';
 import { getConstellationLines, getConstellationInfos } from './star-catalog';
 import { raDecFromAltAz } from './sky-geometry';
+import { horizonAltAt, type HorizonProfile, type HorizonSummit } from './horizon-io';
 import type { SKY_THEME } from './sky-themes';
-import { FONTS, GRID, TILE_BUTTON, HORIZON_LINE } from './canvas-theme';
+import {
+  FONTS,
+  GRID,
+  TILE_BUTTON,
+  HORIZON_LINE,
+  MOUNTAIN_HORIZON,
+  CARDINAL_POINTS,
+  SUMMIT_DOT,
+} from './canvas-theme';
 import pinSvgRaw from './icons/pin.svg?raw';
 
 type SkyTheme = typeof SKY_THEME;
@@ -433,6 +442,156 @@ export function drawAzimuthGrid(
   for (let az = 0; az < 360; az += 30) {
     strokeAzMeridian(ctx, view, az, lstH, latDeg);
   }
+}
+
+/**
+ * Draw the observer's real terrain skyline from a horizon profile: a warm
+ * silhouette line following the terrain altitude at each azimuth, over a
+ * translucent fill of the blocked band down to the astronomical horizon (alt=0).
+ *
+ * Stepped and pen-lifted exactly like `strokeAltCircle`, but with the altitude
+ * varying per azimuth from the profile — so it renders correctly in both the
+ * zenith "local sky" view and the pole-centered stereographic date view.
+ *
+ * The filled ground band (only in zenith mode) is drawn as a strip of small
+ * per-azimuth quads spanning from the silhouette down to the astronomical horizon
+ * (alt = 0). Filling many locally-wound quads is immune to the fill-side inversion
+ * that a single silhouette-to-rim polygon suffered: there, the two boundary loops
+ * wound oppositely and the alt=0 round-trip dropped points near the rim, so the
+ * fill flipped across the E/W diameter. In stereo mode the curves run
+ * off-projection, so only the silhouette line is stroked.
+ */
+export function drawMountainHorizon(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  profile: HorizonProfile,
+): void {
+  // Silhouette point in *projection units* (origin = zenith in zenith mode).
+  const projPt = (altDeg: number, azDeg: number): Point | null => {
+    const { raDeg, decDeg } = raDecFromAltAz(altDeg, azDeg, lstH, latDeg);
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) return null; // far hemisphere / off-projection
+    return p;
+  };
+
+  if (getCenterMode() === 'zenith') {
+    // In zenith mode the astronomical horizon is exactly the unit circle (r = 1)
+    // around the origin, and the silhouette at a given azimuth lies on the same
+    // radial ray. So the rim point is the silhouette point scaled out to r = 1 —
+    // this never calls project(alt=0), whose RA/Dec round-trip is unstable at the
+    // rim and dropped points (previously leaving the southern band unfilled).
+    ctx.beginPath();
+    for (let az = 0; az < 360; az += ALTAZ_STEP_DEG) {
+      const az2 = az + ALTAZ_STEP_DEG;
+      // Clamp the silhouette to the horizon: where terrain dips below alt=0 there is
+      // no blocked band, so that wedge collapses to zero height (nothing filled).
+      const a1 = Math.max(0, horizonAltAt(profile, az));
+      const a2 = Math.max(0, horizonAltAt(profile, az2));
+      if (a1 <= 0 && a2 <= 0) continue;
+      const p1 = projPt(a1, az);
+      const p2 = projPt(a2, az2);
+      if (!p1 || !p2) continue;
+      const r1 = Math.hypot(p1.x, p1.y) || 1e-6;
+      const r2 = Math.hypot(p2.x, p2.y) || 1e-6;
+      const s1 = toCanvas(p1.x, p1.y, view);
+      const s2 = toCanvas(p2.x, p2.y, view);
+      const rim1 = toCanvas(p1.x / r1, p1.y / r1, view); // same ray, scaled to r=1
+      const rim2 = toCanvas(p2.x / r2, p2.y / r2, view);
+      ctx.moveTo(s1.x, s1.y);
+      ctx.lineTo(s2.x, s2.y);
+      ctx.lineTo(rim2.x, rim2.y);
+      ctx.lineTo(rim1.x, rim1.y);
+      ctx.closePath();
+    }
+    ctx.fillStyle = MOUNTAIN_HORIZON.fill;
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = MOUNTAIN_HORIZON.stroke;
+  ctx.lineWidth = MOUNTAIN_HORIZON.lineWidth;
+  ctx.beginPath();
+  let penDown = false;
+  for (let az = 0; az <= 360; az += ALTAZ_STEP_DEG) {
+    const { raDeg, decDeg } = raDecFromAltAz(horizonAltAt(profile, az), az, lstH, latDeg);
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) {
+      penDown = false;
+      continue;
+    }
+    const c = toCanvas(p.x, p.y, view);
+    if (penDown) {
+      ctx.lineTo(c.x, c.y);
+    } else {
+      ctx.moveTo(c.x, c.y);
+      penDown = true;
+    }
+  }
+  ctx.stroke();
+}
+
+/**
+ * Draw small star-like dots on named summits that sit on the terrain skyline.
+ * Each summit is placed at (altDeg, azDeg) — its altDeg is the silhouette altitude
+ * at that azimuth, so the dot lands on the drawn ridge line. Hover hit-testing and
+ * the name/altitude tooltip are handled in sky-map.ts / ui.ts.
+ */
+export function drawSummitDots(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  summits: HorizonSummit[],
+): void {
+  ctx.lineWidth = SUMMIT_DOT.outlineWidth;
+  for (const s of summits) {
+    const { raDeg, decDeg } = raDecFromAltAz(s.altDeg, s.azDeg, lstH, latDeg);
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) continue; // below horizon / far hemisphere in this projection
+    const c = toCanvas(p.x, p.y, view);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, SUMMIT_DOT.radius, 0, Math.PI * 2);
+    ctx.fillStyle = SUMMIT_DOT.fill;
+    ctx.fill();
+    ctx.strokeStyle = SUMMIT_DOT.outline;
+    ctx.stroke();
+  }
+}
+
+/**
+ * Draw the four cardinal-point labels (N/E/S/W) in red at the horizon, each at its
+ * compass azimuth (N = 0°, E = 90°, S = 180°, W = 270°), lifted just off the rim.
+ * Labels are localized (e.g. W → O in French). Drawn on top of the terrain horizon
+ * so they stay legible over the shaded ground — used to check the mountain silhouette
+ * against the real sky. Same project/toCanvas path as the alt-az grid.
+ */
+export function drawCardinalPoints(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  labels: { n: string; e: string; s: string; w: string },
+): void {
+  const points: { az: number; label: string }[] = [
+    { az: 0, label: labels.n },
+    { az: 90, label: labels.e },
+    { az: 180, label: labels.s },
+    { az: 270, label: labels.w },
+  ];
+  ctx.save();
+  ctx.font = CARDINAL_POINTS.font;
+  ctx.fillStyle = CARDINAL_POINTS.color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const { az, label } of points) {
+    const { raDeg, decDeg } = raDecFromAltAz(CARDINAL_POINTS.altDeg, az, lstH, latDeg);
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) continue; // below the horizon / far hemisphere in this projection
+    const c = toCanvas(p.x, p.y, view);
+    ctx.fillText(label, c.x, c.y);
+  }
+  ctx.restore();
 }
 
 export function drawConstellationNames(

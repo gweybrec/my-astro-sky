@@ -206,6 +206,7 @@ const de: Translations = {
     },
     action: {
       togglePanel: 'Seitenleiste ein-/ausblenden',
+      toggleCardinalPoints: 'Himmelsrichtungen ein-/ausblenden (N/O/S/W)',
       zoomIn: 'Vergrößern',
       zoomOut: 'Verkleinern',
       panLeft: 'Nach links verschieben',
@@ -240,6 +241,32 @@ const de: Translations = {
     jumpToEvening: 'Zu diesem Abend springen',
     localSkyButton: 'Lokaler Himmel (Horizontansicht)',
     azimuthGridButton: 'Azimutgitter (Alt-Az)',
+  },
+  horizon: {
+    toggleButton: 'Geländehorizont ein-/ausblenden',
+    eyeHeightLabel: 'Augenhöhe über Grund (m)',
+    compute: 'Horizont berechnen',
+    computing: 'Berechne…',
+    import: 'Horizontdatei importieren',
+    clear: 'Horizont löschen',
+    respectHorizon: 'Horizont berücksichtigen',
+    respectHorizonHint: 'Ziele ausschließen, die im Kulminationspunkt vom Gelände verdeckt sind',
+    error: {
+      noLocation: 'Zuerst einen Beobachtungsort festlegen',
+      compute: 'Horizont konnte nicht aus den Höhendaten berechnet werden',
+      parse: 'Horizontdatei konnte nicht gelesen werden (Paare „Azimut Höhe" erwartet)',
+    },
+  },
+  cardinal: {
+    north: 'N',
+    east: 'O',
+    south: 'S',
+    west: 'W',
+  },
+  summit: {
+    elevation: 'Höhe',
+    metersUnit: 'm',
+    distance: 'Entfernung',
   },
   settings: {
     section: 'Einstellungen',

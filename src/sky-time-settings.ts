@@ -24,6 +24,7 @@ export interface SkyTimeSettings {
   lastSyncEpochMs: number;
   showMoon: boolean;
   showAzimuthGrid: boolean;
+  showCardinalPoints: boolean;
   localSkyMode: boolean;
 }
 
@@ -38,6 +39,7 @@ export const DEFAULT_SETTINGS: SkyTimeSettings = {
   lastSyncEpochMs: Date.now(),
   showMoon: false,
   showAzimuthGrid: false,
+  showCardinalPoints: false,
   localSkyMode: false,
 };
 

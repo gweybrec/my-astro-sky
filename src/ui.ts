@@ -5,6 +5,7 @@ import { useSettingsStore } from './stores/settings';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
 import { useSkyTimeStore } from './stores/sky-time';
+import { useHorizonStore } from './stores/horizon';
 import { altitudeAtDeg } from './sky-geometry';
 import { formatAlt } from './format-utils';
 import { starDisplayName, formatMultiplicity } from './star-catalog';
@@ -354,6 +355,23 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     ui.setSkyTooltip(html, x, y, ds.simplifiedDSOTooltips ? null : dso);
   });
 
+  // Named terrain summit → plain tooltip with the peak name, height, and the
+  // altitude angle at which it sits on the skyline.
+  skyMap.setOnSummitHover((summit, x: number, y: number) => {
+    const ui = useUiStore(pinia);
+    if (!summit || ui.isSkyTooltipSuppressed(x, y)) {
+      ui.setSkyTooltip(null, x, y);
+      return;
+    }
+    const html =
+      `<div class="dso-info-name">${summit.name}</div>` +
+      `<table class="dso-info-table">` +
+      `<tr><td>${t('summit.elevation')}</td><td>${summit.elevationM.toLocaleString()} ${t('summit.metersUnit')}</td></tr>` +
+      `<tr><td>${t('summit.distance')}</td><td>${summit.distanceKm} km</td></tr>` +
+      `</table>`;
+    ui.setSkyTooltip(html, x, y);
+  });
+
   // Panel toggle → use store
   const uiStore = useUiStore(pinia);
   uiStore.panelCollapsed = panel.classList.contains('collapsed');
@@ -405,7 +423,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setObserverLocation(skyTimeSettings.lat, skyTimeSettings.lon);
   skyMap.setShowMoon(skyTimeSettings.showMoon);
   skyMap.setShowAzimuthGrid(skyTimeSettings.showAzimuthGrid);
+  skyMap.setShowCardinalPoints(skyTimeSettings.showCardinalPoints);
   skyMap.setLocalSkyMode(skyTimeSettings.localSkyMode);
+  // Restore the persisted terrain (mountain) horizon profile onto the map.
+  useHorizonStore(pinia).applyToCanvas();
 
   // ─── Hook into view change (dismiss tooltip, persist rotation, sync store) ──────────────
   const origOnViewChange = (skyMap as any)['onViewChange'] as (() => void) | null;

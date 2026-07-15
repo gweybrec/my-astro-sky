@@ -16,6 +16,7 @@
 - [UI Guidelines](dev/ui-guidelines.md)
 - [DSO Catalog](dev/dso-catalog.md)
 - [Target Recommender](dev/target-recommender.md)
+- [Terrain Horizon](dev/horizon.md)
 - [Plate Solve & Placement](dev/solve-field-placement.md)
 - [Imaging Recipe](dev/imaging-recipe.md)
 - [Distribution & Deployment](dev/distribution.md)

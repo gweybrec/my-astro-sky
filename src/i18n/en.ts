@@ -204,6 +204,7 @@ const en: Translations = {
     },
     action: {
       togglePanel: 'Show/hide the side panel',
+      toggleCardinalPoints: 'Show/hide cardinal points (N/E/S/W)',
       zoomIn: 'Zoom in',
       zoomOut: 'Zoom out',
       panLeft: 'Pan left',
@@ -238,6 +239,32 @@ const en: Translations = {
     jumpToEvening: 'Jump to this evening',
     localSkyButton: 'Local sky (horizon view)',
     azimuthGridButton: 'Azimuth (alt-az) grid',
+  },
+  horizon: {
+    toggleButton: 'Show/hide terrain horizon',
+    eyeHeightLabel: 'Eye height above ground (m)',
+    compute: 'Compute horizon',
+    computing: 'Computing…',
+    import: 'Import horizon file',
+    clear: 'Clear horizon',
+    respectHorizon: 'Respect horizon',
+    respectHorizonHint: 'Exclude targets hidden behind the terrain at their peak',
+    error: {
+      noLocation: 'Set an observer location first',
+      compute: 'Could not compute the horizon from elevation data',
+      parse: 'Could not read that horizon file (expected "azimuth altitude" pairs)',
+    },
+  },
+  cardinal: {
+    north: 'N',
+    east: 'E',
+    south: 'S',
+    west: 'W',
+  },
+  summit: {
+    elevation: 'Elevation',
+    metersUnit: 'm',
+    distance: 'Distance',
   },
   settings: {
     section: 'Settings',

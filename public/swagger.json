@@ -161,6 +161,57 @@
         }
       }
     },
+    "/api/horizon": {
+      "get": {
+        "summary": "Compute (or return cached) terrain horizon profile for a location",
+        "description": "Ray-traces open DEM elevation tiles around the given latitude/longitude to produce the observer's real skyline — horizon altitude (degrees) sampled once per degree of azimuth (0 = North, clockwise). Also returns a best-effort `summits` array of named peaks (from OpenStreetMap) sitting on that skyline. Cached by rounded location.\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lat",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lon",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "radiusKm",
+            "schema": {
+              "type": "number",
+              "default": 40
+            }
+          },
+          {
+            "in": "query",
+            "name": "obsHeightM",
+            "description": "Eye height above local ground in metres (default 1.7).",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Horizon profile returned"
+          },
+          "400": {
+            "description": "Invalid or missing lat/lon"
+          },
+          "502": {
+            "description": "Failed to fetch or process elevation data"
+          }
+        }
+      }
+    },
     "/api/settings/probe-astap": {
       "post": {
         "summary": "Probe astap_cli binary (run without args, check exit code)",

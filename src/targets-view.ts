@@ -70,6 +70,7 @@ import { pinia } from './pinia-instance';
 import { usePlansStore } from './stores/plans';
 import { useFovFramesStore } from './stores/fov-frames';
 import { useUiStore } from './stores/ui';
+import { useHorizonStore } from './stores/horizon';
 import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
 import { twilightWindow, dateToJD, moonRaDecDeg, moonPhase } from './astro-time';
@@ -122,6 +123,7 @@ interface TargetsPrefs {
   enabledConstellations?: string[];
   minAltDeg?: number;
   maxAltDeg?: number;
+  respectHorizon?: boolean;
   showMoon?: boolean;
   obsStartTime?: string | null;
   obsEndTime?: string | null;
@@ -2101,6 +2103,18 @@ export class TargetsView {
     });
     oversizedRow.appendChild(excludePhotographedChip);
 
+    const respectHorizonChip = createTargetsChip(t('horizon.respectHorizon'), {
+      extraClass: 'targets-oversized-chip',
+      title: t('horizon.respectHorizonHint'),
+    });
+    const respectHorizonCb = respectHorizonChip.querySelector('input')!;
+    respectHorizonCb.checked = this.prefs.respectHorizon ?? false;
+    respectHorizonCb.addEventListener('change', () => {
+      this.prefs.respectHorizon = respectHorizonCb.checked;
+      savePrefs(this.prefs);
+    });
+    oversizedRow.appendChild(respectHorizonChip);
+
     filterColR.appendChild(oversizedRow);
 
     // ── Primary actions — old placement + style: full-width row at the bottom. ─
@@ -2425,6 +2439,7 @@ export class TargetsView {
         minAltDeg: this.prefs.minAltDeg ?? 20,
         maxAltDeg: this.prefs.maxAltDeg ?? 80,
         timeWindow: timeWindow ?? undefined,
+        horizonProfile: this.prefs.respectHorizon ? useHorizonStore(pinia).profile : null,
       });
 
       let suggestions: TargetSuggestion[];

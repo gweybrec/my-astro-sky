@@ -8,16 +8,17 @@ Ranks DSOs for a given night, observer location, and gear preset. Returns up to 
 
 ## Inputs
 
-| Parameter              | Type                 | Description                                                                    |
-| ---------------------- | -------------------- | ------------------------------------------------------------------------------ |
-| `dsos`                 | `DSO[]`              | Pre-filtered DSO list (after Stage 1 user filters)                             |
-| `preset`               | `GearPreset`         | Gear config — drives FOV, limiting magnitude                                   |
-| `location`             | `{ latDeg, lonDeg }` | Observer coordinates                                                           |
-| `dateNight`            | `Date`               | Any moment on the target night (used to find the dark window)                  |
-| `limit`                | `number`             | Max results (default 8; the UI passes 5000)                                    |
-| `options.ignoreFovFit` | `boolean`            | Force `fovFitScore = 1.0` for all objects                                      |
-| `options.minAltDeg`    | `number`             | Minimum transit altitude threshold (default 20°)                               |
-| `options.maxAltDeg`    | `number`             | Maximum transit altitude threshold — rejects near-zenith objects (default 90°) |
+| Parameter                | Type                 | Description                                                                    |
+| ------------------------ | -------------------- | ------------------------------------------------------------------------------ |
+| `dsos`                   | `DSO[]`              | Pre-filtered DSO list (after Stage 1 user filters)                             |
+| `preset`                 | `GearPreset`         | Gear config — drives FOV, limiting magnitude                                   |
+| `location`               | `{ latDeg, lonDeg }` | Observer coordinates                                                           |
+| `dateNight`              | `Date`               | Any moment on the target night (used to find the dark window)                  |
+| `limit`                  | `number`             | Max results (default 8; the UI passes 5000)                                    |
+| `options.ignoreFovFit`   | `boolean`            | Force `fovFitScore = 1.0` for all objects                                      |
+| `options.minAltDeg`      | `number`             | Minimum transit altitude threshold (default 20°)                               |
+| `options.maxAltDeg`      | `number`             | Maximum transit altitude threshold — rejects near-zenith objects (default 90°) |
+| `options.horizonProfile` | `HorizonProfile`     | Terrain skyline; rejects objects hidden behind terrain at their peak azimuth   |
 
 ---
 

@@ -47,6 +47,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   const lastSyncEpochMs = ref(s.lastSyncEpochMs);
   const showMoon = ref(s.showMoon);
   const showAzimuthGrid = ref(s.showAzimuthGrid);
+  const showCardinalPoints = ref(s.showCardinalPoints);
   const localSkyMode = ref(s.localSkyMode);
 
   let hasSeededLocation = lat.value !== null || lon.value !== null;
@@ -77,6 +78,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
       lastSyncEpochMs: lastSyncEpochMs.value,
       showMoon: showMoon.value,
       showAzimuthGrid: showAzimuthGrid.value,
+      showCardinalPoints: showCardinalPoints.value,
       localSkyMode: localSkyMode.value,
     };
   }
@@ -218,6 +220,12 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     persist();
   }
 
+  function setShowCardinalPoints(v: boolean) {
+    showCardinalPoints.value = v;
+    canvasStore.skyMap?.setShowCardinalPoints(v);
+    persist();
+  }
+
   /**
    * The rate is a single signed dial: forward (l) always moves it one ladder step
    * toward +∞, backward (j) always moves it one step toward -∞ — so from +10,
@@ -328,6 +336,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     paused,
     showMoon,
     showAzimuthGrid,
+    showCardinalPoints,
     localSkyMode,
     effectiveRate,
     // actions
@@ -338,6 +347,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     seedLocationIfNeeded,
     setShowMoon,
     setShowAzimuthGrid,
+    setShowCardinalPoints,
     setLocalSkyMode,
     stepRateForward,
     stepRateBackward,

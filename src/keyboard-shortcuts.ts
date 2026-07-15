@@ -14,6 +14,7 @@ export type ShortcutActionId =
   | 'toggleDSOLabels'
   | 'toggleStarLabels'
   | 'toggleGrid'
+  | 'toggleCardinalPoints'
   | 'togglePhotos'
   | 'togglePhotoOutlines'
   | 'togglePanel'
@@ -70,6 +71,12 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
     labelKey: 'display.starLabels',
   },
   { id: 'toggleGrid', category: 'toggles', defaultKeys: ['e'], labelKey: 'display.raDecGrid' },
+  {
+    id: 'toggleCardinalPoints',
+    category: 'toggles',
+    defaultKeys: ['q'],
+    labelKey: 'shortcuts.action.toggleCardinalPoints',
+  },
   { id: 'togglePhotos', category: 'toggles', defaultKeys: ['p'], labelKey: 'display.showPhotos' },
   {
     id: 'togglePhotoOutlines',

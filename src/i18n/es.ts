@@ -205,6 +205,7 @@ const es: Translations = {
     },
     action: {
       togglePanel: 'Mostrar/ocultar el panel lateral',
+      toggleCardinalPoints: 'Mostrar/ocultar los puntos cardinales (N/E/S/O)',
       zoomIn: 'Acercar',
       zoomOut: 'Alejar',
       panLeft: 'Desplazar a la izquierda',
@@ -239,6 +240,32 @@ const es: Translations = {
     jumpToEvening: 'Ir a esta noche',
     localSkyButton: 'Cielo local (vista de horizonte)',
     azimuthGridButton: 'Cuadrícula azimutal (alt-az)',
+  },
+  horizon: {
+    toggleButton: 'Mostrar/ocultar el horizonte del terreno',
+    eyeHeightLabel: 'Altura de los ojos sobre el suelo (m)',
+    compute: 'Calcular horizonte',
+    computing: 'Calculando…',
+    import: 'Importar archivo de horizonte',
+    clear: 'Borrar horizonte',
+    respectHorizon: 'Respetar el horizonte',
+    respectHorizonHint: 'Excluir objetivos ocultos por el terreno en su culminación',
+    error: {
+      noLocation: 'Primero establece una ubicación de observación',
+      compute: 'No se pudo calcular el horizonte a partir de los datos de altitud',
+      parse: 'No se pudo leer ese archivo de horizonte (se esperan pares «azimut altitud»)',
+    },
+  },
+  cardinal: {
+    north: 'N',
+    east: 'E',
+    south: 'S',
+    west: 'O',
+  },
+  summit: {
+    elevation: 'Altitud',
+    metersUnit: 'm',
+    distance: 'Distancia',
   },
   settings: {
     section: 'Ajustes',

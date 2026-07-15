@@ -41,6 +41,7 @@ describe('sky-time-settings', () => {
       lastSyncEpochMs: 1700000000000,
       showMoon: true,
       showAzimuthGrid: true,
+      showCardinalPoints: true,
       localSkyMode: true,
     };
     saveSkyTimeSettings(settings);

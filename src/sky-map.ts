@@ -1,4 +1,6 @@
 import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
+import type { HorizonProfile, HorizonSummit } from './horizon-io';
+import { t } from './i18n';
 import {
   project,
   projectCached,
@@ -19,7 +21,7 @@ import {
   projectionAreaFactor,
 } from './projection';
 import { dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
-import { altAzFromRaDec } from './sky-geometry';
+import { altAzFromRaDec, raDecFromAltAz } from './sky-geometry';
 import { drawMoonMarker } from './moon-draw';
 import { clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
@@ -94,6 +96,9 @@ import {
   drawConstellationLines,
   drawConstellationNames,
   drawHorizonLine,
+  drawMountainHorizon,
+  drawSummitDots,
+  drawCardinalPoints,
   drawAzimuthGrid,
   drawTileTrash,
   drawTileAdd,
@@ -255,6 +260,7 @@ export function normalizeRotationDeg(deg: number): number {
 
 export type StarHoverCallback = (star: Star | null, x: number, y: number) => void;
 export type DSOHoverCallback = (dso: DSO | null, x: number, y: number) => void;
+export type SummitHoverCallback = (summit: HorizonSummit | null, x: number, y: number) => void;
 export type StarPickedCallback = (star: Star) => void;
 
 export class SkyMap {
@@ -264,6 +270,7 @@ export class SkyMap {
   private onViewChange: (() => void) | null = null;
   private onStarHover: StarHoverCallback | null = null;
   private onDSOHover: DSOHoverCallback | null = null;
+  private onSummitHover: SummitHoverCallback | null = null;
   private showDSOs = true;
   private showStars = true;
   private showConstellationLines = true;
@@ -295,6 +302,12 @@ export class SkyMap {
   // ── Date mode: Moon overlay + horizon simulation ────────────────────────────
   private showMoon = false;
   private showAzimuthGrid = false;
+  // Observer's terrain skyline (mountain horizon) + whether to draw it. Only
+  // rendered in date mode with an observer location set (same gate as the horizon).
+  private mountainProfile: HorizonProfile | null = null;
+  private showMountainHorizon = false;
+  // Red N/E/S/W labels at the horizon, to orient the local-sky view.
+  private showCardinalPoints = false;
   private skyTimeMode: 'live' | 'date' = 'live';
   private simDate: Date = new Date();
   private obsLat: number | null = null;
@@ -458,6 +471,10 @@ export class SkyMap {
     this.onDSOHover = cb;
   }
 
+  setOnSummitHover(cb: SummitHoverCallback) {
+    this.onSummitHover = cb;
+  }
+
   setShowDSOs(show: boolean) {
     this.showDSOs = show;
     this.requestRender();
@@ -485,6 +502,24 @@ export class SkyMap {
   /** The alt-az grid — only drawn in date mode once an observer location is set. */
   setShowAzimuthGrid(show: boolean) {
     this.showAzimuthGrid = show;
+    this.requestRender();
+  }
+
+  /** The observer's terrain skyline profile (mountain horizon); null clears it. */
+  setMountainHorizon(profile: HorizonProfile | null) {
+    this.mountainProfile = profile;
+    this.requestRender();
+  }
+
+  /** Whether to draw the mountain horizon — only visible in date mode with a location. */
+  setShowMountainHorizon(show: boolean) {
+    this.showMountainHorizon = show;
+    this.requestRender();
+  }
+
+  /** Red cardinal-point (N/E/S/W) labels — only visible in date mode with a location. */
+  setShowCardinalPoints(show: boolean) {
+    this.showCardinalPoints = show;
     this.requestRender();
   }
 
@@ -1463,7 +1498,34 @@ export class SkyMap {
     });
   }
 
+  /**
+   * Nearest terrain summit dot to the cursor, within a small pixel radius, or null.
+   * Distance is measured in projection units (like the star/DSO hit-tests) so it can
+   * be compared against them. Only active in date mode with the mountain horizon shown.
+   */
+  private findClosestSummit(
+    mx: number,
+    my: number,
+  ): { summit: HorizonSummit; dist: number } | null {
+    const summits = this.mountainProfile?.summits;
+    if (!this.showMountainHorizon || !summits?.length) return null;
+    const hp = this.computeHorizonParams();
+    if (!hp) return null;
+    const projPt = fromCanvas(mx, my, this.view);
+    const threshold = 12 / this.view.scale; // ~12 px
+    let best: { summit: HorizonSummit; dist: number } | null = null;
+    for (const s of summits) {
+      const { raDeg, decDeg } = raDecFromAltAz(s.altDeg, s.azDeg, hp.lstH, hp.latDeg);
+      const p = project(raDeg, decDeg);
+      if (p.x >= 1e5) continue;
+      const dist = Math.hypot(p.x - projPt.x, p.y - projPt.y);
+      if (dist <= threshold && (!best || dist < best.dist)) best = { summit: s, dist };
+    }
+    return best;
+  }
+
   private handleHover(mx: number, my: number, clientX: number, clientY: number) {
+    const closestSummit = this.findClosestSummit(mx, my);
     const closestStar = this.findClosestStar(mx, my);
     const closestDSO = this.findClosestDSO(mx, my);
 
@@ -1492,8 +1554,15 @@ export class SkyMap {
       dsoDist = Math.sqrt(dx * dx + dy * dy);
     }
 
+    // A summit dot wins when it is the nearest thing under the cursor (they sit on
+    // the horizon where stars/DSOs are sparse, but a genuinely closer star still wins).
+    const summitDist = closestSummit ? closestSummit.dist : Infinity;
+
     // Show tooltip for the closest rendered object
-    if (starRendered && dsoRendered) {
+    if (closestSummit && summitDist <= starDist && summitDist <= dsoDist) {
+      this.onSummitHover?.(closestSummit.summit, clientX, clientY);
+      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
+    } else if (starRendered && dsoRendered) {
       // Both found and rendered - show the closest one
       if (starDist < dsoDist) {
         this.onStarHover?.(closestStar, clientX, clientY);
@@ -1649,6 +1718,21 @@ export class SkyMap {
       const horizonColor =
         cs.getPropertyValue('--accent-color').trim() || this.skyTheme.horizonLineColorFallback;
       drawHorizonLine(ctx, view, horizon.lstH, horizon.latDeg, horizonColor);
+      if (this.showMountainHorizon && this.mountainProfile) {
+        drawMountainHorizon(ctx, view, horizon.lstH, horizon.latDeg, this.mountainProfile);
+        if (this.mountainProfile.summits?.length) {
+          drawSummitDots(ctx, view, horizon.lstH, horizon.latDeg, this.mountainProfile.summits);
+        }
+      }
+      // Cardinal labels sit on top of the terrain fill so they stay legible.
+      if (this.showCardinalPoints) {
+        drawCardinalPoints(ctx, view, horizon.lstH, horizon.latDeg, {
+          n: t('cardinal.north'),
+          e: t('cardinal.east'),
+          s: t('cardinal.south'),
+          w: t('cardinal.west'),
+        });
+      }
     }
     if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
       this.renderPhotoOutlines();
