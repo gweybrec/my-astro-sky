@@ -286,7 +286,11 @@ input:focus-visible {
    readout, location, azimuth grid) are earlier DOM children, so they grow into the
    space to the left of Moon/mode-toggle without shifting them. The readout/location
    buttons each open a DropdownPanel *below* them for the actual editable fields, so
-   the row itself never has to grow wide enough to collide with the top view-tabs. */
+   the row itself never has to grow wide enough to collide with the top view-tabs.
+
+   On a viewport too narrow for even that trimmed row to clear the top-centred
+   #view-tabs, SkyTimeControl.vue measures the collision and adds `.stacked` to the
+   group, which drops it onto its own line under the toggle. */
 
 .sky-time-control {
   position: absolute;
@@ -300,6 +304,23 @@ input:focus-visible {
 
 #side-panel.collapsed ~ .sky-time-control {
   right: 76px;
+}
+
+.sky-time-expanded {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Narrow viewport: take the group out of flow so the toggle keeps its position, and
+   hang it under the toggle, right-aligned with it. */
+.sky-time-expanded.stacked {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  right: 0;
+  /* Out of flow, the containing block is the (now toggle-width) .sky-time-control, so
+     without this the group would shrink-to-fit into ~34px and squash its buttons. */
+  width: max-content;
 }
 
 .sky-time-control .sky-rotation-btn svg {

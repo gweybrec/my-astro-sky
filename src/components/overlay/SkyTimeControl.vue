@@ -3,8 +3,15 @@
     <!-- Conditional/expanding controls (including the moon toggle, which only makes
          sense in date mode) come first in DOM order so they grow into the space to the
          LEFT of the mode-toggle button, which stays last and never moves when
-         entering/leaving date mode. -->
-    <template v-if="store.mode === 'date'">
+         entering/leaving date mode. On screens too narrow for that row to clear the
+         top-centred view tabs, `stacked` drops the whole group below the toggle
+         instead (see measureFit below). -->
+    <div
+      v-if="store.mode === 'date'"
+      ref="expandedRef"
+      class="sky-time-expanded"
+      :class="{ stacked }"
+    >
       <button
         ref="readoutBtnRef"
         type="button"
@@ -238,9 +245,10 @@
         @blur="suppress(false)"
         v-html="moonSvg"
       ></button>
-    </template>
+    </div>
 
     <button
+      ref="toggleBtnRef"
       type="button"
       class="sky-rotation-btn"
       :class="{ active: store.mode === 'date' }"
@@ -259,7 +267,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { t } from '../../i18n';
 import { useSkyTimeStore } from '../../stores/sky-time';
 import { useHorizonStore } from '../../stores/horizon';
@@ -280,6 +288,52 @@ const readoutBtnRef = ref<HTMLButtonElement>();
 const dateTimeOpen = ref(false);
 const locationBtnRef = ref<HTMLButtonElement>();
 const locationOpen = ref(false);
+
+// ── Inline-vs-stacked layout of the date-mode controls ──────────────────────
+// The row is right-edge-anchored and grows leftwards, so on a narrow viewport it
+// runs into the top-centred #view-tabs. Rather than guess a breakpoint, measure:
+// the group's own width and the toggle's left edge are both unaffected by which
+// layout is active (the container is right-anchored, and the stacked group keeps
+// its shrink-to-fit width), so the test can't oscillate between the two states.
+const expandedRef = ref<HTMLElement>();
+const toggleBtnRef = ref<HTMLButtonElement>();
+const stacked = ref(false);
+
+// Row gap (--space-3) between the group and the toggle, plus the clearance we
+// want to keep between the group's left edge and the tabs' right edge.
+const ROW_GAP = 6;
+const TABS_CLEARANCE = 12;
+
+function measureFit() {
+  if (store.mode !== 'date') {
+    stacked.value = false;
+    return;
+  }
+  const group = expandedRef.value;
+  const toggle = toggleBtnRef.value;
+  const tabs = document.getElementById('view-tabs');
+  if (!group || !toggle || !tabs) return;
+  const tabsRect = tabs.getBoundingClientRect();
+  if (tabsRect.width === 0) return; // tabs hidden — nothing to collide with
+  const inlineLeft = toggle.getBoundingClientRect().left - ROW_GAP - group.scrollWidth;
+  stacked.value = inlineLeft < tabsRect.right + TABS_CLEARANCE;
+}
+
+onMounted(() => {
+  window.addEventListener('resize', measureFit);
+  measureFit();
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureFit);
+});
+
+// Collapsing the side panel moves the row's right anchor (a CSS combinator on
+// #side-panel.collapsed), which is a reposition, not a resize — so no observer sees
+// it and the store flag is what we have to key off.
+watch(
+  () => uiStore.panelCollapsed,
+  () => void nextTick(measureFit),
+);
 
 function suppress(v: boolean) {
   uiStore.setForceSuppressTooltip(v);
@@ -325,6 +379,15 @@ const timeStr = computed({
 // naturally renders e.g. "×-10" when time is going into the past. It's never 0 — the
 // dial's resting pivot is 1x, not a stop (see stores/sky-time.ts) — so always show it.
 const rateLabel = computed(() => `×${store.effectiveRate}`);
+
+// Entering date mode mounts the group; re-measure once it has a layout. The readout
+// text also changes width with the date and rate, so track those too. (Declared here
+// rather than beside measureFit: the getter runs on setup, so it can't reference
+// dateStr/rateLabel before their definitions.)
+watch(
+  () => [store.mode, dateStr.value, rateLabel.value] as const,
+  () => void nextTick(measureFit),
+);
 
 // Vue's v-model on <input type="number"> coerces the bound value to a `number`
 // once non-empty (via its built-in looseToNumber), so these refs are a string
