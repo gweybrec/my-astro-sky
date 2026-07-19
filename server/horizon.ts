@@ -28,13 +28,22 @@ export interface HorizonSummit {
   distanceKm: number;
 }
 
+/** One skyline "shell": the silhouette formed by terrain within `maxDistKm`. */
+export interface HorizonLayer {
+  maxDistKm: number;
+  alts: number[];
+}
+
 export interface HorizonProfileResult {
   lat: number;
   lon: number;
   /** Eye height above local ground (m) used; null ⇒ default 1.7 m applied. */
   obsHeightM: number | null;
   azStepDeg: number;
+  /** The true horizon (max over all distances) — === layers[last].alts. */
   alts: number[];
+  /** Near→far distance shells, for layered (depth) rendering. */
+  layers: HorizonLayer[];
   summits: HorizonSummit[];
   source: 'auto';
 }
@@ -50,6 +59,10 @@ const TILE_SIZE = 256;
 const MAX_TILES = 400; // guardrail against an over-large radius
 const STEP_M = 30; // ray-march step distance
 const PEAK_QUERY_RADIUS_M = 30000; // cap the Overpass peak bbox (lighter query)
+// Fine distance shells (km) so the near→far tone reads as continuous atmospheric
+// haze rather than a few chunky bands. The full radius is always appended as the
+// last shell (the true horizon).
+const SHELL_KM = [2, 4, 7, 11, 16, 23];
 
 const TILE_BASE = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
@@ -157,7 +170,14 @@ export async function computeHorizon(
   const eyeHeight = opts.obsHeightM ?? DEFAULT_EYE_HEIGHT_M;
   const obsElev = obsGround + eyeHeight;
 
-  const alts = traceHorizonAngles(elevationAt, lat, lon, { radiusM, obsElev });
+  // Ray-trace the skyline at nested distance shells (near→far). The last shell is
+  // the full radius = the true horizon; the nearer shells give the foreground
+  // ridges the renderer layers back-to-front for depth.
+  const shellsKm = [...new Set([...SHELL_KM.filter((k) => k < radiusKm), radiusKm])];
+  const shellsM = shellsKm.map((k) => k * 1000);
+  const shellAlts = traceHorizonAngles(elevationAt, lat, lon, { radiusM, obsElev, shellsM });
+  const alts = shellAlts[shellAlts.length - 1]; // farthest = true horizon
+  const layers: HorizonLayer[] = shellsKm.map((k, i) => ({ maxDistKm: k, alts: shellAlts[i] }));
 
   // Named summits are best-effort: a failed/absent Overpass response must never
   // fail the horizon itself (which is the important product here). The peak query
@@ -186,6 +206,7 @@ export async function computeHorizon(
     obsHeightM: opts.obsHeightM ?? null,
     azStepDeg: 1,
     alts,
+    layers,
     summits,
     source: 'auto',
   };
@@ -267,30 +288,46 @@ export function selectSkylineSummits(
 }
 
 /**
- * Ray-trace the horizon altitude (degrees) for every azimuth, given a terrain
- * elevation lookup. Pure and DEM-source-agnostic so it can be unit-tested against
- * a synthetic elevation function. Marches outward in `STEP_M` steps to `radiusM`,
- * tracking the maximum elevation angle (with Earth-curvature + refraction drop).
+ * Ray-trace the horizon for every azimuth at one or more nested distance shells,
+ * given a terrain elevation lookup. Returns one `alts` array (degrees) per shell,
+ * ordered near→far to match `shellsM`; the running max is snapshotted as each shell
+ * boundary is crossed, so a nearer shell's silhouette is the skyline formed by
+ * terrain within that distance only. Pure and DEM-source-agnostic (unit-tested).
+ * With the default single shell (`[radiusM]`) it returns the plain full horizon.
  */
 export function traceHorizonAngles(
   elevationAt: (latD: number, lonD: number) => number,
   lat: number,
   lon: number,
-  opts: { radiusM: number; obsElev: number; azStepDeg?: number; stepM?: number },
-): number[] {
+  opts: {
+    radiusM: number;
+    obsElev: number;
+    azStepDeg?: number;
+    stepM?: number;
+    shellsM?: number[];
+  },
+): number[][] {
   const { radiusM, obsElev } = opts;
   const azStepDeg = opts.azStepDeg ?? 1;
   const stepM = opts.stepM ?? STEP_M;
+  const shellsM = opts.shellsM ?? [radiusM];
+  const nShells = shellsM.length;
   const cosLat = Math.cos(lat * DEG);
   const nAz = Math.round(360 / azStepDeg);
-  const alts = new Array<number>(nAz);
+  const shells: number[][] = Array.from({ length: nShells }, () => new Array<number>(nAz));
 
   for (let ai = 0; ai < nAz; ai++) {
     const az = ai * azStepDeg;
     const sinAz = Math.sin(az * DEG);
     const cosAz = Math.cos(az * DEG);
     let maxAngle = ALT_FLOOR_DEG * DEG;
+    let k = 0; // next shell boundary to snapshot at
     for (let d = stepM; d <= radiusM; d += stepM) {
+      // Freeze any shells whose boundary this step has passed (max of terrain nearer than it).
+      while (k < nShells && d > shellsM[k]) {
+        shells[k][ai] = Math.max(ALT_FLOOR_DEG, maxAngle / DEG);
+        k++;
+      }
       const northM = d * cosAz;
       const eastM = d * sinAz;
       const sLat = lat + northM / EARTH_R / DEG;
@@ -301,7 +338,8 @@ export function traceHorizonAngles(
       const angle = Math.atan2(h - obsElev - drop, d);
       if (angle > maxAngle) maxAngle = angle;
     }
-    alts[ai] = Math.max(ALT_FLOOR_DEG, maxAngle / DEG);
+    // Remaining shells (including the full-radius last one) get the final running max.
+    for (; k < nShells; k++) shells[k][ai] = Math.max(ALT_FLOOR_DEG, maxAngle / DEG);
   }
-  return alts;
+  return shells;
 }

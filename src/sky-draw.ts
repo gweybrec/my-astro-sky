@@ -16,7 +16,8 @@ import {
 } from './projection';
 import { getConstellationLines, getConstellationInfos } from './star-catalog';
 import { raDecFromAltAz } from './sky-geometry';
-import { horizonAltAt, type HorizonProfile, type HorizonSummit } from './horizon-io';
+import { sampleDenseAz, type HorizonProfile, type HorizonLayer } from './horizon-io';
+import { lerpColor } from './color-utils';
 import type { SKY_THEME } from './sky-themes';
 import {
   FONTS,
@@ -444,79 +445,79 @@ export function drawAzimuthGrid(
   }
 }
 
+/** Silhouette point in *projection units* (origin = zenith in zenith mode), or null off-projection. */
+function silProjPt(altDeg: number, azDeg: number, lstH: number, latDeg: number): Point | null {
+  const { raDeg, decDeg } = raDecFromAltAz(altDeg, azDeg, lstH, latDeg);
+  const p = project(raDeg, decDeg);
+  return p.x >= 1e5 ? null : p;
+}
+
 /**
- * Draw the observer's real terrain skyline from a horizon profile: a warm
- * silhouette line following the terrain altitude at each azimuth, over a
- * translucent fill of the blocked band down to the astronomical horizon (alt=0).
- *
- * Stepped and pen-lifted exactly like `strokeAltCircle`, but with the altitude
- * varying per azimuth from the profile — so it renders correctly in both the
- * zenith "local sky" view and the pole-centered stereographic date view.
- *
- * The filled ground band (only in zenith mode) is drawn as a strip of small
- * per-azimuth quads spanning from the silhouette down to the astronomical horizon
- * (alt = 0). Filling many locally-wound quads is immune to the fill-side inversion
- * that a single silhouette-to-rim polygon suffered: there, the two boundary loops
- * wound oppositely and the alt=0 round-trip dropped points near the rim, so the
- * fill flipped across the E/W diameter. In stereo mode the curves run
- * off-projection, so only the silhouette line is stroked.
+ * Fill the ground band from a silhouette (given by `altAt`) down to the alt=0 rim,
+ * as a strip of small per-azimuth quads. Zenith-mode only: the astronomical horizon
+ * is exactly the unit circle (r = 1) around the origin and the silhouette at a given
+ * azimuth lies on the same radial ray, so the rim point is the silhouette point
+ * scaled out to r = 1 (never calls project(alt=0), whose round-trip is unstable at
+ * the rim). Many locally-wound quads avoid the fill-side inversion a single
+ * silhouette-to-rim polygon suffered.
  */
-export function drawMountainHorizon(
+function fillSilhouetteBand(
   ctx: CanvasRenderingContext2D,
   view: ViewState,
   lstH: number,
   latDeg: number,
-  profile: HorizonProfile,
+  altAt: (azDeg: number) => number,
+  color: string | CanvasGradient,
+  overlay?: string | CanvasGradient,
 ): void {
-  // Silhouette point in *projection units* (origin = zenith in zenith mode).
-  const projPt = (altDeg: number, azDeg: number): Point | null => {
-    const { raDeg, decDeg } = raDecFromAltAz(altDeg, azDeg, lstH, latDeg);
-    const p = project(raDeg, decDeg);
-    if (p.x >= 1e5) return null; // far hemisphere / off-projection
-    return p;
-  };
-
-  if (getCenterMode() === 'zenith') {
-    // In zenith mode the astronomical horizon is exactly the unit circle (r = 1)
-    // around the origin, and the silhouette at a given azimuth lies on the same
-    // radial ray. So the rim point is the silhouette point scaled out to r = 1 —
-    // this never calls project(alt=0), whose RA/Dec round-trip is unstable at the
-    // rim and dropped points (previously leaving the southern band unfilled).
-    ctx.beginPath();
-    for (let az = 0; az < 360; az += ALTAZ_STEP_DEG) {
-      const az2 = az + ALTAZ_STEP_DEG;
-      // Clamp the silhouette to the horizon: where terrain dips below alt=0 there is
-      // no blocked band, so that wedge collapses to zero height (nothing filled).
-      const a1 = Math.max(0, horizonAltAt(profile, az));
-      const a2 = Math.max(0, horizonAltAt(profile, az2));
-      if (a1 <= 0 && a2 <= 0) continue;
-      const p1 = projPt(a1, az);
-      const p2 = projPt(a2, az2);
-      if (!p1 || !p2) continue;
-      const r1 = Math.hypot(p1.x, p1.y) || 1e-6;
-      const r2 = Math.hypot(p2.x, p2.y) || 1e-6;
-      const s1 = toCanvas(p1.x, p1.y, view);
-      const s2 = toCanvas(p2.x, p2.y, view);
-      const rim1 = toCanvas(p1.x / r1, p1.y / r1, view); // same ray, scaled to r=1
-      const rim2 = toCanvas(p2.x / r2, p2.y / r2, view);
-      ctx.moveTo(s1.x, s1.y);
-      ctx.lineTo(s2.x, s2.y);
-      ctx.lineTo(rim2.x, rim2.y);
-      ctx.lineTo(rim1.x, rim1.y);
-      ctx.closePath();
-    }
-    ctx.fillStyle = MOUNTAIN_HORIZON.fill;
+  ctx.beginPath();
+  for (let az = 0; az < 360; az += ALTAZ_STEP_DEG) {
+    const az2 = az + ALTAZ_STEP_DEG;
+    // Clamp to the horizon: where terrain dips below alt=0 the wedge collapses (nothing filled).
+    const a1 = Math.max(0, altAt(az));
+    const a2 = Math.max(0, altAt(az2));
+    if (a1 <= 0 && a2 <= 0) continue;
+    const p1 = silProjPt(a1, az, lstH, latDeg);
+    const p2 = silProjPt(a2, az2, lstH, latDeg);
+    if (!p1 || !p2) continue;
+    const r1 = Math.hypot(p1.x, p1.y) || 1e-6;
+    const r2 = Math.hypot(p2.x, p2.y) || 1e-6;
+    const s1 = toCanvas(p1.x, p1.y, view);
+    const s2 = toCanvas(p2.x, p2.y, view);
+    const rim1 = toCanvas(p1.x / r1, p1.y / r1, view); // same ray, scaled to r=1
+    const rim2 = toCanvas(p2.x / r2, p2.y / r2, view);
+    ctx.moveTo(s1.x, s1.y);
+    ctx.lineTo(s2.x, s2.y);
+    ctx.lineTo(rim2.x, rim2.y);
+    ctx.lineTo(rim1.x, rim1.y);
+    ctx.closePath();
+  }
+  ctx.fillStyle = color;
+  ctx.fill();
+  // Optional overlay (e.g. the base-darkening form gradient) over the same path.
+  if (overlay) {
+    ctx.fillStyle = overlay;
     ctx.fill();
   }
+}
 
-  ctx.strokeStyle = MOUNTAIN_HORIZON.stroke;
-  ctx.lineWidth = MOUNTAIN_HORIZON.lineWidth;
+/** Stroke a silhouette line (given by `altAt`), pen-lifted at off-projection points. Both modes. */
+function strokeSilhouette(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  altAt: (azDeg: number) => number,
+  color: string,
+  width: number,
+): void {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
   ctx.beginPath();
   let penDown = false;
   for (let az = 0; az <= 360; az += ALTAZ_STEP_DEG) {
-    const { raDeg, decDeg } = raDecFromAltAz(horizonAltAt(profile, az), az, lstH, latDeg);
-    const p = project(raDeg, decDeg);
-    if (p.x >= 1e5) {
+    const p = silProjPt(altAt(az), az, lstH, latDeg);
+    if (!p) {
       penDown = false;
       continue;
     }
@@ -532,29 +533,129 @@ export function drawMountainHorizon(
 }
 
 /**
- * Draw small star-like dots on named summits that sit on the terrain skyline.
- * Each summit is placed at (altDeg, azDeg) — its altDeg is the silhouette altitude
- * at that azimuth, so the dot lands on the drawn ridge line. Hover hit-testing and
- * the name/altitude tooltip are handled in sky-map.ts / ui.ts.
+ * Draw the observer's real terrain skyline as **solid shaded masses — no outline
+ * lines**. Auto profiles carry `layers` (nested distance shells, near→far, from the
+ * DEM), rendered **back-to-front**: far shells filled first (hazy/cool), nearer ones
+ * (dark/warm) on top, so near terrain occludes the far terrain below its ridge while
+ * distant ranges stay visible above. With many fine shells this reads as smooth
+ * atmospheric fog; the jagged ridge outlines are the fill-vs-fill / fill-vs-sky
+ * boundaries (that's what makes it look like mountains — like PeakFinder, which draws
+ * no outlines). A radial `formShadow` darkens each mass toward its base (alt=0 rim)
+ * for body. Where terrain is uniformly near the shells collapse — no faked depth.
+ * Imported/manual profiles (no `layers`) and the pole-centred stereo view fall back
+ * to a single silhouette with one thin edge line.
+ */
+export function drawMountainHorizon(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  profile: HorizonProfile,
+): void {
+  const zenith = getCenterMode() === 'zenith';
+  const altOf =
+    (alts: number[]) =>
+    (az: number): number =>
+      sampleDenseAz(alts, profile.azStepDeg, az);
+
+  const layers = profile.layers;
+  if (zenith && layers && layers.length > 1) {
+    const n = layers.length;
+    // Base-darkening gradient: transparent toward the zenith, dark at the alt=0 rim,
+    // so each terrain mass gets a little body. Radial from the disc origin; reused for
+    // every band and clipped to the band path so it never touches the sky.
+    const origin = toCanvas(0, 0, view);
+    const rimR = view.scale; // r = 1 (horizon) in projection units → px
+    const formShadow = ctx.createRadialGradient(
+      origin.x,
+      origin.y,
+      rimR * 0.4,
+      origin.x,
+      origin.y,
+      rimR,
+    );
+    formShadow.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    formShadow.addColorStop(1, MOUNTAIN_HORIZON.formShadow);
+
+    // Solid fills far→near (t: 0 = near, 1 = far); no crest lines.
+    for (let i = n - 1; i >= 0; i--) {
+      const t = i / (n - 1);
+      const color = lerpColor(MOUNTAIN_HORIZON.groundNear, MOUNTAIN_HORIZON.groundFar, t);
+      fillSilhouetteBand(ctx, view, lstH, latDeg, altOf(layers[i].alts), color, formShadow);
+    }
+    return;
+  }
+
+  // Fallback: single silhouette (imported/manual/no-layers, or stereo mode).
+  const altFull = altOf(profile.alts);
+  if (zenith) fillSilhouetteBand(ctx, view, lstH, latDeg, altFull, MOUNTAIN_HORIZON.fill);
+  strokeSilhouette(
+    ctx,
+    view,
+    lstH,
+    latDeg,
+    altFull,
+    MOUNTAIN_HORIZON.stroke,
+    MOUNTAIN_HORIZON.lineWidth,
+  );
+}
+
+/**
+ * Fog ramp position (0 = near, 1 = far) for a summit at `distanceKm`, matched to the
+ * shell that forms the skyline there — so a dot's tone comes from the exact terrain
+ * shade it sits on. Uses the same shell-index ramp the renderer uses for the fills.
+ */
+function summitShadeT(distanceKm: number, layers: HorizonLayer[]): number {
+  const n = layers.length;
+  if (n <= 1) return 0;
+  let idx = layers.findIndex((l) => l.maxDistKm >= distanceKm);
+  if (idx < 0) idx = n - 1;
+  return idx / (n - 1);
+}
+
+/**
+ * Mark named summits with a small upward **triangle** (a peak glyph — deliberately
+ * not a round dot, which would read as a star) sitting on the ridge at each summit's
+ * (altDeg, azDeg). The fill is derived from the **terrain shade at that distance**
+ * (near = warm/dark-family, far = cool/hazy-family), lightened just enough to read —
+ * so each marker matches the mass it's attached to. Hover + tooltip live in sky-map/ui.
  */
 export function drawSummitDots(
   ctx: CanvasRenderingContext2D,
   view: ViewState,
   lstH: number,
   latDeg: number,
-  summits: HorizonSummit[],
+  profile: HorizonProfile,
 ): void {
-  ctx.lineWidth = SUMMIT_DOT.outlineWidth;
+  const summits = profile.summits;
+  if (!summits?.length) return;
+  const layers = profile.layers;
+  ctx.lineWidth = SUMMIT_DOT.edgeWidth;
+  ctx.lineJoin = 'round';
   for (const s of summits) {
     const { raDeg, decDeg } = raDecFromAltAz(s.altDeg, s.azDeg, lstH, latDeg);
     const p = project(raDeg, decDeg);
     if (p.x >= 1e5) continue; // below horizon / far hemisphere in this projection
     const c = toCanvas(p.x, p.y, view);
+    // Fill = the terrain shade at this summit's distance, lightened for visibility.
+    let fill: string = SUMMIT_DOT.fill;
+    if (layers && layers.length > 1) {
+      const shade = lerpColor(
+        MOUNTAIN_HORIZON.groundNear,
+        MOUNTAIN_HORIZON.groundFar,
+        summitShadeT(s.distanceKm, layers),
+      );
+      fill = lerpColor(shade, SUMMIT_DOT.tintTo, SUMMIT_DOT.tintAmount);
+    }
+    // Upward triangle centred on the summit point.
     ctx.beginPath();
-    ctx.arc(c.x, c.y, SUMMIT_DOT.radius, 0, Math.PI * 2);
-    ctx.fillStyle = SUMMIT_DOT.fill;
+    ctx.moveTo(c.x, c.y - SUMMIT_DOT.riseUp);
+    ctx.lineTo(c.x - SUMMIT_DOT.halfWidth, c.y + SUMMIT_DOT.dropDown);
+    ctx.lineTo(c.x + SUMMIT_DOT.halfWidth, c.y + SUMMIT_DOT.dropDown);
+    ctx.closePath();
+    ctx.fillStyle = fill;
     ctx.fill();
-    ctx.strokeStyle = SUMMIT_DOT.outline;
+    ctx.strokeStyle = SUMMIT_DOT.edge;
     ctx.stroke();
   }
 }

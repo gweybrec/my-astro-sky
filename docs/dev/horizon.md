@@ -55,10 +55,65 @@ render thread — same rationale as proxying astrometry.net) and is exposed as
 `horizon_profiles` table keyed by rounded location + params (`horizonCacheKey` in
 `server/db.ts`) — terrain is stable, so a computed skyline is reusable indefinitely.
 
-> **Why not PeakFinder / HeyWhatsThat?** PeakFinder's API only embeds a visual panorama
-> (iframe/canvas) — no raw azimuth→altitude data. HeyWhatsThat has horizon data but its
-> endpoint is undocumented and "subject to change." Computing from an open DEM keeps the
-> feature self-contained; the file-import path covers offline use and both apps' exports.
+### Why not PeakFinder (or HeyWhatsThat)?
+
+Two separate questions get asked here — "why not use PeakFinder for the **data**?" and the
+subtler "why not use its **canvas** for the display?". Both resolve to _no_.
+
+**Data.** PeakFinder's API returns no raw `azimuth → altitude` numbers, and we need that array
+for the sky-map overlay, the recommender's terrain gate, and the summit placement. HeyWhatsThat
+does expose horizon data, but through an undocumented endpoint that's "subject to change." An open
+DEM keeps the whole feature self-contained and offline-capable; the import path
+(`parseHorizonFile`) already reads the Stellarium-polygonal horizon that PeakFinder itself exports,
+so a user who prefers PeakFinder's terrain can still bring it in.
+
+**Display — why we can't "just draw what we want" on the PeakFinder panel canvas.** The embed is:
+
+```js
+let panel = new PeakFinder.PanoramaPanel({ canvasid: 'pfcanvas', locale: 'en' });
+```
+
+That object is a **self-contained viewer that _owns_ a canvas**, not a canvas we can paint on. The
+distinction is the whole answer:
+
+1. **It owns the element and its render loop.** The panel takes the `<canvas>` by id, holds its
+   rendering context, and runs its own `requestAnimationFrame` loop redrawing the terrain panorama
+   every frame. Anything we draw into that canvas is wiped on its next frame, and we don't control
+   the loop — so we can't interleave our own stars/DSOs/grid, i.e. we cannot _composite_ onto it.
+2. **Its methods are the entire contract.** We can only steer it through what it chooses to expose:
+   `loadViewpoint(lat, lon, name)`, camera azimuth/altitude/FOV, `projection` (**0 perspective,
+   1 cylindrical**), background colour, theme, locale, and "disable infosheets." There is no hook to
+   pass a custom projection/camera matrix, no event to inject a draw pass, no layer ordering.
+3. **The projection we need isn't on offer.** Perspective and cylindrical are both _outward-looking_
+   horizon cameras. Our local-sky view is a **zenith-centred azimuthal dome** (zenith at the disc
+   centre, horizon at the rim) driven by our own `project()` + `toCanvas()`. The panel's API has no
+   mode for that and no way to reproject its output, so it can't render our view — the two camera
+   models line up at a single point and diverge everywhere else.
+4. **No geometry comes back out.** The panel exposes no terrain mesh or silhouette vertices, so we
+   can't even read "where is the ridge" to reproject it into our disc ourselves. It's pixels-only.
+5. **Reading its pixels is a dead end.** Scraping the canvas (`getImageData` / WebGL `readPixels`) is
+   fragile, and because the panel textures imagery fetched from its servers the canvas is
+   cross-origin **tainted**, so readback throws — and even if it didn't, we'd only recover
+   their-projection pixels, not geometry.
+6. **It's a black box.** The engine is a minified, versioned (`peakfinder.1.0.min.js`) bundle loaded
+   from peakfinder.com; its internals aren't a supported surface to reach into or patch.
+
+So "do whatever we want with that panel canvas" would require our projection (not offered),
+compositing our celestial layers into its frames (its loop overwrites), and reading its geometry out
+(not exposed) — none of which the object grants. It's a viewer you point at a location and nudge the
+camera on, full stop.
+
+**Self-hosting the script doesn't change this.** `loadViewpoint()` fetches terrain from PeakFinder's
+servers on every viewpoint, so self-hosting `peakfinder.1.0.min.js` removes the CSP `script-src`
+issue but not the runtime network dependency (our app is deliberately offline/privacy-first), and
+redistributing their proprietary engine isn't granted (their docs say to include it from their URL;
+the demo repo's LICENSE covers the demo, not the engine). Our CSP is same-origin
+(`script-src`/`connect-src` `'self'`) with zero third-party embeds today, so an embed would also mean
+relaxing that posture — for a view that still can't replace our overlay and still returns no data
+(we'd maintain both pipelines).
+
+Worth noting our DEM-geometry + OSM-names split is **not** a compromise: it mirrors PeakFinder's own
+architecture (a DEM for terrain + a names database for labels). The gap is polish, not principle.
 
 ## Frontend
 
@@ -73,12 +128,26 @@ render thread — same rationale as proxying astrometry.net) and is exposed as
 
 ## Rendering
 
-`drawMountainHorizon()` in `src/sky-draw.ts` steps azimuth finely, reads
-`horizonAltAt(profile, az)`, converts via `raDecFromAltAz → project → toCanvas` (same
-pen-lifting pattern as `strokeAltCircle`), strokes the silhouette, and — in zenith
-("local sky") mode — fills the band down to the alt=0 rim. Colours are the
-`MOUNTAIN_HORIZON` canvas token (`src/canvas-theme.ts`). `sky-map.ts` draws it right after
-`drawHorizonLine`, gated on date mode + observer location + `showMountainHorizon`.
+`drawMountainHorizon()` in `src/sky-draw.ts` renders the terrain as **solid shaded masses with no outline
+lines** — depth comes from smooth atmospheric fog, the way PeakFinder does it. `computeHorizon` traces the
+skyline at **fine nested distance shells** (`SHELL_KM = [2, 4, 7, 11, 16, 23]` plus the full radius) via
+`traceHorizonAngles` — which returns one `alts` array per shell (near→far), snapshotting the running max as
+each shell boundary is crossed — and stores them on `profile.layers` (`profile.alts` === the last/farthest
+shell = the true horizon, used by the recommender + summit placement).
+
+In zenith ("local sky") mode with `layers`, the renderer fills the shells **back-to-front** (far first): each
+shell's ground band (silhouette → alt=0 rim, a per-azimuth quad strip via `fillSilhouetteBand`; per-wedge
+fills avoid the single-polygon seam/inversion) is painted solid with `lerpColor(groundNear → groundFar)` by
+shell index. With many close shells the overlapping opaque fills form a continuous near-dark → far-hazy
+gradient that follows the terrain; the jagged ridge outlines are just the fill-vs-fill / fill-vs-sky
+boundaries — **no crest lines are stroked** (that's what made it read as confusing concentric rings before).
+A single radial `formShadow` gradient (transparent toward the zenith, dark at the rim) is overlaid on each
+band to darken the masses toward their base for a little body. Where terrain is uniformly near the shells
+collapse — no faked depth. Imported/manual profiles (no `layers`) and the pole-centred stereo view fall back
+to a single `fill` + one thin `stroke` silhouette. `sampleDenseAz` (in `horizon-io.ts`) samples any shell's
+`alts`, and `lerpColor` (`src/color-utils.ts`, unit-tested) ramps the tones. `sky-map.ts` draws it right
+after `drawHorizonLine`, gated on date mode + observer location + `showMountainHorizon`. The
+`HORIZON_CACHE_VERSION` bump (`v5`) forces cached profiles to recompute with the finer shells.
 
 ## Named summits
 
@@ -101,10 +170,11 @@ azimuth so its dot lands on the drawn ridge. The whole thing is **best-effort**:
 failure/timeout is caught (`logServerError('overpass_fetch_failed')`) and the horizon returns with an
 empty `summits` array. Summits ride in the cached `horizon_profiles` JSON blob for free.
 
-`drawSummitDots()` (`src/sky-draw.ts`) draws a small star-like dot (`SUMMIT_DOT` token) on each summit,
-called right after `drawMountainHorizon`. Hover is wired like the star/DSO path: `findClosestSummit()`
-in `sky-map.ts` (nearest within ~12 px, competes with star/DSO distance) fires `onSummitHover`, and
-`src/ui.ts` builds a plain tooltip with the peak **name**, elevation (m), and distance.
+`drawSummitDots()` (`src/sky-draw.ts`) draws a small, subtle marker dot (`SUMMIT_DOT` token) on each
+summit — **no always-on labels** (this is a sky app; permanent peak labels are clutter). The name shows
+only on **hover**: `findClosestSummit()` in `sky-map.ts` (nearest within ~12 px, competes with star/DSO
+distance) fires `onSummitHover`, and `src/ui.ts` builds a tooltip with the peak **name**, elevation (m),
+and distance.
 Only auto-computed profiles carry summits (imported az/alt files have none).
 
 ## Recommender integration

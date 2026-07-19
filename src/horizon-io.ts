@@ -21,9 +21,21 @@ export interface HorizonProfile {
   azStepDeg: number;
   /** Horizon altitude in degrees at each azimuth: index i → azimuth i * azStepDeg. */
   alts: number[];
+  /**
+   * Near→far distance shells for layered (depth) rendering; the last shell's alts
+   * === `alts` (the true horizon). Auto profiles only — imported/manual profiles
+   * have none and render as a single silhouette.
+   */
+  layers?: HorizonLayer[];
   /** Named summits sitting on the skyline (auto profiles only; optional). */
   summits?: HorizonSummit[];
   source: 'auto' | 'import' | 'manual';
+}
+
+/** One skyline "shell": the silhouette formed by terrain within `maxDistKm`. */
+export interface HorizonLayer {
+  maxDistKm: number;
+  alts: number[];
 }
 
 /**
@@ -54,21 +66,26 @@ export function wrapAz(azDeg: number): number {
 }
 
 /**
- * Horizon altitude (degrees) at an arbitrary azimuth, via wrap-around linear
- * interpolation between the two nearest dense samples. Safe for any azimuth,
- * including the seam between the last sample and azimuth 0.
+ * Sample a dense per-azimuth array (values indexed by `i * azStepDeg`) at an
+ * arbitrary azimuth, via wrap-around linear interpolation between the two nearest
+ * samples. Safe for any azimuth, including the seam between the last sample and 0.
+ * Shared by `horizonAltAt` and by the layered renderer (per-shell `alts`).
  */
-export function horizonAltAt(profile: HorizonProfile, azDeg: number): number {
-  const { alts, azStepDeg } = profile;
-  const n = alts.length;
+export function sampleDenseAz(values: number[], azStepDeg: number, azDeg: number): number {
+  const n = values.length;
   if (n === 0) return HORIZON_ALT_FLOOR_DEG;
-  if (n === 1) return alts[0];
+  if (n === 1) return values[0];
   const az = wrapAz(azDeg);
   const pos = az / azStepDeg;
   const i0 = Math.floor(pos) % n;
   const i1 = (i0 + 1) % n;
   const frac = pos - Math.floor(pos);
-  return alts[i0] * (1 - frac) + alts[i1] * frac;
+  return values[i0] * (1 - frac) + values[i1] * frac;
+}
+
+/** Horizon (true skyline) altitude (degrees) at an arbitrary azimuth. */
+export function horizonAltAt(profile: HorizonProfile, azDeg: number): number {
+  return sampleDenseAz(profile.alts, profile.azStepDeg, azDeg);
 }
 
 /**

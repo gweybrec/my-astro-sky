@@ -11,6 +11,7 @@ import { formatAlt } from './format-utils';
 import { starDisplayName, formatMultiplicity } from './star-catalog';
 import { loadSettings, saveSettings, normalizeRotationDeg } from './display-settings';
 import { loadSkyTimeSettings } from './sky-time-settings';
+import mountainSvg from './icons/mountain.svg?raw';
 import type {
   Star,
   DSO,
@@ -363,8 +364,14 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       ui.setSkyTooltip(null, x, y);
       return;
     }
+    // Prefix the name with the mountain glyph so a summit tooltip is instantly
+    // distinguishable from a star/DSO tooltip while sweeping the cursor around.
+    const icon = mountainSvg.replace(
+      '<svg ',
+      '<svg width="14" height="14" style="vertical-align:-2px;margin-right:5px" ',
+    );
     const html =
-      `<div class="dso-info-name">${summit.name}</div>` +
+      `<div class="dso-info-name">${icon}${summit.name}</div>` +
       `<table class="dso-info-table">` +
       `<tr><td>${t('summit.elevation')}</td><td>${summit.elevationM.toLocaleString()} ${t('summit.metersUnit')}</td></tr>` +
       `<tr><td>${t('summit.distance')}</td><td>${summit.distanceKm} km</td></tr>` +

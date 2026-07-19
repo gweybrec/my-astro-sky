@@ -588,7 +588,7 @@ const setHorizonStmt = db.prepare(
 
 // Bump when the computed profile's shape/content changes (e.g. summits added), so
 // stale entries from an older algorithm are bypassed rather than served forever.
-const HORIZON_CACHE_VERSION = 'v2';
+const HORIZON_CACHE_VERSION = 'v5';
 
 /** Cache key: version + 3-decimal lat/lon (~100 m) plus radius (km) and eye height (m). */
 export function horizonCacheKey(

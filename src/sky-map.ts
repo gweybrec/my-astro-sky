@@ -1721,7 +1721,7 @@ export class SkyMap {
       if (this.showMountainHorizon && this.mountainProfile) {
         drawMountainHorizon(ctx, view, horizon.lstH, horizon.latDeg, this.mountainProfile);
         if (this.mountainProfile.summits?.length) {
-          drawSummitDots(ctx, view, horizon.lstH, horizon.latDeg, this.mountainProfile.summits);
+          drawSummitDots(ctx, view, horizon.lstH, horizon.latDeg, this.mountainProfile);
         }
       }
       // Cardinal labels sit on top of the terrain fill so they stay legible.

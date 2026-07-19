@@ -222,9 +222,18 @@ export const HORIZON_LINE = { lineWidth: 1.5 } as const;
  * stars near the skyline. Canvas draw constants (not CSS), like BORDER_RING.
  */
 export const MOUNTAIN_HORIZON = {
-  lineWidth: 2,
+  lineWidth: 1.5,
+  // Terrain rendered as solid shaded masses (no outline lines): each distance shell
+  // is filled with a tone lerped near→far along this ramp, back-to-front, so near
+  // terrain is dark/warm and distant ranges fade to a muted hazy blue-grey — smooth
+  // atmospheric depth. `formShadow` darkens each mass toward its base (the alt=0
+  // rim) for a bit of body. `fill`/`stroke` are the single-silhouette fallback for
+  // profiles with no `layers` (imported/manual) and the stereo view.
+  groundNear: 'rgb(24, 20, 17)',
+  groundFar: 'rgb(58, 64, 78)',
+  formShadow: 'rgba(0, 0, 0, 0.28)',
   stroke: 'rgba(150, 110, 74, 0.95)',
-  fill: 'rgba(38, 28, 20, 0.5)',
+  fill: 'rgba(30, 24, 19, 0.92)',
 } as const;
 
 /**
@@ -239,15 +248,24 @@ export const CARDINAL_POINTS = {
 } as const;
 
 /**
- * Small "star-like" dots marking named summits on the terrain skyline. Filled in
- * the mountain-line colour over a thin dark outline so they read against both the
- * shaded ground band and the sky. Hover shows the peak's name + altitude.
+ * Small, subtle marker dots on named summits along the terrain skyline — a muted
+ * warm dot with a thin dark edge, sized so it doesn't dominate the ridge. Hover
+ * shows the peak's name + height (no always-on labels — this is a sky app).
  */
+// Summits are drawn as a small upward **triangle** (a peak mark), not a dot — a
+// round dot reads as a star. Tinted from the terrain shade at the summit's distance
+// (see drawSummitDots), lightened toward `tintTo` by `tintAmount` so it matches the
+// mass it sits on while staying legible; a thin dark edge defines it on any tone.
+// `fill` is the fallback when a profile has no layers.
 export const SUMMIT_DOT = {
-  radius: 3,
-  fill: MOUNTAIN_HORIZON.stroke,
-  outline: 'rgba(10, 8, 6, 0.9)',
-  outlineWidth: 1,
+  halfWidth: 3.4, // base half-width (px)
+  riseUp: 3.8, // apex above the summit point (px)
+  dropDown: 2.2, // base below the summit point (px)
+  tintTo: 'rgb(236, 232, 226)',
+  tintAmount: 0.42,
+  fill: 'rgba(180, 140, 100, 0.9)',
+  edge: 'rgba(12, 9, 6, 0.85)',
+  edgeWidth: 1,
 } as const;
 
 /** Circular background disc + radius for a mosaic tile's delete/add button. */

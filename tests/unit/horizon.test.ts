@@ -6,8 +6,9 @@ const EARTH_R = 6371000;
 const DEG = Math.PI / 180;
 
 describe('traceHorizonAngles', () => {
+  // Default single shell → one alts array; [0] is the full horizon.
   it('gives a flat (floor) horizon over flat terrain', () => {
-    const alts = traceHorizonAngles(() => 0, 45, 6, {
+    const [alts] = traceHorizonAngles(() => 0, 45, 6, {
       radiusM: 5000,
       obsElev: 1.7,
       azStepDeg: 90,
@@ -20,7 +21,7 @@ describe('traceHorizonAngles', () => {
     // A 300 m-tall ridge due East (az 90), 3 km away. Observer at ground (eye 0).
     const ridgeLon = 6 + 3000 / (EARTH_R * Math.cos(45 * DEG)) / DEG;
     const elevationAt = (_lat: number, lon: number) => (lon >= ridgeLon - 0.002 ? 300 : 0);
-    const alts = traceHorizonAngles(elevationAt, 45, 6, {
+    const [alts] = traceHorizonAngles(elevationAt, 45, 6, {
       radiusM: 5000,
       obsElev: 0,
       azStepDeg: 1,
@@ -38,18 +39,47 @@ describe('traceHorizonAngles', () => {
   it('a higher observer sees a lower horizon over the same wall', () => {
     const ridgeLon = 6 + 3000 / (EARTH_R * Math.cos(45 * DEG)) / DEG;
     const elevationAt = (_lat: number, lon: number) => (lon >= ridgeLon - 0.002 ? 300 : 0);
-    const low = traceHorizonAngles(elevationAt, 45, 6, { radiusM: 5000, obsElev: 0, stepM: 20 });
-    const high = traceHorizonAngles(elevationAt, 45, 6, { radiusM: 5000, obsElev: 200, stepM: 20 });
+    const [low] = traceHorizonAngles(elevationAt, 45, 6, { radiusM: 5000, obsElev: 0, stepM: 20 });
+    const [high] = traceHorizonAngles(elevationAt, 45, 6, {
+      radiusM: 5000,
+      obsElev: 200,
+      stepM: 20,
+    });
     expect(high[90]).toBeLessThan(low[90]);
   });
 
   it('clamps below-observer terrain to the floor rather than going arbitrarily low', () => {
-    const alts = traceHorizonAngles(() => -100, 45, 6, {
+    const [alts] = traceHorizonAngles(() => -100, 45, 6, {
       radiusM: 5000,
       obsElev: 500,
       azStepDeg: 90,
     });
     for (const a of alts) expect(a).toBeGreaterThanOrEqual(-5);
+  });
+
+  it('nested distance shells capture layered depth (far peak above a near ridge)', () => {
+    const cosLat = Math.cos(45 * DEG);
+    const eastM = (lon: number) => (lon - 6) * DEG * EARTH_R * cosLat;
+    // A near ridge ~3 km east (low angle) and a taller ridge ~20 km east (higher angle).
+    const elevationAt = (_lat: number, lon: number) => {
+      const d = eastM(lon);
+      if (d > 2800 && d < 3200) return 262; // ~5° at 3 km
+      if (d > 19000 && d < 21000) return 2837; // ~8° at 20 km — pokes above the near ridge
+      return 0;
+    };
+    const shells = traceHorizonAngles(elevationAt, 45, 6, {
+      radiusM: 40000,
+      obsElev: 0,
+      azStepDeg: 1,
+      stepM: 20,
+      shellsM: [5000, 40000], // near ≤5 km, far ≤40 km
+    });
+    expect(shells).toHaveLength(2);
+    const near = shells[0][90];
+    const far = shells[1][90];
+    expect(near).toBeGreaterThan(3);
+    expect(near).toBeLessThan(7); // near shell only sees the 3 km ridge
+    expect(far).toBeGreaterThan(near + 1.5); // far shell reveals the distant taller ridge
   });
 });
 
