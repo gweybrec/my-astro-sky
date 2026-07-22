@@ -2375,6 +2375,14 @@
                   "observationDate": {
                     "type": "string",
                     "description": "Observation start date/time (UTC ISO 8601, max 50 characters, null to clear)"
+                  },
+                  "captureDetails": {
+                    "type": "object",
+                    "description": "Parsed capture fields (gain, offset, iso, ccdTemp, setTemp, binning) keyed by field id; unknown keys dropped"
+                  },
+                  "gearSetupId": {
+                    "type": "string",
+                    "description": "Linked gear-setup id (null to unlink)"
                   }
                 }
               }
@@ -2467,6 +2475,14 @@
                     "stackCnt": {
                       "type": "integer",
                       "description": "STACKCNT header value (frame count), present when available"
+                    },
+                    "filter": {
+                      "type": "string",
+                      "description": "FILTER header value, present when available"
+                    },
+                    "captureDetails": {
+                      "type": "object",
+                      "description": "Parsed capture fields (gain, offset, iso, ccdTemp, setTemp, binning) keyed by field id, present when available"
                     }
                   }
                 }

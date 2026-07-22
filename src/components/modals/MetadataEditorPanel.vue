@@ -139,6 +139,63 @@
     />
   </div>
 
+  <!-- Gear setup link -->
+  <div class="metadata-field">
+    <label class="metadata-label">{{ t('modal.metadataGearSetup') }}</label>
+    <select
+      class="dialog-input"
+      :title="t('modal.metadataGearSetupPlaceholder')"
+      :value="gearSetupId ?? ''"
+      @change="onSetupChange"
+    >
+      <option value="">{{ t('modal.metadataGearSetupNone') }}</option>
+      <option v-for="s in gearSetups" :key="s.id" :value="s.id">{{ s.name || s.id }}</option>
+    </select>
+  </div>
+
+  <!-- Capture details (dynamic, opt-in fields) -->
+  <div class="metadata-field">
+    <label class="metadata-label">{{ t('modal.metadataCapture') }}</label>
+    <div
+      v-if="presentCaptureFields.length > 0"
+      class="grid grid-cols-[max-content_1fr_max-content_max-content] items-center gap-x-2 gap-y-1"
+    >
+      <div v-for="f in presentCaptureFields" :key="f.id" class="contents">
+        <span class="text-[length:var(--font-size-small)] text-label">{{ t(f.labelKey) }}</span>
+        <input
+          :type="f.type === 'number' ? 'number' : 'text'"
+          class="tag-input gear-modal-number-input w-full min-w-0"
+          :value="String(captureDetails[f.id] ?? '')"
+          @input="onCaptureInput(f.id, $event)"
+        />
+        <span class="integration-unit">{{ f.unit }}</span>
+        <button
+          type="button"
+          class="integration-row-trash"
+          :title="t('modal.metadataCaptureRemove')"
+          v-html="trashSvg"
+          @click="removeCaptureField(f.id)"
+        ></button>
+      </div>
+    </div>
+    <div class="flex items-stretch gap-2 mt-1">
+      <select v-model="captureFieldToAdd" class="dialog-input flex-1">
+        <option value="">{{ t('modal.metadataCaptureAddPlaceholder') }}</option>
+        <option v-for="f in addableCaptureFields" :key="f.id" :value="f.id">
+          {{ t(f.labelKey) }}
+        </option>
+      </select>
+      <button
+        type="button"
+        class="integration-add-btn !m-0 !self-stretch inline-flex items-center"
+        :disabled="!captureFieldToAdd || addableCaptureFields.length === 0"
+        @click="addCaptureField"
+      >
+        {{ t('modal.metadataCaptureAddField') }}
+      </button>
+    </div>
+  </div>
+
   <!-- Notes -->
   <div class="metadata-field">
     <label class="metadata-label">{{ t('modal.metadataNotes') }}</label>
@@ -155,7 +212,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { filterLabelCandidates } from '../../autocomplete-utils';
-import type { PhotoIntegration, PointOfInterest } from '../../types';
+import type { PhotoIntegration, PointOfInterest, CaptureDetails } from '../../types';
+import type { GearSetupData } from '../../api';
+import { CAPTURE_FIELDS } from '../../capture-fields';
 import { t } from '../../i18n';
 import { searchDSOs } from '../../search';
 import { showToast } from '../../toast';
@@ -170,6 +229,9 @@ const props = defineProps<{
   pointsOfInterest: PointOfInterest[];
   integrations: PhotoIntegration[];
   observationDate: string;
+  captureDetails: CaptureDetails;
+  gearSetupId: string | null;
+  gearSetups: GearSetupData[];
   notes: string;
   displayName: string;
   knownFilterMap: Map<string, string>;
@@ -182,9 +244,55 @@ const emit = defineEmits<{
   'update:pointsOfInterest': [PointOfInterest[]];
   'update:integrations': [PhotoIntegration[]];
   'update:observationDate': [string];
+  'update:captureDetails': [CaptureDetails];
+  'update:gearSetupId': [string | null];
   'update:notes': [string];
   'update:displayName': [string];
 }>();
+
+// ─── Gear setup link ──────────────────────────────────────────────────────────
+function onSetupChange(e: Event) {
+  const val = (e.target as HTMLSelectElement).value;
+  emit('update:gearSetupId', val || null);
+}
+
+// ─── Capture details (dynamic fields) ─────────────────────────────────────────
+// A field's row is shown only when its id is present in captureDetails (parsed or
+// added by the user); the picker offers the rest, in catalog order.
+const presentCaptureFields = computed(() =>
+  CAPTURE_FIELDS.filter((f) => Object.prototype.hasOwnProperty.call(props.captureDetails, f.id)),
+);
+const addableCaptureFields = computed(() =>
+  CAPTURE_FIELDS.filter((f) => !Object.prototype.hasOwnProperty.call(props.captureDetails, f.id)),
+);
+const captureFieldToAdd = ref('');
+
+function onCaptureInput(id: string, e: Event) {
+  const field = CAPTURE_FIELDS.find((f) => f.id === id);
+  const raw = (e.target as HTMLInputElement).value;
+  // Keep the key (as '') while empty so the row stays editable; sanitize drops it on save.
+  let value: number | string;
+  if (field?.type === 'number') {
+    value = raw.trim() === '' ? '' : Number(raw);
+    if (typeof value === 'number' && !Number.isFinite(value)) return; // ignore junk mid-typing
+  } else {
+    value = raw;
+  }
+  emit('update:captureDetails', { ...props.captureDetails, [id]: value });
+}
+
+function removeCaptureField(id: string) {
+  const next = { ...props.captureDetails };
+  delete next[id];
+  emit('update:captureDetails', next);
+}
+
+function addCaptureField() {
+  const id = captureFieldToAdd.value;
+  if (!id || Object.prototype.hasOwnProperty.call(props.captureDetails, id)) return;
+  emit('update:captureDetails', { ...props.captureDetails, [id]: '' });
+  captureFieldToAdd.value = '';
+}
 
 // ─── Observation date ─────────────────────────────────────────────────────────
 const obsDateLocal = computed(() => {

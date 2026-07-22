@@ -209,14 +209,19 @@
           v-model:pointsOfInterest="item.pointsOfInterest"
           v-model:integrations="item.integrations"
           v-model:observationDate="item.observationDate"
+          v-model:captureDetails="item.captureDetails"
+          v-model:gearSetupId="item.gearSetupId"
           v-model:notes="item.notes"
           :knownFilterMap="knownFilterMap"
+          :gearSetups="gearSetups"
           @update:displayName="scheduleMetaSave"
           @update:dsoIds="scheduleMetaSave"
           @update:labels="scheduleMetaSave"
           @update:pointsOfInterest="scheduleMetaSave"
           @update:integrations="scheduleMetaSave"
           @update:observationDate="scheduleMetaSave"
+          @update:captureDetails="scheduleMetaSave"
+          @update:gearSetupId="scheduleMetaSave"
           @update:notes="scheduleMetaSave"
         />
       </div>
@@ -232,6 +237,7 @@ import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
 import { searchUnified } from '../../search';
 import { solveWCS, reuseAstrometrySubmission, updatePhotoMetadata } from '../../api';
+import type { GearSetupData } from '../../api';
 import { findDSOIdsFromCorrespondences } from '../../dso-catalog';
 import { stripExtension, getFileDimensions } from '../../file-utils';
 import { generateThumbnail } from '../../lazy-image';
@@ -245,6 +251,7 @@ const props = defineProps<{
   item: BatchItem;
   solverAvailability: SolverAvailability;
   knownFilterMap: Map<string, string>;
+  gearSetups: GearSetupData[];
 }>();
 
 const emit = defineEmits<{
@@ -364,8 +371,20 @@ async function handleWcsFile(e: Event) {
       }
       if (result.expTime && result.stackCnt && props.item.integrations.length === 0) {
         props.item.integrations = [
-          { frames: Math.round(result.stackCnt), seconds: Math.round(result.expTime), filter: '' },
+          {
+            frames: Math.round(result.stackCnt),
+            seconds: Math.round(result.expTime),
+            filter: result.filter ?? '',
+          },
         ];
+      }
+      // Merge parsed capture fields, keeping any value the user already entered.
+      if (result.captureDetails) {
+        const merged = { ...props.item.captureDetails };
+        for (const [k, v] of Object.entries(result.captureDetails)) {
+          if (merged[k] === undefined || merged[k] === '') merged[k] = v;
+        }
+        props.item.captureDetails = merged;
       }
       wcsLoaded.value = true;
       wcsFileName.value = f.name;
@@ -533,6 +552,8 @@ async function flushMetaSave() {
     pointsOfInterest: props.item.pointsOfInterest.map((p) => ({ ...p })),
     integrations: sanitizeIntegrationRows(props.item.integrations),
     observationDate: props.item.observationDate || null,
+    captureDetails: { ...props.item.captureDetails },
+    gearSetupId: props.item.gearSetupId || null,
     notes: props.item.notes,
     originalName: resolvedName,
   };

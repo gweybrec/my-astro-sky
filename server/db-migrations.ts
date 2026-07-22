@@ -292,7 +292,26 @@ export function applyMigrations(database: Database): number {
         }
       },
     },
-    // Future migrations: { version: 12, run(d) { ... } },
+    {
+      // v12: photos gain a parsed capture-details JSON blob (gain, sensor temp,
+      // focal length, …) and an optional link to a gear setup. capture_details
+      // defaults to '{}'; gear_setup_id is a nullable FK into gear_setups (the
+      // link dangles harmlessly if the setup is later deleted — resolved defensively).
+      version: 12,
+      run(d) {
+        try {
+          d.exec("ALTER TABLE photos ADD COLUMN capture_details TEXT NOT NULL DEFAULT '{}'");
+        } catch {
+          /* exists */
+        }
+        try {
+          d.exec('ALTER TABLE photos ADD COLUMN gear_setup_id TEXT');
+        } catch {
+          /* exists */
+        }
+      },
+    },
+    // Future migrations: { version: 13, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

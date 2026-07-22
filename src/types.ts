@@ -94,10 +94,15 @@ export interface Photo {
   pointsOfInterest: PointOfInterest[];
   integrations?: PhotoIntegration[];
   observationDate?: string | null; // UTC ISO 8601 observation start (from DATE-OBS or user input)
+  captureDetails?: CaptureDetails | null; // Optional parsed/manual capture fields (see capture-fields.ts)
+  gearSetupId?: string | null; // Optional link to a gear setup (gear_setups.id)
   notes: string;
   fileSize?: number | null; // Server-computed file size in bytes (present when loaded from API)
   thumbFilename?: string | null; // Low-res thumbnail filename (generated on upload)
 }
+
+/** Optional per-photo capture fields keyed by field id (see CAPTURE_FIELDS in capture-fields.ts). */
+export type CaptureDetails = Record<string, number | string>;
 
 export interface AffineMatrix {
   a: number;
@@ -167,6 +172,8 @@ export interface PlateSolveResult {
   dateObs?: string; // DATE-OBS from WCS header (UTC ISO 8601)
   expTime?: number; // EXPTIME from WCS header (seconds)
   stackCnt?: number; // STACKCNT from WCS header (frame count)
+  filter?: string; // FILTER from WCS header (feeds the integration row)
+  captureDetails?: CaptureDetails; // Parsed capture fields from WCS header
 }
 
 export interface AstrometrySolveStatus {

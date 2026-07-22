@@ -3,6 +3,7 @@ import type {
   PhotoCorrespondence,
   PhotoIntegration,
   PointOfInterest,
+  CaptureDetails,
   Photo,
 } from './types';
 
@@ -37,6 +38,8 @@ export interface BatchItem {
   pointsOfInterest: PointOfInterest[];
   integrations: PhotoIntegration[];
   observationDate: string;
+  captureDetails: CaptureDetails;
+  gearSetupId: string | null;
   notes: string;
   customName: string;
   elapsedSeconds: number;

@@ -4,8 +4,25 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { applyMigrations } from './db-migrations.js';
+import { sanitizeCaptureDetails } from './wcs-reader.js';
 
 export { applyMigrations };
+// Re-export so callers that already import from db.js (e.g. server/index.ts) keep working.
+export { sanitizeCaptureDetails };
+
+function parseCaptureDetails(val: any): Record<string, number | string> {
+  if (!val) return {};
+  try {
+    return sanitizeCaptureDetails(JSON.parse(val));
+  } catch {
+    return {};
+  }
+}
+
+/** Trim a nullable string FK (gear setup id) to a bounded value or null. */
+function sanitizeSetupId(val: unknown): string | null {
+  return typeof val === 'string' && val.trim().length > 0 ? val.trim().slice(0, 64) : null;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data.db');
@@ -144,8 +161,8 @@ db.exec(`
 `);
 
 const insertPhoto = db.prepare(
-  `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`,
+  `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`,
 );
 const insertCorrespondence = db.prepare(
   'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -229,6 +246,8 @@ export function createPhoto(
   thumbFilename?: string | null,
   observationDate?: string | null,
   pointsOfInterest?: PointOfInterestInput[],
+  captureDetails?: Record<string, number | string> | null,
+  gearSetupId?: string | null,
 ) {
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
   const run = db.transaction(() => {
@@ -246,6 +265,8 @@ export function createPhoto(
       JSON.stringify(sanitizedIntegrations),
       thumbFilename ?? null,
       observationDate ?? null,
+      JSON.stringify(sanitizeCaptureDetails(captureDetails ?? {})),
+      sanitizeSetupId(gearSetupId),
     );
     for (const c of correspondences) {
       insertCorrespondence.run(
@@ -281,6 +302,8 @@ export function getAllPhotos() {
     notes: p.notes ?? '',
     integrations: parseIntegrationRows(p.integrations),
     observationDate: p.observation_date ?? null,
+    captureDetails: parseCaptureDetails(p.capture_details),
+    gearSetupId: p.gear_setup_id ?? null,
     thumbFilename: p.thumb_filename ?? null,
     correspondences: allCorr
       .filter((c) => c.photo_id === p.id)
@@ -336,11 +359,11 @@ function parseIntegrationRows(val: any): IntegrationInput[] {
 }
 
 const updatePhotoMetadataStmt = db.prepare(
-  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ? WHERE id = ?',
+  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ? WHERE id = ?',
 );
 
 const updatePhotoMetadataWithNameStmt = db.prepare(
-  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, original_name = ? WHERE id = ?',
+  'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ?, original_name = ? WHERE id = ?',
 );
 
 export function updatePhotoMetadata(
@@ -352,6 +375,8 @@ export function updatePhotoMetadata(
   integrations?: IntegrationInput[],
   observationDate?: string | null,
   pointsOfInterest?: PointOfInterestInput[],
+  captureDetails?: Record<string, number | string> | null,
+  gearSetupId?: string | null,
 ): boolean {
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
   const pois = JSON.stringify(sanitizePois(pointsOfInterest ?? []));
@@ -359,6 +384,8 @@ export function updatePhotoMetadata(
     typeof observationDate === 'string' && observationDate.length > 0
       ? observationDate.slice(0, 50)
       : null;
+  const capture = JSON.stringify(sanitizeCaptureDetails(captureDetails ?? {}));
+  const setupId = sanitizeSetupId(gearSetupId);
   if (originalName !== undefined) {
     const result = updatePhotoMetadataWithNameStmt.run(
       JSON.stringify(dsoIds),
@@ -367,6 +394,8 @@ export function updatePhotoMetadata(
       notes,
       JSON.stringify(sanitizedIntegrations),
       obsDate,
+      capture,
+      setupId,
       originalName,
       id,
     );
@@ -379,14 +408,16 @@ export function updatePhotoMetadata(
     notes,
     JSON.stringify(sanitizedIntegrations),
     obsDate,
+    capture,
+    setupId,
     id,
   );
   return result.changes > 0;
 }
 
 const insertPhotoWithId = db.prepare(
-  `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?)`,
+  `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`,
 );
 const deletePhotoForReplace = db.prepare('DELETE FROM photos WHERE id = ?');
 
@@ -413,6 +444,8 @@ export function createPhotoWithId(
   thumbFilename?: string | null,
   observationDate?: string | null,
   pointsOfInterest?: PointOfInterestInput[],
+  captureDetails?: Record<string, number | string> | null,
+  gearSetupId?: string | null,
 ): 'imported' | 'skipped' {
   const sanitizedIntegrations = sanitizeIntegrationRows(integrations ?? []);
   const run = db.transaction(() => {
@@ -434,6 +467,8 @@ export function createPhotoWithId(
       JSON.stringify(sanitizedIntegrations),
       thumbFilename ?? null,
       observationDate ?? null,
+      JSON.stringify(sanitizeCaptureDetails(captureDetails ?? {})),
+      sanitizeSetupId(gearSetupId),
     );
     if (result.changes === 0) return 'skipped';
     for (const c of correspondences) {

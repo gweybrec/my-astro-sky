@@ -1,6 +1,13 @@
-import type { Photo, PhotoCorrespondence, PhotoIntegration, PointOfInterest } from './types';
+import type {
+  Photo,
+  PhotoCorrespondence,
+  PhotoIntegration,
+  PointOfInterest,
+  CaptureDetails,
+} from './types';
 import type { BatchItem } from './batch-types';
 import { sanitizeIntegrationRows } from './batch-utils';
+import { sanitizeCaptureDetails } from './capture-fields';
 
 type UploadFn = (
   file: File,
@@ -15,6 +22,8 @@ type UploadFn = (
     notes?: string;
     displayName?: string;
     observationDate?: string | null;
+    captureDetails?: CaptureDetails | null;
+    gearSetupId?: string | null;
   },
 ) => Promise<Photo>;
 
@@ -34,6 +43,8 @@ export async function placeBatchItem(
       pointsOfInterest: item.pointsOfInterest,
       integrations: sanitizeIntegrationRows(item.integrations),
       observationDate: item.observationDate || null,
+      captureDetails: sanitizeCaptureDetails(item.captureDetails),
+      gearSetupId: item.gearSetupId || null,
       notes: item.notes,
       displayName: item.customName,
     });

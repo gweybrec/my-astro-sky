@@ -9,6 +9,7 @@ import type {
   PhotoIntegration,
   PointOfInterest,
   PoiCategory,
+  CaptureDetails,
 } from './types';
 import { t, getLang } from './i18n';
 import { reportRendererError } from './error-reporter';
@@ -134,6 +135,8 @@ export function uploadPhoto(
     notes?: string;
     displayName?: string;
     observationDate?: string | null;
+    captureDetails?: CaptureDetails | null;
+    gearSetupId?: string | null;
   },
 ): Promise<Photo> {
   return new Promise((resolve, reject) => {
@@ -152,6 +155,9 @@ export function uploadPhoto(
     if (metadata?.notes !== undefined) formData.append('notes', metadata.notes);
     if (metadata?.displayName) formData.append('displayName', metadata.displayName);
     if (metadata?.observationDate) formData.append('observationDate', metadata.observationDate);
+    if (metadata?.captureDetails && Object.keys(metadata.captureDetails).length > 0)
+      formData.append('captureDetails', JSON.stringify(metadata.captureDetails));
+    if (metadata?.gearSetupId) formData.append('gearSetupId', metadata.gearSetupId);
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/photos');
@@ -221,6 +227,8 @@ export async function updatePhotoMetadata(
     notes: string;
     originalName?: string;
     observationDate?: string | null;
+    captureDetails?: CaptureDetails | null;
+    gearSetupId?: string | null;
   },
 ): Promise<void> {
   const res = await fetch(`/api/photos/${photoId}/metadata`, {

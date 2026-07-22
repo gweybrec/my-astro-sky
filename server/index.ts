@@ -39,6 +39,7 @@ import {
   deleteGearSetup,
   deleteAllGearSetups,
   sanitizePois,
+  sanitizeCaptureDetails,
   getAllPoiCategories,
   upsertPoiCategory,
   deletePoiCategory,
@@ -553,6 +554,16 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     if (typeof req.body?.observationDate === 'string' && req.body.observationDate.trim()) {
       observationDate = req.body.observationDate.trim().slice(0, 50);
     }
+    let captureDetails: Record<string, number | string> = {};
+    try {
+      captureDetails = sanitizeCaptureDetails(JSON.parse(req.body?.captureDetails || '{}'));
+    } catch {
+      captureDetails = {};
+    }
+    const gearSetupId =
+      typeof req.body?.gearSetupId === 'string' && req.body.gearSetupId.trim()
+        ? req.body.gearSetupId.trim().slice(0, 64)
+        : null;
 
     // Allow caller to override the display name
     const displayName =
@@ -591,6 +602,8 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       thumbFilename,
       observationDate,
       pointsOfInterest,
+      captureDetails,
+      gearSetupId,
     );
 
     res.json({
@@ -607,6 +620,8 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       integrations,
       notes,
       thumbFilename,
+      captureDetails,
+      gearSetupId,
       ...(scaledManualPlacement ? { manualPlacement: JSON.parse(scaledManualPlacement) } : {}),
     });
   } catch (err: any) {
@@ -3597,6 +3612,8 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
           thumbFilename,
           typeof p.observationDate === 'string' ? p.observationDate : null,
           sanitizePois(p.pointsOfInterest),
+          sanitizeCaptureDetails(p.captureDetails),
+          typeof p.gearSetupId === 'string' ? p.gearSetupId : null,
         );
         if (result === 'imported') imported++;
         else skipped++;
@@ -3916,6 +3933,12 @@ app.patch('/api/photos/:id/manual-placement', (req, res) => {
  *               observationDate:
  *                 type: string
  *                 description: Observation start date/time (UTC ISO 8601, max 50 characters, null to clear)
+ *               captureDetails:
+ *                 type: object
+ *                 description: Parsed capture fields (gain, offset, iso, ccdTemp, setTemp, binning) keyed by field id; unknown keys dropped
+ *               gearSetupId:
+ *                 type: string
+ *                 description: Linked gear-setup id (null to unlink)
  *     responses:
  *       200:
  *         description: Photo metadata updated successfully
@@ -3956,12 +3979,22 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
       return;
     }
 
-    let { dsoIds, labels, integrations, notes, originalName, observationDate, pointsOfInterest } =
-      req.body;
+    let {
+      dsoIds,
+      labels,
+      integrations,
+      notes,
+      originalName,
+      observationDate,
+      pointsOfInterest,
+      captureDetails,
+      gearSetupId,
+    } = req.body;
     if (!Array.isArray(dsoIds)) dsoIds = [];
     if (!Array.isArray(labels)) labels = [];
     pointsOfInterest = sanitizePois(pointsOfInterest);
     integrations = sanitizeIntegrationRows(integrations);
+    captureDetails = sanitizeCaptureDetails(captureDetails);
     if (typeof notes !== 'string') notes = '';
     notes = notes.slice(0, 5000);
     const resolvedOriginalName: string | undefined =
@@ -3971,6 +4004,10 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
     const resolvedObsDate: string | null =
       typeof observationDate === 'string' && observationDate.trim()
         ? observationDate.trim().slice(0, 50)
+        : null;
+    const resolvedSetupId: string | null =
+      typeof gearSetupId === 'string' && gearSetupId.trim()
+        ? gearSetupId.trim().slice(0, 64)
         : null;
 
     updatePhotoMetadata(
@@ -3982,6 +4019,8 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
       integrations,
       resolvedObsDate,
       pointsOfInterest,
+      captureDetails,
+      resolvedSetupId,
     );
     res.json({
       ok: true,
@@ -4024,6 +4063,12 @@ app.patch('/api/photos/:id/metadata', (req, res) => {
  *                 stackCnt:
  *                   type: integer
  *                   description: STACKCNT header value (frame count), present when available
+ *                 filter:
+ *                   type: string
+ *                   description: FILTER header value, present when available
+ *                 captureDetails:
+ *                   type: object
+ *                   description: Parsed capture fields (gain, offset, iso, ccdTemp, setTemp, binning) keyed by field id, present when available
  *       400:
  *         description: Missing file, unsupported format, or no WCS data found
  *       500:
@@ -4153,6 +4198,8 @@ app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
       ...(wcs.dateObs ? { dateObs: wcs.dateObs } : {}),
       ...(wcs.expTime !== undefined ? { expTime: wcs.expTime } : {}),
       ...(wcs.stackCnt !== undefined ? { stackCnt: wcs.stackCnt } : {}),
+      ...(wcs.filter ? { filter: wcs.filter } : {}),
+      ...(wcs.captureDetails ? { captureDetails: wcs.captureDetails } : {}),
     });
   } catch (err: any) {
     console.error('WCS solve error:', err);

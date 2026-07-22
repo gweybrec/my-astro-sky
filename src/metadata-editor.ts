@@ -1,7 +1,9 @@
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
-import type { Photo, PhotoIntegration, PointOfInterest } from './types';
-import { updatePhotoMetadata } from './api';
+import type { Photo, PhotoIntegration, PointOfInterest, CaptureDetails } from './types';
+import type { GearSetupData } from './api';
+import { updatePhotoMetadata, getGearSetups } from './api';
+import { sanitizeCaptureDetails } from './capture-fields';
 import { showToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
@@ -48,6 +50,8 @@ export function buildMetadataEditorPanel(
     pointsOfInterest: (photo.pointsOfInterest ?? []).map((p) => ({ ...p })),
     integrations: sanitizeIntegrations(photo.integrations ?? []),
     observationDate: photo.observationDate ?? '',
+    captureDetails: sanitizeCaptureDetails(photo.captureDetails ?? {}),
+    gearSetupId: photo.gearSetupId ?? null,
     notes: photo.notes ?? '',
   };
 
@@ -58,12 +62,30 @@ export function buildMetadataEditorPanel(
     pointsOfInterest: original.pointsOfInterest.map((p) => ({ ...p })),
     integrations: original.integrations.map((r) => ({ ...r })),
     observationDate: original.observationDate,
+    captureDetails: { ...original.captureDetails } as CaptureDetails,
+    gearSetupId: original.gearSetupId,
     notes: original.notes,
+    gearSetups: [] as GearSetupData[],
   });
+
+  // Gear-setup list loads asynchronously; the reactive assignment re-renders the picker.
+  void getGearSetups()
+    .then((setups) => {
+      state.gearSetups = setups;
+    })
+    .catch(() => {
+      /* leave empty on failure — the picker just shows "none" */
+    });
 
   function isDirty(): boolean {
     if (state.displayName !== original.displayName) return true;
     if (state.observationDate !== original.observationDate) return true;
+    if (state.gearSetupId !== original.gearSetupId) return true;
+    if (
+      JSON.stringify(sanitizeCaptureDetails(state.captureDetails)) !==
+      JSON.stringify(original.captureDetails)
+    )
+      return true;
     if (state.notes !== original.notes) return true;
     if (
       state.dsoIds.length !== original.dsoIds.length ||
@@ -119,6 +141,9 @@ export function buildMetadataEditorPanel(
         pointsOfInterest: state.pointsOfInterest,
         integrations: state.integrations,
         observationDate: state.observationDate,
+        captureDetails: state.captureDetails,
+        gearSetupId: state.gearSetupId,
+        gearSetups: state.gearSetups,
         notes: state.notes,
         knownFilterMap,
         knownLabels: knownLabels ?? [],
@@ -139,6 +164,12 @@ export function buildMetadataEditorPanel(
         },
         'onUpdate:observationDate': (v: string) => {
           state.observationDate = v;
+        },
+        'onUpdate:captureDetails': (v: CaptureDetails) => {
+          state.captureDetails = v;
+        },
+        'onUpdate:gearSetupId': (v: string | null) => {
+          state.gearSetupId = v;
         },
         'onUpdate:notes': (v: string) => {
           state.notes = v;
@@ -171,12 +202,16 @@ export function buildMetadataEditorPanel(
       const resolvedName = state.displayName.trim() || photo.originalName;
       const sanitizedIntegrations = sanitizeIntegrations(state.integrations);
       const resolvedObsDate = state.observationDate || null;
+      const resolvedCapture = sanitizeCaptureDetails(state.captureDetails);
+      const resolvedSetupId = state.gearSetupId || null;
       await updatePhotoMetadata(photo.id, {
         dsoIds: state.dsoIds,
         labels: state.labels,
         pointsOfInterest: state.pointsOfInterest,
         integrations: sanitizedIntegrations,
         observationDate: resolvedObsDate,
+        captureDetails: resolvedCapture,
+        gearSetupId: resolvedSetupId,
         notes: state.notes,
         originalName: resolvedName,
       });
@@ -187,6 +222,8 @@ export function buildMetadataEditorPanel(
         pointsOfInterest: state.pointsOfInterest,
         integrations: sanitizedIntegrations,
         observationDate: resolvedObsDate,
+        captureDetails: resolvedCapture,
+        gearSetupId: resolvedSetupId,
         notes: state.notes,
         originalName: resolvedName,
       };

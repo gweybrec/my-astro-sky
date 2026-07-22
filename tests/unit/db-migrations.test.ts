@@ -60,13 +60,13 @@ describe('applyMigrations — fresh database', () => {
   it('returns the latest schema version after first run', () => {
     const db = freshBaseDb();
     const version = applyMigrations(db);
-    expect(version).toBe(11);
+    expect(version).toBe(12);
   });
 
   it('schema_version table contains the latest version', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('adds star_ra and star_dec columns to star_correspondences', () => {
@@ -103,8 +103,8 @@ describe('applyMigrations — idempotency', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     const v = applyMigrations(db);
-    expect(v).toBe(11);
-    expect(schemaVersion(db)).toBe(11);
+    expect(v).toBe(12);
+    expect(schemaVersion(db)).toBe(12);
   });
 });
 
@@ -128,7 +128,7 @@ describe('applyMigrations — v2 per-plan night/setup', () => {
   it('is a no-op (no throw) when the plans table is absent', () => {
     const db = freshBaseDb();
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 });
 
@@ -172,7 +172,7 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
     expect(row.dso_id).toBe('M42');
     expect(row.pa_deg).toBe(142);
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('is idempotent on an already-migrated plan_entries table', () => {
@@ -201,7 +201,7 @@ describe('applyMigrations — existing database (simulates upgrade)', () => {
     db.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
 
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 });
 
@@ -226,7 +226,7 @@ describe('applyMigrations — v4 mosaics', () => {
     expect(mosaicCols).toContain('center_ra');
     expect(mosaicCols).toContain('overlap_pct');
     expect(mosaicCols).toContain('cols');
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('is idempotent — a second run does not duplicate mosaic_id', () => {
@@ -248,7 +248,7 @@ describe('applyMigrations — v5 mosaic name', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     expect(getColumns(db, 'plan_mosaics')).toContain('name');
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('round-trips a stored mosaic name', () => {
@@ -284,7 +284,7 @@ describe('applyMigrations — v6 smart-scope mosaic size', () => {
     const cols = getColumns(db, 'plan_entries');
     expect(cols).toContain('mosaic_w_deg');
     expect(cols).toContain('mosaic_h_deg');
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('round-trips a stored smart mosaic size and preserves existing rows', () => {
@@ -341,7 +341,7 @@ describe('applyMigrations — v7 per-plan observing location', () => {
     const cols = getColumns(db, 'plans');
     expect(cols).toContain('lat');
     expect(cols).toContain('lon');
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('round-trips a stored per-plan location', () => {
@@ -389,7 +389,7 @@ describe('applyMigrations — v8 points of interest', () => {
     expect(catCols).toContain('name');
     expect(catCols).toContain('color');
     expect(catCols).toContain('position');
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('defaults points_of_interest to an empty JSON array', () => {
@@ -502,7 +502,7 @@ describe('applyMigrations — v10 observation windows', () => {
       observation_windows: string;
     };
     expect(row.observation_windows).toBe('[]');
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('is idempotent — a second run keeps a single observation_windows column', () => {
@@ -542,7 +542,7 @@ describe('applyMigrations — v11 per-plan objects-list sort', () => {
       sort_by: string;
     };
     expect(row.sort_by).toBe('transit');
-    expect(schemaVersion(db)).toBe(11);
+    expect(schemaVersion(db)).toBe(12);
   });
 
   it('round-trips a stored sort key', () => {
@@ -568,6 +568,48 @@ describe('applyMigrations — v11 per-plan objects-list sort', () => {
     applyMigrations(db);
     expect(() => applyMigrations(db)).not.toThrow();
     expect(getColumns(db, 'plans').filter((c) => c === 'sort_by').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — v12 photo capture details + gear setup link', () => {
+  it('adds capture_details (default {}) and gear_setup_id columns to photos', () => {
+    const db = freshBaseDb();
+    db.prepare(
+      `INSERT INTO photos (id, filename, original_name, width, height, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run('id1', 'a.jpg', 'a.jpg', 100, 100, '2026-01-01T00:00:00Z');
+    applyMigrations(db);
+    const cols = getColumns(db, 'photos');
+    expect(cols).toContain('capture_details');
+    expect(cols).toContain('gear_setup_id');
+    const row = db
+      .prepare('SELECT capture_details, gear_setup_id FROM photos WHERE id = ?')
+      .get('id1') as { capture_details: string; gear_setup_id: string | null };
+    expect(row.capture_details).toBe('{}');
+    expect(row.gear_setup_id).toBeNull();
+    expect(schemaVersion(db)).toBe(12);
+  });
+
+  it('round-trips capture details and a setup id', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    db.prepare(
+      `INSERT INTO photos (id, filename, original_name, width, height, created_at, capture_details, gear_setup_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('id1', 'a.jpg', 'a.jpg', 100, 100, '2026-01-01T00:00:00Z', '{"gain":120}', 'setup-1');
+    const row = db
+      .prepare('SELECT capture_details, gear_setup_id FROM photos WHERE id = ?')
+      .get('id1') as { capture_details: string; gear_setup_id: string | null };
+    expect(row.capture_details).toBe('{"gain":120}');
+    expect(row.gear_setup_id).toBe('setup-1');
+  });
+
+  it('is idempotent — a second run keeps single columns', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    expect(() => applyMigrations(db)).not.toThrow();
+    expect(getColumns(db, 'photos').filter((c) => c === 'capture_details').length).toBe(1);
+    expect(getColumns(db, 'photos').filter((c) => c === 'gear_setup_id').length).toBe(1);
   });
 });
 

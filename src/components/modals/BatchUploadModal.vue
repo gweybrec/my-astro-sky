@@ -71,6 +71,7 @@
           :item="item"
           :solver-availability="solverAvailability"
           :known-filter-map="knownFilterMap"
+          :gear-setups="gearSetups"
           @remove="removeItem(item)"
           @retry="retryItem(item)"
           @retry-upload="retryUploadItem(item)"
@@ -149,8 +150,9 @@ import {
   cancelLocalSolveJob,
   uploadPhoto,
   getSolverAvailability,
+  getGearSetups,
 } from '../../api';
-import type { SolverAvailability } from '../../api';
+import type { SolverAvailability, GearSetupData } from '../../api';
 import { reportUnknownRendererError } from '../../error-reporter';
 import { findDSOIdsFromCorrespondences } from '../../dso-catalog';
 import { stripExtension } from '../../file-utils';
@@ -201,9 +203,17 @@ function isSolverAvailable(solver: SolverType): boolean {
   return a.astrometry;
 }
 
+// Gear-setup list, loaded once and shared by every card's metadata panel.
+const gearSetups = ref<GearSetupData[]>([]);
+
 onMounted(async () => {
   if (!settingsStore.serverSettings) {
     await settingsStore.load();
+  }
+  try {
+    gearSetups.value = await getGearSetups();
+  } catch {
+    /* leave empty on failure — the picker just shows "none" */
   }
 });
 
@@ -251,6 +261,8 @@ function createBatchItem(file: File): BatchItem {
     pointsOfInterest: [],
     integrations: [],
     observationDate: '',
+    captureDetails: {},
+    gearSetupId: null,
     notes: '',
     customName: stripExtension(file.name),
     elapsedSeconds: 0,

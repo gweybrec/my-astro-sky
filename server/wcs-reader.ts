@@ -16,15 +16,117 @@ export interface WCSData {
   NAXIS1: number;
   NAXIS2: number;
   // Optional observation metadata from FITS headers
-  dateObs?: string; // DATE-OBS, normalised to UTC ISO 8601 (Z suffix)
+  dateObs?: string; // DATE-OBS (or DATE fallback), normalised to UTC ISO 8601 (Z suffix)
   expTime?: number; // EXPTIME in seconds
   stackCnt?: number; // STACKCNT, number of stacked frames
+  filter?: string; // FILTER name (feeds the integration row)
+  captureDetails?: Record<string, number | string>; // parsed capture fields (see CAPTURE_FITS_MAP)
 }
 
 /** Append 'Z' to a FITS DATE-OBS value that has no timezone designator. */
 export function normalizeDateObs(raw: string): string {
   if (/Z|[+-]\d\d:?\d\d$/.test(raw)) return raw;
   return raw + 'Z';
+}
+
+/**
+ * True for the Siril placeholder timestamp `YYYY-01-01T00:00:00` (midnight, Jan 1),
+ * written when a stacked/mosaic image has no single observation time to carry forward.
+ */
+export function isPlaceholderDate(raw: string): boolean {
+  return /^\d{4}-01-01T00:00:00(\.0+)?(Z|[+-]\d\d:?\d\d)?$/.test(raw.trim());
+}
+
+/** A header date string we can trust: parseable to a real Date and not the placeholder. */
+export function isUsableDate(raw: unknown): raw is string {
+  if (typeof raw !== 'string' || raw.trim().length === 0) return false;
+  if (isPlaceholderDate(raw)) return false;
+  return !Number.isNaN(new Date(normalizeDateObs(raw.trim())).getTime());
+}
+
+/**
+ * Pick the best observation date: DATE-OBS if usable, else the DATE card if usable,
+ * else undefined. `DATE` is the file-processing timestamp — only a sane fallback.
+ */
+export function pickObsDate(dateObs?: unknown, date?: unknown): string | undefined {
+  if (isUsableDate(dateObs)) return normalizeDateObs(dateObs.trim());
+  if (isUsableDate(date)) return normalizeDateObs(date.trim());
+  return undefined;
+}
+
+/**
+ * Canonical map of capture-detail field id → FITS keyword(s) + how to coerce the value.
+ * The frontend catalog (`src/capture-fields.ts`) must use the same ids (drift test).
+ * `INSTRUME`/`TELESCOP` are intentionally excluded — gear comes from the setup link.
+ */
+export const CAPTURE_FITS_MAP: Array<{
+  id: string;
+  keys: string[];
+  kind: 'number' | 'string';
+}> = [
+  { id: 'gain', keys: ['GAIN'], kind: 'number' },
+  { id: 'offset', keys: ['OFFSET'], kind: 'number' },
+  { id: 'iso', keys: ['ISOSPEED', 'ISO'], kind: 'number' },
+  { id: 'ccdTemp', keys: ['CCD-TEMP'], kind: 'number' },
+  { id: 'setTemp', keys: ['SET-TEMP'], kind: 'number' },
+  { id: 'binning', keys: ['XBINNING'], kind: 'string' }, // formatted "NxM" using YBINNING
+];
+
+const CAPTURE_FIELD_KIND = new Map<string, 'number' | 'string'>(
+  CAPTURE_FITS_MAP.map((f) => [f.id, f.kind]),
+);
+
+/**
+ * Keep only known capture-detail fields with valid values: finite numbers, or
+ * trimmed non-empty strings (≤64 chars). Unknown keys and bad values are dropped.
+ * Shared by the server DB layer and (mirrored) by the client sanitizer.
+ */
+export function sanitizeCaptureDetails(obj: unknown): Record<string, number | string> {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const src = obj as Record<string, unknown>;
+  const out: Record<string, number | string> = {};
+  for (const [id, kind] of CAPTURE_FIELD_KIND) {
+    const raw = src[id];
+    if (raw === undefined || raw === null || raw === '') continue;
+    if (kind === 'number') {
+      const num = typeof raw === 'number' ? raw : Number(raw);
+      if (Number.isFinite(num)) out[id] = num;
+    } else {
+      const str = String(raw).trim().slice(0, 64);
+      if (str.length > 0) out[id] = str;
+    }
+  }
+  return out;
+}
+
+/** Extract the known capture fields from a parsed FITS header, omitting absent/invalid ones. */
+export function extractCaptureDetails(
+  parsed: Record<string, number | string | boolean>,
+): Record<string, number | string> {
+  const out: Record<string, number | string> = {};
+  for (const { id, keys, kind } of CAPTURE_FITS_MAP) {
+    // First present keyword wins (e.g. ISOSPEED before ISO).
+    const key = keys.find((k) => parsed[k] !== undefined);
+    if (key === undefined) continue;
+    const raw = parsed[key];
+
+    if (kind === 'number') {
+      const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
+      // Round away 32-bit-float noise from FITS values (e.g. 2.90000009536743 → 2.9).
+      if (Number.isFinite(num)) out[id] = Number(num.toFixed(4));
+    } else {
+      const str = String(raw).trim();
+      if (str.length === 0) continue;
+      if (id === 'binning') {
+        const yb = parsed['YBINNING'];
+        const ybStr = yb !== undefined ? String(yb).trim() : str;
+        out[id] = `${str}x${ybStr}`;
+      } else {
+        out[id] = str;
+      }
+    }
+  }
+  return out;
 }
 
 interface CatalogStar {
@@ -667,15 +769,24 @@ export function extractWCS(buffer: Buffer, ext: string): WCSData | null {
     NAXIS2: (parsed.NAXIS2 as number) || 0,
   };
 
-  const rawDateObs = parsed['DATE-OBS'];
-  if (typeof rawDateObs === 'string' && rawDateObs.length > 0) {
-    wcs.dateObs = normalizeDateObs(rawDateObs);
+  // DATE-OBS is preferred; fall back to the DATE card only when both are sane.
+  // Siril writes the placeholder YYYY-01-01T00:00:00 for multi-session stacks.
+  const obsDate = pickObsDate(parsed['DATE-OBS'], parsed['DATE']);
+  if (obsDate) {
+    wcs.dateObs = obsDate;
   }
   if (typeof parsed.EXPTIME === 'number' && isFinite(parsed.EXPTIME) && parsed.EXPTIME >= 0) {
     wcs.expTime = parsed.EXPTIME;
   }
   if (typeof parsed.STACKCNT === 'number' && isFinite(parsed.STACKCNT)) {
     wcs.stackCnt = Math.round(parsed.STACKCNT);
+  }
+  if (typeof parsed.FILTER === 'string' && parsed.FILTER.trim().length > 0) {
+    wcs.filter = parsed.FILTER.trim();
+  }
+  const captureDetails = extractCaptureDetails(parsed);
+  if (Object.keys(captureDetails).length > 0) {
+    wcs.captureDetails = captureDetails;
   }
 
   return wcs;
