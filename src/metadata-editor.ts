@@ -2,7 +2,7 @@ import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
 import type { Photo, PhotoIntegration, PointOfInterest, CaptureDetails } from './types';
 import type { GearSetupData } from './api';
-import { updatePhotoMetadata, getGearSetups } from './api';
+import { updatePhotoMetadata, getGearSetups, solveWCS } from './api';
 import { sanitizeCaptureDetails } from './capture-fields';
 import { showToast } from './toast';
 import { t } from './i18n';
@@ -180,6 +180,90 @@ export function buildMetadataEditorPanel(
   // so this imperatively-mounted app needs the shared pinia instance installed.
   app.use(pinia);
   app.mount(panelEl);
+
+  // ── Load metadata from a WCS/FITS/TIFF file ───────────────────────────────────
+  // Re-solves the companion file to back-fill capture metadata after the fact (e.g.
+  // when the photo was placed with a different solver). Only fills empty fields —
+  // never clobbers values the user already entered.
+  const wcsRow = document.createElement('div');
+  // `wcs-load-row` is a hook gallery.ts uses to relocate this out of the scrolling
+  // form into the fixed action area; `my-2` spaces it in the standalone modal.
+  wcsRow.className = 'wcs-load-row my-2';
+
+  const wcsBtn = document.createElement('button');
+  wcsBtn.type = 'button';
+  wcsBtn.className = 'btn-action btn-action--full';
+  wcsBtn.textContent = t('gallery.loadFromWcs');
+
+  const wcsInput = document.createElement('input');
+  wcsInput.type = 'file';
+  wcsInput.accept = '.fit,.fits,.tif,.tiff';
+  wcsInput.className = 'hidden';
+
+  wcsBtn.addEventListener('click', () => {
+    wcsInput.value = '';
+    wcsInput.click();
+  });
+
+  wcsInput.addEventListener('change', async () => {
+    const file = wcsInput.files?.[0];
+    if (!file) return;
+    wcsBtn.disabled = true;
+    const label = wcsBtn.textContent;
+    wcsBtn.textContent = t('gallery.loadFromWcsLoading');
+    try {
+      const result = await solveWCS(file, photo.width || undefined, photo.height || undefined);
+      if (!result.success) {
+        showToast({ message: t('gallery.loadFromWcsError'), type: 'error', duration: 4000 });
+        return;
+      }
+      let filled = 0;
+      if (result.dateObs && !state.observationDate) {
+        state.observationDate = result.dateObs;
+        filled++;
+      }
+      if (result.expTime && result.stackCnt && state.integrations.length === 0) {
+        state.integrations = [
+          {
+            frames: Math.round(result.stackCnt),
+            seconds: Math.round(result.expTime),
+            filter: result.filter ?? '',
+          },
+        ];
+        rememberFilters([result.filter ?? '']);
+        filled++;
+      }
+      if (result.captureDetails) {
+        const merged: CaptureDetails = { ...state.captureDetails };
+        for (const [k, v] of Object.entries(result.captureDetails)) {
+          if (merged[k] === undefined || merged[k] === '') {
+            merged[k] = v;
+            filled++;
+          }
+        }
+        state.captureDetails = merged;
+      }
+      showToast({
+        message: filled > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
+        type: 'info',
+        duration: 3500,
+      });
+    } catch (err: any) {
+      showToast({
+        message: err?.message || t('gallery.loadFromWcsError'),
+        type: 'error',
+        duration: 4000,
+      });
+    } finally {
+      wcsBtn.disabled = false;
+      wcsBtn.textContent = label;
+    }
+  });
+
+  wcsRow.appendChild(wcsBtn);
+  wcsRow.appendChild(wcsInput);
+  // Placed after the form (panelEl) and before the save/delete row, full width.
+  container.appendChild(wcsRow);
 
   // ── Buttons (imperative DOM so gallery.ts can query and move them) ────────────
   const btnRow = document.createElement('div');

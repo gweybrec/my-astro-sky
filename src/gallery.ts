@@ -687,6 +687,17 @@ export class Gallery {
       this.onDeletePhoto?.(photo);
     });
     actionRow.appendChild(deleteBtn);
+
+    // Move the "Load a WCS file" row out of the scrolling form into the fixed action
+    // area as a full-width line above the save/delete buttons (so it spans their width).
+    const wcsLoadRow = formContainer.querySelector<HTMLElement>('.wcs-load-row');
+    if (wcsLoadRow) {
+      wcsLoadRow.classList.remove('my-2');
+      wcsLoadRow.classList.add('basis-full', 'w-full');
+      actionRow.classList.add('flex-wrap');
+      actionRow.insertBefore(wcsLoadRow, actionRow.firstChild);
+    }
+
     meta.appendChild(actionRow);
 
     // ── Zoom / pan ────────────────────────────────────────────────────────────
