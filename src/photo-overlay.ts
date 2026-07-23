@@ -642,12 +642,25 @@ export class PhotoOverlay {
 
   /** Update in-memory photo data (dsoIds, labels, notes) after a metadata edit */
   updatePhotoData(updated: Photo): void {
-    const idx = this.placedPhotos.findIndex((p) => p.photo.id === updated.id);
-    if (idx >= 0) {
-      // Replace with a new object so Vue's shallowRef detects the change via reference equality
-      this.placedPhotos[idx] = { ...this.placedPhotos[idx], photo: updated };
-      this.fireOnPhotosChanged();
+    this.updatePhotosData([updated]);
+  }
+
+  /**
+   * Same as updatePhotoData for a whole batch, firing onPhotosChanged **once** —
+   * a per-photo call would trigger one full map re-render + gallery reload each
+   * (see the batch label/setup editor).
+   */
+  updatePhotosData(updated: Photo[]): void {
+    let changed = false;
+    for (const photo of updated) {
+      const idx = this.placedPhotos.findIndex((p) => p.photo.id === photo.id);
+      if (idx >= 0) {
+        // Replace with a new object so Vue's shallowRef detects the change via reference equality
+        this.placedPhotos[idx] = { ...this.placedPhotos[idx], photo };
+        changed = true;
+      }
     }
+    if (changed) this.fireOnPhotosChanged();
   }
 
   /** Compute canvas-space quadrilaterals for all visible photos */

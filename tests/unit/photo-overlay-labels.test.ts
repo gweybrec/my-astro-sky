@@ -158,6 +158,43 @@ describe('PhotoOverlay label filtering', () => {
     });
   });
 
+  describe('updatePhotosData', () => {
+    it('updates every photo and fires onPhotosChanged only once', () => {
+      overlay.loadPhotos([makePhoto('1', ['A']), makePhoto('2', ['B'])]);
+      let fired = 0;
+      overlay.addOnPhotosChanged(() => fired++);
+
+      overlay.updatePhotosData([makePhoto('1', ['A', 'new']), makePhoto('2', ['renamed'])]);
+
+      expect(fired).toBe(1);
+      const byId = new Map(overlay.getPlacedPhotos().map((p) => [p.photo.id, p.photo]));
+      expect(byId.get('1')!.labels).toEqual(['A', 'new']);
+      expect(byId.get('2')!.labels).toEqual(['renamed']);
+    });
+
+    it('ignores unknown ids and does not fire when nothing matched', () => {
+      overlay.loadPhotos([makePhoto('1', ['A'])]);
+      let fired = 0;
+      overlay.addOnPhotosChanged(() => fired++);
+
+      overlay.updatePhotosData([makePhoto('nope', ['X'])]);
+
+      expect(fired).toBe(0);
+      expect(overlay.getPlacedPhotos()).toHaveLength(1);
+    });
+
+    it('replaces the PlacedPhoto object so shallowRef consumers see a new reference', () => {
+      overlay.loadPhotos([makePhoto('1', ['A'])]);
+      const before = overlay.getPlacedPhotos()[0];
+
+      overlay.updatePhotoData(makePhoto('1', ['B']));
+
+      const after = overlay.getPlacedPhotos()[0];
+      expect(after).not.toBe(before);
+      expect(after.photo.labels).toEqual(['B']);
+    });
+  });
+
   it('respects the (no label) special key for unlabeled photos', () => {
     const p1 = makePhoto('1', undefined);
     const p2 = makePhoto('2', ['X']);

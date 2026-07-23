@@ -59,6 +59,14 @@
           <span class="labels-count-span">{{ item.count }}</span>
         </label>
       </DropdownPanel>
+      <button
+        type="button"
+        class="btn-icon shrink-0 self-stretch inline-flex items-center justify-center !py-0 !px-[var(--space-4)] leading-none"
+        :title="t('gallery.batchEdit.gearTitleSetups')"
+        @click.stop="batchEditMode = 'setup'"
+      >
+        ⚙
+      </button>
     </div>
 
     <!-- Labels dropdown -->
@@ -107,6 +115,14 @@
           <span class="labels-count-span">{{ item.count }}</span>
         </label>
       </DropdownPanel>
+      <button
+        type="button"
+        class="btn-icon shrink-0 self-stretch inline-flex items-center justify-center !py-0 !px-[var(--space-4)] leading-none"
+        :title="t('gallery.batchEdit.gearTitleLabels')"
+        @click.stop="batchEditMode = 'label'"
+      >
+        ⚙
+      </button>
     </div>
 
     <!-- Points of Interest dropdown (two-level: category → POI name) -->
@@ -211,6 +227,14 @@
       <span v-html="exportSvg" class="inline-flex w-4 h-4" />
       {{ t('settings.exportView.selection') }}
     </button>
+
+    <!-- Batch label / setup editor (teleports to <body>, so it isn't clipped here) -->
+    <BatchPhotoEditModal
+      v-if="batchEditMode"
+      :mode="batchEditMode"
+      @close="batchEditMode = null"
+      @saved="onBatchSaved"
+    />
   </div>
 </template>
 
@@ -223,6 +247,8 @@ import { DSO_TYPES_ALL } from '../../display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import PoiFilterDropdown from './PoiFilterDropdown.vue';
+import BatchPhotoEditModal from '../modals/BatchPhotoEditModal.vue';
+import type { BatchEditMode } from '../../batch-photo-edit';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import {
   buildPoiFilterGroups,
@@ -242,6 +268,16 @@ const canvasStore = useCanvasStore();
 const poiCategoriesStore = usePoiCategoriesStore();
 
 const viewMode = computed(() => uiStore.currentViewMode);
+
+// ── Batch label / setup editor ────────────────────────────────────────────────
+const batchEditMode = ref<BatchEditMode | null>(null);
+
+// Labels/setups may have appeared or disappeared — rebuild both option lists so
+// the dropdowns and their counts match what was just saved.
+function onBatchSaved() {
+  refreshLabels();
+  void refreshSetups();
+}
 
 // ── Points of Interest (two-level) ─────────────────────────────────────────────
 const poiGroups = ref<PoiFilterGroup[]>([]);
@@ -421,6 +457,7 @@ watch(viewMode, (mode) => {
   labelOpen.value = false;
   typeOpen.value = false;
   catalogOpen.value = false;
+  batchEditMode.value = null;
   canvasStore.gallery?.setSearchQuery('');
   canvasStore.gallery?.setSetupFilter(null);
   canvasStore.gallery?.setLabelFilter(null);
