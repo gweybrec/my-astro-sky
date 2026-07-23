@@ -161,6 +161,7 @@ const de: Translations = {
     photoOutlines: 'Fotorahmen',
     labels: 'Fotos nach Etikett filtern',
     noLabel: '(ohne Beschriftung)',
+    noSetup: '(ohne Ausrüstung)',
     selectAll: 'Alle auswählen',
     clear: 'Löschen',
     skyOpacity: 'Himmelstransparenz',
@@ -732,6 +733,7 @@ const de: Translations = {
     metadataTitle: 'Informationen bearbeiten',
     showOnMap: 'Auf Karte anzeigen',
     filterLabels: 'Etiketten',
+    filterSetups: 'Ausrüstung',
     filterTypes: 'Typen',
     filterCatalogs: 'Kataloge',
     filterPoi: 'Interessante Objekte',
@@ -1153,7 +1155,7 @@ const de: Translations = {
       'Nach Abschluss der Lösung auf «Speichern und auf Karte platzieren» klicken, um Fotos zu speichern und auf der Karte anzuzeigen. Fenster ohne Klick schließen, um zu verwerfen — nicht gespeicherte Lösungen bleiben nicht erhalten.',
     addMore: 'Weitere Fotos hinzufügen',
     labelsForAll: 'Etiketten für alle Fotos',
-    labelsForAllHint: 'Wird jedem Foto hinzugefügt; kombinierbar mit Foto-eigenen Etiketten.',
+    setupForAll: 'Ausrüstung für alle Fotos',
   },
 };
 

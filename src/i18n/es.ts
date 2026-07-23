@@ -161,6 +161,7 @@ const es: Translations = {
     photoOutlines: 'Contornos de fotos',
     labels: 'Filtrar fotos por etiqueta',
     noLabel: '(sin etiqueta)',
+    noSetup: '(sin equipo)',
     selectAll: 'Seleccionar todo',
     clear: 'Borrar',
     skyOpacity: 'Opacidad del cielo',
@@ -733,6 +734,7 @@ const es: Translations = {
     metadataTitle: 'Editar información',
     showOnMap: 'Ver en el mapa',
     filterLabels: 'Etiquetas',
+    filterSetups: 'Equipos',
     filterTypes: 'Tipos',
     filterCatalogs: 'Catálogos',
     filterPoi: 'Puntos de interés',
@@ -1152,7 +1154,7 @@ const es: Translations = {
       'Una vez finalizada la resolución, haz clic en «Guardar y colocar en el mapa» para guardar las fotos y mostrarlas en el mapa. Cerrar la ventana sin hacer clic en ese botón descarta los cambios — las soluciones no guardadas no se conservarán.',
     addMore: 'Añadir más fotos',
     labelsForAll: 'Etiquetas para todas las fotos',
-    labelsForAllHint: 'Se añaden a cada foto; combínalas con las etiquetas por foto.',
+    setupForAll: 'Equipo para todas las fotos',
   },
 };
 

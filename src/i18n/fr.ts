@@ -160,6 +160,7 @@ const fr = {
     photoOutlines: 'Cadres des photos',
     labels: 'Filtrer les photos par étiquette',
     noLabel: '(sans étiquette)',
+    noSetup: '(sans équipement)',
     selectAll: 'Tout sélectionner',
     clear: 'Effacer',
     skyOpacity: 'Opacité ciel',
@@ -732,6 +733,7 @@ const fr = {
     metadataTitle: 'Modifier les infos',
     showOnMap: 'Voir sur la carte',
     filterLabels: 'Étiquettes',
+    filterSetups: 'Équipements',
     filterTypes: 'Types',
     filterCatalogs: 'Catalogues',
     filterPoi: "Points d'intérêt",
@@ -1153,7 +1155,7 @@ const fr = {
       'Une fois la résolution terminée, cliquez sur « Sauvegarder et placer sur la carte » pour enregistrer les photos et les afficher sur la carte. Fermez la fenêtre sans cliquer sur ce bouton pour annuler — les photos non sauvegardées ne seront pas conservées.',
     addMore: "Ajouter d'autres photos",
     labelsForAll: 'Étiquettes pour toutes les photos',
-    labelsForAllHint: 'Ajoutées à chaque photo ; combinez avec les étiquettes par photo.',
+    setupForAll: 'Équipement pour toutes les photos',
   },
 };
 

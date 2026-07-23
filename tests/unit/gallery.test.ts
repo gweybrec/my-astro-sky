@@ -321,6 +321,73 @@ describe('Gallery', () => {
     expect(document.querySelectorAll('.gallery-item').length).toBe(3);
   });
 
+  it('setSetupFilter / getAllSetups group photos by linked gear setup with a (no setup) sentinel', () => {
+    const gallery = new Gallery();
+    const setup = (id: string, name: string) => ({
+      id,
+      name,
+      telescopeId: 't',
+      cameraId: 'c',
+      accessoryId: null,
+      enabled: true,
+    });
+    gallery.setGearSetups([setup('s1', 'Vespera'), setup('s2', 'Seestar')]);
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', gearSetupId: 's1' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg', gearSetupId: 's2' }),
+      makePhoto({ id: 'c', originalName: 'NGC7000', filename: 'c.jpg', gearSetupId: null }),
+      // dangling setup id (setup since deleted) is treated as "no setup"
+      makePhoto({ id: 'd', originalName: 'M13', filename: 'd.jpg', gearSetupId: 'gone' }),
+    ]);
+
+    // Options sorted by name, sentinel last; dangling + null fall into (no setup)
+    const setups = gallery.getAllSetups();
+    expect(setups.map((s) => s.setupId)).toEqual(['s2', 's1', '(no setup)']);
+    expect(setups.find((s) => s.setupId === '(no setup)')?.count).toBe(2);
+
+    gallery.setSetupFilter(['s1']);
+    expect(document.querySelectorAll('.gallery-item').length).toBe(1);
+    expect(document.querySelector('.gallery-item-name')?.textContent).toBe('M42');
+
+    gallery.setSetupFilter(['(no setup)']);
+    const names = Array.from(document.querySelectorAll('.gallery-item-name'))
+      .map((n) => n.textContent)
+      .sort();
+    expect(names).toEqual(['M13', 'NGC7000']);
+
+    gallery.setSetupFilter(null);
+    expect(document.querySelectorAll('.gallery-item').length).toBe(4);
+  });
+
+  it('renders the gear-setup name as the first (green) chip on grid cards', () => {
+    const gallery = new Gallery();
+    gallery.setGearSetups([
+      {
+        id: 's1',
+        name: 'Vespera',
+        telescopeId: 't',
+        cameraId: 'c',
+        accessoryId: null,
+        enabled: true,
+      },
+    ]);
+    gallery.loadPhotos([
+      makePhoto({
+        id: 'a',
+        originalName: 'M42',
+        filename: 'a.jpg',
+        gearSetupId: 's1',
+        labels: ['nebula'],
+      }),
+    ]);
+    const chips = document.querySelector('.gallery-item-chips')!;
+    const first = chips.querySelector('.tag-chip');
+    expect(first?.classList.contains('setup-chip')).toBe(true);
+    expect(first?.textContent).toBe('Vespera');
+    // The label chip is still rendered (now styled separately)
+    expect(chips.querySelector('.label-chip')?.textContent).toBe('nebula');
+  });
+
   it('setPoiFilter restricts to photos with a matching point of interest', () => {
     const gallery = new Gallery();
     gallery.setPoiCategories([

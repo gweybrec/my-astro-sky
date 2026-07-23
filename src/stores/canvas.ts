@@ -4,6 +4,7 @@ import type { SkyMap, FovFrameSpec } from '../sky-map';
 import type { PhotoOverlay } from '../photo-overlay';
 import type { Photo } from '../types';
 import type { PoiFilterGroup } from '../poi';
+import type { GearSetupData } from '../api';
 
 /** Minimal interface for objects that can show/hide themselves. */
 export interface ShowHide {
@@ -22,11 +23,14 @@ export interface GalleryInterface extends ShowHide {
   loadPhotos(photos: Photo[]): void;
   setSearchQuery(q: string): void;
   setLabelFilter(labels: string[] | null): void;
+  setSetupFilter(setupIds: string[] | null): void;
   setDSOTypeFilter(types: string[]): void;
   setDSOCatalogFilter(catalogs: string[]): void;
   setPoiFilter(selected: Map<string, Set<string>> | null): void;
+  setGearSetups(setups: GearSetupData[]): void;
   getAllPois(): PoiFilterGroup[];
   getAllLabels(): { label: string; count: number }[];
+  getAllSetups(): { setupId: string; name: string; count: number }[];
   getFilteredPhotos(): Photo[];
 }
 

@@ -200,7 +200,11 @@ async function init() {
 
   // Load existing photos from backend
   try {
-    const photos = await getPhotos();
+    const [photos, setups] = await Promise.all([
+      getPhotos(),
+      getGearSetups().catch(() => [] as Awaited<ReturnType<typeof getGearSetups>>),
+    ]);
+    gallery.setGearSetups(setups);
     overlay.loadPhotos(photos);
     gallery.loadPhotos(photos);
     // Ensure outlines are drawn on initial load (onViewChange hasn't fired yet)

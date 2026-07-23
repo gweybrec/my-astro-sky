@@ -232,12 +232,17 @@
   --btn-batch-trash-border-hover: rgba(200, 80, 80, 0.5);
 
   /* Chip tokens */
-  --chip-label-bg: rgba(80, 160, 80, 0.1);
-  --chip-label-border: rgba(80, 160, 80, 0.35);
-  --chip-label-text: rgba(140, 200, 140, 0.8);
-  --chip-label-bg-edit: rgba(60, 120, 60, 0.45);
-  --chip-label-border-edit: rgba(80, 180, 80, 0.4);
-  --chip-label-text-edit: #afa;
+  /* Labels — soft red (freed from gear-setup duty, now a general-purpose tag). */
+  --chip-label-bg: rgba(200, 90, 90, 0.1);
+  --chip-label-border: rgba(200, 90, 90, 0.35);
+  --chip-label-text: rgba(235, 150, 150, 0.85);
+  --chip-label-bg-edit: rgba(140, 55, 55, 0.45);
+  --chip-label-border-edit: rgba(200, 90, 90, 0.45);
+  --chip-label-text-edit: #f4b0b0;
+  /* Gear setup — green (the colour labels used to have). */
+  --chip-setup-bg: rgba(80, 160, 80, 0.1);
+  --chip-setup-border: rgba(80, 160, 80, 0.35);
+  --chip-setup-text: rgba(140, 200, 140, 0.8);
   --chip-gallery-border: rgba(192, 120, 48, 0.3);
 
   /* Toast / card status */
@@ -2118,8 +2123,10 @@ body {
   letter-spacing: 0.02em;
 }
 /* Observation-date input: match the other metadata field inputs (12px / secondary)
-   instead of the larger, brighter generic .dialog-input default (14px / primary). */
-.metadata-field .dialog-input {
+   instead of the larger, brighter generic .dialog-input default (14px / primary).
+   The batch "setup for all photos" dropdown reuses the same subdued treatment. */
+.metadata-field .dialog-input,
+.batch-labels-bar .dialog-input {
   font-size: var(--font-size-base);
   color: var(--text-secondary);
 }
@@ -2149,6 +2156,12 @@ body {
   background: var(--chip-label-bg);
   border-color: var(--chip-label-border);
   color: var(--chip-label-text);
+}
+
+.tag-chip.setup-chip {
+  background: var(--chip-setup-bg);
+  border-color: var(--chip-setup-border);
+  color: var(--chip-setup-text);
 }
 .tag-chip-remove {
   background: none;

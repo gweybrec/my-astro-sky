@@ -161,6 +161,7 @@ const en: Translations = {
     photoOutlines: 'Photo outlines',
     labels: 'Filter photos by label',
     noLabel: '(no label)',
+    noSetup: '(no setup)',
     selectAll: 'Select all',
     clear: 'Clear',
     skyOpacity: 'Sky opacity',
@@ -727,6 +728,7 @@ const en: Translations = {
     metadataTitle: 'Edit info',
     showOnMap: 'Show on map',
     filterLabels: 'Labels',
+    filterSetups: 'Setups',
     filterTypes: 'Types',
     filterCatalogs: 'Catalogs',
     filterPoi: 'Points of interest',
@@ -1142,7 +1144,7 @@ const en: Translations = {
       'Once solving is done, click “Save and place on map” to save photos and display them on the map. Close the window without clicking that button to discard — unsaved solves will not be kept.',
     addMore: 'Add more photos',
     labelsForAll: 'Labels for all photos',
-    labelsForAllHint: 'Added to every photo; combine with per-photo labels below.',
+    setupForAll: 'Setup for all photos',
   },
 };
 

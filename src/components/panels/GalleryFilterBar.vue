@@ -13,6 +13,54 @@
       <button v-if="searchQuery" class="search-clear-btn" @click="clearSearch">&times;</button>
     </div>
 
+    <!-- Setups dropdown -->
+    <div class="display-controls-mag-row">
+      <button
+        ref="setupBtnRef"
+        type="button"
+        class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
+        @click.stop="setupOpen = !setupOpen"
+      >
+        {{ t('gallery.filterSetups')
+        }}{{ selectedSetups.length > 0 ? ` (${selectedSetups.length})` : '' }}
+      </button>
+      <DropdownPanel v-model="setupOpen" :anchor-el="setupBtnRef" min-width="220px">
+        <div class="labels-select-all-row justify-between">
+          <span class="labels-select-all-label text-muted">{{
+            selectedSetups.length === 0
+              ? t('gallery.showingAll')
+              : `${selectedSetups.length} ${t('gallery.selected')}`
+          }}</span>
+          <button
+            type="button"
+            class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
+            :disabled="selectedSetups.length === 0"
+            @click="clearSetups"
+          >
+            ✕ {{ t('display.clear') }}
+          </button>
+        </div>
+        <div v-if="availableSetups.length === 0" class="px-6 py-3 text-muted text-base">—</div>
+        <label
+          v-for="item in availableSetups"
+          :key="item.setupId"
+          class="dso-toggle-label labels-select-all-row justify-between"
+        >
+          <div class="flex items-center">
+            <input
+              type="checkbox"
+              :checked="selectedSetups.includes(item.setupId)"
+              @change="(e) => toggleSetup(item.setupId, (e.target as HTMLInputElement).checked)"
+            />
+            <span class="tag-chip setup-chip tag-chip-sm ml-4">{{
+              item.setupId === '(no setup)' ? t('display.noSetup') : item.name
+            }}</span>
+          </div>
+          <span class="labels-count-span">{{ item.count }}</span>
+        </label>
+      </DropdownPanel>
+    </div>
+
     <!-- Labels dropdown -->
     <div class="display-controls-mag-row">
       <button
@@ -183,6 +231,7 @@ import {
   type PoiFilterGroup,
 } from '../../poi';
 import { showToast } from '../../toast';
+import { getGearSetups } from '../../api';
 import { downloadBlob } from '../../file-utils';
 import { reportUnknownRendererError } from '../../error-reporter';
 import exportSvg from '../../icons/export.svg?raw';
@@ -246,6 +295,39 @@ async function onExport() {
     showToast({ message: t('settings.exportView.error'), type: 'error', duration: 4000 });
   }
 }
+
+// ── Setups ────────────────────────────────────────────────────────────────────
+const setupBtnRef = ref<HTMLButtonElement>();
+const setupOpen = ref(false);
+const availableSetups = ref<{ setupId: string; name: string; count: number }[]>([]);
+const selectedSetups = ref<string[]>([]);
+
+async function refreshSetups() {
+  // Re-fetch so setups created since load appear; push into the gallery so chips resolve too.
+  try {
+    const setups = await getGearSetups();
+    canvasStore.gallery?.setGearSetups(setups);
+  } catch {
+    /* keep whatever the gallery already has */
+  }
+  availableSetups.value = canvasStore.gallery?.getAllSetups() ?? [];
+}
+
+function toggleSetup(setupId: string, checked: boolean) {
+  selectedSetups.value = checked
+    ? [...selectedSetups.value, setupId]
+    : selectedSetups.value.filter((s) => s !== setupId);
+  canvasStore.gallery?.setSetupFilter(selectedSetups.value);
+}
+
+function clearSetups() {
+  selectedSetups.value = [];
+  canvasStore.gallery?.setSetupFilter(null);
+}
+
+watch(setupOpen, (open) => {
+  if (open) void refreshSetups();
+});
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 const labelBtnRef = ref<HTMLButtonElement>();
@@ -313,28 +395,34 @@ function clearCatalogs() {
 // ── Init / reset filters on gallery entry/exit ────────────────────────────────
 watch(viewMode, (mode) => {
   if (mode === 'gallery') {
+    selectedSetups.value = [];
     selectedLabels.value = [];
     selectedTypes.value = [];
     selectedCatalogs.value = [];
     selectedPois.value = new Map();
+    canvasStore.gallery?.setSetupFilter(null);
     canvasStore.gallery?.setLabelFilter(null);
     canvasStore.gallery?.setDSOTypeFilter([]);
     canvasStore.gallery?.setDSOCatalogFilter([]);
     canvasStore.gallery?.setPoiFilter(null);
     refreshLabels();
+    void refreshSetups();
     poiCategoriesStore.ensureLoaded();
     refreshPois();
     return;
   }
   searchQuery.value = '';
+  selectedSetups.value = [];
   selectedLabels.value = [];
   selectedTypes.value = [];
   selectedCatalogs.value = [];
   selectedPois.value = new Map();
+  setupOpen.value = false;
   labelOpen.value = false;
   typeOpen.value = false;
   catalogOpen.value = false;
   canvasStore.gallery?.setSearchQuery('');
+  canvasStore.gallery?.setSetupFilter(null);
   canvasStore.gallery?.setLabelFilter(null);
   canvasStore.gallery?.setDSOTypeFilter([]);
   canvasStore.gallery?.setDSOCatalogFilter([]);

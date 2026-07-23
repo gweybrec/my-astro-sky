@@ -1,4 +1,5 @@
 import type { Photo, PoiCategory } from './types';
+import type { GearSetupData } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
@@ -69,10 +70,15 @@ export class Gallery {
   private filterByDSOTypes: string[] | null = null;
   private filterByDSOCatalogs: string[] | null = null;
   private filterByLabels: string[] | null = null;
+  // Filter by linked gear setup. Values are setup ids, plus the '(no setup)'
+  // sentinel for photos with no setup. null ⇒ no filter.
+  private filterBySetups: string[] | null = null;
   // Two-level POI filter: categoryId → set of selected names (empty set ⇒ whole
   // category). null ⇒ no POI filter (every photo passes).
   private filterByPois: Map<string, Set<string>> | null = null;
   private poiCategories: PoiCategory[] = [];
+  private gearSetups: GearSetupData[] = [];
+  private setupNameById = new Map<string, string>();
   private searchQuery: string = '';
   private lazyObserver: IntersectionObserver;
   private carouselTimer: ReturnType<typeof setInterval> | null = null;
@@ -114,6 +120,50 @@ export class Gallery {
   setLabelFilter(labels: string[] | null) {
     this.filterByLabels = labels && labels.length > 0 ? labels : null;
     this.applyFilters();
+  }
+
+  /** Provide the live gear-setup list so grid chips resolve names and the setup filter works. */
+  setGearSetups(setups: GearSetupData[]) {
+    this.gearSetups = setups;
+    this.setupNameById = new Map(setups.map((s) => [s.id, s.name || s.id]));
+    this.renderCarousel();
+    this.applyFilters();
+  }
+
+  /** Resolve a photo's gearSetupId to its display name (undefined if unset or dangling). */
+  private resolveSetupName(gearSetupId?: string | null): string | undefined {
+    if (!gearSetupId) return undefined;
+    return this.setupNameById.get(gearSetupId);
+  }
+
+  setSetupFilter(setupIds: string[] | null) {
+    this.filterBySetups = setupIds && setupIds.length > 0 ? setupIds : null;
+    this.applyFilters();
+  }
+
+  /**
+   * Setup filter options: one entry per setup that at least one photo links to, plus a
+   * '(no setup)' sentinel for unlinked photos. Setups no photo uses are omitted.
+   */
+  getAllSetups(): { setupId: string; name: string; count: number }[] {
+    const counts = new Map<string, number>();
+    for (const p of this.photos) {
+      const id =
+        p.gearSetupId && this.setupNameById.has(p.gearSetupId) ? p.gearSetupId : '(no setup)';
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([setupId, count]) => ({
+        setupId,
+        name:
+          setupId === '(no setup)' ? '(no setup)' : (this.setupNameById.get(setupId) ?? setupId),
+        count,
+      }))
+      .sort((a, b) => {
+        if (a.setupId === '(no setup)') return 1; // sentinel last
+        if (b.setupId === '(no setup)') return -1;
+        return a.name.localeCompare(b.name);
+      });
   }
 
   setSearchQuery(query: string) {
@@ -183,6 +233,18 @@ export class Gallery {
       );
     }
 
+    // Filter by gear setup — null means no filter; (no setup) sentinel controls unlinked photos
+    if (this.filterBySetups !== null) {
+      const sel = this.filterBySetups;
+      filtered = filtered.filter((photo) => {
+        const id =
+          photo.gearSetupId && this.setupNameById.has(photo.gearSetupId)
+            ? photo.gearSetupId
+            : '(no setup)';
+        return sel.includes(id);
+      });
+    }
+
     // Filter by DSO types — photos with no DSO always pass; others need at least one match
     if (this.filterByDSOTypes && this.filterByDSOTypes.length > 0) {
       const sel = this.filterByDSOTypes;
@@ -233,9 +295,17 @@ export class Gallery {
     dsoIds: string[],
     labels: string[],
     pois: import('./types').PointOfInterest[] = [],
+    setupName?: string,
   ): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'gallery-item-chips';
+    // Setup name is the first, most prominent chip (green).
+    if (setupName) {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip setup-chip';
+      chip.textContent = setupName;
+      wrap.appendChild(chip);
+    }
     for (const poi of pois) {
       const cat = this.poiCategories.find((c) => c.id === poi.categoryId);
       const icon = poiTypeIcon(poi.categoryId);
@@ -341,13 +411,15 @@ export class Gallery {
       nameEl.textContent = photo.originalName;
       caption.appendChild(nameEl);
 
+      const setupName = this.resolveSetupName(photo.gearSetupId);
       if (
+        setupName ||
         photo.dsoIds.length > 0 ||
         photo.labels.length > 0 ||
         (photo.pointsOfInterest?.length ?? 0) > 0
       ) {
         caption.appendChild(
-          this.buildChips(photo.dsoIds, photo.labels, photo.pointsOfInterest ?? []),
+          this.buildChips(photo.dsoIds, photo.labels, photo.pointsOfInterest ?? [], setupName),
         );
       }
 
@@ -422,6 +494,13 @@ export class Gallery {
     const updateCaption = (photo: Photo) => {
       nameEl.textContent = photo.originalName;
       chipsEl.innerHTML = '';
+      const setupName = this.resolveSetupName(photo.gearSetupId);
+      if (setupName) {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip setup-chip';
+        chip.textContent = setupName;
+        chipsEl.appendChild(chip);
+      }
       for (const label of photo.labels) {
         const chip = document.createElement('span');
         chip.className = 'tag-chip label-chip';

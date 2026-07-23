@@ -19,39 +19,61 @@
       <!-- Batch labels bar -->
       <div class="batch-labels-bar">
         <div class="batch-labels-bar-main">
-          <span class="batch-labels-bar-title">{{ t('batch.labelsForAll') }}</span>
-          <div class="batch-labels-input-row">
-            <div v-if="batchLabels.length > 0" class="tag-chips">
-              <span v-for="lbl in batchLabels" :key="lbl" class="tag-chip label-chip">
-                {{ lbl }}
-                <button type="button" class="tag-chip-remove" @click="removeBatchLabel(lbl)">
-                  ×
-                </button>
-              </span>
-            </div>
-            <div class="tag-input-wrap relative">
-              <input
-                class="tag-input"
-                :placeholder="t('modal.metadataLabelsPlaceholder')"
-                v-model="batchLabelInput"
-                @input="showBatchLabelSuggest = true"
-                @focus="showBatchLabelSuggest = true"
-                @keydown="onBatchLabelKeydown"
-                @blur="onBatchLabelBlur"
-              />
-              <div v-if="showBatchLabelSuggest && batchLabelSuggestions.length" class="tag-suggest">
-                <div
-                  v-for="suggestion in batchLabelSuggestions"
-                  :key="suggestion"
-                  class="tag-suggest-item"
-                  @mousedown.prevent="selectBatchLabelSuggestion(suggestion)"
-                >
-                  {{ suggestion }}
+          <div class="flex flex-row flex-wrap items-start gap-8">
+            <!-- Labels for all photos -->
+            <div class="flex flex-col gap-2">
+              <span class="batch-labels-bar-title">{{ t('batch.labelsForAll') }}</span>
+              <div class="batch-labels-input-row">
+                <div v-if="batchLabels.length > 0" class="tag-chips">
+                  <span v-for="lbl in batchLabels" :key="lbl" class="tag-chip label-chip">
+                    {{ lbl }}
+                    <button type="button" class="tag-chip-remove" @click="removeBatchLabel(lbl)">
+                      ×
+                    </button>
+                  </span>
+                </div>
+                <div class="tag-input-wrap relative">
+                  <input
+                    class="tag-input"
+                    :placeholder="t('modal.metadataLabelsPlaceholder')"
+                    v-model="batchLabelInput"
+                    @input="showBatchLabelSuggest = true"
+                    @focus="showBatchLabelSuggest = true"
+                    @keydown="onBatchLabelKeydown"
+                    @blur="onBatchLabelBlur"
+                  />
+                  <div
+                    v-if="showBatchLabelSuggest && batchLabelSuggestions.length"
+                    class="tag-suggest"
+                  >
+                    <div
+                      v-for="suggestion in batchLabelSuggestions"
+                      :key="suggestion"
+                      class="tag-suggest-item"
+                      @mousedown.prevent="selectBatchLabelSuggestion(suggestion)"
+                    >
+                      {{ suggestion }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            <!-- Setup for all photos -->
+            <div class="flex flex-col gap-2 w-[240px] shrink-0">
+              <span class="batch-labels-bar-title">{{ t('batch.setupForAll') }}</span>
+              <select
+                class="dialog-input !py-[var(--space-2h)] !h-[25.2px]"
+                :value="batchSetupId"
+                @change="onBatchSetupChange"
+              >
+                <option value="">{{ t('modal.metadataGearSetupNone') }}</option>
+                <option v-for="s in gearSetups" :key="s.id" :value="s.id">
+                  {{ s.name || s.id }}
+                </option>
+              </select>
+            </div>
           </div>
-          <p class="batch-labels-bar-hint">{{ t('batch.labelsForAllHint') }}</p>
         </div>
         <button
           class="btn-action batch-add-more-btn"
@@ -745,6 +767,17 @@ function retryUploadItem(item: BatchItem) {
   } else {
     placeAll();
   }
+}
+
+// ─── Batch gear setup ─────────────────────────────────────────────────────────
+// Selecting a setup here overwrites gearSetupId on every loaded card (unlike batch
+// labels, which are merged at placement time).
+const batchSetupId = ref('');
+
+function onBatchSetupChange(e: Event) {
+  batchSetupId.value = (e.target as HTMLSelectElement).value;
+  const setupId = batchSetupId.value || null;
+  for (const item of items) item.gearSetupId = setupId;
 }
 
 // ─── Batch labels ─────────────────────────────────────────────────────────────
