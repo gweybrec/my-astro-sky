@@ -124,8 +124,16 @@ export class Gallery {
 
   /** Provide the live gear-setup list so grid chips resolve names and the setup filter works. */
   setGearSetups(setups: GearSetupData[]) {
+    const nextEntries = setups.map((s) => [s.id, s.name || s.id] as const);
+    const changed =
+      nextEntries.length !== this.setupNameById.size ||
+      nextEntries.some(([id, name]) => this.setupNameById.get(id) !== name);
     this.gearSetups = setups;
-    this.setupNameById = new Map(setups.map((s) => [s.id, s.name || s.id]));
+    this.setupNameById = new Map(nextEntries);
+    // Re-fetched on every dropdown open (see GalleryFilterBar) so this is a no-op most of
+    // the time — skip the rebuild to avoid reshuffling/restarting the hero carousel for
+    // nothing every time the user opens the setups filter.
+    if (!changed) return;
     this.renderCarousel();
     this.applyFilters();
   }

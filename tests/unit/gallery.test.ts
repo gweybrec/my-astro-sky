@@ -388,6 +388,35 @@ describe('Gallery', () => {
     expect(chips.querySelector('.label-chip')?.textContent).toBe('nebula');
   });
 
+  it('setGearSetups is a no-op when the setup list is unchanged (no hero carousel rebuild)', () => {
+    const gallery = new Gallery();
+    const setup = (id: string, name: string) => ({
+      id,
+      name,
+      telescopeId: 't',
+      cameraId: 'c',
+      accessoryId: null,
+      enabled: true,
+    });
+    gallery.setGearSetups([setup('s1', 'Vespera')]);
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg', gearSetupId: 's1' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg', gearSetupId: 's1' }),
+    ]);
+
+    const heroImgBefore = document.querySelector('.gallery-carousel-img');
+    expect(heroImgBefore).not.toBeNull();
+
+    // Re-supplying an identical setup list (e.g. re-fetched every time the setups
+    // dropdown is opened) must not tear down and rebuild the hero carousel.
+    gallery.setGearSetups([setup('s1', 'Vespera')]);
+    expect(document.querySelector('.gallery-carousel-img')).toBe(heroImgBefore);
+
+    // A genuine change (rename) still refreshes it.
+    gallery.setGearSetups([setup('s1', 'Vespera Pro')]);
+    expect(document.querySelector('.gallery-carousel-img')).not.toBe(heroImgBefore);
+  });
+
   it('setPoiFilter restricts to photos with a matching point of interest', () => {
     const gallery = new Gallery();
     gallery.setPoiCategories([
