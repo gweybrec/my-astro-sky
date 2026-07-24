@@ -1587,7 +1587,16 @@ export class SkyMap {
       const skyMoved = a !== null && this.simDate.getTime() !== a.simMs;
       const cursorStill =
         a !== null && Math.hypot(mx - a.mx, my - a.my) <= SkyMap.HOVER_DRIFT_GRACE_PX;
-      if (skyMoved && cursorStill) return; // object drifted, cursor didn't — hold
+      if (skyMoved && cursorStill) {
+        // Refresh the anchor to this frame's position/time instead of leaving it
+        // pinned to the original find. Otherwise the grace radius is a *cumulative*
+        // budget spent across the whole hold (every real mouse has some tremor), so a
+        // long hold during a fast clock eventually exceeds it and the tooltip drops —
+        // even though the cursor barely moved on any single frame. Refreshing makes it
+        // a per-frame tolerance instead, so a genuinely still cursor holds indefinitely.
+        this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
+        return;
+      }
       this.hoverAnchor = null;
       this.onStarHover?.(null, clientX, clientY);
     }
