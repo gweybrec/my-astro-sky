@@ -11,6 +11,7 @@ import { t } from './i18n';
 import { formatAlt } from './format-utils';
 import { buildSetupInfoRows } from './setup-info';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
+import { catalogFilterColor } from './gear-catalog';
 import { moonDangerLevel, type AltSample } from './sky-geometry';
 import { drawMoonMarker } from './moon-draw';
 import {
@@ -652,7 +653,7 @@ function drawAltChartToCanvas(
       const x1 = gutter + Math.max(0, Math.min(1, w.endFrac)) * plotW;
       const bandW = Math.max(0, x1 - x0);
       if (bandW <= 0) continue;
-      const color = resolveWindowColor(w, readVar);
+      const color = resolveWindowColor(w, readVar, catalogFilterColor);
       // Keep the interior translucent so the curve shows through — token colours
       // already carry alpha; an opaque user hex is converted to rgba by toBandFill.
       ctx.fillStyle = toBandFill(color, 0.3);
@@ -1127,7 +1128,7 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
         let legendY = chartTop + layout.chartH + legendPadTop;
         doc.setFontSize(7.5);
         for (const w of windows) {
-          const hex = cssColorToHex(resolveWindowColor(w, readVar));
+          const hex = cssColorToHex(resolveWindowColor(w, readVar, catalogFilterColor));
           doc.setFillColor(
             parseInt(hex.slice(1, 3), 16),
             parseInt(hex.slice(3, 5), 16),

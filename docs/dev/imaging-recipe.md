@@ -89,6 +89,17 @@ else (mono camera, non-integrated scope)
         note: noteCluster
 ```
 
+> **Suggested-filter badges stay generic on purpose.** The recipe recommends a
+> _band_ (`Ha`, `OIII`, `L`…), not a product, so the "Suggested filters" badges on
+> result cards keep the generic names and their `--filter-{key}` token colours.
+> This is deliberately distinct from the **filter catalog** (`resources/filters.json`,
+> surfaced via `gear-catalog.ts`), which is used when a user tags an _actual_
+> acquisition — the photo integration rows and the plan observation-window picker.
+> There, a real product ("Antlia Pro Luminance") is chosen and rendered in its own
+> catalogued colour. The two never collide: no catalog product is allowed to share a
+> name with a generic band (guarded in `tests/unit/filters-json-schema.test.ts`), so
+> `createFilterBadge('Ha')` always takes the generic path.
+
 ### Sub-exposure durations
 
 | Mode       | bright (mag ≤ 9) | medium (9–12) | faint (mag > 12) |

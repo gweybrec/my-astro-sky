@@ -64,6 +64,14 @@ catches it if the generation chain is ever broken apart again.
 recomputing, so it's also safe to run standalone (`node scripts/add-ratings.mjs`) after
 changing its rating/difficulty/containment/priority logic, without a manual reset step.
 
+### Filter catalog colours
+
+`npm run filters:seed` (`scripts/seed-filter-colors.mjs`) seeds the per-entry `color`
+on `resources/filters.json`; it only fills entries missing a valid `#rrggbb`, so hand
+overrides survive. Run it after appending filters to the catalog. Filters are served at
+`GET /api/filters` and consumed via `src/gear-catalog.ts` (they are **not** part of a
+gear setup — picked per integration row / observation window).
+
 ### Linting & formatting
 
 ESLint (flat config, `eslint.config.js`) + Prettier (`.prettierrc.json`).

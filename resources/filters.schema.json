@@ -1,0 +1,45 @@
+{
+  "id": "string (kebab-case unique identifier, e.g. 'antlia-ha-pro-3nm')",
+  "brand": "string",
+  "model": "string",
+  "series": "string | null (product line name, e.g. 'Pro', 'MaxFR', 'LRGBC')",
+
+  "type": "enum[broadband, narrowband, dual_narrowband, triband_narrowband, quadband_narrowband, light_pollution, solar_narrowband, solar_nd, none]",
+  "subtype": "enum[luminance, red, green, blue, green/visual, blue/green, near-IR, LRGB set, UV/IR cut, DSLR LPF, DSLR LPF Ha-modified, DSLR LPF replacement, Ha, OIII, SII, Hβ, NII, Ha+OIII, Ha+OIII+Hβ, Ha+OIII+SII, Ha+OIII+SII+Hβ, LPS broadband, UHC, CLS, skyglow, broadband_lp, Ha solar, CaK solar, Solar continuum, Solar ND 3.8, clear] (descriptive subtype within the type)",
+
+  "color": "string (hex #rrggbb — badge colour in the UI; seeded per subtype/type by scripts/seed-filter-colors.mjs, which never overwrites an existing value, so per-entry hand overrides are safe)",
+
+  "mono_osc": "enum[mono, osc, both] (intended camera type: mono = monochrome only, osc = one-shot colour only, both = either)",
+
+  "bandpass_nm": "number | null (total passband width in nm; null for broadband or multi-passband filters)",
+  "center_nm": "number | null (centre wavelength in nm; null if not a single-line or broadband filter)",
+  "fwhm_nm": "number | null (full-width half-maximum in nm; null if not specified or multi-passband)",
+
+  "passbands": [
+    {
+      "line": "string (emission line name, e.g. 'Ha', 'OIII', 'SII', 'Hβ')",
+      "center_nm": "number (centre wavelength in nm)",
+      "fwhm_nm": "number | null (FWHM in nm; null if not published)"
+    }
+  ],
+
+  "blocking": "string | null (out-of-band blocking spec, e.g. 'OD4', 'OD6', '<0.1%', 'UV/IR'; null if not applicable or not specified)",
+  "size_options": ["string (each available size, e.g. '1.25\"', '2\"', '36mm', 'Built-in', 'Canon EOS APS-C')"],
+  "thickness_mm": "number | null (glass substrate thickness in mm; null if not applicable or not specified)",
+  "coatings": "string | null (coating description, e.g. 'Ion-assisted deposition', 'Hard sputtered multi-layer AR'; null if not specified)",
+
+  "recommended_for": ["string (use-case tags, e.g. 'Ha', 'SHO', 'OSC dual-band', 'visual', 'light pollution', 'fast optics f/2–f/3.5')"],
+
+  "notes": "string | null (free-form notes: compatibility, caveats, accessory requirements, special behaviour)",
+
+  "spcc_name": "string | null (exact name as it appears in the Siril SPCC filter database; null if not present in SPCC)",
+  "in_spcc": "boolean (true if a real transmittance curve for this filter exists in the Siril SPCC database)",
+
+  "astrobin_name": "string | null (exact name as it appears in the AstroBin equipment database; null if not listed)",
+  "in_astrobin": "boolean (true if this filter is listed in the AstroBin equipment database)",
+
+  "status": "enum[active, discontinued, standard, software] (active = currently sold; discontinued = no longer in production; standard = photometric/reference standard, not a commercial product; software = synthetic/internal, not a physical filter)",
+
+  "source_url": "string | null (canonical URL for specs, e.g. manufacturer product page or spec sheet)",
+  "last_verified": "ISO-8601 date | null (date the entry was last checked against the source)"
+}

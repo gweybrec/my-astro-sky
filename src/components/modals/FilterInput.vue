@@ -4,8 +4,9 @@
     <template v-if="selectedValue">
       <span class="integration-filter-selected">
         <span
-          :class="['target-filter-badge', badgeClass]"
-          :title="tooltip"
+          :class="selectedBadge.class"
+          :style="selectedBadge.style"
+          :title="selectedTitle"
           class="cursor-pointer"
           @click="enterEditMode"
           >{{ selectedValue }}</span
@@ -35,12 +36,18 @@
       />
       <div v-if="showSuggestions && suggestions.length" class="tag-suggest">
         <div
-          v-for="label in suggestions"
-          :key="label"
+          v-for="s in suggestions"
+          :key="s.label"
           class="tag-suggest-item"
-          @mousedown.prevent="selectSuggestion(label)"
+          @mousedown.prevent="selectSuggestion(s.label)"
         >
-          <span :class="['target-filter-badge', getSuggestionClass(label)]">{{ label }}</span>
+          <span
+            :class="badgeAttrs(s.label, s.color).class"
+            :style="badgeAttrs(s.label, s.color).style"
+            :title="catalogBadgeTitle(s.label) ?? s.label"
+            >{{ s.label }}</span
+          >
+          <span v-if="s.detail" class="tag-suggest-detail">{{ s.detail }}</span>
         </div>
       </div>
     </template>
@@ -49,14 +56,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
-import { filterFilterCandidates } from '../../autocomplete-utils';
+import { filterCandidatesWithCatalog } from '../../autocomplete-utils';
+import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
+import { getVisibleFilterEntries } from '../../gear-catalog';
 
-const KNOWN_FILTER_CSS_KEYS = new Set(['ha', 'oiii', 'sii', 'l', 'r', 'g', 'b', 'rgb']);
-
-function getBadgeClass(name: string) {
-  const key = name.toLowerCase();
-  return KNOWN_FILTER_CSS_KEYS.has(key) ? `filter-${key}` : 'filter-custom';
-}
+const badgeAttrs = filterBadgeAttrs;
 
 const props = defineProps<{
   modelValue: string;
@@ -87,13 +91,14 @@ watch(
   },
 );
 
-const badgeClass = computed(() => getBadgeClass(selectedValue.value));
+const selectedBadge = computed(() => filterBadgeAttrs(selectedValue.value));
+// Full name (+ specs) for a catalog product, since the badge ellipsises in the
+// narrow filter column; a plain band name keeps the generic help tooltip.
+const selectedTitle = computed(() => catalogBadgeTitle(selectedValue.value) ?? props.tooltip);
 
-const suggestions = computed(() => filterFilterCandidates(props.knownFilterMap, inputText.value));
-
-function getSuggestionClass(name: string) {
-  return getBadgeClass(name);
-}
+const suggestions = computed(() =>
+  filterCandidatesWithCatalog(props.knownFilterMap, getVisibleFilterEntries(), inputText.value),
+);
 
 function enterEditMode() {
   selectedValue.value = '';

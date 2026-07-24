@@ -9,6 +9,7 @@ import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from './version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
 import { getHemisphere } from './projection';
 import { computeFovTargetScale } from './gear-presets';
+import { getFilters } from './gear-catalog';
 import { setupUI } from './ui';
 import { mountVueApp, openVueModal } from './modal-host';
 import { pinia } from './pinia-instance';
@@ -70,6 +71,11 @@ async function init() {
     }
     return;
   }
+
+  // Warm the filter catalog in the background: filter badges resolve their colour
+  // synchronously and fall back to the generic token colours until it lands, so
+  // this must not block (or fail) the boot sequence.
+  void getFilters().catch((err) => reportUnknownRendererError('filter_catalog_load_failed', err));
 
   // Remove loading overlay
   if (loadingOverlay) {

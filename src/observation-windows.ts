@@ -8,6 +8,7 @@
 
 import type { ObservationWindow } from './api';
 import { filterCssKey } from './chip-utils';
+import { cssColorToHex, hexToRgba } from './color-utils';
 
 /** Minimum window width as a fraction of the night window (keeps edges grabbable). */
 export const MIN_WINDOW_FRAC = 0.02;
@@ -148,50 +149,37 @@ export function formatWindowDuration(ms: number): string {
 }
 
 /**
- * Resolve the concrete CSS colour a window should paint with. An explicit
- * `color` override wins; otherwise fall back to the filter's `--filter-{key}`
- * token (read from the document so it respects the active theme). `readVar`
- * is injected so this stays testable without a DOM.
+ * Resolve the concrete CSS colour a window should paint with, in precedence order:
+ *
+ *   1. an explicit `color` override the user picked in the swatch;
+ *   2. the colour of the catalog filter the window names, if it names one;
+ *   3. the generic `--filter-{key}` token for a band name like `Ha` (read from
+ *      the document so it respects the active theme);
+ *   4. `--filter-custom` for anything else.
+ *
+ * Both `readVar` and `resolveCatalogColor` are injected so this stays testable
+ * without a DOM or a loaded catalog. Without step 2 every catalog filter would
+ * paint the same generic blue, since `filterCssKey` returns `custom` for any name
+ * outside the eight legacy bands.
  */
 export function resolveWindowColor(
   w: Pick<ObservationWindow, 'filter' | 'color'>,
   readVar: (cssVar: string) => string,
+  resolveCatalogColor?: (name: string) => string | null,
 ): string {
   if (w.color) return w.color;
+  if (w.filter && resolveCatalogColor) {
+    const catalogColor = resolveCatalogColor(w.filter);
+    if (catalogColor) return catalogColor;
+  }
   const token = readVar(`--filter-${filterCssKey(w.filter)}`).trim();
   return token || readVar('--filter-custom').trim() || 'rgba(40,80,160,0.5)';
 }
 
-/**
- * Convert a CSS colour string (`#rgb`, `#rrggbb`, or `rgb()/rgba()`) to a
- * `#rrggbb` hex — the only form a native `<input type="color">` accepts. Alpha
- * is dropped. Unparseable input falls back to a neutral blue.
- */
-export function cssColorToHex(str: string): string {
-  const s = (str ?? '').trim();
-  const toHex = (n: number) =>
-    Math.max(0, Math.min(255, Math.round(n)))
-      .toString(16)
-      .padStart(2, '0');
-  if (s.startsWith('#')) {
-    const hex = s.slice(1);
-    if (hex.length === 3) return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`;
-    if (hex.length >= 6) return `#${hex.slice(0, 6)}`;
-    return '#3b6fd0';
-  }
-  const m = s.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (m) return `#${toHex(+m[1])}${toHex(+m[2])}${toHex(+m[3])}`;
-  return '#3b6fd0';
-}
-
-/** A `#rrggbb` (or `#rgb`) hex as an `rgba()` string at the given alpha. */
-export function hexToRgba(hex: string, alpha: number): string {
-  const h = cssColorToHex(hex).slice(1);
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+// Colour primitives live in color-utils alongside the rest of the colour maths.
+// Re-exported here because they were originally defined in this module and the
+// window-colour call sites read more naturally importing them from it.
+export { cssColorToHex, hexToRgba };
 
 /**
  * Fill colour for a window band: the interior must stay translucent so the

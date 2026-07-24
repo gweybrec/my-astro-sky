@@ -177,6 +177,14 @@ Once saved, the new item appears immediately at the bottom of the relevant dropd
 
 Custom gear is stored on the server (in the app database) and persists across sessions. It can be exported together with your other data via **Settings → Export → Custom telescopes/cameras/accessories**.
 
+### Filters
+
+Below the three gear dropdowns is a **Manage filters** button. Unlike a telescope or camera, a filter is not part of a gear setup — you pick it per acquisition. The app ships with a built-in catalog of 170+ imaging filters (Antlia, Astronomik, Optolong, Chroma, ZWO, smart-scope integrated filters, photometric standards, …), each with its own colour.
+
+- **Manage filters** opens a checklist of the whole catalog. Untick the filters you don't own to remove them from the autocompletes; the ones you keep are the only catalogued filters offered when you tag an acquisition. **+ Add filter** lets you create a filter the catalog is missing (brand, model, colour, band, and optional passband specs).
+- When you add an **integration row** to a photo (in the photo details panel), the filter field autocompletes against your filters as you type — search by brand, model, or band (`Ha`, `OIII`, `luminance`…). Picking one stores its name and shows it as a coloured badge. The short generic names (`L`, `R`, `G`, `B`, `Ha`, `OIII`, `SII`, `RGB`) remain available for quick tagging, and you can still type any free-text name.
+- The same picker drives the **filter** field on a plan's [observation windows](#observing-plans) — and the window's band on the night-trajectory chart takes on the filter's colour (you can still override it with the colour swatch).
+
 ---
 
 ## Terrain horizon (mountains)

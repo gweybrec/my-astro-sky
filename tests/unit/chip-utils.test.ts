@@ -1,7 +1,20 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { createFilterBadge, buildIntegrationFilterField } from '../../src/chip-utils';
+import {
+  createFilterBadge,
+  filterBadgeAttrs,
+  buildIntegrationFilterField,
+} from '../../src/chip-utils';
+import { resolveCatalogFilter } from '../../src/gear-catalog';
+import type { FilterCatalogEntry } from '../../src/autocomplete-utils';
 
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
+
+// The catalog is fetched at runtime; stub the two lookups chip-utils performs so
+// badge colouring can be tested without a network round-trip.
+vi.mock('../../src/gear-catalog', () => ({
+  resolveCatalogFilter: vi.fn(() => null),
+  getVisibleFilterEntries: vi.fn(() => []),
+}));
 
 // ─── createFilterBadge ────────────────────────────────────────────────────────
 
@@ -36,6 +49,47 @@ describe('createFilterBadge', () => {
   });
 });
 
+// ─── Catalog-coloured badges ─────────────────────────────────────────────────
+
+describe('createFilterBadge – catalog filters', () => {
+  afterEach(() => {
+    vi.mocked(resolveCatalogFilter).mockReturnValue(null);
+  });
+
+  it('an explicit catalog colour switches to the data-driven class', () => {
+    const badge = createFilterBadge('Antlia ALP-T Dual Band 5nm', '#501e96');
+    expect(badge.className).toContain('filter-catalog');
+    expect(badge.className).not.toContain('filter-custom');
+    expect(badge.style.getPropertyValue('--filter-color-bg')).toBe('rgba(80, 30, 150, 0.4)');
+    expect(badge.style.getPropertyValue('--filter-color-border')).toBe('rgba(80, 30, 150, 0.55)');
+    expect(badge.style.getPropertyValue('--filter-color-text')).toBeTruthy();
+    expect(badge.textContent).toBe('Antlia ALP-T Dual Band 5nm');
+  });
+
+  it('looks the colour up from the catalog when none is passed', () => {
+    vi.mocked(resolveCatalogFilter).mockReturnValue({ color: '#b42828' } as never);
+    const badge = createFilterBadge('Antlia Pro Ha 3nm');
+    expect(badge.className).toContain('filter-catalog');
+    expect(badge.style.getPropertyValue('--filter-color-bg')).toBe('rgba(180, 40, 40, 0.4)');
+  });
+
+  it('a generic band name keeps its legacy token class even with a catalog loaded', () => {
+    // The Targets "suggested filters" badges depend on this staying true.
+    vi.mocked(resolveCatalogFilter).mockReturnValue(null);
+    const badge = createFilterBadge('Ha');
+    expect(badge.className).toContain('filter-ha');
+    expect(badge.className).not.toContain('filter-catalog');
+    expect(badge.style.getPropertyValue('--filter-color-bg')).toBe('');
+  });
+
+  it('filterBadgeAttrs returns no inline properties for a non-catalog name', () => {
+    expect(filterBadgeAttrs('OIII')).toEqual({
+      class: 'target-filter-badge filter-oiii',
+      style: {},
+    });
+  });
+});
+
 // ─── buildIntegrationFilterField helpers ────────────────────────────────────
 
 function makeMap(labels: string[]): Map<string, string> {
@@ -47,6 +101,7 @@ function makeMap(labels: string[]): Map<string, string> {
 function build(opts: {
   initialValue?: string;
   labels?: string[];
+  catalog?: FilterCatalogEntry[];
   onSelect?: (v: string) => void;
   onCommit?: (v: string) => void;
 }) {
@@ -55,6 +110,7 @@ function build(opts: {
   const result = buildIntegrationFilterField({
     initialValue: opts.initialValue ?? '',
     knownFilterMap: makeMap(opts.labels ?? ['Ha', 'OIII', 'SII', 'L', 'R', 'G', 'B', 'RGB']),
+    catalog: opts.catalog ?? [],
     placeholder: 'Filter',
     tooltip: 'Choose filter',
     onSelect,
@@ -150,13 +206,30 @@ describe('buildIntegrationFilterField – typing', () => {
     }
   });
 
-  it('empty query on focus shows all suggestions (up to 8)', () => {
+  it('empty query on focus shows every known name (uncapped, dropdown scrolls)', () => {
     const labels = ['Ha', 'OIII', 'SII', 'L', 'R', 'G', 'B', 'RGB', 'Extra'];
     const { el } = build({ labels });
     const input = getInput(el);
     input.dispatchEvent(new Event('focus'));
     const items = getSuggestions(el);
-    expect(items.length).toBe(8); // capped at 8
+    expect(items.length).toBe(labels.length);
+  });
+
+  it('an empty query offers the whole catalog for browsing', () => {
+    const catalog = Array.from({ length: 30 }, (_, i) => ({
+      label: `Brand Filter ${i}`,
+      color: '#123456',
+      detail: null,
+      brand: 'Brand',
+      model: `Filter ${i}`,
+      series: null,
+      subtype: 'Ha',
+    }));
+    const { el } = build({ labels: ['Ha'], catalog });
+    const input = getInput(el);
+    input.dispatchEvent(new Event('focus'));
+    // 1 known name + all 30 catalog entries, none dropped.
+    expect(getSuggestions(el).length).toBe(31);
   });
 });
 
@@ -406,5 +479,59 @@ describe('buildIntegrationFilterField – custom filter autocomplete persistence
     input.dispatchEvent(new Event('focus'));
     const labels = Array.from(getSuggestions(el)).map((i) => i.textContent ?? '');
     expect(labels.some((l) => l.includes('CustomDB'))).toBe(true);
+  });
+});
+
+// ─── Catalog suggestions ─────────────────────────────────────────────────────
+
+describe('buildIntegrationFilterField – catalog suggestions', () => {
+  const CATALOG: FilterCatalogEntry[] = [
+    {
+      label: 'Antlia ALP-T Dual Band 5nm',
+      color: '#501e96',
+      detail: 'Ha+OIII · 656.3nm + 500.7nm',
+      brand: 'Antlia',
+      model: 'ALP-T 5nm',
+      series: 'ALP-T',
+      subtype: 'Ha+OIII',
+    },
+  ];
+
+  it('offers catalog products alongside the known band names', () => {
+    const { el } = build({ labels: ['Ha'], catalog: CATALOG });
+    const input = getInput(el);
+    input.dispatchEvent(new Event('focus'));
+    const labels = Array.from(getSuggestions(el)).map((i) => i.textContent ?? '');
+    expect(labels.some((l) => l.includes('Ha'))).toBe(true);
+    expect(labels.some((l) => l.includes('Antlia ALP-T Dual Band 5nm'))).toBe(true);
+  });
+
+  it('renders the spec line next to a catalog suggestion badge', () => {
+    const { el } = build({ labels: [], catalog: CATALOG });
+    const input = getInput(el);
+    input.value = 'antlia';
+    input.dispatchEvent(new Event('input'));
+    const item = getSuggestions(el)[0];
+    expect(item.querySelector('.target-filter-badge')?.className).toContain('filter-catalog');
+    expect(item.querySelector('.tag-suggest-detail')?.textContent).toBe(
+      'Ha+OIII · 656.3nm + 500.7nm',
+    );
+  });
+
+  it('a band name suggestion has no spec line', () => {
+    const { el } = build({ labels: ['Ha'], catalog: [] });
+    const input = getInput(el);
+    input.dispatchEvent(new Event('focus'));
+    expect(getSuggestions(el)[0].querySelector('.tag-suggest-detail')).toBeNull();
+  });
+
+  it('selecting a catalog suggestion stores its full display label', () => {
+    const onSelect = vi.fn();
+    const { el } = build({ labels: [], catalog: CATALOG, onSelect });
+    const input = getInput(el);
+    input.value = 'alp-t';
+    input.dispatchEvent(new Event('input'));
+    getSuggestions(el)[0].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(onSelect).toHaveBeenCalledWith('Antlia ALP-T Dual Band 5nm');
   });
 });

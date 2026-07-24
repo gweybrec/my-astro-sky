@@ -123,6 +123,9 @@ const builtInCameras: object[] = JSON.parse(
 const builtInAccessories: object[] = JSON.parse(
   fs.readFileSync(path.join(RESOURCES_DIR, 'accessories.json'), 'utf-8'),
 );
+const builtInFilters: object[] = JSON.parse(
+  fs.readFileSync(path.join(RESOURCES_DIR, 'filters.json'), 'utf-8'),
+);
 
 const byBrandModel = (a: any, b: any) =>
   `${a.brand ?? ''} ${a.model ?? ''}`.localeCompare(`${b.brand ?? ''} ${b.model ?? ''}`);
@@ -1243,6 +1246,35 @@ app.get('/api/accessories', (_req, res) => {
 
 /**
  * @swagger
+ * /api/filters:
+ *   get:
+ *     summary: List all imaging filters (built-in + custom)
+ *     description: Returns the full filter catalog merged with any user-created custom filters. Consumed by the filter autocomplete on photo integration rows and on plan observation windows.
+ *     responses:
+ *       200:
+ *         description: Filter list returned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/filters', (_req, res) => {
+  try {
+    const custom = getAllCustomGear()
+      .filter((g) => g.type === 'filter')
+      .map((g) => JSON.parse(g.data));
+    res.json([...builtInFilters, ...custom].sort(byBrandModel));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
  * /api/custom-gear:
  *   post:
  *     summary: Create a custom telescope, camera, or accessory
@@ -1259,7 +1291,7 @@ app.get('/api/accessories', (_req, res) => {
  *             properties:
  *               type:
  *                 type: string
- *                 enum: [telescope, camera, accessory]
+ *                 enum: [telescope, camera, accessory, filter]
  *                 description: Equipment category
  *               data:
  *                 type: object
@@ -1290,8 +1322,10 @@ app.get('/api/accessories', (_req, res) => {
 app.post('/api/custom-gear', (req, res) => {
   try {
     const { type, data } = req.body as { type?: string; data?: object };
-    if (!type || !['telescope', 'camera', 'accessory'].includes(type)) {
-      res.status(400).json({ error: 'Invalid type — must be telescope, camera, or accessory' });
+    if (!type || !['telescope', 'camera', 'accessory', 'filter'].includes(type)) {
+      res
+        .status(400)
+        .json({ error: 'Invalid type — must be telescope, camera, accessory, or filter' });
       return;
     }
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -1299,7 +1333,10 @@ app.post('/api/custom-gear', (req, res) => {
       return;
     }
     const id = `custom-${uuidv4()}`;
-    upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory', { ...data, id });
+    upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory' | 'filter', {
+      ...data,
+      id,
+    });
     res.json({ id });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -3383,7 +3420,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
                 const name = typeof data.name === 'string' ? data.name : id;
                 const sameType = existingGear.filter((r) => r.type === type);
                 idsToReplaceByName(sameType, name).forEach(deleteCustomGearDB);
-                upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory', {
+                upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory' | 'filter', {
                   ...data,
                   id,
                 });

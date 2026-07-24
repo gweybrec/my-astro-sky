@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lerpColor } from '../../src/color-utils';
+import { lerpColor, filterBadgeColors, cssColorToHex, hexToRgba } from '../../src/color-utils';
 
 describe('lerpColor', () => {
   it('returns the endpoints at t=0 and t=1', () => {
@@ -22,5 +22,49 @@ describe('lerpColor', () => {
 
   it('falls back to white on unparseable input', () => {
     expect(lerpColor('nope', 'rgb(0,0,0)', 0)).toBe('rgba(255, 255, 255, 1)');
+  });
+});
+
+describe('filterBadgeColors', () => {
+  it('derives a translucent fill and a stronger border from the catalog hex', () => {
+    // #b42828 is the Ha hue seeded into resources/filters.json.
+    expect(filterBadgeColors('#b42828')).toEqual({
+      bg: 'rgba(180, 40, 40, 0.4)',
+      text: 'rgb(221, 158, 158)',
+      border: 'rgba(180, 40, 40, 0.55)',
+    });
+  });
+
+  it('lightens dark hues so the label stays readable', () => {
+    // Dual-band violet is far too dark to use as text directly.
+    const { text } = filterBadgeColors('#501e96');
+    const [r, g, b] = text.match(/\d+/g)!.map(Number);
+    expect(r).toBeGreaterThan(0x50);
+    expect(g).toBeGreaterThan(0x1e);
+    expect(b).toBeGreaterThan(0x96);
+  });
+
+  it('never produces an out-of-range channel, even from white', () => {
+    const { text } = filterBadgeColors('#ffffff');
+    expect(text).toBe('rgb(255, 255, 255)');
+  });
+
+  it('accepts shorthand hex', () => {
+    expect(filterBadgeColors('#abc').bg).toBe('rgba(170, 187, 204, 0.4)');
+  });
+});
+
+describe('cssColorToHex / hexToRgba (moved here from observation-windows)', () => {
+  it('normalises shorthand and rgb() input', () => {
+    expect(cssColorToHex('#abc')).toBe('#aabbcc');
+    expect(cssColorToHex('rgba(180,40,40,0.4)')).toBe('#b42828');
+  });
+
+  it('falls back to a neutral blue on unparseable input', () => {
+    expect(cssColorToHex('nonsense')).toBe('#3b6fd0');
+  });
+
+  it('converts a hex to rgba at the given alpha', () => {
+    expect(hexToRgba('#12ab34', 0.3)).toBe('rgba(18, 171, 52, 0.3)');
   });
 });

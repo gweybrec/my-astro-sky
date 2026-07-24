@@ -450,6 +450,30 @@
         }
       }
     },
+    "/api/filters": {
+      "get": {
+        "summary": "List all imaging filters (built-in + custom)",
+        "description": "Returns the full filter catalog merged with any user-created custom filters. Consumed by the filter autocomplete on photo integration rows and on plan observation windows.",
+        "responses": {
+          "200": {
+            "description": "Filter list returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/api/custom-gear": {
       "post": {
         "summary": "Create a custom telescope, camera, or accessory",
@@ -470,7 +494,8 @@
                     "enum": [
                       "telescope",
                       "camera",
-                      "accessory"
+                      "accessory",
+                      "filter"
                     ],
                     "description": "Equipment category"
                   },

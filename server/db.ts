@@ -97,11 +97,13 @@ db.exec(`
   );
 `);
 
-// User-created custom gear (telescopes, cameras, accessories)
+// User-created custom gear (telescopes, cameras, accessories, filters).
+// Note: existing databases are widened to accept 'filter' by migration v13, which
+// rebuilds the table — SQLite cannot alter a CHECK constraint in place.
 db.exec(`
   CREATE TABLE IF NOT EXISTS custom_gear (
     id   TEXT PRIMARY KEY,
-    type TEXT NOT NULL CHECK(type IN ('telescope','camera','accessory')),
+    type TEXT NOT NULL CHECK(type IN ('telescope','camera','accessory','filter')),
     data TEXT NOT NULL
   );
 `);
@@ -698,9 +700,13 @@ const upsertCustomGearStmt = db.prepare(
 const deleteCustomGearStmt = db.prepare('DELETE FROM custom_gear WHERE id = ?');
 const getCustomGearByTypeStmt = db.prepare('SELECT id, type, data FROM custom_gear WHERE type = ?');
 
+/** Equipment categories stored in `custom_gear`. `filter` items are not part of a
+ *  gear setup — they are picked per photo integration row / observation window. */
+export type CustomGearType = 'telescope' | 'camera' | 'accessory' | 'filter';
+
 export interface CustomGearRow {
   id: string;
-  type: 'telescope' | 'camera' | 'accessory';
+  type: CustomGearType;
   data: string;
 }
 
@@ -708,15 +714,11 @@ export function getAllCustomGear(): CustomGearRow[] {
   return getAllCustomGearStmt.all() as CustomGearRow[];
 }
 
-export function getCustomGearByType(type: 'telescope' | 'camera' | 'accessory'): CustomGearRow[] {
+export function getCustomGearByType(type: CustomGearType): CustomGearRow[] {
   return getCustomGearByTypeStmt.all(type) as CustomGearRow[];
 }
 
-export function upsertCustomGear(
-  id: string,
-  type: 'telescope' | 'camera' | 'accessory',
-  data: object,
-): void {
+export function upsertCustomGear(id: string, type: CustomGearType, data: object): void {
   upsertCustomGearStmt.run(id, type, JSON.stringify(data));
 }
 

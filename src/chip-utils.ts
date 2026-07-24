@@ -1,4 +1,10 @@
-import { filterFilterCandidates } from './autocomplete-utils';
+import {
+  filterCandidatesWithCatalog,
+  type FilterCandidate,
+  type FilterCatalogEntry,
+} from './autocomplete-utils';
+import { filterBadgeColors } from './color-utils';
+import { resolveCatalogFilter, getVisibleFilterEntries, filterDetail } from './gear-catalog';
 
 /**
  * Creates a colored filter badge identical to the ones shown in the
@@ -27,9 +33,54 @@ export function filterCssKey(name: string | null | undefined): string {
   return KNOWN_FILTER_CSS_KEYS.has(key) ? key : 'custom';
 }
 
-export function createFilterBadge(name: string): HTMLSpanElement {
+/**
+ * The class and CSS custom properties that colour a filter badge.
+ *
+ * A name that matches a catalog product carries its own colour as data, applied
+ * through custom properties on the element (the same escape hatch POI chips use
+ * for `--poi-color`). Anything else — the generic band names `Ha`, `OIII`, `L`…
+ * that the imaging recipe recommends, or a free-typed name — keeps the legacy
+ * `.filter-{key}` token classes. Exported so the Vue `FilterInput` renders
+ * badges identically to this module's imperative ones.
+ */
+export function filterBadgeAttrs(
+  name: string,
+  catalogColor?: string | null,
+): { class: string; style: Record<string, string> } {
+  const color = catalogColor ?? resolveCatalogFilter(name)?.color ?? null;
+  if (!color) {
+    return { class: `target-filter-badge filter-${filterCssKey(name)}`, style: {} };
+  }
+  const { bg, text, border } = filterBadgeColors(color);
+  return {
+    class: 'target-filter-badge filter-catalog',
+    style: {
+      '--filter-color-bg': bg,
+      '--filter-color-text': text,
+      '--filter-color-border': border,
+    },
+  };
+}
+
+/**
+ * Tooltip text for a selected filter badge: the full name, plus the catalog spec
+ * line when the name is a real product. Returns null for a plain band name, so
+ * callers can fall back to their generic help tooltip.
+ */
+export function catalogBadgeTitle(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const entry = resolveCatalogFilter(trimmed);
+  if (!entry) return null;
+  const detail = filterDetail(entry);
+  return detail ? `${trimmed} · ${detail}` : trimmed;
+}
+
+export function createFilterBadge(name: string, catalogColor?: string | null): HTMLSpanElement {
   const badge = document.createElement('span');
-  badge.className = `target-filter-badge filter-${filterCssKey(name)}`;
+  const attrs = filterBadgeAttrs(name, catalogColor);
+  badge.className = attrs.class;
+  for (const [prop, value] of Object.entries(attrs.style)) badge.style.setProperty(prop, value);
   badge.textContent = name;
   return badge;
 }
@@ -44,6 +95,8 @@ export function createFilterBadge(name: string): HTMLSpanElement {
 export function buildIntegrationFilterField(opts: {
   initialValue: string;
   knownFilterMap: Map<string, string>;
+  /** Catalog products to offer. Defaults to the user's visible filters; pass `[]` to disable. */
+  catalog?: FilterCatalogEntry[];
   placeholder: string;
   tooltip: string;
   onSelect: (value: string) => void;
@@ -73,7 +126,9 @@ export function buildIntegrationFilterField(opts: {
   const showBadge = (value: string) => {
     badgeDisplay.innerHTML = '';
     const badge = createFilterBadge(value);
-    badge.title = opts.tooltip;
+    // The badge ellipsises in the narrow filter column, so its tooltip carries the
+    // full name (plus specs for a catalog product) rather than the generic help text.
+    badge.title = catalogBadgeTitle(value) ?? opts.tooltip;
     badge.style.cursor = 'pointer';
     badge.addEventListener('click', () => enterEditMode());
     const clearBtn = document.createElement('button');
@@ -107,11 +162,25 @@ export function buildIntegrationFilterField(opts: {
 
   const renderSuggestions = () => {
     suggest.innerHTML = '';
-    const candidates = filterFilterCandidates(opts.knownFilterMap, input.value);
-    for (const label of candidates) {
+    const candidates: FilterCandidate[] = filterCandidatesWithCatalog(
+      opts.knownFilterMap,
+      opts.catalog ?? getVisibleFilterEntries(),
+      input.value,
+    );
+    for (const { label, color, detail } of candidates) {
       const opt = document.createElement('div');
       opt.className = 'tag-suggest-item';
-      opt.appendChild(createFilterBadge(label));
+      const suggestBadge = createFilterBadge(label, color);
+      // Long product names ellipsis in the width-clamped dropdown — keep the full
+      // name (+ spec) reachable on hover.
+      suggestBadge.title = catalogBadgeTitle(label) ?? label;
+      opt.appendChild(suggestBadge);
+      if (detail) {
+        const detailEl = document.createElement('span');
+        detailEl.className = 'tag-suggest-detail';
+        detailEl.textContent = detail;
+        opt.appendChild(detailEl);
+      }
       opt.addEventListener('mousedown', (e) => {
         e.preventDefault();
         currentValue = label;

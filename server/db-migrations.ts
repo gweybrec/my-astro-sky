@@ -311,7 +311,31 @@ export function applyMigrations(database: Database): number {
         }
       },
     },
-    // Future migrations: { version: 13, run(d) { ... } },
+    {
+      // v13: custom_gear accepts a fourth type, 'filter'. The type column carries a
+      // CHECK constraint, which SQLite cannot alter in place — the table has to be
+      // rebuilt and its rows copied across. Guarded by a check of the existing
+      // constraint text so it is a no-op on a database already carrying it.
+      version: 13,
+      run(d) {
+        const row = d
+          .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'custom_gear'")
+          .get() as { sql: string } | undefined;
+        if (!row || row.sql.includes("'filter'")) return;
+
+        d.exec(`
+          CREATE TABLE custom_gear_new (
+            id   TEXT PRIMARY KEY,
+            type TEXT NOT NULL CHECK(type IN ('telescope','camera','accessory','filter')),
+            data TEXT NOT NULL
+          );
+          INSERT INTO custom_gear_new (id, type, data) SELECT id, type, data FROM custom_gear;
+          DROP TABLE custom_gear;
+          ALTER TABLE custom_gear_new RENAME TO custom_gear;
+        `);
+      },
+    },
+    // Future migrations: { version: 14, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

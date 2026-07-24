@@ -403,6 +403,70 @@ input:focus-visible {
   border-left: 1px solid var(--border-white-md);
 }
 
+/* ── Catalog filter badges ─────────────────────────────────────────────────────
+   Generic band names (Ha, OIII, L…) use the `.filter-{key}` classes and their
+   `--filter-*` design tokens. A badge naming a real filter product instead carries
+   its colour as *data*, from the `color` field in resources/filters.json — the same
+   situation as POI category colours below, so it uses the same escape hatch: three
+   custom properties set per element (see filterBadgeAttrs in src/chip-utils.ts),
+   derived from the one catalog hex by filterBadgeColors in src/color-utils.ts. */
+.filter-catalog {
+  background: var(--filter-color-bg, var(--filter-custom));
+  color: var(--filter-color-text, var(--filter-custom-text));
+  border: 1px solid var(--filter-color-border, var(--filter-custom-border));
+}
+
+/* Spec line ("Ha · 656.3nm / 3nm") under a filter suggestion's badge. */
+.tag-suggest-detail {
+  font-size: var(--font-size-small);
+  color: var(--text-dim);
+}
+
+/* Filter suggestions carry full product names ("Antlia 4.5nm H-Alpha Edge") plus a
+   spec line. Putting the badge and the spec on the SAME line makes them fight for a
+   narrow column and crushes the name into unreadable slivers. So each row STACKS:
+   the coloured name badge on its own line (left-aligned, wraps in full — never
+   clipped), the dim spec beneath it. Readable at any panel width. Right-anchored so
+   it grows leftward out of the last row column rather than off the panel's right. */
+.integration-filter-wrap .tag-suggest {
+  left: auto;
+  right: 0;
+  min-width: max(100%, 15rem);
+  max-width: min(24rem, 90vw);
+  max-height: 18rem;
+  border-top: 1px solid var(--border-panel);
+  border-radius: var(--radius-sm);
+}
+.integration-filter-wrap .tag-suggest-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.integration-filter-wrap .tag-suggest-item .target-filter-badge {
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.integration-filter-wrap .tag-suggest-item .tag-suggest-detail {
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* A selected catalog filter's badge shows the full product name, but the filter
+   column of an integration row is only ~90px inside the side panel. Keep it on a
+   single line and let it ellipsis rather than wrap — a 25-character name wrapped
+   to 4 lines tripled the row height. The full name stays available as the badge's
+   title tooltip. */
+.integration-filter-selected .target-filter-badge {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 /* ── Points-of-Interest chips ──────────────────────────────────────────────────
    A POI chip is a tag-chip prefixed with a category-coloured dot. The colour comes
    from the inline `--poi-color` custom property set per chip (category data, not a

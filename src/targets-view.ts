@@ -15,8 +15,15 @@ import {
   telescopeLabel,
   cameraLabel,
   accessoryLabel,
+  getFilters,
+  getVisibleFilters,
+  getVisibleFilterEntries,
+  getHiddenFilterIds,
+  setHiddenFilterIds,
+  filterLabel,
+  catalogFilterColor,
 } from './gear-catalog';
-import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
+import type { TelescopeData, CameraData, AccessoryData, CustomGearType } from './gear-catalog';
 import { formatGearFovLabel, fovDeg, formatFov, computeFovTargetScale } from './gear-presets';
 import { getHemisphere } from './projection';
 import { buildSetupInfoRows } from './setup-info';
@@ -371,22 +378,22 @@ function sortSuggestions(suggestions: TargetSuggestion[], sortBy: SortKey): Targ
 interface FieldDef {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select';
+  type: 'text' | 'number' | 'select' | 'color';
   required: boolean;
   options?: { value: string; label: string }[];
   step?: string;
   helpKey?: string;
   placeholder?: string;
+  /** Initial value for `color` fields (they always submit a value). */
+  defaultValue?: string;
 }
 
-export function openAddGearModal(
-  gearType: 'telescope' | 'camera' | 'accessory',
-  onSaved: () => void,
-): void {
+export function openAddGearModal(gearType: CustomGearType, onSaved: () => void): void {
   const titles: Record<string, string> = {
     telescope: t('targets.gear.addTelescopeTitle'),
     camera: t('targets.gear.addCameraTitle'),
     accessory: t('targets.gear.addAccessoryTitle'),
+    filter: t('targets.gear.addFilterTitle'),
   };
 
   const fieldsByType: Record<string, FieldDef[]> = {
@@ -571,6 +578,94 @@ export function openAddGearModal(
         placeholder: 'e.g. M42',
       },
     ],
+    filter: [
+      {
+        key: 'brand',
+        label: t('targets.gear.fields.brand'),
+        type: 'text',
+        required: true,
+        helpKey: 'brand',
+        placeholder: 'e.g. Antlia',
+      },
+      {
+        key: 'model',
+        label: t('targets.gear.fields.model'),
+        type: 'text',
+        required: true,
+        helpKey: 'model',
+        placeholder: 'e.g. ALP-T 5nm',
+      },
+      {
+        key: 'color',
+        label: t('targets.gear.fields.filterColor'),
+        type: 'color',
+        required: false,
+        helpKey: 'filterColor',
+        defaultValue: '#2850a0',
+      },
+      {
+        key: 'type',
+        label: t('targets.gear.fields.filterType'),
+        type: 'select',
+        required: false,
+        helpKey: 'filterType',
+        options: [
+          'broadband',
+          'narrowband',
+          'dual_narrowband',
+          'triband_narrowband',
+          'quadband_narrowband',
+          'light_pollution',
+          'solar_narrowband',
+          'solar_nd',
+        ].map((v) => ({ value: v, label: t(`targets.gear.filterTypes.${v}`) })),
+      },
+      {
+        key: 'subtype',
+        label: t('targets.gear.fields.filterSubtype'),
+        type: 'text',
+        required: false,
+        helpKey: 'filterSubtype',
+        placeholder: 'e.g. Ha+OIII',
+      },
+      {
+        key: 'mono_osc',
+        label: t('targets.gear.fields.monoOsc'),
+        type: 'select',
+        required: false,
+        helpKey: 'monoOsc',
+        options: ['both', 'mono', 'osc'].map((v) => ({
+          value: v,
+          label: t(`targets.gear.monoOsc.${v}`),
+        })),
+      },
+      {
+        key: 'center_nm',
+        label: t('targets.gear.fields.centerNm'),
+        type: 'number',
+        required: false,
+        step: '0.1',
+        helpKey: 'centerNm',
+        placeholder: 'e.g. 656.3',
+      },
+      {
+        key: 'fwhm_nm',
+        label: t('targets.gear.fields.fwhmNm'),
+        type: 'number',
+        required: false,
+        step: '0.1',
+        helpKey: 'fwhmNm',
+        placeholder: 'e.g. 5',
+      },
+      {
+        key: 'bandpass_nm',
+        label: t('targets.gear.fields.bandpassNm'),
+        type: 'number',
+        required: false,
+        step: '0.1',
+        helpKey: 'bandpassNm',
+      },
+    ],
   };
 
   const fields = fieldsByType[gearType];
@@ -630,6 +725,13 @@ export function openAddGearModal(
         sel.appendChild(o);
       }
       input = sel;
+    } else if (field.type === 'color') {
+      // Same swatch the POI category editor uses (PoiTypesModal.vue).
+      const inp = document.createElement('input');
+      inp.type = 'color';
+      inp.className = 'w-8 h-8 flex-none cursor-pointer bg-transparent border-none p-0';
+      inp.value = field.defaultValue ?? '#2850a0';
+      input = inp;
     } else {
       const inp = document.createElement('input');
       const isNum = field.type === 'number';
@@ -705,6 +807,17 @@ export function openAddGearModal(
       data.status = 'active';
     } else if (gearType === 'accessory') {
       data.status = 'active';
+    } else if (gearType === 'filter') {
+      // A custom filter has no AstroBin/SPCC entry, so filterLabel() falls back to
+      // its model — which is what the user typed and expects to see on the badge.
+      data.astrobin_name = null as any;
+      data.spcc_name = null as any;
+      data.series = null as any;
+      data.type ??= 'broadband';
+      data.subtype ??= '';
+      data.mono_osc ??= 'both';
+      data.color ??= '#2850a0';
+      data.status = 'active';
     }
 
     saveBtn.disabled = true;
@@ -734,7 +847,7 @@ export function openAddGearModal(
 // ─── Manage gear modal ────────────────────────────────────────────────────────
 
 export function openManageGearModal(
-  gearType: 'telescope' | 'camera' | 'accessory',
+  gearType: CustomGearType,
   allGear: Array<{ id: string; label: string }>,
   hiddenIds: Set<string>,
   onClose: (newHiddenIds: Set<string>, deletedIds: Set<string>) => void,
@@ -743,19 +856,24 @@ export function openManageGearModal(
     telescope: t('targets.gear.manageTelescopeTitle'),
     camera: t('targets.gear.manageCameraTitle'),
     accessory: t('targets.gear.manageAccessoryTitle'),
+    filter: t('targets.gear.manageFilterTitle'),
   };
   const addLabels: Record<string, string> = {
     telescope: t('targets.gear.addTelescope'),
     camera: t('targets.gear.addCamera'),
     accessory: t('targets.gear.addAccessory'),
+    filter: t('targets.gear.addFilter'),
   };
   const selectedCountKeys: Record<string, string> = {
     telescope: 'targets.gear.telescopesSelected',
     camera: 'targets.gear.camerasSelected',
     accessory: 'targets.gear.accessoriesSelected',
+    filter: 'targets.gear.filtersSelected',
   };
 
-  const requireOne = gearType !== 'accessory';
+  // Accessories and filters are both optional: a rig may have no reducer, and a
+  // user may own no catalogued filter (generic band names still work).
+  const requireOne = gearType !== 'accessory' && gearType !== 'filter';
   const currentHidden = new Set(hiddenIds);
   const pendingDeletes = new Map<string, { label: string; dismissFn: () => void }>();
 
@@ -1006,8 +1124,8 @@ export function buildGearSectionContent(
 ): void {
   container.innerHTML = `<div class="targets-form-row"><span class="targets-label" style="color:#888">…</span></div>`;
 
-  Promise.all([getTelescopes(), getCameras(), getAccessories()])
-    .then(([telescopes, cameras, accessories]) => {
+  Promise.all([getTelescopes(), getCameras(), getAccessories(), getFilters()])
+    .then(([telescopes, cameras, accessories, filters]) => {
       container.innerHTML = '';
 
       const hiddenSet = new Set(prefs.hiddenGearIds ?? []);
@@ -1211,6 +1329,21 @@ export function buildGearSectionContent(
       });
       if (isSmart) accManageBtn.classList.add('hidden');
       container.appendChild(accManageBtn);
+
+      // ── Filters ──────────────────────────────────────────────────────────
+      // No select: unlike the three above, a filter is not part of the rig — it is
+      // picked per integration row / observation window. This button only curates
+      // WHICH filters those autocompletes offer, so its hidden set lives in
+      // gear-catalog (localStorage), not in the Targets prefs.
+      const filtersManageBtn = buildAddButton(t('targets.gear.manageFilter'), () => {
+        const all = sortCustomFirst(filters).map((f) => ({ id: f.id, label: filterLabel(f) }));
+        openManageGearModal('filter', all, getHiddenFilterIds(), (newHidden, deleted) => {
+          if (deleted.size > 0) invalidateGearCache('filter');
+          setHiddenFilterIds(new Set([...newHidden].filter((id) => !deleted.has(id))));
+          callbacks.onRebuild(container);
+        });
+      });
+      container.appendChild(filtersManageBtn);
 
       // ── FOV hint ─────────────────────────────────────────────────────────
       container.appendChild(fovHintEl);
@@ -4808,7 +4941,11 @@ export class TargetsView {
     return { row, applyPreset };
   }
 
-  /** Filters offered in the observation-window filter picker. */
+  /**
+   * Generic band names seeded into the observation-window filter picker. They sit
+   * above the real filter catalog in the dropdown, for planning a session without
+   * committing to a specific product.
+   */
   private static readonly OBS_WINDOW_FILTERS = [
     'L',
     'R',
@@ -4992,7 +5129,8 @@ export class TargetsView {
     };
     const paintBand = (w: ObservationWindow): void => {
       const band = bandEls.get(w.id);
-      if (band) band.style.background = toBandFill(resolveWindowColor(w, readVar));
+      if (band)
+        band.style.background = toBandFill(resolveWindowColor(w, readVar, catalogFilterColor));
     };
     // Push the window's current fracs into its row's time pickers + duration + frame count.
     const syncRow = (w: ObservationWindow): void => {
@@ -5055,7 +5193,7 @@ export class TargetsView {
         band.title = w.filter ? w.filter : t('targets.plan.obsWindowTitle');
         bandEls.set(w.id, band);
         positionBand(band, w);
-        band.style.background = toBandFill(resolveWindowColor(w, readVar));
+        band.style.background = toBandFill(resolveWindowColor(w, readVar, catalogFilterColor));
         const lh = document.createElement('div');
         lh.className = 'obs-window-handle obs-window-handle-l';
         const rh = document.createElement('div');
@@ -5104,7 +5242,7 @@ export class TargetsView {
         colorInput.type = 'color';
         colorInput.className = 'obs-window-color';
         colorInput.title = t('targets.plan.obsWindowColor');
-        colorInput.value = cssColorToHex(resolveWindowColor(w, readVar));
+        colorInput.value = cssColorToHex(resolveWindowColor(w, readVar, catalogFilterColor));
         colorInput.addEventListener('input', () => {
           w.color = colorInput.value;
           paintBand(w);
@@ -5122,7 +5260,7 @@ export class TargetsView {
             // If the colour still derives from the filter, follow the new filter.
             if (!w.color) {
               paintBand(w);
-              colorInput.value = cssColorToHex(resolveWindowColor(w, readVar));
+              colorInput.value = cssColorToHex(resolveWindowColor(w, readVar, catalogFilterColor));
             }
             persist();
           },

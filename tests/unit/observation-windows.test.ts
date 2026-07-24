@@ -221,6 +221,54 @@ describe('resolveWindowColor', () => {
   it('falls back to the custom token for an unknown filter', () => {
     expect(resolveWindowColor({ filter: 'ZZ', color: null }, readVar)).toBe('rgba(40,80,160,0.5)');
   });
+
+  // ── Catalog filters ────────────────────────────────────────────────────────
+  // Without the catalog lookup, every real filter product would hit the `custom`
+  // branch above and every band would paint the same generic blue.
+  const resolveCatalogColor = (name: string): string | null =>
+    name === 'Antlia ALP-T Dual Band 5nm' ? '#501e96' : null;
+
+  it("uses the catalog filter's own colour when it names a product", () => {
+    expect(
+      resolveWindowColor(
+        { filter: 'Antlia ALP-T Dual Band 5nm', color: null },
+        readVar,
+        resolveCatalogColor,
+      ),
+    ).toBe('#501e96');
+  });
+
+  it('an explicit override still beats the catalog colour', () => {
+    expect(
+      resolveWindowColor(
+        { filter: 'Antlia ALP-T Dual Band 5nm', color: '#123456' },
+        readVar,
+        resolveCatalogColor,
+      ),
+    ).toBe('#123456');
+  });
+
+  it('a generic band name keeps its token even when a catalog is available', () => {
+    expect(resolveWindowColor({ filter: 'Ha', color: null }, readVar, resolveCatalogColor)).toBe(
+      'rgba(180,40,40,0.4)',
+    );
+  });
+
+  it('falls through to the custom token when the catalog has not loaded', () => {
+    expect(
+      resolveWindowColor(
+        { filter: 'Antlia ALP-T Dual Band 5nm', color: null },
+        readVar,
+        () => null,
+      ),
+    ).toBe('rgba(40,80,160,0.5)');
+  });
+
+  it('handles a null filter with a catalog resolver present', () => {
+    expect(resolveWindowColor({ filter: null, color: null }, readVar, resolveCatalogColor)).toBe(
+      'rgba(40,80,160,0.5)',
+    );
+  });
 });
 
 describe('cssColorToHex', () => {

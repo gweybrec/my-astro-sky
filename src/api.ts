@@ -740,7 +740,7 @@ export async function deleteDsoOverride(id: string): Promise<void> {
 // ─── Custom gear ──────────────────────────────────────────────────────────────
 
 export async function createCustomGear(
-  type: 'telescope' | 'camera' | 'accessory',
+  type: 'telescope' | 'camera' | 'accessory' | 'filter',
   data: object,
 ): Promise<{ id: string }> {
   const res = await fetch('/api/custom-gear', {
