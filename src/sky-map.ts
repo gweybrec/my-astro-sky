@@ -1727,11 +1727,12 @@ export class SkyMap {
       const horizonColor =
         cs.getPropertyValue('--accent-color').trim() || this.skyTheme.horizonLineColorFallback;
       drawHorizonLine(ctx, view, horizon.lstH, horizon.latDeg, horizonColor);
-      if (this.showMountainHorizon && this.mountainProfile) {
-        drawMountainHorizon(ctx, view, horizon.lstH, horizon.latDeg, this.mountainProfile);
-        if (this.mountainProfile.summits?.length) {
-          drawSummitDots(ctx, view, horizon.lstH, horizon.latDeg, this.mountainProfile);
-        }
+      // The terrain mass is drawn on the overlay canvas (above the photo layer) for live
+      // renders, so photos sitting behind the mountains are correctly hidden rather than
+      // painted on top of them — same pattern as FOV frames below. Offscreen/export renders
+      // have no overlay canvas, so it's drawn inline here instead (see renderOverlay).
+      if (this._renderingOffscreen) {
+        this.renderMountainHorizon(ctx, horizon);
       }
       // Cardinal labels sit on top of the terrain fill so they stay legible.
       if (this.showCardinalPoints) {
@@ -1799,7 +1800,9 @@ export class SkyMap {
 
     oc.clearRect(0, 0, width, height);
 
-    if (this.fovFrameSpecs.length === 0 && this.fovInstances.length === 0) return;
+    const horizon = this.skyTimeMode === 'date' ? this.computeHorizonParams() : null;
+    const hasFrames = this.fovFrameSpecs.length > 0 || this.fovInstances.length > 0;
+    if (!horizon && !hasFrames) return;
 
     const poleOrigin = toCanvas(0, 0, view);
     const borderR = borderRadiusPU(this.borderLatDeg) * view.scale;
@@ -1808,6 +1811,12 @@ export class SkyMap {
     oc.beginPath();
     oc.arc(poleOrigin.x, poleOrigin.y, borderR, 0, Math.PI * 2);
     oc.clip();
+
+    // Terrain mass first (drawn above the photo layer so photos behind the mountains are
+    // hidden — see the comment in the main render loop), then frames on top of that.
+    if (horizon) {
+      this.renderMountainHorizon(oc, horizon);
+    }
 
     // Temporarily route ctx to the overlay canvas so renderFovFrames / renderFovInstances
     // draw there without any other changes to those methods.
@@ -1818,6 +1827,18 @@ export class SkyMap {
     this.ctx = mainCtx;
 
     oc.restore();
+  }
+
+  /** Draws the mountain-horizon terrain mass (+ summit dots) into `ctx`, if enabled. */
+  private renderMountainHorizon(
+    ctx: CanvasRenderingContext2D,
+    horizon: { lstH: number; latDeg: number },
+  ): void {
+    if (!this.showMountainHorizon || !this.mountainProfile) return;
+    drawMountainHorizon(ctx, this.view, horizon.lstH, horizon.latDeg, this.mountainProfile);
+    if (this.mountainProfile.summits?.length) {
+      drawSummitDots(ctx, this.view, horizon.lstH, horizon.latDeg, this.mountainProfile);
+    }
   }
 
   private renderPhotoOutlines() {
