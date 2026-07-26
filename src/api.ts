@@ -520,6 +520,7 @@ export interface ExportOptions {
   includePlans?: boolean;
   includeShortcuts?: boolean;
   includePoiCategories?: boolean;
+  includeSkyRegions?: boolean;
 }
 
 /**
@@ -586,6 +587,7 @@ export interface ImportPreviewResult {
   hasCustomGear: boolean;
   hasSetups: boolean;
   hasPoiCategories: boolean;
+  hasSkyRegions: boolean;
   hasPlans: boolean;
   hasShortcuts: boolean;
   /** Parsed shortcuts.json content, applied client-side to localStorage on import. */
@@ -618,6 +620,7 @@ export interface ImportOptions {
   importMetadata: boolean;
   importDsoOverrides: boolean;
   importPoiCategories?: boolean;
+  importSkyRegions?: boolean;
   /** null means no image filtering (metadata-only import). */
   selectedImages: string[] | null;
   /** ids of plans to import (name-collisions are replaced); null/empty ⇒ none. */
@@ -635,6 +638,7 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
   if (opts.importMetadata) fd.append('importMetadata', '1');
   if (opts.importDsoOverrides) fd.append('importDsoOverrides', '1');
   if (opts.importPoiCategories) fd.append('importPoiCategories', '1');
+  if (opts.importSkyRegions) fd.append('importSkyRegions', '1');
   if (opts.selectedImages !== null)
     fd.append('selectedImages', JSON.stringify(opts.selectedImages));
   if (opts.selectedPlans !== null) fd.append('selectedPlans', JSON.stringify(opts.selectedPlans));
@@ -919,6 +923,64 @@ export async function deletePoiCategoryAPI(id: string): Promise<void> {
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to delete POI category');
+  }
+}
+
+// ─── Sky regions ────────────────────────────────────────────────────────────
+
+/** A freehand Alt/Az polygon drawn on the Local Sky (zenith) view, saved by name. */
+export interface SkyRegionData {
+  id: string;
+  name: string;
+  color: string;
+  points: { azDeg: number; altDeg: number }[];
+  position: number;
+}
+
+export async function getSkyRegions(): Promise<SkyRegionData[]> {
+  const res = await fetch('/api/sky-regions');
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to load sky regions');
+  }
+  return res.json();
+}
+
+export async function createSkyRegion(
+  data: Omit<SkyRegionData, 'id' | 'position'>,
+): Promise<{ id: string }> {
+  const res = await fetch('/api/sky-regions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to create sky region');
+  }
+  return res.json();
+}
+
+export async function updateSkyRegion(
+  id: string,
+  data: Partial<Omit<SkyRegionData, 'id'>>,
+): Promise<void> {
+  const res = await fetch(`/api/sky-regions/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to update sky region');
+  }
+}
+
+export async function deleteSkyRegionAPI(id: string): Promise<void> {
+  const res = await fetch(`/api/sky-regions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error ?? 'Failed to delete sky region');
   }
 }
 

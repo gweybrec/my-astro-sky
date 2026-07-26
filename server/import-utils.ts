@@ -20,6 +20,7 @@ export interface ZipInspectResult {
   hasCustomGear: boolean;
   hasSetups: boolean;
   hasPoiCategories: boolean;
+  hasSkyRegions: boolean;
   hasPlans: boolean;
   /** Individual night plans in plans.json (id + name), for per-item import selection. */
   planItems: Array<{ id: string; name: string }>;
@@ -72,6 +73,7 @@ export interface ImportPreviewResponse {
   hasCustomGear: boolean;
   hasSetups: boolean;
   hasPoiCategories: boolean;
+  hasSkyRegions: boolean;
   hasPlans: boolean;
   hasShortcuts: boolean;
   shortcuts?: unknown;
@@ -107,6 +109,7 @@ export function buildZipPreviewResponse(
     hasCustomGear: inspect.hasCustomGear,
     hasSetups: inspect.hasSetups,
     hasPoiCategories: inspect.hasPoiCategories,
+    hasSkyRegions: inspect.hasSkyRegions,
     hasPlans: inspect.hasPlans,
     hasShortcuts: extra.hasShortcuts,
     shortcuts: extra.shortcuts,
@@ -146,6 +149,7 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
     hasCustomGear: false,
     hasSetups: false,
     hasPoiCategories: false,
+    hasSkyRegions: false,
     hasPlans: false,
     planItems: [],
     setupItems: [],
@@ -213,6 +217,13 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
       try {
         const cats = JSON.parse((await entry.buffer()).toString('utf8'));
         if (Array.isArray(cats) && cats.length > 0) result.hasPoiCategories = true;
+      } catch {
+        /* ignore */
+      }
+    } else if (entry.path === 'sky-regions.json') {
+      try {
+        const regions = JSON.parse((await entry.buffer()).toString('utf8'));
+        if (Array.isArray(regions) && regions.length > 0) result.hasSkyRegions = true;
       } catch {
         /* ignore */
       }

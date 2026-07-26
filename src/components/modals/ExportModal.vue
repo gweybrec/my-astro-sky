@@ -25,6 +25,10 @@
           {{ t('settings.exportPoiCategories') }}
         </label>
         <label class="export-checkbox-row">
+          <input type="checkbox" v-model="includeSkyRegions" @change="update" />
+          {{ t('settings.exportSkyRegions') }}
+        </label>
+        <label class="export-checkbox-row">
           <input type="checkbox" v-model="includePlans" @change="update" />
           {{ t('settings.exportPlans') }}
         </label>
@@ -94,6 +98,7 @@ const includeDso = ref(false);
 const includeGear = ref(false);
 const includeSetups = ref(false);
 const includePoiCategories = ref(false);
+const includeSkyRegions = ref(false);
 const includePlans = ref(false);
 const includeShortcuts = ref(false);
 const busy = ref(false);
@@ -123,6 +128,7 @@ const canExport = computed(
     includeGear.value ||
     includeSetups.value ||
     includePoiCategories.value ||
+    includeSkyRegions.value ||
     includePlans.value ||
     includeShortcuts.value ||
     someChecked.value,
@@ -157,6 +163,7 @@ async function onExport() {
     includeCustomGear: includeGear.value,
     includeSetups: includeSetups.value,
     includePoiCategories: includePoiCategories.value,
+    includeSkyRegions: includeSkyRegions.value,
     includePlans: includePlans.value,
     includeShortcuts: includeShortcuts.value,
   };

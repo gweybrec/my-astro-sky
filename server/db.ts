@@ -830,6 +830,43 @@ export function deleteAllPoiCategories(): number {
   }
 }
 
+// ─── Sky regions ───────────────────────────────────────────────────────────
+
+export interface SkyRegionRow {
+  id: string;
+  name: string;
+  color: string;
+  /** JSON-encoded {azDeg,altDeg}[] polygon, closed, ≥3 vertices. */
+  points: string;
+  position: number;
+}
+
+const getAllSkyRegionsStmt = db.prepare(
+  'SELECT * FROM sky_regions ORDER BY position ASC, rowid ASC',
+);
+const upsertSkyRegionStmt = db.prepare(
+  'INSERT OR REPLACE INTO sky_regions (id, name, color, points, position) VALUES (?, ?, ?, ?, ?)',
+);
+const deleteSkyRegionStmt = db.prepare('DELETE FROM sky_regions WHERE id = ?');
+
+export function getAllSkyRegions(): SkyRegionRow[] {
+  return getAllSkyRegionsStmt.all() as SkyRegionRow[];
+}
+
+export function upsertSkyRegion(row: SkyRegionRow): void {
+  upsertSkyRegionStmt.run(
+    row.id,
+    row.name.slice(0, 60),
+    row.color.slice(0, 32),
+    row.points,
+    row.position,
+  );
+}
+
+export function deleteSkyRegion(id: string): boolean {
+  return deleteSkyRegionStmt.run(id).changes > 0;
+}
+
 // ─── Night plans ────────────────────────────────────────────────────────────
 
 export interface PlanRow {

@@ -335,7 +335,23 @@ export function applyMigrations(database: Database): number {
         `);
       },
     },
-    // Future migrations: { version: 14, run(d) { ... } },
+    {
+      // v14: sky_regions — freehand Alt/Az polygons drawn on the Local Sky (zenith)
+      // view, saved by name and used as a Targets search filter.
+      version: 14,
+      run(d) {
+        d.exec(`
+          CREATE TABLE IF NOT EXISTS sky_regions (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            color TEXT NOT NULL,
+            points TEXT NOT NULL,
+            position INTEGER NOT NULL
+          )
+        `);
+      },
+    },
+    // Future migrations: { version: 15, run(d) { ... } },
   ];
 
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;

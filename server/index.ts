@@ -44,8 +44,12 @@ import {
   upsertPoiCategory,
   deletePoiCategory,
   deleteAllPoiCategories,
+  getAllSkyRegions,
+  upsertSkyRegion,
+  deleteSkyRegion,
   type PointOfInterestInput,
   type PoiCategoryRow,
+  type SkyRegionRow,
   getPlans,
   getPlan,
   getAllPlanEntries,
@@ -1975,6 +1979,238 @@ app.delete('/api/poi-categories', (_req, res) => {
   }
 });
 
+// ─── Sky regions ─────────────────────────────────────────────────────────────
+
+function skyRegionToApi(r: SkyRegionRow) {
+  let points: { azDeg: number; altDeg: number }[] = [];
+  try {
+    points = JSON.parse(r.points);
+  } catch {
+    /* corrupt row, surface as empty polygon rather than 500ing the whole list */
+  }
+  return { id: r.id, name: r.name, color: r.color, points, position: r.position };
+}
+
+function isValidRegionPoints(points: unknown): points is { azDeg: number; altDeg: number }[] {
+  return (
+    Array.isArray(points) &&
+    points.length >= 3 &&
+    points.every(
+      (p) =>
+        p &&
+        typeof p === 'object' &&
+        Number.isFinite((p as any).azDeg) &&
+        Number.isFinite((p as any).altDeg),
+    )
+  );
+}
+
+/**
+ * @swagger
+ * /api/sky-regions:
+ *   get:
+ *     summary: Get all saved sky regions
+ *     description: >
+ *       Freehand Alt/Az polygons drawn on the Local Sky (zenith) view, used as a
+ *       Targets search filter for "what I can actually see from my garden".
+ *     responses:
+ *       200:
+ *         description: Array of regions ordered by position
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string }
+ *                   name: { type: string }
+ *                   color: { type: string }
+ *                   points:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         azDeg: { type: number }
+ *                         altDeg: { type: number }
+ *                   position: { type: number }
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/sky-regions', (_req, res) => {
+  try {
+    res.json(getAllSkyRegions().map(skyRegionToApi));
+  } catch (err: any) {
+    console.error('[SkyRegions] Failed to list regions', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/sky-regions:
+ *   post:
+ *     summary: Create a new sky region
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, points]
+ *             properties:
+ *               name: { type: string }
+ *               color: { type: string, description: "CSS color, e.g. #4ea1ff" }
+ *               points:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     azDeg: { type: number }
+ *                     altDeg: { type: number }
+ *     responses:
+ *       200:
+ *         description: Region created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *       400:
+ *         description: Missing name or invalid points (needs at least 3 {azDeg,altDeg} vertices)
+ *       500:
+ *         description: Server error
+ */
+app.post('/api/sky-regions', (req, res) => {
+  try {
+    const { name, color, points } = req.body as any;
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' });
+      return;
+    }
+    if (!isValidRegionPoints(points)) {
+      res.status(400).json({ error: 'points must have at least 3 {azDeg,altDeg} vertices' });
+      return;
+    }
+    const id = `region-${uuidv4()}`;
+    const position = getAllSkyRegions().length;
+    upsertSkyRegion({
+      id,
+      name: name.trim(),
+      color: typeof color === 'string' && color.trim() ? color.trim() : '#4ea1ff',
+      points: JSON.stringify(points),
+      position,
+    });
+    res.json({ id });
+  } catch (err: any) {
+    console.error('[SkyRegions] Failed to create region', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/sky-regions/{id}:
+ *   patch:
+ *     summary: Update a sky region (name/color/points/position)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               color: { type: string }
+ *               points:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     azDeg: { type: number }
+ *                     altDeg: { type: number }
+ *               position: { type: number }
+ *     responses:
+ *       200:
+ *         description: Region updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       404:
+ *         description: Region not found
+ *       500:
+ *         description: Server error
+ */
+app.patch('/api/sky-regions/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = getAllSkyRegions().find((r) => r.id === id);
+    if (!existing) {
+      res.status(404).json({ error: 'Region not found' });
+      return;
+    }
+    const { name, color, points, position } = req.body as any;
+    upsertSkyRegion({
+      id,
+      name: typeof name === 'string' && name.trim() ? name.trim() : existing.name,
+      color: typeof color === 'string' && color.trim() ? color.trim() : existing.color,
+      points: isValidRegionPoints(points) ? JSON.stringify(points) : existing.points,
+      position: Number.isFinite(position) ? Number(position) : existing.position,
+    });
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[SkyRegions] Failed to update region', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/sky-regions/{id}:
+ *   delete:
+ *     summary: Delete a sky region
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Region deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       404:
+ *         description: Region not found
+ *       500:
+ *         description: Server error
+ */
+app.delete('/api/sky-regions/:id', (req, res) => {
+  try {
+    const ok = deleteSkyRegion(req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: 'Region not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[SkyRegions] Failed to delete region', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Night plans ──────────────────────────────────────────────────────────────
 
 /** Allowed plan objects-list sort keys (mirrors client PlanSortKey). */
@@ -3034,6 +3270,7 @@ app.post('/api/export', (req, res) => {
         includePlans?: boolean;
         includeShortcuts?: boolean;
         includePoiCategories?: boolean;
+        includeSkyRegions?: boolean;
       };
       ids?: string[];
       // Keyboard-shortcut bindings live in the client's localStorage; the client sends
@@ -3052,6 +3289,7 @@ app.post('/api/export', (req, res) => {
     const includePlans = options.includePlans === true;
     const includeShortcuts = options.includeShortcuts === true;
     const includePoiCategories = options.includePoiCategories === true;
+    const includeSkyRegions = options.includeSkyRegions === true;
 
     const { ids } = body;
     const allPhotos = getAllPhotos();
@@ -3128,6 +3366,12 @@ app.post('/api/export', (req, res) => {
     if (includePoiCategories) {
       const cats = getAllPoiCategories().map(poiCategoryToApi);
       archive.append(Buffer.from(JSON.stringify(cats, null, 2)), { name: 'poi-categories.json' });
+    }
+    if (includeSkyRegions) {
+      const regions = getAllSkyRegions().map(skyRegionToApi);
+      archive.append(Buffer.from(JSON.stringify(regions, null, 2)), {
+        name: 'sky-regions.json',
+      });
     }
     if (includePlans) {
       const entriesByPlan = new Map<string, PlanEntryRow[]>();
@@ -3272,6 +3516,7 @@ app.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) 
         hasCustomGear: false,
         hasSetups: false,
         hasPoiCategories: false,
+        hasSkyRegions: false,
         hasPlans: false,
         hasShortcuts: false,
         images: [],
@@ -3313,6 +3558,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
     const importMetadata = req.body?.importMetadata === '1';
     const importDsoOverrides = req.body?.importDsoOverrides === '1';
     const importPoiCategories = req.body?.importPoiCategories === '1';
+    const importSkyRegions = req.body?.importSkyRegions === '1';
     // null means "no image filter" (metadata-only import); a Set means "import only these filenames"
     const selectedImages: Set<string> | null = req.body?.selectedImages
       ? new Set(JSON.parse(req.body.selectedImages) as string[])
@@ -3348,6 +3594,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
       const customGearEntry = zipDir.files.find((f) => f.path === 'custom-gear.json');
       const gearSetupsEntry = zipDir.files.find((f) => f.path === 'gear-setups.json');
       const poiCategoriesEntry = zipDir.files.find((f) => f.path === 'poi-categories.json');
+      const skyRegionsEntry = zipDir.files.find((f) => f.path === 'sky-regions.json');
       const plansEntry = zipDir.files.find((f) => f.path === 'plans.json');
 
       if (
@@ -3356,6 +3603,7 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
         !customGearEntry &&
         !gearSetupsEntry &&
         !poiCategoriesEntry &&
+        !skyRegionsEntry &&
         !plansEntry
       ) {
         res.status(400).json({ error: 'Aucun contenu reconnu dans le ZIP' });
@@ -3487,6 +3735,34 @@ app.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
           }
         } catch {
           /* ignore invalid poi-categories.json */
+        }
+      }
+
+      // Import sky regions (id-based upsert: a re-imported region with the same id
+      // replaces the existing one).
+      if (skyRegionsEntry && importSkyRegions) {
+        try {
+          const rawRegions = JSON.parse((await skyRegionsEntry.buffer()).toString('utf8'));
+          if (Array.isArray(rawRegions)) {
+            rawRegions.forEach((r, ri) => {
+              if (
+                typeof r?.id !== 'string' ||
+                typeof r?.name !== 'string' ||
+                !Array.isArray(r.points)
+              ) {
+                return;
+              }
+              upsertSkyRegion({
+                id: r.id,
+                name: r.name,
+                color: typeof r.color === 'string' && r.color.trim() ? r.color : '#4ea1ff',
+                points: JSON.stringify(r.points),
+                position: Number.isFinite(r.position) ? Number(r.position) : ri,
+              });
+            });
+          }
+        } catch {
+          /* ignore invalid sky-regions.json */
         }
       }
 

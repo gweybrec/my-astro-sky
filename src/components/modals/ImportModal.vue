@@ -47,7 +47,14 @@
         </div>
 
         <!-- Global toggles (no per-item selection) -->
-        <div v-if="preview.hasDsoOverrides || preview.hasPoiCategories || preview.hasShortcuts">
+        <div
+          v-if="
+            preview.hasDsoOverrides ||
+            preview.hasPoiCategories ||
+            preview.hasSkyRegions ||
+            preview.hasShortcuts
+          "
+        >
           <div class="export-options-label">{{ t('settings.importContent') }}</div>
           <label v-if="preview.hasDsoOverrides" class="export-checkbox-row">
             <input type="checkbox" v-model="importDso" />
@@ -56,6 +63,10 @@
           <label v-if="preview.hasPoiCategories" class="export-checkbox-row">
             <input type="checkbox" v-model="importPoiCategories" />
             {{ t('settings.importPoiCategoriesLabel') }}
+          </label>
+          <label v-if="preview.hasSkyRegions" class="export-checkbox-row">
+            <input type="checkbox" v-model="importSkyRegions" />
+            {{ t('settings.importSkyRegionsLabel') }}
           </label>
           <label v-if="preview.hasShortcuts" class="export-checkbox-row">
             <input type="checkbox" v-model="importShortcuts" />
@@ -235,6 +246,7 @@ import { usePhotosStore } from '../../stores/photos';
 import { useCanvasStore } from '../../stores/canvas';
 import { useShortcutsStore } from '../../stores/shortcuts';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
+import { useSkyRegionsStore } from '../../stores/sky-regions';
 import { importPreview, importData, exportData, getPhotos } from '../../api';
 import type { ImportPreviewResult } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
@@ -247,6 +259,7 @@ const photosStore = usePhotosStore();
 const canvasStore = useCanvasStore();
 const shortcutsStore = useShortcutsStore();
 const poiCategoriesStore = usePoiCategoriesStore();
+const skyRegionsStore = useSkyRegionsStore();
 const hasPhotos = computed(() => photosStore.placedPhotos.length > 0);
 
 const phase = ref<'pick' | 'options'>('pick');
@@ -259,6 +272,7 @@ const backingUp = ref(false);
 
 const importDso = ref(true);
 const importPoiCategories = ref(true);
+const importSkyRegions = ref(true);
 const importShortcuts = ref(true);
 
 /**
@@ -324,6 +338,7 @@ const canImport = computed(() => {
     gearSel.some ||
     (preview.value.hasDsoOverrides && importDso.value) ||
     (preview.value.hasPoiCategories && importPoiCategories.value) ||
+    (preview.value.hasSkyRegions && importSkyRegions.value) ||
     (preview.value.hasShortcuts && importShortcuts.value)
   );
 });
@@ -358,6 +373,7 @@ async function onFilePicked(e: Event) {
     setupSel.reset(true);
     gearSel.reset(true);
     importDso.value = true;
+    importSkyRegions.value = true;
     importShortcuts.value = true;
     phase.value = 'options';
   } catch (err: any) {
@@ -391,6 +407,7 @@ async function onImport() {
       importMetadata: preview.value.hasMetadata,
       importDsoOverrides: preview.value.hasDsoOverrides && importDso.value,
       importPoiCategories: preview.value.hasPoiCategories && importPoiCategories.value,
+      importSkyRegions: preview.value.hasSkyRegions && importSkyRegions.value,
       selectedImages: hasImages ? Array.from(imgSel.selected) : null,
       selectedPlans: Array.from(planSel.selected),
       selectedSetups: Array.from(setupSel.selected),
@@ -425,6 +442,15 @@ async function onImport() {
     if (preview.value?.hasPoiCategories && importPoiCategories.value) {
       try {
         await poiCategoriesStore.load();
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Refresh sky regions if they were part of the bundle.
+    if (preview.value?.hasSkyRegions && importSkyRegions.value) {
+      try {
+        await skyRegionsStore.load();
       } catch {
         /* ignore */
       }

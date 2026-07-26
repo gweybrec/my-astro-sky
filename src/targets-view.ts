@@ -78,15 +78,19 @@ import { usePlansStore } from './stores/plans';
 import { useFovFramesStore } from './stores/fov-frames';
 import { useUiStore } from './stores/ui';
 import { useHorizonStore } from './stores/horizon';
+import { useSkyRegionsStore } from './stores/sky-regions';
+import { isAltAzInRegion } from './region-geometry';
+import { openManageRegionsModal } from './region-overlay';
 import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
-import { twilightWindow, dateToJD, moonRaDecDeg, moonPhase } from './astro-time';
+import { twilightWindow, dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
 import {
   maxAltDuringWindow,
   sampleAltCurve,
   sampleMoonAltCurve,
   angularSeparationDeg,
   moonDangerLevel,
+  altAzFromRaDec,
   type AltSample,
 } from './sky-geometry';
 import { outlineFromGrid } from './mosaic';
@@ -121,6 +125,8 @@ interface TargetsPrefs {
   resultLimit?: number;
   sortBy?: SortKey;
   horizonDirs?: string[];
+  /** Selected saved sky-region id, or null/undefined for "no region filter". */
+  skyRegionId?: string | null;
   enabledRatings?: number[];
   enabledDifficulties?: number[];
   enabledCatalogs?: string[];
@@ -1446,6 +1452,7 @@ export class TargetsView {
   private plansStore = usePlansStore(pinia);
   private fovFramesStore = useFovFramesStore(pinia);
   private uiStore = useUiStore(pinia);
+  private skyRegionsStore = useSkyRegionsStore(pinia);
   /** Live per-entry position-angle value spans, keyed by entryId (rebuilt each render). */
   private paSpans = new Map<string, HTMLElement>();
   private planBadgeEl: HTMLElement | null = null;
@@ -1468,6 +1475,11 @@ export class TargetsView {
     this.plansStore.$subscribe(() => this.refreshPaReadouts());
     // Load plans in the background; refresh the plans view when ready.
     this.plansStore.ensureLoaded().then(() => this.render());
+    // Sky regions populate the region filter dropdown; refresh once loaded, and
+    // again on any later create/delete from the region management modal so the
+    // dropdown stays current without needing the panel to be closed/reopened.
+    this.skyRegionsStore.ensureLoaded().then(() => this.render());
+    this.skyRegionsStore.$subscribe(() => this.render());
   }
 
   /** Update the live position-angle spans from current plan-entry values. */
@@ -2068,6 +2080,62 @@ export class TargetsView {
     horizonRow.appendChild(compassEl);
     filterColR.appendChild(horizonRow);
 
+    // ── Sky region filter ─────────────────────────────────────────────────────
+    // A user-drawn Alt/Az polygon ("what I can see from my garden"), much more
+    // precise than the N/S/E/W chips above — the two compose as AND, not either/or.
+    const regionRow = document.createElement('div');
+    regionRow.className = 'targets-form-row';
+    const regionLabel = document.createElement('div');
+    regionLabel.className = 'targets-label';
+    regionLabel.textContent = t('targets.skyRegion.label');
+    regionLabel.title = t('targets.skyRegion.tooltip') ?? '';
+
+    const regionControls = document.createElement('div');
+    regionControls.className = 'flex items-center gap-2';
+
+    const regionSelect = document.createElement('select');
+    regionSelect.className = 'dialog-input';
+    const renderRegionOptions = (): void => {
+      const selected = this.prefs.skyRegionId ?? '';
+      regionSelect.innerHTML = '';
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = t('targets.skyRegion.none');
+      regionSelect.appendChild(noneOpt);
+      for (const region of this.skyRegionsStore.regions) {
+        const opt = document.createElement('option');
+        opt.value = region.id;
+        opt.textContent = region.name;
+        regionSelect.appendChild(opt);
+      }
+      regionSelect.value = this.skyRegionsStore.regions.some((r) => r.id === selected)
+        ? selected
+        : '';
+    };
+    renderRegionOptions();
+    regionSelect.addEventListener('change', () => {
+      this.prefs.skyRegionId = regionSelect.value || null;
+      savePrefs(this.prefs);
+    });
+
+    const manageRegionsBtn = document.createElement('button');
+    manageRegionsBtn.type = 'button';
+    manageRegionsBtn.className = 'display-controls-btn text-small whitespace-nowrap';
+    manageRegionsBtn.textContent = t('targets.skyRegion.manage');
+    manageRegionsBtn.addEventListener('click', () => {
+      // Hide the Targets search sheet (it covers the whole map) so the sky map
+      // is visible and clickable for drawing/viewing regions; restore it once
+      // the user is done with the region flow.
+      this.uiStore.closeTargetsOverlay();
+      openManageRegionsModal(this.skyMap, () => this.uiStore.openTargetsOverlay());
+    });
+
+    regionControls.appendChild(regionSelect);
+    regionControls.appendChild(manageRegionsBtn);
+    regionRow.appendChild(regionLabel);
+    regionRow.appendChild(regionControls);
+    filterColR.appendChild(regionRow);
+
     // ── Altitude range filter ─────────────────────────────────────────────────
     const altRow = document.createElement('div');
     altRow.className = 'targets-form-row';
@@ -2588,6 +2656,19 @@ export class TargetsView {
           if (!enabledDirs.has('E') && isEast) return false;
           if (!enabledDirs.has('W') && !isEast) return false;
           return true;
+        });
+      }
+
+      // Sky region filter: composes as AND with the N/S/E/W chips above — a precise
+      // "what I can actually see from my garden" cut on top of the coarse quadrant one.
+      const activeRegion = this.prefs.skyRegionId
+        ? this.skyRegionsStore.regions.find((r) => r.id === this.prefs.skyRegionId)
+        : null;
+      if (activeRegion) {
+        suggestions = suggestions.filter((s) => {
+          const lstH = lstHours(dateToJD(s.bestTimeUtc), lon);
+          const { altDeg, azDeg } = altAzFromRaDec(s.dso.ra, s.dso.dec, lstH, lat);
+          return isAltAzInRegion(azDeg, altDeg, activeRegion);
         });
       }
 

@@ -384,6 +384,26 @@ export class SkyMap {
   // Merge: a standalone frame dropped onto another frame/mosaic of the same plan.
   private onFrameMerge: ((movedId: string, targetId: string) => void) | null = null;
 
+  // Freehand sky-region drawing (Local Sky / zenith view only, see enterRegionDrawMode).
+  // regionDrawActive spans the whole gesture (mousedown → mouseup); regionDrawing is
+  // true only while the mouse button is held (so mousemove before the first press,
+  // impossible in practice, is never captured as a point).
+  private regionDrawActive = false;
+  private regionDrawing = false;
+  private regionDrawPoints: { azDeg: number; altDeg: number }[] = [];
+  // Local Sky mode state to restore once drawing finishes/cancels, so forcing it on
+  // for the gesture never clobbers whatever the user had before.
+  private regionDrawPrevLocalSkyMode = false;
+  private onRegionDrawComplete: ((points: { azDeg: number; altDeg: number }[]) => void) | null =
+    null;
+  private onRegionDrawCancel: (() => void) | null = null;
+  // A saved region shown on the map for reference (see setActiveRegionOverlay); only
+  // meaningful while localSkyMode is active, since the polygon is stored in Alt/Az.
+  private activeRegionOverlay: {
+    color: string;
+    points: { azDeg: number; altDeg: number }[];
+  } | null = null;
+
   // Spatial indexes for fast hover detection
   private starIndex = new SpatialIndex<Star>(0.02);
   private dsoIndex = new SpatialIndex<DSO>(0.02);
@@ -1122,6 +1142,71 @@ export class SkyMap {
     this.canvas.style.cursor = 'default';
   }
 
+  /**
+   * Starts a freehand sky-region drawing gesture: forces Local Sky (zenith) mode on
+   * (restored to its prior state once the gesture ends) so captured points are in
+   * Alt/Az, a time-invariant frame matching "what I can see from a fixed location".
+   * Returns false (no-op) if no observer location is set — same guard as
+   * setLocalSkyMode, since computeHorizonParams() can't resolve without one.
+   */
+  enterRegionDrawMode(
+    onComplete: (points: { azDeg: number; altDeg: number }[]) => void,
+    onCancel: () => void,
+  ): boolean {
+    if (!this.computeHorizonParams()) return false;
+    this.regionDrawPrevLocalSkyMode = this.localSkyMode;
+    if (!this.localSkyMode) this.setLocalSkyMode(true);
+    this.regionDrawActive = true;
+    this.regionDrawing = false;
+    this.regionDrawPoints = [];
+    this.onRegionDrawComplete = onComplete;
+    this.onRegionDrawCancel = onCancel;
+    this.canvas.style.cursor = 'crosshair';
+    return true;
+  }
+
+  /** Cancels an in-progress region drawing gesture (e.g. a "Cancel" button). */
+  cancelRegionDrawMode(): void {
+    if (this.regionDrawActive) this.finishRegionDraw(true);
+  }
+
+  private finishRegionDraw(cancelled: boolean): void {
+    const points = this.regionDrawPoints;
+    const onComplete = this.onRegionDrawComplete;
+    const onCancel = this.onRegionDrawCancel;
+    this.regionDrawActive = false;
+    this.regionDrawing = false;
+    this.regionDrawPoints = [];
+    this.onRegionDrawComplete = null;
+    this.onRegionDrawCancel = null;
+    this.canvas.style.cursor = 'default';
+    if (!this.regionDrawPrevLocalSkyMode) this.setLocalSkyMode(false);
+    if (cancelled || points.length < 3) onCancel?.();
+    else onComplete?.(points);
+    this.requestRender();
+  }
+
+  private pushRegionDrawPoint(mx: number, my: number): void {
+    const hp = this.computeHorizonParams();
+    if (!hp) return;
+    const proj = fromCanvas(mx, my, this.view);
+    const { ra, dec } = unproject(proj.x, proj.y);
+    const { altDeg, azDeg } = altAzFromRaDec(ra, dec, hp.lstH, hp.latDeg);
+    const last = this.regionDrawPoints[this.regionDrawPoints.length - 1];
+    // Dedupe near-identical consecutive points so the saved polygon stays lean.
+    if (last && Math.abs(azDeg - last.azDeg) < 0.3 && Math.abs(altDeg - last.altDeg) < 0.3) return;
+    this.regionDrawPoints.push({ azDeg, altDeg });
+  }
+
+  /** Shows a saved region on the map for reference; pass null to clear it. Requires
+   * Local Sky mode to render meaningfully (the polygon is stored in Alt/Az). */
+  setActiveRegionOverlay(
+    region: { color: string; points: { azDeg: number; altDeg: number }[] } | null,
+  ): void {
+    this.activeRegionOverlay = region;
+    this.requestRender();
+  }
+
   resize() {
     const dpr = window.devicePixelRatio || 1;
     const rect = this.canvas.getBoundingClientRect();
@@ -1234,6 +1319,14 @@ export class SkyMap {
     this.addEvent(this.canvas, 'mousedown', ((e: MouseEvent) => {
       this.cancelAnimation();
       if (e.button === 0) {
+        if (this.regionDrawActive) {
+          this.regionDrawing = true;
+          this.regionDrawPoints = [];
+          const rect = this.canvas.getBoundingClientRect();
+          this.pushRegionDrawPoint(e.clientX - rect.left, e.clientY - rect.top);
+          this.requestRenderInteractive();
+          return; // region drawing consumed the press — no pan
+        }
         const rectF = this.canvas.getBoundingClientRect();
         if (this.handleFrameMouseDown(e.clientX - rectF.left, e.clientY - rectF.top)) {
           // A frame grab can start right over a DSO/star (e.g. the centre move
@@ -1265,6 +1358,12 @@ export class SkyMap {
     }) as EventListener);
 
     this.addEvent(window, 'mousemove', ((e: MouseEvent) => {
+      if (this.regionDrawActive && this.regionDrawing) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.pushRegionDrawPoint(e.clientX - rect.left, e.clientY - rect.top);
+        this.requestRenderInteractive();
+        return;
+      }
       if (this.frameDrag) {
         const rect = this.canvas.getBoundingClientRect();
         this.handleFrameDragMove(e.clientX - rect.left, e.clientY - rect.top);
@@ -1310,6 +1409,10 @@ export class SkyMap {
     }) as EventListener);
 
     this.addEvent(window, 'mouseup', ((e: MouseEvent) => {
+      if (this.regionDrawActive) {
+        this.finishRegionDraw(!this.regionDrawing);
+        return;
+      }
       if (this.frameDrag) {
         const drag = this.frameDrag;
         this.frameDrag = null;
@@ -1372,7 +1475,9 @@ export class SkyMap {
     // Escape exits picking mode, or deselects the active frame.
     this.addEvent(window, 'keydown', ((e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (this.pickingMode) {
+      if (this.regionDrawActive) {
+        this.finishRegionDraw(true);
+      } else if (this.pickingMode) {
         this.exitPickingMode();
       } else if (this.fovInstances.some((f) => f.active)) {
         // Abandon any in-progress snap drag/animation so deselecting can't leave
@@ -1832,7 +1937,9 @@ export class SkyMap {
 
     const horizon = this.skyTimeMode === 'date' ? this.computeHorizonParams() : null;
     const hasFrames = this.fovFrameSpecs.length > 0 || this.fovInstances.length > 0;
-    if (!horizon && !hasFrames) return;
+    const hasRegionDraw = this.regionDrawActive && this.regionDrawPoints.length > 0;
+    const hasRegionOverlay = this.activeRegionOverlay !== null && this.localSkyMode;
+    if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay) return;
 
     const poleOrigin = toCanvas(0, 0, view);
     const borderR = borderRadiusPU(this.borderLatDeg) * view.scale;
@@ -1856,7 +1963,55 @@ export class SkyMap {
     if (this.fovInstances.length > 0) this.renderFovInstances();
     this.ctx = mainCtx;
 
+    if (hasRegionOverlay) this.renderRegionOverlay(oc);
+    if (hasRegionDraw) this.renderRegionDrawPreview(oc);
+
     oc.restore();
+  }
+
+  /** Draws the saved region reference overlay (see setActiveRegionOverlay). */
+  private renderRegionOverlay(ctx: CanvasRenderingContext2D): void {
+    const region = this.activeRegionOverlay;
+    const hp = this.computeHorizonParams();
+    if (!region || !hp || region.points.length < 3) return;
+    const { view } = this;
+    ctx.save();
+    ctx.beginPath();
+    region.points.forEach((p, i) => {
+      const { raDeg, decDeg } = raDecFromAltAz(p.altDeg, p.azDeg, hp.lstH, hp.latDeg);
+      const proj = project(raDeg, decDeg);
+      const c = toCanvas(proj.x, proj.y, view);
+      if (i === 0) ctx.moveTo(c.x, c.y);
+      else ctx.lineTo(c.x, c.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = `${region.color}40`; // ~25% alpha
+    ctx.fill();
+    ctx.strokeStyle = region.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Draws the live in-progress freehand region stroke while drawing. */
+  private renderRegionDrawPreview(ctx: CanvasRenderingContext2D): void {
+    const hp = this.computeHorizonParams();
+    if (!hp || this.regionDrawPoints.length === 0) return;
+    const { view } = this;
+    ctx.save();
+    ctx.beginPath();
+    this.regionDrawPoints.forEach((p, i) => {
+      const { raDeg, decDeg } = raDecFromAltAz(p.altDeg, p.azDeg, hp.lstH, hp.latDeg);
+      const proj = project(raDeg, decDeg);
+      const c = toCanvas(proj.x, proj.y, view);
+      if (i === 0) ctx.moveTo(c.x, c.y);
+      else ctx.lineTo(c.x, c.y);
+    });
+    ctx.strokeStyle = '#4ea1ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** Draws the mountain-horizon terrain mass (+ summit dots) into `ctx`, if enabled. */

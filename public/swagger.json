@@ -1188,6 +1188,230 @@
         }
       }
     },
+    "/api/sky-regions": {
+      "get": {
+        "summary": "Get all saved sky regions",
+        "description": "Freehand Alt/Az polygons drawn on the Local Sky (zenith) view, used as a Targets search filter for \"what I can actually see from my garden\".\n",
+        "responses": {
+          "200": {
+            "description": "Array of regions ordered by position",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "color": {
+                        "type": "string"
+                      },
+                      "points": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "azDeg": {
+                              "type": "number"
+                            },
+                            "altDeg": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      },
+                      "position": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new sky region",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "points"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "CSS color, e.g. #4ea1ff"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "azDeg": {
+                          "type": "number"
+                        },
+                        "altDeg": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Region created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing name or invalid points (needs at least 3 {azDeg,altDeg} vertices)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/sky-regions/{id}": {
+      "patch": {
+        "summary": "Update a sky region (name/color/points/position)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "azDeg": {
+                          "type": "number"
+                        },
+                        "altDeg": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "position": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Region updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Region not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a sky region",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Region deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Region not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/api/plans": {
       "get": {
         "summary": "Get all night plans with their entries",

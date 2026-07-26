@@ -153,6 +153,14 @@ export function confirmSetupDelete(name: string): Promise<boolean> {
   );
 }
 
+export function confirmSkyRegionDelete(name: string): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('targets.skyRegion.deleteConfirmTitle'),
+    t('targets.skyRegion.deleteConfirmMessage', { name }),
+    t('photos.delete'),
+  );
+}
+
 export function confirmPlanEntryDelete(targetName: string): Promise<boolean> {
   return confirmDeleteDialog(
     t('fovOverlay.deleteFrame'),
