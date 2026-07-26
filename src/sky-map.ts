@@ -20,9 +20,19 @@ import {
   setProjectionObserver,
   projectionAreaFactor,
 } from './projection';
-import { dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
+import {
+  dateToJD,
+  lstHours,
+  moonRaDecDeg,
+  moonPhase,
+  sunRaDecDeg,
+  planetRaDecDeg,
+  PLANET_KEYS,
+  type PlanetKey,
+} from './astro-time';
 import { altAzFromRaDec, raDecFromAltAz } from './sky-geometry';
 import { drawMoonMarker } from './moon-draw';
+import { drawBodyMarker, drawBodyLabel } from './body-draw';
 import { clampSmartMosaicSize } from './mosaic';
 import type { SmartMosaicEnvelope } from './mosaic';
 import { getStars, getStarMagsSorted, loadConstellationStyle, normalizeRA } from './star-catalog';
@@ -301,6 +311,8 @@ export class SkyMap {
 
   // ── Date mode: Moon overlay + horizon simulation ────────────────────────────
   private showMoon = false;
+  private showSun = false;
+  private showPlanets = false;
   private showAzimuthGrid = false;
   // Observer's terrain skyline (mountain horizon) + whether to draw it. Only
   // rendered in date mode with an observer location set (same gate as the horizon).
@@ -496,6 +508,18 @@ export class SkyMap {
   /** Independent of live/date mode — shows the Moon's real position in live mode. */
   setShowMoon(show: boolean) {
     this.showMoon = show;
+    this.requestRender();
+  }
+
+  /** Only rendered in date mode, same gating as the Moon toggle. */
+  setShowSun(show: boolean) {
+    this.showSun = show;
+    this.requestRender();
+  }
+
+  /** Only rendered in date mode; shows all 7 planets (Mercury–Neptune) together. */
+  setShowPlanets(show: boolean) {
+    this.showPlanets = show;
     this.requestRender();
   }
 
@@ -1693,6 +1717,12 @@ export class SkyMap {
     // where its position relative to "now" wouldn't be meaningful to show.
     if (this.showMoon && this.skyTimeMode === 'date') {
       this.renderMoon(horizon);
+    }
+    if (this.showSun && this.skyTimeMode === 'date') {
+      this.renderSun(horizon);
+    }
+    if (this.showPlanets && this.skyTimeMode === 'date') {
+      this.renderPlanets(horizon);
     }
     if (this.showStars) {
       this.renderStars(horizon);
@@ -2935,6 +2965,98 @@ export class SkyMap {
       outline: this.skyTheme.moonOutlineColor,
     });
     ctx.restore();
+  }
+
+  private static readonly SUN_RADIUS_PX = 6;
+  private static readonly PLANET_RADIUS_PX = 3.5;
+
+  private planetLabelKey(planet: PlanetKey): string {
+    return `planets.${planet}`;
+  }
+
+  private planetColor(planet: PlanetKey): string {
+    const theme = this.skyTheme;
+    switch (planet) {
+      case 'mercury':
+        return theme.mercuryColor;
+      case 'venus':
+        return theme.venusColor;
+      case 'mars':
+        return theme.marsColor;
+      case 'jupiter':
+        return theme.jupiterColor;
+      case 'saturn':
+        return theme.saturnColor;
+      case 'uranus':
+        return theme.uranusColor;
+      case 'neptune':
+        return theme.neptuneColor;
+    }
+  }
+
+  /** Renders a single point-like body (Sun or planet): a colored dot plus a name label. */
+  private renderCelestialBody(
+    horizon: { lstH: number; latDeg: number } | null,
+    raDeg: number,
+    decDeg: number,
+    radiusPx: number,
+    fillColor: string,
+    label: string,
+  ) {
+    const { ctx, view } = this;
+    const altDeg = horizon
+      ? altAzFromRaDec(raDeg, decDeg, horizon.lstH, horizon.latDeg).altDeg
+      : null;
+
+    if (this.localSkyMode) {
+      if (altDeg !== null && altDeg < 0) return;
+    } else if (!this.fisheyeMode) {
+      if (this.hemisphere === 'north' && decDeg < -(this.borderLatDeg + 2)) return;
+      if (this.hemisphere === 'south' && decDeg > +(this.borderLatDeg + 2)) return;
+    }
+
+    const p = project(raDeg, decDeg);
+    if (p.x >= 1e5) return;
+    const c = toCanvas(p.x, p.y, view);
+    if (c.x < -50 || c.x > view.width + 50 || c.y < -50 || c.y > view.height + 50) return;
+
+    const belowHorizon = altDeg !== null && altDeg < 0;
+
+    ctx.save();
+    ctx.globalAlpha = belowHorizon ? SkyMap.BELOW_HORIZON_ALPHA : 1;
+    drawBodyMarker(ctx, c.x, c.y, radiusPx, fillColor, this.skyTheme.bodyOutlineColor);
+    drawBodyLabel(ctx, c.x, c.y, radiusPx, label, this.skyTheme.bodyLabelColor, FONTS.bodyLabel);
+    ctx.restore();
+  }
+
+  private renderSun(horizon: { lstH: number; latDeg: number } | null) {
+    const date = this.skyTimeMode === 'live' ? new Date() : this.simDate;
+    const jd = dateToJD(date);
+    const { raDeg, decDeg } = sunRaDecDeg(jd);
+    this.renderCelestialBody(
+      horizon,
+      raDeg,
+      decDeg,
+      SkyMap.SUN_RADIUS_PX,
+      this.skyTheme.sunColor,
+      t('planets.sun'),
+    );
+  }
+
+  private renderPlanets(horizon: { lstH: number; latDeg: number } | null) {
+    const date = this.skyTimeMode === 'live' ? new Date() : this.simDate;
+    const jd = dateToJD(date);
+    for (const planet of PLANET_KEYS) {
+      const { raDeg, decDeg } = planetRaDecDeg(jd, planet);
+      this.renderCelestialBody(
+        horizon,
+        raDeg,
+        decDeg,
+        SkyMap.PLANET_RADIUS_PX,
+        this.planetColor(planet),
+        t(this.planetLabelKey(planet)),
+      );
+    }
   }
 
   private renderDSOLabels() {

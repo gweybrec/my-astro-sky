@@ -23,6 +23,8 @@ export interface SkyTimeSettings {
    *  left running in the background — including across an app close/reopen. */
   lastSyncEpochMs: number;
   showMoon: boolean;
+  showSun: boolean;
+  showPlanets: boolean;
   showAzimuthGrid: boolean;
   showCardinalPoints: boolean;
   localSkyMode: boolean;
@@ -38,6 +40,8 @@ export const DEFAULT_SETTINGS: SkyTimeSettings = {
   paused: false,
   lastSyncEpochMs: Date.now(),
   showMoon: false,
+  showSun: false,
+  showPlanets: false,
   showAzimuthGrid: false,
   showCardinalPoints: false,
   localSkyMode: false,

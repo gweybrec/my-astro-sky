@@ -20,6 +20,8 @@ describe('sky-time store', () => {
     expect(store.effectiveRate).toBe(1);
     expect(store.paused).toBe(false);
     expect(store.showMoon).toBe(false);
+    expect(store.showSun).toBe(false);
+    expect(store.showPlanets).toBe(false);
     expect(store.showAzimuthGrid).toBe(false);
   });
 
@@ -243,6 +245,18 @@ describe('sky-time store', () => {
     store.toggleMode(); // -> date again, same session
     expect(store.showMoon).toBe(true);
     expect(store.showAzimuthGrid).toBe(true);
+  });
+
+  it('setShowSun and setShowPlanets toggle independently and persist', () => {
+    const store = useSkyTimeStore();
+    store.setShowSun(true);
+    expect(store.showSun).toBe(true);
+    expect(store.showPlanets).toBe(false);
+    expect(JSON.parse(localStorage.getItem(SKY_TIME_SETTINGS_KEY)!).showSun).toBe(true);
+
+    store.setShowPlanets(true);
+    expect(store.showPlanets).toBe(true);
+    expect(JSON.parse(localStorage.getItem(SKY_TIME_SETTINGS_KEY)!).showPlanets).toBe(true);
   });
 
   it('setShowAzimuthGrid toggles and persists', () => {

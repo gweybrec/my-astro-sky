@@ -22,6 +22,8 @@ describe('sky-time-settings', () => {
     expect(s.timeRateSign).toBe(1);
     expect(s.paused).toBe(false);
     expect(s.showMoon).toBe(false);
+    expect(s.showSun).toBe(false);
+    expect(s.showPlanets).toBe(false);
     expect(s.showAzimuthGrid).toBe(false);
     expect(s.localSkyMode).toBe(false);
     // simDateISO must be a valid, parseable ISO date close to "now".
@@ -40,6 +42,8 @@ describe('sky-time-settings', () => {
       paused: true,
       lastSyncEpochMs: 1700000000000,
       showMoon: true,
+      showSun: true,
+      showPlanets: true,
       showAzimuthGrid: true,
       showCardinalPoints: true,
       localSkyMode: true,

@@ -17,6 +17,7 @@ export const FONTS = {
   dsoLabel: '9px sans-serif',
   starLabel: '10px sans-serif',
   frameLabel: '11px sans-serif',
+  bodyLabel: '10px sans-serif',
 } as const;
 
 /** Grid line widths (equator drawn heavier than the regular declination circles). */

@@ -75,6 +75,20 @@ export interface SkyThemeConfig {
   /** Outline stroke around the Moon disk. */
   moonOutlineColor: string;
 
+  // ── Sun/planet markers (date-mode overlay, plain colored dots) ──
+  sunColor: string;
+  mercuryColor: string;
+  venusColor: string;
+  marsColor: string;
+  jupiterColor: string;
+  saturnColor: string;
+  uranusColor: string;
+  neptuneColor: string;
+  /** Shared outline stroke for all Sun/planet markers. */
+  bodyOutlineColor: string;
+  /** Shared name-label color for Sun/planet markers. */
+  bodyLabelColor: string;
+
   // ── Horizon line (date mode, when an observer location is set) ──
   /** Fallback only — SkyMap prefers the live `--accent-color` CSS var so the horizon
    * line matches the current warm/cold UI theme instead of a fixed hardcoded hue. */
@@ -126,6 +140,17 @@ export const SKY_THEME: SkyThemeConfig = {
   moonLitColor: 'rgba(225, 230, 245, 0.92)',
   moonShadowColor: 'rgba(30, 34, 48, 0.9)',
   moonOutlineColor: 'rgba(190, 195, 215, 0.7)',
+  // Evocative of each body's real-world hue, tuned for visibility against the dark sky.
+  sunColor: 'rgba(255, 214, 120, 0.95)',
+  mercuryColor: 'rgba(180, 175, 170, 0.95)',
+  venusColor: 'rgba(240, 225, 180, 0.95)',
+  marsColor: 'rgba(225, 120, 85, 0.95)',
+  jupiterColor: 'rgba(220, 185, 140, 0.95)',
+  saturnColor: 'rgba(225, 200, 150, 0.95)',
+  uranusColor: 'rgba(150, 220, 230, 0.95)',
+  neptuneColor: 'rgba(95, 130, 230, 0.95)',
+  bodyOutlineColor: 'rgba(255, 255, 255, 0.6)',
+  bodyLabelColor: 'rgba(220, 210, 190, 0.75)',
   horizonLineColorFallback: 'rgba(192, 120, 48, 0.65)',
   // Soft green, well clear of the grid's blue family.
   azGridColor: 'rgba(110, 200, 140, 0.35)',

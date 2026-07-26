@@ -55,23 +55,179 @@ function sunEclipticLongDeg(jd: number): number {
 }
 
 /**
- * Sun altitude in degrees above horizon for a given JD, lat, lon.
+ * Geocentric apparent Sun RA/Dec in degrees for a given JD.
+ * Low-precision (Meeus ch. 25 simplified) — same accuracy class as sunEclipticLongDeg.
  */
-export function sunAltDeg(jd: number, latDeg: number, lonDeg: number): number {
+export function sunRaDecDeg(jd: number): { raDeg: number; decDeg: number } {
   const lambda = sunEclipticLongDeg(jd) * DEG;
   const epsilon = 23.439 * DEG; // mean obliquity (approx)
 
-  // Equatorial coords
   const ra = Math.atan2(Math.cos(epsilon) * Math.sin(lambda), Math.cos(lambda));
   const dec = Math.asin(Math.sin(epsilon) * Math.sin(lambda));
+  return { raDeg: (((ra / DEG) % 360) + 360) % 360, decDeg: dec / DEG };
+}
+
+/**
+ * Sun altitude in degrees above horizon for a given JD, lat, lon.
+ */
+export function sunAltDeg(jd: number, latDeg: number, lonDeg: number): number {
+  const { raDeg, decDeg } = sunRaDecDeg(jd);
+  const dec = decDeg * DEG;
 
   // Hour angle
   const lst = lstHours(jd, lonDeg);
-  const ha = ((lst - ra / DEG / 15 + 24) % 24) * 15 * DEG; // radians
+  const ha = ((lst - raDeg / 15 + 24) % 24) * 15 * DEG; // radians
 
   const lat = latDeg * DEG;
   const sinAlt = Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha);
   return Math.asin(Math.max(-1, Math.min(1, sinAlt))) / DEG;
+}
+
+// ─── Planet positions ───────────────────────────────────────────────────────
+
+export type PlanetKey = 'mercury' | 'venus' | 'mars' | 'jupiter' | 'saturn' | 'uranus' | 'neptune';
+
+export const PLANET_KEYS: PlanetKey[] = [
+  'mercury',
+  'venus',
+  'mars',
+  'jupiter',
+  'saturn',
+  'uranus',
+  'neptune',
+];
+
+/**
+ * J2000.0 mean Keplerian orbital elements and their per-Julian-century rates
+ * (JPL "Keplerian elements for approximate positions of the major planets",
+ * valid 1800-2050). Units: a in AU, angles in degrees.
+ * [a, aDot, e, eDot, i, iDot, L, LDot, peri, periDot, node, nodeDot]
+ */
+type ElementRow = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
+
+const EARTH_ELEMENTS: ElementRow = [
+  1.00000261, 0.00000562, 0.01671123, -0.00004392, -0.00001531, -0.01294668, 100.46457166,
+  35999.37244981, 102.93768193, 0.32327364, 0.0, 0.0,
+];
+
+const PLANET_ELEMENTS: Record<PlanetKey, ElementRow> = {
+  mercury: [
+    0.38709927, 0.00000037, 0.20563593, 0.00001906, 7.00497902, -0.00594749, 252.2503235,
+    149472.67411175, 77.45779628, 0.16047689, 48.33076593, -0.12534081,
+  ],
+  venus: [
+    0.72333566, 0.0000039, 0.00677672, -0.00004107, 3.39467605, -0.0007889, 181.9790995,
+    58517.81538729, 131.60246718, 0.00268329, 76.67984255, -0.27769418,
+  ],
+  mars: [
+    1.52371034, 0.00001847, 0.0933941, 0.00007882, 1.84969142, -0.00813131, -4.55343205,
+    19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343,
+  ],
+  jupiter: [
+    5.202887, -0.00011607, 0.04838624, -0.00013253, 1.30439695, -0.00183714, 34.39644051,
+    3034.74612775, 14.72847983, 0.21252668, 100.47390909, 0.20469106,
+  ],
+  saturn: [
+    9.53667594, -0.0012506, 0.05386179, -0.00050991, 2.48599187, 0.00193609, 49.95424423,
+    1222.49362201, 92.59887831, -0.41897216, 113.66242448, -0.28867794,
+  ],
+  uranus: [
+    19.18916464, -0.00196176, 0.04725744, -0.00004397, 0.77263783, -0.00242939, 313.23810451,
+    428.48202785, 170.9542763, 0.40805281, 74.01692503, 0.04240589,
+  ],
+  neptune: [
+    30.06992276, 0.00026291, 0.00859048, 0.00005105, 1.77004347, 0.00035372, -55.12002969,
+    218.45945325, 44.96476227, -0.32241464, 131.78422574, -0.00508664,
+  ],
+};
+
+/** Heliocentric ecliptic rectangular coordinates (AU, J2000 ecliptic frame) at time T (centuries since J2000). */
+function heliocentricEclipticXYZ(row: ElementRow, T: number): [number, number, number] {
+  const [a0, aDot, e0, eDot, i0, iDot, L0, LDot, peri0, periDot, node0, nodeDot] = row;
+  const a = a0 + aDot * T;
+  const e = e0 + eDot * T;
+  const iDeg = i0 + iDot * T;
+  const LDeg = L0 + LDot * T;
+  const periDeg = peri0 + periDot * T; // longitude of perihelion (ϖ)
+  const nodeDeg = node0 + nodeDot * T; // longitude of ascending node (Ω)
+
+  const wDeg = periDeg - nodeDeg; // argument of perihelion
+  let MDeg = LDeg - periDeg; // mean anomaly
+  MDeg = ((MDeg + 180) % 360) - 180; // normalize to [-180, 180) for fast Kepler convergence
+  if (MDeg < -180) MDeg += 360;
+
+  // Solve Kepler's equation E - e*sin(E) = M (degrees, Meeus/JPL iteration form).
+  const eStarDeg = (e * 180) / Math.PI;
+  let E = MDeg + eStarDeg * Math.sin(MDeg * DEG);
+  for (let iter = 0; iter < 10; iter++) {
+    const dM = MDeg - (E - eStarDeg * Math.sin(E * DEG));
+    const dE = dM / (1 - e * Math.cos(E * DEG));
+    E += dE;
+    if (Math.abs(dE) < 1e-7) break;
+  }
+  const Erad = E * DEG;
+
+  // Heliocentric coordinates in the orbital plane.
+  const xp = a * (Math.cos(Erad) - e);
+  const yp = a * Math.sqrt(1 - e * e) * Math.sin(Erad);
+
+  const w = wDeg * DEG;
+  const node = nodeDeg * DEG;
+  const i = iDeg * DEG;
+
+  const cosW = Math.cos(w),
+    sinW = Math.sin(w);
+  const cosNode = Math.cos(node),
+    sinNode = Math.sin(node);
+  const cosI = Math.cos(i),
+    sinI = Math.sin(i);
+
+  const xecl =
+    (cosW * cosNode - sinW * sinNode * cosI) * xp + (-sinW * cosNode - cosW * sinNode * cosI) * yp;
+  const yecl =
+    (cosW * sinNode + sinW * cosNode * cosI) * xp + (-sinW * sinNode + cosW * cosNode * cosI) * yp;
+  const zecl = sinW * sinI * xp + cosW * sinI * yp;
+
+  return [xecl, yecl, zecl];
+}
+
+/**
+ * Geocentric apparent RA/Dec in degrees for a given planet and JD.
+ * Low-precision Keplerian-element method (JPL "approximate positions of the
+ * major planets", valid 1800-2050) — same accuracy class as the Moon/Sun
+ * formulas above (light-minutes-scale accuracy, no light-time correction).
+ */
+export function planetRaDecDeg(jd: number, planet: PlanetKey): { raDeg: number; decDeg: number } {
+  const T = (jd - 2451545.0) / 36525.0;
+  const [xp, yp, zp] = heliocentricEclipticXYZ(PLANET_ELEMENTS[planet], T);
+  const [xe, ye, ze] = heliocentricEclipticXYZ(EARTH_ELEMENTS, T);
+
+  // Geocentric ecliptic vector.
+  const xg = xp - xe;
+  const yg = yp - ye;
+  const zg = zp - ze;
+
+  const eps = 23.43928 * DEG; // mean obliquity at J2000
+  const xeq = xg;
+  const yeq = yg * Math.cos(eps) - zg * Math.sin(eps);
+  const zeq = yg * Math.sin(eps) + zg * Math.cos(eps);
+
+  const ra = Math.atan2(yeq, xeq);
+  const dec = Math.atan2(zeq, Math.sqrt(xeq * xeq + yeq * yeq));
+  return { raDeg: (((ra / DEG) % 360) + 360) % 360, decDeg: dec / DEG };
 }
 
 // ─── Moon position & phase ──────────────────────────────────────────────────

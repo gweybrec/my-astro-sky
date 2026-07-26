@@ -4,10 +4,14 @@ import {
   gmstHours,
   lstHours,
   sunAltDeg,
+  sunRaDecDeg,
   twilightWindow,
   jdToDate,
   moonRaDecDeg,
   moonPhase,
+  planetRaDecDeg,
+  PLANET_KEYS,
+  type PlanetKey,
 } from '../../src/astro-time';
 
 describe('dateToJD', () => {
@@ -97,6 +101,102 @@ describe('sunAltDeg', () => {
     const altWinter = sunAltDeg(jdWinter, 48, 0);
     expect(altSummer).toBeGreaterThan(altWinter);
   });
+});
+
+describe('sunRaDecDeg', () => {
+  it('declination near +23.4° at summer solstice and -23.4° at winter solstice', () => {
+    const summer = sunRaDecDeg(dateToJD(new Date('2024-06-21T12:00:00Z')));
+    const winter = sunRaDecDeg(dateToJD(new Date('2024-12-21T12:00:00Z')));
+    expect(summer.decDeg).toBeCloseTo(23.4, 0);
+    expect(winter.decDeg).toBeCloseTo(-23.4, 0);
+  });
+
+  it('is consistent with sunAltDeg (same underlying RA/Dec)', () => {
+    const jd = dateToJD(new Date('2024-03-20T12:00:00Z'));
+    const { raDeg, decDeg } = sunRaDecDeg(jd);
+    // Pick the longitude directly under the Sun (hour angle = 0) → altitude at
+    // lat = decDeg should be ~90° (the sub-solar point).
+    const lon = raDeg - gmstHours(jd) * 15;
+    const alt = sunAltDeg(jd, decDeg, lon);
+    expect(alt).toBeGreaterThan(89);
+  });
+
+  it('RA stays in [0, 360)', () => {
+    const { raDeg } = sunRaDecDeg(dateToJD(new Date('2024-09-01T00:00:00Z')));
+    expect(raDeg).toBeGreaterThanOrEqual(0);
+    expect(raDeg).toBeLessThan(360);
+  });
+});
+
+describe('planetRaDecDeg', () => {
+  const sampleDates = [
+    new Date('2024-01-15T00:00:00Z'),
+    new Date('2024-04-15T00:00:00Z'),
+    new Date('2024-07-15T00:00:00Z'),
+    new Date('2024-10-15T00:00:00Z'),
+    new Date('2025-01-15T00:00:00Z'),
+    new Date('2025-06-15T00:00:00Z'),
+  ];
+
+  it('covers all 7 planets (excluding Pluto)', () => {
+    expect(PLANET_KEYS).toHaveLength(7);
+    expect(PLANET_KEYS).not.toContain('pluto');
+  });
+
+  it('RA/Dec stay within physically plausible ranges for every planet', () => {
+    for (const planet of PLANET_KEYS) {
+      for (const date of sampleDates) {
+        const { raDeg, decDeg } = planetRaDecDeg(dateToJD(date), planet);
+        expect(raDeg).toBeGreaterThanOrEqual(0);
+        expect(raDeg).toBeLessThan(360);
+        // Obliquity (~23.4°) + max orbital inclination (Mercury, ~7°) + margin.
+        expect(Math.abs(decDeg)).toBeLessThan(35);
+      }
+    }
+  });
+
+  it('Mercury never exceeds ~28° max elongation from the Sun', () => {
+    const maxElongation = maxElongationDeg('mercury', sampleDates);
+    expect(maxElongation).toBeLessThan(30);
+  });
+
+  it('Venus never exceeds ~48° max elongation from the Sun', () => {
+    const maxElongation = maxElongationDeg('venus', sampleDates);
+    expect(maxElongation).toBeLessThan(50);
+  });
+
+  it('an outer planet (Mars) can reach a large elongation from the Sun over a year', () => {
+    const maxElongation = maxElongationDeg('mars', sampleDates);
+    expect(maxElongation).toBeGreaterThan(50);
+  });
+
+  it('planet position changes measurably over a month (not a static/frozen value)', () => {
+    const jd1 = dateToJD(new Date('2024-06-01T00:00:00Z'));
+    const jd2 = dateToJD(new Date('2024-07-01T00:00:00Z'));
+    const p1 = planetRaDecDeg(jd1, 'mars');
+    const p2 = planetRaDecDeg(jd2, 'mars');
+    const dRa = Math.abs(p1.raDeg - p2.raDeg);
+    expect(Math.min(dRa, 360 - dRa) + Math.abs(p1.decDeg - p2.decDeg)).toBeGreaterThan(0.1);
+  });
+
+  function maxElongationDeg(planet: PlanetKey, dates: Date[]): number {
+    let max = 0;
+    for (const date of dates) {
+      const jd = dateToJD(date);
+      const sun = sunRaDecDeg(jd);
+      const p = planetRaDecDeg(jd, planet);
+      const sunRad = (sun.raDeg * Math.PI) / 180;
+      const sunDecRad = (sun.decDeg * Math.PI) / 180;
+      const pRad = (p.raDeg * Math.PI) / 180;
+      const pDecRad = (p.decDeg * Math.PI) / 180;
+      const cosSep =
+        Math.sin(sunDecRad) * Math.sin(pDecRad) +
+        Math.cos(sunDecRad) * Math.cos(pDecRad) * Math.cos(sunRad - pRad);
+      const sepDeg = (Math.acos(Math.max(-1, Math.min(1, cosSep))) * 180) / Math.PI;
+      if (sepDeg > max) max = sepDeg;
+    }
+    return max;
+  }
 });
 
 describe('moonRaDecDeg', () => {

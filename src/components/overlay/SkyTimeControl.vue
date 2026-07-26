@@ -245,6 +245,34 @@
         @blur="suppress(false)"
         v-html="moonSvg"
       ></button>
+
+      <button
+        type="button"
+        class="sky-rotation-btn"
+        :class="{ active: store.showSun }"
+        :title="t('skyTime.sunButton')"
+        :aria-label="t('skyTime.sunButton')"
+        @click="store.setShowSun(!store.showSun)"
+        @mouseenter="suppress(true)"
+        @mouseleave="suppress(false)"
+        @focus="suppress(true)"
+        @blur="suppress(false)"
+        v-html="sunSvg"
+      ></button>
+
+      <button
+        type="button"
+        class="sky-rotation-btn"
+        :class="{ active: store.showPlanets }"
+        :title="t('skyTime.planetsButton')"
+        :aria-label="t('skyTime.planetsButton')"
+        @click="store.setShowPlanets(!store.showPlanets)"
+        @mouseenter="suppress(true)"
+        @mouseleave="suppress(false)"
+        @focus="suppress(true)"
+        @blur="suppress(false)"
+        v-html="planetsSvg"
+      ></button>
     </div>
 
     <button
@@ -275,6 +303,8 @@ import { useUiStore } from '../../stores/ui';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import calendarSvg from '../../icons/calendar.svg?raw';
 import moonSvg from '../../icons/moon.svg?raw';
+import sunSvg from '../../icons/sun.svg?raw';
+import planetsSvg from '../../icons/planets.svg?raw';
 import mapPinSvg from '../../icons/map-pin.svg?raw';
 import azimuthGridSvg from '../../icons/azimuth-grid.svg?raw';
 import localSkySvg from '../../icons/local-sky.svg?raw';

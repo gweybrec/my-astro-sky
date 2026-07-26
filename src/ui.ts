@@ -429,6 +429,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setSimDate(new Date(skyTimeSettings.simDateISO));
   skyMap.setObserverLocation(skyTimeSettings.lat, skyTimeSettings.lon);
   skyMap.setShowMoon(skyTimeSettings.showMoon);
+  skyMap.setShowSun(skyTimeSettings.showSun);
+  skyMap.setShowPlanets(skyTimeSettings.showPlanets);
   skyMap.setShowAzimuthGrid(skyTimeSettings.showAzimuthGrid);
   skyMap.setShowCardinalPoints(skyTimeSettings.showCardinalPoints);
   skyMap.setLocalSkyMode(skyTimeSettings.localSkyMode);

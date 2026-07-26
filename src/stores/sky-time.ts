@@ -46,6 +46,8 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   const paused = ref(s.paused);
   const lastSyncEpochMs = ref(s.lastSyncEpochMs);
   const showMoon = ref(s.showMoon);
+  const showSun = ref(s.showSun);
+  const showPlanets = ref(s.showPlanets);
   const showAzimuthGrid = ref(s.showAzimuthGrid);
   const showCardinalPoints = ref(s.showCardinalPoints);
   const localSkyMode = ref(s.localSkyMode);
@@ -77,6 +79,8 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
       paused: paused.value,
       lastSyncEpochMs: lastSyncEpochMs.value,
       showMoon: showMoon.value,
+      showSun: showSun.value,
+      showPlanets: showPlanets.value,
       showAzimuthGrid: showAzimuthGrid.value,
       showCardinalPoints: showCardinalPoints.value,
       localSkyMode: localSkyMode.value,
@@ -141,11 +145,11 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     if (next !== 'date' && localSkyMode.value) setLocalSkyMode(false);
     mode.value = next;
     if (next === 'date') activateDateMode();
-    // showMoon and showAzimuthGrid are intentionally left as-is: switching back to
-    // live and then back to date within the same session should find these exactly
-    // where they were left, not reset — the sky-map render loop is what hides the
-    // moon/azimuth grid while in live mode (they only make sense relative to a
-    // simulated date/time), not this store.
+    // showMoon, showSun, showPlanets, and showAzimuthGrid are intentionally left as-is:
+    // switching back to live and then back to date within the same session should find
+    // these exactly where they were left, not reset — the sky-map render loop is what
+    // hides them while in live mode (they only make sense relative to a simulated
+    // date/time), not this store.
     canvasStore.skyMap?.setSkyTimeMode(mode.value);
     updateTicker();
     persist();
@@ -211,6 +215,18 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   function setShowMoon(v: boolean) {
     showMoon.value = v;
     canvasStore.skyMap?.setShowMoon(v);
+    persist();
+  }
+
+  function setShowSun(v: boolean) {
+    showSun.value = v;
+    canvasStore.skyMap?.setShowSun(v);
+    persist();
+  }
+
+  function setShowPlanets(v: boolean) {
+    showPlanets.value = v;
+    canvasStore.skyMap?.setShowPlanets(v);
     persist();
   }
 
@@ -335,6 +351,8 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     timeRateSign,
     paused,
     showMoon,
+    showSun,
+    showPlanets,
     showAzimuthGrid,
     showCardinalPoints,
     localSkyMode,
@@ -346,6 +364,8 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     setLocation,
     seedLocationIfNeeded,
     setShowMoon,
+    setShowSun,
+    setShowPlanets,
     setShowAzimuthGrid,
     setShowCardinalPoints,
     setLocalSkyMode,

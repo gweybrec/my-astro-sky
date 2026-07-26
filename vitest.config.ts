@@ -27,6 +27,7 @@ export default defineConfig({
         'src/star-draw.ts',
         'src/frame-draw.ts',
         'src/moon-draw.ts',
+        'src/body-draw.ts',
         'src/targets-view.ts',
         'src/metadata-editor.ts',
         'src/toast.ts',
