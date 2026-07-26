@@ -4,6 +4,46 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.8.0] - 2026-07-26
+
+### Features
+
+- Add a bunch of different filters to choose from ([5ca9f8d](https://github.com/gweybrec/my-astro-sky/commit/5ca9f8d023d0645a2714d4d79fa78b0ec492234f))
+
+- Allow batch edits of photo labels and gears ([61f8169](https://github.com/gweybrec/my-astro-sky/commit/61f816955880752f56b29136b87efe9360f16135))
+
+- Easily add a setup for all photo that are added in a batch ([235d9af](https://github.com/gweybrec/my-astro-sky/commit/235d9afad8050903f91519c74db5713119bdbd5a))
+
+- Add a load WCS file inside the gallery photo details ([5a8edc7](https://github.com/gweybrec/my-astro-sky/commit/5a8edc78fa3097f3fde43395178793224f36d701))
+
+- Parse more fits/tiff metadata ([6a64d18](https://github.com/gweybrec/my-astro-sky/commit/6a64d180d497687e7f49788c93ad9d58754bdba0))
+
+- Add local mountains on the horizons of the local sky ([e8d0ae0](https://github.com/gweybrec/my-astro-sky/commit/e8d0ae0ca1ba9b1f8351966167571d24be9b4f24))
+
+
+### Bug Fixes
+
+- Acutally fix the tooltip dismissing on every tick of the local sky projection ([622ea3c](https://github.com/gweybrec/my-astro-sky/commit/622ea3ccb82bc25042291b31704a33bc932ba29e))
+
+
+### Refactor
+
+- Prevent local sky buttons from overlapping the tabs buttons ([dc680ba](https://github.com/gweybrec/my-astro-sky/commit/dc680ba3c8f2c398eeeb9feb06e97eea87161ae4))
+
+
+### Build System
+
+- V0.8.0 ([3e0dfeb](https://github.com/gweybrec/my-astro-sky/commit/3e0dfeb8ff4101f5bd59fb4f991f9b4eaa06e8ad))
+
+
+### Other
+
+- Fix photos displayed on top of mountains ([1cd8420](https://github.com/gweybrec/my-astro-sky/commit/1cd8420fa9f886f39285451c20bdc5aed186f0ac))
+
+- Fix unwated reload on the setup dropdown in the gallery ([f03f141](https://github.com/gweybrec/my-astro-sky/commit/f03f141c450e988e768cdc8f530f6f66541c72a8))
+
+- Try improving mountains display ([d3a77e0](https://github.com/gweybrec/my-astro-sky/commit/d3a77e0f7882da311fb0302ede7cdb057d04d243))
+
 ## [0.7.0] - 2026-07-09
 
 ### Features
