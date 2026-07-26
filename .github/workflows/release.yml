@@ -71,7 +71,7 @@ jobs:
         run: npm run electron:make
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: windows-artifacts
           path: |
@@ -103,7 +103,7 @@ jobs:
         run: npm run electron:make
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: linux-artifacts
           path: |
@@ -139,7 +139,7 @@ jobs:
         run: npm run electron:make
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: macos-artifacts-${{ matrix.arch }}
           path: |
@@ -196,19 +196,19 @@ jobs:
           fi
 
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: windows-artifacts
           path: artifacts/windows
 
       - name: Download Linux artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: linux-artifacts
           path: artifacts/linux
 
       - name: Download macOS artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: macos-artifacts-*
           path: artifacts/macos
