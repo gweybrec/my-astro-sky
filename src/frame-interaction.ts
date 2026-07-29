@@ -67,6 +67,6 @@ export function resizeRegionFromDraft(
   const { ra, dec } = unproject(proj.x, proj.y);
   // PA that reproduces the frame's on-screen orientation at the new centre
   // (works whether the frame was sky- or screen-anchored).
-  const paDeg = canvasRotDegToPa(geo.rotDeg, ra, view);
+  const paDeg = canvasRotDegToPa(geo.rotDeg, ra, dec, view);
   return { centerRa: ra, centerDec: dec, wDeg, hDeg, paDeg };
 }

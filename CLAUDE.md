@@ -207,6 +207,7 @@ See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
 - Backend reads `PORT` env var (default 3001) and `DB_PATH` (default `./data.db`).
 - Uploaded photos go to `uploads/` directory on disk, named with UUIDs.
 - `DSO_CATALOGS_ALL` is exported from `dso-catalog.ts` — do not redefine it locally in `ui.ts` or elsewhere.
+- **Smart telescopes:** never read a gear setup's `cameraId` directly — resolve it through `resolveSetupCamera()` in `gear-catalog.ts`, which substitutes the scope's `integrated_camera_id`. `tests/unit/gear-catalog-integrity.test.ts` pins each smart scope's FOV to its published spec; extend its table when adding one.
 
 ### Commit messages
 

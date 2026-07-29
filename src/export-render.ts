@@ -412,7 +412,7 @@ function drawOverviewFrames(
     // A mosaic envelope is oriented by the mosaic PA (per its RA); standalone
     // targets use the shared FOV-frame rotation.
     const rot = tgt.mosaic
-      ? paToCanvasRotationDeg(tgt.mosaic.paDeg, tgt.dso.ra, view.rotationDeg)
+      ? paToCanvasRotationDeg(tgt.mosaic.paDeg, tgt.dso.ra, tgt.dso.dec, view)
       : rotationDeg;
     const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rot);
     ctx.setLineDash([6 * dpr, 4 * dpr]);
@@ -827,7 +827,7 @@ function drawMosaicTiles(
     // north points at the tile's RA — mirror the live renderer's per-tile rotation
     // so the rectangles form the same coherent grid (a single uniform rotation
     // leaves them pinwheeled when the mosaic PA ≠ 0).
-    const rotationDeg = paToCanvasRotationDeg(paDeg, tile.ra, view.rotationDeg);
+    const rotationDeg = paToCanvasRotationDeg(paDeg, tile.ra, tile.dec, view);
     const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rotationDeg);
     ctx.beginPath();
     ctx.moveTo(corners[0].x, corners[0].y);

@@ -1074,6 +1074,21 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: opacity 0.15s ease;
+}
+
+/* Lets a modal peek through at what's behind it — e.g. the sky-region manager
+   while a region overlay is shown on the map. Toggled at runtime, not a static
+   variant, so it stays a modifier class rather than a new component. */
+.modal-backdrop--peek {
+  background: rgba(0, 0, 0, 0.15);
+  transition: background 0.15s ease;
+}
+.modal--peek {
+  opacity: 0.32;
+}
+.modal--peek:hover {
+  opacity: 0.92;
 }
 
 .modal-header {

@@ -91,6 +91,7 @@ import {
   type FrameGeometry,
 } from './frame-geometry';
 import { findMergeTarget, resizeRegionFromDraft, type ResizeDraft } from './frame-interaction';
+import { canvasPxPerDeg, isSkyPointVisible } from './sky-axes';
 import {
   easeInOutCubic,
   navigateDurationMs,
@@ -1162,6 +1163,7 @@ export class SkyMap {
     this.onRegionDrawComplete = onComplete;
     this.onRegionDrawCancel = onCancel;
     this.canvas.style.cursor = 'crosshair';
+    this.dismissTooltip();
     return true;
   }
 
@@ -1358,10 +1360,15 @@ export class SkyMap {
     }) as EventListener);
 
     this.addEvent(window, 'mousemove', ((e: MouseEvent) => {
-      if (this.regionDrawActive && this.regionDrawing) {
-        const rect = this.canvas.getBoundingClientRect();
-        this.pushRegionDrawPoint(e.clientX - rect.left, e.clientY - rect.top);
-        this.requestRenderInteractive();
+      if (this.regionDrawActive) {
+        // Suppress hover/tooltips for the whole gesture (not just while dragging) —
+        // a star/DSO tooltip popping up under the crosshair gets in the way of drawing.
+        this.dismissTooltip();
+        if (this.regionDrawing) {
+          const rect = this.canvas.getBoundingClientRect();
+          this.pushRegionDrawPoint(e.clientX - rect.left, e.clientY - rect.top);
+          this.requestRenderInteractive();
+        }
         return;
       }
       if (this.frameDrag) {
@@ -1869,15 +1876,6 @@ export class SkyMap {
       if (this._renderingOffscreen) {
         this.renderMountainHorizon(ctx, horizon);
       }
-      // Cardinal labels sit on top of the terrain fill so they stay legible.
-      if (this.showCardinalPoints) {
-        drawCardinalPoints(ctx, view, horizon.lstH, horizon.latDeg, {
-          n: t('cardinal.north'),
-          e: t('cardinal.east'),
-          s: t('cardinal.south'),
-          w: t('cardinal.west'),
-        });
-      }
     }
     if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
       this.renderPhotoOutlines();
@@ -1966,7 +1964,25 @@ export class SkyMap {
     if (hasRegionOverlay) this.renderRegionOverlay(oc);
     if (hasRegionDraw) this.renderRegionDrawPreview(oc);
 
+    // Cardinal labels last, so the N/E/S/W letters stay legible above the terrain
+    // mass, the photo layer and the frames.
+    if (horizon) this.renderCardinalPoints(oc, horizon);
+
     oc.restore();
+  }
+
+  /** Draws the red N/E/S/W horizon labels into `ctx`, if enabled. */
+  private renderCardinalPoints(
+    ctx: CanvasRenderingContext2D,
+    horizon: { lstH: number; latDeg: number },
+  ): void {
+    if (!this.showCardinalPoints) return;
+    drawCardinalPoints(ctx, this.view, horizon.lstH, horizon.latDeg, {
+      n: t('cardinal.north'),
+      e: t('cardinal.east'),
+      s: t('cardinal.south'),
+      w: t('cardinal.west'),
+    });
   }
 
   /** Draws the saved region reference overlay (see setActiveRegionOverlay). */
@@ -2049,7 +2065,11 @@ export class SkyMap {
     const { ctx, view } = this;
     const cx = view.width / 2;
     const cy = view.height / 2;
-    const { dec } = unproject(view.centerX, view.centerY);
+    // These previews sit at the screen centre, so their scale is the projection's scale at
+    // the sky point under it — measured, not derived from dec, which is the wrong quantity
+    // once the projection is zenith-centred (see sky-axes.ts).
+    const { ra, dec } = unproject(view.centerX, view.centerY);
+    const pxPerDeg = canvasPxPerDeg(ra, dec, view);
 
     // Resolve CSS token values from computed style (canvas does not support CSS vars directly)
     const cs = getComputedStyle(this.canvas);
@@ -2057,8 +2077,8 @@ export class SkyMap {
     const labelColor = cs.getPropertyValue('--fov-frame-label').trim() || FRAME.labelFallback;
 
     for (const spec of this.fovFrameSpecs) {
-      const halfWPx = angularSizeToCanvasPx(spec.wDeg * 30, dec, view.scale);
-      const halfHPx = angularSizeToCanvasPx(spec.hDeg * 30, dec, view.scale);
+      const halfWPx = (spec.wDeg / 2) * pxPerDeg;
+      const halfHPx = (spec.hDeg / 2) * pxPerDeg;
       const corners = computeFovFrameCorners(halfWPx, halfHPx, cx, cy, this.fovRotationDeg);
 
       ctx.save();
@@ -2079,8 +2099,8 @@ export class SkyMap {
   private frameAnchorCanvas(f: RenderableFrame): { cx: number; cy: number } {
     return frameAnchorCanvas(f, this.view);
   }
-  private canvasRotDegToPa(rotDeg: number, raDeg: number): number {
-    return canvasRotDegToPa(rotDeg, raDeg, this.view);
+  private canvasRotDegToPa(rotDeg: number, raDeg: number, decDeg: number): number {
+    return canvasRotDegToPa(rotDeg, raDeg, decDeg, this.view);
   }
   private frameCanvasRotationDeg(f: RenderableFrame): number {
     return frameCanvasRotationDeg(f, this.view);
@@ -2109,6 +2129,10 @@ export class SkyMap {
 
     for (const f of this.fovInstances) {
       if (f.visible === false) continue; // hidden via the manager checkbox
+      // Off-projection (below the Local Sky horizon, or the far hemisphere in fisheye):
+      // project() returns a sentinel there, so the frame would be painted far off-canvas
+      // with zero extents and degenerate handles. Skip it outright.
+      if (f.anchorKind === 'sky' && !isSkyPointVisible(f.ra ?? 0, f.dec ?? 0)) continue;
       const { corners, cx, cy, rotDeg, halfW, halfH } = this.frameGeometry(f);
       const isActive = f.active;
       const isTile = !!f.mosaicId; // a faint mosaic panel (the outline frame draws the rest)
@@ -2422,7 +2446,7 @@ export class SkyMap {
         dsoId = frameTargetDso(this.dsosInFrame(moved).map((d) => d.id));
       }
     }
-    const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
+    const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra, dec);
     this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
   }
 
@@ -2453,7 +2477,7 @@ export class SkyMap {
     // Keep the frame's on-screen orientation across the re-anchor by recomputing
     // the PA at the snapped object's RA.
     const canvasRotDeg = this.frameCanvasRotationDeg(f);
-    const paDeg = this.canvasRotDegToPa(canvasRotDeg, near.ra);
+    const paDeg = this.canvasRotDegToPa(canvasRotDeg, near.ra, near.dec);
     this.onFovInstanceChange?.(f.id, {
       anchor: { kind: 'sky', ra: near.ra, dec: near.dec, dsoId: near.id },
       paDeg,
@@ -2495,7 +2519,7 @@ export class SkyMap {
       const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
       const ra = normalizeRA(startRa + dRa * ease);
       const dec = startDec + dDec * ease;
-      const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
+      const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra, dec);
       const done = t >= 1;
       // Keep the DSO target bound for every frame of the spring (it's known the
       // whole time); a null mid-flight would flip a mosaic's name to the gear spec.
@@ -2575,7 +2599,7 @@ export class SkyMap {
       const { cx, cy } = this.frameAnchorCanvas(f);
       const rotDeg = canvasRotationDegFromCursor(cx, cy, mx, my);
       if (f.anchorKind === 'sky') {
-        const pa = this.canvasRotDegToPa(rotDeg, f.ra ?? 0);
+        const pa = this.canvasRotDegToPa(rotDeg, f.ra ?? 0, f.dec ?? 0);
         this.onFovInstanceChange?.(f.id, { paDeg: pa });
       } else {
         this.onFovInstanceChange?.(f.id, { screenRotationDeg: normalizeRotationDeg(rotDeg) });
@@ -2599,7 +2623,7 @@ export class SkyMap {
         const near = f.anchorSnap !== false ? this.findClosestDSO(mx, my) : null;
         // Recompute the PA so the frame keeps the same on-screen angle at the
         // new position.
-        const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra);
+        const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra, dec);
         if (near) {
           this.snapCandidate = {
             id: near.id,
@@ -3039,7 +3063,7 @@ export class SkyMap {
       const cos2 = dsoSizeCos2(dso, this.localSkyMode ? dso._altDeg : undefined);
       const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, cos2));
       const ry = Math.max(2, angularSizeToCanvasPx(minorArcmin / 2, dso.dec, view.scale, cos2));
-      const angle = dsoCanvasAngle(dso.pa, dso.ra, view.rotationDeg);
+      const angle = dsoCanvasAngle(dso, view.rotationDeg);
 
       // Opacity based on magnitude
       const mag = dso.mag ?? 10;

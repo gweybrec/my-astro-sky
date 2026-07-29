@@ -13,7 +13,7 @@ import type { RenderableFrame } from './sky-map';
 import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { framePointToSky } from './mosaic';
 import { paToCanvasRotationDeg, canvasRotationToPaDeg } from './frame-orientation';
-import { angularSizeToCanvasPx } from './dso-render-math';
+import { canvasPxPerDeg } from './sky-axes';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -68,21 +68,42 @@ export function frameAnchorCanvas(f: RenderableFrame, view: ViewState): { cx: nu
  * *up* (top edge) must point to celestial north at PA 0°, so we add 90° to the DSO
  * major-axis angle (local +x). Wraps {@link paToCanvasRotationDeg}.
  */
-export function paToCanvasRotDeg(paDeg: number, raDeg: number, view: ViewState): number {
-  return paToCanvasRotationDeg(paDeg, raDeg, view.rotationDeg);
+export function paToCanvasRotDeg(
+  paDeg: number,
+  raDeg: number,
+  decDeg: number,
+  view: ViewState,
+): number {
+  return paToCanvasRotationDeg(paDeg, raDeg, decDeg, view);
 }
 
 /** Inverse of {@link paToCanvasRotDeg}: recover PA (°E of N) from a canvas rotation. */
-export function canvasRotDegToPa(rotDeg: number, raDeg: number, view: ViewState): number {
-  return canvasRotationToPaDeg(rotDeg, raDeg, view.rotationDeg);
+export function canvasRotDegToPa(
+  rotDeg: number,
+  raDeg: number,
+  decDeg: number,
+  view: ViewState,
+): number {
+  return canvasRotationToPaDeg(rotDeg, raDeg, decDeg, view);
 }
 
 /** Canvas rotation (deg) for a frame instance. */
 export function frameCanvasRotationDeg(f: RenderableFrame, view: ViewState): number {
   if (f.anchorKind === 'sky') {
-    return paToCanvasRotDeg(f.paDeg ?? 0, f.ra ?? 0, view);
+    return paToCanvasRotDeg(f.paDeg ?? 0, f.ra ?? 0, f.dec ?? 0, view);
   }
   return f.screenRotationDeg ?? 0;
+}
+
+/**
+ * Sky position a frame's size and orientation must be measured at: its own centre when
+ * sky-anchored, otherwise the sky point currently under its screen anchor.
+ */
+function frameCenterSky(f: RenderableFrame, view: ViewState): { ra: number; dec: number } {
+  if (f.anchorKind === 'sky') return { ra: f.ra ?? 0, dec: f.dec ?? 0 };
+  const { cx, cy } = frameAnchorCanvas(f, view);
+  const proj = fromCanvas(cx, cy, view);
+  return unproject(proj.x, proj.y);
 }
 
 export function frameGeometry(f: RenderableFrame, view: ViewState): FrameGeometry {
@@ -95,10 +116,14 @@ export function frameGeometry(f: RenderableFrame, view: ViewState): FrameGeometr
     if (g) return g;
   }
   const { cx, cy } = frameAnchorCanvas(f, view);
-  const decForSize =
-    f.anchorKind === 'sky' ? (f.dec ?? 0) : unproject(view.centerX, view.centerY).dec;
-  const halfW = angularSizeToCanvasPx(f.wDeg * 30, decForSize, view.scale);
-  const halfH = angularSizeToCanvasPx(f.hDeg * 30, decForSize, view.scale);
+  // Scale is measured from the active projection at the frame's own position, so the
+  // frame covers the right patch of sky in the pole-centred map *and* in the Local Sky
+  // dome (where the projection's pole is the zenith, and a dec-based factor is simply the
+  // wrong quantity — see sky-axes.ts). Returns 0 below the horizon, collapsing the frame.
+  const center = frameCenterSky(f, view);
+  const pxPerDeg = canvasPxPerDeg(center.ra, center.dec, view);
+  const halfW = (f.wDeg / 2) * pxPerDeg;
+  const halfH = (f.hDeg / 2) * pxPerDeg;
   const rotDeg = frameCanvasRotationDeg(f, view);
   const corners = computeFovFrameCorners(halfW, halfH, cx, cy, rotDeg);
   return { corners, cx, cy, rotDeg, halfW, halfH };
@@ -117,10 +142,11 @@ export function mosaicCenterPa(
     if (f.ra == null || f.dec == null) return null;
     return { center: { ra: f.ra, dec: f.dec }, paDeg: f.paDeg ?? 0 };
   }
-  const { cx, cy } = frameAnchorCanvas(f, view);
-  const proj = fromCanvas(cx, cy, view);
-  const center = unproject(proj.x, proj.y);
-  return { center, paDeg: canvasRotDegToPa(f.screenRotationDeg ?? 0, center.ra, view) };
+  const center = frameCenterSky(f, view);
+  return {
+    center,
+    paDeg: canvasRotDegToPa(f.screenRotationDeg ?? 0, center.ra, center.dec, view),
+  };
 }
 
 /**

@@ -169,6 +169,18 @@ export function confirmPlanEntryDelete(targetName: string): Promise<boolean> {
   );
 }
 
+/**
+ * Free (ad-hoc) mosaics aren't part of a plan, so the message must not mention
+ * one — unlike {@link confirmPlanEntryDelete}, which is for plan items.
+ */
+export function confirmMosaicDelete(mosaicName: string): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('fovOverlay.deleteMosaic'),
+    t('fovOverlay.deleteMosaicConfirmFree', { name: mosaicName }),
+    t('fovOverlay.deleteMosaic'),
+  );
+}
+
 export function confirmDiscardUnsavedSolves(count: number): Promise<boolean> {
   return confirmDeleteDialog(
     t('batch.confirmCloseTitle'),

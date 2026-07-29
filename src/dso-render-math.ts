@@ -5,6 +5,7 @@
  */
 import type { DSO } from './types';
 import { getHemisphere, getProjectionGeneration, getCenterMode } from './projection';
+import { skyAxesProj } from './sky-axes';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -70,9 +71,25 @@ export function dsoSizeCos2(dso: DSO, altDeg?: number): number {
   return dso._cos2!;
 }
 
-/** Position angle (E of celestial north) → angle on canvas. */
-export function dsoCanvasAngle(pa: number, raDeg: number, viewRotationDeg: number): number {
-  const raRad = (raDeg * Math.PI) / 180;
-  const northAngle = Math.atan2(Math.cos(raRad), -Math.sin(raRad));
-  return northAngle - (pa * Math.PI) / 180 + viewRotationDeg * DEG2RAD;
+/**
+ * A DSO's position angle (E of celestial north) → its angle on canvas.
+ *
+ * The direction of north on screen is a property of the *active* projection, so it is
+ * measured rather than derived from RA (see `sky-axes.ts`): the old closed form
+ * `atan2(cos ra, −sin ra)` only describes the pole-centred map, and in the Local Sky dome
+ * north is rotated by the parallactic angle.
+ *
+ * The measurement is cached on the object per projection generation — exactly like
+ * {@link dsoSizeCos2} — so the per-frame cost for the whole rendered set is a multiply and
+ * two adds, and no allocation.
+ */
+export function dsoCanvasAngle(dso: DSO, viewRotationDeg: number): number {
+  const gen = getProjectionGeneration();
+  if (dso._nazg !== gen) {
+    const a = skyAxesProj(dso.ra, dso.dec);
+    dso._naz = a.northAngle;
+    dso._nazE = a.eastSign;
+    dso._nazg = gen;
+  }
+  return dso._naz! + dso._nazE! * dso.pa * DEG2RAD - viewRotationDeg * DEG2RAD;
 }

@@ -31,6 +31,17 @@ vi.mock('../../src/gear-catalog', () => ({
   buildGearPreset: vi
     .fn()
     .mockReturnValue({ focalLengthMm: 500, sensorWidthMm: 23, sensorHeightMm: 15 }),
+  resolveSetupCamera: vi.fn(
+    (
+      tel: { is_smart_telescope?: boolean; integrated_camera_id?: string | null },
+      cams: { id: string }[],
+      cameraId: string | null | undefined,
+    ) => {
+      const wanted =
+        tel.is_smart_telescope && tel.integrated_camera_id ? tel.integrated_camera_id : cameraId;
+      return cams.find((c) => c.id === wanted) ?? null;
+    },
+  ),
 }));
 vi.mock('../../src/gear-presets', () => ({
   fovDeg: vi.fn().mockReturnValue({ wDeg: 2.5, hDeg: 1.7 }),

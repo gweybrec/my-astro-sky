@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import {
   computeFovFrameCorners,
   frameAnchorCanvas,
@@ -9,7 +9,8 @@ import {
   paToCanvasRotDeg,
   canvasRotDegToPa,
 } from '../../src/frame-geometry';
-import { setHemisphere } from '../../src/projection';
+import { setHemisphere, setCenterMode, setProjectionObserver } from '../../src/projection';
+import { raDecFromAltAz } from '../../src/sky-geometry';
 import type { RenderableFrame } from '../../src/sky-map';
 import type { ViewState } from '../../src/types';
 
@@ -102,10 +103,81 @@ describe('framePinGlyphPos', () => {
 describe('paToCanvasRotDeg / canvasRotDegToPa round-trip', () => {
   it('recovers the original position angle', () => {
     const ra = 80,
+      dec = 12,
       pa = 33;
-    const rot = paToCanvasRotDeg(pa, ra, view);
-    const back = canvasRotDegToPa(rot, ra, view);
+    const rot = paToCanvasRotDeg(pa, ra, dec, view);
+    const back = canvasRotDegToPa(rot, ra, dec, view);
     // canvasRotDegToPa normalises into [0,360); 33° round-trips to itself.
     expect(back).toBeCloseTo(33, 4);
+  });
+});
+
+describe('frameGeometry in the Local Sky (zenith) view', () => {
+  const LST_H = 5;
+  const LAT_DEG = 40;
+
+  afterEach(() => setCenterMode('pole'));
+
+  /** Sky-anchored frame at a given RA/Dec. */
+  const skyFrame = (ra: number, dec: number, over: Partial<RenderableFrame> = {}) =>
+    ({
+      id: 'f2',
+      name: 'Vespera',
+      label: 'Vespera 2',
+      wDeg: 2.5,
+      hDeg: 1.4,
+      active: true,
+      movable: true,
+      anchorKind: 'sky',
+      ra,
+      dec,
+      paDeg: 0,
+      ...over,
+    }) as RenderableFrame;
+
+  it('sizes by altitude, not declination — the reported "frame too big" bug', () => {
+    // M14, where the user placed a Vespera 2 frame over an existing photo.
+    const { raDeg, decDeg } = raDecFromAltAz(35, 150, LST_H, LAT_DEG);
+    const f = skyFrame(raDeg, decDeg);
+    const poleHalfW = frameGeometry(f, view).halfW;
+
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const zenithHalfW = frameGeometry(f, view).halfW;
+
+    // At 35° altitude the projection's scale is well below the dec-based one, which is
+    // exactly why the frame drew too large before.
+    expect(zenithHalfW).toBeLessThan(poleHalfW);
+    // And it tracks the altitude-based stereographic factor.
+    const expected =
+      ((2.5 / 2) * (Math.PI / 180) * view.scale) / (2 * Math.cos(((90 - 35) * Math.PI) / 360) ** 2);
+    expect(zenithHalfW).toBeCloseTo(expected, 2);
+  });
+
+  it('keeps the width/height ratio (a conformal projection scales both axes alike)', () => {
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const { raDeg, decDeg } = raDecFromAltAz(55, 20, LST_H, LAT_DEG);
+    const g = frameGeometry(skyFrame(raDeg, decDeg), view);
+    expect(g.halfW / g.halfH).toBeCloseTo(2.5 / 1.4, 6);
+  });
+
+  it('collapses a frame below the horizon instead of drawing it off-canvas', () => {
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+    const { raDeg, decDeg } = raDecFromAltAz(-20, 200, LST_H, LAT_DEG);
+    const g = frameGeometry(skyFrame(raDeg, decDeg), view);
+    expect(g.halfW).toBe(0);
+    expect(g.halfH).toBe(0);
+  });
+
+  it('is unchanged in the pole-centred view (regression guard)', () => {
+    // The measured scale is the exact derivative of the old closed form, so switching to
+    // it must not move anything in the default projection.
+    const f = skyFrame(200, -15);
+    const g = frameGeometry(f, view);
+    const legacy =
+      ((1.4 / 2) * (Math.PI / 180) * view.scale) / (2 * Math.cos((105 * Math.PI) / 360) ** 2);
+    expect(g.halfH).toBeCloseTo(legacy, 4);
   });
 });

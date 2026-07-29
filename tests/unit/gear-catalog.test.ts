@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildGearPreset } from '../../src/gear-catalog';
+import { buildGearPreset, resolveSetupCamera } from '../../src/gear-catalog';
 import { fovDeg, pixelScaleArcsec } from '../../src/gear-presets';
 import type { TelescopeData, CameraData, AccessoryData } from '../../src/gear-catalog';
 
@@ -139,6 +139,59 @@ describe('buildGearPreset', () => {
   it('sets builtIn=true for smart telescope', () => {
     const preset = buildGearPreset(SMART_TELESCOPE, ATIK_CAMERA, null);
     expect(preset.builtIn).toBe(true);
+  });
+});
+
+// ─── resolveSetupCamera ───────────────────────────────────────────────────────
+
+describe('resolveSetupCamera', () => {
+  const SEESTAR_CAMERA: CameraData = {
+    ...ATIK_CAMERA,
+    id: 'seestar-s50-camera',
+    brand: 'ZWO',
+    model: 'Seestar S50 Integrated Sensor',
+    color_type: 'OSC',
+    sensor_width_mm: 5.6144,
+    sensor_height_mm: 3.1784,
+    pixel_size_um: 2.9,
+  };
+  const CATALOG = [ATIK_CAMERA, OSC_CAMERA, SEESTAR_CAMERA];
+
+  it('overrides a stored cameraId with the smart scope integrated sensor', () => {
+    // Setups saved before the fix carry an unrelated cameraId (historically the
+    // alphabetically-first catalog camera); the sealed-in sensor must still win.
+    expect(resolveSetupCamera(SMART_TELESCOPE, CATALOG, 'atik-314l-plus')).toBe(SEESTAR_CAMERA);
+  });
+
+  it('uses the integrated sensor when the setup stored no camera at all', () => {
+    expect(resolveSetupCamera(SMART_TELESCOPE, CATALOG, null)).toBe(SEESTAR_CAMERA);
+  });
+
+  it('honours the stored cameraId for a non-smart telescope', () => {
+    expect(resolveSetupCamera(C8_TELESCOPE, CATALOG, 'atik-314l-plus')).toBe(ATIK_CAMERA);
+  });
+
+  it('falls back to the stored cameraId when a smart scope has no integrated id', () => {
+    const orphan = { ...SMART_TELESCOPE, integrated_camera_id: null };
+    expect(resolveSetupCamera(orphan, CATALOG, 'osc-cam')).toBe(OSC_CAMERA);
+  });
+
+  it('returns null when the integrated camera is absent from the catalog', () => {
+    const broken = { ...SMART_TELESCOPE, integrated_camera_id: 'does-not-exist' };
+    expect(resolveSetupCamera(broken, CATALOG, 'atik-314l-plus')).toBeNull();
+  });
+
+  it('returns null when nothing identifies a camera', () => {
+    expect(resolveSetupCamera(C8_TELESCOPE, CATALOG, null)).toBeNull();
+  });
+
+  it('yields the integrated sensor FOV, not the stored camera FOV', () => {
+    const cam = resolveSetupCamera(SMART_TELESCOPE, CATALOG, 'atik-314l-plus');
+    const { wDeg, hDeg } = fovDeg(buildGearPreset(SMART_TELESCOPE, cam!, null));
+    expect(wDeg).toBeCloseTo(1.29, 2);
+    expect(hDeg).toBeCloseTo(0.73, 2);
+    // The Atik would have produced the wrong 2.06° × 1.54° at this focal length.
+    expect(wDeg).not.toBeCloseTo(2.06, 1);
   });
 });
 

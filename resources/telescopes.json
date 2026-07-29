@@ -1985,10 +1985,10 @@
     "brand": "ZWO",
     "model": "Seestar S30",
     "type": "Smart Telescope",
-    "optical_design": "Sealed catadioptric smart telescope",
+    "optical_design": "Apochromatic triplet refractor (ED glass) with integrated camera",
     "aperture_mm": 30,
-    "focal_length_mm": 120,
-    "f_ratio": 4.0,
+    "focal_length_mm": 150,
+    "f_ratio": 5,
     "central_obstruction_ratio": null,
     "image_circle_mm": null,
     "backfocus_mm": null,
@@ -2003,13 +2003,14 @@
     "accessory_mounting": { "thread": null, "format": "None — sealed all-in-one unit" },
     "supported_accessories": [],
     "recommended_use": ["widefield", "eaa"],
-    "optical_notes": "Ultra-compact smart telescope with WiFi control via Seestar app. Integrated Sony IMX462 sensor. Built-in dual-band filter.",
+    "optical_notes": "Ultra-compact smart telescope with WiFi control via Seestar app. Integrated Sony IMX662 (STARVIS 2) sensor. Built-in dual-band filter. Published tele FOV 2.46° (diagonal).",
     "status": "active",
     "verification": {
       "is_verified": true,
-      "source": "ZWO official",
-      "source_url": "https://www.zwoastro.com/product/seestar-s30/",
-      "last_verified": "2026-06-06"
+      "source": "ZWO official Seestar S30 page + Sky & Telescope test report",
+      "source_url": "https://www.seestar.com/blogs/faq/s30",
+      "secondary_source_url": "https://skyandtelescope.org/astronomy-equipment/choosing-astronomy-equipment/st-test-report-the-zwo-seestar-s30-telescope/",
+      "last_verified": "2026-07-29"
     }
   },
   {
@@ -2085,8 +2086,8 @@
     "model": "Vespera Pro",
     "type": "Smart Telescope",
     "optical_design": "Sealed refractor with integrated sensor and corrector",
-    "aperture_mm": 60,
-    "focal_length_mm": 300,
+    "aperture_mm": 50,
+    "focal_length_mm": 250,
     "f_ratio": 5.0,
     "central_obstruction_ratio": null,
     "image_circle_mm": null,
@@ -2106,9 +2107,9 @@
     "status": "active",
     "verification": {
       "is_verified": true,
-      "source": "Vaonis official",
-      "source_url": "https://vaonis.com",
-      "last_verified": "2026-06-06"
+      "source": "Vaonis official / B&H Vespera Pro listing (published FOV 1.6° × 1.6°)",
+      "source_url": "https://www.bhphotovideo.com/c/product/1773647-REG/vaonis_vep50_po1_vespera_pro_50mm_f_5.html",
+      "last_verified": "2026-07-29"
     }
   },
   {
@@ -2119,7 +2120,7 @@
     "optical_design": "Reflector (Newtonian) with integrated CMOS sensor",
     "aperture_mm": 114,
     "focal_length_mm": 450,
-    "f_ratio": 3.9,
+    "f_ratio": 4,
     "central_obstruction_ratio": 0.35,
     "image_circle_mm": null,
     "backfocus_mm": null,
@@ -2138,9 +2139,9 @@
     "status": "active",
     "verification": {
       "is_verified": true,
-      "source": "Unistellar official",
-      "source_url": "https://unistellar.com",
-      "last_verified": "2026-06-06"
+      "source": "Unistellar official comparison table (published FOV 34′ × 47′)",
+      "source_url": "https://help.unistellar.com/hc/en-us/articles/4406616411922",
+      "last_verified": "2026-07-29"
     }
   },
   {
@@ -2150,8 +2151,8 @@
     "type": "Smart Telescope",
     "optical_design": "Rowe-Ackermann Schmidt Astrograph with integrated sensor (Halo design)",
     "aperture_mm": 152,
-    "focal_length_mm": 305,
-    "f_ratio": 2.0,
+    "focal_length_mm": 335,
+    "f_ratio": 2.2,
     "central_obstruction_ratio": 0.40,
     "image_circle_mm": null,
     "backfocus_mm": null,
@@ -2170,9 +2171,9 @@
     "status": "active",
     "verification": {
       "is_verified": true,
-      "source": "Celestron official",
-      "source_url": "https://www.celestron.com",
-      "last_verified": "2026-06-06"
+      "source": "Celestron official Origin specifications (published FOV 1.32° × 0.75°)",
+      "source_url": "https://www.celestron.com/products/celestron-origin-intelligent-home-observatory",
+      "last_verified": "2026-07-29"
     }
   },
   {
@@ -2181,9 +2182,9 @@
     "model": "Odyssey Pro",
     "type": "Smart Telescope",
     "optical_design": "Reflector (Newtonian) with integrated CMOS sensor — enhanced version",
-    "aperture_mm": 114,
-    "focal_length_mm": 450,
-    "f_ratio": 3.9,
+    "aperture_mm": 85,
+    "focal_length_mm": 320,
+    "f_ratio": 3.8,
     "central_obstruction_ratio": 0.35,
     "image_circle_mm": null,
     "backfocus_mm": null,
@@ -2202,9 +2203,9 @@
     "status": "active",
     "verification": {
       "is_verified": true,
-      "source": "Unistellar official",
-      "source_url": "https://unistellar.com",
-      "last_verified": "2026-06-06"
+      "source": "Unistellar official / Universe Today review (85 mm, 320 mm; FOV 34′ × 45′). Vendor rounds the ratio to f/3.9; stored as 320/85 = f/3.8 for internal consistency.",
+      "source_url": "https://www.universetoday.com/articles/review-unistellars-new-odyssey-pro-smart-telescope",
+      "last_verified": "2026-07-29"
     }
   },
   {
@@ -2369,11 +2370,6 @@
       "resolution": "2160 x 3840 (8.3 MP)",
       "notes": "Wide-angle camera for Milky Way, star trails, and landscape astrophotography"
     },
-    "sensor": "Sony IMX585",
-    "sensor_format": "1/1.2 inch",
-    "sensor_resolution": "3840 x 2160 (8.3 MP)",
-    "pixel_size_um": 2.9,
-    "fov_deg": "4.6° (tele) / 63° (wide)",
     "accessory_mounting": {
       "thread": "3/8\"-16 tripod mount",
       "format": "None — sealed all-in-one unit"
@@ -2428,12 +2424,6 @@
       "resolution": "1920 x 1080",
       "notes": "Wide-angle lens for daytime/landscape use and target acquisition"
     },
-    "sensor": "Sony IMX678 (STARVIS 2)",
-    "sensor_format": "1/2.8 inch",
-    "sensor_resolution": "3840 x 2160 (8.3 MP)",
-    "pixel_size_um": 2,
-    "effective_focal_length_mm": 737,
-    "fov_deg": "2.93° x 1.65° (tele)",
     "accessory_mounting": {
       "thread": "1/4\"-20 tripod mount",
       "format": "None — sealed all-in-one unit"
@@ -2485,12 +2475,6 @@
       "sensor_format": "1/2.8 inch",
       "notes": "Wide-angle lens for target framing, Milky Way, and star trail capture"
     },
-    "sensor": "Sony IMX662",
-    "sensor_format": "1/2.8 inch",
-    "sensor_resolution": "1920 x 1080 (2 MP RAW)",
-    "pixel_size_um": 2.9,
-    "effective_focal_length_mm": 1016,
-    "fov_deg": "2.45° x 2.14° (tele)",
     "accessory_mounting": {
       "thread": "1/4\"-20 tripod mount",
       "format": "None — sealed all-in-one unit"

@@ -227,6 +227,9 @@ export interface DSO {
   _cos2g?: number; // projection generation _cos2 was computed for
   _cos2z?: number; // cached angular-size altitude factor (zenith/local-sky mode)
   _cos2zg?: number; // projection generation _cos2z was computed for
+  _naz?: number; // cached canvas angle of celestial north here, map rotation excluded (see dsoCanvasAngle)
+  _nazE?: 1 | -1; // cached screen handedness of increasing RA at this point
+  _nazg?: number; // projection generation _naz/_nazE were computed for
   // ── horizon-visibility cache (see isBelowHorizonCached) ──
   _altDeg?: number;
   _belowHorizon?: boolean;

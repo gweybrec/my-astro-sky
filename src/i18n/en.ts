@@ -1169,8 +1169,8 @@ const en: Translations = {
     planNeedsSetup: 'Choose a gear setup above to size this plan’s frames.',
     anchorOn: 'Anchor: snapping to nearest object',
     anchorOff: 'Anchor off: pin anywhere',
-    deleteFrameConfirm:
-      'Remove “{name}” from this plan? It will also disappear from Targets & Plan.',
+    deleteFrameConfirm: 'Remove “{name}” from this plan?',
+    deleteMosaicConfirmFree: 'Remove “{name}”? This deletes all of its tiles.',
     showOnMap: 'Show on map',
     showFrames: 'Show frames',
     hideFrames: 'Hide frames',

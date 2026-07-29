@@ -153,10 +153,16 @@ export function openDrawRegionFlow(skyMap: SkyMap, onDone?: () => void): void {
 export function openManageRegionsModal(skyMap: SkyMap, onFullyClosed?: () => void): void {
   const store = useSkyRegionsStore();
 
+  // Viewing a region requires Local Sky mode (the polygon is stored in Alt/Az);
+  // remember whether it was already on so closing this modal doesn't leave the
+  // map stuck in that mode for a user who never asked for it.
+  const wasLocalSkyMode = skyMap.getLocalSkyMode();
+
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   const closeModalOnly = (): void => {
     skyMap.setActiveRegionOverlay(null);
+    if (!wasLocalSkyMode) skyMap.setLocalSkyMode(false);
     backdrop.remove();
   };
   const close = (): void => {
@@ -189,6 +195,15 @@ export function openManageRegionsModal(skyMap: SkyMap, onFullyClosed?: () => voi
   list.className = 'flex flex-col gap-2';
   body.appendChild(list);
 
+  // Viewing a region fades the modal (and dims the backdrop less) so the
+  // overlay drawn on the map behind it is actually visible; hovering the
+  // modal restores full opacity to read/interact with it (see .modal--peek).
+  let viewingRegionId: string | null = null;
+  const setPeek = (active: boolean): void => {
+    backdrop.classList.toggle('modal-backdrop--peek', active);
+    modal.classList.toggle('modal--peek', active);
+  };
+
   function renderList(): void {
     list.innerHTML = '';
     if (store.regions.length === 0) {
@@ -217,7 +232,17 @@ export function openManageRegionsModal(skyMap: SkyMap, onFullyClosed?: () => voi
       viewBtn.className = 'display-controls-btn text-small';
       viewBtn.textContent = t('targets.skyRegion.view');
       viewBtn.addEventListener('click', () => {
+        if (viewingRegionId === region.id) {
+          // Toggle off: viewing the same region again hides it and restores the modal.
+          viewingRegionId = null;
+          skyMap.setActiveRegionOverlay(null);
+          setPeek(false);
+          return;
+        }
+        viewingRegionId = region.id;
+        skyMap.setLocalSkyMode(true);
         skyMap.setActiveRegionOverlay({ color: region.color, points: region.points });
+        setPeek(true);
       });
       row.appendChild(viewBtn);
 
@@ -250,7 +275,7 @@ export function openManageRegionsModal(skyMap: SkyMap, onFullyClosed?: () => voi
 
   const drawBtn = document.createElement('button');
   drawBtn.type = 'button';
-  drawBtn.className = 'display-controls-btn mr-auto';
+  drawBtn.className = 'btn-confirm mr-auto';
   drawBtn.textContent = t('targets.skyRegion.drawNew');
   drawBtn.addEventListener('click', () => {
     closeModalOnly();

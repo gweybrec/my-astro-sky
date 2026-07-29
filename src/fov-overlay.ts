@@ -3,7 +3,13 @@ import { t } from './i18n';
 import type { FovFrameSpec } from './sky-map';
 import type { DSO } from './types';
 import { buildGearSectionContent, type GearSectionPrefs } from './targets-view';
-import { getTelescopes, getCameras, getAccessories, buildGearPreset } from './gear-catalog';
+import {
+  getTelescopes,
+  getCameras,
+  getAccessories,
+  buildGearPreset,
+  resolveSetupCamera,
+} from './gear-catalog';
 import { formatSetupCanvasLabel, formatFov, fovDeg } from './gear-presets';
 import { formatPaDeg } from './frame-orientation';
 import { reportUnknownRendererError } from './error-reporter';
@@ -32,7 +38,11 @@ import addFrameSvg from './icons/add-frame.svg?raw';
 import addMosaicSvg from './icons/add-mosaic.svg?raw';
 import planListSvg from './icons/plan-list.svg?raw';
 import listPlusSvg from './icons/list-plus.svg?raw';
-import { confirmPlanEntryDelete, confirmSetupDelete } from './photo-delete-confirm';
+import {
+  confirmMosaicDelete,
+  confirmPlanEntryDelete,
+  confirmSetupDelete,
+} from './photo-delete-confirm';
 import { showToast } from './toast';
 import { deleteFrameWithUndo } from './frame-delete';
 
@@ -76,11 +86,12 @@ export async function buildFovFrameSpecs(setups: FovSetup[]): Promise<FovFrameSp
     const specs: FovFrameSpec[] = [];
     for (const setup of enabled) {
       const tel = telescopes.find((t) => t.id === setup.telescopeId);
-      const cam = cameras.find((c) => c.id === setup.cameraId);
+      if (!tel) continue;
+      const cam = resolveSetupCamera(tel, cameras, setup.cameraId);
       const acc = setup.accessoryId
         ? (accessories.find((a) => a.id === setup.accessoryId) ?? null)
         : null;
-      if (!tel || !cam) continue;
+      if (!cam) continue;
 
       const preset = buildGearPreset(tel, cam, acc);
       const { wDeg, hDeg } = fovDeg(preset);
@@ -297,7 +308,12 @@ function buildSetupModal(opts: {
     .then(([telescopes, cameras]) => {
       if (!currentPrefs.telescopeId && telescopes.length > 0)
         currentPrefs.telescopeId = telescopes[0].id;
-      if (!currentPrefs.cameraId && cameras.length > 0) currentPrefs.cameraId = cameras[0].id;
+      // A smart telescope's sealed-in sensor always wins; only fall back to the first
+      // catalog camera for scopes where the user actually gets to pick one.
+      const tel = telescopes.find((t) => t.id === currentPrefs.telescopeId);
+      const resolved = tel ? resolveSetupCamera(tel, cameras, currentPrefs.cameraId) : null;
+      if (resolved) currentPrefs.cameraId = resolved.id;
+      else if (!currentPrefs.cameraId && cameras.length > 0) currentPrefs.cameraId = cameras[0].id;
       const rebuild = (container: HTMLElement) => {
         buildGearSectionContent(container, currentPrefs, {
           onPrefsChange: (partial) => {
@@ -1438,15 +1454,19 @@ export function buildFovPopup(
         e.stopPropagation();
         const name = f.anchorLabel ?? customFrameLabel(f);
         if (isFreeMosaic) {
-          if (await confirmPlanEntryDelete(name)) fovStore.removeAdhocMosaic(f.id.split(':')[2]);
+          // Free mosaic: not part of a plan, so no "from this plan" wording —
+          // still confirms since restoring a tile grid isn't undoable.
+          if (await confirmMosaicDelete(name)) fovStore.removeAdhocMosaic(f.id.split(':')[2]);
         } else if (isMosaic) {
           // A whole mosaic still confirms (restoring a tile grid isn't undoable).
           const [, planId, mosaicId] = f.id.split(':');
           if (await confirmPlanEntryDelete(name)) await plansStore.deleteMosaic(planId, mosaicId);
         } else if (isPlan) {
-          // Plan frames map to plan entries — delete immediately with an undo toast.
+          // Plan frames: confirm removal from the plan, then delete with an undo toast.
           const [, planId, entryId] = f.id.split(':');
-          deleteFrameWithUndo({ kind: 'plan', planId, entryId, name });
+          if (await confirmPlanEntryDelete(name)) {
+            deleteFrameWithUndo({ kind: 'plan', planId, entryId, name });
+          }
         } else {
           deleteFrameWithUndo({ kind: 'adhoc', id: f.id, name });
         }

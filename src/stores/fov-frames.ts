@@ -14,7 +14,13 @@ import {
 } from '../mosaic';
 import type { SmartMosaicEnvelope } from '../mosaic';
 import { getGearSetups, updatePlanMosaicAPI } from '../api';
-import { getTelescopes, getCameras, getAccessories, buildGearPreset } from '../gear-catalog';
+import {
+  getTelescopes,
+  getCameras,
+  getAccessories,
+  buildGearPreset,
+  resolveSetupCamera,
+} from '../gear-catalog';
 import { fovDeg, formatSetupCanvasLabel } from '../gear-presets';
 import { getDSOById } from '../dso-catalog';
 import { usePlansStore } from './plans';
@@ -409,9 +415,10 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       const m = new Map<string, SetupSpec>();
       for (const s of setups) {
         const tel = tels.find((t) => t.id === s.telescopeId);
-        const cam = cams.find((c) => c.id === s.cameraId);
+        if (!tel) continue;
+        const cam = resolveSetupCamera(tel, cams, s.cameraId);
         const acc = s.accessoryId ? (accs.find((a) => a.id === s.accessoryId) ?? null) : null;
-        if (!tel || !cam) continue;
+        if (!cam) continue;
         const preset = buildGearPreset(tel, cam, acc);
         const { wDeg, hDeg } = fovDeg(preset);
         const mosaic = smartMosaicEnvelope(tel.mosaic, wDeg, hDeg);

@@ -11,6 +11,7 @@ import {
   getCameras,
   getAccessories,
   buildGearPreset,
+  resolveSetupCamera,
   invalidateGearCache,
   telescopeLabel,
   cameraLabel,
@@ -1216,10 +1217,9 @@ export function buildGearSectionContent(
       }
 
       // Determine camera ID: for smart telescopes, use integrated camera
-      let initialCamId = prefs.cameraId;
-      if (isSmart && currentTel?.integrated_camera_id) {
-        initialCamId = currentTel.integrated_camera_id;
-      }
+      const initialCamId = currentTel
+        ? (resolveSetupCamera(currentTel, cameras, prefs.cameraId)?.id ?? prefs.cameraId)
+        : prefs.cameraId;
 
       const { row: camRow, select: camSelect } = buildGearRow(
         t('targets.gear.camera'),
@@ -1354,14 +1354,11 @@ export function buildGearSectionContent(
       // ── FOV hint ─────────────────────────────────────────────────────────
       container.appendChild(fovHintEl);
 
-      // Initial hint
-      const currentCam = visibleCameras.find(
-        (c) =>
-          c.id ===
-          (isSmart && currentTel?.integrated_camera_id
-            ? currentTel.integrated_camera_id
-            : (prefs.cameraId ?? '')),
-      );
+      // Initial hint — resolve against the full catalog, not `visibleCameras`: a smart
+      // scope's integrated camera must still resolve even if the user hid it.
+      const currentCam = currentTel
+        ? (resolveSetupCamera(currentTel, cameras, prefs.cameraId) ?? undefined)
+        : undefined;
       const currentAcc = isSmart
         ? null
         : (visibleAccessories.find((a) => a.id === (prefs.accessoryId ?? '')) ?? null);
@@ -1369,7 +1366,14 @@ export function buildGearSectionContent(
 
       // ── Change handlers ──────────────────────────────────────────────────
       telSelect.addEventListener('change', () => {
-        callbacks.onPrefsChange({ telescopeId: telSelect.value });
+        // Switching to a smart telescope also pins its sealed-in sensor: the camera
+        // picker is disabled and never fires `change`, so without this the setup would
+        // be saved with whatever unrelated cameraId was there before.
+        const nextTel = visibleTelescopes.find((tel) => tel.id === telSelect.value);
+        const nextCamId = nextTel
+          ? (resolveSetupCamera(nextTel, cameras, prefs.cameraId)?.id ?? prefs.cameraId)
+          : prefs.cameraId;
+        callbacks.onPrefsChange({ telescopeId: telSelect.value, cameraId: nextCamId });
         callbacks.onRebuild(container);
       });
 
@@ -1475,11 +1479,11 @@ export class TargetsView {
     this.plansStore.$subscribe(() => this.refreshPaReadouts());
     // Load plans in the background; refresh the plans view when ready.
     this.plansStore.ensureLoaded().then(() => this.render());
-    // Sky regions populate the region filter dropdown; refresh once loaded, and
-    // again on any later create/delete from the region management modal so the
-    // dropdown stays current without needing the panel to be closed/reopened.
-    this.skyRegionsStore.ensureLoaded().then(() => this.render());
-    this.skyRegionsStore.$subscribe(() => this.render());
+    // Sky regions: kick off the fetch early so it's already resolved by the time
+    // the region dropdown is built (see buildForm, which owns its own refresh hook
+    // since the recommend form — unlike the plans view — is built once and never
+    // rebuilt by this.render()).
+    this.skyRegionsStore.ensureLoaded();
   }
 
   /** Update the live position-angle spans from current plan-entry values. */
@@ -2091,10 +2095,10 @@ export class TargetsView {
     regionLabel.title = t('targets.skyRegion.tooltip') ?? '';
 
     const regionControls = document.createElement('div');
-    regionControls.className = 'flex items-center gap-2';
+    regionControls.className = 'flex items-stretch gap-2';
 
     const regionSelect = document.createElement('select');
-    regionSelect.className = 'dialog-input';
+    regionSelect.className = 'targets-select !max-w-sm';
     const renderRegionOptions = (): void => {
       const selected = this.prefs.skyRegionId ?? '';
       regionSelect.innerHTML = '';
@@ -2113,6 +2117,17 @@ export class TargetsView {
         : '';
     };
     renderRegionOptions();
+    // The recommend form is built once and never rebuilt (see getRecommendElement),
+    // so this dropdown needs its own refresh hook rather than relying on the
+    // Plans-view-only this.render(): re-render its options once the initial
+    // background load resolves, and again on every later create/delete so a
+    // region saved from the manage modal shows up without reopening the panel.
+    // detached: true — this first runs inside TargetsOverlay.vue's onMounted, and
+    // Pinia ties $subscribe to the active component by default; without it, the
+    // subscription would be torn down the moment that overlay first unmounts
+    // (e.g. closed to make room for the region-drawing flow) and never fire again.
+    this.skyRegionsStore.ensureLoaded().then(renderRegionOptions);
+    this.skyRegionsStore.$subscribe(renderRegionOptions, { detached: true });
     regionSelect.addEventListener('change', () => {
       this.prefs.skyRegionId = regionSelect.value || null;
       savePrefs(this.prefs);
@@ -2407,16 +2422,13 @@ export class TargetsView {
       Promise.all([getTelescopes(), getCameras(), getAccessories()])
         .then(([tels, cams, accs]) => {
           const tel = tels.find((t) => t.id === setup.telescopeId);
-          const effectiveCameraId =
-            tel?.is_smart_telescope && tel.integrated_camera_id
-              ? tel.integrated_camera_id
-              : setup.cameraId;
-          const cam = cams.find((c) => c.id === effectiveCameraId);
+          if (!tel) return;
+          const cam = resolveSetupCamera(tel, cams, setup.cameraId);
           const acc =
-            tel?.is_smart_telescope || !setup.accessoryId
+            tel.is_smart_telescope || !setup.accessoryId
               ? null
               : (accs.find((a) => a.id === setup.accessoryId) ?? null);
-          if (!tel || !cam) return;
+          if (!cam) return;
           const preset = buildGearPreset(tel, cam, acc);
           fovHintEl.textContent = `${t('targets.gear.effectiveFocalLength')}: ${formatGearFovLabel(preset)}`;
           const tooltipRows = buildSetupInfoRows(tel, cam, acc);
@@ -2558,13 +2570,7 @@ export class TargetsView {
         return;
       }
 
-      // For smart telescopes, use integrated camera ID
-      const effectiveCameraId =
-        telescope.is_smart_telescope && telescope.integrated_camera_id
-          ? telescope.integrated_camera_id
-          : setup.cameraId;
-
-      const camera = cameras.find((c) => c.id === effectiveCameraId);
+      const camera = resolveSetupCamera(telescope, cameras, setup.cameraId);
       if (!camera) {
         resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
         allGenBtns.forEach((b) => {
@@ -3592,11 +3598,7 @@ export class TargetsView {
       if (!setup) return null;
       const telescope = telescopes.find((tel) => tel.id === setup.telescopeId);
       if (!telescope) return null;
-      const effectiveCameraId =
-        telescope.is_smart_telescope && telescope.integrated_camera_id
-          ? telescope.integrated_camera_id
-          : setup.cameraId;
-      const camera = cameras.find((c) => c.id === effectiveCameraId);
+      const camera = resolveSetupCamera(telescope, cameras, setup.cameraId);
       if (!camera) return null;
       const accessory =
         telescope.is_smart_telescope || !setup.accessoryId
@@ -3628,11 +3630,7 @@ export class TargetsView {
       if (!setup) return null;
       const tel = telescopes.find((t) => t.id === setup.telescopeId);
       if (!tel) return null;
-      const effectiveCameraId =
-        tel.is_smart_telescope && tel.integrated_camera_id
-          ? tel.integrated_camera_id
-          : setup.cameraId;
-      const cam = cameras.find((c) => c.id === effectiveCameraId);
+      const cam = resolveSetupCamera(tel, cameras, setup.cameraId);
       if (!cam) return null;
       const acc =
         tel.is_smart_telescope || !setup.accessoryId
@@ -4171,8 +4169,10 @@ export class TargetsView {
           win,
           effectiveSetupId(),
           moon,
-          (rowEl) => {
-            // Delete immediately with an undo toast (shared with the FOV popup).
+          async (rowEl) => {
+            // Confirm removal from the plan, then delete with an undo toast
+            // (shared with the FOV popup).
+            if (!(await confirmPlanEntryDelete(entryName))) return;
             deleteFrameWithUndo(
               { kind: 'plan', planId: plan.id, entryId: info.entryId, name: entryName },
               {

@@ -1179,8 +1179,8 @@ const de: Translations = {
     planNeedsSetup: 'Wähle oben eine Ausrüstung, um die Rahmen dieses Plans zu dimensionieren.',
     anchorOn: 'Anker: am nächsten Objekt einrasten',
     anchorOff: 'Anker aus: beliebig anheften',
-    deleteFrameConfirm:
-      '„{name}“ aus diesem Plan entfernen? Es verschwindet auch aus Ziele & Plan.',
+    deleteFrameConfirm: '„{name}“ aus diesem Plan entfernen?',
+    deleteMosaicConfirmFree: '„{name}“ entfernen? Dadurch werden alle Kacheln gelöscht.',
     showOnMap: 'Auf Karte anzeigen',
     showFrames: 'Rahmen anzeigen',
     hideFrames: 'Rahmen ausblenden',

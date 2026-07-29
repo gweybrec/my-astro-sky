@@ -1,42 +1,53 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, afterEach } from 'vitest';
 import {
   MIN_HIGHLIGHT_AXIS_PX,
   angularSizeToCanvasPxForDSO,
   computeDSOHighlightShape,
-  dsoCanvasAngleForHighlight,
-  canvasAngleToPADeg,
 } from '../../src/dso-highlight';
+import { setCenterMode, setProjectionObserver } from '../../src/projection';
+import { raDecFromAltAz } from '../../src/sky-geometry';
 
 describe('dso highlight geometry', () => {
-  it('matches expected PA-to-canvas angle behavior', () => {
-    const base = dsoCanvasAngleForHighlight(0, 0, 0);
-    expect(base).toBeCloseTo(Math.PI / 2, 12);
+  afterEach(() => setCenterMode('pole'));
 
-    const withPa = dsoCanvasAngleForHighlight(30, 0, 0);
-    expect(withPa).toBeCloseTo(base - (30 * Math.PI) / 180, 12);
+  it('orients the ellipse to celestial north at PA 0 in the pole-centred map', () => {
+    const at = (pa: number, rotationDeg = 0) =>
+      computeDSOHighlightShape(
+        { ra: 0, dec: 0, pa, majAxis: 90, minAxis: 30 },
+        { scale: 2000, rotationDeg },
+      ).angle;
 
-    const withRotation = dsoCanvasAngleForHighlight(30, 0, 15);
-    expect(withRotation).toBeCloseTo(withPa + (15 * Math.PI) / 180, 12);
+    expect(at(0)).toBeCloseTo(Math.PI / 2, 4); // atan2(cos 0, −sin 0)
+    expect(at(30)).toBeCloseTo(at(0) - (30 * Math.PI) / 180, 4); // east is clockwise here
+    // The map rotation SUBTRACTS (see sky-axes.ts / dso-render-math.test.ts) — the old
+    // helper added it, mis-orienting the ring by 2θ on a rotated map.
+    expect(at(30, 15)).toBeCloseTo(at(30) - (15 * Math.PI) / 180, 4);
   });
 
-  it('round-trips canvasAngleToPADeg against dsoCanvasAngleForHighlight', () => {
-    for (const ra of [0, 45, 123, 270, 359]) {
-      for (const rot of [-30, 0, 17, 90]) {
-        for (const pa of [0, 30, 142, 200, 359]) {
-          const canvasAngle = dsoCanvasAngleForHighlight(pa, ra, rot);
-          expect(canvasAngleToPADeg(canvasAngle, ra, rot)).toBeCloseTo(pa, 9);
-        }
-      }
-    }
+  it('reorients in the Local Sky dome (mirrored, parallactic-rotated north)', () => {
+    const dso = (() => {
+      const { raDeg, decDeg } = raDecFromAltAz(45, 120, 5, 40);
+      return { ra: raDeg, dec: decDeg, pa: 0, majAxis: 90, minAxis: 30 };
+    })();
+    const view = { scale: 2000, rotationDeg: 0 };
+    const poleAngle = computeDSOHighlightShape(dso, view).angle;
+    setCenterMode('zenith');
+    setProjectionObserver(5, 40);
+    const zenithAngle = computeDSOHighlightShape(dso, view).angle;
+    expect(Math.abs(zenithAngle - poleAngle)).toBeGreaterThan(5 * (Math.PI / 180));
   });
 
-  it('normalises recovered position angle to [0, 360)', () => {
-    // An angle that maps back to a negative raw value must wrap into range.
-    const canvasAngle = dsoCanvasAngleForHighlight(-40, 80, 25);
-    const pa = canvasAngleToPADeg(canvasAngle, 80, 25);
-    expect(pa).toBeGreaterThanOrEqual(0);
-    expect(pa).toBeLessThan(360);
-    expect(pa).toBeCloseTo(320, 9); // -40 ≡ 320
+  it('sizes by altitude, not declination, in the Local Sky dome', () => {
+    const { raDeg, decDeg } = raDecFromAltAz(25, 100, 5, 40);
+    const dso = { ra: raDeg, dec: decDeg, pa: 0, majAxis: 600, minAxis: 600 };
+    const view = { scale: 2000, rotationDeg: 0 };
+    const poleRx = computeDSOHighlightShape(dso, view).rx;
+    setCenterMode('zenith');
+    setProjectionObserver(5, 40);
+    const zenithRx = computeDSOHighlightShape(dso, view).rx;
+    // alt 25° is far from the zenith, so the zenith-mode scale is much smaller than the
+    // dec-based one would have been at this declination.
+    expect(zenithRx).toBeLessThan(poleRx);
   });
 
   it('preserves elongated shape at high zoom when both axes are above floor', () => {

@@ -191,6 +191,32 @@ export function buildGearPreset(
   };
 }
 
+/**
+ * The camera a gear setup actually images with.
+ *
+ * A smart telescope's sensor is sealed inside the tube, so its `integrated_camera_id`
+ * always wins over whatever `cameraId` the setup happens to store — the camera picker is
+ * disabled for smart scopes, so a stored id there is meaningless (historically it was
+ * left at the alphabetically-first catalog camera, which produced a wrong FOV on the sky
+ * map). Resolving here rather than at save time means setups persisted before that fix
+ * render correctly without a migration.
+ *
+ * Returns null when nothing resolves; callers should skip the setup rather than fall back
+ * to an arbitrary camera.
+ */
+export function resolveSetupCamera(
+  telescope: TelescopeData,
+  cameras: CameraData[],
+  cameraId: string | null | undefined,
+): CameraData | null {
+  const wantedId =
+    telescope.is_smart_telescope && telescope.integrated_camera_id
+      ? telescope.integrated_camera_id
+      : cameraId;
+  if (!wantedId) return null;
+  return cameras.find((c) => c.id === wantedId) ?? null;
+}
+
 // ─── Display helpers ──────────────────────────────────────────────────────────
 
 export function telescopeLabel(t: TelescopeData): string {

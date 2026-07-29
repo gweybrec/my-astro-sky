@@ -40,6 +40,8 @@ vi.mock('../../src/gear-catalog', () => ({
       focal_length_mm: 250,
       aperture_mm: 50,
       is_smart_telescope: true,
+      // Sealed-in sensor: setup s2 stores the unrelated 'c1', which must be ignored.
+      integrated_camera_id: 'c2',
       mosaic: { scale: 2 },
     },
     { id: 't3', focal_length_mm: 450, aperture_mm: 114, is_smart_telescope: true },
@@ -52,11 +54,32 @@ vi.mock('../../src/gear-catalog', () => ({
       pixel_size_um: 3.8,
       color_type: 'OSC',
     },
+    // t2's integrated sensor — much smaller, so using c1 by mistake is obvious.
+    {
+      id: 'c2',
+      sensor_width_mm: 5.6,
+      sensor_height_mm: 3.2,
+      pixel_size_um: 2.9,
+      color_type: 'OSC',
+    },
   ]),
   getAccessories: vi.fn().mockResolvedValue([]),
   buildGearPreset: vi
     .fn()
     .mockReturnValue({ focalLengthMm: 500, sensorWidthMm: 23, sensorHeightMm: 15 }),
+  // Mirrors the real resolver: a smart scope's integrated sensor wins over the
+  // setup's stored cameraId (these fixtures declare none, so it falls through).
+  resolveSetupCamera: vi.fn(
+    (
+      tel: { is_smart_telescope?: boolean; integrated_camera_id?: string | null },
+      cams: { id: string }[],
+      cameraId: string | null | undefined,
+    ) => {
+      const wanted =
+        tel.is_smart_telescope && tel.integrated_camera_id ? tel.integrated_camera_id : cameraId;
+      return cams.find((c) => c.id === wanted) ?? null;
+    },
+  ),
 }));
 
 vi.mock('../../src/gear-presets', () => ({
@@ -1612,6 +1635,21 @@ describe('fov-frames store — smart-scope single-frame mosaics', () => {
     store.setSelection({ kind: 'plan', planId: 'p1' });
     return { store, plans };
   }
+
+  it('sizes a smart-scope setup from its integrated sensor, not its stored cameraId', async () => {
+    // Regression: setups saved for a smart scope carried an arbitrary cameraId (the
+    // camera picker is disabled, so it never got updated), and loadSpecs used it
+    // verbatim — every smart scope of the same focal length rendered the same wrong FOV.
+    const { buildGearPreset } = await import('../../src/gear-catalog');
+    (buildGearPreset as ReturnType<typeof vi.fn>).mockClear();
+    await useFovFramesStore().loadSpecs();
+
+    const smartCall = (buildGearPreset as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([tel]) => tel.id === 't2',
+    );
+    expect(smartCall).toBeDefined();
+    expect(smartCall![1].id).toBe('c2');
+  });
 
   it('a smart-scope plan frame is resizable and carries its mosaic envelope', async () => {
     const { store } = await smartPlan();
