@@ -114,10 +114,12 @@ export function maxAltDuringWindow(
   return { maxAltDeg: best, atDate: bestDate };
 }
 
-/** One altitude sample along the night. */
+/** One altitude sample along the night (azimuth kept for direction readouts). */
 export interface AltSample {
   time: Date;
   altDeg: number;
+  /** Azimuth in degrees, clockwise from North (0 = N, 90 = E). */
+  azDeg: number;
 }
 
 /**
@@ -138,27 +140,16 @@ export function sampleAltCurve(
   const endMs = windowEnd.getTime();
   const dtMs = Math.max(1, stepMin) * 60 * 1000;
   const samples: AltSample[] = [];
-  if (endMs <= startMs) {
-    const jd = dateToJD(windowStart);
-    const lst = lstHours(jd, lonDeg);
-    return [{ time: new Date(startMs), altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg }];
-  }
-  for (let tMs = startMs; tMs <= endMs; tMs += dtMs) {
+  const sampleAt = (tMs: number): AltSample => {
     const time = new Date(tMs);
-    const jd = dateToJD(time);
-    const lst = lstHours(jd, lonDeg);
-    samples.push({ time, altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg });
-  }
+    const lst = lstHours(dateToJD(time), lonDeg);
+    const { altDeg, azDeg } = altAzFromRaDec(raDeg, decDeg, lst, latDeg);
+    return { time, altDeg, azDeg };
+  };
+  if (endMs <= startMs) return [sampleAt(startMs)];
+  for (let tMs = startMs; tMs <= endMs; tMs += dtMs) samples.push(sampleAt(tMs));
   // Ensure the exact window end is represented (loop may stop just short).
-  const last = samples[samples.length - 1];
-  if (last.time.getTime() < endMs) {
-    const jd = dateToJD(windowEnd);
-    const lst = lstHours(jd, lonDeg);
-    samples.push({
-      time: new Date(endMs),
-      altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg,
-    });
-  }
+  if (samples[samples.length - 1].time.getTime() < endMs) samples.push(sampleAt(endMs));
   return samples;
 }
 
@@ -183,13 +174,100 @@ export function sampleMoonAltCurve(
     const jd = dateToJD(time);
     const { raDeg, decDeg } = moonRaDecDeg(jd);
     const lst = lstHours(jd, lonDeg);
-    return { time, altDeg: altAzFromRaDec(raDeg, decDeg, lst, latDeg).altDeg };
+    const { altDeg, azDeg } = altAzFromRaDec(raDeg, decDeg, lst, latDeg);
+    return { time, altDeg, azDeg };
   };
   if (endMs <= startMs) return [sampleAt(startMs)];
   const samples: AltSample[] = [];
   for (let tMs = startMs; tMs <= endMs; tMs += dtMs) samples.push(sampleAt(tMs));
   if (samples[samples.length - 1].time.getTime() < endMs) samples.push(sampleAt(endMs));
   return samples;
+}
+
+/** A moment when an object's azimuth crosses an exact multiple of a step. */
+export interface AzCrossing {
+  time: Date;
+  /** Azimuth in [0, 360), an exact multiple of the step (0 = N, 90 = E, …). */
+  azDeg: number;
+  /** Altitude interpolated at the crossing, to tell horizon side. */
+  altDeg: number;
+}
+
+/** True for the four cardinal directions (N/E/S/W). */
+export function isCardinalAz(azDeg: number): boolean {
+  return azDeg % 90 === 0;
+}
+
+/**
+ * Times at which an object's azimuth crosses each multiple of `stepDeg` along a
+ * sampled curve — used to mark direction (N/E/S/W plus finer graduations) on the
+ * time axis of a trajectory chart.
+ *
+ * Azimuth is unwrapped as the curve is walked (each step follows the shortest
+ * signed delta), so the 0/360 discontinuity at north needs no special case, and
+ * *every* multiple spanned by a sample interval is emitted — near a zenith
+ * passage azimuth can swing more than 90° between two 10-minute samples, which a
+ * pairwise "did it cross" test would miss. Crossings below `minAltDeg` are
+ * dropped (by default, everything under the horizon).
+ */
+export function azimuthCrossings(curve: AltSample[], stepDeg = 15, minAltDeg = 0): AzCrossing[] {
+  const step = Math.abs(stepDeg);
+  if (curve.length < 2 || step <= 0) return [];
+  const out: AzCrossing[] = [];
+  let unwrapped = curve[0].azDeg;
+  for (let i = 1; i < curve.length; i++) {
+    const a = curve[i - 1],
+      b = curve[i];
+    // Shortest signed delta into (-180, 180], so the walk never jumps 360°.
+    const delta = ((b.azDeg - a.azDeg + 540) % 360) - 180;
+    const from = unwrapped;
+    const to = from + delta;
+    unwrapped = to;
+    if (delta === 0) continue;
+    // Multiples of `step` strictly between `from` and `to`, in travel order.
+    const lo = Math.min(from, to),
+      hi = Math.max(from, to);
+    const firstK = Math.floor(lo / step) + 1;
+    const lastK = Math.ceil(hi / step) - 1;
+    const ks: number[] = [];
+    for (let k = firstK; k <= lastK; k++) ks.push(k);
+    if (delta < 0) ks.reverse();
+    for (const k of ks) {
+      const frac = (k * step - from) / delta; // 0..1 within the interval
+      const altDeg = a.altDeg + frac * (b.altDeg - a.altDeg);
+      if (altDeg < minAltDeg) continue;
+      out.push({
+        time: new Date(a.time.getTime() + frac * (b.time.getTime() - a.time.getTime())),
+        azDeg: (((k * step) % 360) + 360) % 360,
+        altDeg,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Thin a crossing list so no two kept entries are closer than `minGap` on the
+ * x axis (`xOf` maps a crossing to whatever unit the caller draws in). Cardinal
+ * directions are reserved first and win every conflict, so a graduation never
+ * crowds an N/E/S/W label. Order is preserved.
+ */
+export function thinCrossingsByX<T extends AzCrossing>(
+  items: T[],
+  xOf: (c: T) => number,
+  minGap: number,
+): T[] {
+  const cardinals = items.filter((c) => isCardinalAz(c.azDeg));
+  const kept = new Set<T>(cardinals);
+  const xs = cardinals.map(xOf);
+  for (const item of items) {
+    if (kept.has(item)) continue;
+    const x = xOf(item);
+    if (xs.some((k) => Math.abs(k - x) < minGap)) continue;
+    kept.add(item);
+    xs.push(x);
+  }
+  return items.filter((c) => kept.has(c));
 }
 
 /**

@@ -129,6 +129,11 @@
   --fov-frame-stroke: rgba(220, 60, 60, 0.85);
   --fov-frame-label: rgba(220, 90, 90, 0.9);
 
+  /* Cardinal-point labels — keep in sync with CARDINAL_POINTS.color (canvas-theme.ts),
+     so the N/E/S/W letters on the trajectory charts match the ones on the sky map.
+     Theme-independent on purpose: the same red in every app theme. */
+  --cardinal-point: #ff4d4d;
+
   /* Moon trajectory overlay (plan altitude charts) */
   --moon-curve: rgba(180, 188, 210, 0.55); /* dashed moon path + phase-icon outline */
   --moon-lit: rgba(225, 230, 245, 0.92); /* illuminated portion of the phase icon */

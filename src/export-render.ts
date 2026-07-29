@@ -8,12 +8,19 @@ import { angularSizeToCanvasPxForDSO } from './dso-highlight';
 import { paToCanvasRotationDeg } from './frame-orientation';
 import { getConstellationInfos } from './star-catalog';
 import { t } from './i18n';
-import { formatAlt } from './format-utils';
+import { formatAlt, cardinalLetter } from './format-utils';
 import { buildSetupInfoRows } from './setup-info';
 import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
 import { catalogFilterColor } from './gear-catalog';
-import { moonDangerLevel, type AltSample } from './sky-geometry';
+import {
+  moonDangerLevel,
+  azimuthCrossings,
+  thinCrossingsByX,
+  isCardinalAz,
+  type AltSample,
+} from './sky-geometry';
 import { drawMoonMarker } from './moon-draw';
+import { CARDINAL_POINTS } from './canvas-theme';
 import {
   resolveWindowColor,
   toBandFill,
@@ -311,6 +318,8 @@ export interface PlanPdfTarget {
 export interface PlanPdfOptions {
   planName: string;
   targets: PlanPdfTarget[];
+  /** Draw the cardinal letters + azimuth graduations under each chart's time axis. */
+  showCardinal?: boolean;
   fovSpecs: FovFrameSpec[];
   /** Plan header shown on the summary page. */
   header: { nightOf: string | null; latDeg: number | null; lonDeg: number | null };
@@ -583,6 +592,7 @@ function drawAltChartToCanvas(
   moonCurve?: AltSample[],
   moonPhaseIndex?: number,
   observationWindows?: ObservationWindow[],
+  showCardinal?: boolean,
 ): void {
   if (curve.length === 0) return;
   ctx.save();
@@ -743,6 +753,37 @@ function drawAltChartToCanvas(
     const halfW = ctx.measureText(label).width / 2;
     const lx = Math.max(gutter + halfW, Math.min(plotR - halfW, tx));
     ctx.fillText(label, lx, padY - 1 * dpr);
+  }
+
+  // Azimuth graduations under the 0° line (the transit label rides at the top, so
+  // this band is free): a tick every 15° of azimuth, longer at the intercardinals,
+  // and a red N/E/S/W letter — same red as the sky map — at the cardinals.
+  if (showCardinal) {
+    const crossings = thinCrossingsByX(azimuthCrossings(curve, 15, 0), (c) => xAt(c.time), 4 * dpr);
+    const y0 = h - padY;
+    ctx.strokeStyle = 'rgba(100,100,100,0.7)';
+    ctx.lineWidth = dpr;
+    ctx.beginPath();
+    for (const c of crossings) {
+      if (isCardinalAz(c.azDeg)) continue; // the letter is the marker there
+      const cx = xAt(c.time);
+      ctx.moveTo(cx, y0);
+      ctx.lineTo(cx, y0 + (c.azDeg % 45 === 0 ? 7 : 4) * dpr);
+    }
+    ctx.stroke();
+
+    const letterFont = 8 * dpr;
+    ctx.font = `bold ${letterFont}px sans-serif`;
+    ctx.fillStyle = CARDINAL_POINTS.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (const c of crossings) {
+      if (!isCardinalAz(c.azDeg)) continue;
+      const label = cardinalLetter(c.azDeg);
+      const halfW = ctx.measureText(label).width / 2;
+      const lx = Math.max(gutter + halfW, Math.min(plotR - halfW, xAt(c.time)));
+      ctx.fillText(label, lx, y0 + 1.5 * dpr);
+    }
   }
 
   // Left-axis graduation labels, in the gutter to the left of the axis.
@@ -1109,6 +1150,7 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
           tgt.moonCurve,
           tgt.moonPhaseIndex,
           tgt.observationWindows,
+          opts.showCardinal,
         );
       }
       doc.addImage(

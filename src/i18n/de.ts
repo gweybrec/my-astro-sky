@@ -796,6 +796,9 @@ const de: Translations = {
       mosaicLabel: 'Mosaik',
       itemCount: '{n} Objekte',
       showMoon: 'Mond anzeigen',
+      showCardinal: 'Himmelsrichtungen anzeigen',
+      cardinalLegend:
+        'Richtung des Objekts auf der Zeitachse: die Buchstaben N/O/S/W dort, wo es genau im Norden, Osten, Süden und Westen steht, mit einer Teilung alle 15° Azimut.',
       nightStart: 'Nachtbeginn',
       nightEnd: 'Nachtende',
       moonrise: 'Mondaufgang',

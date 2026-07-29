@@ -797,6 +797,9 @@ const es: Translations = {
       mosaicLabel: 'Mosaico',
       itemCount: '{n} objetos',
       showMoon: 'Mostrar la Luna',
+      showCardinal: 'Mostrar los puntos cardinales',
+      cardinalLegend:
+        'Dirección del objeto en el eje del tiempo: las letras N/E/S/O donde pasa justo al norte, este, sur y oeste, con una graduación cada 15° de azimut.',
       nightStart: 'Inicio de noche',
       nightEnd: 'Fin de noche',
       moonrise: 'Salida de la Luna',

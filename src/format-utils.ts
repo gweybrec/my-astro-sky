@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -33,6 +35,18 @@ export function formatSize(majAxis: number | null, minAxis: number | null): stri
 /** Altitude in whole degrees, e.g. `42°`. */
 export function formatAlt(deg: number): string {
   return `${deg.toFixed(0)}°`;
+}
+
+/**
+ * Localised single letter for a cardinal azimuth (0 = N, 90 = E, 180 = S,
+ * 270 = W). Shared by the sky-map labels and the trajectory-chart graduations so
+ * both read the same in every language (FR/ES west is `O`, DE east is `O`).
+ */
+export function cardinalLetter(azDeg: number): string {
+  if (azDeg === 90) return t('cardinal.east');
+  if (azDeg === 180) return t('cardinal.south');
+  if (azDeg === 270) return t('cardinal.west');
+  return t('cardinal.north');
 }
 
 export function formatRating(rating: number | null): string {

@@ -791,6 +791,9 @@ const en: Translations = {
       mosaicLabel: 'Mosaic',
       itemCount: '{n} objects',
       showMoon: 'Show Moon',
+      showCardinal: 'Show cardinal points',
+      cardinalLegend:
+        'Direction of the target on the time axis: N/E/S/W letters where it crosses due north, east, south and west, with a graduation every 15° of azimuth.',
       nightStart: 'Night start',
       nightEnd: 'Night end',
       moonrise: 'Moonrise',

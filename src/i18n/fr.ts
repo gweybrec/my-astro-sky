@@ -796,6 +796,9 @@ const fr = {
       mosaicLabel: 'Mosaïque',
       itemCount: '{n} objets',
       showMoon: 'Afficher la Lune',
+      showCardinal: 'Afficher les points cardinaux',
+      cardinalLegend:
+        "Direction de l'objet sur l'axe du temps : les lettres N/E/S/O là où il passe plein nord, est, sud et ouest, avec une graduation tous les 15° d'azimut.",
       nightStart: 'Début de nuit',
       nightEnd: 'Fin de nuit',
       moonrise: 'Lever de Lune',

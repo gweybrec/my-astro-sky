@@ -31,7 +31,7 @@ import { buildSetupInfoRows } from './setup-info';
 import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
 import { buildMultipleStarTargets } from './multiple-stars';
 import { formatPaDeg } from './frame-orientation';
-import { formatRA, formatDec, formatAlt } from './format-utils';
+import { formatRA, formatDec, formatAlt, cardinalLetter } from './format-utils';
 import { attachAnchoredPanel } from './popup-utils';
 import type { GearPreset } from './gear-presets';
 import { recommendRecipe } from './imaging-recipe';
@@ -92,6 +92,9 @@ import {
   angularSeparationDeg,
   moonDangerLevel,
   altAzFromRaDec,
+  azimuthCrossings,
+  thinCrossingsByX,
+  isCardinalAz,
   type AltSample,
 } from './sky-geometry';
 import { outlineFromGrid } from './mosaic';
@@ -139,6 +142,7 @@ interface TargetsPrefs {
   maxAltDeg?: number;
   respectHorizon?: boolean;
   showMoon?: boolean;
+  showCardinal?: boolean;
   obsStartTime?: string | null;
   obsEndTime?: string | null;
 }
@@ -3377,7 +3381,7 @@ export class TargetsView {
 
       infoSlot.innerHTML = '';
       infoSlot.appendChild(this.buildTrajectoryPopupMeta(s, this.lastPreset!, moon, actionsGroup));
-      infoSlot.appendChild(this.buildMoonToggle(render));
+      infoSlot.appendChild(this.buildChartToggles(render));
 
       // Night start/end + moon rise/set, aligned to the chart's x-axis —
       // same row (and overlap-prevention via `spaceMoonMarkers`) as plan
@@ -4147,13 +4151,14 @@ export class TargetsView {
       currentInfos = infos;
       currentWin = win;
 
-      // Sort dropdown (left) and Moon toggle (right) share one row to save space,
-      // using the same wide inter-group gap as the date/setup/location row above.
+      // Sort dropdown (left) and the chart overlay toggles (right) share one row to
+      // save space, using the same wide inter-group gap as the date/setup/location
+      // row above.
       const controlsRow = document.createElement('div');
       controlsRow.className = 'flex flex-wrap items-center gap-x-12 gap-y-2 mb-[var(--space-6h)]';
       controlsRow.append(
         this.buildPlanSortBar(plan, renderTrajectories),
-        this.buildMoonToggle(renderTrajectories),
+        this.buildChartToggles(renderTrajectories),
       );
       trajWrap.appendChild(controlsRow);
       trajWrap.appendChild(this.buildTimelineHeader(win, observer.loc, moon));
@@ -4512,6 +4517,7 @@ export class TargetsView {
         const blob = await renderPlanPdf(this.skyMap, {
           planName: plan.name,
           targets,
+          showCardinal: this.prefs.showCardinal !== false,
           fovSpecs,
           header: {
             nightOf: plan.nightOf,
@@ -4541,23 +4547,58 @@ export class TargetsView {
     return moon ? 'w-8' : 'w-7';
   }
 
-  /** Show-moon toggle for the plan trajectory charts (persisted in prefs). */
-  private buildMoonToggle(rerender: () => void): HTMLElement {
+  /** Azimuth spacing of the graduations under a trajectory chart's time axis. */
+  private static readonly AZ_STEP_DEG = 15;
+
+  /** A labelled checkbox bound to a persisted Targets pref. */
+  private buildPrefCheckbox(
+    label: string,
+    checked: boolean,
+    onChange: (value: boolean) => void,
+    title?: string,
+  ): HTMLElement {
     const wrap = document.createElement('label');
     wrap.className = 'flex items-center gap-1.5 text-base text-dim cursor-pointer w-fit';
+    if (title) wrap.title = title;
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'gear-manage-checkbox';
-    cb.checked = this.prefs.showMoon !== false;
-    cb.addEventListener('change', () => {
-      this.prefs.showMoon = cb.checked;
-      savePrefs(this.prefs);
-      rerender();
-    });
+    cb.checked = checked;
+    cb.addEventListener('change', () => onChange(cb.checked));
     const txt = document.createElement('span');
-    txt.textContent = t('targets.plan.showMoon');
+    txt.textContent = label;
     wrap.append(cb, txt);
     return wrap;
+  }
+
+  /**
+   * Overlay toggles for the plan trajectory charts (both persisted in prefs):
+   * the Moon's trajectory, and the cardinal-direction letters + azimuth
+   * graduations on the time axis.
+   */
+  private buildChartToggles(rerender: () => void): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'flex flex-wrap items-center gap-x-8 gap-y-2';
+    const persist = (key: 'showMoon' | 'showCardinal') => (value: boolean) => {
+      this.prefs[key] = value;
+      savePrefs(this.prefs);
+      rerender();
+    };
+    row.append(
+      this.buildPrefCheckbox(
+        t('targets.plan.showMoon'),
+        this.prefs.showMoon !== false,
+        persist('showMoon'),
+        t('targets.plan.moonLegend'),
+      ),
+      this.buildPrefCheckbox(
+        t('targets.plan.showCardinal'),
+        this.prefs.showCardinal !== false,
+        persist('showCardinal'),
+        t('targets.plan.cardinalLegend'),
+      ),
+    );
+    return row;
   }
 
   /**
@@ -5550,6 +5591,20 @@ export class TargetsView {
       minLab.textContent = formatAlt(chart.lo);
       chartBox.appendChild(minLab);
     }
+    // Cardinal-direction letters, hanging from the 0° line at the top of the band
+    // below it — red, like the N/E/S/W labels on the sky map. The transit hour
+    // (below) is pinned to the bottom of that same band, so the two never collide.
+    for (const c of chart.cardinals) {
+      const letter = document.createElement('span');
+      letter.className =
+        'absolute text-micro leading-none font-bold text-[var(--cardinal-point)] px-0.5 bg-card whitespace-nowrap pointer-events-none';
+      letter.style.left = `${(c.frac * 100).toFixed(1)}%`;
+      letter.style.top = '86.8%'; // (H - padY) / H — the 0° gridline
+      letter.style.transform = 'translate(-50%, 1px)';
+      letter.textContent = c.letter;
+      chartBox.appendChild(letter);
+    }
+
     if (chart.transitFrac !== null) {
       // HTML overlays (the SVG is non-uniformly scaled, which would distort text):
       // "Transit" above the line and the transit hour below it.
@@ -5581,9 +5636,11 @@ export class TargetsView {
    * Altitude-trajectory chart across the night window. The vertical axis is
    * fixed at 0–90° so all objects share the same scale. Two dashed reference
    * lines mark the object's actual min and max altitude for the night, and a
-   * dashed vertical line marks the transit. Returns the object's altitude
-   * extremes and the height/width fractions used to place HTML overlay labels
-   * (the SVG itself is non-uniformly scaled, so text is drawn in HTML instead).
+   * dashed vertical line marks the transit. Below the 0° line, azimuth
+   * graduations mark where the object faces each 15° of azimuth (the cardinal
+   * ones are returned so the letters can be drawn as HTML). Returns the object's
+   * altitude extremes and the height/width fractions used to place HTML overlay
+   * labels (the SVG itself is non-uniformly scaled, so text is drawn in HTML).
    */
   private buildAltChart(
     curve: AltSample[],
@@ -5600,6 +5657,7 @@ export class TargetsView {
     transitFrac: number | null;
     moonIconYFrac: number | null;
     ticks: { label: string; frac: number }[];
+    cardinals: { frac: number; letter: string }[];
   } {
     const NS = 'http://www.w3.org/2000/svg';
     const W = 120,
@@ -5621,6 +5679,7 @@ export class TargetsView {
         transitFrac: null,
         moonIconYFrac: null,
         ticks: [],
+        cardinals: [],
       };
 
     const span = win.end.getTime() - win.start.getTime() || 1;
@@ -5746,6 +5805,43 @@ export class TargetsView {
       svg.appendChild(vLine);
     }
 
+    // Azimuth graduations below the 0° line: a tick every 15° of azimuth (longer
+    // at the intercardinals), and the four cardinals returned for HTML letters —
+    // enough to read which way the scope points at any time of the night.
+    // Crossings while the object is under the horizon are skipped.
+    const cardinals: { frac: number; letter: string }[] = [];
+    if (this.prefs.showCardinal !== false) {
+      const crossings = thinCrossingsByX(
+        azimuthCrossings(curve, TargetsView.AZ_STEP_DEG, 0),
+        (c) => xAt(c.time),
+        1, // viewBox units ≈ 0.83 % of the chart width
+      );
+      // Tick lengths are fixed in *pixels*, converted to viewBox units, so they
+      // look the same in the 180 px plan rows and the 340 px popup chart.
+      const tickU = (px: number) => (px * H) / heightPx;
+      const y0 = H - padY;
+      const segs = { minor: [] as string[], major: [] as string[] };
+      for (const c of crossings) {
+        const x = xAt(c.time).toFixed(1);
+        if (isCardinalAz(c.azDeg)) {
+          cardinals.push({ frac: xAt(c.time) / W, letter: cardinalLetter(c.azDeg) });
+          continue; // the letter is the marker; a tick under it would collide
+        }
+        const bucket = c.azDeg % 45 === 0 ? segs.major : segs.minor;
+        bucket.push(`M${x},${y0}v${tickU(c.azDeg % 45 === 0 ? 7 : 4).toFixed(2)}`);
+      }
+      // One path per tick class keeps the node count at 2 per chart.
+      for (const d of [segs.minor, segs.major]) {
+        if (d.length === 0) continue;
+        const path = document.createElementNS(NS, 'path');
+        path.setAttribute('d', d.join(''));
+        path.setAttribute('class', 'stroke-[var(--text-dim)] fill-none');
+        path.setAttribute('stroke-width', '1');
+        path.setAttribute('vector-effect', 'non-scaling-stroke');
+        svg.appendChild(path);
+      }
+    }
+
     return {
       svg,
       lo: objLo,
@@ -5755,6 +5851,7 @@ export class TargetsView {
       transitFrac,
       moonIconYFrac,
       ticks,
+      cardinals,
     };
   }
 

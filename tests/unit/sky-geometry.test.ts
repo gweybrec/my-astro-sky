@@ -9,6 +9,10 @@ import {
   angularSeparationDeg,
   sampleMoonAltCurve,
   moonDangerLevel,
+  azimuthCrossings,
+  thinCrossingsByX,
+  isCardinalAz,
+  type AltSample,
 } from '../../src/sky-geometry';
 import { lstHours, dateToJD, moonRaDecDeg } from '../../src/astro-time';
 
@@ -167,6 +171,16 @@ describe('sampleAltCurve', () => {
     }
   });
 
+  it('exposes the azimuth of each sample', () => {
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 120);
+    for (const s of curve) {
+      const lst = lstHours(dateToJD(s.time), lonDeg);
+      expect(s.azDeg).toBeCloseTo(altAzFromRaDec(raDeg, decDeg, lst, latDeg).azDeg, 6);
+      expect(s.azDeg).toBeGreaterThanOrEqual(0);
+      expect(s.azDeg).toBeLessThanOrEqual(360);
+    }
+  });
+
   it('peak sample altitude is close to maxAltDuringWindow', () => {
     const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 10);
     const peak = Math.max(...curve.map((s) => s.altDeg));
@@ -218,6 +232,16 @@ describe('sampleMoonAltCurve', () => {
     expect(curve[curve.length - 1].time.getTime()).toBe(end.getTime());
   });
 
+  it('exposes the azimuth of each sample', () => {
+    const curve = sampleMoonAltCurve(latDeg, lonDeg, start, end, 120);
+    for (const s of curve) {
+      const jd = dateToJD(s.time);
+      const { raDeg, decDeg } = moonRaDecDeg(jd);
+      const lst = lstHours(jd, lonDeg);
+      expect(s.azDeg).toBeCloseTo(altAzFromRaDec(raDeg, decDeg, lst, latDeg).azDeg, 6);
+    }
+  });
+
   it('recomputes the Moon position per step (curve differs from a fixed RA/Dec)', () => {
     const moonCurve = sampleMoonAltCurve(latDeg, lonDeg, start, end, 60);
     // A fixed-position curve using the Moon's RA/Dec at window start.
@@ -254,5 +278,109 @@ describe('moonDangerLevel', () => {
   it('higher illumination is never less dangerous at a fixed separation', () => {
     const rank = { danger: 2, warn: 1, ok: 0 } as const;
     expect(rank[moonDangerLevel(50, 0.9)]).toBeGreaterThanOrEqual(rank[moonDangerLevel(50, 0.3)]);
+  });
+});
+
+describe('azimuthCrossings', () => {
+  const latDeg = 48.85,
+    lonDeg = 2.35;
+  const start = new Date('2024-01-15T12:00:00Z');
+  const end = new Date('2024-01-16T12:00:00Z'); // full 24h, so every direction is reachable
+
+  /** Two samples with a straight azimuth ramp — for the interval-level cases. */
+  const ramp = (az0: number, az1: number, alt = 60): AltSample[] => [
+    { time: new Date('2024-01-15T22:00:00Z'), altDeg: alt, azDeg: az0 },
+    { time: new Date('2024-01-15T23:00:00Z'), altDeg: alt, azDeg: az1 },
+  ];
+
+  it('marks the due-south crossing at transit (northern hemisphere, dec < lat)', () => {
+    const raDeg = 84,
+      decDeg = -1.2;
+    const curve = sampleAltCurve(raDeg, decDeg, latDeg, lonDeg, start, end, 10);
+    const { atDate } = maxAltDuringWindow(raDeg, decDeg, latDeg, lonDeg, start, end, 1);
+    const south = azimuthCrossings(curve).filter((c) => c.azDeg === 180);
+    expect(south.length).toBe(1);
+    // Culmination is due south; 10-minute sampling + linear interpolation is
+    // accurate to a couple of minutes.
+    expect(Math.abs(south[0].time.getTime() - atDate.getTime())).toBeLessThan(3 * 60 * 1000);
+  });
+
+  it('returns exact step multiples in [0,360), in chronological order', () => {
+    const curve = sampleAltCurve(84, -1.2, latDeg, lonDeg, start, end, 10);
+    const crossings = azimuthCrossings(curve, 15);
+    expect(crossings.length).toBeGreaterThan(2);
+    for (const c of crossings) {
+      expect(c.azDeg % 15).toBe(0);
+      expect(c.azDeg).toBeGreaterThanOrEqual(0);
+      expect(c.azDeg).toBeLessThan(360);
+    }
+    for (let i = 1; i < crossings.length; i++) {
+      expect(crossings[i].time.getTime()).toBeGreaterThanOrEqual(crossings[i - 1].time.getTime());
+    }
+  });
+
+  it('a circumpolar target (dec > lat) crosses due north, never due south', () => {
+    const curve = sampleAltCurve(84, 70, latDeg, lonDeg, start, end, 10);
+    const azs = azimuthCrossings(curve).map((c) => c.azDeg);
+    // It circles the pole: due north at both culminations, and it never swings
+    // far enough east/west to reach the south half of the sky.
+    expect(azs.filter((az) => az === 0).length).toBe(2);
+    expect(azs).not.toContain(180);
+  });
+
+  it('handles the 0/360 wrap without spurious crossings', () => {
+    const crossings = azimuthCrossings(ramp(350, 10), 15);
+    expect(crossings.map((c) => c.azDeg)).toEqual([0]);
+  });
+
+  it('drops below-horizon crossings by default and keeps them when allowed', () => {
+    const curve = sampleAltCurve(84, -1.2, latDeg, lonDeg, start, end, 10);
+    const visible = azimuthCrossings(curve);
+    const all = azimuthCrossings(curve, 15, -90);
+    expect(visible.every((c) => c.altDeg >= 0)).toBe(true);
+    expect(all.length).toBeGreaterThan(visible.length);
+  });
+
+  it('emits every multiple spanned by one sample interval (fast azimuth)', () => {
+    const crossings = azimuthCrossings(ramp(100, 260), 15);
+    expect(crossings.map((c) => c.azDeg)).toEqual([
+      105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255,
+    ]);
+    // Times interpolate inside the interval, in travel order.
+    for (let i = 1; i < crossings.length; i++) {
+      expect(crossings[i].time.getTime()).toBeGreaterThan(crossings[i - 1].time.getTime());
+    }
+  });
+
+  it('follows a decreasing azimuth in travel order', () => {
+    const crossings = azimuthCrossings(ramp(200, 160), 15);
+    expect(crossings.map((c) => c.azDeg)).toEqual([195, 180, 165]);
+  });
+
+  it('returns nothing for a degenerate curve', () => {
+    expect(azimuthCrossings([], 15)).toEqual([]);
+    expect(azimuthCrossings(ramp(100, 100), 15)).toEqual([]);
+  });
+});
+
+describe('thinCrossingsByX', () => {
+  const at = (azDeg: number) => ({ time: new Date(0), azDeg, altDeg: 30 });
+  const xByAz = (c: { azDeg: number }) => c.azDeg; // x in "degrees" for the test
+
+  it('drops graduations closer than the gap to a kept entry', () => {
+    const kept = thinCrossingsByX([at(0), at(15), at(45), at(90)], xByAz, 20);
+    // 15 is within 20 of the cardinal 0 → dropped; 45 is clear of both 0 and 90.
+    expect(kept.map((c) => c.azDeg)).toEqual([0, 45, 90]);
+  });
+
+  it('never drops a cardinal, even when crowded', () => {
+    const kept = thinCrossingsByX([at(90), at(95), at(180)], xByAz, 1000);
+    expect(kept.map((c) => c.azDeg)).toEqual([90, 180]);
+    expect(kept.every((c) => isCardinalAz(c.azDeg))).toBe(true);
+  });
+
+  it('keeps everything when the gap is zero and preserves order', () => {
+    const items = [at(15), at(0), at(30)];
+    expect(thinCrossingsByX(items, xByAz, 0).map((c) => c.azDeg)).toEqual([15, 0, 30]);
   });
 });
