@@ -13,10 +13,8 @@ import {
   type SummitHoverCallback,
   type StarPickedCallback,
 } from './sky-map-types';
-import { t } from './i18n';
 import {
   project,
-  projectCached,
   toCanvas,
   fromCanvas,
   unproject,
@@ -24,36 +22,17 @@ import {
   fitScaleForBorderCircle,
   borderRadiusPU,
   bumpObsGeneration,
-  isBelowHorizonCached,
   setCenterMode,
   setProjectionObserver,
 } from './projection';
-import {
-  dateToJD,
-  lstHours,
-  moonRaDecDeg,
-  moonPhase,
-  sunRaDecDeg,
-  planetRaDecDeg,
-  PLANET_KEYS,
-  type PlanetKey,
-} from './astro-time';
-import { altAzFromRaDec, raDecFromAltAz } from './sky-geometry';
-import { drawMoonMarker } from './moon-draw';
-import { drawBodyMarker, drawBodyLabel } from './body-draw';
-import { getStars, getStarMagsSorted, loadConstellationStyle } from './star-catalog';
+import { dateToJD, lstHours } from './astro-time';
+import { altAzFromRaDec } from './sky-geometry';
+import { getStarMagsSorted, loadConstellationStyle } from './star-catalog';
 import { getDSOs } from './dso-catalog';
 import { targetRenderCount, DSO_DENSITY_K, MIN_BUDGET_MULT } from './render-budget';
-import {
-  starAreaBudget,
-  starFaintLimitAt,
-  starMagThreshold,
-  type StarAreaBudget,
-} from './star-budget';
+import { starAreaBudget, starMagThreshold, type StarAreaBudget } from './star-budget';
 import { SKY_THEME } from './sky-themes';
-import { computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint } from './star-render-math';
-import { paintStar, buildStarSprite } from './star-draw';
-import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle } from './dso-render-math';
+import { computeMaxMag } from './star-render-math';
 import { InteractionLod } from './interaction-lod';
 import {
   pointInConvexPolygon,
@@ -63,9 +42,26 @@ import {
   type PhotoOutline,
 } from './photo-outline';
 import { computeFovFrameCorners } from './frame-geometry';
-import { canvasPxPerDeg, isSkyPointVisible } from './sky-axes';
 import { easeInOutCubic, navigateDurationMs, navigateProfile } from './sky-view-math';
 import { resolveHover } from './hover-resolve';
+import { StarSpriteAtlas } from './star-sprite-atlas';
+import type { SkyScene, SkyLayerFlags } from './sky-scene';
+import {
+  renderStars,
+  renderStarLabels,
+  renderDSOs,
+  renderDSOLabels,
+  renderMoon,
+  renderSun,
+  renderPlanets,
+} from './sky-scene-render';
+import {
+  renderOverlay,
+  renderMountainHorizon,
+  renderPhotoOutlines,
+  renderFovFrames,
+  renderFovInstances,
+} from './sky-frame-render';
 import { RegionDrawGesture } from './sky-region-draw';
 import { FrameController } from './frame-controller';
 import { attachSkyMapEvents, type EventBinding, type SkyEventHost } from './sky-map-events';
@@ -79,33 +75,9 @@ import {
   drawConstellationLines,
   drawConstellationNames,
   drawHorizonLine,
-  drawMountainHorizon,
-  drawSummitDots,
-  drawCardinalPoints,
   drawAzimuthGrid,
-  drawTileTrash,
-  drawTileAdd,
 } from './sky-draw';
-import {
-  FONTS,
-  FRAME,
-  BORDER_RING,
-  HIGHLIGHT_RING,
-  PHOTO_OUTLINE,
-  DSO_LABEL_COLORS,
-  DEFAULT_DSO_LABEL_COLOR,
-} from './canvas-theme';
-import { drawDsoMarker, drawDsoHighlightRing } from './dso-draw';
-import { formatDsoLabel, dsoLabelVisible } from './dso-label';
-import {
-  drawFramePolyline,
-  drawEdgeLabel,
-  drawFrameHandles,
-  drawResizeDraftRect,
-  drawElasticSnapLine,
-} from './frame-draw';
-
-const DEG2RAD = Math.PI / 180;
+import { BORDER_RING } from './canvas-theme';
 
 // Photo-outline geometry now lives in ./photo-outline; re-exported here for the
 // existing import sites (tests, export-render, overlays) that reference sky-map.
@@ -198,12 +170,10 @@ export class SkyMap {
   private static readonly BELOW_HORIZON_ALPHA = 0.18;
 
   // ── Star sprite atlas ──────────────────────────────────────────────────────
-  // Distinct quantized (mag, bv) sprites pre-rendered for the current zoom. Keyed
-  // by an integer bucket; rebuilt only when scale or the mag limit changes, so a
-  // pan reuses every sprite instead of rebuilding ~15-stop gradients per star.
-  private starSprites = new Map<number, { canvas: HTMLCanvasElement; half: number }>();
-  private starSpriteScale = -1;
-  private starSpriteMaxMag = -1;
+  // Distinct quantized (mag, bv) sprites pre-rendered for the current zoom, so a pan
+  // reuses every sprite instead of rebuilding ~15-stop gradients per star. The rebuild
+  // policy lives in ./star-sprite-atlas (unit-tested).
+  private starAtlas = new StarSpriteAtlas();
 
   // ── Hover hit-test throttle ────────────────────────────────────────────────
   // mousemove fires faster than we can draw a tooltip, and the hit-test walks the
@@ -265,11 +235,6 @@ export class SkyMap {
   private lod = new InteractionLod();
   private settleTimer: ReturnType<typeof setTimeout> | null = null;
   private onAutoDensityChange: ((dso: number) => void) | null = null;
-  // During a gesture the frozen star sprite atlas is rebuilt once the live zoom drifts
-  // past this radius ratio from it — bounding how much drawImage upscales (and thus
-  // pixelates) a frozen sprite, while a continuous zoom rebuilds only once per such
-  // step rather than every frame (see renderStars).
-  private static readonly ATLAS_REBUILD_RATIO = 1.3;
 
   // Listeners registered by attachSkyMapEvents, removed on destroy().
   private eventBindings: EventBinding[] = [];
@@ -774,9 +739,9 @@ export class SkyMap {
    * lives in ./star-budget (pure, unit-tested); this binds the live view, border
    * latitude and the LOD-reduced density budget.
    */
-  private starAreaBudget(): StarAreaBudget {
+  private starAreaBudget(view: ViewState = this.view): StarAreaBudget {
     return starAreaBudget(
-      this.view,
+      view,
       this.borderLatDeg,
       this.lod.effectiveStarBudget(this.maxStarCount),
       getStarMagsSorted(),
@@ -789,12 +754,12 @@ export class SkyMap {
   }
 
   /**
-   * Pan-invariant DSO priority cutoff for the current zoom + canvas. A DSO renders iff
+   * Pan-invariant DSO priority cutoff for the given zoom + canvas. A DSO renders iff
    * `dso.priority < this` (priority is a dense global blue-noise rank, lower = drawn
    * first). Independent of pan, mirroring {@link starMagThreshold}.
    */
-  private dsoPriorityThreshold(): number {
-    const { scale, width, height } = this.view;
+  private dsoPriorityThreshold(view: ViewState = this.view): number {
+    const { scale, width, height } = view;
     // Upper bound is the DSO catalog size; the per-DSO magnitude gate (dsoMaxMag) and
     // the field of view bound how many actually draw when zoomed in.
     const budget = this.lod.effectiveDSOBudget(this.maxDSOCount);
@@ -908,44 +873,22 @@ export class SkyMap {
     target: HTMLCanvasElement,
     view: ViewState,
     pixelScale: number,
-    layers?: Partial<{
-      showStars: boolean;
-      showDSOs: boolean;
-      showConstellationLines: boolean;
-      showConstellationNames: boolean;
-      showGrid: boolean;
-      showStarLabels: boolean;
-      showDSOLabels: boolean;
-    }>,
+    layers?: Partial<SkyLayerFlags>,
   ): void {
     const tctx = target.getContext('2d');
     if (!tctx) return;
-    const savedCtx = this.ctx;
-    const savedView = this.view;
-    // Snapshot any layer flags we may override, so we can restore them exactly.
-    const savedLayers = {
-      showStars: this.showStars,
-      showDSOs: this.showDSOs,
-      showConstellationLines: this.showConstellationLines,
-      showConstellationNames: this.showConstellationNames,
-      showGrid: this.showGrid,
-      showStarLabels: this.showStarLabels,
-      showDSOLabels: this.showDSOLabels,
-    };
-    this.ctx = tctx;
-    this.view = view;
-    this._renderingOffscreen = true;
-    if (layers) Object.assign(this, layers);
+    // A different scene, not a different SkyMap: the live ctx, view and layer flags are
+    // never touched, so an export can't leak state into the on-screen map.
+    const scene = this.buildScene({ ctx: tctx, view, offscreen: true, ...layers });
     tctx.save();
     tctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
     try {
-      this.render();
+      this.renderScene(scene);
     } finally {
       tctx.restore();
-      this._renderingOffscreen = false;
-      this.ctx = savedCtx;
-      this.view = savedView;
-      if (layers) Object.assign(this, savedLayers);
+      // The export shares the per-frame DSO cache, which is now keyed to the export
+      // view; drop it so the next on-screen frame rebuilds for the live view.
+      this.dsoSelection.invalidate();
     }
   }
 
@@ -1337,15 +1280,94 @@ export class SkyMap {
     this.requestRender();
   }
 
+  /**
+   * Build the render context for one pass. Everything the draw passes read is gathered
+   * here, so an off-screen/export render is just a scene with a different ctx/view/layer
+   * flags — the live map's own state is never mutated (see {@link renderToCanvas}).
+   */
+  private buildScene(over: Partial<SkyScene> = {}): SkyScene {
+    const canvas = this.canvas;
+    // The view may be overridden (export), and the density budgets/selection depend
+    // on it, so resolve it before computing anything view-derived.
+    const view = over.view ?? this.view;
+    return {
+      ctx: this.ctx,
+      view,
+      theme: this.skyTheme,
+      horizon: this.skyTimeMode === 'date' ? this.computeHorizonParams() : null,
+      offscreen: this._renderingOffscreen,
+
+      hemisphere: this.hemisphere,
+      borderLatDeg: this.borderLatDeg,
+      localSkyMode: this.localSkyMode,
+      fisheyeMode: this.fisheyeMode,
+
+      skyOpacity: this.skyOpacity,
+      backgroundOpacity: this.backgroundOpacity,
+      belowHorizonAlpha: SkyMap.BELOW_HORIZON_ALPHA,
+
+      skyTimeMode: this.skyTimeMode,
+      simDate: this.simDate,
+      showMoon: this.showMoon,
+      showSun: this.showSun,
+      showPlanets: this.showPlanets,
+      showAzimuthGrid: this.showAzimuthGrid,
+      showMountainHorizon: this.showMountainHorizon,
+      showCardinalPoints: this.showCardinalPoints,
+      mountainProfile: this.mountainProfile,
+
+      showStars: this.showStars,
+      showDSOs: this.showDSOs,
+      showConstellationLines: this.showConstellationLines,
+      showConstellationNames: this.showConstellationNames,
+      showGrid: this.showGrid,
+      showStarLabels: this.showStarLabels,
+      showDSOLabels: this.showDSOLabels,
+
+      highlightedStar: this.highlightedStar,
+      highlightedDSO: this.highlightedDSO,
+
+      starBudget: this.starAreaBudget(view),
+      atlas: this.starAtlas,
+      interacting: this.lod.interacting,
+
+      selectedDSOs: () => this.selectRenderedDSOs(view),
+
+      showPhotoOutlines: this.showPhotoOutlines,
+      photoOutlines: this.photoOutlines,
+      fovFrameSpecs: this.fovFrameSpecs,
+      fovRotationDeg: this.fovRotationDeg,
+      frames: this.frames,
+      regionDrawPoints: this.regionDraw.capturedPoints,
+      regionDrawActive: this.regionDraw.active,
+      activeRegionOverlay: this.activeRegionOverlay,
+
+      // Canvas has no CSS vars, so design tokens are resolved from computed style.
+      cssVar: (name, fallback) =>
+        getComputedStyle(canvas).getPropertyValue(name).trim() || fallback,
+
+      ...over,
+    };
+  }
+
   render() {
-    const { ctx, view } = this;
+    this.renderScene(this.buildScene());
+  }
+
+  /**
+   * Draw one scene. `render()` passes the live scene; the export path passes one with
+   * a different ctx/view/layers ({@link renderToCanvas}), which is why nothing here
+   * reads `this.view` or `this.ctx` directly.
+   */
+  private renderScene(scene: SkyScene): void {
+    const { ctx, view } = scene;
     const { width, height } = view;
 
     // Time interactive frames to drive the adaptive budgets — plus a one-shot at-rest burst
     // right after DSO-auto is switched on (dsoCalibrating) so the slider re-tunes immediately.
     // Outside those, no measurement: the budget never creeps up at rest, so nothing pops when
     // a gesture starts.
-    const measure = this.lod.shouldMeasure(this._renderingOffscreen);
+    const measure = this.lod.shouldMeasure(scene.offscreen);
     const t0 = measure ? performance.now() : 0;
 
     // Invalidate the per-frame DSO selection cache; rebuilt lazily by the first consumer.
@@ -1353,100 +1375,98 @@ export class SkyMap {
 
     // Horizon params (LST + latitude), computed once per frame — null outside date mode
     // or before an observer location is set, in which case no dimming/line is drawn.
-    const horizon = this.skyTimeMode === 'date' ? this.computeHorizonParams() : null;
+    const horizon = scene.horizon;
 
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
-    drawBackground(ctx, view, this.skyTheme, this.backgroundOpacity);
+    drawBackground(ctx, view, scene.theme, scene.backgroundOpacity);
 
     // ── Hemisphere clip circle ──────────────────────────────────────────────
     // In stereo mode: borderLatDeg determines how far into the opposite hemisphere we show.
     // In fisheye mode: borderRadiusPU() returns 1.0 (the horizon circle).
     const poleOrigin = toCanvas(0, 0, view);
-    const borderR = borderRadiusPU(this.borderLatDeg) * view.scale;
+    const borderR = borderRadiusPU(scene.borderLatDeg) * view.scale;
 
     ctx.save();
     ctx.beginPath();
     ctx.arc(poleOrigin.x, poleOrigin.y, borderR, 0, Math.PI * 2);
     ctx.clip();
 
-    ctx.globalAlpha = this.skyOpacity;
-    if (this.showConstellationLines) {
+    ctx.globalAlpha = scene.skyOpacity;
+    if (scene.showConstellationLines) {
       drawConstellationLines(
         ctx,
         view,
         this.constellationStyle,
-        this.skyTheme.constellationLineColor,
+        scene.theme.constellationLineColor,
       );
     }
-    if (this.showDSOs) {
-      this.renderDSOs(horizon);
+    if (scene.showDSOs) {
+      renderDSOs(scene);
     }
     // Gated on date mode (not just showMoon) so the toggle's on/off state survives
     // switching in/out of date mode without the Moon reappearing in live/full mode,
     // where its position relative to "now" wouldn't be meaningful to show.
-    if (this.showMoon && this.skyTimeMode === 'date') {
-      this.renderMoon(horizon);
+    if (scene.showMoon && scene.skyTimeMode === 'date') {
+      renderMoon(scene);
     }
-    if (this.showSun && this.skyTimeMode === 'date') {
-      this.renderSun(horizon);
+    if (scene.showSun && scene.skyTimeMode === 'date') {
+      renderSun(scene);
     }
-    if (this.showPlanets && this.skyTimeMode === 'date') {
-      this.renderPlanets(horizon);
+    if (scene.showPlanets && scene.skyTimeMode === 'date') {
+      renderPlanets(scene);
     }
-    if (this.showStars) {
-      this.renderStars(horizon);
-      if (this.showStarLabels) {
-        this.renderStarLabels();
+    if (scene.showStars) {
+      renderStars(scene);
+      if (scene.showStarLabels) {
+        renderStarLabels(scene);
       }
     }
-    if (this.showDSOs && this.showDSOLabels) {
-      this.renderDSOLabels();
+    if (scene.showDSOs && scene.showDSOLabels) {
+      renderDSOLabels(scene);
     }
-    if (this.showConstellationNames) {
-      drawConstellationNames(ctx, view, this.skyTheme);
+    if (scene.showConstellationNames) {
+      drawConstellationNames(ctx, view, scene.theme);
     }
 
     ctx.globalAlpha = 1;
-    if (this.showGrid) {
-      if (this.localSkyMode) {
-        drawGridZenith(ctx, view, this.skyTheme);
-      } else if (this.fisheyeMode) {
-        drawFisheyeGrid(ctx, view, this.skyTheme);
+    if (scene.showGrid) {
+      if (scene.localSkyMode) {
+        drawGridZenith(ctx, view, scene.theme);
+      } else if (scene.fisheyeMode) {
+        drawFisheyeGrid(ctx, view, scene.theme);
       } else {
-        drawGrid(ctx, view, this.skyTheme, this.borderLatDeg);
+        drawGrid(ctx, view, scene.theme, scene.borderLatDeg);
       }
     }
     if (horizon) {
-      if (this.showAzimuthGrid) {
-        drawAzimuthGrid(ctx, view, horizon.lstH, horizon.latDeg, this.skyTheme);
+      if (scene.showAzimuthGrid) {
+        drawAzimuthGrid(ctx, view, horizon.lstH, horizon.latDeg, scene.theme);
       }
       // --accent-color tracks the current warm/cold UI theme, so the horizon line
       // reads well regardless of theme instead of a fixed hardcoded hue.
-      const cs = getComputedStyle(this.canvas);
-      const horizonColor =
-        cs.getPropertyValue('--accent-color').trim() || this.skyTheme.horizonLineColorFallback;
+      const horizonColor = scene.cssVar('--accent-color', scene.theme.horizonLineColorFallback);
       drawHorizonLine(ctx, view, horizon.lstH, horizon.latDeg, horizonColor);
       // The terrain mass is drawn on the overlay canvas (above the photo layer) for live
       // renders, so photos sitting behind the mountains are correctly hidden rather than
       // painted on top of them — same pattern as FOV frames below. Offscreen/export renders
       // have no overlay canvas, so it's drawn inline here instead (see renderOverlay).
-      if (this._renderingOffscreen) {
-        this.renderMountainHorizon(ctx, horizon);
+      if (scene.offscreen) {
+        renderMountainHorizon(scene, horizon);
       }
     }
-    if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
-      this.renderPhotoOutlines();
+    if (scene.showPhotoOutlines && scene.photoOutlines.length > 0) {
+      renderPhotoOutlines(scene);
     }
     // Frames are drawn on the overlay canvas (above photos) for live renders,
-    // but inline here for offscreen/export renders (see renderOverlay / _renderingOffscreen).
-    if (this._renderingOffscreen) {
-      if (this.fovFrameSpecs.length > 0) {
-        this.renderFovFrames();
+    // but inline here for offscreen/export renders (see renderOverlay / scene.offscreen).
+    if (scene.offscreen) {
+      if (scene.fovFrameSpecs.length > 0) {
+        renderFovFrames(scene);
       }
-      if (this.frames.frames.length > 0) {
-        this.renderFovInstances();
+      if (scene.frames.frames.length > 0) {
+        renderFovInstances(scene);
       }
     }
 
@@ -1463,8 +1483,10 @@ export class SkyMap {
 
     ctx.restore(); // outer save
 
-    if (!this._renderingOffscreen) {
-      this.renderOverlay();
+    // The overlay is the same scene painted onto the overlay canvas (which sits above
+    // the photo layer), so photos behind frames/terrain are hidden rather than covered.
+    if (!scene.offscreen && this.overlayCtx) {
+      renderOverlay({ ...scene, ctx: this.overlayCtx });
     }
 
     if (t0) {
@@ -1484,288 +1506,6 @@ export class SkyMap {
     }
   }
 
-  private renderOverlay(): void {
-    const oc = this.overlayCtx;
-    if (!oc) return;
-    const { view } = this;
-    const { width, height } = view;
-
-    oc.clearRect(0, 0, width, height);
-
-    const horizon = this.skyTimeMode === 'date' ? this.computeHorizonParams() : null;
-    const hasFrames = this.fovFrameSpecs.length > 0 || this.frames.frames.length > 0;
-    const hasRegionDraw = this.regionDraw.active && this.regionDraw.capturedPoints.length > 0;
-    const hasRegionOverlay = this.activeRegionOverlay !== null && this.localSkyMode;
-    if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay) return;
-
-    const poleOrigin = toCanvas(0, 0, view);
-    const borderR = borderRadiusPU(this.borderLatDeg) * view.scale;
-
-    oc.save();
-    oc.beginPath();
-    oc.arc(poleOrigin.x, poleOrigin.y, borderR, 0, Math.PI * 2);
-    oc.clip();
-
-    // Terrain mass first (drawn above the photo layer so photos behind the mountains are
-    // hidden — see the comment in the main render loop), then frames on top of that.
-    if (horizon) {
-      this.renderMountainHorizon(oc, horizon);
-    }
-
-    // Temporarily route ctx to the overlay canvas so renderFovFrames / renderFovInstances
-    // draw there without any other changes to those methods.
-    const mainCtx = this.ctx;
-    this.ctx = oc;
-    if (this.fovFrameSpecs.length > 0) this.renderFovFrames();
-    if (this.frames.frames.length > 0) this.renderFovInstances();
-    this.ctx = mainCtx;
-
-    if (hasRegionOverlay) this.renderRegionOverlay(oc);
-    if (hasRegionDraw) this.renderRegionDrawPreview(oc);
-
-    // Cardinal labels last, so the N/E/S/W letters stay legible above the terrain
-    // mass, the photo layer and the frames.
-    if (horizon) this.renderCardinalPoints(oc, horizon);
-
-    oc.restore();
-  }
-
-  /** Draws the red N/E/S/W horizon labels into `ctx`, if enabled. */
-  private renderCardinalPoints(
-    ctx: CanvasRenderingContext2D,
-    horizon: { lstH: number; latDeg: number },
-  ): void {
-    if (!this.showCardinalPoints) return;
-    drawCardinalPoints(ctx, this.view, horizon.lstH, horizon.latDeg, {
-      n: t('cardinal.north'),
-      e: t('cardinal.east'),
-      s: t('cardinal.south'),
-      w: t('cardinal.west'),
-    });
-  }
-
-  /** Draws the saved region reference overlay (see setActiveRegionOverlay). */
-  private renderRegionOverlay(ctx: CanvasRenderingContext2D): void {
-    const region = this.activeRegionOverlay;
-    const hp = this.computeHorizonParams();
-    if (!region || !hp || region.points.length < 3) return;
-    const { view } = this;
-    ctx.save();
-    ctx.beginPath();
-    region.points.forEach((p, i) => {
-      const { raDeg, decDeg } = raDecFromAltAz(p.altDeg, p.azDeg, hp.lstH, hp.latDeg);
-      const proj = project(raDeg, decDeg);
-      const c = toCanvas(proj.x, proj.y, view);
-      if (i === 0) ctx.moveTo(c.x, c.y);
-      else ctx.lineTo(c.x, c.y);
-    });
-    ctx.closePath();
-    ctx.fillStyle = `${region.color}40`; // ~25% alpha
-    ctx.fill();
-    ctx.strokeStyle = region.color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /** Draws the live in-progress freehand region stroke while drawing. */
-  private renderRegionDrawPreview(ctx: CanvasRenderingContext2D): void {
-    const hp = this.computeHorizonParams();
-    const points = this.regionDraw.capturedPoints;
-    if (!hp || points.length === 0) return;
-    const { view } = this;
-    ctx.save();
-    ctx.beginPath();
-    points.forEach((p, i) => {
-      const { raDeg, decDeg } = raDecFromAltAz(p.altDeg, p.azDeg, hp.lstH, hp.latDeg);
-      const proj = project(raDeg, decDeg);
-      const c = toCanvas(proj.x, proj.y, view);
-      if (i === 0) ctx.moveTo(c.x, c.y);
-      else ctx.lineTo(c.x, c.y);
-    });
-    ctx.strokeStyle = '#4ea1ff';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 3]);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /** Draws the mountain-horizon terrain mass (+ summit dots) into `ctx`, if enabled. */
-  private renderMountainHorizon(
-    ctx: CanvasRenderingContext2D,
-    horizon: { lstH: number; latDeg: number },
-  ): void {
-    if (!this.showMountainHorizon || !this.mountainProfile) return;
-    drawMountainHorizon(ctx, this.view, horizon.lstH, horizon.latDeg, this.mountainProfile);
-    if (this.mountainProfile.summits?.length) {
-      drawSummitDots(ctx, this.view, horizon.lstH, horizon.latDeg, this.mountainProfile);
-    }
-  }
-
-  private renderPhotoOutlines() {
-    const { ctx } = this;
-
-    for (const outline of this.photoOutlines) {
-      const { corners, name } = outline;
-      if (corners.length < 4) continue;
-
-      ctx.save();
-      ctx.strokeStyle = PHOTO_OUTLINE.stroke;
-      ctx.lineWidth = PHOTO_OUTLINE.lineWidth;
-      ctx.setLineDash(PHOTO_OUTLINE.dash);
-      drawFramePolyline(ctx, corners);
-
-      // Label along the longest edge, always readable (not upside-down)
-      drawEdgeLabel(ctx, corners, name, PHOTO_OUTLINE.label);
-      ctx.restore();
-    }
-  }
-
-  private renderFovFrames() {
-    const { ctx, view } = this;
-    const cx = view.width / 2;
-    const cy = view.height / 2;
-    // These previews sit at the screen centre, so their scale is the projection's scale at
-    // the sky point under it — measured, not derived from dec, which is the wrong quantity
-    // once the projection is zenith-centred (see sky-axes.ts).
-    const { ra, dec } = unproject(view.centerX, view.centerY);
-    const pxPerDeg = canvasPxPerDeg(ra, dec, view);
-
-    // Resolve CSS token values from computed style (canvas does not support CSS vars directly)
-    const cs = getComputedStyle(this.canvas);
-    const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || FRAME.strokeFallback;
-    const labelColor = cs.getPropertyValue('--fov-frame-label').trim() || FRAME.labelFallback;
-
-    for (const spec of this.fovFrameSpecs) {
-      const halfWPx = (spec.wDeg / 2) * pxPerDeg;
-      const halfHPx = (spec.hDeg / 2) * pxPerDeg;
-      const corners = computeFovFrameCorners(halfWPx, halfHPx, cx, cy, this.fovRotationDeg);
-
-      ctx.save();
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = FRAME.lineWidth;
-      ctx.setLineDash(FRAME.dashOutline);
-      drawFramePolyline(ctx, corners);
-      drawEdgeLabel(ctx, corners, spec.label, labelColor);
-      ctx.restore();
-    }
-  }
-
-  private renderFovInstances() {
-    const { ctx } = this;
-    const cs = getComputedStyle(this.canvas);
-    const strokeColor = cs.getPropertyValue('--fov-frame-stroke').trim() || FRAME.strokeFallback;
-    const labelColor = cs.getPropertyValue('--fov-frame-label').trim() || FRAME.labelFallback;
-    const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
-    const dangerColor = cs.getPropertyValue('--color-danger').trim() || FRAME.dangerFallback;
-    // The selected mosaic's tiles each get a delete button (per-tile editing).
-    const activeMosaicId = this.frames.frames
-      .find((f) => f.active && f.isMosaicOutline)
-      ?.id.split(':')[2];
-
-    for (const f of this.frames.frames) {
-      if (f.visible === false) continue; // hidden via the manager checkbox
-      // Off-projection (below the Local Sky horizon, or the far hemisphere in fisheye):
-      // project() returns a sentinel there, so the frame would be painted far off-canvas
-      // with zero extents and degenerate handles. Skip it outright.
-      if (f.anchorKind === 'sky' && !isSkyPointVisible(f.ra ?? 0, f.dec ?? 0)) continue;
-      const { corners, cx, cy, rotDeg, halfW, halfH } = this.frames.frameGeometry(f);
-      const isActive = f.active;
-      const isTile = !!f.mosaicId; // a faint mosaic panel (the outline frame draws the rest)
-
-      ctx.save();
-      ctx.globalAlpha = isTile ? 0.4 : isActive ? 1 : 0.5;
-      ctx.strokeStyle = isActive && !isTile ? activeColor : strokeColor;
-      ctx.lineWidth = isActive && !isTile ? FRAME.lineWidthActive : FRAME.lineWidth;
-      ctx.setLineDash(FRAME.dashOutline);
-      // A mosaic outline traces its tile perimeter (follows projection curvature);
-      // every other frame is its 4-corner rectangle.
-      const outline = f.isMosaicOutline ? (this.frames.mosaicOutlinePath(f) ?? corners) : corners;
-      drawFramePolyline(ctx, outline);
-
-      if (isTile) {
-        // Border tiles of the selected mosaic carry a delete button (large tiles only).
-        if (
-          f.mosaicId === activeMosaicId &&
-          f.mosaicIsBorderTile &&
-          this.frames.tileTrashVisible(halfW, halfH)
-        ) {
-          ctx.globalAlpha = 1;
-          drawTileTrash(ctx, { x: cx, y: cy }, dangerColor);
-        }
-        ctx.restore();
-        continue; // tiles: outline only, no label/handles
-      }
-
-      // Label (setup name only) along the longest edge — hidden when the frame
-      // is too small to read it.
-      const edgeIdx = photoLabelEdgeIndex(corners);
-      const a = corners[edgeIdx];
-      const b = corners[(edgeIdx + 1) % corners.length];
-      if (Math.hypot(b.x - a.x, b.y - a.y) >= FRAME.labelMinEdgePx) {
-        drawEdgeLabel(ctx, corners, f.name, isActive ? activeColor : labelColor);
-      }
-
-      // Handles on the active frame only (so other frames stay locked), and only
-      // while the frame is large enough that the centre dot isn't near the edges.
-      if (isActive && this.frames.frameHandlesVisible(halfW, halfH)) {
-        drawFrameHandles(
-          ctx,
-          { corners, cx, cy, rotDeg, halfH },
-          {
-            movable: f.movable,
-            pinnable: !!f.pinnable,
-            resizable: !!f.resizable,
-            anchorSky: f.anchorKind === 'sky',
-          },
-          activeColor,
-          this.frames.framePinGlyphPos(corners[1], rotDeg),
-        );
-      }
-      ctx.restore();
-    }
-
-    // Rubber-band preview of a drag-to-extend in progress.
-    if (this.frames.resizeDraft) {
-      const d = this.frames.resizeDraft;
-      drawResizeDraftRect(
-        ctx,
-        computeFovFrameCorners(d.halfW, d.halfH, d.cx, d.cy, d.rotDeg),
-        activeColor,
-      );
-    }
-
-    // Elastic line: while moving a frame whose anchor will snap, a taut line runs
-    // from the frame centre (cursor) to the pending DSO's centre. It tightens
-    // (brighter + thicker) as the frame nears the break threshold, signalling the
-    // snap-back that fires on release; it vanishes when the elastic "breaks".
-    if (this.frames.snapCandidate && this.frames.activeDrag?.mode === 'move') {
-      const f = this.frames.frames.find((x) => x.id === this.frames.activeDrag!.id);
-      if (f) {
-        const snap = this.frames.snapCandidate;
-        const { cx, cy } = this.frames.frameAnchorCanvas(f);
-        const dp = project(snap.ra, snap.dec);
-        const dc = toCanvas(dp.x, dp.y, this.view);
-        // Break radius mirrors findClosestDSO: the rendered ellipse, floored at 20px.
-        const rx = Math.max(2, angularSizeToCanvasPx(snap.majAxis / 2, snap.dec, this.view.scale));
-        const breakPx = Math.max(rx, 20);
-        const tension = Math.min(1, Math.hypot(cx - dc.x, cy - dc.y) / breakPx);
-        drawElasticSnapLine(ctx, { x: cx, y: cy }, dc, tension, activeColor);
-      }
-    }
-
-    // Add ("+") buttons at the empty neighbour cells of the selected mosaic.
-    if (
-      activeMosaicId &&
-      this.frames.mosaicAddCandidates.length &&
-      this.frames.mosaicEditButtonsVisible(activeMosaicId)
-    ) {
-      const avoid = this.frames.activeOutlineRotateAvoid();
-      for (const c of this.frames.mosaicAddCandidates)
-        drawTileAdd(ctx, this.frames.candidateCanvasPoint(c, avoid), activeColor);
-    }
-  }
-
   /** Observer/time parameters for horizon visibility this frame — null when not applicable. */
   private computeHorizonParams(): { lstH: number; latDeg: number } | null {
     if (this.obsLat === null || this.obsLon === null) return null;
@@ -1773,191 +1513,15 @@ export class SkyMap {
     return { lstH: lstHours(jd, this.obsLon), latDeg: this.obsLat };
   }
 
-  private renderStars(horizon: { lstH: number; latDeg: number } | null) {
-    const { ctx, view } = this;
-    // Stars render at full opacity (not dimmed by skyOpacity like the rest of the
-    // sky), so their opaque cores fully occlude constellation/grid lines behind
-    // them instead of letting the line bleed through the middle of the star.
-    const prevAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = 1;
-    const stars = getStars();
-    const theme = this.skyTheme;
-    // Pan-invariant, area-weighted magnitude budget (see render-budget.ts). The precise
-    // cutoff is per-position (starFaintLimitAt) — brighter near the crowded map centre,
-    // fainter toward the edge — so on-screen star density stays uniform under the
-    // stereographic projection's area distortion. `maxMag` here is the faintest limit
-    // anywhere (the rim): it is the cheap pre-filter below and the single atlas/paint key
-    // (so edge-fill stars share sprites and don't fade), while starFaintLimitAt applies
-    // the exact per-star gate after projecting. Pan-invariant either way, so nothing pops
-    // into the static part of the view while panning.
-    const sb = this.starAreaBudget();
-    const maxMag = sb.edgeMag;
-
-    // The sprite atlas (offscreen canvas per quantized mag/bv) is expensive to build, so
-    // we don't rebuild it on every frame. A fast zoom changes scale by >1 bucket per
-    // frame, which would churn hundreds of canvases per frame and drive the GC. Between
-    // rebuilds the frozen sprites are scaled to the live zoom with drawImage (cheap).
-    //
-    // Rebuild a crisp atlas: always at rest / when empty; during a gesture, only once the
-    // live zoom has drifted past ATLAS_REBUILD_RATIO from the frozen atlas. Throttling by
-    // scale drift (not time) bounds the upscale — and thus the pixelation — directly, and
-    // is self-limiting: each rebuild resets the drift to ~1, so a continuous zoom rebuilds
-    // once per ~1.3× step regardless of frame rate (no time-floor feedback loop).
-    const atlasScale = atlasScaleBucket(view.scale);
-    const atlasMaxMag = Math.round(maxMag * 10) / 10;
-    const atlasStale = atlasScale !== this.starSpriteScale || atlasMaxMag !== this.starSpriteMaxMag;
-    // How much the frozen sprites would be scaled to track the current zoom.
-    const liveRatio = this.starSpriteScale > 0 ? Math.sqrt(view.scale / this.starSpriteScale) : 1;
-    const drifted =
-      liveRatio > SkyMap.ATLAS_REBUILD_RATIO || liveRatio < 1 / SkyMap.ATLAS_REBUILD_RATIO;
-    if (atlasStale && (!this.lod.interacting || this.starSprites.size === 0 || drifted)) {
-      this.starSprites.clear();
-      this.starSpriteScale = atlasScale;
-      this.starSpriteMaxMag = atlasMaxMag;
-    }
-    // Just-rebuilt frames draw crisp 1:1 (bucket matches); between rebuilds, scale the
-    // frozen sprites by the radius ratio (≈ √ of the scale ratio, matching starRadius'
-    // curve). At rest and during pan the bucket matches, so this stays 1.
-    const frozenScale = this.starSpriteScale !== atlasScale;
-    const spriteScale =
-      frozenScale && this.starSpriteScale > 0 ? Math.sqrt(view.scale / this.starSpriteScale) : 1;
-
-    for (const star of stars) {
-      // Always include the highlighted star.
-      const isHighlighted = this.highlightedStar === star.hip;
-
-      if (!isHighlighted) {
-        if (star.mag > maxMag) continue;
-        if (this.localSkyMode) {
-          // Below-horizon stars are already hidden by the horizon-circle canvas
-          // clip; this just skips the projection/bbox work for them earlier.
-          if (horizon && isBelowHorizonCached(star, horizon.lstH, horizon.latDeg)) continue;
-        } else if (!this.fisheyeMode) {
-          // Dec pre-filter: skip objects clearly outside the border (stereo only —
-          // in fisheye the far hemisphere is clipped by project() returning off-canvas).
-          if (this.hemisphere === 'north' && star.dec < -(this.borderLatDeg + 2)) continue;
-          if (this.hemisphere === 'south' && star.dec > +(this.borderLatDeg + 2)) continue;
-        }
-      }
-
-      projectCached(star);
-
-      // Area-weighted per-position gate: thin the crowded centre, keep the naked-eye
-      // floor everywhere, allow fainter fill toward the edge. Runs after projecting so
-      // it can read the local area factor from the cached _px/_py.
-      if (!isHighlighted && star.mag > starFaintLimitAt(star._px!, star._py!, sb)) {
-        continue;
-      }
-
-      const c = toCanvas(star._px!, star._py!, view);
-
-      // Skip if off-screen (with margin)
-      if (c.x < -20 || c.x > view.width + 20 || c.y < -20 || c.y > view.height + 20) {
-        continue;
-      }
-
-      // Below-horizon stars are dimmed (not hidden) in date mode, once a location is set.
-      // The highlighted star stays at full brightness regardless (it's actively selected).
-      ctx.globalAlpha =
-        horizon && !isHighlighted && isBelowHorizonCached(star, horizon.lstH, horizon.latDeg)
-          ? SkyMap.BELOW_HORIZON_ALPHA
-          : 1;
-
-      if (isHighlighted) {
-        // Drawn live (not via the atlas): rare, uses estab=1, and gets a ring.
-        const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, true);
-        paintStar(ctx, c.x, c.y, paint);
-        ctx.strokeStyle = HIGHLIGHT_RING.color;
-        ctx.lineWidth = HIGHLIGHT_RING.lineWidth;
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, paint.radius + HIGHLIGHT_RING.padPx, 0, Math.PI * 2);
-        ctx.stroke();
-        continue;
-      }
-
-      // Glow halos (bright stars, mag < glowThresholdMag) are a soft radial gradient
-      // several times the dot's radius — the 1.3x atlas drift bound (imperceptible on
-      // small solid dots) is visibly blurry on them. Only ~321 stars catalog-wide are
-      // glow-eligible, so draw them live at the true zoom scale during the drift window
-      // instead of blitting the frozen/scaled sprite — same treatment as the highlighted
-      // star above, gated to the exact frames (frozenScale) where the blur would show.
-      if (frozenScale && star.mag < theme.glowThresholdMag) {
-        const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, false);
-        paintStar(ctx, c.x, c.y, paint);
-        continue;
-      }
-
-      // Quantize (mag, bv) to a sprite bucket: 0.25-mag and ~1/12 B-V steps.
-      const magKey = Math.round(star.mag * 4);
-      const bvKey = Math.round((Math.max(-0.4, Math.min(2.0, star.bv)) + 0.4) * 12);
-      const key = magKey * 100 + bvKey;
-      let sprite = this.starSprites.get(key);
-      if (sprite === undefined) {
-        // Build at the atlas's frozen scale/maxMag so a sprite minted mid-gesture (a
-        // newly-appeared bucket) matches the rest of the atlas and scales identically.
-        const paint = computeStarPaint(
-          star.mag,
-          star.bv,
-          this.starSpriteScale,
-          this.starSpriteMaxMag,
-          theme,
-          false,
-        );
-        sprite = buildStarSprite(paint);
-        this.starSprites.set(key, sprite);
-      }
-      if (spriteScale === 1) {
-        ctx.drawImage(sprite.canvas, c.x - sprite.half, c.y - sprite.half);
-      } else {
-        const h = sprite.half * spriteScale;
-        ctx.drawImage(
-          sprite.canvas,
-          c.x - h,
-          c.y - h,
-          sprite.canvas.width * spriteScale,
-          sprite.canvas.height * spriteScale,
-        );
-      }
-    }
-
-    ctx.globalAlpha = prevAlpha;
-  }
-
-  private renderStarLabels() {
-    const { ctx, view } = this;
-    const stars = getStars();
-
-    ctx.font = FONTS.starLabel;
-    ctx.fillStyle = this.skyTheme.starLabelColor;
-    ctx.textBaseline = 'middle';
-
-    for (const star of stars) {
-      if (star.mag > 3 || !star.name) continue;
-
-      projectCached(star);
-      const c = toCanvas(star._px!, star._py!, view);
-
-      if (c.x < -50 || c.x > view.width + 50 || c.y < -50 || c.y > view.height + 50) {
-        continue;
-      }
-
-      const r = starRadius(star.mag, view.scale, this.skyTheme.brightZoomBoost);
-      ctx.fillText(star.name, c.x + r + 3, c.y);
-    }
-
-    ctx.textBaseline = 'alphabetic';
-  }
-
   /**
    * The DSOs to draw this frame. The selection logic, its position index and its
-   * per-frame cache live in ./dso-render-select (unit-tested); this binds the live
-   * view and display state. Single source of truth shared by renderDSOs,
-   * renderDSOLabels and isDSORendered, so drawing and hit-testing always agree.
+   * per-frame cache live in ./dso-render-select (unit-tested); this binds the display
+   * state. Single source of truth shared by the shape pass, the label pass and
+   * isDSORendered, so drawing and hit-testing always agree.
    */
-  private selectRenderedDSOs(): DSO[] {
+  private selectRenderedDSOs(view: ViewState = this.view): DSO[] {
     return this.dsoSelection.select({
-      view: this.view,
+      view,
       borderLatDeg: this.borderLatDeg,
       hemisphere: this.hemisphere,
       localSkyMode: this.localSkyMode,
@@ -1966,230 +1530,7 @@ export class SkyMap {
       visibleCatalogs: this.visibleDSOCatalogs,
       highlightedId: this.highlightedDSO,
       horizon: this.localSkyMode ? this.computeHorizonParams() : null,
-      priorityThreshold: this.dsoPriorityThreshold(),
+      priorityThreshold: this.dsoPriorityThreshold(view),
     });
-  }
-
-  private renderDSOs(horizon: { lstH: number; latDeg: number } | null) {
-    const { ctx, view } = this;
-
-    // Render the selected DSOs
-    for (const dso of this.selectRenderedDSOs()) {
-      projectCached(dso);
-      const c = toCanvas(dso._px!, dso._py!, view);
-
-      // Compute below-horizon state (and, as a side effect, _altDeg) before the size
-      // calc: in zenith ("local sky") mode, angular size must scale with altitude
-      // (the projection's pole), not dec — see dsoSizeCos2.
-      const isHighlighted = dso.id === this.highlightedDSO;
-      const isBelowHorizon = !!horizon && isBelowHorizonCached(dso, horizon.lstH, horizon.latDeg);
-
-      const majorArcmin = dso.majAxis ?? 1;
-      const minorArcmin = dso.minAxis ?? majorArcmin;
-      const cos2 = dsoSizeCos2(dso, this.localSkyMode ? dso._altDeg : undefined);
-      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale, cos2));
-      const ry = Math.max(2, angularSizeToCanvasPx(minorArcmin / 2, dso.dec, view.scale, cos2));
-      const angle = dsoCanvasAngle(dso, view.rotationDeg);
-
-      // Opacity based on magnitude
-      const mag = dso.mag ?? 10;
-      const opacity = Math.min(1, Math.max(0.3, 1 - (mag - 4) * 0.07));
-      // Below-horizon DSOs are dimmed (not hidden) in date mode, once a location is set.
-      // The highlighted DSO stays at full brightness regardless (it's actively selected).
-      const horizonMul = !isHighlighted && isBelowHorizon ? SkyMap.BELOW_HORIZON_ALPHA : 1;
-
-      ctx.save();
-      ctx.globalAlpha = opacity * this.skyOpacity * horizonMul;
-      ctx.translate(c.x, c.y);
-      ctx.rotate(angle);
-
-      drawDsoMarker(ctx, dso.type, rx, ry);
-
-      // Highlight indicator for searched DSO
-      if (isHighlighted) {
-        drawDsoHighlightRing(ctx, rx, ry);
-      }
-
-      ctx.restore();
-    }
-  }
-
-  /**
-   * Draws the Moon at its position for the current instant: real "now" in live mode
-   * (so the Moon toggle works even outside date mode), or the simulated date/time in
-   * date mode. Below-horizon dimming only applies in date mode with a location set —
-   * `horizon` is always null in live mode, so the Moon simply never dims there.
-   */
-  private renderMoon(horizon: { lstH: number; latDeg: number } | null) {
-    const { ctx, view } = this;
-    const date = this.skyTimeMode === 'live' ? new Date() : this.simDate;
-    const jd = dateToJD(date);
-    const { raDeg, decDeg } = moonRaDecDeg(jd);
-    const { phaseIndex } = moonPhase(jd);
-
-    // Computed once up front (rather than after sizing, as before) because in
-    // zenith ("local sky") mode the altitude both gates visibility and drives the
-    // apparent-size formula below — see dsoSizeCos2's doc comment for why altitude
-    // (not dec) is the correct colatitude input while the projection is zenith-centred.
-    const moonAltDeg = horizon
-      ? altAzFromRaDec(raDeg, decDeg, horizon.lstH, horizon.latDeg).altDeg
-      : null;
-
-    if (this.localSkyMode) {
-      // Below-horizon is already hidden by the horizon-circle canvas clip; this
-      // just skips the projection/size work for it earlier.
-      if (moonAltDeg !== null && moonAltDeg < 0) return;
-    } else if (!this.fisheyeMode) {
-      // Dec pre-filter, same convention as stars/DSOs (stereo only — fisheye clips via project()).
-      if (this.hemisphere === 'north' && decDeg < -(this.borderLatDeg + 2)) return;
-      if (this.hemisphere === 'south' && decDeg > +(this.borderLatDeg + 2)) return;
-    }
-
-    // The Moon's RA/Dec changes continuously, so it's projected directly (not via
-    // projectCached, which is keyed on the hemisphere/mode generation and would go stale).
-    const p = project(raDeg, decDeg);
-    if (p.x >= 1e5) return; // far hemisphere (fisheye) / below horizon (zenith fisheye)
-    const c = toCanvas(p.x, p.y, view);
-    if (c.x < -50 || c.x > view.width + 50 || c.y < -50 || c.y > view.height + 50) return;
-
-    const cos2 =
-      this.localSkyMode && moonAltDeg !== null
-        ? Math.cos(((90 - moonAltDeg) * DEG2RAD) / 2) ** 2
-        : undefined;
-    // 15 arcmin ≈ half the Moon's true ~30' diameter; floored so it reads as a disk
-    // (not a speck) at typical zoom levels, same floor pattern as DSO marker sizing.
-    const r = Math.max(7, angularSizeToCanvasPx(15, decDeg, view.scale, cos2));
-
-    const belowHorizon = moonAltDeg !== null && moonAltDeg < 0;
-
-    ctx.save();
-    ctx.globalAlpha = belowHorizon ? SkyMap.BELOW_HORIZON_ALPHA : 1;
-    drawMoonMarker(ctx, c.x, c.y, r, phaseIndex, {
-      litFill: this.skyTheme.moonLitColor,
-      shadowFill: this.skyTheme.moonShadowColor,
-      outline: this.skyTheme.moonOutlineColor,
-    });
-    ctx.restore();
-  }
-
-  private static readonly SUN_RADIUS_PX = 6;
-  private static readonly PLANET_RADIUS_PX = 3.5;
-
-  private planetLabelKey(planet: PlanetKey): string {
-    return `planets.${planet}`;
-  }
-
-  private planetColor(planet: PlanetKey): string {
-    const theme = this.skyTheme;
-    switch (planet) {
-      case 'mercury':
-        return theme.mercuryColor;
-      case 'venus':
-        return theme.venusColor;
-      case 'mars':
-        return theme.marsColor;
-      case 'jupiter':
-        return theme.jupiterColor;
-      case 'saturn':
-        return theme.saturnColor;
-      case 'uranus':
-        return theme.uranusColor;
-      case 'neptune':
-        return theme.neptuneColor;
-    }
-  }
-
-  /** Renders a single point-like body (Sun or planet): a colored dot plus a name label. */
-  private renderCelestialBody(
-    horizon: { lstH: number; latDeg: number } | null,
-    raDeg: number,
-    decDeg: number,
-    radiusPx: number,
-    fillColor: string,
-    label: string,
-  ) {
-    const { ctx, view } = this;
-    const altDeg = horizon
-      ? altAzFromRaDec(raDeg, decDeg, horizon.lstH, horizon.latDeg).altDeg
-      : null;
-
-    if (this.localSkyMode) {
-      if (altDeg !== null && altDeg < 0) return;
-    } else if (!this.fisheyeMode) {
-      if (this.hemisphere === 'north' && decDeg < -(this.borderLatDeg + 2)) return;
-      if (this.hemisphere === 'south' && decDeg > +(this.borderLatDeg + 2)) return;
-    }
-
-    const p = project(raDeg, decDeg);
-    if (p.x >= 1e5) return;
-    const c = toCanvas(p.x, p.y, view);
-    if (c.x < -50 || c.x > view.width + 50 || c.y < -50 || c.y > view.height + 50) return;
-
-    const belowHorizon = altDeg !== null && altDeg < 0;
-
-    ctx.save();
-    ctx.globalAlpha = belowHorizon ? SkyMap.BELOW_HORIZON_ALPHA : 1;
-    drawBodyMarker(ctx, c.x, c.y, radiusPx, fillColor, this.skyTheme.bodyOutlineColor);
-    drawBodyLabel(ctx, c.x, c.y, radiusPx, label, this.skyTheme.bodyLabelColor, FONTS.bodyLabel);
-    ctx.restore();
-  }
-
-  private renderSun(horizon: { lstH: number; latDeg: number } | null) {
-    const date = this.skyTimeMode === 'live' ? new Date() : this.simDate;
-    const jd = dateToJD(date);
-    const { raDeg, decDeg } = sunRaDecDeg(jd);
-    this.renderCelestialBody(
-      horizon,
-      raDeg,
-      decDeg,
-      SkyMap.SUN_RADIUS_PX,
-      this.skyTheme.sunColor,
-      t('planets.sun'),
-    );
-  }
-
-  private renderPlanets(horizon: { lstH: number; latDeg: number } | null) {
-    const date = this.skyTimeMode === 'live' ? new Date() : this.simDate;
-    const jd = dateToJD(date);
-    for (const planet of PLANET_KEYS) {
-      const { raDeg, decDeg } = planetRaDecDeg(jd, planet);
-      this.renderCelestialBody(
-        horizon,
-        raDeg,
-        decDeg,
-        SkyMap.PLANET_RADIUS_PX,
-        this.planetColor(planet),
-        t(this.planetLabelKey(planet)),
-      );
-    }
-  }
-
-  private renderDSOLabels() {
-    const { ctx, view } = this;
-    ctx.textBaseline = 'middle';
-
-    // Render labels for exactly the DSOs drawn this frame (shared selection).
-    // In zenith mode, _altDeg is already fresh here — renderDSOs (or
-    // selectRenderedDSOs' own pre-filter) already ran isBelowHorizonCached on
-    // every one of these DSOs earlier in this same render pass.
-    for (const dso of this.selectRenderedDSOs()) {
-      const majorArcmin = dso.majAxis ?? 1;
-      const rx = angularSizeToCanvasPx(
-        majorArcmin / 2,
-        dso.dec,
-        view.scale,
-        dsoSizeCos2(dso, this.localSkyMode ? dso._altDeg : undefined),
-      );
-      if (!dsoLabelVisible(dso, rx, view)) continue;
-
-      projectCached(dso);
-      const c = toCanvas(dso._px!, dso._py!, view);
-
-      ctx.font = FONTS.dsoLabel;
-      ctx.fillStyle = DSO_LABEL_COLORS[dso.type] ?? DEFAULT_DSO_LABEL_COLOR;
-      ctx.fillText(formatDsoLabel(dso), c.x + Math.max(2, rx) + 2, c.y);
-    }
-
-    ctx.textBaseline = 'alphabetic';
   }
 }

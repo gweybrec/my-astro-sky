@@ -4,7 +4,14 @@
 
 ## Frontend (`src/`)
 
-- **Canvas layer** (`sky-map.ts`): Renders ~5000 stars with B-V color, 12,000+ DSOs with type-specific styling, constellation lines/names, RA/Dec grid. Handles zoom (wheel) and pan (drag). Fires `onViewChange` callback on every view update for photo transform recomputation.
+- **Canvas layer** (`sky-map.ts`): Renders ~5000 stars with B-V color, 12,000+ DSOs with type-specific styling, constellation lines/names, RA/Dec grid. Handles zoom (wheel) and pan (drag). Fires `onViewChange` callback on every view update for photo transform recomputation. `SkyMap` itself is a thin shell — it owns the view, the display settings and the `render()` orchestrator, and delegates everything else to focused modules:
+  - `sky-map-types.ts` — frame/callback types, imported by anything that needs the shapes without the canvas class.
+  - `sky-scene.ts` — the per-frame render context (`SkyScene`). `SkyMap.buildScene()` gathers everything the draw passes read, so an off-screen export is just a scene with a different `ctx`/`view`/layer flags instead of a temporary mutation of the live map.
+  - `sky-scene-render.ts` / `sky-frame-render.ts` — the draw passes (stars, DSOs, labels, Moon/Sun/planets; frames, photo outlines, terrain, cardinals, region polygons).
+  - `sky-map-events.ts` — pointer/keyboard routing and the pan state, with the gesture precedence rules.
+  - `frame-controller.ts` — the interactive FOV-frame state machine (drag, pin, snap, merge, resize).
+  - `sky-hit-test.ts` — star/DSO hover indexes and the `findClosest*` queries.
+  - `dso-render-select.ts`, `star-budget.ts`, `star-sprite-atlas.ts`, `hover-resolve.ts`, `sky-region-draw.ts` — density gating, the sprite atlas rebuild policy, tooltip resolution, and the freehand region gesture.
 - **Photo layer** (`photo-overlay.ts`): Each photo is an `<img>` with absolute positioning and CSS matrix transform. On view change, all photo transforms are recomputed so they track the canvas. LOD: when a photo's rendered pixel width (derived from the affine matrix scale × `photo.width`) is below 300 px and a server thumbnail exists, `img.src` is swapped to `/uploads/{thumbFilename}`; swapped back to the full-res URL when the photo renders larger. `photo.width` (authoritative DB value) is always used for matrix math — never `imgEl.naturalWidth` — so LOD swaps do not disturb hit-testing or transform accuracy. Manages:
   - `openManualIdentifyModal()` — the manual star-identification sub-modal launched per-card from the batch upload flow (user clicks photo pixel → searches for matching star / enters RA-Dec / picks on map; "Validate" enabled at 2+ identified points). No solve buttons or metadata — those live in the batch card. Resolves with correspondences, a free-drag hand-off, or cancel.
   - Manual placement mode (`openManualPlacement()`: drag photo, rotate/zoom sliders, mirror X/Y toggles)
@@ -201,7 +208,7 @@ Blob URLs are revoked when a card is removed (trash button) and when the modal c
 
 ### DSO render selection (priority + spread + container gating)
 
-When the viewport holds more DSOs than the render budget (`maxDSOCount`, the "display few/many objects" setting), the map must choose which to draw. `SkyMap.selectRenderedDSOs()` (`src/sky-map.ts`) is the **single source of truth** for that choice, consumed by all three places that need it — `renderDSOs()` (shapes), `renderDSOLabels()` (labels), and `isDSORendered()` (hover/click hit-test gating). Keeping one selection guarantees drawing and hit-testing always agree (previously three copies of the logic could drift).
+When the viewport holds more DSOs than the render budget (`maxDSOCount`, the "display few/many objects" setting), the map must choose which to draw. `DsoRenderSelection.select()` (`src/dso-render-select.ts`, unit-tested) is the **single source of truth** for that choice, reached via `SkyMap.selectRenderedDSOs()` and consumed by all three places that need it — `renderDSOs()` (shapes), `renderDSOLabels()` (labels), and `isDSORendered()` (hover/click hit-test gating). Keeping one selection guarantees drawing and hit-testing always agree (previously three copies of the logic could drift). The class also owns the all-DSO position index used for the viewport cull and the per-frame cache, which `render()` invalidates at the top of each pass.
 
 The selection is:
 

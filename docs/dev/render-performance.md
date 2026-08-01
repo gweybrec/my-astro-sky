@@ -1,6 +1,6 @@
 # Canvas Render Performance
 
-How the sky-map render loop (`src/sky-map.ts`) was profiled and sped up, written as a set of **transferable techniques** rather than a changelog. The map redraws the whole sky on every pan/zoom frame — 10k+ stars and 12k+ DSOs projected and drawn to a 2D canvas — so the per-frame `render()` path is the hot path and the rules below apply to any per-frame canvas loop.
+How the sky-map render loop (`src/sky-map.ts` and the draw passes it orchestrates in `src/sky-scene-render.ts` / `src/sky-frame-render.ts`) was profiled and sped up, written as a set of **transferable techniques** rather than a changelog. The map redraws the whole sky on every pan/zoom frame — 10k+ stars and 12k+ DSOs projected and drawn to a 2D canvas — so the per-frame `render()` path is the hot path and the rules below apply to any per-frame canvas loop.
 
 The worked example cut pan frame time ~45% (64 ms → 35 ms median) and zoom frame time ~3.5× (84 ms → 24 ms median) at above-average star/DSO density, with no visible change to the output.
 
@@ -205,8 +205,8 @@ this and _looked_ like a 6914× win; a second benchmark with points spread over 
 sphere (matching the real projection) showed the clamp doing nothing. **If a fix's benchmark
 doesn't reproduce the real data distribution, it isn't measuring the fix.**
 
-**The real fix — cap the radius at the drawable region** (`sky-map.ts`,
-`selectRenderedDSOs`). Every DSO that can actually be drawn lies within the border radius of
+**The real fix — cap the radius at the drawable region** (`dso-render-select.ts`,
+`DsoRenderSelection.select`). Every DSO that can actually be drawn lies within the border radius of
 the projection _origin_: anything past it is unconditionally culled by the dec pre-filter
 (and projects far away anyway). By the triangle inequality, all drawable objects sit within
 `hypot(viewCentre) + borderRadiusPU(borderLatDeg + 2)` of the query centre, so
