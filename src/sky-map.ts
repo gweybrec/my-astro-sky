@@ -21,7 +21,6 @@ import {
   fromCanvas,
   unproject,
   setHemisphere,
-  getHemisphere,
   fitScaleForBorderCircle,
   borderRadiusPU,
   isInsideBorderCircle,
@@ -43,8 +42,7 @@ import {
 import { altAzFromRaDec, raDecFromAltAz } from './sky-geometry';
 import { drawMoonMarker } from './moon-draw';
 import { drawBodyMarker, drawBodyLabel } from './body-draw';
-import { clampSmartMosaicSize } from './mosaic';
-import { getStars, getStarMagsSorted, loadConstellationStyle, normalizeRA } from './star-catalog';
+import { getStars, getStarMagsSorted, loadConstellationStyle } from './star-catalog';
 import { getDSOs } from './dso-catalog';
 import { targetRenderCount, DSO_DENSITY_K, MIN_BUDGET_MULT } from './render-budget';
 import {
@@ -53,15 +51,6 @@ import {
   starMagThreshold,
   type StarAreaBudget,
 } from './star-budget';
-import { frameTargetDso } from './fov-frame-target';
-import {
-  isNearPolygonBorder,
-  isNearHandle,
-  rotateHandlePos,
-  canvasRotationDegFromCursor,
-  resizeFromCorner,
-} from './fov-frame-geometry';
-import { computeFovTargetScale } from './gear-presets';
 import { SKY_THEME } from './sky-themes';
 import { computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint } from './star-render-math';
 import { paintStar, buildStarSprite } from './star-draw';
@@ -74,18 +63,7 @@ import {
   findTopPhotoOutlineAtPoint,
   type PhotoOutline,
 } from './photo-outline';
-import {
-  computeFovFrameCorners,
-  frameAnchorCanvas,
-  canvasRotDegToPa,
-  frameCanvasRotationDeg,
-  frameGeometry,
-  mosaicOutlinePath,
-  frameHandlesVisible,
-  framePinGlyphPos,
-  type FrameGeometry,
-} from './frame-geometry';
-import { findMergeTarget, resizeRegionFromDraft, type ResizeDraft } from './frame-interaction';
+import { computeFovFrameCorners } from './frame-geometry';
 import { canvasPxPerDeg, isSkyPointVisible } from './sky-axes';
 import {
   easeInOutCubic,
@@ -95,6 +73,7 @@ import {
 } from './sky-view-math';
 import { resolveHover } from './hover-resolve';
 import { RegionDrawGesture } from './sky-region-draw';
+import { FrameController } from './frame-controller';
 import { SkyHitTest, isStarRendered, type DsoIndexFilters } from './sky-hit-test';
 import { DsoRenderSelection } from './dso-render-select';
 import {
@@ -111,7 +90,6 @@ import {
   drawAzimuthGrid,
   drawTileTrash,
   drawTileAdd,
-  TILE_TRASH_R,
 } from './sky-draw';
 import {
   FONTS,
@@ -260,26 +238,10 @@ export class SkyMap {
   private fovFrameSpecs: FovFrameSpec[] = [];
   private fovRotationDeg = 0;
 
-  // Interactive frame instances (independent anchor + rotation, single active).
-  private fovInstances: RenderableFrame[] = [];
-  private onFovInstanceSelect: ((id: string | null) => void) | null = null;
-  private onFovInstanceChange: ((id: string, change: FovFrameChange) => void) | null = null;
-  private frameDrag: { id: string; mode: 'move' | 'rotate' | 'resize'; corner?: number } | null =
-    null;
-  // Transient rubber-band rectangle shown while a resize drag is in progress.
-  private resizeDraft: ResizeDraft | null = null;
-  // DSO the active move-drag will snap to on release; drives the elastic overlay.
-  private snapCandidate: { id: string; ra: number; dec: number; majAxis: number } | null = null;
-  // In-flight snap-back animation after a release within range (requestAnimationFrame handle).
-  private snapAnim: { id: string; raf: number } | null = null;
-  private onFovFrameResize: ((id: string, region: FovFrameResizeRegion) => void) | null = null;
-  // Per-tile delete: clicking a tile's trash button on the selected mosaic.
-  private onMosaicTileRemove: ((tileId: string) => void) | null = null;
-  // Add-tile: sky positions of the "+" spots around the selected mosaic.
-  private mosaicAddCandidates: Array<{ ra: number; dec: number }> = [];
-  private onMosaicTileAdd: ((ra: number, dec: number) => void) | null = null;
-  // Merge: a standalone frame dropped onto another frame/mosaic of the same plan.
-  private onFrameMerge: ((movedId: string, targetId: string) => void) | null = null;
+  // Interactive frame instances and the whole drag/pin/snap/merge/resize state
+  // machine. See ./frame-controller (unit-tested against a stub host). Built in the
+  // constructor because its host reads live state off this instance.
+  private frames: FrameController;
 
   // Freehand sky-region drawing (Local Sky / zenith view only, see enterRegionDrawMode).
   // The gesture's state machine lives in ./sky-region-draw (unit-tested).
@@ -363,6 +325,25 @@ export class SkyMap {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.view = { centerX: 0, centerY: 0, scale: 0, rotationDeg: 0, width: 0, height: 0 };
+    const map = this;
+    this.frames = new FrameController({
+      // Getters, not a snapshot: the controller must always see the live view and
+      // interaction flags, which change under it between frames.
+      get view() {
+        return map.view;
+      },
+      get interactionEnabled() {
+        return map.interactionEnabled;
+      },
+      get pickingMode() {
+        return map.pickingMode;
+      },
+      findClosestDSO: (mx, my) => map.findClosestDSO(mx, my),
+      dsosInFrame: (f) => map.dsosInFrame(f),
+      requestRenderInteractive: () => map.requestRenderInteractive(),
+      render: () => map.render(),
+      navigateTo: (ra, dec, scale, animate) => map.navigateTo(ra, dec, scale, animate),
+    });
     this.setupEvents();
     this.resize();
   }
@@ -632,36 +613,71 @@ export class SkyMap {
     this.requestRender();
   }
 
+  // ── Interactive frames ────────────────────────────────────────────────────
+  // Thin delegations onto FrameController, which owns all the frame state.
+
   /** Replace the interactive frame instances and re-render. */
   setFovInstances(frames: RenderableFrame[]) {
-    this.fovInstances = frames;
+    this.frames.setFrames(frames);
     this.requestRender();
   }
   /** Current interactive frame instances (for save/restore around off-screen renders). */
   getFovInstances(): RenderableFrame[] {
-    return this.fovInstances;
+    return this.frames.frames;
   }
   setOnFovInstanceSelect(cb: (id: string | null) => void) {
-    this.onFovInstanceSelect = cb;
+    this.frames.setOnSelect(cb);
   }
   setOnFovInstanceChange(cb: (id: string, change: FovFrameChange) => void) {
-    this.onFovInstanceChange = cb;
+    this.frames.setOnChange(cb);
   }
   setOnFovFrameResize(cb: (id: string, region: FovFrameResizeRegion) => void) {
-    this.onFovFrameResize = cb;
+    this.frames.setOnResize(cb);
   }
   setOnMosaicTileRemove(cb: (tileId: string) => void) {
-    this.onMosaicTileRemove = cb;
+    this.frames.setOnTileRemove(cb);
   }
   setOnMosaicTileAdd(cb: (ra: number, dec: number) => void) {
-    this.onMosaicTileAdd = cb;
+    this.frames.setOnTileAdd(cb);
   }
   setMosaicAddCandidates(c: Array<{ ra: number; dec: number }>) {
-    this.mosaicAddCandidates = c;
+    this.frames.setMosaicAddCandidates(c);
     this.requestRender();
   }
   setOnFrameMerge(cb: (movedId: string, targetId: string) => void) {
-    this.onFrameMerge = cb;
+    this.frames.setOnMerge(cb);
+  }
+
+  /** Toggle the pin state of a frame by id (used by the frame-manager popup). */
+  toggleFramePinById(id: string): void {
+    this.frames.toggleFramePinById(id);
+  }
+  /** Pin the currently-active frame if it is still floating. */
+  pinActiveIfFloating(): void {
+    this.frames.pinActiveIfFloating();
+  }
+  /** Change the active frame, auto-pinning the previously-active floating one. */
+  selectFrame(id: string | null): void {
+    this.frames.selectFrame(id);
+  }
+  /** Pin every floating frame to its exact current sky position (no DSO snap). */
+  pinAllFloatingFrames(): void {
+    this.frames.pinAllFloatingFrames();
+  }
+  /** Re-run anchor detection on a pinned frame and snap it to the nearest DSO. */
+  resnapFrame(id: string): void {
+    this.frames.resnapFrame(id);
+  }
+  /** Bring the given frame to the centre of the view. */
+  centerFrameInView(id: string): void {
+    this.frames.centerFrameInView(id);
+  }
+
+  /** Sky coordinates (degrees) at the centre of the current viewport — used to
+   * spawn a new frame on the visible sky. */
+  viewCenterSky(): { ra: number; dec: number } {
+    const proj = fromCanvas(this.view.width / 2, this.view.height / 2, this.view);
+    return unproject(proj.x, proj.y);
   }
   setOnPhotoClick(cb: (photoName: string) => void) {
     this.onPhotoClick = cb;
@@ -1104,7 +1120,7 @@ export class SkyMap {
           return; // region drawing consumed the press — no pan
         }
         const rectF = this.canvas.getBoundingClientRect();
-        if (this.handleFrameMouseDown(e.clientX - rectF.left, e.clientY - rectF.top)) {
+        if (this.frames.handleMouseDown(e.clientX - rectF.left, e.clientY - rectF.top)) {
           // A frame grab can start right over a DSO/star (e.g. the centre move
           // dot sits on the DSO inside the frame), so hide any hover tooltip.
           this.dismissTooltip();
@@ -1145,9 +1161,9 @@ export class SkyMap {
         }
         return;
       }
-      if (this.frameDrag) {
+      if (this.frames.activeDrag) {
         const rect = this.canvas.getBoundingClientRect();
-        this.handleFrameDragMove(e.clientX - rect.left, e.clientY - rect.top);
+        this.frames.handleDragMove(e.clientX - rect.left, e.clientY - rect.top);
         return;
       }
       if (this.isPanning) {
@@ -1194,19 +1210,8 @@ export class SkyMap {
         this.finishRegionDraw(!this.regionDraw.capturing);
         return;
       }
-      if (this.frameDrag) {
-        const drag = this.frameDrag;
-        this.frameDrag = null;
-        const snap = this.snapCandidate;
-        this.snapCandidate = null;
-        if (drag.mode === 'resize') this.finalizeResize(drag.id);
-        else if (drag.mode === 'move') {
-          // Release within snap range: spring the frame to the DSO centre.
-          if (snap) this.animateSnapToDso(drag.id, snap);
-          // A standalone frame dropped onto another frame/mosaic of the same plan merges.
-          else if (drag.id.startsWith('plan:')) this.checkFrameMerge(drag.id);
-        }
-        this.render();
+      if (this.frames.activeDrag) {
+        this.frames.handleMouseUp();
         return;
       }
       if (this.isPanning) {
@@ -1260,13 +1265,11 @@ export class SkyMap {
         this.finishRegionDraw(true);
       } else if (this.pickingMode) {
         this.exitPickingMode();
-      } else if (this.fovInstances.some((f) => f.active)) {
+      } else if (this.frames.hasActiveFrame()) {
         // Abandon any in-progress snap drag/animation so deselecting can't leave
         // a dangling elastic overlay or running rAF.
-        this.frameDrag = null;
-        this.snapCandidate = null;
-        this.cancelSnapAnim();
-        this.selectFrame(null);
+        this.frames.clearInteraction();
+        this.frames.selectFrame(null);
         this.render();
       }
     }) as EventListener);
@@ -1274,7 +1277,7 @@ export class SkyMap {
 
   destroy() {
     this.cancelAnimation();
-    this.cancelSnapAnim();
+    this.frames.cancelSnapAnim();
     if (this._renderRaf !== null) {
       cancelAnimationFrame(this._renderRaf);
       this._renderRaf = null;
@@ -1322,7 +1325,7 @@ export class SkyMap {
     if (!this.showDSOs) return [];
     const maxMag = computeMaxMag(this.view.scale) + 4;
     return this.hitTest.dsosInFrame(
-      this.frameGeometry(f),
+      this.frames.frameGeometry(f),
       this.view,
       maxMag,
       this.dsoIndexFilters(),
@@ -1585,7 +1588,7 @@ export class SkyMap {
       if (this.fovFrameSpecs.length > 0) {
         this.renderFovFrames();
       }
-      if (this.fovInstances.length > 0) {
+      if (this.frames.frames.length > 0) {
         this.renderFovInstances();
       }
     }
@@ -1633,7 +1636,7 @@ export class SkyMap {
     oc.clearRect(0, 0, width, height);
 
     const horizon = this.skyTimeMode === 'date' ? this.computeHorizonParams() : null;
-    const hasFrames = this.fovFrameSpecs.length > 0 || this.fovInstances.length > 0;
+    const hasFrames = this.fovFrameSpecs.length > 0 || this.frames.frames.length > 0;
     const hasRegionDraw = this.regionDraw.active && this.regionDraw.capturedPoints.length > 0;
     const hasRegionOverlay = this.activeRegionOverlay !== null && this.localSkyMode;
     if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay) return;
@@ -1657,7 +1660,7 @@ export class SkyMap {
     const mainCtx = this.ctx;
     this.ctx = oc;
     if (this.fovFrameSpecs.length > 0) this.renderFovFrames();
-    if (this.fovInstances.length > 0) this.renderFovInstances();
+    if (this.frames.frames.length > 0) this.renderFovInstances();
     this.ctx = mainCtx;
 
     if (hasRegionOverlay) this.renderRegionOverlay(oc);
@@ -1791,30 +1794,6 @@ export class SkyMap {
     }
   }
 
-  // ── Interactive frame instances ────────────────────────────────────────────
-
-  // ── Frame canvas geometry ────────────────────────────────────────────────
-  // The maths lives in ./frame-geometry (pure, unit-tested); these thin wrappers
-  // bind the live `this.view` so the many call sites below stay unchanged.
-  private frameAnchorCanvas(f: RenderableFrame): { cx: number; cy: number } {
-    return frameAnchorCanvas(f, this.view);
-  }
-  private canvasRotDegToPa(rotDeg: number, raDeg: number, decDeg: number): number {
-    return canvasRotDegToPa(rotDeg, raDeg, decDeg, this.view);
-  }
-  private frameCanvasRotationDeg(f: RenderableFrame): number {
-    return frameCanvasRotationDeg(f, this.view);
-  }
-  private frameGeometry(f: RenderableFrame): FrameGeometry {
-    return frameGeometry(f, this.view);
-  }
-  private mosaicOutlinePath(f: RenderableFrame): Point[] | null {
-    return mosaicOutlinePath(f, this.view);
-  }
-  private frameHandlesVisible(halfW: number, halfH: number): boolean {
-    return frameHandlesVisible(halfW, halfH);
-  }
-
   private renderFovInstances() {
     const { ctx } = this;
     const cs = getComputedStyle(this.canvas);
@@ -1823,17 +1802,17 @@ export class SkyMap {
     const activeColor = cs.getPropertyValue('--accent-color').trim() || labelColor;
     const dangerColor = cs.getPropertyValue('--color-danger').trim() || FRAME.dangerFallback;
     // The selected mosaic's tiles each get a delete button (per-tile editing).
-    const activeMosaicId = this.fovInstances
+    const activeMosaicId = this.frames.frames
       .find((f) => f.active && f.isMosaicOutline)
       ?.id.split(':')[2];
 
-    for (const f of this.fovInstances) {
+    for (const f of this.frames.frames) {
       if (f.visible === false) continue; // hidden via the manager checkbox
       // Off-projection (below the Local Sky horizon, or the far hemisphere in fisheye):
       // project() returns a sentinel there, so the frame would be painted far off-canvas
       // with zero extents and degenerate handles. Skip it outright.
       if (f.anchorKind === 'sky' && !isSkyPointVisible(f.ra ?? 0, f.dec ?? 0)) continue;
-      const { corners, cx, cy, rotDeg, halfW, halfH } = this.frameGeometry(f);
+      const { corners, cx, cy, rotDeg, halfW, halfH } = this.frames.frameGeometry(f);
       const isActive = f.active;
       const isTile = !!f.mosaicId; // a faint mosaic panel (the outline frame draws the rest)
 
@@ -1844,7 +1823,7 @@ export class SkyMap {
       ctx.setLineDash(FRAME.dashOutline);
       // A mosaic outline traces its tile perimeter (follows projection curvature);
       // every other frame is its 4-corner rectangle.
-      const outline = f.isMosaicOutline ? (this.mosaicOutlinePath(f) ?? corners) : corners;
+      const outline = f.isMosaicOutline ? (this.frames.mosaicOutlinePath(f) ?? corners) : corners;
       drawFramePolyline(ctx, outline);
 
       if (isTile) {
@@ -1852,7 +1831,7 @@ export class SkyMap {
         if (
           f.mosaicId === activeMosaicId &&
           f.mosaicIsBorderTile &&
-          this.tileTrashVisible(halfW, halfH)
+          this.frames.tileTrashVisible(halfW, halfH)
         ) {
           ctx.globalAlpha = 1;
           drawTileTrash(ctx, { x: cx, y: cy }, dangerColor);
@@ -1872,7 +1851,7 @@ export class SkyMap {
 
       // Handles on the active frame only (so other frames stay locked), and only
       // while the frame is large enough that the centre dot isn't near the edges.
-      if (isActive && this.frameHandlesVisible(halfW, halfH)) {
+      if (isActive && this.frames.frameHandlesVisible(halfW, halfH)) {
         drawFrameHandles(
           ctx,
           { corners, cx, cy, rotDeg, halfH },
@@ -1883,15 +1862,15 @@ export class SkyMap {
             anchorSky: f.anchorKind === 'sky',
           },
           activeColor,
-          this.framePinGlyphPos(corners[1], rotDeg),
+          this.frames.framePinGlyphPos(corners[1], rotDeg),
         );
       }
       ctx.restore();
     }
 
     // Rubber-band preview of a drag-to-extend in progress.
-    if (this.resizeDraft) {
-      const d = this.resizeDraft;
+    if (this.frames.resizeDraft) {
+      const d = this.frames.resizeDraft;
       drawResizeDraftRect(
         ctx,
         computeFovFrameCorners(d.halfW, d.halfH, d.cx, d.cy, d.rotDeg),
@@ -1903,11 +1882,11 @@ export class SkyMap {
     // from the frame centre (cursor) to the pending DSO's centre. It tightens
     // (brighter + thicker) as the frame nears the break threshold, signalling the
     // snap-back that fires on release; it vanishes when the elastic "breaks".
-    if (this.snapCandidate && this.frameDrag?.mode === 'move') {
-      const f = this.fovInstances.find((x) => x.id === this.frameDrag!.id);
+    if (this.frames.snapCandidate && this.frames.activeDrag?.mode === 'move') {
+      const f = this.frames.frames.find((x) => x.id === this.frames.activeDrag!.id);
       if (f) {
-        const snap = this.snapCandidate;
-        const { cx, cy } = this.frameAnchorCanvas(f);
+        const snap = this.frames.snapCandidate;
+        const { cx, cy } = this.frames.frameAnchorCanvas(f);
         const dp = project(snap.ra, snap.dec);
         const dc = toCanvas(dp.x, dp.y, this.view);
         // Break radius mirrors findClosestDSO: the rendered ellipse, floored at 20px.
@@ -1921,470 +1900,13 @@ export class SkyMap {
     // Add ("+") buttons at the empty neighbour cells of the selected mosaic.
     if (
       activeMosaicId &&
-      this.mosaicAddCandidates.length &&
-      this.mosaicEditButtonsVisible(activeMosaicId)
+      this.frames.mosaicAddCandidates.length &&
+      this.frames.mosaicEditButtonsVisible(activeMosaicId)
     ) {
-      const avoid = this.activeOutlineRotateAvoid();
-      for (const c of this.mosaicAddCandidates)
-        drawTileAdd(ctx, this.candidateCanvasPoint(c, avoid), activeColor);
+      const avoid = this.frames.activeOutlineRotateAvoid();
+      for (const c of this.frames.mosaicAddCandidates)
+        drawTileAdd(ctx, this.frames.candidateCanvasPoint(c, avoid), activeColor);
     }
-  }
-
-  /** Pin glyph position: the top-right corner lifted outward (local "up") so the
-   * icon sits just above the frame with a small margin. */
-  private framePinGlyphPos(corner: Point, rotDeg: number): Point {
-    return framePinGlyphPos(corner, rotDeg);
-  }
-
-  /** Whether a tile is large enough to host its delete/add button. */
-  private tileTrashVisible(halfW: number, halfH: number): boolean {
-    return Math.min(halfW, halfH) >= 16; // only on tiles big enough that the icon fits
-  }
-
-  /** Whether the selected mosaic's tiles are large enough to host their edit
-   * buttons (delete / add), and the canvas point of an add candidate. */
-  private mosaicEditButtonsVisible(mosaicId: string): boolean {
-    const t = this.fovInstances.find((f) => f.mosaicId === mosaicId);
-    if (!t) return false;
-    const g = this.frameGeometry(t);
-    return this.tileTrashVisible(g.halfW, g.halfH);
-  }
-
-  /** The selected mosaic outline's rotate-handle position + centre, so add ("+")
-   * buttons can be nudged clear of the rotation needle. Null when not applicable. */
-  private activeOutlineRotateAvoid(): { handle: Point; center: Point } | null {
-    const outline = this.fovInstances.find((f) => f.active && f.isMosaicOutline);
-    if (!outline) return null;
-    const geo = this.frameGeometry(outline);
-    if (!this.frameHandlesVisible(geo.halfW, geo.halfH)) return null;
-    return {
-      handle: rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24),
-      center: { x: geo.cx, y: geo.cy },
-    };
-  }
-
-  /** Canvas point of an add candidate. If it would sit on the rotate needle, push
-   * it outward (away from the mosaic centre) past the handle so it stays clickable. */
-  private candidateCanvasPoint(
-    c: { ra: number; dec: number },
-    avoid?: { handle: Point; center: Point } | null,
-  ): Point {
-    const p = project(c.ra, c.dec);
-    let pt = toCanvas(p.x, p.y, this.view);
-    if (avoid && Math.hypot(pt.x - avoid.handle.x, pt.y - avoid.handle.y) < TILE_TRASH_R * 2 + 4) {
-      const dx = pt.x - avoid.center.x,
-        dy = pt.y - avoid.center.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const newDist =
-        Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) +
-        TILE_TRASH_R +
-        14;
-      pt = { x: avoid.center.x + (dx / len) * newDist, y: avoid.center.y + (dy / len) * newDist };
-    }
-    return pt;
-  }
-
-  /** Hit-test the active/instance frames on mousedown. Returns true if the event was consumed (no pan). */
-  private handleFrameMouseDown(mx: number, my: number): boolean {
-    if (!this.interactionEnabled || this.pickingMode || this.fovInstances.length === 0)
-      return false;
-
-    const active = this.fovInstances.find((f) => f.active);
-    if (active && active.visible !== false) {
-      const geo = this.frameGeometry(active);
-      const handlesVisible = this.frameHandlesVisible(geo.halfW, geo.halfH);
-      if (handlesVisible) {
-        const rh = rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24);
-        if (isNearHandle(mx, my, rh, 9)) {
-          this.frameDrag = { id: active.id, mode: 'rotate' };
-          return true;
-        }
-        if (active.pinnable) {
-          const pinPos = this.framePinGlyphPos(geo.corners[1], geo.rotDeg);
-          if (isNearHandle(mx, my, pinPos, 10)) {
-            this.toggleFramePin(active);
-            return true;
-          }
-        }
-        // Corner resize handles (drag-to-extend into a mosaic) take priority over
-        // the centre move dot and border move.
-        if (active.resizable) {
-          for (let i = 0; i < geo.corners.length; i++) {
-            if (isNearHandle(mx, my, geo.corners[i], 9)) {
-              this.frameDrag = { id: active.id, mode: 'resize', corner: i };
-              return true;
-            }
-          }
-        }
-        if (active.movable && isNearHandle(mx, my, { x: geo.cx, y: geo.cy }, 9)) {
-          this.frameDrag = { id: active.id, mode: 'move' };
-          return true;
-        }
-      }
-      // Dragging the border moves the active frame at any size.
-      if (active.movable && isNearPolygonBorder(mx, my, geo.corners, 6)) {
-        this.frameDrag = { id: active.id, mode: 'move' };
-        return true;
-      }
-      // Per-tile editing: the selected mosaic shows a delete button on each tile
-      // and an add ("+") button at each empty neighbour cell.
-      if (active.isMosaicOutline) {
-        const mosaicId = active.id.split(':')[2];
-        if (this.mosaicEditButtonsVisible(mosaicId)) {
-          const avoid = this.activeOutlineRotateAvoid();
-          for (const c of this.mosaicAddCandidates) {
-            if (isNearHandle(mx, my, this.candidateCanvasPoint(c, avoid), TILE_TRASH_R)) {
-              this.onMosaicTileAdd?.(c.ra, c.dec);
-              return true;
-            }
-          }
-          for (const t of this.fovInstances) {
-            if (t.mosaicId !== mosaicId || !t.mosaicIsBorderTile) continue;
-            const tg = this.frameGeometry(t);
-            if (isNearHandle(mx, my, { x: tg.cx, y: tg.cy }, TILE_TRASH_R)) {
-              this.onMosaicTileRemove?.(t.id);
-              return true;
-            }
-          }
-        }
-      }
-    }
-
-    // Select a frame by clicking anywhere inside it (topmost first). Mosaic tiles
-    // (mosaicId set) aren't selectable — the mosaic's outline frame is.
-    for (let i = this.fovInstances.length - 1; i >= 0; i--) {
-      const f = this.fovInstances[i];
-      if (f.active || f.visible === false || f.mosaicId) continue;
-      const geo = this.frameGeometry(f);
-      if (pointInConvexPolygon(mx, my, geo.corners)) {
-        this.selectFrame(f.id);
-        return true;
-      }
-    }
-
-    // Clicked the interior / empty space: let the map pan. The active frame
-    // stays selected (deselect explicitly via the popup or the Escape key) so
-    // panning the sky under a floating frame never loses the selection.
-    return false;
-  }
-
-  /** Toggle the pin state of a frame by id (used by the frame-manager popup). */
-  toggleFramePinById(id: string): void {
-    const f = this.fovInstances.find((x) => x.id === id);
-    if (f && f.pinnable) this.toggleFramePin(f);
-  }
-
-  /** Sky coordinates (degrees) at the centre of the current viewport — used to
-   * spawn a new frame on the visible sky. */
-  viewCenterSky(): { ra: number; dec: number } {
-    const proj = fromCanvas(this.view.width / 2, this.view.height / 2, this.view);
-    return unproject(proj.x, proj.y);
-  }
-
-  /** Pin the currently-active frame if it is still floating (used when the
-   * selection changes — only the selected frame stays free to move). */
-  pinActiveIfFloating(): void {
-    const active = this.fovInstances.find((f) => f.active);
-    if (active && active.pinnable && active.anchorKind === 'screen') this.toggleFramePin(active);
-  }
-
-  /** Change the active frame, auto-pinning the previously-active floating one. */
-  selectFrame(id: string | null): void {
-    this.pinActiveIfFloating();
-    this.onFovInstanceSelect?.(id);
-  }
-
-  /**
-   * Toggle a movable frame between floating (screen) and pinned (sky) at its
-   * current centre. The on-screen orientation is preserved across the switch by
-   * converting the rotation value (screen rotation ↔ position angle), so pinning
-   * never appears to rotate the frame — it only changes the anchor.
-   */
-  private toggleFramePin(f: RenderableFrame): void {
-    if (!f.pinnable) return;
-    if (f.anchorKind === 'sky') {
-      const { cx, cy } = this.frameAnchorCanvas(f);
-      const canvasRotDeg = this.frameCanvasRotationDeg(f);
-      // Pinned → floating: the canvas rotation becomes the screen rotation as-is.
-      this.onFovInstanceChange?.(f.id, {
-        anchor: { kind: 'screen', nx: cx / this.view.width, ny: cy / this.view.height },
-        screenRotationDeg: normalizeRotationDeg(canvasRotDeg),
-      });
-    } else {
-      // Floating → pinned: snap to the nearest DSO when the anchor is on.
-      this.pinFloatingFrame(f, f.anchorSnap !== false);
-    }
-  }
-
-  /**
-   * Pin a floating frame to the sky at its current centre, converting its canvas
-   * rotation to a position angle so it stays visually put. When `snap` is true the
-   * centre is anchored to the nearest DSO; when false it is pinned exactly where it
-   * sits (used when freezing frames so nothing moves).
-   */
-  private pinFloatingFrame(f: RenderableFrame, snap: boolean): void {
-    if (!f.pinnable || f.anchorKind !== 'screen') return;
-    const { cx, cy } = this.frameAnchorCanvas(f);
-    const canvasRotDeg = this.frameCanvasRotationDeg(f);
-    let ra: number, dec: number, dsoId: string | null;
-    const near = snap ? this.findClosestDSO(cx, cy) : null;
-    if (near) {
-      // Anchored: the snapped object sits at the centre, so it is the target.
-      ra = near.ra;
-      dec = near.dec;
-      dsoId = near.id;
-    } else {
-      const proj = fromCanvas(cx, cy, this.view);
-      const u = unproject(proj.x, proj.y);
-      ra = u.ra;
-      dec = u.dec;
-      dsoId = null;
-      // A plan frame placed freely takes the DSO nearest its centre that falls
-      // inside it (custom location if none).
-      if (f.derivesTargetFromContent) {
-        const moved: RenderableFrame = { ...f, anchorKind: 'sky', ra, dec };
-        dsoId = frameTargetDso(this.dsosInFrame(moved).map((d) => d.id));
-      }
-    }
-    const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra, dec);
-    this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
-  }
-
-  /**
-   * Pin every floating frame to its exact current sky position (no DSO snap),
-   * locking them to the sky so a later view change can't drift them. Called when
-   * hiding all frames so nothing moves while the overlay is off.
-   */
-  pinAllFloatingFrames(): void {
-    for (const f of this.fovInstances) {
-      if (f.pinnable && f.anchorKind === 'screen') this.pinFloatingFrame(f, false);
-    }
-  }
-
-  /**
-   * Re-run anchor detection on a pinned frame at its current centre and snap it
-   * onto the nearest DSO when one is close enough — the same snap the pin action
-   * applies with the anchor on. Used by the anchor toggle so turning the anchor
-   * on re-anchors an already-pinned frame. No-op for floating frames or when no
-   * DSO is close enough (the frame keeps its current position and target).
-   */
-  resnapFrame(id: string): void {
-    const f = this.fovInstances.find((x) => x.id === id);
-    if (!f || !f.pinnable || f.anchorKind !== 'sky') return;
-    const { cx, cy } = this.frameAnchorCanvas(f);
-    const near = this.findClosestDSO(cx, cy);
-    if (!near) return;
-    // Keep the frame's on-screen orientation across the re-anchor by recomputing
-    // the PA at the snapped object's RA.
-    const canvasRotDeg = this.frameCanvasRotationDeg(f);
-    const paDeg = this.canvasRotDegToPa(canvasRotDeg, near.ra, near.dec);
-    this.onFovInstanceChange?.(f.id, {
-      anchor: { kind: 'sky', ra: near.ra, dec: near.dec, dsoId: near.id },
-      paDeg,
-    });
-  }
-
-  /** Cancel any in-flight frame snap-back animation. */
-  private cancelSnapAnim(): void {
-    if (this.snapAnim) {
-      cancelAnimationFrame(this.snapAnim.raf);
-      this.snapAnim = null;
-    }
-  }
-
-  /**
-   * Spring a just-dropped frame from its current (cursor) centre to the snap
-   * target's DSO centre over a short ease-out, then commit the anchor with the
-   * DSO as its target. The frame's on-screen orientation is held by recomputing
-   * the PA at each interpolated RA (as the drag does).
-   */
-  private animateSnapToDso(id: string, snap: { id: string; ra: number; dec: number }): void {
-    this.cancelSnapAnim();
-    const f = this.fovInstances.find((x) => x.id === id);
-    if (!f || f.anchorKind !== 'sky') return;
-    const startRa = f.ra ?? snap.ra;
-    const startDec = f.dec ?? snap.dec;
-    // Shortest-arc RA delta so a wrap across 0/360 doesn't sweep the long way.
-    let dRa = snap.ra - startRa;
-    if (dRa > 180) dRa -= 360;
-    else if (dRa < -180) dRa += 360;
-    const dDec = snap.dec - startDec;
-    const canvasRotDeg = this.frameCanvasRotationDeg(f);
-    const duration = 150;
-    const startTime = performance.now();
-
-    const step = (now: number) => {
-      let t = (now - startTime) / duration;
-      if (t >= 1) t = 1;
-      const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
-      const ra = normalizeRA(startRa + dRa * ease);
-      const dec = startDec + dDec * ease;
-      const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra, dec);
-      const done = t >= 1;
-      // Keep the DSO target bound for every frame of the spring (it's known the
-      // whole time); a null mid-flight would flip a mosaic's name to the gear spec.
-      this.onFovInstanceChange?.(id, {
-        anchor: {
-          kind: 'sky',
-          ra: done ? snap.ra : ra,
-          dec: done ? snap.dec : dec,
-          dsoId: snap.id,
-        },
-        paDeg,
-      });
-      if (done) {
-        this.snapAnim = null;
-      } else {
-        this.snapAnim = { id, raf: requestAnimationFrame(step) };
-      }
-    };
-    this.snapAnim = { id, raf: requestAnimationFrame(step) };
-  }
-
-  /**
-   * Bring the given frame to the centre of the view (used by the frame manager).
-   * Idempotent: a pinned frame pans the view to its sky anchor; a floating frame
-   * snaps its own screen anchor back to the viewport centre.
-   */
-  centerFrameInView(id: string): void {
-    const f = this.fovInstances.find((x) => x.id === id);
-    if (!f) return;
-    if (f.anchorKind === 'sky') {
-      // Same framing zoom the targets "view on map" button uses.
-      const minDim = Math.min(this.view.width, this.view.height);
-      const scale = computeFovTargetScale(f.wDeg, f.hDeg, f.dec ?? 0, getHemisphere(), minDim);
-      this.navigateTo(f.ra ?? 0, f.dec ?? 0, scale, true);
-    } else {
-      this.onFovInstanceChange?.(f.id, { anchor: { kind: 'screen', nx: 0.5, ny: 0.5 } });
-    }
-  }
-
-  /** Apply a frame move/rotate drag for the current cursor position. */
-  private handleFrameDragMove(mx: number, my: number): void {
-    if (!this.frameDrag) return;
-    const f = this.fovInstances.find((x) => x.id === this.frameDrag!.id);
-    if (!f) {
-      this.frameDrag = null;
-      return;
-    }
-
-    if (this.frameDrag.mode === 'resize') {
-      // Recompute the rubber-band rectangle from the (unchanged) frame geometry's
-      // fixed corner and the cursor; nothing is committed until mouseup.
-      const geo = this.frameGeometry(f);
-      const r = resizeFromCorner(geo.corners, this.frameDrag.corner ?? 2, mx, my, geo.rotDeg);
-      let { halfW, halfH } = r;
-      // Smart-scope frame: clamp the rubber band to the scope's mosaic envelope
-      // live (per-axis cap + area cap). resizeFromCorner keeps the centre fixed,
-      // so clamping the half-extents alone keeps the preview anchored.
-      if (f.smartMosaic) {
-        const reqWDeg = f.wDeg * (r.halfW / Math.max(1e-6, geo.halfW));
-        const reqHDeg = f.hDeg * (r.halfH / Math.max(1e-6, geo.halfH));
-        const c = clampSmartMosaicSize(
-          reqWDeg,
-          reqHDeg,
-          f.smartMosaic.nativeWDeg,
-          f.smartMosaic.nativeHDeg,
-          f.smartMosaic.env,
-        );
-        halfW = (c.wDeg / Math.max(1e-6, f.wDeg)) * geo.halfW;
-        halfH = (c.hDeg / Math.max(1e-6, f.hDeg)) * geo.halfH;
-      }
-      this.resizeDraft = { cx: r.cx, cy: r.cy, halfW, halfH, rotDeg: geo.rotDeg };
-      this.requestRenderInteractive();
-      return;
-    }
-
-    if (this.frameDrag.mode === 'rotate') {
-      const { cx, cy } = this.frameAnchorCanvas(f);
-      const rotDeg = canvasRotationDegFromCursor(cx, cy, mx, my);
-      if (f.anchorKind === 'sky') {
-        const pa = this.canvasRotDegToPa(rotDeg, f.ra ?? 0, f.dec ?? 0);
-        this.onFovInstanceChange?.(f.id, { paDeg: pa });
-      } else {
-        this.onFovInstanceChange?.(f.id, { screenRotationDeg: normalizeRotationDeg(rotDeg) });
-      }
-    } else {
-      if (f.anchorKind === 'sky') {
-        // Hold the frame's on-screen orientation fixed while moving: a pinned
-        // frame's rotation is a position angle relative to celestial north,
-        // whose screen direction changes across the projection — so without
-        // this the frame would spin to stay north-aligned as it's dragged.
-        const canvasRotDeg = this.frameCanvasRotationDeg(f);
-        // The centre always follows the cursor exactly — no mid-drag jump. When
-        // the anchor is on and a DSO is within snap range we only *record* it as
-        // the pending snap target (drawn as the elastic line); the actual snap
-        // happens on mouse-up via animateSnapToDso.
-        const proj = fromCanvas(mx, my, this.view);
-        const u = unproject(proj.x, proj.y);
-        const ra = u.ra,
-          dec = u.dec;
-        let dsoId: string | null = null;
-        const near = f.anchorSnap !== false ? this.findClosestDSO(mx, my) : null;
-        // Recompute the PA so the frame keeps the same on-screen angle at the
-        // new position.
-        const paDeg = this.canvasRotDegToPa(canvasRotDeg, ra, dec);
-        if (near) {
-          this.snapCandidate = {
-            id: near.id,
-            ra: near.ra,
-            dec: near.dec,
-            majAxis: near.majAxis ?? 1,
-          };
-          // Keep the pending target *bound* while the elastic is shown. The centre
-          // still follows the cursor (it springs to the DSO only on release), but
-          // nulling the target here would, for a mosaic, drop its dsoId — flipping
-          // its name to the gear spec and turning anchorSnap off, which then
-          // toggles back on next frame and flickers. Binding it keeps identity stable.
-          dsoId = near.id;
-        } else {
-          this.snapCandidate = null;
-          // A plan/mosaic frame dragged out of snap range takes the DSO nearest
-          // its centre that falls inside it (custom location if none).
-          if (f.derivesTargetFromContent) {
-            const moved: RenderableFrame = { ...f, ra, dec, paDeg };
-            dsoId = frameTargetDso(this.dsosInFrame(moved).map((d) => d.id));
-          }
-        }
-        // Emitting the change drives the re-render (via the store watch →
-        // setFovInstances), which redraws the elastic from the frame's updated
-        // centre. No explicit render() here — a synchronous one would paint the
-        // line from the frame's stale (pre-change) position and flicker.
-        this.onFovInstanceChange?.(f.id, { anchor: { kind: 'sky', ra, dec, dsoId }, paDeg });
-      } else {
-        this.onFovInstanceChange?.(f.id, {
-          anchor: { kind: 'screen', nx: mx / this.view.width, ny: my / this.view.height },
-        });
-      }
-    }
-  }
-
-  /** After moving a standalone plan frame, merge it if it now overlaps another
-   * frame or a mosaic of the same plan (emits the merge for the store to apply). */
-  private checkFrameMerge(movedId: string): void {
-    if (!this.onFrameMerge) return;
-    const targetId = findMergeTarget(movedId, this.fovInstances, this.view);
-    if (targetId) this.onFrameMerge(movedId, targetId);
-  }
-
-  /**
-   * Commit a drag-to-extend: convert the rubber-band rectangle to a sky region
-   * (centre + angular size + PA) and hand it to the resize callback, which builds
-   * the mosaic. The angular size scales the frame's single-tile FOV by the px
-   * ratio (so it stays correct at the frame's location). No-op for a drag that
-   * barely changed the size.
-   */
-  private finalizeResize(frameId: string): void {
-    const draft = this.resizeDraft;
-    this.resizeDraft = null;
-    const f = draft ? this.fovInstances.find((x) => x.id === frameId) : undefined;
-    if (!draft || !f) {
-      this.render();
-      return;
-    }
-    const region = resizeRegionFromDraft(f, draft, this.view, fromCanvas, unproject);
-    this.render();
-    this.onFovFrameResize?.(f.id, region);
   }
 
   /** Observer/time parameters for horizon visibility this frame — null when not applicable. */
