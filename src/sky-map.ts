@@ -23,7 +23,6 @@ import {
   setHemisphere,
   fitScaleForBorderCircle,
   borderRadiusPU,
-  isInsideBorderCircle,
   bumpObsGeneration,
   isBelowHorizonCached,
   setCenterMode,
@@ -65,15 +64,11 @@ import {
 } from './photo-outline';
 import { computeFovFrameCorners } from './frame-geometry';
 import { canvasPxPerDeg, isSkyPointVisible } from './sky-axes';
-import {
-  easeInOutCubic,
-  navigateDurationMs,
-  navigateProfile,
-  zoomAboutPoint,
-} from './sky-view-math';
+import { easeInOutCubic, navigateDurationMs, navigateProfile } from './sky-view-math';
 import { resolveHover } from './hover-resolve';
 import { RegionDrawGesture } from './sky-region-draw';
 import { FrameController } from './frame-controller';
+import { attachSkyMapEvents, type EventBinding, type SkyEventHost } from './sky-map-events';
 import { SkyHitTest, isStarRendered, type DsoIndexFilters } from './sky-hit-test';
 import { DsoRenderSelection } from './dso-render-select';
 import {
@@ -256,13 +251,6 @@ export class SkyMap {
   // Cursor hit-testing (star/DSO spatial indexes + summit search). See ./sky-hit-test.
   private hitTest = new SkyHitTest();
 
-  // Pan state
-  private isPanning = false;
-  private panStartX = 0;
-  private panStartY = 0;
-  private panAnchorProjX = 0;
-  private panAnchorProjY = 0;
-
   // Animation
   private animationId: number | null = null;
 
@@ -283,8 +271,8 @@ export class SkyMap {
   // step rather than every frame (see renderStars).
   private static readonly ATLAS_REBUILD_RATIO = 1.3;
 
-  // Bound event handlers for cleanup
-  private boundHandlers: { target: EventTarget; event: string; handler: EventListener }[] = [];
+  // Listeners registered by attachSkyMapEvents, removed on destroy().
+  private eventBindings: EventBinding[] = [];
 
   // Picking mode
   private pickingMode = false;
@@ -344,7 +332,7 @@ export class SkyMap {
       render: () => map.render(),
       navigateTo: (ra, dec, scale, animate) => map.navigateTo(ra, dec, scale, animate),
     });
-    this.setupEvents();
+    this.eventBindings = attachSkyMapEvents(this.eventHost());
     this.resize();
   }
 
@@ -1070,209 +1058,78 @@ export class SkyMap {
     return this.hitTest.findClosestStar(mx, my, this.view, this.starMagThreshold());
   }
 
-  private addEvent(
-    target: EventTarget,
-    event: string,
-    handler: EventListener,
-    options?: AddEventListenerOptions,
-  ) {
-    target.addEventListener(event, handler, options);
-    this.boundHandlers.push({ target, event, handler });
-  }
+  /**
+   * Adapter handed to ./sky-map-events, which owns the pointer/keyboard routing.
+   * Live values are exposed as getters so the handlers always see current state.
+   */
+  private eventHost(): SkyEventHost {
+    const map = this;
+    return {
+      get canvas() {
+        return map.canvas;
+      },
+      get view() {
+        return map.view;
+      },
+      get borderLatDeg() {
+        return map.borderLatDeg;
+      },
+      get interactionEnabled() {
+        return map.interactionEnabled;
+      },
+      get pickingMode() {
+        return map.pickingMode;
+      },
+      get photoOutlines() {
+        return map.photoOutlines;
+      },
+      get hoveredDSO() {
+        return map.hoveredDSO;
+      },
+      hasSelection: () => map.highlightedDSO !== null || map.highlightedStar !== null,
 
-  private setupEvents() {
-    // Zoom with mouse wheel
-    this.addEvent(
-      this.canvas,
-      'wheel',
-      ((e: WheelEvent) => {
-        e.preventDefault();
-        this.cancelAnimation();
-        // A wheel gesture takes over from hovering: hide any tooltip so it doesn't
-        // linger over the moving map while the user zooms.
-        this.dismissTooltip();
-        const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+      regionDrawActive: () => map.regionDraw.active,
+      regionDrawCapturing: () => map.regionDraw.capturing,
+      regionDrawPress: () => map.regionDraw.press(),
+      regionDrawMove: (pt) => map.regionDraw.move(pt),
+      regionDrawFinish: (cancelled) => map.finishRegionDraw(cancelled),
+      canvasToAltAz: (mx, my) => map.canvasToAltAz(mx, my),
 
-        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-        // Keep the projection point under the cursor anchored across the zoom.
-        const z = zoomAboutPoint(this.view, mx, my, factor, 50, 1000000);
-        this.view.scale = z.scale;
-        this.view.centerX = z.centerX;
-        this.view.centerY = z.centerY;
+      frameMouseDown: (mx, my) => map.frames.handleMouseDown(mx, my),
+      frameDragActive: () => map.frames.activeDrag !== null,
+      frameDragMove: (mx, my) => map.frames.handleDragMove(mx, my),
+      frameMouseUp: () => map.frames.handleMouseUp(),
+      frameHasActive: () => map.frames.hasActiveFrame(),
+      frameClearInteraction: () => map.frames.clearInteraction(),
+      frameSelect: (id) => map.frames.selectFrame(id),
 
-        this.onViewChange?.();
-        this.requestRenderInteractive();
-      }) as EventListener,
-      { passive: false },
-    );
+      cancelAnimation: () => map.cancelAnimation(),
+      dismissTooltip: () => map.dismissTooltip(),
+      requestHover: (mx, my, cx, cy) => map.requestHover(mx, my, cx, cy),
+      requestRenderInteractive: () => map.requestRenderInteractive(),
+      render: () => map.render(),
+      viewChanged: () => map.onViewChange?.(),
+      findClosestStar: (mx, my) => map.findClosestStar(mx, my),
+      exitPickingMode: () => map.exitPickingMode(),
 
-    // Pan with mouse drag
-    this.addEvent(this.canvas, 'mousedown', ((e: MouseEvent) => {
-      this.cancelAnimation();
-      if (e.button === 0) {
-        if (this.regionDraw.active) {
-          this.regionDraw.press();
-          const rect = this.canvas.getBoundingClientRect();
-          this.regionDraw.move(this.canvasToAltAz(e.clientX - rect.left, e.clientY - rect.top));
-          this.requestRenderInteractive();
-          return; // region drawing consumed the press — no pan
+      hasStarPickedHandler: () => map.onStarPicked !== null,
+      hasPhotoClickHandler: () => map.onPhotoClick !== null,
+      emitStarPicked: (star) => map.onStarPicked?.(star),
+      emitPhotoClick: (name) => map.onPhotoClick?.(name),
+      emitDSOClick: () => {
+        const dso = map.hoveredDSO;
+        if (!dso) return;
+        map.onDSOClick?.(dso);
+        // A one-shot picker (e.g. choosing a mosaic target) fires after the
+        // normal selection so the click still selects the DSO as usual.
+        if (map.onNextDSOPick) {
+          const cb = map.onNextDSOPick;
+          map.onNextDSOPick = null;
+          cb(dso);
         }
-        const rectF = this.canvas.getBoundingClientRect();
-        if (this.frames.handleMouseDown(e.clientX - rectF.left, e.clientY - rectF.top)) {
-          // A frame grab can start right over a DSO/star (e.g. the centre move
-          // dot sits on the DSO inside the frame), so hide any hover tooltip.
-          this.dismissTooltip();
-          return; // frame interaction consumed the press — no pan
-        }
-        this.isPanning = true;
-        this.panStartX = e.clientX;
-        this.panStartY = e.clientY;
-        const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const anchor = fromCanvas(mx, my, this.view);
-        this.panAnchorProjX = anchor.x;
-        this.panAnchorProjY = anchor.y;
-        if (!this.pickingMode) {
-          this.canvas.style.cursor = 'grabbing';
-        }
-      }
-    }) as EventListener);
-
-    // Right-click clears the active DSO/star selection (and suppresses the
-    // browser context menu when there was something to clear).
-    this.addEvent(this.canvas, 'contextmenu', ((e: MouseEvent) => {
-      if (this.highlightedDSO === null && this.highlightedStar === null) return;
-      e.preventDefault();
-      this.onClearSelection?.();
-    }) as EventListener);
-
-    this.addEvent(window, 'mousemove', ((e: MouseEvent) => {
-      if (this.regionDraw.active) {
-        // Suppress hover/tooltips for the whole gesture (not just while dragging) —
-        // a star/DSO tooltip popping up under the crosshair gets in the way of drawing.
-        this.dismissTooltip();
-        if (this.regionDraw.capturing) {
-          const rect = this.canvas.getBoundingClientRect();
-          this.regionDraw.move(this.canvasToAltAz(e.clientX - rect.left, e.clientY - rect.top));
-          this.requestRenderInteractive();
-        }
-        return;
-      }
-      if (this.frames.activeDrag) {
-        const rect = this.canvas.getBoundingClientRect();
-        this.frames.handleDragMove(e.clientX - rect.left, e.clientY - rect.top);
-        return;
-      }
-      if (this.isPanning) {
-        const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const now = fromCanvas(mx, my, this.view);
-        this.view.centerX += this.panAnchorProjX - now.x;
-        this.view.centerY += this.panAnchorProjY - now.y;
-        this.onViewChange?.();
-        this.requestRenderInteractive();
-      } else {
-        if (!this.interactionEnabled) return;
-        // Cursor is over the (now-interactive) tooltip: leave it as-is so the
-        // user can move into it to select/copy without it hiding.
-        if ((e.target as HTMLElement)?.closest?.('#tooltip')) return;
-        // Hover detection
-        const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-
-        // Check if mouse is over the side panel by checking if it's on the right side
-        const sidePanel = document.getElementById('side-panel');
-        const isOverPanel =
-          sidePanel &&
-          !sidePanel.classList.contains('collapsed') &&
-          e.clientX > window.innerWidth - 280; // Panel is 280px wide on the right
-
-        const inSky = !isOverPanel && isInsideBorderCircle(mx, my, this.view, this.borderLatDeg);
-        if (inSky) {
-          this.requestHover(mx, my, e.clientX, e.clientY);
-        } else {
-          // Cursor is over the side panel or outside the visible sky circle (in the
-          // black corners beyond the rim). Dismiss any tooltip so it never lingers or
-          // fires out there — the render loop clips objects to this same circle, so a
-          // rectangular hover gate would tooltip objects the user cannot see.
-          this.dismissTooltip();
-        }
-      }
-    }) as EventListener);
-
-    this.addEvent(window, 'mouseup', ((e: MouseEvent) => {
-      if (this.regionDraw.active) {
-        this.finishRegionDraw(!this.regionDraw.capturing);
-        return;
-      }
-      if (this.frames.activeDrag) {
-        this.frames.handleMouseUp();
-        return;
-      }
-      if (this.isPanning) {
-        const dx = e.clientX - this.panStartX;
-        const dy = e.clientY - this.panStartY;
-        const moved = Math.abs(dx) + Math.abs(dy) > 3;
-
-        this.isPanning = false;
-        this.canvas.style.cursor = this.pickingMode ? 'crosshair' : 'default';
-
-        // Picking mode: click (not drag) selects star
-        if (this.pickingMode && !moved && this.onStarPicked) {
-          const rect = this.canvas.getBoundingClientRect();
-          const mx = e.clientX - rect.left;
-          const my = e.clientY - rect.top;
-          const star = this.findClosestStar(mx, my);
-          if (star) {
-            this.onStarPicked(star);
-          }
-        }
-
-        // Photo click: test if click lands inside a photo outline
-        if (!this.pickingMode && !moved && this.onPhotoClick) {
-          const rect = this.canvas.getBoundingClientRect();
-          const mx = e.clientX - rect.left;
-          const my = e.clientY - rect.top;
-          const photoName = findTopPhotoOutlineAtPoint(mx, my, this.photoOutlines);
-          if (photoName) {
-            this.onPhotoClick(photoName);
-          }
-        }
-
-        // DSO click: fire alongside photo click if a DSO is under the cursor.
-        if (!this.pickingMode && !moved && this.hoveredDSO) {
-          this.onDSOClick?.(this.hoveredDSO);
-          // A one-shot picker (e.g. choosing a mosaic target) fires after the
-          // normal selection so the click still selects the DSO as usual.
-          if (this.onNextDSOPick) {
-            const cb = this.onNextDSOPick;
-            this.onNextDSOPick = null;
-            cb(this.hoveredDSO);
-          }
-        }
-      }
-    }) as EventListener);
-
-    // Escape exits picking mode, or deselects the active frame.
-    this.addEvent(window, 'keydown', ((e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (this.regionDraw.active) {
-        this.finishRegionDraw(true);
-      } else if (this.pickingMode) {
-        this.exitPickingMode();
-      } else if (this.frames.hasActiveFrame()) {
-        // Abandon any in-progress snap drag/animation so deselecting can't leave
-        // a dangling elastic overlay or running rAF.
-        this.frames.clearInteraction();
-        this.frames.selectFrame(null);
-        this.render();
-      }
-    }) as EventListener);
+      },
+      emitClearSelection: () => map.onClearSelection?.(),
+    };
   }
 
   destroy() {
@@ -1290,10 +1147,10 @@ export class SkyMap {
       clearTimeout(this.settleTimer);
       this.settleTimer = null;
     }
-    for (const { target, event, handler } of this.boundHandlers) {
+    for (const { target, event, handler } of this.eventBindings) {
       target.removeEventListener(event, handler);
     }
-    this.boundHandlers = [];
+    this.eventBindings = [];
   }
 
   setInteractionEnabled(enabled: boolean): void {
