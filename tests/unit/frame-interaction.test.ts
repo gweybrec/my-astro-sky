@@ -5,7 +5,7 @@ import {
   type ResizeDraft,
 } from '../../src/frame-interaction';
 import { fromCanvas, unproject, setHemisphere } from '../../src/projection';
-import type { RenderableFrame } from '../../src/sky-map';
+import type { RenderableFrame } from '../../src/sky-map-types';
 import type { ViewState } from '../../src/types';
 
 const view: ViewState = {

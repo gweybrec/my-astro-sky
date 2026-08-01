@@ -46,7 +46,6 @@ vi.mock('../../src/gear-catalog', () => ({
 }));
 vi.mock('../../src/star-catalog', () => ({ getConstellationInfos: vi.fn() }));
 vi.mock('../../src/imaging-recipe', () => ({ recommendRecipe: vi.fn() }));
-vi.mock('../../src/sky-map', () => ({}));
 vi.mock('../../src/tooltip-utils', () => ({
   showKeyValueTooltip: vi.fn(),
   showTextTooltip: vi.fn(),

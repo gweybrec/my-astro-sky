@@ -11,7 +11,7 @@ import {
 } from '../../src/frame-geometry';
 import { setHemisphere, setCenterMode, setProjectionObserver } from '../../src/projection';
 import { raDecFromAltAz } from '../../src/sky-geometry';
-import type { RenderableFrame } from '../../src/sky-map';
+import type { RenderableFrame } from '../../src/sky-map-types';
 import type { ViewState } from '../../src/types';
 
 const view: ViewState = {

@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import type { SkyMap } from './sky-map';
-import { computeFovFrameCorners, type FovFrameSpec } from './sky-map';
+import { computeFovFrameCorners } from './frame-geometry';
+import type { FovFrameSpec } from './sky-map-types';
 import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
 import type { Photo, DSO, ViewState } from './types';
 import { project, toCanvas } from './projection';

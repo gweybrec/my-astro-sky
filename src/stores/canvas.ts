@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { shallowRef } from 'vue';
-import type { SkyMap, FovFrameSpec } from '../sky-map';
+import type { SkyMap } from '../sky-map';
+import type { FovFrameSpec } from '../sky-map-types';
 import type { PhotoOverlay } from '../photo-overlay';
 import type { Photo } from '../types';
 import type { PoiFilterGroup } from '../poi';

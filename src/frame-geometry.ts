@@ -9,7 +9,7 @@
  * hit-testing primitives (distance-to-segment, handle proximity, corner resize).
  */
 import type { Point, ViewState } from './types';
-import type { RenderableFrame } from './sky-map';
+import type { RenderableFrame } from './sky-map-types';
 import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { framePointToSky } from './mosaic';
 import { paToCanvasRotationDeg, canvasRotationToPaDeg } from './frame-orientation';

@@ -23,7 +23,7 @@ import FOVRibbon from '../../src/components/overlay/FOVRibbon.vue';
 import { buildFovPopup } from '../../src/fov-overlay';
 import { useCanvasStore } from '../../src/stores/canvas';
 import { useFovFramesStore } from '../../src/stores/fov-frames';
-import type { FovFrameSpec } from '../../src/sky-map';
+import type { FovFrameSpec } from '../../src/sky-map-types';
 
 function makeSkyMap() {
   return {

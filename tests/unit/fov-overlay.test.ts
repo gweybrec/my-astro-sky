@@ -12,7 +12,7 @@ vi.mock('../../src/dso-catalog', () => ({
   getDSOCatalog: () => null,
 }));
 
-import { computeFovFrameCorners } from '../../src/sky-map';
+import { computeFovFrameCorners } from '../../src/frame-geometry';
 
 describe('computeFovFrameCorners', () => {
   const cx = 100;

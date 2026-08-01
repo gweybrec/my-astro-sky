@@ -5,7 +5,7 @@
  * to decide *what* a completed gesture means, then applies the result via callbacks.
  */
 import type { ViewState } from './types';
-import type { RenderableFrame, FovFrameResizeRegion } from './sky-map';
+import type { RenderableFrame, FovFrameResizeRegion } from './sky-map-types';
 import { frameGeometry, canvasRotDegToPa } from './frame-geometry';
 import { convexPolygonsOverlap } from './fov-frame-geometry';
 

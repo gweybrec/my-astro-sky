@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { RenderableFrame, FovFrameChange, FovFrameResizeRegion } from '../sky-map';
+import type { RenderableFrame, FovFrameChange, FovFrameResizeRegion } from '../sky-map-types';
 import {
   planGrid,
   tileCenters,

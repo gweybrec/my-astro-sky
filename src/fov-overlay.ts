@@ -1,6 +1,6 @@
 import { watch } from 'vue';
 import { t } from './i18n';
-import type { FovFrameSpec } from './sky-map';
+import type { FovFrameSpec } from './sky-map-types';
 import type { DSO } from './types';
 import { buildGearSectionContent, type GearSectionPrefs } from './targets-view';
 import {
