@@ -219,11 +219,18 @@ Use **[Conventional Commits](https://www.conventionalcommits.org)** — the rele
 | `improvement:`     | Improvements           | An enhancement to an existing feature (custom type) |
 | `fix:`             | Bug Fixes              | A bug fix                                           |
 | `perf:`            | Performance            | A speed/efficiency change with no behavior change   |
-| `refactor:`        | Refactor               | Internal restructuring, no observable change        |
+| `refactor:`        | Refactor               | Internal restructuring worth showing in the notes   |
 | `docs:`            | Documentation          | Docs only                                           |
 | `test:`            | Testing                | Tests only                                          |
 | `style:`, `build:` | Styling / Build System | Formatting, build tooling                           |
 | `chore:`, `ci:`    | _(hidden)_             | Skipped from the changelog                          |
+| `internal(...):`   | _(hidden)_             | Internal-only work users would not recognise        |
+
+Use `internal(refactor):` (or `internal(<scope>):`) rather than `refactor:` when the
+change is pure plumbing — module splits, moving logic behind an interface, test
+scaffolding. It is real work, but nothing an astronomer reading the release notes
+would recognise, so it is skipped. Reserve plain `refactor:` for restructuring you
+_do_ want announced.
 
 Append `!` (e.g. `feat!:`) or a `BREAKING CHANGE:` footer for breaking changes. Preview the _unreleased_ section (since the last tag) to the console with `npm run changelog:preview`; regenerate the actual files with `npm run changelog` (runs `scripts/generate-changelog.mjs`). `CHANGELOG.md` is scoped to the **current major version series**; completed majors are frozen into `CHANGELOG.v<n>.md` archives automatically at the next major release. See [docs/dev/ci.md](docs/dev/ci.md#release-release-yml) for how the release pipeline consumes commits.
 

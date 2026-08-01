@@ -68,6 +68,9 @@ commit_parsers = [
   { message = "^chore\\(deps\\)", skip = true },
   { message = "^chore", skip = true },
   { message = "^ci", skip = true },
+  # Internal-only work (e.g. `internal(refactor):`) — real changes, but nothing a
+  # user of the app would recognise, so they stay out of the release notes.
+  { message = "^internal", skip = true },
   { message = "^Merge", skip = true },
   # Anything else conventional but unmapped.
   { message = ".*", group = "<!-- 9 -->Other" },
