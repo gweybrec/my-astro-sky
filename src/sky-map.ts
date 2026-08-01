@@ -17,7 +17,6 @@ import { t } from './i18n';
 import {
   project,
   projectCached,
-  getProjectionGeneration,
   toCanvas,
   fromCanvas,
   unproject,
@@ -26,12 +25,10 @@ import {
   fitScaleForBorderCircle,
   borderRadiusPU,
   isInsideBorderCircle,
-  getProjectionMode,
   bumpObsGeneration,
   isBelowHorizonCached,
   setCenterMode,
   setProjectionObserver,
-  projectionAreaFactor,
 } from './projection';
 import {
   dateToJD,
@@ -48,22 +45,14 @@ import { drawMoonMarker } from './moon-draw';
 import { drawBodyMarker, drawBodyLabel } from './body-draw';
 import { clampSmartMosaicSize } from './mosaic';
 import { getStars, getStarMagsSorted, loadConstellationStyle, normalizeRA } from './star-catalog';
-import { getDSOs, getDSOById, getDSOImportanceRank } from './dso-catalog';
+import { getDSOs } from './dso-catalog';
+import { targetRenderCount, DSO_DENSITY_K, MIN_BUDGET_MULT } from './render-budget';
 import {
-  selectDSOsToRender,
-  DSO_CONTAINER_VISIBLE_RADIUS_PX,
-  type SelectableDSO,
-} from './dso-selection';
-import {
-  targetRenderCount,
-  magThresholdForCount,
-  STAR_DENSITY_K,
-  DSO_DENSITY_K,
-  MIN_BUDGET_MULT,
-  STAR_BRIGHT_FLOOR_MAG,
-  areaNormForBorderRadius,
-  areaWeightedBudget,
-} from './render-budget';
+  starAreaBudget,
+  starFaintLimitAt,
+  starMagThreshold,
+  type StarAreaBudget,
+} from './star-budget';
 import { frameTargetDso } from './fov-frame-target';
 import { SpatialIndex } from './spatial-index';
 import {
@@ -77,12 +66,7 @@ import { computeFovTargetScale } from './gear-presets';
 import { SKY_THEME } from './sky-themes';
 import { computeMaxMag, starRadius, atlasScaleBucket, computeStarPaint } from './star-render-math';
 import { paintStar, buildStarSprite } from './star-draw';
-import {
-  angularSizeToCanvasPx,
-  dsoSizeCos2,
-  dsoCanvasAngle,
-  DSO_GIANT_BODY_PU,
-} from './dso-render-math';
+import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle } from './dso-render-math';
 import { InteractionLod } from './interaction-lod';
 import {
   pointInConvexPolygon,
@@ -111,6 +95,8 @@ import {
   zoomAboutPoint,
 } from './sky-view-math';
 import { pickDsoAtCursor } from './hover-hit-test';
+import { resolveHover } from './hover-resolve';
+import { DsoRenderSelection } from './dso-render-select';
 import {
   drawBackground,
   drawFisheyeGrid,
@@ -262,11 +248,11 @@ export class SkyMap {
   private static readonly HOVER_DRIFT_GRACE_PX = 6;
   private maxStarCount = 2000;
   private maxDSOCount = 500;
-  // Per-frame cache of the DSO render selection — single source of truth shared by
-  // renderDSOs, renderDSOLabels and isDSORendered so drawing and hit-testing agree.
-  // Invalidated at the top of render(); rebuilt lazily (e.g. on a hover between frames).
-  private cachedSelectedDSOs: DSO[] | null = null;
-  private cachedSelectedDSOIds: Set<string> | null = null;
+  // Which DSOs to draw this frame — single source of truth shared by renderDSOs,
+  // renderDSOLabels and isDSORendered so drawing and hit-testing agree. Owns the
+  // all-DSO position index and the per-frame cache (invalidated at the top of
+  // render(), rebuilt lazily e.g. on a hover between frames). See ./dso-render-select.
+  private dsoSelection = new DsoRenderSelection();
   private highlightedDSO: string | null = null; // ID of DSO to always render
   private highlightedStar: number | null = null; // HIP number of star to highlight
   private photoOutlines: PhotoOutline[] = [];
@@ -320,14 +306,6 @@ export class SkyMap {
   private dsoIndex = new SpatialIndex<DSO>(0.02);
   private starIndexMaxMag = -1;
   private dsoIndexMaxMag = -99999; // Sentinel value meaning "not initialized"
-
-  // All DSOs indexed by projection position (no mag/filter), for viewport culling in
-  // selectRenderedDSOs. Positions change only with the projection generation, so this
-  // is rebuilt once per hemisphere/mode change (or DSO coordinate override), not per frame.
-  private dsoAllIndex = new SpatialIndex<DSO>(0.02);
-  private dsoGiants: DSO[] = []; // bodies larger than the query margin; always considered
-  private dsoAllIndexGen = -1;
-  private dsoMaxBodyPU = 0; // largest indexed (non-giant) body radius (projection units)
 
   // Pan state
   private isPanning = false;
@@ -804,70 +782,22 @@ export class SkyMap {
   }
 
   /**
-   * Shared budget context for the area-weighted star gate (see {@link renderStars} and
-   * {@link starFaintLimitAt}). `count` is the pan-invariant global eligible count; the
-   * per-star limit then scales it by the local projection area factor so on-screen star
-   * density is uniform despite the stereographic projection's area distortion.
+   * Budget context for the area-weighted star gate at the current view. The maths
+   * lives in ./star-budget (pure, unit-tested); this binds the live view, border
+   * latitude and the LOD-reduced density budget.
    */
-  private starAreaBudget(): {
-    mags: number[];
-    count: number;
-    aNorm: number;
-    edgeMag: number;
-  } {
-    const { scale, width, height } = this.view;
-    const mags = getStarMagsSorted();
-    // Upper bound is the catalog length, not an artificial cap: on-screen count is
-    // already bounded by the field of view, so when zoomed in the magnitude gate
-    // (not a count cap) decides how faint we go.
-    const budget = this.lod.effectiveStarBudget(this.maxStarCount);
-    const count = targetRenderCount(
-      budget,
-      scale,
-      width,
-      height,
-      STAR_DENSITY_K,
-      budget * MIN_BUDGET_MULT,
-      mags.length,
+  private starAreaBudget(): StarAreaBudget {
+    return starAreaBudget(
+      this.view,
+      this.borderLatDeg,
+      this.lod.effectiveStarBudget(this.maxStarCount),
+      getStarMagsSorted(),
     );
-    const aNorm = areaNormForBorderRadius(borderRadiusPU(this.borderLatDeg));
-    // Faintest limit anywhere on the map: at the rim the local area factor equals aNorm²
-    // so the local count is count·aNorm. Used as a cheap pre-filter before projecting, and
-    // as the single atlas/paint maxMag so edge-fill stars share sprites and don't fade.
-    // NOTE: no separate zoom/faintness cap (computeMaxMag) is applied. A single magnitude
-    // cap applied uniformly would clamp the edge — which needs *fainter* stars than the
-    // centre to reach the same on-screen density — long before the centre, so raising the
-    // density budget would pile new stars into the centre and never fill the edge
-    // ("outside-in", not uniform). The area-weighted count IS the cap, and it already
-    // scales with zoom because count ∝ scale² (targetRenderCount).
-    const edgeMag = magThresholdForCount(mags, Math.round(count * aNorm));
-    return { mags, count, aNorm, edgeMag };
   }
 
-  /**
-   * Per-position faint magnitude limit for the area-weighted star gate: brighter (fewer
-   * stars) near the map centre, fainter (more) toward the edge, so on-screen star density
-   * stays uniform under the non-equal-area stereographic projection — at every density
-   * level. Floored at STAR_BRIGHT_FLOOR_MAG so the brightest anchor stars always render.
-   */
-  private starFaintLimitAt(
-    px: number,
-    py: number,
-    b: { mags: number[]; count: number; aNorm: number },
-  ): number {
-    const A = projectionAreaFactor(px, py);
-    const localCount = Math.round(areaWeightedBudget(b.count, A, b.aNorm));
-    return Math.max(magThresholdForCount(b.mags, localCount), STAR_BRIGHT_FLOOR_MAG);
-  }
-
-  /**
-   * Position-independent star magnitude limit (the un-weighted budget threshold). Used
-   * where a single scalar is enough — star-label gating. The precise per-position gate
-   * the render loop applies is {@link starFaintLimitAt}.
-   */
+  /** Position-independent star magnitude limit for the current view. */
   private starMagThreshold(): number {
-    const { mags, count } = this.starAreaBudget();
-    return Math.max(magThresholdForCount(mags, count), STAR_BRIGHT_FLOOR_MAG);
+    return starMagThreshold(this.starAreaBudget());
   }
 
   /**
@@ -1502,7 +1432,7 @@ export class SkyMap {
     // always shows), so hover/click matches exactly what is drawn.
     if (
       star.hip !== this.highlightedStar &&
-      star.mag > this.starFaintLimitAt(p.x, p.y, this.starAreaBudget())
+      star.mag > starFaintLimitAt(p.x, p.y, this.starAreaBudget())
     ) {
       return false;
     }
@@ -1524,7 +1454,7 @@ export class SkyMap {
     // Consult the same per-frame selection the renderer uses, so hover/click
     // gating exactly matches what is drawn (including the container-size gate).
     this.selectRenderedDSOs();
-    return this.cachedSelectedDSOIds!.has(dso.id);
+    return this.dsoSelection.has(dso.id);
   }
 
   /**
@@ -1570,6 +1500,12 @@ export class SkyMap {
     return best;
   }
 
+  /** Distance from the cursor to a sky object, in projection units. */
+  private projDist(ra: number, dec: number, projPt: Point): number {
+    const p = project(ra, dec);
+    return Math.hypot(p.x - projPt.x, p.y - projPt.y);
+  }
+
   private handleHover(mx: number, my: number, clientX: number, clientY: number) {
     const closestSummit = this.findClosestSummit(mx, my);
     const closestStar = this.findClosestStar(mx, my);
@@ -1581,71 +1517,42 @@ export class SkyMap {
 
     this.hoveredDSO = closestDSO && dsoRendered ? closestDSO : null;
 
-    // Find which rendered object is actually closest to the mouse cursor
     const projPt = fromCanvas(mx, my, this.view);
 
-    let starDist = Infinity;
-    if (closestStar && starRendered) {
-      const starProj = project(closestStar.ra, closestStar.dec);
-      const dx = starProj.x - projPt.x;
-      const dy = starProj.y - projPt.y;
-      starDist = Math.sqrt(dx * dx + dy * dy);
-    }
+    // Winner selection + the sky-drift grace live in ./hover-resolve (pure, unit-tested).
+    const res = resolveHover({
+      summit: closestSummit ? { rendered: true, dist: closestSummit.dist } : null,
+      star: closestStar
+        ? { rendered: starRendered, dist: this.projDist(closestStar.ra, closestStar.dec, projPt) }
+        : null,
+      dso: closestDSO
+        ? { rendered: dsoRendered, dist: this.projDist(closestDSO.ra, closestDSO.dec, projPt) }
+        : null,
+      mx,
+      my,
+      simMs: this.simDate.getTime(),
+      anchor: this.hoverAnchor,
+      gracePx: SkyMap.HOVER_DRIFT_GRACE_PX,
+    });
 
-    let dsoDist = Infinity;
-    if (closestDSO && dsoRendered) {
-      const dsoProj = project(closestDSO.ra, closestDSO.dec);
-      const dx = dsoProj.x - projPt.x;
-      const dy = dsoProj.y - projPt.y;
-      dsoDist = Math.sqrt(dx * dx + dy * dy);
-    }
-
-    // A summit dot wins when it is the nearest thing under the cursor (they sit on
-    // the horizon where stars/DSOs are sparse, but a genuinely closer star still wins).
-    const summitDist = closestSummit ? closestSummit.dist : Infinity;
-
-    // Show tooltip for the closest rendered object
-    if (closestSummit && summitDist <= starDist && summitDist <= dsoDist) {
-      this.onSummitHover?.(closestSummit.summit, clientX, clientY);
-      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
-    } else if (starRendered && dsoRendered) {
-      // Both found and rendered - show the closest one
-      if (starDist < dsoDist) {
+    switch (res.kind) {
+      case 'summit':
+        this.onSummitHover?.(closestSummit!.summit, clientX, clientY);
+        break;
+      case 'star':
         this.onStarHover?.(closestStar, clientX, clientY);
-      } else {
+        break;
+      case 'dso':
         this.onDSOHover?.(closestDSO, clientX, clientY);
-      }
-      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
-    } else if (dsoRendered) {
-      this.onDSOHover?.(closestDSO, clientX, clientY);
-      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
-    } else if (starRendered) {
-      this.onStarHover?.(closestStar, clientX, clientY);
-      this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
-    } else {
-      // No rendered object under the cursor. Normally this dismisses the tooltip, but
-      // while the clock is running the object may simply have drifted away from a
-      // still cursor (the whole sky rotates as simDate advances). In that case a tiny
-      // mousemove/jitter must NOT dismiss it — only a deliberate move does. So keep the
-      // tooltip when the sky has advanced since it was shown AND the cursor is still
-      // within jitter range of the anchor; dismiss otherwise.
-      const a = this.hoverAnchor;
-      const skyMoved = a !== null && this.simDate.getTime() !== a.simMs;
-      const cursorStill =
-        a !== null && Math.hypot(mx - a.mx, my - a.my) <= SkyMap.HOVER_DRIFT_GRACE_PX;
-      if (skyMoved && cursorStill) {
-        // Refresh the anchor to this frame's position/time instead of leaving it
-        // pinned to the original find. Otherwise the grace radius is a *cumulative*
-        // budget spent across the whole hold (every real mouse has some tremor), so a
-        // long hold during a fast clock eventually exceeds it and the tooltip drops —
-        // even though the cursor barely moved on any single frame. Refreshing makes it
-        // a per-frame tolerance instead, so a genuinely still cursor holds indefinitely.
-        this.hoverAnchor = { mx, my, simMs: this.simDate.getTime() };
-        return;
-      }
-      this.hoverAnchor = null;
-      this.onStarHover?.(null, clientX, clientY);
+        break;
+      case 'keep':
+        // Sky drifted under a still cursor — leave the tooltip up, refresh the anchor.
+        break;
+      case 'dismiss':
+        this.onStarHover?.(null, clientX, clientY);
+        break;
     }
+    this.hoverAnchor = res.kind === 'dismiss' ? null : res.anchor;
   }
 
   /**
@@ -1699,8 +1606,7 @@ export class SkyMap {
     const t0 = measure ? performance.now() : 0;
 
     // Invalidate the per-frame DSO selection cache; rebuilt lazily by the first consumer.
-    this.cachedSelectedDSOs = null;
-    this.cachedSelectedDSOIds = null;
+    this.dsoSelection.invalidate();
 
     // Horizon params (LST + latitude), computed once per frame — null outside date mode
     // or before an observer location is set, in which case no dimming/line is drawn.
@@ -2676,7 +2582,7 @@ export class SkyMap {
       // Area-weighted per-position gate: thin the crowded centre, keep the naked-eye
       // floor everywhere, allow fainter fill toward the edge. Runs after projecting so
       // it can read the local area factor from the cached _px/_py.
-      if (!isHighlighted && star.mag > this.starFaintLimitAt(star._px!, star._py!, sb)) {
+      if (!isHighlighted && star.mag > starFaintLimitAt(star._px!, star._py!, sb)) {
         continue;
       }
 
@@ -2781,177 +2687,24 @@ export class SkyMap {
   }
 
   /**
-   * Single source of truth for which DSOs to draw this frame: applies the
-   * type/catalog/viewport filters and the container-size gate (hide inner objects until
-   * their container renders large enough), then keeps candidates whose precomputed
-   * render `priority` is below a pan-invariant, zoom-derived threshold (the density
-   * budget). `priority` is rating-weighted, so a low budget shows the brightest/most
-   * famous DSOs and a high budget fills the map with fainter ones — no magnitude gate.
-   * Cached per frame so renderDSOs, renderDSOLabels and isDSORendered all agree.
+   * The DSOs to draw this frame. The selection logic, its position index and its
+   * per-frame cache live in ./dso-render-select (unit-tested); this binds the live
+   * view and display state. Single source of truth shared by renderDSOs,
+   * renderDSOLabels and isDSORendered, so drawing and hit-testing always agree.
    */
-  /**
-   * (Re)build the all-DSO position index used for viewport culling. Positions depend
-   * only on the projection generation (hemisphere/mode/coordinate override), so this
-   * rebuilds at most once per such change, never per frame. Also records the largest
-   * on-border DSO body radius so the viewport query can include big objects whose
-   * centre sits just off-screen.
-   */
-  private ensureDsoAllIndex(): void {
-    const gen = getProjectionGeneration();
-    if (this.dsoAllIndexGen === gen) return;
-    this.dsoAllIndex.clear();
-    this.dsoGiants = [];
-    let maxBody = 0;
-    for (const dso of getDSOs()) {
-      projectCached(dso);
-      // Body radius (projection units) = rx / scale, independent of zoom. A handful of
-      // very large objects (Barnard's Loop, big LBN/LDN clouds) would force a wide query
-      // margin for everyone, so they bypass the index and are always considered.
-      const near = dso._px! * dso._px! + dso._py! * dso._py! < 4; // exclude far hemisphere
-      const body = near ? (((dso.majAxis ?? 1) / 2 / 60) * DEG2RAD) / (2 * dsoSizeCos2(dso)) : 0;
-      if (body > DSO_GIANT_BODY_PU) {
-        this.dsoGiants.push(dso);
-      } else {
-        this.dsoAllIndex.insert(dso, dso._px!, dso._py!);
-        if (body > maxBody) maxBody = body;
-      }
-    }
-    this.dsoMaxBodyPU = maxBody;
-    this.dsoAllIndexGen = gen;
-  }
-
   private selectRenderedDSOs(): DSO[] {
-    if (this.cachedSelectedDSOs) return this.cachedSelectedDSOs;
-    const { view } = this;
-
-    // In zenith ("local sky") mode, DSO angular size must scale with altitude (the
-    // projection's pole), not dec — see dsoSizeCos2. isBelowHorizonCached also
-    // stamps _altDeg as a side effect, so this doubles as the altitude source.
-    const horizon = this.localSkyMode ? this.computeHorizonParams() : null;
-    const dsoAltDeg = (d: DSO): number | undefined => {
-      if (!horizon) return undefined;
-      isBelowHorizonCached(d, horizon.lstH, horizon.latDeg);
-      return d._altDeg;
-    };
-
-    // Viewport cull: query the position index for DSOs whose centre is within the
-    // visible disc plus a margin for the largest body and the off-screen render margin.
-    // This replaces a full scan of all ~12k DSOs every frame with a bounded query — a big
-    // win when zoomed in (small viewport).
-    this.ensureDsoAllIndex();
-    // The raw viewport radius grows as 1/scale, so zooming *out* makes it enormous and the
-    // spatial query degenerates into a scan of a huge, mostly-empty region (it was 75% of
-    // CPU in a zoom-out trace — see render-performance.md T5 addendum). But every DSO that
-    // can actually be drawn lies within the border radius of the projection origin: objects
-    // past it are unconditionally culled by the dec pre-filter below (and in stereo they
-    // project to huge radii — dec −89° → r≈114 — so they can never be near the visible
-    // sky). By the triangle inequality they all sit within (viewCentre→origin distance +
-    // border radius) of the query centre, so capping queryR there never drops a drawable
-    // object while keeping the query bounded when zoomed out. (+2° matches the pre-filter
-    // margin; borderRadiusPU returns 1.0 in fisheye/zenith, where the far side is clipped.)
-    const capR =
-      Math.hypot(view.centerX, view.centerY) +
-      borderRadiusPU(this.borderLatDeg + 2) +
-      this.dsoMaxBodyPU;
-    const queryR = Math.min(
-      Math.hypot(view.width / 2, view.height / 2) / view.scale +
-        this.dsoMaxBodyPU +
-        20 / view.scale,
-      capR,
-    );
-    const nearby = this.dsoAllIndex.collect(view.centerX, view.centerY, queryR);
-
-    // Area-normalisation for the area-weighted gate below (see render-budget.ts): the mean
-    // projection area factor over the visible cap, so weighting compensates the projection
-    // (thinner centre, denser edge) without changing the overall count.
-    const aNorm = areaNormForBorderRadius(borderRadiusPU(this.borderLatDeg));
-    // Rank DSOs by intrinsic quality (rating/brightness), NOT the blue-noise `priority`.
-    // Gating the top count·A/aNorm by intrinsic quality makes on-screen DSO density track
-    // the true sky (Milky Way / rich regions denser) with the projection bias removed —
-    // the exact analogue of the star magnitude gate. `priority` would instead even out
-    // that natural clustering.
-    const qRank = getDSOImportanceRank();
-
-    const candidates: (SelectableDSO & { dso: DSO })[] = [];
-    // The spatial query covers normal-sized objects; the few giant DSOs (body larger
-    // than the query margin) live outside the index and are always considered, so the
-    // margin can stay tight without ever missing a large object near the edge.
-    for (const src of [nearby, this.dsoGiants])
-      for (const dso of src) {
-        const isHighlighted = this.highlightedDSO === dso.id;
-
-        if (!isHighlighted) {
-          if (!this.visibleDSOTypes.has(dso.type)) continue;
-          const cat = dso.catalog;
-          if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
-          if (this.localSkyMode) {
-            // Below-horizon DSOs are already hidden by the horizon-circle canvas
-            // clip; this just skips the size/bbox work for them earlier.
-            if (horizon && isBelowHorizonCached(dso, horizon.lstH, horizon.latDeg)) continue;
-          } else if (!this.fisheyeMode) {
-            // Dec pre-filter: skip objects clearly outside the border (stereo only
-            // — in fisheye the far hemisphere is clipped by project() returning
-            // off-canvas).
-            if (this.hemisphere === 'north' && dso.dec < -(this.borderLatDeg + 2)) continue;
-            if (this.hemisphere === 'south' && dso.dec > +(this.borderLatDeg + 2)) continue;
-          }
-          // Container gate: hide an inner object until its container renders large
-          // enough on screen (so the container stays clean and clickable when zoomed out).
-          if (dso.containerId && dso.containerId !== this.highlightedDSO) {
-            const container = getDSOById(dso.containerId);
-            if (container) {
-              const cRx = Math.max(
-                2,
-                angularSizeToCanvasPx(
-                  (container.majAxis ?? 1) / 2,
-                  container.dec,
-                  view.scale,
-                  dsoSizeCos2(container, dsoAltDeg(container)),
-                ),
-              );
-              if (cRx < DSO_CONTAINER_VISIBLE_RADIUS_PX) continue;
-            }
-          }
-        }
-
-        projectCached(dso);
-        const c = toCanvas(dso._px!, dso._py!, view);
-        const majorArcmin = dso.majAxis ?? 1;
-        const rx = Math.max(
-          2,
-          angularSizeToCanvasPx(
-            majorArcmin / 2,
-            dso.dec,
-            view.scale,
-            dsoSizeCos2(dso, dsoAltDeg(dso)),
-          ),
-        );
-        const margin = rx + 20;
-        if (
-          c.x < -margin ||
-          c.x > view.width + margin ||
-          c.y < -margin ||
-          c.y > view.height + margin
-        ) {
-          continue;
-        }
-
-        // Screen-space (area-weighted) importance rank: scaling the intrinsic-quality rank
-        // by aNorm/A removes the projection bias while preserving the true-sky distribution
-        // — fewer DSOs near the crowded map centre (A≈1 → larger effective rank), more
-        // toward the edge (A large → smaller). Because the rank is intrinsic (not spatially
-        // spread), dense regions keep proportionally more of the top-N → natural clustering
-        // survives. A=0 at the exact fisheye rim → never render (off-screen).
-        const A = projectionAreaFactor(dso._px!, dso._py!);
-        const rank = qRank.get(dso.id) ?? Number.MAX_SAFE_INTEGER;
-        const effPriority = A > 0 ? (rank * aNorm) / A : Infinity;
-        candidates.push({ id: dso.id, priority: effPriority, isHighlighted, dso });
-      }
-
-    const selected = selectDSOsToRender(candidates, this.dsoPriorityThreshold()).map((s) => s.dso);
-    this.cachedSelectedDSOs = selected;
-    this.cachedSelectedDSOIds = new Set(selected.map((d) => d.id));
-    return selected;
+    return this.dsoSelection.select({
+      view: this.view,
+      borderLatDeg: this.borderLatDeg,
+      hemisphere: this.hemisphere,
+      localSkyMode: this.localSkyMode,
+      fisheyeMode: this.fisheyeMode,
+      visibleTypes: this.visibleDSOTypes,
+      visibleCatalogs: this.visibleDSOCatalogs,
+      highlightedId: this.highlightedDSO,
+      horizon: this.localSkyMode ? this.computeHorizonParams() : null,
+      priorityThreshold: this.dsoPriorityThreshold(),
+    });
   }
 
   private renderDSOs(horizon: { lstH: number; latDeg: number } | null) {
