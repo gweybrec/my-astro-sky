@@ -54,7 +54,6 @@ import {
   type StarAreaBudget,
 } from './star-budget';
 import { frameTargetDso } from './fov-frame-target';
-import { SpatialIndex } from './spatial-index';
 import {
   isNearPolygonBorder,
   isNearHandle,
@@ -94,8 +93,9 @@ import {
   navigateProfile,
   zoomAboutPoint,
 } from './sky-view-math';
-import { pickDsoAtCursor } from './hover-hit-test';
 import { resolveHover } from './hover-resolve';
+import { RegionDrawGesture } from './sky-region-draw';
+import { SkyHitTest, isStarRendered, type DsoIndexFilters } from './sky-hit-test';
 import { DsoRenderSelection } from './dso-render-select';
 import {
   drawBackground,
@@ -282,30 +282,17 @@ export class SkyMap {
   private onFrameMerge: ((movedId: string, targetId: string) => void) | null = null;
 
   // Freehand sky-region drawing (Local Sky / zenith view only, see enterRegionDrawMode).
-  // regionDrawActive spans the whole gesture (mousedown → mouseup); regionDrawing is
-  // true only while the mouse button is held (so mousemove before the first press,
-  // impossible in practice, is never captured as a point).
-  private regionDrawActive = false;
-  private regionDrawing = false;
-  private regionDrawPoints: { azDeg: number; altDeg: number }[] = [];
-  // Local Sky mode state to restore once drawing finishes/cancels, so forcing it on
-  // for the gesture never clobbers whatever the user had before.
-  private regionDrawPrevLocalSkyMode = false;
-  private onRegionDrawComplete: ((points: { azDeg: number; altDeg: number }[]) => void) | null =
-    null;
-  private onRegionDrawCancel: (() => void) | null = null;
+  // The gesture's state machine lives in ./sky-region-draw (unit-tested).
+  private regionDraw = new RegionDrawGesture();
   // A saved region shown on the map for reference (see setActiveRegionOverlay); only
   // meaningful while localSkyMode is active, since the polygon is stored in Alt/Az.
   private activeRegionOverlay: {
     color: string;
-    points: { azDeg: number; altDeg: number }[];
+    points: AltAzPoint[];
   } | null = null;
 
-  // Spatial indexes for fast hover detection
-  private starIndex = new SpatialIndex<Star>(0.02);
-  private dsoIndex = new SpatialIndex<DSO>(0.02);
-  private starIndexMaxMag = -1;
-  private dsoIndexMaxMag = -99999; // Sentinel value meaning "not initialized"
+  // Cursor hit-testing (star/DSO spatial indexes + summit search). See ./sky-hit-test.
+  private hitTest = new SkyHitTest();
 
   // Pan state
   private isPanning = false;
@@ -591,22 +578,22 @@ export class SkyMap {
   }
   setHighlightedDSO(dsoId: string | null) {
     this.highlightedDSO = dsoId;
-    this.dsoIndexMaxMag = -99999;
+    this.hitTest.invalidateDsoIndex();
     this.requestRender();
   }
   setHighlightedStar(hip: number | null) {
     this.highlightedStar = hip;
-    this.starIndexMaxMag = -1;
+    this.hitTest.invalidateStarIndex();
     this.requestRender();
   }
   setVisibleDSOTypes(types: Set<string>) {
     this.visibleDSOTypes = types;
-    this.dsoIndexMaxMag = -99999;
+    this.hitTest.invalidateDsoIndex();
     this.requestRender();
   }
   setVisibleDSOCatalogs(catalogs: Set<string>) {
     this.visibleDSOCatalogs = catalogs;
-    this.dsoIndexMaxMag = -99999;
+    this.hitTest.invalidateDsoIndex();
     this.requestRender();
   }
   setShowGrid(show: boolean) {
@@ -706,8 +693,7 @@ export class SkyMap {
     if (borderLatDeg !== undefined) this.borderLatDeg = borderLatDeg;
     setHemisphere(h);
     // Reset spatial indexes (projection coords change)
-    this.starIndexMaxMag = -1;
-    this.dsoIndexMaxMag = -99999;
+    this.hitTest.invalidate();
     // Re-center on the new pole (projection origin) and fit equator
     this.cancelAnimation();
     this.view.centerX = 0;
@@ -723,8 +709,7 @@ export class SkyMap {
   setBorderLatDeg(deg: number) {
     this.borderLatDeg = deg;
     // Invalidate spatial indexes so border check on hover stays consistent
-    this.starIndexMaxMag = -1;
-    this.dsoIndexMaxMag = -99999;
+    this.hitTest.invalidate();
     this.requestRender();
   }
 
@@ -746,8 +731,7 @@ export class SkyMap {
 
   /** Invalidate spatial indexes so they are rebuilt on the next render. */
   invalidateSpatialIndexes() {
-    this.starIndexMaxMag = -1;
-    this.dsoIndexMaxMag = -99999;
+    this.hitTest.invalidate();
   }
 
   zoomBy(factor: number) {
@@ -990,18 +974,10 @@ export class SkyMap {
    * Returns false (no-op) if no observer location is set — same guard as
    * setLocalSkyMode, since computeHorizonParams() can't resolve without one.
    */
-  enterRegionDrawMode(
-    onComplete: (points: { azDeg: number; altDeg: number }[]) => void,
-    onCancel: () => void,
-  ): boolean {
+  enterRegionDrawMode(onComplete: (points: AltAzPoint[]) => void, onCancel: () => void): boolean {
     if (!this.computeHorizonParams()) return false;
-    this.regionDrawPrevLocalSkyMode = this.localSkyMode;
+    this.regionDraw.enter({ onComplete, onCancel }, this.localSkyMode);
     if (!this.localSkyMode) this.setLocalSkyMode(true);
-    this.regionDrawActive = true;
-    this.regionDrawing = false;
-    this.regionDrawPoints = [];
-    this.onRegionDrawComplete = onComplete;
-    this.onRegionDrawCancel = onCancel;
     this.canvas.style.cursor = 'crosshair';
     this.dismissTooltip();
     return true;
@@ -1009,42 +985,29 @@ export class SkyMap {
 
   /** Cancels an in-progress region drawing gesture (e.g. a "Cancel" button). */
   cancelRegionDrawMode(): void {
-    if (this.regionDrawActive) this.finishRegionDraw(true);
+    if (this.regionDraw.active) this.finishRegionDraw(true);
   }
 
   private finishRegionDraw(cancelled: boolean): void {
-    const points = this.regionDrawPoints;
-    const onComplete = this.onRegionDrawComplete;
-    const onCancel = this.onRegionDrawCancel;
-    this.regionDrawActive = false;
-    this.regionDrawing = false;
-    this.regionDrawPoints = [];
-    this.onRegionDrawComplete = null;
-    this.onRegionDrawCancel = null;
+    const { restoreLocalSkyOff } = this.regionDraw.finish(cancelled);
     this.canvas.style.cursor = 'default';
-    if (!this.regionDrawPrevLocalSkyMode) this.setLocalSkyMode(false);
-    if (cancelled || points.length < 3) onCancel?.();
-    else onComplete?.(points);
+    if (restoreLocalSkyOff) this.setLocalSkyMode(false);
     this.requestRender();
   }
 
-  private pushRegionDrawPoint(mx: number, my: number): void {
+  /** Canvas point → Alt/Az, or null when no observer location is set. */
+  private canvasToAltAz(mx: number, my: number): AltAzPoint | null {
     const hp = this.computeHorizonParams();
-    if (!hp) return;
+    if (!hp) return null;
     const proj = fromCanvas(mx, my, this.view);
     const { ra, dec } = unproject(proj.x, proj.y);
     const { altDeg, azDeg } = altAzFromRaDec(ra, dec, hp.lstH, hp.latDeg);
-    const last = this.regionDrawPoints[this.regionDrawPoints.length - 1];
-    // Dedupe near-identical consecutive points so the saved polygon stays lean.
-    if (last && Math.abs(azDeg - last.azDeg) < 0.3 && Math.abs(altDeg - last.altDeg) < 0.3) return;
-    this.regionDrawPoints.push({ azDeg, altDeg });
+    return { azDeg, altDeg };
   }
 
   /** Shows a saved region on the map for reference; pass null to clear it. Requires
    * Local Sky mode to render meaningfully (the polygon is stored in Alt/Az). */
-  setActiveRegionOverlay(
-    region: { color: string; points: { azDeg: number; altDeg: number }[] } | null,
-  ): void {
+  setActiveRegionOverlay(region: { color: string; points: AltAzPoint[] } | null): void {
     this.activeRegionOverlay = region;
     this.requestRender();
   }
@@ -1076,47 +1039,19 @@ export class SkyMap {
     this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  private buildStarIndex(maxMag: number) {
-    if (maxMag === this.starIndexMaxMag) return;
-    this.starIndexMaxMag = maxMag;
-    this.starIndex.clear();
-    for (const star of getStars()) {
-      if (star.mag > maxMag) continue;
-      projectCached(star);
-      this.starIndex.insert(star, star._px!, star._py!);
-    }
-  }
-
-  private buildDSOIndex(maxMag: number | null) {
-    // Convert maxMag to a cache key (null becomes -999 for different behavior than computed values)
-    const cacheKey = maxMag === null ? -999 : maxMag;
-    if (cacheKey === this.dsoIndexMaxMag) return;
-    this.dsoIndexMaxMag = cacheKey;
-    this.dsoIndex.clear();
-    for (const dso of getDSOs()) {
-      const isHighlighted = this.highlightedDSO === dso.id;
-
-      if (!isHighlighted) {
-        if (!this.visibleDSOTypes.has(dso.type)) continue;
-        const cat = dso.catalog;
-        if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
-        if (maxMag !== null && dso.mag !== null && dso.mag > maxMag) continue;
-        if (dso.mag === null && maxMag !== null) continue;
-      }
-
-      projectCached(dso);
-      this.dsoIndex.insert(dso, dso._px!, dso._py!);
-    }
+  /** Display state the hover DSO index filters on. */
+  private dsoIndexFilters(): DsoIndexFilters {
+    return {
+      visibleTypes: this.visibleDSOTypes,
+      visibleCatalogs: this.visibleDSOCatalogs,
+      highlightedId: this.highlightedDSO,
+    };
   }
 
   private findClosestStar(mx: number, my: number): Star | null {
     // Match the renderer's magnitude gate so the hover index is a superset of what is
     // drawn (isStarRendered does the final confirm).
-    const maxMag = this.starMagThreshold();
-    this.buildStarIndex(maxMag);
-    const projPt = fromCanvas(mx, my, this.view);
-    const threshold = 8 / this.view.scale;
-    return this.starIndex.findNearest(projPt.x, projPt.y, threshold);
+    return this.hitTest.findClosestStar(mx, my, this.view, this.starMagThreshold());
   }
 
   private addEvent(
@@ -1161,11 +1096,10 @@ export class SkyMap {
     this.addEvent(this.canvas, 'mousedown', ((e: MouseEvent) => {
       this.cancelAnimation();
       if (e.button === 0) {
-        if (this.regionDrawActive) {
-          this.regionDrawing = true;
-          this.regionDrawPoints = [];
+        if (this.regionDraw.active) {
+          this.regionDraw.press();
           const rect = this.canvas.getBoundingClientRect();
-          this.pushRegionDrawPoint(e.clientX - rect.left, e.clientY - rect.top);
+          this.regionDraw.move(this.canvasToAltAz(e.clientX - rect.left, e.clientY - rect.top));
           this.requestRenderInteractive();
           return; // region drawing consumed the press — no pan
         }
@@ -1200,13 +1134,13 @@ export class SkyMap {
     }) as EventListener);
 
     this.addEvent(window, 'mousemove', ((e: MouseEvent) => {
-      if (this.regionDrawActive) {
+      if (this.regionDraw.active) {
         // Suppress hover/tooltips for the whole gesture (not just while dragging) —
         // a star/DSO tooltip popping up under the crosshair gets in the way of drawing.
         this.dismissTooltip();
-        if (this.regionDrawing) {
+        if (this.regionDraw.capturing) {
           const rect = this.canvas.getBoundingClientRect();
-          this.pushRegionDrawPoint(e.clientX - rect.left, e.clientY - rect.top);
+          this.regionDraw.move(this.canvasToAltAz(e.clientX - rect.left, e.clientY - rect.top));
           this.requestRenderInteractive();
         }
         return;
@@ -1256,8 +1190,8 @@ export class SkyMap {
     }) as EventListener);
 
     this.addEvent(window, 'mouseup', ((e: MouseEvent) => {
-      if (this.regionDrawActive) {
-        this.finishRegionDraw(!this.regionDrawing);
+      if (this.regionDraw.active) {
+        this.finishRegionDraw(!this.regionDraw.capturing);
         return;
       }
       if (this.frameDrag) {
@@ -1322,7 +1256,7 @@ export class SkyMap {
     // Escape exits picking mode, or deselects the active frame.
     this.addEvent(window, 'keydown', ((e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (this.regionDrawActive) {
+      if (this.regionDraw.active) {
         this.finishRegionDraw(true);
       } else if (this.pickingMode) {
         this.exitPickingMode();
@@ -1376,16 +1310,7 @@ export class SkyMap {
 
   private findClosestDSO(mx: number, my: number): DSO | null {
     if (!this.showDSOs) return null;
-    // DSOs are gated by priority (not magnitude), so the hit-test index must include all
-    // catalog DSOs — a superset of what is drawn; isDSORendered does the precise gating.
-    this.buildDSOIndex(null);
-    const projPt = fromCanvas(mx, my, this.view);
-
-    // Generous threshold collects all nearby DSO centres: large DSOs (e.g. M42 at 90')
-    // have centres far from the cursor even when it sits inside their rendered ellipse.
-    const generousThreshold = 200 / this.view.scale;
-    const candidates = this.dsoIndex.findAll(projPt.x, projPt.y, generousThreshold);
-    return pickDsoAtCursor(candidates, mx, my, this.view);
+    return this.hitTest.findClosestDSO(mx, my, this.view, this.dsoIndexFilters());
   }
 
   /**
@@ -1396,28 +1321,12 @@ export class SkyMap {
   private dsosInFrame(f: RenderableFrame): DSO[] {
     if (!this.showDSOs) return [];
     const maxMag = computeMaxMag(this.view.scale) + 4;
-    this.buildDSOIndex(maxMag);
-
-    const { corners, cx, cy, halfW, halfH } = this.frameGeometry(f);
-    const projCenter = fromCanvas(cx, cy, this.view);
-    // Collect candidates around the frame centre out to its half-diagonal (+margin).
-    const radiusPx = Math.hypot(halfW, halfH) + 4;
-    const candidates = this.dsoIndex.findAll(
-      projCenter.x,
-      projCenter.y,
-      radiusPx / this.view.scale,
+    return this.hitTest.dsosInFrame(
+      this.frameGeometry(f),
+      this.view,
+      maxMag,
+      this.dsoIndexFilters(),
     );
-
-    const inside: Array<{ dso: DSO; dist: number }> = [];
-    for (const dso of candidates) {
-      const p = project(dso.ra, dso.dec);
-      const c = toCanvas(p.x, p.y, this.view);
-      if (pointInConvexPolygon(c.x, c.y, corners)) {
-        inside.push({ dso, dist: Math.hypot(c.x - cx, c.y - cy) });
-      }
-    }
-    inside.sort((a, b) => a.dist - b.dist);
-    return inside.map((e) => e.dso);
   }
 
   /**
@@ -1425,25 +1334,7 @@ export class SkyMap {
    * Replicates the filtering logic from renderStars().
    */
   private isStarRendered(star: Star): boolean {
-    const { view } = this;
-    const p = project(star.ra, star.dec);
-
-    // Same area-weighted per-position magnitude gate as renderStars (highlighted star
-    // always shows), so hover/click matches exactly what is drawn.
-    if (
-      star.hip !== this.highlightedStar &&
-      star.mag > starFaintLimitAt(p.x, p.y, this.starAreaBudget())
-    ) {
-      return false;
-    }
-
-    // Check viewport bounds
-    const c = toCanvas(p.x, p.y, view);
-    if (c.x < -20 || c.x > view.width + 20 || c.y < -20 || c.y > view.height + 20) {
-      return false;
-    }
-
-    return true;
+    return isStarRendered(star, this.view, this.starAreaBudget(), this.highlightedStar);
   }
 
   /**
@@ -1483,21 +1374,13 @@ export class SkyMap {
     mx: number,
     my: number,
   ): { summit: HorizonSummit; dist: number } | null {
-    const summits = this.mountainProfile?.summits;
-    if (!this.showMountainHorizon || !summits?.length) return null;
-    const hp = this.computeHorizonParams();
-    if (!hp) return null;
-    const projPt = fromCanvas(mx, my, this.view);
-    const threshold = 12 / this.view.scale; // ~12 px
-    let best: { summit: HorizonSummit; dist: number } | null = null;
-    for (const s of summits) {
-      const { raDeg, decDeg } = raDecFromAltAz(s.altDeg, s.azDeg, hp.lstH, hp.latDeg);
-      const p = project(raDeg, decDeg);
-      if (p.x >= 1e5) continue;
-      const dist = Math.hypot(p.x - projPt.x, p.y - projPt.y);
-      if (dist <= threshold && (!best || dist < best.dist)) best = { summit: s, dist };
-    }
-    return best;
+    return this.hitTest.findClosestSummit(
+      mx,
+      my,
+      this.view,
+      this.showMountainHorizon ? this.mountainProfile : null,
+      this.computeHorizonParams(),
+    );
   }
 
   /** Distance from the cursor to a sky object, in projection units. */
@@ -1751,7 +1634,7 @@ export class SkyMap {
 
     const horizon = this.skyTimeMode === 'date' ? this.computeHorizonParams() : null;
     const hasFrames = this.fovFrameSpecs.length > 0 || this.fovInstances.length > 0;
-    const hasRegionDraw = this.regionDrawActive && this.regionDrawPoints.length > 0;
+    const hasRegionDraw = this.regionDraw.active && this.regionDraw.capturedPoints.length > 0;
     const hasRegionOverlay = this.activeRegionOverlay !== null && this.localSkyMode;
     if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay) return;
 
@@ -1828,11 +1711,12 @@ export class SkyMap {
   /** Draws the live in-progress freehand region stroke while drawing. */
   private renderRegionDrawPreview(ctx: CanvasRenderingContext2D): void {
     const hp = this.computeHorizonParams();
-    if (!hp || this.regionDrawPoints.length === 0) return;
+    const points = this.regionDraw.capturedPoints;
+    if (!hp || points.length === 0) return;
     const { view } = this;
     ctx.save();
     ctx.beginPath();
-    this.regionDrawPoints.forEach((p, i) => {
+    points.forEach((p, i) => {
       const { raDeg, decDeg } = raDecFromAltAz(p.altDeg, p.azDeg, hp.lstH, hp.latDeg);
       const proj = project(raDeg, decDeg);
       const c = toCanvas(proj.x, proj.y, view);
