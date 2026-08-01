@@ -289,6 +289,40 @@ describe('zenith mode: borderRadiusPU', () => {
     expect(borderRadiusPU(0)).toBe(1.0);
     expect(borderRadiusPU(45)).toBe(1.0);
   });
+
+  /**
+   * Why SkyMap does NOT draw the horizon line in Local Sky mode: here the border ring
+   * already *is* the horizon, so a second stroke only repaints the rim in the accent
+   * colour. Worse, alt 0 sits exactly on the projection's visibility boundary, so
+   * rounding sends roughly half the azimuths off-projection and the redundant stroke
+   * lands as a partial orange arc over one side of the ring.
+   *
+   * If the zenith projection ever stops putting the horizon on the border, this fails
+   * and the gate in SkyMap.renderScene() should be revisited.
+   */
+  it('places the alt=0 circle exactly on the border ring, so the horizon needs no stroke', () => {
+    setProjectionMode('stereo');
+    setCenterMode('zenith');
+    setProjectionObserver(LST_H, LAT_DEG);
+
+    let onProjection = 0;
+    let offProjection = 0;
+    for (let az = 0; az < 360; az += 15) {
+      const { raDeg, decDeg } = raDecFromAltAz(0, az, LST_H, LAT_DEG);
+      const p = project(raDeg, decDeg);
+      if (p.x >= 1e5) {
+        offProjection++;
+        continue;
+      }
+      onProjection++;
+      expect(Math.hypot(p.x, p.y)).toBeCloseTo(borderRadiusPU(45), 6);
+    }
+
+    // Both counts are non-zero: the circle coincides with the ring, and the boundary
+    // rounding really does drop a large share of it — the partial-arc artefact.
+    expect(onProjection).toBeGreaterThan(0);
+    expect(offProjection).toBeGreaterThan(0);
+  });
 });
 
 // ── Center mode state / generation ──────────────────────────────────────────

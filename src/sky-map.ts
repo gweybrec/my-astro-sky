@@ -1444,10 +1444,18 @@ export class SkyMap {
       if (scene.showAzimuthGrid) {
         drawAzimuthGrid(ctx, view, horizon.lstH, horizon.latDeg, scene.theme);
       }
-      // --accent-color tracks the current warm/cold UI theme, so the horizon line
-      // reads well regardless of theme instead of a fixed hardcoded hue.
-      const horizonColor = scene.cssVar('--accent-color', scene.theme.horizonLineColorFallback);
-      drawHorizonLine(ctx, view, horizon.lstH, horizon.latDeg, horizonColor);
+      // Only in the pole-centred view, where the horizon is a genuine curve across the
+      // map. In Local Sky the projection is zenith-centred, so the horizon IS the border
+      // circle (borderRadiusPU returns 1.0 = alt 0) — drawing it again just repaints the
+      // rim in the accent colour, and since alt 0 sits exactly on the projection's
+      // visibility boundary, rounding drops about half the azimuths and it lands as a
+      // partial orange arc over one side of the ring.
+      if (!scene.localSkyMode) {
+        // --accent-color tracks the current warm/cold UI theme, so the horizon line
+        // reads well regardless of theme instead of a fixed hardcoded hue.
+        const horizonColor = scene.cssVar('--accent-color', scene.theme.horizonLineColorFallback);
+        drawHorizonLine(ctx, view, horizon.lstH, horizon.latDeg, horizonColor);
+      }
       // The terrain mass is drawn on the overlay canvas (above the photo layer) for live
       // renders, so photos sitting behind the mountains are correctly hidden rather than
       // painted on top of them — same pattern as FOV frames below. Offscreen/export renders
