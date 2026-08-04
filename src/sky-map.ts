@@ -63,7 +63,7 @@ import {
   renderFovInstances,
 } from './sky-frame-render';
 import { RegionDrawGesture } from './sky-region-draw';
-import { FrameController } from './frame-controller';
+import { FrameController, type FrameHost } from './frame-controller';
 import { attachSkyMapEvents, type EventBinding, type SkyEventHost } from './sky-map-events';
 import { SkyHitTest, isStarRendered, type DsoIndexFilters } from './sky-hit-test';
 import { DsoRenderSelection } from './dso-render-select';
@@ -278,25 +278,7 @@ export class SkyMap {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.view = { centerX: 0, centerY: 0, scale: 0, rotationDeg: 0, width: 0, height: 0 };
-    const map = this;
-    this.frames = new FrameController({
-      // Getters, not a snapshot: the controller must always see the live view and
-      // interaction flags, which change under it between frames.
-      get view() {
-        return map.view;
-      },
-      get interactionEnabled() {
-        return map.interactionEnabled;
-      },
-      get pickingMode() {
-        return map.pickingMode;
-      },
-      findClosestDSO: (mx, my) => map.findClosestDSO(mx, my),
-      dsosInFrame: (f) => map.dsosInFrame(f),
-      requestRenderInteractive: () => map.requestRenderInteractive(),
-      render: () => map.render(),
-      navigateTo: (ra, dec, scale, animate) => map.navigateTo(ra, dec, scale, animate),
-    });
+    this.frames = new FrameController(this.frameHost());
     this.eventBindings = attachSkyMapEvents(this.eventHost());
     this.resize();
   }
@@ -1002,76 +984,112 @@ export class SkyMap {
   }
 
   /**
-   * Adapter handed to ./sky-map-events, which owns the pointer/keyboard routing.
-   * Live values are exposed as getters so the handlers always see current state.
+   * Adapter handed to ./frame-controller.
+   *
+   * The live values (view, interaction flags) are exposed as getters so the controller
+   * always sees current state rather than a snapshot. Each getter delegates to an arrow
+   * closure captured here: an object-literal getter would rebind `this` to the literal,
+   * and aliasing `this` into a local to work around that trips `no-this-alias`.
    */
-  private eventHost(): SkyEventHost {
-    const map = this;
+  private frameHost(): FrameHost {
+    const view = () => this.view;
+    const interactionEnabled = () => this.interactionEnabled;
+    const pickingMode = () => this.pickingMode;
     return {
-      get canvas() {
-        return map.canvas;
-      },
       get view() {
-        return map.view;
-      },
-      get borderLatDeg() {
-        return map.borderLatDeg;
+        return view();
       },
       get interactionEnabled() {
-        return map.interactionEnabled;
+        return interactionEnabled();
       },
       get pickingMode() {
-        return map.pickingMode;
+        return pickingMode();
+      },
+      findClosestDSO: (mx, my) => this.findClosestDSO(mx, my),
+      dsosInFrame: (f) => this.dsosInFrame(f),
+      requestRenderInteractive: () => this.requestRenderInteractive(),
+      render: () => this.render(),
+      navigateTo: (ra, dec, scale, animate) => this.navigateTo(ra, dec, scale, animate),
+    };
+  }
+
+  /**
+   * Adapter handed to ./sky-map-events, which owns the pointer/keyboard routing.
+   * Live values are getters over arrow closures — see {@link frameHost}.
+   */
+  private eventHost(): SkyEventHost {
+    const canvas = () => this.canvas;
+    const view = () => this.view;
+    const borderLatDeg = () => this.borderLatDeg;
+    const interactionEnabled = () => this.interactionEnabled;
+    const pickingMode = () => this.pickingMode;
+    const photoOutlines = () => this.photoOutlines;
+    const hoveredDSO = () => this.hoveredDSO;
+    return {
+      get canvas() {
+        return canvas();
+      },
+      get view() {
+        return view();
+      },
+      get borderLatDeg() {
+        return borderLatDeg();
+      },
+      get interactionEnabled() {
+        return interactionEnabled();
+      },
+      get pickingMode() {
+        return pickingMode();
       },
       get photoOutlines() {
-        return map.photoOutlines;
+        return photoOutlines();
       },
       get hoveredDSO() {
-        return map.hoveredDSO;
+        return hoveredDSO();
       },
-      hasSelection: () => map.highlightedDSO !== null || map.highlightedStar !== null,
+      hasSelection: () => this.highlightedDSO !== null || this.highlightedStar !== null,
 
-      regionDrawActive: () => map.regionDraw.active,
-      regionDrawCapturing: () => map.regionDraw.capturing,
-      regionDrawPress: () => map.regionDraw.press(),
-      regionDrawMove: (pt) => map.regionDraw.move(pt),
-      regionDrawFinish: (cancelled) => map.finishRegionDraw(cancelled),
-      canvasToAltAz: (mx, my) => map.canvasToAltAz(mx, my),
+      regionDrawActive: () => this.regionDraw.active,
+      regionDrawCapturing: () => this.regionDraw.capturing,
+      regionDrawPress: () => this.regionDraw.press(),
+      regionDrawMove: (pt) => this.regionDraw.move(pt),
+      regionDrawFinish: (cancelled) => this.finishRegionDraw(cancelled),
+      canvasToAltAz: (mx, my) => this.canvasToAltAz(mx, my),
 
-      frameMouseDown: (mx, my) => map.frames.handleMouseDown(mx, my),
-      frameDragActive: () => map.frames.activeDrag !== null,
-      frameDragMove: (mx, my) => map.frames.handleDragMove(mx, my),
-      frameMouseUp: () => map.frames.handleMouseUp(),
-      frameHasActive: () => map.frames.hasActiveFrame(),
-      frameClearInteraction: () => map.frames.clearInteraction(),
-      frameSelect: (id) => map.frames.selectFrame(id),
+      frameMouseDown: (mx, my) => this.frames.handleMouseDown(mx, my),
+      frameDragActive: () => this.frames.activeDrag !== null,
+      frameDragMove: (mx, my) => this.frames.handleDragMove(mx, my),
+      frameMouseUp: () => this.frames.handleMouseUp(),
+      frameHasActive: () => this.frames.hasActiveFrame(),
+      frameClearInteraction: () => this.frames.clearInteraction(),
+      frameSelect: (id) => this.frames.selectFrame(id),
 
-      cancelAnimation: () => map.cancelAnimation(),
-      dismissTooltip: () => map.dismissTooltip(),
-      requestHover: (mx, my, cx, cy) => map.requestHover(mx, my, cx, cy),
-      requestRenderInteractive: () => map.requestRenderInteractive(),
-      render: () => map.render(),
-      viewChanged: () => map.onViewChange?.(),
-      findClosestStar: (mx, my) => map.findClosestStar(mx, my),
-      exitPickingMode: () => map.exitPickingMode(),
+      cancelAnimation: () => this.cancelAnimation(),
+      dismissTooltip: () => this.dismissTooltip(),
+      requestHover: (mx, my, cx, cy) => this.requestHover(mx, my, cx, cy),
+      requestRenderInteractive: () => this.requestRenderInteractive(),
+      render: () => this.render(),
+      viewChanged: () => this.onViewChange?.(),
+      findClosestStar: (mx, my) => this.findClosestStar(mx, my),
+      exitPickingMode: () => this.exitPickingMode(),
 
-      hasStarPickedHandler: () => map.onStarPicked !== null,
-      hasPhotoClickHandler: () => map.onPhotoClick !== null,
-      emitStarPicked: (star) => map.onStarPicked?.(star),
-      emitPhotoClick: (name) => map.onPhotoClick?.(name),
+      hasStarPickedHandler: () => this.onStarPicked !== null,
+      hasPhotoClickHandler: () => this.onPhotoClick !== null,
+      emitStarPicked: (star) => this.onStarPicked?.(star),
+      emitPhotoClick: (name) => this.onPhotoClick?.(name),
       emitDSOClick: () => {
-        const dso = map.hoveredDSO;
+        const dso = this.hoveredDSO;
         if (!dso) return;
-        map.onDSOClick?.(dso);
+        this.onDSOClick?.(dso);
         // A one-shot picker (e.g. choosing a mosaic target) fires after the
         // normal selection so the click still selects the DSO as usual.
-        if (map.onNextDSOPick) {
-          const cb = map.onNextDSOPick;
-          map.onNextDSOPick = null;
+        if (this.onNextDSOPick) {
+          const cb = this.onNextDSOPick;
+          this.onNextDSOPick = null;
           cb(dso);
         }
       },
-      emitClearSelection: () => map.onClearSelection?.(),
+      emitClearSelection: () => this.onClearSelection?.(),
     };
   }
 
