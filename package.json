@@ -26,6 +26,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run verify:icon && npm test && npx vite build",
+    "verify:icon": "node -e \"const f=require('fs');const a=f.readFileSync('public/icon.png'),b=f.readFileSync('docs/icon.png');if(Buffer.compare(a,b)){console.error('docs/icon.png is out of sync with public/icon.png - run npm run generate-icons');process.exit(1)}\"",
     "test": "vitest run",
     "test:dot": "vitest run --reporter=dot",
     "test:watch": "vitest",

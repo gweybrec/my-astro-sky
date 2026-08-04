@@ -77,26 +77,38 @@ gear setup — picked per integration row / observation window).
 ESLint (flat config, `eslint.config.js`) + Prettier (`.prettierrc.json`).
 
 ```bash
-npm run lint          # ESLint over the repo (warn-only — never fails)
+npm run lint          # ESLint over the repo — CAN fail, see below
 npm run lint:fix      # ESLint with --fix
 npm run format        # Prettier --write (format everything)
 npm run format:check  # Prettier --check (CI gate; must pass)
 ```
 
-**Warn-only convention:** every ESLint rule is set to `warn`, so `npm run lint` exits 0
-and never blocks CI — it's a guardrail against _new_ issues, not a mandate to fix the
-~750 existing warnings. The `ci.yml` **Lint** step surfaces them; the **Prettier check**
-step is the only hard gate. Promote a rule from `warn` to `error` in `eslint.config.js`
-once its existing warnings have been paid down. Highest-value rules already on:
+**Warn-only convention — and its limit.** Every rule the project configures itself in
+`eslint.config.js` is set to `warn`, so the ~800 existing warnings don't block anything:
+they are a guardrail against _new_ issues, not a mandate to pay them down. Promote a rule
+from `warn` to `error` once its warnings are cleared. Highest-value rules already on:
 `@typescript-eslint/no-floating-promises`, `no-unused-vars`, `no-explicit-any`,
-`no-console` (allows `warn`/`error`). Prettier owns all formatting (no ESLint stylistic
-rules — `eslint-config-prettier` disables them).
+`no-console` (allows `warn`/`error`).
+
+**But `npm run lint` is not warn-only overall.** Rules inherited from the `recommended`
+presets (`js`, `tseslint`, `vue`) keep their `error` severity unless explicitly downgraded,
+so they exit non-zero and **fail the `ci.yml` Lint step**. This is intentional — that set is
+small and high-signal — but it means you must check the exit code, never assume lint passes.
+(`@typescript-eslint/no-this-alias` once reached CI this way.) Report errors only with
+`npx eslint --quiet <file>`.
 
 `endOfLine: "auto"` in `.prettierrc.json` keeps Windows CRLF checkouts from mass-flagging
 under `"lf"`. Always use `npm run format` / `format:check`, not raw `npx prettier`.
 
-A PostToolUse hook (`.claude/hooks/prettier-on-edit.js`) runs `prettier --write` on the
-edited file after any Edit or Write, so formatting issues never reach CI.
+Two PostToolUse hooks keep both out of CI: `.claude/hooks/prettier-on-edit.js` runs
+`prettier --write` on the edited file, and `.claude/hooks/lint-on-ts-edit.js` runs
+`eslint --quiet` on it (errors only — warnings would bury the signal).
+
+### Verifying before you push
+
+`npm run verify` runs the whole CI gate in `ci.yml`'s order — typecheck, lint,
+format:check, the docs-icon sync check, tests, and the production build. Use it instead of
+running the steps by hand: a locally-passing subset is how a lint error reached CI before.
 
 ## Unit Tests
 

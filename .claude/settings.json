@@ -56,6 +56,10 @@
           },
           {
             "type": "command",
+            "command": "node .claude/hooks/lint-on-ts-edit.js"
+          },
+          {
+            "type": "command",
             "command": "node .claude/hooks/vitest-on-ts-edit.js"
           }
         ]
