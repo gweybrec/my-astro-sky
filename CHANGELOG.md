@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.9.0] - 2026-08-04
+
+### Features
+
+- Add cardinal points on trajectories ([481c195](https://github.com/gweybrec/my-astro-sky/commit/481c1958a029bfbb0e1cc07ade1b390d2816d8d5))
+
+- Targets in a sky region drawn by the user ([8906193](https://github.com/gweybrec/my-astro-sky/commit/89061938c1edf3427aad99596d2bb74475270c57))
+
+- Add the sun and the planets in local sky projection ([ea20c66](https://github.com/gweybrec/my-astro-sky/commit/ea20c66b2d665c0f8ad108793e0d1e92f62f12ec))
+
+
+### Bug Fixes
+
+- Don't draw the horizon line in Local Sky mode ([c94b9c2](https://github.com/gweybrec/my-astro-sky/commit/c94b9c2c88de3304c21040a9d4ee575e03ba4d77))
+
+- Incorrect frames sizes for smart scopes and frames projection on local sky ([5d5bb52](https://github.com/gweybrec/my-astro-sky/commit/5d5bb52eed6ab2d11541dc6769c04ae4ce335e9b))
+
 ## [0.8.0] - 2026-07-26
 
 ### Features
@@ -37,10 +54,6 @@ by [git-cliff](https://git-cliff.org).
 
 
 ### Other
-
-- Fix photos displayed on top of mountains ([1cd8420](https://github.com/gweybrec/my-astro-sky/commit/1cd8420fa9f886f39285451c20bdc5aed186f0ac))
-
-- Fix unwated reload on the setup dropdown in the gallery ([f03f141](https://github.com/gweybrec/my-astro-sky/commit/f03f141c450e988e768cdc8f530f6f66541c72a8))
 
 - Try improving mountains display ([d3a77e0](https://github.com/gweybrec/my-astro-sky/commit/d3a77e0f7882da311fb0302ede7cdb057d04d243))
 
@@ -98,25 +111,11 @@ by [git-cliff](https://git-cliff.org).
 
 - Restore DSO natural uneven distribution ([ecbf046](https://github.com/gweybrec/my-astro-sky/commit/ecbf0465b2e4b478193b01ade349179680974bfe))
 
-- Opened plan stay opened after the targets menu closes ([7703d05](https://github.com/gweybrec/my-astro-sky/commit/7703d054e1de9b45c41e832233d8c9669ef9c0e9))
-
-- Fix plan pdf export ([d79a179](https://github.com/gweybrec/my-astro-sky/commit/d79a1795e6dedb95f3ddc626cd535d4bcb95c199))
-
 - Plan observation window ([d9d7ec8](https://github.com/gweybrec/my-astro-sky/commit/d9d7ec88dc89aa144d904ecd875e4964f9fa4d4d))
-
-- Fix photo culling after changing multiple projections ([1294149](https://github.com/gweybrec/my-astro-sky/commit/1294149041c4ac83f6280a0df6fc14cd94cace99))
-
-- Draw constellation line parts when one of the stars if outside the edge ([a857c80](https://github.com/gweybrec/my-astro-sky/commit/a857c8054b830199b54aacd8b7fd211b44f4ff9b))
 
 - Fix local sky projection orientation ([c2808d0](https://github.com/gweybrec/my-astro-sky/commit/c2808d09e70e5700abaec55a02ebac448f0f659e))
 
 - Fix a few DSO ([0f6b146](https://github.com/gweybrec/my-astro-sky/commit/0f6b146cbff139707e64a047a1c327086106e9db))
-
-- Fix local sky constellation line draw beow the horizonÃ ([05f7a22](https://github.com/gweybrec/my-astro-sky/commit/05f7a2206d1a362c3b02e7c0098c3bd05e293d91))
-
-- Fix tooltip dismissing every tick on local date projection ([f42f200](https://github.com/gweybrec/my-astro-sky/commit/f42f200c8e7802fb635febb7021d391c5836749c))
-
-- Improve the time management for local sky ([2f6f387](https://github.com/gweybrec/my-astro-sky/commit/2f6f387ea9fbd9cc943056e6b3e93f64e5af9374))
 
 ## [0.6.0] - 2026-07-03
 
@@ -191,47 +190,6 @@ by [git-cliff](https://git-cliff.org).
 - V0.6.0 ([105d085](https://github.com/gweybrec/my-astro-sky/commit/105d085d35db9fc18a554a59d7698cabadbd978f))
 
 - Slightly update the app icon ([01527d3](https://github.com/gweybrec/my-astro-sky/commit/01527d31e3db0292ae82ad498acc44289708b81c))
-
-
-### Other
-
-- Fix vue-tsc failures ([0690e09](https://github.com/gweybrec/my-astro-sky/commit/0690e09fab8312f808f5f7d8985711a8eff70eb8))
-
-- Extract FOV frame drawing into frame-draw and tokenize ([5892dfe](https://github.com/gweybrec/my-astro-sky/commit/5892dfe9a44f6adae904e955489788d673d34aae))
-
-- Extract star painters and DSO label logic ([d55dd66](https://github.com/gweybrec/my-astro-sky/commit/d55dd66bac4225240d55bd07d9b7ba40767cb36a))
-
-- Extract table-driven DSO marker painter into dso-draw ([7a3a872](https://github.com/gweybrec/my-astro-sky/commit/7a3a872e8454788950879edb0f6452d552abd406))
-
-- Add canvas-theme tokens for sky-map render colors and sizes ([34ff2c3](https://github.com/gweybrec/my-astro-sky/commit/34ff2c37dea1932950199839d59ee4377bd26f71))
-
-- Move self-contained draw layers into sky-draw ([2ebdf60](https://github.com/gweybrec/my-astro-sky/commit/2ebdf602c97be203c112aaed62c38cede1396f07))
-
-- Wire sky-map to the extracted modules ([41b1da6](https://github.com/gweybrec/my-astro-sky/commit/41b1da6e6c8495a09157bf24055195a2d633b21f))
-
-- Extract DSO hover hit-test into hover-hit-test ([4a380db](https://github.com/gweybrec/my-astro-sky/commit/4a380db06c7fc55eef15a46418761b1f35aeaf34))
-
-- Extract camera maths into sky-view-math ([35a7778](https://github.com/gweybrec/my-astro-sky/commit/35a7778efc603623c847a710b4be90a10644408e))
-
-- Extract frame merge/resize decisions into frame-interaction ([ba74479](https://github.com/gweybrec/my-astro-sky/commit/ba74479505f012195fbafbd9333337cd80319a84))
-
-- Extract frame canvas geometry into frame-geometry ([2bc231c](https://github.com/gweybrec/my-astro-sky/commit/2bc231c7b0fa0a81fb3d77ec588f9b866b2a09c4))
-
-- Extract adaptive-LOD state machine into interaction-lod ([c6abbaf](https://github.com/gweybrec/my-astro-sky/commit/c6abbaf55b38bc4c1e104fa880a9bd04a6b8c915))
-
-- Extract photo-outline geometry from sky-map ([62b306f](https://github.com/gweybrec/my-astro-sky/commit/62b306f884dccd60692fc50f6daba733e9cc1660))
-
-- Extract DSO render maths into dso-render-math ([e35e3e4](https://github.com/gweybrec/my-astro-sky/commit/e35e3e4868d8538513d69fa59fe7fa1d3f507d8c))
-
-- Extract star render maths into star-render-math ([999fe2e](https://github.com/gweybrec/my-astro-sky/commit/999fe2e9216c43fa7f485fec9c2108c0cd0fe2a5))
-
-- Remove unused field ([4e80b2a](https://github.com/gweybrec/my-astro-sky/commit/4e80b2a9d05164c136153ef7f5ce9ed256c19363))
-
-- Make the zoom look smoother by redrawing more often stars with a glow ([59e9e66](https://github.com/gweybrec/my-astro-sky/commit/59e9e6660f07cdf4124ca8ee4822b81119818554))
-
-- Extract and reuse the eye toggle icon ([b0f0d56](https://github.com/gweybrec/my-astro-sky/commit/b0f0d56394396eda7c9124d17ae5bc7422295aaf))
-
-- Improve POI chip creation ([d4e755d](https://github.com/gweybrec/my-astro-sky/commit/d4e755d6f7f081fc8a8fbf8efa5e2ea5a7e8a2b7))
 
 ## [0.5.0] - 2026-06-22
 
