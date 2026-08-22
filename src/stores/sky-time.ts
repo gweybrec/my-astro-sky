@@ -134,7 +134,14 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     canvasStore.skyMap?.setSimDate(simDate.value);
   }
 
-  if (mode.value === 'date') activateDateMode();
+  // Boot straight into date mode (the persisted state) — activate it *and* start the
+  // ticker. Without this the clock only ever started via a user action (setMode,
+  // togglePaused, a rate change…), so relaunching into date mode left the sky frozen
+  // at launch until a time control was touched.
+  if (mode.value === 'date') {
+    activateDateMode();
+    updateTicker();
+  }
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
 

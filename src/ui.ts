@@ -427,7 +427,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   // ─── Apply initial sky-time settings (date mode / Moon / horizon location) ──────
   const skyTimeSettings = loadSkyTimeSettings();
   skyMap.setSkyTimeMode(skyTimeSettings.mode);
-  skyMap.setSimDate(new Date(skyTimeSettings.simDateISO));
+  // simDate comes from the store, not the raw snapshot: booting into date mode resets the
+  // session's first activation to "now" (see activateDateMode), so the persisted ISO is
+  // already stale by the time we get here and would show the sky for the wrong instant.
+  skyMap.setSimDate(useSkyTimeStore(pinia).simDate);
   skyMap.setObserverLocation(skyTimeSettings.lat, skyTimeSettings.lon);
   skyMap.setShowMoon(skyTimeSettings.showMoon);
   skyMap.setShowSun(skyTimeSettings.showSun);

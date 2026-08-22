@@ -302,6 +302,67 @@ describe('sky-time store', () => {
     expect(store.simDate.getTime()).toBe(start + RATE_LADDER[0] * 500);
   });
 
+  it('starts ticking on boot when already persisted into date mode (no user action)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-14T21:00:00.000Z'));
+    localStorage.setItem(
+      SKY_TIME_SETTINGS_KEY,
+      JSON.stringify({
+        mode: 'date',
+        simDateISO: '2026-01-01T00:00:00.000Z',
+        lat: 45,
+        lon: 5,
+        timeRateIndex: 0,
+        timeRateSign: 1,
+        paused: false,
+        lastSyncEpochMs: Date.now(),
+        localSkyMode: true,
+      }),
+    );
+
+    const store = useSkyTimeStore();
+    // First activation of the session rebases to "now" (see activateDateMode).
+    const start = store.simDate.getTime();
+    expect(start).toBe(new Date('2026-03-14T21:00:00.000Z').getTime());
+
+    vi.advanceTimersByTime(1000);
+    expect(store.simDate.getTime()).toBe(start + 1000);
+  });
+
+  it('does not start ticking on boot in live mode', () => {
+    vi.useFakeTimers();
+    const store = useSkyTimeStore();
+    expect(store.mode).toBe('live');
+    const start = store.simDate.getTime();
+    vi.advanceTimersByTime(2000);
+    expect(store.simDate.getTime()).toBe(start);
+  });
+
+  it('booting into date mode discards a persisted pause, so the clock runs', () => {
+    vi.useFakeTimers();
+    localStorage.setItem(
+      SKY_TIME_SETTINGS_KEY,
+      JSON.stringify({
+        mode: 'date',
+        simDateISO: '2026-01-01T00:00:00.000Z',
+        lat: null,
+        lon: null,
+        timeRateIndex: 0,
+        timeRateSign: 1,
+        paused: true,
+        lastSyncEpochMs: Date.now(),
+      }),
+    );
+
+    // The session's first date-mode activation resets to "now", 1x, unpaused by design
+    // (see activateDateMode) — the boot ticker must follow that reset, not the stale flag.
+    const store = useSkyTimeStore();
+    expect(store.paused).toBe(false);
+    const start = store.simDate.getTime();
+    vi.advanceTimersByTime(1500);
+    expect(store.simDate.getTime()).toBe(start + 1500);
+  });
+
   it('stops ticking once paused', () => {
     vi.useFakeTimers();
     const store = useSkyTimeStore();
