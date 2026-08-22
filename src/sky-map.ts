@@ -12,6 +12,8 @@ import {
   type DSOHoverCallback,
   type SummitHoverCallback,
   type StarPickedCallback,
+  type ViewChangeCallback,
+  type ViewChangeReason,
 } from './sky-map-types';
 import {
   project,
@@ -103,6 +105,8 @@ export type {
   DSOHoverCallback,
   SummitHoverCallback,
   StarPickedCallback,
+  ViewChangeCallback,
+  ViewChangeReason,
 };
 export { normalizeRotationDeg };
 
@@ -119,7 +123,7 @@ export class SkyMap {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private view: ViewState;
-  private onViewChange: (() => void) | null = null;
+  private onViewChange: ViewChangeCallback | null = null;
   private onStarHover: StarHoverCallback | null = null;
   private onDSOHover: DSOHoverCallback | null = null;
   private onSummitHover: SummitHoverCallback | null = null;
@@ -283,7 +287,7 @@ export class SkyMap {
     this.resize();
   }
 
-  setOnViewChange(cb: () => void) {
+  setOnViewChange(cb: ViewChangeCallback) {
     this.onViewChange = cb;
   }
 
@@ -414,7 +418,7 @@ export class SkyMap {
     if (this.view.width > 0) {
       this.view.scale = (Math.min(this.view.width, this.view.height) / 2) * 0.9;
     }
-    this.onViewChange?.();
+    this.onViewChange?.('view');
     this.requestRender();
   }
 
@@ -436,7 +440,9 @@ export class SkyMap {
     if (!h) return;
     setProjectionObserver(h.lstH, h.latDeg);
     this.invalidateSpatialIndexes();
-    this.onViewChange?.();
+    // 'skyClock', not 'view': the view is untouched — only the simulated clock moved.
+    // Listeners still need to refresh, but must not treat this as a user gesture.
+    this.onViewChange?.('skyClock');
   }
 
   async setConstellationStyle(style: ConstellationStyle): Promise<void> {
@@ -652,7 +658,7 @@ export class SkyMap {
     if (this.view.width > 0) {
       this.view.scale = Math.min(this.view.width, this.view.height) / 2.2;
     }
-    this.onViewChange?.();
+    this.onViewChange?.('view');
     this.requestRender();
   }
 
@@ -676,7 +682,7 @@ export class SkyMap {
     if (this.view.width > 0) {
       this.view.scale = (Math.min(this.view.width, this.view.height) / 2) * 0.9;
     }
-    this.onViewChange?.();
+    this.onViewChange?.('view');
     this.requestRender();
   }
 
@@ -687,7 +693,7 @@ export class SkyMap {
 
   zoomBy(factor: number) {
     this.view.scale = Math.max(50, Math.min(100000, this.view.scale * factor));
-    this.onViewChange?.();
+    this.onViewChange?.('view');
     this.requestRenderInteractive();
   }
 
@@ -697,7 +703,7 @@ export class SkyMap {
 
   setRotationDeg(rotationDeg: number) {
     this.view.rotationDeg = normalizeRotationDeg(rotationDeg);
-    this.onViewChange?.();
+    this.onViewChange?.('view');
     this.requestRenderInteractive();
   }
 
@@ -708,7 +714,7 @@ export class SkyMap {
   panBy(dxPx: number, dyPx: number) {
     this.view.centerX += dxPx / this.view.scale;
     this.view.centerY -= dyPx / this.view.scale;
-    this.onViewChange?.();
+    this.onViewChange?.('view');
     this.requestRender();
   }
 
@@ -771,7 +777,7 @@ export class SkyMap {
       this.view.centerX = target.x;
       this.view.centerY = target.y;
       this.view.scale = targetScale;
-      this.onViewChange?.();
+      this.onViewChange?.('view');
       this.render();
       return;
     }
@@ -805,7 +811,7 @@ export class SkyMap {
       this.view.centerY = startY + (target.y - startY) * ease;
       this.view.scale = startScale + (targetScale - startScale) * ease;
 
-      this.onViewChange?.();
+      this.onViewChange?.('view');
       if (t < 1) {
         // Reduced budget for smooth flight; markInteracting also arms the settle
         // timer so the flag self-clears even if the animation is interrupted.
@@ -956,7 +962,7 @@ export class SkyMap {
     }
 
     this.resizeOverlay();
-    this.onViewChange?.();
+    this.onViewChange?.('view');
     this.requestRender();
   }
 
@@ -1069,7 +1075,7 @@ export class SkyMap {
       requestHover: (mx, my, cx, cy) => this.requestHover(mx, my, cx, cy),
       requestRenderInteractive: () => this.requestRenderInteractive(),
       render: () => this.render(),
-      viewChanged: () => this.onViewChange?.(),
+      viewChanged: () => this.onViewChange?.('view'),
       findClosestStar: (mx, my) => this.findClosestStar(mx, my),
       exitPickingMode: () => this.exitPickingMode(),
 

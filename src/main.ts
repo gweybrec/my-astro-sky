@@ -148,11 +148,17 @@ async function init() {
   // Update photo transforms and outlines when map view changes.
   // Hide photos during interaction and restore after 100ms to avoid painting large images on every frame.
   let interactionTimer: ReturnType<typeof setTimeout> | null = null;
-  skyMap.setOnViewChange(() => {
-    if (!interactionTimer) overlayDiv.classList.add('photos-frozen');
-    else clearTimeout(interactionTimer);
+  skyMap.setOnViewChange((reason) => {
+    // The freeze is an interaction optimisation, so it only applies to real view moves.
+    // A 'skyClock' tick (local-sky mode advancing the simulated clock) fires twice a
+    // second under an idle cursor — freezing on those would blink the photos forever.
+    if (reason !== 'skyClock') {
+      if (!interactionTimer) overlayDiv.classList.add('photos-frozen');
+      else clearTimeout(interactionTimer);
+    }
     overlay.updateTransforms();
     skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
+    if (reason === 'skyClock') return;
     interactionTimer = setTimeout(() => {
       interactionTimer = null;
       overlayDiv.classList.remove('photos-frozen');

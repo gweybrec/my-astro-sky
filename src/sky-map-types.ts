@@ -141,6 +141,20 @@ export type DSOHoverCallback = (dso: DSO | null, x: number, y: number) => void;
 export type SummitHoverCallback = (summit: HorizonSummit | null, x: number, y: number) => void;
 export type StarPickedCallback = (star: Star) => void;
 
+/**
+ * Why a view-change notification fired.
+ *
+ * - `'view'` — the user (or code) moved the view itself: pan, zoom, rotate, resize,
+ *   hemisphere/local-sky switch. Anything anchored to a screen position is now stale.
+ * - `'skyClock'` — the view is untouched; only the simulated clock advanced, which
+ *   re-derives the zenith projection in local-sky mode so the sky rotates underneath
+ *   a fixed view. Listeners must refresh what they draw, but must NOT treat this as a
+ *   user gesture (dismissing a hover tooltip once a second, for one).
+ */
+export type ViewChangeReason = 'view' | 'skyClock';
+
+export type ViewChangeCallback = (reason: ViewChangeReason) => void;
+
 /** Normalise a rotation to the (−180, 180] range. */
 export function normalizeRotationDeg(deg: number): number {
   let normalized = ((deg % 360) + 360) % 360;

@@ -62,6 +62,7 @@ import { showToast } from './toast';
 import { getDSOById, findDSOsInImage } from './dso-catalog';
 import { renderSharedSolveStatus } from './solve-status-widget';
 import type { SkyMap } from './sky-map';
+import type { ViewChangeCallback } from './sky-map-types';
 import { t } from './i18n';
 import { stripExtension } from './file-utils';
 import type { PhotoCanvasQuad } from './photo-draw-order';
@@ -2207,9 +2208,9 @@ export class PhotoOverlay {
 
     // Hook into view changes via SkyMap's public setOnViewChange
     if (this.skyMap) {
-      const origOnViewChange = (this.skyMap as any)['onViewChange'] as (() => void) | null;
-      this.skyMap.setOnViewChange(() => {
-        origOnViewChange?.();
+      const origOnViewChange = (this.skyMap as any)['onViewChange'] as ViewChangeCallback | null;
+      this.skyMap.setOnViewChange((reason) => {
+        origOnViewChange?.(reason);
         redraw(this.getView());
       });
     }
@@ -2495,9 +2496,9 @@ export class PhotoOverlay {
 
     // Hook into view changes
     if (this.skyMap) {
-      const origOnViewChange = (this.skyMap as any)['onViewChange'] as (() => void) | null;
-      this.skyMap.setOnViewChange(() => {
-        origOnViewChange?.();
+      const origOnViewChange = (this.skyMap as any)['onViewChange'] as ViewChangeCallback | null;
+      this.skyMap.setOnViewChange((reason) => {
+        origOnViewChange?.(reason);
         redraw(this.getView());
       });
     }

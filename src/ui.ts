@@ -24,6 +24,7 @@ import type {
 } from './types';
 import { isIAUStyle } from './types';
 import { SkyMap } from './sky-map';
+import type { ViewChangeCallback } from './sky-map-types';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery, smartSortPhotos } from './gallery';
 import { getDSOTypeName, searchUnified, searchDSOs } from './search';
@@ -438,13 +439,17 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   useHorizonStore(pinia).applyToCanvas();
 
   // ─── Hook into view change (dismiss tooltip, persist rotation, sync store) ──────────────
-  const origOnViewChange = (skyMap as any)['onViewChange'] as (() => void) | null;
-  skyMap.setOnViewChange(() => {
-    origOnViewChange?.();
+  const origOnViewChange = (skyMap as any)['onViewChange'] as ViewChangeCallback | null;
+  skyMap.setOnViewChange((reason) => {
+    origOnViewChange?.(reason);
     // The tooltip is anchored to a fixed screen position; once the sky pans/zooms it
-    // is stale, so dismiss it as soon as the view starts moving.
+    // is stale, so dismiss it as soon as the view starts moving. A 'skyClock' change is
+    // not a view move — in local-sky mode the simulated clock re-derives the zenith
+    // projection every tick, and dismissing on that would kill the tooltip once a
+    // second under a perfectly still cursor. Drift there is handled by resolveHover()'s
+    // grace on the next mousemove instead.
     const uiForTooltip = useUiStore(pinia);
-    if (uiForTooltip.skyTooltipHtml) uiForTooltip.hideSkyTooltipNow();
+    if (reason !== 'skyClock' && uiForTooltip.skyTooltipHtml) uiForTooltip.hideSkyTooltipNow();
     const currentRotation = normalizeRotationDeg(skyMap.getView().rotationDeg);
     if (currentRotation !== settings.mapRotationDeg) {
       settings.mapRotationDeg = currentRotation;
