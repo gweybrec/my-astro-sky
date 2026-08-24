@@ -414,6 +414,8 @@ const fr = {
     dataCreditsDocsLabel: 'Documents de référence',
     dataCreditsLargePnNote:
       'Source des grandes nébuleuses planétaires dans le catalogue du ciel profond.',
+    dataCreditsLicenseAllRights: 'Tous droits réservés',
+    dataCreditsLicensePublicDomain: 'Domaine public',
     diagnosticsSection: 'Diagnostic',
     logsPathLabel: 'Chemin des logs :',
     logsPathHintLoading: 'Chemin des logs : chargement…',

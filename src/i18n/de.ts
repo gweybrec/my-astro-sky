@@ -416,6 +416,8 @@ const de: Translations = {
     dataCreditsCatalogsLabel: 'Kataloge',
     dataCreditsDocsLabel: 'Referenzdokumente',
     dataCreditsLargePnNote: 'Quelle für große Planetarische Nebel im Deep-Sky-Katalog.',
+    dataCreditsLicenseAllRights: 'Alle Rechte vorbehalten',
+    dataCreditsLicensePublicDomain: 'Gemeinfrei',
     diagnosticsSection: 'Diagnose',
     logsPathLabel: 'Log-Pfad:',
     logsPathHintLoading: 'Log-Pfad: wird geladen…',

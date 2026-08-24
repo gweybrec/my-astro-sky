@@ -414,6 +414,8 @@ const en: Translations = {
     dataCreditsCatalogsLabel: 'Catalogues',
     dataCreditsDocsLabel: 'Reference documents',
     dataCreditsLargePnNote: 'Source for large planetary nebula entries in the deep-sky catalogue.',
+    dataCreditsLicenseAllRights: 'All rights reserved',
+    dataCreditsLicensePublicDomain: 'Public domain',
     diagnosticsSection: 'Diagnostics',
     logsPathLabel: 'Logs path:',
     logsPathHintLoading: 'Logs path: loading…',

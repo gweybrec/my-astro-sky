@@ -417,6 +417,8 @@ const es: Translations = {
     dataCreditsDocsLabel: 'Documentos de referencia',
     dataCreditsLargePnNote:
       'Fuente de las nebulosas planetarias grandes en el catálogo de cielo profundo.',
+    dataCreditsLicenseAllRights: 'Todos los derechos reservados',
+    dataCreditsLicensePublicDomain: 'Dominio público',
     diagnosticsSection: 'Diagnóstico',
     logsPathLabel: 'Ruta de logs:',
     logsPathHintLoading: 'Ruta de logs: cargando…',
