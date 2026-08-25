@@ -26,6 +26,7 @@ describe('sky-time-settings', () => {
     expect(s.showPlanets).toBe(false);
     expect(s.showAzimuthGrid).toBe(false);
     expect(s.localSkyMode).toBe(false);
+    expect(s.showTrajectory).toBe(false);
     // simDateISO must be a valid, parseable ISO date close to "now".
     expect(new Date(s.simDateISO).getTime()).not.toBeNaN();
     expect(Math.abs(s.lastSyncEpochMs - Date.now())).toBeLessThan(1000);
@@ -47,6 +48,7 @@ describe('sky-time-settings', () => {
       showAzimuthGrid: true,
       showCardinalPoints: true,
       localSkyMode: true,
+      showTrajectory: true,
     };
     saveSkyTimeSettings(settings);
     const loaded = loadSkyTimeSettings();

@@ -45,7 +45,7 @@ const DEG2RAD = Math.PI / 180;
 const H_DEG = 0.005;
 
 /** `project()` flags off-projection points with 1e6 (below horizon / far hemisphere). */
-const OFF_PROJECTION = 1e5;
+export const OFF_PROJECTION = 1e5;
 
 /** Projected point, or null when the sky point is off-projection. */
 function projOrNull(raDeg: number, decDeg: number): Point | null {

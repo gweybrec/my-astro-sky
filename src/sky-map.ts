@@ -29,8 +29,9 @@ import {
 } from './projection';
 import { dateToJD, lstHours } from './astro-time';
 import { altAzFromRaDec } from './sky-geometry';
-import { getStarMagsSorted, loadConstellationStyle } from './star-catalog';
-import { getDSOs } from './dso-catalog';
+import { getStarMagsSorted, loadConstellationStyle, getStarByHip } from './star-catalog';
+import { getDSOs, getDSOById } from './dso-catalog';
+import { computeTrajectory, type Trajectory } from './sky-trajectory';
 import { targetRenderCount, DSO_DENSITY_K, MIN_BUDGET_MULT } from './render-budget';
 import { starAreaBudget, starMagThreshold, type StarAreaBudget } from './star-budget';
 import { SKY_THEME } from './sky-themes';
@@ -63,6 +64,7 @@ import {
   renderPhotoOutlines,
   renderFovFrames,
   renderFovInstances,
+  renderTrajectory,
 } from './sky-frame-render';
 import { RegionDrawGesture } from './sky-region-draw';
 import { FrameController, type FrameHost } from './frame-controller';
@@ -160,6 +162,7 @@ export class SkyMap {
   private showSun = false;
   private showPlanets = false;
   private showAzimuthGrid = false;
+  private showTrajectory = false;
   // Observer's terrain skyline (mountain horizon) + whether to draw it. Only
   // rendered in date mode with an observer location set (same gate as the horizon).
   private mountainProfile: HorizonProfile | null = null;
@@ -342,6 +345,12 @@ export class SkyMap {
   /** The alt-az grid — only drawn in date mode once an observer location is set. */
   setShowAzimuthGrid(show: boolean) {
     this.showAzimuthGrid = show;
+    this.requestRender();
+  }
+
+  /** The selected object's night path — only drawn in Local Sky, with something selected. */
+  setShowTrajectory(show: boolean) {
+    this.showTrajectory = show;
     this.requestRender();
   }
 
@@ -1319,6 +1328,7 @@ export class SkyMap {
       view,
       theme: this.skyTheme,
       horizon: this.skyTimeMode === 'date' ? this.computeHorizonParams() : null,
+      trajectory: this.computeTrajectoryForSelection(),
       offscreen: this._renderingOffscreen,
 
       hemisphere: this.hemisphere,
@@ -1336,6 +1346,7 @@ export class SkyMap {
       showSun: this.showSun,
       showPlanets: this.showPlanets,
       showAzimuthGrid: this.showAzimuthGrid,
+      showTrajectory: this.showTrajectory,
       showMountainHorizon: this.showMountainHorizon,
       showCardinalPoints: this.showCardinalPoints,
       mountainProfile: this.mountainProfile,
@@ -1500,6 +1511,9 @@ export class SkyMap {
       if (scene.frames.frames.length > 0) {
         renderFovInstances(scene);
       }
+      if (scene.trajectory && scene.localSkyMode) {
+        renderTrajectory(scene);
+      }
     }
 
     ctx.restore(); // removes clip
@@ -1536,6 +1550,23 @@ export class SkyMap {
         this.lod.adaptInteractionQuality(ms);
       }
     }
+  }
+
+  /**
+   * The highlighted DSO's (or star's) arc across tonight's dome — null unless the
+   * overlay is on, Local Sky is active and something is selected. Only meaningful in
+   * the zenith projection: pole-centred, the object's RA/Dec never moves, so its
+   * "path" would collapse to a single point. `computeTrajectory` memoises, so calling
+   * this once per frame is cheap.
+   */
+  private computeTrajectoryForSelection(): Trajectory | null {
+    if (!this.showTrajectory || !this.localSkyMode) return null;
+    if (this.obsLat === null || this.obsLon === null) return null;
+    const target =
+      (this.highlightedDSO ? getDSOById(this.highlightedDSO) : null) ??
+      (this.highlightedStar !== null ? getStarByHip(this.highlightedStar) : null);
+    if (!target) return null;
+    return computeTrajectory(target.ra, target.dec, this.obsLat, this.obsLon, this.simDate);
   }
 
   /** Observer/time parameters for horizon visibility this frame — null when not applicable. */

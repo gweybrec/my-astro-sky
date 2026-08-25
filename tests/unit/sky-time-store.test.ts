@@ -267,6 +267,15 @@ describe('sky-time store', () => {
     expect(JSON.parse(raw!).showAzimuthGrid).toBe(true);
   });
 
+  it('setShowTrajectory toggles and persists', () => {
+    const store = useSkyTimeStore();
+    expect(store.showTrajectory).toBe(false);
+    store.setShowTrajectory(true);
+    expect(store.showTrajectory).toBe(true);
+    const raw = localStorage.getItem(SKY_TIME_SETTINGS_KEY);
+    expect(JSON.parse(raw!).showTrajectory).toBe(true);
+  });
+
   it('seedLocationIfNeeded pre-fills from the Targets tab location, once', () => {
     localStorage.setItem('targets-prefs-v3', JSON.stringify({ lat: 48.85, lon: 2.35 }));
     const store = useSkyTimeStore();

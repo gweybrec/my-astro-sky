@@ -17,6 +17,7 @@ import type { SkyThemeConfig } from './sky-themes';
 import type { StarAreaBudget } from './star-budget';
 import type { StarSpriteAtlas } from './star-sprite-atlas';
 import type { FrameController } from './frame-controller';
+import type { Trajectory } from './sky-trajectory';
 
 /** Layers that the export path can override per render. */
 export interface SkyLayerFlags {
@@ -61,6 +62,8 @@ export interface SkyScene extends SkyLayerFlags {
   showSun: boolean;
   showPlanets: boolean;
   showAzimuthGrid: boolean;
+  /** The selected object's night path — Local Sky only (see sky-trajectory.ts). */
+  showTrajectory: boolean;
   showMountainHorizon: boolean;
   showCardinalPoints: boolean;
   mountainProfile: HorizonProfile | null;
@@ -68,6 +71,12 @@ export interface SkyScene extends SkyLayerFlags {
   // ── Selection / highlight ─────────────────────────────────────────────────
   highlightedStar: number | null;
   highlightedDSO: string | null;
+  /**
+   * The highlighted object's sampled night arc, resolved in buildScene() — null
+   * unless the trajectory overlay is on, Local Sky is active and something is
+   * selected. Precomputed here (behind a memo) so the draw pass stays pure.
+   */
+  trajectory: Trajectory | null;
 
   // ── Stars ─────────────────────────────────────────────────────────────────
   starBudget: StarAreaBudget;

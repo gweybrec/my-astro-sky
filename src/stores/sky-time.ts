@@ -51,6 +51,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   const showAzimuthGrid = ref(s.showAzimuthGrid);
   const showCardinalPoints = ref(s.showCardinalPoints);
   const localSkyMode = ref(s.localSkyMode);
+  const showTrajectory = ref(s.showTrajectory);
 
   let hasSeededLocation = lat.value !== null || lon.value !== null;
   // Reset every fresh page load/app launch (module-scope-per-store-instance, not persisted) —
@@ -84,6 +85,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
       showAzimuthGrid: showAzimuthGrid.value,
       showCardinalPoints: showCardinalPoints.value,
       localSkyMode: localSkyMode.value,
+      showTrajectory: showTrajectory.value,
     };
   }
 
@@ -243,6 +245,12 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     persist();
   }
 
+  function setShowTrajectory(v: boolean) {
+    showTrajectory.value = v;
+    canvasStore.skyMap?.setShowTrajectory(v);
+    persist();
+  }
+
   function setShowCardinalPoints(v: boolean) {
     showCardinalPoints.value = v;
     canvasStore.skyMap?.setShowCardinalPoints(v);
@@ -363,6 +371,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     showAzimuthGrid,
     showCardinalPoints,
     localSkyMode,
+    showTrajectory,
     effectiveRate,
     // actions
     setMode,
@@ -374,6 +383,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     setShowSun,
     setShowPlanets,
     setShowAzimuthGrid,
+    setShowTrajectory,
     setShowCardinalPoints,
     setLocalSkyMode,
     stepRateForward,

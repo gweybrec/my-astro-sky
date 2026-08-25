@@ -243,6 +243,8 @@ const fr = {
     jumpToEvening: 'Aller à ce soir',
     localSkyButton: 'Ciel local (vue horizon)',
     azimuthGridButton: 'Grille azimutale (alt-az)',
+    trajectoryButton: "Trajectoire de l'objet sélectionné",
+    trajectoryHour: '{h}h',
   },
   planets: {
     sun: 'Soleil',

@@ -202,6 +202,25 @@ export const HIGHLIGHT_RING = {
   padPx: 4,
 } as const;
 
+/**
+ * The selected object's path across the local-sky dome (see sky-trajectory.ts).
+ * Deliberately the same cyan as the selection ring above, so the ring and the arc
+ * read as one object. Drawn over the photo layer, so the line and the marker labels
+ * carry a dark halo to stay legible against a bright astrophoto.
+ */
+export const TRAJECTORY = {
+  color: 'rgba(0, 255, 255, 0.9)',
+  lineWidth: 2,
+  dash: [2, 6] as number[],
+  halo: 'rgba(0, 0, 0, 0.85)',
+  haloBlur: 4,
+  markerRadius: 3,
+  markerFill: 'rgba(0, 255, 255, 0.95)',
+  markerEdge: 'rgba(0, 0, 0, 0.8)',
+  labelColor: 'rgba(190, 255, 255, 0.95)',
+  labelFont: 'bold 11px sans-serif',
+} as const;
+
 /** Astrophoto outline + its edge label (same accent orange, softer stroke). */
 export const PHOTO_OUTLINE = {
   stroke: 'rgba(192, 120, 48, 0.55)',

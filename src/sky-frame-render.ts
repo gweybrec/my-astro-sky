@@ -13,7 +13,8 @@ import type { SkyScene } from './sky-scene';
 import { t } from './i18n';
 import { project, toCanvas, unproject, borderRadiusPU } from './projection';
 import { raDecFromAltAz } from './sky-geometry';
-import { canvasPxPerDeg, isSkyPointVisible } from './sky-axes';
+import { canvasPxPerDeg, isSkyPointVisible, OFF_PROJECTION } from './sky-axes';
+import { drawBodyMarker, drawBodyLabel } from './body-draw';
 import { computeFovFrameCorners } from './frame-geometry';
 import { angularSizeToCanvasPx } from './dso-render-math';
 import { photoLabelEdgeIndex } from './photo-outline';
@@ -31,7 +32,7 @@ import {
   drawResizeDraftRect,
   drawElasticSnapLine,
 } from './frame-draw';
-import { FRAME, PHOTO_OUTLINE } from './canvas-theme';
+import { FRAME, PHOTO_OUTLINE, TRAJECTORY } from './canvas-theme';
 
 /** Frame stroke/label colours resolved from CSS custom properties. */
 interface FrameColors {
@@ -68,7 +69,8 @@ export function renderOverlay(s: SkyScene): void {
   const hasFrames = s.fovFrameSpecs.length > 0 || s.frames.frames.length > 0;
   const hasRegionDraw = s.regionDrawActive && s.regionDrawPoints.length > 0;
   const hasRegionOverlay = s.activeRegionOverlay !== null && s.localSkyMode;
-  if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay) return;
+  const hasTrajectory = s.trajectory !== null && s.localSkyMode && horizon !== null;
+  if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay && !hasTrajectory) return;
 
   const poleOrigin = toCanvas(0, 0, view);
   const borderR = borderRadiusPU(s.borderLatDeg) * view.scale;
@@ -87,6 +89,10 @@ export function renderOverlay(s: SkyScene): void {
 
   if (hasRegionOverlay) renderRegionOverlay(s);
   if (hasRegionDraw) renderRegionDrawPreview(s);
+
+  // Above the terrain, the photo layer and the frames — the whole point of the
+  // trajectory is that it stays readable wherever it passes.
+  if (hasTrajectory) renderTrajectory(s);
 
   // Cardinal labels last, so the N/E/S/W letters stay legible above the terrain
   // mass, the photo layer and the frames.
@@ -146,6 +152,74 @@ export function renderRegionOverlay(s: SkyScene): void {
   ctx.strokeStyle = region.color;
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draws the highlighted object's night path across the local-sky dome: a bright
+ * dotted arc plus a labelled dot every couple of hours (see sky-trajectory.ts).
+ *
+ * Unlike `traceAltAzPath`, this pen-lifts on below-horizon samples instead of
+ * connecting them — a region is a closed polygon, an arc is not, and without the lift
+ * the object's rise and set points would be joined by a chord straight across the sky.
+ */
+export function renderTrajectory(s: SkyScene): void {
+  const { ctx, view } = s;
+  const traj = s.trajectory;
+  const hp = s.horizon;
+  if (!traj || !hp) return;
+
+  ctx.save();
+  ctx.shadowColor = TRAJECTORY.halo;
+  ctx.shadowBlur = TRAJECTORY.haloBlur;
+
+  ctx.beginPath();
+  let penDown = false;
+  for (const sample of traj.samples) {
+    const { raDeg, decDeg } = raDecFromAltAz(sample.altDeg, sample.azDeg, hp.lstH, hp.latDeg);
+    const proj = project(raDeg, decDeg);
+    if (proj.x >= OFF_PROJECTION) {
+      penDown = false; // below the horizon — nothing to join to
+      continue;
+    }
+    const c = toCanvas(proj.x, proj.y, view);
+    if (penDown) ctx.lineTo(c.x, c.y);
+    else {
+      ctx.moveTo(c.x, c.y);
+      penDown = true;
+    }
+  }
+  ctx.strokeStyle = TRAJECTORY.color;
+  ctx.lineWidth = TRAJECTORY.lineWidth;
+  ctx.lineCap = 'round';
+  ctx.setLineDash(TRAJECTORY.dash);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (const marker of traj.markers) {
+    const { raDeg, decDeg } = raDecFromAltAz(marker.altDeg, marker.azDeg, hp.lstH, hp.latDeg);
+    const proj = project(raDeg, decDeg);
+    if (proj.x >= OFF_PROJECTION) continue;
+    const c = toCanvas(proj.x, proj.y, view);
+    drawBodyMarker(
+      ctx,
+      c.x,
+      c.y,
+      TRAJECTORY.markerRadius,
+      TRAJECTORY.markerFill,
+      TRAJECTORY.markerEdge,
+    );
+    drawBodyLabel(
+      ctx,
+      c.x,
+      c.y,
+      TRAJECTORY.markerRadius,
+      marker.label,
+      TRAJECTORY.labelColor,
+      TRAJECTORY.labelFont,
+    );
+  }
+
   ctx.restore();
 }
 

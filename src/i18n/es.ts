@@ -243,6 +243,8 @@ const es: Translations = {
     jumpToEvening: 'Ir a esta noche',
     localSkyButton: 'Cielo local (vista de horizonte)',
     azimuthGridButton: 'Cuadrícula azimutal (alt-az)',
+    trajectoryButton: 'Trayectoria del objeto seleccionado',
+    trajectoryHour: '{h}:00',
   },
   planets: {
     sun: 'Sol',

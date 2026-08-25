@@ -28,6 +28,8 @@ export interface SkyTimeSettings {
   showAzimuthGrid: boolean;
   showCardinalPoints: boolean;
   localSkyMode: boolean;
+  /** The selected object's night path on the local-sky dome (Local Sky only). */
+  showTrajectory: boolean;
 }
 
 export const DEFAULT_SETTINGS: SkyTimeSettings = {
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: SkyTimeSettings = {
   showAzimuthGrid: false,
   showCardinalPoints: false,
   localSkyMode: false,
+  showTrajectory: false,
 };
 
 export function loadSkyTimeSettings(): SkyTimeSettings {

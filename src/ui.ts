@@ -437,6 +437,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setShowPlanets(skyTimeSettings.showPlanets);
   skyMap.setShowAzimuthGrid(skyTimeSettings.showAzimuthGrid);
   skyMap.setShowCardinalPoints(skyTimeSettings.showCardinalPoints);
+  skyMap.setShowTrajectory(skyTimeSettings.showTrajectory);
   skyMap.setLocalSkyMode(skyTimeSettings.localSkyMode);
   // Restore the persisted terrain (mountain) horizon profile onto the map.
   useHorizonStore(pinia).applyToCanvas();

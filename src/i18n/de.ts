@@ -244,6 +244,8 @@ const de: Translations = {
     jumpToEvening: 'Zu diesem Abend springen',
     localSkyButton: 'Lokaler Himmel (Horizontansicht)',
     azimuthGridButton: 'Azimutgitter (Alt-Az)',
+    trajectoryButton: 'Bahn des ausgewählten Objekts',
+    trajectoryHour: '{h}:00',
   },
   planets: {
     sun: 'Sonne',

@@ -220,6 +220,21 @@
       <button
         type="button"
         class="sky-rotation-btn"
+        :class="{ active: store.showTrajectory }"
+        :disabled="!store.localSkyMode"
+        :title="t('skyTime.trajectoryButton')"
+        :aria-label="t('skyTime.trajectoryButton')"
+        @click="store.setShowTrajectory(!store.showTrajectory)"
+        @mouseenter="suppress(true)"
+        @mouseleave="suppress(false)"
+        @focus="suppress(true)"
+        @blur="suppress(false)"
+        v-html="skyTrajectorySvg"
+      ></button>
+
+      <button
+        type="button"
+        class="sky-rotation-btn"
         :class="{ active: horizon.enabled }"
         :disabled="!horizon.profile"
         :title="t('horizon.toggleButton')"
@@ -308,6 +323,7 @@ import planetsSvg from '../../icons/planets.svg?raw';
 import mapPinSvg from '../../icons/map-pin.svg?raw';
 import azimuthGridSvg from '../../icons/azimuth-grid.svg?raw';
 import localSkySvg from '../../icons/local-sky.svg?raw';
+import skyTrajectorySvg from '../../icons/sky-trajectory.svg?raw';
 import mountainSvg from '../../icons/mountain.svg?raw';
 
 const store = useSkyTimeStore();
