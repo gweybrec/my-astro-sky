@@ -132,6 +132,8 @@ CI runs the full suite on every push/PR via `.github/workflows/test.yml` (Node.j
 
 **Every code change must be verified in the browser before considering it done.** Use the Playwright MCP tools to test visually and interactively.
 
+**UI changes go through the `ui-verify` skill, which the `ui-verify-guard.js` Stop hook enforces.** A trivial token/class tweak gets an inline screenshot + per-element checklist closed by `<!-- ui-verified -->`. A structural change (new DOM / builder fn / `.vue` component, layout CSS) must be signed off by the cold-eyes `ui-verify-reviewer` subagent (`.claude/agents/ui-verify-reviewer.md`) — spawn it, paste its table + `VERDICT`, close with `<!-- ui-verified: reviewer=pass -->`. Either tier is skippable with `<!-- ui-verified: <reason> -->` when the user is verifying.
+
 ### Workflow
 
 1. Start the dev server with `npm run dev` (runs Vite on port 5173 + Express on port 3001).
