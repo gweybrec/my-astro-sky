@@ -7,7 +7,12 @@ Copilot instructions and skills must never duplicate knowledge — they always r
 
 | Claude file                                                                                         | What it contains                                                                                                                                                                                                                                                       |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`CLAUDE.md`](../CLAUDE.md)                                                                         | Dev commands, browser testing workflow, architecture overview, DSO catalog pointers, conventions                                                                                                                                                                       |
+| [`CLAUDE.md`](../CLAUDE.md)                                                                         | Cross-cutting only: dev commands, lint/format, `npm run verify`, architecture overview, DSO catalog pointers, i18n default, commit conventions                                                                                                                         |
+| [`src/CLAUDE.md`](../src/CLAUDE.md)                                                                 | Frontend: browser verification workflow + "what to verify", CSS/UnoCSS checklist, ui-verify tiers, i18n specifics, `DSO_CATALOGS_ALL` / smart-telescope conventions                                                                                                    |
+| [`server/CLAUDE.md`](../server/CLAUDE.md)                                                           | Backend: `PORT`/`DB_PATH` env vars, `/api` proxy, `GET /api/filters`, `db-migrations.ts`, Swagger JSDoc on every route, backend logging via `server/logger.ts`                                                                                                         |
+| [`tests/CLAUDE.md`](../tests/CLAUDE.md)                                                             | The matching-test-file rule, Vitest 3 + happy-dom setup, `tests/fixtures/` inventory, `@vue/test-utils` component-test patterns                                                                                                                                        |
+| [`scripts/CLAUDE.md`](../scripts/CLAUDE.md)                                                         | DSO catalog regeneration (`npm run dso:generate`, `add-ratings.mjs` idempotency), filter catalog colour seeding (`npm run filters:seed`)                                                                                                                               |
+| [`docs/CLAUDE.md`](../docs/CLAUDE.md)                                                               | The two-audience documentation-file map (user vs dev) and its rules                                                                                                                                                                                                    |
 | [`docs/dev/architecture.md`](../docs/dev/architecture.md)                                           | Full frontend/backend module descriptions, data flows, key types                                                                                                                                                                                                       |
 | [`docs/dev/dso-catalog.md`](../docs/dev/dso-catalog.md)                                             | SIMBAD validation, known OpenNGC issues, rating/difficulty field docs                                                                                                                                                                                                  |
 | [`docs/user/user-guide.md`](../docs/user/user-guide.md)                                             | User manual: features, plate solving, installation, how to access the app                                                                                                                                                                                              |
@@ -29,7 +34,12 @@ Copilot instructions and skills must never duplicate knowledge — they always r
 
 When asked about any of the following topics, **read the corresponding Claude file first** before answering:
 
-- **Dev setup, commands, conventions** → read `CLAUDE.md`
+- **Dev setup, commands, lint/format, commit conventions** → read `CLAUDE.md`
+- **Frontend work — browser verification, CSS/UnoCSS, ui-verify, i18n specifics** → read `src/CLAUDE.md`
+- **Backend work — env vars, API routes, Swagger, backend logging** → read `server/CLAUDE.md`
+- **Writing or updating tests — the testing rule, Vitest setup, fixtures** → read `tests/CLAUDE.md`
+- **DSO / filter catalog regeneration scripts** → read `scripts/CLAUDE.md`
+- **Which doc file owns a topic (user vs dev)** → read `docs/CLAUDE.md`
 - **Frontend or backend modules, data flows, types** → read `docs/dev/architecture.md`
 - **DSO catalog structure, SIMBAD validation, rating/difficulty** → read `docs/dev/dso-catalog.md`
 - **User-facing features, plate solving, installation** → read `docs/user/user-guide.md`
@@ -53,10 +63,16 @@ Copilot files in this repository contain **no independent knowledge**. They exis
 
 ### Where things live
 
-| Content type                                                 | Location                                                        |
-| ------------------------------------------------------------ | --------------------------------------------------------------- |
-| Narrative documentation (features, architecture, deployment) | `docs/dev/` or `docs/user/`                                     |
-| Reusable agent skills and step-by-step workflows             | `.claude/skills/<name>/SKILL.md`                                |
-| Copilot pointers (this file)                                 | `.github/copilot-instructions.md` — references only, no content |
+| Content type                                                 | Location                                                                                 |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Cross-cutting AI-agent guidance (commands, commits, gate)    | root `CLAUDE.md`                                                                         |
+| Task-specific AI-agent guidance                              | the nearest per-directory `CLAUDE.md` (`src/`, `server/`, `tests/`, `scripts/`, `docs/`) |
+| Narrative documentation (features, architecture, deployment) | `docs/dev/` or `docs/user/`                                                              |
+| Reusable agent skills and step-by-step workflows             | `.claude/skills/<name>/SKILL.md`                                                         |
+| Copilot pointers (this file)                                 | `.github/copilot-instructions.md` — references only, no content                          |
+
+New per-directory guidance goes in that directory's `CLAUDE.md`, not the root file — it
+loads only when a file in that directory is opened. Add a corresponding row to the
+source-of-truth table above.
 
 **Skills never go in `.github/`.** When creating a new skill, place `SKILL.md` under `.claude/skills/<name>/`, then add a row to the source-of-truth table above and a bullet in "How to use this as a Copilot agent".

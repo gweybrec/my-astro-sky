@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+It holds only **cross-cutting** guidance. Task-specific rules live in per-directory
+`CLAUDE.md` files, loaded automatically when you read or edit a file in that directory.
+
+## Nested guides
+
+| File                    | Covers                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `src/CLAUDE.md`         | Frontend: browser verification + "what to verify", CSS/UnoCSS rules, ui-verify, i18n details, frontend conventions |
+| `server/CLAUDE.md`      | Backend: env vars, `/api` routes, Swagger annotations, backend logging                                             |
+| `tests/CLAUDE.md`       | The testing rule, Vitest + happy-dom setup, `tests/fixtures/` inventory, Vue component-test patterns               |
+| `scripts/CLAUDE.md`     | DSO catalog regeneration (`dso:generate`) and filter catalog colour seeding                                        |
+| `docs/CLAUDE.md`        | The two-audience documentation-file map and its rules                                                              |
+| `test-photos/CLAUDE.md` | Raw local test-image inventory (gitignored; present only on machines that have it)                                 |
+
 ## Skills
 
 Project-specific skills live in `.claude/skills/`. The harness auto-invokes them on matching trigger phrases.
@@ -38,39 +52,12 @@ npm run electron:make     # Package desktop app (runs clean + build + electron-f
 npm run docs:serve        # Serve docs/ locally with docsify (live-reload) to preview before pushing
 ```
 
+For DSO catalog regeneration (`npm run dso:generate`) and filter colour seeding
+(`npm run filters:seed`), see `scripts/CLAUDE.md`.
+
 ### Stopping a dev server you started
 
 `npm run dev` is `concurrently "vite" "tsx watch server/index.ts"` — a process tree (npm → concurrently → vite/tsx). Killing only the port-holding leaf (e.g. `kill-port`) orphans the rest, which accumulate across a session and can eventually lock native modules like `better-sqlite3` (breaking the next `predev`/`npm rebuild`). To stop a server you started, kill its full process tree (record the PID at launch, then tree-kill it), and verify with `netstat`/`Get-NetTCPConnection` afterward — don't trust "port freed" or "process killed" output alone. Never kill a dev server you didn't start yourself in this session — check the process's command line/working directory first, since the user may already have one running.
-
-### DSO catalog regeneration
-
-After editing `scripts/dso-metadata-overrides.json` or `scripts/generate-dso.mjs`:
-
-```bash
-npm run dso:generate   # generate-dso.mjs && add-constellations.mjs && add-ratings.mjs
-```
-
-This single command rebuilds `public/data/dso.json`, recomputes constellations, and
-(re)computes the four derived columns — `rating`, `difficulty`, `containerId`,
-`priority` — via `scripts/add-ratings.mjs`. The runtime DSO density gate ranks by
-**intrinsic quality** (`dsoImportance` = rating/brightness, in `src/dso-catalog.ts`),
-area-weighted so on-screen density tracks the true sky (Milky Way denser) with the
-stereographic projection bias removed — it no longer uses the blue-noise `priority`
-column, which is retained but currently only informational. `tests/unit/dso-json-schema.test.ts`
-still asserts the committed `dso.json` has all these columns fully populated, so CI
-catches it if the generation chain is ever broken apart again.
-
-`add-ratings.mjs` is idempotent: it strips any derived columns from a prior run before
-recomputing, so it's also safe to run standalone (`node scripts/add-ratings.mjs`) after
-changing its rating/difficulty/containment/priority logic, without a manual reset step.
-
-### Filter catalog colours
-
-`npm run filters:seed` (`scripts/seed-filter-colors.mjs`) seeds the per-entry `color`
-on `resources/filters.json`; it only fills entries missing a valid `#rrggbb`, so hand
-overrides survive. Run it after appending filters to the catalog. Filters are served at
-`GET /api/filters` and consumed via `src/gear-catalog.ts` (they are **not** part of a
-gear setup — picked per integration row / observation window).
 
 ### Linting & formatting
 
@@ -110,83 +97,6 @@ Two PostToolUse hooks keep both out of CI: `.claude/hooks/prettier-on-edit.js` r
 format:check, the docs-icon sync check, tests, and the production build. Use it instead of
 running the steps by hand: a locally-passing subset is how a lint error reached CI before.
 
-## Unit Tests
-
-The test suite uses **Vitest 3** + **happy-dom**. Tests live under `tests/` (mainly `tests/unit/`, plus `tests/components/`). Run with `npm test`. To count the test files: `git ls-files 'tests/**/*.test.ts' | wc -l`.
-
-### Testing rule
-
-Before finishing any edit to a `.ts` file in `src/` or `server/`, check `tests/unit/` for a matching test file (e.g. editing `src/affine.ts` → look for `tests/unit/affine.test.ts`). Update or add tests for any changed or new logic. Skip files explicitly excluded in `vitest.config.ts` — they are listed there with comments explaining why (DOM-only, fetch-only, entry points).
-
-A PostToolUse hook (`.claude/hooks/vitest-on-ts-edit.js`) runs `npx vitest run` automatically after any Edit or Write to `src/**/*.ts` or `server/**/*.ts`, so regressions surface immediately.
-
-Fixtures in `tests/fixtures/`:
-
-- `solve-field/LDN1235.wcs` and `M1_CCD_siril.wcs` — real WCS files from local solve-field runs
-- `astrometry/10796000-*.json` and `10796000-wcs.fits` — real data from nova.astrometry.net job 10796000 (M13 field)
-- `stars.test.json` — minimal 6-star catalog for deterministic WCS tests
-
-CI runs the full suite on every push/PR via `.github/workflows/test.yml` (Node.js 24).
-
-## Browser Testing
-
-**Every code change must be verified in the browser before considering it done.** Use the Playwright MCP tools to test visually and interactively.
-
-**UI changes go through the `ui-verify` skill, which the `ui-verify-guard.js` Stop hook enforces.** A trivial token/class tweak gets an inline screenshot + per-element checklist closed by `<!-- ui-verified -->`. A structural change (new DOM / builder fn / `.vue` component, layout CSS) must be signed off by the cold-eyes `ui-verify-reviewer` subagent (`.claude/agents/ui-verify-reviewer.md`) — spawn it, paste its table + `VERDICT`, close with `<!-- ui-verified: reviewer=pass -->`. Either tier is skippable with `<!-- ui-verified: <reason> -->` when the user is verifying.
-
-### Workflow
-
-1. Start the dev server with `npm run dev` (runs Vite on port 5173 + Express on port 3001).
-2. Navigate to `http://localhost:5173` using `browser_navigate`.
-3. Take a snapshot (`browser_snapshot`) or screenshot (`browser_take_screenshot`) to verify the UI state.
-4. Interact with the app (click, type, etc.) to test the modified feature.
-5. Check the browser console (`browser_console_messages`) for errors or warnings.
-6. **Fix any bug found during testing**, even if unrelated to the current task.
-
-### What to verify
-
-- No console errors or unhandled exceptions.
-- UI renders correctly (layout, text, translations).
-- Interactive features work (buttons, modals, search, canvas pan/zoom).
-- Photos display and transform correctly on the sky map.
-- Gallery mode displays photos correctly in grid, navigates to map on click.
-- View mode toggle switches between Map and Gallery smoothly.
-- Repositioning feature works (extracts current state, allows editing, saves new state).
-- Smart sorting works in both photo list and gallery (M1, M8, M31, M100, M101...).
-- Targets tab: gear preset selection, location, date, filters, Best/Random buttons, pagination.
-- Both FR and EN languages render properly if i18n was touched.
-
-## Documentation architecture
-
-This repository has two doc audiences with separate folders. **Never mix them.**
-
-| File                                | Audience                 | Owns                                                                                                                                                                  |
-| ----------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/user/getting-started.md`      | Astronomers / end users  | First-run walkthrough: uploading and placing your first photo, navigating the sky map                                                                                 |
-| `docs/user/installing-app.md`       | Astronomers / end users  | Getting the app running: desktop app download/install/uninstall, self-hosting via Docker, LAN sharing                                                                 |
-| `docs/user/user-guide.md`           | Astronomers / end users  | Features, UI, plate solving methods, solver installation, how to access the running app                                                                               |
-| `docs/user/installing-solvers.md`   | Astronomers / end users  | Installing ASTAP, solve-field, and astrometry.net API key setup, per OS                                                                                               |
-| `docs/user/troubleshooting.md`      | Astronomers / end users  | Common problems and fixes: plate solving, photo placement, UI, desktop app logs                                                                                       |
-| `docs/dev/architecture.md`          | Developers               | Module descriptions (frontend + backend), data flows, key types                                                                                                       |
-| `docs/dev/dso-catalog.md`           | Developers               | SIMBAD validation, known OpenNGC data quality issues, rating/difficulty field docs                                                                                    |
-| `docs/dev/distribution.md`          | Developers / maintainers | Building/running from source, Electron packaging internals, env var & CSP config reference                                                                            |
-| `docs/dev/solve-field-placement.md` | Developers               | Y-axis convention, EXIF orientation correction, plate solving diagnostic checklist                                                                                    |
-| `docs/dev/ui-guidelines.md`         | Developers               | UI reference **hub**: CSS architecture + shortcuts cheat-sheet, linking to chunked chapters under `docs/dev/ui/` (`tokens.md`, `components.md`, `patterns.md`)        |
-| `docs/dev/curved-arrow-svg.md`      | Developers               | Math for constructing tangent-aligned arrowheads on circular-arc SVG arrows                                                                                           |
-| `docs/dev/imaging-recipe.md`        | Developers               | Integration time algorithm, filter selection logic, type-family constants, tuning guide                                                                               |
-| `docs/dev/target-recommender.md`    | Developers               | Target recommender pipeline: filters, scoring formula, diversity cap, altitude preferences, known constraints                                                         |
-| `docs/dev/horizon.md`               | Developers               | Terrain (mountain) horizon: data model, DEM ray-trace/compute, `/api/horizon` + caching, file import, sky-map overlay, recommender horizon gate                       |
-| `docs/dev/render-performance.md`    | Developers               | Transferable canvas-perf techniques from the sky-map render loop: profiling, hoisting per-frame invariants, sprite atlas, input coalescing, cache-key bucketing/drift |
-| `docs/dev/ci.md`                    | Developers               | GitHub Actions workflows: CI, tests, Docker image build/smoke-test, Electron release builds; also documents the (workflow-free) GitHub Pages docs deployment          |
-
-**Rules:**
-
-- User-facing content (features, how to use, how to install a solver) → `docs/user/`
-- Technical content (implementation, deployment, architecture, build steps) → `docs/dev/`
-- `CLAUDE.md` itself holds only AI-agent guidance (commands, conventions, brief pointers) — it does not duplicate the content of the doc files
-- Do not create new doc files without updating this table and the Copilot instructions (`.github/copilot-instructions.md`)
-- The `docs/dev/ui/` chapters (`tokens.md`, `components.md`, `patterns.md`) are children of the `ui-guidelines.md` hub — reached via its Contents links, intentionally **not** listed separately in `docs/_sidebar.md` or in this table
-
 ---
 
 ## Architecture
@@ -207,7 +117,8 @@ See [docs/dev/solve-field-placement.md](docs/dev/solve-field-placement.md) for:
 
 ## DSO Catalog
 
-`public/data/dso.json` — 12,000+ objects, columnar JSON, 15 fields.
+`public/data/dso.json` — 12,000+ objects, columnar JSON, 15 fields. Regeneration commands
+are in `scripts/CLAUDE.md`.
 
 See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
 
@@ -216,12 +127,9 @@ See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
 
 ## Conventions
 
-- **UI text is internationalized (FR/EN).** French is the default language. Translations live in `src/i18n/fr.ts` and `src/i18n/en.ts`. Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time).
-- Vite proxies `/api` and `/uploads` to `http://localhost:3001` during dev.
-- Backend reads `PORT` env var (default 3001) and `DB_PATH` (default `./data.db`).
-- Uploaded photos go to `uploads/` directory on disk, named with UUIDs.
-- `DSO_CATALOGS_ALL` is exported from `dso-catalog.ts` — do not redefine it locally in `ui.ts` or elsewhere.
-- **Smart telescopes:** never read a gear setup's `cameraId` directly — resolve it through `resolveSetupCamera()` in `gear-catalog.ts`, which substitutes the scope's `integrated_camera_id`. `tests/unit/gear-catalog-integrity.test.ts` pins each smart scope's FOV to its published spec; extend its table when adding one.
+- **UI text is internationalized (FR/EN).** French is the default language. Translations live in `src/i18n/fr.ts` and `src/i18n/en.ts` (server-side strings in `server/messages.ts`). Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time). Frontend specifics: `src/CLAUDE.md`.
+- Editing a `.ts` file in `src/` or `server/`? See `tests/CLAUDE.md` for the matching-test-file rule.
+- Do not create new doc files without updating the table in `docs/CLAUDE.md` **and** `.github/copilot-instructions.md`.
 
 ### Committing
 
@@ -255,14 +163,3 @@ would recognise, so it is skipped. Reserve plain `refactor:` for restructuring y
 _do_ want announced.
 
 Append `!` (e.g. `feat!:`) or a `BREAKING CHANGE:` footer for breaking changes. Preview the _unreleased_ section (since the last tag) to the console with `npm run changelog:preview`; regenerate the actual files with `npm run changelog` (runs `scripts/generate-changelog.mjs`). `CHANGELOG.md` is scoped to the **current major version series**; completed majors are frozen into `CHANGELOG.v<n>.md` archives automatically at the next major release. See [docs/dev/ci.md](docs/dev/ci.md#release-release-yml) for how the release pipeline consumes commits.
-
-### Before adding CSS
-
-This project uses **UnoCSS** (utility-first, Tailwind-compatible). Agents must follow this checklist or they will create duplicate CSS:
-
-1. **Never use `style=` in Vue templates.** All styling goes through class names.
-2. **Check `uno.config.ts` shortcuts first** for an existing named component class (e.g. `btn-action`, `input-base`, `tag-chip`). Use it before inventing a new one.
-3. **Use UnoCSS atomic utilities** for spacing, color, flex, layout — `ml-4`, `text-primary`, `flex`, `gap-2`, `w-full`, `hidden`, etc.
-4. **Only add to `src/styles/canvas.css`** when the style requires a pseudo-element (`::before`/`::after`), `@keyframes`, a canvas-layer selector, or a `:has()`/sibling combinator that cannot be expressed as a class attribute. Everything else is a UnoCSS class.
-5. **New design tokens** go in both `uno.config.ts` theme AND `src/styles/tokens.css` (kept in sync). Never hardcode a color or pixel value directly — always use a CSS variable.
-6. **Do not add new rules to `src/style.css`** — it is a legacy file being phased out. All new component styles go to shortcuts or utilities.
