@@ -770,6 +770,15 @@ const fr = {
     noPhotosHint: 'Ajoutez votre première astrophoto depuis le panneau Carte du ciel',
     unsavedChanges: 'Vous avez des modifications non enregistrées.',
     closeWithoutSaving: 'Fermer sans enregistrer',
+    zoom: {
+      out: 'Dézoomer',
+      in: 'Zoomer',
+      reset: 'Réinitialiser',
+      fit: 'Ajuster',
+      fitTitle: "Ajuster l'image à la vue",
+      actual: '1:1',
+      actualTitle: 'Taille réelle (100 %)',
+    },
     batchEdit: {
       titleLabels: 'Modifier les étiquettes de plusieurs photos',
       titleSetups: 'Modifier les équipements de plusieurs photos',

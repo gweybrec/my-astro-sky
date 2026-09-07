@@ -67,43 +67,63 @@ describe('applyZoomToward', () => {
   });
 });
 
-// Model a small image flex-centred inside a larger container: the image's top-left is
-// offset from the container origin, which is exactly what used to break the zoom.
-const CONTAINER = { left: 0, top: 0, width: 1000, height: 800 };
-const IMG_W = 200;
-const IMG_H = 200;
-
 interface SetupOpts {
-  imgLeft?: number; // untransformed position within the container
+  containerW?: number;
+  containerH?: number;
+  /** Untransformed layout box of the <img> within the container. */
+  imgLeft?: number;
   imgTop?: number;
-  paddingRight?: number; // reserved space (metadata pane) the display area excludes
+  imgW?: number;
+  imgH?: number;
+  /** Reserved right-hand pane (metadata) the display area excludes. */
+  paddingRight?: number;
+  /** Intrinsic pixel size reported by the <img>. */
+  naturalWidth?: number;
+  naturalHeight?: number;
+  fitButtons?: boolean;
+  fitOnLoad?: boolean;
+  dblClick?: 'fit' | 'reset' | 'none';
 }
 
+// Model an image flex-centred inside a larger container. transform-origin is '0 0', so
+// scaling never moves the image's left/top edge — only translate does. The stub parses
+// the exact string applyTransform() writes rather than lean on happy-dom's DOMMatrix,
+// which parses translate()/scale() notation inconsistently.
 function setup(opts: SetupOpts = {}) {
+  const containerW = opts.containerW ?? 1000;
+  const containerH = opts.containerH ?? 800;
   const imgLeft = opts.imgLeft ?? 400;
   const imgTop = opts.imgTop ?? 300;
+  const imgW = opts.imgW ?? 200;
+  const imgH = opts.imgH ?? 200;
+
   const container = document.createElement('div');
   const img = document.createElement('img');
   container.appendChild(img);
   document.body.appendChild(container);
   if (opts.paddingRight) container.style.paddingRight = `${opts.paddingRight}px`;
+  if (opts.naturalWidth !== undefined) {
+    Object.defineProperty(img, 'naturalWidth', { value: opts.naturalWidth, configurable: true });
+  }
+  if (opts.naturalHeight !== undefined) {
+    Object.defineProperty(img, 'naturalHeight', { value: opts.naturalHeight, configurable: true });
+  }
 
   container.getBoundingClientRect = vi.fn(() => ({
-    ...CONTAINER,
-    right: 1000,
-    bottom: 800,
+    left: 0,
+    top: 0,
+    width: containerW,
+    height: containerH,
+    right: containerW,
+    bottom: containerH,
     x: 0,
     y: 0,
     toJSON() {},
   })) as never;
 
-  // transform-origin is '0 0', so scale never moves the left/top edge — only translate
-  // does. Parse the exact string applyTransform() writes rather than lean on happy-dom's
-  // DOMMatrix, which parses translate()/scale() notation inconsistently.
   img.getBoundingClientRect = vi.fn(() => {
-    const t = img.style.transform;
-    const tr = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(t);
-    const sc = /scale\(([-\d.]+)\)/.exec(t);
+    const tr = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(img.style.transform);
+    const sc = /scale\(([-\d.]+)\)/.exec(img.style.transform);
     const tx = tr ? parseFloat(tr[1]) : 0;
     const ty = tr ? parseFloat(tr[2]) : 0;
     const scale = sc ? parseFloat(sc[1]) : 1;
@@ -112,17 +132,22 @@ function setup(opts: SetupOpts = {}) {
     return {
       left,
       top,
-      width: IMG_W * scale,
-      height: IMG_H * scale,
-      right: left + IMG_W * scale,
-      bottom: top + IMG_H * scale,
+      width: imgW * scale,
+      height: imgH * scale,
+      right: left + imgW * scale,
+      bottom: top + imgH * scale,
       x: left,
       y: top,
       toJSON() {},
     };
   }) as never;
 
-  const zoom = createImageZoomPan(img, container);
+  const zoom = createImageZoomPan(img, container, {
+    fitButtons: opts.fitButtons,
+    fitOnLoad: opts.fitOnLoad,
+    dblClick: opts.dblClick,
+    ...(opts.fitButtons ? { maxScale: 16 } : {}),
+  });
   return { container, img, zoom };
 }
 
@@ -140,6 +165,8 @@ function wheelAt(container: HTMLElement, clientX: number, clientY: number, delta
   Object.defineProperty(e, 'clientY', { value: clientY });
   container.dispatchEvent(e);
 }
+
+const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
 describe('createImageZoomPan onWheel', () => {
   it.each([
@@ -190,8 +217,8 @@ describe('createImageZoomPan onWheel', () => {
 });
 
 describe('createImageZoomPan +/- buttons', () => {
-  function btn(zoom: ReturnType<typeof createImageZoomPan>, title: string): HTMLButtonElement {
-    return zoom.controls.querySelector<HTMLButtonElement>(`button[title="${title}"]`)!;
+  function btn(zoom: ReturnType<typeof createImageZoomPan>, cls: string): HTMLButtonElement {
+    return zoom.controls.querySelector<HTMLButtonElement>(`button.${cls}`)!;
   }
 
   // Container 1000×800 with a 340px right pane reserved, so the display area is x:[0,660];
@@ -203,7 +230,7 @@ describe('createImageZoomPan +/- buttons', () => {
     const { zoom, img } = setup(opts);
     const before = localUnder(img, zoom.getState().scale, CENTRE.x, CENTRE.y);
 
-    btn(zoom, 'Zoom in').click();
+    btn(zoom, 'gallery-zoom-in').click();
 
     const s1 = zoom.getState().scale;
     expect(s1).toBeGreaterThan(1);
@@ -217,7 +244,7 @@ describe('createImageZoomPan +/- buttons', () => {
     const { zoom, img } = setup(opts);
     const before = localUnder(img, zoom.getState().scale, CENTRE.x, CENTRE.y);
 
-    btn(zoom, 'Zoom out').click();
+    btn(zoom, 'gallery-zoom-out').click();
 
     const s1 = zoom.getState().scale;
     expect(s1).toBeLessThan(1);
@@ -231,8 +258,8 @@ describe('createImageZoomPan +/- buttons', () => {
     const { zoom, img } = setup(opts);
     const before = localUnder(img, zoom.getState().scale, CENTRE.x, CENTRE.y);
 
-    for (let i = 0; i < 4; i++) btn(zoom, 'Zoom in').click();
-    for (let i = 0; i < 6; i++) btn(zoom, 'Zoom out').click();
+    for (let i = 0; i < 4; i++) btn(zoom, 'gallery-zoom-in').click();
+    for (let i = 0; i < 6; i++) btn(zoom, 'gallery-zoom-out').click();
 
     const after = localUnder(img, zoom.getState().scale, CENTRE.x, CENTRE.y);
     expect(after.lx).toBeCloseTo(before.lx, 5);
@@ -245,11 +272,176 @@ describe('createImageZoomPan +/- buttons', () => {
     const { zoom, img } = setup();
     const before = localUnder(img, zoom.getState().scale, 500, 400);
 
-    btn(zoom, 'Zoom in').click();
+    btn(zoom, 'gallery-zoom-in').click();
 
     const after = localUnder(img, zoom.getState().scale, 500, 400);
     expect(after.lx).toBeCloseTo(before.lx, 6);
     expect(after.ly).toBeCloseTo(before.ly, 6);
+    zoom.destroy();
+  });
+});
+
+describe('createImageZoomPan Fit / 1:1', () => {
+  const fitBtn = (z: ReturnType<typeof createImageZoomPan>) =>
+    z.controls.querySelector<HTMLButtonElement>('button.gallery-zoom-fit')!;
+  const oneToOneBtn = (z: ReturnType<typeof createImageZoomPan>) =>
+    z.controls.querySelector<HTMLButtonElement>('button.gallery-zoom-11')!;
+
+  /** Client-space centre of the current image bounding box. */
+  function imgCentre(img: HTMLElement) {
+    const r = img.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  it('renders 4 buttons in order [− Fit 1:1 +] when fitButtons is set', () => {
+    const { zoom } = setup({ fitButtons: true });
+    const classes = [...zoom.controls.querySelectorAll('button')].map((b) => b.className);
+    expect(classes).toHaveLength(4);
+    expect(classes[0]).toContain('gallery-zoom-out');
+    expect(classes[1]).toContain('gallery-zoom-fit');
+    expect(classes[2]).toContain('gallery-zoom-11');
+    expect(classes[3]).toContain('gallery-zoom-in');
+    expect(zoom.controls.querySelector('.gallery-zoom-reset')).toBeNull();
+    zoom.destroy();
+  });
+
+  it('keeps the ⟲ reset button when fitButtons is not set', () => {
+    const { zoom } = setup();
+    expect([...zoom.controls.querySelectorAll('button')]).toHaveLength(3);
+    expect(zoom.controls.querySelector('.gallery-zoom-reset')).not.toBeNull();
+    zoom.destroy();
+  });
+
+  it('Fit enlarges a small image to fill the area and centres it', () => {
+    // container 1000×800, layout 200×200 → fit scale = min(1000/200, 800/200) = 4
+    const { zoom, img } = setup({ fitButtons: true, imgW: 200, imgH: 200 });
+    fitBtn(zoom).click();
+
+    expect(zoom.getState().scale).toBeCloseTo(4, 6);
+    const c = imgCentre(img);
+    expect(c.x).toBeCloseTo(500, 4); // container content-box centre
+    expect(c.y).toBeCloseTo(400, 4);
+    zoom.destroy();
+  });
+
+  it('Fit respects a reserved pane (display area excludes padding-right)', () => {
+    // area = 660×800 → fit scale = min(660/200, 800/200) = 3.3; centre x = 330
+    const { zoom, img } = setup({ fitButtons: true, paddingRight: 340, imgW: 200, imgH: 200 });
+    fitBtn(zoom).click();
+
+    expect(zoom.getState().scale).toBeCloseTo(3.3, 6);
+    const c = imgCentre(img);
+    expect(c.x).toBeCloseTo(330, 4);
+    expect(c.y).toBeCloseTo(400, 4);
+    zoom.destroy();
+  });
+
+  it('Fit on an already-fitting image gives scale ≈ 1', () => {
+    const { zoom } = setup({
+      fitButtons: true,
+      containerW: 200,
+      containerH: 200,
+      imgW: 200,
+      imgH: 200,
+    });
+    fitBtn(zoom).click();
+    expect(zoom.getState().scale).toBeCloseTo(1, 6);
+    zoom.destroy();
+  });
+
+  it('1:1 scales a high-res image to native pixels, centred and clipping', () => {
+    // layout 200 wide, natural 600 → scale = 3
+    const { zoom, img } = setup({
+      fitButtons: true,
+      imgW: 200,
+      imgH: 150,
+      naturalWidth: 600,
+      naturalHeight: 450,
+    });
+    oneToOneBtn(zoom).click();
+
+    expect(zoom.getState().scale).toBeCloseTo(3, 6);
+    const r = img.getBoundingClientRect();
+    expect(r.width).toBeCloseTo(600, 4); // == naturalWidth
+    const c = imgCentre(img);
+    expect(c.x).toBeCloseTo(500, 4);
+    expect(c.y).toBeCloseTo(400, 4);
+    zoom.destroy();
+  });
+
+  it('1:1 shows a sub-viewport image smaller than fit, centred', () => {
+    // layout 200 wide, natural 120 → scale = 0.6
+    const { zoom, img } = setup({
+      fitButtons: true,
+      imgW: 200,
+      imgH: 200,
+      naturalWidth: 120,
+      naturalHeight: 120,
+    });
+    oneToOneBtn(zoom).click();
+
+    expect(zoom.getState().scale).toBeCloseTo(0.6, 6);
+    const c = imgCentre(img);
+    expect(c.x).toBeCloseTo(500, 4);
+    expect(c.y).toBeCloseTo(400, 4);
+    zoom.destroy();
+  });
+
+  it('fitOnLoad applies the fit scale after the image loads and a frame passes', async () => {
+    const { zoom, img } = setup({ fitButtons: true, fitOnLoad: true, imgW: 200, imgH: 200 });
+    expect(zoom.getState().scale).toBe(1); // deferred, not synchronous
+    img.dispatchEvent(new Event('load')); // no-op if the image was already complete
+    await nextFrame();
+    expect(zoom.getState().scale).toBeCloseTo(4, 6);
+    zoom.destroy();
+  });
+
+  // The handler is bound to the container, not the image: the drag handler's
+  // setPointerCapture() on the container retargets derived click/dblclick events to it,
+  // so a listener on the image would never fire.
+  it("double-click on the container fits when dblClick is 'fit' (the fitButtons default)", () => {
+    const { zoom, container } = setup({ fitButtons: true, imgW: 200, imgH: 200 });
+    container.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(zoom.getState().scale).toBeCloseTo(4, 6);
+    zoom.destroy();
+  });
+
+  it('double-click is ignored right after a drag', () => {
+    const { zoom, container } = setup({ fitButtons: true, imgW: 200, imgH: 200 });
+    const down = new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 });
+    Object.defineProperty(down, 'clientX', { value: 100 });
+    Object.defineProperty(down, 'clientY', { value: 100 });
+    container.dispatchEvent(down);
+    const move = new PointerEvent('pointermove', { bubbles: true, pointerId: 1 });
+    Object.defineProperty(move, 'clientX', { value: 160 });
+    Object.defineProperty(move, 'clientY', { value: 140 });
+    container.dispatchEvent(move);
+    container.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+
+    container.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(zoom.getState().scale).toBe(1); // drag guard blocked the fit
+    zoom.destroy();
+  });
+
+  it("double-click is inert when dblClick is 'none'", () => {
+    const { zoom, container } = setup({ fitButtons: true, dblClick: 'none', imgW: 200, imgH: 200 });
+    container.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(zoom.getState().scale).toBe(1);
+    zoom.destroy();
+  });
+
+  it('controller exposes fit() and actualSize()', () => {
+    const { zoom } = setup({
+      fitButtons: true,
+      imgW: 200,
+      imgH: 200,
+      naturalWidth: 600,
+      naturalHeight: 600,
+    });
+    zoom.fit();
+    expect(zoom.getState().scale).toBeCloseTo(4, 6);
+    zoom.actualSize();
+    expect(zoom.getState().scale).toBeCloseTo(3, 6);
     zoom.destroy();
   });
 });

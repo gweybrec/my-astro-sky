@@ -1962,7 +1962,12 @@ export class PhotoOverlay {
       const markers: HTMLDivElement[] = [];
 
       // ── Zoom / pan ───────────────────────────────────────────────────────────
-      zoom = createImageZoomPan(photoImg, photoContainer, { minScale: 1, maxScale: 5 });
+      zoom = createImageZoomPan(photoImg, photoContainer, {
+        minScale: 1,
+        maxScale: 5,
+        fitButtons: true,
+        dblClick: 'none',
+      });
       photoWrapper.appendChild(zoom.controls);
 
       function updateMarkerPositions() {

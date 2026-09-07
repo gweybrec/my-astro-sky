@@ -771,6 +771,15 @@ const es: Translations = {
     noPhotosHint: 'Añade tu primera astrofoto desde el panel del mapa celeste',
     unsavedChanges: 'Tiene cambios sin guardar.',
     closeWithoutSaving: 'Cerrar sin guardar',
+    zoom: {
+      out: 'Alejar',
+      in: 'Acercar',
+      reset: 'Restablecer',
+      fit: 'Ajustar',
+      fitTitle: 'Ajustar la imagen a la vista',
+      actual: '1:1',
+      actualTitle: 'Tamaño real (100 %)',
+    },
     batchEdit: {
       titleLabels: 'Editar las etiquetas de varias fotos',
       titleSetups: 'Editar los equipos de varias fotos',

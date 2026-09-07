@@ -823,7 +823,11 @@ export class Gallery {
     meta.appendChild(actionRow);
 
     // ── Zoom / pan ────────────────────────────────────────────────────────────
-    zoom = createImageZoomPan(img, imgWrap);
+    zoom = createImageZoomPan(img, imgWrap, {
+      maxScale: 16,
+      fitButtons: true,
+      fitOnLoad: true,
+    });
     const zoomControls = zoom.controls;
 
     imgWrap.style.cursor = 'grab';

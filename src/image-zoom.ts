@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 export interface ZoomPanState {
   scale: number;
   tx: number;
@@ -7,6 +9,15 @@ export interface ZoomPanState {
 export interface ZoomPanOptions {
   minScale?: number;
   maxScale?: number;
+  /** Replace the single ⟲ reset button with explicit "Fit" + "1:1" buttons. */
+  fitButtons?: boolean;
+  /** Once the image has loaded and been laid out, run Fit once (ideal default framing). */
+  fitOnLoad?: boolean;
+  /**
+   * What double-clicking the image does. Defaults to `'reset'` when `fitButtons` is off,
+   * `'fit'` when it is on. `'none'` disables the double-click handler entirely.
+   */
+  dblClick?: 'fit' | 'reset' | 'none';
 }
 
 export interface ZoomPanController {
@@ -14,6 +25,10 @@ export interface ZoomPanController {
   getState(): ZoomPanState;
   onTransformChange(cb: () => void): () => void;
   readonly wasDrag: boolean;
+  /** Scale to fill the display area while fully visible, then centre. */
+  fit(): void;
+  /** Scale to native pixel size (1 image px = 1 screen px), then centre. */
+  actualSize(): void;
   reset(): void;
   destroy(): void;
 }
@@ -42,6 +57,8 @@ export function createImageZoomPan(
 ): ZoomPanController {
   const MIN_SCALE = opts?.minScale ?? 0.2;
   const MAX_SCALE = opts?.maxScale ?? 6;
+  const useFitButtons = opts?.fitButtons ?? false;
+  const dblClickMode = opts?.dblClick ?? (useFitButtons ? 'fit' : 'reset');
 
   let scale = 1,
     tx = 0,
@@ -51,6 +68,7 @@ export function createImageZoomPan(
     lastY = 0,
     dragDist = 0;
   let _wasDrag = false;
+  let fitRaf = 0;
   const listeners: Array<() => void> = [];
 
   img.style.transformOrigin = '0 0';
@@ -64,18 +82,61 @@ export function createImageZoomPan(
     b.className = 'gallery-zoom-btn' + (extraClass ? ' ' + extraClass : '');
     b.textContent = text;
     b.title = title;
+    b.setAttribute('aria-label', title);
     return b;
   }
 
-  const zoomOutBtn = makeBtn('−', 'Zoom out');
-  const resetBtn = makeBtn('⟲', 'Reset', 'gallery-zoom-reset');
-  const zoomInBtn = makeBtn('+', 'Zoom in');
-  controls.append(zoomOutBtn, resetBtn, zoomInBtn);
+  const zoomOutBtn = makeBtn('−', t('gallery.zoom.out'), 'gallery-zoom-out');
+  const zoomInBtn = makeBtn('+', t('gallery.zoom.in'), 'gallery-zoom-in');
+
+  let resetBtn: HTMLButtonElement | null = null;
+  let fitBtn: HTMLButtonElement | null = null;
+  let oneToOneBtn: HTMLButtonElement | null = null;
+
+  if (useFitButtons) {
+    fitBtn = makeBtn(
+      t('gallery.zoom.fit'),
+      t('gallery.zoom.fitTitle'),
+      'gallery-zoom-text gallery-zoom-fit',
+    );
+    oneToOneBtn = makeBtn(
+      t('gallery.zoom.actual'),
+      t('gallery.zoom.actualTitle'),
+      'gallery-zoom-text gallery-zoom-11',
+    );
+    controls.append(zoomOutBtn, fitBtn, oneToOneBtn, zoomInBtn);
+  } else {
+    resetBtn = makeBtn('⟲', t('gallery.zoom.reset'), 'gallery-zoom-reset');
+    controls.append(zoomOutBtn, resetBtn, zoomInBtn);
+  }
 
   // ── Transform ───────────────────────────────────────────────────────────────
   function applyTransform() {
     img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
     for (const cb of listeners) cb();
+  }
+
+  // ── Geometry ────────────────────────────────────────────────────────────────
+  /** Client-space content box of the container (the visible image area, minus padding). */
+  function contentBox(): { left: number; top: number; width: number; height: number } {
+    const rect = container.getBoundingClientRect();
+    const cs = getComputedStyle(container);
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const padT = parseFloat(cs.paddingTop) || 0;
+    const padB = parseFloat(cs.paddingBottom) || 0;
+    return {
+      left: rect.left + padL,
+      top: rect.top + padT,
+      width: rect.width - padL - padR,
+      height: rect.height - padT - padB,
+    };
+  }
+
+  /** Client-space centre of the container's content box. */
+  function displayCentre(): { x: number; y: number } {
+    const box = contentBox();
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
   }
 
   // ── Zoom toward a point ─────────────────────────────────────────────────────
@@ -102,18 +163,48 @@ export function createImageZoomPan(
     applyTransform();
   }
 
-  /** Client-space centre of the container's content box (where the image is displayed). */
-  function displayCentre(): { x: number; y: number } {
-    const rect = container.getBoundingClientRect();
-    const cs = getComputedStyle(container);
-    const padL = parseFloat(cs.paddingLeft) || 0;
-    const padR = parseFloat(cs.paddingRight) || 0;
-    const padT = parseFloat(cs.paddingTop) || 0;
-    const padB = parseFloat(cs.paddingBottom) || 0;
-    return {
-      x: rect.left + padL + (rect.width - padL - padR) / 2,
-      y: rect.top + padT + (rect.height - padT - padB) / 2,
-    };
+  /** Set an absolute scale and centre the image in the container's content box. */
+  function applyAbsoluteScaleCentered(targetScale: number) {
+    const cRect = container.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+    const layoutW = imgRect.width / scale;
+    const layoutH = imgRect.height / scale;
+    if (!(layoutW > 0) || !(layoutH > 0) || !Number.isFinite(targetScale) || targetScale <= 0) {
+      return;
+    }
+    const offX = imgRect.left - cRect.left - tx;
+    const offY = imgRect.top - cRect.top - ty;
+    const box = contentBox();
+    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, targetScale));
+    tx = box.left - cRect.left + box.width / 2 - offX - (layoutW / 2) * scale;
+    ty = box.top - cRect.top + box.height / 2 - offY - (layoutH / 2) * scale;
+    applyTransform();
+  }
+
+  /** Largest scale that keeps the whole image inside the content box. */
+  function fitToArea() {
+    const imgRect = img.getBoundingClientRect();
+    const layoutW = imgRect.width / scale;
+    const layoutH = imgRect.height / scale;
+    if (!(layoutW > 0) || !(layoutH > 0)) return;
+    const box = contentBox();
+    applyAbsoluteScaleCentered(Math.min(box.width / layoutW, box.height / layoutH));
+  }
+
+  /** Native pixel size: 1 image pixel == 1 screen pixel. */
+  function actualSize() {
+    const imgRect = img.getBoundingClientRect();
+    const layoutW = imgRect.width / scale;
+    if (!(layoutW > 0)) return;
+    const nat = (img as HTMLImageElement).naturalWidth || layoutW;
+    applyAbsoluteScaleCentered(nat / layoutW);
+  }
+
+  function reset() {
+    scale = 1;
+    tx = 0;
+    ty = 0;
+    applyTransform();
   }
 
   // ── Wheel ───────────────────────────────────────────────────────────────────
@@ -166,12 +257,15 @@ export function createImageZoomPan(
     onPointerUp(ev);
   }
 
-  // ── Double-click reset ──────────────────────────────────────────────────────
-  function onDblClick() {
-    scale = 1;
-    tx = 0;
-    ty = 0;
-    applyTransform();
+  // ── Double-click ────────────────────────────────────────────────────────────
+  // Bound to `container`, not `img`: the drag handler calls setPointerCapture() on the
+  // container, which retargets the derived click/dblclick events to it, so a listener on
+  // `img` would never fire.
+  function onDblClick(ev: MouseEvent) {
+    if ((ev.target as HTMLElement).closest('.gallery-zoom-controls')) return;
+    if (_wasDrag) return;
+    if (dblClickMode === 'fit') fitToArea();
+    else if (dblClickMode === 'reset') reset();
   }
 
   // ── Button handlers ─────────────────────────────────────────────────────────
@@ -185,12 +279,17 @@ export function createImageZoomPan(
     const c = displayCentre();
     zoomTowardClientPoint(0.8, c.x, c.y);
   });
-  resetBtn.addEventListener('click', (e) => {
+  resetBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
-    scale = 1;
-    tx = 0;
-    ty = 0;
-    applyTransform();
+    reset();
+  });
+  fitBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fitToArea();
+  });
+  oneToOneBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    actualSize();
   });
 
   // ── Attach listeners ────────────────────────────────────────────────────────
@@ -199,7 +298,21 @@ export function createImageZoomPan(
   container.addEventListener('pointermove', onPointerMove);
   container.addEventListener('pointerup', onPointerUp);
   container.addEventListener('pointercancel', onPointerCancel);
-  img.addEventListener('dblclick', onDblClick);
+  if (dblClickMode !== 'none') container.addEventListener('dblclick', onDblClick);
+
+  // ── Fit on load ─────────────────────────────────────────────────────────────
+  // createImageZoomPan runs before the caller appends its overlay to the DOM, so the
+  // container has no layout yet — defer one frame before measuring.
+  const runFitOnLoad = () => {
+    fitRaf = requestAnimationFrame(() => fitToArea());
+  };
+  if (opts?.fitOnLoad) {
+    if (img instanceof HTMLImageElement && !img.complete) {
+      img.addEventListener('load', runFitOnLoad, { once: true });
+    } else {
+      runFitOnLoad();
+    }
+  }
 
   return {
     controls,
@@ -214,19 +327,18 @@ export function createImageZoomPan(
     get wasDrag() {
       return _wasDrag;
     },
-    reset() {
-      scale = 1;
-      tx = 0;
-      ty = 0;
-      applyTransform();
-    },
+    fit: fitToArea,
+    actualSize,
+    reset,
     destroy() {
+      if (fitRaf) cancelAnimationFrame(fitRaf);
+      img.removeEventListener('load', runFitOnLoad);
       container.removeEventListener('wheel', onWheel);
       container.removeEventListener('pointerdown', onPointerDown);
       container.removeEventListener('pointermove', onPointerMove);
       container.removeEventListener('pointerup', onPointerUp);
       container.removeEventListener('pointercancel', onPointerCancel);
-      img.removeEventListener('dblclick', onDblClick);
+      container.removeEventListener('dblclick', onDblClick);
       controls.remove();
       listeners.length = 0;
     },

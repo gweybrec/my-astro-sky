@@ -770,6 +770,15 @@ const de: Translations = {
     noPhotosHint: 'Fügen Sie Ihr erstes Astrofoto über das Himmelskartenfeld hinzu',
     unsavedChanges: 'Sie haben ungespeicherte Änderungen.',
     closeWithoutSaving: 'Ohne Speichern schließen',
+    zoom: {
+      out: 'Verkleinern',
+      in: 'Vergrößern',
+      reset: 'Zurücksetzen',
+      fit: 'Einpassen',
+      fitTitle: 'Bild an Ansicht anpassen',
+      actual: '1:1',
+      actualTitle: 'Tatsächliche Größe (100 %)',
+    },
     batchEdit: {
       titleLabels: 'Etiketten mehrerer Fotos bearbeiten',
       titleSetups: 'Ausrüstung mehrerer Fotos bearbeiten',

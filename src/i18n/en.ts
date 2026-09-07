@@ -764,6 +764,15 @@ const en: Translations = {
     noPhotosHint: 'Add your first astrophoto from the Sky Map panel',
     unsavedChanges: 'You have unsaved changes.',
     closeWithoutSaving: 'Close without saving',
+    zoom: {
+      out: 'Zoom out',
+      in: 'Zoom in',
+      reset: 'Reset',
+      fit: 'Fit',
+      fitTitle: 'Fit image to view',
+      actual: '1:1',
+      actualTitle: 'Actual size (100%)',
+    },
     batchEdit: {
       titleLabels: 'Edit labels of several photos',
       titleSetups: 'Edit setups of several photos',
