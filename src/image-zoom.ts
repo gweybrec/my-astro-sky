@@ -78,19 +78,48 @@ export function createImageZoomPan(
     for (const cb of listeners) cb();
   }
 
-  // ── Wheel ───────────────────────────────────────────────────────────────────
-  function onWheel(e: WheelEvent) {
-    e.preventDefault();
-    const rect = container.getBoundingClientRect();
+  // ── Zoom toward a point ─────────────────────────────────────────────────────
+  /**
+   * Zoom by `factor`, holding the image pixel currently under client point
+   * (`clientX`, `clientY`) fixed — the behaviour of a mouse wheel at that point.
+   *
+   * The cursor is measured from the image's own top-left corner (its transform origin),
+   * not the container. The <img> is flex-centred in the wrapper, so the two differ by the
+   * centring offset — feeding container coords made the zoom lurch toward the top-left,
+   * badly so for images smaller than the viewport. With transform-origin '0 0', scaling
+   * never moves the left/top edge, so imgRect.left already includes tx.
+   */
+  function zoomTowardClientPoint(factor: number, clientX: number, clientY: number) {
+    const imgRect = img.getBoundingClientRect();
     const next = applyZoomToward(
       { scale, tx, ty },
-      { cx: e.clientX - rect.left, cy: e.clientY - rect.top },
-      e.deltaY < 0 ? 1.12 : 0.9,
+      { cx: clientX - imgRect.left + tx, cy: clientY - imgRect.top + ty },
+      factor,
       MIN_SCALE,
       MAX_SCALE,
     );
     ({ scale, tx, ty } = next);
     applyTransform();
+  }
+
+  /** Client-space centre of the container's content box (where the image is displayed). */
+  function displayCentre(): { x: number; y: number } {
+    const rect = container.getBoundingClientRect();
+    const cs = getComputedStyle(container);
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const padT = parseFloat(cs.paddingTop) || 0;
+    const padB = parseFloat(cs.paddingBottom) || 0;
+    return {
+      x: rect.left + padL + (rect.width - padL - padR) / 2,
+      y: rect.top + padT + (rect.height - padT - padB) / 2,
+    };
+  }
+
+  // ── Wheel ───────────────────────────────────────────────────────────────────
+  function onWheel(e: WheelEvent) {
+    e.preventDefault();
+    zoomTowardClientPoint(e.deltaY < 0 ? 1.12 : 0.9, e.clientX, e.clientY);
   }
 
   // ── Pointer drag ─────────────────────────────────────────────────────────────
@@ -148,13 +177,13 @@ export function createImageZoomPan(
   // ── Button handlers ─────────────────────────────────────────────────────────
   zoomInBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    scale = Math.min(MAX_SCALE, scale * 1.25);
-    applyTransform();
+    const c = displayCentre();
+    zoomTowardClientPoint(1.25, c.x, c.y);
   });
   zoomOutBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    scale = Math.max(MIN_SCALE, scale * 0.8);
-    applyTransform();
+    const c = displayCentre();
+    zoomTowardClientPoint(0.8, c.x, c.y);
   });
   resetBtn.addEventListener('click', (e) => {
     e.stopPropagation();
