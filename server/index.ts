@@ -627,6 +627,7 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       integrations,
       notes,
       thumbFilename,
+      observationDate,
       captureDetails,
       gearSetupId,
       ...(scaledManualPlacement ? { manualPlacement: JSON.parse(scaledManualPlacement) } : {}),

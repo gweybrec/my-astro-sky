@@ -736,4 +736,74 @@ describe('Gallery', () => {
 
     vi.unstubAllGlobals();
   });
+
+  // ── Observation-date range filter ─────────────────────────────────────────
+
+  describe('setDateRangeFilter', () => {
+    const dated = () => {
+      const gallery = new Gallery();
+      gallery.loadPhotos([
+        makePhoto({
+          id: 'a',
+          originalName: 'M42',
+          filename: 'a.jpg',
+          observationDate: '2024-03-14T21:05:00.000Z',
+        }),
+        makePhoto({
+          id: 'b',
+          originalName: 'M31',
+          filename: 'b.jpg',
+          observationDate: '2024-03-18T03:30:00.000Z',
+        }),
+        makePhoto({
+          id: 'c',
+          originalName: 'M13',
+          filename: 'c.jpg',
+          observationDate: '2024-04-02T22:00:00.000Z',
+        }),
+        makePhoto({ id: 'd', originalName: 'NGC7000', filename: 'd.jpg', observationDate: null }),
+      ]);
+      return gallery;
+    };
+    const visibleNames = () =>
+      Array.from(document.querySelectorAll('.gallery-item-name'))
+        .map((n) => n.textContent)
+        .sort();
+
+    it('From alone matches exactly that UTC day', () => {
+      const gallery = dated();
+      gallery.setDateRangeFilter('2024-03-14', null);
+      expect(visibleNames()).toEqual(['M42']);
+    });
+
+    it('From + To is inclusive on both ends', () => {
+      const gallery = dated();
+      gallery.setDateRangeFilter('2024-03-14', '2024-04-02');
+      expect(visibleNames()).toEqual(['M13', 'M31', 'M42']);
+    });
+
+    it('a reversed From/To pair is swapped, not treated as empty', () => {
+      const gallery = dated();
+      gallery.setDateRangeFilter('2024-04-02', '2024-03-14');
+      expect(visibleNames()).toEqual(['M13', 'M31', 'M42']);
+    });
+
+    it('photos with no observationDate are excluded while active and return once cleared', () => {
+      const gallery = dated();
+      gallery.setDateRangeFilter('2024-01-01', '2024-12-31');
+      expect(visibleNames()).toEqual(['M13', 'M31', 'M42']); // NGC7000 (no date) hidden
+
+      gallery.setDateRangeFilter(null, null);
+      expect(visibleNames()).toEqual(['M13', 'M31', 'M42', 'NGC7000']);
+    });
+
+    it('an empty-string From clears the filter', () => {
+      const gallery = dated();
+      gallery.setDateRangeFilter('2024-03-14', null);
+      expect(document.querySelectorAll('.gallery-item').length).toBe(1);
+
+      gallery.setDateRangeFilter('', '');
+      expect(document.querySelectorAll('.gallery-item').length).toBe(4);
+    });
+  });
 });

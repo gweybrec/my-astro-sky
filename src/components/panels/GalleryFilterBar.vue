@@ -217,6 +217,54 @@
       </DropdownPanel>
     </div>
 
+    <!-- Observation-date range dropdown -->
+    <div class="display-controls-mag-row">
+      <button
+        ref="dateBtnRef"
+        type="button"
+        class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
+        @click.stop="dateOpen = !dateOpen"
+      >
+        {{ t('gallery.filterDates') }}{{ dateRangeLabel ? ` (${dateRangeLabel})` : '' }}
+      </button>
+      <DropdownPanel v-model="dateOpen" :anchor-el="dateBtnRef" min-width="240px">
+        <div class="labels-select-all-row justify-between">
+          <span class="labels-select-all-label text-muted">{{
+            dateRangeLabel || t('gallery.showingAll')
+          }}</span>
+          <button
+            type="button"
+            class="bg-transparent border border-[var(--border-white-sm)] text-[var(--text-primary)] text-base rounded-sm cursor-pointer px-2 py-px hover:bg-[var(--accent-fill-sm)] disabled:opacity-40 disabled:cursor-default"
+            :disabled="!dateFrom"
+            @click="clearDateRange"
+          >
+            ✕ {{ t('display.clear') }}
+          </button>
+        </div>
+        <div class="flex gap-4 px-6 py-3">
+          <label class="flex flex-col gap-1 text-base text-muted">
+            {{ t('gallery.dateFrom') }}
+            <input
+              type="date"
+              class="targets-coord-input !min-w-0 !max-w-none !flex-none w-auto"
+              v-model="dateFrom"
+              @change="applyDateRange"
+            />
+          </label>
+          <label class="flex flex-col gap-1 text-base text-muted">
+            {{ t('gallery.dateTo') }}
+            <input
+              type="date"
+              class="targets-coord-input !min-w-0 !max-w-none !flex-none w-auto"
+              :min="dateFrom || undefined"
+              v-model="dateTo"
+              @change="applyDateRange"
+            />
+          </label>
+        </div>
+      </DropdownPanel>
+    </div>
+
     <!-- Export -->
     <button
       type="button"
@@ -428,6 +476,33 @@ function clearCatalogs() {
   canvasStore.gallery?.setDSOCatalogFilter([]);
 }
 
+// ── Observation-date range ────────────────────────────────────────────────────
+const dateBtnRef = ref<HTMLButtonElement>();
+const dateOpen = ref(false);
+const dateFrom = ref('');
+const dateTo = ref('');
+
+// Button/summary text: "" when inactive, "2024-03-14" for a single day, or
+// "2024-03-14 → 2024-03-20" for a range.
+const dateRangeLabel = computed(() => {
+  if (!dateFrom.value) return '';
+  if (!dateTo.value || dateTo.value === dateFrom.value) return dateFrom.value;
+  // Show the range in chronological order even if the user picked To before From
+  // (the gallery filter swaps a reversed pair internally).
+  const [lo, hi] = [dateFrom.value, dateTo.value].sort();
+  return `${lo} → ${hi}`;
+});
+
+function applyDateRange() {
+  canvasStore.gallery?.setDateRangeFilter(dateFrom.value || null, dateTo.value || null);
+}
+
+function clearDateRange() {
+  dateFrom.value = '';
+  dateTo.value = '';
+  canvasStore.gallery?.setDateRangeFilter(null, null);
+}
+
 // ── Init / reset filters on gallery entry/exit ────────────────────────────────
 watch(viewMode, (mode) => {
   if (mode === 'gallery') {
@@ -436,11 +511,14 @@ watch(viewMode, (mode) => {
     selectedTypes.value = [];
     selectedCatalogs.value = [];
     selectedPois.value = new Map();
+    dateFrom.value = '';
+    dateTo.value = '';
     canvasStore.gallery?.setSetupFilter(null);
     canvasStore.gallery?.setLabelFilter(null);
     canvasStore.gallery?.setDSOTypeFilter([]);
     canvasStore.gallery?.setDSOCatalogFilter([]);
     canvasStore.gallery?.setPoiFilter(null);
+    canvasStore.gallery?.setDateRangeFilter(null, null);
     refreshLabels();
     void refreshSetups();
     poiCategoriesStore.ensureLoaded();
@@ -453,10 +531,13 @@ watch(viewMode, (mode) => {
   selectedTypes.value = [];
   selectedCatalogs.value = [];
   selectedPois.value = new Map();
+  dateFrom.value = '';
+  dateTo.value = '';
   setupOpen.value = false;
   labelOpen.value = false;
   typeOpen.value = false;
   catalogOpen.value = false;
+  dateOpen.value = false;
   batchEditMode.value = null;
   canvasStore.gallery?.setSearchQuery('');
   canvasStore.gallery?.setSetupFilter(null);
@@ -464,5 +545,6 @@ watch(viewMode, (mode) => {
   canvasStore.gallery?.setDSOTypeFilter([]);
   canvasStore.gallery?.setDSOCatalogFilter([]);
   canvasStore.gallery?.setPoiFilter(null);
+  canvasStore.gallery?.setDateRangeFilter(null, null);
 });
 </script>

@@ -28,6 +28,7 @@ export interface GalleryInterface extends ShowHide {
   setDSOTypeFilter(types: string[]): void;
   setDSOCatalogFilter(catalogs: string[]): void;
   setPoiFilter(selected: Map<string, Set<string>> | null): void;
+  setDateRangeFilter(from: string | null, to: string | null): void;
   setGearSetups(setups: GearSetupData[]): void;
   getAllPois(): PoiFilterGroup[];
   getAllLabels(): { label: string; count: number }[];

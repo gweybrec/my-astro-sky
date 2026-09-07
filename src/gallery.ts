@@ -76,6 +76,10 @@ export class Gallery {
   // Two-level POI filter: categoryId → set of selected names (empty set ⇒ whole
   // category). null ⇒ no POI filter (every photo passes).
   private filterByPois: Map<string, Set<string>> | null = null;
+  // Observation-date range, each 'YYYY-MM-DD' or null. filterByDateFrom null ⇒ no
+  // date filter. filterByDateTo null with a From set ⇒ that single day.
+  private filterByDateFrom: string | null = null;
+  private filterByDateTo: string | null = null;
   private poiCategories: PoiCategory[] = [];
   private gearSetups: GearSetupData[] = [];
   private setupNameById = new Map<string, string>();
@@ -176,6 +180,24 @@ export class Gallery {
 
   setSearchQuery(query: string) {
     this.searchQuery = query.toLowerCase().trim();
+    this.applyFilters();
+  }
+
+  /**
+   * Filter by observation-date range. From alone ⇒ that single day; From + To ⇒
+   * inclusive range. A reversed pair is swapped so callers can't produce an empty
+   * range. Both null ⇒ no date filter.
+   */
+  setDateRangeFilter(from: string | null, to: string | null) {
+    this.filterByDateFrom = from || null;
+    this.filterByDateTo = to || null;
+    if (
+      this.filterByDateFrom &&
+      this.filterByDateTo &&
+      this.filterByDateTo < this.filterByDateFrom
+    ) {
+      [this.filterByDateFrom, this.filterByDateTo] = [this.filterByDateTo, this.filterByDateFrom];
+    }
     this.applyFilters();
   }
 
@@ -293,6 +315,19 @@ export class Gallery {
       filtered = filtered.filter((photo) =>
         poisMatchFilter(photo.pointsOfInterest ?? [], this.poiCategories, this.filterByPois),
       );
+    }
+
+    // Observation-date range — strict: a photo with no observationDate can't satisfy
+    // an explicit date constraint, so it drops out while the filter is active.
+    // ISO 8601 date strings compare lexicographically, so slice off the UTC day.
+    if (this.filterByDateFrom) {
+      const from = this.filterByDateFrom;
+      const to = this.filterByDateTo ?? from;
+      filtered = filtered.filter((photo) => {
+        if (!photo.observationDate) return false;
+        const day = photo.observationDate.slice(0, 10);
+        return day >= from && day <= to;
+      });
     }
 
     this.filteredPhotos = filtered;
