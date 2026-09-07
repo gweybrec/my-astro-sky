@@ -173,6 +173,10 @@ const selectPhotos = db.prepare(
   'SELECT * FROM photos ORDER BY display_order ASC, created_at ASC, id ASC',
 );
 const selectCorrespondences = db.prepare('SELECT * FROM star_correspondences ORDER BY point_index');
+const selectPhotoById = db.prepare('SELECT * FROM photos WHERE id = ?');
+const selectCorrespondencesForPhoto = db.prepare(
+  'SELECT * FROM star_correspondences WHERE photo_id = ? ORDER BY point_index',
+);
 const deletePhotoStmt = db.prepare('DELETE FROM photos WHERE id = ?');
 const selectFilename = db.prepare('SELECT filename FROM photos WHERE id = ?');
 const updatePhotoDisplayOrderStmt = db.prepare('UPDATE photos SET display_order = ? WHERE id = ?');
@@ -286,11 +290,15 @@ export function createPhoto(
   run();
 }
 
-export function getAllPhotos() {
-  const photos = selectPhotos.all() as any[];
-  const allCorr = selectCorrespondences.all() as any[];
-
-  return photos.map((p) => ({
+/**
+ * Map one raw `photos` table row (plus the correspondence rows for that photo) to the
+ * serialized API shape. This is the **single source of truth** for what a photo looks
+ * like over the wire: `getAllPhotos()` (GET /api/photos) and `getPhotoById()` (the
+ * POST /api/photos response) both go through here, so the two can never drift and drop
+ * a field. When you add a new metadata column, wire it in here once — nowhere else.
+ */
+function rowToPhoto(p: any, corr: any[]) {
+  return {
     id: p.id,
     filename: p.filename,
     originalName: p.original_name,
@@ -307,7 +315,7 @@ export function getAllPhotos() {
     captureDetails: parseCaptureDetails(p.capture_details),
     gearSetupId: p.gear_setup_id ?? null,
     thumbFilename: p.thumb_filename ?? null,
-    correspondences: allCorr
+    correspondences: corr
       .filter((c) => c.photo_id === p.id)
       .map((c) => ({
         pointIndex: c.point_index,
@@ -318,7 +326,23 @@ export function getAllPhotos() {
         ...(c.star_ra != null ? { starRa: c.star_ra } : {}),
         ...(c.star_dec != null ? { starDec: c.star_dec } : {}),
       })),
-  }));
+  };
+}
+
+export function getAllPhotos() {
+  const photos = selectPhotos.all() as any[];
+  const allCorr = selectCorrespondences.all() as any[];
+  return photos.map((p) => rowToPhoto(p, allCorr));
+}
+
+/**
+ * One serialized photo by id, or `undefined` if there is no such row. Identical in
+ * shape to a single `getAllPhotos()` entry (see `rowToPhoto`).
+ */
+export function getPhotoById(id: string) {
+  const p = selectPhotoById.get(id) as any;
+  if (!p) return undefined;
+  return rowToPhoto(p, selectCorrespondencesForPhoto.all(id) as any[]);
 }
 
 export function deletePhoto(id: string): boolean {

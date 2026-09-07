@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import {
   createPhoto,
   getAllPhotos,
+  getPhotoById,
   deletePhoto,
   getPhotoFilename,
   updatePhotoManualPlacement,
@@ -613,25 +614,10 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       gearSetupId,
     );
 
-    res.json({
-      id,
-      filename,
-      originalName: displayName,
-      width: newWidth,
-      height: newHeight,
-      createdAt: new Date().toISOString(),
-      correspondences: scaledCorrespondences,
-      dsoIds,
-      labels,
-      pointsOfInterest,
-      integrations,
-      notes,
-      thumbFilename,
-      observationDate,
-      captureDetails,
-      gearSetupId,
-      ...(scaledManualPlacement ? { manualPlacement: JSON.parse(scaledManualPlacement) } : {}),
-    });
+    // Return the freshly persisted row through the same serializer GET /api/photos
+    // uses, so the client's in-memory photo matches what a reload would fetch and no
+    // metadata field can be silently dropped from the response.
+    res.json(getPhotoById(id));
   } catch (err: any) {
     console.error('Upload error:', err);
     res.status(500).json({ error: err.message });
