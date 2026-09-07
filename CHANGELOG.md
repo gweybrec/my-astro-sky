@@ -4,6 +4,40 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.10.0] - 2026-09-07
+
+### Features
+
+- Add POI in the sky photo search result card ([a4f9d2f](https://github.com/gweybrec/my-astro-sky/commit/a4f9d2f5077360ab6810f0f398c5e8c4655c5967))
+
+- Filter gallery by date + fix missing dates when saving photos ([f8fbd45](https://github.com/gweybrec/my-astro-sky/commit/f8fbd4540c2fa66a6c7929d53250491514bde312))
+
+- Show a selected object's trajectory on the local sky ([538c794](https://github.com/gweybrec/my-astro-sky/commit/538c7943f5be9bdd9e364971c73531195cd45dac))
+
+
+### Improvements
+
+- Show third-party licences in the data credits modal ([ec54934](https://github.com/gweybrec/my-astro-sky/commit/ec549346327e32873b84991918b011723db6b822))
+
+
+### Bug Fixes
+
+- Guard against non-finite scale when framing a photo below the horizon ([1ba73d2](https://github.com/gweybrec/my-astro-sky/commit/1ba73d29810b00fcfff8006b116688d7b4a3f19c))
+
+- Clock not starting when the app open in local sky view ([cde630a](https://github.com/gweybrec/my-astro-sky/commit/cde630a72a9222921985edbbf87ec3c4677299de))
+
+- Tooltip dismissing in local sky every second ([e354cc6](https://github.com/gweybrec/my-astro-sky/commit/e354cc6edf773688063e8d73c0626b4eb7b42bae))
+
+
+### Refactor
+
+- Integration time display ([0da0e2d](https://github.com/gweybrec/my-astro-sky/commit/0da0e2da600e26e2a8003ff3ab9fb3d696bbf47d))
+
+
+### Build System
+
+- V0.10.0 ([e823637](https://github.com/gweybrec/my-astro-sky/commit/e823637101131ec1ef079d5269b057305230beeb))
+
 ## [0.9.0] - 2026-08-04
 
 ### Features
