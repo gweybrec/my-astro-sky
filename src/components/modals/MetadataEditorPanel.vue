@@ -82,47 +82,86 @@
   <div class="metadata-field">
     <label class="metadata-label">{{ t('modal.metadataIntegrations') }}</label>
     <div class="integration-rows">
-      <div v-for="(row, idx) in integrations" :key="idx" class="integration-row">
-        <input
-          type="number"
-          min="0"
-          step="1"
-          class="tag-input integration-input integration-frames-input"
-          :placeholder="t('modal.metadataIntegrationsFramesPlaceholder')"
-          :title="t('modal.metadataIntegrationsFramesTooltip')"
-          :value="row.frames >= 1 ? String(row.frames) : ''"
-          @input="onFramesInput(idx, $event)"
-        />
-        <span class="integration-operator">x</span>
-        <input
-          type="number"
-          min="0"
-          step="1"
-          class="tag-input integration-input integration-seconds-input"
-          :placeholder="t('modal.metadataIntegrationsSecondsPlaceholder')"
-          :title="t('modal.metadataIntegrationsSecondsTooltip')"
-          :value="row.seconds >= 1 ? String(row.seconds) : ''"
-          @input="onSecondsInput(idx, $event)"
-        />
-        <span class="integration-unit">{{ t('modal.metadataIntegrationsSecondsSuffix') }}</span>
-        <FilterInput
-          :model-value="row.filter"
-          :known-filter-map="knownFilterMap"
-          :placeholder="t('modal.metadataIntegrationsFilterPlaceholder')"
-          :tooltip="t('modal.metadataIntegrationsFilterTooltip')"
-          @update:model-value="(v) => onFilterSelect(idx, v)"
-          @commit="onFilterCommit"
-        />
-        <button
-          type="button"
-          class="integration-row-trash"
-          :title="t('modal.metadataIntegrationsRemoveRow')"
-          v-html="trashSvg"
-          @click="removeIntegrationRow(idx)"
-        ></button>
-      </div>
+      <template v-for="(row, idx) in rows" :key="row._id">
+        <!-- Edit mode: N × Sec + filter inputs -->
+        <div v-if="row._open" class="integration-row">
+          <input
+            type="number"
+            min="0"
+            step="1"
+            class="tag-input integration-input integration-frames-input"
+            :placeholder="t('modal.metadataIntegrationsFramesPlaceholder')"
+            :title="t('modal.metadataIntegrationsFramesTooltip')"
+            :value="row.frames >= 1 ? String(row.frames) : ''"
+            @input="onFramesInput(idx, $event)"
+          />
+          <span class="integration-operator">x</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            class="tag-input integration-input integration-seconds-input"
+            :placeholder="t('modal.metadataIntegrationsSecondsPlaceholder')"
+            :title="t('modal.metadataIntegrationsSecondsTooltip')"
+            :value="row.seconds >= 1 ? String(row.seconds) : ''"
+            @input="onSecondsInput(idx, $event)"
+          />
+          <span class="integration-unit">{{ t('modal.metadataIntegrationsSecondsSuffix') }}</span>
+          <FilterInput
+            :model-value="row.filter"
+            :known-filter-map="knownFilterMap"
+            :placeholder="t('modal.metadataIntegrationsFilterPlaceholder')"
+            :tooltip="t('modal.metadataIntegrationsFilterTooltip')"
+            @update:model-value="(v) => onFilterSelect(idx, v)"
+            @commit="onFilterCommit"
+          />
+          <button
+            type="button"
+            class="integration-row-validate btn-icon flex-none w-[24px] h-[24px] p-0 inline-flex items-center justify-center [&>svg]:w-[12px] [&>svg]:h-[12px] !text-[var(--status-success-text)]"
+            :title="t('modal.metadataIntegrationsValidateRow')"
+            :aria-label="t('modal.metadataIntegrationsValidateRow')"
+            v-html="checkSvg"
+            @click="validateRow(idx)"
+          ></button>
+          <button
+            type="button"
+            class="integration-row-trash"
+            :title="t('modal.metadataIntegrationsRemoveRow')"
+            v-html="trashSvg"
+            @click="removeIntegrationRow(idx)"
+          ></button>
+        </div>
+
+        <!-- Display mode: collapsed "N × Sec = Total" label. Either field may be
+             left blank ("N/A"); the total + "=" show only when both are set. -->
+        <div v-else class="integration-row min-h-[26px]">
+          <span class="flex-1 min-w-0 truncate text-body text-secondary">
+            {{ integrationRowLabel(row) }}
+          </span>
+          <span
+            v-if="row.filter"
+            :class="filterBadgeAttrs(row.filter).class"
+            :style="filterBadgeAttrs(row.filter).style"
+            :title="catalogBadgeTitle(row.filter) ?? row.filter"
+            class="max-w-[40%] shrink-0 truncate"
+            >{{ row.filter }}</span
+          >
+          <button
+            type="button"
+            class="integration-row-edit btn-icon flex-none w-[24px] h-[24px] p-0 inline-flex items-center justify-center [&>svg]:w-[12px] [&>svg]:h-[12px]"
+            :title="t('modal.metadataIntegrationsEditRow')"
+            :aria-label="t('modal.metadataIntegrationsEditRow')"
+            v-html="penSvg"
+            @click="openRow(idx)"
+          ></button>
+        </div>
+      </template>
     </div>
-    <button type="button" class="integration-add-btn" @click="addIntegrationRow">
+    <button
+      type="button"
+      class="integration-add-btn integration-add-row"
+      @click="addIntegrationRow"
+    >
       {{ t('modal.metadataIntegrationsAddRow') }}
     </button>
   </div>
@@ -210,18 +249,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { filterLabelCandidates } from '../../autocomplete-utils';
+import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
 import type { PhotoIntegration, PointOfInterest, CaptureDetails } from '../../types';
 import type { GearSetupData } from '../../api';
 import { CAPTURE_FIELDS } from '../../capture-fields';
 import { t } from '../../i18n';
 import { searchDSOs } from '../../search';
 import { showToast } from '../../toast';
-import { normalizeIntegrationFilterKey } from '../../batch-utils';
+import { formatIntegrationTotal, normalizeIntegrationFilterKey } from '../../batch-utils';
 import FilterInput from './FilterInput.vue';
 import PoiEditor from './PoiEditor.vue';
 import trashSvg from '../../icons/trash.svg?raw';
+import penSvg from '../../icons/pen.svg?raw';
+import checkSvg from '../../icons/check.svg?raw';
 
 const props = defineProps<{
   dsoIds: string[];
@@ -411,11 +453,63 @@ function removeLabel(lbl: string) {
 }
 
 // ─── Integration rows ─────────────────────────────────────────────────────────
+// Each row carries transient view state: `_open` toggles between the editable
+// inputs and the collapsed `N × Sec = Total` label; `_id` is a stable v-for key.
+// Neither is ever emitted. We keep a local working copy so a mode toggle is a
+// pure UI change (no emit) and per-row state survives re-renders.
+type EditableRow = PhotoIntegration & { _open: boolean; _id: number };
+
+let rowSeq = 0;
+// A row is worth collapsing once it carries at least one value; either the frame
+// count or the exposure may be left blank (rendered as "N/A" in display mode).
+const hasData = (r: PhotoIntegration) => r.frames >= 1 || r.seconds >= 1;
+const toRows = (list: PhotoIntegration[]): EditableRow[] =>
+  list.map((r) => ({ ...r, _open: !hasData(r), _id: ++rowSeq }));
+
+/** Collapsed-row text: "300 × N/A", "N/A × 10s", or "120 × 180s = 6h00". */
+function integrationRowLabel(row: PhotoIntegration): string {
+  const na = t('modal.metadataIntegrationsFieldNA');
+  const sfx = t('modal.metadataIntegrationsSecondsSuffix');
+  const framesText = row.frames >= 1 ? String(row.frames) : na;
+  const secondsText = row.seconds >= 1 ? `${row.seconds}${sfx}` : na;
+  let label = `${framesText} × ${secondsText}`;
+  if (row.frames >= 1 && row.seconds >= 1) {
+    label += ` = ${formatIntegrationTotal(row.frames * row.seconds)}`;
+  }
+  return label;
+}
+
+const rows = ref<EditableRow[]>(toRows(props.integrations));
+
+const stripped = (): PhotoIntegration[] =>
+  rows.value.map((r) => ({ frames: r.frames, seconds: r.seconds, filter: r.filter }));
+const emitRows = () => emit('update:integrations', stripped());
+
+const sameShape = (a: PhotoIntegration[], b: readonly EditableRow[]): boolean =>
+  a.length === b.length &&
+  a.every(
+    (x, i) => x.frames === b[i].frames && x.seconds === b[i].seconds && x.filter === b[i].filter,
+  );
+
+// Rebuild the local rows only on an EXTERNAL change (WCS prefill replacing the
+// array, clearWcsSolution emptying it, the panel reused for another photo). Our
+// own emits round-trip back structurally identical, so `sameShape` is true and
+// in-progress edits / `_open` state survive. No `immediate`: `rows` is already
+// seeded above. Contract: parents must assign `update:integrations` back
+// untransformed (gallery `state.integrations = v`; batch `v-model`).
+watch(
+  () => props.integrations,
+  (next) => {
+    if (sameShape(next, rows.value)) return;
+    rows.value = toRows(next);
+  },
+);
+
 function onFramesInput(idx: number, e: Event) {
   const raw = (e.target as HTMLInputElement).value.trim();
   if (!raw) {
-    const updated = props.integrations.map((r, i) => (i === idx ? { ...r, frames: 0 } : r));
-    emit('update:integrations', updated);
+    rows.value[idx].frames = 0;
+    emitRows();
     return;
   }
   const parsed = Number.parseInt(raw, 10);
@@ -423,15 +517,15 @@ function onFramesInput(idx: number, e: Event) {
     showToast({ message: t('errors.invalidIntegrationNumber'), type: 'error', duration: 4000 });
     return;
   }
-  const updated = props.integrations.map((r, i) => (i === idx ? { ...r, frames: parsed } : r));
-  emit('update:integrations', updated);
+  rows.value[idx].frames = parsed;
+  emitRows();
 }
 
 function onSecondsInput(idx: number, e: Event) {
   const raw = (e.target as HTMLInputElement).value.trim();
   if (!raw) {
-    const updated = props.integrations.map((r, i) => (i === idx ? { ...r, seconds: 0 } : r));
-    emit('update:integrations', updated);
+    rows.value[idx].seconds = 0;
+    emitRows();
     return;
   }
   const parsed = Number.parseInt(raw, 10);
@@ -439,13 +533,13 @@ function onSecondsInput(idx: number, e: Event) {
     showToast({ message: t('errors.invalidIntegrationNumber'), type: 'error', duration: 4000 });
     return;
   }
-  const updated = props.integrations.map((r, i) => (i === idx ? { ...r, seconds: parsed } : r));
-  emit('update:integrations', updated);
+  rows.value[idx].seconds = parsed;
+  emitRows();
 }
 
 function onFilterSelect(idx: number, v: string) {
-  const updated = props.integrations.map((r, i) => (i === idx ? { ...r, filter: v } : r));
-  emit('update:integrations', updated);
+  rows.value[idx].filter = v;
+  emitRows();
 }
 
 function onFilterCommit(v: string) {
@@ -456,13 +550,28 @@ function onFilterCommit(v: string) {
 }
 
 function removeIntegrationRow(idx: number) {
-  emit(
-    'update:integrations',
-    props.integrations.filter((_, i) => i !== idx),
-  );
+  rows.value.splice(idx, 1);
+  emitRows();
 }
 
 function addIntegrationRow() {
-  emit('update:integrations', [...props.integrations, { frames: 0, seconds: 0, filter: '' }]);
+  rows.value.push({ frames: 0, seconds: 0, filter: '', _open: true, _id: ++rowSeq });
+  emitRows();
+}
+
+// Collapse a row to its label. At least one of frames / seconds must be set;
+// the other may stay blank. Pure view change — no emit.
+function validateRow(idx: number) {
+  const r = rows.value[idx];
+  if (r.frames < 1 && r.seconds < 1) {
+    showToast({ message: t('errors.integrationRowIncomplete'), type: 'error', duration: 4000 });
+    return;
+  }
+  r._open = false;
+}
+
+// Reopen a collapsed row for editing. Pure view change — no emit.
+function openRow(idx: number) {
+  rows.value[idx]._open = true;
 }
 </script>

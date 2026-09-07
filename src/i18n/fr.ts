@@ -616,6 +616,9 @@ const fr = {
     metadataIntegrationsFilterTooltip:
       "Filtre d'acquisition (R, G, B, Halpha, OIII, Luminance ou personnalisé)",
     metadataIntegrationsRemoveRow: "Supprimer la ligne d'intégration",
+    metadataIntegrationsValidateRow: "Valider cette ligne d'intégration",
+    metadataIntegrationsEditRow: "Modifier cette ligne d'intégration",
+    metadataIntegrationsFieldNA: 'N/A',
     metadataObsDate: "Date d'observation",
     metadataObsDatePlaceholder: "Date et heure de début d'observation",
     metadataGearSetup: 'Équipement',
@@ -663,6 +666,8 @@ const fr = {
     networkError: "Erreur réseau lors de l'upload",
     invalidIntegrationNumber:
       "Les champs poses et secondes de l'intégration doivent être numériques.",
+    integrationRowIncomplete:
+      'Saisissez un nombre de poses ou une durée de pose avant de valider cette ligne.',
     loadPhotos: 'Impossible de charger les photos',
     deletePhoto: 'Impossible de supprimer la photo',
     updatePhoto: 'Impossible de mettre à jour la photo',

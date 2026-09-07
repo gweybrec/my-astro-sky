@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { clearWcsSolution, sanitizeIntegrationRows, wcsErrorMessage } from '../../src/batch-utils';
+import {
+  clearWcsSolution,
+  formatIntegrationTotal,
+  sanitizeIntegrationRows,
+  wcsErrorMessage,
+} from '../../src/batch-utils';
 import type { BatchItem } from '../../src/batch-types';
 
 function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
@@ -101,6 +106,32 @@ describe('clearWcsSolution', () => {
     expect(item.customName).toBe('Andromeda');
     expect(item.notes).toBe('my notes');
     expect(item.file).toBe(file);
+  });
+});
+
+describe('formatIntegrationTotal', () => {
+  it('formats an exact-hours total as clock style with zero-padded minutes', () => {
+    expect(formatIntegrationTotal(21600)).toBe('6h00');
+  });
+
+  it('formats hours + minutes as clock style', () => {
+    expect(formatIntegrationTotal(5400)).toBe('1h30');
+    expect(formatIntegrationTotal(3660)).toBe('1h01');
+  });
+
+  it('formats a sub-hour total in minutes', () => {
+    expect(formatIntegrationTotal(2700)).toBe('45min');
+    expect(formatIntegrationTotal(90)).toBe('2min');
+  });
+
+  it('formats a sub-minute total in seconds', () => {
+    expect(formatIntegrationTotal(45)).toBe('45s');
+  });
+
+  it('returns "0min" for zero, negative, or non-finite input', () => {
+    expect(formatIntegrationTotal(0)).toBe('0min');
+    expect(formatIntegrationTotal(-5)).toBe('0min');
+    expect(formatIntegrationTotal(Number.NaN)).toBe('0min');
   });
 });
 

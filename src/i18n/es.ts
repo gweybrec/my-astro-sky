@@ -618,6 +618,9 @@ const es: Translations = {
     metadataIntegrationsFilterTooltip:
       'Filtro de adquisición (R, G, B, Halpha, OIII, Luminance o personalizado)',
     metadataIntegrationsRemoveRow: 'Eliminar fila de integración',
+    metadataIntegrationsValidateRow: 'Validar esta fila de integración',
+    metadataIntegrationsEditRow: 'Editar esta fila de integración',
+    metadataIntegrationsFieldNA: 'N/A',
     metadataObsDate: 'Fecha de observación',
     metadataObsDatePlaceholder: 'Fecha y hora de inicio de la observación',
     metadataGearSetup: 'Equipo',
@@ -664,6 +667,8 @@ const es: Translations = {
     networkError: 'Error de red durante la subida',
     invalidIntegrationNumber:
       'Los campos de integración de tomas y segundos deben ser valores numéricos.',
+    integrationRowIncomplete:
+      'Introduce un número de tomas o un tiempo de exposición antes de validar esta fila.',
     loadPhotos: 'Error al cargar las fotos',
     deletePhoto: 'Error al eliminar la foto',
     updatePhoto: 'Error al actualizar la foto',

@@ -616,6 +616,9 @@ const de: Translations = {
     metadataIntegrationsFilterTooltip:
       'Aufnahmefilter (R, G, B, Halpha, OIII, Luminance oder benutzerdefiniert)',
     metadataIntegrationsRemoveRow: 'Integrationszeile entfernen',
+    metadataIntegrationsValidateRow: 'Diese Integrationszeile bestätigen',
+    metadataIntegrationsEditRow: 'Diese Integrationszeile bearbeiten',
+    metadataIntegrationsFieldNA: 'N/A',
     metadataObsDate: 'Beobachtungsdatum',
     metadataObsDatePlaceholder: 'Datum und Uhrzeit der Beobachtung',
     metadataGearSetup: 'Ausrüstung',
@@ -663,6 +666,8 @@ const de: Translations = {
     networkError: 'Netzwerkfehler beim Upload',
     invalidIntegrationNumber:
       'Integrationsfelder für Frames und Sekunden müssen numerische Werte sein.',
+    integrationRowIncomplete:
+      'Gib eine Bildanzahl oder eine Belichtungszeit ein, bevor du diese Zeile bestätigst.',
     loadPhotos: 'Fotos konnten nicht geladen werden',
     deletePhoto: 'Foto konnte nicht gelöscht werden',
     updatePhoto: 'Foto konnte nicht aktualisiert werden',

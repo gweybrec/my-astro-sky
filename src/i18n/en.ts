@@ -613,6 +613,9 @@ const en: Translations = {
     metadataIntegrationsFilterTooltip:
       'Acquisition filter (R, G, B, Halpha, OIII, Luminance, or custom)',
     metadataIntegrationsRemoveRow: 'Remove integration row',
+    metadataIntegrationsValidateRow: 'Validate this integration row',
+    metadataIntegrationsEditRow: 'Edit this integration row',
+    metadataIntegrationsFieldNA: 'N/A',
     metadataObsDate: 'Observation date',
     metadataObsDatePlaceholder: 'Observation start date and time',
     metadataGearSetup: 'Gear setup',
@@ -658,6 +661,7 @@ const en: Translations = {
     uploadFailed: 'Upload failed: {response}',
     networkError: 'Network error during upload',
     invalidIntegrationNumber: 'Integration frames and seconds must be numeric values.',
+    integrationRowIncomplete: 'Enter a frame count or an exposure time before validating this row.',
     loadPhotos: 'Failed to load photos',
     deletePhoto: 'Failed to delete photo',
     updatePhoto: 'Failed to update photo',
