@@ -2,7 +2,7 @@
   "name": "my-astro-sky",
   "productName": "MyAstroSky",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.10.1",
   "author": {
     "name": "Guillaume WEYBRECHT",
     "email": "gweybrec.dev@gmail.com"
