@@ -233,7 +233,13 @@ export function computePhotoCenterAndScale(
     const center = unproject((minX + maxX) / 2, (minY + maxY) / 2);
     const extentX = maxX - minX;
     const extentY = maxY - minY;
+    // All four corners coincide (e.g. every correspondence is below the horizon in
+    // Local Sky mode / in the far hemisphere in fisheye mode, so project() returns
+    // the same off-screen sentinel for all of them). There is no finite framing
+    // scale — `Math.min(viewWidth / 0, viewHeight / 0)` would be Infinity.
+    if (!(extentX > 0) || !(extentY > 0)) return null;
     const scale = Math.min(viewWidth / extentX, viewHeight / extentY) * 0.8;
+    if (!Number.isFinite(scale) || scale <= 0) return null;
 
     return { ra: center.ra, dec: center.dec, scale };
   } catch {

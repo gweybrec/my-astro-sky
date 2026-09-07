@@ -226,6 +226,18 @@ describe('geometry getters', () => {
     expect(fit!.scale).toBeGreaterThan(0);
   });
 
+  it('computePhotoCenterAndScale returns null when all correspondences map to one point', () => {
+    // Distinct photo pixels, identical sky coords → all four projected corners
+    // coincide → extentX === extentY === 0 → previously returned { scale: Infinity }.
+    const photo = makePhoto([
+      corr(0, 0, 0, 30, 45),
+      corr(1, 100, 0, 30, 45),
+      corr(2, 100, 80, 30, 45),
+      corr(3, 0, 80, 30, 45),
+    ]);
+    expect(computePhotoCenterAndScale(photo, 800, 600)).toBeNull();
+  });
+
   it('computePhotoQuadCorners returns 4 corners or null', () => {
     expect(computePhotoQuadCorners(makePhoto([corr(0, 0, 0, 0, 80)]), VIEW)).toBeNull();
     const corners = computePhotoQuadCorners(

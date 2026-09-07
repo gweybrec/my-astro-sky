@@ -780,6 +780,11 @@ export class SkyMap {
 
   navigateTo(ra: number, dec: number, targetScale = 600, animate = true) {
     const target = project(ra, dec);
+    // Guard against a caller-supplied non-finite target/scale (e.g. a degenerate
+    // photo fit): a NaN/Infinity here propagates into `view.scale` via the `step`
+    // interpolation and floods the DSO renderer with non-finite radii.
+    if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return;
+    if (!Number.isFinite(targetScale) || targetScale <= 0) targetScale = this.view.scale;
 
     if (!animate) {
       this.cancelAnimation();
