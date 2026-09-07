@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.10.1] - 2026-09-07
+
+### Bug Fixes
+
+- Zooming in gallery photos ([fbb5e8d](https://github.com/gweybrec/my-astro-sky/commit/fbb5e8d85a996b731203f8f398220eea2714a2ca))
+
+
+### Refactor
+
+- Add a Fit and 1:1 zoom buttons in the gallery image details page ([e09da91](https://github.com/gweybrec/my-astro-sky/commit/e09da911f91ca9503881b2251073cd24c6a71585))
+
+
+### Build System
+
+- V0.10.1 ([b5d8b72](https://github.com/gweybrec/my-astro-sky/commit/b5d8b727a2b67c70e6dca9726e2fb76cc5907a2b))
+
 ## [0.10.0] - 2026-09-07
 
 ### Features
