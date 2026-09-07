@@ -1,9 +1,10 @@
-import type { Photo } from './types';
+import type { Photo, PointOfInterest } from './types';
 
 export interface PhotoQueryMatch {
   photo: Photo;
   matchingDsoIds: string[];
   matchingLabels: string[];
+  matchingPois: PointOfInterest[];
 }
 
 export function buildPhotoQueryMatches(photos: Photo[], query: string): PhotoQueryMatch[] {
@@ -14,6 +15,9 @@ export function buildPhotoQueryMatches(photos: Photo[], query: string): PhotoQue
   for (const photo of photos) {
     const matchingDsoIds = photo.dsoIds.filter((id) => id.toLowerCase().includes(q));
     const matchingLabels = photo.labels.filter((label) => label.toLowerCase().includes(q));
+    const matchingPois = (photo.pointsOfInterest ?? []).filter((poi) =>
+      poi.name.toLowerCase().includes(q),
+    );
     const matchesName = photo.originalName.toLowerCase().includes(q);
     const matchesNotes = photo.notes.toLowerCase().includes(q);
 
@@ -21,7 +25,8 @@ export function buildPhotoQueryMatches(photos: Photo[], query: string): PhotoQue
       !matchesName &&
       !matchesNotes &&
       matchingDsoIds.length === 0 &&
-      matchingLabels.length === 0
+      matchingLabels.length === 0 &&
+      matchingPois.length === 0
     ) {
       continue;
     }
@@ -30,6 +35,7 @@ export function buildPhotoQueryMatches(photos: Photo[], query: string): PhotoQue
       photo,
       matchingDsoIds,
       matchingLabels,
+      matchingPois,
     });
   }
 

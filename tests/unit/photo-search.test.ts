@@ -13,6 +13,7 @@ function makePhoto(overrides: Partial<Photo> = {}): Photo {
     correspondences: [],
     dsoIds: ['M42', 'NGC1976'],
     labels: ['nebula', 'orion'],
+    pointsOfInterest: [],
     notes: 'great winter target',
     ...overrides,
   };
@@ -42,6 +43,40 @@ describe('buildPhotoQueryMatches', () => {
     expect(matches).toHaveLength(1);
     expect(matches[0].matchingDsoIds).toEqual(['NGC1976']);
     expect(matches[0].matchingLabels).toEqual([]);
+    expect(matches[0].matchingPois).toEqual([]);
+  });
+
+  it('matches on a point-of-interest name and returns only matching POIs', () => {
+    const photo = makePhoto({
+      dsoIds: [],
+      labels: [],
+      notes: '',
+      pointsOfInterest: [
+        { name: 'C/2023 A3 (Tsuchinshan-ATLAS)', categoryId: 'cat-comet' },
+        { name: 'SN 2023ixf', categoryId: 'cat-supernova' },
+      ],
+    });
+
+    const matches = buildPhotoQueryMatches([photo], 'tsuchinshan');
+    expect(matches).toHaveLength(1);
+    expect(matches[0].matchingPois).toEqual([
+      { name: 'C/2023 A3 (Tsuchinshan-ATLAS)', categoryId: 'cat-comet' },
+    ]);
+    expect(matches[0].matchingDsoIds).toEqual([]);
+  });
+
+  it('keeps POI matches empty when the match came from the name', () => {
+    const photo = makePhoto({
+      originalName: 'Comet night',
+      dsoIds: [],
+      labels: [],
+      notes: '',
+      pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
+    });
+
+    const matches = buildPhotoQueryMatches([photo], 'night');
+    expect(matches).toHaveLength(1);
+    expect(matches[0].matchingPois).toEqual([]);
   });
 
   it('matches by notes while keeping chip matches empty when no chips match', () => {

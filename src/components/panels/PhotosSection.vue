@@ -40,6 +40,7 @@
               :placed="match.placed"
               :dso-chips="match.matchingDsoIds"
               :label-chips="match.matchingLabels"
+              :poi-chips="match.matchingPois"
               @name-click="selectFromDropdown(match.placed.photo.id)"
               @toggle="onToggle(match.placed.photo.id)"
               @gear="onGear(match.placed.photo.id, $event)"
@@ -57,6 +58,7 @@
         :placed="selectedPlaced"
         :dso-chips="selectedPlaced.photo.dsoIds"
         :label-chips="selectedPlaced.photo.labels"
+        :poi-chips="selectedPlaced.photo.pointsOfInterest"
         @name-click="photosStore.zoomToPhoto(selectedPlaced!.photo.id)"
         @toggle="onToggle(selectedPlaced!.photo.id)"
         @gear="onGear(selectedPlaced!.photo.id, $event)"
@@ -131,7 +133,12 @@ const searchMatches = computed(() => {
     .map((photo) => {
       const match = matchById.get(photo.id)!;
       const placed = placedById.get(photo.id)!;
-      return { placed, matchingDsoIds: match.matchingDsoIds, matchingLabels: match.matchingLabels };
+      return {
+        placed,
+        matchingDsoIds: match.matchingDsoIds,
+        matchingLabels: match.matchingLabels,
+        matchingPois: match.matchingPois,
+      };
     })
     .filter((m) => m.placed);
 });
