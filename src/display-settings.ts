@@ -15,6 +15,7 @@ export const DSO_TYPES_ALL = [
   'PN',
   'SNR',
   'DN',
+  'PS',
   '?',
 ];
 export const DSO_CATALOGS_DEFAULT_ON = new Set(['M', 'NGC', 'IC', 'SH2']);

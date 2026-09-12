@@ -3079,6 +3079,13 @@ async function main() {
   const messierOnlyEntries = [
     // M45 Pleiades (Mel 22 / OCl 421). SIMBAD coords: RA 03h 47m 24s, Dec +24° 07' 00"
     ['M45', hms(3, 47, 24), dms(24, 7, 0), 'OC', 110, null, 0, 1.6, ['M45']],
+    // M40 / Winnecke 4: an unrelated pair of stars merely aligned by chance (not a
+    // physical binary), not a real deep-sky object — Messier recorded it while looking
+    // for a nebula reported by Hevelius and found only this pair. No NGC/IC number, so
+    // (like M45) it never appears in OpenNGC. SIMBAD coords: RA 12h 22m 12s, Dec +58°
+    // 05' 00"; majAxis/minAxis null (point source, not extended); mag ≈ 9.0 combined
+    // (components ~9.6 / ~10.1).
+    ['M40', hms(12, 22, 12), dms(58, 5, 0), 'PS', null, null, 0, 9.0, ['M40']],
   ];
   for (const [id, ra, dec, type, majAxis, minAxis, pa, mag, cats] of messierOnlyEntries) {
     data.push([

@@ -123,6 +123,7 @@ const fr = {
       SNR: 'Rémanents de supernova',
       DN: 'Nébuleuses sombres',
       MS: 'Étoiles multiples',
+      PS: "Paires d'étoiles",
       '?': 'Objets célestes',
     },
     types: {
@@ -138,6 +139,7 @@ const fr = {
       SNR: 'Rémanent de supernova',
       DN: 'Nébuleuse sombre',
       MS: 'Étoile multiple',
+      PS: "Paire d'étoiles",
       '?': 'Objet céleste',
     },
   },

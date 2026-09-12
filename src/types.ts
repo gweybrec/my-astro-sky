@@ -197,6 +197,8 @@ export type DSOType =
   | 'SNR'
   | 'DN'
   | 'MS' // multiple/double star — synthetic recommender target only (see multiple-stars.ts)
+  | 'PS' // unrelated pair of stars aligned by chance (not a physical binary — hence not
+  // "double star"), catalogued as a real DSO (e.g. M40/Winnecke 4), unlike synthetic-only MS
   | '?';
 
 export interface DSO {

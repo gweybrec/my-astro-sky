@@ -124,6 +124,7 @@ const es: Translations = {
       SNR: 'Remanentes de supernova',
       DN: 'Nebulosas oscuras',
       MS: 'Estrellas múltiples',
+      PS: 'Pares de estrellas',
       '?': 'Objetos celestes',
     },
     types: {
@@ -139,6 +140,7 @@ const es: Translations = {
       SNR: 'Remanente de supernova',
       DN: 'Nebulosa oscura',
       MS: 'Estrella múltiple',
+      PS: 'Par de estrellas',
       '?': 'Objeto celeste',
     },
   },

@@ -237,6 +237,7 @@ const ALL_DSO_TYPES = [
   'PN',
   'SNR',
   'DN',
+  'PS',
   'MS',
 ] as const;
 
