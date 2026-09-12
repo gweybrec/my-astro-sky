@@ -26,6 +26,7 @@ import {
   resetDsoToBaseValues,
   getDSOCatalogBaseValues,
   getUserOverride,
+  computeCatalogStats,
 } from '../../src/dso-catalog';
 
 // Columnar fixture — mirrors the real dso.json schema.
@@ -326,6 +327,40 @@ describe('getDSOs()', () => {
     for (const dso of getDSOs()) {
       expect(dso.catalog).toBe(getDSOCatalog(dso.id));
     }
+  });
+});
+
+// ─── computeCatalogStats ────────────────────────────────────────────────────────
+
+describe('computeCatalogStats()', () => {
+  it('counts each catalog family from every alias, not just the canonical id', () => {
+    // M1/NGC1952 and M42/NGC1976 both count toward M and NGC.
+    const stats = computeCatalogStats(new Set(), null);
+    expect(stats.M.total).toBe(2);
+    expect(stats.NGC.total).toBe(2);
+    expect(stats.IC.total).toBe(1);
+    // SH2-106 plus Abell35's SH2-313 alias — a DSO belongs to every family it has an
+    // alias in, so Abell35 counts toward SH2 (and Abell/LPN) at once.
+    expect(stats.SH2.total).toBe(2);
+    expect(stats.LBN.total).toBe(1);
+    expect(stats.LDN.total).toBe(1);
+  });
+
+  it('counts a photographed object toward every catalog family it belongs to', () => {
+    // M1's canonical id photographed → both M and NGC gain one photographed count.
+    const stats = computeCatalogStats(new Set(['M1']), null);
+    expect(stats.M.photographed).toBe(1);
+    expect(stats.NGC.photographed).toBe(1);
+    expect(stats.IC.photographed).toBe(0);
+  });
+
+  it('restricts totals and photographed counts to the given constellations', () => {
+    const stats = computeCatalogStats(new Set(['M1', 'IC434']), new Set(['Ori']));
+    // M1 is in Tau, excluded; only M42 (Ori) counts toward M/NGC.
+    expect(stats.M.total).toBe(1);
+    expect(stats.M.photographed).toBe(0);
+    expect(stats.IC.total).toBe(1);
+    expect(stats.IC.photographed).toBe(1);
   });
 });
 

@@ -282,6 +282,10 @@ const es: Translations = {
     metersUnit: 'm',
     distance: 'Distancia',
   },
+  stats: {
+    title: 'Estadísticas',
+    modalTitle: 'Estadísticas',
+  },
   settings: {
     section: 'Ajustes',
     modalTitle: 'Ajustes',

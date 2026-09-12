@@ -282,6 +282,10 @@ const fr = {
     metersUnit: 'm',
     distance: 'Distance',
   },
+  stats: {
+    title: 'Statistiques',
+    modalTitle: 'Statistiques',
+  },
   settings: {
     section: 'Réglages',
     modalTitle: 'Paramètres',
