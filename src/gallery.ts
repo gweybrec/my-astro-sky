@@ -1,13 +1,24 @@
+import { createApp, reactive, h } from 'vue';
+import type { App } from 'vue';
 import type { Photo, PoiCategory } from './types';
 import type { GearSetupData } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
 import { createLazyObserver } from './lazy-image';
-import { getDSOById } from './dso-catalog';
+import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
+import { computePhotoToProjMatrix } from './photo-placement';
+import {
+  computePhotoDsoOverlayLayout,
+  renderPhotoDsoOverlay,
+  LABEL_FONT,
+} from './photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
 import { buildPoiFilterGroups, poisMatchFilter, type PoiFilterGroup } from './poi';
 import { poiTypeIcon } from './poi-icons';
+import { pinia } from './pinia-instance';
+import { useDisplayStore } from './stores/display';
+import PhotoDsoCatalogFilter from './components/panels/PhotoDsoCatalogFilter.vue';
 
 /**
  * Smart sorting for astronomical catalog names
@@ -644,11 +655,14 @@ export class Gallery {
     let zoom: ReturnType<typeof createImageZoomPan> | null = null;
     let metaPanelTeardown: (() => void) | null = null;
     let metaPanelIsDirty: (() => boolean) | null = null;
+    let dsoFilterApp: App | null = null;
 
     const rawClose = () => {
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', redrawDsoOverlay);
       zoom?.destroy();
       metaPanelTeardown?.();
+      dsoFilterApp?.unmount();
       overlay.remove();
     };
 
@@ -722,6 +736,12 @@ export class Gallery {
 
     imgWrap.appendChild(img);
 
+    // ── DSO overlay canvas (toggled by the "show DSOs" button below) ──────────
+    const dsoCanvas = document.createElement('canvas');
+    dsoCanvas.className = 'gallery-detail-dso-overlay';
+    dsoCanvas.style.display = 'none';
+    imgWrap.appendChild(dsoCanvas);
+
     // ── Close button ─────────────────────────────────────────────────────────
     const closeBtn = document.createElement('button');
     closeBtn.className = 'gallery-cinematic-close';
@@ -757,9 +777,137 @@ export class Gallery {
       if (await close()) this.onNavigateToMap?.(photo);
     });
 
+    // ── "Show DSOs" toggle + catalog filter ────────────────────────────────────
+    // photo→projection affine, independent of the sky map's view — null when the
+    // photo has no manual placement and fewer than 2 resolvable correspondences.
+    const photoToProj = computePhotoToProjMatrix(photo);
+    let dsoPlacements: PhotoDsoPlacement[] = [];
+    const dsoState = reactive({
+      show: false,
+      // Seeded once from the sky map's current catalog selection; not kept in sync
+      // with it afterwards (this photo view's selection is its own).
+      catalogs: [...useDisplayStore(pinia).dsoCatalogs],
+    });
+
+    function recomputeDsoPlacements() {
+      dsoPlacements =
+        dsoState.show && photoToProj
+          ? findDsoPlacementsInImage(
+              photoToProj,
+              photo.width,
+              photo.height,
+              new Set(dsoState.catalogs),
+            )
+          : [];
+    }
+
+    function redrawDsoOverlay() {
+      if (!dsoState.show || !photoToProj) {
+        dsoCanvas.style.display = 'none';
+        return;
+      }
+      const imgRect = img.getBoundingClientRect();
+      const wrapRect = imgWrap.getBoundingClientRect();
+      if (imgRect.width <= 0 || imgRect.height <= 0) return;
+
+      // imgWrap clips the image via overflow:hidden, and once zoomed the image's own
+      // bounding box can be far larger than (and centred outside) that visible
+      // window. Size/position the canvas — and the label-clamp viewport — to the
+      // *visible* intersection, not the full image: otherwise a label "clamped
+      // inside the photo" can still land in a region that is itself scrolled off
+      // screen, which is exactly what left an edge DSO's label missing when zoomed.
+      const visLeft = Math.max(imgRect.left, wrapRect.left);
+      const visTop = Math.max(imgRect.top, wrapRect.top);
+      const visRight = Math.min(imgRect.right, wrapRect.right);
+      const visBottom = Math.min(imgRect.bottom, wrapRect.bottom);
+      if (visRight <= visLeft || visBottom <= visTop) {
+        dsoCanvas.style.display = 'none';
+        return;
+      }
+      const visWidth = visRight - visLeft;
+      const visHeight = visBottom - visTop;
+
+      dsoCanvas.style.display = 'block';
+      dsoCanvas.style.left = `${visLeft - wrapRect.left}px`;
+      dsoCanvas.style.top = `${visTop - wrapRect.top}px`;
+      dsoCanvas.style.width = `${visWidth}px`;
+      dsoCanvas.style.height = `${visHeight}px`;
+
+      const dpr = window.devicePixelRatio || 1;
+      dsoCanvas.width = Math.round(visWidth * dpr);
+      dsoCanvas.height = Math.round(visHeight * dpr);
+
+      const ctx = dsoCanvas.getContext('2d');
+      if (!ctx) return;
+      // Drawing stays in image-relative CSS px (same space computePhotoDsoOverlayLayout
+      // already uses); this offset maps that space onto the smaller physical canvas,
+      // which starts at the visible window's corner, not the image's own corner.
+      const offsetX = visLeft - imgRect.left;
+      const offsetY = visTop - imgRect.top;
+      ctx.setTransform(dpr, 0, 0, dpr, -offsetX * dpr, -offsetY * dpr);
+      ctx.clearRect(offsetX, offsetY, visWidth, visHeight);
+
+      const dispScale = imgRect.width / photo.width;
+      const items = computePhotoDsoOverlayLayout(
+        dsoPlacements,
+        dispScale,
+        // Measure against the same font renderPhotoDsoOverlay actually draws with —
+        // this runs first, before that font is ever set on this context, so relying
+        // on it already being set (the canvas default is narrower) under-measures
+        // every label and starves ellipseLabelClearance's footprint calculation.
+        (text) => {
+          ctx.font = LABEL_FONT;
+          return ctx.measureText(text).width;
+        },
+        { left: offsetX, top: offsetY, right: offsetX + visWidth, bottom: offsetY + visHeight },
+      );
+      renderPhotoDsoOverlay(ctx, items);
+    }
+
+    const showDsosBtn = document.createElement('button');
+    showDsosBtn.type = 'button';
+    showDsosBtn.className = 'btn-action gallery-dso-toggle-btn';
+    showDsosBtn.textContent = t('gallery.showDsos');
+    showDsosBtn.setAttribute('aria-pressed', 'false');
+    if (!photoToProj) {
+      showDsosBtn.disabled = true;
+      showDsosBtn.title = t('gallery.showDsosUnavailable');
+    }
+    showDsosBtn.addEventListener('click', () => {
+      dsoState.show = !dsoState.show;
+      showDsosBtn.setAttribute('aria-pressed', String(dsoState.show));
+      recomputeDsoPlacements();
+      redrawDsoOverlay();
+    });
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'gallery-detail-btn-row';
+    btnRow.appendChild(showDsosBtn);
+    btnRow.appendChild(showOnMapBtn);
+
+    const dsoFilterEl = document.createElement('div');
+    dsoFilterApp = createApp({
+      render: () =>
+        h(PhotoDsoCatalogFilter, {
+          modelValue: dsoState.show,
+          catalogs: dsoState.catalogs,
+          'onUpdate:catalogs': (v: string[]) => {
+            dsoState.catalogs = v;
+            recomputeDsoPlacements();
+            redrawDsoOverlay();
+          },
+        }),
+    });
+    dsoFilterApp.use(pinia);
+    dsoFilterApp.mount(dsoFilterEl);
+
     header.appendChild(nameRow);
-    header.appendChild(showOnMapBtn);
+    header.appendChild(btnRow);
+    header.appendChild(dsoFilterEl);
     meta.appendChild(header);
+
+    img.addEventListener('load', () => redrawDsoOverlay(), { once: true });
+    window.addEventListener('resize', redrawDsoOverlay);
 
     const formContainer = document.createElement('div');
     formContainer.className = 'gallery-detail-form';
@@ -829,6 +977,7 @@ export class Gallery {
       fitOnLoad: true,
     });
     const zoomControls = zoom.controls;
+    zoom.onTransformChange(redrawDsoOverlay);
 
     imgWrap.style.cursor = 'grab';
     imgWrap.addEventListener('pointerdown', () => {

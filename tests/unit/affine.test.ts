@@ -4,6 +4,8 @@ import {
   computeSimilarityTransform,
   computeAffineLSQ,
   affineToCSS,
+  applyAffine as applyAffineReal,
+  invertAffine,
 } from '../../src/affine';
 
 // Mock i18n so affine.ts can be imported in Node/happy-dom without localStorage issues
@@ -226,5 +228,40 @@ describe('affineToCSS', () => {
 
   it('identity matrix formats correctly', () => {
     expect(affineToCSS({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })).toBe('matrix(1, 0, 0, 1, 0, 0)');
+  });
+});
+
+describe('applyAffine', () => {
+  it('applies the linear part and the translation', () => {
+    const p = applyAffineReal({ a: 2, b: 0, c: 0, d: 3, e: 10, f: 20 }, { x: 5, y: 4 });
+    expect(p).toEqual({ x: 20, y: 32 });
+  });
+});
+
+describe('invertAffine', () => {
+  it('round-trips a point through a matrix and its inverse', () => {
+    const m = computeAffineTransform(
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+      ],
+      [
+        { x: 100, y: 200 },
+        { x: 150, y: 210 },
+        { x: 90, y: 260 },
+      ],
+    );
+    const inv = invertAffine(m)!;
+    expect(inv).not.toBeNull();
+    const original = { x: 0.3, y: 0.7 };
+    const forward = applyAffineReal(m, original);
+    const back = applyAffineReal(inv, forward);
+    expect(back.x).toBeCloseTo(original.x, 6);
+    expect(back.y).toBeCloseTo(original.y, 6);
+  });
+
+  it('returns null for a singular matrix', () => {
+    expect(invertAffine({ a: 1, b: 2, c: 2, d: 4, e: 0, f: 0 })).toBeNull();
   });
 });

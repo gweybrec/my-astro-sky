@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" ref="panelRef" class="dropdown-panel" @click.stop>
+    <div v-if="modelValue" ref="panelRef" :class="['dropdown-panel', panelClass]" @click.stop>
       <slot />
     </div>
   </Teleport>
@@ -24,6 +24,10 @@ const props = defineProps<{
   anchorEl: HTMLElement | null | undefined;
   alignRight?: boolean;
   minWidth?: string;
+  /** Extra class(es) for the panel root. A plain `class` attribute does not fall
+   * through automatically here — Vue does not inherit non-prop attributes onto a
+   * component whose template root is `<Teleport>` (it warns and drops them). */
+  panelClass?: string;
 }>();
 
 const emit = defineEmits<{ 'update:modelValue': [v: boolean] }>();

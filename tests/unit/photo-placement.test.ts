@@ -16,6 +16,8 @@ import {
   isPoiAllowed,
   manualPlacementCentroid,
   computeManualMatrix,
+  computeManualProjMatrix,
+  computePhotoToProjMatrix,
   buildSyntheticCorrespondences,
   extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
@@ -24,6 +26,7 @@ import {
 import {
   project,
   toCanvas,
+  fromCanvas,
   setHemisphere,
   setProjectionMode,
   setCenterMode,
@@ -303,6 +306,71 @@ describe('manual placement math', () => {
     const mappedY = m.b * 50 + m.d * 40 + m.f;
     expect(mappedX).toBeCloseTo(expected.x);
     expect(mappedY).toBeCloseTo(expected.y);
+  });
+
+  it('computeManualProjMatrix maps the image centre to the placed sky projection point', () => {
+    const m = computeManualProjMatrix(placement, 100, 80);
+    const expected = project(placement.centerRa, placement.centerDec);
+    const mappedX = m.a * 50 + m.c * 40 + m.e;
+    const mappedY = m.b * 50 + m.d * 40 + m.f;
+    expect(mappedX).toBeCloseTo(expected.x);
+    expect(mappedY).toBeCloseTo(expected.y);
+  });
+
+  it('computeManualProjMatrix matches computeManualMatrix composed with fromCanvas', () => {
+    const p: ManualPlacement = {
+      centerRa: 20,
+      centerDec: 35,
+      rotationDeg: 25,
+      projPerPx: 0.0018,
+      mirrorX: true,
+      mirrorY: false,
+    };
+    const projM = computeManualProjMatrix(p, 100, 80);
+    const canvasM = computeManualMatrix(p, VIEW, 100, 80);
+    for (const [x, y] of [
+      [0, 0],
+      [100, 0],
+      [30, 80],
+    ]) {
+      const viaProj = {
+        x: projM.a * x + projM.c * y + projM.e,
+        y: projM.b * x + projM.d * y + projM.f,
+      };
+      const canvasPt = {
+        x: canvasM.a * x + canvasM.c * y + canvasM.e,
+        y: canvasM.b * x + canvasM.d * y + canvasM.f,
+      };
+      const viaCanvas = fromCanvas(canvasPt.x, canvasPt.y, VIEW);
+      expect(viaProj.x).toBeCloseTo(viaCanvas.x, 6);
+      expect(viaProj.y).toBeCloseTo(viaCanvas.y, 6);
+    }
+  });
+
+  it('computePhotoToProjMatrix uses the manual-placement path when present', () => {
+    const photo = makePhoto([], { manualPlacement: placement, width: 100, height: 80 });
+    const m = computePhotoToProjMatrix(photo);
+    expect(m).not.toBeNull();
+    const expected = computeManualProjMatrix(placement, 100, 80);
+    expect(m).toEqual(expected);
+  });
+
+  it('computePhotoToProjMatrix falls back to correspondences when there is no manual placement', () => {
+    const photo = makePhoto([
+      corr(0, 0, 0, 10, 80),
+      corr(1, 100, 0, 20, 80),
+      corr(2, 0, 80, 10, 70),
+    ]);
+    const m = computePhotoToProjMatrix(photo);
+    expect(m).not.toBeNull();
+    const p0 = project(10, 80);
+    expect(m!.e).toBeCloseTo(p0.x, 6);
+    expect(m!.f).toBeCloseTo(p0.y, 6);
+  });
+
+  it('computePhotoToProjMatrix returns null with fewer than 2 usable correspondences and no manual placement', () => {
+    const photo = makePhoto([corr(0, 0, 0, 10, 80)]);
+    expect(computePhotoToProjMatrix(photo)).toBeNull();
   });
 
   it('derivePlacementFromMatrix inverts computeManualMatrix', () => {

@@ -124,6 +124,25 @@ export function affineToCSS(m: AffineMatrix): string {
   return `matrix(${m.a}, ${m.b}, ${m.c}, ${m.d}, ${m.e}, ${m.f})`;
 }
 
+/** Apply an affine matrix to a point: `(a·x + c·y + e, b·x + d·y + f)`. */
+export function applyAffine(m: AffineMatrix, p: Point): Point {
+  return { x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f };
+}
+
+/** Invert an affine matrix, or null when it is singular (zero determinant). */
+export function invertAffine(m: AffineMatrix): AffineMatrix | null {
+  const det = m.a * m.d - m.b * m.c;
+  if (Math.abs(det) < 1e-30) return null;
+  return {
+    a: m.d / det,
+    b: -m.b / det,
+    c: -m.c / det,
+    d: m.a / det,
+    e: (m.c * m.f - m.d * m.e) / det,
+    f: (m.b * m.e - m.a * m.f) / det,
+  };
+}
+
 /**
  * Least-squares affine fit for N ≥ 3 point pairs.
  * Falls back to the exact 3-point solver when N === 3.

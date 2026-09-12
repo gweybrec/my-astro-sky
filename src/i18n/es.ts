@@ -756,6 +756,8 @@ const es: Translations = {
     loadFromWcsError: 'No se pudieron leer los metadatos de este archivo',
     metadataTitle: 'Editar información',
     showOnMap: 'Ver en el mapa',
+    showDsos: 'Mostrar objetos',
+    showDsosUnavailable: 'Esta foto aún no está colocada en el mapa del cielo',
     filterLabels: 'Etiquetas',
     filterSetups: 'Equipos',
     filterTypes: 'Tipos',

@@ -11,12 +11,13 @@ export function isMessier(id: string): boolean {
 }
 
 /**
- * Human-readable label for a DSO id: Messier shown as-is, LPN objects use their proper
- * name, and other catalogs get a space inserted after the prefix (NGC/IC/LBN/LDN/Sh2/
- * vdB/Abell/Barnard). Mirrors the original inline `replace` chain exactly.
+ * Human-readable label for any catalog id belonging to `dso` — its primary id or one
+ * of its aliases (`dso.catalogs`). Messier shown as-is, LPN objects use their proper
+ * name (`dso.displayName`, since an LPN alias has no readable form of its own),
+ * and other catalogs get a space inserted after the prefix (NGC/IC/LBN/LDN/Sh2/vdB/
+ * Abell/Barnard). Mirrors the original inline `replace` chain exactly.
  */
-export function formatDsoLabel(dso: DSO): string {
-  const id = dso.id;
+export function formatCatalogId(id: string, dso: DSO): string {
   if (isMessier(id)) return id;
   if (id.startsWith('LPN-')) return dso.displayName || id.replace(/^LPN-/, '');
   return id
@@ -28,6 +29,11 @@ export function formatDsoLabel(dso: DSO): string {
     .replace('vdB', 'vdB ')
     .replace(/^(Abell)(\d)/, '$1 $2')
     .replace(/^(Barnard)(\d)/, '$1 $2');
+}
+
+/** Human-readable label for a DSO's own primary id — see {@link formatCatalogId}. */
+export function formatDsoLabel(dso: DSO): string {
+  return formatCatalogId(dso.id, dso);
 }
 
 /**

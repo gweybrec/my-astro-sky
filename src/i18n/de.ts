@@ -755,6 +755,8 @@ const de: Translations = {
     loadFromWcsError: 'Metadaten dieser Datei konnten nicht gelesen werden',
     metadataTitle: 'Informationen bearbeiten',
     showOnMap: 'Auf Karte anzeigen',
+    showDsos: 'Objekte anzeigen',
+    showDsosUnavailable: 'Dieses Foto ist noch nicht auf der Himmelskarte platziert',
     filterLabels: 'Etiketten',
     filterSetups: 'Ausrüstung',
     filterTypes: 'Typen',

@@ -9,6 +9,8 @@ vi.mock('../../src/metadata-editor', () => ({
 
 vi.mock('../../src/i18n', () => ({
   t: (key: string) => key,
+  getLang: () => 'en',
+  setLang: vi.fn(),
 }));
 
 import { Gallery } from '../../src/gallery';

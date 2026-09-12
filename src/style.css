@@ -851,9 +851,54 @@ body {
   margin-bottom: 0;
 }
 
-/* Gallery detail header: show-on-map button spans full width */
+/* Gallery detail header: show-on-map / show-DSOs buttons share a row */
+.gallery-detail-btn-row {
+  display: flex;
+  gap: var(--space-4);
+}
+.gallery-detail-btn-row .btn-action {
+  flex: 1;
+  width: auto;
+}
 .gallery-detail-header .btn-action {
   width: 100%;
+}
+
+/* "Show DSOs" toggle — off state is a ghost outline, on state fills like btn-action's
+   own hover, following the amber-fill + --border-focus convention other text-button
+   toggles use (.lang-btn.active, .manual-mirror-btn.active). */
+.gallery-dso-toggle-btn {
+  background: transparent;
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+}
+.gallery-dso-toggle-btn:hover:not(:disabled) {
+  background: var(--accent-fill-lg);
+  color: var(--text-bright);
+}
+.gallery-dso-toggle-btn[aria-pressed='true'] {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+.gallery-dso-toggle-btn[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--accent-bg-hover);
+}
+
+/* Gallery detail: "show DSOs" canvas overlay, registered onto the zoomed/panned img
+   by gallery.ts on every transform change. */
+.gallery-detail-dso-overlay {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* The catalog-filter dropdown opens while the gallery's own fullscreen overlay
+   (--z-gallery) is on screen, which sits above --z-modal (.dropdown-panel's own
+   z-index) — without this override the panel renders invisibly behind the photo.
+   Two classes for specificity: .dropdown-panel's own z-index rule is declared later
+   in this file, so a same-specificity override placed earlier would lose the tie. */
+.dropdown-panel.gallery-dso-catalog-dropdown {
+  z-index: calc(var(--z-gallery) + 1);
 }
 
 /* Gallery detail actions row: delete/save buttons share space */

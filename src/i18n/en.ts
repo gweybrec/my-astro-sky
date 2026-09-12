@@ -749,6 +749,8 @@ const en: Translations = {
     loadFromWcsError: 'Could not read metadata from this file',
     metadataTitle: 'Edit info',
     showOnMap: 'Show on map',
+    showDsos: 'Show DSOs',
+    showDsosUnavailable: 'This photo is not placed on the sky map yet',
     filterLabels: 'Labels',
     filterSetups: 'Setups',
     filterTypes: 'Types',
