@@ -60,6 +60,9 @@
   <!-- Keyboard shortcuts cheat-sheet + remap -->
   <KeyboardShortcutsModal v-if="activeModal === 'shortcuts'" @close="closeModal()" />
 
+  <!-- Statistics: photographed/total per DSO catalog, filterable by constellation -->
+  <StatisticsModal v-if="activeModal === 'stats'" @close="closeModal()" />
+
   <!-- "Find targets" recommender, summoned from Plans or the Sky map. The
        recommend surface itself is built once by TargetsView and survives this
        component unmounting on close (see TargetsOverlay.vue). -->
@@ -88,6 +91,7 @@ import PrivacyModal from './components/modals/PrivacyModal.vue';
 import DataCreditsModal from './components/modals/DataCreditsModal.vue';
 import UpdateAvailableModal from './components/modals/UpdateAvailableModal.vue';
 import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue';
+import StatisticsModal from './components/modals/StatisticsModal.vue';
 import TargetsOverlay from './components/overlay/TargetsOverlay.vue';
 import { useUiStore } from './stores/ui';
 
@@ -102,7 +106,8 @@ type ModalName =
   | 'privacy'
   | 'credits'
   | 'update'
-  | 'shortcuts';
+  | 'shortcuts'
+  | 'stats';
 
 const activeModal = ref<ModalName | null>(null);
 const previousModal = ref<ModalName | null>(null);

@@ -345,6 +345,52 @@ export function getDSOCatalog(id: string): DSOCatalog | null {
   return null;
 }
 
+export interface CatalogStat {
+  photographed: number;
+  total: number;
+}
+
+/**
+ * Per-catalog photographed/total counts, for the statistics page. Unlike `DSO.catalog`
+ * (the single canonical/priority family), this counts a DSO toward *every* catalog
+ * family it has an alias in — e.g. an M42/NGC1976/LBN974 object counts toward Messier,
+ * NGC and LBN alike — since `catalogs[]` holds every designation, not just the primary.
+ *
+ * @param photographedIds - canonical DSO ids the user has photographed (already
+ *   resolved via getDSOById, so an alias stored on a photo still matches)
+ * @param constellationIds - restrict to these 3-letter IAU codes, or null for all
+ */
+export function computeCatalogStats(
+  photographedIds: Set<string>,
+  constellationIds: Set<string> | null,
+): Record<DSOCatalog, CatalogStat> {
+  const stats = Object.fromEntries(
+    DSO_CATALOGS_ALL.map((cat) => [cat, { photographed: 0, total: 0 }]),
+  ) as Record<DSOCatalog, CatalogStat>;
+
+  for (const d of dsos) {
+    if (
+      constellationIds !== null &&
+      (d.constellation === null || !constellationIds.has(d.constellation))
+    )
+      continue;
+
+    const families = new Set<DSOCatalog>();
+    for (const alias of d.catalogs) {
+      const family = getDSOCatalog(alias);
+      if (family !== null) families.add(family);
+    }
+
+    const photographed = photographedIds.has(d.id);
+    for (const family of families) {
+      stats[family].total++;
+      if (photographed) stats[family].photographed++;
+    }
+  }
+
+  return stats;
+}
+
 export function getDSOsNear(ra: number, dec: number, radiusDeg: number): DSO[] {
   // First pass: bounding box filter
   const decMin = dec - radiusDeg;

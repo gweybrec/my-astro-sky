@@ -16,7 +16,8 @@ type ModalName =
   | 'batchUpload'
   | 'solverSettings'
   | 'update'
-  | 'shortcuts';
+  | 'shortcuts'
+  | 'stats';
 
 let _appRef: { openModal: (name: ModalName | null) => void } | null = null;
 
