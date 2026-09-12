@@ -1,8 +1,8 @@
-import type { DSO, DSOType, DSOUserOverride, PhotoCorrespondence } from './types';
+import type { DSO, DSOType, DSOUserOverride, PhotoCorrespondence, Point } from './types';
 import type { AffineMatrix } from './types';
 import { getLang } from './i18n';
 import { project, invalidateProjections } from './projection';
-import { computeAffineTransform } from './affine';
+import { computeAffineTransform, invertAffine, applyAffine } from './affine';
 import { getDsoOverrides } from './api';
 
 let dsos: DSO[] = [];
@@ -374,26 +374,129 @@ export function findDSOsInImage(
   imgHeight: number,
 ): DSO[] {
   // Invert the affine: canvas projection → photo pixels
-  const { a, b, c, d, e, f } = photoToCanvas;
-  const det = a * d - b * c;
-  if (Math.abs(det) < 1e-30) return [];
-  const inv: AffineMatrix = {
-    a: d / det,
-    b: -b / det,
-    c: -c / det,
-    d: a / det,
-    e: (c * f - d * e) / det,
-    f: (b * e - a * f) / det,
-  };
+  const inv = invertAffine(photoToCanvas);
+  if (!inv) return [];
 
   const result: DSO[] = [];
   for (const dso of dsos) {
-    const pt = project(dso.ra, dso.dec);
-    const px = inv.a * pt.x + inv.c * pt.y + inv.e;
-    const py = inv.b * pt.x + inv.d * pt.y + inv.f;
-    if (px >= 0 && px <= imgWidth && py >= 0 && py <= imgHeight) {
+    const pt = applyAffine(inv, project(dso.ra, dso.dec));
+    if (pt.x >= 0 && pt.x <= imgWidth && pt.y >= 0 && pt.y <= imgHeight) {
       result.push(dso);
     }
+  }
+  return result;
+}
+
+/** Photo-pixel placement of a DSO for a photo-detail overlay: centre plus ellipse
+ * geometry, all already in photo pixels. */
+export interface PhotoDsoPlacement {
+  dso: DSO;
+  /** Which of `dso.catalogs` to label this placement with — the DSO's own primary
+   * id, unless that catalog is filtered out and one of its aliases is shown instead
+   * (see {@link findDsoPlacementsInImage}). */
+  displayId: string;
+  x: number;
+  y: number;
+  /** Full major/minor axis lengths in photo pixels. 0 when the DSO has no cataloged size. */
+  majorPx: number;
+  minorPx: number;
+  /** Screen angle of the major axis, degrees clockwise from the +x axis. 0 when sizeless. */
+  angleDeg: number;
+}
+
+/**
+ * Photo-pixel vector from a DSO's centre to a point `arcmin` away along
+ * `positionAngleDeg` (measured east of north, the catalog's convention). Ports
+ * TiffViewer's `SkyCatalogue.offsetPixels`: projecting the offset sky point through
+ * the same affine as the centre means the result inherits the photo's own rotation,
+ * mirroring and scale rather than re-deriving them separately.
+ */
+function offsetPhotoPx(
+  inv: AffineMatrix,
+  ra: number,
+  dec: number,
+  centerPx: Point,
+  arcmin: number,
+  positionAngleDeg: number,
+): Point {
+  const radius = arcmin / 60;
+  const angle = (positionAngleDeg * Math.PI) / 180;
+  const decOffset = dec + radius * Math.cos(angle);
+  const raOffset =
+    ra + (radius * Math.sin(angle)) / Math.max(Math.cos((dec * Math.PI) / 180), 1e-6);
+  const edgePx = applyAffine(inv, project(raOffset, decOffset));
+  return { x: edgePx.x - centerPx.x, y: edgePx.y - centerPx.y };
+}
+
+/**
+ * Which of `dso`'s catalog ids to display given the enabled `catalogs` — its own
+ * primary id when that's enabled, otherwise the first alias (in `dso.catalogs`'
+ * existing priority order, e.g. M before NGC before IC) whose own catalog family is
+ * enabled, so unchecking Messier still shows an M-object with an enabled NGC alias
+ * under its NGC name rather than hiding it outright. Null when none of its catalogs
+ * are enabled. A DSO with no recognized catalog at all (`dso.catalog` null — no id
+ * in `dso.catalogs` matches any known prefix) is never filtered, same as
+ * {@link findDSOsInImage}'s own predicate.
+ */
+function pickVisibleCatalogAlias(dso: DSO, catalogs: Set<string>): string | null {
+  if (!dso.catalog) return dso.id;
+  for (const id of dso.catalogs) {
+    const cat = getDSOCatalog(id);
+    if (cat && catalogs.has(cat)) return id;
+  }
+  return null;
+}
+
+/**
+ * Find every DSO with at least one enabled catalog alias (see
+ * {@link pickVisibleCatalogAlias}) whose centre falls within the image, with the
+ * photo-pixel geometry (position + ellipse) needed to draw it directly on the photo —
+ * the richer sibling of {@link findDSOsInImage}, used by the gallery detail view's
+ * "show DSOs" overlay rather than the auto-tagging path.
+ *
+ * @param photoToProj - Affine matrix mapping photo pixels → the same projection space `project()` returns
+ * @param catalogs - The enabled catalog families (matches the predicate `dso-render-select.ts` uses for the sky map's own catalog filter, generalised to also check aliases)
+ */
+export function findDsoPlacementsInImage(
+  photoToProj: AffineMatrix,
+  imgWidth: number,
+  imgHeight: number,
+  catalogs: Set<string>,
+): PhotoDsoPlacement[] {
+  const inv = invertAffine(photoToProj);
+  if (!inv) return [];
+
+  const result: PhotoDsoPlacement[] = [];
+  for (const dso of dsos) {
+    const displayId = pickVisibleCatalogAlias(dso, catalogs);
+    if (displayId === null) continue;
+
+    const centerPx = applyAffine(inv, project(dso.ra, dso.dec));
+    if (centerPx.x < 0 || centerPx.x > imgWidth || centerPx.y < 0 || centerPx.y > imgHeight) {
+      continue;
+    }
+
+    const majorArcmin = dso.majAxis ?? 0;
+    let majorPx = 0;
+    let minorPx = 0;
+    let angleDeg = 0;
+    if (majorArcmin > 0) {
+      const minorArcmin = dso.minAxis ?? majorArcmin;
+      const majorOffset = offsetPhotoPx(inv, dso.ra, dso.dec, centerPx, majorArcmin / 2, dso.pa);
+      const minorOffset = offsetPhotoPx(
+        inv,
+        dso.ra,
+        dso.dec,
+        centerPx,
+        minorArcmin / 2,
+        dso.pa + 90,
+      );
+      majorPx = Math.hypot(majorOffset.x, majorOffset.y) * 2;
+      minorPx = Math.hypot(minorOffset.x, minorOffset.y) * 2;
+      angleDeg = (Math.atan2(majorOffset.y, majorOffset.x) * 180) / Math.PI;
+    }
+
+    result.push({ dso, displayId, x: centerPx.x, y: centerPx.y, majorPx, minorPx, angleDeg });
   }
   return result;
 }

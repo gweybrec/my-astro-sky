@@ -329,6 +329,54 @@ export function computeManualMatrix(
   return { a, b, c, d, e, f };
 }
 
+/** Neutral view under which `toCanvas` reduces to the pure flip `(x, y) → (x, -y)` —
+ * scale 1, no rotation, no translation. Used by {@link computeManualProjMatrix} to get
+ * a photo→canvas matrix out of `computeManualMatrix` and undo just that flip, landing
+ * in projection space instead of canvas space. */
+const PROJ_VIEW: ViewState = {
+  centerX: 0,
+  centerY: 0,
+  scale: 1,
+  rotationDeg: 0,
+  width: 0,
+  height: 0,
+};
+
+/**
+ * Build the photo→projection-space affine matrix for a manual placement, independent
+ * of any view/canvas — the manual-placement analogue of
+ * {@link buildPhotoProjPoints}+{@link fitPhotoAffine} for correspondence-based photos.
+ * Reuses {@link computeManualMatrix}'s rotation/mirror math via the neutral
+ * {@link PROJ_VIEW} rather than re-deriving it, then un-flips the y row.
+ */
+export function computeManualProjMatrix(
+  placement: ManualPlacement,
+  natW: number,
+  natH: number,
+): AffineMatrix {
+  const m = computeManualMatrix(placement, PROJ_VIEW, natW, natH);
+  return { a: m.a, b: -m.b, c: m.c, d: -m.d, e: m.e, f: -m.f };
+}
+
+/**
+ * The photo→projection-space affine matrix for any `Photo`, manually placed or
+ * plate-solved, independent of any view/canvas. Null when the photo can't be placed
+ * (manual placement missing, or fewer than 2 resolvable correspondences).
+ */
+export function computePhotoToProjMatrix(photo: Photo): AffineMatrix | null {
+  if (photo.manualPlacement) {
+    return computeManualProjMatrix(photo.manualPlacement, photo.width, photo.height);
+  }
+  if (photo.correspondences.length < 2) return null;
+  const { photoPoints, projPoints } = buildPhotoProjPoints(photo);
+  if (photoPoints.length < 2) return null;
+  try {
+    return fitPhotoAffine(photoPoints, projPoints);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Build 3 synthetic PhotoCorrespondences from a manual placement, so a manually
  * placed photo can be persisted/re-solved through the same correspondence pipeline

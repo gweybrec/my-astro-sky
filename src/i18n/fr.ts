@@ -755,6 +755,8 @@ const fr = {
     loadFromWcsError: 'Impossible de lire les métadonnées de ce fichier',
     metadataTitle: 'Modifier les infos',
     showOnMap: 'Voir sur la carte',
+    showDsos: 'Afficher les objets',
+    showDsosUnavailable: "Cette photo n'est pas encore placée sur la carte du ciel",
     filterLabels: 'Étiquettes',
     filterSetups: 'Équipements',
     filterTypes: 'Types',

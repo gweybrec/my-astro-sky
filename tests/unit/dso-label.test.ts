@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isMessier, formatDsoLabel, dsoLabelVisible } from '../../src/dso-label';
+import { isMessier, formatDsoLabel, formatCatalogId, dsoLabelVisible } from '../../src/dso-label';
 import type { DSO } from '../../src/types';
 
 function dso(id: string, over: Partial<DSO> = {}): DSO {
@@ -44,6 +44,15 @@ describe('formatDsoLabel', () => {
   it('uses the proper name for LPN objects, falling back to the stripped id', () => {
     expect(formatDsoLabel(dso('LPN-7', { displayName: 'Cave Nebula' }))).toBe('Cave Nebula');
     expect(formatDsoLabel(dso('LPN-7', { displayName: '' }))).toBe('7');
+  });
+});
+
+describe('formatCatalogId', () => {
+  it('formats an alias id, not the DSO’s own primary id', () => {
+    // M1's own id is Messier, but formatting its NGC alias should read as NGC.
+    const m1 = dso('M1', { catalogs: ['M1', 'NGC1952'] });
+    expect(formatCatalogId('NGC1952', m1)).toBe('NGC 1952');
+    expect(formatDsoLabel(m1)).toBe('M1');
   });
 });
 

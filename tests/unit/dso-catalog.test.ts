@@ -19,6 +19,7 @@ import {
   getDSOById,
   getDSOsNear,
   findDSOsInImage,
+  findDsoPlacementsInImage,
   findDSOIdsFromCorrespondences,
   getDSOCatalog,
   applyAndStoreSingleOverride,
@@ -482,6 +483,80 @@ describe('findDSOsInImage()', () => {
     const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
     const result = findDSOsInImage(affine, 1000, 1000);
     expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── findDsoPlacementsInImage ────────────────────────────────────────────────
+
+describe('findDsoPlacementsInImage()', () => {
+  const IDENTITY: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  const ALL_CATALOGS = new Set([
+    'M',
+    'NGC',
+    'IC',
+    'SH2',
+    'LBN',
+    'LDN',
+    'vdB',
+    'Abell',
+    'LPN',
+    'Barnard',
+  ]);
+
+  it('returns DSOs whose projected center falls within the image, with photo-pixel geometry', () => {
+    const placements = findDsoPlacementsInImage(IDENTITY, 10, 10, ALL_CATALOGS);
+    const testObj = placements.find((p) => p.dso.id === 'TESTOBJ');
+    expect(testObj).toBeDefined();
+    expect(testObj!.x).toBeCloseTo(0);
+    expect(testObj!.y).toBeCloseTo(0);
+    // majAxis=1 arcmin → a finite, positive ellipse size in photo pixels.
+    expect(testObj!.majorPx).toBeGreaterThan(0);
+    expect(testObj!.minorPx).toBeGreaterThan(0);
+    expect(Number.isFinite(testObj!.angleDeg)).toBe(true);
+  });
+
+  it('excludes DSOs outside the image bounds', () => {
+    const placements = findDsoPlacementsInImage(IDENTITY, 10, 10, ALL_CATALOGS);
+    expect(placements.some((p) => p.dso.id === 'M42')).toBe(false);
+  });
+
+  it('filters by the given catalog set, same predicate as the sky map', () => {
+    // SH2-106 has only one catalog family (no alias), so this is the plain
+    // exclusion case: disabling SH2 hides it outright.
+    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
+    const withSH2 = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['SH2']));
+    const withoutSH2 = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['NGC']));
+    expect(withSH2.some((p) => p.dso.id === 'SH2-106')).toBe(true);
+    expect(withoutSH2.some((p) => p.dso.id === 'SH2-106')).toBe(false);
+  });
+
+  it('falls back to an enabled catalog alias instead of hiding the DSO entirely', () => {
+    // M1's catalogs are ['M1', 'NGC1952']. Unchecking Messier but leaving NGC
+    // enabled must still show it — labelled with its NGC alias, not hidden.
+    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
+    const ngcOnly = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['NGC']));
+    const placed = ngcOnly.find((p) => p.dso.id === 'M1');
+    expect(placed).toBeDefined();
+    expect(placed!.displayId).toBe('NGC1952');
+  });
+
+  it('uses the primary id as displayId when its own catalog is enabled', () => {
+    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
+    const withM = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['M']));
+    const placed = withM.find((p) => p.dso.id === 'M1');
+    expect(placed).toBeDefined();
+    expect(placed!.displayId).toBe('M1');
+  });
+
+  it('hides a DSO entirely when none of its catalog aliases are enabled', () => {
+    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
+    const neither = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['IC', 'LBN']));
+    expect(neither.some((p) => p.dso.id === 'M1')).toBe(false);
+  });
+
+  it('returns empty array when the affine is singular', () => {
+    const singular: AffineMatrix = { a: 1, b: 2, c: 3, d: 6, e: 0, f: 0 };
+    expect(findDsoPlacementsInImage(singular, 100, 100, ALL_CATALOGS)).toEqual([]);
   });
 });
 
