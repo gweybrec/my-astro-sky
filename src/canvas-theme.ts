@@ -177,6 +177,13 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
     shape: 'circle',
     stroke: { color: 'rgba(160, 160, 160, 0.4)', lineWidth: 0.7 },
   },
+  // Unrelated pair of stars that is itself a real catalogued DSO (e.g. M40): a stellar
+  // point, not an extended object, so a plain pale circle rather than a nebula/galaxy gradient.
+  PS: {
+    shape: 'circle',
+    fill: { stops: [[0, 'rgba(230, 220, 200, 0.5)']] },
+    stroke: { color: 'rgba(230, 220, 200, 0.6)', lineWidth: 0.7 },
+  },
 };
 
 /** DSO label text color per type. Galaxy subtypes (GxS/GxE/GxI) intentionally fall
@@ -190,6 +197,7 @@ export const DSO_LABEL_COLORS: Partial<Record<DSOType, string>> = {
   PN: 'rgba(80, 200, 220, 0.9)',
   SNR: 'rgba(80, 200, 150, 0.8)',
   DN: 'rgba(120, 120, 140, 0.6)',
+  PS: 'rgba(230, 220, 200, 0.8)',
   '?': 'rgba(160, 160, 160, 0.6)',
 };
 export const DEFAULT_DSO_LABEL_COLOR = 'rgba(160, 160, 160, 0.7)';

@@ -146,6 +146,7 @@ export class SkyMap {
     'PN',
     'SNR',
     'DN',
+    'PS',
     '?',
   ]);
   private visibleDSOCatalogs: Set<string> = new Set(['M', 'NGC', 'IC', 'SH2']);

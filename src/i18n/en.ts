@@ -124,6 +124,7 @@ const en: Translations = {
       SNR: 'Supernova remnants',
       DN: 'Dark nebulae',
       MS: 'Multiple stars',
+      PS: 'Pairs of stars',
       '?': 'Celestial objects',
     },
     types: {
@@ -139,6 +140,7 @@ const en: Translations = {
       SNR: 'Supernova remnant',
       DN: 'Dark nebula',
       MS: 'Multiple star',
+      PS: 'Pair of stars',
       '?': 'Celestial object',
     },
   },

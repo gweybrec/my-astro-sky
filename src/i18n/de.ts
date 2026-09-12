@@ -124,6 +124,7 @@ const de: Translations = {
       SNR: 'Supernovaüberreste',
       DN: 'Dunkelnebel',
       MS: 'Mehrfachsterne',
+      PS: 'Sternenpaare',
       '?': 'Himmelsobjekte',
     },
     types: {
@@ -139,6 +140,7 @@ const de: Translations = {
       SNR: 'Supernovaüberrest',
       DN: 'Dunkelnebel',
       MS: 'Mehrfachstern',
+      PS: 'Sternenpaar',
       '?': 'Himmelsobjekt',
     },
   },

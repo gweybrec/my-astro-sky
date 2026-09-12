@@ -187,6 +187,7 @@ export async function openDSOEditModal(dso: DSO, onSaved?: () => void): Promise<
     'PN',
     'SNR',
     'DN',
+    'PS',
     '?',
   ];
   for (const code of DSO_TYPE_OPTIONS) {
