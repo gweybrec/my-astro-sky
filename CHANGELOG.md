@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.11.0] - 2026-09-13
+
+### Features
+
+- Add a button to go direclty to an image gallery page from the sky map ([68db9eb](https://github.com/gweybrec/my-astro-sky/commit/68db9ebb814e7a0186b58e00556fa5decc8b5a8a))
+
+- Add M40 as a pair of stars ([c992381](https://github.com/gweybrec/my-astro-sky/commit/c9923814873e185c9b36a81c61c4c957151f0910))
+
+- Add a trophy icon to have some stats about the photographed objects ([59b27d5](https://github.com/gweybrec/my-astro-sky/commit/59b27d50522feb39a3ad7573c10b2d87c8cc3fca))
+
+- Add the option to draw DSOs on the photo inside the gallery ([585d588](https://github.com/gweybrec/my-astro-sky/commit/585d588142f551a877d5767d231bdaf27d4ff38c))
+
+
+### Build System
+
+- V0.11.0 ([cd70eef](https://github.com/gweybrec/my-astro-sky/commit/cd70eefcf6d3bfb8c794db1e33e9206659c6b716))
+
 ## [0.10.1] - 2026-09-07
 
 ### Bug Fixes
