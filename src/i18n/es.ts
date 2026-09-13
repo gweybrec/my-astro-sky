@@ -30,6 +30,7 @@ const es: Translations = {
     deleteError: 'Error al eliminar: {message}',
     placementError: 'Error de posicionamiento: {name}',
     settings: 'Ajustes',
+    openInGallery: 'Abrir en la galería',
     opacity: 'Opacidad',
     zOrder: 'Orden de visualización',
     overlapOnly: 'Solo superpuestas',

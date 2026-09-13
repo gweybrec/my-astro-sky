@@ -29,6 +29,7 @@ const fr = {
     deleteError: 'Erreur de suppression : {message}',
     placementError: 'Erreur de placement : {name}',
     settings: 'Paramètres',
+    openInGallery: 'Ouvrir dans la galerie',
     opacity: 'Opacité',
     zOrder: 'Ordre d\u0027affichage',
     overlapOnly: 'Chevauchement uniquement',

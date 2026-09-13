@@ -22,6 +22,12 @@
         >
           ⚙
         </button>
+        <button
+          class="btn-icon btn-open-gallery"
+          :title="t('photos.openInGallery')"
+          @click.stop="$emit('open-gallery')"
+          v-html="imageSvg"
+        ></button>
       </div>
     </div>
     <div
@@ -66,6 +72,7 @@ import { computed } from 'vue';
 import { t } from '../../i18n';
 import PhotoChip from './PhotoChip.vue';
 import EyeToggleButton from '../base/EyeToggleButton.vue';
+import imageSvg from '../../icons/image.svg?raw';
 import type { PlacedPhoto } from '../../photo-overlay';
 import type { PointOfInterest } from '../../types';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
@@ -90,6 +97,7 @@ defineEmits<{
   'name-click': [];
   toggle: [];
   gear: [event: MouseEvent];
+  'open-gallery': [];
   'dso-chip': [id: string];
   'label-chip': [label: string];
 }>();

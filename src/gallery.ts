@@ -646,6 +646,11 @@ export class Gallery {
     return wrap;
   }
 
+  openPhoto(photoId: string) {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (photo) this.openDetailModal(photo);
+  }
+
   private openDetailModal(photo: Photo) {
     const overlay = document.createElement('div');
     overlay.className = 'gallery-cinematic-overlay';

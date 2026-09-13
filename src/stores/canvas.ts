@@ -34,6 +34,7 @@ export interface GalleryInterface extends ShowHide {
   getAllLabels(): { label: string; count: number }[];
   getAllSetups(): { setupId: string; name: string; count: number }[];
   getFilteredPhotos(): Photo[];
+  openPhoto(photoId: string): void;
 }
 
 export const useCanvasStore = defineStore('canvas', () => {

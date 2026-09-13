@@ -44,6 +44,7 @@
               @name-click="selectFromDropdown(match.placed.photo.id)"
               @toggle="onToggle(match.placed.photo.id)"
               @gear="onGear(match.placed.photo.id, $event)"
+              @open-gallery="onOpenGallery(match.placed.photo.id)"
               @dso-chip="onDSOChip"
               @label-chip="selectFromDropdown(match.placed.photo.id)"
             />
@@ -62,6 +63,7 @@
         @name-click="photosStore.zoomToPhoto(selectedPlaced!.photo.id)"
         @toggle="onToggle(selectedPlaced!.photo.id)"
         @gear="onGear(selectedPlaced!.photo.id, $event)"
+        @open-gallery="onOpenGallery(selectedPlaced!.photo.id)"
         @dso-chip="onDSOChip"
         @label-chip="photosStore.zoomToPhoto(selectedPlaced!.photo.id)"
       />
@@ -94,6 +96,7 @@ import GearPopup from './GearPopup.vue';
 import DrawOrderModal from '../modals/DrawOrderModal.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
+import { useUiStore } from '../../stores/ui';
 import { buildPhotoQueryMatches } from '../../photo-search';
 import { smartSortPhotos } from '../../gallery';
 import { triggerSelectDSOForPhotoChip, triggerBatchModal } from '../../ui';
@@ -185,6 +188,13 @@ function onGear(photoId: string, e: MouseEvent) {
   const btn = e.currentTarget as HTMLElement;
   gearAnchorRect.value = btn.getBoundingClientRect();
   gearPhotoId.value = photoId;
+}
+
+function onOpenGallery(photoId: string) {
+  useUiStore().switchView('gallery');
+  setTimeout(() => {
+    canvasStore.gallery?.openPhoto(photoId);
+  }, 80);
 }
 
 function closeGear() {
