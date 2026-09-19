@@ -114,6 +114,7 @@ import { solveWithASTAP } from './astap.js';
 import { solveWithSolveField } from './solve-field.js';
 import { createJob, getJob, updateJob, cancelJob } from './solve-queue.js';
 import { searchDeepStars, getDeepStarByHip, searchStarsByPosition } from './star-search.js';
+import { skybotConesearch } from './skybot.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
 import { logServerError } from './logger.js';
@@ -5382,6 +5383,68 @@ app.post('/api/astrometry/reuse', upload.single('photo'), async (req, res) => {
   } catch (err: any) {
     console.error('Reuse submission error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/skybot/conesearch:
+ *   post:
+ *     summary: Cone-search IMCCE SkyBoT for known asteroids near a sky position and epoch
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               raDeg:
+ *                 type: number
+ *               decDeg:
+ *                 type: number
+ *               radiusArcmin:
+ *                 type: number
+ *               epochJd:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Candidate asteroids returned successfully
+ *       400:
+ *         description: Invalid search parameters
+ *       502:
+ *         description: SkyBoT upstream request failed
+ */
+// --- SkyBoT asteroid cone search (used by the asteroid-identification modal) ---
+app.post('/api/skybot/conesearch', async (req, res) => {
+  const lang: ServerLang = req.body.lang === 'fr' ? 'fr' : 'en';
+  try {
+    const raDeg = Number(req.body.raDeg);
+    const decDeg = Number(req.body.decDeg);
+    const radiusArcmin = Number(req.body.radiusArcmin);
+    const epochJd = Number(req.body.epochJd);
+
+    if (
+      !Number.isFinite(raDeg) ||
+      raDeg < 0 ||
+      raDeg > 360 ||
+      !Number.isFinite(decDeg) ||
+      decDeg < -90 ||
+      decDeg > 90 ||
+      !Number.isFinite(radiusArcmin) ||
+      radiusArcmin <= 0 ||
+      radiusArcmin > 60 ||
+      !Number.isFinite(epochJd) ||
+      epochJd <= 0
+    ) {
+      res.status(400).json({ error: msg.api.invalidSkybotParams(lang), code: 'INVALID_PARAMS' });
+      return;
+    }
+
+    const candidates = await skybotConesearch({ raDeg, decDeg, radiusArcmin, epochJd });
+    res.json({ candidates });
+  } catch (err) {
+    logServerError('skybot_conesearch_failed', err);
+    res.status(502).json({ error: msg.api.skybotError(lang, (err as Error).message) });
   }
 });
 

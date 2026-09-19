@@ -17,7 +17,8 @@ type ModalName =
   | 'solverSettings'
   | 'update'
   | 'shortcuts'
-  | 'stats';
+  | 'stats'
+  | 'asteroidIdentify';
 
 let _appRef: { openModal: (name: ModalName | null) => void } | null = null;
 

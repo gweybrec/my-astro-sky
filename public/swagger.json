@@ -3264,6 +3264,46 @@
         }
       }
     },
+    "/api/skybot/conesearch": {
+      "post": {
+        "summary": "Cone-search IMCCE SkyBoT for known asteroids near a sky position and epoch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "raDeg": {
+                    "type": "number"
+                  },
+                  "decDeg": {
+                    "type": "number"
+                  },
+                  "radiusArcmin": {
+                    "type": "number"
+                  },
+                  "epochJd": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidate asteroids returned successfully"
+          },
+          "400": {
+            "description": "Invalid search parameters"
+          },
+          "502": {
+            "description": "SkyBoT upstream request failed"
+          }
+        }
+      }
+    },
     "/api/stars/search": {
       "get": {
         "summary": "Search stars by name or catalog identifier",

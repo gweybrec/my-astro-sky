@@ -495,3 +495,12 @@ input:focus-visible {
   width: 0.95rem;
   height: 0.95rem;
 }
+
+/* AsteroidIdentifyModal can be opened from the gallery detail view's own button,
+   while the gallery's fullscreen overlay (--z-gallery) is on screen — without
+   this override the modal-backdrop's --z-modal renders it invisibly behind the
+   gallery. Same fix as .dropdown-panel.gallery-dso-catalog-dropdown in style.css.
+   :has() is the only way to target the backdrop from the modal's own class. */
+.modal-backdrop:has(.asteroid-identify-modal) {
+  z-index: calc(var(--z-gallery) + 1);
+}

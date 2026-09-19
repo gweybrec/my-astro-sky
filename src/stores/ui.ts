@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import type { ViewMode, DSO, Star } from '../types';
+import { ref, shallowRef } from 'vue';
+import type { ViewMode, DSO, Star, Photo, PointOfInterest } from '../types';
 import { useCanvasStore } from './canvas';
 
 // Screen offset (px) of the tooltip from the cursor anchor; the tooltip is drawn
@@ -70,6 +70,20 @@ export const useUiStore = defineStore('ui', () => {
   const panelCollapsed = ref(false);
   const currentViewMode = ref<ViewMode>('skymap');
   const pendingBatchFiles = ref<File[] | null>(null);
+
+  // Set before opening the asteroid identification modal — it always opens
+  // pre-targeted at one already-solved photo now (see triggerAsteroidModal in
+  // ui.ts): the "Identifier un astéroïde" trigger lives next to "+ Ajouter un
+  // point d'intérêt" in PoiEditor.vue, which always has a specific photo in
+  // scope. `pendingAsteroidOnIdentified` is that call's own callback — there
+  // can be several PoiEditor instances live at once (one per BatchUploadModal
+  // card), each needing the result routed back to its own POI list, so the
+  // modal can't hard-code a single global handler the way its old
+  // "just persist to the server" behaviour did.
+  const pendingAsteroidPhoto = ref<Photo | null>(null);
+  const pendingAsteroidOnIdentified = shallowRef<
+    ((photo: Photo, poi: PointOfInterest) => void) | null
+  >(null);
 
   // Set before switchView('plans') to make the Plans view expand/scroll to this
   // plan. Consumed (and cleared) on render.
@@ -296,6 +310,8 @@ export const useUiStore = defineStore('ui', () => {
     setPanelCollapsed,
     switchView,
     pendingBatchFiles,
+    pendingAsteroidPhoto,
+    pendingAsteroidOnIdentified,
     pendingUpdate,
     pendingPlanFocusId,
     targetsOverlayOpen,

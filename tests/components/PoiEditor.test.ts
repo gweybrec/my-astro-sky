@@ -2,16 +2,49 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import PoiEditor from '../../src/components/modals/PoiEditor.vue';
-import type { PointOfInterest } from '../../src/types';
+import type { ManualPlacement, Photo, PointOfInterest } from '../../src/types';
+
+vi.mock('../../src/ui', () => ({
+  triggerAsteroidModal: vi.fn(),
+}));
+import { triggerAsteroidModal } from '../../src/ui';
+const mockTrigger = vi.mocked(triggerAsteroidModal);
 
 const categories = [
   { id: 'cat-a', name: 'Galaxy', color: '#f00', position: 0 },
   { id: 'cat-b', name: 'Nebula', color: '#0f0', position: 1 },
 ];
 
-function makeWrapper(pois: PointOfInterest[] = []) {
+const placement: ManualPlacement = {
+  centerRa: 0,
+  centerDec: 90,
+  rotationDeg: 0,
+  projPerPx: 0.002,
+  mirrorX: false,
+  mirrorY: false,
+};
+
+function makeSolvedPhoto(overrides?: Partial<Photo>): Photo {
+  return {
+    id: 'p1',
+    filename: 'p1.jpg',
+    originalName: 'p1.jpg',
+    width: 800,
+    height: 600,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    correspondences: [],
+    manualPlacement: placement,
+    dsoIds: [],
+    labels: [],
+    pointsOfInterest: [],
+    notes: '',
+    ...overrides,
+  };
+}
+
+function makeWrapper(pois: PointOfInterest[] = [], photo?: Photo | null) {
   return mount(PoiEditor, {
-    props: { pois },
+    props: { pois, photo },
     global: {
       plugins: [
         createTestingPinia({
@@ -22,6 +55,11 @@ function makeWrapper(pois: PointOfInterest[] = []) {
       ],
     },
   });
+}
+
+// Test environment default language is English (see asteroid-identify.test.ts).
+function findAsteroidButton(wrapper: ReturnType<typeof makeWrapper>) {
+  return wrapper.findAll('button').find((b) => b.text() === 'Identify asteroid');
 }
 
 describe('PoiEditor blur-to-register', () => {
@@ -81,5 +119,55 @@ describe('PoiEditor blur-to-register', () => {
     await input.trigger('blur', { relatedTarget: null });
 
     expect(wrapper.emitted('update:pois')).toBeUndefined();
+  });
+});
+
+describe('PoiEditor "Identifier un astéroïde" trigger', () => {
+  beforeEach(() => {
+    mockTrigger.mockReset();
+  });
+
+  it('hides the button when no photo is given (e.g. a BatchUploadModal card before placement)', () => {
+    const wrapper = makeWrapper([], null);
+    expect(findAsteroidButton(wrapper)).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('hides the button when the photo is not yet solved', () => {
+    const wrapper = makeWrapper([], makeSolvedPhoto({ manualPlacement: undefined }));
+    expect(findAsteroidButton(wrapper)).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('shows the button and opens the modal with the photo once solved', async () => {
+    const photo = makeSolvedPhoto();
+    const wrapper = makeWrapper([], photo);
+    const btn = findAsteroidButton(wrapper);
+    expect(btn).toBeTruthy();
+
+    await btn!.trigger('click');
+    expect(mockTrigger).toHaveBeenCalledTimes(1);
+    expect(mockTrigger.mock.calls[0][0]).toEqual(photo);
+    wrapper.unmount();
+  });
+
+  it("appends the modal's result to the POI list via the callback, without persisting itself", async () => {
+    const photo = makeSolvedPhoto();
+    const existing: PointOfInterest[] = [{ name: 'Existing', categoryId: 'cat-a' }];
+    const wrapper = makeWrapper(existing, photo);
+    const btn = findAsteroidButton(wrapper);
+    await btn!.trigger('click');
+
+    // Simulate the modal resolving: invoke the callback triggerAsteroidModal was given.
+    const onIdentified = mockTrigger.mock.calls[0][1];
+    onIdentified(photo, { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid' });
+
+    const emitted = wrapper.emitted('update:pois');
+    expect(emitted).toBeTruthy();
+    expect(emitted![0][0]).toEqual([
+      ...existing,
+      { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid' },
+    ]);
+    wrapper.unmount();
   });
 });

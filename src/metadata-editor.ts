@@ -148,6 +148,7 @@ export function buildMetadataEditorPanel(
         notes: state.notes,
         knownFilterMap,
         knownLabels: knownLabels ?? [],
+        photo,
         'onUpdate:displayName': (v: string) => {
           state.displayName = v;
         },

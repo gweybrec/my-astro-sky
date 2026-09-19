@@ -52,7 +52,19 @@
       ></button>
     </div>
 
-    <button type="button" class="integration-add-btn" @click="addPoi">{{ t('poi.addPoi') }}</button>
+    <div class="flex gap-2 flex-wrap">
+      <button type="button" class="integration-add-btn" @click="addPoi">
+        {{ t('poi.addPoi') }}
+      </button>
+      <button
+        v-if="canIdentifyAsteroid"
+        type="button"
+        class="integration-add-btn"
+        @click="onIdentifyAsteroid"
+      >
+        {{ t('asteroid.menuLabel') }}
+      </button>
+    </div>
 
     <PoiTypesModal v-if="showTypes" @close="showTypes = false" />
   </div>
@@ -60,16 +72,37 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { PointOfInterest } from '../../types';
+import type { Photo, PointOfInterest } from '../../types';
 import { t } from '../../i18n';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import { resolveCategory } from '../../poi';
 import { poiTypeIcon } from '../../poi-icons';
+import { computePhotoToProjMatrix } from '../../photo-placement';
+import { triggerAsteroidModal } from '../../ui';
+import { showToast } from '../../toast';
 import PoiTypesModal from './PoiTypesModal.vue';
 import penSvg from '../../icons/pen.svg?raw';
 
-const props = defineProps<{ pois: PointOfInterest[] }>();
+// `photo` is optional/nullable because PoiEditor is also used before a photo
+// exists yet (a BatchUploadModal card, pre-placement — see BatchCard.vue): the
+// "Identifier un astéroïde" trigger needs a real, already-solved, server-hosted
+// photo (to show the image and place markers on it) and simply doesn't render
+// until one is available, exactly like "+ Ajouter un point d'intérêt" itself
+// works regardless.
+const props = defineProps<{ pois: PointOfInterest[]; photo?: Photo | null }>();
 const emit = defineEmits<{ 'update:pois': [PointOfInterest[]] }>();
+
+const canIdentifyAsteroid = computed(
+  () => !!props.photo && computePhotoToProjMatrix(props.photo) !== null,
+);
+
+function onIdentifyAsteroid() {
+  if (!props.photo) return;
+  triggerAsteroidModal(props.photo, (_photo, poi) => {
+    emit('update:pois', [...props.pois, poi]);
+    showToast({ message: t('asteroid.added', { name: poi.name }), type: 'info', duration: 3000 });
+  });
+}
 
 const categoriesStore = usePoiCategoriesStore();
 const categories = computed(() => categoriesStore.categories);

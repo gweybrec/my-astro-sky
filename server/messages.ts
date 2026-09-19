@@ -260,5 +260,11 @@ export const msg = {
 
     solveFieldError: (lang: ServerLang, err: string) =>
       m(lang, `Erreur solve-field : ${err}`, `solve-field error: ${err}`),
+
+    invalidSkybotParams: (lang: ServerLang) =>
+      m(lang, 'Paramètres de recherche SkyBoT invalides', 'Invalid SkyBoT search parameters'),
+
+    skybotError: (lang: ServerLang, err: string) =>
+      m(lang, `Erreur SkyBoT : ${err}`, `SkyBoT error: ${err}`),
   },
 };
