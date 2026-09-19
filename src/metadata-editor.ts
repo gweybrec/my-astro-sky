@@ -8,6 +8,7 @@ import { showToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
 import { pinia } from './pinia-instance';
+import { RAW_COMPANION_ACCEPT } from './photo-formats';
 
 const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];
 
@@ -197,7 +198,7 @@ export function buildMetadataEditorPanel(
 
   const wcsInput = document.createElement('input');
   wcsInput.type = 'file';
-  wcsInput.accept = '.fit,.fits,.tif,.tiff';
+  wcsInput.accept = RAW_COMPANION_ACCEPT;
   wcsInput.className = 'hidden';
 
   wcsBtn.addEventListener('click', () => {

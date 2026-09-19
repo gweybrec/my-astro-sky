@@ -10,6 +10,7 @@ import type {
 export type SolverType = 'solve-field' | 'astap' | 'astrometry';
 export type BatchItemStatus =
   | 'pending'
+  | 'converting'
   | 'wcs-ready'
   | 'solving'
   | 'success'
@@ -22,6 +23,10 @@ export type BatchItemStatus =
 export interface BatchItem {
   id: string;
   file: File;
+  /** Original raw filename (e.g. "M101.fit") while the item is converting/converted; null for a plain jpg/png/webp import. */
+  rawName: string | null;
+  /** Upload progress (0-1) of the raw file to the conversion endpoint, while status is 'converting'. */
+  convertProgress: number;
   thumbBlobUrl: string | null;
   solver: SolverType;
   hintCoords: { ra: number; dec: number } | null;

@@ -272,6 +272,81 @@ export async function solveWCS(
   return res.json();
 }
 
+export interface ConvertRawPhotoResult {
+  png: File;
+  meta: PlateSolveResult & { width: number; height: number };
+}
+
+/**
+ * Convert a raw astro image (TIFF/FITS) to a PNG on the server — the raw file is never
+ * stored. Returns the converted PNG as a `File` (ready to flow through the normal upload
+ * pipeline) plus any WCS/capture metadata found in the raw file's header, in the same
+ * shape `solveWCS` returns. XHR (not fetch) is used because the raw upload is the slow
+ * part and only XHR exposes upload progress.
+ */
+export function convertRawPhoto(
+  file: File,
+  onUploadProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+): Promise<ConvertRawPhotoResult> {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('lang', getLang());
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/photos/convert');
+
+    if (onUploadProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onUploadProgress(e.loaded / e.total);
+      };
+    }
+
+    if (signal) {
+      if (signal.aborted) {
+        reject(new DOMException('Aborted', 'AbortError'));
+        return;
+      }
+      signal.addEventListener('abort', () => xhr.abort());
+    }
+
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        let errorMsg = t('errors.uploadFailed', { response: xhr.responseText });
+        try {
+          errorMsg = parseServerError(JSON.parse(xhr.responseText), 'errors.uploadFailed');
+        } catch {
+          /* non-JSON response, keep default */
+        }
+        reject(new Error(errorMsg));
+        return;
+      }
+      try {
+        const body = JSON.parse(xhr.responseText) as PlateSolveResult & {
+          width: number;
+          height: number;
+          pngBase64: string;
+        };
+        const bytes = atob(body.pngBase64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const pngFile = new File([arr], `${file.name.replace(/\.[^.]+$/, '')}.png`, {
+          type: 'image/png',
+        });
+        const { pngBase64: _pngBase64, ...meta } = body;
+        resolve({ png: pngFile, meta });
+      } catch {
+        reject(new Error(t('errors.invalidResponse')));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error(t('errors.networkError')));
+    xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'));
+    xhr.send(formData);
+  });
+}
+
 export async function submitPlateSolve(
   file: File,
   hints?: {

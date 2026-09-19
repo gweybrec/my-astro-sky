@@ -13,7 +13,12 @@
   >
     <!-- Trash button (absolute corner) -->
     <button
-      v-show="item.status !== 'solving' && item.status !== 'placing' && item.status !== 'placed'"
+      v-show="
+        item.status !== 'solving' &&
+        item.status !== 'placing' &&
+        item.status !== 'placed' &&
+        item.status !== 'converting'
+      "
       type="button"
       class="batch-trash-btn"
       :title="t('batch.removeItem')"
@@ -24,12 +29,33 @@
     <!-- Top row: thumbnail + info -->
     <div class="batch-item-top">
       <div class="batch-item-thumb-wrap">
-        <div v-if="!thumbUrl" class="batch-item-thumb-placeholder">{{ t('app.imageLoading') }}</div>
-        <img v-if="thumbUrl" class="batch-item-thumb" :src="thumbUrl" alt="" />
+        <div v-if="item.status === 'converting'" class="batch-item-thumb-placeholder">
+          {{
+            item.convertProgress < 1
+              ? t('batch.convertingUpload', { pct: String(Math.round(item.convertProgress * 100)) })
+              : t('batch.convertingDecode')
+          }}
+        </div>
+        <div v-else-if="!thumbUrl" class="batch-item-thumb-placeholder">
+          {{ t('app.imageLoading') }}
+        </div>
+        <img
+          v-if="item.status !== 'converting' && thumbUrl"
+          class="batch-item-thumb"
+          :src="thumbUrl"
+          alt=""
+        />
       </div>
 
       <div class="batch-item-info">
         <div class="batch-item-filename" :title="displayName">{{ displayName }}</div>
+        <div
+          v-if="item.rawName"
+          class="text-xs text-hint truncate"
+          :title="t('batch.rawConvertedBadge', { rawName: item.rawName })"
+        >
+          {{ t('batch.rawConvertedBadge', { rawName: item.rawName }) }}
+        </div>
 
         <!-- Solver select -->
         <div class="batch-item-controls">
@@ -116,7 +142,7 @@
       <input
         ref="wcsInputEl"
         type="file"
-        accept=".fit,.fits,.tif,.tiff"
+        :accept="RAW_COMPANION_ACCEPT"
         class="hidden"
         @change="handleWcsFile"
       />
@@ -230,7 +256,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, onUnmounted } from 'vue';
 import type { BatchItem, SolverType } from '../../batch-types';
 import type { SolverAvailability } from '../../api';
 import { t } from '../../i18n';
@@ -238,11 +264,12 @@ import { useCanvasStore } from '../../stores/canvas';
 import { searchUnified } from '../../search';
 import { solveWCS, reuseAstrometrySubmission, updatePhotoMetadata } from '../../api';
 import type { GearSetupData } from '../../api';
-import { findDSOIdsFromCorrespondences } from '../../dso-catalog';
 import { stripExtension, getFileDimensions } from '../../file-utils';
 import { generateThumbnail } from '../../lazy-image';
 import { showToast } from '../../toast';
 import { sanitizeIntegrationRows, clearWcsSolution, wcsErrorMessage } from '../../batch-utils';
+import { applyWcsResultToItem } from '../../batch-wcs';
+import { RAW_COMPANION_ACCEPT } from '../../photo-formats';
 import BatchSolveStatus from './BatchSolveStatus.vue';
 import MetadataEditorPanel from './MetadataEditorPanel.vue';
 import trashSvg from '../../icons/trash.svg?raw';
@@ -272,7 +299,9 @@ onMounted(() => {
   cardObserver = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
-        if (entry.isIntersecting && !thumbUrl.value) {
+        // A 'converting' item's file is still the raw .fit/.tiff — nothing a browser
+        // can decode into a thumbnail. Wait for the file swap below instead.
+        if (entry.isIntersecting && !thumbUrl.value && props.item.status !== 'converting') {
           thumbUrl.value = 'pending'; // mark in-progress
           generateThumbnail(props.item.file, 240).then((url) => {
             thumbUrl.value = url || '';
@@ -293,6 +322,24 @@ onUnmounted(() => {
   }
 });
 
+// A converted raw item swaps `item.file` from the raw source to the converted PNG once
+// conversion finishes — regenerate the thumbnail from the new file rather than leaving
+// the placeholder shown by the observer above (which deliberately skipped it).
+watch(
+  () => props.item.file,
+  (newFile, oldFile) => {
+    if (newFile === oldFile || props.item.status === 'converting') return;
+    if (thumbUrl.value && thumbUrl.value !== 'pending') {
+      URL.revokeObjectURL(thumbUrl.value);
+    }
+    thumbUrl.value = 'pending';
+    generateThumbnail(newFile, 240).then((url) => {
+      thumbUrl.value = url || '';
+    });
+    cardObserver?.disconnect();
+  },
+);
+
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const displayName = computed(() => props.item.customName || stripExtension(props.item.file.name));
 
@@ -309,7 +356,8 @@ const isBusy = computed(
   () =>
     props.item.status === 'solving' ||
     props.item.status === 'placing' ||
-    props.item.status === 'placed',
+    props.item.status === 'placed' ||
+    props.item.status === 'converting',
 );
 
 const solverModel = computed({
@@ -342,8 +390,9 @@ async function handleWcsFile(e: Event) {
   try {
     const { width: imgWidth, height: imgHeight } = await getFileDimensions(props.item.file);
     const result = await solveWCS(f, imgWidth || undefined, imgHeight || undefined);
-    if (result.success && result.correspondences && result.correspondences.length >= 1) {
-      if (result.dimensionWarning?.aspectMismatch) {
+    const applied = applyWcsResultToItem(props.item, result, imgWidth, imgHeight);
+    if (applied.applied) {
+      if (applied.aspectMismatch && result.dimensionWarning) {
         const { sourceW, sourceH, targetW, targetH } = result.dimensionWarning;
         showToast({
           message: t('modal.wcsDimensionMismatchBody', {
@@ -356,35 +405,6 @@ async function handleWcsFile(e: Event) {
           duration: 6000,
         });
         wcsWarning.value = true;
-      }
-      props.item.wcsResult = result;
-      props.item.solveCorrespondences = result.correspondences;
-      props.item.status = 'success';
-      // WCS solving doesn't return DSOs from the server; derive them from the
-      // solved correspondences against the local catalog (like the async solvers).
-      props.item.dsoIds =
-        result.dsoIds && result.dsoIds.length > 0
-          ? [...result.dsoIds]
-          : findDSOIdsFromCorrespondences(result.correspondences, imgWidth, imgHeight);
-      if (result.dateObs && !props.item.observationDate) {
-        props.item.observationDate = result.dateObs;
-      }
-      if (result.expTime && result.stackCnt && props.item.integrations.length === 0) {
-        props.item.integrations = [
-          {
-            frames: Math.round(result.stackCnt),
-            seconds: Math.round(result.expTime),
-            filter: result.filter ?? '',
-          },
-        ];
-      }
-      // Merge parsed capture fields, keeping any value the user already entered.
-      if (result.captureDetails) {
-        const merged = { ...props.item.captureDetails };
-        for (const [k, v] of Object.entries(result.captureDetails)) {
-          if (merged[k] === undefined || merged[k] === '') merged[k] = v;
-        }
-        props.item.captureDetails = merged;
       }
       wcsLoaded.value = true;
       wcsFileName.value = f.name;

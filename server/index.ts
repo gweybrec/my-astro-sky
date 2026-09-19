@@ -97,6 +97,12 @@ import {
 } from './import-utils.js';
 import { extractWCS, wcsToCorrespondences, loadServerCatalog } from './wcs-reader.js';
 import {
+  decodeRawAstroImage,
+  UnsupportedRawFormatError,
+  UnsupportedTiffError,
+  UnsupportedFitsError,
+} from './raw-decode/index.js';
+import {
   submitJob,
   getJobStatus,
   isConfigured as isAstrometryConfigured,
@@ -284,6 +290,14 @@ const uploadWCS = multer({
 const uploadBundle = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+// Separate multer instance for raw astro image conversion (FITS/TIFF, arrives as
+// application/octet-stream and can be much larger than a normal photo upload — deliberately
+// no fileFilter, mirroring uploadWCS; the route validates by extension instead).
+const uploadRaw = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 600 * 1024 * 1024 }, // 600 MB — real FITS stacks can exceed 200 MB
 });
 
 // In production, serve the built frontend
@@ -4503,6 +4517,110 @@ app.post('/api/solve-wcs', uploadWCS.single('photo'), async (req, res) => {
     });
   } catch (err: any) {
     console.error('WCS solve error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/photos/convert:
+ *   post:
+ *     summary: Convert a raw astro image (TIFF/FITS) to a PNG, plus any WCS/capture metadata
+ *     description: >
+ *       The raw file is never stored. It is decoded server-side with a faithful linear
+ *       mapping (no histogram stretch) into an 8-bit PNG, returned to the caller alongside
+ *       any WCS-derived star correspondences and capture metadata found in its FITS header
+ *       — in the same shape as `/api/solve-wcs` — so a plate-solved raw file can be placed
+ *       on the sky map without running a solver.
+ *     consumes:
+ *       - multipart/form-data
+ *     responses:
+ *       200:
+ *         description: Converted successfully (success:false in the body means no WCS was found — not an error; the PNG is still returned)
+ *       400:
+ *         description: Missing file or unsupported/corrupt raw format
+ *       500:
+ *         description: Server error
+ */
+app.post('/api/photos/convert', uploadRaw.single('photo'), async (req, res) => {
+  try {
+    const lang = (
+      req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en'
+    ) as ServerLang;
+
+    if (!isElectron) {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkRateLimit(ip + ':upload', UPLOAD_LIMIT)) {
+        res
+          .status(429)
+          .json({ error: "Trop d'uploads, réessayez dans un instant", code: 'UPLOAD_RATE_LIMIT' });
+        return;
+      }
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ success: false, error: msg.api.noFile(lang), code: 'NO_FILE' });
+      return;
+    }
+
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_WCS_EXTENSIONS.has(ext)) {
+      res.status(400).json({
+        success: false,
+        error: msg.api.unsupportedRawFormat(lang, ext),
+        code: 'UNSUPPORTED_FORMAT',
+      });
+      return;
+    }
+
+    let decoded: Awaited<ReturnType<typeof decodeRawAstroImage>>;
+    try {
+      decoded = await decodeRawAstroImage(file.buffer, ext);
+    } catch (err) {
+      if (
+        err instanceof UnsupportedRawFormatError ||
+        err instanceof UnsupportedTiffError ||
+        err instanceof UnsupportedFitsError
+      ) {
+        logServerError('raw_convert_unsupported', err, { ext });
+        res.status(400).json({
+          success: false,
+          error: msg.api.rawDecodeFailed(lang, err.message),
+          code: 'UNSUPPORTED_RAW_FORMAT',
+        });
+        return;
+      }
+      throw err;
+    }
+
+    // WCS + capture metadata, exactly like /api/solve-wcs — no rescale is ever needed
+    // here since the PNG has the raw file's own exact dimensions.
+    const wcs = extractWCS(file.buffer, ext);
+    let success = false;
+    let correspondences: ReturnType<typeof wcsToCorrespondences> = [];
+    if (wcs) {
+      loadServerCatalog();
+      correspondences = wcsToCorrespondences(wcs, decoded.width, decoded.height, true);
+      success = correspondences.length >= 3;
+    }
+
+    res.json({
+      success,
+      ...(success ? { correspondences } : { error: msg.api.noWcsData(lang), code: 'NO_WCS_DATA' }),
+      sourceWidth: decoded.width,
+      sourceHeight: decoded.height,
+      width: decoded.width,
+      height: decoded.height,
+      pngBase64: decoded.png.toString('base64'),
+      ...(wcs?.dateObs ? { dateObs: wcs.dateObs } : {}),
+      ...(wcs?.expTime !== undefined ? { expTime: wcs.expTime } : {}),
+      ...(wcs?.stackCnt !== undefined ? { stackCnt: wcs.stackCnt } : {}),
+      ...(wcs?.filter ? { filter: wcs.filter } : {}),
+      ...(wcs?.captureDetails ? { captureDetails: wcs.captureDetails } : {}),
+    });
+  } catch (err: any) {
+    logServerError('raw_convert_failed', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

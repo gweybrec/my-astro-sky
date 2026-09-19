@@ -238,6 +238,23 @@ export const msg = {
         `Unsupported format for solve-field: ${ext}. Use JPG/PNG/WEBP.`,
       ),
 
+    unsupportedRawFormat: (lang: ServerLang, ext: string) =>
+      m(
+        lang,
+        `Format brut non pris en charge : ${ext}. Utilisez TIFF ou FITS.`,
+        `Unsupported raw format: ${ext}. Use TIFF or FITS.`,
+      ),
+
+    rawDecodeFailed: (lang: ServerLang, detail: string) =>
+      m(
+        lang,
+        `Impossible de convertir le fichier brut : ${detail}`,
+        `Could not convert the raw file: ${detail}`,
+      ),
+
+    rawTooLarge: (lang: ServerLang) =>
+      m(lang, 'Fichier brut trop volumineux (max 600 Mo)', 'Raw file too large (max 600 MB)'),
+
     astapError: (lang: ServerLang, err: string) =>
       m(lang, `Erreur ASTAP : ${err}`, `ASTAP error: ${err}`),
 

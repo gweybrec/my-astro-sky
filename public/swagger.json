@@ -2747,6 +2747,26 @@
         }
       }
     },
+    "/api/photos/convert": {
+      "post": {
+        "summary": "Convert a raw astro image (TIFF/FITS) to a PNG, plus any WCS/capture metadata",
+        "description": "The raw file is never stored. It is decoded server-side with a faithful linear mapping (no histogram stretch) into an 8-bit PNG, returned to the caller alongside any WCS-derived star correspondences and capture metadata found in its FITS header — in the same shape as `/api/solve-wcs` — so a plate-solved raw file can be placed on the sky map without running a solver.\n",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Converted successfully (success:false in the body means no WCS was found — not an error; the PNG is still returned)"
+          },
+          "400": {
+            "description": "Missing file or unsupported/corrupt raw format"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/api/solve-astap": {
       "post": {
         "summary": "Submit ASTAP plate solve job",

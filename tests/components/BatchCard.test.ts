@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { reactive } from 'vue';
+import { mount, flushPromises } from '@vue/test-utils';
 import BatchCard from '../../src/components/modals/BatchCard.vue';
 import type { BatchItem } from '../../src/batch-types';
 import type { SolverAvailability } from '../../src/api';
+import { generateThumbnail } from '../../src/lazy-image';
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -45,6 +47,8 @@ function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
   return {
     id: 'item-1',
     file: new File(['jpeg-data'], 'M42.jpg', { type: 'image/jpeg' }),
+    rawName: null,
+    convertProgress: 0,
     thumbBlobUrl: null,
     solver: 'solve-field',
     hintCoords: null,
@@ -97,6 +101,7 @@ async function triggerWcsChange(wrapper: ReturnType<typeof mountCard>, wcsFile: 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
+  vi.mocked(generateThumbnail).mockClear();
   mockSolveWCS.mockReset();
   mockGetFileDimensions.mockReset();
   mockFindDSOIds.mockReset();
@@ -323,6 +328,71 @@ describe('BatchCard — controls locked while solving', () => {
     expect(actionBtns[0].attributes('disabled')).toBeUndefined();
     expect(actionBtns[1].attributes('disabled')).toBeUndefined();
 
+    wrapper.unmount();
+  });
+
+  it('disables the solver dropdown and the WCS/manual buttons while converting a raw file', () => {
+    const wrapper = mountWithStatus('converting');
+
+    expect(wrapper.find('.batch-solver-select').attributes('disabled')).toBeDefined();
+    const actionBtns = wrapper.findAll('.batch-wcs-btn');
+    expect(actionBtns[0].attributes('disabled')).toBeDefined();
+    expect(actionBtns[1].attributes('disabled')).toBeDefined();
+
+    wrapper.unmount();
+  });
+});
+
+describe('BatchCard — raw conversion progress', () => {
+  const allAvailable: SolverAvailability = { solveField: true, astap: true, astrometry: true };
+
+  it('shows an upload-percentage placeholder while converting, then a decode message', () => {
+    // reactive(): the production code mounts BatchCard against a reactive item too
+    // (BatchUploadModal's `items` array), so mutating a field after mount must re-render.
+    const item = reactive(
+      makeItem({
+        status: 'converting',
+        rawName: 'M101.fit',
+        convertProgress: 0.4,
+        file: new File(['raw'], 'M101.fit'),
+      }),
+    );
+    const wrapper = mount(BatchCard, {
+      props: { item, solverAvailability: allAvailable, knownFilterMap: new Map() },
+      global: { stubs: { BatchSolveStatus: true, MetadataEditorPanel: true } },
+      attachTo: document.body,
+    });
+
+    expect(wrapper.find('.batch-item-thumb-placeholder').text()).toBe('batch.convertingUpload');
+    expect(wrapper.find('.batch-item-thumb').exists()).toBe(false);
+
+    item.convertProgress = 1;
+    return wrapper.vm.$nextTick().then(() => {
+      expect(wrapper.find('.batch-item-thumb-placeholder').text()).toBe('batch.convertingDecode');
+      wrapper.unmount();
+    });
+  });
+
+  it('regenerates the thumbnail once the raw file is swapped for the converted PNG', async () => {
+    const rawFile = new File(['raw'], 'M101.fit');
+    const item = reactive(makeItem({ status: 'converting', rawName: 'M101.fit', file: rawFile }));
+    const wrapper = mount(BatchCard, {
+      props: { item, solverAvailability: allAvailable, knownFilterMap: new Map() },
+      global: { stubs: { BatchSolveStatus: true, MetadataEditorPanel: true } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    // While converting, the lazy-thumbnail observer must never touch the raw file.
+    expect(generateThumbnail).not.toHaveBeenCalled();
+
+    const pngFile = new File(['png'], 'M101.png', { type: 'image/png' });
+    item.file = pngFile;
+    item.status = 'success';
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    expect(generateThumbnail).toHaveBeenCalledWith(pngFile, 240);
     wrapper.unmount();
   });
 });

@@ -118,7 +118,7 @@
             </button>
             <button
               class="btn-action"
-              :disabled="isStarting || allSolversDisabled"
+              :disabled="isStarting || allSolversDisabled || hasConverting"
               :title="allSolversDisabled ? t('batch.noSolverConfigured') : undefined"
               @click="startSolving"
             >
@@ -187,6 +187,9 @@ import { filterLabelCandidates } from '../../autocomplete-utils';
 import { placeBatchItem } from '../../batch-place';
 import { confirmDiscardUnsavedSolves } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
+import { ANY_PHOTO_EXT_RE, PHOTO_PICKER_ACCEPT, isRawAstroFile } from '../../photo-formats';
+import { convertRawPhoto } from '../../api';
+import { applyWcsResultToItem } from '../../batch-wcs';
 import BatchCard from './BatchCard.vue';
 import CheckRow from '../base/CheckRow.vue';
 import addPhotoSvg from '../../icons/add-photo.svg?raw';
@@ -264,9 +267,12 @@ uiStore.pendingBatchFiles = null;
 let itemSeq = 0;
 
 function createBatchItem(file: File): BatchItem {
+  const raw = isRawAstroFile(file.name);
   return {
     id: `batch-${Date.now()}-${itemSeq++}`,
     file,
+    rawName: raw ? file.name : null,
+    convertProgress: 0,
     thumbBlobUrl: null,
     solver: defaultSolver(),
     hintCoords: null,
@@ -274,7 +280,7 @@ function createBatchItem(file: File): BatchItem {
     fovDeg: null,
     wcsResult: null,
     solveCorrespondences: null,
-    status: 'pending',
+    status: raw ? 'converting' : 'pending',
     photo: null,
     error: '',
     diagnostics: undefined,
@@ -298,17 +304,71 @@ function createBatchItem(file: File): BatchItem {
 
 const items = reactive<BatchItem[]>(pendingFiles.map(createBatchItem));
 
+// ─── Raw file conversion (TIFF/FITS → PNG, server-side) ────────────────────────
+// Serialized: a 200+ MB raw body plus its decode buffers must not be held in memory
+// for several items at once.
+const rawConvertQueue: BatchItem[] = [];
+let convertQueueActive = false;
+
+function enqueueForConversion(newItems: BatchItem[]) {
+  const rawItems = newItems.filter((i) => i.rawName !== null);
+  if (rawItems.length === 0) return;
+  rawConvertQueue.push(...rawItems);
+  void processConvertQueue();
+}
+
+async function processConvertQueue() {
+  if (convertQueueActive) return;
+  convertQueueActive = true;
+  while (rawConvertQueue.length > 0) {
+    const item = rawConvertQueue.shift()!;
+    if (!items.includes(item)) continue; // removed while queued
+    await convertOneItem(item);
+  }
+  convertQueueActive = false;
+}
+
+async function convertOneItem(item: BatchItem) {
+  const abort = new AbortController();
+  item.solveAbort = abort;
+  try {
+    const { png, meta } = await convertRawPhoto(
+      item.file,
+      (fraction) => {
+        item.convertProgress = fraction;
+      },
+      abort.signal,
+    );
+    if (!items.includes(item)) return; // removed mid-flight
+    item.file = png;
+    item.solveAbort = null;
+    const applied = applyWcsResultToItem(item, meta, meta.width, meta.height);
+    item.status = applied.applied ? 'success' : 'pending';
+  } catch (err: any) {
+    if (!items.includes(item)) return;
+    item.solveAbort = null;
+    item.status = 'failed';
+    item.error = t('errors.convertRawFailed', {
+      filename: item.rawName ?? item.file.name,
+      detail: err?.message || 'unknown error',
+    });
+  }
+}
+
+const hasConverting = computed(() => items.some((i) => i.status === 'converting'));
+
+enqueueForConversion(items);
+
 // ─── Add more photos without closing the modal ─────────────────────────────────
 function addMorePhotos() {
-  const allowedExt = /\.(jpe?g|png|webp)$/i;
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
+  input.accept = PHOTO_PICKER_ACCEPT;
   input.multiple = true;
   input.onchange = () => {
     if (!input.files || input.files.length === 0) return;
     const selected = Array.from(input.files);
-    const valid = selected.filter((f) => allowedExt.test(f.name));
+    const valid = selected.filter((f) => ANY_PHOTO_EXT_RE.test(f.name));
     if (valid.length === 0) {
       showToast({ message: t('errors.invalidPhotoFormat'), type: 'error', duration: 3500 });
       return;
@@ -316,8 +376,10 @@ function addMorePhotos() {
     if (valid.length !== selected.length) {
       showToast({ message: t('errors.someFilesSkipped'), type: 'error', duration: 3500 });
     }
-    // New items join as 'pending', bumping the total/unsolved count in the footer.
-    items.push(...valid.map(createBatchItem));
+    // New items join as 'pending' (or 'converting'), bumping the total/unsolved count.
+    const newItems = valid.map(createBatchItem);
+    items.push(...newItems);
+    enqueueForConversion(newItems);
   };
   input.click();
 }
@@ -358,7 +420,8 @@ onBeforeUnmount(() => {
 
 // ─── Remove item ──────────────────────────────────────────────────────────────
 function removeItem(item: BatchItem) {
-  if (item.status === 'solving' || item.status === 'placing') return;
+  if (item.status === 'solving' || item.status === 'placing' || item.status === 'converting')
+    return;
   const idx = items.indexOf(item);
   if (idx !== -1) items.splice(idx, 1);
 }
@@ -644,7 +707,12 @@ function startSolving() {
 
   for (const item of items) {
     if (cancelled) break;
-    if (item.status === 'success' || item.status === 'placing' || item.status === 'placed')
+    if (
+      item.status === 'success' ||
+      item.status === 'placing' ||
+      item.status === 'placed' ||
+      item.status === 'converting'
+    )
       continue;
     if (item.status === 'failed') {
       item.error = '';

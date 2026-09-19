@@ -101,6 +101,7 @@ import { buildPhotoQueryMatches } from '../../photo-search';
 import { smartSortPhotos } from '../../gallery';
 import { triggerSelectDSOForPhotoChip, triggerBatchModal } from '../../ui';
 import { showToast } from '../../toast';
+import { ANY_PHOTO_EXT_RE, PHOTO_PICKER_ACCEPT } from '../../photo-formats';
 
 const canvasStore = useCanvasStore();
 const photosStore = usePhotosStore();
@@ -211,15 +212,14 @@ function onDSOChip(dsoId: string) {
 }
 
 function onAddPhoto() {
-  const allowedExt = /\.(jpe?g|png|webp)$/i;
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
+  input.accept = PHOTO_PICKER_ACCEPT;
   input.multiple = true;
   input.onchange = () => {
     if (!input.files || input.files.length === 0) return;
     const selected = Array.from(input.files);
-    const valid = selected.filter((f) => allowedExt.test(f.name));
+    const valid = selected.filter((f) => ANY_PHOTO_EXT_RE.test(f.name));
     if (valid.length === 0) {
       showToast({ message: t('errors.invalidPhotoFormat'), type: 'error', duration: 3500 });
       return;

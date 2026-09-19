@@ -51,6 +51,7 @@ const pollLocalSolveJob = vi.fn(async (_endpoint: string, jobId: string) =>
   state.pollResponder(jobId),
 );
 const cancelLocalSolveJob = vi.fn(async () => {});
+const convertRawPhoto = vi.fn();
 vi.mock('../../src/api', () => ({
   getSolverAvailability: () => state.availability,
   submitLocalSolveJob: (...args: unknown[]) => submitLocalSolveJob(...(args as [])),
@@ -59,11 +60,16 @@ vi.mock('../../src/api', () => ({
   submitPlateSolve: vi.fn(),
   pollPlateSolve: vi.fn(),
   uploadPhoto: vi.fn(),
+  convertRawPhoto: (...args: unknown[]) => convertRawPhoto(...(args as [])),
 }));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 function jpeg(name: string): File {
   return new File(['x'], name, { type: 'image/jpeg' });
+}
+
+function fit(name: string): File {
+  return new File(['raw'], name);
 }
 
 function mountModal() {
@@ -87,6 +93,7 @@ beforeEach(() => {
   submitLocalSolveJob.mockClear();
   pollLocalSolveJob.mockClear();
   cancelLocalSolveJob.mockClear();
+  convertRawPhoto.mockReset();
   localStorage.setItem('batch-auto-place', 'false');
 });
 
@@ -148,6 +155,119 @@ describe('BatchUploadModal — cancel all solving', () => {
 
     // Finished item is preserved; the two in-progress solves are cancelled.
     expect(statuses(wrapper)).toEqual(['success', 'canceled', 'canceled']);
+
+    wrapper.unmount();
+  });
+});
+
+// The card components are stubbed, so read fields straight off the reactive items.
+function items(
+  wrapper: ReturnType<typeof mountModal>,
+): { status: string; file: File; error: string }[] {
+  return (wrapper.vm as unknown as { items: { status: string; file: File; error: string }[] })
+    .items;
+}
+
+describe('BatchUploadModal — raw file conversion', () => {
+  it('joins a raw .fit file as "converting" rather than "pending"', async () => {
+    state.pendingFiles = [fit('M101.fit')];
+    let resolveConvert: (v: unknown) => void = () => {};
+    convertRawPhoto.mockReturnValue(new Promise((resolve) => (resolveConvert = resolve)));
+
+    const wrapper = mountModal();
+    expect(statuses(wrapper)).toEqual(['converting']);
+    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
+
+    resolveConvert({
+      png: new File(['png'], 'M101.png', { type: 'image/png' }),
+      meta: { success: false },
+    });
+    await flushPromises();
+    expect(statuses(wrapper)).toEqual(['pending']); // no WCS → falls back to solving
+
+    wrapper.unmount();
+  });
+
+  it('reaches "success" directly (no solver) when the raw file already carries WCS', async () => {
+    state.pendingFiles = [fit('M101.fit')];
+    convertRawPhoto.mockResolvedValue({
+      png: new File(['png'], 'M101.png', { type: 'image/png' }),
+      meta: {
+        success: true,
+        correspondences: [
+          { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starRa: 10, starDec: 20 },
+          { pointIndex: 1, photoX: 2, photoY: 2, starHip: 2, starRa: 11, starDec: 21 },
+          { pointIndex: 2, photoX: 3, photoY: 3, starHip: 3, starRa: 12, starDec: 22 },
+        ],
+        width: 100,
+        height: 100,
+      },
+    });
+
+    const wrapper = mountModal();
+    await flushPromises();
+
+    expect(statuses(wrapper)).toEqual(['success']);
+    expect(items(wrapper)[0].file.name).toBe('M101.png');
+    // Never reached a solver — placed straight from the raw file's own WCS.
+    expect(submitLocalSolveJob).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
+  it('serializes conversions — the second file is not sent until the first resolves', async () => {
+    state.pendingFiles = [fit('a.fit'), fit('b.fit')];
+    let resolveFirst: (v: unknown) => void = () => {};
+    convertRawPhoto.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    convertRawPhoto.mockResolvedValueOnce({
+      png: new File(['png'], 'b.png', { type: 'image/png' }),
+      meta: { success: false },
+    });
+
+    const wrapper = mountModal();
+    await flushPromises();
+
+    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
+    expect(statuses(wrapper)).toEqual(['converting', 'converting']);
+
+    resolveFirst({
+      png: new File(['png'], 'a.png', { type: 'image/png' }),
+      meta: { success: false },
+    });
+    await flushPromises();
+
+    expect(convertRawPhoto).toHaveBeenCalledTimes(2);
+    expect(statuses(wrapper)).toEqual(['pending', 'pending']);
+
+    wrapper.unmount();
+  });
+
+  it('marks the item "failed" with an error message when conversion rejects', async () => {
+    state.pendingFiles = [fit('bad.fit')];
+    convertRawPhoto.mockRejectedValue(new Error('unsupported raw format'));
+
+    const wrapper = mountModal();
+    await flushPromises();
+
+    expect(statuses(wrapper)).toEqual(['failed']);
+    // The mocked t() in this file returns the key itself, ignoring interpolation params.
+    expect(items(wrapper)[0].error).toBe('errors.convertRawFailed');
+
+    wrapper.unmount();
+  });
+
+  it('does not enqueue plain jpg/png files for conversion', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const wrapper = mountModal();
+    await flushPromises();
+
+    expect(convertRawPhoto).not.toHaveBeenCalled();
+    expect(statuses(wrapper)).toEqual(['pending']);
 
     wrapper.unmount();
   });

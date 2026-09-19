@@ -705,8 +705,11 @@ const es: Translations = {
     astapSuggestionsWithHint: '(1) Usar el solver en línea, o (2) Identificación manual.',
     astapSuggestionsNoHint:
       '(1) Proporcionar indicación de posición (objeto objetivo), (2) Usar el solver en línea, o (3) Identificación manual.',
-    invalidPhotoFormat: 'Formato de foto no válido. Formatos permitidos: JPG, PNG, WEBP.',
-    someFilesSkipped: 'Se omitieron algunos archivos. Formatos permitidos: JPG, PNG, WEBP.',
+    invalidPhotoFormat:
+      'Formato de foto no válido. Formatos permitidos: JPG, PNG, WEBP, TIFF, FITS.',
+    someFilesSkipped:
+      'Se omitieron algunos archivos. Formatos permitidos: JPG, PNG, WEBP, TIFF, FITS.',
+    convertRawFailed: 'No se pudo convertir {filename}: {detail}',
     listSubmissionsFailed: 'Error al obtener los envíos',
     reuseSubmissionFailed: 'Error al reutilizar el envío',
   },
@@ -1236,6 +1239,11 @@ const es: Translations = {
     removeItem: 'Quitar esta foto',
     solverLabel: 'Solver:',
     noSolverConfigured: 'Ningún solver configurado',
+    convertingUpload: 'Enviando… {pct} %',
+    convertingDecode: 'Convirtiendo archivo bruto…',
+    statusConverting: 'Convirtiendo',
+    rawConvertedBadge: 'Convertido desde {rawName} (el archivo bruto no se conserva)',
+    rawNoWcs: 'Sin datos WCS en el archivo bruto — se necesita resolución astrométrica.',
     progress: '{solved} / {total} resueltas',
     statusSolving: 'Resolviendo… ({seconds}s)',
     statusSuccess: '✓ Resuelto — listo para colocar',

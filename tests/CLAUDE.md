@@ -22,6 +22,7 @@ Use `@vue/test-utils` `mount` (not `@testing-library/vue`). Content rendered thr
 - `solve-field/LDN1235.wcs` and `M1_CCD_siril.wcs` — real WCS files from local solve-field runs
 - `astrometry/10796000-*.json` and `10796000-wcs.fits` — real data from nova.astrometry.net job 10796000 (M13 field)
 - `stars.test.json` — minimal 6-star catalog for deterministic WCS tests
+- `tiff-builders.ts` / `fits-builders.ts` — synthetic TIFF/FITS file builders for `server/raw-decode/` decoder tests (not `.test.ts`, so not collected as a suite)
 
 The raw source images those solves came from are in the gitignored `test-photos/` directory (local only) — see `test-photos/CLAUDE.md` if present.
 
