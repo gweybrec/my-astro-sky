@@ -145,6 +145,7 @@ const fr = {
     },
   },
   display: {
+    showPois: "Afficher les points d'intérêt",
     section: 'Affichage',
     showStars: 'Afficher les étoiles',
     constellationLines: 'Traits des constellations',
@@ -711,6 +712,7 @@ const fr = {
       'Certains fichiers ont été ignorés. Formats autorisés : JPG, PNG, WEBP, TIFF, FITS.',
     convertRawFailed: 'Conversion de {filename} impossible : {detail}',
     skybotSearch: 'Échec de la recherche SkyBoT',
+    tnsSearch: 'Échec de la recherche TNS',
   },
   serverErrors: {
     RATE_LIMIT: 'Trop de requêtes, réessayez dans un instant',
@@ -779,6 +781,31 @@ const fr = {
     addAsPoi: "Ajouter comme point d'intérêt",
     added: "« {name} » ajouté aux points d'intérêt",
   },
+  supernova: {
+    menuLabel: 'Identifier des supernovae',
+    title: 'Identifier des supernovae',
+    intro:
+      'Recherche dans le Transient Name Server (TNS) les supernovae découvertes dans le champ de cette photo jusqu’à un an avant sa date d’observation.',
+    obsDateLabel: 'Date d’observation (UTC)',
+    dateRequired:
+      'Cette photo n’a pas de date d’observation — saisissez-la pour lancer la recherche.',
+    searchButton: 'Rechercher',
+    searching: 'Recherche…',
+    searchError: 'Échec de la recherche TNS : {message}',
+    noCandidates: 'Aucune supernova connue dans ce champ autour de la date d’observation',
+    fieldTruncated: 'Champ large : seul un rayon central de 60′ est recherché',
+    unconfirmed: 'Non confirmée',
+    unconfirmedHint:
+      'Transitoire pas (encore) classifié par spectroscopie — peut ne pas être une supernova',
+    colMag: 'Mag. découv.',
+    colHost: 'Hôte',
+    discoveryDay: 'découverte le jour de l’observation',
+    daysAfter: '{n} j après la découverte',
+    daysBefore: '{n} j avant la découverte',
+    viewOnTns: 'Voir sur TNS',
+    addSelected: 'Ajouter la sélection ({n})',
+    added: '{names} ajouté(s) aux points d’intérêt',
+  },
   gallery: {
     editMetadata: 'Modifier les métadonnées',
     saveMetadata: 'Enregistrer',
@@ -792,6 +819,9 @@ const fr = {
     showOnMap: 'Voir sur la carte',
     showDsos: 'Afficher les objets',
     showDsosUnavailable: "Cette photo n'est pas encore placée sur la carte du ciel",
+    showPois: "Afficher les points d'intérêt",
+    showPoisUnavailable:
+      "Aucun point d'intérêt positionné sur cette photo — utilisez « Identifier des supernovae » pour en ajouter",
     filterLabels: 'Étiquettes',
     filterSetups: 'Équipements',
     filterTypes: 'Types',

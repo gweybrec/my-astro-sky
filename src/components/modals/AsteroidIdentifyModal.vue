@@ -388,8 +388,12 @@ async function onIdentify() {
   ranked.value = null;
   resultPage.value = 0;
   try {
-    const startRaDec = photoPixelToRaDec(photoToProj.value, startPx.value.x, startPx.value.y);
-    const endRaDec = photoPixelToRaDec(photoToProj.value, endPx.value.x, endPx.value.y);
+    // Fitted fresh, in the same tick as the unprojection: in zenith-centred mode the
+    // projection rotates with the sky clock, so the matrix cached when the modal
+    // opened would put the marks minutes of arc off by now.
+    const matrix = computePhotoToProjMatrix(props.photo) ?? photoToProj.value;
+    const startRaDec = photoPixelToRaDec(matrix, startPx.value.x, startPx.value.y);
+    const endRaDec = photoPixelToRaDec(matrix, endPx.value.x, endPx.value.y);
     const startJd = isoToJd(startIso.value);
     const endJd = isoToJd(endIso.value);
     const search = buildSearch(startRaDec, endRaDec, startJd, endJd);

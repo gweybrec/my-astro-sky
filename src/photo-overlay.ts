@@ -32,7 +32,6 @@ import {
   computePhotoCenterAndScale,
   computePhotoCenter,
   isLabelAllowed as labelAllowed,
-  isPoiAllowed as poiAllowed,
   manualPlacementCentroid,
   computeManualMatrix,
   buildSyntheticCorrespondences,
@@ -69,6 +68,8 @@ import type { PhotoCanvasQuad } from './photo-draw-order';
 import { buildIntegrationFilterField } from './chip-utils';
 import trashSvg from './icons/trash.svg?raw';
 import { createImageZoomPan } from './image-zoom';
+import { hasPosition, type SkyPoiPin } from './poi-pins';
+import { resolveCategory, isPoiVisible } from './poi';
 
 /** Result of the manual star-identification sub-modal (see openManualIdentifyModal). */
 export type ManualIdentifyResult =
@@ -481,7 +482,8 @@ export class PhotoOverlay {
   private borderRadiusPU = Infinity; // projection-unit radius of the border circle
   private showPhotos = true; // Global toggle for all photos
   private visibleLabels: { [label: string]: boolean } = {};
-  private visiblePois: Map<string, Set<string>> | null = null;
+  private visiblePois: { [poiKey: string]: boolean } = {};
+  private showPois = true; // "Show points of interest" — pins over photos
   private poiCategories: PoiCategory[] = [];
 
   constructor(container: HTMLDivElement, getView: () => ViewState, skyMap?: SkyMap) {
@@ -525,20 +527,39 @@ export class PhotoOverlay {
     return labelAllowed(placed.photo, this.visibleLabels);
   }
 
-  /** True when the photo passes the current POI filter (no filter ⇒ allowed). */
-  private isPoiAllowed(placed: PlacedPhoto): boolean {
-    return poiAllowed(placed.photo, this.poiCategories, this.visiblePois);
-  }
-
   private applyPhotoVisibility() {
     for (const placed of this.placedPhotos) {
-      const shouldDisplay =
-        this.showPhotos &&
-        placed.visible &&
-        this.isLabelAllowed(placed) &&
-        this.isPoiAllowed(placed);
+      const shouldDisplay = this.showPhotos && placed.visible && this.isLabelAllowed(placed);
       placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
     }
+    // POI pins are drawn on the sky map's overlay canvas — repaint so they follow.
+    this.skyMap?.requestRender();
+  }
+
+  /**
+   * Positioned POIs (e.g. identified supernovae) of every photo currently shown on
+   * the map, for the sky map's pin pass: only while "Show points of interest" is on,
+   * only for photos that are themselves displayed, and each POI shown unless unchecked
+   * in the panel's POI dropdown (checked = shown, like labels; it never hides photos).
+   */
+  getPoiPins(): SkyPoiPin[] {
+    const pins: SkyPoiPin[] = [];
+    if (!this.showPhotos || !this.showPois) return pins;
+    for (const placed of this.placedPhotos) {
+      if (!placed.visible || placed.pendingDelete || placed.borderHidden) continue;
+      if (!this.isLabelAllowed(placed)) continue;
+      for (const poi of placed.photo.pointsOfInterest ?? []) {
+        if (!hasPosition(poi)) continue;
+        if (!isPoiVisible(poi, this.poiCategories, this.visiblePois)) continue;
+        pins.push({
+          ra: poi.ra,
+          dec: poi.dec,
+          label: poi.name,
+          color: resolveCategory(poi.categoryId, this.poiCategories).color,
+        });
+      }
+    }
+    return pins;
   }
 
   setVisibleLabels(visibleLabels: { [label: string]: boolean }) {
@@ -552,10 +573,16 @@ export class PhotoOverlay {
     this.applyPhotoVisibility();
   }
 
-  /** Two-level sky POI filter; an empty map (or null) disables it. */
-  setVisiblePois(selected: Map<string, Set<string>> | null) {
-    this.visiblePois = selected && selected.size > 0 ? selected : null;
-    this.applyPhotoVisibility();
+  /** Sky-map POI dropdown state: `poiKey` → false hides that pin (absent ⇒ shown). */
+  setVisiblePois(visible: { [poiKey: string]: boolean }) {
+    this.visiblePois = visible || {};
+    this.skyMap?.requestRender();
+  }
+
+  /** "Show points of interest" toggle: pins only — photos are unaffected. */
+  setShowPois(show: boolean) {
+    this.showPois = show;
+    this.skyMap?.requestRender();
   }
 
   setShowPhotos(show: boolean) {
@@ -719,6 +746,7 @@ export class PhotoOverlay {
     if (shouldDisplay) {
       this.applyTransform(placed, this.getView());
     }
+    this.skyMap?.requestRender();
   }
 
   setMultiplePhotosVisible(photoIds: string[], visible: boolean) {

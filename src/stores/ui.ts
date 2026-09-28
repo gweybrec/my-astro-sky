@@ -85,6 +85,13 @@ export const useUiStore = defineStore('ui', () => {
     ((photo: Photo, poi: PointOfInterest) => void) | null
   >(null);
 
+  // Same contract as the asteroid pair above, for the supernova identification
+  // modal (triggerSupernovaModal) — which can hand back several POIs at once.
+  const pendingSupernovaPhoto = ref<Photo | null>(null);
+  const pendingSupernovaOnIdentified = shallowRef<
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
+  >(null);
+
   // Set before switchView('plans') to make the Plans view expand/scroll to this
   // plan. Consumed (and cleared) on render.
   const pendingPlanFocusId = ref<string | null>(null);
@@ -312,6 +319,8 @@ export const useUiStore = defineStore('ui', () => {
     pendingBatchFiles,
     pendingAsteroidPhoto,
     pendingAsteroidOnIdentified,
+    pendingSupernovaPhoto,
+    pendingSupernovaOnIdentified,
     pendingUpdate,
     pendingPlanFocusId,
     targetsOverlayOpen,

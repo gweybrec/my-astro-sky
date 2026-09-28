@@ -146,6 +146,7 @@ const es: Translations = {
     },
   },
   display: {
+    showPois: 'Mostrar puntos de interés',
     section: 'Visualización',
     showStars: 'Mostrar estrellas',
     constellationLines: 'Líneas de constelaciones',
@@ -713,6 +714,7 @@ const es: Translations = {
     listSubmissionsFailed: 'Error al obtener los envíos',
     reuseSubmissionFailed: 'Error al reutilizar el envío',
     skybotSearch: 'Fallo en la búsqueda SkyBoT',
+    tnsSearch: 'Fallo en la búsqueda TNS',
   },
   serverErrors: {
     RATE_LIMIT: 'Demasiadas solicitudes, inténtalo de nuevo en un momento',
@@ -781,6 +783,30 @@ const es: Translations = {
     addAsPoi: 'Añadir como punto de interés',
     added: '«{name}» añadido a los puntos de interés',
   },
+  supernova: {
+    menuLabel: 'Identificar supernovas',
+    title: 'Identificar supernovas',
+    intro:
+      'Busca en el Transient Name Server (TNS) las supernovas descubiertas en el campo de esta foto hasta un año antes de su fecha de observación.',
+    obsDateLabel: 'Fecha de observación (UTC)',
+    dateRequired: 'Esta foto no tiene fecha de observación: introdúcela para buscar.',
+    searchButton: 'Buscar',
+    searching: 'Buscando…',
+    searchError: 'Fallo en la búsqueda TNS: {message}',
+    noCandidates: 'Ninguna supernova conocida en este campo alrededor de la fecha de observación',
+    fieldTruncated: 'Campo amplio: solo se busca en un radio central de 60′',
+    unconfirmed: 'No confirmada',
+    unconfirmedHint:
+      'Transitorio (aún) sin clasificación espectroscópica: puede no ser una supernova',
+    colMag: 'Mag. desc.',
+    colHost: 'Anfitriona',
+    discoveryDay: 'descubierta el día de la observación',
+    daysAfter: '{n} d después del descubrimiento',
+    daysBefore: '{n} d antes del descubrimiento',
+    viewOnTns: 'Ver en TNS',
+    addSelected: 'Añadir selección ({n})',
+    added: '{names} añadido(s) a los puntos de interés',
+  },
   gallery: {
     editMetadata: 'Editar metadatos',
     saveMetadata: 'Guardar',
@@ -794,6 +820,9 @@ const es: Translations = {
     showOnMap: 'Ver en el mapa',
     showDsos: 'Mostrar objetos',
     showDsosUnavailable: 'Esta foto aún no está colocada en el mapa del cielo',
+    showPois: 'Mostrar puntos de interés',
+    showPoisUnavailable:
+      'Ningún punto de interés posicionado en esta foto: use «Identificar supernovas» para añadir uno',
     filterLabels: 'Etiquetas',
     filterSetups: 'Equipos',
     filterTypes: 'Tipos',

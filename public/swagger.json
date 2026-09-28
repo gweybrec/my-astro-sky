@@ -3304,6 +3304,54 @@
         }
       }
     },
+    "/api/tns/conesearch": {
+      "post": {
+        "summary": "Cone-search the IAU Transient Name Server for supernovae discovered in a date window",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "raDeg": {
+                    "type": "number"
+                  },
+                  "decDeg": {
+                    "type": "number"
+                  },
+                  "radiusArcmin": {
+                    "type": "number"
+                  },
+                  "dateStart": {
+                    "type": "string",
+                    "description": "Earliest discovery date (YYYY-MM-DD)"
+                  },
+                  "dateEnd": {
+                    "type": "string",
+                    "description": "Latest discovery date (YYYY-MM-DD)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidate transients returned successfully"
+          },
+          "400": {
+            "description": "Invalid search parameters"
+          },
+          "429": {
+            "description": "TNS rate limit reached (anonymous cone search allows ~2 queries per minute)"
+          },
+          "502": {
+            "description": "TNS upstream request failed"
+          }
+        }
+      }
+    },
     "/api/stars/search": {
       "get": {
         "summary": "Search stars by name or catalog identifier",

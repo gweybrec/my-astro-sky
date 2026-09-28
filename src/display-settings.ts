@@ -42,6 +42,10 @@ export interface DisplaySettings {
   skyOpacity: number;
   backgroundOpacity: number;
   showDSOs: boolean;
+  /** Pins for positioned POIs (e.g. identified supernovae) over their photos. */
+  showPois: boolean;
+  /** Sky-map POI pins unchecked in the POI dropdown (`poiKey` → false); absent ⇒ shown. */
+  visiblePois: { [poiKey: string]: boolean };
   dsoTypes: string[];
   dsoCatalogs: string[];
   showStarTooltips: boolean;
@@ -71,6 +75,8 @@ export const DEFAULT_SETTINGS: DisplaySettings = {
   skyOpacity: 0.7,
   backgroundOpacity: 0.5,
   showDSOs: true,
+  showPois: true,
+  visiblePois: {},
   dsoTypes: [...DSO_TYPES_ALL],
   dsoCatalogs: [...DSO_CATALOGS_DEFAULT_ON],
   showStarTooltips: true,

@@ -851,37 +851,36 @@ body {
   margin-bottom: 0;
 }
 
-/* Gallery detail header: show-on-map / show-DSOs buttons share a row */
+/* Gallery detail header: show-DSOs / show-POIs / show-on-map icon buttons */
 .gallery-detail-btn-row {
   display: flex;
   gap: var(--space-4);
 }
-.gallery-detail-btn-row .btn-action {
-  flex: 1;
-  width: auto;
-}
-.gallery-detail-header .btn-action {
-  width: 100%;
-}
 
-/* "Show DSOs" toggle — off state is a ghost outline, on state fills like btn-action's
-   own hover, following the amber-fill + --border-focus convention other text-button
-   toggles use (.lang-btn.active, .manual-mirror-btn.active). */
-.gallery-dso-toggle-btn {
+/* Header icon buttons (on top of btn-action) — off state is a ghost outline, pressed
+   state fills like btn-action's own hover, following the amber-fill + --border-focus
+   convention other text-button toggles use (.lang-btn.active, .manual-mirror-btn.active).
+   Formerly the "Show DSOs" text button's .gallery-dso-toggle-btn. */
+.gallery-detail-toggle-btn {
   background: transparent;
   border-color: var(--accent-border);
   color: var(--text-primary);
+  line-height: 0;
 }
-.gallery-dso-toggle-btn:hover:not(:disabled) {
+.gallery-detail-toggle-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.gallery-detail-toggle-btn:hover:not(:disabled) {
   background: var(--accent-fill-lg);
   color: var(--text-bright);
 }
-.gallery-dso-toggle-btn[aria-pressed='true'] {
+.gallery-detail-toggle-btn[aria-pressed='true'] {
   background: var(--accent-bg);
   border-color: var(--border-focus);
   color: var(--text-bright);
 }
-.gallery-dso-toggle-btn[aria-pressed='true']:hover:not(:disabled) {
+.gallery-detail-toggle-btn[aria-pressed='true']:hover:not(:disabled) {
   background: var(--accent-bg-hover);
 }
 

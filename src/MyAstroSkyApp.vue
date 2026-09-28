@@ -75,6 +75,16 @@
     @identified="onAsteroidIdentified"
   />
 
+  <!-- Supernova identification: query TNS for transients in a solved photo's field
+       around its observation date. Opened via triggerSupernovaModal(photo, cb) from
+       PoiEditor.vue, same contract as the asteroid modal above. -->
+  <SupernovaIdentifyModal
+    v-if="activeModal === 'supernovaIdentify' && uiStore.pendingSupernovaPhoto"
+    :photo="uiStore.pendingSupernovaPhoto"
+    @close="closeModal()"
+    @identified="onSupernovaIdentified"
+  />
+
   <!-- "Find targets" recommender, summoned from Plans or the Sky map. The
        recommend surface itself is built once by TargetsView and survives this
        component unmounting on close (see TargetsOverlay.vue). -->
@@ -106,6 +116,7 @@ import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.v
 import StatisticsModal from './components/modals/StatisticsModal.vue';
 import TargetsOverlay from './components/overlay/TargetsOverlay.vue';
 import AsteroidIdentifyModal from './components/modals/AsteroidIdentifyModal.vue';
+import SupernovaIdentifyModal from './components/modals/SupernovaIdentifyModal.vue';
 import { useUiStore } from './stores/ui';
 import type { Photo, PointOfInterest } from './types';
 
@@ -122,7 +133,8 @@ type ModalName =
   | 'update'
   | 'shortcuts'
   | 'stats'
-  | 'asteroidIdentify';
+  | 'asteroidIdentify'
+  | 'supernovaIdentify';
 
 const activeModal = ref<ModalName | null>(null);
 const previousModal = ref<ModalName | null>(null);
@@ -135,6 +147,11 @@ function onAsteroidIdentified(photo: Photo, poi: PointOfInterest) {
   // v-model, which each of its two hosts (the gallery's metadata editor, or a
   // BatchUploadModal card) already knows how to save on its own terms.
   uiStore.pendingAsteroidOnIdentified?.(photo, poi);
+  closeModal();
+}
+
+function onSupernovaIdentified(photo: Photo, pois: PointOfInterest[]) {
+  uiStore.pendingSupernovaOnIdentified?.(photo, pois);
   closeModal();
 }
 

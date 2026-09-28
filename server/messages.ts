@@ -266,5 +266,18 @@ export const msg = {
 
     skybotError: (lang: ServerLang, err: string) =>
       m(lang, `Erreur SkyBoT : ${err}`, `SkyBoT error: ${err}`),
+
+    invalidTnsParams: (lang: ServerLang) =>
+      m(lang, 'Paramètres de recherche TNS invalides', 'Invalid TNS search parameters'),
+
+    tnsError: (lang: ServerLang, err: string) =>
+      m(lang, `Erreur TNS : ${err}`, `TNS error: ${err}`),
+
+    tnsRateLimited: (lang: ServerLang, seconds: number | null) =>
+      m(
+        lang,
+        `Le serveur TNS limite les recherches — réessayez dans ${seconds ?? 60} s`,
+        `The TNS server is rate-limiting searches — try again in ${seconds ?? 60} s`,
+      ),
   },
 };

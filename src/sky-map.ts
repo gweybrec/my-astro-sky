@@ -65,7 +65,9 @@ import {
   renderFovFrames,
   renderFovInstances,
   renderTrajectory,
+  renderPoiPins,
 } from './sky-frame-render';
+import type { SkyPoiPin } from './poi-pins';
 import { RegionDrawGesture } from './sky-region-draw';
 import { FrameController, type FrameHost } from './frame-controller';
 import { attachSkyMapEvents, type EventBinding, type SkyEventHost } from './sky-map-events';
@@ -207,6 +209,7 @@ export class SkyMap {
   private highlightedDSO: string | null = null; // ID of DSO to always render
   private highlightedStar: number | null = null; // HIP number of star to highlight
   private photoOutlines: PhotoOutline[] = [];
+  private poiPinSource: (() => SkyPoiPin[]) | null = null;
   private showPhotoOutlines = true;
   private fovFrameSpecs: FovFrameSpec[] = [];
   private fovRotationDeg = 0;
@@ -548,6 +551,12 @@ export class SkyMap {
     this.backgroundOpacity = v;
     this.requestRender();
   }
+  /** Pulled every frame, so pins always follow photo visibility and the POI filter. */
+  setPoiPinSource(source: (() => SkyPoiPin[]) | null) {
+    this.poiPinSource = source;
+    this.requestRender();
+  }
+
   setPhotoOutlines(outlines: PhotoOutline[]) {
     this.photoOutlines = outlines;
   }
@@ -1376,6 +1385,7 @@ export class SkyMap {
 
       showPhotoOutlines: this.showPhotoOutlines,
       photoOutlines: this.photoOutlines,
+      poiPins: this.poiPinSource?.() ?? [],
       fovFrameSpecs: this.fovFrameSpecs,
       fovRotationDeg: this.fovRotationDeg,
       frames: this.frames,
@@ -1519,6 +1529,9 @@ export class SkyMap {
       }
       if (scene.trajectory && scene.localSkyMode) {
         renderTrajectory(scene);
+      }
+      if (scene.poiPins.length > 0) {
+        renderPoiPins(scene);
       }
     }
 

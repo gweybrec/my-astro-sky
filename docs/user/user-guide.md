@@ -97,6 +97,7 @@ Click the gear icon on any photo in the side panel, then **Reposition**. This re
 - **Order**: Drag to reorder photos. The bottom of the list renders on top.
 - **Opacity**: Set per-photo opacity (0–100%) via the gear popup slider.
 - **Deletion**: Deleted photos have a 5-second undo window via the toast notification.
+- **Points of interest**: Tag comets, asteroids, satellites or supernovae captured in a photo. On a solved photo, **Identify asteroid** matches a trail you mark against IMCCE SkyBoT, and **Identify supernovae** searches the IAU Transient Name Server (TNS) for supernovae in the photo's field discovered up to a year before its observation date (enter the date if the file has none). Supernovae you add are pinned with a red starburst: on the sky map (toggle **Show points of interest** in the Display section, whose dropdown picks which POIs are pinned), and on the photo in the gallery detail view (comet icon button next to the DSO button; disabled when no POI of the photo has a position). TNS allows only about two searches a minute; results are cached, so reopening the dialog on the same photo is instant.
 
 ---
 

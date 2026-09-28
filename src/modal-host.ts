@@ -18,7 +18,8 @@ type ModalName =
   | 'update'
   | 'shortcuts'
   | 'stats'
-  | 'asteroidIdentify';
+  | 'asteroidIdentify'
+  | 'supernovaIdentify';
 
 let _appRef: { openModal: (name: ModalName | null) => void } | null = null;
 

@@ -12,6 +12,7 @@
 import type { DSO, ViewState } from './types';
 import type { HorizonParams, AltAzPoint, FovFrameSpec } from './sky-map-types';
 import type { PhotoOutline } from './photo-outline';
+import type { SkyPoiPin } from './poi-pins';
 import type { HorizonProfile } from './horizon-io';
 import type { SkyThemeConfig } from './sky-themes';
 import type { StarAreaBudget } from './star-budget';
@@ -91,6 +92,8 @@ export interface SkyScene extends SkyLayerFlags {
   // ── Overlays ──────────────────────────────────────────────────────────────
   showPhotoOutlines: boolean;
   photoOutlines: PhotoOutline[];
+  /** Positioned POIs (e.g. supernovae) of the displayed photos, pinned above them. */
+  poiPins: SkyPoiPin[];
   fovFrameSpecs: FovFrameSpec[];
   fovRotationDeg: number;
   frames: FrameController;

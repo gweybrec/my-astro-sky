@@ -211,20 +211,42 @@ function sanitizeIntegrationRows(rows: any): IntegrationInput[] {
 export interface PointOfInterestInput {
   name: string;
   categoryId: string;
+  /** Sky position (degrees) — set when the POI was identified on the photo (e.g. a supernova). */
+  ra?: number;
+  dec?: number;
 }
 
 /**
  * Accept only well-formed POI entries: a non-empty trimmed name (≤100 chars) and a
  * string categoryId. Orphan categoryIds (category since deleted) are preserved — the
- * UI resolves them to an "Uncategorized" group at render time.
+ * UI resolves them to an "Uncategorized" group at render time. An optional ra/dec
+ * position is kept only when both are finite and in range.
  */
 export function sanitizePois(rows: any): PointOfInterestInput[] {
   if (!Array.isArray(rows)) return [];
   return rows
-    .map((entry: any) => ({
-      name: typeof entry?.name === 'string' ? entry.name.trim().slice(0, 100) : '',
-      categoryId: typeof entry?.categoryId === 'string' ? entry.categoryId.slice(0, 64) : '',
-    }))
+    .map((entry: any) => {
+      const poi: PointOfInterestInput = {
+        name: typeof entry?.name === 'string' ? entry.name.trim().slice(0, 100) : '',
+        categoryId: typeof entry?.categoryId === 'string' ? entry.categoryId.slice(0, 64) : '',
+      };
+      const ra = entry?.ra;
+      const dec = entry?.dec;
+      if (
+        typeof ra === 'number' &&
+        typeof dec === 'number' &&
+        Number.isFinite(ra) &&
+        Number.isFinite(dec) &&
+        ra >= 0 &&
+        ra < 360 &&
+        dec >= -90 &&
+        dec <= 90
+      ) {
+        poi.ra = ra;
+        poi.dec = dec;
+      }
+      return poi;
+    })
     .filter((entry) => entry.name.length > 0 && entry.categoryId.length > 0);
 }
 

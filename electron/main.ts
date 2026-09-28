@@ -1,4 +1,4 @@
-import { app, BrowserWindow, safeStorage, Menu, crashReporter, dialog } from 'electron';
+import { app, BrowserWindow, safeStorage, Menu, crashReporter, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
@@ -6,6 +6,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { setupErrorLogging, logMainError, logCrash } from './error-logger.js';
 import { shouldReloadAfterCrash } from './crash-reload-guard.js';
+import { shouldOpenExternally } from './external-links.js';
 import { installLogger } from '../server/logger.js';
 import { ipcMain } from 'electron';
 
@@ -231,7 +232,17 @@ async function main() {
     logCrash('window_unresponsive', new Error('Renderer window became unresponsive'));
   });
 
-  win.loadURL(`http://localhost:${port}`);
+  // target="_blank" links (e.g. "Voir sur TNS", credits) open in the user's default
+  // browser, never in a bare in-app window.
+  const appOrigin = `http://localhost:${port}`;
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (shouldOpenExternally(url, appOrigin)) {
+      shell.openExternal(url).catch((err) => logMainError('open_external_failed', err));
+    }
+    return { action: 'deny' };
+  });
+
+  win.loadURL(appOrigin);
   win.maximize();
 
   // Dev tools if needed for debugging. Never enable in production builds.

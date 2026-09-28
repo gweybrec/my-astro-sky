@@ -28,6 +28,8 @@ export const useDisplayStore = defineStore('display', () => {
   const skyOpacity = ref(s.skyOpacity);
   const backgroundOpacity = ref(s.backgroundOpacity);
   const showDSOs = ref(s.showDSOs);
+  const showPois = ref(s.showPois);
+  const visiblePois = ref<{ [poiKey: string]: boolean }>({ ...s.visiblePois });
   const dsoTypes = ref<string[]>([...s.dsoTypes]);
   const dsoCatalogs = ref<string[]>([...s.dsoCatalogs]);
   const showStarTooltips = ref(s.showStarTooltips);
@@ -59,6 +61,8 @@ export const useDisplayStore = defineStore('display', () => {
       skyOpacity: skyOpacity.value,
       backgroundOpacity: backgroundOpacity.value,
       showDSOs: showDSOs.value,
+      showPois: showPois.value,
+      visiblePois: { ...visiblePois.value },
       dsoTypes: [...dsoTypes.value],
       dsoCatalogs: [...dsoCatalogs.value],
       showStarTooltips: showStarTooltips.value,
@@ -143,6 +147,21 @@ export const useDisplayStore = defineStore('display', () => {
     persist();
   }
 
+  /** Sky-map POI dropdown — same checked-means-shown model as the labels above. */
+  function setVisiblePoi(key: string, visible: boolean) {
+    visiblePois.value = { ...visiblePois.value, [key]: visible };
+    canvasStore.overlay?.setVisiblePois(visiblePois.value);
+    persist();
+  }
+
+  function setAllPois(keys: string[], visible: boolean) {
+    const next = { ...visiblePois.value };
+    for (const k of keys) next[k] = visible;
+    visiblePois.value = next;
+    canvasStore.overlay?.setVisiblePois(visiblePois.value);
+    persist();
+  }
+
   function setAllLabels(labels: string[], visible: boolean) {
     const next: { [label: string]: boolean } = {};
     for (const l of labels) next[l] = visible;
@@ -209,6 +228,12 @@ export const useDisplayStore = defineStore('display', () => {
   function setShowDSOs(v: boolean) {
     showDSOs.value = v;
     canvasStore.skyMap?.setShowDSOs(v);
+    persist();
+  }
+
+  function setShowPois(v: boolean) {
+    showPois.value = v;
+    canvasStore.overlay?.setShowPois(v);
     persist();
   }
 
@@ -290,6 +315,8 @@ export const useDisplayStore = defineStore('display', () => {
     skyOpacity,
     backgroundOpacity,
     showDSOs,
+    showPois,
+    visiblePois,
     dsoTypes,
     dsoCatalogs,
     showStarTooltips,
@@ -327,6 +354,9 @@ export const useDisplayStore = defineStore('display', () => {
     onMapViewChanged,
     setMapRotationDeg,
     setShowDSOs,
+    setShowPois,
+    setVisiblePoi,
+    setAllPois,
     setDsoTypes,
     setDsoCatalogs,
   };

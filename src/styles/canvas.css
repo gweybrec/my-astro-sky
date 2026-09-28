@@ -501,6 +501,7 @@ input:focus-visible {
    this override the modal-backdrop's --z-modal renders it invisibly behind the
    gallery. Same fix as .dropdown-panel.gallery-dso-catalog-dropdown in style.css.
    :has() is the only way to target the backdrop from the modal's own class. */
-.modal-backdrop:has(.asteroid-identify-modal) {
+.modal-backdrop:has(.asteroid-identify-modal),
+.modal-backdrop:has(.supernova-identify-modal) {
   z-index: calc(var(--z-gallery) + 1);
 }

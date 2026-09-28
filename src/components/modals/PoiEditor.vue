@@ -64,6 +64,14 @@
       >
         {{ t('asteroid.menuLabel') }}
       </button>
+      <button
+        v-if="canIdentifyAsteroid"
+        type="button"
+        class="integration-add-btn"
+        @click="onIdentifySupernovae"
+      >
+        {{ t('supernova.menuLabel') }}
+      </button>
     </div>
 
     <PoiTypesModal v-if="showTypes" @close="showTypes = false" />
@@ -78,7 +86,7 @@ import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import { resolveCategory } from '../../poi';
 import { poiTypeIcon } from '../../poi-icons';
 import { computePhotoToProjMatrix } from '../../photo-placement';
-import { triggerAsteroidModal } from '../../ui';
+import { triggerAsteroidModal, triggerSupernovaModal } from '../../ui';
 import { showToast } from '../../toast';
 import PoiTypesModal from './PoiTypesModal.vue';
 import penSvg from '../../icons/pen.svg?raw';
@@ -101,6 +109,22 @@ function onIdentifyAsteroid() {
   triggerAsteroidModal(props.photo, (_photo, poi) => {
     emit('update:pois', [...props.pois, poi]);
     showToast({ message: t('asteroid.added', { name: poi.name }), type: 'info', duration: 3000 });
+  });
+}
+
+// Several supernovae can be added at once; one already on the photo (same name)
+// is skipped rather than duplicated.
+function onIdentifySupernovae() {
+  if (!props.photo) return;
+  triggerSupernovaModal(props.photo, (_photo, pois) => {
+    const fresh = pois.filter((poi) => !props.pois.some((p) => p.name === poi.name));
+    if (!fresh.length) return;
+    emit('update:pois', [...props.pois, ...fresh]);
+    showToast({
+      message: t('supernova.added', { names: fresh.map((p) => p.name).join(', ') }),
+      type: 'info',
+      duration: 3000,
+    });
   });
 }
 

@@ -13,7 +13,6 @@ import {
   computePhotoCenterAndScale,
   computePhotoCenter,
   isLabelAllowed,
-  isPoiAllowed,
   manualPlacementCentroid,
   computeManualMatrix,
   computeManualProjMatrix,
@@ -273,10 +272,6 @@ describe('visibility predicates', () => {
     const photo = makePhoto([], { labels: [] });
     expect(isLabelAllowed(photo, { '(no label)': false })).toBe(false);
     expect(isLabelAllowed(photo, { '(no label)': true })).toBe(true);
-  });
-
-  it('isPoiAllowed allows everything when no POI filter is set', () => {
-    expect(isPoiAllowed(makePhoto([]), [], null)).toBe(true);
   });
 });
 

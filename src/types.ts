@@ -66,10 +66,14 @@ export interface PhotoIntegration {
   filter: string;
 }
 
-/** A non-DSO object captured in a photo (comet, asteroid, satellite, ISS…). */
+/** A non-DSO object captured in a photo (comet, asteroid, satellite, ISS, supernova…). */
 export interface PointOfInterest {
   name: string;
   categoryId: string;
+  /** Sky position in degrees — set when the POI was identified at a fixed position
+   * (e.g. a supernova); such POIs are pinned on the photo and the sky map. */
+  ra?: number;
+  dec?: number;
 }
 
 /** A user-managed POI category (e.g. Comet, Asteroid). Stored globally, not per-photo. */

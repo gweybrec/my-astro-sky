@@ -6,9 +6,11 @@ import type { ManualPlacement, Photo, PointOfInterest } from '../../src/types';
 
 vi.mock('../../src/ui', () => ({
   triggerAsteroidModal: vi.fn(),
+  triggerSupernovaModal: vi.fn(),
 }));
-import { triggerAsteroidModal } from '../../src/ui';
+import { triggerAsteroidModal, triggerSupernovaModal } from '../../src/ui';
 const mockTrigger = vi.mocked(triggerAsteroidModal);
+const mockSupernovaTrigger = vi.mocked(triggerSupernovaModal);
 
 const categories = [
   { id: 'cat-a', name: 'Galaxy', color: '#f00', position: 0 },
@@ -168,6 +170,51 @@ describe('PoiEditor "Identifier un astéroïde" trigger', () => {
       ...existing,
       { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid' },
     ]);
+    wrapper.unmount();
+  });
+});
+
+describe('PoiEditor "Identify supernovae" trigger', () => {
+  const findButton = (wrapper: ReturnType<typeof makeWrapper>) =>
+    wrapper.findAll('button').find((b) => b.text() === 'Identify supernovae');
+
+  beforeEach(() => {
+    mockSupernovaTrigger.mockReset();
+  });
+
+  it('only shows the button for a solved photo', () => {
+    const none = makeWrapper([], null);
+    expect(findButton(none)).toBeUndefined();
+    none.unmount();
+    const unsolved = makeWrapper([], makeSolvedPhoto({ manualPlacement: undefined }));
+    expect(findButton(unsolved)).toBeUndefined();
+    unsolved.unmount();
+  });
+
+  it('appends the chosen supernovae (with position), skipping ones already listed', async () => {
+    const photo = makeSolvedPhoto();
+    const existing: PointOfInterest[] = [
+      { name: 'SN 2025rbs', categoryId: 'cat-supernova', ra: 339.265, dec: 34.419 },
+    ];
+    const wrapper = makeWrapper(existing, photo);
+    await findButton(wrapper)!.trigger('click');
+    expect(mockSupernovaTrigger.mock.calls[0][0]).toEqual(photo);
+
+    const onIdentified = mockSupernovaTrigger.mock.calls[0][1];
+    const aaiv = { name: 'SN 2026aaiv', categoryId: 'cat-supernova', ra: 339.273, dec: 34.41 };
+    onIdentified(photo, [existing[0], aaiv]);
+
+    expect(wrapper.emitted('update:pois')![0][0]).toEqual([...existing, aaiv]);
+    wrapper.unmount();
+  });
+
+  it('emits nothing when every chosen supernova is already listed', async () => {
+    const photo = makeSolvedPhoto();
+    const existing: PointOfInterest[] = [{ name: 'SN 2026aaiv', categoryId: 'cat-supernova' }];
+    const wrapper = makeWrapper(existing, photo);
+    await findButton(wrapper)!.trigger('click');
+    mockSupernovaTrigger.mock.calls[0][1](photo, [existing[0]]);
+    expect(wrapper.emitted('update:pois')).toBeUndefined();
     wrapper.unmount();
   });
 });

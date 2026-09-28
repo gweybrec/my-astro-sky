@@ -24,6 +24,7 @@ Use `@vue/test-utils` `mount` (not `@testing-library/vue`). Content rendered thr
 - `stars.test.json` — minimal 6-star catalog for deterministic WCS tests
 - `tiff-builders.ts` / `fits-builders.ts` — synthetic TIFF/FITS file builders for `server/raw-decode/` decoder tests (not `.test.ts`, so not collected as a suite)
 - `skybot/ngc4438-conesearch.json` — real IMCCE SkyBoT response (top 25 nearest of 1273, trimmed) for a 3′ cone at the `NGC4438-CCD_(18799) 1999 JZ73.fit` test photo's field/epoch; includes asteroid 18799 at rank 1 — the asteroid-identification regression fixture
+- `tns/ngc7331-search.csv` — real IAU Transient Name Server CSV export (60′ cone around NGC 7331, discoveries 2024-01-01 → 2026-09-28): SN 2026aaiv and SN 2025rbs (the `test-photos/NGC7331_*` supernovae) plus unclassified AT rows — the supernova-identification regression fixture
 
 The raw source images those solves came from are in the gitignored `test-photos/` directory (local only) — see `test-photos/CLAUDE.md` if present.
 

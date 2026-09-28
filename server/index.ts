@@ -115,6 +115,7 @@ import { solveWithSolveField } from './solve-field.js';
 import { createJob, getJob, updateJob, cancelJob } from './solve-queue.js';
 import { searchDeepStars, getDeepStarByHip, searchStarsByPosition } from './star-search.js';
 import { skybotConesearch } from './skybot.js';
+import { tnsConesearch, TnsRateLimitError } from './tns.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
 import { logServerError } from './logger.js';
@@ -5445,6 +5446,84 @@ app.post('/api/skybot/conesearch', async (req, res) => {
   } catch (err) {
     logServerError('skybot_conesearch_failed', err);
     res.status(502).json({ error: msg.api.skybotError(lang, (err as Error).message) });
+  }
+});
+
+/**
+ * @swagger
+ * /api/tns/conesearch:
+ *   post:
+ *     summary: Cone-search the IAU Transient Name Server for supernovae discovered in a date window
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               raDeg:
+ *                 type: number
+ *               decDeg:
+ *                 type: number
+ *               radiusArcmin:
+ *                 type: number
+ *               dateStart:
+ *                 type: string
+ *                 description: Earliest discovery date (YYYY-MM-DD)
+ *               dateEnd:
+ *                 type: string
+ *                 description: Latest discovery date (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Candidate transients returned successfully
+ *       400:
+ *         description: Invalid search parameters
+ *       429:
+ *         description: TNS rate limit reached (anonymous cone search allows ~2 queries per minute)
+ *       502:
+ *         description: TNS upstream request failed
+ */
+// --- TNS supernova cone search (used by the supernova-identification modal) ---
+app.post('/api/tns/conesearch', async (req, res) => {
+  const lang: ServerLang = req.body.lang === 'fr' ? 'fr' : 'en';
+  try {
+    const raDeg = Number(req.body.raDeg);
+    const decDeg = Number(req.body.decDeg);
+    const radiusArcmin = Number(req.body.radiusArcmin);
+    const dateStart = String(req.body.dateStart ?? '');
+    const dateEnd = String(req.body.dateEnd ?? '');
+    const isDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
+
+    if (
+      !Number.isFinite(raDeg) ||
+      raDeg < 0 ||
+      raDeg > 360 ||
+      !Number.isFinite(decDeg) ||
+      decDeg < -90 ||
+      decDeg > 90 ||
+      !Number.isFinite(radiusArcmin) ||
+      radiusArcmin <= 0 ||
+      radiusArcmin > 60 ||
+      !isDay(dateStart) ||
+      !isDay(dateEnd) ||
+      dateStart > dateEnd
+    ) {
+      res.status(400).json({ error: msg.api.invalidTnsParams(lang), code: 'INVALID_PARAMS' });
+      return;
+    }
+
+    const candidates = await tnsConesearch({ raDeg, decDeg, radiusArcmin, dateStart, dateEnd });
+    res.json({ candidates });
+  } catch (err) {
+    if (err instanceof TnsRateLimitError) {
+      res.status(429).json({
+        error: msg.api.tnsRateLimited(lang, err.retryAfterSeconds),
+        code: 'RATE_LIMITED',
+      });
+      return;
+    }
+    logServerError('tns_conesearch_failed', err);
+    res.status(502).json({ error: msg.api.tnsError(lang, (err as Error).message) });
   }
 });
 

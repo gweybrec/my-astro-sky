@@ -74,7 +74,7 @@ export function buildPoiFilterGroups(
     const seen = new Set<string>();
     for (const poi of pois) {
       const cat = resolveCategory(poi.categoryId, categories);
-      const key = `${cat.id}\u001f${poi.name}`;
+      const key = poiKey(cat.id, poi.name);
       if (seen.has(key)) continue;
       seen.add(key);
       let names = counts.get(cat.id);
@@ -170,4 +170,26 @@ export function poisMatchFilter(
     if (names.size === 0 || names.has(poi.name)) return true;
   }
   return false;
+}
+
+/**
+ * Stable key of a POI name within its (resolved) category — also the key of the sky
+ * map's `visiblePois` map. Unit separator: category ids and names never contain it.
+ */
+export function poiKey(categoryId: string, name: string): string {
+  return `${categoryId}\u001f${name}`;
+}
+
+/**
+ * Sky-map POI visibility — the opposite convention of the gallery's search filter
+ * ({@link poisMatchFilter}): every POI is shown unless explicitly unchecked
+ * (`visiblePois[key] === false`), like the sky map's label dropdown. A POI whose
+ * category was deleted is keyed under the Uncategorized group.
+ */
+export function isPoiVisible(
+  poi: PointOfInterest,
+  categories: PoiCategory[],
+  visiblePois: Record<string, boolean>,
+): boolean {
+  return visiblePois[poiKey(resolveCategory(poi.categoryId, categories).id, poi.name)] !== false;
 }

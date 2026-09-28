@@ -146,6 +146,7 @@ const de: Translations = {
     },
   },
   display: {
+    showPois: 'Points of Interest anzeigen',
     section: 'Anzeige',
     showStars: 'Sterne anzeigen',
     constellationLines: 'Sternbildlinien',
@@ -711,6 +712,7 @@ const de: Translations = {
     listSubmissionsFailed: 'Einreichungen konnten nicht abgerufen werden',
     reuseSubmissionFailed: 'Einreichung konnte nicht wiederverwendet werden',
     skybotSearch: 'SkyBoT-Suche fehlgeschlagen',
+    tnsSearch: 'TNS-Suche fehlgeschlagen',
   },
   serverErrors: {
     RATE_LIMIT: 'Zu viele Anfragen, bitte kurz warten',
@@ -779,6 +781,30 @@ const de: Translations = {
     addAsPoi: 'Als interessantes Objekt hinzufügen',
     added: '„{name}“ zu den interessanten Objekten hinzugefügt',
   },
+  supernova: {
+    menuLabel: 'Supernovae identifizieren',
+    title: 'Supernovae identifizieren',
+    intro:
+      'Durchsucht den Transient Name Server (TNS) nach Supernovae, die im Feld dieses Fotos bis zu einem Jahr vor dem Beobachtungsdatum entdeckt wurden.',
+    obsDateLabel: 'Beobachtungsdatum (UTC)',
+    dateRequired: 'Dieses Foto hat kein Beobachtungsdatum – geben Sie es für die Suche ein.',
+    searchButton: 'Suchen',
+    searching: 'Suche…',
+    searchError: 'TNS-Suche fehlgeschlagen: {message}',
+    noCandidates: 'Keine bekannte Supernova in diesem Feld um das Beobachtungsdatum',
+    fieldTruncated: 'Weites Feld: nur ein zentraler Radius von 60′ wird durchsucht',
+    unconfirmed: 'Unbestätigt',
+    unconfirmedHint:
+      'Transient (noch) nicht spektroskopisch klassifiziert – möglicherweise keine Supernova',
+    colMag: 'Entd.-Mag.',
+    colHost: 'Wirt',
+    discoveryDay: 'am Beobachtungstag entdeckt',
+    daysAfter: '{n} T nach der Entdeckung',
+    daysBefore: '{n} T vor der Entdeckung',
+    viewOnTns: 'Auf TNS ansehen',
+    addSelected: 'Auswahl hinzufügen ({n})',
+    added: '{names} zu den Points of Interest hinzugefügt',
+  },
   gallery: {
     editMetadata: 'Metadaten bearbeiten',
     saveMetadata: 'Speichern',
@@ -792,6 +818,9 @@ const de: Translations = {
     showOnMap: 'Auf Karte anzeigen',
     showDsos: 'Objekte anzeigen',
     showDsosUnavailable: 'Dieses Foto ist noch nicht auf der Himmelskarte platziert',
+    showPois: 'Points of Interest anzeigen',
+    showPoisUnavailable:
+      'Kein positionierter Point of Interest auf diesem Foto – mit „Supernovae identifizieren“ hinzufügen',
     filterLabels: 'Etiketten',
     filterSetups: 'Ausrüstung',
     filterTypes: 'Typen',

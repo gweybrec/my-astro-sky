@@ -1,6 +1,6 @@
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
-import type { Photo, PoiCategory } from './types';
+import type { Photo, PoiCategory, PointOfInterest } from './types';
 import type { GearSetupData } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
@@ -14,11 +14,39 @@ import {
   LABEL_FONT,
 } from './photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
-import { buildPoiFilterGroups, poisMatchFilter, type PoiFilterGroup } from './poi';
+import { buildPoiFilterGroups, poisMatchFilter, resolveCategory, type PoiFilterGroup } from './poi';
+import {
+  poiPinsInImage,
+  computePoiPinLayout,
+  renderPoiPinOverlay,
+  type PhotoPoiPin,
+} from './poi-pins';
 import { poiTypeIcon } from './poi-icons';
 import { pinia } from './pinia-instance';
 import { useDisplayStore } from './stores/display';
 import PhotoDsoCatalogFilter from './components/panels/PhotoDsoCatalogFilter.vue';
+import mapPinSvg from './icons/map-pin.svg?raw';
+import dsoGalaxySvg from './icons/dso-galaxy.svg?raw';
+import poiCometSvg from './icons/poi-comet.svg?raw';
+
+/** Icon-only button for the photo detail header (tooltip + accessible name). Same
+ * look as the former "Show DSOs" text button — `btn-action` + the ghost-outline
+ * `.gallery-detail-toggle-btn` rule in style.css. */
+function iconButton(svg: string, label: string): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn-action gallery-detail-toggle-btn';
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+  btn.innerHTML = svg;
+  return btn;
+}
+
+/** On/off state of a header toggle: only `aria-pressed` changes (the CSS keys off
+ * it), never the class list, so pressing can't change the button's size. */
+function setToggleState(btn: HTMLButtonElement, on: boolean): void {
+  btn.setAttribute('aria-pressed', String(on));
+}
 
 /**
  * Smart sorting for astronomical catalog names
@@ -775,9 +803,7 @@ export class Gallery {
     nameRow.appendChild(photoName);
     nameRow.appendChild(metaCloseBtn);
 
-    const showOnMapBtn = document.createElement('button');
-    showOnMapBtn.className = 'btn-action';
-    showOnMapBtn.textContent = t('gallery.showOnMap');
+    const showOnMapBtn = iconButton(mapPinSvg, t('gallery.showOnMap'));
     showOnMapBtn.addEventListener('click', async () => {
       if (await close()) this.onNavigateToMap?.(photo);
     });
@@ -785,6 +811,10 @@ export class Gallery {
     // ── "Show DSOs" toggle + catalog filter ────────────────────────────────────
     // photo→projection affine, independent of the sky map's view — null when the
     // photo has no manual placement and fewer than 2 resolvable correspondences.
+    // Only used to know whether the photo is solved: the projection itself is NOT
+    // fixed (zenith-centred mode rotates with the sky clock), so every sky→pixel
+    // conversion below re-fits it and projects in the same tick — a matrix cached
+    // at open time drifts off target by minutes of arc within a minute.
     const photoToProj = computePhotoToProjMatrix(photo);
     let dsoPlacements: PhotoDsoPlacement[] = [];
     const dsoState = reactive({
@@ -794,20 +824,29 @@ export class Gallery {
       catalogs: [...useDisplayStore(pinia).dsoCatalogs],
     });
 
+    // Positioned POIs (e.g. identified supernovae) are pinned on the same canvas,
+    // behind their own "show POIs" toggle (off by default, like "show DSOs").
+    let poiPins: PhotoPoiPin[] = [];
+    const poiState = { show: false };
+    // Arrow-captured: redrawDsoOverlay below is a plain function (no `this`).
+    const getPoiCategories = () => this.poiCategories;
+    const recomputePoiPins = (pois: PointOfInterest[]) => {
+      const matrix = computePhotoToProjMatrix(photo);
+      poiPins = matrix ? poiPinsInImage(pois, matrix, photo.width, photo.height) : [];
+    };
+    recomputePoiPins(photo.pointsOfInterest ?? []);
+
     function recomputeDsoPlacements() {
+      const matrix = dsoState.show ? computePhotoToProjMatrix(photo) : null;
       dsoPlacements =
-        dsoState.show && photoToProj
-          ? findDsoPlacementsInImage(
-              photoToProj,
-              photo.width,
-              photo.height,
-              new Set(dsoState.catalogs),
-            )
+        dsoState.show && matrix
+          ? findDsoPlacementsInImage(matrix, photo.width, photo.height, new Set(dsoState.catalogs))
           : [];
     }
 
     function redrawDsoOverlay() {
-      if (!dsoState.show || !photoToProj) {
+      const drawPins = poiState.show && poiPins.length > 0;
+      if ((!dsoState.show && !drawPins) || !photoToProj) {
         dsoCanvas.style.display = 'none';
         return;
       }
@@ -867,27 +906,66 @@ export class Gallery {
         { left: offsetX, top: offsetY, right: offsetX + visWidth, bottom: offsetY + visHeight },
       );
       renderPhotoDsoOverlay(ctx, items);
+
+      if (drawPins) {
+        const pinItems = computePoiPinLayout(
+          poiPins,
+          dispScale,
+          (poi) => resolveCategory(poi.categoryId, getPoiCategories()).color,
+          (text) => {
+            ctx.font = LABEL_FONT;
+            return ctx.measureText(text).width;
+          },
+          { left: offsetX, top: offsetY, right: offsetX + visWidth, bottom: offsetY + visHeight },
+          items.map((item) => item.labelBox),
+        );
+        renderPoiPinOverlay(ctx, pinItems, LABEL_FONT);
+      }
     }
 
-    const showDsosBtn = document.createElement('button');
-    showDsosBtn.type = 'button';
-    showDsosBtn.className = 'btn-action gallery-dso-toggle-btn';
-    showDsosBtn.textContent = t('gallery.showDsos');
-    showDsosBtn.setAttribute('aria-pressed', 'false');
+    const showDsosBtn = iconButton(dsoGalaxySvg, t('gallery.showDsos'));
+    setToggleState(showDsosBtn, false);
     if (!photoToProj) {
       showDsosBtn.disabled = true;
       showDsosBtn.title = t('gallery.showDsosUnavailable');
     }
     showDsosBtn.addEventListener('click', () => {
       dsoState.show = !dsoState.show;
-      showDsosBtn.setAttribute('aria-pressed', String(dsoState.show));
+      setToggleState(showDsosBtn, dsoState.show);
       recomputeDsoPlacements();
       redrawDsoOverlay();
     });
 
+    // "Show POIs" — disabled (with the reason as tooltip) while no POI of the photo
+    // has a sky position to pin.
+    const showPoisBtn = iconButton(poiCometSvg, t('gallery.showPois'));
+    const syncPoisBtn = () => {
+      const available = poiPins.length > 0;
+      if (!available) poiState.show = false;
+      showPoisBtn.disabled = !available;
+      showPoisBtn.title = t(available ? 'gallery.showPois' : 'gallery.showPoisUnavailable');
+      setToggleState(showPoisBtn, poiState.show);
+    };
+    syncPoisBtn();
+    showPoisBtn.addEventListener('click', () => {
+      poiState.show = !poiState.show;
+      setToggleState(showPoisBtn, poiState.show);
+      redrawDsoOverlay();
+    });
+    /** POIs changed (saved or still unsaved in the editor). A newly added positioned
+     * POI — e.g. a supernova just identified — switches the pins on so it shows. */
+    const onPoisChanged = (pois: PointOfInterest[]) => {
+      const before = poiPins.length;
+      recomputePoiPins(pois);
+      if (poiPins.length > before) poiState.show = true;
+      syncPoisBtn();
+      redrawDsoOverlay();
+    };
+
     const btnRow = document.createElement('div');
     btnRow.className = 'gallery-detail-btn-row';
     btnRow.appendChild(showDsosBtn);
+    btnRow.appendChild(showPoisBtn);
     btnRow.appendChild(showOnMapBtn);
 
     const dsoFilterEl = document.createElement('div');
@@ -922,6 +1000,7 @@ export class Gallery {
       (updated) => {
         const idx = this.photos.findIndex((p) => p.id === updated.id);
         if (idx !== -1) this.photos[idx] = updated;
+        onPoisChanged(updated.pointsOfInterest ?? []);
         this.renderCarousel();
         this.applyFilters();
         this.onPhotoMetadataUpdated?.(updated);
@@ -933,6 +1012,9 @@ export class Gallery {
           this.photos.flatMap((p) => (p.integrations ?? []).map((r) => r.filter)).filter(Boolean),
         ),
       ],
+      // Pins follow the editor's unsaved POI list, so a supernova added from the
+      // identification modal (or a POI removed) shows on the photo immediately.
+      onPoisChanged,
     );
     metaPanelTeardown = metaPanel.teardown;
     metaPanelIsDirty = metaPanel.isDirty;

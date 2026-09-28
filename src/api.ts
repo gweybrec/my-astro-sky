@@ -16,6 +16,7 @@ import { reportRendererError } from './error-reporter';
 import { downloadBlob } from './file-utils';
 import type { HorizonProfile } from './horizon-io';
 import type { SkybotCandidate } from './asteroid-identify';
+import type { TnsCandidate } from './supernova-identify';
 
 /** Translate a server error response using the `code` field when available. */
 export function parseServerError(
@@ -1430,6 +1431,31 @@ export async function skybotConesearchAPI(params: {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(parseServerError(data, 'errors.skybotSearch'));
+  }
+  return data.candidates ?? [];
+}
+
+/**
+ * Cone-searches the IAU Transient Name Server (via the server proxy,
+ * `POST /api/tns/conesearch`) for transients discovered in a date window. Used by
+ * the supernova identification modal. The proxy caches results — TNS allows only
+ * ~2 anonymous cone searches a minute, surfaced as a translated 429 message.
+ */
+export async function tnsConesearchAPI(params: {
+  raDeg: number;
+  decDeg: number;
+  radiusArcmin: number;
+  dateStart: string;
+  dateEnd: string;
+}): Promise<TnsCandidate[]> {
+  const res = await fetch('/api/tns/conesearch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...params, lang: getLang() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(parseServerError(data, 'errors.tnsSearch'));
   }
   return data.candidates ?? [];
 }

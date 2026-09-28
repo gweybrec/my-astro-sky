@@ -15,11 +15,9 @@ import type {
   ViewState,
   ManualPlacement,
   AffineMatrix,
-  PoiCategory,
 } from './types';
 import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform } from './affine';
-import { poisMatchFilter } from './poi';
 import { getStarByHip } from './star-catalog';
 import { reportUnknownRendererError } from './error-reporter';
 
@@ -266,15 +264,6 @@ export function isLabelAllowed(photo: Photo, visibleLabels: { [label: string]: b
     return visibleLabels['(no label)'] !== false;
   }
   return photo.labels.some((l) => visibleLabels[l] !== false);
-}
-
-/** True when the photo passes the current POI filter (no filter ⇒ allowed). */
-export function isPoiAllowed(
-  photo: Photo,
-  poiCategories: PoiCategory[],
-  visiblePois: Map<string, Set<string>> | null,
-): boolean {
-  return poisMatchFilter(photo.pointsOfInterest ?? [], poiCategories, visiblePois);
 }
 
 /**

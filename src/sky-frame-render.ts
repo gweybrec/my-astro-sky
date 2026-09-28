@@ -33,6 +33,7 @@ import {
   drawElasticSnapLine,
 } from './frame-draw';
 import { FRAME, PHOTO_OUTLINE, TRAJECTORY } from './canvas-theme';
+import { drawPoiPin } from './poi-pins';
 
 /** Frame stroke/label colours resolved from CSS custom properties. */
 interface FrameColors {
@@ -70,7 +71,9 @@ export function renderOverlay(s: SkyScene): void {
   const hasRegionDraw = s.regionDrawActive && s.regionDrawPoints.length > 0;
   const hasRegionOverlay = s.activeRegionOverlay !== null && s.localSkyMode;
   const hasTrajectory = s.trajectory !== null && s.localSkyMode && horizon !== null;
-  if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay && !hasTrajectory) return;
+  const hasPins = s.poiPins.length > 0;
+  if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay && !hasTrajectory && !hasPins)
+    return;
 
   const poleOrigin = toCanvas(0, 0, view);
   const borderR = borderRadiusPU(s.borderLatDeg) * view.scale;
@@ -94,10 +97,42 @@ export function renderOverlay(s: SkyScene): void {
   // trajectory is that it stays readable wherever it passes.
   if (hasTrajectory) renderTrajectory(s);
 
+  // Above the photo layer, so a supernova pin stays visible over its own photo.
+  if (hasPins) renderPoiPins(s);
+
   // Cardinal labels last, so the N/E/S/W letters stay legible above the terrain
   // mass, the photo layer and the frames.
   if (horizon) renderCardinalPoints(s, horizon);
 
+  ctx.restore();
+}
+
+/** Tip radius of a POI pin on the sky map — fixed on screen, like a DSO label. */
+const SKY_PIN_RADIUS_PX = 9;
+const SKY_PIN_FONT = 'bold 10px sans-serif';
+
+/** Draws the positioned POIs (e.g. supernovae) of displayed photos, with their names. */
+export function renderPoiPins(s: SkyScene): void {
+  const { ctx, view } = s;
+  ctx.save();
+  ctx.font = SKY_PIN_FONT;
+  ctx.textBaseline = 'middle';
+  for (const pin of s.poiPins) {
+    if (!isSkyPointVisible(pin.ra, pin.dec)) continue;
+    const proj = project(pin.ra, pin.dec);
+    const c = toCanvas(proj.x, proj.y, view);
+    const margin = SKY_PIN_RADIUS_PX + 200;
+    if (c.x < -margin || c.y < -margin || c.x > view.width + margin || c.y > view.height + margin) {
+      continue;
+    }
+    drawPoiPin(ctx, c.x, c.y, SKY_PIN_RADIUS_PX, pin.color, 1.5);
+    const tx = c.x + SKY_PIN_RADIUS_PX + 3;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.strokeText(pin.label, tx, c.y);
+    ctx.fillStyle = pin.color;
+    ctx.fillText(pin.label, tx, c.y);
+  }
   ctx.restore();
 }
 

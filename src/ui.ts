@@ -109,6 +109,10 @@ export let triggerAsteroidModal: (
   photo: Photo,
   onIdentified: (photo: Photo, poi: PointOfInterest) => void,
 ) => void = () => {};
+export let triggerSupernovaModal: (
+  photo: Photo,
+  onIdentified: (photo: Photo, pois: PointOfInterest[]) => void,
+) => void = () => {};
 export let setDSOHighlight: (id: string | null) => void = () => {};
 let _selectDSOInSearch: (dsoId: string) => void = () => {};
 export function setSelectDSOInSearchHandler(fn: (dsoId: string) => void) {
@@ -250,6 +254,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     store.pendingAsteroidPhoto = photo;
     store.pendingAsteroidOnIdentified = onIdentified;
     openVueModal('asteroidIdentify');
+  };
+  triggerSupernovaModal = (photo, onIdentified) => {
+    const store = useUiStore(pinia);
+    store.pendingSupernovaPhoto = photo;
+    store.pendingSupernovaOnIdentified = onIdentified;
+    openVueModal('supernovaIdentify');
   };
   setDSOHighlight = setHighlightedDSOState;
 
@@ -416,6 +426,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setShowDSOLabels(settings.showDSOLabels);
   skyMap.setShowGrid(settings.showGrid);
   overlay.setShowPhotos(settings.showPhotos);
+  overlay.setShowPois(settings.showPois);
+  overlay.setVisiblePois(settings.visiblePois || {});
   overlay.setVisibleLabels(settings.visibleLabels || {});
   skyMap.setShowPhotoOutlines(settings.showPhotoOutlines);
   skyMap.setSkyOpacity(settings.skyOpacity);
