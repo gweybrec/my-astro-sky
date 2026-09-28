@@ -1477,6 +1477,12 @@ export class TargetsView {
     this.skyMap = skyMap;
     this.onNavigate = onNavigate;
     this.prefs = loadPrefs();
+    // The date is the one setting that goes stale on its own: unlike gear/location,
+    // which rarely change, a persisted date silently points at a past night if the
+    // app is reopened later. Reset it to today on every app start, but only here in
+    // the constructor (which runs once) — show()/hide() reuse this same instance, so
+    // closing/reopening the modal within a session keeps whatever date was picked.
+    this.prefs.lastDateISO = todayISO();
     this.container = document.getElementById('plans-container')!;
     this.render();
     // Keep plan-row PA readouts in sync when a frame is rotated on the map
