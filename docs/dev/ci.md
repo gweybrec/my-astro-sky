@@ -81,7 +81,7 @@ Every build job runs `npm run generate-icons` before `electron:make`, because `b
 
 1. `npm ci`
 2. `npm run generate-icons`
-3. `npm run electron:make` — clean → tsc/vite build → `electron-rebuild` (recompiles native modules for Electron ABI) → `electron-forge make`
+3. `npm run electron:make` — clean → tsc/vite build → `electron-forge make` (which recompiles native modules for the Electron ABI inside the packaged copy — see [Native module builds](#native-module-builds))
 4. Uploads two artifacts:
    - `out/make/squirrel.windows/x64/MyAstroSkySetup.exe` — Windows installer (Squirrel)
    - `out/make/zip/win32/x64/MyAstroSky-win32-x64-<version>.zip` — Windows portable zip
@@ -98,7 +98,7 @@ Every build job runs `npm run generate-icons` before `electron:make`, because `b
 
 ### `build-macos` (matrix: `macos-14` arm64 + `macos-13` x64)
 
-Runs once per architecture. No `apt-get` step is needed — macOS runners ship Xcode Command Line Tools + Python, so `better-sqlite3` compiles and `electron-rebuild` works; `sharp` resolves its per-arch prebuilt binary (`@img/sharp-darwin-arm64` / `@img/sharp-darwin-x64`) during `npm ci`.
+Runs once per architecture. No `apt-get` step is needed — macOS runners ship Xcode Command Line Tools + Python, so `better-sqlite3` compiles and Forge's native rebuild works; `sharp` resolves its per-arch prebuilt binary (`@img/sharp-darwin-arm64` / `@img/sharp-darwin-x64`) during `npm ci`.
 
 1. `npm ci`
 2. `npm run generate-icons`
@@ -154,6 +154,8 @@ Go to **Actions → Release → Run workflow** in the GitHub UI. Optionally ente
 
 ## Native module builds
 
-`better-sqlite3` and `sharp` are native Node addons. The `electron-rebuild` step recompiles them against Electron's ABI (which differs from the host Node.js ABI). Without this step the packaged app segfaults on launch. The `rebuildConfig: { force: true }` in `forge.config.ts` ensures the rebuild always runs even if the modules appear up to date.
+`better-sqlite3` and `sharp` are native Node addons, compiled against one runtime's ABI (`NODE_MODULE_VERSION`). Node and Electron never share an ABI number (e.g. Node 24 = 137, Electron 36 = 135), so one binary cannot serve both. Electron Forge recompiles them for Electron while packaging (`rebuildConfig: { force: true }` in `forge.config.ts` makes it always run), into the packaged copy only (`out/…/resources/app.asar.unpacked/node_modules`). Without it the packaged app segfaults on launch.
+
+The working `node_modules` keeps its Node build, so `npm run dev` and the test suite keep working after a local `electron:make` / `electron:package`. Do **not** add a standalone `electron-rebuild` step to those scripts: it recompiles the working `node_modules` in place for Electron, after which Node fails to load `better-sqlite3` ("compiled against a different Node.js version") until the next `npm rebuild`.
 
 `sharp` v0.34+ ships prebuilt binaries via `@img/sharp-linux-x64` / `@img/sharp-win32-x64`, so it does not require `libvips` installed on the host. `better-sqlite3` always compiles from source and requires a C++ toolchain (`build-essential`) and Python 3.
