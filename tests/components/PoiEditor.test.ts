@@ -7,10 +7,12 @@ import type { ManualPlacement, Photo, PointOfInterest } from '../../src/types';
 vi.mock('../../src/ui', () => ({
   triggerAsteroidModal: vi.fn(),
   triggerSupernovaModal: vi.fn(),
+  triggerCometModal: vi.fn(),
 }));
-import { triggerAsteroidModal, triggerSupernovaModal } from '../../src/ui';
+import { triggerAsteroidModal, triggerSupernovaModal, triggerCometModal } from '../../src/ui';
 const mockTrigger = vi.mocked(triggerAsteroidModal);
 const mockSupernovaTrigger = vi.mocked(triggerSupernovaModal);
+const mockCometTrigger = vi.mocked(triggerCometModal);
 
 const categories = [
   { id: 'cat-a', name: 'Galaxy', color: '#f00', position: 0 },
@@ -215,6 +217,37 @@ describe('PoiEditor "Identify supernovae" trigger', () => {
     await findButton(wrapper)!.trigger('click');
     mockSupernovaTrigger.mock.calls[0][1](photo, [existing[0]]);
     expect(wrapper.emitted('update:pois')).toBeUndefined();
+    wrapper.unmount();
+  });
+});
+
+describe('PoiEditor "Identify comets" trigger', () => {
+  const findButton = (wrapper: ReturnType<typeof makeWrapper>) =>
+    wrapper.findAll('button').find((b) => b.text() === 'Identify comets');
+
+  beforeEach(() => {
+    mockCometTrigger.mockReset();
+  });
+
+  it('only shows the button for a solved photo', () => {
+    const none = makeWrapper([], null);
+    expect(findButton(none)).toBeUndefined();
+    none.unmount();
+    const unsolved = makeWrapper([], makeSolvedPhoto({ manualPlacement: undefined }));
+    expect(findButton(unsolved)).toBeUndefined();
+    unsolved.unmount();
+  });
+
+  it('appends the chosen comets (with position), skipping ones already listed', async () => {
+    const photo = makeSolvedPhoto();
+    const existing: PointOfInterest[] = [{ name: '10P/Tempel', categoryId: 'cat-comet' }];
+    const wrapper = makeWrapper(existing, photo);
+    await findButton(wrapper)!.trigger('click');
+    expect(mockCometTrigger.mock.calls[0][0]).toEqual(photo);
+
+    const r2 = { name: 'C/2025 R2 (SWAN)', categoryId: 'cat-comet', ra: 341.43, dec: 2.28 };
+    mockCometTrigger.mock.calls[0][1](photo, [existing[0], r2]);
+    expect(wrapper.emitted('update:pois')![0][0]).toEqual([...existing, r2]);
     wrapper.unmount();
   });
 });

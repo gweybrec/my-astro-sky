@@ -116,6 +116,7 @@ import { createJob, getJob, updateJob, cancelJob } from './solve-queue.js';
 import { searchDeepStars, getDeepStarByHip, searchStarsByPosition } from './star-search.js';
 import { skybotConesearch } from './skybot.js';
 import { tnsConesearch, TnsRateLimitError } from './tns.js';
+import { fetchCometElements } from './comets.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
 import { logServerError } from './logger.js';
@@ -5524,6 +5525,87 @@ app.post('/api/tns/conesearch', async (req, res) => {
     }
     logServerError('tns_conesearch_failed', err);
     res.status(502).json({ error: msg.api.tnsError(lang, (err as Error).message) });
+  }
+});
+
+/**
+ * @swagger
+ * /api/comets/elements:
+ *   get:
+ *     summary: Current comet orbital elements from the Minor Planet Center
+ *     description: Cached for 24 h server-side. The client propagates them to a photo's observation date to identify comets in its field.
+ *     parameters:
+ *       - in: query
+ *         name: lang
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [fr, en]
+ *         description: Language of the error message
+ *     responses:
+ *       200:
+ *         description: Comet elements returned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 comets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       designation:
+ *                         type: string
+ *                         example: C/2025 R2
+ *                       name:
+ *                         type: string
+ *                         example: C/2025 R2 (SWAN)
+ *                       tpJd:
+ *                         type: number
+ *                         description: Perihelion time (Julian Date, TT)
+ *                       q:
+ *                         type: number
+ *                         description: Perihelion distance (AU)
+ *                       e:
+ *                         type: number
+ *                         description: Eccentricity
+ *                       peri:
+ *                         type: number
+ *                         description: Argument of perihelion (deg, J2000 ecliptic)
+ *                       node:
+ *                         type: number
+ *                         description: Longitude of the ascending node (deg, J2000 ecliptic)
+ *                       incl:
+ *                         type: number
+ *                         description: Inclination (deg, J2000 ecliptic)
+ *                       h:
+ *                         type: number
+ *                         nullable: true
+ *                         description: Absolute total magnitude (M1)
+ *                       k:
+ *                         type: number
+ *                         nullable: true
+ *                         description: Magnitude slope parameter (K1)
+ *       502:
+ *         description: The MPC could not be reached and nothing is cached
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+// --- MPC comet elements (used by the comet-identification modal) ---
+app.get('/api/comets/elements', async (req, res) => {
+  const lang: ServerLang = req.query.lang === 'fr' ? 'fr' : 'en';
+  try {
+    const comets = await fetchCometElements();
+    res.json({ comets });
+  } catch (err) {
+    logServerError('comet_elements_failed', err);
+    res.status(502).json({ error: msg.api.cometElementsError(lang, (err as Error).message) });
   }
 });
 

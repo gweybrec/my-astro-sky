@@ -11,6 +11,7 @@ import { createTestingPinia } from '@pinia/testing';
 import AsteroidIdentifyModal from '../../src/components/modals/AsteroidIdentifyModal.vue';
 import { isoToUtcParts, isoToJd } from '../../src/asteroid-identify';
 import type { Photo, ManualPlacement } from '../../src/types';
+import { setCenterMode, setProjectionObserver } from '../../src/projection';
 
 vi.mock('../../src/api', () => ({
   skybotConesearchAPI: vi.fn(),
@@ -350,6 +351,45 @@ describe('AsteroidIdentifyModal', () => {
     const pagination = document.body.querySelector('.targets-pagination') as HTMLElement;
     expect(pagination.parentElement?.className).toContain('justify-center');
     wrapper.unmount();
+  });
+
+  it('sends the same SkyBoT search while the zenith-centred sky map has the field below the horizon', async () => {
+    // Field around RA 12h28m, Dec +13°: at LST 0.5h from 48°N it is ~12 h from the meridian.
+    const photo = makePhoto({
+      manualPlacement: { ...placement, centerRa: 186.97, centerDec: 12.89, projPerPx: 0.00002 },
+    });
+    const searchParams = async () => {
+      mockConesearch.mockReset();
+      mockConesearch.mockResolvedValue([]);
+      const wrapper = mountModal(photo);
+      stubImageRect(wrapper, 1233, 931);
+      await wrapper.vm.$nextTick();
+      const target = document.body.querySelector('.modal-photo-container') as HTMLElement;
+      target.dispatchEvent(new MouseEvent('click', { clientX: 600, clientY: 460, bubbles: true }));
+      await wrapper.vm.$nextTick();
+      target.dispatchEvent(new MouseEvent('click', { clientX: 610, clientY: 465, bubbles: true }));
+      await wrapper.vm.$nextTick();
+      const identifyBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Identify'),
+      ) as HTMLButtonElement;
+      identifyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await flushPromises();
+      wrapper.unmount();
+      document.body.innerHTML = '';
+      return mockConesearch.mock.calls[0][0];
+    };
+
+    const pole = await searchParams();
+    setCenterMode('zenith');
+    setProjectionObserver(0.5, 48);
+    try {
+      const zenith = await searchParams();
+      expect(zenith.raDeg).toBeCloseTo(pole.raDeg, 9);
+      expect(zenith.decDeg).toBeCloseTo(pole.decDeg, 9);
+      expect(zenith.decDeg).toBeCloseTo(12.89, 1);
+    } finally {
+      setCenterMode('pole');
+    }
   });
 });
 

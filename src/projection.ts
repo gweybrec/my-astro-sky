@@ -84,6 +84,36 @@ export function getCenterMode(): CenterMode {
   return _centerMode;
 }
 
+let _canonicalScopeSeq = 0;
+
+/**
+ * Runs `fn` (synchronously) with the default celestial-pole stereographic
+ * projection, whatever the sky map displays. For sky-geometry math that goes
+ * photo pixels ↔ projection ↔ RA/Dec (computePhotoToProjMatrix + project /
+ * unproject): the zenith and fisheye modes clip below-horizon / far-hemisphere
+ * points to a sentinel, which collapses a photo's fit when its field is not
+ * currently up, and zenith mode also rotates with the sky clock. Inside the scope
+ * the projection generation is a unique negative value, so anything memoised
+ * there (projectCached, generation-keyed indexes) is never reused outside it.
+ */
+export function withCanonicalProjection<T>(fn: () => T): T {
+  const saved = {
+    center: _centerMode,
+    mode: _projectionMode,
+    generation: _projGeneration,
+  };
+  _centerMode = 'pole';
+  _projectionMode = 'stereo';
+  _projGeneration = -++_canonicalScopeSeq;
+  try {
+    return fn();
+  } finally {
+    _centerMode = saved.center;
+    _projectionMode = saved.mode;
+    _projGeneration = saved.generation;
+  }
+}
+
 /**
  * Observer LST/latitude for the zenith-centered ("local sky") projection. Always
  * stored (harmless while centerMode is 'pole'); only bumps _projGeneration — and

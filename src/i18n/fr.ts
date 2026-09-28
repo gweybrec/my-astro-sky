@@ -713,6 +713,7 @@ const fr = {
     convertRawFailed: 'Conversion de {filename} impossible : {detail}',
     skybotSearch: 'Échec de la recherche SkyBoT',
     tnsSearch: 'Échec de la recherche TNS',
+    cometElements: 'Impossible de charger les orbites des comètes',
   },
   serverErrors: {
     RATE_LIMIT: 'Trop de requêtes, réessayez dans un instant',
@@ -803,6 +804,30 @@ const fr = {
     daysAfter: '{n} j après la découverte',
     daysBefore: '{n} j avant la découverte',
     viewOnTns: 'Voir sur TNS',
+    addSelected: 'Ajouter la sélection ({n})',
+    added: '{names} ajouté(s) aux points d’intérêt',
+  },
+  comet: {
+    menuLabel: 'Identifier des comètes',
+    title: 'Identifier des comètes',
+    intro:
+      'Calcule où se trouvaient les comètes connues du Minor Planet Center à l’heure d’observation de cette photo, à partir de leurs orbites actuelles. Les positions sont approximatives (quelques minutes d’arc) et les comètes éteintes depuis longtemps ne sont pas listées.',
+    obsDateLabel: 'Date d’observation (UTC)',
+    dateRequired:
+      'Cette photo n’a pas de date d’observation — saisissez-la pour trouver les comètes.',
+    loading: 'Chargement des orbites des comètes…',
+    loadError: 'Impossible de charger les orbites des comètes : {message}',
+    noCandidates: 'Aucune comète connue dans cette photo à l’heure d’observation',
+    clickToAdjust: 'Cliquez sur la photo pour placer le repère de {name} sur son noyau',
+    adjusted: 'Ajusté',
+    resetPosition: 'Revenir à la position prédite',
+    colMag: 'Mag',
+    rate: '{n}′/h',
+    viewOnJpl: 'Voir sur JPL',
+    nearbyTitle: 'Près de ce champ',
+    nearbyHint:
+      'Juste hors du cadre à cette heure. Si vous attendiez l’une de ces comètes, vérifiez la date et l’heure d’observation : une comète peut se déplacer de plusieurs degrés en quelques jours.',
+    awayDeg: 'à {n}° du centre',
     addSelected: 'Ajouter la sélection ({n})',
     added: '{names} ajouté(s) aux points d’intérêt',
   },

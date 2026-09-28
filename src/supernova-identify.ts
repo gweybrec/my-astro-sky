@@ -60,12 +60,14 @@ export interface FieldCircle {
 
 /**
  * Centre of the photo + the radius reaching its farthest corner (+5 % margin), so
- * a transient in a corner is still returned. Clamped to the server's 60′ cap.
+ * a transient in a corner is still returned. Clamped to `maxRadiusArcmin` — by
+ * default the TNS server's 60′ cap.
  */
 export function photoFieldCircle(
   photoToProj: AffineMatrix,
   width: number,
   height: number,
+  maxRadiusArcmin = MAX_SEARCH_RADIUS_ARCMIN,
 ): FieldCircle {
   const center = photoPixelToRaDec(photoToProj, width / 2, height / 2);
   const corners = [
@@ -81,8 +83,8 @@ export function photoFieldCircle(
   return {
     raDeg: ((center.ra % 360) + 360) % 360,
     decDeg: center.dec,
-    radiusArcmin: Math.min(MAX_SEARCH_RADIUS_ARCMIN, Math.max(1, wanted)),
-    truncated: wanted > MAX_SEARCH_RADIUS_ARCMIN,
+    radiusArcmin: Math.min(maxRadiusArcmin, Math.max(1, wanted)),
+    truncated: wanted > maxRadiusArcmin,
   };
 }
 

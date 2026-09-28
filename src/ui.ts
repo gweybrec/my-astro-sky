@@ -113,6 +113,10 @@ export let triggerSupernovaModal: (
   photo: Photo,
   onIdentified: (photo: Photo, pois: PointOfInterest[]) => void,
 ) => void = () => {};
+export let triggerCometModal: (
+  photo: Photo,
+  onIdentified: (photo: Photo, pois: PointOfInterest[]) => void,
+) => void = () => {};
 export let setDSOHighlight: (id: string | null) => void = () => {};
 let _selectDSOInSearch: (dsoId: string) => void = () => {};
 export function setSelectDSOInSearchHandler(fn: (dsoId: string) => void) {
@@ -260,6 +264,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     store.pendingSupernovaPhoto = photo;
     store.pendingSupernovaOnIdentified = onIdentified;
     openVueModal('supernovaIdentify');
+  };
+  triggerCometModal = (photo, onIdentified) => {
+    const store = useUiStore(pinia);
+    store.pendingCometPhoto = photo;
+    store.pendingCometOnIdentified = onIdentified;
+    openVueModal('cometIdentify');
   };
   setDSOHighlight = setHighlightedDSOState;
 

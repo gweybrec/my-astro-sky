@@ -17,6 +17,7 @@ import { downloadBlob } from './file-utils';
 import type { HorizonProfile } from './horizon-io';
 import type { SkybotCandidate } from './asteroid-identify';
 import type { TnsCandidate } from './supernova-identify';
+import type { CometElements } from './comet-ephemeris';
 
 /** Translate a server error response using the `code` field when available. */
 export function parseServerError(
@@ -1458,4 +1459,27 @@ export async function tnsConesearchAPI(params: {
     throw new Error(parseServerError(data, 'errors.tnsSearch'));
   }
   return data.candidates ?? [];
+}
+
+let cometElementsPromise: Promise<CometElements[]> | null = null;
+
+/**
+ * Current MPC comet orbital elements (via the server's cached proxy,
+ * `GET /api/comets/elements`). Memoised for the session — the comet
+ * identification modal re-propagates them on every date edit. A failed load
+ * is not memoised, so reopening the modal retries.
+ */
+export function cometElementsAPI(): Promise<CometElements[]> {
+  cometElementsPromise ??= (async () => {
+    const res = await fetch(`/api/comets/elements?lang=${getLang()}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(parseServerError(data, 'errors.cometElements'));
+    }
+    return (data.comets ?? []) as CometElements[];
+  })().catch((err: unknown) => {
+    cometElementsPromise = null;
+    throw err;
+  });
+  return cometElementsPromise;
 }

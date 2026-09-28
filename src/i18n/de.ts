@@ -713,6 +713,7 @@ const de: Translations = {
     reuseSubmissionFailed: 'Einreichung konnte nicht wiederverwendet werden',
     skybotSearch: 'SkyBoT-Suche fehlgeschlagen',
     tnsSearch: 'TNS-Suche fehlgeschlagen',
+    cometElements: 'Kometenbahnen konnten nicht geladen werden',
   },
   serverErrors: {
     RATE_LIMIT: 'Zu viele Anfragen, bitte kurz warten',
@@ -802,6 +803,31 @@ const de: Translations = {
     daysAfter: '{n} T nach der Entdeckung',
     daysBefore: '{n} T vor der Entdeckung',
     viewOnTns: 'Auf TNS ansehen',
+    addSelected: 'Auswahl hinzufügen ({n})',
+    added: '{names} zu den Points of Interest hinzugefügt',
+  },
+  comet: {
+    menuLabel: 'Kometen identifizieren',
+    title: 'Kometen identifizieren',
+    intro:
+      'Berechnet aus ihren aktuellen Bahnen, wo die dem Minor Planet Center bekannten Kometen zum Beobachtungszeitpunkt dieses Fotos standen. Die Positionen sind näherungsweise (einige Bogenminuten), längst verblasste Kometen werden nicht aufgeführt.',
+    obsDateLabel: 'Beobachtungsdatum (UTC)',
+    dateRequired:
+      'Dieses Foto hat kein Beobachtungsdatum – geben Sie es ein, um Kometen zu finden.',
+    loading: 'Kometenbahnen werden geladen…',
+    loadError: 'Kometenbahnen konnten nicht geladen werden: {message}',
+    noCandidates: 'Kein bekannter Komet in diesem Foto zum Beobachtungszeitpunkt',
+    clickToAdjust:
+      'Klicken Sie auf das Foto, um die Markierung von {name} auf seinen Kern zu setzen',
+    adjusted: 'Angepasst',
+    resetPosition: 'Vorhergesagte Position wiederherstellen',
+    colMag: 'Mag',
+    rate: '{n}′/h',
+    viewOnJpl: 'Auf JPL ansehen',
+    nearbyTitle: 'In der Nähe dieses Feldes',
+    nearbyHint:
+      'Zu diesem Zeitpunkt knapp außerhalb des Bildes. Wenn Sie einen dieser Kometen erwartet haben, prüfen Sie Beobachtungsdatum und -uhrzeit: Ein Komet kann in wenigen Tagen mehrere Grad zurücklegen.',
+    awayDeg: '{n}° vom Zentrum',
     addSelected: 'Auswahl hinzufügen ({n})',
     added: '{names} zu den Points of Interest hinzugefügt',
   },

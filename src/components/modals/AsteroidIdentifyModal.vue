@@ -206,6 +206,7 @@ import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { t } from '../../i18n';
 import { computePhotoToProjMatrix } from '../../photo-placement';
+import { withCanonicalProjection } from '../../projection';
 import { skybotConesearchAPI } from '../../api';
 import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
 import { buildPageList } from '../../targets-view';
@@ -388,12 +389,18 @@ async function onIdentify() {
   ranked.value = null;
   resultPage.value = 0;
   try {
-    // Fitted fresh, in the same tick as the unprojection: in zenith-centred mode the
-    // projection rotates with the sky clock, so the matrix cached when the modal
-    // opened would put the marks minutes of arc off by now.
-    const matrix = computePhotoToProjMatrix(props.photo) ?? photoToProj.value;
-    const startRaDec = photoPixelToRaDec(matrix, startPx.value.x, startPx.value.y);
-    const endRaDec = photoPixelToRaDec(matrix, endPx.value.x, endPx.value.y);
+    // Fitted and unprojected in the canonical pole projection: the zenith-centred
+    // display mode clips a field that is currently below the horizon (collapsing the
+    // fit) and rotates with the sky clock (see withCanonicalProjection).
+    const start = startPx.value;
+    const end = endPx.value;
+    const { startRaDec, endRaDec } = withCanonicalProjection(() => {
+      const matrix = computePhotoToProjMatrix(props.photo) ?? photoToProj.value!;
+      return {
+        startRaDec: photoPixelToRaDec(matrix, start.x, start.y),
+        endRaDec: photoPixelToRaDec(matrix, end.x, end.y),
+      };
+    });
     const startJd = isoToJd(startIso.value);
     const endJd = isoToJd(endIso.value);
     const search = buildSearch(startRaDec, endRaDec, startJd, endJd);

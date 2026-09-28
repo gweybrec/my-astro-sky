@@ -8,6 +8,7 @@ import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confir
 import { createLazyObserver } from './lazy-image';
 import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
 import { computePhotoToProjMatrix } from './photo-placement';
+import { withCanonicalProjection } from './projection';
 import {
   computePhotoDsoOverlayLayout,
   renderPhotoDsoOverlay,
@@ -106,6 +107,10 @@ export class Gallery {
   private grid: HTMLElement;
   private photos: Photo[] = [];
   private filteredPhotos: Photo[] = [];
+  /** Closes the open detail view (asking about unsaved edits) — resolves false if kept.
+   * Only one detail view may exist: each owns a metadata editor, keydown handler and
+   * Vue apps, so a stacked second one would duplicate them all. */
+  private closeActiveDetail: (() => Promise<boolean>) | null = null;
   private filterByDSOTypes: string[] | null = null;
   private filterByDSOCatalogs: string[] | null = null;
   private filterByLabels: string[] | null = null;
@@ -522,7 +527,7 @@ export class Gallery {
         item.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg)';
       });
 
-      item.addEventListener('click', () => this.openDetailModal(photo));
+      item.addEventListener('click', () => void this.openDetailModal(photo));
       mosaic.appendChild(item);
       this.lazyObserver.observe(item);
     }
@@ -666,7 +671,7 @@ export class Gallery {
 
     goTo(0, false);
 
-    imgWrapper.addEventListener('click', () => this.openDetailModal(photos[index]));
+    imgWrapper.addEventListener('click', () => void this.openDetailModal(photos[index]));
     imgWrapper.appendChild(imgEl);
     wrap.appendChild(imgWrapper);
     wrap.appendChild(captionEl);
@@ -676,10 +681,14 @@ export class Gallery {
 
   openPhoto(photoId: string) {
     const photo = this.photos.find((p) => p.id === photoId);
-    if (photo) this.openDetailModal(photo);
+    if (photo) void this.openDetailModal(photo);
   }
 
-  private openDetailModal(photo: Photo) {
+  private async openDetailModal(photo: Photo) {
+    // Replace, never stack: close the open detail view first (e.g. openPhoto() from
+    // the sky map's photo list). Stays synchronous when none is open.
+    if (this.closeActiveDetail && !(await this.closeActiveDetail())) return;
+
     const overlay = document.createElement('div');
     overlay.className = 'gallery-cinematic-overlay';
 
@@ -697,6 +706,7 @@ export class Gallery {
       metaPanelTeardown?.();
       dsoFilterApp?.unmount();
       overlay.remove();
+      if (this.closeActiveDetail === close) this.closeActiveDetail = null;
     };
 
     const close = async (): Promise<boolean> => {
@@ -707,6 +717,7 @@ export class Gallery {
       rawClose();
       return true;
     };
+    this.closeActiveDetail = close;
 
     // ── Arrow-key navigation to the adjacent photo in the gallery ─────────────
     const navigate = async (delta: number) => {
@@ -725,7 +736,7 @@ export class Gallery {
         if (!discard) return;
       }
       rawClose();
-      this.openDetailModal(next);
+      void this.openDetailModal(next);
     };
 
     const onKey = (e: KeyboardEvent) => {
@@ -811,10 +822,8 @@ export class Gallery {
     // ── "Show DSOs" toggle + catalog filter ────────────────────────────────────
     // photo→projection affine, independent of the sky map's view — null when the
     // photo has no manual placement and fewer than 2 resolvable correspondences.
-    // Only used to know whether the photo is solved: the projection itself is NOT
-    // fixed (zenith-centred mode rotates with the sky clock), so every sky→pixel
-    // conversion below re-fits it and projects in the same tick — a matrix cached
-    // at open time drifts off target by minutes of arc within a minute.
+    // Only used to know whether the photo is solved: every sky→pixel conversion
+    // below re-fits it and projects in the same withCanonicalProjection scope.
     const photoToProj = computePhotoToProjMatrix(photo);
     let dsoPlacements: PhotoDsoPlacement[] = [];
     const dsoState = reactive({
@@ -830,18 +839,23 @@ export class Gallery {
     const poiState = { show: false };
     // Arrow-captured: redrawDsoOverlay below is a plain function (no `this`).
     const getPoiCategories = () => this.poiCategories;
+    // Canonical pole projection: the zenith-centred display mode would clip a photo
+    // whose field is currently below the horizon (see withCanonicalProjection).
     const recomputePoiPins = (pois: PointOfInterest[]) => {
-      const matrix = computePhotoToProjMatrix(photo);
-      poiPins = matrix ? poiPinsInImage(pois, matrix, photo.width, photo.height) : [];
+      poiPins = withCanonicalProjection(() => {
+        const matrix = computePhotoToProjMatrix(photo);
+        return matrix ? poiPinsInImage(pois, matrix, photo.width, photo.height) : [];
+      });
     };
     recomputePoiPins(photo.pointsOfInterest ?? []);
 
     function recomputeDsoPlacements() {
-      const matrix = dsoState.show ? computePhotoToProjMatrix(photo) : null;
-      dsoPlacements =
-        dsoState.show && matrix
+      dsoPlacements = withCanonicalProjection(() => {
+        const matrix = dsoState.show ? computePhotoToProjMatrix(photo) : null;
+        return dsoState.show && matrix
           ? findDsoPlacementsInImage(matrix, photo.width, photo.height, new Set(dsoState.catalogs))
           : [];
+      });
     }
 
     function redrawDsoOverlay() {

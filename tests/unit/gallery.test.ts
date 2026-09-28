@@ -171,6 +171,66 @@ describe('Gallery', () => {
     expect(document.querySelector('.gallery-cinematic-overlay')).toBeNull();
   });
 
+  it('replaces an open detail view rather than stacking a second one', async () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg' }),
+    ]);
+    gallery.openPhoto('a');
+    const firstTeardown = mockBuildMetadataEditorPanel.mock.results[0].value.teardown;
+
+    gallery.openPhoto('b'); // e.g. the sky map's photo list, while "a" is still open
+    await Promise.resolve();
+
+    const overlays = document.querySelectorAll('.gallery-cinematic-overlay');
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0].querySelector('img')?.getAttribute('alt')).toBe('M31');
+    expect(firstTeardown).toHaveBeenCalledOnce();
+    expect(mockBuildMetadataEditorPanel).toHaveBeenCalledTimes(2);
+
+    // Close it: an open detail keeps a document keydown listener across tests.
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
+    await Promise.resolve();
+    expect(document.querySelector('.gallery-cinematic-overlay')).toBeNull();
+  });
+
+  it('keeps the open detail view when its unsaved edits are not discarded', async () => {
+    mockBuildMetadataEditorPanel.mockImplementationOnce(() => ({
+      teardown: vi.fn(),
+      isDirty: () => true,
+    }));
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg' }),
+    ]);
+    gallery.openPhoto('a');
+    gallery.openPhoto('b');
+
+    const keepEditing = Array.from(document.querySelectorAll('.dialog button')).find(
+      (b) => b.textContent === 'gallery.cancelEdit',
+    ) as HTMLButtonElement;
+    keepEditing.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const overlays = document.querySelectorAll('.gallery-cinematic-overlay');
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0].querySelector('img')?.getAttribute('alt')).toBe('M42');
+    expect(mockBuildMetadataEditorPanel).toHaveBeenCalledTimes(1);
+
+    // Close it, discarding: an open detail keeps a document keydown listener across tests.
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
+    const discard = Array.from(document.querySelectorAll('.dialog button')).find(
+      (b) => b.textContent === 'gallery.closeWithoutSaving',
+    ) as HTMLButtonElement;
+    discard.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(document.querySelector('.gallery-cinematic-overlay')).toBeNull();
+  });
+
   it('pins an unsaved positioned POI on the photo as soon as the editor reports it', () => {
     const gallery = new Gallery();
     gallery.loadPhotos([
@@ -317,6 +377,43 @@ describe('Gallery', () => {
       (document.querySelector('.gallery-item') as HTMLElement).click();
 
       setProjectionObserver(22.5, 45); // half an hour of sidereal time later
+      const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
+        pois: Photo['pointsOfInterest'],
+      ) => void;
+      onPoisChange([{ name: 'SN centre', categoryId: 'cat-supernova', ra: 339.27, dec: 34.42 }]);
+
+      const pins = vi.mocked(poiPinsInImage).mock.results.at(-1)!.value;
+      expect(pins).toHaveLength(1);
+      expect(pins[0].x).toBeCloseTo(500, 0);
+      expect(pins[0].y).toBeCloseTo(350, 0);
+    } finally {
+      setCenterMode('pole');
+    }
+  });
+
+  it('pins a POI while the zenith-centred sky map has the photo below the horizon', () => {
+    // Zenith mode clips below-horizon points to one sentinel, which used to collapse
+    // the photo's fit (no pins at all); sky math now runs in the canonical projection.
+    setCenterMode('zenith');
+    setProjectionObserver(10.6, 45); // RA 22h37m is ~12 h from the meridian
+    try {
+      const gallery = new Gallery();
+      gallery.loadPhotos([
+        makePhoto({
+          id: 'sn',
+          originalName: 'NGC7331',
+          filename: 'sn.jpg',
+          manualPlacement: {
+            centerRa: 339.27,
+            centerDec: 34.42,
+            rotationDeg: 0,
+            projPerPx: 0.00005,
+            mirrorX: false,
+            mirrorY: false,
+          },
+        }),
+      ]);
+      (document.querySelector('.gallery-item') as HTMLElement).click();
       const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
         pois: Photo['pointsOfInterest'],
       ) => void;

@@ -13,6 +13,7 @@ import { computePhotoToProjMatrix } from '../../src/photo-placement';
 import { photoPixelToRaDec } from '../../src/asteroid-identify';
 import type { TnsCandidate } from '../../src/supernova-identify';
 import type { Photo, ManualPlacement } from '../../src/types';
+import { setCenterMode, setProjectionObserver } from '../../src/projection';
 
 vi.mock('../../src/api', () => ({
   tnsConesearchAPI: vi.fn(),
@@ -220,5 +221,44 @@ describe('SupernovaIdentifyModal', () => {
     expect(document.body.textContent).toContain('rate-limiting');
     expect(byText('Add selected')!.disabled).toBe(true);
     wrapper.unmount();
+  });
+
+  it('searches and pins the same way while the zenith-centred sky map has the field below the horizon', async () => {
+    const photo = makePhoto();
+    const sn = candidateAt(photo, 300, 260, {});
+    const run = async () => {
+      mockSearch.mockReset();
+      mockSearch.mockResolvedValue([sn]);
+      const wrapper = mountModal(photo);
+      await flushPromises();
+      stubImageRect(664, 470);
+      await flushPromises();
+      const pin = document.body.querySelector<HTMLElement>(
+        '.modal-photo-container span svg',
+      )?.parentElement;
+      const result = {
+        params: mockSearch.mock.calls[0][0],
+        left: pin ? parseFloat(pin.style.left) : NaN,
+        top: pin ? parseFloat(pin.style.top) : NaN,
+      };
+      wrapper.unmount();
+      document.body.innerHTML = '';
+      return result;
+    };
+
+    const pole = await run();
+    setCenterMode('zenith');
+    // NGC 7331 (RA 22h37m) at LST 10.6h from 48°N: ~12 h from the meridian.
+    setProjectionObserver(10.6, 48);
+    try {
+      const zenith = await run();
+      expect(zenith.params.raDeg).toBeCloseTo(pole.params.raDeg, 9);
+      expect(zenith.params.decDeg).toBeCloseTo(pole.params.decDeg, 9);
+      expect(zenith.params.radiusArcmin).toBeCloseTo(pole.params.radiusArcmin, 9);
+      expect(zenith.left).toBeCloseTo(300, 0);
+      expect(zenith.top).toBeCloseTo(260, 0);
+    } finally {
+      setCenterMode('pole');
+    }
   });
 });

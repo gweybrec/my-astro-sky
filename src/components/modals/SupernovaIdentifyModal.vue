@@ -131,6 +131,7 @@ import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { t } from '../../i18n';
 import { computePhotoToProjMatrix } from '../../photo-placement';
+import { withCanonicalProjection } from '../../projection';
 import { tnsConesearchAPI } from '../../api';
 import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
 import { isoToUtcParts, utcPartsToIso } from '../../asteroid-identify';
@@ -234,27 +235,33 @@ const selected = ref(new Set<string>());
 const hovered = ref<string | null>(null);
 
 async function onSearch() {
-  // Fitted fresh (not the cached `photoToProj`) and used in the same tick as each
-  // projection: in zenith-centred mode the projection rotates with the sky clock,
-  // so a stale matrix drifts the pins off their transients.
-  const matrix = computePhotoToProjMatrix(props.photo);
+  // Sky geometry runs in the canonical pole projection: the zenith-centred display
+  // mode clips a field that is currently below the horizon (see
+  // withCanonicalProjection), which would collapse the photo's fit.
+  const fieldCircle = withCanonicalProjection(() => {
+    const matrix = computePhotoToProjMatrix(props.photo);
+    return matrix ? photoFieldCircle(matrix, props.photo.width, props.photo.height) : null;
+  });
   const dateWindow = obsIso.value ? searchWindow(obsIso.value) : null;
-  if (!matrix || !dateWindow) return;
+  if (!fieldCircle || !dateWindow) return;
   searching.value = true;
   searchErrorMessage.value = '';
   results.value = null;
   try {
-    field.value = photoFieldCircle(matrix, props.photo.width, props.photo.height);
+    field.value = fieldCircle;
     const candidates = await tnsConesearchAPI({
       raDeg: field.value.raDeg,
       decDeg: field.value.decDeg,
       radiusArcmin: field.value.radiusArcmin,
       ...dateWindow,
     });
-    const placeMatrix = computePhotoToProjMatrix(props.photo) ?? matrix;
-    results.value = rankTransients(
-      placeInImage(candidates, placeMatrix, props.photo.width, props.photo.height, obsIso.value),
-    );
+    const placed = withCanonicalProjection(() => {
+      const matrix = computePhotoToProjMatrix(props.photo);
+      return matrix
+        ? placeInImage(candidates, matrix, props.photo.width, props.photo.height, obsIso.value)
+        : [];
+    });
+    results.value = rankTransients(placed);
     // Confirmed supernovae are pre-selected; unclassified transients are opt-in.
     selected.value = new Set(results.value.filter((c) => c.classified).map((c) => c.name));
   } catch (err) {

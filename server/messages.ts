@@ -279,5 +279,12 @@ export const msg = {
         `Le serveur TNS limite les recherches — réessayez dans ${seconds ?? 60} s`,
         `The TNS server is rate-limiting searches — try again in ${seconds ?? 60} s`,
       ),
+
+    cometElementsError: (lang: ServerLang, err: string) =>
+      m(
+        lang,
+        `Impossible de charger les orbites des comètes (MPC) : ${err}`,
+        `Could not load comet orbits (MPC): ${err}`,
+      ),
   },
 };

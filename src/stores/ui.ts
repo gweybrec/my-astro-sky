@@ -92,6 +92,12 @@ export const useUiStore = defineStore('ui', () => {
     ((photo: Photo, pois: PointOfInterest[]) => void) | null
   >(null);
 
+  // Same contract again, for the comet identification modal (triggerCometModal).
+  const pendingCometPhoto = ref<Photo | null>(null);
+  const pendingCometOnIdentified = shallowRef<
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
+  >(null);
+
   // Set before switchView('plans') to make the Plans view expand/scroll to this
   // plan. Consumed (and cleared) on render.
   const pendingPlanFocusId = ref<string | null>(null);
@@ -321,6 +327,8 @@ export const useUiStore = defineStore('ui', () => {
     pendingAsteroidOnIdentified,
     pendingSupernovaPhoto,
     pendingSupernovaOnIdentified,
+    pendingCometPhoto,
+    pendingCometOnIdentified,
     pendingUpdate,
     pendingPlanFocusId,
     targetsOverlayOpen,

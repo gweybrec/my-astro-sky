@@ -85,6 +85,16 @@
     @identified="onSupernovaIdentified"
   />
 
+  <!-- Comet identification: propagate MPC comet orbits to a solved photo's
+       observation date. Opened via triggerCometModal(photo, cb) from PoiEditor.vue,
+       same contract as the supernova modal above. -->
+  <CometIdentifyModal
+    v-if="activeModal === 'cometIdentify' && uiStore.pendingCometPhoto"
+    :photo="uiStore.pendingCometPhoto"
+    @close="closeModal()"
+    @identified="onCometIdentified"
+  />
+
   <!-- "Find targets" recommender, summoned from Plans or the Sky map. The
        recommend surface itself is built once by TargetsView and survives this
        component unmounting on close (see TargetsOverlay.vue). -->
@@ -117,6 +127,7 @@ import StatisticsModal from './components/modals/StatisticsModal.vue';
 import TargetsOverlay from './components/overlay/TargetsOverlay.vue';
 import AsteroidIdentifyModal from './components/modals/AsteroidIdentifyModal.vue';
 import SupernovaIdentifyModal from './components/modals/SupernovaIdentifyModal.vue';
+import CometIdentifyModal from './components/modals/CometIdentifyModal.vue';
 import { useUiStore } from './stores/ui';
 import type { Photo, PointOfInterest } from './types';
 
@@ -134,7 +145,8 @@ type ModalName =
   | 'shortcuts'
   | 'stats'
   | 'asteroidIdentify'
-  | 'supernovaIdentify';
+  | 'supernovaIdentify'
+  | 'cometIdentify';
 
 const activeModal = ref<ModalName | null>(null);
 const previousModal = ref<ModalName | null>(null);
@@ -152,6 +164,11 @@ function onAsteroidIdentified(photo: Photo, poi: PointOfInterest) {
 
 function onSupernovaIdentified(photo: Photo, pois: PointOfInterest[]) {
   uiStore.pendingSupernovaOnIdentified?.(photo, pois);
+  closeModal();
+}
+
+function onCometIdentified(photo: Photo, pois: PointOfInterest[]) {
+  uiStore.pendingCometOnIdentified?.(photo, pois);
   closeModal();
 }
 
