@@ -98,6 +98,12 @@ export const useUiStore = defineStore('ui', () => {
     ((photo: Photo, pois: PointOfInterest[]) => void) | null
   >(null);
 
+  // Same contract, for the manual "add a point of interest" modal (triggerPoiAddModal).
+  const pendingPoiAddPhoto = ref<Photo | null>(null);
+  const pendingPoiAddOnIdentified = shallowRef<
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
+  >(null);
+
   // Set before switchView('plans') to make the Plans view expand/scroll to this
   // plan. Consumed (and cleared) on render.
   const pendingPlanFocusId = ref<string | null>(null);
@@ -329,6 +335,8 @@ export const useUiStore = defineStore('ui', () => {
     pendingSupernovaOnIdentified,
     pendingCometPhoto,
     pendingCometOnIdentified,
+    pendingPoiAddPhoto,
+    pendingPoiAddOnIdentified,
     pendingUpdate,
     pendingPlanFocusId,
     targetsOverlayOpen,

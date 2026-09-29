@@ -739,6 +739,12 @@ const en: Translations = {
     uncategorized: 'Uncategorized',
     editTypes: 'Manage types',
     addPoi: '+ Add point of interest',
+    addTitle: 'Add a point of interest',
+    addIntro: 'Name the point of interest, choose its type, then click the photo to position it.',
+    addConfirm: 'Add',
+    added: '{names} added to points of interest',
+    nameLabel: 'Name',
+    typeLabel: 'Type',
     addType: '+ Add type',
     typesTitle: 'Point of interest types',
     typesHint:

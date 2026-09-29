@@ -746,6 +746,13 @@ const fr = {
     uncategorized: 'Sans type',
     editTypes: 'Gérer les types',
     addPoi: "+ Ajouter un point d'intérêt",
+    addTitle: 'Ajouter un point d’intérêt',
+    addIntro:
+      'Nommez le point d’intérêt, choisissez son type, puis cliquez sur la photo pour le positionner.',
+    addConfirm: 'Ajouter',
+    added: '{names} ajouté(s) aux points d’intérêt',
+    nameLabel: 'Nom',
+    typeLabel: 'Type',
     addType: '+ Ajouter un type',
     typesTitle: "Types de points d'intérêt",
     typesHint:

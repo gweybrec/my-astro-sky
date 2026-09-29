@@ -162,6 +162,16 @@ describe('IdentifyModalShell', () => {
     wrapper.unmount();
   });
 
+  it('drops the Search button with hideSearch and shows a custom add label', () => {
+    const wrapper = mountShell({ hideSearch: true, addLabel: 'Add it', selectedCount: 1 });
+    expect(byText('Search')).toBeUndefined();
+    expect(document.body.querySelector('.test-input')).not.toBeNull();
+    expect(byText('Add selected')).toBeUndefined();
+    byText('Add it')!.click();
+    expect(wrapper.emitted('add')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   it('renders nothing but the footer for a photo that is not solved', () => {
     const wrapper = mountShell({ photo: makePhoto({ manualPlacement: undefined }) });
     expect(document.body.querySelector('.modal-photo-container')).toBeNull();

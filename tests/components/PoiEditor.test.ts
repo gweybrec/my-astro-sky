@@ -8,8 +8,15 @@ vi.mock('../../src/ui', () => ({
   triggerAsteroidModal: vi.fn(),
   triggerSupernovaModal: vi.fn(),
   triggerCometModal: vi.fn(),
+  triggerPoiAddModal: vi.fn(),
 }));
-import { triggerAsteroidModal, triggerSupernovaModal, triggerCometModal } from '../../src/ui';
+import {
+  triggerAsteroidModal,
+  triggerSupernovaModal,
+  triggerCometModal,
+  triggerPoiAddModal,
+} from '../../src/ui';
+const mockPoiAddTrigger = vi.mocked(triggerPoiAddModal);
 const mockTrigger = vi.mocked(triggerAsteroidModal);
 const mockSupernovaTrigger = vi.mocked(triggerSupernovaModal);
 const mockCometTrigger = vi.mocked(triggerCometModal);
@@ -66,63 +73,41 @@ function findAsteroidButton(wrapper: ReturnType<typeof makeWrapper>) {
   return wrapper.findAll('button').find((b) => b.text() === 'Identify asteroid');
 }
 
-describe('PoiEditor blur-to-register', () => {
-  let wrapper: ReturnType<typeof makeWrapper>;
+describe('PoiEditor "+ Add point of interest" trigger', () => {
+  const findAddButton = (wrapper: ReturnType<typeof makeWrapper>) =>
+    wrapper.findAll('button').find((b) => b.text() === '+ Add point of interest');
 
   beforeEach(() => {
-    wrapper = makeWrapper();
+    mockPoiAddTrigger.mockReset();
   });
 
-  function lastEmittedPois(): PointOfInterest[] | undefined {
-    const ev = wrapper.emitted('update:pois');
-    return ev ? (ev[ev.length - 1][0] as PointOfInterest[]) : undefined;
-  }
-
-  it('registers the chip when the name input blurs to somewhere other than the dropdown', async () => {
-    const input = wrapper.find('input[type="text"]');
-    await input.setValue('My Target');
-    await input.trigger('blur', { relatedTarget: null });
-
-    expect(lastEmittedPois()).toEqual([{ name: 'My Target', categoryId: 'cat-a' }]);
+  it('has no inline name input or type dropdown any more', () => {
+    const wrapper = makeWrapper([], makeSolvedPhoto());
+    expect(wrapper.find('input[type="text"]').exists()).toBe(false);
+    expect(wrapper.find('select').exists()).toBe(false);
+    wrapper.unmount();
   });
 
-  it('does NOT register when the name input blurs to the type dropdown', async () => {
-    const input = wrapper.find('input[type="text"]');
-    const select = wrapper.find('select');
-    await input.setValue('My Target');
-    await input.trigger('blur', { relatedTarget: select.element });
-
-    expect(wrapper.emitted('update:pois')).toBeUndefined();
+  it('is disabled without a photo or while the photo is unsolved', () => {
+    const none = makeWrapper([], null);
+    expect(findAddButton(none)!.attributes('disabled')).toBeDefined();
+    none.unmount();
+    const unsolved = makeWrapper([], makeSolvedPhoto({ manualPlacement: undefined }));
+    expect(findAddButton(unsolved)!.attributes('disabled')).toBeDefined();
+    unsolved.unmount();
   });
 
-  it('registers after the type is chosen in the dropdown', async () => {
-    const input = wrapper.find('input[type="text"]');
-    const select = wrapper.find('select');
-    await input.setValue('My Target');
-    await input.trigger('blur', { relatedTarget: select.element });
+  it('opens the modal with the photo and appends the placed POI, skipping duplicates', async () => {
+    const photo = makeSolvedPhoto();
+    const existing: PointOfInterest[] = [{ name: 'Existing', categoryId: 'cat-a' }];
+    const wrapper = makeWrapper(existing, photo);
+    await findAddButton(wrapper)!.trigger('click');
+    expect(mockPoiAddTrigger.mock.calls[0][0]).toEqual(photo);
 
-    // Pick a different type — the change commits the pending name.
-    await select.setValue('cat-b');
-
-    expect(lastEmittedPois()).toEqual([{ name: 'My Target', categoryId: 'cat-b' }]);
-  });
-
-  it('registers when the dropdown is left unchanged (blur to elsewhere)', async () => {
-    const input = wrapper.find('input[type="text"]');
-    const select = wrapper.find('select');
-    await input.setValue('My Target');
-    await input.trigger('blur', { relatedTarget: select.element });
-    // No change event; user clicks away from the dropdown.
-    await select.trigger('blur', { relatedTarget: null });
-
-    expect(lastEmittedPois()).toEqual([{ name: 'My Target', categoryId: 'cat-a' }]);
-  });
-
-  it('does not register an empty name on blur', async () => {
-    const input = wrapper.find('input[type="text"]');
-    await input.trigger('blur', { relatedTarget: null });
-
-    expect(wrapper.emitted('update:pois')).toBeUndefined();
+    const placed = { name: 'My Target', categoryId: 'cat-b', ra: 10, dec: 20 };
+    mockPoiAddTrigger.mock.calls[0][1](photo, [existing[0], placed]);
+    expect(wrapper.emitted('update:pois')![0][0]).toEqual([...existing, placed]);
+    wrapper.unmount();
   });
 });
 

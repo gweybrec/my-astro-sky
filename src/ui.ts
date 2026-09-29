@@ -117,6 +117,10 @@ export let triggerCometModal: (
   photo: Photo,
   onIdentified: (photo: Photo, pois: PointOfInterest[]) => void,
 ) => void = () => {};
+export let triggerPoiAddModal: (
+  photo: Photo,
+  onIdentified: (photo: Photo, pois: PointOfInterest[]) => void,
+) => void = () => {};
 export let setDSOHighlight: (id: string | null) => void = () => {};
 let _selectDSOInSearch: (dsoId: string) => void = () => {};
 export function setSelectDSOInSearchHandler(fn: (dsoId: string) => void) {
@@ -270,6 +274,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     store.pendingCometPhoto = photo;
     store.pendingCometOnIdentified = onIdentified;
     openVueModal('cometIdentify');
+  };
+  triggerPoiAddModal = (photo, onIdentified) => {
+    const store = useUiStore(pinia);
+    store.pendingPoiAddPhoto = photo;
+    store.pendingPoiAddOnIdentified = onIdentified;
+    openVueModal('poiAdd');
   };
   setDSOHighlight = setHighlightedDSOState;
 

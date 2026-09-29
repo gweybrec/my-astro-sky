@@ -503,6 +503,7 @@ input:focus-visible {
    :has() is the only way to target the backdrop from the modal's own class. */
 .modal-backdrop:has(.asteroid-identify-modal),
 .modal-backdrop:has(.supernova-identify-modal),
-.modal-backdrop:has(.comet-identify-modal) {
+.modal-backdrop:has(.comet-identify-modal),
+.modal-backdrop:has(.poi-add-modal) {
   z-index: calc(var(--z-gallery) + 1);
 }

@@ -20,7 +20,8 @@ type ModalName =
   | 'stats'
   | 'asteroidIdentify'
   | 'supernovaIdentify'
-  | 'cometIdentify';
+  | 'cometIdentify'
+  | 'poiAdd';
 
 let _appRef: { openModal: (name: ModalName | null) => void } | null = null;
 

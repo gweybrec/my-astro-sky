@@ -20,13 +20,17 @@
            Searching is explicit (never on each edit): editing the date and then the
            time costs one request, not two (TNS allows ~2 searches a minute). -->
       <div class="flex flex-col gap-2">
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2">
+        <div
+          class="grid gap-x-2 gap-y-2"
+          :class="hideSearch ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_auto]'"
+        >
           <div class="min-w-0"><slot name="labels" /></div>
-          <div></div>
+          <div v-if="!hideSearch"></div>
           <div class="min-w-0"><slot name="inputs" /></div>
           <!-- No vertical padding: the inputs set the row height and the button
                (a grid item, stretched by default) fills exactly that height. -->
           <button
+            v-if="!hideSearch"
             type="button"
             class="btn-action !py-0"
             :disabled="!canSearch || searching"
@@ -74,7 +78,7 @@
         :disabled="selectedCount === 0"
         @click="$emit('add')"
       >
-        {{ t('identify.addSelected', { n: selectedCount }) }}
+        {{ addLabel ?? t('identify.addSelected', { n: selectedCount }) }}
       </button>
     </template>
   </BaseModal>
@@ -84,7 +88,7 @@
 /**
  * Shared layout of the POI identification modals (asteroid, supernova, comet):
  * intro, search row (fields + Search button) above a zoom/pan photo, results,
- * and a Cancel / "Add selected (n)" footer. The modals keep their own search
+ * and a Cancel / "Add selected (n)" footer (or `addLabel`). The modals keep their own search
  * logic and only fill the slots, so all three look and behave alike.
  */
 import { ref, computed, watch, onUnmounted } from 'vue';
@@ -99,10 +103,14 @@ const props = defineProps<{
   modalClass: string;
   title: string;
   intro: string;
-  canSearch: boolean;
-  searching: boolean;
+  canSearch?: boolean;
+  searching?: boolean;
   errorMessage?: string;
   selectedCount: number;
+  /** No search step (the manual "add a point of interest" modal): drops the Search button. */
+  hideSearch?: boolean;
+  /** Replaces the default "Add selected (n)" footer label. */
+  addLabel?: string;
 }>();
 
 const emit = defineEmits<{

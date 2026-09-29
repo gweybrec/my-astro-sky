@@ -95,6 +95,16 @@
     @identified="onCometIdentified"
   />
 
+  <!-- Manual point of interest: name + type, then a click on the solved photo places
+       it. Opened via triggerPoiAddModal(photo, cb) from PoiEditor.vue, same
+       contract as the identification modals above. -->
+  <PoiAddModal
+    v-if="activeModal === 'poiAdd' && uiStore.pendingPoiAddPhoto"
+    :photo="uiStore.pendingPoiAddPhoto"
+    @close="closeModal()"
+    @identified="onPoiAdded"
+  />
+
   <!-- "Find targets" recommender, summoned from Plans or the Sky map. The
        recommend surface itself is built once by TargetsView and survives this
        component unmounting on close (see TargetsOverlay.vue). -->
@@ -128,6 +138,7 @@ import TargetsOverlay from './components/overlay/TargetsOverlay.vue';
 import AsteroidIdentifyModal from './components/modals/AsteroidIdentifyModal.vue';
 import SupernovaIdentifyModal from './components/modals/SupernovaIdentifyModal.vue';
 import CometIdentifyModal from './components/modals/CometIdentifyModal.vue';
+import PoiAddModal from './components/modals/PoiAddModal.vue';
 import { useUiStore } from './stores/ui';
 import type { Photo, PointOfInterest } from './types';
 
@@ -146,7 +157,8 @@ type ModalName =
   | 'stats'
   | 'asteroidIdentify'
   | 'supernovaIdentify'
-  | 'cometIdentify';
+  | 'cometIdentify'
+  | 'poiAdd';
 
 const activeModal = ref<ModalName | null>(null);
 const previousModal = ref<ModalName | null>(null);
@@ -169,6 +181,11 @@ function onSupernovaIdentified(photo: Photo, pois: PointOfInterest[]) {
 
 function onCometIdentified(photo: Photo, pois: PointOfInterest[]) {
   uiStore.pendingCometOnIdentified?.(photo, pois);
+  closeModal();
+}
+
+function onPoiAdded(photo: Photo, pois: PointOfInterest[]) {
+  uiStore.pendingPoiAddOnIdentified?.(photo, pois);
   closeModal();
 }
 

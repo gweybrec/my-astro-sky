@@ -746,6 +746,12 @@ const de: Translations = {
     uncategorized: 'Ohne Typ',
     editTypes: 'Typen verwalten',
     addPoi: '+ Interessantes Objekt hinzufügen',
+    addTitle: 'Interessantes Objekt hinzufügen',
+    addIntro: 'Benenne das Objekt, wähle seinen Typ und klicke ins Foto, um es zu positionieren.',
+    addConfirm: 'Hinzufügen',
+    added: '{names} zu den interessanten Objekten hinzugefügt',
+    nameLabel: 'Name',
+    typeLabel: 'Typ',
     addType: '+ Typ hinzufügen',
     typesTitle: 'Typen interessanter Objekte',
     typesHint:
