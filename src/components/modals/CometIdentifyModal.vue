@@ -1,69 +1,61 @@
 <template>
-  <BaseModal
+  <IdentifyModalShell
+    :photo="photo"
     modal-class="comet-identify-modal"
-    body-class="modal-form-body--scroll flex flex-col gap-4"
+    :title="t('comet.title')"
+    :intro="t('comet.intro')"
+    :can-search="!!obsIso"
+    :searching="searching"
+    :error-message="searchErrorMessage"
+    :selected-count="selected.size"
     @close="$emit('close')"
+    @search="onSearch"
+    @add="onAdd"
+    @photo-click="onPhotoClick"
   >
-    <template #title>
-      <h2>{{ t('comet.title') }}</h2>
+    <template #labels>
+      <label class="metadata-label">{{ t('identify.obsDateLabel') }}</label>
+    </template>
+    <template #inputs>
+      <div class="flex gap-2">
+        <input v-model="obsDateStr" type="date" class="dialog-input flex-[3_1_0%]" />
+        <input v-model="obsTimeStr" type="time" class="dialog-input flex-[2_1_0%]" />
+      </div>
+    </template>
+    <template #fields-hint>
+      <div v-if="!obsIso" class="text-[var(--text-warning-sm)]">
+        {{ t('identify.dateRequired') }}
+      </div>
     </template>
 
-    <!-- Like the supernova modal, always opened pre-targeted at an already-solved
-         photo (PoiEditor.vue's trigger only renders once one is in scope). -->
-    <template v-if="photoToProj">
-      <p class="text-hint m-0">{{ t('comet.intro') }}</p>
-
-      <!-- Observation date (UTC). No search button: comet positions are computed
-           locally, so the results follow every edit of the date or time. -->
-      <div class="flex flex-col gap-2">
-        <label class="metadata-label">{{ t('comet.obsDateLabel') }}</label>
-        <div class="flex items-stretch gap-2">
-          <input v-model="obsDateStr" type="date" class="dialog-input flex-[3_1_0%]" />
-          <input v-model="obsTimeStr" type="time" class="dialog-input flex-[2_1_0%]" />
-        </div>
-        <div v-if="!obsIso" class="text-[var(--text-warning-sm)]">
-          {{ t('comet.dateRequired') }}
-        </div>
+    <!-- Clicking the photo (not dragging it) moves the active comet's pin onto the
+         nucleus actually seen, when the prediction is a few arcminutes off. -->
+    <template #photo-hint>
+      <div v-if="results?.inFrame.length" class="text-hint">
+        {{ t('comet.clickToAdjust', { name: activeName ?? '' }) }}
       </div>
+    </template>
 
-      <!-- Photo with a starburst pin per comet; clicking the photo (not dragging it)
-           moves the active comet's pin onto the nucleus actually seen. -->
-      <div class="flex items-center justify-center w-full overflow-hidden">
-        <div ref="photoContainerEl" class="modal-photo-container select-none" @click="onImageClick">
-          <img
-            ref="imgEl"
-            :src="`/uploads/${photo.filename}`"
-            :alt="photo.originalName"
-            class="modal-photo"
-            draggable="false"
-          />
-          <span
-            v-for="pin in pinMarks"
-            :key="pin.name"
-            class="absolute w-[28px] h-[28px] -ml-[14px] -mt-[14px] pointer-events-none transition-transform [&>svg]:w-full [&>svg]:h-full"
-            :class="{
-              'opacity-40': !selected.has(pin.name),
-              'scale-150': hovered === pin.name,
-            }"
-            :style="{ left: `${pin.dispX}px`, top: `${pin.dispY}px`, color: pinColor }"
-            v-html="pinSvg"
-          ></span>
-          <!-- Zoom controls are appended here imperatively by createImageZoomPan. -->
-          <div ref="zoomControlsHost"></div>
-        </div>
-      </div>
+    <template #markers="{ toDisplay }">
+      <template v-for="c in results?.inFrame ?? []" :key="c.name">
+        <span
+          v-if="toDisplay(pinPixel(c))"
+          class="absolute w-[28px] h-[28px] -ml-[14px] -mt-[14px] pointer-events-none transition-transform [&>svg]:w-full [&>svg]:h-full"
+          :class="{ 'opacity-40': !selected.has(c.name), 'scale-150': hovered === c.name }"
+          :style="{
+            left: `${toDisplay(pinPixel(c))!.left}px`,
+            top: `${toDisplay(pinPixel(c))!.top}px`,
+            color: pinColor,
+          }"
+          v-html="pinSvg"
+        ></span>
+      </template>
+    </template>
 
-      <div v-if="loading" class="text-hint">{{ t('comet.loading') }}</div>
-      <div v-if="loadErrorMessage" class="text-[var(--color-danger)]">
-        {{ loadErrorMessage }}
-      </div>
-
+    <template #results>
       <div v-if="results" class="flex flex-col gap-1">
         <div v-if="results.inFrame.length === 0" class="text-hint">
           {{ t('comet.noCandidates') }}
-        </div>
-        <div v-else class="text-hint text-small">
-          {{ t('comet.clickToAdjust', { name: activeName ?? '' }) }}
         </div>
         <div
           v-for="c in results.inFrame"
@@ -136,26 +128,16 @@
         </template>
       </div>
     </template>
-
-    <template #footer>
-      <button type="button" class="btn-cancel" @click="$emit('close')">
-        {{ t('modal.cancel') }}
-      </button>
-      <button type="button" class="btn-confirm" :disabled="selected.size === 0" @click="onAdd">
-        {{ t('comet.addSelected', { n: selected.size }) }}
-      </button>
-    </template>
-  </BaseModal>
+  </IdentifyModalShell>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue';
-import BaseModal from '../base/BaseModal.vue';
+import { ref, computed } from 'vue';
+import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
 import { computePhotoToProjMatrix } from '../../photo-placement';
 import { withCanonicalProjection } from '../../projection';
 import { cometElementsAPI } from '../../api';
-import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
 import { isoToUtcParts, utcPartsToIso, photoPixelToRaDec } from '../../asteroid-identify';
 import {
   findComets,
@@ -163,20 +145,18 @@ import {
   jplLookupUrl,
   COMET_CATEGORY_ID,
   type CometSearchResult,
+  type PlacedComet,
 } from '../../comet-identify';
-import type { CometElements } from '../../comet-ephemeris';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import { resolveCategory } from '../../poi';
 import { reportUnknownRendererError } from '../../error-reporter';
 import pinSvg from '../../icons/supernova-pin.svg?raw';
-import type { Photo, AffineMatrix, PointOfInterest } from '../../types';
+import type { Photo, PointOfInterest } from '../../types';
 
 const props = defineProps<{ photo: Photo }>();
 // The modal never persists: the caller (PoiEditor.vue) pushes the POIs into its own
-// v-model, exactly like SupernovaIdentifyModal's `identified`.
+// v-model, like the asteroid and supernova modals.
 const emit = defineEmits<{ close: []; identified: [Photo, PointOfInterest[]] }>();
-
-const photoToProj = computed<AffineMatrix | null>(() => computePhotoToProjMatrix(props.photo));
 
 const categoriesStore = usePoiCategoriesStore();
 void categoriesStore.ensureLoaded();
@@ -199,82 +179,10 @@ const obsTimeStr = computed({
   },
 });
 
-// ─── Zoom / pan (same options as the supernova modal) ────────────────────────
-const imgEl = ref<HTMLImageElement | null>(null);
-const photoContainerEl = ref<HTMLElement | null>(null);
-const zoomControlsHost = ref<HTMLElement | null>(null);
-let zoom: ZoomPanController | null = null;
-let unsubTransform: (() => void) | null = null;
-// Bumped on zoom/pan and whenever the image box resizes, so pin positions —
-// read from live getBoundingClientRect — are recomputed.
-const layoutVersion = ref(0);
-let resizeObserver: ResizeObserver | null = null;
-
-function teardownZoom() {
-  resizeObserver?.disconnect();
-  resizeObserver = null;
-  unsubTransform?.();
-  unsubTransform = null;
-  zoom?.destroy();
-  zoom = null;
-}
-
-function setupZoom() {
-  teardownZoom();
-  if (!imgEl.value || !photoContainerEl.value) return;
-  zoom = createImageZoomPan(imgEl.value, photoContainerEl.value, {
-    minScale: 1,
-    maxScale: 5,
-    fitButtons: true,
-    dblClick: 'none',
-  });
-  zoomControlsHost.value?.appendChild(zoom.controls);
-  unsubTransform = zoom.onTransformChange(() => {
-    layoutVersion.value++;
-  });
-  imgEl.value.addEventListener('load', () => layoutVersion.value++, { once: true });
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => layoutVersion.value++);
-    resizeObserver.observe(imgEl.value);
-  }
-}
-
-watch(imgEl, (el) => {
-  if (el) setupZoom();
-  else teardownZoom();
-});
-onUnmounted(teardownZoom);
-
-// ─── Comet elements (fetched once per session, see cometElementsAPI) ─────────
-const elements = ref<CometElements[] | null>(null);
-const loading = ref(true);
-const loadErrorMessage = ref('');
-
-cometElementsAPI()
-  .then((list) => {
-    elements.value = list;
-  })
-  .catch((err: unknown) => {
-    reportUnknownRendererError('comet_elements_load', err);
-    loadErrorMessage.value = t('comet.loadError', { message: (err as Error).message });
-  })
-  .finally(() => {
-    loading.value = false;
-  });
-
-// Recomputed whenever the date/time or the elements change. Fitted and projected
-// in the canonical pole projection: the zenith-centred display mode clips a field
-// that is currently below the horizon and rotates with the sky clock.
-const results = computed<CometSearchResult | null>(() => {
-  const comets = elements.value;
-  if (!comets || !obsIso.value) return null;
-  return withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(props.photo);
-    if (!matrix) return null;
-    return findComets(comets, matrix, props.photo.width, props.photo.height, obsIso.value);
-  });
-});
-
+// ─── Search ─────────────────────────────────────────────────────────────────
+const searching = ref(false);
+const searchErrorMessage = ref('');
+const results = ref<CometSearchResult | null>(null);
 const selected = ref(new Set<string>());
 const hovered = ref<string | null>(null);
 /** The comet whose pin a click on the photo moves. */
@@ -282,12 +190,40 @@ const activeName = ref<string | null>(null);
 /** Pixel positions the user clicked, per comet name — they win over the prediction. */
 const overrides = ref(new Map<string, { x: number; y: number }>());
 
-// Comets in the frame are pre-selected; the brightest one is the click target.
-watch(results, (r) => {
-  const names = r?.inFrame.map((c) => c.name) ?? [];
-  selected.value = new Set(names);
-  if (!activeName.value || !names.includes(activeName.value)) activeName.value = names[0] ?? null;
-});
+/**
+ * Propagates the MPC comet orbits (fetched once per session by cometElementsAPI,
+ * so only the first search waits on the network) to the observation date. Fitted
+ * and projected in the canonical pole projection: the zenith-centred display mode
+ * clips a field that is currently below the horizon.
+ */
+async function onSearch() {
+  if (!obsIso.value) return;
+  const obs = obsIso.value;
+  searching.value = true;
+  searchErrorMessage.value = '';
+  try {
+    const comets = await cometElementsAPI();
+    results.value = withCanonicalProjection(() => {
+      const matrix = computePhotoToProjMatrix(props.photo);
+      return matrix
+        ? findComets(comets, matrix, props.photo.width, props.photo.height, obs)
+        : { inFrame: [], nearby: [] };
+    });
+    // Comets in the frame are pre-selected; the brightest one is the click target.
+    const names = results.value.inFrame.map((c) => c.name);
+    selected.value = new Set(names);
+    if (!activeName.value || !names.includes(activeName.value)) activeName.value = names[0] ?? null;
+  } catch (err) {
+    reportUnknownRendererError('comet_elements_load', err);
+    results.value = null;
+    searchErrorMessage.value = t('comet.loadError', { message: (err as Error).message });
+  } finally {
+    searching.value = false;
+  }
+}
+
+// One search on open when the date is already known, like the supernova modal.
+if (computePhotoToProjMatrix(props.photo) && obsIso.value) void onSearch();
 
 function toggle(name: string, on: boolean) {
   const next = new Set(selected.value);
@@ -296,16 +232,10 @@ function toggle(name: string, on: boolean) {
   selected.value = next;
 }
 
-function onImageClick(e: MouseEvent) {
-  if (zoom?.wasDrag || !activeName.value) return;
-  const img = imgEl.value;
-  if (!img) return;
-  const rect = img.getBoundingClientRect();
-  const relX = (e.clientX - rect.left) / rect.width;
-  const relY = (e.clientY - rect.top) / rect.height;
-  if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
+function onPhotoClick(px: { x: number; y: number }) {
+  if (!activeName.value) return;
   const next = new Map(overrides.value);
-  next.set(activeName.value, { x: relX * props.photo.width, y: relY * props.photo.height });
+  next.set(activeName.value, px);
   overrides.value = next;
   toggle(activeName.value, true);
 }
@@ -316,22 +246,10 @@ function resetPosition(name: string) {
   overrides.value = next;
 }
 
-/** Screen position of each pin (override or prediction), relative to the image box. */
-const pinMarks = computed(() => {
-  const _dep = layoutVersion.value; // reactive dependency — see layoutVersion
-  if (!results.value || !imgEl.value || !photoContainerEl.value) return [];
-  const imgRect = imgEl.value.getBoundingClientRect();
-  const containerRect = photoContainerEl.value.getBoundingClientRect();
-  if (imgRect.width <= 0) return [];
-  return results.value.inFrame.map((c) => {
-    const px = overrides.value.get(c.name) ?? c;
-    return {
-      name: c.name,
-      dispX: imgRect.left - containerRect.left + (px.x / props.photo.width) * imgRect.width,
-      dispY: imgRect.top - containerRect.top + (px.y / props.photo.height) * imgRect.height,
-    };
-  });
-});
+/** A comet's pin in photo pixels: where the user clicked, else the prediction. */
+function pinPixel(c: PlacedComet): { x: number; y: number } {
+  return overrides.value.get(c.name) ?? c;
+}
 
 function onAdd() {
   if (!results.value) return;

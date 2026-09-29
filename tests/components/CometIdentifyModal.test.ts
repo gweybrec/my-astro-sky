@@ -1,7 +1,7 @@
 /**
- * Tests for CometIdentifyModal.vue: comet elements load once and the results
- * follow the (UTC) observation date live, with no search button; comets in the
- * frame are listed, pre-selected and pinned; comets just outside it are listed as
+ * Tests for CometIdentifyModal.vue: one search runs on open when the photo has a
+ * date; editing the (UTC) date/time does nothing until Search is clicked; comets in
+ * the frame are listed, pre-selected and pinned; comets just outside it are listed as
  * "nearby" (a wrong date diagnosis); clicking the photo moves the active comet's
  * pin, and "Add selected" emits positioned comet POIs — the modal never persists.
  */
@@ -127,8 +127,9 @@ describe('CometIdentifyModal', () => {
     expect((document.body.querySelector('input[type="time"]') as HTMLInputElement).value).toBe(
       '18:42',
     );
+    // One search ran on open (the photo has a date).
     expect(mockElements).toHaveBeenCalledTimes(1);
-    expect(byText('Search')).toBeUndefined();
+    expect(byText('Search')!.disabled).toBe(false);
 
     const text = document.body.textContent ?? '';
     expect(text).toContain('C/2025 R2 (SWAN)');
@@ -142,30 +143,41 @@ describe('CometIdentifyModal', () => {
     wrapper.unmount();
   });
 
-  it('recomputes live when the date changes: a day off moves the comet to "nearby"', async () => {
+  it('keeps the results until Search is clicked, then a day off moves the comet to "nearby"', async () => {
     const wrapper = mountModal(makePhoto());
     await flushPromises();
     await setDate('2025-11-08');
+    // Editing the date alone changes nothing: no request, same results.
+    expect(mockElements).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain('Near this field');
+    expect(byText('Add selected (1)')).toBeTruthy();
 
+    byText('Search')!.click();
+    await flushPromises();
     const text = document.body.textContent ?? '';
     expect(text).toContain('No known comet in this photo');
     expect(text).toContain('Near this field');
     expect(text).toMatch(/C\/2025 R2 \(SWAN\).*° from the centre/);
     expect(byText('Add selected')!.disabled).toBe(true);
-    expect(mockElements).toHaveBeenCalledTimes(1);
+    expect(mockElements).toHaveBeenCalledTimes(2);
     wrapper.unmount();
   });
 
-  it('requires a date when the photo has none', async () => {
+  it('requires a date when the photo has none, then searches on demand', async () => {
     const wrapper = mountModal(makePhoto({ observationDate: null }));
     await flushPromises();
     expect(document.body.textContent).toContain('This photo has no observation date');
     expect(document.body.textContent).not.toContain('C/2025 R2');
+    expect(mockElements).not.toHaveBeenCalled();
+    expect(byText('Search')!.disabled).toBe(true);
 
     await setDate('2025-11-07');
     const time = document.body.querySelector('input[type="time"]') as HTMLInputElement;
     time.value = '18:42';
     time.dispatchEvent(new Event('input'));
+    await flushPromises();
+    expect(document.body.textContent).not.toContain('C/2025 R2');
+    byText('Search')!.click();
     await flushPromises();
     expect(document.body.textContent).toContain('C/2025 R2 (SWAN)');
     wrapper.unmount();

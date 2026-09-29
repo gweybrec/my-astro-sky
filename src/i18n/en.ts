@@ -750,17 +750,24 @@ const en: Translations = {
       'Delete the type “{name}”? Photos keep their points of interest as Uncategorized.',
     colorLabel: 'Color',
   },
+  identify: {
+    search: 'Search',
+    searching: 'Searching…',
+    addSelected: 'Add selected ({n})',
+    obsDateLabel: 'Observation date (UTC)',
+    dateRequired: 'This photo has no observation date — enter it to search.',
+  },
   asteroid: {
     menuLabel: 'Identify asteroid',
     title: 'Identify asteroid',
+    intro:
+      'Mark the start and end of the trail on the photo: IMCCE SkyBoT searches for the known asteroids that crossed there between those two times.',
     markHint: 'Click on the trail to place the selected marker',
     markStart: 'Start',
     markEnd: 'End',
     startTimeLabel: 'Start time (UTC)',
     endTimeLabel: 'End time (UTC)',
     radiusLabel: 'Search radius (arcmin)',
-    identifyButton: 'Identify',
-    searching: 'Searching…',
     searchError: 'SkyBoT search failed: {message}',
     noCandidates: 'No matching asteroid found within the search radius',
     colMag: 'Mag',
@@ -772,18 +779,13 @@ const en: Translations = {
     classCentaur: 'Centaur',
     classTrojan: 'Trojan',
     uncertainOrbit: 'Uncertain orbit',
-    addAsPoi: 'Add as point of interest',
-    added: '“{name}” added to points of interest',
+    added: '{names} added to points of interest',
   },
   supernova: {
     menuLabel: 'Identify supernovae',
     title: 'Identify supernovae',
     intro:
       'Searches the Transient Name Server (TNS) for supernovae discovered in this photo’s field up to a year before its observation date.',
-    obsDateLabel: 'Observation date (UTC)',
-    dateRequired: 'This photo has no observation date — enter it to search.',
-    searchButton: 'Search',
-    searching: 'Searching…',
     searchError: 'TNS search failed: {message}',
     noCandidates: 'No known supernova in this field around the observation date',
     fieldTruncated: 'Wide field: only the central 60′ radius is searched',
@@ -795,7 +797,6 @@ const en: Translations = {
     daysAfter: '{n} d after discovery',
     daysBefore: '{n} d before discovery',
     viewOnTns: 'View on TNS',
-    addSelected: 'Add selected ({n})',
     added: '{names} added to points of interest',
   },
   comet: {
@@ -803,9 +804,6 @@ const en: Translations = {
     title: 'Identify comets',
     intro:
       'Computes where the comets known to the Minor Planet Center were at this photo’s observation time, from their current orbits. Positions are approximate (a few arcminutes), and comets that faded long ago are not listed.',
-    obsDateLabel: 'Observation date (UTC)',
-    dateRequired: 'This photo has no observation date — enter it to find comets.',
-    loading: 'Loading comet orbits…',
     loadError: 'Could not load comet orbits: {message}',
     noCandidates: 'No known comet in this photo at the observation time',
     clickToAdjust: 'Click the photo to move the pin of {name} onto its nucleus',
@@ -818,7 +816,6 @@ const en: Translations = {
     nearbyHint:
       'Just outside the frame at this time. If you expected one of these comets, check the observation date and time: a comet can move several degrees in a few days.',
     awayDeg: '{n}° from the centre',
-    addSelected: 'Add selected ({n})',
     added: '{names} added to points of interest',
   },
   gallery: {
@@ -836,7 +833,7 @@ const en: Translations = {
     showDsosUnavailable: 'This photo is not placed on the sky map yet',
     showPois: 'Show points of interest',
     showPoisUnavailable:
-      'No positioned point of interest on this photo — use “Identify supernovae” to add one',
+      'No point of interest with a position on this photo — identified asteroids, comets and supernovae are pinned; names typed by hand are not',
     filterLabels: 'Labels',
     filterSetups: 'Setups',
     filterTypes: 'Types',

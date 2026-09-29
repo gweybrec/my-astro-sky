@@ -349,6 +349,25 @@ describe('Gallery', () => {
       expect(pois.getAttribute('aria-pressed')).toBe('true');
       expect(canvas.style.display).toBe('block');
     });
+
+    it('enables the POI button for an unsaved identified asteroid, not for a typed name', () => {
+      const { pois, canvas } = openDetail({ manualPlacement: placement });
+      const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
+        p: Photo['pointsOfInterest'],
+      ) => void;
+      const typed = { name: 'Some satellite', categoryId: 'cat-satellite' };
+      onPoisChange([typed]);
+      expect(pois.disabled).toBe(true);
+      expect(pois.title).toBe('gallery.showPoisUnavailable');
+
+      onPoisChange([
+        typed,
+        { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid', ra: 339.27, dec: 34.42 },
+      ]);
+      expect(pois.disabled).toBe(false);
+      expect(pois.title).toBe('gallery.showPois');
+      expect(canvas.style.display).toBe('block');
+    });
   });
 
   it('keeps pins on target when the zenith projection rotates after the view opened', () => {

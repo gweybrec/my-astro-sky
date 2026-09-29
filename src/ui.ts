@@ -107,7 +107,7 @@ export let triggerSelectDSOForPhotoChip: (dsoId: string) => void = () => {};
 export let triggerBatchModal: (files: File[]) => void = () => {};
 export let triggerAsteroidModal: (
   photo: Photo,
-  onIdentified: (photo: Photo, poi: PointOfInterest) => void,
+  onIdentified: (photo: Photo, pois: PointOfInterest[]) => void,
 ) => void = () => {};
 export let triggerSupernovaModal: (
   photo: Photo,

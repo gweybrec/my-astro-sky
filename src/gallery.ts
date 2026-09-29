@@ -833,7 +833,7 @@ export class Gallery {
       catalogs: [...useDisplayStore(pinia).dsoCatalogs],
     });
 
-    // Positioned POIs (e.g. identified supernovae) are pinned on the same canvas,
+    // Positioned POIs (identified asteroids, comets, supernovae) are pinned on the same canvas,
     // behind their own "show POIs" toggle (off by default, like "show DSOs").
     let poiPins: PhotoPoiPin[] = [];
     const poiState = { show: false };
@@ -967,7 +967,7 @@ export class Gallery {
       redrawDsoOverlay();
     });
     /** POIs changed (saved or still unsaved in the editor). A newly added positioned
-     * POI — e.g. a supernova just identified — switches the pins on so it shows. */
+     * POI — an asteroid, comet or supernova just identified — switches the pins on. */
     const onPoisChanged = (pois: PointOfInterest[]) => {
       const before = poiPins.length;
       recomputePoiPins(pois);
@@ -1026,7 +1026,7 @@ export class Gallery {
           this.photos.flatMap((p) => (p.integrations ?? []).map((r) => r.filter)).filter(Boolean),
         ),
       ],
-      // Pins follow the editor's unsaved POI list, so a supernova added from the
+      // Pins follow the editor's unsaved POI list, so a POI added from an
       // identification modal (or a POI removed) shows on the photo immediately.
       onPoisChanged,
     );

@@ -757,17 +757,25 @@ const fr = {
       "Supprimer le type « {name} » ? Les photos conservent leurs points d'intérêt en Sans type.",
     colorLabel: 'Couleur',
   },
+  identify: {
+    search: 'Rechercher',
+    searching: 'Recherche…',
+    addSelected: 'Ajouter la sélection ({n})',
+    obsDateLabel: 'Date d’observation (UTC)',
+    dateRequired:
+      'Cette photo n’a pas de date d’observation — saisissez-la pour lancer la recherche.',
+  },
   asteroid: {
     menuLabel: 'Identifier un astéroïde',
     title: 'Identifier un astéroïde',
+    intro:
+      'Marquez le début et la fin de la traînée sur la photo : IMCCE SkyBoT recherche les astéroïdes connus qui passaient là entre ces deux instants.',
     markHint: 'Cliquez sur la traînée pour placer le marqueur sélectionné',
     markStart: 'Départ',
     markEnd: 'Arrivée',
     startTimeLabel: 'Heure de départ (UTC)',
     endTimeLabel: "Heure d'arrivée (UTC)",
     radiusLabel: 'Rayon de recherche (arcmin)',
-    identifyButton: 'Identifier',
-    searching: 'Recherche en cours…',
     searchError: 'Échec de la recherche SkyBoT : {message}',
     noCandidates: 'Aucun astéroïde correspondant trouvé dans le rayon de recherche',
     colMag: 'Mag',
@@ -779,19 +787,13 @@ const fr = {
     classCentaur: 'Centaure',
     classTrojan: 'Troyen',
     uncertainOrbit: 'Orbite incertaine',
-    addAsPoi: "Ajouter comme point d'intérêt",
-    added: "« {name} » ajouté aux points d'intérêt",
+    added: '{names} ajouté(s) aux points d’intérêt',
   },
   supernova: {
     menuLabel: 'Identifier des supernovae',
     title: 'Identifier des supernovae',
     intro:
       'Recherche dans le Transient Name Server (TNS) les supernovae découvertes dans le champ de cette photo jusqu’à un an avant sa date d’observation.',
-    obsDateLabel: 'Date d’observation (UTC)',
-    dateRequired:
-      'Cette photo n’a pas de date d’observation — saisissez-la pour lancer la recherche.',
-    searchButton: 'Rechercher',
-    searching: 'Recherche…',
     searchError: 'Échec de la recherche TNS : {message}',
     noCandidates: 'Aucune supernova connue dans ce champ autour de la date d’observation',
     fieldTruncated: 'Champ large : seul un rayon central de 60′ est recherché',
@@ -804,7 +806,6 @@ const fr = {
     daysAfter: '{n} j après la découverte',
     daysBefore: '{n} j avant la découverte',
     viewOnTns: 'Voir sur TNS',
-    addSelected: 'Ajouter la sélection ({n})',
     added: '{names} ajouté(s) aux points d’intérêt',
   },
   comet: {
@@ -812,10 +813,6 @@ const fr = {
     title: 'Identifier des comètes',
     intro:
       'Calcule où se trouvaient les comètes connues du Minor Planet Center à l’heure d’observation de cette photo, à partir de leurs orbites actuelles. Les positions sont approximatives (quelques minutes d’arc) et les comètes éteintes depuis longtemps ne sont pas listées.',
-    obsDateLabel: 'Date d’observation (UTC)',
-    dateRequired:
-      'Cette photo n’a pas de date d’observation — saisissez-la pour trouver les comètes.',
-    loading: 'Chargement des orbites des comètes…',
     loadError: 'Impossible de charger les orbites des comètes : {message}',
     noCandidates: 'Aucune comète connue dans cette photo à l’heure d’observation',
     clickToAdjust: 'Cliquez sur la photo pour placer le repère de {name} sur son noyau',
@@ -828,7 +825,6 @@ const fr = {
     nearbyHint:
       'Juste hors du cadre à cette heure. Si vous attendiez l’une de ces comètes, vérifiez la date et l’heure d’observation : une comète peut se déplacer de plusieurs degrés en quelques jours.',
     awayDeg: 'à {n}° du centre',
-    addSelected: 'Ajouter la sélection ({n})',
     added: '{names} ajouté(s) aux points d’intérêt',
   },
   gallery: {
@@ -846,7 +842,7 @@ const fr = {
     showDsosUnavailable: "Cette photo n'est pas encore placée sur la carte du ciel",
     showPois: "Afficher les points d'intérêt",
     showPoisUnavailable:
-      "Aucun point d'intérêt positionné sur cette photo — utilisez « Identifier des supernovae » pour en ajouter",
+      "Aucun point d'intérêt localisé sur cette photo — les astéroïdes, comètes et supernovae identifiés sont épinglés, pas les noms saisis à la main",
     filterLabels: 'Étiquettes',
     filterSetups: 'Équipements',
     filterTypes: 'Types',

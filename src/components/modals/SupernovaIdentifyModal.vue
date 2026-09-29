@@ -1,72 +1,54 @@
 <template>
-  <BaseModal
+  <IdentifyModalShell
+    :photo="photo"
     modal-class="supernova-identify-modal"
-    body-class="modal-form-body--scroll flex flex-col gap-4"
+    :title="t('supernova.title')"
+    :intro="t('supernova.intro')"
+    :can-search="!!obsIso"
+    :searching="searching"
+    :error-message="searchErrorMessage"
+    :selected-count="selected.size"
     @close="$emit('close')"
+    @search="onSearch"
+    @add="onAdd"
   >
-    <template #title>
-      <h2>{{ t('supernova.title') }}</h2>
+    <template #labels>
+      <label class="metadata-label">{{ t('identify.obsDateLabel') }}</label>
+    </template>
+    <!-- Split date/time inputs rather than datetime-local: these are literal UTC,
+         while a native datetime-local (and its "Now" shortcut) is always local time. -->
+    <template #inputs>
+      <div class="flex gap-2">
+        <input v-model="obsDateStr" type="date" class="dialog-input flex-[3_1_0%]" />
+        <input v-model="obsTimeStr" type="time" class="dialog-input flex-[2_1_0%]" />
+      </div>
+    </template>
+    <template #fields-hint>
+      <div v-if="!obsIso" class="text-[var(--text-warning-sm)]">
+        {{ t('identify.dateRequired') }}
+      </div>
     </template>
 
-    <!-- Like AsteroidIdentifyModal, always opened pre-targeted at an already-solved
-         photo (PoiEditor.vue's trigger only renders once one is in scope). -->
-    <template v-if="photoToProj">
-      <p class="text-hint m-0">{{ t('supernova.intro') }}</p>
+    <!-- A starburst pin per candidate (same rays as the POI chip icon, no centre
+         dot, so the transient itself stays visible). -->
+    <template #markers="{ toDisplay }">
+      <template v-for="c in results ?? []" :key="c.name">
+        <span
+          v-if="toDisplay(c)"
+          class="absolute w-[28px] h-[28px] -ml-[14px] -mt-[14px] pointer-events-none transition-transform [&>svg]:w-full [&>svg]:h-full"
+          :class="{ 'opacity-40': !selected.has(c.name), 'scale-150': hovered === c.name }"
+          :style="{
+            left: `${toDisplay(c)!.left}px`,
+            top: `${toDisplay(c)!.top}px`,
+            color: pinColor,
+          }"
+          v-html="pinSvg"
+        ></span>
+      </template>
+    </template>
 
-      <!-- Observation date (UTC) + search, one row. Split date/time inputs rather than
-           datetime-local, for the same "literal UTC" reason as the asteroid modal. -->
-      <div class="flex flex-col gap-2">
-        <label class="metadata-label">{{ t('supernova.obsDateLabel') }}</label>
-        <div class="flex items-stretch gap-2">
-          <input v-model="obsDateStr" type="date" class="dialog-input flex-[3_1_0%]" />
-          <input v-model="obsTimeStr" type="time" class="dialog-input flex-[2_1_0%]" />
-          <button
-            type="button"
-            class="btn-action flex-none"
-            :disabled="!obsIso || searching"
-            @click="onSearch"
-          >
-            {{ searching ? t('supernova.searching') : t('supernova.searchButton') }}
-          </button>
-        </div>
-        <div v-if="!obsIso" class="text-[var(--text-warning-sm)]">
-          {{ t('supernova.dateRequired') }}
-        </div>
-      </div>
-
-      <!-- Photo with a starburst pin per candidate (same rays as the POI chip icon,
-           no centre dot, so the transient itself stays visible). -->
-      <div class="flex items-center justify-center w-full overflow-hidden">
-        <div ref="photoContainerEl" class="modal-photo-container select-none">
-          <img
-            ref="imgEl"
-            :src="`/uploads/${photo.filename}`"
-            :alt="photo.originalName"
-            class="modal-photo"
-            draggable="false"
-          />
-          <span
-            v-for="pin in pinMarks"
-            :key="pin.name"
-            class="absolute w-[28px] h-[28px] -ml-[14px] -mt-[14px] pointer-events-none transition-transform [&>svg]:w-full [&>svg]:h-full"
-            :class="{
-              'opacity-40': !selected.has(pin.name),
-              'scale-150': hovered === pin.name,
-            }"
-            :style="{ left: `${pin.dispX}px`, top: `${pin.dispY}px`, color: pinColor }"
-            v-html="pinSvg"
-          ></span>
-          <!-- Zoom controls are appended here imperatively by createImageZoomPan. -->
-          <div ref="zoomControlsHost"></div>
-        </div>
-      </div>
-
+    <template #results>
       <div v-if="field?.truncated" class="text-hint">{{ t('supernova.fieldTruncated') }}</div>
-
-      <div v-if="searchErrorMessage" class="text-[var(--color-danger)]">
-        {{ searchErrorMessage }}
-      </div>
-
       <div v-if="results !== null" class="flex flex-col gap-1">
         <div v-if="results.length === 0" class="text-hint">{{ t('supernova.noCandidates') }}</div>
         <label
@@ -114,26 +96,16 @@
         </label>
       </div>
     </template>
-
-    <template #footer>
-      <button type="button" class="btn-cancel" @click="$emit('close')">
-        {{ t('modal.cancel') }}
-      </button>
-      <button type="button" class="btn-confirm" :disabled="selected.size === 0" @click="onAdd">
-        {{ t('supernova.addSelected', { n: selected.size }) }}
-      </button>
-    </template>
-  </BaseModal>
+  </IdentifyModalShell>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue';
-import BaseModal from '../base/BaseModal.vue';
+import { ref, computed } from 'vue';
+import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
 import { computePhotoToProjMatrix } from '../../photo-placement';
 import { withCanonicalProjection } from '../../projection';
 import { tnsConesearchAPI } from '../../api';
-import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
 import { isoToUtcParts, utcPartsToIso } from '../../asteroid-identify';
 import {
   photoFieldCircle,
@@ -149,14 +121,12 @@ import {
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import { resolveCategory } from '../../poi';
 import pinSvg from '../../icons/supernova-pin.svg?raw';
-import type { Photo, AffineMatrix, PointOfInterest } from '../../types';
+import type { Photo, PointOfInterest } from '../../types';
 
 const props = defineProps<{ photo: Photo }>();
 // The modal never persists: the caller (PoiEditor.vue) pushes the POIs into its own
-// v-model, exactly like AsteroidIdentifyModal's `identified`.
+// v-model, like the asteroid and comet modals.
 const emit = defineEmits<{ close: []; identified: [Photo, PointOfInterest[]] }>();
-
-const photoToProj = computed<AffineMatrix | null>(() => computePhotoToProjMatrix(props.photo));
 
 const categoriesStore = usePoiCategoriesStore();
 void categoriesStore.ensureLoaded();
@@ -178,53 +148,6 @@ const obsTimeStr = computed({
     obsIso.value = utcPartsToIso(isoToUtcParts(obsIso.value).date, v);
   },
 });
-
-// ─── Zoom / pan (same options as the asteroid modal) ─────────────────────────
-const imgEl = ref<HTMLImageElement | null>(null);
-const photoContainerEl = ref<HTMLElement | null>(null);
-const zoomControlsHost = ref<HTMLElement | null>(null);
-let zoom: ZoomPanController | null = null;
-let unsubTransform: (() => void) | null = null;
-// Bumped on zoom/pan and whenever the image box resizes (image load, or the
-// "date required" line disappearing and giving the photo more room), so pin
-// positions — read from live getBoundingClientRect — are recomputed.
-const layoutVersion = ref(0);
-let resizeObserver: ResizeObserver | null = null;
-
-function teardownZoom() {
-  resizeObserver?.disconnect();
-  resizeObserver = null;
-  unsubTransform?.();
-  unsubTransform = null;
-  zoom?.destroy();
-  zoom = null;
-}
-
-function setupZoom() {
-  teardownZoom();
-  if (!imgEl.value || !photoContainerEl.value) return;
-  zoom = createImageZoomPan(imgEl.value, photoContainerEl.value, {
-    minScale: 1,
-    maxScale: 5,
-    fitButtons: true,
-    dblClick: 'none',
-  });
-  zoomControlsHost.value?.appendChild(zoom.controls);
-  unsubTransform = zoom.onTransformChange(() => {
-    layoutVersion.value++;
-  });
-  imgEl.value.addEventListener('load', () => layoutVersion.value++, { once: true });
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => layoutVersion.value++);
-    resizeObserver.observe(imgEl.value);
-  }
-}
-
-watch(imgEl, (el) => {
-  if (el) setupZoom();
-  else teardownZoom();
-});
-onUnmounted(teardownZoom);
 
 // ─── Search ─────────────────────────────────────────────────────────────────
 const searching = ref(false);
@@ -273,7 +196,7 @@ async function onSearch() {
 
 // One search on open when the date is already known — cached server-side, so
 // re-opening the modal on the same photo doesn't hit TNS's rate limit again.
-if (photoToProj.value && obsIso.value) void onSearch();
+if (computePhotoToProjMatrix(props.photo) && obsIso.value) void onSearch();
 
 function toggle(name: string, on: boolean) {
   const next = new Set(selected.value);
@@ -281,20 +204,6 @@ function toggle(name: string, on: boolean) {
   else next.delete(name);
   selected.value = next;
 }
-
-/** Screen position of each candidate, relative to the (possibly zoomed) image box. */
-const pinMarks = computed(() => {
-  const _dep = layoutVersion.value; // reactive dependency — see layoutVersion
-  if (!results.value || !imgEl.value || !photoContainerEl.value) return [];
-  const imgRect = imgEl.value.getBoundingClientRect();
-  const containerRect = photoContainerEl.value.getBoundingClientRect();
-  if (imgRect.width <= 0) return [];
-  return results.value.map((c) => ({
-    name: c.name,
-    dispX: imgRect.left - containerRect.left + (c.x / props.photo.width) * imgRect.width,
-    dispY: imgRect.top - containerRect.top + (c.y / props.photo.height) * imgRect.height,
-  }));
-});
 
 function onAdd() {
   if (!results.value) return;

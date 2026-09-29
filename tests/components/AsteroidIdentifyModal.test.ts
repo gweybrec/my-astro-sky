@@ -1,9 +1,10 @@
 /**
  * Tests for AsteroidIdentifyModal.vue: marking the trail on the photo converts
  * clicks to photo pixels, times pre-fill from the photo's observation date +
- * integration time, Identify calls the SkyBoT API and ranks results, and
- * choosing a candidate emits `identified` with the photo and the formatted POI
- * — the modal itself never persists (see the component's doc comment).
+ * integration time and sit above the photo, Search calls the SkyBoT API and ranks
+ * results as checkbox rows (best match pre-ticked, selection kept across pages),
+ * and "Add selected" emits `identified` with the photo and positioned POIs — the
+ * modal itself never persists (see the component's doc comment).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -88,6 +89,44 @@ afterEach(() => {
 });
 
 describe('AsteroidIdentifyModal', () => {
+  const candidate = (i: number, over: Record<string, unknown> = {}) => ({
+    number: String(i),
+    name: `Test ${i}`,
+    raDeg: 186.966,
+    decDeg: 12.89,
+    className: 'MB>Middle',
+    vMag: 20,
+    ephemErrArcsec: 0.02,
+    distArcsec: 10,
+    dRaArcsecPerHour: -1,
+    dDecArcsecPerHour: 1,
+    ...over,
+  });
+  const buttonByText = (text: string) =>
+    Array.from(document.body.querySelectorAll('button')).find((b) =>
+      b.textContent?.trim().startsWith(text),
+    ) as HTMLButtonElement;
+  const checkboxes = () =>
+    Array.from(document.body.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+
+  /** Marks a short trail on the photo, then clicks Search. */
+  async function markAndSearch(wrapper: ReturnType<typeof mountModal>) {
+    stubImageRect(wrapper, 1233, 931);
+    await wrapper.vm.$nextTick();
+    const clickTarget = document.body.querySelector('.modal-photo-container') as HTMLElement;
+    clickTarget.dispatchEvent(
+      new MouseEvent('click', { clientX: 600, clientY: 460, bubbles: true }),
+    );
+    await wrapper.vm.$nextTick();
+    clickTarget.dispatchEvent(
+      new MouseEvent('click', { clientX: 610, clientY: 465, bubbles: true }),
+    );
+    await wrapper.vm.$nextTick();
+    buttonByText('Search').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+  }
+
   it('pre-fills start/end date+time (UTC, not local) from observation date + integration time', () => {
     const wrapper = mountModal();
     const dateInputs = document.body.querySelectorAll('input[type="date"]');
@@ -105,6 +144,19 @@ describe('AsteroidIdentifyModal', () => {
     expect((timeInputs[0] as HTMLInputElement).value).toBe(start.time);
     expect((dateInputs[1] as HTMLInputElement).value).toBe(end.date);
     expect((timeInputs[1] as HTMLInputElement).value).toBe(end.time);
+    wrapper.unmount();
+  });
+
+  it('lays out the times and the Search button above the photo, like the other identify modals', () => {
+    const wrapper = mountModal();
+    const photo = document.body.querySelector('.modal-photo-container')!;
+    const firstDate = document.body.querySelector('input[type="date"]')!;
+    const search = buttonByText('Search');
+    const before = (a: Node, b: Node) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(firstDate, photo)).toBe(true);
+    expect(before(search, photo)).toBe(true);
+    expect(buttonByText('Add selected (0)').disabled).toBe(true);
     wrapper.unmount();
   });
 
@@ -137,12 +189,12 @@ describe('AsteroidIdentifyModal', () => {
     setVal(dateInputs[1], '2026-04-08');
     setVal(timeInputs[1], '23:39');
     await wrapper.vm.$nextTick();
+    // Editing the times never searches by itself.
+    expect(mockConesearch).not.toHaveBeenCalled();
 
-    const identifyBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Identify'),
-    ) as HTMLButtonElement;
-    expect(identifyBtn.disabled).toBe(false);
-    identifyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const searchBtn = buttonByText('Search');
+    expect(searchBtn.disabled).toBe(false);
+    searchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushPromises();
 
     // The mid-epoch JD sent to SkyBoT must be derived from the *literal* UTC
@@ -171,180 +223,95 @@ describe('AsteroidIdentifyModal', () => {
     );
     await wrapper.vm.$nextTick();
 
-    // Two markers should now render (start = success color, end = danger color).
-    const markers = document.body.querySelectorAll('.rounded-full.pointer-events-none');
+    // Two markers should now render (start = success color, end = danger color), at
+    // the clicked spots (1:1 display scale).
+    const markers = document.body.querySelectorAll<HTMLElement>(
+      '.rounded-full.pointer-events-none',
+    );
     expect(markers.length).toBe(2);
+    expect(parseFloat(markers[0].style.left)).toBeCloseTo(100, 0);
+    expect(parseFloat(markers[1].style.top)).toBeCloseTo(220, 0);
     wrapper.unmount();
   });
 
-  it('does not enable Identify until both markers and both times are set', () => {
+  it('does not enable Search until both markers and both times are set', () => {
     const wrapper = mountModal();
-    const identifyBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Identify'),
-    ) as HTMLButtonElement;
-    expect(identifyBtn.disabled).toBe(true);
+    expect(buttonByText('Search').disabled).toBe(true);
     wrapper.unmount();
   });
 
-  it('searches SkyBoT and ranks candidates, then emits identified with the chosen POI', async () => {
+  it('searches SkyBoT, pre-ticks the best match, and emits it as a positioned POI', async () => {
     mockConesearch.mockResolvedValue([
-      {
-        number: '18799',
+      candidate(18799, {
         name: '1999 JZ73',
-        raDeg: 186.966,
-        decDeg: 12.89,
-        className: 'MB>Middle',
         vMag: 17.6,
-        ephemErrArcsec: 0.02,
-        distArcsec: 10,
         dRaArcsecPerHour: -33.2244,
         dDecArcsecPerHour: 5.4436,
-      },
+      }),
     ]);
-
     const wrapper = mountModal();
-    stubImageRect(wrapper, 1233, 931);
-    await wrapper.vm.$nextTick();
-
-    const clickTarget = document.body.querySelector('.modal-photo-container') as HTMLElement;
-    clickTarget.dispatchEvent(
-      new MouseEvent('click', { clientX: 600, clientY: 460, bubbles: true }),
-    );
-    await wrapper.vm.$nextTick();
-    clickTarget.dispatchEvent(
-      new MouseEvent('click', { clientX: 610, clientY: 465, bubbles: true }),
-    );
-    await wrapper.vm.$nextTick();
-
-    const identifyBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Identify'),
-    ) as HTMLButtonElement;
-    expect(identifyBtn.disabled).toBe(false);
-    identifyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await flushPromises();
-    await wrapper.vm.$nextTick();
+    await markAndSearch(wrapper);
 
     expect(mockConesearch).toHaveBeenCalledTimes(1);
+    expect(checkboxes().map((c) => c.checked)).toEqual([true]);
 
-    const addBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Add as point of interest'),
-    ) as HTMLButtonElement;
-    expect(addBtn).toBeTruthy();
-    addBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
+    buttonByText('Add selected (1)').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const emitted = wrapper.emitted('identified');
     expect(emitted).toBeTruthy();
-    const [emittedPhoto, emittedPoi] = emitted![0] as [Photo, { name: string; categoryId: string }];
+    const [emittedPhoto, pois] = emitted![0] as [Photo, unknown[]];
     expect(emittedPhoto.id).toBe('p1');
-    expect(emittedPoi).toEqual({ name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid' });
+    expect(pois).toEqual([
+      {
+        name: '(18799) 1999 JZ73',
+        categoryId: 'cat-asteroid',
+        ra: 186.966,
+        dec: 12.89,
+      },
+    ]);
     wrapper.unmount();
   });
 
-  it('paginates a large result list instead of dumping every row at once', async () => {
-    mockConesearch.mockResolvedValue(
-      Array.from({ length: 10 }, (_, i) => ({
-        number: String(i),
-        name: `Test ${i}`,
-        raDeg: 186.966,
-        decDeg: 12.89,
-        className: 'MB>Middle',
-        vMag: 20,
-        ephemErrArcsec: 0.02,
-        distArcsec: 10,
-        dRaArcsecPerHour: -1,
-        dDecArcsecPerHour: 1,
-      })),
-    );
-
+  it('paginates a large result list and keeps the selection across pages', async () => {
+    mockConesearch.mockResolvedValue(Array.from({ length: 10 }, (_, i) => candidate(i)));
     const wrapper = mountModal();
-    stubImageRect(wrapper, 1233, 931);
-    await wrapper.vm.$nextTick();
-
-    const clickTarget = document.body.querySelector('.modal-photo-container') as HTMLElement;
-    clickTarget.dispatchEvent(
-      new MouseEvent('click', { clientX: 600, clientY: 460, bubbles: true }),
-    );
-    await wrapper.vm.$nextTick();
-    clickTarget.dispatchEvent(
-      new MouseEvent('click', { clientX: 610, clientY: 465, bubbles: true }),
-    );
-    await wrapper.vm.$nextTick();
-
-    const identifyBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Identify'),
-    ) as HTMLButtonElement;
-    identifyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await flushPromises();
-    await wrapper.vm.$nextTick();
+    await markAndSearch(wrapper);
 
     // 10 candidates, page size 6: first page shows 6 rows + the same pagination
     // widget (markup/classes/page-range algorithm) as the Targets tab's result
     // list — see targets-view.ts's buildPageList, reused here directly.
-    let addButtons = Array.from(document.body.querySelectorAll('button')).filter((b) =>
-      b.textContent?.includes('Add as point of interest'),
-    );
-    expect(addButtons.length).toBe(6);
+    expect(checkboxes().length).toBe(6);
     expect(document.body.querySelector('.targets-pagination')).toBeTruthy();
     expect(document.body.querySelector('.targets-pagination-info')?.textContent).toContain('10');
 
     const nextBtn = Array.from(document.body.querySelectorAll('button')).find(
       (b) => b.title === 'Next page',
     ) as HTMLButtonElement;
-    expect(nextBtn).toBeTruthy();
-
     nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await wrapper.vm.$nextTick();
 
-    // Second (last) page shows the remaining 4 rows.
-    addButtons = Array.from(document.body.querySelectorAll('button')).filter((b) =>
-      b.textContent?.includes('Add as point of interest'),
-    );
-    expect(addButtons.length).toBe(4);
+    // Second (last) page shows the remaining 4 rows; tick one of them.
+    expect(checkboxes().length).toBe(4);
+    const last = checkboxes()[3];
+    last.checked = true;
+    last.dispatchEvent(new Event('change'));
+    await wrapper.vm.$nextTick();
 
     // Clicking Next again on the last page is a clamped no-op, not an error.
     nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await wrapper.vm.$nextTick();
-    addButtons = Array.from(document.body.querySelectorAll('button')).filter((b) =>
-      b.textContent?.includes('Add as point of interest'),
-    );
-    expect(addButtons.length).toBe(4);
+    expect(checkboxes().length).toBe(4);
+
+    // The first page's pre-ticked best match is still selected: two POIs are added.
+    buttonByText('Add selected (2)').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const [, pois] = wrapper.emitted('identified')![0] as [Photo, { name: string }[]];
+    expect(pois).toHaveLength(2);
     wrapper.unmount();
   });
 
   it('centres the pagination widget rather than leaving it stuck left below the results', async () => {
-    mockConesearch.mockResolvedValue(
-      Array.from({ length: 10 }, (_, i) => ({
-        number: String(i),
-        name: `Test ${i}`,
-        raDeg: 186.966,
-        decDeg: 12.89,
-        className: 'MB>Middle',
-        vMag: 20,
-        ephemErrArcsec: 0.02,
-        distArcsec: 10,
-        dRaArcsecPerHour: -1,
-        dDecArcsecPerHour: 1,
-      })),
-    );
-
+    mockConesearch.mockResolvedValue(Array.from({ length: 10 }, (_, i) => candidate(i)));
     const wrapper = mountModal();
-    stubImageRect(wrapper, 1233, 931);
-    await wrapper.vm.$nextTick();
-    const clickTarget = document.body.querySelector('.modal-photo-container') as HTMLElement;
-    clickTarget.dispatchEvent(
-      new MouseEvent('click', { clientX: 600, clientY: 460, bubbles: true }),
-    );
-    await wrapper.vm.$nextTick();
-    clickTarget.dispatchEvent(
-      new MouseEvent('click', { clientX: 610, clientY: 465, bubbles: true }),
-    );
-    await wrapper.vm.$nextTick();
-    const identifyBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Identify'),
-    ) as HTMLButtonElement;
-    identifyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await flushPromises();
-    await wrapper.vm.$nextTick();
+    await markAndSearch(wrapper);
 
     // The pagination widget's immediate parent centres it (flex justify-center),
     // rather than the widget itself sitting flush-left in normal block flow.
@@ -356,24 +323,18 @@ describe('AsteroidIdentifyModal', () => {
   it('sends the same SkyBoT search while the zenith-centred sky map has the field below the horizon', async () => {
     // Field around RA 12h28m, Dec +13°: at LST 0.5h from 48°N it is ~12 h from the meridian.
     const photo = makePhoto({
-      manualPlacement: { ...placement, centerRa: 186.97, centerDec: 12.89, projPerPx: 0.00002 },
+      manualPlacement: {
+        ...placement,
+        centerRa: 186.97,
+        centerDec: 12.89,
+        projPerPx: 0.00002,
+      },
     });
     const searchParams = async () => {
       mockConesearch.mockReset();
       mockConesearch.mockResolvedValue([]);
       const wrapper = mountModal(photo);
-      stubImageRect(wrapper, 1233, 931);
-      await wrapper.vm.$nextTick();
-      const target = document.body.querySelector('.modal-photo-container') as HTMLElement;
-      target.dispatchEvent(new MouseEvent('click', { clientX: 600, clientY: 460, bubbles: true }));
-      await wrapper.vm.$nextTick();
-      target.dispatchEvent(new MouseEvent('click', { clientX: 610, clientY: 465, bubbles: true }));
-      await wrapper.vm.$nextTick();
-      const identifyBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-        b.textContent?.includes('Identify'),
-      ) as HTMLButtonElement;
-      identifyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await flushPromises();
+      await markAndSearch(wrapper);
       wrapper.unmount();
       document.body.innerHTML = '';
       return mockConesearch.mock.calls[0][0];

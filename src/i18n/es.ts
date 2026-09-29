@@ -759,17 +759,24 @@ const es: Translations = {
       '¿Eliminar el tipo «{name}»? Las fotos conservan sus puntos de interés como Sin tipo.',
     colorLabel: 'Color',
   },
+  identify: {
+    search: 'Buscar',
+    searching: 'Buscando…',
+    addSelected: 'Añadir selección ({n})',
+    obsDateLabel: 'Fecha de observación (UTC)',
+    dateRequired: 'Esta foto no tiene fecha de observación: introdúzcala para buscar.',
+  },
   asteroid: {
     menuLabel: 'Identificar asteroide',
     title: 'Identificar asteroide',
+    intro:
+      'Marque el inicio y el final de la traza en la foto: IMCCE SkyBoT busca los asteroides conocidos que pasaban por allí entre esos dos instantes.',
     markHint: 'Haga clic en la estela para colocar el marcador seleccionado',
     markStart: 'Inicio',
     markEnd: 'Fin',
     startTimeLabel: 'Hora de inicio (UTC)',
     endTimeLabel: 'Hora de fin (UTC)',
     radiusLabel: 'Radio de búsqueda (arcmin)',
-    identifyButton: 'Identificar',
-    searching: 'Buscando…',
     searchError: 'Fallo en la búsqueda SkyBoT: {message}',
     noCandidates: 'No se encontró ningún asteroide coincidente dentro del radio de búsqueda',
     colMag: 'Mag',
@@ -781,18 +788,13 @@ const es: Translations = {
     classCentaur: 'Centauro',
     classTrojan: 'Troyano',
     uncertainOrbit: 'Órbita incierta',
-    addAsPoi: 'Añadir como punto de interés',
-    added: '«{name}» añadido a los puntos de interés',
+    added: '{names} añadido(s) a los puntos de interés',
   },
   supernova: {
     menuLabel: 'Identificar supernovas',
     title: 'Identificar supernovas',
     intro:
       'Busca en el Transient Name Server (TNS) las supernovas descubiertas en el campo de esta foto hasta un año antes de su fecha de observación.',
-    obsDateLabel: 'Fecha de observación (UTC)',
-    dateRequired: 'Esta foto no tiene fecha de observación: introdúcela para buscar.',
-    searchButton: 'Buscar',
-    searching: 'Buscando…',
     searchError: 'Fallo en la búsqueda TNS: {message}',
     noCandidates: 'Ninguna supernova conocida en este campo alrededor de la fecha de observación',
     fieldTruncated: 'Campo amplio: solo se busca en un radio central de 60′',
@@ -805,7 +807,6 @@ const es: Translations = {
     daysAfter: '{n} d después del descubrimiento',
     daysBefore: '{n} d antes del descubrimiento',
     viewOnTns: 'Ver en TNS',
-    addSelected: 'Añadir selección ({n})',
     added: '{names} añadido(s) a los puntos de interés',
   },
   comet: {
@@ -813,9 +814,6 @@ const es: Translations = {
     title: 'Identificar cometas',
     intro:
       'Calcula dónde estaban los cometas conocidos por el Minor Planet Center a la hora de observación de esta foto, a partir de sus órbitas actuales. Las posiciones son aproximadas (unos minutos de arco) y no se listan los cometas apagados hace tiempo.',
-    obsDateLabel: 'Fecha de observación (UTC)',
-    dateRequired: 'Esta foto no tiene fecha de observación: introdúzcala para buscar cometas.',
-    loading: 'Cargando las órbitas de los cometas…',
     loadError: 'No se pudieron cargar las órbitas de los cometas: {message}',
     noCandidates: 'Ningún cometa conocido en esta foto a la hora de observación',
     clickToAdjust: 'Haga clic en la foto para mover el marcador de {name} a su núcleo',
@@ -828,7 +826,6 @@ const es: Translations = {
     nearbyHint:
       'Justo fuera del encuadre a esta hora. Si esperaba uno de estos cometas, compruebe la fecha y la hora de observación: un cometa puede desplazarse varios grados en pocos días.',
     awayDeg: 'a {n}° del centro',
-    addSelected: 'Añadir selección ({n})',
     added: '{names} añadido(s) a los puntos de interés',
   },
   gallery: {
@@ -846,7 +843,7 @@ const es: Translations = {
     showDsosUnavailable: 'Esta foto aún no está colocada en el mapa del cielo',
     showPois: 'Mostrar puntos de interés',
     showPoisUnavailable:
-      'Ningún punto de interés posicionado en esta foto: use «Identificar supernovas» para añadir uno',
+      'Ningún punto de interés localizado en esta foto: los asteroides, cometas y supernovas identificados se marcan; los nombres escritos a mano, no',
     filterLabels: 'Etiquetas',
     filterSetups: 'Equipos',
     filterTypes: 'Tipos',

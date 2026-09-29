@@ -243,12 +243,17 @@ export function formatCandidateName(c: Pick<SkybotCandidate, 'number' | 'name'>)
   return c.number ? `(${c.number}) ${c.name}` : c.name;
 }
 
-/** Builds the PointOfInterest to append to a photo for a chosen candidate. */
+/**
+ * Builds the PointOfInterest to append to a photo for a chosen candidate, with the
+ * candidate's position at the search epoch (mid-trail) so it can be pinned on the
+ * photo and the sky map like identified comets and supernovae.
+ */
 export function candidateToPoi(
-  c: Pick<SkybotCandidate, 'number' | 'name'>,
+  c: Pick<SkybotCandidate, 'number' | 'name' | 'raDeg' | 'decDeg'>,
   categoryId: string,
 ): PointOfInterest {
-  return { name: formatCandidateName(c), categoryId };
+  const ra = ((c.raDeg % 360) + 360) % 360;
+  return { name: formatCandidateName(c), categoryId, ra, dec: c.decDeg };
 }
 
 // SkyBoT's dynamical classification arrives as a raw code — "MB>Middle",

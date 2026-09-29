@@ -214,11 +214,18 @@ describe('formatCandidateName() / candidateToPoi()', () => {
     expect(formatCandidateName({ number: null, name: '2018 PT9' })).toBe('2018 PT9');
   });
 
-  it('builds a POI with the given category', () => {
-    expect(candidateToPoi({ number: '18799', name: '1999 JZ73' }, 'cat-asteroid')).toEqual({
-      name: '(18799) 1999 JZ73',
-      categoryId: 'cat-asteroid',
-    });
+  it('builds a POI with the given category and the candidate position (so it can be pinned)', () => {
+    expect(
+      candidateToPoi(
+        { number: '18799', name: '1999 JZ73', raDeg: 186.966, decDeg: 12.89 },
+        'cat-asteroid',
+      ),
+    ).toEqual({ name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid', ra: 186.966, dec: 12.89 });
+  });
+
+  it('normalises the POI right ascension to [0, 360)', () => {
+    const poi = candidateToPoi({ number: null, name: 'X', raDeg: -0.5, decDeg: 1 }, 'cat-asteroid');
+    expect(poi.ra).toBeCloseTo(359.5, 9);
   });
 });
 

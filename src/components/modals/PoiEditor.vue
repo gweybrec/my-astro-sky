@@ -114,14 +114,11 @@ const canIdentifyAsteroid = computed(
 
 function onIdentifyAsteroid() {
   if (!props.photo) return;
-  triggerAsteroidModal(props.photo, (_photo, poi) => {
-    emit('update:pois', [...props.pois, poi]);
-    showToast({ message: t('asteroid.added', { name: poi.name }), type: 'info', duration: 3000 });
-  });
+  triggerAsteroidModal(props.photo, (_photo, pois) => addIdentifiedPois(pois, 'asteroid.added'));
 }
 
-// Several supernovae / comets can be added at once; one already on the photo
-// (same name) is skipped rather than duplicated.
+// Several asteroids / supernovae / comets can be added at once; one already on
+// the photo (same name) is skipped rather than duplicated.
 function addIdentifiedPois(pois: PointOfInterest[], toastKey: string) {
   const fresh = pois.filter((poi) => !props.pois.some((p) => p.name === poi.name));
   if (!fresh.length) return;

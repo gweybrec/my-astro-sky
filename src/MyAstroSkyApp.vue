@@ -153,12 +153,12 @@ const previousModal = ref<ModalName | null>(null);
 const uiStore = useUiStore();
 useKeyboardShortcuts();
 
-function onAsteroidIdentified(photo: Photo, poi: PointOfInterest) {
+function onAsteroidIdentified(photo: Photo, pois: PointOfInterest[]) {
   // Persistence is entirely the caller's job (see triggerAsteroidModal in
-  // ui.ts) — PoiEditor.vue's callback pushes the POI into its own `pois`
+  // ui.ts) — PoiEditor.vue's callback pushes the POIs into its own `pois`
   // v-model, which each of its two hosts (the gallery's metadata editor, or a
   // BatchUploadModal card) already knows how to save on its own terms.
-  uiStore.pendingAsteroidOnIdentified?.(photo, poi);
+  uiStore.pendingAsteroidOnIdentified?.(photo, pois);
   closeModal();
 }
 

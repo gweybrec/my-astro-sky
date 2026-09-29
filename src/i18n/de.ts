@@ -757,17 +757,24 @@ const de: Translations = {
       'Typ „{name}“ löschen? Fotos behalten ihre interessanten Objekte als „Ohne Typ“.',
     colorLabel: 'Farbe',
   },
+  identify: {
+    search: 'Suchen',
+    searching: 'Suche…',
+    addSelected: 'Auswahl hinzufügen ({n})',
+    obsDateLabel: 'Beobachtungsdatum (UTC)',
+    dateRequired: 'Dieses Foto hat kein Beobachtungsdatum – geben Sie es für die Suche ein.',
+  },
   asteroid: {
     menuLabel: 'Asteroid identifizieren',
     title: 'Asteroid identifizieren',
+    intro:
+      'Markieren Sie Anfang und Ende der Spur auf dem Foto: IMCCE SkyBoT sucht die bekannten Asteroiden, die dort zwischen diesen beiden Zeitpunkten vorbeizogen.',
     markHint: 'Klicken Sie auf die Spur, um den ausgewählten Marker zu setzen',
     markStart: 'Start',
     markEnd: 'Ende',
     startTimeLabel: 'Startzeit (UTC)',
     endTimeLabel: 'Endzeit (UTC)',
     radiusLabel: 'Suchradius (Bogenmin.)',
-    identifyButton: 'Identifizieren',
-    searching: 'Suche läuft…',
     searchError: 'SkyBoT-Suche fehlgeschlagen: {message}',
     noCandidates: 'Kein passender Asteroid im Suchradius gefunden',
     colMag: 'Mag',
@@ -779,18 +786,13 @@ const de: Translations = {
     classCentaur: 'Zentaur',
     classTrojan: 'Trojaner',
     uncertainOrbit: 'Unsichere Umlaufbahn',
-    addAsPoi: 'Als interessantes Objekt hinzufügen',
-    added: '„{name}“ zu den interessanten Objekten hinzugefügt',
+    added: '{names} zu den interessanten Objekten hinzugefügt',
   },
   supernova: {
     menuLabel: 'Supernovae identifizieren',
     title: 'Supernovae identifizieren',
     intro:
       'Durchsucht den Transient Name Server (TNS) nach Supernovae, die im Feld dieses Fotos bis zu einem Jahr vor dem Beobachtungsdatum entdeckt wurden.',
-    obsDateLabel: 'Beobachtungsdatum (UTC)',
-    dateRequired: 'Dieses Foto hat kein Beobachtungsdatum – geben Sie es für die Suche ein.',
-    searchButton: 'Suchen',
-    searching: 'Suche…',
     searchError: 'TNS-Suche fehlgeschlagen: {message}',
     noCandidates: 'Keine bekannte Supernova in diesem Feld um das Beobachtungsdatum',
     fieldTruncated: 'Weites Feld: nur ein zentraler Radius von 60′ wird durchsucht',
@@ -803,7 +805,6 @@ const de: Translations = {
     daysAfter: '{n} T nach der Entdeckung',
     daysBefore: '{n} T vor der Entdeckung',
     viewOnTns: 'Auf TNS ansehen',
-    addSelected: 'Auswahl hinzufügen ({n})',
     added: '{names} zu den Points of Interest hinzugefügt',
   },
   comet: {
@@ -811,10 +812,6 @@ const de: Translations = {
     title: 'Kometen identifizieren',
     intro:
       'Berechnet aus ihren aktuellen Bahnen, wo die dem Minor Planet Center bekannten Kometen zum Beobachtungszeitpunkt dieses Fotos standen. Die Positionen sind näherungsweise (einige Bogenminuten), längst verblasste Kometen werden nicht aufgeführt.',
-    obsDateLabel: 'Beobachtungsdatum (UTC)',
-    dateRequired:
-      'Dieses Foto hat kein Beobachtungsdatum – geben Sie es ein, um Kometen zu finden.',
-    loading: 'Kometenbahnen werden geladen…',
     loadError: 'Kometenbahnen konnten nicht geladen werden: {message}',
     noCandidates: 'Kein bekannter Komet in diesem Foto zum Beobachtungszeitpunkt',
     clickToAdjust:
@@ -828,7 +825,6 @@ const de: Translations = {
     nearbyHint:
       'Zu diesem Zeitpunkt knapp außerhalb des Bildes. Wenn Sie einen dieser Kometen erwartet haben, prüfen Sie Beobachtungsdatum und -uhrzeit: Ein Komet kann in wenigen Tagen mehrere Grad zurücklegen.',
     awayDeg: '{n}° vom Zentrum',
-    addSelected: 'Auswahl hinzufügen ({n})',
     added: '{names} zu den Points of Interest hinzugefügt',
   },
   gallery: {
@@ -846,7 +842,7 @@ const de: Translations = {
     showDsosUnavailable: 'Dieses Foto ist noch nicht auf der Himmelskarte platziert',
     showPois: 'Points of Interest anzeigen',
     showPoisUnavailable:
-      'Kein positionierter Point of Interest auf diesem Foto – mit „Supernovae identifizieren“ hinzufügen',
+      'Kein interessantes Objekt mit Position auf diesem Foto – identifizierte Asteroiden, Kometen und Supernovae werden markiert, von Hand eingegebene Namen nicht',
     filterLabels: 'Etiketten',
     filterSetups: 'Ausrüstung',
     filterTypes: 'Typen',

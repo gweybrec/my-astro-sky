@@ -82,11 +82,11 @@ export const useUiStore = defineStore('ui', () => {
   // "just persist to the server" behaviour did.
   const pendingAsteroidPhoto = ref<Photo | null>(null);
   const pendingAsteroidOnIdentified = shallowRef<
-    ((photo: Photo, poi: PointOfInterest) => void) | null
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
   >(null);
 
   // Same contract as the asteroid pair above, for the supernova identification
-  // modal (triggerSupernovaModal) — which can hand back several POIs at once.
+  // modal (triggerSupernovaModal).
   const pendingSupernovaPhoto = ref<Photo | null>(null);
   const pendingSupernovaOnIdentified = shallowRef<
     ((photo: Photo, pois: PointOfInterest[]) => void) | null

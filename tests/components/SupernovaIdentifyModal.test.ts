@@ -143,7 +143,12 @@ describe('SupernovaIdentifyModal', () => {
     const date = document.body.querySelector('input[type="date"]') as HTMLInputElement;
     date.value = '2025-10-15';
     date.dispatchEvent(new Event('input'));
+    const time = document.body.querySelector('input[type="time"]') as HTMLInputElement;
+    time.value = '21:30';
+    time.dispatchEvent(new Event('input'));
     await flushPromises();
+    // Editing the date and then the time never searches by itself (TNS rate limit).
+    expect(mockSearch).not.toHaveBeenCalled();
     expect(byText('Search')!.disabled).toBe(false);
     byText('Search')!.click();
     await flushPromises();

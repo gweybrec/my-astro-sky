@@ -155,23 +155,25 @@ describe('PoiEditor "Identifier un astéroïde" trigger', () => {
     wrapper.unmount();
   });
 
-  it("appends the modal's result to the POI list via the callback, without persisting itself", async () => {
+  it("appends the modal's results to the POI list via the callback, without persisting itself", async () => {
     const photo = makeSolvedPhoto();
-    const existing: PointOfInterest[] = [{ name: 'Existing', categoryId: 'cat-a' }];
+    const existing: PointOfInterest[] = [
+      { name: 'Existing', categoryId: 'cat-a' },
+      { name: '(4) Vesta', categoryId: 'cat-asteroid', ra: 186.9, dec: 12.8 },
+    ];
     const wrapper = makeWrapper(existing, photo);
     const btn = findAsteroidButton(wrapper);
     await btn!.trigger('click');
 
     // Simulate the modal resolving: invoke the callback triggerAsteroidModal was given.
+    // An asteroid already on the photo (same name) is skipped, not duplicated.
     const onIdentified = mockTrigger.mock.calls[0][1];
-    onIdentified(photo, { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid' });
+    const jz73 = { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid', ra: 186.97, dec: 12.89 };
+    onIdentified(photo, [existing[1], jz73]);
 
     const emitted = wrapper.emitted('update:pois');
     expect(emitted).toBeTruthy();
-    expect(emitted![0][0]).toEqual([
-      ...existing,
-      { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid' },
-    ]);
+    expect(emitted![0][0]).toEqual([...existing, jz73]);
     wrapper.unmount();
   });
 });

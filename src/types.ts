@@ -71,7 +71,8 @@ export interface PointOfInterest {
   name: string;
   categoryId: string;
   /** Sky position in degrees — set when the POI was identified at a fixed position
-   * (e.g. a supernova); such POIs are pinned on the photo and the sky map. */
+   * (an identified asteroid, comet or supernova); such POIs are pinned on the photo
+   * and the sky map. Names typed by hand have none. */
   ra?: number;
   dec?: number;
 }
