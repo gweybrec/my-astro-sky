@@ -26,33 +26,24 @@
       <button
         type="button"
         class="integration-add-btn"
-        :disabled="!canIdentifyAsteroid"
+        :disabled="!isSolved"
+        :title="isSolved ? undefined : t('poi.addNeedsSolve')"
         @click="onAddPoi"
       >
         {{ t('poi.addPoi') }}
       </button>
-      <button
-        v-if="canIdentifyAsteroid"
-        type="button"
-        class="integration-add-btn"
-        @click="onIdentifyAsteroid"
-      >
+      <button v-if="isSolved" type="button" class="integration-add-btn" @click="onIdentifyAsteroid">
         {{ t('asteroid.menuLabel') }}
       </button>
       <button
-        v-if="canIdentifyAsteroid"
+        v-if="isSolved"
         type="button"
         class="integration-add-btn"
         @click="onIdentifySupernovae"
       >
         {{ t('supernova.menuLabel') }}
       </button>
-      <button
-        v-if="canIdentifyAsteroid"
-        type="button"
-        class="integration-add-btn"
-        @click="onIdentifyComets"
-      >
+      <button v-if="isSolved" type="button" class="integration-add-btn" @click="onIdentifyComets">
         {{ t('comet.menuLabel') }}
       </button>
     </div>
@@ -76,17 +67,15 @@ import {
 import { showToast } from '../../toast';
 
 // `photo` is optional/nullable because PoiEditor is also used before a photo
-// exists yet (a BatchUploadModal card, pre-placement — see BatchCard.vue): the
-// "Identifier un astéroïde" trigger needs a real, already-solved, server-hosted
-// photo (to show the image and place markers on it) and simply doesn't render
-// until one is available, exactly like "+ Ajouter un point d'intérêt" itself
-// works regardless.
+// exists yet (a BatchUploadModal card, pre-placement — see BatchCard.vue). Every
+// trigger here opens a modal that needs a real, already-solved, server-hosted
+// photo (to show the image and turn a click into RA/Dec): until one is
+// available the identify buttons don't render, and "+ Ajouter un point
+// d'intérêt" stays visible but disabled, with a tooltip saying why.
 const props = defineProps<{ pois: PointOfInterest[]; photo?: Photo | null }>();
 const emit = defineEmits<{ 'update:pois': [PointOfInterest[]] }>();
 
-const canIdentifyAsteroid = computed(
-  () => !!props.photo && computePhotoToProjMatrix(props.photo) !== null,
-);
+const isSolved = computed(() => !!props.photo && computePhotoToProjMatrix(props.photo) !== null);
 
 function onIdentifyAsteroid() {
   if (!props.photo) return;
@@ -94,10 +83,15 @@ function onIdentifyAsteroid() {
 }
 
 // Several asteroids / supernovae / comets can be added at once; one already on
-// the photo (same name) is skipped rather than duplicated.
+// the photo (same name and type) is skipped rather than duplicated.
 function addIdentifiedPois(pois: PointOfInterest[], toastKey: string) {
-  const fresh = pois.filter((poi) => !props.pois.some((p) => p.name === poi.name));
-  if (!fresh.length) return;
+  const fresh = pois.filter(
+    (poi) => !props.pois.some((p) => p.name === poi.name && p.categoryId === poi.categoryId),
+  );
+  if (!fresh.length) {
+    if (pois.length) showToast({ message: t('poi.alreadyListed'), type: 'info', duration: 3000 });
+    return;
+  }
   emit('update:pois', [...props.pois, ...fresh]);
   showToast({
     message: t(toastKey, { names: fresh.map((p) => p.name).join(', ') }),

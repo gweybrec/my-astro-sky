@@ -750,7 +750,9 @@ const fr = {
     addIntro:
       'Nommez le point d’intérêt, choisissez son type, puis cliquez sur la photo pour le positionner.',
     addConfirm: 'Ajouter',
+    addNeedsSolve: 'Placez d’abord la photo sur la carte du ciel pour ajouter un point d’intérêt',
     added: '{names} ajouté(s) aux points d’intérêt',
+    alreadyListed: 'Déjà présent dans les points d’intérêt',
     nameLabel: 'Nom',
     typeLabel: 'Type',
     addType: '+ Ajouter un type',

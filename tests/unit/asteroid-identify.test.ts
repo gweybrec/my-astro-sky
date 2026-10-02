@@ -157,6 +157,26 @@ describe('buildSearch()', () => {
     expect(search.epochJd).toBeCloseTo(2461139.45, 5);
     expect(search.suggestedRadiusArcmin).toBeGreaterThanOrEqual(5);
   });
+
+  it('centres a trail crossing RA 0h/24h on the seam, not on the opposite side of the sky', () => {
+    const search = buildSearch(
+      { ra: 359.98, dec: 10 },
+      { ra: 0.02, dec: 10 },
+      2461139.4,
+      2461139.5,
+    );
+    // Midpoint is RA 0° (equivalently 360°), never 180°.
+    expect(Math.cos((search.raDeg * Math.PI) / 180)).toBeCloseTo(1, 9);
+    expect(search.raDeg).toBeGreaterThanOrEqual(0);
+    expect(search.raDeg).toBeLessThan(360);
+    // A 0.04° (2.4′) trail: radius stays close to the floor instead of saturating at 60′.
+    expect(search.suggestedRadiusArcmin).toBeLessThan(15);
+  });
+
+  it('wraps the midpoint back into [0, 360) when the trail crosses the seam westward', () => {
+    const search = buildSearch({ ra: 0.01, dec: 0 }, { ra: 359.95, dec: 0 }, 2461139.4, 2461139.5);
+    expect(search.raDeg).toBeCloseTo(359.98, 6);
+  });
 });
 
 describe('rankCandidates()', () => {
@@ -202,6 +222,35 @@ describe('rankCandidates()', () => {
     };
     const ranked = rankCandidates([uncertain], { start, end }, queryEpochJd);
     expect(ranked[0].uncertainOrbit).toBe(true);
+  });
+
+  it('matches a candidate across the RA 0h/24h seam', () => {
+    // Marks straddle the seam (359.99° → 0.01°, over one hour); the true object is
+    // cataloged at RA 0° at mid-epoch, moving +0.02°/h (72″/h) in RA.
+    const seamStart = { ra: 359.99, dec: 0, jd: 2461139.0 };
+    const seamEnd = { ra: 0.01, dec: 0, jd: 2461139.0 + 1 / 24 };
+    const midJd = (seamStart.jd + seamEnd.jd) / 2;
+    const base: SkybotCandidate = {
+      number: null,
+      name: 'on-seam',
+      raDeg: 0,
+      decDeg: 0,
+      className: 'MB>Inner',
+      vMag: 18,
+      ephemErrArcsec: 0.1,
+      distArcsec: null,
+      dRaArcsecPerHour: 72,
+      dDecArcsecPerHour: 0,
+    };
+    // 3′ away on the far side of the seam, same motion.
+    const offSeam: SkybotCandidate = { ...base, name: 'off-seam', raDeg: 359.95 };
+
+    const ranked = rankCandidates([offSeam, base], { start: seamStart, end: seamEnd }, midJd);
+    expect(ranked[0].name).toBe('on-seam');
+    expect(ranked[0].positionErrorArcsec).toBeLessThan(1);
+    expect(ranked[0].motionErrorArcsec).toBeLessThan(1);
+    expect(ranked[1].positionErrorArcsec).toBeCloseTo(180, 0);
+    expect(ranked[1].motionErrorArcsec).toBeLessThan(1);
   });
 });
 

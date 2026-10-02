@@ -10,6 +10,9 @@ vi.mock('../../src/ui', () => ({
   triggerCometModal: vi.fn(),
   triggerPoiAddModal: vi.fn(),
 }));
+vi.mock('../../src/toast', () => ({ showToast: vi.fn() }));
+import { showToast } from '../../src/toast';
+const mockShowToast = vi.mocked(showToast);
 import {
   triggerAsteroidModal,
   triggerSupernovaModal,
@@ -79,6 +82,7 @@ describe('PoiEditor "+ Add point of interest" trigger', () => {
 
   beforeEach(() => {
     mockPoiAddTrigger.mockReset();
+    mockShowToast.mockReset();
   });
 
   it('has no inline name input or type dropdown any more', () => {
@@ -95,6 +99,47 @@ describe('PoiEditor "+ Add point of interest" trigger', () => {
     const unsolved = makeWrapper([], makeSolvedPhoto({ manualPlacement: undefined }));
     expect(findAddButton(unsolved)!.attributes('disabled')).toBeDefined();
     unsolved.unmount();
+  });
+
+  it('explains why it is disabled in a tooltip, and drops the tooltip once solved', () => {
+    const unsolved = makeWrapper([], makeSolvedPhoto({ manualPlacement: undefined }));
+    expect(findAddButton(unsolved)!.attributes('title')).toBe(
+      'Place the photo on the sky map first to add a point of interest',
+    );
+    unsolved.unmount();
+    const solved = makeWrapper([], makeSolvedPhoto());
+    expect(findAddButton(solved)!.attributes('disabled')).toBeUndefined();
+    expect(findAddButton(solved)!.attributes('title')).toBeUndefined();
+    solved.unmount();
+  });
+
+  it('adds a POI whose name is already used by another type', async () => {
+    const photo = makeSolvedPhoto();
+    const existing: PointOfInterest[] = [{ name: 'Foo', categoryId: 'cat-a' }];
+    const wrapper = makeWrapper(existing, photo);
+    await findAddButton(wrapper)!.trigger('click');
+
+    const sameNameOtherType = { name: 'Foo', categoryId: 'cat-b', ra: 10, dec: 20 };
+    mockPoiAddTrigger.mock.calls[0][1](photo, [sameNameOtherType]);
+    expect(wrapper.emitted('update:pois')![0][0]).toEqual([...existing, sameNameOtherType]);
+    wrapper.unmount();
+  });
+
+  it('says so instead of closing silently when the POI is already listed', async () => {
+    const photo = makeSolvedPhoto();
+    const existing: PointOfInterest[] = [{ name: 'Foo', categoryId: 'cat-a' }];
+    const wrapper = makeWrapper(existing, photo);
+    await findAddButton(wrapper)!.trigger('click');
+
+    mockPoiAddTrigger.mock.calls[0][1](photo, [
+      { name: 'Foo', categoryId: 'cat-a', ra: 1, dec: 2 },
+    ]);
+    expect(wrapper.emitted('update:pois')).toBeUndefined();
+    expect(mockShowToast).toHaveBeenCalledTimes(1);
+    expect(mockShowToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Already in the points of interest', type: 'info' }),
+    );
+    wrapper.unmount();
   });
 
   it('opens the modal with the photo and appends the placed POI, skipping duplicates', async () => {

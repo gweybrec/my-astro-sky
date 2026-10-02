@@ -2372,9 +2372,14 @@ body {
   cursor: pointer;
 }
 
-.integration-add-btn:hover {
+.integration-add-btn:hover:not(:disabled) {
   background: var(--bg-warm-hover2);
   color: var(--text-primary);
+}
+
+.integration-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .integration-row-trash {

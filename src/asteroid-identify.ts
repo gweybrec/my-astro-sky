@@ -29,6 +29,14 @@ function pad2(n: number): string {
 }
 
 /**
+ * Normalises a difference of two angles (degrees) to (−180, 180], so an RA
+ * delta across the 0h/24h seam (359.98° → 0.02°) reads +0.04°, not −359.96°.
+ */
+function wrap180(deg: number): number {
+  return 180 - ((((180 - deg) % 360) + 360) % 360);
+}
+
+/**
  * Splits an ISO 8601 UTC timestamp into the literal UTC calendar date and
  * clock time — for `<input type="date">` + `<input type="time">`, read with
  * `getUTC*`, never `get*` (local). The modal's time fields are explicitly
@@ -125,11 +133,12 @@ export function buildSearch(
   endJd: number,
 ): AsteroidSearch {
   const decRad = (((start.dec + end.dec) / 2) * Math.PI) / 180;
-  const dRa = (end.ra - start.ra) * Math.cos(decRad);
+  const dRaDeg = wrap180(end.ra - start.ra);
+  const dRa = dRaDeg * Math.cos(decRad);
   const dDec = end.dec - start.dec;
   const trailArcmin = Math.hypot(dRa, dDec) * 60 || 0;
   return {
-    raDeg: (start.ra + end.ra) / 2,
+    raDeg: (((start.ra + dRaDeg / 2) % 360) + 360) % 360,
     decDeg: (start.dec + end.dec) / 2,
     epochJd: (startJd + endJd) / 2,
     suggestedRadiusArcmin: Math.min(60, Math.max(5, trailArcmin * 3 + 5)),
@@ -170,7 +179,7 @@ function angularSeparationArcsec(
   decDeg2: number,
 ): number {
   const decRad = (((decDeg1 + decDeg2) / 2) * Math.PI) / 180;
-  const dRa = (raDeg2 - raDeg1) * Math.cos(decRad);
+  const dRa = wrap180(raDeg2 - raDeg1) * Math.cos(decRad);
   const dDec = decDeg2 - decDeg1;
   return Math.hypot(dRa, dDec) * 3600;
 }
@@ -202,7 +211,7 @@ export function rankCandidates(
 ): RankedCandidate[] {
   const { start, end } = marks;
   const markedDRa =
-    (end.ra - start.ra) * Math.cos((((start.dec + end.dec) / 2) * Math.PI) / 180) * 3600;
+    wrap180(end.ra - start.ra) * Math.cos((((start.dec + end.dec) / 2) * Math.PI) / 180) * 3600;
   const markedDDec = (end.dec - start.dec) * 3600;
 
   return candidates
@@ -219,7 +228,7 @@ export function rankCandidates(
       const positionErrorArcsec = (startErr + endErr) / 2;
 
       const predictedDRa =
-        (endPos.raDeg - startPos.raDeg) *
+        wrap180(endPos.raDeg - startPos.raDeg) *
         Math.cos((((startPos.decDeg + endPos.decDeg) / 2) * Math.PI) / 180) *
         3600;
       const predictedDDec = (endPos.decDeg - startPos.decDeg) * 3600;

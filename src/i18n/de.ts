@@ -749,7 +749,10 @@ const de: Translations = {
     addTitle: 'Interessantes Objekt hinzufügen',
     addIntro: 'Benenne das Objekt, wähle seinen Typ und klicke ins Foto, um es zu positionieren.',
     addConfirm: 'Hinzufügen',
+    addNeedsSolve:
+      'Platziere das Foto zuerst auf der Himmelskarte, um ein interessantes Objekt hinzuzufügen',
     added: '{names} zu den interessanten Objekten hinzugefügt',
+    alreadyListed: 'Bereits bei den interessanten Objekten vorhanden',
     nameLabel: 'Name',
     typeLabel: 'Typ',
     addType: '+ Typ hinzufügen',
