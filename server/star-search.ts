@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { normalizeRA } from '@myastrosky/core/angles';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,12 +84,6 @@ export interface StarSearchResult {
 
 let deepStars: DeepStar[] | null = null;
 let starsByHip: Map<number, DeepStar> | null = null;
-
-function normalizeRA(ra: number): number {
-  while (ra < 0) ra += 360;
-  while (ra >= 360) ra -= 360;
-  return ra;
-}
 
 export function loadDeepCatalog(): void {
   if (deepStars) return;

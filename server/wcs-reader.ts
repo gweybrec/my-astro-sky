@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { normalizeRA } from '@myastrosky/core/angles';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -151,12 +152,6 @@ interface Correspondence {
 
 // Server-side star catalog (loaded lazily)
 let serverStars: CatalogStar[] | null = null;
-
-function normalizeRA(ra: number): number {
-  while (ra < 0) ra += 360;
-  while (ra >= 360) ra -= 360;
-  return ra;
-}
 
 export function loadServerCatalog(): CatalogStar[] {
   if (serverStars) return serverStars;

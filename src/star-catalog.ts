@@ -6,6 +6,7 @@ import type {
   ConstellationStyle,
 } from './types';
 import { getLang, t } from './i18n';
+import { normalizeRA } from '@myastrosky/core/angles';
 
 let stars: Star[] = [];
 let starsByHip = new Map<number, Star>();
@@ -19,11 +20,7 @@ let starMagsSorted: number[] | null = null;
 // Constellation lines are stored per style; 'western' is loaded eagerly at startup.
 const constellationLinesByStyle = new Map<ConstellationStyle, ConstellationLine[]>();
 
-export function normalizeRA(ra: number): number {
-  while (ra < 0) ra += 360;
-  while (ra >= 360) ra -= 360;
-  return ra;
-}
+export { normalizeRA };
 
 export function parseConstellationLines(linesData: any): ConstellationLine[] {
   const result: ConstellationLine[] = [];

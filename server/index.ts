@@ -122,6 +122,9 @@ import type { ServerLang } from './messages.js';
 import { logServerError } from './logger.js';
 import { probeAstap, probeSolveField, probeDataDir } from './probe-utils.js';
 import { parseLatestRelease, type LatestRelease } from './github-release.js';
+import type { PoiCategory } from '@myastrosky/core/types';
+import type { SkyRegionData } from '@myastrosky/core/domain/regions';
+import type { PlanEntry, PlanMosaic, ObservationWindow } from '@myastrosky/core/domain/plans';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '..', 'uploads');
@@ -1772,7 +1775,7 @@ app.delete('/api/gear-setups', (_req, res) => {
 
 // ─── Points of Interest categories ──────────────────────────────────────────────
 
-function poiCategoryToApi(r: PoiCategoryRow) {
+function poiCategoryToApi(r: PoiCategoryRow): PoiCategory {
   return { id: r.id, name: r.name, color: r.color, position: r.position };
 }
 
@@ -1985,8 +1988,8 @@ app.delete('/api/poi-categories', (_req, res) => {
 
 // ─── Sky regions ─────────────────────────────────────────────────────────────
 
-function skyRegionToApi(r: SkyRegionRow) {
-  let points: { azDeg: number; altDeg: number }[] = [];
+function skyRegionToApi(r: SkyRegionRow): SkyRegionData {
+  let points: SkyRegionData['points'] = [];
   try {
     points = JSON.parse(r.points);
   } catch {
@@ -2229,8 +2232,8 @@ const PLAN_SORT_KEYS = [
   'window',
 ] as const;
 
-function planEntryToApi(e: PlanEntryRow) {
-  let observationWindows: unknown = [];
+function planEntryToApi(e: PlanEntryRow): PlanEntry {
+  let observationWindows: ObservationWindow[] = [];
   try {
     observationWindows = JSON.parse(e.observation_windows ?? '[]');
   } catch {
@@ -2251,7 +2254,7 @@ function planEntryToApi(e: PlanEntryRow) {
   };
 }
 
-function planMosaicToApi(m: PlanMosaicRow) {
+function planMosaicToApi(m: PlanMosaicRow): PlanMosaic {
   return {
     id: m.id,
     dsoId: m.dso_id ?? null,

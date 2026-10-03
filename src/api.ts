@@ -19,6 +19,72 @@ import type { SkybotCandidate } from './asteroid-identify';
 import type { TnsCandidate } from './supernova-identify';
 import type { CometElements } from './comet-ephemeris';
 
+// ─── Shared domain types (live in @myastrosky/core; re-exported so importers are unchanged) ───
+import type {
+  LatestRelease,
+  ServerSettings,
+  SolverAvailability,
+} from '@myastrosky/core/domain/settings';
+import type { StarSearchResult } from '@myastrosky/core/domain/stars';
+import type {
+  ConvertRawPhotoResult as CoreConvertRawPhotoResult,
+  AstrometrySubmission,
+} from '@myastrosky/core/domain/solve';
+import type {
+  ExportOptions,
+  ImportPreviewImage,
+  ImportPreviewPlan,
+  ImportPreviewSetup,
+  ImportPreviewGear,
+  ImportPreviewResult,
+  ImportResult,
+  ImportOptions,
+} from '@myastrosky/core/domain/backup';
+import type { GearSetupData } from '@myastrosky/core/domain/gear';
+import type { SkyRegionData } from '@myastrosky/core/domain/regions';
+import type {
+  ObservationWindow,
+  PlanEntry,
+  PlanMosaic,
+  MosaicTileInput,
+  MosaicParams,
+  PlanSortKey,
+  Plan,
+} from '@myastrosky/core/domain/plans';
+
+export type {
+  LatestRelease,
+  ServerSettings,
+  SolverAvailability,
+} from '@myastrosky/core/domain/settings';
+export type { StarMultiplicity } from '@myastrosky/core/types';
+export type { StarSearchResult } from '@myastrosky/core/domain/stars';
+export type { AstrometrySubmission } from '@myastrosky/core/domain/solve';
+export type {
+  ExportOptions,
+  ImportPreviewImage,
+  ImportPreviewPlan,
+  ImportPreviewSetup,
+  ImportPreviewGear,
+  ImportPreviewResult,
+  ImportResult,
+  ImportOptions,
+} from '@myastrosky/core/domain/backup';
+export type { GearSetupData } from '@myastrosky/core/domain/gear';
+export type { SkyRegionData } from '@myastrosky/core/domain/regions';
+export type {
+  ObservationWindow,
+  PlanEntry,
+  PlanMosaic,
+  MosaicTileInput,
+  MosaicParams,
+  PlanSortKey,
+  Plan,
+} from '@myastrosky/core/domain/plans';
+
+/** Result of `convertRawPhoto`: the converted PNG as a browser `File` plus any header metadata. */
+export type ConvertRawPhotoResult = CoreConvertRawPhotoResult<File>;
+
 /** Translate a server error response using the `code` field when available. */
 export function parseServerError(
   data: { error?: string; code?: string },
@@ -29,12 +95,6 @@ export function parseServerError(
     if (!translated.startsWith('serverErrors.')) return translated;
   }
   return data.error || t(fallbackKey);
-}
-
-export interface LatestRelease {
-  version: string;
-  url: string;
-  publishedAt: string | null;
 }
 
 /**
@@ -76,27 +136,6 @@ export async function fetchHorizonProfile(
     throw new Error(parseServerError(data, 'horizon.error.compute'));
   }
   return (await res.json()) as HorizonProfile;
-}
-
-export interface StarMultiplicity {
-  components: number;
-  sep?: string;
-}
-
-export interface StarSearchResult {
-  hip: number;
-  ra: number;
-  dec: number;
-  mag: number;
-  bv: number;
-  name?: string;
-  bayer?: string;
-  flam?: string;
-  constellation?: string;
-  desig?: string;
-  multiplicity?: StarMultiplicity;
-  label: string;
-  score: number;
 }
 
 export async function searchStarsAPI(query: string, limit = 10): Promise<StarSearchResult[]> {
@@ -273,11 +312,6 @@ export async function solveWCS(
   }
 
   return res.json();
-}
-
-export interface ConvertRawPhotoResult {
-  png: File;
-  meta: PlateSolveResult & { width: number; height: number };
 }
 
 /**
@@ -551,16 +585,6 @@ export async function solveWithSolveField(
   return res.json();
 }
 
-export interface AstrometrySubmission {
-  submissionId: number;
-  jobId?: number;
-  status: string;
-  timestamp?: string;
-  filename?: string;
-  width?: number;
-  height?: number;
-}
-
 export async function listAstrometrySubmissions(): Promise<AstrometrySubmission[]> {
   const res = await fetch('/api/astrometry/submissions');
   if (!res.ok) {
@@ -588,18 +612,6 @@ export async function reuseAstrometrySubmission(
 }
 
 // ─── Export / Import ──────────────────────────────────────────────────────────
-
-export interface ExportOptions {
-  includeImages?: boolean;
-  includeMetadata?: boolean;
-  includeDsoOverrides?: boolean;
-  includeCustomGear?: boolean;
-  includeSetups?: boolean;
-  includePlans?: boolean;
-  includeShortcuts?: boolean;
-  includePoiCategories?: boolean;
-  includeSkyRegions?: boolean;
-}
 
 /**
  * Trigger a sky data export download.
@@ -629,53 +641,6 @@ export async function exportData(
   downloadBlob(blob, match ? match[1] : 'sky-export.zip');
 }
 
-export interface ImportPreviewImage {
-  filename: string;
-  originalName: string;
-  size: number;
-  exists: boolean;
-}
-
-export interface ImportPreviewPlan {
-  id: string;
-  name: string;
-  /** true if a plan with the same name already exists (will be replaced if imported). */
-  exists: boolean;
-}
-
-export interface ImportPreviewSetup {
-  id: string;
-  name: string;
-  /** true if a setup with the same name already exists (will be replaced if imported). */
-  exists: boolean;
-}
-
-export interface ImportPreviewGear {
-  id: string;
-  type: string;
-  name: string;
-  /** true if gear of the same type + name already exists (will be replaced if imported). */
-  exists: boolean;
-}
-
-export interface ImportPreviewResult {
-  hasMetadata: boolean;
-  photos: number;
-  hasDsoOverrides: boolean;
-  hasCustomGear: boolean;
-  hasSetups: boolean;
-  hasPoiCategories: boolean;
-  hasSkyRegions: boolean;
-  hasPlans: boolean;
-  hasShortcuts: boolean;
-  /** Parsed shortcuts.json content, applied client-side to localStorage on import. */
-  shortcuts?: unknown;
-  images: ImportPreviewImage[];
-  plans: ImportPreviewPlan[];
-  setups: ImportPreviewSetup[];
-  gear: ImportPreviewGear[];
-}
-
 /** Dry-run: inspects ZIP/JSON bundle contents without writing to DB. */
 export async function importPreview(file: File): Promise<ImportPreviewResult> {
   const fd = new FormData();
@@ -686,27 +651,6 @@ export async function importPreview(file: File): Promise<ImportPreviewResult> {
     throw new Error(data.error ?? t('settings.importError'));
   }
   return res.json();
-}
-
-export interface ImportResult {
-  imported: number;
-  skipped: number;
-  dsoOverridesImported?: number;
-}
-
-export interface ImportOptions {
-  importMetadata: boolean;
-  importDsoOverrides: boolean;
-  importPoiCategories?: boolean;
-  importSkyRegions?: boolean;
-  /** null means no image filtering (metadata-only import). */
-  selectedImages: string[] | null;
-  /** ids of plans to import (name-collisions are replaced); null/empty ⇒ none. */
-  selectedPlans: string[] | null;
-  /** ids of gear setups to import (name-collisions are replaced); null/empty ⇒ none. */
-  selectedSetups: string[] | null;
-  /** ids of custom gear to import (type+name-collisions are replaced); null/empty ⇒ none. */
-  selectedGear: string[] | null;
 }
 
 /** Import a sky bundle (.zip or .json) with the given options. */
@@ -729,23 +673,6 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
     throw new Error(data.error ?? t('settings.importError'));
   }
   return res.json();
-}
-
-export interface ServerSettings {
-  apiKeySet: boolean;
-  isWindows: boolean;
-  ASTAP_PATH: string;
-  SOLVE_FIELD_PATH: string;
-  ASTROMETRY_DATA_DIR: string;
-  USE_WSL_FOR_SOLVE_FIELD: boolean;
-  USE_WSL_FOR_ASTAP: boolean;
-  MAX_PARALLEL_SOLVES: string;
-}
-
-export interface SolverAvailability {
-  solveField: boolean;
-  astap: boolean;
-  astrometry: boolean;
 }
 
 /** A solver is considered available if the user explicitly provided a path (or API key). */
@@ -883,15 +810,6 @@ export async function deleteAllCustomGear(): Promise<void> {
 
 // ─── Gear setups ──────────────────────────────────────────────────────────────
 
-export interface GearSetupData {
-  id: string;
-  name: string;
-  telescopeId: string;
-  cameraId: string;
-  accessoryId: string | null;
-  enabled: boolean;
-}
-
 export async function getGearSetups(): Promise<GearSetupData[]> {
   const res = await fetch('/api/gear-setups');
   if (!res.ok) {
@@ -1006,15 +924,6 @@ export async function deletePoiCategoryAPI(id: string): Promise<void> {
 
 // ─── Sky regions ────────────────────────────────────────────────────────────
 
-/** A freehand Alt/Az polygon drawn on the Local Sky (zenith) view, saved by name. */
-export interface SkyRegionData {
-  id: string;
-  name: string;
-  color: string;
-  points: { azDeg: number; altDeg: number }[];
-  position: number;
-}
-
 export async function getSkyRegions(): Promise<SkyRegionData[]> {
   const res = await fetch('/api/sky-regions');
   if (!res.ok) {
@@ -1063,117 +972,6 @@ export async function deleteSkyRegionAPI(id: string): Promise<void> {
 }
 
 // ─── Night plans ───────────────────────────────────────────────────────────
-
-/**
- * A user-drawn observation window on a plan entry's night trajectory: a time
- * region (two draggable edges) during which the target will be imaged, with an
- * optional imaging filter and colour. Positions are stored as fractions of the
- * plotted night window so they render identically on the interactive chart and
- * the exported PDF (both map the same `win` via the chart's `xAt`).
- */
-export interface ObservationWindow {
-  id: string;
-  /** Start position within the night window, [0,1] (win.start → win.end). */
-  startFrac: number;
-  /** End position within the night window, [0,1]; always > startFrac. */
-  endFrac: number;
-  /** Imaging filter name (e.g. 'Ha'), or null for no filter. */
-  filter: string | null;
-  /** Explicit CSS colour when the user overrides; null ⇒ derive from the filter. */
-  color: string | null;
-  /** Single-frame (sub) exposure in seconds; null ⇒ unset. Also the optional
-   * drag snap-step when the window's step mode is enabled. */
-  frameSeconds: number | null;
-  /** When true, dragging snaps to whole single-frame steps (the "link" toggle).
-   * Defaults on for newly created windows. */
-  snap: boolean;
-}
-
-export interface PlanEntry {
-  id: string;
-  /** Target DSO id, or null for a custom location (framed on empty sky). */
-  dsoId: string | null;
-  position: number;
-  paDeg: number | null;
-  /** Frame-centre sky coordinates (degrees); null → use the DSO position. */
-  ra: number | null;
-  dec: number | null;
-  notes: string | null;
-  /** Mosaic this entry is a tile of, or null for a standalone frame. */
-  mosaicId: string | null;
-  /** Smart-scope single-frame mosaic size (deg); null ⇒ render at native FOV. */
-  mosaicWDeg: number | null;
-  mosaicHDeg: number | null;
-  /** User-drawn observation windows on the night trajectory (may be empty). */
-  observationWindows: ObservationWindow[];
-}
-
-/** A mosaic: a group of tile entries covering one target. Tiles are the plan
- * entries whose `mosaicId` equals this id; this record holds the group params. */
-export interface PlanMosaic {
-  id: string;
-  dsoId: string | null;
-  /** User-supplied name; null on legacy mosaics (then derived from the DSO). */
-  name: string | null;
-  /** Mosaic centre (degrees). */
-  centerRa: number;
-  centerDec: number;
-  /** Group position angle (°E of N). */
-  paDeg: number;
-  /** Overlap percentage between adjacent tiles. */
-  overlapPct: number;
-  cols: number;
-  rows: number;
-  position: number;
-}
-
-/** Per-tile sky centre sent to the server when creating/updating a mosaic. */
-export interface MosaicTileInput {
-  ra: number;
-  dec: number;
-  paDeg: number | null;
-}
-
-export interface MosaicParams {
-  dsoId: string | null;
-  /** Omit to leave a stored name unchanged (background drags/transforms). */
-  name?: string;
-  centerRa: number;
-  centerDec: number;
-  paDeg: number;
-  overlapPct: number;
-  cols: number;
-  rows: number;
-  tiles: MosaicTileInput[];
-  /** Standalone plan entries this mosaic replaces — deleted when it is created. */
-  replaceEntryIds?: string[];
-}
-
-/**
- * Sort key for a plan's objects list (and its exported PDF). Mirrors the
- * meaningful subset of the Targets-search sort values plus `window` (order by
- * each entry's earliest observation window). `transit` is the default.
- */
-export type PlanSortKey =
-  'transit' | 'altitude' | 'rating' | 'magnitude' | 'size' | 'name' | 'difficulty' | 'window';
-
-export interface Plan {
-  id: string;
-  name: string;
-  position: number;
-  /** Observation night (ISO `YYYY-MM-DD`), or null to fall back to the global date. */
-  nightOf: string | null;
-  /** Gear setup id used for this plan's FOV/recipe, or null. */
-  setupId: string | null;
-  /** Observing latitude (°N), or null to fall back to the global location. */
-  lat: number | null;
-  /** Observing longitude (°E), or null to fall back to the global location. */
-  lon: number | null;
-  /** Objects-list sort key (drives the UI list and the exported PDF order). */
-  sortBy: PlanSortKey;
-  entries: PlanEntry[];
-  mosaics: PlanMosaic[];
-}
 
 export async function getPlans(): Promise<Plan[]> {
   const res = await fetch('/api/plans');

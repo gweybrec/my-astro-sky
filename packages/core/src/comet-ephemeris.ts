@@ -10,16 +10,22 @@
  */
 import { earthHeliocentricXYZ } from './astro-time';
 
-/** One comet's orbital elements — mirrors `CometElements` in server/comets.ts. */
+/** One comet's orbital elements (MPC `CometEls.txt`); also the server's /api/comets payload. */
 export interface CometElements {
+  /** Short designation, e.g. "10P", "C/2025 R2", "73P-B". */
   designation: string;
+  /** Designation + name as published by the MPC, e.g. "C/2025 R2 (SWAN)", "10P/Tempel". */
   name: string;
+  /** Perihelion time, Julian Date (TT). */
   tpJd: number;
+  /** Perihelion distance (AU). */
   q: number;
   e: number;
+  /** Argument of perihelion, longitude of ascending node, inclination — degrees, J2000 ecliptic. */
   peri: number;
   node: number;
   incl: number;
+  /** Absolute total magnitude M1 and slope parameter K1 (MPC's "H" and "G" columns). */
   h: number | null;
   k: number | null;
 }

@@ -18,15 +18,9 @@
 import sharp from 'sharp';
 import { fetchPeaks, type OverpassPeak } from './overpass.js';
 import { logServerError } from './logger.js';
+import type { HorizonSummit } from '@myastrosky/core/horizon-io';
 
-/** A named summit sitting on the skyline (mirrors HorizonSummit in src/horizon-io.ts). */
-export interface HorizonSummit {
-  name: string;
-  azDeg: number;
-  altDeg: number;
-  elevationM: number;
-  distanceKm: number;
-}
+export type { HorizonSummit };
 
 /** One skyline "shell": the silhouette formed by terrain within `maxDistKm`. */
 export interface HorizonLayer {

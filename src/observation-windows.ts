@@ -6,7 +6,7 @@
  * `sanitizeObservationWindows` in `server/db.ts`.
  */
 
-import type { ObservationWindow } from './api';
+import type { ObservationWindow } from '@myastrosky/core/domain/plans';
 import { filterCssKey } from './chip-utils';
 import { cssColorToHex, hexToRgba } from './color-utils';
 
