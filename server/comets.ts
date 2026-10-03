@@ -12,28 +12,13 @@
  * https://www.minorplanetcenter.net/iau/info/CometOrbitFormat.html
  */
 
+import type { CometElements } from '@myastrosky/core/comet-ephemeris';
+
 const MPC_COMET_ELS_URL = 'https://www.minorplanetcenter.net/iau/MPCORB/CometEls.txt';
 const FETCH_TIMEOUT_MS = 30_000;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-export interface CometElements {
-  /** Short designation, e.g. "10P", "C/2025 R2", "73P-B". */
-  designation: string;
-  /** Designation + name as published by the MPC, e.g. "C/2025 R2 (SWAN)", "10P/Tempel". */
-  name: string;
-  /** Perihelion time, Julian Date (TT). */
-  tpJd: number;
-  /** Perihelion distance (AU). */
-  q: number;
-  e: number;
-  /** Argument of perihelion, longitude of ascending node, inclination — degrees, J2000 ecliptic. */
-  peri: number;
-  node: number;
-  incl: number;
-  /** Absolute total magnitude M1 and slope parameter K1 (MPC's "H" and "G" columns). */
-  h: number | null;
-  k: number | null;
-}
+export type { CometElements };
 
 /** Gregorian calendar date (fractional day) → Julian Date (Meeus, ch. 7). */
 export function calendarToJd(year: number, month: number, day: number): number {

@@ -204,7 +204,7 @@ The regression was reverted upstream and confirmed fixed in **Node.js 24.18.0** 
 | ASTAP               | ✅ `install-astap.sh` | install from hnsky.org | ✅ `install-astap.ps1` |
 | nova.astrometry.net | ✅                    | ✅                     | ✅                     |
 
-The UI already reads `solveFieldAvailable` from `/api/config` (set to `process.platform !== 'win32'` on the backend) and disables the solve-field option in the batch modal when it is false.
+`/api/config` returns only `starCatalog`. The UI derives solver availability from `GET /api/settings` (`getSolverAvailability()` in `src/api.ts`): a solver is enabled only when its path (`SOLVE_FIELD_PATH`, `ASTAP_PATH`) or the astrometry.net API key is set, and the batch modal disables the others. `/api/settings` also returns `isWindows` (`process.platform === 'win32'`), used by the solver settings modal.
 
 ### ASTAP on Windows
 

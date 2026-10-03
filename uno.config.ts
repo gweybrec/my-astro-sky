@@ -130,7 +130,7 @@ export default defineConfig({
     ].join(' '),
 
     'btn-cancel': [
-      'py-4 px-8',
+      'py-5 px-8',
       'bg-transparent text-dim',
       'border border-[var(--border-panel)]',
       'rounded-md cursor-pointer',
@@ -141,7 +141,7 @@ export default defineConfig({
     ].join(' '),
 
     'btn-danger': [
-      'py-4 px-8',
+      'py-5 px-8',
       'bg-[var(--btn-danger-bg)] text-[var(--btn-danger-text)]',
       'border border-[var(--btn-danger-border)]',
       'rounded-md cursor-pointer',
@@ -161,6 +161,9 @@ export default defineConfig({
     'btn-icon': [
       'bg-transparent border border-[var(--border-white-md)] text-primary',
       'cursor-pointer py-2 px-4 rounded-sm text-body',
+      // The content (an SVG, or a text glyph) is centred on both axes in a row at
+      // least one line high, so the button keeps the height of a text line.
+      'inline-grid grid-rows-[minmax(1lh,auto)] place-items-center place-content-center',
       'transition-colors duration-150',
       'hover:bg-[var(--accent-fill-lg)] hover:border-[var(--border-focus)] hover:text-bright',
     ].join(' '),
@@ -197,10 +200,15 @@ export default defineConfig({
     // ── Inputs ───────────────────────────────────────────────────────────────
     // Replaces near-identical rules for star-search-input, tag-input,
     // radec-input, targets-coord-input, targets-date-input.
+    // A <select> ignores `line-height` (Chromium forces `normal` on a menulist),
+    // so it is shorter than an <input> with the same padding. Give it the input's
+    // border-box height explicitly: 1.5em (text-body's line-height) + py-2 twice
+    // + the 1px border twice (--space-px).
     'input-base': [
       'bg-[var(--bg-input)] text-primary',
       'border border-[var(--border-input)] rounded-sm',
       'px-4 py-2 text-body',
+      '[&:is(select)]:h-[calc(1.5em+2*var(--space-2)+2*var(--space-px))]',
       'focus:border-focus focus:outline-none',
       'w-full',
     ].join(' '),

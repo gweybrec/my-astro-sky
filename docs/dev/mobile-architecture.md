@@ -1,0 +1,202 @@
+# Mobile Architecture
+
+This document describes the architecture for the Android app and the shared code strategy.
+
+## 3. Target architecture
+
+The desktop app **stays at the repo root** (`src/`, `server/`, `electron/` do not move). This avoids rewriting every config, hook, skill and doc path. New code goes into workspaces.
+
+```
+src/, server/, electron/        Desktop + server + Electron — unchanged locations, gradually thinned.
+packages/core/                  Pure TS. tsconfig lib ["ES2022"], types [] → compiler-enforced purity.
+                                A hand-written env.d.ts declares only: console, TextEncoder/TextDecoder, timers.
+                                astronomy, projection, affine, mosaic, recommender, identify, WCS/FITS/TIFF/XISF decoders,
+                                domain types, i18n (platform injected), CATALOG REGISTRIES (state + lookups),
+                                Backend + port interfaces, SERVICES, migrations.
+packages/render/                Canvas 2D painters + scene + Pointer-Events gesture controller (theme injected).
+packages/backend-http/          HttpBackend(baseUrl, token?) — today's api.ts behind the Backend interface.
+packages/backend-local/         LocalBackend = core services + ports (adapters supplied by the shell).
+packages/app-state/             Shared Pinia stores that depend only on Backend + PrefsStore + core registries.
+apps/mobile/                    Capacitor + Ionic Vue. LocalBackend (standalone) or HttpBackend (LAN connect).
+```
+
+### Dependency rules
+
+These are enforced by an ESLint `no-restricted-imports` rule set to _error_, plus the tsconfig `lib` setting:
+
+- `core` imports nothing: no vue, pinia, `@capacitor/*`, `node:*`, `src/` or `server/`.
+- `render` imports `core` only.
+- `app-state` imports `core` plus vue and pinia.
+- Apps import packages and never each other.
+- `server` imports `core` only.
+
+### Catalog registries
+
+The DSO and star catalogs get a home in core:
+
+- `core/catalog/dso-registry.ts` and `core/catalog/star-registry.ts` hold the state, a setter (`setDsoCatalog(json, overrides, lang)`) and all lookups.
+- Each shell keeps only a loader, which fetches the data through `CatalogSource` and calls the setter.
+- This is what lets `dso-render-select`, `sky-hit-test`, `photo-placement` and the painters move into shared packages.
+
+### Ports (platform adapters)
+
+Signatures were validated against the code.
+
+| Port                                                                    | Desktop / server                  | Mobile                                         |
+| ----------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------- |
+| `SqlDb` (`query/get/run/exec/batch/transaction`, mutex)                 | better-sqlite3                    | @capacitor-community/sqlite (`executeSet`)     |
+| `BlobStore` (`put/get/exists/remove/url`)                               | fs `uploads/`                     | Filesystem + `convertFileSrc`                  |
+| `ImageCodec` (`probe/bakeOrientation/thumbnail/encodePng/decodePngRaw`) | sharp                             | `createImageBitmap`/OffscreenCanvas + fast-png |
+| `HttpClient`                                                            | Node fetch                        | CapacitorHttp                                  |
+| `SecretStore`                                                           | AES in DB (existing)              | Android Keystore                               |
+| `BundleReader` / `ExportBundle`                                         | unzipper / archiver               | fflate + Filesystem + Share                    |
+| `CatalogSource` (gear, stars, DSOs)                                     | `resources/*.json`, `public/data` | bundled assets                                 |
+| `PrefsStore` (the localStorage-only state)                              | localStorage                      | Capacitor Preferences                          |
+| `LocationProvider`, `I18nPlatform`                                      | navigator / Electron IPC          | GPS / Preferences                              |
+| `Clock`, `IdGenerator`, `Logger`                                        | Date / uuid / `server/logger.ts`  | Date / `crypto.randomUUID` / console           |
+
+### Backend interface types
+
+The interface lives in core, so it cannot use browser types:
+
+- `FileInput { name; type; bytes(): Promise<Uint8Array> }` replaces `File`.
+- A progress callback replaces `XMLHttpRequest` progress, and a `CancelToken` replaces `AbortSignal`.
+- The `api.ts` facade adapts browser types to these.
+
+### Services in core
+
+Each service throws a `DomainError`. Its kinds are `invalid`, `notFound`, `conflict`, `rateLimited` and `upstream`, and it keeps the existing `code` strings that `parseServerError` (`api.ts:23`) translates. Long-running work returns a job handle, not an error.
+
+| Service                                                        | Responsibility                                                           | Note                                                                |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `PlanService`                                                  | Plans, entries, mosaics                                                  | Absorbs the row mappers and `parseMosaicBody`                       |
+| `GearService`                                                  | Catalog merge, custom gear, setups                                       |                                                                     |
+| `PhotoService`                                                 | Upload pipeline, metadata, placement, order                              | Settles `sanitizeIntegrationRows`                                   |
+| `SolvedImportService`                                          | `/api/solve-wcs` and `/api/photos/convert`: read WCS from FITS/TIFF/XISF | The heart of "import already-solved files"                          |
+| `NovaSolveService`                                             | nova submit, poll, submissions list, reuse                               | Jobs persisted, so they resume after the app is suspended           |
+| `StarSearchService`                                            | `/api/stars/search`, `nearby`, `:hip`                                    | Runs over the star registry                                         |
+| `IdentifyService`                                              | SkyBoT, TNS, MPC comets                                                  | Keeps the existing caches and rate limits                           |
+| `HorizonService`                                               | Terrain tiles + Overpass peaks, cached                                   | Needs raw PNG decoding (`ImageCodec.decodePngRaw`)                  |
+| `SettingsService`                                              | Settings                                                                 | Uses `SecretStore`                                                  |
+| `DsoOverrideService`, `PoiCategoryService`, `SkyRegionService` | CRUD                                                                     |                                                                     |
+| `BackupService`                                                | Export, import preview, import apply                                     | Atomic; manifest versioned; **now includes the `PrefsStore` state** |
+| `VersionService`                                               | Latest GitHub release                                                    |                                                                     |
+
+ASTAP and solve-field stay server-only and are exposed through **capabilities**.
+
+### The seam is `api.ts`
+
+- It keeps its exported names as a facade over `getBackend()`, set once with a module-level `setBackend()`.
+- All 39 importers and every `vi.mock('../api')` keep working unchanged while the stores live in `src/`.
+- When a store moves to `app-state` (card 3.5), its test is updated to mock the backend, not `src/api`.
+- A new `photoUrl(name)` replaces the hard-coded `/uploads/` paths.
+- `export()` returns bytes instead of downloading.
+
+### SQL portability
+
+The schema already avoids `RETURNING`, `json_*` and `STRICT`. The mobile adapter must:
+
+- pass `transaction:false` when it manages the transaction itself;
+- set `PRAGMA foreign_keys=ON` explicitly;
+- keep WAL on the server only;
+- run migrations through our own runner, from a merged v0 baseline.
+
+On mobile, write as read-then-`batch()`: each bridge round-trip costs 1–5 ms.
+
+### Transaction safety rule during the transition
+
+While old synchronous `db.ts` code and new services share one connection:
+
+- inside `SqlDb.transaction()`, only `SqlDb` calls may be awaited — never sharp, file or zip work;
+- card 2.2 adds a test that proves a legacy statement cannot run inside an open service transaction.
+
+---
+
+## 4. Mobile-specific engineering
+
+### Sky map on touch
+
+- A gesture controller in `render/`, built on Pointer Events:
+  - pan with fling;
+  - pinch zoom about the centroid (`sky-view-math.ts`);
+  - tap to select, with a larger hit radius;
+  - long-press to open a sheet;
+  - `touch-action:none` on the canvas.
+- Desktop gets touchscreen support from the same controller.
+- **Catalog:** decided by spike WP0.2. The likely outcome is a compact binary catalog with tiered loading.
+- Cap the DPR at 2, render on demand, and pause the timers while backgrounded.
+
+### Photos on the canvas
+
+- The reusable part is `computePhotoMatrixForView` (`photo-placement.ts:177`). The export routine in `export-render.ts` is **not** a frame painter: it loads a full-resolution image on every call.
+- A new canvas photo layer is needed, with its own ImageBitmap cache, level-of-detail selection and eviction.
+- These parts of `photo-overlay.ts` do not carry over and are redesigned for mobile:
+  - level-of-detail by swapping `img.src`;
+  - hiding photos while panning (`.photos-frozen`) — a canvas must redraw them every frame;
+  - manual repositioning, which reads the transform back from the DOM (`:2469-2483`) and drags with window mouse events;
+  - the layer order: sky canvas, then photos, then the overlay canvas.
+- Spike WP0.2 measures this before any commitment.
+
+### Touch equivalents
+
+These desktop interactions have no touch equivalent yet. Design round D1 must decide each one:
+
+- hover tooltips (`requestHover`);
+- right-click clears the selection (`sky-map-events.ts:177`) — on Android a long-press fires the same event, which collides with "long-press opens a sheet";
+- freehand region drawing uses press-and-drag, which collides with panning;
+- keyboard shortcuts, including the time controls;
+- gallery controls that appear on mouse move;
+- FOV-frame handles sized for a mouse.
+
+A Sonnet card (WP5.0) produces the full inventory from the code, as input to D1.
+
+### Field use
+
+- A night-vision **red theme**, for both the UI tokens and `SKY_THEME`.
+- Keep the screen awake during sessions.
+- GPS location.
+- Offline except for solving and identification.
+
+### Photos and solving on the device
+
+**Import already-solved files** through core decoders (`Uint8Array`/`DataView`, fflate):
+
+- FITS, TIFF, **XISF** (new) and **`.wcs` sidecars** (new).
+- Desktop gets XISF and sidecars too.
+
+**nova.astrometry.net** through `NovaSolveService` + CapacitorHttp:
+
+- downscale to about 2,000 px before upload;
+- API key stored in the Keystore;
+- the plan target is used as the solve hint;
+- jobs resume after the app is suspended.
+
+**Getting files in:**
+
+- a file picker that accepts any MIME type (FITS, XISF);
+- an **Android "Share to MyAstroSky" intent**, for files from the Seestar, ASIAIR or Gallery apps;
+- the camera roll.
+
+**Memory:** decode with `createImageBitmap(resize*)` and keep only a display copy plus a thumbnail.
+
+### LAN connect
+
+- The phone uses `HttpBackend(baseUrl, token)` against the desktop or Docker server.
+- Server side:
+  - an opt-in "Allow LAN devices" setting;
+  - a CORS allowlist for `https://localhost` and `capacitor://localhost`;
+  - a QR pairing token;
+  - an `/api/capabilities` endpoint.
+- Android side: `network_security_config` for private IPs, and `photoUrl()` returns absolute URLs.
+- **Bonus:** while connected, the phone can run **ASTAP or solve-field on the desktop**.
+
+### Information architecture
+
+(A starting point; the design phase decides)
+
+- Bottom tabs: **Sky · Targets · Plans · Library · Settings**.
+- **Sky:** a full-screen canvas, search, a time scrubber, and an object bottom sheet (peek, half, full).
+- **Targets:** filter chips plus a filter sheet, and cards with an altitude sparkline.
+- **Plans:** plan detail, a framing editor with FOV-frame gestures, and mosaics.
+- **Library:** a grid, a photo detail view with metadata and identification, and an import flow (pick, then solved or online solve, then place).
+- **Settings:** gear setups, location, language (FR/EN/ES/DE), theme and night mode, astrometry key, LAN pairing, export/import.

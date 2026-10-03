@@ -49,9 +49,9 @@ Live design-debt only. Address each when you next touch the relevant component; 
 one giant refactor. Historical items resolved by the CSS-token sweep and the `uno.config.ts`
 shortcut migration have been removed — the git history holds them if needed.
 
-| #   | Issue                                                          | Action                                                                                                                                                                                 |
-| --- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Legacy button aliases still coexist with the `btn-*` shortcuts | Migrate call-sites off the bespoke classes listed in [Buttons](components.md) §2.1 to `btn-action` / `btn-confirm` / `btn-cancel` / `btn-danger` / `btn-icon`, then delete the aliases |
+| #   | Issue                                                          | Action                                                                                                                                                                                                                                                                                                   |
+| --- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Legacy button aliases still coexist with the `btn-*` shortcuts | Migrate the remaining call-sites of the bespoke classes listed in [Buttons](components.md) §2.1 (`.btn-auto-solve`, `.btn-pick-map`, `.gear-popup-delete-btn`) to `btn-action` / `btn-confirm` / `btn-cancel` / `btn-danger` / `btn-icon`, then delete the aliases (and the unused `.btn-danger-action`) |
 
 > Found a new inconsistency? Add a row here **and** fix it or note the file, so this list stays a
 > short, honest record rather than growing into another stale backlog.

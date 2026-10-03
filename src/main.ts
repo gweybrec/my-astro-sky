@@ -1,3 +1,4 @@
+import './platform-init';
 import { loadCatalog } from './star-catalog';
 import { loadDSOCatalog } from './dso-catalog';
 import { SkyMap } from './sky-map';
@@ -24,6 +25,7 @@ import { reportRendererError, reportUnknownRendererError } from './error-reporte
 import { openDSOEditModal } from './dso-editor';
 import { loadTheme, applyTheme } from './theme';
 import 'virtual:uno.css';
+import './styles/tokens.css';
 import './style.css';
 import './styles/canvas.css';
 

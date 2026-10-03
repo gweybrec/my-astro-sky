@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { applyMigrations } from './db-migrations.js';
 import { sanitizeCaptureDetails } from './wcs-reader.js';
+import type { Photo } from '@myastrosky/core/types';
 
 export { applyMigrations };
 // Re-export so callers that already import from db.js (e.g. server/index.ts) keep working.
@@ -319,7 +320,7 @@ export function createPhoto(
  * POST /api/photos response) both go through here, so the two can never drift and drop
  * a field. When you add a new metadata column, wire it in here once — nowhere else.
  */
-function rowToPhoto(p: any, corr: any[]) {
+function rowToPhoto(p: any, corr: any[]): Photo {
   return {
     id: p.id,
     filename: p.filename,

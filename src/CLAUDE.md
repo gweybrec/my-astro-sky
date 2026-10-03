@@ -29,7 +29,7 @@ conventions, the CI gate, architecture overview) stay in the root `CLAUDE.md`.
 - Repositioning feature works (extracts current state, allows editing, saves new state).
 - Smart sorting works in both photo list and gallery (M1, M8, M31, M100, M101...).
 - Targets tab: gear preset selection, location, date, filters, Best/Random buttons, pagination.
-- Both FR and EN languages render properly if i18n was touched.
+- All four languages (FR/EN/ES/DE) render properly if i18n was touched.
 
 ## Before adding CSS
 
@@ -46,7 +46,7 @@ See [docs/dev/ui-guidelines.md](docs/dev/ui-guidelines.md) — the UI hub — fo
 
 ## Frontend conventions
 
-- **UI text is internationalized (FR/EN).** French is the default language. Translations live in `src/i18n/fr.ts` and `src/i18n/en.ts`. Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time).
+- **UI text is internationalized in four languages (FR/EN/ES/DE).** French is the default language. Translations live in `src/i18n/fr.ts`, `en.ts`, `es.ts` and `de.ts`. Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time).
 - `DSO_CATALOGS_ALL` is exported from `dso-catalog.ts` — do not redefine it locally in `ui.ts` or elsewhere.
 - **Smart telescopes:** never read a gear setup's `cameraId` directly — resolve it through `resolveSetupCamera()` in `gear-catalog.ts`, which substitutes the scope's `integrated_camera_id`. `tests/unit/gear-catalog-integrity.test.ts` pins each smart scope's FOV to its published spec; extend its table when adding one.
 - The runtime DSO density gate ranks by **intrinsic quality** (`dsoImportance` = rating/brightness, in `src/dso-catalog.ts`), area-weighted so on-screen density tracks the true sky (Milky Way denser) with the stereographic projection bias removed — it no longer uses the blue-noise `priority` column, which is retained but currently only informational. See `scripts/CLAUDE.md` for how the derived columns are regenerated.

@@ -56,15 +56,6 @@ import { filterDrawOrderPhotos } from './photo-draw-order';
 import { computeDSOHighlightShape } from './dso-highlight';
 import { confirmPhotoDelete } from './photo-delete-confirm';
 
-function angularDistance(ra1: number, dec1: number, ra2: number, dec2: number): number {
-  const toRad = Math.PI / 180;
-  const d1 = dec1 * toRad;
-  const d2 = dec2 * toRad;
-  const dra = (ra2 - ra1) * toRad;
-  const cos = Math.sin(d1) * Math.sin(d2) + Math.cos(d1) * Math.cos(d2) * Math.cos(dra);
-  return Math.acos(Math.max(-1, Math.min(1, cos))) / toRad;
-}
-
 function formatRA(raDeg: number): string {
   const raH = raDeg / 15;
   const h = Math.floor(raH);

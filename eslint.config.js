@@ -27,6 +27,9 @@ export default tseslint.config(
       'resources/**',
       'other-resources/**',
       '.claude/**',
+      'spikes/**',
+      '**/android/**',
+      '**/ios/**',
       '**/*.min.*',
       'Trace-*.json',
     ],
@@ -59,13 +62,18 @@ export default tseslint.config(
   // (tsconfig.json → src incl. .vue, tsconfig.server.json → server, tsconfig.test.json
   // → src/server/tests). This is what makes `no-floating-promises` possible.
   {
-    files: ['src/**/*.{ts,vue}', 'server/**/*.ts', 'tests/**/*.ts'],
+    files: ['src/**/*.{ts,vue}', 'server/**/*.ts', 'tests/**/*.ts', 'packages/**/*.ts'],
     languageOptions: {
       parserOptions: {
         // Explicit list rather than `projectService` — the repo has one root
         // tsconfig.json (src only) plus separate server/test configs, which
         // project-service auto-discovery does not pick up.
-        project: ['./tsconfig.json', './tsconfig.server.json', './tsconfig.test.json'],
+        project: [
+          './tsconfig.json',
+          './tsconfig.server.json',
+          './tsconfig.test.json',
+          './packages/core/tsconfig.json',
+        ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],
       },
@@ -109,6 +117,35 @@ export default tseslint.config(
   {
     files: ['server/**/*.ts', 'electron/**/*.ts', 'tests/**/*.ts', '*.config.{ts,js,mjs}'],
     languageOptions: { globals: { ...globals.node } },
+  },
+
+  // @myastrosky/core must stay platform-neutral (browser, worker, Node, Electron, Capacitor):
+  // no framework, no Node built-ins, and no imports back into the app. This block gets neither
+  // the browser nor the Node globals above. `error`, not `warn`: a violation must fail CI.
+  {
+    files: ['packages/core/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['fs', 'path', 'url', 'crypto'].map((name) => ({
+            name,
+            message: 'core must not depend on Node built-ins.',
+          })),
+          patterns: [
+            { group: ['vue', 'vue/*'], message: 'core must not depend on Vue.' },
+            { group: ['pinia', 'pinia/*'], message: 'core must not depend on Pinia.' },
+            { group: ['@capacitor/*'], message: 'core must not depend on Capacitor.' },
+            { group: ['node:*'], message: 'core must not depend on Node built-ins.' },
+            { group: ['**/src/**', '**/server/**'], message: 'core must not import from the app.' },
+            {
+              group: ['@myastrosky/core', '@myastrosky/core/*'],
+              message: 'core must import itself with relative paths.',
+            },
+          ],
+        },
+      ],
+    },
   },
 
   // Build/CLI scripts: plain ES modules, no type information, and console output is

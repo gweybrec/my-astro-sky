@@ -1,5 +1,6 @@
 import { watch } from 'vue';
 import { t } from './i18n';
+import { angularSeparationDeg } from './sky-geometry';
 import type { FovFrameSpec } from './sky-map-types';
 import type { DSO } from './types';
 import { buildGearSectionContent, type GearSectionPrefs } from './targets-view';
@@ -58,16 +59,6 @@ function customFrameLabel(f: { ra?: number; dec?: number }): string {
   return f.ra != null && f.dec != null
     ? customLocationLabel(f.ra, f.dec)
     : t('fovOverlay.customLocation');
-}
-
-/** Great-circle angular distance between two sky points, in degrees. */
-function angularDistDeg(ra1: number, dec1: number, ra2: number, dec2: number): number {
-  const d2r = Math.PI / 180;
-  const dLat = (dec2 - dec1) * d2r;
-  const dLon = (ra2 - ra1) * d2r;
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(dec1 * d2r) * Math.cos(dec2 * d2r) * Math.sin(dLon / 2) ** 2;
-  return (2 * Math.asin(Math.min(1, Math.sqrt(h)))) / d2r;
 }
 
 // ─── Frame spec builder ───────────────────────────────────────────────────────
@@ -1926,7 +1917,7 @@ export function buildFovPopup(
             const era = e.ra ?? ed?.ra;
             const edec = e.dec ?? ed?.dec;
             if (era == null || edec == null) return false;
-            return angularDistDeg(center.ra, center.dec, era, edec) <= reach;
+            return angularSeparationDeg(center.ra, center.dec, era, edec) <= reach;
           })
           .map((e) => e.id);
         const params: MosaicParams = {

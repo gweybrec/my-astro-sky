@@ -9,7 +9,7 @@ import {
 } from '../../src/affine';
 
 // Mock i18n so affine.ts can be imported in Node/happy-dom without localStorage issues
-vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
+vi.mock('@myastrosky/core/i18n/index', () => ({ t: (key: string) => key }));
 
 function applyAffine(
   m: { a: number; b: number; c: number; d: number; e: number; f: number },

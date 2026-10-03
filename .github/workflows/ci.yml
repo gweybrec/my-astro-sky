@@ -26,6 +26,9 @@ jobs:
       - name: Type-check server
         run: npm run typecheck:server
 
+      - name: Type-check core
+        run: npm run typecheck:core
+
       # docs/icon.png is a committed copy of public/icon.png — the GitHub Pages docs
       # site has no build step (see docs/dev/distribution.md), so it can't be generated
       # at deploy time. Catch drift here instead of letting it go unnoticed.

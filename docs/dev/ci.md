@@ -14,10 +14,11 @@ All workflows live in `.github/workflows/`. They are independent — each serves
 
 1. `npm run typecheck:client` (`vue-tsc --noEmit`) — type-checks the frontend, including inside `.vue` SFCs (plain `tsc` treats `.vue` files as opaque via the shim and does not check their `<script>` blocks)
 2. `npm run typecheck:server` (`tsc --noEmit -p tsconfig.server.json`) — type-checks the Express backend
-3. `cmp public/icon.png docs/icon.png` — **blocking**: `docs/icon.png` is a committed copy kept in sync by `npm run generate-icons` (see [Building the packages](distribution.md#building-the-packages)); this catches drift since the workflow-free GitHub Pages docs site can't regenerate it at deploy time
-4. `npm run lint` (`eslint .`) — **warn-only**: every rule is `warn`, so ESLint exits 0 and this step surfaces issues in the log without failing the build (see `eslint.config.js` and `CLAUDE.md`)
-5. `npm run format:check` (`prettier --check .`) — **blocking**: fails if any file isn't Prettier-formatted
-6. `npx vite build` — verifies the frontend bundles without errors
+3. `npm run typecheck:core` (`tsc --noEmit -p packages/core/tsconfig.json`) — type-checks the platform-neutral `@myastrosky/core` workspace package with `lib: ["ES2022"]` and `types: []`, so any use of a DOM or Node global there fails
+4. `cmp public/icon.png docs/icon.png` — **blocking**: `docs/icon.png` is a committed copy kept in sync by `npm run generate-icons` (see [Building the packages](distribution.md#building-the-packages)); this catches drift since the workflow-free GitHub Pages docs site can't regenerate it at deploy time
+5. `npm run lint` (`eslint .`) — **warn-only**: every rule is `warn`, so ESLint exits 0 and this step surfaces issues in the log without failing the build (see `eslint.config.js` and `CLAUDE.md`)
+6. `npm run format:check` (`prettier --check .`) — **blocking**: fails if any file isn't Prettier-formatted
+7. `npx vite build` — verifies the frontend bundles without errors
 
 This workflow does **not** build or run Electron — it only validates that the TypeScript compiles, the code is lint-clean/formatted, and Vite produces a valid bundle.
 
@@ -25,7 +26,7 @@ This workflow does **not** build or run Electron — it only validates that the 
 
 ## Tests (`test.yml`)
 
-**Trigger:** push or PR to `master` / `main`
+**Trigger:** push or PR to `master`, `main` or `dev` (the `dev` trigger means the tests run on pull requests into `dev`)
 
 **Runner:** `ubuntu-latest`, Node.js 24
 
@@ -39,7 +40,7 @@ This workflow does **not** build or run Electron — it only validates that the 
 
 ## Docker (`docker.yml`)
 
-**Trigger:** push or PR to `master`, **path-filtered** — only runs when something that affects the image changes (`Dockerfile`, `docker-compose.yml`, `.dockerignore`, `server/**`, `public/**`, `resources/**`, `src/**`, `index.html`, `package*.json`, `vite.config.ts`, `uno.config.ts`, `tsconfig*.json`, or the workflow itself). Doc-only changes don't trigger a build.
+**Trigger:** push or PR to `master`, **path-filtered** — only runs when something that affects the image changes (`Dockerfile`, `docker-compose.yml`, `.dockerignore`, `server/**`, `public/**`, `resources/**`, `src/**`, `packages/**`, `index.html`, `package*.json`, `vite.config.ts`, `uno.config.ts`, `tsconfig*.json`, or the workflow itself). Doc-only changes don't trigger a build.
 
 **Runner:** `ubuntu-latest`
 

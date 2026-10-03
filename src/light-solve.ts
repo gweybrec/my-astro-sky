@@ -2,6 +2,7 @@ import { detectStars } from './star-detector';
 import { searchStarsByPosition } from './api';
 import type { DetectedSpot } from './types';
 import { t } from './i18n';
+import { angularSeparationDeg } from './sky-geometry';
 import { reportUnknownRendererError } from './error-reporter';
 
 /**
@@ -89,7 +90,7 @@ export async function lightSolve(
             ra: star.ra,
             dec: star.dec,
             mag: star.mag,
-            distance: angularDistance(hints.ra, hints.dec, star.ra, star.dec),
+            distance: angularSeparationDeg(hints.ra, hints.dec, star.ra, star.dec),
           })),
         });
       }
@@ -122,24 +123,4 @@ export async function lightSolve(
     candidates,
     message: t('lightSolve.foundStars', { count: candidates.length }),
   };
-}
-
-/**
- * Calculate angular distance between two positions (in degrees)
- */
-function angularDistance(ra1: number, dec1: number, ra2: number, dec2: number): number {
-  const toRad = Math.PI / 180;
-  const ra1Rad = ra1 * toRad;
-  const dec1Rad = dec1 * toRad;
-  const ra2Rad = ra2 * toRad;
-  const dec2Rad = dec2 * toRad;
-
-  const dRa = ra2Rad - ra1Rad;
-  const dDec = dec2Rad - dec1Rad;
-
-  const a =
-    Math.sin(dDec / 2) ** 2 + Math.cos(dec1Rad) * Math.cos(dec2Rad) * Math.sin(dRa / 2) ** 2;
-  const c = 2 * Math.asin(Math.sqrt(a));
-
-  return c / toRad; // Convert back to degrees
 }

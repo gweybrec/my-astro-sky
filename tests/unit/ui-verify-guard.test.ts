@@ -5,6 +5,7 @@ import {
   isUiEdit,
   classifyUiEdits,
   calledReviewerSubagent,
+  isScreenshotTool,
 } from '../../.claude/hooks/ui-verify-guard.js';
 
 /** Wrap one or more tool_use blocks in a single assistant transcript entry. */
@@ -117,11 +118,32 @@ describe('calledReviewerSubagent', () => {
   it('detects the reviewer subagent spawn', () => {
     expect(calledReviewerSubagent([assistant(reviewerCall)], 0)).toBe(true);
   });
+  it('detects the mobile reviewer subagent spawn', () => {
+    const mobile = {
+      type: 'tool_use',
+      name: 'Agent',
+      input: { subagent_type: 'mobile-ui-verify-reviewer' },
+    };
+    expect(calledReviewerSubagent([assistant(mobile)], 0)).toBe(true);
+  });
   it('is false for an unrelated subagent', () => {
     const other = { type: 'tool_use', name: 'Agent', input: { subagent_type: 'Explore' } };
     expect(calledReviewerSubagent([assistant(other)], 0)).toBe(false);
   });
   it('is false when no subagent was spawned', () => {
     expect(calledReviewerSubagent([assistant(edit('src/ui.ts'))], 0)).toBe(false);
+  });
+});
+
+describe('isScreenshotTool', () => {
+  it('accepts the default and aliased Playwright screenshot tools', () => {
+    expect(isScreenshotTool('mcp__playwright__browser_take_screenshot')).toBe(true);
+    expect(isScreenshotTool('mcp__playwright_mobile__browser_take_screenshot')).toBe(true);
+    expect(isScreenshotTool('mcp__playwright-android__browser_take_screenshot')).toBe(true);
+  });
+  it('rejects other tools', () => {
+    expect(isScreenshotTool('mcp__playwright__browser_snapshot')).toBe(false);
+    expect(isScreenshotTool('mcp__other__browser_take_screenshot')).toBe(false);
+    expect(isScreenshotTool(undefined)).toBe(false);
   });
 });

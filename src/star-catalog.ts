@@ -1,42 +1,20 @@
-import type {
-  Star,
-  StarMultiplicity,
-  ConstellationLine,
-  ConstellationInfo,
-  ConstellationStyle,
-} from './types';
+import type { Star, StarMultiplicity, ConstellationInfo, ConstellationStyle } from './types';
 import { getLang, t } from './i18n';
+import { normalizeRA } from '@myastrosky/core/angles';
+import {
+  expandMultiples,
+  hasConstellationLines,
+  nearestNamedStar,
+  parseConstellationLines,
+  setConstellationInfos,
+  setConstellationLines,
+  setStarCatalog,
+  starDisplayName,
+} from '@myastrosky/core/catalog/star-registry';
 
-let stars: Star[] = [];
-let starsByHip = new Map<number, Star>();
-let constellationInfos: ConstellationInfo[] = [];
-// Raw curated multiple-star systems (HIP-keyed), retained for the Targets recommender.
-let multipleSystems: Record<string, StarMultipleEntry> = {};
-// Cached ascending magnitude list (brightest first), built lazily from `stars`.
-// `stars` is itself kept sorted by magnitude, so this is just its `mag` column.
-let starMagsSorted: number[] | null = null;
+export * from '@myastrosky/core/catalog/star-registry';
 
-// Constellation lines are stored per style; 'western' is loaded eagerly at startup.
-const constellationLinesByStyle = new Map<ConstellationStyle, ConstellationLine[]>();
-
-export function normalizeRA(ra: number): number {
-  while (ra < 0) ra += 360;
-  while (ra >= 360) ra -= 360;
-  return ra;
-}
-
-export function parseConstellationLines(linesData: any): ConstellationLine[] {
-  const result: ConstellationLine[] = [];
-  for (const f of linesData.features) {
-    result.push({
-      id: f.id,
-      segments: f.geometry.coordinates.map((seg: number[][]) =>
-        seg.map(([ra, dec]: number[]) => [normalizeRA(ra), dec] as [number, number]),
-      ),
-    });
-  }
-  return result;
-}
+export { normalizeRA };
 
 async function fetchJSON(url: string): Promise<any> {
   const res = await fetch(url);
@@ -72,18 +50,17 @@ export async function loadCatalog(): Promise<void> {
     fetchJSON('/data/star-multiples.json'),
   ]);
 
-  // Retain the raw systems for the Targets recommender (see multiple-stars.ts).
-  multipleSystems = multiplesData;
   // Expand the curated systems: the metadata attaches to the primary HIP *and* every
   // listed companion HIP (e.g. Albireo β1 + β2 Cyg), so each present component shows it.
   const multByHip = expandMultiples(multiplesData);
 
   // Parse stars
+  const stars: Star[] = [];
   for (const f of starsData.features) {
     const hip: number = f.id;
     const [ra, dec]: [number, number] = f.geometry.coordinates;
     const info = namesData[String(hip)];
-    const star: Star = {
+    stars.push({
       hip,
       ra: normalizeRA(ra),
       dec,
@@ -95,20 +72,18 @@ export async function loadCatalog(): Promise<void> {
       constellation: info?.c || undefined,
       desig: info?.desig || undefined,
       multiplicity: multByHip.get(hip),
-    };
-    stars.push(star);
-    starsByHip.set(hip, star);
+    });
   }
 
-  // Sort by magnitude (brightest first) for rendering priority
-  stars.sort((a, b) => a.mag - b.mag);
-  starMagsSorted = null; // invalidate cache; rebuilt lazily on next access
+  // Raw systems are retained for the Targets recommender (see multiple-stars.ts).
+  setStarCatalog(stars, multiplesData);
 
   // Parse and cache the default (western) constellation lines
-  constellationLinesByStyle.set('western', parseConstellationLines(linesData));
+  setConstellationLines('western', parseConstellationLines(linesData));
 
   // Parse constellation info
   const lang = getLang();
+  const infos: ConstellationInfo[] = [];
   for (const f of constData.features) {
     const p = f.properties;
     let displayName: string;
@@ -116,7 +91,7 @@ export async function loadCatalog(): Promise<void> {
     else if (lang === 'es') displayName = p.es || p.en || p.name;
     else if (lang === 'de') displayName = p.de || p.name;
     else displayName = p.en || p.name;
-    constellationInfos.push({
+    infos.push({
       id: f.id,
       name: f.properties.name,
       displayName,
@@ -124,92 +99,13 @@ export async function loadCatalog(): Promise<void> {
       dec: f.geometry.coordinates[1],
     });
   }
+  setConstellationInfos(infos);
 }
 
 export async function loadConstellationStyle(style: ConstellationStyle): Promise<void> {
-  if (constellationLinesByStyle.has(style)) return; // already cached
+  if (hasConstellationLines(style)) return; // already cached
   const data = await fetchJSON(`/data/constellations.lines.${style}.json`);
-  constellationLinesByStyle.set(style, parseConstellationLines(data));
-}
-
-export function getStars(): Star[] {
-  return stars;
-}
-
-export function getStarByHip(hip: number): Star | undefined {
-  return starsByHip.get(hip);
-}
-
-/**
- * Catalog magnitudes sorted ascending (brightest first), for the pan-invariant render
- * budget (see render-budget.ts). Built once and cached; `stars` is already mag-sorted.
- */
-export function getStarMagsSorted(): number[] {
-  if (!starMagsSorted) starMagsSorted = stars.map((s) => s.mag);
-  return starMagsSorted;
-}
-
-export function getConstellationLines(style: ConstellationStyle = 'western'): ConstellationLine[] {
-  return constellationLinesByStyle.get(style) ?? [];
-}
-
-export function getConstellationInfos(): ConstellationInfo[] {
-  return constellationInfos;
-}
-
-export function getNamedStars(): Star[] {
-  return stars.filter((s) => s.name || s.bayer);
-}
-
-/** Raw shape of a public/data/star-multiples.json entry. `members` lists the other
- *  component HIPs of the system (present in the catalog), which inherit the metadata.
- *  `magB`/`bvB` give the companion's photometry when it is NOT a catalogued member —
- *  used by the recommender's rating (see multiple-stars.ts). */
-export interface StarMultipleEntry {
-  components: number;
-  sep?: string;
-  members?: number[];
-  magB?: number;
-  bvB?: number;
-}
-
-/** Curated multiple-star systems (HIP-keyed), for the Targets recommender. */
-export function getMultipleSystems(): Record<string, StarMultipleEntry> {
-  return multipleSystems;
-}
-
-/**
- * Expand curated multiple-star systems into a per-HIP lookup: the metadata attaches to
- * the primary HIP and to each companion listed in `members`, so every component present
- * in the catalog surfaces it. Companion `members` are stripped from the attached object.
- */
-export function expandMultiples(
-  raw: Record<string, StarMultipleEntry>,
-): Map<number, StarMultiplicity> {
-  const map = new Map<number, StarMultiplicity>();
-  for (const [hipStr, e] of Object.entries(raw)) {
-    const meta: StarMultiplicity = { components: e.components };
-    if (e.sep) meta.sep = e.sep;
-    map.set(Number(hipStr), meta);
-    for (const member of e.members ?? []) map.set(member, meta);
-  }
-  return map;
-}
-
-/** Human display name for a star: proper name → Bayer → Flamsteed → HIP. */
-export function starDisplayName(s: {
-  name?: string;
-  bayer?: string;
-  flam?: string;
-  constellation?: string;
-  hip: number;
-}): string {
-  return (
-    s.name ||
-    (s.bayer && s.constellation ? `${s.bayer} ${s.constellation}` : null) ||
-    (s.flam && s.constellation ? `${s.flam} ${s.constellation}` : null) ||
-    `HIP ${s.hip}`
-  );
+  setConstellationLines(style, parseConstellationLines(data));
 }
 
 /** i18n key for a system's type name, by star count (2 = binary … 8 = octuple). */
@@ -228,30 +124,6 @@ export function formatMultiplicity(m: StarMultiplicity): string {
   const key = MULTIPLE_KEY_BY_COUNT[m.components];
   const typeName = key ? t(key) : t('stars.multiple.system', { n: m.components });
   return m.sep ? `${typeName} · ${m.sep}″` : typeName;
-}
-
-/**
- * Nearest star with a proper name / Bayer / Flamsteed designation within `maxDeg` of
- * the given sky position, or undefined if none. Used for display-only naming of
- * custom-location frames — it never affects frame anchoring (which stays DSO-only).
- */
-export function nearestNamedStar(ra: number, dec: number, maxDeg = 3): Star | undefined {
-  const toRad = Math.PI / 180;
-  const d1 = dec * toRad;
-  const sinD1 = Math.sin(d1);
-  const cosD1 = Math.cos(d1);
-  let best: Star | undefined;
-  let bestCos = Math.cos(maxDeg * toRad); // accept only stars closer than maxDeg
-  for (const s of stars) {
-    if (!(s.name || s.bayer || s.flam)) continue;
-    const d2 = s.dec * toRad;
-    const cos = sinD1 * Math.sin(d2) + cosD1 * Math.cos(d2) * Math.cos((s.ra - ra) * toRad);
-    if (cos > bestCos) {
-      bestCos = cos;
-      best = s;
-    }
-  }
-  return best;
 }
 
 /**

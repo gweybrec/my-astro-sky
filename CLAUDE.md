@@ -7,28 +7,30 @@ It holds only **cross-cutting** guidance. Task-specific rules live in per-direct
 
 ## Nested guides
 
-| File                    | Covers                                                                                                             |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `src/CLAUDE.md`         | Frontend: browser verification + "what to verify", CSS/UnoCSS rules, ui-verify, i18n details, frontend conventions |
-| `server/CLAUDE.md`      | Backend: env vars, `/api` routes, Swagger annotations, backend logging                                             |
-| `tests/CLAUDE.md`       | The testing rule, Vitest + happy-dom setup, `tests/fixtures/` inventory, Vue component-test patterns               |
-| `scripts/CLAUDE.md`     | DSO catalog regeneration (`dso:generate`) and filter catalog colour seeding                                        |
-| `docs/CLAUDE.md`        | The two-audience documentation-file map and its rules                                                              |
-| `test-photos/CLAUDE.md` | Raw local test-image inventory (gitignored; present only on machines that have it)                                 |
+| File                      | Covers                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `src/CLAUDE.md`           | Frontend: browser verification + "what to verify", CSS/UnoCSS rules, ui-verify, i18n details, frontend conventions |
+| `server/CLAUDE.md`        | Backend: env vars, `/api` routes, Swagger annotations, backend logging                                             |
+| `tests/CLAUDE.md`         | The testing rule, Vitest + happy-dom setup, `tests/fixtures/` inventory, Vue component-test patterns               |
+| `scripts/CLAUDE.md`       | DSO catalog regeneration (`dso:generate`) and filter catalog colour seeding                                        |
+| `docs/CLAUDE.md`          | The two-audience documentation-file map and its rules                                                              |
+| `packages/core/CLAUDE.md` | Platform-neutral `@myastrosky/core` workspace package: no DOM/Node globals, import restrictions, shims, tests      |
+| `test-photos/CLAUDE.md`   | Raw local test-image inventory (gitignored; present only on machines that have it)                                 |
 
 ## Skills
 
 Project-specific skills live in `.claude/skills/`. The harness auto-invokes them on matching trigger phrases.
 
-| Skill                   | When to invoke                                                                                                     |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `frontend-feature`      | Adding or changing purely frontend UI (panels, modals, widgets, CSS)                                               |
-| `fullstack-feature`     | Adding or changing API routes together with frontend UI                                                            |
-| `add-photo-metadata`    | Adding a new optional field to photo metadata (DB, all 3 UI editors, export/import, WCS/astrometry pre-fill)       |
-| `add-dso-catalog`       | Integrating a new DSO catalog (RCW, Barnard, Abell…)                                                               |
-| `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog                                         |
-| `test-placement`        | Testing astrophoto upload, plate solving, and sky-map placement                                                    |
-| `profile-performance`   | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark |
+| Skill                   | When to invoke                                                                                                       |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `frontend-feature`      | Adding or changing purely frontend UI (panels, modals, widgets, CSS)                                                 |
+| `fullstack-feature`     | Adding or changing API routes together with frontend UI                                                              |
+| `add-photo-metadata`    | Adding a new optional field to photo metadata (DB, all 3 UI editors, export/import, WCS/astrometry pre-fill)         |
+| `add-dso-catalog`       | Integrating a new DSO catalog (RCW, Barnard, Abell…)                                                                 |
+| `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog                                           |
+| `test-placement`        | Testing astrophoto upload, plate solving, and sky-map placement                                                      |
+| `profile-performance`   | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark   |
+| `ui-verify`             | Mandatory visual verification of any UI change before presenting it (enforced by the `ui-verify-guard.js` Stop hook) |
 
 ---
 
@@ -42,6 +44,7 @@ npm run build        # tsc type-check + vite build to dist/
 npm run typecheck    # Type-check frontend (vue-tsc) + server (tsc)
 npm run typecheck:client  # vue-tsc --noEmit (type-checks .vue SFCs; plain tsc does not)
 npm run typecheck:server  # tsc --noEmit -p tsconfig.server.json
+npm run typecheck:core    # tsc --noEmit -p packages/core/tsconfig.json (platform-neutral core package)
 npm run preview      # Preview production build
 npm test             # Run unit test suite (Vitest)
 npm run test:watch   # Vitest in watch mode
@@ -127,7 +130,7 @@ See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
 
 ## Conventions
 
-- **UI text is internationalized (FR/EN).** French is the default language. Translations live in `src/i18n/fr.ts` and `src/i18n/en.ts` (server-side strings in `server/messages.ts`). Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time). Frontend specifics: `src/CLAUDE.md`.
+- **UI text is internationalized in four languages (FR/EN/ES/DE).** French is the default language. Translations live in `src/i18n/fr.ts`, `en.ts`, `es.ts` and `de.ts` (server-side strings in `server/messages.ts`). Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time). Frontend specifics: `src/CLAUDE.md`.
 - Editing a `.ts` file in `src/` or `server/`? See `tests/CLAUDE.md` for the matching-test-file rule.
 - Do not create new doc files without updating the table in `docs/CLAUDE.md` **and** `.github/copilot-instructions.md`.
 
