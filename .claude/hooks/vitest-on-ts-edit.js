@@ -6,6 +6,8 @@
 // this file uses ESM import/export rather than require().
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 let filePath = '';
 try {
@@ -18,14 +20,20 @@ const isTargetFile =
 
 if (!isTargetFile) process.exit(0);
 
+// Run Vitest's JS entry point with the current node rather than through `npx`/`npx.cmd`:
+// no shell, so file_path stays a plain argv entry (a path with spaces or shell metacharacters
+// is never re-parsed), and no npx resolution difference between Windows and POSIX.
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const vitestBin = path.join(repoRoot, 'node_modules', 'vitest', 'vitest.mjs');
+
 try {
   const output = execFileSync(
-    'npx',
-    ['vitest', 'related', filePath, '--run', '--reporter=dot', '--passWithNoTests'],
+    process.execPath,
+    [vitestBin, 'related', filePath, '--run', '--reporter=dot', '--passWithNoTests'],
     {
+      cwd: repoRoot,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32', // npx is npx.cmd on Windows
     },
   );
   const lines = output.trim().split('\n');
