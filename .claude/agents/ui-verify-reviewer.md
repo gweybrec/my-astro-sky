@@ -22,8 +22,8 @@ Every gate below exists because a change passed a shallower check and shipped br
 ## Do
 
 1. **Integrity first** — measurements off a stale page are lies. Confirm ONE dev server is
-   serving **current** code (kill orphaned `npm run dev` trees that hold the port and
-   serve old CSS), navigate to `http://localhost:5173`, then assert a value the diff
+   serving **current** code (never kill a process you did not start; if the ports are
+   busy, report it), navigate to `http://localhost:5173`, then assert a value the diff
    changed is actually live in the DOM / `getComputedStyle`. If a computed value
    contradicts the diff, STOP and find the real source (orphan/unimported file? later
    `:root`/theme override? stale page?) — never report green off it.

@@ -126,10 +126,20 @@ function calledReviewerSubagent(entries, startIdx) {
     for (const b of content) {
       if (!b || b.type !== 'tool_use') continue;
       if (!/^(Agent|Task)$/.test(b.name)) continue;
-      if (b.input && b.input.subagent_type === 'ui-verify-reviewer') return true;
+      if (b.input && isReviewerAgentType(b.input.subagent_type)) return true;
     }
   }
   return false;
+}
+
+/** The cold-eyes reviewer agent types (web and mobile variants). */
+function isReviewerAgentType(type) {
+  return type === 'ui-verify-reviewer' || type === 'mobile-ui-verify-reviewer';
+}
+
+/** Any Playwright MCP screenshot tool, whatever the server alias. */
+function isScreenshotTool(name) {
+  return /^mcp__playwright[\w-]*__browser_take_screenshot$/.test(String(name || ''));
 }
 
 function main() {
@@ -170,7 +180,7 @@ function main() {
     for (const b of content) {
       if (!b) continue;
       if (b.type === 'tool_use') {
-        if (b.name === 'mcp__playwright__browser_take_screenshot') screenshotTaken = true;
+        if (isScreenshotTool(b.name)) screenshotTaken = true;
       } else if (b.type === 'text') {
         hasText = true;
       }
@@ -226,4 +236,11 @@ if (invokedDirectly) {
   }
 }
 
-export { isUiEdit, classifyUiEdits, calledReviewerSubagent, netAddedLines, editBlob };
+export {
+  isUiEdit,
+  classifyUiEdits,
+  calledReviewerSubagent,
+  isScreenshotTool,
+  netAddedLines,
+  editBlob,
+};
