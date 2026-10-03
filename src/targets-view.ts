@@ -344,7 +344,9 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function buildPageList(current: number, total: number): (number | null)[] {
+/** Exported so other paginated lists (e.g. AsteroidIdentifyModal.vue's SkyBoT
+ *  results) can reuse the exact same page-button layout/algorithm. */
+export function buildPageList(current: number, total: number): (number | null)[] {
   if (total <= 1) return [0];
   const pages = new Set<number>([0, total - 1]);
   for (let i = Math.max(0, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.add(i);

@@ -76,7 +76,11 @@
   </div>
 
   <!-- Points of Interest -->
-  <PoiEditor :pois="pointsOfInterest" @update:pois="emit('update:pointsOfInterest', $event)" />
+  <PoiEditor
+    :pois="pointsOfInterest"
+    :photo="photo"
+    @update:pois="emit('update:pointsOfInterest', $event)"
+  />
 
   <!-- Integrations -->
   <div class="metadata-field">
@@ -252,13 +256,14 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { filterLabelCandidates } from '../../autocomplete-utils';
 import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
-import type { PhotoIntegration, PointOfInterest, CaptureDetails } from '../../types';
+import type { Photo, PhotoIntegration, PointOfInterest, CaptureDetails } from '../../types';
 import type { GearSetupData } from '../../api';
 import { CAPTURE_FIELDS } from '../../capture-fields';
 import { t } from '../../i18n';
 import { searchDSOs } from '../../search';
 import { showToast } from '../../toast';
 import { formatIntegrationTotal, normalizeIntegrationFilterKey } from '../../batch-utils';
+import { isoToDatetimeLocal, datetimeLocalToIso } from '../../datetime-local';
 import FilterInput from './FilterInput.vue';
 import PoiEditor from './PoiEditor.vue';
 import trashSvg from '../../icons/trash.svg?raw';
@@ -278,6 +283,10 @@ const props = defineProps<{
   displayName: string;
   knownFilterMap: Map<string, string>;
   knownLabels?: string[];
+  /** Passed straight through to PoiEditor — gates its "Identifier un astéroïde"
+   *  trigger, which needs a real, already-solved, server-hosted photo. Absent
+   *  (undefined) before a BatchUploadModal card has been placed. */
+  photo?: Photo | null;
 }>();
 
 const emit = defineEmits<{
@@ -337,16 +346,11 @@ function addCaptureField() {
 }
 
 // ─── Observation date ─────────────────────────────────────────────────────────
-const obsDateLocal = computed(() => {
-  if (!props.observationDate) return '';
-  const d = new Date(props.observationDate);
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-});
+const obsDateLocal = computed(() => isoToDatetimeLocal(props.observationDate));
 
 function onObsDateInput(e: Event) {
   const val = (e.target as HTMLInputElement).value;
-  emit('update:observationDate', val ? new Date(val).toISOString() : '');
+  emit('update:observationDate', datetimeLocalToIso(val));
 }
 
 // ─── DSO search ───────────────────────────────────────────────────────────────

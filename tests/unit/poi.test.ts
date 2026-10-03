@@ -6,6 +6,8 @@ import {
   poisMatchFilter,
   prunePoiSelection,
   poiSelectionsEqual,
+  poiKey,
+  isPoiVisible,
   UNCATEGORIZED_ID,
 } from '../../src/poi';
 import type { PoiCategory, PointOfInterest } from '../../src/types';
@@ -180,5 +182,28 @@ describe('poisMatchFilter', () => {
     const orphan: PointOfInterest[] = [{ name: 'Ghost', categoryId: 'cat-deleted' }];
     const sel = new Map([[UNCATEGORIZED_ID, new Set(['Ghost'])]]);
     expect(poisMatchFilter(orphan, cats, sel)).toBe(true);
+  });
+});
+
+describe('isPoiVisible (sky map: checked = shown)', () => {
+  const vesta: PointOfInterest = { name: 'Vesta', categoryId: 'cat-asteroid' };
+
+  it('shows every POI by default', () => {
+    expect(isPoiVisible(vesta, cats, {})).toBe(true);
+  });
+
+  it('hides only a POI explicitly unchecked', () => {
+    expect(isPoiVisible(vesta, cats, { [poiKey('cat-asteroid', 'Vesta')]: false })).toBe(false);
+    expect(isPoiVisible(vesta, cats, { [poiKey('cat-asteroid', 'Vesta')]: true })).toBe(true);
+    expect(isPoiVisible(vesta, cats, { [poiKey('cat-asteroid', 'Ceres')]: false })).toBe(true);
+  });
+
+  it('keys an orphan category under Uncategorized', () => {
+    const orphan: PointOfInterest = { name: 'X', categoryId: 'cat-deleted' };
+    expect(isPoiVisible(orphan, cats, { [poiKey(UNCATEGORIZED_ID, 'X')]: false })).toBe(false);
+  });
+
+  it('poiKey keeps category and name apart', () => {
+    expect(poiKey('a', 'bc')).not.toBe(poiKey('ab', 'c'));
   });
 });

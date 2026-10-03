@@ -10,9 +10,6 @@
     <!-- Labels dropdown (must be first after show-photos, per original DOM insertion order) -->
     <LabelsDropdown />
 
-    <!-- Points of Interest filter (two-level: category → POI name) -->
-    <SkyPoiDropdown />
-
     <!-- Show DSOs -->
     <CheckRow
       :label="t('dso.showDSOs')"
@@ -57,8 +54,8 @@
       </DropdownPanel>
     </div>
 
-    <!-- Catalogs dropdown -->
-    <div class="display-controls-mag-row" :class="{ 'opacity-40': !displayStore.showDSOs }">
+    <!-- Catalogs dropdown (mb-3: closes the DSO group, like LabelsDropdown closes the photo group) -->
+    <div class="display-controls-mag-row mb-3" :class="{ 'opacity-40': !displayStore.showDSOs }">
       <button
         ref="catalogBtnRef"
         type="button"
@@ -93,6 +90,14 @@
         </label>
       </DropdownPanel>
     </div>
+
+    <!-- Show points of interest (pins over photos) + which ones (category → name) -->
+    <CheckRow
+      :label="t('display.showPois')"
+      :model-value="displayStore.showPois"
+      @update:model-value="displayStore.setShowPois($event)"
+    />
+    <SkyPoiDropdown :disabled="!displayStore.showPois" />
 
     <!-- Hemisphere picker (meaningless once centered on zenith instead of a pole) -->
     <div

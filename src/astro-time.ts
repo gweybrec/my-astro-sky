@@ -230,6 +230,11 @@ export function planetRaDecDeg(jd: number, planet: PlanetKey): { raDeg: number; 
   return { raDeg: (((ra / DEG) % 360) + 360) % 360, decDeg: dec / DEG };
 }
 
+/** Earth's heliocentric position (AU, J2000 ecliptic frame) — the observer for comet ephemerides. */
+export function earthHeliocentricXYZ(jd: number): [number, number, number] {
+  return heliocentricEclipticXYZ(EARTH_ELEMENTS, (jd - 2451545.0) / 36525.0);
+}
+
 // ─── Moon position & phase ──────────────────────────────────────────────────
 
 /**

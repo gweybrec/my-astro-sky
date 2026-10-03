@@ -1,0 +1,488 @@
+[
+  {
+    "Name": "2018 PT9",
+    "RA (hms)": "12 28 4.7062",
+    "DEC (dms)": "+12 56 11.940",
+    "Class": "Mars-Crosser",
+    "VMag (mag)": 25.6,
+    "Err (arcsec)": 1.067,
+    "d (arcsec)": 379.303,
+    "dRA (arcsec/h)": -28.1903,
+    "dDEC (arcsec/h)": 5.8913,
+    "dg (ua)": 3.14448951503,
+    "dh (ua)": 4.08648843548,
+    "Phase (deg)": 5.43,
+    "SunElong (deg)": 22.73,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2018 PT9\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2018_PT9"
+    }
+  },
+  {
+    "Num": 18799,
+    "Name": "1999 JZ73",
+    "RA (hms)": "12 27 51.8342",
+    "DEC (dms)": "+12 53 24.083",
+    "Class": "MB>Middle",
+    "VMag (mag)": 17.6,
+    "Err (arcsec)": 0.02,
+    "d (arcsec)": 432.063,
+    "dRA (arcsec/h)": -33.2244,
+    "dDEC (arcsec/h)": 5.4436,
+    "dg (ua)": 1.5693294021,
+    "dh (ua)": 2.52288768435,
+    "Phase (deg)": 8.81,
+    "SunElong (deg)": 22.71,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"1999 JZ73\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/1999_JZ73"
+    }
+  },
+  {
+    "Name": "2023 TF193",
+    "RA (hms)": "12 28 2.3340",
+    "DEC (dms)": "+12 51 53.223",
+    "Class": "MB>Inner",
+    "VMag (mag)": 22.2,
+    "Err (arcsec)": 17377.5,
+    "d (arcsec)": 569.11,
+    "dRA (arcsec/h)": -37.604,
+    "dDEC (arcsec/h)": 6.1358,
+    "dg (ua)": 1.40887502301,
+    "dh (ua)": 2.36462526981,
+    "Phase (deg)": 9.39,
+    "SunElong (deg)": 22.67,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2023 TF193\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2023_TF193"
+    }
+  },
+  {
+    "Num": 393535,
+    "Name": "2002 TE371",
+    "RA (hms)": "12 27 2.0166",
+    "DEC (dms)": "+13 02 51.410",
+    "Class": "MB>Middle",
+    "VMag (mag)": 21.3,
+    "Err (arcsec)": 0.022,
+    "d (arcsec)": 650.934,
+    "dRA (arcsec/h)": -30.445,
+    "dDEC (arcsec/h)": 10.2158,
+    "dg (ua)": 2.16864454068,
+    "dh (ua)": 3.11537597398,
+    "Phase (deg)": 7.2,
+    "SunElong (deg)": 22.94,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2002 TE371\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2002_TE371"
+    }
+  },
+  {
+    "Name": "2015 AE308",
+    "RA (hms)": "12 27 0.4895",
+    "DEC (dms)": "+13 00 48.480",
+    "Class": "MB>Outer",
+    "VMag (mag)": 22,
+    "Err (arcsec)": 16.245,
+    "d (arcsec)": 657.209,
+    "dRA (arcsec/h)": -25.0728,
+    "dDEC (arcsec/h)": 11.4929,
+    "dg (ua)": 2.02497921351,
+    "dh (ua)": 2.97302409683,
+    "Phase (deg)": 7.54,
+    "SunElong (deg)": 22.92,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2015 AE308\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2015_AE308"
+    }
+  },
+  {
+    "Num": 710682,
+    "Name": "2014 DX12",
+    "RA (hms)": "12 26 55.8660",
+    "DEC (dms)": "+13 03 53.416",
+    "Class": "MB>Inner",
+    "VMag (mag)": 20.8,
+    "Err (arcsec)": 0.029,
+    "d (arcsec)": 753.464,
+    "dRA (arcsec/h)": -30.7065,
+    "dDEC (arcsec/h)": 8.3371,
+    "dg (ua)": 1.67349012852,
+    "dh (ua)": 2.62474071322,
+    "Phase (deg)": 8.56,
+    "SunElong (deg)": 22.97,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2014 DX12\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2014_DX12"
+    }
+  },
+  {
+    "Name": "2023 TE104",
+    "RA (hms)": "12 28 38.3409",
+    "DEC (dms)": "+12 58 16.139",
+    "Class": "MB>Outer",
+    "VMag (mag)": 23.2,
+    "Err (arcsec)": 481.93,
+    "d (arcsec)": 784.152,
+    "dRA (arcsec/h)": -29.7181,
+    "dDEC (arcsec/h)": 1.8508,
+    "dg (ua)": 2.67755604938,
+    "dh (ua)": 3.62207991536,
+    "Phase (deg)": 6.12,
+    "SunElong (deg)": 22.7,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2023 TE104\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2023_TE104"
+    }
+  },
+  {
+    "Num": 166944,
+    "Name": "Seton",
+    "RA (hms)": "12 28 39.5252",
+    "DEC (dms)": "+12 59 2.865",
+    "Class": "MB>Inner",
+    "VMag (mag)": 19.3,
+    "Err (arcsec)": 0.005,
+    "d (arcsec)": 794.981,
+    "dRA (arcsec/h)": -35.9956,
+    "dDEC (arcsec/h)": 11.3973,
+    "dg (ua)": 1.37310000524,
+    "dh (ua)": 2.329189701,
+    "Phase (deg)": 9.55,
+    "SunElong (deg)": 22.71,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"Seton\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/Seton"
+    }
+  },
+  {
+    "Name": "2020 XS7",
+    "RA (hms)": "12 28 16.2085",
+    "DEC (dms)": "+12 49 22.207",
+    "Class": "MB>Middle",
+    "VMag (mag)": 21.8,
+    "Err (arcsec)": 0.046,
+    "d (arcsec)": 801.847,
+    "dRA (arcsec/h)": -28.3434,
+    "dDEC (arcsec/h)": 15.1992,
+    "dg (ua)": 2.05030981685,
+    "dh (ua)": 2.99957743119,
+    "Phase (deg)": 7.37,
+    "SunElong (deg)": 22.6,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2020 XS7\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2020_XS7"
+    }
+  },
+  {
+    "Num": 489869,
+    "Name": "2008 GM68",
+    "RA (hms)": "12 27 5.0935",
+    "DEC (dms)": "+13 09 49.961",
+    "Class": "MB>Middle",
+    "VMag (mag)": 20,
+    "Err (arcsec)": 0.179,
+    "d (arcsec)": 815.798,
+    "dRA (arcsec/h)": -29.2426,
+    "dDEC (arcsec/h)": -7.4114,
+    "dg (ua)": 1.02540235456,
+    "dh (ua)": 1.98597454963,
+    "Phase (deg)": 11.38,
+    "SunElong (deg)": 23.04,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2008 GM68\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2008_GM68"
+    }
+  },
+  {
+    "Name": "2023 TW166",
+    "RA (hms)": "12 26 49.2396",
+    "DEC (dms)": "+13 03 16.374",
+    "Class": "MB>Outer",
+    "VMag (mag)": 22.3,
+    "Err (arcsec)": 39596.5,
+    "d (arcsec)": 838.683,
+    "dRA (arcsec/h)": -26.4828,
+    "dDEC (arcsec/h)": 8.3021,
+    "dg (ua)": 2.29671058242,
+    "dh (ua)": 3.24232570596,
+    "Phase (deg)": 6.92,
+    "SunElong (deg)": 22.97,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2023 TW166\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2023_TW166"
+    }
+  },
+  {
+    "Name": "2024 YC49",
+    "RA (hms)": "12 28 43.1518",
+    "DEC (dms)": "+12 58 28.458",
+    "Class": "MB>Outer",
+    "VMag (mag)": 21.7,
+    "Err (arcsec)": 0.021,
+    "d (arcsec)": 851.789,
+    "dRA (arcsec/h)": -26.4717,
+    "dDEC (arcsec/h)": 5.961,
+    "dg (ua)": 2.16313995662,
+    "dh (ua)": 3.11111016883,
+    "Phase (deg)": 7.13,
+    "SunElong (deg)": 22.69,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2024 YC49\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2024_YC49"
+    }
+  },
+  {
+    "Num": 398321,
+    "Name": "2011 KV36",
+    "RA (hms)": "12 28 31.5458",
+    "DEC (dms)": "+13 09 35.405",
+    "Class": "MB>Outer",
+    "VMag (mag)": 21,
+    "Err (arcsec)": 0.025,
+    "d (arcsec)": 869.449,
+    "dRA (arcsec/h)": -27.6011,
+    "dDEC (arcsec/h)": 5.0807,
+    "dg (ua)": 2.43197846954,
+    "dh (ua)": 3.37712421291,
+    "Phase (deg)": 6.62,
+    "SunElong (deg)": 22.88,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2011 KV36\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2011_KV36"
+    }
+  },
+  {
+    "Name": "2010 GY201",
+    "RA (hms)": "12 28 8.3955",
+    "DEC (dms)": "+12 46 41.931",
+    "Class": "MB>Middle",
+    "VMag (mag)": 21.2,
+    "Err (arcsec)": 0.014,
+    "d (arcsec)": 889.752,
+    "dRA (arcsec/h)": -34.3208,
+    "dDEC (arcsec/h)": 5.5564,
+    "dg (ua)": 1.31963562781,
+    "dh (ua)": 2.27697229493,
+    "Phase (deg)": 9.72,
+    "SunElong (deg)": 22.58,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2010 GY201\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2010_GY201"
+    }
+  },
+  {
+    "Name": "2020 BJ61",
+    "RA (hms)": "12 28 24.7977",
+    "DEC (dms)": "+13 12 20.688",
+    "Class": "MB>Outer",
+    "VMag (mag)": 21.8,
+    "Err (arcsec)": 0.046,
+    "d (arcsec)": 917.45,
+    "dRA (arcsec/h)": -27.0451,
+    "dDEC (arcsec/h)": 4.4848,
+    "dg (ua)": 2.12234319344,
+    "dh (ua)": 3.0695097174,
+    "Phase (deg)": 7.3,
+    "SunElong (deg)": 22.93,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2020 BJ61\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2020_BJ61"
+    }
+  },
+  {
+    "Num": 765693,
+    "Name": "2013 YL87",
+    "RA (hms)": "12 26 45.9897",
+    "DEC (dms)": "+12 54 45.900",
+    "Class": "MB>Inner",
+    "VMag (mag)": 21.8,
+    "Err (arcsec)": 0.024,
+    "d (arcsec)": 933.061,
+    "dRA (arcsec/h)": -31.5838,
+    "dDEC (arcsec/h)": 7.0178,
+    "dg (ua)": 1.62344960446,
+    "dh (ua)": 2.5757641642,
+    "Phase (deg)": 8.68,
+    "SunElong (deg)": 22.85,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2013 YL87\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2013_YL87"
+    }
+  },
+  {
+    "Name": "2021 GT221",
+    "RA (hms)": "12 27 0.7815",
+    "DEC (dms)": "+12 48 6.179",
+    "Class": "MB>Outer",
+    "VMag (mag)": 22.1,
+    "Err (arcsec)": 0.024,
+    "d (arcsec)": 986.591,
+    "dRA (arcsec/h)": -24.9112,
+    "dDEC (arcsec/h)": 8.4514,
+    "dg (ua)": 2.48520108852,
+    "dh (ua)": 3.4307228631,
+    "Phase (deg)": 6.48,
+    "SunElong (deg)": 22.73,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2021 GT221\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2021_GT221"
+    }
+  },
+  {
+    "Name": "2021 GA41",
+    "RA (hms)": "12 28 45.2239",
+    "DEC (dms)": "+12 52 14.871",
+    "Class": "MB>Outer",
+    "VMag (mag)": 22.2,
+    "Err (arcsec)": 25.596,
+    "d (arcsec)": 1002.594,
+    "dRA (arcsec/h)": -31.4592,
+    "dDEC (arcsec/h)": 1.3699,
+    "dg (ua)": 2.19584927335,
+    "dh (ua)": 3.14402158645,
+    "Phase (deg)": 7.03,
+    "SunElong (deg)": 22.59,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2021 GA41\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2021_GA41"
+    }
+  },
+  {
+    "Name": "2022 CA38",
+    "RA (hms)": "12 28 26.0314",
+    "DEC (dms)": "+13 14 37.105",
+    "Class": "MB>Inner",
+    "VMag (mag)": 20.7,
+    "Err (arcsec)": 594.4,
+    "d (arcsec)": 1037.476,
+    "dRA (arcsec/h)": -22.928,
+    "dDEC (arcsec/h)": 10.1467,
+    "dg (ua)": 0.82778639226,
+    "dh (ua)": 1.79291932873,
+    "Phase (deg)": 12.59,
+    "SunElong (deg)": 22.96,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2022 CA38\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2022_CA38"
+    }
+  },
+  {
+    "Num": 657223,
+    "Name": "2016 NM21",
+    "RA (hms)": "12 26 38.4737",
+    "DEC (dms)": "+13 06 23.044",
+    "Class": "MB>Inner",
+    "VMag (mag)": 20.6,
+    "Err (arcsec)": 0.037,
+    "d (arcsec)": 1041.554,
+    "dRA (arcsec/h)": -38.1602,
+    "dDEC (arcsec/h)": 7.2169,
+    "dg (ua)": 1.2439601921,
+    "dh (ua)": 2.20065852806,
+    "Phase (deg)": 10.26,
+    "SunElong (deg)": 23.04,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2016 NM21\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2016_NM21"
+    }
+  },
+  {
+    "Num": 380480,
+    "Name": "Glennhawley",
+    "RA (hms)": "12 26 49.7744",
+    "DEC (dms)": "+12 45 46.524",
+    "Class": "MB>Outer",
+    "VMag (mag)": 21.3,
+    "Err (arcsec)": 0.015,
+    "d (arcsec)": 1198.174,
+    "dRA (arcsec/h)": -27.8802,
+    "dDEC (arcsec/h)": 4.884,
+    "dg (ua)": 2.20356439841,
+    "dh (ua)": 3.15110480765,
+    "Phase (deg)": 7.05,
+    "SunElong (deg)": 22.72,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"Glennhawley\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/Glennhawley"
+    }
+  },
+  {
+    "Num": 738248,
+    "Name": "2016 LB97",
+    "RA (hms)": "12 28 38.8222",
+    "DEC (dms)": "+12 45 7.539",
+    "Class": "MB>Outer",
+    "VMag (mag)": 21.6,
+    "Err (arcsec)": 0.017,
+    "d (arcsec)": 1205.367,
+    "dRA (arcsec/h)": -24.2136,
+    "dDEC (arcsec/h)": 13.3778,
+    "dg (ua)": 2.32883792817,
+    "dh (ua)": 3.27649805942,
+    "Phase (deg)": 6.72,
+    "SunElong (deg)": 22.5,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2016 LB97\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2016_LB97"
+    }
+  },
+  {
+    "Num": 170114,
+    "Name": "2002 XN104",
+    "RA (hms)": "12 27 2.6051",
+    "DEC (dms)": "+12 42 10.852",
+    "Class": "MB>Outer",
+    "VMag (mag)": 20.7,
+    "Err (arcsec)": 0.018,
+    "d (arcsec)": 1261.495,
+    "dRA (arcsec/h)": -26.4137,
+    "dDEC (arcsec/h)": 6.3269,
+    "dg (ua)": 2.54733594122,
+    "dh (ua)": 3.49291337285,
+    "Phase (deg)": 6.34,
+    "SunElong (deg)": 22.64,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2002 XN104\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2002_XN104"
+    }
+  },
+  {
+    "Name": "2023 TA162",
+    "RA (hms)": "12 26 33.4115",
+    "DEC (dms)": "+13 13 1.322",
+    "Class": "MB>Outer",
+    "VMag (mag)": 22.1,
+    "Err (arcsec)": 25718,
+    "d (arcsec)": 1295.261,
+    "dRA (arcsec/h)": -27.0499,
+    "dDEC (arcsec/h)": 6.5206,
+    "dg (ua)": 2.19483563514,
+    "dh (ua)": 3.14038692246,
+    "Phase (deg)": 7.2,
+    "SunElong (deg)": 23.15,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2023 TA162\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2023_TA162"
+    }
+  },
+  {
+    "Name": "2002 PX158",
+    "RA (hms)": "12 26 51.6357",
+    "DEC (dms)": "+12 42 43.162",
+    "Class": "MB>Middle",
+    "VMag (mag)": 22.7,
+    "Err (arcsec)": 0.063,
+    "d (arcsec)": 1322.236,
+    "dRA (arcsec/h)": -28.0138,
+    "dDEC (arcsec/h)": 11.6777,
+    "dg (ua)": 2.42433299826,
+    "dh (ua)": 3.37054858294,
+    "Phase (deg)": 6.57,
+    "SunElong (deg)": 22.67,
+    "ssodnet": {
+      "quaero": "https://api.ssodnet.imcce.fr/quaero/1/sso/search?q=\"2002 PX158\" AND type:(Asteroid OR Dwarf Planet)",
+      "ssocard": "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/2002_PX158"
+    }
+  }
+]

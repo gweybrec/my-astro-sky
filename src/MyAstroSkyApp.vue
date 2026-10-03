@@ -63,6 +63,48 @@
   <!-- Statistics: photographed/total per DSO catalog, filterable by constellation -->
   <StatisticsModal v-if="activeModal === 'stats'" @close="closeModal()" />
 
+  <!-- Asteroid identification: mark a trail on a solved photo, match it against
+       SkyBoT. Always opened via triggerAsteroidModal(photo, onIdentified) —
+       PoiEditor.vue's "Identifier un astéroïde" trigger, this modal's only
+       entry point — which sets both pending* fields together, so by the time
+       this v-if is true pendingAsteroidPhoto is never actually null. -->
+  <AsteroidIdentifyModal
+    v-if="activeModal === 'asteroidIdentify' && uiStore.pendingAsteroidPhoto"
+    :photo="uiStore.pendingAsteroidPhoto"
+    @close="closeModal()"
+    @identified="onAsteroidIdentified"
+  />
+
+  <!-- Supernova identification: query TNS for transients in a solved photo's field
+       around its observation date. Opened via triggerSupernovaModal(photo, cb) from
+       PoiEditor.vue, same contract as the asteroid modal above. -->
+  <SupernovaIdentifyModal
+    v-if="activeModal === 'supernovaIdentify' && uiStore.pendingSupernovaPhoto"
+    :photo="uiStore.pendingSupernovaPhoto"
+    @close="closeModal()"
+    @identified="onSupernovaIdentified"
+  />
+
+  <!-- Comet identification: propagate MPC comet orbits to a solved photo's
+       observation date. Opened via triggerCometModal(photo, cb) from PoiEditor.vue,
+       same contract as the supernova modal above. -->
+  <CometIdentifyModal
+    v-if="activeModal === 'cometIdentify' && uiStore.pendingCometPhoto"
+    :photo="uiStore.pendingCometPhoto"
+    @close="closeModal()"
+    @identified="onCometIdentified"
+  />
+
+  <!-- Manual point of interest: name + type, then a click on the solved photo places
+       it. Opened via triggerPoiAddModal(photo, cb) from PoiEditor.vue, same
+       contract as the identification modals above. -->
+  <PoiAddModal
+    v-if="activeModal === 'poiAdd' && uiStore.pendingPoiAddPhoto"
+    :photo="uiStore.pendingPoiAddPhoto"
+    @close="closeModal()"
+    @identified="onPoiAdded"
+  />
+
   <!-- "Find targets" recommender, summoned from Plans or the Sky map. The
        recommend surface itself is built once by TargetsView and survives this
        component unmounting on close (see TargetsOverlay.vue). -->
@@ -93,7 +135,12 @@ import UpdateAvailableModal from './components/modals/UpdateAvailableModal.vue';
 import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue';
 import StatisticsModal from './components/modals/StatisticsModal.vue';
 import TargetsOverlay from './components/overlay/TargetsOverlay.vue';
+import AsteroidIdentifyModal from './components/modals/AsteroidIdentifyModal.vue';
+import SupernovaIdentifyModal from './components/modals/SupernovaIdentifyModal.vue';
+import CometIdentifyModal from './components/modals/CometIdentifyModal.vue';
+import PoiAddModal from './components/modals/PoiAddModal.vue';
 import { useUiStore } from './stores/ui';
+import type { Photo, PointOfInterest } from './types';
 
 type ModalName =
   | 'settings'
@@ -107,12 +154,40 @@ type ModalName =
   | 'credits'
   | 'update'
   | 'shortcuts'
-  | 'stats';
+  | 'stats'
+  | 'asteroidIdentify'
+  | 'supernovaIdentify'
+  | 'cometIdentify'
+  | 'poiAdd';
 
 const activeModal = ref<ModalName | null>(null);
 const previousModal = ref<ModalName | null>(null);
 const uiStore = useUiStore();
 useKeyboardShortcuts();
+
+function onAsteroidIdentified(photo: Photo, pois: PointOfInterest[]) {
+  // Persistence is entirely the caller's job (see triggerAsteroidModal in
+  // ui.ts) — PoiEditor.vue's callback pushes the POIs into its own `pois`
+  // v-model, which each of its two hosts (the gallery's metadata editor, or a
+  // BatchUploadModal card) already knows how to save on its own terms.
+  uiStore.pendingAsteroidOnIdentified?.(photo, pois);
+  closeModal();
+}
+
+function onSupernovaIdentified(photo: Photo, pois: PointOfInterest[]) {
+  uiStore.pendingSupernovaOnIdentified?.(photo, pois);
+  closeModal();
+}
+
+function onCometIdentified(photo: Photo, pois: PointOfInterest[]) {
+  uiStore.pendingCometOnIdentified?.(photo, pois);
+  closeModal();
+}
+
+function onPoiAdded(photo: Photo, pois: PointOfInterest[]) {
+  uiStore.pendingPoiAddOnIdentified?.(photo, pois);
+  closeModal();
+}
 
 function openModal(name: ModalName | null) {
   previousModal.value = activeModal.value;

@@ -18,6 +18,10 @@ import {
   getObsGeneration,
   bumpObsGeneration,
   isBelowHorizonCached,
+  withCanonicalProjection,
+  setProjectionObserver,
+  getCenterMode,
+  getProjectionMode,
 } from '../../src/projection';
 import { altAzFromRaDec } from '../../src/sky-geometry';
 
@@ -356,5 +360,51 @@ describe('isBelowHorizonCached / observer generation', () => {
     const result = isBelowHorizonCached(o, 12, -20);
     expect(result).toBe(expected);
     expect(o._ag).toBe(getObsGeneration());
+  });
+});
+
+describe('withCanonicalProjection', () => {
+  it('projects in the pole stereographic frame even while zenith mode clips the point', () => {
+    setCenterMode('pole');
+    setProjectionMode('stereo');
+    const canonical = project(45.3, -10.6);
+
+    setCenterMode('zenith');
+    setProjectionMode('fisheye');
+    // LST 15h at 48°N: RA 3h is ~12 h from the meridian, far below the horizon.
+    setProjectionObserver(15, 48);
+    expect(project(45.3, -10.6)).toEqual({ x: 1e6, y: 1e6 });
+    const inside = withCanonicalProjection(() => project(45.3, -10.6));
+    expect(inside.x).toBeCloseTo(canonical.x, 12);
+    expect(inside.y).toBeCloseTo(canonical.y, 12);
+
+    expect(getCenterMode()).toBe('zenith');
+    expect(getProjectionMode()).toBe('fisheye');
+    setCenterMode('pole');
+    setProjectionMode('stereo');
+  });
+
+  it('restores the generation, so nothing memoised inside the scope is reused', () => {
+    setCenterMode('zenith');
+    setProjectionObserver(15, 48);
+    const before = getProjectionGeneration();
+    const star = { ra: 45.3, dec: -10.6 } as { ra: number; dec: number; _px?: number };
+    withCanonicalProjection(() => projectCached(star));
+    expect(star._px).not.toBe(1e6);
+    expect(getProjectionGeneration()).toBe(before);
+    projectCached(star);
+    expect(star._px).toBe(1e6); // re-projected in the (clipping) display mode
+    setCenterMode('pole');
+  });
+
+  it('restores the display mode when the callback throws', () => {
+    setCenterMode('zenith');
+    expect(() =>
+      withCanonicalProjection(() => {
+        throw new Error('boom');
+      }),
+    ).toThrow('boom');
+    expect(getCenterMode()).toBe('zenith');
+    setCenterMode('pole');
   });
 });

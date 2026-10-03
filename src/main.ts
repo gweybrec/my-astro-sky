@@ -93,6 +93,8 @@ async function init() {
   // Init photo overlay
   const overlayDiv = document.getElementById('photo-layer') as HTMLDivElement;
   const overlay = new PhotoOverlay(overlayDiv, () => skyMap.getView(), skyMap);
+  // Supernova (and other positioned POI) pins, pulled by the sky map every frame.
+  skyMap.setPoiPinSource(() => overlay.getPoiPins());
 
   // Init gallery
   const gallery = new Gallery();

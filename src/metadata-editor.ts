@@ -43,6 +43,9 @@ export function buildMetadataEditorPanel(
   onClose: () => void,
   knownLabels?: string[],
   knownFilters?: string[],
+  /** Fired on every (unsaved) POI edit — lets the gallery detail view pin a
+   * just-identified supernova on the photo before the user saves. */
+  onPoisChange?: (pois: PointOfInterest[]) => void,
 ): { teardown: () => void; isDirty: () => boolean } {
   const original = {
     displayName: photo.originalName,
@@ -148,6 +151,7 @@ export function buildMetadataEditorPanel(
         notes: state.notes,
         knownFilterMap,
         knownLabels: knownLabels ?? [],
+        photo,
         'onUpdate:displayName': (v: string) => {
           state.displayName = v;
         },
@@ -159,6 +163,7 @@ export function buildMetadataEditorPanel(
         },
         'onUpdate:pointsOfInterest': (v: PointOfInterest[]) => {
           state.pointsOfInterest = v;
+          onPoisChange?.(v);
         },
         'onUpdate:integrations': (v: PhotoIntegration[]) => {
           state.integrations = v;

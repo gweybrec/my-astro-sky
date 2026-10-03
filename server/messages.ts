@@ -260,5 +260,31 @@ export const msg = {
 
     solveFieldError: (lang: ServerLang, err: string) =>
       m(lang, `Erreur solve-field : ${err}`, `solve-field error: ${err}`),
+
+    invalidSkybotParams: (lang: ServerLang) =>
+      m(lang, 'Paramètres de recherche SkyBoT invalides', 'Invalid SkyBoT search parameters'),
+
+    skybotError: (lang: ServerLang, err: string) =>
+      m(lang, `Erreur SkyBoT : ${err}`, `SkyBoT error: ${err}`),
+
+    invalidTnsParams: (lang: ServerLang) =>
+      m(lang, 'Paramètres de recherche TNS invalides', 'Invalid TNS search parameters'),
+
+    tnsError: (lang: ServerLang, err: string) =>
+      m(lang, `Erreur TNS : ${err}`, `TNS error: ${err}`),
+
+    tnsRateLimited: (lang: ServerLang, seconds: number | null) =>
+      m(
+        lang,
+        `Le serveur TNS limite les recherches — réessayez dans ${seconds ?? 60} s`,
+        `The TNS server is rate-limiting searches — try again in ${seconds ?? 60} s`,
+      ),
+
+    cometElementsError: (lang: ServerLang, err: string) =>
+      m(
+        lang,
+        `Impossible de charger les orbites des comètes (MPC) : ${err}`,
+        `Could not load comet orbits (MPC): ${err}`,
+      ),
   },
 };

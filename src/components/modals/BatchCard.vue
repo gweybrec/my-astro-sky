@@ -240,6 +240,7 @@
           v-model:notes="item.notes"
           :knownFilterMap="knownFilterMap"
           :gearSetups="gearSetups"
+          :photo="item.photo"
           @update:displayName="scheduleMetaSave"
           @update:dsoIds="scheduleMetaSave"
           @update:labels="scheduleMetaSave"

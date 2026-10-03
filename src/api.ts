@@ -15,6 +15,9 @@ import { t, getLang } from './i18n';
 import { reportRendererError } from './error-reporter';
 import { downloadBlob } from './file-utils';
 import type { HorizonProfile } from './horizon-io';
+import type { SkybotCandidate } from './asteroid-identify';
+import type { TnsCandidate } from './supernova-identify';
+import type { CometElements } from './comet-ephemeris';
 
 /** Translate a server error response using the `code` field when available. */
 export function parseServerError(
@@ -1408,4 +1411,75 @@ export async function updatePlanEntryPositionAPI(
     const d = await res.json().catch(() => ({}));
     throw new Error(d.error ?? 'Failed to update plan entry position');
   }
+}
+
+/**
+ * Cone-searches IMCCE SkyBoT (via the server proxy, `POST /api/skybot/conesearch`)
+ * for known asteroids near a sky position and epoch. Used by the asteroid
+ * identification modal to match the user's marked trail against a candidate.
+ */
+export async function skybotConesearchAPI(params: {
+  raDeg: number;
+  decDeg: number;
+  radiusArcmin: number;
+  epochJd: number;
+}): Promise<SkybotCandidate[]> {
+  const res = await fetch('/api/skybot/conesearch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...params, lang: getLang() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(parseServerError(data, 'errors.skybotSearch'));
+  }
+  return data.candidates ?? [];
+}
+
+/**
+ * Cone-searches the IAU Transient Name Server (via the server proxy,
+ * `POST /api/tns/conesearch`) for transients discovered in a date window. Used by
+ * the supernova identification modal. The proxy caches results — TNS allows only
+ * ~2 anonymous cone searches a minute, surfaced as a translated 429 message.
+ */
+export async function tnsConesearchAPI(params: {
+  raDeg: number;
+  decDeg: number;
+  radiusArcmin: number;
+  dateStart: string;
+  dateEnd: string;
+}): Promise<TnsCandidate[]> {
+  const res = await fetch('/api/tns/conesearch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...params, lang: getLang() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(parseServerError(data, 'errors.tnsSearch'));
+  }
+  return data.candidates ?? [];
+}
+
+let cometElementsPromise: Promise<CometElements[]> | null = null;
+
+/**
+ * Current MPC comet orbital elements (via the server's cached proxy,
+ * `GET /api/comets/elements`). Memoised for the session — the comet
+ * identification modal re-propagates them on every date edit. A failed load
+ * is not memoised, so reopening the modal retries.
+ */
+export function cometElementsAPI(): Promise<CometElements[]> {
+  cometElementsPromise ??= (async () => {
+    const res = await fetch(`/api/comets/elements?lang=${getLang()}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(parseServerError(data, 'errors.cometElements'));
+    }
+    return (data.comets ?? []) as CometElements[];
+  })().catch((err: unknown) => {
+    cometElementsPromise = null;
+    throw err;
+  });
+  return cometElementsPromise;
 }

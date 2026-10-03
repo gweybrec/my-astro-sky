@@ -186,6 +186,8 @@ vi.mock('../../src/display-settings', () => ({
     skyOpacity: 0.5,
     backgroundOpacity: 1.0,
     showDSOs: true,
+    showPois: true,
+    visiblePois: {},
     dsoTypes: ['GxS', 'OC', 'GC'],
     dsoCatalogs: ['M', 'NGC'],
     showStarTooltips: true,
@@ -240,6 +242,13 @@ describe('useDisplayStore', () => {
     const store = makeStore();
     store.setShowDSOs(false);
     expect(store.showDSOs).toBe(false);
+  });
+
+  it('setShowPois updates store (loaded from settings)', () => {
+    const store = makeStore();
+    expect(store.showPois).toBe(true);
+    store.setShowPois(false);
+    expect(store.showPois).toBe(false);
   });
 
   it('setDsoTypes updates store dsoTypes', () => {
@@ -327,5 +336,35 @@ describe('DSO controls in DisplayControlsSection', () => {
     const catBtn = buttons.find((b) => b.text().includes('Catalogs'));
     expect((typeBtn?.element as HTMLButtonElement).disabled).toBe(true);
     expect((catBtn?.element as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('places the "Show points of interest" toggle + POI dropdown below the DSO block', () => {
+    const wrapper = mountDSOSection();
+    const text = wrapper.text();
+    const catalogs = text.indexOf('Catalogs');
+    const showPois = text.indexOf('Show points of interest');
+    const poiDropdown = text.indexOf('Points of interest', showPois + 1);
+    expect(catalogs).toBeGreaterThan(-1);
+    expect(showPois).toBeGreaterThan(catalogs);
+    expect(poiDropdown).toBeGreaterThan(showPois);
+    // No longer under "Show photos": exactly one POI dropdown in the section.
+    const poiButtons = wrapper
+      .findAll('button.display-dropdown-btn')
+      .filter((b) => b.text().startsWith('Points of interest'));
+    expect(poiButtons).toHaveLength(1);
+  });
+
+  it('disables the POI dropdown when "Show points of interest" is off', async () => {
+    const wrapper = mountDSOSection();
+    const { useDisplayStore: useDSStore } = await import('../../src/stores/display');
+    const store = useDSStore();
+    const poiBtn = () =>
+      wrapper
+        .findAll('button.display-dropdown-btn')
+        .find((b) => b.text().startsWith('Points of interest'))!.element as HTMLButtonElement;
+    expect(poiBtn().disabled).toBe(false);
+    store.showPois = false;
+    await wrapper.vm.$nextTick();
+    expect(poiBtn().disabled).toBe(true);
   });
 });

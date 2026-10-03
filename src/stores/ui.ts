@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import type { ViewMode, DSO, Star } from '../types';
+import { ref, shallowRef } from 'vue';
+import type { ViewMode, DSO, Star, Photo, PointOfInterest } from '../types';
 import { useCanvasStore } from './canvas';
 
 // Screen offset (px) of the tooltip from the cursor anchor; the tooltip is drawn
@@ -70,6 +70,39 @@ export const useUiStore = defineStore('ui', () => {
   const panelCollapsed = ref(false);
   const currentViewMode = ref<ViewMode>('skymap');
   const pendingBatchFiles = ref<File[] | null>(null);
+
+  // Set before opening the asteroid identification modal — it always opens
+  // pre-targeted at one already-solved photo now (see triggerAsteroidModal in
+  // ui.ts): the "Identifier un astéroïde" trigger lives next to "+ Ajouter un
+  // point d'intérêt" in PoiEditor.vue, which always has a specific photo in
+  // scope. `pendingAsteroidOnIdentified` is that call's own callback — there
+  // can be several PoiEditor instances live at once (one per BatchUploadModal
+  // card), each needing the result routed back to its own POI list, so the
+  // modal can't hard-code a single global handler the way its old
+  // "just persist to the server" behaviour did.
+  const pendingAsteroidPhoto = ref<Photo | null>(null);
+  const pendingAsteroidOnIdentified = shallowRef<
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
+  >(null);
+
+  // Same contract as the asteroid pair above, for the supernova identification
+  // modal (triggerSupernovaModal).
+  const pendingSupernovaPhoto = ref<Photo | null>(null);
+  const pendingSupernovaOnIdentified = shallowRef<
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
+  >(null);
+
+  // Same contract again, for the comet identification modal (triggerCometModal).
+  const pendingCometPhoto = ref<Photo | null>(null);
+  const pendingCometOnIdentified = shallowRef<
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
+  >(null);
+
+  // Same contract, for the manual "add a point of interest" modal (triggerPoiAddModal).
+  const pendingPoiAddPhoto = ref<Photo | null>(null);
+  const pendingPoiAddOnIdentified = shallowRef<
+    ((photo: Photo, pois: PointOfInterest[]) => void) | null
+  >(null);
 
   // Set before switchView('plans') to make the Plans view expand/scroll to this
   // plan. Consumed (and cleared) on render.
@@ -296,6 +329,14 @@ export const useUiStore = defineStore('ui', () => {
     setPanelCollapsed,
     switchView,
     pendingBatchFiles,
+    pendingAsteroidPhoto,
+    pendingAsteroidOnIdentified,
+    pendingSupernovaPhoto,
+    pendingSupernovaOnIdentified,
+    pendingCometPhoto,
+    pendingCometOnIdentified,
+    pendingPoiAddPhoto,
+    pendingPoiAddOnIdentified,
     pendingUpdate,
     pendingPlanFocusId,
     targetsOverlayOpen,

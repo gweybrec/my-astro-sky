@@ -13,7 +13,14 @@ vi.mock('../../src/i18n', () => ({
   setLang: vi.fn(),
 }));
 
+vi.mock('../../src/poi-pins', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/poi-pins')>();
+  return { ...real, poiPinsInImage: vi.fn(real.poiPinsInImage) };
+});
+
 import { Gallery } from '../../src/gallery';
+import { poiPinsInImage } from '../../src/poi-pins';
+import { setCenterMode, setProjectionObserver } from '../../src/projection';
 
 function makePhoto(overrides: Partial<Photo> = {}): Photo {
   return {
@@ -164,6 +171,282 @@ describe('Gallery', () => {
     expect(document.querySelector('.gallery-cinematic-overlay')).toBeNull();
   });
 
+  it('replaces an open detail view rather than stacking a second one', async () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg' }),
+    ]);
+    gallery.openPhoto('a');
+    const firstTeardown = mockBuildMetadataEditorPanel.mock.results[0].value.teardown;
+
+    gallery.openPhoto('b'); // e.g. the sky map's photo list, while "a" is still open
+    await Promise.resolve();
+
+    const overlays = document.querySelectorAll('.gallery-cinematic-overlay');
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0].querySelector('img')?.getAttribute('alt')).toBe('M31');
+    expect(firstTeardown).toHaveBeenCalledOnce();
+    expect(mockBuildMetadataEditorPanel).toHaveBeenCalledTimes(2);
+
+    // Close it: an open detail keeps a document keydown listener across tests.
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
+    await Promise.resolve();
+    expect(document.querySelector('.gallery-cinematic-overlay')).toBeNull();
+  });
+
+  it('keeps the open detail view when its unsaved edits are not discarded', async () => {
+    mockBuildMetadataEditorPanel.mockImplementationOnce(() => ({
+      teardown: vi.fn(),
+      isDirty: () => true,
+    }));
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg' }),
+    ]);
+    gallery.openPhoto('a');
+    gallery.openPhoto('b');
+
+    const keepEditing = Array.from(document.querySelectorAll('.dialog button')).find(
+      (b) => b.textContent === 'gallery.cancelEdit',
+    ) as HTMLButtonElement;
+    keepEditing.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const overlays = document.querySelectorAll('.gallery-cinematic-overlay');
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0].querySelector('img')?.getAttribute('alt')).toBe('M42');
+    expect(mockBuildMetadataEditorPanel).toHaveBeenCalledTimes(1);
+
+    // Close it, discarding: an open detail keeps a document keydown listener across tests.
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
+    const discard = Array.from(document.querySelectorAll('.dialog button')).find(
+      (b) => b.textContent === 'gallery.closeWithoutSaving',
+    ) as HTMLButtonElement;
+    discard.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(document.querySelector('.gallery-cinematic-overlay')).toBeNull();
+  });
+
+  it('pins an unsaved positioned POI on the photo as soon as the editor reports it', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({
+        id: 'sn',
+        originalName: 'NGC7331',
+        filename: 'sn.jpg',
+        manualPlacement: {
+          centerRa: 339.27,
+          centerDec: 34.42,
+          rotationDeg: 0,
+          projPerPx: 0.00002,
+          mirrorX: false,
+          mirrorY: false,
+        },
+      }),
+    ]);
+    (document.querySelector('.gallery-item') as HTMLElement).click();
+
+    const canvas = document.querySelector('.gallery-detail-dso-overlay') as HTMLCanvasElement;
+    // Give the image and its wrapper a real layout box so the overlay can draw.
+    const img = document.querySelector('.gallery-cinematic-img') as HTMLImageElement;
+    const box = { left: 0, top: 0, right: 1000, bottom: 700, width: 1000, height: 700, x: 0, y: 0 };
+    img.getBoundingClientRect = () => ({ ...box, toJSON() {} }) as DOMRect;
+    img.parentElement!.getBoundingClientRect = () => ({ ...box, toJSON() {} }) as DOMRect;
+    expect(canvas.style.display).toBe('none');
+
+    // 7th argument: the editor's unsaved-POI callback (fired by "Add selected").
+    const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
+      pois: Photo['pointsOfInterest'],
+    ) => void;
+    onPoisChange([{ name: 'SN 2026aaiv', categoryId: 'cat-supernova', ra: 339.27, dec: 34.42 }]);
+    expect(canvas.style.display).toBe('block');
+
+    // Removing it again (still unsaved) hides the overlay.
+    onPoisChange([]);
+    expect(canvas.style.display).toBe('none');
+  });
+
+  describe('detail header icon buttons', () => {
+    const placement = {
+      centerRa: 339.27,
+      centerDec: 34.42,
+      rotationDeg: 0,
+      projPerPx: 0.00002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const box = { left: 0, top: 0, right: 1000, bottom: 700, width: 1000, height: 700, x: 0, y: 0 };
+
+    function openDetail(overrides: Partial<Photo>) {
+      const gallery = new Gallery();
+      gallery.loadPhotos([makePhoto({ id: 'd', filename: 'd.jpg', ...overrides })]);
+      (document.querySelector('.gallery-item') as HTMLElement).click();
+      const img = document.querySelector('.gallery-cinematic-img') as HTMLImageElement;
+      img.getBoundingClientRect = () => ({ ...box, toJSON() {} }) as DOMRect;
+      img.parentElement!.getBoundingClientRect = () => ({ ...box, toJSON() {} }) as DOMRect;
+      const btn = (label: string) =>
+        document.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement;
+      return {
+        dsos: btn('gallery.showDsos'),
+        pois: btn('gallery.showPois'),
+        map: btn('gallery.showOnMap'),
+        canvas: document.querySelector('.gallery-detail-dso-overlay') as HTMLCanvasElement,
+      };
+    }
+
+    it('renders DSO, POI and map icon buttons in that order', () => {
+      const { dsos, pois, map } = openDetail({ manualPlacement: placement });
+      const row = [...document.querySelectorAll('.gallery-detail-btn-row button')];
+      expect(row).toEqual([dsos, pois, map]);
+      for (const b of row) {
+        expect(b.querySelector('svg')).toBeTruthy();
+        expect(b.textContent?.trim()).toBe('');
+      }
+    });
+
+    it('disables the POI button with a reason when no POI has a position', () => {
+      const { pois } = openDetail({
+        manualPlacement: placement,
+        pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
+      });
+      expect(pois.disabled).toBe(true);
+      expect(pois.title).toBe('gallery.showPoisUnavailable');
+    });
+
+    it('POI pins are off by default and toggle on with the button', () => {
+      const { pois, canvas } = openDetail({
+        manualPlacement: placement,
+        pointsOfInterest: [
+          { name: 'SN 2026aaiv', categoryId: 'cat-supernova', ra: 339.27, dec: 34.42 },
+        ],
+      });
+      expect(pois.disabled).toBe(false);
+      expect(pois.getAttribute('aria-pressed')).toBe('false');
+      expect(canvas.style.display).toBe('none');
+
+      pois.click();
+      expect(pois.getAttribute('aria-pressed')).toBe('true');
+      // Pressed state is aria-pressed only — the class list never changes (no resize).
+      expect(pois.className).toBe('btn-action gallery-detail-toggle-btn');
+      expect(canvas.style.display).toBe('block');
+
+      pois.click();
+      expect(canvas.style.display).toBe('none');
+    });
+
+    it('switches POI pins on when a positioned POI is newly added in the editor', () => {
+      const { pois, canvas } = openDetail({ manualPlacement: placement });
+      expect(pois.disabled).toBe(true);
+      const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
+        p: Photo['pointsOfInterest'],
+      ) => void;
+      onPoisChange([{ name: 'SN X', categoryId: 'cat-supernova', ra: 339.27, dec: 34.42 }]);
+      expect(pois.disabled).toBe(false);
+      expect(pois.getAttribute('aria-pressed')).toBe('true');
+      expect(canvas.style.display).toBe('block');
+    });
+
+    it('enables the POI button for an unsaved identified asteroid, not for a typed name', () => {
+      const { pois, canvas } = openDetail({ manualPlacement: placement });
+      const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
+        p: Photo['pointsOfInterest'],
+      ) => void;
+      const typed = { name: 'Some satellite', categoryId: 'cat-satellite' };
+      onPoisChange([typed]);
+      expect(pois.disabled).toBe(true);
+      expect(pois.title).toBe('gallery.showPoisUnavailable');
+
+      onPoisChange([
+        typed,
+        { name: '(18799) 1999 JZ73', categoryId: 'cat-asteroid', ra: 339.27, dec: 34.42 },
+      ]);
+      expect(pois.disabled).toBe(false);
+      expect(pois.title).toBe('gallery.showPois');
+      expect(canvas.style.display).toBe('block');
+    });
+  });
+
+  it('keeps pins on target when the zenith projection rotates after the view opened', () => {
+    // Zenith-centred ("local sky") projection follows the sky clock: a photo→projection
+    // matrix fitted when the detail view opened is stale a minute later, which put
+    // pins (and DSO outlines) minutes of arc off target. Pins must use a fresh fit.
+    setCenterMode('zenith');
+    setProjectionObserver(22, 45);
+    try {
+      const gallery = new Gallery();
+      gallery.loadPhotos([
+        makePhoto({
+          id: 'sn',
+          originalName: 'NGC7331',
+          filename: 'sn.jpg',
+          manualPlacement: {
+            centerRa: 339.27,
+            centerDec: 34.42,
+            rotationDeg: 0,
+            projPerPx: 0.00005,
+            mirrorX: false,
+            mirrorY: false,
+          },
+        }),
+      ]);
+      (document.querySelector('.gallery-item') as HTMLElement).click();
+
+      setProjectionObserver(22.5, 45); // half an hour of sidereal time later
+      const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
+        pois: Photo['pointsOfInterest'],
+      ) => void;
+      onPoisChange([{ name: 'SN centre', categoryId: 'cat-supernova', ra: 339.27, dec: 34.42 }]);
+
+      const pins = vi.mocked(poiPinsInImage).mock.results.at(-1)!.value;
+      expect(pins).toHaveLength(1);
+      expect(pins[0].x).toBeCloseTo(500, 0);
+      expect(pins[0].y).toBeCloseTo(350, 0);
+    } finally {
+      setCenterMode('pole');
+    }
+  });
+
+  it('pins a POI while the zenith-centred sky map has the photo below the horizon', () => {
+    // Zenith mode clips below-horizon points to one sentinel, which used to collapse
+    // the photo's fit (no pins at all); sky math now runs in the canonical projection.
+    setCenterMode('zenith');
+    setProjectionObserver(10.6, 45); // RA 22h37m is ~12 h from the meridian
+    try {
+      const gallery = new Gallery();
+      gallery.loadPhotos([
+        makePhoto({
+          id: 'sn',
+          originalName: 'NGC7331',
+          filename: 'sn.jpg',
+          manualPlacement: {
+            centerRa: 339.27,
+            centerDec: 34.42,
+            rotationDeg: 0,
+            projPerPx: 0.00005,
+            mirrorX: false,
+            mirrorY: false,
+          },
+        }),
+      ]);
+      (document.querySelector('.gallery-item') as HTMLElement).click();
+      const onPoisChange = mockBuildMetadataEditorPanel.mock.calls[0][6] as (
+        pois: Photo['pointsOfInterest'],
+      ) => void;
+      onPoisChange([{ name: 'SN centre', categoryId: 'cat-supernova', ra: 339.27, dec: 34.42 }]);
+
+      const pins = vi.mocked(poiPinsInImage).mock.results.at(-1)!.value;
+      expect(pins).toHaveLength(1);
+      expect(pins[0].x).toBeCloseTo(500, 0);
+      expect(pins[0].y).toBeCloseTo(350, 0);
+    } finally {
+      setCenterMode('pole');
+    }
+  });
+
   it('arrow keys navigate to the next/previous photo in the gallery', () => {
     const gallery = new Gallery();
     gallery.loadPhotos([
@@ -227,8 +510,8 @@ describe('Gallery', () => {
 
     (document.querySelector('.gallery-item') as HTMLElement).click();
 
-    const button = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'gallery.showOnMap',
+    const button = document.querySelector(
+      'button[aria-label="gallery.showOnMap"]',
     ) as HTMLButtonElement;
     button.click();
     // close() is async; flush microtasks so the handler completes

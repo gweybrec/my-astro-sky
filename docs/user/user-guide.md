@@ -97,6 +97,12 @@ Click the gear icon on any photo in the side panel, then **Reposition**. This re
 - **Order**: Drag to reorder photos. The bottom of the list renders on top.
 - **Opacity**: Set per-photo opacity (0–100%) via the gear popup slider.
 - **Deletion**: Deleted photos have a 5-second undo window via the toast notification.
+- **Points of interest**: Tag comets, asteroids, satellites or supernovae captured in a photo. On a solved photo, three **Identify** dialogs share one layout — date/time fields and a **Search** button above the photo, the candidates below it, and **Add selected** to add the ticked ones (the search only runs when you click **Search**, or automatically on opening when the photo's date is known, so editing the date and then the time costs a single request):
+  - **Identify asteroid**: mark the start and end of the trail on the photo; IMCCE SkyBoT lists the known asteroids that match it, best match pre-ticked.
+  - **Identify supernovae**: searches the IAU Transient Name Server (TNS) for supernovae in the photo's field discovered up to a year before its observation date. TNS allows only about two searches a minute; results are cached, so searching the same photo again is instant.
+  - **Identify comets**: computes where the comets known to the Minor Planet Center were at the photo's observation time. Click the photo to move a comet's pin onto its nucleus if the prediction is a few arcminutes off; comets just outside the frame are listed with their distance — usually a sign that the observation date or time is wrong. Positions come from current orbits, so comets that faded long ago (e.g. C/2020 F3 NEOWISE) are not found; add those by hand.
+
+  Identified asteroids, comets and supernovae carry their sky position and are pinned in their type's colour: on the sky map (toggle **Show points of interest** in the Display section, whose dropdown picks which POIs are pinned), and on the photo in the gallery detail view (comet icon button next to the DSO button, available as soon as such a POI is in the list, even before saving). Names typed by hand have no position and are not pinned.
 
 ---
 

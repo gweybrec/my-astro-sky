@@ -3264,6 +3264,194 @@
         }
       }
     },
+    "/api/skybot/conesearch": {
+      "post": {
+        "summary": "Cone-search IMCCE SkyBoT for known asteroids near a sky position and epoch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "raDeg": {
+                    "type": "number"
+                  },
+                  "decDeg": {
+                    "type": "number"
+                  },
+                  "radiusArcmin": {
+                    "type": "number"
+                  },
+                  "epochJd": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidate asteroids returned successfully"
+          },
+          "400": {
+            "description": "Invalid search parameters"
+          },
+          "502": {
+            "description": "SkyBoT upstream request failed"
+          }
+        }
+      }
+    },
+    "/api/tns/conesearch": {
+      "post": {
+        "summary": "Cone-search the IAU Transient Name Server for supernovae discovered in a date window",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "raDeg": {
+                    "type": "number"
+                  },
+                  "decDeg": {
+                    "type": "number"
+                  },
+                  "radiusArcmin": {
+                    "type": "number"
+                  },
+                  "dateStart": {
+                    "type": "string",
+                    "description": "Earliest discovery date (YYYY-MM-DD)"
+                  },
+                  "dateEnd": {
+                    "type": "string",
+                    "description": "Latest discovery date (YYYY-MM-DD)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidate transients returned successfully"
+          },
+          "400": {
+            "description": "Invalid search parameters"
+          },
+          "429": {
+            "description": "TNS rate limit reached (anonymous cone search allows ~2 queries per minute)"
+          },
+          "502": {
+            "description": "TNS upstream request failed"
+          }
+        }
+      }
+    },
+    "/api/comets/elements": {
+      "get": {
+        "summary": "Current comet orbital elements from the Minor Planet Center",
+        "description": "Cached for 24 h server-side. The client propagates them to a photo's observation date to identify comets in its field.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fr",
+                "en"
+              ]
+            },
+            "description": "Language of the error message"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comet elements returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "comets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "designation": {
+                            "type": "string",
+                            "example": "C/2025 R2"
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "C/2025 R2 (SWAN)"
+                          },
+                          "tpJd": {
+                            "type": "number",
+                            "description": "Perihelion time (Julian Date, TT)"
+                          },
+                          "q": {
+                            "type": "number",
+                            "description": "Perihelion distance (AU)"
+                          },
+                          "e": {
+                            "type": "number",
+                            "description": "Eccentricity"
+                          },
+                          "peri": {
+                            "type": "number",
+                            "description": "Argument of perihelion (deg, J2000 ecliptic)"
+                          },
+                          "node": {
+                            "type": "number",
+                            "description": "Longitude of the ascending node (deg, J2000 ecliptic)"
+                          },
+                          "incl": {
+                            "type": "number",
+                            "description": "Inclination (deg, J2000 ecliptic)"
+                          },
+                          "h": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "Absolute total magnitude (M1)"
+                          },
+                          "k": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "Magnitude slope parameter (K1)"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The MPC could not be reached and nothing is cached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/stars/search": {
       "get": {
         "summary": "Search stars by name or catalog identifier",
