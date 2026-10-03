@@ -460,18 +460,14 @@ function generateSyntheticCorrespondences(
   return result;
 }
 
-export function wcsToCorrespondences(
+/** Pure core of wcsToCorrespondences: the star catalog is injected (no fs access). */
+export function wcsToCorrespondencesWithCatalog(
   wcs: WCSData,
+  catalog: CatalogStar[],
   imageWidth: number,
   imageHeight: number,
   fitsYConvention = false,
 ): Correspondence[] {
-  console.log('[WCS] Converting WCS to correspondences for image', imageWidth, 'x', imageHeight);
-  console.log('[WCS] CRPIX:', wcs.CRPIX1, ',', wcs.CRPIX2, '(FITS coords)');
-  console.log('[WCS] CRVAL:', wcs.CRVAL1, ',', wcs.CRVAL2, '(RA/Dec degrees)');
-
-  const catalog = loadServerCatalog();
-
   // Compute approximate field of view from CD matrix
   const pixscaleX = Math.sqrt(wcs.CD1_1 * wcs.CD1_1 + wcs.CD2_1 * wcs.CD2_1); // deg/pixel
   const pixscaleY = Math.sqrt(wcs.CD1_2 * wcs.CD1_2 + wcs.CD2_2 * wcs.CD2_2);
@@ -700,6 +696,21 @@ export function wcsToCorrespondences(
   }
 
   return result;
+}
+
+export function wcsToCorrespondences(
+  wcs: WCSData,
+  imageWidth: number,
+  imageHeight: number,
+  fitsYConvention = false,
+): Correspondence[] {
+  return wcsToCorrespondencesWithCatalog(
+    wcs,
+    loadServerCatalog(),
+    imageWidth,
+    imageHeight,
+    fitsYConvention,
+  );
 }
 
 export function extractWCS(buffer: Buffer, ext: string): WCSData | null {
