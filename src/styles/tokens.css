@@ -273,8 +273,8 @@
   --hints-info-icon-border: #88a;
   --hints-bg: rgba(100, 100, 100, 0.15);
   --hints-border: rgba(120, 120, 140, 0.2);
-  --hints-confirmed-bg: rgba(50, 150, 50, 0.1);
-  --hints-confirmed-text: #6c6;
+  --hints-active-border: rgba(200, 160, 50, 0.45);
+  --hints-active-bg: rgba(200, 160, 50, 0.06);
   --hints-close-bg: rgba(30, 28, 22, 0.8);
   --hints-close-bg-hover: rgba(180, 100, 100, 0.4);
   --hints-close-text-hover: #faa;
