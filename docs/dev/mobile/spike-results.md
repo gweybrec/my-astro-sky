@@ -284,18 +284,18 @@ From `observations.md` (device session, Galaxy A16 SM-A165F, Android 16, 2026-10
 **Go.** No risk identified in the plan is a blocker on an entry-level phone (Galaxy A16, about 3.7 GB RAM).
 
 1. **Star catalog: keep the JSON format.** `stars.14.json` (15.4 MB) parses in under 0.2 s and the app holds about 54 MB of JS heap after load. A binary or tiered catalog is not needed for the first release.
-2. **Sky map: keep Canvas 2D and the current painters.** Dragging and zooming stay well above 60 fps with the existing code.
+2. **Sky map: keep Canvas 2D and the current painters.** With the existing code, dragging runs at about 69 fps and zooming at about 79 fps. Dragging is not uniformly smooth: 16 frames took more than 25 ms in 5 s, and the longest took about 100 ms. Card 4.3 measures again with real touch gestures.
 3. **Photo layer: draw photos on the canvas.** Twenty bitmaps of 2048 px pan and pinch at about 90 fps. Keep a level-of-detail cache with a budget: at most about 20 bitmaps at 2048 px in memory at once, thumbnails beyond that.
 4. **SQLite: batching is mandatory.** One statement per bridge call costs about 35 ms; the same statements in one `executeSet` cost about 0.3 ms each. Any write of more than a handful of rows goes through `batch()`. A photo and its correspondences are written in one batch.
 5. **Migrations: use a merged v0 baseline.** Replaying the desktop's schema history in its original order needed 11 tolerated `ALTER` errors. Set `PRAGMA foreign_keys=ON` explicitly even though it was already on.
-6. **Images: decode on the device, one large file at a time.** A 9 MB JPEG decodes and resizes to 2048 px in about 0.6 s, and a 213 MB FITS decodes in about 1.8 s, but process memory peaked at 426 MB. Always keep only a display copy of at most 2048 px plus a thumbnail, release the source buffer at once, and set an upper file-size limit after testing a larger file.
+6. **Images: decode on the device, one large file at a time.** A 9 MB JPEG decodes and resizes to 2048 px in about 0.6 s, and a 213 MB FITS decodes in about 2 s (1.8 s and 2.1 s in two runs), but process memory peaked at 426 MB. Always keep only a display copy of at most 2048 px plus a thumbnail, release the source buffer at once, and set an upper file-size limit after testing a larger file.
 7. **nova.astrometry.net: native HTTP with our own user agent, and upload with a form.**
    - Every nova call goes through the native HTTP layer with `User-Agent: MyAstroSky`. With a browser-like user agent nova answers status requests with an HTML page; a plain WebView `fetch` is blocked by CORS.
    - Upload with `FormData` + `Blob` (variant a): verified end to end, a job id came back.
    - Do not use the raw-bytes multipart body (variant b): nova accepted it but produced no job id in two polls of about 90 s each. The cause is not proven.
    - Consequence: the core `HttpClient` port must support a multipart request with a file part, not only a raw byte body. No native plugin is needed.
 8. **TNS: native HTTP only.** A plain `fetch` fails; the patched fetch works.
-9. **MPC and Overpass: a plain `fetch` works.** Overpass rate-limits repeated calls (429 and 504 were seen), so cache results and back off, as the desktop does.
+9. **MPC: a plain `fetch` works. Overpass: CORS allows a plain `fetch`, but the service is unreliable.** The plain Overpass call failed in two runs out of three with a server error page, and the native-HTTP call was refused once with 429 and once with 504. No transport was reliable, so the horizon feature must cache results, retry with a back-off, and work without the peaks when Overpass is unavailable.
 10. **Real-device automation works.** The WebView can be driven over CDP through `adb forward`, and the system file picker through `uiautomator`, with no human tap.
 11. **App shell: handle the safe areas.** On Android 16 the app is drawn edge to edge and the spike's content sits under the status bar.
 
