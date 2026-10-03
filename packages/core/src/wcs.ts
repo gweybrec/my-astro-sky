@@ -204,6 +204,15 @@ export function parseFITSHeader(headerStr: string): Record<string, number | stri
   return result;
 }
 
+/**
+ * Parse a plate-solver `.wcs` sidecar (ASTAP `.wcs`, astrometry.net `wcs.fits`) into the same
+ * header shape as `parseFITSHeader`. Both are FITS headers: 80-char records (astrometry.net,
+ * and ASTAP's binary form) or newline-delimited text (ASTAP's text form); both are handled.
+ */
+export function parseWcsSidecar(bytes: Uint8Array): Record<string, number | string | boolean> {
+  return parseFITSHeader(extractFITSHeaderFromFITS(bytes));
+}
+
 // --- TIFF Tag 270 Extraction ---
 
 export function extractFITSHeaderFromTIFF(buffer: Uint8Array): string | null {
