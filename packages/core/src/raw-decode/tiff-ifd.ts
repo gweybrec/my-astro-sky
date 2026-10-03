@@ -1,3 +1,5 @@
+import { bytesToAscii7 } from './ascii';
+
 /**
  * Minimal TIFF (classic, 32-bit offsets) IFD parser — reads only the tags the raw-astro
  * decoder needs. Not a general-purpose TIFF library: no BigTIFF, no writing.
@@ -52,7 +54,7 @@ export function fieldAscii(ifd: TiffIfd, tag: number): string | undefined {
 
 export function parseTiffHeader(buf: Uint8Array): TiffHeaderInfo {
   if (buf.length < 8) throw new Error('Buffer too small to be a TIFF file');
-  const bo = new TextDecoder('latin1').decode(buf.subarray(0, 2));
+  const bo = bytesToAscii7(buf, 0, 2);
   const littleEndian = bo === 'II';
   if (!littleEndian && bo !== 'MM') throw new Error('Not a TIFF file (bad byte-order marker)');
 
@@ -87,9 +89,7 @@ export function parseTiffHeader(buf: Uint8Array): TiffHeaderInfo {
 
       if (type === 2) {
         // ASCII, NUL-terminated
-        field.ascii = new TextDecoder('latin1')
-          .decode(buf.subarray(dataOffset, dataOffset + count))
-          .replace(/\0.*$/s, '');
+        field.ascii = bytesToAscii7(buf, dataOffset, dataOffset + count).replace(/\0.*$/s, '');
       } else {
         for (let k = 0; k < count; k++) {
           const off = dataOffset + k * typeSize;

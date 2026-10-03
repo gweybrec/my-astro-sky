@@ -1,3 +1,5 @@
+import { bytesToAscii7 } from './raw-decode/ascii';
+
 export interface WCSData {
   CRPIX1: number;
   CRPIX2: number;
@@ -143,9 +145,9 @@ export interface Correspondence {
   starDec?: number;
 }
 
-/** Decode bytes `[start, end)` of `buf` as a Latin-1 string (one char per byte; clamps like `subarray`). */
+/** Decode bytes `[start, end)` of `buf` as 7-bit ASCII (like Node's `toString('ascii')`; clamps like `subarray`). */
 export function bytesToAscii(buf: Uint8Array, start: number, end: number): string {
-  return new TextDecoder('latin1').decode(buf.subarray(start, end));
+  return bytesToAscii7(buf, start, end);
 }
 
 // --- FITS Header Parsing ---
