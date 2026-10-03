@@ -80,6 +80,8 @@ Rules:
 - The icon SVG must use `stroke="currentColor"` (or `fill="currentColor"`) so every state recolours
   it automatically. No hardcoded hex/`white` in the SVG.
 - Reflect toggle state with `aria-pressed="true|false"` on the button.
+- `btn-icon` is an `inline-grid` that centres its content (SVG or text glyph) on both axes in a
+  row at least one line high; do not add `vertical-align` to the icon.
 
 This is the same amber-fill + `--border-focus` convention used by the `.active` modifiers on
 pagination, language, hemisphere, and mirror buttons — keeping every toggle in the app consistent.

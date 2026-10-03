@@ -161,6 +161,9 @@ export default defineConfig({
     'btn-icon': [
       'bg-transparent border border-[var(--border-white-md)] text-primary',
       'cursor-pointer py-2 px-4 rounded-sm text-body',
+      // The content (an SVG, or a text glyph) is centred on both axes in a row at
+      // least one line high, so the button keeps the height of a text line.
+      'inline-grid grid-rows-[minmax(1lh,auto)] place-items-center place-content-center',
       'transition-colors duration-150',
       'hover:bg-[var(--accent-fill-lg)] hover:border-[var(--border-focus)] hover:text-bright',
     ].join(' '),
