@@ -7,14 +7,15 @@ It holds only **cross-cutting** guidance. Task-specific rules live in per-direct
 
 ## Nested guides
 
-| File                    | Covers                                                                                                             |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `src/CLAUDE.md`         | Frontend: browser verification + "what to verify", CSS/UnoCSS rules, ui-verify, i18n details, frontend conventions |
-| `server/CLAUDE.md`      | Backend: env vars, `/api` routes, Swagger annotations, backend logging                                             |
-| `tests/CLAUDE.md`       | The testing rule, Vitest + happy-dom setup, `tests/fixtures/` inventory, Vue component-test patterns               |
-| `scripts/CLAUDE.md`     | DSO catalog regeneration (`dso:generate`) and filter catalog colour seeding                                        |
-| `docs/CLAUDE.md`        | The two-audience documentation-file map and its rules                                                              |
-| `test-photos/CLAUDE.md` | Raw local test-image inventory (gitignored; present only on machines that have it)                                 |
+| File                      | Covers                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `src/CLAUDE.md`           | Frontend: browser verification + "what to verify", CSS/UnoCSS rules, ui-verify, i18n details, frontend conventions |
+| `server/CLAUDE.md`        | Backend: env vars, `/api` routes, Swagger annotations, backend logging                                             |
+| `tests/CLAUDE.md`         | The testing rule, Vitest + happy-dom setup, `tests/fixtures/` inventory, Vue component-test patterns               |
+| `scripts/CLAUDE.md`       | DSO catalog regeneration (`dso:generate`) and filter catalog colour seeding                                        |
+| `docs/CLAUDE.md`          | The two-audience documentation-file map and its rules                                                              |
+| `packages/core/CLAUDE.md` | Platform-neutral `@myastrosky/core` workspace package: no DOM/Node globals, import restrictions, shims, tests      |
+| `test-photos/CLAUDE.md`   | Raw local test-image inventory (gitignored; present only on machines that have it)                                 |
 
 ## Skills
 
@@ -43,6 +44,7 @@ npm run build        # tsc type-check + vite build to dist/
 npm run typecheck    # Type-check frontend (vue-tsc) + server (tsc)
 npm run typecheck:client  # vue-tsc --noEmit (type-checks .vue SFCs; plain tsc does not)
 npm run typecheck:server  # tsc --noEmit -p tsconfig.server.json
+npm run typecheck:core    # tsc --noEmit -p packages/core/tsconfig.json (platform-neutral core package)
 npm run preview      # Preview production build
 npm test             # Run unit test suite (Vitest)
 npm run test:watch   # Vitest in watch mode

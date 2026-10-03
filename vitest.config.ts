@@ -8,7 +8,7 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/components/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/**/*.ts', 'src/**/*.vue', 'server/**/*.ts'],
+      include: ['src/**/*.ts', 'src/**/*.vue', 'server/**/*.ts', 'packages/**/*.ts'],
       exclude: [
         // Entry points
         'src/ui.ts',

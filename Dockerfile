@@ -8,6 +8,9 @@ FROM node:24-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
+# npm workspaces: packages/*/package.json must be present before `npm ci` so the
+# @myastrosky/core link is created (the sources are then used as-is by Vite and tsx).
+COPY packages/ packages/
 RUN npm ci
 
 # Everything Vite needs to build the frontend bundle.
@@ -29,6 +32,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
+# npm workspaces: packages/*/package.json must be present before `npm ci` so the
+# @myastrosky/core link is created (the sources are then used as-is by Vite and tsx).
+COPY packages/ packages/
 
 # Install runtime deps only, skipping install scripts of dependencies; the
 # native modules are then built explicitly with `npm rebuild`.
