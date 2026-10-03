@@ -13,8 +13,8 @@ UnoCSS utility, a shortcut, or `var(--token)`.
 ### 1.1 Colour palette
 
 All variables are defined in **`src/styles/tokens.css`** (`:root`) and mirrored into the
-`uno.config.ts` theme — that pair is the single source of truth. The default theme is warm amber on
-near-void black; the `cold-blue-v2` theme re-tints most of these tokens.
+`uno.config.ts` theme — that pair is the single source of truth. The bare `:root` is the **warm** theme (amber on
+near-void black), but the app's **default** theme is `cold-blue-v2` (`src/theme.ts`; `warm` and `cold-blue` are the other choices); the `[data-theme]` themes re-tint most of these tokens.
 
 > **Why no literal values below?** Colour tokens are theme-dependent — `[data-theme='cold-blue-v2']`
 > in `src/style.css` overrides them — so any hex/rgba printed here would be true for only one theme
@@ -152,6 +152,8 @@ These tokens drive Canvas 2D rendering. They are defined in `tokens.css` but rea
 | -------------------- | ------------------------ |
 | `--fov-frame-stroke` | FOV frame dashed outline |
 | `--fov-frame-label`  | FOV frame text label     |
+
+> The sky-map look (background, stars, grid, constellation tint) comes from `src/sky-themes.ts`, not from CSS tokens. `--sky-bg-inner`, `--sky-bg-outer` and `--constellation-line` are defined but **unused** — no code reads them; do not rely on them.
 
 ---
 

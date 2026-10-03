@@ -39,7 +39,7 @@ A collapsible side panel on the right holds Photos, Search, DSO info, Display se
 ## Uploading and placing a photo
 
 1. Click the **+** button in the Photos section of the side panel.
-2. Drop your image or use the file picker. Supported formats: JPEG, PNG, WEBP, TIFF, FITS. Max size: 200 MB.
+2. Pick one or more files in the file picker (dropping files onto the app is not supported). Supported formats: JPEG, PNG, WEBP, TIFF, FITS. Max size: 200 MB.
 3. Choose a plate-solving method (see below) or place the photo manually.
 4. Once solved or placed, the photo appears on the map at the correct position.
 
@@ -94,7 +94,7 @@ Click the gear icon on any photo in the side panel, then **Reposition**. This re
 ## Photo organization
 
 - **Visibility**: Toggle individual photos on/off with the eye icon.
-- **Order**: Drag to reorder photos. The bottom of the list renders on top.
+- **Order**: Click the gear icon on a photo, then **Display order**, and drag the ⠿ grip to move photos in the list. The top of the list is drawn on top on the map.
 - **Opacity**: Set per-photo opacity (0–100%) via the gear popup slider.
 - **Deletion**: Deleted photos have a 5-second undo window via the toast notification.
 - **Points of interest**: Tag comets, asteroids, satellites or supernovae captured in a photo. On a solved photo, three **Identify** dialogs share one layout — date/time fields and a **Search** button above the photo, the candidates below it, and **Add selected** to add the ticked ones (the search only runs when you click **Search**, or automatically on opening when the photo's date is known, so editing the date and then the time costs a single request):
@@ -242,7 +242,7 @@ Use the **Show on map / Hide from map** toggle in the plan header to show or hid
 
 ### Reordering and removing entries
 
-Drag entries to reorder them within a plan. Click the × button on an entry to remove it from the plan (the DSO itself is not deleted).
+Entries cannot be reordered by hand: use the **Sort by** dropdown in the plan (transit time by default, or max altitude, interest, brightness, size, name, difficulty, observation window) — the choice is saved per plan and also sets the order of the exported PDF. Click the × button on an entry to remove it from the plan (the DSO itself is not deleted).
 
 ### Exporting a plan
 

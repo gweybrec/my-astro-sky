@@ -76,7 +76,7 @@
 Express 5 server with multiple modules:
 
 - **`index.ts`**: Main routes:
-  - `POST /api/photos` — Upload + resize via Sharp to max 2048 px, generate `{uuid}_thumb.jpg` (400 px, JPEG q75) via Sharp, scale correspondences proportionally, store in SQLite + disk; returns `thumbFilename` in response. Sharp errors on invalid/corrupt image files return **HTTP 400** with `{ code: 'INVALID_IMAGE' }` rather than 500.
+  - `POST /api/photos` — Upload; Sharp only bakes the EXIF orientation into the file (`.rotate()`, no resizing — the original resolution is kept); generate `{uuid}_thumb.jpg` (400 px, JPEG q75) via Sharp, scale correspondences proportionally, store in SQLite + disk; returns `thumbFilename` in response. Sharp errors on invalid/corrupt image files return **HTTP 400** with `{ code: 'INVALID_IMAGE' }` rather than 500.
   - `GET /api/photos` — List all photos with correspondences
   - `DELETE /api/photos/:id` — Delete photo file and its `_thumb.jpg` sibling
   - `PATCH /api/photos/:id/manual-placement` — Update manual placement parameters for photo repositioning
@@ -222,7 +222,7 @@ The selection is:
 
 ### Server-side thumbnail generation
 
-On every upload, `server/index.ts` runs Sharp twice: once to resize the original to max 2048 px (stored as `{uuid}.jpg`) and once to produce `{uuid}_thumb.jpg` (width 400 px, JPEG quality 75). The thumbnail filename is stored in `photos.thumb_filename` and returned in `GET /api/photos` so every frontend module can use the server thumb without regenerating it client-side.
+On every upload, `server/index.ts` runs Sharp twice: once to apply the EXIF rotation to the original (full resolution, no resizing; stored as `{uuid}{ext}`) and once to produce `{uuid}_thumb.jpg` (width 400 px, JPEG quality 75). The thumbnail filename is stored in `photos.thumb_filename` and returned in `GET /api/photos` so every frontend module can use the server thumb without regenerating it client-side.
 
 **Export/import:** The export ZIP includes `_thumb.jpg` files alongside their full-res counterparts. The import route reads `thumbFilename` from the bundle manifest and, after inserting photos, regenerates any missing thumbnails with Sharp so the LOD system works immediately after import.
 

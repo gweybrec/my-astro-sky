@@ -12,19 +12,19 @@ referenced throughout this page.
 
 ### 2.1 Buttons
 
-Five semantic roles. Map your intent to a role, then use the matching **UnoCSS shortcut** (defined
+Seven roles. Map your intent to a role, then use the matching **UnoCSS shortcut** (defined
 in `uno.config.ts`). These shortcut classes already exist — use them directly; do **not** invent a
 new button variant.
 
-| Role                   | Class (shortcut)        | Appearance                    | When                                                                              |
-| ---------------------- | ----------------------- | ----------------------------- | --------------------------------------------------------------------------------- |
-| **Confirm / primary**  | `btn-confirm`           | Green filled                  | Main positive action in a modal footer                                            |
-| **Action / navigate**  | `btn-action`            | Amber filled                  | Panel primary action, open map, trigger solver                                    |
-| **Cancel / secondary** | `btn-cancel`            | Dim/transparent               | Dismiss, go back                                                                  |
-| **Ghost**              | `.display-controls-btn` | Transparent with hover border | Compact panel controls                                                            |
-| **Icon-only**          | `btn-icon`              | Square, no label              | Per-item controls in lists                                                        |
-| **Danger — dialog**    | `btn-danger`            | Full red                      | Destructive action that **replaces** a dialog confirm (irreversible, modal-level) |
-| **Danger — inline**    | `.btn-danger-action`    | Dark red, lower contrast      | Destructive action inside a form alongside other buttons (e.g. "Reset all")       |
+| Role                   | Class (shortcut)        | Appearance                    | When                                                                                                        |
+| ---------------------- | ----------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Confirm / primary**  | `btn-confirm`           | Green filled                  | Main positive action in a modal footer                                                                      |
+| **Action / navigate**  | `btn-action`            | Amber filled                  | Panel primary action, open map, trigger solver                                                              |
+| **Cancel / secondary** | `btn-cancel`            | Dim/transparent               | Dismiss, go back                                                                                            |
+| **Ghost**              | `.display-controls-btn` | Transparent with hover border | Compact panel controls                                                                                      |
+| **Icon-only**          | `btn-icon`              | Square, no label              | Per-item controls in lists                                                                                  |
+| **Danger — dialog**    | `btn-danger`            | Full red                      | Destructive action that **replaces** a dialog confirm (irreversible, modal-level)                           |
+| **Danger — inline**    | `.btn-danger-action`    | Dark red, lower contrast      | Destructive action inside a form alongside other buttons (CSS class in `src/style.css`; no call-site today) |
 
 > **Danger button disambiguation:** use `btn-danger` when the button is the sole destructive choice
 > in a confirmation dialog. Use `.btn-danger-action` for secondary destructive actions inside a form
@@ -35,13 +35,10 @@ new button variant.
 > `btn-icon`, or the equivalent `--color-danger` styling. Never use a plain `✕`/`×` cross for a
 > destructive per-item action; that glyph is reserved for non-destructive dismiss/close controls.
 
-> **Legacy aliases still in the tree** — a number of older call-sites hand-roll the same appearance
-> under bespoke class names (`.modal-submit`, `.manual-validate-btn`, `.meta-editor-save`,
-> `.batch-start-btn`, `.dialog-btn-primary`, `.dso-editor-save-btn`, `.add-photo-btn-top`,
-> `.btn-primary`, `.btn-auto-solve`, `.btn-pick-map`, `.modal-cancel`, `.manual-cancel-btn`,
-> `.meta-editor-cancel`, `.dialog-btn-cancel`, `.dialog-btn-danger`, `.gear-popup-delete-btn`). When
-> you touch one of these, migrate it to the corresponding `btn-*` shortcut rather than adding another
-> variant.
+> **Legacy aliases still in the tree** — a few call-sites hand-roll button appearance under bespoke
+> classes defined in `src/style.css`: `.btn-auto-solve`, `.btn-pick-map` (both in `photo-overlay.ts`)
+> and `.gear-popup-delete-btn` (`GearPopup.vue`). When you touch one of these, migrate it to the
+> corresponding `btn-*` shortcut rather than adding another variant.
 
 #### Icon button states — the one canonical scale
 
@@ -292,19 +289,17 @@ Triggered when the user attempts to save a form with an invalid field:
 
 #### Input CSS classes
 
-| Class                            | Use                                                                      |
-| -------------------------------- | ------------------------------------------------------------------------ |
-| `.star-search-input`             | Full-width search input (padding-right reserved for `.search-clear-btn`) |
-| `.tag-input`                     | Metadata editor text fields (DSO IDs, labels, notes)                     |
-| `.notes-textarea`                | Multi-line textarea in metadata editor                                   |
-| `.radec-input`                   | Fixed-width (90 px) coordinate field                                     |
-| `.radec-input-small`             | Flex, centred — for DMS sub-fields                                       |
-| `.targets-coord-input`           | Targets-form date/coord fields                                           |
-| `.display-controls-number-input` | Number spinner in display panel                                          |
-| `.dialog-input`                  | Input inside a generic `.dialog`                                         |
+| Class                  | Use                                                                      |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `.star-search-input`   | Full-width search input (padding-right reserved for `.search-clear-btn`) |
+| `.tag-input`           | Metadata editor text fields (DSO IDs, labels, notes)                     |
+| `.notes-textarea`      | Multi-line textarea in metadata editor                                   |
+| `.radec-input`         | Fixed-width (90 px) coordinate field                                     |
+| `.radec-input-small`   | Flex, centred — for DMS sub-fields                                       |
+| `.targets-coord-input` | Targets-form date/coord fields                                           |
+| `.dialog-input`        | Input inside a generic `.dialog`                                         |
 
-Number inputs: use the `.no-spinner` class to hide browser up/down arrows where the default
-browser widget is undesirable.
+Number inputs: there is no generic spinner-hiding class; `src/style.css` hides the native arrows per class (e.g. `.radec-input-small`, `.integration-input[type='number']`).
 
 Autocomplete inputs: wrap in `.tag-input-wrap`; suggestions appear in `.tag-suggest`.
 
@@ -315,7 +310,7 @@ Autocomplete inputs: wrap in `.tag-input-wrap`; suggestions appear in `.tag-sugg
 - Styled via `accent-color: var(--accent-color)`.
 - Always wrapped in a `<label>` so the label text is also a click target.
 - Use `.dso-toggle-label` on the `<label>` for checkbox rows inside panels.
-- Use the `makeCheckRow()` helper in `src/ui.ts` for any new display/settings toggle.
+- Use the `CheckRow` component (`src/components/base/CheckRow.vue`) for any new display/settings toggle.
 
 ---
 
@@ -439,7 +434,7 @@ Six contexts exist, each with its own classes. Match the context you are in:
 | Photo list section  | `.photo-section-header`        | `.photo-section-items`         | `.collapsed` on `.photo-section`   |
 
 All chevrons use the `▶` character rotated `90deg` via `transform: rotate(90deg)` when open.
-Use `makeSection()` from `src/ui.ts` for any new sidebar section.
+Use the `CollapsibleSection` component (`src/components/base/CollapsibleSection.vue`) for any new sidebar section.
 
 ---
 
@@ -628,23 +623,23 @@ Used for simple affordances (single character, no precise shape required). Assig
 
 **Unicode icon inventory:**
 
-| Character | Unicode | Name                     | Where used                                          |
-| --------- | ------- | ------------------------ | --------------------------------------------------- |
-| `×`       | U+00D7  | Close / dismiss          | `.modal-close` buttons, chip remove buttons         |
-| `⚙`       | U+2699  | Gear / settings          | Panel settings button, per-photo gear button        |
-| `↺`       | U+21BA  | Rotate counter-clockwise | Sky-map rotation control                            |
-| `↻`       | U+21BB  | Rotate clockwise         | Sky-map rotation control                            |
-| `◎`       | U+25CE  | Reset rotation           | Sky-map rotation reset button                       |
-| `▾`       | U+25BE  | Chevron / expand         | Sidebar section headers                             |
-| `⠿`       | U+28FF  | Drag handle              | Z-order list drag grip                              |
-| `−`       | U+2212  | Zoom out                 | Gallery detail viewer                               |
-| `+`       | U+002B  | Zoom in                  | Gallery detail viewer                               |
-| `⟲`       | U+27F2  | Reset zoom               | Gallery detail viewer                               |
-| `✓`       | U+2713  | Success / checked        | Astrometry.net submission badge, hints feedback     |
-| `⚠`       | U+26A0  | Warning                  | Error state in loading placeholder                  |
-| `i`       | —       | Info                     | `.hints-info-icon` text content                     |
-| `◀`       | U+25C0  | Collapse left            | Side panel toggle (closed state), FOV ribbon toggle |
-| `▶`       | U+25B6  | Expand right             | Side panel toggle (open state), FOV ribbon toggle   |
+| Character | Unicode | Name                     | Where used                                      |
+| --------- | ------- | ------------------------ | ----------------------------------------------- |
+| `×`       | U+00D7  | Close / dismiss          | `.modal-close` buttons, chip remove buttons     |
+| `⚙`       | U+2699  | Gear / settings          | Panel settings button, per-photo gear button    |
+| `↺`       | U+21BA  | Rotate counter-clockwise | Sky-map rotation control                        |
+| `↻`       | U+21BB  | Rotate clockwise         | Sky-map rotation control                        |
+| `◎`       | U+25CE  | Reset rotation           | Sky-map rotation reset button                   |
+| `▾`       | U+25BE  | Chevron / expand         | Sidebar section headers                         |
+| `⠿`       | U+28FF  | Drag handle              | Z-order list drag grip                          |
+| `−`       | U+2212  | Zoom out                 | Gallery detail viewer                           |
+| `+`       | U+002B  | Zoom in                  | Gallery detail viewer                           |
+| `⟲`       | U+27F2  | Reset zoom               | Gallery detail viewer                           |
+| `✓`       | U+2713  | Success / checked        | Astrometry.net submission badge, hints feedback |
+| `⚠`       | U+26A0  | Warning                  | Error state in loading placeholder              |
+| `i`       | —       | Info                     | `.hints-info-icon` text content                 |
+| `◀`       | U+25C0  | Collapse left            | Side panel toggle (closed state)                |
+| `▶`       | U+25B6  | Expand right             | Side panel toggle (open state)                  |
 
 > **Note — calendar:** there is no custom calendar icon. Date/datetime fields use `<input type="date">` and `<input type="datetime-local">`, which render a browser-native calendar picker. This is intentional.
 
@@ -675,7 +670,7 @@ wcsStatusRow.className = 'wcs-companion-status wcs-status wcs-status--info';
 wcsStatusRow.classList.add('wcs-status--info');
 ```
 
-Always call `classList.add('hidden')` to hide the row and clear its `innerHTML` before a new operation begins. Expose the show/hide logic through small `showWCSStatus()` / `hideWCSStatus()` helpers so callers never touch the modifier classes directly.
+Always call `classList.add('hidden')` to hide the row and clear its `innerHTML` before a new operation begins. The `.wcs-status*` classes are defined in `src/style.css` but have no call-site in `src/` today; reuse them rather than inventing a new status-row style.
 
 ---
 
@@ -724,36 +719,22 @@ During pan/zoom interactions, photo overlay images are hidden by toggling `.phot
 
 ### 2.23 FOV Ribbon
 
-**Purpose:** A floating, collapsible bar at the bottom-left of the sky map. Houses the telescope-icon popup trigger and 9 parametric rotation step buttons for rotating all FOV frames together.
+**Purpose:** A small floating bar at the bottom-left of the sky map (`src/components/overlay/FOVRibbon.vue`). It holds two buttons: the telescope button that opens the FOV frame manager popup (§2.24), and an eye toggle that shows or hides all FOV frames on the map. It has no rotation buttons and is not collapsible.
 
 **CSS container:** `.fov-ribbon` — `position: absolute; left: var(--space-8); bottom: var(--space-8); background: var(--bg-panel)` (same background as the left sidebar).
 
-**Collapsed state:** `.fov-ribbon--collapsed` — hides all `.fov-rotate-btn` children via `display: none`. The telescope button and toggle button remain visible.
-
 **Button anatomy (left to right):**
 
-| Role               | Class                                  | Content                                          |
-| ------------------ | -------------------------------------- | ------------------------------------------------ |
-| FOV popup trigger  | `.sky-rotation-btn .fov-telescope-btn` | `telescope.svg` inline SVG                       |
-| Rotation step (×9) | `.sky-rotation-btn .fov-rotate-btn`    | Parametric SVG from `createRotationIconSvg(deg)` |
-| Collapse/expand    | `.sky-rotation-btn .fov-ribbon-toggle` | `◀` (open) / `▶` (collapsed)                     |
+| Role                     | Class                                   | Content                                                       |
+| ------------------------ | --------------------------------------- | ------------------------------------------------------------- |
+| FOV popup trigger        | `.sky-rotation-btn .fov-telescope-btn`  | `telescope.svg` inline SVG                                    |
+| Show/hide all FOV frames | `.sky-rotation-btn .fov-visibility-btn` | `EyeToggleButton` (`src/components/base/EyeToggleButton.vue`) |
 
 **All buttons reuse `.sky-rotation-btn` as their base class** — no new button variant.
 
-**Collapse toggle:** textContent `◀` when open, `▶` when collapsed (same characters as the left panel toggle).
+**Show/hide toggle:** hiding locks floating frames to the sky first and closes the popup; showing opens the popup. The visibility state persists in `localStorage` key `fov-frames-visible-v1` (`src/stores/fov-frames.ts`).
 
-**Disabled state:** all `.fov-rotate-btn` become `disabled` when no setup has `enabled = true`. CSS handles opacity via `.sky-rotation-btn:disabled { opacity: 0.35; cursor: not-allowed; }`.
-
-**Parametric rotation icons:** Generated at runtime by `createRotationIconSvg(deg)` from `src/fov-overlay.ts`. Do **not** create individual SVG files for these — the function takes the degree value and returns an SVG string with arc sweep proportional to |deg|, arrowhead direction reflecting the sign, and the degree text label centred below the arc.
-
-| |deg| | Arc sweep |
-|---|---|
-| 1° | ~40° |
-| 5° | ~90° |
-| 15° | ~150° |
-| 45° | ~240° |
-
-**State persistence:** `localStorage` key `fov-overlay-v1` via `loadFovState()` / `saveFovState()` from `src/fov-overlay.ts`.
+**Popup tooltip suppression:** hovering or focusing either button suppresses the sky tooltip via `uiStore.setForceSuppressTooltip`.
 
 ---
 
@@ -763,14 +744,14 @@ During pan/zoom interactions, photo overlay images are hidden by toggling `.phot
 
 **CSS classes:**
 
-| Class                       | Description                                                                                          |
-| --------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `.fov-popup`                | Root container — `position: fixed`, `background: var(--bg-modal)`, `border-radius: var(--radius-md)` |
-| `.fov-popup-header`         | Title + close button row — uppercase 11 px label style                                               |
-| `.fov-popup-body`           | Scrollable setup list — `max-height: 300px; overflow-y: auto`                                        |
-| `.fov-popup-footer`         | "Add a setup" button — full-width `.btn-primary`                                                     |
-| `.fov-popup-select-all-row` | Tristate select-all row (see §2.8 for the tristate pattern)                                          |
-| `.fov-popup-setup-row`      | Per-setup row — checkbox + label text + remove `×` button                                            |
+| Class                       | Description                                                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `.fov-popup`                | Root container — `position: fixed`, `background: var(--bg-modal)`, `border-radius: var(--radius-md)`             |
+| `.fov-popup-header`         | Title + close button row — uppercase 11 px label style                                                           |
+| `.fov-popup-body`           | Scrollable setup list — `max-height: 300px; overflow-y: auto`                                                    |
+| `.fov-popup-footer`         | Row of icon actions (`.btn-icon`): add frame, add mosaic, open plan details; which show depends on the selection |
+| `.fov-popup-select-all-row` | Tristate select-all row (see §2.8 for the tristate pattern)                                                      |
+| `.fov-popup-setup-row`      | Per-setup row — checkbox + label text + remove `×` button                                                        |
 
 **Opened by:** `buildFovPopup()` in `src/fov-overlay.ts`; positioned with `positionPopup()` from `src/ui.ts`. Closes on outside click.
 
@@ -798,7 +779,7 @@ base: 34 × 34 px, `display: inline-flex`, content centred, `var(--radius-lg)`, 
 card fill, `var(--border-white-md)` neutral border, `var(--text-primary)` icon. Its hover and
 `.active` (selected) states follow the **canonical icon-button scale in §2.1** — do not give it a
 bespoke hover/selected colour. **Never create a new button variant for a floating control** — the
-rotation buttons (§2.23), the FOV ribbon/telescope buttons (§2.23/§2.24), and the export button all
+map rotation buttons, the FOV ribbon buttons (§2.23), and the export button all
 share it. Disabled styling (`opacity: 0.35; cursor: not-allowed`) is built into the base.
 
 **Positioning rules:**
@@ -820,11 +801,11 @@ share it. Disabled styling (`opacity: 0.35; cursor: not-allowed`) is built into 
 
 **Container inventory:**
 
-| Container                | Corner       | Anchor                                         | Holds                                    |
-| ------------------------ | ------------ | ---------------------------------------------- | ---------------------------------------- |
-| `.sky-rotation-controls` | bottom-right | `right: 298px; bottom: var(--space-8)`         | Rotate ↺ / reset ◎ / ↻                   |
-| `.fov-ribbon`            | bottom-left  | `left: var(--space-8); bottom: var(--space-8)` | Telescope popup + rotation steps (§2.23) |
-| `.sky-export-control`    | top-right    | `top: var(--space-8); right: 298px`            | View export button                       |
+| Container                | Corner       | Anchor                                         | Holds                                      |
+| ------------------------ | ------------ | ---------------------------------------------- | ------------------------------------------ |
+| `.sky-rotation-controls` | bottom-right | `right: 298px; bottom: var(--space-8)`         | Rotate ↺ / reset ◎ / ↻                     |
+| `.fov-ribbon`            | bottom-left  | `left: var(--space-8); bottom: var(--space-8)` | Telescope popup + show/hide frames (§2.23) |
+| `.sky-export-control`    | top-right    | `top: var(--space-8); right: 298px`            | View export button                         |
 
 **Icon sizing.** Buttons that render a Unicode glyph size it with `font-size` (the base sets
 `var(--font-size-large)`). Buttons that render an **SVG** (`v-html` / `innerHTML`) must constrain it
