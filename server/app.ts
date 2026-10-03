@@ -3,12 +3,32 @@ import { promisify } from 'util';
 import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
-import multer from 'multer';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { UPLOADS_DIR, RESOURCES_DIR, DIST_DIR, SWAGGER_JSON_PATH } from './server-paths.js';
+import {
+  ALLOWED_PHOTO_EXTENSIONS,
+  ALLOWED_WCS_EXTENSIONS,
+  isElectron,
+  UPLOAD_LIMIT,
+  API_LIMIT,
+  checkRateLimit,
+  upload,
+  uploadWCS,
+  uploadBundle,
+  uploadRaw,
+  sanitizeIntegrationRows,
+  type IntegrationRow,
+} from './routes/shared.js';
+import {
+  poiCategoryToApi,
+  skyRegionToApi,
+  planEntryToApi,
+  planMosaicToApi,
+  PLAN_SORT_KEYS,
+} from './routes/mappers.js';
 import {
   createPhoto,
   getAllPhotos,
@@ -48,8 +68,6 @@ import {
   upsertSkyRegion,
   deleteSkyRegion,
   type PointOfInterestInput,
-  type PoiCategoryRow,
-  type SkyRegionRow,
   getPlans,
   getPlan,
   getAllPlanEntries,
@@ -121,9 +139,6 @@ import type { ServerLang } from './messages.js';
 import { logServerError } from './logger.js';
 import { probeAstap, probeSolveField, probeDataDir } from './probe-utils.js';
 import { parseLatestRelease, type LatestRelease } from './github-release.js';
-import type { PoiCategory } from '@myastrosky/core/types';
-import type { SkyRegionData } from '@myastrosky/core/domain/regions';
-import type { PlanEntry, PlanMosaic, ObservationWindow } from '@myastrosky/core/domain/plans';
 
 // Built-in gear catalogs — loaded once at startup
 const builtInTelescopes: object[] = JSON.parse(
@@ -141,30 +156,7 @@ const builtInFilters: object[] = JSON.parse(
 
 const byBrandModel = (a: any, b: any) =>
   `${a.brand ?? ''} ${a.model ?? ''}`.localeCompare(`${b.brand ?? ''} ${b.model ?? ''}`);
-const ALLOWED_PHOTO_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-const ALLOWED_WCS_EXTENSIONS = new Set(['.tif', '.tiff', '.fits', '.fit']);
 const MAX_CORRESPONDENCES = 100;
-
-interface IntegrationRow {
-  frames: number;
-  seconds: number;
-  filter: string;
-}
-
-function sanitizeIntegrationRows(input: unknown): IntegrationRow[] {
-  if (!Array.isArray(input)) return [];
-  return input.map((entry: any) => ({
-    frames:
-      Number.isInteger(Number(entry?.frames)) && Number(entry?.frames) >= 1
-        ? Number(entry.frames)
-        : 0,
-    seconds:
-      Number.isInteger(Number(entry?.seconds)) && Number(entry?.seconds) >= 1
-        ? Number(entry.seconds)
-        : 0,
-    filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
-  }));
-}
 
 /**
  * Transform raw image coordinates to browser-display coordinates based on EXIF orientation.
@@ -188,32 +180,6 @@ import { rawToBrowserCoords } from './exif-utils.js';
 // electronApp.whenReady().then(async () => {
 // await session.defaultSession.clearCache();
 // });
-
-// In Electron the server runs inside the Electron main process (process.versions.electron is set).
-// Rate limiting is meaningless there (single-user local app).
-const isElectron = !!process.versions.electron;
-
-// Simple in-memory rate limiter
-const rateLimits = new Map<string, number[]>();
-const RATE_WINDOW_MS = 60_000;
-const UPLOAD_LIMIT = 200; // uploads per minute
-const API_LIMIT = 300; // API requests per minute — sized for batch status polling (every 2s per active solve)
-
-function checkRateLimit(ip: string, limit: number): boolean {
-  const now = Date.now();
-  let timestamps = rateLimits.get(ip);
-  if (!timestamps) {
-    timestamps = [];
-    rateLimits.set(ip, timestamps);
-  }
-  // Evict old entries
-  while (timestamps.length > 0 && timestamps[0] <= now - RATE_WINDOW_MS) {
-    timestamps.shift();
-  }
-  if (timestamps.length >= limit) return false;
-  timestamps.push(now);
-  return true;
-}
 
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -260,46 +226,6 @@ app.use((req, res, next) => (req.path.startsWith('/api/docs') ? next() : csp(req
 
 app.use(compression());
 app.use(express.json()); // Parse JSON request bodies
-const ALLOWED_IMAGE_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/tiff',
-  'image/gif',
-  'image/webp',
-  'image/bmp',
-]);
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(Object.assign(new Error('Invalid file type'), { status: 400, code: 'INVALID_FILE_TYPE' }));
-    }
-  },
-});
-
-// Separate multer instance for WCS companion files (FITS/TIFF can be large)
-const uploadWCS = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB for raw FITS/TIFF
-});
-
-// Separate multer instance for import bundles (ZIP/JSON — not image MIME types)
-const uploadBundle = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 },
-});
-
-// Separate multer instance for raw astro image conversion (FITS/TIFF, arrives as
-// application/octet-stream and can be much larger than a normal photo upload — deliberately
-// no fileFilter, mirroring uploadWCS; the route validates by extension instead).
-const uploadRaw = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 600 * 1024 * 1024 }, // 600 MB — real FITS stacks can exceed 200 MB
-});
 
 // In production, serve the built frontend
 if (fs.existsSync(DIST_DIR)) {
@@ -340,6 +266,8 @@ app.use('/api', (req, res, next) => {
   }
   next();
 });
+
+// Domain routers (one file per domain under server/routes/), mounted without a prefix.
 
 /**
  * @swagger
@@ -1769,10 +1697,6 @@ app.delete('/api/gear-setups', (_req, res) => {
 
 // ─── Points of Interest categories ──────────────────────────────────────────────
 
-function poiCategoryToApi(r: PoiCategoryRow): PoiCategory {
-  return { id: r.id, name: r.name, color: r.color, position: r.position };
-}
-
 /**
  * @swagger
  * /api/poi-categories:
@@ -1981,16 +1905,6 @@ app.delete('/api/poi-categories', (_req, res) => {
 });
 
 // ─── Sky regions ─────────────────────────────────────────────────────────────
-
-function skyRegionToApi(r: SkyRegionRow): SkyRegionData {
-  let points: SkyRegionData['points'] = [];
-  try {
-    points = JSON.parse(r.points);
-  } catch {
-    /* corrupt row, surface as empty polygon rather than 500ing the whole list */
-  }
-  return { id: r.id, name: r.name, color: r.color, points, position: r.position };
-}
 
 function isValidRegionPoints(points: unknown): points is { azDeg: number; altDeg: number }[] {
   return (
@@ -2213,55 +2127,6 @@ app.delete('/api/sky-regions/:id', (req, res) => {
 });
 
 // ─── Night plans ──────────────────────────────────────────────────────────────
-
-/** Allowed plan objects-list sort keys (mirrors client PlanSortKey). */
-const PLAN_SORT_KEYS = [
-  'transit',
-  'altitude',
-  'rating',
-  'magnitude',
-  'size',
-  'name',
-  'difficulty',
-  'window',
-] as const;
-
-function planEntryToApi(e: PlanEntryRow): PlanEntry {
-  let observationWindows: ObservationWindow[] = [];
-  try {
-    observationWindows = JSON.parse(e.observation_windows ?? '[]');
-  } catch {
-    observationWindows = [];
-  }
-  return {
-    id: e.id,
-    dsoId: e.dso_id ?? null,
-    position: e.position,
-    paDeg: e.pa_deg ?? null,
-    ra: e.ra ?? null,
-    dec: e.dec ?? null,
-    notes: e.notes ?? null,
-    mosaicId: e.mosaic_id ?? null,
-    mosaicWDeg: e.mosaic_w_deg ?? null,
-    mosaicHDeg: e.mosaic_h_deg ?? null,
-    observationWindows,
-  };
-}
-
-function planMosaicToApi(m: PlanMosaicRow): PlanMosaic {
-  return {
-    id: m.id,
-    dsoId: m.dso_id ?? null,
-    name: m.name ?? null,
-    centerRa: m.center_ra,
-    centerDec: m.center_dec,
-    paDeg: m.pa_deg,
-    overlapPct: m.overlap_pct,
-    cols: m.cols,
-    rows: m.rows,
-    position: m.position,
-  };
-}
 
 /**
  * @swagger
