@@ -269,6 +269,9 @@ inputs and selects.
 | Font-size     | `var(--font-size-base)`         |
 | Padding       | `var(--space-3) var(--space-4)` |
 
+A `<select>` ignores `line-height`, so `input-base` pins its height to the `<input>` one
+(`1.5em` + padding + border) — a select and an input in the same row have the same height.
+
 #### Labels
 
 - Always place the label **above** or **to the left** of its input.

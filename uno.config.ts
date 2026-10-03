@@ -197,10 +197,15 @@ export default defineConfig({
     // ── Inputs ───────────────────────────────────────────────────────────────
     // Replaces near-identical rules for star-search-input, tag-input,
     // radec-input, targets-coord-input, targets-date-input.
+    // A <select> ignores `line-height` (Chromium forces `normal` on a menulist),
+    // so it is shorter than an <input> with the same padding. Give it the input's
+    // border-box height explicitly: 1.5em (text-body's line-height) + py-2 twice
+    // + the 1px border twice (--space-px).
     'input-base': [
       'bg-[var(--bg-input)] text-primary',
       'border border-[var(--border-input)] rounded-sm',
       'px-4 py-2 text-body',
+      '[&:is(select)]:h-[calc(1.5em+2*var(--space-2)+2*var(--space-px))]',
       'focus:border-focus focus:outline-none',
       'w-full',
     ].join(' '),
