@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 This file is generated from [Conventional Commits](https://www.conventionalcommits.org)
 by [git-cliff](https://git-cliff.org).
 
+## [0.12.0] - 2026-10-03
+
+### Features
+
+- Identify comets ([fcd1e38](https://github.com/gweybrec/my-astro-sky/commit/fcd1e38e8da276f37487c6f3cf6ef7a6da3cb1bf))
+
+- Identify supernova and rework the UX to show them ([506d968](https://github.com/gweybrec/my-astro-sky/commit/506d9689703541c9d200d9d236711a5025a04d65))
+
+- Identify an asteroid ([6bce73a](https://github.com/gweybrec/my-astro-sky/commit/6bce73a9d1e92e34fbd65b191bcbb127374e17dd))
+
+- Allow adding raw photos ([6d81d1c](https://github.com/gweybrec/my-astro-sky/commit/6d81d1c6c614f7412a4cf84174d0e0309c665899))
+
+
+### Bug Fixes
+
+- Reset the target view date when the app starts ([37118b4](https://github.com/gweybrec/my-astro-sky/commit/37118b47409914d8c0f5444aad4c2a82cded4eca))
+
+
+### Refactor
+
+- Adding a manual POI now uses the same type of modal auto indentification ([a58c57a](https://github.com/gweybrec/my-astro-sky/commit/a58c57af27602100a6e429d75343d95452a4ce65))
+
+
+### Build System
+
+- V0.12.0 ([7917f7f](https://github.com/gweybrec/my-astro-sky/commit/7917f7f46e1ea260ff89a22a4d36fb6cb8bc0ca4))
+
+- Stop Electron packaging from overwriting better-sqlite3 ([8a0b23f](https://github.com/gweybrec/my-astro-sky/commit/8a0b23fa20862874eba0bc42697b8371688baee0))
+
 ## [0.11.0] - 2026-09-13
 
 ### Features
