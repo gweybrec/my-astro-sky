@@ -162,7 +162,39 @@ no browser, no question**. It ends at a fixed point, or earlier on any stop cond
 - **Browser check for WP0.D2:** the app is opened in the three themes and each token's computed value is compared with `dev`. This needs a dev server, so it is not part of a background run.
 - **Stretch B — device session:** the user plugs in the phone; the spike app is installed and the four measurements run (see `phase-0/WP0.1-0.5-spikes.md`, "Device session").
 - **Stretch C — WP0.6:** results drafted by Sonnet, go/no-go decided by Opus.
-- **Stretch D — Phase 1:** WP1.0 → WP1.6, WP1.8, WP1.9 on `mobile/phase-1`. Its bounds are written here before it starts.
+- **Stretch D — Phase 1:** split in two, see below.
+
+**Phase 0 is complete (2026-10-03):** stretch A done, device session done on a Galaxy A16, go decision recorded in `docs/dev/mobile/spike-results.md`, tokens browser check passed.
+
+### Stretch D1 — the workspace skeleton
+
+- **Starts from:** the checkout on `mobile/phase-1`, with no modified tracked files.
+- **Does, in this order:**
+  1. WP1.0 — workspace skeleton and the first two modules moved to `packages/core`. One commit.
+  2. WP1.9 — docs. One commit.
+- **Ends when:** WP1.9 is committed. The checkout stays on `mobile/phase-1`.
+- **Does NOT do:** any other Phase 1 card; start a dev server or open a browser; local `docker build`; merge, push, or touch `dev` and `master`.
+- **Allowed heavy steps:** `npm install` (the lockfile gains the workspace entry) and one `npm run electron:package` followed by `npm run clean`, as WP1.0 requires. Measure free disk before `electron:package`; stop if it is under 6 GB.
+- **Stops early if:** a card escalates; `npm run verify` fails twice on the same card; the lockfile diff contains unrelated lines; anything is not covered by a card.
+- **Result:** 2 commits, and a report of at most 150 words plus the status table.
+
+### After stretch D1, with the user present
+
+- **Browser check for WP1.0:** the desktop app starts with `npm run dev`, the sky map renders, and the console has no errors.
+
+### Stretch D2 — the core extraction
+
+- **Starts from:** `mobile/phase-1` after the D1 browser check has passed.
+- **Does, in this order, one commit per card:** WP1.1 → WP1.2 → WP1.3 → WP1.7a → WP1.7 → WP1.4 → WP1.5 → WP1.5b → WP1.6 → WP1.8.
+- **Ends when:** WP1.8 is committed. The checkout stays on `mobile/phase-1`.
+- **Does NOT do:** start a dev server or open a browser; any Phase 2 work; merge, push, or touch `dev` and `master`.
+- **Stops early if:** a card escalates; `npm run verify` fails twice on the same card; a test file has to change in a way its card does not allow; anything is not covered by a card.
+- **Result:** up to 10 commits, the "blocked" and "not pure" lists from WP1.2 and WP1.6, and a report of at most 150 words plus the status table.
+
+### After stretch D2, with the user present
+
+- **Browser check for Phase 1:** sky map renders; a DSO search works; switching the language to English reloads in English; a FITS or TIFF with WCS uploads and is placed correctly (`test-placement` skill).
+- Then a Sonnet `/code-review` on the phase diff, and the user opens the pull request from `mobile/phase-1` into `dev`.
 
 ## Status
 
