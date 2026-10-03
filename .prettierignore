@@ -28,3 +28,8 @@ Trace-*.json
 
 # Untracked scratch artifacts (not part of the repo; malformed/handwritten)
 smart_telescope_mosaic_capabilities.html
+
+# Work-package spikes and native platform folders
+spikes
+**/android
+**/ios
