@@ -1,5 +1,5 @@
 import type { DSO } from './types';
-import type { PlanSortKey } from '@myastrosky/core/domain/plans';
+import type { PlanSortKey } from './domain/plans';
 
 /** Minimal shape needed to order a plan's objects — satisfied by PlanTargetInfo. */
 export interface PlanSortItem {

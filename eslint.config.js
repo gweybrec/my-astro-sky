@@ -138,6 +138,10 @@ export default tseslint.config(
             { group: ['@capacitor/*'], message: 'core must not depend on Capacitor.' },
             { group: ['node:*'], message: 'core must not depend on Node built-ins.' },
             { group: ['**/src/**', '**/server/**'], message: 'core must not import from the app.' },
+            {
+              group: ['@myastrosky/core', '@myastrosky/core/*'],
+              message: 'core must import itself with relative paths.',
+            },
           ],
         },
       ],
