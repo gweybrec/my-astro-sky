@@ -387,7 +387,7 @@ body {
 
 /* Dim/transparent — cancel / dismiss */
 .btn-cancel {
-  padding: var(--space-4) var(--space-8);
+  padding: var(--space-5) var(--space-8);
   background: none;
   border: 1px solid var(--border-panel);
   color: var(--text-dim);
@@ -406,7 +406,7 @@ body {
 
 /* Red — destructive / delete */
 .btn-danger {
-  padding: var(--space-4) var(--space-8);
+  padding: var(--space-5) var(--space-8);
   background: var(--btn-danger-bg);
   border: 1px solid var(--btn-danger-border);
   color: var(--btn-danger-text);

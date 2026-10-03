@@ -130,7 +130,7 @@ export default defineConfig({
     ].join(' '),
 
     'btn-cancel': [
-      'py-4 px-8',
+      'py-5 px-8',
       'bg-transparent text-dim',
       'border border-[var(--border-panel)]',
       'rounded-md cursor-pointer',
@@ -141,7 +141,7 @@ export default defineConfig({
     ].join(' '),
 
     'btn-danger': [
-      'py-4 px-8',
+      'py-5 px-8',
       'bg-[var(--btn-danger-bg)] text-[var(--btn-danger-text)]',
       'border border-[var(--btn-danger-border)]',
       'rounded-md cursor-pointer',

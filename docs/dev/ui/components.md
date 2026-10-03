@@ -30,6 +30,11 @@ new button variant.
 > in a confirmation dialog. Use `.btn-danger-action` for secondary destructive actions inside a form
 > footer where a confirm button also exists.
 
+> **One text-button height.** `btn-action`, `btn-confirm`, `btn-cancel` and `btn-danger` all use
+> `var(--space-5) var(--space-8)` padding, so side by side they are the same height (41.5 px at
+> the 13 px base font). The padding is declared twice (`uno.config.ts` and `src/style.css`);
+> change both.
+
 > **Trash / delete icons must be red.** Any icon-only button that deletes or removes something
 > uses the trash SVG (`src/icons/trash.svg`) and the danger colour — `btn-icon--danger` for a
 > `btn-icon`, or the equivalent `--color-danger` styling. Never use a plain `✕`/`×` cross for a
