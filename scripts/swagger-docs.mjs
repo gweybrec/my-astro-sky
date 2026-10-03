@@ -23,7 +23,7 @@ const options = {
       description: 'API documentation generated from Swagger JSDoc annotations',
     },
   },
-  apis: ['server/*.ts'],
+  apis: ['server/*.ts', 'server/routes/*.ts'],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
