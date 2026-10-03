@@ -25,6 +25,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 | `docs/dev/horizon.md`               | Developers               | Terrain (mountain) horizon: data model, DEM ray-trace/compute, `/api/horizon` + caching, file import, sky-map overlay, recommender horizon gate                       |
 | `docs/dev/render-performance.md`    | Developers               | Transferable canvas-perf techniques from the sky-map render loop: profiling, hoisting per-frame invariants, sprite atlas, input coalescing, cache-key bucketing/drift |
 | `docs/dev/ci.md`                    | Developers               | GitHub Actions workflows: CI, tests, Docker image build/smoke-test, Electron release builds; also documents the (workflow-free) GitHub Pages docs deployment          |
+| `docs/dev/mobile/spike-results.md`  | Developers               | Mobile spike measurements on a Galaxy A16, the go decision, and the resulting plan changes                                                                            |
 
 **Rules:**
 
