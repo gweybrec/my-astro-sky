@@ -83,6 +83,8 @@ async function openDialog(): Promise<VueWrapper> {
 
 const setupRow = (w: VueWrapper, name: string) =>
   w.findAll('[data-test="import-setup-row"]').find((r) => r.text().includes(name))!;
+const radioFor = (w: VueWrapper, name: string, choice: string) =>
+  setupRow(w, name).find(`input[type="radio"][value="${choice}"]`);
 const confirmButton = (w: VueWrapper) => w.find('.btn-confirm');
 const planCheckbox = (w: VueWrapper, name: string) =>
   w
@@ -123,38 +125,35 @@ describe('ImportModal setups', () => {
     expect(row.find('[data-test="import-setup-choice"]').exists()).toBe(false);
   });
 
-  it('offers the three-option choice for a different setup, and disables the confirm button until one is made', async () => {
+  it('offers three radio buttons for a different setup, and disables the confirm button until one is chosen', async () => {
     const w = await openDialog();
     const choice = setupRow(w, 'Diff rig').find('[data-test="import-setup-choice"]');
-    expect(choice.findAll('button').map((b) => b.attributes('data-choice'))).toEqual([
+    const radios = () => choice.findAll('input[type="radio"]');
+    expect(radios().map((r) => (r.element as HTMLInputElement).value)).toEqual([
       'replace',
       'keepBoth',
       'skip',
     ]);
-    expect(choice.findAll('button').map((b) => b.text())).toEqual([
+    expect(choice.findAll('label').map((l) => l.text())).toEqual([
       'settings.importSetupReplace',
       'settings.importSetupKeepBoth',
       'settings.importSetupSkip',
     ]);
 
-    // Nothing is chosen at first.
-    expect(choice.findAll('button').every((b) => b.attributes('aria-pressed') === 'false')).toBe(
-      true,
-    );
+    // Nothing is chosen at first: the confirm button waits, and the name carries a warning mark.
+    expect(radios().every((r) => !(r.element as HTMLInputElement).checked)).toBe(true);
     expect(confirmButton(w).attributes('disabled')).toBeDefined();
-    expect(w.find('[data-test="import-setup-choose"]').text()).toBe('settings.importSetupChoose');
+    expect(setupRow(w, 'Diff rig').find('.import-warn-icon').exists()).toBe(true);
 
-    await choice.find('[data-choice="keepBoth"]').trigger('click');
+    await radioFor(w, 'Diff rig', 'keepBoth').setValue(true);
     expect(confirmButton(w).attributes('disabled')).toBeUndefined();
-    expect(w.find('[data-test="import-setup-choose"]').exists()).toBe(false);
-    expect(
-      setupRow(w, 'Diff rig').find('[data-choice="keepBoth"]').attributes('aria-pressed'),
-    ).toBe('true');
+    expect(setupRow(w, 'Diff rig').find('.import-warn-icon').exists()).toBe(false);
+    expect((radioFor(w, 'Diff rig', 'keepBoth').element as HTMLInputElement).checked).toBe(true);
   });
 
   it('sends the choice as setupConflicts, for the different setup only', async () => {
     const w = await openDialog();
-    await setupRow(w, 'Diff rig').find('[data-choice="replace"]').trigger('click');
+    await radioFor(w, 'Diff rig', 'replace').setValue(true);
     await confirmButton(w).trigger('click');
     await flushPromises();
 
@@ -169,7 +168,7 @@ describe('ImportModal setups', () => {
   it('"Do not import" on a setup no ticked plan needs unticks it and asks nothing more', async () => {
     const w = await openDialog();
     await planCheckbox(w, 'Plan C').setValue(false);
-    await setupRow(w, 'Diff rig').find('[data-choice="skip"]').trigger('click');
+    await radioFor(w, 'Diff rig', 'skip').setValue(true);
 
     const row = setupRow(w, 'Diff rig');
     expect((row.find('input').element as HTMLInputElement).checked).toBe(false);
@@ -185,10 +184,8 @@ describe('ImportModal setups', () => {
 
   it('keeps "Do not import" as a choice when a ticked plan needs the setup', async () => {
     const w = await openDialog();
-    await setupRow(w, 'Diff rig').find('[data-choice="skip"]').trigger('click');
-    expect(setupRow(w, 'Diff rig').find('[data-choice="skip"]').attributes('aria-pressed')).toBe(
-      'true',
-    );
+    await radioFor(w, 'Diff rig', 'skip').setValue(true);
+    expect((radioFor(w, 'Diff rig', 'skip').element as HTMLInputElement).checked).toBe(true);
 
     await confirmButton(w).trigger('click');
     await flushPromises();

@@ -342,7 +342,6 @@ const fr = {
     importSetupSkip: 'Ne pas importer',
     importSetupIdentical: 'Déjà présent, identique',
     importSetupWithPlan: 'Importé avec le plan « {name} »',
-    importSetupChoose: 'Un setup différent du même nom existe déjà. Choisissez quoi faire.',
     importReplaceWarning: 'Un élément du même nom existe déjà et sera remplacé si vous l’importez.',
     importBackupWarning: 'Recommandé : créez une sauvegarde de vos données avant de restaurer.',
     deleteBackupWarning: 'Recommandé : créez une sauvegarde de vos données avant de supprimer.',

@@ -342,7 +342,6 @@ const es: Translations = {
     importSetupSkip: 'No importar',
     importSetupIdentical: 'Ya existe, idéntica',
     importSetupWithPlan: 'Importada con el plan «{name}»',
-    importSetupChoose: 'Ya existe una configuración distinta con el mismo nombre. Elige qué hacer.',
     importReplaceWarning:
       'Ya existe un elemento con el mismo nombre y será reemplazado si lo importas.',
     importBackupWarning:

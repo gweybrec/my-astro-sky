@@ -190,7 +190,7 @@
                     >
                       <span class="text-small font-normal truncate min-w-0">{{ s.name }}</span>
                       <span
-                        v-if="s.conflict === 'different' && !setupNeedsChoice(s)"
+                        v-if="s.conflict === 'different' && !setupChoices[s.id]"
                         class="import-warn-icon"
                         :title="t('settings.importReplaceWarning')"
                         >⚠</span
@@ -215,22 +215,20 @@
                     >
                     <div
                       v-else-if="setupNeedsChoice(s)"
-                      class="hemisphere-pill flex-col"
-                      role="group"
+                      class="flex flex-col gap-2"
+                      role="radiogroup"
                       data-test="import-setup-choice"
                     >
-                      <button
-                        v-for="c in SETUP_CHOICES"
-                        :key="c.value"
-                        type="button"
-                        class="hemisphere-btn text-left"
-                        :class="{ 'hemisphere-btn--active': setupChoices[s.id] === c.value }"
-                        :aria-pressed="setupChoices[s.id] === c.value"
-                        :data-choice="c.value"
-                        @click="onSetupChoice(s, c.value)"
-                      >
-                        {{ t(c.label) }}
-                      </button>
+                      <label v-for="c in SETUP_CHOICES" :key="c.value" class="export-photo-row">
+                        <input
+                          type="radio"
+                          :name="`import-setup-choice-${s.id}`"
+                          :value="c.value"
+                          :checked="setupChoices[s.id] === c.value"
+                          @change="onSetupChoice(s, c.value)"
+                        />
+                        <span class="text-small font-normal">{{ t(c.label) }}</span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -275,12 +273,6 @@
       </div>
 
       <div class="modal-footer">
-        <span
-          v-if="phase === 'options' && setupChoiceMissing"
-          class="text-small text-[var(--status-warn-text)] mr-auto self-center"
-          data-test="import-setup-choose"
-          >{{ t('settings.importSetupChoose') }}</span
-        >
         <button class="btn-cancel" :disabled="importBusy" @click="onClose">
           {{ t('modal.cancel') }}
         </button>

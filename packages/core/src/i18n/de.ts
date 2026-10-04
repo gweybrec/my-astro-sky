@@ -343,8 +343,6 @@ const de: Translations = {
     importSetupSkip: 'Nicht importieren',
     importSetupIdentical: 'Bereits vorhanden, identisch',
     importSetupWithPlan: 'Mit dem Plan „{name}“ importiert',
-    importSetupChoose:
-      'Ein anderes Setup mit demselben Namen existiert bereits. Wähle, was geschehen soll.',
     importReplaceWarning:
       'Ein Element mit demselben Namen existiert bereits und wird beim Import ersetzt.',
     importBackupWarning:
