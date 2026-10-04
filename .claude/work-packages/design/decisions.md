@@ -67,7 +67,8 @@ Keyboard-only actions: every mode gets visible Cancel and Done buttons; label ch
 
 ## Design rounds
 
-| Round | State                                                                                                                                             | Where                                             |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| D0    | approved 2026-10-03                                                                                                                               | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS |
-| D1    | 43 screens published 2026-10-04, through revision 11 (descriptions removed) and the format list change; waiting for the user to approve the round | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 |
+| Round | State                                                                                                               | Where                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| D0    | approved 2026-10-03                                                                                                 | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS |
+| D1    | **approved by the user on 2026-10-04** ("I approve"): 43 screens, structure and navigation                          | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 |
+| D2    | started 2026-10-04: night-red palette, real sky and photo imagery, every screen in the default and night-red themes | same canvas                                       |
