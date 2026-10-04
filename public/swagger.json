@@ -6,42 +6,6 @@
     "description": "API documentation generated from Swagger JSDoc annotations"
   },
   "paths": {
-    "/api/export": {
-      "post": {
-        "summary": "Export photos as ZIP or metadata JSON",
-        "responses": {
-          "200": {
-            "description": "Export generated successfully"
-          }
-        }
-      }
-    },
-    "/api/import/preview": {
-      "post": {
-        "summary": "Preview import bundle without writing data",
-        "consumes": [
-          "multipart/form-data"
-        ],
-        "responses": {
-          "200": {
-            "description": "Import preview returned successfully"
-          }
-        }
-      }
-    },
-    "/api/import": {
-      "post": {
-        "summary": "Import photos and optional DSO overrides from a bundle",
-        "consumes": [
-          "multipart/form-data"
-        ],
-        "responses": {
-          "200": {
-            "description": "Import completed successfully"
-          }
-        }
-      }
-    },
     "/api/stars/search": {
       "get": {
         "summary": "Search stars by name or catalog identifier",
@@ -3488,6 +3452,42 @@
           },
           "500": {
             "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/export": {
+      "post": {
+        "summary": "Export photos as ZIP or metadata JSON",
+        "responses": {
+          "200": {
+            "description": "Export generated successfully"
+          }
+        }
+      }
+    },
+    "/api/import/preview": {
+      "post": {
+        "summary": "Preview import bundle without writing data",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Import preview returned successfully"
+          }
+        }
+      }
+    },
+    "/api/import": {
+      "post": {
+        "summary": "Import photos and optional DSO overrides from a bundle",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Import completed successfully"
           }
         }
       }
