@@ -42,6 +42,46 @@
         }
       }
     },
+    "/api/stars/search": {
+      "get": {
+        "summary": "Search stars by name or catalog identifier",
+        "responses": {
+          "200": {
+            "description": "Star search results returned successfully"
+          }
+        }
+      }
+    },
+    "/api/stars/nearby": {
+      "get": {
+        "summary": "Search stars near a given position",
+        "responses": {
+          "200": {
+            "description": "Nearby stars returned successfully"
+          }
+        }
+      }
+    },
+    "/api/stars/{hip}": {
+      "get": {
+        "summary": "Get deep star details by HIP identifier",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hip",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Star details returned successfully"
+          }
+        }
+      }
+    },
     "/api/solve-wcs": {
       "post": {
         "summary": "Solve WCS from FITS/TIFF companion files",
@@ -118,543 +158,6 @@
           },
           "500": {
             "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/solve-astap": {
-      "post": {
-        "summary": "Submit ASTAP plate solve job",
-        "consumes": [
-          "multipart/form-data"
-        ],
-        "responses": {
-          "202": {
-            "description": "Job accepted, poll GET /api/solve-astap/:jobId for result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "jobId": {
-                      "type": "string",
-                      "description": "Job ID for polling"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request (missing file, unsupported format, bad dimensions)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/solve-astap/{jobId}": {
-      "get": {
-        "summary": "Get ASTAP solve job status and result",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "jobId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Job ID returned from POST /api/solve-astap"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Job status retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "jobId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "running",
-                        "success",
-                        "failed",
-                        "canceled"
-                      ]
-                    },
-                    "result": {
-                      "type": "object",
-                      "description": "Plate solve result (present when status is success or failed)"
-                    },
-                    "error": {
-                      "type": "string",
-                      "description": "Error message when status is failed"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Job not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "JOB_NOT_FOUND"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Cancel an in-progress ASTAP solve job",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "jobId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Job ID returned from POST /api/solve-astap"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Job canceled successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "example": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Job not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "JOB_NOT_FOUND"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/solve-field": {
-      "post": {
-        "summary": "Submit solve-field plate solve job",
-        "consumes": [
-          "multipart/form-data"
-        ],
-        "responses": {
-          "202": {
-            "description": "Job accepted, poll GET /api/solve-field/:jobId for result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "jobId": {
-                      "type": "string",
-                      "description": "Job ID for polling"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request (missing file, unsupported format, bad dimensions)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/solve-field/{jobId}": {
-      "get": {
-        "summary": "Get solve-field job status and result",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "jobId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Job ID returned from POST /api/solve-field"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Job status retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "jobId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "running",
-                        "success",
-                        "failed",
-                        "canceled"
-                      ]
-                    },
-                    "result": {
-                      "type": "object",
-                      "description": "Plate solve result (present when status is success or failed)"
-                    },
-                    "error": {
-                      "type": "string",
-                      "description": "Error message when status is failed"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Job not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "JOB_NOT_FOUND"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Cancel an in-progress solve-field job",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "jobId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Job ID returned from POST /api/solve-field"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Job canceled successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "example": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Job not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "JOB_NOT_FOUND"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/solve-plate": {
-      "post": {
-        "summary": "Submit a photo to Astrometry.net for plate solving",
-        "consumes": [
-          "multipart/form-data"
-        ],
-        "responses": {
-          "200": {
-            "description": "Plate solve job submitted successfully"
-          }
-        }
-      }
-    },
-    "/api/solve-plate/{id}": {
-      "get": {
-        "summary": "Get Astrometry.net job status and correspondences",
-        "description": "Retrieve the status and plate solving results for a submitted Astrometry.net job",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "The job ID returned from /api/solve-plate POST submission"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Job status retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "jobId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "succeeded",
-                        "failed"
-                      ]
-                    },
-                    "correspondences": {
-                      "type": "array",
-                      "description": "Star correspondences if solve succeeded"
-                    },
-                    "error": {
-                      "type": "string",
-                      "description": "Error message if solve failed"
-                    },
-                    "dsoIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Job not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Job introuvable"
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "JOB_NOT_FOUND"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/astrometry/submissions": {
-      "get": {
-        "summary": "List user's Astrometry.net submissions",
-        "responses": {
-          "200": {
-            "description": "Submissions returned successfully"
-          }
-        }
-      }
-    },
-    "/api/astrometry/reuse": {
-      "post": {
-        "summary": "Reuse an existing Astrometry.net submission for a new photo",
-        "consumes": [
-          "multipart/form-data"
-        ],
-        "responses": {
-          "200": {
-            "description": "Submission reused successfully"
-          }
-        }
-      }
-    },
-    "/api/stars/search": {
-      "get": {
-        "summary": "Search stars by name or catalog identifier",
-        "responses": {
-          "200": {
-            "description": "Star search results returned successfully"
-          }
-        }
-      }
-    },
-    "/api/stars/nearby": {
-      "get": {
-        "summary": "Search stars near a given position",
-        "responses": {
-          "200": {
-            "description": "Nearby stars returned successfully"
-          }
-        }
-      }
-    },
-    "/api/stars/{hip}": {
-      "get": {
-        "summary": "Get deep star details by HIP identifier",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "hip",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Star details returned successfully"
           }
         }
       }
@@ -2511,6 +2014,503 @@
                       "type": "string",
                       "enum": [
                         "PHOTO_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/solve-plate": {
+      "post": {
+        "summary": "Submit a photo to Astrometry.net for plate solving",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Plate solve job submitted successfully"
+          }
+        }
+      }
+    },
+    "/api/solve-plate/{id}": {
+      "get": {
+        "summary": "Get Astrometry.net job status and correspondences",
+        "description": "Retrieve the status and plate solving results for a submitted Astrometry.net job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The job ID returned from /api/solve-plate POST submission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "succeeded",
+                        "failed"
+                      ]
+                    },
+                    "correspondences": {
+                      "type": "array",
+                      "description": "Star correspondences if solve succeeded"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message if solve failed"
+                    },
+                    "dsoIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Job introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/astrometry/submissions": {
+      "get": {
+        "summary": "List user's Astrometry.net submissions",
+        "responses": {
+          "200": {
+            "description": "Submissions returned successfully"
+          }
+        }
+      }
+    },
+    "/api/astrometry/reuse": {
+      "post": {
+        "summary": "Reuse an existing Astrometry.net submission for a new photo",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Submission reused successfully"
+          }
+        }
+      }
+    },
+    "/api/solve-astap": {
+      "post": {
+        "summary": "Submit ASTAP plate solve job",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "202": {
+            "description": "Job accepted, poll GET /api/solve-astap/:jobId for result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string",
+                      "description": "Job ID for polling"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (missing file, unsupported format, bad dimensions)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/solve-astap/{jobId}": {
+      "get": {
+        "summary": "Get ASTAP solve job status and result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-astap"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "running",
+                        "success",
+                        "failed",
+                        "canceled"
+                      ]
+                    },
+                    "result": {
+                      "type": "object",
+                      "description": "Plate solve result (present when status is success or failed)"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message when status is failed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel an in-progress ASTAP solve job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-astap"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job canceled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/solve-field": {
+      "post": {
+        "summary": "Submit solve-field plate solve job",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "responses": {
+          "202": {
+            "description": "Job accepted, poll GET /api/solve-field/:jobId for result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string",
+                      "description": "Job ID for polling"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (missing file, unsupported format, bad dimensions)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/solve-field/{jobId}": {
+      "get": {
+        "summary": "Get solve-field job status and result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "running",
+                        "success",
+                        "failed",
+                        "canceled"
+                      ]
+                    },
+                    "result": {
+                      "type": "object",
+                      "description": "Plate solve result (present when status is success or failed)"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message when status is failed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel an in-progress solve-field job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Job ID returned from POST /api/solve-field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job canceled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "JOB_NOT_FOUND"
                       ]
                     }
                   }
