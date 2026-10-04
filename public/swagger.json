@@ -98,563 +98,6 @@
         }
       }
     },
-    "/api/dso-overrides": {
-      "get": {
-        "summary": "Get all DSO overrides",
-        "responses": {
-          "200": {
-            "description": "DSO override list returned successfully"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete all DSO overrides",
-        "description": "Removes all user-defined DSO metadata overrides from the database, reverting all DSOs to default catalog data.",
-        "responses": {
-          "200": {
-            "description": "All DSO overrides deleted successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "deleted": {
-                      "type": "number"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/dso-overrides/{id}": {
-      "put": {
-        "summary": "Create or update a DSO override",
-        "description": "Create or update metadata overrides for a DSO (name, type, coordinates)",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "DSO catalog identifier (e.g. \"M1\", \"NGC253\", \"SH2-15\")"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "Override properties (name_fr, name_en, type, ra, dec, etc.)"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "DSO override saved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "example": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid DSO id or override data"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete a DSO override",
-        "description": "Remove metadata overrides for a DSO, reverting to default catalog data",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "DSO catalog identifier (e.g. \"M1\", \"NGC253\", \"SH2-15\")"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "DSO override deleted successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "example": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/poi-categories": {
-      "get": {
-        "summary": "Get all Points-of-Interest categories",
-        "responses": {
-          "200": {
-            "description": "Array of categories ordered by position",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "color": {
-                        "type": "string"
-                      },
-                      "position": {
-                        "type": "number"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "post": {
-        "summary": "Create a new Point-of-Interest category",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "color": {
-                    "type": "string",
-                    "description": "CSS color, e.g. #4ea1ff"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Category created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing name"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete all Point-of-Interest categories",
-        "responses": {
-          "200": {
-            "description": "All categories deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "deleted": {
-                      "type": "number"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/poi-categories/{id}": {
-      "patch": {
-        "summary": "Update a Point-of-Interest category (name/color/position)",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "color": {
-                    "type": "string"
-                  },
-                  "position": {
-                    "type": "number"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Category updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Category not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete a Point-of-Interest category",
-        "description": "Photos keep any POIs that referenced this category; those POIs are shown under an \"Uncategorized\" group until re-tagged.\n",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Category deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Category not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/sky-regions": {
-      "get": {
-        "summary": "Get all saved sky regions",
-        "description": "Freehand Alt/Az polygons drawn on the Local Sky (zenith) view, used as a Targets search filter for \"what I can actually see from my garden\".\n",
-        "responses": {
-          "200": {
-            "description": "Array of regions ordered by position",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "color": {
-                        "type": "string"
-                      },
-                      "points": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "azDeg": {
-                              "type": "number"
-                            },
-                            "altDeg": {
-                              "type": "number"
-                            }
-                          }
-                        }
-                      },
-                      "position": {
-                        "type": "number"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "post": {
-        "summary": "Create a new sky region",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "name",
-                  "points"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "color": {
-                    "type": "string",
-                    "description": "CSS color, e.g. #4ea1ff"
-                  },
-                  "points": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "azDeg": {
-                          "type": "number"
-                        },
-                        "altDeg": {
-                          "type": "number"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Region created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing name or invalid points (needs at least 3 {azDeg,altDeg} vertices)"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/sky-regions/{id}": {
-      "patch": {
-        "summary": "Update a sky region (name/color/points/position)",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "color": {
-                    "type": "string"
-                  },
-                  "points": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "azDeg": {
-                          "type": "number"
-                        },
-                        "altDeg": {
-                          "type": "number"
-                        }
-                      }
-                    }
-                  },
-                  "position": {
-                    "type": "number"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Region updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Region not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete a sky region",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Region deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Region not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
     "/api/plans": {
       "get": {
         "summary": "Get all night plans with their entries",
@@ -2547,6 +1990,230 @@
         }
       }
     },
+    "/api/sky-regions": {
+      "get": {
+        "summary": "Get all saved sky regions",
+        "description": "Freehand Alt/Az polygons drawn on the Local Sky (zenith) view, used as a Targets search filter for \"what I can actually see from my garden\".\n",
+        "responses": {
+          "200": {
+            "description": "Array of regions ordered by position",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "color": {
+                        "type": "string"
+                      },
+                      "points": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "azDeg": {
+                              "type": "number"
+                            },
+                            "altDeg": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      },
+                      "position": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new sky region",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "points"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "CSS color, e.g. #4ea1ff"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "azDeg": {
+                          "type": "number"
+                        },
+                        "altDeg": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Region created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing name or invalid points (needs at least 3 {azDeg,altDeg} vertices)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/sky-regions/{id}": {
+      "patch": {
+        "summary": "Update a sky region (name/color/points/position)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "azDeg": {
+                          "type": "number"
+                        },
+                        "altDeg": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "position": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Region updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Region not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a sky region",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Region deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Region not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/api/version/latest": {
       "get": {
         "summary": "Get the latest published GitHub release",
@@ -2646,6 +2313,213 @@
         "responses": {
           "200": {
             "description": "Probe result returned"
+          }
+        }
+      }
+    },
+    "/api/poi-categories": {
+      "get": {
+        "summary": "Get all Points-of-Interest categories",
+        "responses": {
+          "200": {
+            "description": "Array of categories ordered by position",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "color": {
+                        "type": "string"
+                      },
+                      "position": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Point-of-Interest category",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "CSS color, e.g. #4ea1ff"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Category created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing name"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete all Point-of-Interest categories",
+        "responses": {
+          "200": {
+            "description": "All categories deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "deleted": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/poi-categories/{id}": {
+      "patch": {
+        "summary": "Update a Point-of-Interest category (name/color/position)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Category updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Category not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Point-of-Interest category",
+        "description": "Photos keep any POIs that referenced this category; those POIs are shown under an \"Uncategorized\" group until re-tagged.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Category not found"
+          },
+          "500": {
+            "description": "Server error"
           }
         }
       }
@@ -3480,6 +3354,132 @@
                   "properties": {
                     "error": {
                       "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/dso-overrides": {
+      "get": {
+        "summary": "Get all DSO overrides",
+        "responses": {
+          "200": {
+            "description": "DSO override list returned successfully"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete all DSO overrides",
+        "description": "Removes all user-defined DSO metadata overrides from the database, reverting all DSOs to default catalog data.",
+        "responses": {
+          "200": {
+            "description": "All DSO overrides deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "deleted": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/dso-overrides/{id}": {
+      "put": {
+        "summary": "Create or update a DSO override",
+        "description": "Create or update metadata overrides for a DSO (name, type, coordinates)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "DSO catalog identifier (e.g. \"M1\", \"NGC253\", \"SH2-15\")"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Override properties (name_fr, name_en, type, ra, dec, etc.)"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DSO override saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid DSO id or override data"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a DSO override",
+        "description": "Remove metadata overrides for a DSO, reverting to default catalog data",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "DSO catalog identifier (e.g. \"M1\", \"NGC253\", \"SH2-15\")"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSO override deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
                     }
                   }
                 }
