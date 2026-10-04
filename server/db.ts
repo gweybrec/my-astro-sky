@@ -1,9 +1,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { applyMigrations } from './db-migrations.js';
+import { ENC_PREFIX, encryptSecret, decryptSecret } from './secret-codec.js';
 import { wrapLegacyConnection } from './db-tx-guard.js';
 import { sanitizeCaptureDetails } from './wcs-reader.js';
 import type { Photo } from '@myastrosky/core/types';
@@ -579,51 +579,10 @@ const getSettingStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
 const setSettingStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
 const deleteSettingStmt = db.prepare('DELETE FROM settings WHERE key = ?');
 const SECRET_SETTINGS = new Set(['ASTROMETRY_API_KEY']);
-const ENC_PREFIX = 'enc:v1:aesgcm:';
 
-function getSettingsEncryptionKey(): Buffer | null {
-  const raw = process.env.SETTINGS_ENCRYPTION_KEY?.trim();
-  if (!raw) return null;
-  try {
-    const key = Buffer.from(raw, 'base64');
-    if (key.length !== 32) return null;
-    return key;
-  } catch {
-    return null;
-  }
-}
-
-function encryptSecret(value: string): string {
-  const key = getSettingsEncryptionKey();
-  if (!key) return value;
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${ENC_PREFIX}${iv.toString('base64')}:${tag.toString('base64')}:${enc.toString('base64')}`;
-}
-
-function decryptSecret(value: string): string | null {
-  if (!value.startsWith(ENC_PREFIX)) return value;
-  const key = getSettingsEncryptionKey();
-  if (!key) return null;
-  const payload = value.slice(ENC_PREFIX.length);
-  const parts = payload.split(':');
-  if (parts.length !== 3) return null;
-  try {
-    const [ivB64, tagB64, ctB64] = parts;
-    const iv = Buffer.from(ivB64, 'base64');
-    const tag = Buffer.from(tagB64, 'base64');
-    const ciphertext = Buffer.from(ctB64, 'base64');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(tag);
-    const dec = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    return dec.toString('utf8');
-  } catch {
-    return null;
-  }
-}
-
+// Kept for the solver modules until they move to services (astap, solve-field, astrometry). The rules
+// are also in `packages/core/src/services/settings.ts`; `tests/unit/settings-service.test.ts` proves the
+// two agree.
 export function getSetting(key: string): string | undefined {
   if (SECRET_SETTINGS.has(key) && process.env[key] !== undefined) {
     return process.env[key];

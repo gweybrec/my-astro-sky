@@ -2,7 +2,10 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import express from 'express';
-import { getSetting, setSetting, deleteSetting } from '../db.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import { settings } from '../services.js';
+import { logServerError } from '../logger.js';
+import { sendError } from './http-errors.js';
 import { resetSession as resetAstrometrySession } from '../astrometry.js';
 import { probeAstap, probeSolveField, probeDataDir } from '../probe-utils.js';
 import { parseLatestRelease, type LatestRelease } from '../github-release.js';
@@ -90,15 +93,6 @@ settingsRouter.get('/api/config', (_req, res) => {
   });
 });
 
-// User-configurable solver / API settings
-const EDITABLE_STRING_SETTINGS = [
-  'ASTAP_PATH',
-  'SOLVE_FIELD_PATH',
-  'ASTROMETRY_DATA_DIR',
-  'MAX_PARALLEL_SOLVES',
-] as const;
-const EDITABLE_BOOLEAN_SETTINGS = ['USE_WSL_FOR_SOLVE_FIELD', 'USE_WSL_FOR_ASTAP'] as const;
-
 /**
  * @swagger
  * /api/settings:
@@ -108,19 +102,14 @@ const EDITABLE_BOOLEAN_SETTINGS = ['USE_WSL_FOR_SOLVE_FIELD', 'USE_WSL_FOR_ASTAP
  *       200:
  *         description: Settings returned successfully
  */
-settingsRouter.get('/api/settings', (_req, res) => {
-  const result: Record<string, string | boolean> = {
-    apiKeySet: !!getSetting('ASTROMETRY_API_KEY'),
-    isWindows: process.platform === 'win32',
-  };
-  for (const key of EDITABLE_STRING_SETTINGS) {
-    result[key] = getSetting(key) ?? '';
+settingsRouter.get('/api/settings', async (_req, res) => {
+  try {
+    const { apiKeySet, ...rest } = await settings.readPublic();
+    res.json({ apiKeySet, isWindows: process.platform === 'win32', ...rest });
+  } catch (err) {
+    if (!isDomainError(err)) logServerError('settings_read_failed', err);
+    sendError(res, err);
   }
-  for (const key of EDITABLE_BOOLEAN_SETTINGS) {
-    const value = (getSetting(key) ?? '').trim().toLowerCase();
-    result[key] = value === '1' || value === 'true' || value === 'yes' || value === 'on';
-  }
-  res.json(result);
 });
 
 /**
@@ -132,36 +121,15 @@ settingsRouter.get('/api/settings', (_req, res) => {
  *       200:
  *         description: Settings updated successfully
  */
-settingsRouter.put('/api/settings', (req, res) => {
-  const body = req.body as Record<string, unknown>;
-
-  // API key: only update when the user provides a non-empty value
-  if (typeof body.apiKey === 'string' && body.apiKey.trim().length > 0) {
-    if (process.env.ASTROMETRY_API_KEY !== undefined) {
-      res.status(409).json({
-        error: 'ASTROMETRY_API_KEY is managed via environment variable and cannot be changed here',
-        code: 'SETTING_LOCKED_BY_ENV',
-        key: 'ASTROMETRY_API_KEY',
-      });
-      return;
-    }
-    setSetting('ASTROMETRY_API_KEY', body.apiKey.trim());
-    resetAstrometrySession(); // invalidate cached session for the old key
+settingsRouter.put('/api/settings', async (req, res) => {
+  try {
+    const { apiKeyChanged } = await settings.update(req.body);
+    if (apiKeyChanged) resetAstrometrySession(); // invalidate cached session for the old key
+    res.json({ ok: true });
+  } catch (err) {
+    if (!isDomainError(err)) logServerError('settings_update_failed', err);
+    sendError(res, err);
   }
-
-  for (const key of EDITABLE_STRING_SETTINGS) {
-    if (typeof body[key] === 'string') {
-      setSetting(key, (body[key] as string).trim());
-    }
-  }
-
-  for (const key of EDITABLE_BOOLEAN_SETTINGS) {
-    if (typeof body[key] === 'boolean') {
-      setSetting(key, body[key] ? '1' : '0');
-    }
-  }
-
-  res.json({ ok: true });
 });
 
 /**
@@ -173,19 +141,15 @@ settingsRouter.put('/api/settings', (req, res) => {
  *       200:
  *         description: API key deleted successfully
  */
-settingsRouter.delete('/api/settings/astrometry-api-key', (_req, res) => {
-  if (process.env.ASTROMETRY_API_KEY !== undefined) {
-    res.status(409).json({
-      error: 'ASTROMETRY_API_KEY is managed via environment variable and cannot be changed here',
-      code: 'SETTING_LOCKED_BY_ENV',
-      key: 'ASTROMETRY_API_KEY',
-    });
-    return;
+settingsRouter.delete('/api/settings/astrometry-api-key', async (_req, res) => {
+  try {
+    await settings.removeApiKey();
+    resetAstrometrySession();
+    res.json({ ok: true });
+  } catch (err) {
+    if (!isDomainError(err)) logServerError('settings_delete_key_failed', err);
+    sendError(res, err);
   }
-
-  deleteSetting('ASTROMETRY_API_KEY');
-  resetAstrometrySession();
-  res.json({ ok: true });
 });
 
 const execFileAsync = promisify(execFile);
