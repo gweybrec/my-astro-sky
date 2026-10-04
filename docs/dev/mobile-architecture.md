@@ -92,9 +92,10 @@ Each service throws a `DomainError`. Its kinds are `invalid`, `notFound`, `confl
 
 Services already moved into `packages/core/src/services/` (built in `server/services.ts`, errors turned into responses by `sendError` in `server/routes/http-errors.ts`):
 
-| Service              | File                                          | What it owns                                                 | Routes that use it                                                                                 |
-| -------------------- | --------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `DsoOverrideService` | `packages/core/src/services/dso-overrides.ts` | DSO override rows, id and RA/Dec checks, `dso_overrides` SQL | `GET/PUT/DELETE /api/dso-overrides[/:id]`, `POST /api/export` and `POST /api/import` (`backup.ts`) |
+| Service              | File                                          | What it owns                                                      | Routes that use it                                                                                      |
+| -------------------- | --------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `DsoOverrideService` | `packages/core/src/services/dso-overrides.ts` | DSO override rows, id and RA/Dec checks, `dso_overrides` SQL      | `GET/PUT/DELETE /api/dso-overrides[/:id]`, `POST /api/export` and `POST /api/import` (`backup.ts`)      |
+| `SkyRegionService`   | `packages/core/src/services/sky-regions.ts`   | Alt/Az polygon regions, name and vertex checks, `sky_regions` SQL | `GET/POST/PATCH/DELETE /api/sky-regions[/:id]`, `POST /api/export` and `POST /api/import` (`backup.ts`) |
 
 ASTAP and solve-field stay server-only and are exposed through **capabilities**.
 

@@ -1,20 +1,9 @@
-import type { PoiCategoryRow, SkyRegionRow, PlanEntryRow, PlanMosaicRow } from '../db.js';
+import type { PoiCategoryRow, PlanEntryRow, PlanMosaicRow } from '../db.js';
 import type { PoiCategory } from '@myastrosky/core/types';
-import type { SkyRegionData } from '@myastrosky/core/domain/regions';
 import type { PlanEntry, PlanMosaic, ObservationWindow } from '@myastrosky/core/domain/plans';
 
 export function poiCategoryToApi(r: PoiCategoryRow): PoiCategory {
   return { id: r.id, name: r.name, color: r.color, position: r.position };
-}
-
-export function skyRegionToApi(r: SkyRegionRow): SkyRegionData {
-  let points: SkyRegionData['points'] = [];
-  try {
-    points = JSON.parse(r.points);
-  } catch {
-    /* corrupt row, surface as empty polygon rather than 500ing the whole list */
-  }
-  return { id: r.id, name: r.name, color: r.color, points, position: r.position };
 }
 
 /** Allowed plan objects-list sort keys (mirrors client PlanSortKey). */

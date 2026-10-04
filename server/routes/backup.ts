@@ -4,13 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { UPLOADS_DIR } from '../server-paths.js';
 import { ALLOWED_PHOTO_EXTENSIONS, uploadBundle, sanitizeIntegrationRows } from './shared.js';
-import {
-  poiCategoryToApi,
-  skyRegionToApi,
-  planEntryToApi,
-  planMosaicToApi,
-  PLAN_SORT_KEYS,
-} from './mappers.js';
+import { poiCategoryToApi, planEntryToApi, planMosaicToApi, PLAN_SORT_KEYS } from './mappers.js';
 import {
   getAllPhotos,
   deletePhoto,
@@ -26,8 +20,6 @@ import {
   sanitizeCaptureDetails,
   getAllPoiCategories,
   upsertPoiCategory,
-  getAllSkyRegions,
-  upsertSkyRegion,
   getPlans,
   getAllPlanEntries,
   createPlan,
@@ -39,7 +31,10 @@ import {
   type PlanEntryRow,
   type PlanMosaicRow,
 } from '../db.js';
-import { dsoOverrides as dsoOverridesService } from '../services.js';
+import {
+  dsoOverrides as dsoOverridesService,
+  skyRegions as skyRegionsService,
+} from '../services.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 import {
@@ -180,7 +175,7 @@ backupRouter.post('/api/export', async (req, res) => {
       archive.append(Buffer.from(JSON.stringify(cats, null, 2)), { name: 'poi-categories.json' });
     }
     if (includeSkyRegions) {
-      const regions = getAllSkyRegions().map(skyRegionToApi);
+      const regions = await skyRegionsService.list();
       archive.append(Buffer.from(JSON.stringify(regions, null, 2)), {
         name: 'sky-regions.json',
       });
@@ -556,22 +551,22 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
         try {
           const rawRegions = JSON.parse((await skyRegionsEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawRegions)) {
-            rawRegions.forEach((r, ri) => {
+            for (const [ri, r] of rawRegions.entries()) {
               if (
                 typeof r?.id !== 'string' ||
                 typeof r?.name !== 'string' ||
                 !Array.isArray(r.points)
               ) {
-                return;
+                continue;
               }
-              upsertSkyRegion({
+              await skyRegionsService.importOne({
                 id: r.id,
                 name: r.name,
                 color: typeof r.color === 'string' && r.color.trim() ? r.color : '#4ea1ff',
-                points: JSON.stringify(r.points),
+                points: r.points,
                 position: Number.isFinite(r.position) ? Number(r.position) : ri,
               });
-            });
+            }
           }
         } catch {
           /* ignore invalid sky-regions.json */

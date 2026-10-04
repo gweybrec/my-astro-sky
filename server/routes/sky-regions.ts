@@ -1,25 +1,11 @@
 import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { getAllSkyRegions, upsertSkyRegion, deleteSkyRegion } from '../db.js';
-import { skyRegionToApi } from './mappers.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import { skyRegions } from '../services.js';
+import { sendError } from './http-errors.js';
 
 export const skyRegionsRouter = express.Router();
 
 // ─── Sky regions ─────────────────────────────────────────────────────────────
-
-function isValidRegionPoints(points: unknown): points is { azDeg: number; altDeg: number }[] {
-  return (
-    Array.isArray(points) &&
-    points.length >= 3 &&
-    points.every(
-      (p) =>
-        p &&
-        typeof p === 'object' &&
-        Number.isFinite((p as any).azDeg) &&
-        Number.isFinite((p as any).altDeg),
-    )
-  );
-}
 
 /**
  * @swagger
@@ -53,12 +39,12 @@ function isValidRegionPoints(points: unknown): points is { azDeg: number; altDeg
  *       500:
  *         description: Server error
  */
-skyRegionsRouter.get('/api/sky-regions', (_req, res) => {
+skyRegionsRouter.get('/api/sky-regions', async (_req, res) => {
   try {
-    res.json(getAllSkyRegions().map(skyRegionToApi));
-  } catch (err: any) {
-    console.error('[SkyRegions] Failed to list regions', err);
-    res.status(500).json({ error: err.message });
+    res.json(await skyRegions.list());
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[SkyRegions] Failed to list regions', err);
+    sendError(res, err);
   }
 });
 
@@ -98,30 +84,12 @@ skyRegionsRouter.get('/api/sky-regions', (_req, res) => {
  *       500:
  *         description: Server error
  */
-skyRegionsRouter.post('/api/sky-regions', (req, res) => {
+skyRegionsRouter.post('/api/sky-regions', async (req, res) => {
   try {
-    const { name, color, points } = req.body as any;
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' });
-      return;
-    }
-    if (!isValidRegionPoints(points)) {
-      res.status(400).json({ error: 'points must have at least 3 {azDeg,altDeg} vertices' });
-      return;
-    }
-    const id = `region-${uuidv4()}`;
-    const position = getAllSkyRegions().length;
-    upsertSkyRegion({
-      id,
-      name: name.trim(),
-      color: typeof color === 'string' && color.trim() ? color.trim() : '#4ea1ff',
-      points: JSON.stringify(points),
-      position,
-    });
-    res.json({ id });
-  } catch (err: any) {
-    console.error('[SkyRegions] Failed to create region', err);
-    res.status(500).json({ error: err.message });
+    res.json(await skyRegions.create(req.body));
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[SkyRegions] Failed to create region', err);
+    sendError(res, err);
   }
 });
 
@@ -166,26 +134,13 @@ skyRegionsRouter.post('/api/sky-regions', (req, res) => {
  *       500:
  *         description: Server error
  */
-skyRegionsRouter.patch('/api/sky-regions/:id', (req, res) => {
+skyRegionsRouter.patch('/api/sky-regions/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const existing = getAllSkyRegions().find((r) => r.id === id);
-    if (!existing) {
-      res.status(404).json({ error: 'Region not found' });
-      return;
-    }
-    const { name, color, points, position } = req.body as any;
-    upsertSkyRegion({
-      id,
-      name: typeof name === 'string' && name.trim() ? name.trim() : existing.name,
-      color: typeof color === 'string' && color.trim() ? color.trim() : existing.color,
-      points: isValidRegionPoints(points) ? JSON.stringify(points) : existing.points,
-      position: Number.isFinite(position) ? Number(position) : existing.position,
-    });
+    await skyRegions.update(req.params.id, req.body);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[SkyRegions] Failed to update region', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[SkyRegions] Failed to update region', err);
+    sendError(res, err);
   }
 });
 
@@ -213,16 +168,12 @@ skyRegionsRouter.patch('/api/sky-regions/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-skyRegionsRouter.delete('/api/sky-regions/:id', (req, res) => {
+skyRegionsRouter.delete('/api/sky-regions/:id', async (req, res) => {
   try {
-    const ok = deleteSkyRegion(req.params.id);
-    if (!ok) {
-      res.status(404).json({ error: 'Region not found' });
-      return;
-    }
+    await skyRegions.remove(req.params.id);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[SkyRegions] Failed to delete region', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[SkyRegions] Failed to delete region', err);
+    sendError(res, err);
   }
 });
