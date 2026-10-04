@@ -33,6 +33,10 @@ One line per decision, with the date. Cards and design rounds must follow these.
 | 2026-10-04 | Scrolling sheets          | A scrolling sheet shows a styled scroll bar that is always visible.                                                                                                                                                                                                        |
 | 2026-10-04 | Delete                    | Every delete (plan, photo, setup, frame, …) asks for confirmation in a confirm/cancel popup, as on the desktop. A plan has a visible delete button.                                                                                                                        |
 | 2026-10-04 | Import warning            | The "make a backup first" warning is visible in the import section before a file is chosen, as on the desktop.                                                                                                                                                             |
+| 2026-10-04 | Icon meanings             | An eye icon means show or hide, and nothing else. Adding something is a plus button.                                                                                                                                                                                       |
+| 2026-10-04 | Draw order                | The "Ordre d'affichage" screen has no explanation sentence.                                                                                                                                                                                                                |
+| 2026-10-04 | Three-star alignment      | A star can also be picked on the sky map, as on the desktop ("Carte").                                                                                                                                                                                                     |
+| 2026-10-04 | Map toggles               | The ribbon at the top right of the map holds the desktop's seven toggles (local sky, azimuth grid, trajectory, terrain horizon, Moon, Sun, planets) and, last, the entry to the full display settings.                                                                     |
 
 ## Touch decisions for the mobile app (2026-10-03)
 
@@ -57,7 +61,7 @@ Keyboard-only actions: every mode gets visible Cancel and Done buttons; label ch
 
 ## Design rounds
 
-| Round | State                                                                                                            | Where                                             |
-| ----- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| D0    | approved 2026-10-03                                                                                              | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS |
-| D1    | 36 screens published 2026-10-04; the user reviewed all of them and gave twelve changes (revision 8, in progress) | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 |
+| Round | State                                                                                                                                       | Where                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| D0    | approved 2026-10-03                                                                                                                         | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS |
+| D1    | 42 screens published 2026-10-04 with the twelve review changes (revisions 8a and 8b); revision 9 (icon meanings, map star pick) in progress | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 |
