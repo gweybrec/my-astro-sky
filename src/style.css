@@ -4015,7 +4015,7 @@ details.targets-form-details[open] .targets-form-summary::before {
 
 .target-card-type {
   font-size: var(--font-size-small);
-  color: var(--text-dim);
+  color: var(--text-secondary);
   background: var(--target-type-bg);
   border: 1px solid var(--accent-fill-md);
   border-radius: var(--radius-sm);
