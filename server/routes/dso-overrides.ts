@@ -1,11 +1,6 @@
 import express from 'express';
-import {
-  getAllDsoOverrides,
-  upsertDsoOverride as upsertDsoOverrideDB,
-  deleteDsoOverride as deleteDsoOverrideDB,
-  deleteAllDsoOverrides as deleteAllDsoOverridesDB,
-} from '../db.js';
-import { validateDsoOverrideCoords } from '../import-utils.js';
+import { dsoOverrides } from '../services.js';
+import { sendError } from './http-errors.js';
 
 export const dsoOverridesRouter = express.Router();
 
@@ -20,11 +15,11 @@ export const dsoOverridesRouter = express.Router();
  */
 // ─── DSO user overrides ──────────────────────────────────────────────────────
 
-dsoOverridesRouter.get('/api/dso-overrides', (_req, res) => {
+dsoOverridesRouter.get('/api/dso-overrides', async (_req, res) => {
   try {
-    res.json(getAllDsoOverrides());
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await dsoOverrides.getAll());
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -64,27 +59,12 @@ dsoOverridesRouter.get('/api/dso-overrides', (_req, res) => {
  *       500:
  *         description: Server error
  */
-dsoOverridesRouter.put('/api/dso-overrides/:id', (req, res) => {
+dsoOverridesRouter.put('/api/dso-overrides/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!id || id.length > 100) {
-      res.status(400).json({ error: 'Invalid DSO id' });
-      return;
-    }
-    const data = req.body;
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      res.status(400).json({ error: 'Invalid override data' });
-      return;
-    }
-    const coordError = validateDsoOverrideCoords(data as Record<string, unknown>);
-    if (coordError) {
-      res.status(400).json(coordError);
-      return;
-    }
-    upsertDsoOverrideDB(id, data);
+    await dsoOverrides.upsert(req.params.id, req.body);
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -115,12 +95,12 @@ dsoOverridesRouter.put('/api/dso-overrides/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-dsoOverridesRouter.delete('/api/dso-overrides/:id', (req, res) => {
+dsoOverridesRouter.delete('/api/dso-overrides/:id', async (req, res) => {
   try {
-    deleteDsoOverrideDB(req.params.id);
+    await dsoOverrides.remove(req.params.id);
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -146,12 +126,12 @@ dsoOverridesRouter.delete('/api/dso-overrides/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-dsoOverridesRouter.delete('/api/dso-overrides', (_req, res) => {
+dsoOverridesRouter.delete('/api/dso-overrides', async (_req, res) => {
   try {
-    const deleted = deleteAllDsoOverridesDB();
+    const deleted = await dsoOverrides.removeAll();
     res.json({ ok: true, deleted });
-  } catch (err: any) {
+  } catch (err) {
     console.error('[DeleteAll] DSO overrides delete failed', err);
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });

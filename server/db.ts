@@ -706,46 +706,6 @@ export function setCachedHorizon(key: string, profile: object): void {
   setHorizonStmt.run(key, JSON.stringify(profile));
 }
 
-// ─── DSO user overrides ────────────────────────────────────────────────────────
-
-const getDsoOverrideStmt = db.prepare('SELECT data FROM dso_overrides WHERE id = ?');
-const getAllDsoOverridesStmt = db.prepare('SELECT id, data FROM dso_overrides');
-const upsertDsoOverrideStmt = db.prepare(
-  'INSERT OR REPLACE INTO dso_overrides (id, data) VALUES (?, ?)',
-);
-const deleteDsoOverrideByIdStmt = db.prepare('DELETE FROM dso_overrides WHERE id = ?');
-
-export function getDsoOverride(id: string): object | undefined {
-  const row = getDsoOverrideStmt.get(id) as { data: string } | undefined;
-  if (!row) return undefined;
-  try {
-    return JSON.parse(row.data);
-  } catch {
-    return undefined;
-  }
-}
-
-export function getAllDsoOverrides(): Record<string, object> {
-  const rows = getAllDsoOverridesStmt.all() as { id: string; data: string }[];
-  const result: Record<string, object> = {};
-  for (const row of rows) {
-    try {
-      result[row.id] = JSON.parse(row.data);
-    } catch {
-      /* skip invalid */
-    }
-  }
-  return result;
-}
-
-export function upsertDsoOverride(id: string, data: object): void {
-  upsertDsoOverrideStmt.run(id, JSON.stringify(data));
-}
-
-export function deleteDsoOverride(id: string): void {
-  deleteDsoOverrideByIdStmt.run(id);
-}
-
 // ─── Custom gear ───────────────────────────────────────────────────────────────
 
 const getAllCustomGearStmt = db.prepare('SELECT id, type, data FROM custom_gear');
@@ -1424,17 +1384,11 @@ export function reorderPlanEntries(planId: string, ids: string[]): void {
 // ─── Bulk-delete helpers (used by "Delete all data" feature) ───────────────────
 
 const deleteAllPhotosStmt = db.prepare('DELETE FROM photos');
-const deleteAllDsoOverridesStmt = db.prepare('DELETE FROM dso_overrides');
 const deleteAllCustomGearStmt = db.prepare("DELETE FROM custom_gear WHERE id LIKE 'custom-%'");
 
 /** Delete all photo rows from the DB (no file removal). Returns number of rows deleted. */
 export function deleteAllPhotoMetadata(): number {
   return deleteAllPhotosStmt.run().changes;
-}
-
-/** Delete all DSO override rows. Returns number of rows deleted. */
-export function deleteAllDsoOverrides(): number {
-  return deleteAllDsoOverridesStmt.run().changes;
 }
 
 /** Delete all custom gear rows. Returns number of rows deleted. */

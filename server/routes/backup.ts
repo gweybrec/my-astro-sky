@@ -16,8 +16,6 @@ import {
   deletePhoto,
   createPhotoWithId,
   checkPhotosExistByName,
-  getAllDsoOverrides,
-  upsertDsoOverride as upsertDsoOverrideDB,
   getAllCustomGear,
   upsertCustomGear as upsertCustomGearDB,
   deleteCustomGear as deleteCustomGearDB,
@@ -41,6 +39,7 @@ import {
   type PlanEntryRow,
   type PlanMosaicRow,
 } from '../db.js';
+import { dsoOverrides as dsoOverridesService } from '../services.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 import {
@@ -70,7 +69,7 @@ export const backupRouter = express.Router();
 // Export photos as ZIP (full) or JSON (metadata only)
 // POST body: { mode: 'full' | 'metadata', ids?: string[] }
 // New shape:  { options: { includeImages?, includeMetadata?, includeDsoOverrides? }, ids? }
-backupRouter.post('/api/export', (req, res) => {
+backupRouter.post('/api/export', async (req, res) => {
   try {
     const body = req.body as {
       mode?: string;
@@ -150,7 +149,7 @@ backupRouter.post('/api/export', (req, res) => {
       }
     }
     if (includeDsoOverrides) {
-      const overrides = getAllDsoOverrides();
+      const overrides = await dsoOverridesService.getAll();
       archive.append(Buffer.from(JSON.stringify(overrides, null, 2)), {
         name: 'dso-overrides.json',
       });
@@ -441,7 +440,7 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
                 data !== null &&
                 !Array.isArray(data)
               ) {
-                upsertDsoOverrideDB(id, data as object);
+                await dsoOverridesService.importOne(id, data as object);
                 dsoOverridesImported++;
               }
             }

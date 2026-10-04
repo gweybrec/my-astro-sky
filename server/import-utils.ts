@@ -317,20 +317,4 @@ export function parseManifestPhotos(parsed: unknown): unknown[] {
   return [];
 }
 
-/**
- * Validate RA and Dec fields in a DSO override payload.
- * Returns `{ error, code }` if any value is out of range, otherwise null.
- *
- * Ranges: RA ∈ [0, 360), Dec ∈ [−90, 90].
- */
-export function validateDsoOverrideCoords(
-  data: Record<string, unknown>,
-): { error: string; code: string } | null {
-  if (typeof data.ra === 'number' && (data.ra < 0 || data.ra >= 360)) {
-    return { error: 'RA must be in [0, 360)', code: 'INVALID_DSO_RA' };
-  }
-  if (typeof data.dec === 'number' && (data.dec < -90 || data.dec > 90)) {
-    return { error: 'Dec must be in [-90, 90]', code: 'INVALID_DSO_DEC' };
-  }
-  return null;
-}
+export { validateDsoOverrideCoords } from '@myastrosky/core/services/dso-overrides';

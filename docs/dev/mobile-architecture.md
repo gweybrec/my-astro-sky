@@ -90,6 +90,12 @@ Each service throws a `DomainError`. Its kinds are `invalid`, `notFound`, `confl
 | `BackupService`                                                | Export, import preview, import apply                                     | Atomic; manifest versioned; **now includes the `PrefsStore` state** |
 | `VersionService`                                               | Latest GitHub release                                                    |                                                                     |
 
+Services already moved into `packages/core/src/services/` (built in `server/services.ts`, errors turned into responses by `sendError` in `server/routes/http-errors.ts`):
+
+| Service              | File                                          | What it owns                                                 | Routes that use it                                                                                 |
+| -------------------- | --------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `DsoOverrideService` | `packages/core/src/services/dso-overrides.ts` | DSO override rows, id and RA/Dec checks, `dso_overrides` SQL | `GET/PUT/DELETE /api/dso-overrides[/:id]`, `POST /api/export` and `POST /api/import` (`backup.ts`) |
+
 ASTAP and solve-field stay server-only and are exposed through **capabilities**.
 
 ### The seam is `api.ts`
