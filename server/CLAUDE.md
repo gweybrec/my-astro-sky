@@ -10,6 +10,7 @@ conventions, the CI gate, architecture overview) stay in the root `CLAUDE.md`.
 - Uploaded photos go to `uploads/` directory on disk, named with UUIDs.
 - Filters are served at `GET /api/filters` and consumed via `src/gear-catalog.ts` (they are **not** part of a gear setup — picked per integration row / observation window). The catalog itself is `resources/filters.json`; see `scripts/CLAUDE.md` for the colour-seeding step.
 - Schema changes go through `server/db-migrations.ts` (idempotent, run on startup).
+- New persistence code goes through the `SqlDb` port (`packages/core/src/ports/sql-db.ts`, adapter `server/sqlite-adapter.ts`). Inside `SqlDb.transaction` only `tx` calls may be awaited; awaiting anything else rolls the transaction back with `SQL_TX_AWAITED_NON_DB`.
 
 ## Adding or changing a route
 

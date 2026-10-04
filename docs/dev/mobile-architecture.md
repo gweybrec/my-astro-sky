@@ -55,6 +55,14 @@ Signatures were validated against the code.
 | `LocationProvider`, `I18nPlatform`                                      | navigator / Electron IPC          | GPS / Preferences                              |
 | `Clock`, `IdGenerator`, `Logger`                                        | Date / uuid / `server/logger.ts`  | Date / `crypto.randomUUID` / console           |
 
+### `SqlDb` details
+
+- The port lives in `packages/core/src/ports/sql-db.ts`; the server adapter is `server/sqlite-adapter.ts` (`createBetterSqliteDb(getConnection())`).
+- Transaction rule: `SqlDb.transaction(body)` may only await calls on its `tx`; a `setImmediate` watchdog rolls back a body that awaits anything else, and transactions do not nest.
+- Error codes (exported by the port): `SQL_TX_AWAITED_NON_DB`, `SQL_TX_NESTED`, `SQL_LEGACY_CALL_IN_TX`.
+- Old synchronous `server/db.ts` functions throw `SQL_LEGACY_CALL_IN_TX` if called while a service transaction is open (`server/db-tx-guard.ts`).
+- `getConnection()` in `db.ts` returns the raw, unguarded better-sqlite3 handle; only the adapter should use it.
+
 ### Backend interface types
 
 The interface lives in core, so it cannot use browser types:

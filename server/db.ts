@@ -4,6 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { applyMigrations } from './db-migrations.js';
+import { wrapLegacyConnection } from './db-tx-guard.js';
 import { sanitizeCaptureDetails } from './wcs-reader.js';
 import type { Photo } from '@myastrosky/core/types';
 
@@ -28,7 +29,9 @@ function sanitizeSetupId(val: unknown): string | null {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data.db');
 
-const db = new Database(dbPath);
+const rawDb = new Database(dbPath);
+// Old synchronous code goes through this wrapper; it throws while a SqlDb service transaction is open.
+const db = wrapLegacyConnection(rawDb);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
@@ -655,6 +658,11 @@ export function setSetting(key: string, value: string): void {
 
 export function deleteSetting(key: string): void {
   deleteSettingStmt.run(key);
+}
+
+/** The raw better-sqlite3 handle, for the `SqlDb` adapter only (not guarded against service transactions). */
+export function getConnection(): Database.Database {
+  return rawDb;
 }
 
 export function closeDatabase(): void {
