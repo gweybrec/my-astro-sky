@@ -6,6 +6,7 @@ import fs from 'fs';
 import { UPLOADS_DIR, DIST_DIR, SWAGGER_JSON_PATH } from './server-paths.js';
 import { isElectron, API_LIMIT, checkRateLimit } from './routes/shared.js';
 import { logServerError } from './logger.js';
+import { poiCategories } from './services.js';
 import { starsRouter } from './routes/stars.js';
 import { identifyRouter } from './routes/identify.js';
 import { horizonRouter } from './routes/horizon.js';
@@ -133,6 +134,9 @@ app.use(backupRouter);
 // guaranteeing correct ordering regardless of dist/ presence. It does not listen: the
 // entry point (server/index.ts) does.
 export async function createApp(): Promise<express.Express> {
+  // First run: give the user the default POI categories before any route can list them.
+  await poiCategories.ensureDefaults();
+
   // swagger: dev only — not available in Electron/production (swagger-ui-express is a devDependency
   // and swagger.json is not embedded in the Electron bundle).
   if (enableSwagger) {

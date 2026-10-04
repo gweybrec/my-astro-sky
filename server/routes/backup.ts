@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { UPLOADS_DIR } from '../server-paths.js';
 import { ALLOWED_PHOTO_EXTENSIONS, uploadBundle, sanitizeIntegrationRows } from './shared.js';
-import { poiCategoryToApi, planEntryToApi, planMosaicToApi, PLAN_SORT_KEYS } from './mappers.js';
+import { planEntryToApi, planMosaicToApi, PLAN_SORT_KEYS } from './mappers.js';
 import {
   getAllPhotos,
   deletePhoto,
@@ -18,8 +18,6 @@ import {
   deleteGearSetup,
   sanitizePois,
   sanitizeCaptureDetails,
-  getAllPoiCategories,
-  upsertPoiCategory,
   getPlans,
   getAllPlanEntries,
   createPlan,
@@ -33,6 +31,7 @@ import {
 } from '../db.js';
 import {
   dsoOverrides as dsoOverridesService,
+  poiCategories as poiCategoriesService,
   skyRegions as skyRegionsService,
 } from '../services.js';
 import { ZipArchive } from 'archiver';
@@ -171,7 +170,7 @@ backupRouter.post('/api/export', async (req, res) => {
       archive.append(Buffer.from(JSON.stringify(setups, null, 2)), { name: 'gear-setups.json' });
     }
     if (includePoiCategories) {
-      const cats = getAllPoiCategories().map(poiCategoryToApi);
+      const cats = await poiCategoriesService.list();
       archive.append(Buffer.from(JSON.stringify(cats, null, 2)), { name: 'poi-categories.json' });
     }
     if (includeSkyRegions) {
@@ -530,15 +529,15 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
         try {
           const rawCats = JSON.parse((await poiCategoriesEntry.buffer()).toString('utf8'));
           if (Array.isArray(rawCats)) {
-            rawCats.forEach((c, ci) => {
-              if (typeof c?.id !== 'string' || typeof c?.name !== 'string') return;
-              upsertPoiCategory({
+            for (const [ci, c] of rawCats.entries()) {
+              if (typeof c?.id !== 'string' || typeof c?.name !== 'string') continue;
+              await poiCategoriesService.importOne({
                 id: c.id,
                 name: c.name,
                 color: typeof c.color === 'string' && c.color.trim() ? c.color : '#888888',
                 position: Number.isFinite(c.position) ? Number(c.position) : ci,
               });
-            });
+            }
           }
         } catch {
           /* ignore invalid poi-categories.json */

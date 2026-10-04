@@ -1,12 +1,7 @@
 import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import {
-  getAllPoiCategories,
-  upsertPoiCategory,
-  deletePoiCategory,
-  deleteAllPoiCategories,
-} from '../db.js';
-import { poiCategoryToApi } from './mappers.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import { poiCategories } from '../services.js';
+import { sendError } from './http-errors.js';
 
 export const poiCategoriesRouter = express.Router();
 
@@ -34,12 +29,12 @@ export const poiCategoriesRouter = express.Router();
  *       500:
  *         description: Server error
  */
-poiCategoriesRouter.get('/api/poi-categories', (_req, res) => {
+poiCategoriesRouter.get('/api/poi-categories', async (_req, res) => {
   try {
-    res.json(getAllPoiCategories().map(poiCategoryToApi));
-  } catch (err: any) {
-    console.error('[PoiCategories] Failed to list categories', err);
-    res.status(500).json({ error: err.message });
+    res.json(await poiCategories.list());
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[PoiCategories] Failed to list categories', err);
+    sendError(res, err);
   }
 });
 
@@ -72,25 +67,12 @@ poiCategoriesRouter.get('/api/poi-categories', (_req, res) => {
  *       500:
  *         description: Server error
  */
-poiCategoriesRouter.post('/api/poi-categories', (req, res) => {
+poiCategoriesRouter.post('/api/poi-categories', async (req, res) => {
   try {
-    const { name, color } = req.body as any;
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' });
-      return;
-    }
-    const id = `cat-${uuidv4()}`;
-    const position = getAllPoiCategories().length;
-    upsertPoiCategory({
-      id,
-      name: name.trim(),
-      color: typeof color === 'string' && color.trim() ? color.trim() : '#888888',
-      position,
-    });
-    res.json({ id });
-  } catch (err: any) {
-    console.error('[PoiCategories] Failed to create category', err);
-    res.status(500).json({ error: err.message });
+    res.json(await poiCategories.create(req.body));
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[PoiCategories] Failed to create category', err);
+    sendError(res, err);
   }
 });
 
@@ -128,25 +110,13 @@ poiCategoriesRouter.post('/api/poi-categories', (req, res) => {
  *       500:
  *         description: Server error
  */
-poiCategoriesRouter.patch('/api/poi-categories/:id', (req, res) => {
+poiCategoriesRouter.patch('/api/poi-categories/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const existing = getAllPoiCategories().find((c) => c.id === id);
-    if (!existing) {
-      res.status(404).json({ error: 'Category not found' });
-      return;
-    }
-    const { name, color, position } = req.body as any;
-    upsertPoiCategory({
-      id,
-      name: typeof name === 'string' && name.trim() ? name.trim() : existing.name,
-      color: typeof color === 'string' && color.trim() ? color.trim() : existing.color,
-      position: Number.isFinite(position) ? Number(position) : existing.position,
-    });
+    await poiCategories.update(req.params.id, req.body);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[PoiCategories] Failed to update category', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[PoiCategories] Failed to update category', err);
+    sendError(res, err);
   }
 });
 
@@ -177,17 +147,13 @@ poiCategoriesRouter.patch('/api/poi-categories/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-poiCategoriesRouter.delete('/api/poi-categories/:id', (req, res) => {
+poiCategoriesRouter.delete('/api/poi-categories/:id', async (req, res) => {
   try {
-    const ok = deletePoiCategory(req.params.id);
-    if (!ok) {
-      res.status(404).json({ error: 'Category not found' });
-      return;
-    }
+    await poiCategories.remove(req.params.id);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[PoiCategories] Failed to delete category', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[PoiCategories] Failed to delete category', err);
+    sendError(res, err);
   }
 });
 
@@ -209,12 +175,11 @@ poiCategoriesRouter.delete('/api/poi-categories/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-poiCategoriesRouter.delete('/api/poi-categories', (_req, res) => {
+poiCategoriesRouter.delete('/api/poi-categories', async (_req, res) => {
   try {
-    const deleted = deleteAllPoiCategories();
-    res.json({ ok: true, deleted });
-  } catch (err: any) {
-    console.error('[PoiCategories] Failed to delete all categories', err);
-    res.status(500).json({ error: err.message });
+    res.json({ ok: true, deleted: await poiCategories.removeAll() });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[PoiCategories] Failed to delete all categories', err);
+    sendError(res, err);
   }
 });

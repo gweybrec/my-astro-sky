@@ -791,60 +791,6 @@ export function deleteAllGearSetups(): number {
   return deleteAllGearSetupsStmt.run().changes;
 }
 
-// ─── Points of Interest categories ────────────────────────────────────────────
-
-export interface PoiCategoryRow {
-  id: string;
-  name: string;
-  color: string;
-  position: number;
-}
-
-const getAllPoiCategoriesStmt = db.prepare(
-  'SELECT * FROM poi_categories ORDER BY position ASC, rowid ASC',
-);
-const upsertPoiCategoryStmt = db.prepare(
-  'INSERT OR REPLACE INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)',
-);
-const deletePoiCategoryStmt = db.prepare('DELETE FROM poi_categories WHERE id = ?');
-const deleteAllPoiCategoriesStmt = db.prepare('DELETE FROM poi_categories');
-const countPoiCategoriesStmt = db.prepare('SELECT COUNT(*) AS cnt FROM poi_categories');
-
-export function getAllPoiCategories(): PoiCategoryRow[] {
-  return getAllPoiCategoriesStmt.all() as PoiCategoryRow[];
-}
-
-export function upsertPoiCategory(row: PoiCategoryRow): void {
-  upsertPoiCategoryStmt.run(row.id, row.name.slice(0, 60), row.color.slice(0, 32), row.position);
-}
-
-export function deletePoiCategory(id: string): boolean {
-  return deletePoiCategoryStmt.run(id).changes > 0;
-}
-
-export function deleteAllPoiCategories(): number {
-  return deleteAllPoiCategoriesStmt.run().changes;
-}
-
-// Seed a few sensible default categories on first run (empty table only). They are
-// fully editable/deletable afterwards — this just gives the user a starting point.
-{
-  const cnt = (countPoiCategoriesStmt.get() as { cnt: number }).cnt;
-  if (cnt === 0) {
-    const defaults: PoiCategoryRow[] = [
-      { id: 'cat-comet', name: 'Comet', color: '#4ea1ff', position: 0 },
-      { id: 'cat-asteroid', name: 'Asteroid', color: '#c9a227', position: 1 },
-      { id: 'cat-satellite', name: 'Satellite', color: '#7bd88f', position: 2 },
-      { id: 'cat-iss', name: 'ISS', color: '#cbd5e1', position: 3 },
-      { id: 'cat-supernova', name: 'Supernova', color: '#ff5a5a', position: 4 },
-    ];
-    const seed = db.transaction(() => {
-      for (const c of defaults) upsertPoiCategory(c);
-    });
-    seed();
-  }
-}
-
 // ─── Night plans ────────────────────────────────────────────────────────────
 
 export interface PlanRow {
