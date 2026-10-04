@@ -625,8 +625,32 @@ describe('export and import round trip', () => {
     expect((await c.call('GET', '/api/sky-regions')).body).toEqual([]);
     expect((await c.call('GET', '/api/dso-overrides')).body).toEqual({});
     expect((await c.call('GET', '/api/poi-categories')).body).toHaveLength(5);
-    // KNOWN GAP: with no selectedImages field the route writes every image and thumbnail of the ZIP to the
-    // uploads folder even when the photos' metadata is not imported, leaving orphan files.
-    expect(fs.readdirSync(c.uploadsDir).sort()).toEqual(Object.keys(aImages).sort());
+    // No photo record is imported, so no image file is written either.
+    expect(fs.readdirSync(c.uploadsDir)).toEqual([]);
+  }, 30_000);
+
+  it('imports every photo and its files when importMetadata is set without selectedImages', async () => {
+    await live!.stop();
+    const d = await startInstance();
+    const r = await d.call('POST', '/api/import', bundleForm(zip, { importMetadata: '1' }));
+    expect(r).toEqual({ status: 200, body: { imported: 2, skipped: 0, dsoOverridesImported: 0 } });
+
+    expect((await d.call('GET', '/api/photos')).body.map((p: any) => p.id).sort()).toEqual(
+      [...photoIds].sort(),
+    );
+    expect(fs.readdirSync(d.uploadsDir).sort()).toEqual(Object.keys(aImages).sort());
+  }, 30_000);
+
+  it('writes no file when selectedImages is empty', async () => {
+    await live!.stop();
+    const e = await startInstance();
+    const r = await e.call(
+      'POST',
+      '/api/import',
+      bundleForm(zip, { importMetadata: '1', selectedImages: JSON.stringify([]) }),
+    );
+    expect(r).toEqual({ status: 200, body: { imported: 0, skipped: 2, dsoOverridesImported: 0 } });
+    expect((await e.call('GET', '/api/photos')).body).toEqual([]);
+    expect(fs.readdirSync(e.uploadsDir)).toEqual([]);
   }, 30_000);
 });

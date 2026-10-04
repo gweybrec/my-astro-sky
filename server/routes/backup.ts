@@ -628,7 +628,11 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
         (f) => f.path.startsWith('images/') && f.type === 'File',
       );
       writtenFiles = new Set<string>();
+      // Without a selection, files are written only for the photo records this same
+      // request imports (all photos of the manifest); otherwise they would belong to no photo.
+      const importsPhotoRecords = importMetadata && photos.length > 0;
       for (const entry of imageEntries) {
+        if (selectedImages === null && !importsPhotoRecords) continue;
         const baseName = path.basename(entry.path);
         const ext2 = path.extname(baseName).toLowerCase();
         if (!ALLOWED_PHOTO_EXTENSIONS.has(ext2)) continue;
