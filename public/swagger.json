@@ -88,109 +88,6 @@
         }
       }
     },
-    "/api/version/latest": {
-      "get": {
-        "summary": "Get the latest published GitHub release",
-        "description": "Proxies the latest release of the project's GitHub repository, cached for one hour. Returns null on any upstream failure so the in-app update check fails silently.\n",
-        "responses": {
-          "200": {
-            "description": "Latest release info, or null when unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "nullable": true,
-                  "type": "object",
-                  "properties": {
-                    "version": {
-                      "type": "string",
-                      "description": "Release tag name (e.g. v0.2.0)",
-                      "example": "v0.2.0"
-                    },
-                    "url": {
-                      "type": "string",
-                      "description": "GitHub release page URL"
-                    },
-                    "publishedAt": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "ISO 8601 publication timestamp"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/config": {
-      "get": {
-        "summary": "Get frontend configuration values",
-        "responses": {
-          "200": {
-            "description": "Configuration returned successfully"
-          }
-        }
-      }
-    },
-    "/api/settings": {
-      "get": {
-        "summary": "Get current API and solver settings",
-        "responses": {
-          "200": {
-            "description": "Settings returned successfully"
-          }
-        }
-      },
-      "put": {
-        "summary": "Update solver and API settings",
-        "responses": {
-          "200": {
-            "description": "Settings updated successfully"
-          }
-        }
-      }
-    },
-    "/api/settings/astrometry-api-key": {
-      "delete": {
-        "summary": "Delete stored Astrometry API key",
-        "responses": {
-          "200": {
-            "description": "API key deleted successfully"
-          }
-        }
-      }
-    },
-    "/api/settings/probe-astap": {
-      "post": {
-        "summary": "Probe astap_cli binary (run without args, check exit code)",
-        "responses": {
-          "200": {
-            "description": "Probe result returned"
-          }
-        }
-      }
-    },
-    "/api/settings/probe-solve-field": {
-      "post": {
-        "summary": "Probe solve-field binary (run --version, check exit code)",
-        "responses": {
-          "200": {
-            "description": "Probe result returned"
-          }
-        }
-      }
-    },
-    "/api/settings/probe-data-dir": {
-      "post": {
-        "summary": "Probe astrometry index directory (list contents)",
-        "responses": {
-          "200": {
-            "description": "Probe result returned"
-          }
-        }
-      }
-    },
     "/api/photos/order": {
       "patch": {
         "summary": "Persist photo draw order",
@@ -3249,6 +3146,109 @@
         "responses": {
           "200": {
             "description": "Star details returned successfully"
+          }
+        }
+      }
+    },
+    "/api/version/latest": {
+      "get": {
+        "summary": "Get the latest published GitHub release",
+        "description": "Proxies the latest release of the project's GitHub repository, cached for one hour. Returns null on any upstream failure so the in-app update check fails silently.\n",
+        "responses": {
+          "200": {
+            "description": "Latest release info, or null when unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "description": "Release tag name (e.g. v0.2.0)",
+                      "example": "v0.2.0"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "GitHub release page URL"
+                    },
+                    "publishedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "ISO 8601 publication timestamp"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "summary": "Get frontend configuration values",
+        "responses": {
+          "200": {
+            "description": "Configuration returned successfully"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "summary": "Get current API and solver settings",
+        "responses": {
+          "200": {
+            "description": "Settings returned successfully"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update solver and API settings",
+        "responses": {
+          "200": {
+            "description": "Settings updated successfully"
+          }
+        }
+      }
+    },
+    "/api/settings/astrometry-api-key": {
+      "delete": {
+        "summary": "Delete stored Astrometry API key",
+        "responses": {
+          "200": {
+            "description": "API key deleted successfully"
+          }
+        }
+      }
+    },
+    "/api/settings/probe-astap": {
+      "post": {
+        "summary": "Probe astap_cli binary (run without args, check exit code)",
+        "responses": {
+          "200": {
+            "description": "Probe result returned"
+          }
+        }
+      }
+    },
+    "/api/settings/probe-solve-field": {
+      "post": {
+        "summary": "Probe solve-field binary (run --version, check exit code)",
+        "responses": {
+          "200": {
+            "description": "Probe result returned"
+          }
+        }
+      }
+    },
+    "/api/settings/probe-data-dir": {
+      "post": {
+        "summary": "Probe astrometry index directory (list contents)",
+        "responses": {
+          "200": {
+            "description": "Probe result returned"
           }
         }
       }
