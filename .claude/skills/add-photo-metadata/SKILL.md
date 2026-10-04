@@ -103,7 +103,7 @@ in both `.run()` calls (same order as the SET clause).
 
 ---
 
-## Step 3 — `server/index.ts`
+## Step 3 — `server/routes/photos.ts`
 
 ### Upload route `POST /api/photos`
 
@@ -288,7 +288,7 @@ When the user uploads a `.wcs`, `.tiff`, or `.fit` WCS companion file:
 
    Extend the `WCSData` interface with the new optional field.
 
-2. `server/index.ts` — `POST /api/solve-wcs` spreads the field into the response:
+2. `server/routes/solved-import.ts` — `POST /api/solve-wcs` (and `POST /api/photos/convert`) spread the field into the response:
 
    ```typescript
    ...(wcs.myField ? { myField: wcs.myField } : {}),
@@ -321,7 +321,7 @@ job (via `server/astrometry.ts`). To add pre-fill support:
 1. After `reuseSubmission()` succeeds in `server/astrometry.ts`, fetch and
    parse the WCS FITS file with `extractWCS()` to get the new field.
 2. Return the field in the `PlateSolveResult` from `reuseSubmission()`.
-3. In `server/index.ts` at `POST /api/astrometry/reuse`, spread the field into
+3. In `server/routes/nova-solve.ts` at `POST /api/astrometry/reuse`, spread the field into
    `res.json()` the same way `solve-wcs` does.
 4. For the poll route (`GET /api/solve-plate/:id`), extend `AstrometrySolveStatus`
    in `src/types.ts` and populate it the same way.
@@ -346,7 +346,7 @@ If a future metadata field _is_ derivable from the astrometry.net WCS output
 Export is automatic: `getAllPhotos()` includes every column, and the export
 route writes the full `Photo` object to `manifest.json`.
 
-Import requires an explicit change: in the import route in `server/index.ts`,
+Import requires an explicit change: in the `POST /api/import` route in `server/routes/backup.ts`,
 find the `createPhotoWithId()` call and pass the value from the manifest:
 
 ```typescript
@@ -415,13 +415,13 @@ In `photo-overlay.ts` this is not needed — everything is in one big closure.
 
 - [ ] `src/types.ts` — `Photo` and `PlateSolveResult` updated
 - [ ] `server/db.ts` — migration, prepared statements, CRUD functions, `getAllPhotos()`
-- [ ] `server/index.ts` — upload route, PATCH route, import route, Swagger annotations
+- [ ] `server/routes/photos.ts` (upload and PATCH routes), `server/routes/backup.ts` (import route) — Swagger annotations next to each route
 - [ ] `src/api.ts` — `updatePhotoMetadata()` and `uploadPhoto()` param types
 - [ ] i18n — all four language files
 - [ ] `src/photo-overlay.ts` — state variable, UI field, `prefillWCSMeta`, upload calls (both paths)
 - [ ] `src/ui.ts` — `BatchItem` interface + init, `buildCard()`, card ref, WCS handler, `scheduleMetaSave`, upload call
 - [ ] `src/metadata-editor.ts` — state variable, UI field, save handler
-- [ ] WCS extraction — `server/wcs-reader.ts` `WCSData` + `extractWCS()`, `server/index.ts` response spread
+- [ ] WCS extraction — `server/wcs-reader.ts` `WCSData` + `extractWCS()`, `server/routes/solved-import.ts` response spread
 - [ ] Export automatic; Import needs explicit `createPhotoWithId()` argument
 - [ ] `npm run swagger:generate` run
 - [ ] `npm run build` — zero TypeScript errors

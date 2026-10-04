@@ -20,7 +20,7 @@ Two independent coordinate-system issues must be handled correctly:
 | `fitsYConvention=true`  | **bottom** of image | PixInsight/Siril FITS files; **ASTAP** (`server/astap.ts`) |
 | `fitsYConvention=false` | **top** of image    | solve-field, astrometry.net (JPEG/PNG input)               |
 
-**ASTAP** uses the **same pixel convention as the Siril/PixInsight metadata path**. This was verified empirically: solving `M97+M108.jpg` with ASTAP and reading the embedded WCS of the same image in `M97+M108.tiff` (Siril) gave the **same `CDELT2` sign and scale**. Since the metadata path passes `true` (`extractWCS` → `wcsToCorrespondences(..., true)` in `server/index.ts`) and places correctly, `server/astap.ts` passes `true` as well.
+**ASTAP** uses the **same pixel convention as the Siril/PixInsight metadata path**. This was verified empirically: solving `M97+M108.jpg` with ASTAP and reading the embedded WCS of the same image in `M97+M108.tiff` (Siril) gave the **same `CDELT2` sign and scale**. Since the metadata path passes `true` (`extractWCS` → `wcsToCorrespondences(..., true)` in `POST /api/solve-wcs`, `server/routes/solved-import.ts`) and places correctly, `server/astap.ts` passes `true` as well.
 
 **solve-field always writes its `.wcs` with Y=1 at the top row** when the input is a JPEG or PNG (the natural storage order of those formats). Therefore `server/solve-field.ts` passes `false` unconditionally:
 
@@ -55,7 +55,7 @@ Astrophoto JPEGs often carry an EXIF orientation tag (e.g., images from camera p
 
 solve-field reads the JPEG raw pixel data **without** applying EXIF rotation. Its WCS solution and the resulting `(photoX, photoY)` correspondences are in **raw pixel coordinates**.
 
-`rawToBrowserCoords` in `server/index.ts` bridges the gap, converting raw pixel coords to browser-display coords after solving.
+`rawToBrowserCoords` (`server/exif-utils.ts`, called from `server/routes/local-solve.ts`) bridges the gap, converting raw pixel coords to browser-display coords after solving.
 
 ### Orientation formulas
 
@@ -74,7 +74,7 @@ For raw image dimensions `rawW × rawH` (0-indexed):
 
 ### Where this correction is applied
 
-The correction is applied in two places in `server/index.ts`, once for ASTAP and once for solve-field, immediately after the solver returns:
+The correction is applied in two places in `server/routes/local-solve.ts`, once for ASTAP and once for solve-field, immediately after the solver returns:
 
 ```typescript
 if (result.success && result.correspondences && meta.orientation && meta.orientation !== 1) {

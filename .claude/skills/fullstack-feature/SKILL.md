@@ -2,7 +2,7 @@
 name: fullstack-feature
 description: >
   Guide for implementing a feature that adds or modifies both API routes
-  (server/index.ts) and frontend UI. Combines all frontend rules with backend
+  (server/routes/*.ts) and frontend UI. Combines all frontend rules with backend
   conventions: Swagger annotations on every route, backend error logging, and
   swagger regeneration.
   Trigger phrases: "fullstack feature", "new API route", "add endpoint",
@@ -12,7 +12,7 @@ description: >
 
 # Fullstack Feature Development
 
-This skill covers features that touch both `server/index.ts` (Express routes) and
+This skill covers features that touch both `server/routes/*.ts` (Express routers, one file per domain) and
 `src/` (frontend). For purely frontend changes, see `[[frontend-feature]]`.
 
 ---
@@ -46,7 +46,7 @@ Follow all steps from `[[frontend-feature]]` for any UI work. In brief:
 
 ## Part B — Backend: Swagger annotations
 
-Every new or modified route in `server/index.ts` **must** have a `@swagger` JSDoc block.
+Every new or modified route in `server/routes/*.ts` **must** have a `@swagger` JSDoc block.
 
 ### Required fields
 

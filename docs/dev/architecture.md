@@ -75,7 +75,31 @@
 
 Express 5 server with multiple modules:
 
-- **`index.ts`**: Main routes:
+- **`index.ts`**: The entry point. Loads `dotenv`, calls `createApp()` and listens on `PORT` (default 3001). It holds no route.
+- **`app.ts`**: Builds the Express app: helmet/CSP, compression, JSON body parsing, static serving of `dist/` and `/uploads`, the `/api` rate limiter, the mount block of the domain routers, then (inside the async `createApp()`) the dev-only Swagger UI, the SPA fallback and the global error handler. It does not listen.
+- **`server-paths.ts`**: Exports `SERVER_DIR`, `UPLOADS_DIR`, `RESOURCES_DIR`, `DIST_DIR` and `SWAGGER_JSON_PATH` (`UPLOADS_DIR`, `RESOURCES_DIR` and `DIST_DIR` are overridable by env var).
+- **`routes/`**: One Express router per domain, each exported as `<name>Router` and mounted without a prefix in `app.ts`. The `@swagger` comment of each route sits next to it.
+
+  | File                | Router                | Serves                                                                                                 |
+  | ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------ |
+  | `stars.ts`          | `starsRouter`         | `/api/stars/search`, `/api/stars/nearby`, `/api/stars/:hip` (server star catalog)                      |
+  | `identify.ts`       | `identifyRouter`      | `/api/skybot/conesearch`, `/api/tns/conesearch`, `/api/comets/elements` (object identification)        |
+  | `horizon.ts`        | `horizonRouter`       | `/api/horizon` (horizon profile lookup)                                                                |
+  | `settings.ts`       | `settingsRouter`      | `/api/version/latest`, `/api/config`, `/api/settings`, the `/api/settings/probe-*` solver/dir checks   |
+  | `gear.ts`           | `gearRouter`          | telescopes, cameras, accessories, filters, custom gear and gear setups                                 |
+  | `dso-overrides.ts`  | `dsoOverridesRouter`  | `/api/dso-overrides` CRUD                                                                              |
+  | `poi-categories.ts` | `poiCategoriesRouter` | `/api/poi-categories` CRUD                                                                             |
+  | `sky-regions.ts`    | `skyRegionsRouter`    | `/api/sky-regions` CRUD                                                                                |
+  | `plans.ts`          | `plansRouter`         | `/api/plans` and their entries and mosaics                                                             |
+  | `photos.ts`         | `photosRouter`        | `/api/photos` upload, list, order, delete, manual placement and metadata; `DELETE /api/photo-metadata` |
+  | `solved-import.ts`  | `solvedImportRouter`  | `POST /api/solve-wcs` (WCS from FITS/TIFF headers) and `POST /api/photos/convert` (TIFF/FITS to PNG)   |
+  | `local-solve.ts`    | `localSolveRouter`    | `/api/solve-astap` and `/api/solve-field` (local solvers: submit, poll, cancel)                        |
+  | `nova-solve.ts`     | `novaSolveRouter`     | `/api/solve-plate`, `/api/astrometry/submissions`, `/api/astrometry/reuse` (astrometry.net online)     |
+  | `backup.ts`         | `backupRouter`        | `POST /api/export`, `POST /api/import/preview`, `POST /api/import`                                     |
+
+  `routes/shared.ts` holds what several routers share (allowed file extensions, `sanitizeIntegrationRows`, `isElectron`, the in-memory rate limiter and its limits, the multer setup). `routes/mappers.ts` holds the DB-row to API-shape mappers and the plan sort keys.
+
+- **Notable routes** (details; the table above is the full map):
   - `POST /api/photos` — Upload; Sharp only bakes the EXIF orientation into the file (`.rotate()`, no resizing — the original resolution is kept); generate `{uuid}_thumb.jpg` (400 px, JPEG q75) via Sharp, scale correspondences proportionally, store in SQLite + disk; returns `thumbFilename` in response. Sharp errors on invalid/corrupt image files return **HTTP 400** with `{ code: 'INVALID_IMAGE' }` rather than 500.
   - `GET /api/photos` — List all photos with correspondences
   - `DELETE /api/photos/:id` — Delete photo file and its `_thumb.jpg` sibling
@@ -90,7 +114,6 @@ Express 5 server with multiple modules:
   - `DELETE /api/dso-overrides/:id` — Delete a single DSO override
   - `POST /api/export` — Build and stream a ZIP with configurable content (images + their `_thumb.jpg` siblings when present, photo metadata JSON, `dso-overrides.json`). The photo metadata manifest uses format `{ manifestVersion: 1, photos: [...] }` (see [Export manifest versioning](#export-manifest-versioning) below).
   - `POST /api/import` — Import a `.zip` or `.json` bundle; reads `thumbFilename` from manifest; regenerates any missing `_thumb.jpg` files with Sharp after import; respects `strategy` (skip/replace) and `skipDsoOverrides` flag. Accepts both the legacy bare array manifest and the new versioned manifest.
-  - Static file serving for uploads and SPA fallback
 
 #### Rate limiting
 
@@ -154,7 +177,7 @@ The app ships in two forms: a **web app** (`npm run dev` / Docker) and an **Elec
 | Area                        | Electron                                                                                                                                                                                      | Web (`npm run dev` / Docker)                                                                                                |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | **Geolocation**             | `window.electronAPI.getLocation()` → IPC → main process → `fetch('http://ip-api.com/json/')`. `navigator.geolocation` is not used (no Google Maps key / no real browser engine in Electron).  | `navigator.geolocation.getCurrentPosition()` — uses the browser's native geolocation.                                       |
-| **Rate limiting**           | Disabled (`isElectron` guard in `server/index.ts`). Single-user local app; limits would only hurt the user.                                                                                   | Active. Global limiter + stricter per-upload limiter.                                                                       |
+| **Rate limiting**           | Disabled (`isElectron` guard in `server/app.ts`, defined in `server/routes/shared.ts`). Single-user local app; limits would only hurt the user.                                               | Active. Global limiter + stricter per-upload limiter.                                                                       |
 | **Settings encryption key** | Auto-provisioned via `electron.safeStorage`: generated once, encrypted with the OS keychain, stored in `userData/settings-encryption-key.bin`. Available on every launch without user action. | Must be injected as `SETTINGS_ENCRYPTION_KEY` env var (Docker secret / `.env`). If absent, settings are stored unencrypted. |
 | **Data directories**        | `UPLOADS_DIR` and `DB_PATH` point to `app.getPath('userData')` (OS user-data folder). Data survives app updates because it lives outside the `.asar` archive.                                 | Defaults: `./uploads/` and `./data.db` relative to the process working directory (or overridden via env vars).              |
 | **Express port**            | `findFreePort(3001)` scans for the first free TCP port ≥ 3001. The `BrowserWindow` loads `http://localhost:{port}`. Port 3001 is not guaranteed.                                              | Fixed at `3001` (or `PORT` env var).                                                                                        |
@@ -168,14 +191,14 @@ The Electron entry point (`electron/main.ts`) runs as follows:
 2. `initSettingsEncryptionKey()` — provision or load the settings encryption key via `safeStorage`.
 3. `findFreePort(3001)` — find a free port and set `process.env.PORT`.
 4. Set data-directory env vars (`UPLOADS_DIR`, `DB_PATH`, `PUBLIC_DATA_DIR`, etc.) **if** `app.isPackaged`. In dev Electron (`npm start`), defaults are used, same as the web dev server.
-5. `await import('../server/index.js')` — dynamically import the Express server **after** env vars are set (static ESM imports would be hoisted before the env vars are ready).
+5. `await import('../server/index.js')` — dynamically import the Express server entry point (`index.ts`, which builds the app via `createApp()` in `app.ts` and listens) **after** env vars are set (static ESM imports would be hoisted before the env vars are ready).
 6. `waitForPort(port)` — poll until Express accepts connections.
 7. Open `BrowserWindow` and load `http://localhost:{port}`.
 
 ### Dependency note: mixed ESM/CJS interop
 
 `archiver` is on v8 (`^8.0.0`), which is ESM-only and exposes its zip writer as a named
-class rather than a callable factory: `server/index.ts` does
+class rather than a callable factory: `server/routes/backup.ts` does
 `import { ZipArchive } from 'archiver'` and `new ZipArchive({ zlib: { level: 1 } })`.
 
 `unzipper` (used for import) is still CommonJS-only, so it can't be `import`ed directly
@@ -222,7 +245,7 @@ The selection is:
 
 ### Server-side thumbnail generation
 
-On every upload, `server/index.ts` runs Sharp twice: once to apply the EXIF rotation to the original (full resolution, no resizing; stored as `{uuid}{ext}`) and once to produce `{uuid}_thumb.jpg` (width 400 px, JPEG quality 75). The thumbnail filename is stored in `photos.thumb_filename` and returned in `GET /api/photos` so every frontend module can use the server thumb without regenerating it client-side.
+On every upload, `POST /api/photos` in `server/routes/photos.ts` runs Sharp twice: once to apply the EXIF rotation to the original (full resolution, no resizing; stored as `{uuid}{ext}`) and once to produce `{uuid}_thumb.jpg` (width 400 px, JPEG quality 75). The thumbnail filename is stored in `photos.thumb_filename` and returned in `GET /api/photos` so every frontend module can use the server thumb without regenerating it client-side.
 
 **Export/import:** The export ZIP includes `_thumb.jpg` files alongside their full-res counterparts. The import route reads `thumbFilename` from the bundle manifest and, after inserting photos, regenerates any missing thumbnails with Sharp so the LOD system works immediately after import.
 

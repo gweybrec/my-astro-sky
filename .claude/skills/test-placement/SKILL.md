@@ -23,7 +23,7 @@ This skill covers browser-based manual verification only. It does not modify sou
 
 All astro photos live in `astro-photos/` (relative to the repository root). If the user names a specific file, use that. Otherwise list the folder and pick one that isn't already in the photo list on the map.
 
-**Only `.jpg` / `.jpeg` / `.png` files can be added as photos.** `.fit`, `.fits`, `.tif`, and `.tiff` files are raw/calibration files used only as WCS metadata companions (via the "Metadata (FITS/TIFF)…" button inside the modal) — never pass them to the file chooser when adding a photo.
+**The file chooser accepts `.jpg` / `.jpeg` / `.png` / `.webp` and also raw `.fit` / `.fits` / `.tif` / `.tiff` files** (`PHOTO_PICKER_ACCEPT` in `packages/core/src/photo-formats.ts`). A raw file is converted server-side to a PNG by `POST /api/photos/convert`, which also returns any WCS found in its header, so a plate-solved FITS/TIFF can be placed without running a solver. The "Metadata (FITS/TIFF)…" button inside the modal is still available to attach a raw file as a WCS companion to a JPEG/PNG. Prefer a JPEG/PNG from `astro-photos/` unless the user names a raw file.
 
 ## Step 0 — Make sure the app is running
 
