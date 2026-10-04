@@ -1,4 +1,5 @@
 import type DatabaseConstructor from 'better-sqlite3';
+import { MIGRATIONS, type DataMigration } from '@myastrosky/core/db/schema';
 
 type Database = DatabaseConstructor.Database;
 
@@ -361,6 +362,28 @@ export function applyMigrations(database: Database): number {
       setVersion.run(migration.version);
       current = migration.version;
     }
+  }
+  return applyDataMigrations(database, MIGRATIONS, current);
+}
+
+/**
+ * Run the SQL-only migrations (version 15 and above, defined in core's `schema.ts`) above
+ * `fromVersion`. Each migration's statements and the version update share one transaction.
+ * Returns the final version.
+ */
+export function applyDataMigrations(
+  database: Database,
+  migrations: readonly DataMigration[],
+  fromVersion: number,
+): number {
+  let current = fromVersion;
+  for (const migration of migrations) {
+    if (migration.version <= current) continue;
+    database.transaction(() => {
+      for (const sql of migration.statements) database.exec(sql);
+      database.prepare('UPDATE schema_version SET version = ?').run(migration.version);
+    })();
+    current = migration.version;
   }
   return current;
 }

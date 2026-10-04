@@ -66,15 +66,16 @@ astrometry.net polling route will return the value (see Step 8).
 
 ### Migration (add column to existing databases)
 
+Do not edit `server/db-migrations.ts` (migrations 1 to 14 are frozen). Add a migration in
+`packages/core/src/db/schema.ts`: a `{ version: <next>, statements: [...] }` entry in
+`MIGRATIONS`, for example:
+
 ```typescript
-try {
-  db.exec('ALTER TABLE photos ADD COLUMN my_field TEXT');
-} catch {
-  /* column exists */
-}
+{ version: 15, statements: ['ALTER TABLE photos ADD COLUMN my_field TEXT'] },
 ```
 
-Add this block after the existing migration block (around line 87).
+In the same commit, add the column (at the end of the table, as `ALTER TABLE` does) to
+`BASELINE_SCHEMA` and bump `SCHEMA_VERSION`; `tests/unit/schema-baseline.test.ts` fails otherwise.
 
 ### `insertPhoto` prepared statement
 
@@ -414,7 +415,7 @@ In `photo-overlay.ts` this is not needed — everything is in one big closure.
 ## Checklist
 
 - [ ] `src/types.ts` — `Photo` and `PlateSolveResult` updated
-- [ ] `server/db.ts` — migration, prepared statements, CRUD functions, `getAllPhotos()`
+- [ ] `packages/core/src/db/schema.ts` — migration + `BASELINE_SCHEMA` + `SCHEMA_VERSION`; `server/db.ts` — prepared statements, CRUD functions, `getAllPhotos()`
 - [ ] `server/routes/photos.ts` (upload and PATCH routes), `server/routes/backup.ts` (import route) — Swagger annotations next to each route
 - [ ] `src/api.ts` — `updatePhotoMetadata()` and `uploadPhoto()` param types
 - [ ] i18n — all four language files

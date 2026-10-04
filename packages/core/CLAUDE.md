@@ -17,3 +17,5 @@ browser, a worker, Node/Electron and Capacitor. Consumers import `@myastrosky/co
 - `export *` does not re-export `default`: a shim for a module with `export default` also needs
   `export { default } from '@myastrosky/core/<module>';`.
 - Type-check with `npm run typecheck:core`.
+- **Schema changes:** new migrations (version 15 and above) are SQL statements added to `MIGRATIONS` in `src/db/schema.ts`.
+  Update `BASELINE_SCHEMA` and `SCHEMA_VERSION` in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise.

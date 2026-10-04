@@ -109,6 +109,9 @@ The schema already avoids `RETURNING`, `json_*` and `STRICT`. The mobile adapter
 - keep WAL on the server only;
 - run migrations through our own runner, from a merged v0 baseline.
 
+The schema is defined once in `packages/core/src/db/schema.ts` (`BASELINE_SCHEMA` at `SCHEMA_VERSION`, plus `MIGRATIONS` from version 15 and `initSchema`); migrations 1 to 14 stay frozen in `server/db-migrations.ts`.
+New migrations (version 15 and above) are SQL statements added to `MIGRATIONS`, and `BASELINE_SCHEMA` and `SCHEMA_VERSION` are updated in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise.
+
 On mobile, write as read-then-`batch()`: each bridge round-trip costs 1–5 ms.
 
 ### Transaction safety rule during the transition
