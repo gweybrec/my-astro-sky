@@ -41,6 +41,8 @@ One line per decision, with the date. Cards and design rounds must follow these.
 | 2026-10-04 | Descriptions              | The phone prints an explanatory line only if the desktop prints that text visibly. A line that restates a label or is obvious is removed; a desktop tooltip with real information goes behind an "i" button; no sentence is invented. The user: "if the texts were not there in the desktop app, what makes you think they are needed on mobile? They're not." |
 | 2026-10-04 | Import, image files       | An import writes an image file only for a photo it imports. If no photo is imported, no file is written (card WP2.5b).                                                                                                                                                                                                                                         |
 | 2026-10-04 | Import, a plan's setup    | Importing a plan brings its setup when the setup is not on the machine. When a corresponding local setup has different content (name, telescope, camera, accessory), the user chooses: replace, keep both, or do not import. Comparing names is not enough (card WP2.5a).                                                                                      |
+| 2026-10-04 | Descriptions kept         | Kept by the user after seeing them framed in a picture: the reason under the greyed-out "Supprimer le setup"; the file formats under "Choisir des fichiers", now "JPEG, PNG, TIF, TIFF, FIT, FITS, XISF"; the finger hints on the map modes; the descriptions of the rarely opened "Comment placer cette photo" menu.                                          |
+| 2026-10-04 | Import window (desktop)   | When an imported setup differs from a local one, the import window shows three round option buttons under the setup (Remplacer, Garder les deux, Ne pas importer), a warning icon until one is chosen, and no added sentence. Commits 9f19407 and 7de6990.                                                                                                     |
 
 ## Touch decisions for the mobile app (2026-10-03)
 
@@ -65,7 +67,7 @@ Keyboard-only actions: every mode gets visible Cancel and Done buttons; label ch
 
 ## Design rounds
 
-| Round | State                                                                                                             | Where                                             |
-| ----- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| D0    | approved 2026-10-03                                                                                               | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS |
-| D1    | 43 screens published 2026-10-04 (revision 10: two or three stars); revision 11 (descriptions removed) in progress | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 |
+| Round | State                                                                                                                                             | Where                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| D0    | approved 2026-10-03                                                                                                                               | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS |
+| D1    | 43 screens published 2026-10-04, through revision 11 (descriptions removed) and the format list change; waiting for the user to approve the round | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 |
