@@ -93,11 +93,7 @@ import {
   type PlanEntryRow,
   type PlanMosaicRow,
   type MosaicTileInput,
-  horizonCacheKey,
-  getCachedHorizon,
-  setCachedHorizon,
 } from './db.js';
-import { computeHorizon } from './horizon.js';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 // unzipper is CommonJS-only and has no ESM export, so it can't be `import`ed under
@@ -130,13 +126,12 @@ import {
 import { solveWithASTAP } from './astap.js';
 import { solveWithSolveField } from './solve-field.js';
 import { createJob, getJob, updateJob, cancelJob } from './solve-queue.js';
-import { searchDeepStars, getDeepStarByHip, searchStarsByPosition } from './star-search.js';
-import { skybotConesearch } from './skybot.js';
-import { tnsConesearch, TnsRateLimitError } from './tns.js';
-import { fetchCometElements } from './comets.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
 import { logServerError } from './logger.js';
+import { starsRouter } from './routes/stars.js';
+import { identifyRouter } from './routes/identify.js';
+import { horizonRouter } from './routes/horizon.js';
 import { probeAstap, probeSolveField, probeDataDir } from './probe-utils.js';
 import { parseLatestRelease, type LatestRelease } from './github-release.js';
 
@@ -268,6 +263,9 @@ app.use('/api', (req, res, next) => {
 });
 
 // Domain routers (one file per domain under server/routes/), mounted without a prefix.
+app.use(starsRouter);
+app.use(identifyRouter);
+app.use(horizonRouter);
 
 /**
  * @swagger
@@ -743,71 +741,6 @@ app.delete('/api/settings/astrometry-api-key', (_req, res) => {
   deleteSetting('ASTROMETRY_API_KEY');
   resetAstrometrySession();
   res.json({ ok: true });
-});
-
-/**
- * @swagger
- * /api/horizon:
- *   get:
- *     summary: Compute (or return cached) terrain horizon profile for a location
- *     description: >
- *       Ray-traces open DEM elevation tiles around the given latitude/longitude to
- *       produce the observer's real skyline — horizon altitude (degrees) sampled once
- *       per degree of azimuth (0 = North, clockwise). Also returns a best-effort
- *       `summits` array of named peaks (from OpenStreetMap) sitting on that skyline.
- *       Cached by rounded location.
- *     parameters:
- *       - in: query
- *         name: lat
- *         required: true
- *         schema: { type: number }
- *       - in: query
- *         name: lon
- *         required: true
- *         schema: { type: number }
- *       - in: query
- *         name: radiusKm
- *         schema: { type: number, default: 40 }
- *       - in: query
- *         name: obsHeightM
- *         description: Eye height above local ground in metres (default 1.7).
- *         schema: { type: number }
- *     responses:
- *       200:
- *         description: Horizon profile returned
- *       400:
- *         description: Invalid or missing lat/lon
- *       502:
- *         description: Failed to fetch or process elevation data
- */
-app.get('/api/horizon', async (req, res) => {
-  const lat = Number(req.query.lat);
-  const lon = Number(req.query.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90) {
-    res.status(400).json({ error: 'Invalid or missing lat/lon' });
-    return;
-  }
-  const radiusKm = Number.isFinite(Number(req.query.radiusKm)) ? Number(req.query.radiusKm) : 40;
-  const obsHeightM =
-    req.query.obsHeightM !== undefined && Number.isFinite(Number(req.query.obsHeightM))
-      ? Number(req.query.obsHeightM)
-      : null;
-
-  const key = horizonCacheKey(lat, lon, radiusKm, obsHeightM);
-  const cached = getCachedHorizon(key);
-  if (cached) {
-    res.json(cached);
-    return;
-  }
-
-  try {
-    const profile = await computeHorizon(lat, lon, { radiusKm, obsHeightM });
-    setCachedHorizon(key, profile);
-    res.json(profile);
-  } catch (err) {
-    logServerError('horizon_compute_failed', err);
-    res.status(502).json({ error: 'Failed to compute horizon from elevation data' });
-  }
 });
 
 const execFileAsync = promisify(execFile);
@@ -5246,305 +5179,6 @@ app.post('/api/astrometry/reuse', upload.single('photo'), async (req, res) => {
     }
   } catch (err: any) {
     console.error('Reuse submission error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * @swagger
- * /api/skybot/conesearch:
- *   post:
- *     summary: Cone-search IMCCE SkyBoT for known asteroids near a sky position and epoch
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               raDeg:
- *                 type: number
- *               decDeg:
- *                 type: number
- *               radiusArcmin:
- *                 type: number
- *               epochJd:
- *                 type: number
- *     responses:
- *       200:
- *         description: Candidate asteroids returned successfully
- *       400:
- *         description: Invalid search parameters
- *       502:
- *         description: SkyBoT upstream request failed
- */
-// --- SkyBoT asteroid cone search (used by the asteroid-identification modal) ---
-app.post('/api/skybot/conesearch', async (req, res) => {
-  const lang: ServerLang = req.body.lang === 'fr' ? 'fr' : 'en';
-  try {
-    const raDeg = Number(req.body.raDeg);
-    const decDeg = Number(req.body.decDeg);
-    const radiusArcmin = Number(req.body.radiusArcmin);
-    const epochJd = Number(req.body.epochJd);
-
-    if (
-      !Number.isFinite(raDeg) ||
-      raDeg < 0 ||
-      raDeg > 360 ||
-      !Number.isFinite(decDeg) ||
-      decDeg < -90 ||
-      decDeg > 90 ||
-      !Number.isFinite(radiusArcmin) ||
-      radiusArcmin <= 0 ||
-      radiusArcmin > 60 ||
-      !Number.isFinite(epochJd) ||
-      epochJd <= 0
-    ) {
-      res.status(400).json({ error: msg.api.invalidSkybotParams(lang), code: 'INVALID_PARAMS' });
-      return;
-    }
-
-    const candidates = await skybotConesearch({ raDeg, decDeg, radiusArcmin, epochJd });
-    res.json({ candidates });
-  } catch (err) {
-    logServerError('skybot_conesearch_failed', err);
-    res.status(502).json({ error: msg.api.skybotError(lang, (err as Error).message) });
-  }
-});
-
-/**
- * @swagger
- * /api/tns/conesearch:
- *   post:
- *     summary: Cone-search the IAU Transient Name Server for supernovae discovered in a date window
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               raDeg:
- *                 type: number
- *               decDeg:
- *                 type: number
- *               radiusArcmin:
- *                 type: number
- *               dateStart:
- *                 type: string
- *                 description: Earliest discovery date (YYYY-MM-DD)
- *               dateEnd:
- *                 type: string
- *                 description: Latest discovery date (YYYY-MM-DD)
- *     responses:
- *       200:
- *         description: Candidate transients returned successfully
- *       400:
- *         description: Invalid search parameters
- *       429:
- *         description: TNS rate limit reached (anonymous cone search allows ~2 queries per minute)
- *       502:
- *         description: TNS upstream request failed
- */
-// --- TNS supernova cone search (used by the supernova-identification modal) ---
-app.post('/api/tns/conesearch', async (req, res) => {
-  const lang: ServerLang = req.body.lang === 'fr' ? 'fr' : 'en';
-  try {
-    const raDeg = Number(req.body.raDeg);
-    const decDeg = Number(req.body.decDeg);
-    const radiusArcmin = Number(req.body.radiusArcmin);
-    const dateStart = String(req.body.dateStart ?? '');
-    const dateEnd = String(req.body.dateEnd ?? '');
-    const isDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
-
-    if (
-      !Number.isFinite(raDeg) ||
-      raDeg < 0 ||
-      raDeg > 360 ||
-      !Number.isFinite(decDeg) ||
-      decDeg < -90 ||
-      decDeg > 90 ||
-      !Number.isFinite(radiusArcmin) ||
-      radiusArcmin <= 0 ||
-      radiusArcmin > 60 ||
-      !isDay(dateStart) ||
-      !isDay(dateEnd) ||
-      dateStart > dateEnd
-    ) {
-      res.status(400).json({ error: msg.api.invalidTnsParams(lang), code: 'INVALID_PARAMS' });
-      return;
-    }
-
-    const candidates = await tnsConesearch({ raDeg, decDeg, radiusArcmin, dateStart, dateEnd });
-    res.json({ candidates });
-  } catch (err) {
-    if (err instanceof TnsRateLimitError) {
-      res.status(429).json({
-        error: msg.api.tnsRateLimited(lang, err.retryAfterSeconds),
-        code: 'RATE_LIMITED',
-      });
-      return;
-    }
-    logServerError('tns_conesearch_failed', err);
-    res.status(502).json({ error: msg.api.tnsError(lang, (err as Error).message) });
-  }
-});
-
-/**
- * @swagger
- * /api/comets/elements:
- *   get:
- *     summary: Current comet orbital elements from the Minor Planet Center
- *     description: Cached for 24 h server-side. The client propagates them to a photo's observation date to identify comets in its field.
- *     parameters:
- *       - in: query
- *         name: lang
- *         required: false
- *         schema:
- *           type: string
- *           enum: [fr, en]
- *         description: Language of the error message
- *     responses:
- *       200:
- *         description: Comet elements returned successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 comets:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       designation:
- *                         type: string
- *                         example: C/2025 R2
- *                       name:
- *                         type: string
- *                         example: C/2025 R2 (SWAN)
- *                       tpJd:
- *                         type: number
- *                         description: Perihelion time (Julian Date, TT)
- *                       q:
- *                         type: number
- *                         description: Perihelion distance (AU)
- *                       e:
- *                         type: number
- *                         description: Eccentricity
- *                       peri:
- *                         type: number
- *                         description: Argument of perihelion (deg, J2000 ecliptic)
- *                       node:
- *                         type: number
- *                         description: Longitude of the ascending node (deg, J2000 ecliptic)
- *                       incl:
- *                         type: number
- *                         description: Inclination (deg, J2000 ecliptic)
- *                       h:
- *                         type: number
- *                         nullable: true
- *                         description: Absolute total magnitude (M1)
- *                       k:
- *                         type: number
- *                         nullable: true
- *                         description: Magnitude slope parameter (K1)
- *       502:
- *         description: The MPC could not be reached and nothing is cached
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- */
-// --- MPC comet elements (used by the comet-identification modal) ---
-app.get('/api/comets/elements', async (req, res) => {
-  const lang: ServerLang = req.query.lang === 'fr' ? 'fr' : 'en';
-  try {
-    const comets = await fetchCometElements();
-    res.json({ comets });
-  } catch (err) {
-    logServerError('comet_elements_failed', err);
-    res.status(502).json({ error: msg.api.cometElementsError(lang, (err as Error).message) });
-  }
-});
-
-/**
- * @swagger
- * /api/stars/search:
- *   get:
- *     summary: Search stars by name or catalog identifier
- *     responses:
- *       200:
- *         description: Star search results returned successfully
- */
-// --- Star search API ---
-app.get('/api/stars/search', (req, res) => {
-  try {
-    const q = String(req.query.q || '');
-    const limit = Math.min(Math.max(1, parseInt(String(req.query.limit || '10'), 10) || 10), 50);
-    const results = searchDeepStars(q, limit);
-    res.json(results);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * @swagger
- * /api/stars/nearby:
- *   get:
- *     summary: Search stars near a given position
- *     responses:
- *       200:
- *         description: Nearby stars returned successfully
- */
-app.get('/api/stars/nearby', (req, res) => {
-  try {
-    const ra = parseFloat(String(req.query.ra || '0'));
-    const dec = parseFloat(String(req.query.dec || '0'));
-    const radius = parseFloat(String(req.query.radius || '5'));
-    const magLimit = parseFloat(String(req.query.magLimit || '10'));
-    const limit = Math.min(Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20), 100);
-
-    const results = searchStarsByPosition(ra, dec, radius, magLimit, limit);
-    res.json(results);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * @swagger
- * /api/stars/{hip}:
- *   get:
- *     summary: Get deep star details by HIP identifier
- *     parameters:
- *       - in: path
- *         name: hip
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Star details returned successfully
- */
-app.get('/api/stars/:hip', (req, res) => {
-  try {
-    const hip = parseInt(req.params.hip, 10);
-    if (isNaN(hip)) {
-      res.status(400).json({ error: 'HIP invalide', code: 'INVALID_HIP' });
-      return;
-    }
-    const star = getDeepStarByHip(hip);
-    if (!star) {
-      res.status(404).json({ error: 'Étoile introuvable', code: 'STAR_NOT_FOUND' });
-      return;
-    }
-    res.json(star);
-  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
