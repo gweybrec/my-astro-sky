@@ -8,6 +8,8 @@ import {
   idsToReplaceByName,
 } from '../../server/import-utils';
 import type { ZipEntry, ZipInspectResult } from '../../server/import-utils';
+import { createGearService } from '@myastrosky/core/services/gear';
+import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -944,50 +946,70 @@ describe('Name-based override on import (replace, else add)', () => {
     expect(names).toEqual(['Summer', 'Winter']);
   });
 
+  // The gear service on the same in-memory database as the legacy `db` module.
+  const gearOn = async (db: typeof import('../../server/db.js')) =>
+    createGearService({
+      db: createBetterSqliteDb(db.getConnection()),
+      newId: () => 'unused',
+      catalog: { telescopes: [], cameras: [], accessories: [], filters: [] },
+    });
+
   it('gear setup with a colliding name replaces the existing one', async () => {
     const db = await import('../../server/db.js');
-    db.upsertGearSetup({
-      id: 'local-id',
-      name: 'Main rig',
-      telescope_id: 't1',
-      camera_id: 'c1',
-      accessory_id: null,
-      enabled: 1,
-    });
+    const gear = await gearOn(db);
+    await gear.importSetup(
+      {
+        id: 'local-id',
+        name: 'Main rig',
+        telescopeId: 't1',
+        cameraId: 'c1',
+        accessoryId: null,
+        enabled: true,
+      },
+      [],
+    );
 
     const importedName = 'Main rig';
-    idsToReplaceByName(db.getAllGearSetups(), importedName).forEach(db.deleteGearSetup);
-    db.upsertGearSetup({
-      id: 'bundle-id',
-      name: importedName,
-      telescope_id: 't2',
-      camera_id: 'c2',
-      accessory_id: null,
-      enabled: 1,
-    });
+    await gear.importSetup(
+      {
+        id: 'bundle-id',
+        name: importedName,
+        telescopeId: 't2',
+        cameraId: 'c2',
+        accessoryId: null,
+        enabled: true,
+      },
+      idsToReplaceByName(await gear.listSetups(), importedName),
+    );
 
-    const setups = db.getAllGearSetups();
+    const setups = await gear.listSetups();
     expect(setups).toHaveLength(1);
     expect(setups[0].id).toBe('bundle-id');
-    expect(setups[0].telescope_id).toBe('t2');
+    expect(setups[0].telescopeId).toBe('t2');
   });
 
   it('custom gear collision is scoped to the same type', async () => {
     const db = await import('../../server/db.js');
+    const gear = await gearOn(db);
     // A telescope and an accessory may share a name without colliding.
-    db.upsertCustomGear('scope-local', 'telescope', { id: 'scope-local', name: 'Vega' });
-    db.upsertCustomGear('acc-1', 'accessory', { id: 'acc-1', name: 'Vega' });
+    await gear.importCustom(
+      { id: 'scope-local', type: 'telescope', data: { id: 'scope-local', name: 'Vega' } },
+      [],
+    );
+    await gear.importCustom(
+      { id: 'acc-1', type: 'accessory', data: { id: 'acc-1', name: 'Vega' } },
+      [],
+    );
 
     // Import a telescope also named "Vega" → replaces only the telescope.
     const importedName = 'Vega';
-    const sameType = db
-      .getAllCustomGear()
-      .filter((r) => r.type === 'telescope')
-      .map((r) => ({ id: r.id, name: JSON.parse(r.data).name as string }));
-    idsToReplaceByName(sameType, importedName).forEach(db.deleteCustomGear);
-    db.upsertCustomGear('scope-bundle', 'telescope', { id: 'scope-bundle', name: importedName });
+    const sameType = (await gear.listCustomNames()).filter((r) => r.type === 'telescope');
+    await gear.importCustom(
+      { id: 'scope-bundle', type: 'telescope', data: { id: 'scope-bundle', name: importedName } },
+      idsToReplaceByName(sameType, importedName),
+    );
 
-    const all = db.getAllCustomGear();
+    const all = await gear.listCustomNames();
     const scopes = all.filter((r) => r.type === 'telescope');
     const accessories = all.filter((r) => r.type === 'accessory');
     expect(scopes).toHaveLength(1);

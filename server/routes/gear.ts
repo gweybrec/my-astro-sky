@@ -1,40 +1,11 @@
-import fs from 'fs';
-import path from 'path';
 import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { RESOURCES_DIR } from '../server-paths.js';
-import {
-  getAllCustomGear,
-  upsertCustomGear as upsertCustomGearDB,
-  deleteCustomGear as deleteCustomGearDB,
-  deleteAllCustomGear as deleteAllCustomGearDB,
-  getAllGearSetups,
-  upsertGearSetup,
-  updateGearSetupEnabled,
-  deleteGearSetup,
-  deleteAllGearSetups,
-} from '../db.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import { gear } from '../services.js';
+import { sendError } from './http-errors.js';
 
 export const gearRouter = express.Router();
 
 // ─── Gear catalogs ────────────────────────────────────────────────────────────
-
-// Built-in gear catalogs — loaded once at startup
-const builtInTelescopes: object[] = JSON.parse(
-  fs.readFileSync(path.join(RESOURCES_DIR, 'telescopes.json'), 'utf-8'),
-);
-const builtInCameras: object[] = JSON.parse(
-  fs.readFileSync(path.join(RESOURCES_DIR, 'cameras.json'), 'utf-8'),
-);
-const builtInAccessories: object[] = JSON.parse(
-  fs.readFileSync(path.join(RESOURCES_DIR, 'accessories.json'), 'utf-8'),
-);
-const builtInFilters: object[] = JSON.parse(
-  fs.readFileSync(path.join(RESOURCES_DIR, 'filters.json'), 'utf-8'),
-);
-
-const byBrandModel = (a: any, b: any) =>
-  `${a.brand ?? ''} ${a.model ?? ''}`.localeCompare(`${b.brand ?? ''} ${b.model ?? ''}`);
 
 /**
  * @swagger
@@ -54,14 +25,11 @@ const byBrandModel = (a: any, b: any) =>
  *       500:
  *         description: Server error
  */
-gearRouter.get('/api/telescopes', (_req, res) => {
+gearRouter.get('/api/telescopes', async (_req, res) => {
   try {
-    const custom = getAllCustomGear()
-      .filter((g) => g.type === 'telescope')
-      .map((g) => JSON.parse(g.data));
-    res.json([...builtInTelescopes, ...custom].sort(byBrandModel));
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await gear.listCatalog('telescope'));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -83,14 +51,11 @@ gearRouter.get('/api/telescopes', (_req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.get('/api/cameras', (_req, res) => {
+gearRouter.get('/api/cameras', async (_req, res) => {
   try {
-    const custom = getAllCustomGear()
-      .filter((g) => g.type === 'camera')
-      .map((g) => JSON.parse(g.data));
-    res.json([...builtInCameras, ...custom].sort(byBrandModel));
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await gear.listCatalog('camera'));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -112,14 +77,11 @@ gearRouter.get('/api/cameras', (_req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.get('/api/accessories', (_req, res) => {
+gearRouter.get('/api/accessories', async (_req, res) => {
   try {
-    const custom = getAllCustomGear()
-      .filter((g) => g.type === 'accessory')
-      .map((g) => JSON.parse(g.data));
-    res.json([...builtInAccessories, ...custom].sort(byBrandModel));
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await gear.listCatalog('accessory'));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -141,14 +103,11 @@ gearRouter.get('/api/accessories', (_req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.get('/api/filters', (_req, res) => {
+gearRouter.get('/api/filters', async (_req, res) => {
   try {
-    const custom = getAllCustomGear()
-      .filter((g) => g.type === 'filter')
-      .map((g) => JSON.parse(g.data));
-    res.json([...builtInFilters, ...custom].sort(byBrandModel));
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await gear.listCatalog('filter'));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -198,27 +157,12 @@ gearRouter.get('/api/filters', (_req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.post('/api/custom-gear', (req, res) => {
+gearRouter.post('/api/custom-gear', async (req, res) => {
   try {
     const { type, data } = req.body as { type?: string; data?: object };
-    if (!type || !['telescope', 'camera', 'accessory', 'filter'].includes(type)) {
-      res
-        .status(400)
-        .json({ error: 'Invalid type — must be telescope, camera, accessory, or filter' });
-      return;
-    }
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      res.status(400).json({ error: 'Invalid data — must be a non-null object' });
-      return;
-    }
-    const id = `custom-${uuidv4()}`;
-    upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory' | 'filter', {
-      ...data,
-      id,
-    });
-    res.json({ id });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await gear.addCustom(type, data));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -253,21 +197,12 @@ gearRouter.post('/api/custom-gear', (req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.delete('/api/custom-gear/:id', (req, res) => {
+gearRouter.delete('/api/custom-gear/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!id.startsWith('custom-')) {
-      res.status(400).json({ error: 'Only custom gear items can be deleted' });
-      return;
-    }
-    const deleted = deleteCustomGearDB(id);
-    if (!deleted) {
-      res.status(404).json({ error: 'Not found' });
-      return;
-    }
+    await gear.removeCustom(req.params.id);
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -293,13 +228,13 @@ gearRouter.delete('/api/custom-gear/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.delete('/api/custom-gear', (_req, res) => {
+gearRouter.delete('/api/custom-gear', async (_req, res) => {
   try {
-    const deleted = deleteAllCustomGearDB();
+    const deleted = await gear.removeAllCustom();
     res.json({ ok: true, deleted });
-  } catch (err: any) {
-    console.error('[DeleteAll] Custom gear delete failed', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[DeleteAll] Custom gear delete failed', err);
+    sendError(res, err);
   }
 });
 
@@ -329,22 +264,12 @@ gearRouter.delete('/api/custom-gear', (_req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.get('/api/gear-setups', (_req, res) => {
+gearRouter.get('/api/gear-setups', async (_req, res) => {
   try {
-    const rows = getAllGearSetups();
-    res.json(
-      rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        telescopeId: r.telescope_id,
-        cameraId: r.camera_id,
-        accessoryId: r.accessory_id ?? null,
-        enabled: r.enabled === 1,
-      })),
-    );
-  } catch (err: any) {
-    console.error('[GearSetups] Failed to list setups', err);
-    res.status(500).json({ error: err.message });
+    res.json(await gear.listSetups());
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[GearSetups] Failed to list setups', err);
+    sendError(res, err);
   }
 });
 
@@ -395,34 +320,12 @@ gearRouter.get('/api/gear-setups', (_req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.post('/api/gear-setups', (req, res) => {
+gearRouter.post('/api/gear-setups', async (req, res) => {
   try {
-    const { name, telescopeId, cameraId, accessoryId, enabled } = req.body as any;
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'name is required', code: 'MISSING_NAME' });
-      return;
-    }
-    if (!telescopeId || typeof telescopeId !== 'string') {
-      res.status(400).json({ error: 'telescopeId is required', code: 'MISSING_TELESCOPE' });
-      return;
-    }
-    if (!cameraId || typeof cameraId !== 'string') {
-      res.status(400).json({ error: 'cameraId is required', code: 'MISSING_CAMERA' });
-      return;
-    }
-    const id = `setup-${uuidv4()}`;
-    upsertGearSetup({
-      id,
-      name: name.trim(),
-      telescope_id: telescopeId,
-      camera_id: cameraId,
-      accessory_id: accessoryId ?? null,
-      enabled: enabled !== false ? 1 : 0,
-    });
-    res.json({ id });
-  } catch (err: any) {
-    console.error('[GearSetups] Failed to create setup', err);
-    res.status(500).json({ error: err.message });
+    res.json(await gear.createSetup(req.body));
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[GearSetups] Failed to create setup', err);
+    sendError(res, err);
   }
 });
 
@@ -470,32 +373,13 @@ gearRouter.post('/api/gear-setups', (req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.put('/api/gear-setups/:id', (req, res) => {
+gearRouter.put('/api/gear-setups/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, telescopeId, cameraId, accessoryId, enabled } = req.body as any;
-    if (
-      !name ||
-      typeof name !== 'string' ||
-      name.trim().length === 0 ||
-      !telescopeId ||
-      !cameraId
-    ) {
-      res.status(400).json({ error: 'name, telescopeId, and cameraId are required' });
-      return;
-    }
-    upsertGearSetup({
-      id,
-      name: name.trim(),
-      telescope_id: telescopeId,
-      camera_id: cameraId,
-      accessory_id: accessoryId ?? null,
-      enabled: enabled !== false ? 1 : 0,
-    });
+    await gear.replaceSetup(req.params.id, req.body);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[GearSetups] Failed to update setup', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[GearSetups] Failed to update setup', err);
+    sendError(res, err);
   }
 });
 
@@ -547,23 +431,14 @@ gearRouter.put('/api/gear-setups/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.patch('/api/gear-setups/:id/enabled', (req, res) => {
+gearRouter.patch('/api/gear-setups/:id/enabled', async (req, res) => {
   try {
-    const { id } = req.params;
     const { enabled } = req.body as any;
-    if (typeof enabled !== 'boolean') {
-      res.status(400).json({ error: 'enabled must be boolean' });
-      return;
-    }
-    const ok = updateGearSetupEnabled(id, enabled);
-    if (!ok) {
-      res.status(404).json({ error: 'Setup not found' });
-      return;
-    }
+    await gear.setSetupEnabled(req.params.id, enabled);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[GearSetups] Failed to update enabled state', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[GearSetups] Failed to update enabled state', err);
+    sendError(res, err);
   }
 });
 
@@ -598,18 +473,13 @@ gearRouter.patch('/api/gear-setups/:id/enabled', (req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.delete('/api/gear-setups/:id', (req, res) => {
+gearRouter.delete('/api/gear-setups/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const ok = deleteGearSetup(id);
-    if (!ok) {
-      res.status(404).json({ error: 'Setup not found' });
-      return;
-    }
+    await gear.removeSetup(req.params.id);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[GearSetups] Failed to delete setup', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[GearSetups] Failed to delete setup', err);
+    sendError(res, err);
   }
 });
 
@@ -631,12 +501,12 @@ gearRouter.delete('/api/gear-setups/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-gearRouter.delete('/api/gear-setups', (_req, res) => {
+gearRouter.delete('/api/gear-setups', async (_req, res) => {
   try {
-    const deleted = deleteAllGearSetups();
+    const deleted = await gear.removeAllSetups();
     res.json({ ok: true, deleted });
-  } catch (err: any) {
-    console.error('[GearSetups] Failed to delete all setups', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[GearSetups] Failed to delete all setups', err);
+    sendError(res, err);
   }
 });

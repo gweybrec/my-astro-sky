@@ -665,91 +665,6 @@ export function setCachedHorizon(key: string, profile: object): void {
   setHorizonStmt.run(key, JSON.stringify(profile));
 }
 
-// ─── Custom gear ───────────────────────────────────────────────────────────────
-
-const getAllCustomGearStmt = db.prepare('SELECT id, type, data FROM custom_gear');
-const upsertCustomGearStmt = db.prepare(
-  'INSERT OR REPLACE INTO custom_gear (id, type, data) VALUES (?, ?, ?)',
-);
-const deleteCustomGearStmt = db.prepare('DELETE FROM custom_gear WHERE id = ?');
-const getCustomGearByTypeStmt = db.prepare('SELECT id, type, data FROM custom_gear WHERE type = ?');
-
-/** Equipment categories stored in `custom_gear`. `filter` items are not part of a
- *  gear setup — they are picked per photo integration row / observation window. */
-export type CustomGearType = 'telescope' | 'camera' | 'accessory' | 'filter';
-
-export interface CustomGearRow {
-  id: string;
-  type: CustomGearType;
-  data: string;
-}
-
-export function getAllCustomGear(): CustomGearRow[] {
-  return getAllCustomGearStmt.all() as CustomGearRow[];
-}
-
-export function getCustomGearByType(type: CustomGearType): CustomGearRow[] {
-  return getCustomGearByTypeStmt.all(type) as CustomGearRow[];
-}
-
-export function upsertCustomGear(id: string, type: CustomGearType, data: object): void {
-  upsertCustomGearStmt.run(id, type, JSON.stringify(data));
-}
-
-export function deleteCustomGear(id: string): boolean {
-  const result = deleteCustomGearStmt.run(id);
-  return result.changes > 0;
-}
-
-// ─── Gear setups ──────────────────────────────────────────────────────────────
-
-export interface GearSetupRow {
-  id: string;
-  name: string;
-  telescope_id: string;
-  camera_id: string;
-  accessory_id: string | null;
-  enabled: number; // 0 | 1
-}
-
-const getAllGearSetupsStmt = db.prepare('SELECT * FROM gear_setups ORDER BY rowid ASC');
-const upsertGearSetupStmt = db.prepare(
-  `INSERT OR REPLACE INTO gear_setups (id, name, telescope_id, camera_id, accessory_id, enabled)
-   VALUES (?, ?, ?, ?, ?, ?)`,
-);
-const updateGearSetupEnabledStmt = db.prepare('UPDATE gear_setups SET enabled = ? WHERE id = ?');
-const deleteGearSetupStmt = db.prepare('DELETE FROM gear_setups WHERE id = ?');
-const deleteAllGearSetupsStmt = db.prepare('DELETE FROM gear_setups');
-
-export function getAllGearSetups(): GearSetupRow[] {
-  return getAllGearSetupsStmt.all() as GearSetupRow[];
-}
-
-export function upsertGearSetup(row: GearSetupRow): void {
-  upsertGearSetupStmt.run(
-    row.id,
-    row.name,
-    row.telescope_id,
-    row.camera_id,
-    row.accessory_id ?? null,
-    row.enabled,
-  );
-}
-
-export function updateGearSetupEnabled(id: string, enabled: boolean): boolean {
-  const result = updateGearSetupEnabledStmt.run(enabled ? 1 : 0, id);
-  return result.changes > 0;
-}
-
-export function deleteGearSetup(id: string): boolean {
-  const result = deleteGearSetupStmt.run(id);
-  return result.changes > 0;
-}
-
-export function deleteAllGearSetups(): number {
-  return deleteAllGearSetupsStmt.run().changes;
-}
-
 // ─── Night plans ────────────────────────────────────────────────────────────
 
 export interface PlanRow {
@@ -1252,14 +1167,8 @@ export function reorderPlanEntries(planId: string, ids: string[]): void {
 // ─── Bulk-delete helpers (used by "Delete all data" feature) ───────────────────
 
 const deleteAllPhotosStmt = db.prepare('DELETE FROM photos');
-const deleteAllCustomGearStmt = db.prepare("DELETE FROM custom_gear WHERE id LIKE 'custom-%'");
 
 /** Delete all photo rows from the DB (no file removal). Returns number of rows deleted. */
 export function deleteAllPhotoMetadata(): number {
   return deleteAllPhotosStmt.run().changes;
-}
-
-/** Delete all custom gear rows. Returns number of rows deleted. */
-export function deleteAllCustomGear(): number {
-  return deleteAllCustomGearStmt.run().changes;
 }

@@ -1,4 +1,5 @@
 import express from 'express';
+import type { CustomGearType } from '@myastrosky/core/domain/gear';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
@@ -10,12 +11,6 @@ import {
   deletePhoto,
   createPhotoWithId,
   checkPhotosExistByName,
-  getAllCustomGear,
-  upsertCustomGear as upsertCustomGearDB,
-  deleteCustomGear as deleteCustomGearDB,
-  getAllGearSetups,
-  upsertGearSetup,
-  deleteGearSetup,
   sanitizePois,
   sanitizeCaptureDetails,
   getPlans,
@@ -31,6 +26,7 @@ import {
 } from '../db.js';
 import {
   dsoOverrides as dsoOverridesService,
+  gear as gearService,
   poiCategories as poiCategoriesService,
   skyRegions as skyRegionsService,
 } from '../services.js';
@@ -149,24 +145,13 @@ backupRouter.post('/api/export', async (req, res) => {
       });
     }
     if (includeCustomGear) {
-      const customGear = getAllCustomGear().map((g) => ({
-        id: g.id,
-        type: g.type,
-        ...JSON.parse(g.data),
-      }));
+      const customGear = await gearService.exportCustom();
       archive.append(Buffer.from(JSON.stringify(customGear, null, 2)), {
         name: 'custom-gear.json',
       });
     }
     if (includeSetups) {
-      const setups = getAllGearSetups().map((r) => ({
-        id: r.id,
-        name: r.name,
-        telescopeId: r.telescope_id,
-        cameraId: r.camera_id,
-        accessoryId: r.accessory_id,
-        enabled: r.enabled === 1,
-      }));
+      const setups = await gearService.listSetups();
       archive.append(Buffer.from(JSON.stringify(setups, null, 2)), { name: 'gear-setups.json' });
     }
     if (includePoiCategories) {
@@ -282,18 +267,9 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
       // Resolve name-based conflicts: a plan/setup/gear whose name already exists
       // will be replaced (not duplicated) if the user selects it for import.
       const existingPlanNames = new Set(getPlans().map((p) => p.name));
-      const existingSetupNames = new Set(getAllGearSetups().map((s) => s.name));
+      const existingSetupNames = new Set((await gearService.listSetups()).map((s) => s.name));
       const existingGearKeys = new Set(
-        getAllCustomGear().map((g) => {
-          let name = g.id;
-          try {
-            const d = JSON.parse(g.data);
-            if (typeof d?.name === 'string') name = d.name;
-          } catch {
-            /* ignore */
-          }
-          return `${g.type}\u001f${name}`;
-        }),
+        (await gearService.listCustomNames()).map((g) => `${g.type}\u001f${g.name}`),
       );
 
       const plans = inspect.planItems.map((p) => ({ ...p, exists: existingPlanNames.has(p.name) }));
@@ -454,16 +430,7 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
             // Snapshot existing gear once, before importing, so name-based replacement
             // targets only pre-import rows — two same-type+name items within this bundle
             // must not delete each other.
-            const existingGear = getAllCustomGear().map((r) => {
-              let n = r.id;
-              try {
-                const d = JSON.parse(r.data);
-                if (typeof d?.name === 'string') n = d.name;
-              } catch {
-                /* ignore */
-              }
-              return { id: r.id, type: r.type, name: n };
-            });
+            const existingGear = await gearService.listCustomNames();
             for (const g of rawGear) {
               if (
                 typeof g.id === 'string' &&
@@ -473,11 +440,10 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
                 const { id, type, ...data } = g;
                 const name = typeof data.name === 'string' ? data.name : id;
                 const sameType = existingGear.filter((r) => r.type === type);
-                idsToReplaceByName(sameType, name).forEach(deleteCustomGearDB);
-                upsertCustomGearDB(id, type as 'telescope' | 'camera' | 'accessory' | 'filter', {
-                  ...data,
-                  id,
-                });
+                await gearService.importCustom(
+                  { id, type: type as CustomGearType, data },
+                  idsToReplaceByName(sameType, name),
+                );
               }
             }
           }
@@ -496,8 +462,8 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
             // Snapshot once (so same-name siblings in this bundle don't delete each
             // other) and only replace by name when the name is non-empty — an empty
             // name must not match, and delete, every existing unnamed setup. Same-id
-            // re-imports are still handled by upsertGearSetup.
-            const existingSetups = getAllGearSetups();
+            // re-imports are still handled by the setup write.
+            const existingSetups = await gearService.listSetups();
             for (const s of rawSetups) {
               if (
                 typeof s.id === 'string' &&
@@ -506,15 +472,17 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
                 typeof s.cameraId === 'string'
               ) {
                 const name = typeof s.name === 'string' ? s.name : '';
-                if (name) idsToReplaceByName(existingSetups, name).forEach(deleteGearSetup);
-                upsertGearSetup({
-                  id: s.id,
-                  name: typeof s.name === 'string' ? s.name : '',
-                  telescope_id: s.telescopeId,
-                  camera_id: s.cameraId,
-                  accessory_id: typeof s.accessoryId === 'string' ? s.accessoryId : null,
-                  enabled: s.enabled === false ? 0 : 1,
-                });
+                await gearService.importSetup(
+                  {
+                    id: s.id,
+                    name: typeof s.name === 'string' ? s.name : '',
+                    telescopeId: s.telescopeId,
+                    cameraId: s.cameraId,
+                    accessoryId: typeof s.accessoryId === 'string' ? s.accessoryId : null,
+                    enabled: s.enabled !== false,
+                  },
+                  name ? idsToReplaceByName(existingSetups, name) : [],
+                );
               }
             }
           }
