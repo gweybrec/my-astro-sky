@@ -58,8 +58,8 @@ Signatures were validated against the code.
 ### `SqlDb` details
 
 - The port lives in `packages/core/src/ports/sql-db.ts`; the server adapter is `server/sqlite-adapter.ts` (`createBetterSqliteDb(getConnection())`).
-- Transaction rule: `SqlDb.transaction(body)` may only await calls on its `tx`; a `setImmediate` watchdog rolls back a body that awaits anything else, and transactions do not nest.
-- Error codes (exported by the port): `SQL_TX_AWAITED_NON_DB`, `SQL_TX_NESTED`, `SQL_LEGACY_CALL_IN_TX`.
+- Transaction rule: `SqlDb.transaction(body)` may only await calls on its `tx`; a `setImmediate` watchdog rolls back a body that awaits anything else, and transactions do not nest. Inside a transaction body, use only `tx`; calls on the outer `SqlDb` are rejected, and a function that must work in both places takes a `SqlTx` parameter (`SqlDb` is one).
+- Error codes (exported by the port): `SQL_TX_AWAITED_NON_DB`, `SQL_TX_NESTED`, `SQL_TX_OUTER_CALL`, `SQL_LEGACY_CALL_IN_TX`.
 - Old synchronous `server/db.ts` functions throw `SQL_LEGACY_CALL_IN_TX` if called while a service transaction is open (`server/db-tx-guard.ts`).
 - `getConnection()` in `db.ts` returns the raw, unguarded better-sqlite3 handle; only the adapter should use it.
 
@@ -118,7 +118,7 @@ On mobile, write as read-then-`batch()`: each bridge round-trip costs 1–5 ms.
 
 While old synchronous `db.ts` code and new services share one connection:
 
-- inside `SqlDb.transaction()`, only `SqlDb` calls may be awaited — never sharp, file or zip work;
+- inside `SqlDb.transaction()`, only `tx` calls may be awaited — never sharp, file or zip work;
 - card 2.2 adds a test that proves a legacy statement cannot run inside an open service transaction.
 
 ---

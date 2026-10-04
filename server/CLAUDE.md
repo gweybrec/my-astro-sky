@@ -10,7 +10,7 @@ conventions, the CI gate, architecture overview) stay in the root `CLAUDE.md`.
 - Uploaded photos go to `uploads/` directory on disk, named with UUIDs.
 - Filters are served at `GET /api/filters` and consumed via `src/gear-catalog.ts` (they are **not** part of a gear setup — picked per integration row / observation window). The catalog itself is `resources/filters.json`; see `scripts/CLAUDE.md` for the colour-seeding step.
 - Migrations 1 to 14 in `server/db-migrations.ts` are frozen. New migrations (version 15 and above) are SQL statements added to `MIGRATIONS` in `packages/core/src/db/schema.ts`, and `BASELINE_SCHEMA` and `SCHEMA_VERSION` are updated in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise.
-- New persistence code goes through the `SqlDb` port (`packages/core/src/ports/sql-db.ts`, adapter `server/sqlite-adapter.ts`). Inside `SqlDb.transaction` only `tx` calls may be awaited; awaiting anything else rolls the transaction back with `SQL_TX_AWAITED_NON_DB`.
+- New persistence code goes through the `SqlDb` port (`packages/core/src/ports/sql-db.ts`, adapter `server/sqlite-adapter.ts`). Inside `SqlDb.transaction` only `tx` calls may be awaited; awaiting anything else rolls the transaction back with `SQL_TX_AWAITED_NON_DB`. Inside a transaction body, use only `tx`; outer `SqlDb` calls are rejected with `SQL_TX_OUTER_CALL` (the port has four error codes: `SQL_TX_AWAITED_NON_DB`, `SQL_TX_NESTED`, `SQL_TX_OUTER_CALL`, `SQL_LEGACY_CALL_IN_TX`).
 
 ## Adding or changing a route
 

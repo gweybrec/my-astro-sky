@@ -42,6 +42,8 @@ export interface SqlDb extends SqlTx {
    * Runs `body` inside one transaction: committed if it resolves, rolled back if it rejects.
    * RULE: `body` may only await calls on `tx`. Awaiting anything else is an error (see the adapter).
    * Transactions do not nest.
+   * Inside `body`, calls on the outer `SqlDb` are rejected: pass `tx` to the code that needs the database.
+   * A function that must work both inside and outside a transaction takes a `SqlTx` parameter (`SqlDb` is one).
    */
   transaction<T>(body: (tx: SqlTx) => Promise<T>): Promise<T>;
 }
@@ -53,3 +55,5 @@ export const SQL_TX_AWAITED_NON_DB = 'SQL_TX_AWAITED_NON_DB';
 export const SQL_TX_NESTED = 'SQL_TX_NESTED';
 /** Old synchronous database code ran while a service transaction was open. */
 export const SQL_LEGACY_CALL_IN_TX = 'SQL_LEGACY_CALL_IN_TX';
+/** A call was made on the outer `SqlDb` from inside a transaction body; use `tx`. */
+export const SQL_TX_OUTER_CALL = 'SQL_TX_OUTER_CALL';

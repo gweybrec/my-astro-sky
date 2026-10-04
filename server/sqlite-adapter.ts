@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import {
   SQL_TX_AWAITED_NON_DB,
   SQL_TX_NESTED,
+  SQL_TX_OUTER_CALL,
   type SqlDb,
   type SqlRunResult,
   type SqlStatement,
@@ -39,6 +40,9 @@ function bind(params: readonly SqlValue[] | undefined): unknown[] {
   );
 }
 
+/** Most prepared statements kept; when full, the oldest is dropped. */
+const STATEMENT_CACHE_MAX = 200;
+
 const INSERT_RE = /^\s*(?:insert|replace)\b/i;
 
 /**
@@ -62,6 +66,10 @@ export function createBetterSqliteDb(conn: Conn): SqlDb {
   const prep = (sql: string): Database.Statement => {
     let stmt = cache.get(sql);
     if (!stmt) {
+      if (cache.size >= STATEMENT_CACHE_MAX) {
+        const oldest = cache.keys().next();
+        if (!oldest.done) cache.delete(oldest.value);
+      }
       stmt = conn.prepare(sql);
       cache.set(sql, stmt);
     }
@@ -82,12 +90,35 @@ export function createBetterSqliteDb(conn: Conn): SqlDb {
     for (const s of statements) prep(s.sql).run(...bind(s.params));
   };
 
-  /** Runs `fn` at once when nothing is queued or the caller is inside the open transaction; otherwise after the queue. */
-  const gated = <T>(fn: () => T): Promise<T> => {
+  /**
+   * Rejects a call made from a transaction context: from inside the open body (the outer `SqlDb`
+   * must not be used there; use `tx`) or from a body that went on after its transaction closed.
+   * Returns null for a caller with no transaction context.
+   */
+  const refuseFromTx = <T>(): Promise<T> | null => {
     const store = als.getStore();
-    if (pending === 0 || (store !== undefined && store === current && store.open)) {
-      return settle(fn);
+    if (store === undefined) return null;
+    if (store === current && store.open) {
+      return Promise.reject(
+        codedError(
+          SQL_TX_OUTER_CALL,
+          'Inside a SqlDb transaction body, use only tx: a call was made on the outer SqlDb.',
+        ),
+      );
     }
+    return Promise.reject(
+      codedError(
+        SQL_TX_AWAITED_NON_DB,
+        'A SqlDb transaction body may only await tx calls; this transaction is no longer open.',
+      ),
+    );
+  };
+
+  /** Runs `fn` at once when nothing is queued; otherwise after the queue. Rejects calls from transaction bodies. */
+  const gated = <T>(fn: () => T): Promise<T> => {
+    const refused = refuseFromTx<T>();
+    if (refused) return refused;
+    if (pending === 0) return settle(fn);
     return enqueue(() => settle(fn));
   };
 
@@ -205,11 +236,19 @@ export function createBetterSqliteDb(conn: Conn): SqlDb {
       }),
     transaction: (body) => {
       const store = als.getStore();
-      if (store !== undefined && store === current && store.open) {
+      if (store !== undefined) {
+        if (store === current && store.open) {
+          return Promise.reject(
+            codedError(
+              SQL_TX_NESTED,
+              'SqlDb transactions do not nest: transaction() was called from inside a transaction body.',
+            ),
+          );
+        }
         return Promise.reject(
           codedError(
-            SQL_TX_NESTED,
-            'SqlDb transactions do not nest: transaction() was called from inside a transaction body.',
+            SQL_TX_AWAITED_NON_DB,
+            'A SqlDb transaction body may only await tx calls; this transaction is no longer open.',
           ),
         );
       }

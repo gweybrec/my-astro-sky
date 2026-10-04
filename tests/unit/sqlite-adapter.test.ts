@@ -10,8 +10,9 @@ import {
   SQL_LEGACY_CALL_IN_TX,
   SQL_TX_AWAITED_NON_DB,
   SQL_TX_NESTED,
+  SQL_TX_OUTER_CALL,
 } from '@myastrosky/core/ports/sql-db';
-import type { SqlDb } from '@myastrosky/core/ports/sql-db';
+import type { SqlDb, SqlTx } from '@myastrosky/core/ports/sql-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -157,6 +158,60 @@ describe('createBetterSqliteDb', () => {
     });
     expect((nested as { code?: string }).code).toBe(SQL_TX_NESTED);
     expect(await count()).toBe(1);
+  });
+
+  it('i. a plain call on the outer SqlDb inside a body rejects with SQL_TX_OUTER_CALL', async () => {
+    let outer: unknown;
+    await db.transaction(async (tx) => {
+      await tx.run('INSERT INTO t (name) VALUES (?)', ['inside']);
+      await db.run('INSERT INTO t (name) VALUES (?)', ['outer']).catch((e) => (outer = e));
+      await db.get('SELECT 1').catch(() => {});
+      await tx.run('INSERT INTO t (name) VALUES (?)', ['inside2']);
+    });
+    expect((outer as { code?: string }).code).toBe(SQL_TX_OUTER_CALL);
+    const names = await db.all<{ name: string }>('SELECT name FROM t ORDER BY id');
+    expect(names.map((r) => r.name)).toEqual(['inside', 'inside2']);
+    expect(conn.inTransaction).toBe(false);
+  });
+
+  it('j. an outer call after the body awaited a timer rejects with SQL_TX_AWAITED_NON_DB', async () => {
+    let late: unknown;
+    const p = db.transaction(async (tx) => {
+      await tx.run('INSERT INTO t (name) VALUES (?)', ['a']);
+      await sleep(5);
+      try {
+        await db.run('INSERT INTO t (name) VALUES (?)', ['late']);
+      } catch (e) {
+        late = e;
+        throw e;
+      }
+    });
+    await expect(p).rejects.toMatchObject({ code: SQL_TX_AWAITED_NON_DB });
+    await sleep(10);
+    expect((late as { code?: string }).code).toBe(SQL_TX_AWAITED_NON_DB);
+    expect(conn.inTransaction).toBe(false);
+    expect(await count()).toBe(0);
+  });
+
+  it('k. a function taking a SqlTx works with tx and with the outer SqlDb', async () => {
+    const addRow = async (target: SqlTx, name: string) => {
+      await target.run('INSERT INTO t (name) VALUES (?)', [name]);
+    };
+    await db.transaction(async (tx) => {
+      await addRow(tx, 'via-tx');
+    });
+    await addRow(db, 'via-db');
+    const names = await db.all<{ name: string }>('SELECT name FROM t ORDER BY id');
+    expect(names.map((r) => r.name)).toEqual(['via-tx', 'via-db']);
+  });
+
+  it('l. 250 different SQL texts in a row all work (statement cache cap)', async () => {
+    for (let i = 0; i < 250; i++) {
+      const row = await db.get<{ v: number }>(`SELECT ${i} AS v`);
+      expect(row).toEqual({ v: i });
+    }
+    // The oldest texts were dropped from the cache and are prepared again.
+    expect(await db.get<{ v: number }>('SELECT 0 AS v')).toEqual({ v: 0 });
   });
 });
 
