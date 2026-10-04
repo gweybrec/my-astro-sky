@@ -13,6 +13,8 @@ One line per decision, with the date. Cards and design rounds must follow these.
 | 2026-10-04 | D1 batch 1 feedback | Tab order: Ciel, **Galerie**, Cibles, Plans, Réglages. Use the desktop's meaning colours on mobile (yellow rating stars, etc.). The object sheet takes the height of its content. **No horizontally scrolling chip rows.** The Galerie screen has no title in its top bar. |
 | 2026-10-04 | D1 revision 2       | The Cibles and Plans top bars lose their title too, like Galerie (search field plus button only). Réglages and the plan detail keep theirs. The wording of the object-type filter ("2 types", "Tous") is accepted.                                                         |
 | 2026-10-04 | Type badge colour   | The object-type badge uses a lighter grey for its text on mobile (`text-secondary` in place of `text-dim`; measured 3.39:1 before). Apply the same on the desktop **if** it improves contrast there, shown with before/after pictures.                                     |
+| 2026-10-04 | Placement panel     | The manual placement mode keeps its fixed bottom panel (about a third of the screen). No collapsible panel.                                                                                                                                                                |
+| 2026-10-04 | Placeholder text    | Field placeholders on mobile are very slightly lighter, not too light: just past 4.5:1 (was 3.38:1; now a mix of text-dim and text-secondary measured at 4.59:1), still clearly dimmer than typed text.                                                                    |
 
 ## Touch decisions for the mobile app (2026-10-03)
 
@@ -37,7 +39,7 @@ Keyboard-only actions: every mode gets visible Cancel and Done buttons; label ch
 
 ## Design rounds
 
-| Round | State                                                                                                                   | Where                                                                                                                                                   |
-| ----- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D0    | approved 2026-10-03                                                                                                     | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS                                                                                                       |
-| D1    | batch 1 revision 2 published 2026-10-04 and reviewed; revision 3 (titles, badge colour) and batch 2 (flows) in progress | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 (eight screens: Ciel, object sheet, Galerie, Cibles, object-type sheet, Plans, plan detail, Réglages) |
+| Round | State                                                                                                                                                        | Where                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| D0    | approved 2026-10-03                                                                                                                                          | https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS |
+| D1    | lots 1, 2a (photo flows) and 2b (map modes, filters, computer link) published 2026-10-04: 22 screens; the user reviewed lot 1 and lot 2a; lot 2c in progress | https://claude.ai/artifact/CVQQT66LNbyaxQdCZJ2yD8 |
