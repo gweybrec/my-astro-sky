@@ -1,6 +1,7 @@
 import express from 'express';
 import type { CustomGearType } from '@myastrosky/core/domain/gear';
 import sharp from 'sharp';
+import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { UPLOADS_DIR } from '../server-paths.js';
@@ -38,6 +39,10 @@ import {
   inspectZipContents,
   buildZipPreviewResponse,
   idsToReplaceByName,
+  parseBundleSetups,
+  parseBundlePlanSetupIds,
+  classifyBundleSetup,
+  planSetupImportActions,
 } from '../import-utils.js';
 
 // unzipper is CommonJS-only and has no ESM export, so it can't be `import`ed under
@@ -211,9 +216,58 @@ backupRouter.post('/api/export', async (req, res) => {
  *     summary: Preview import bundle without writing data
  *     consumes:
  *       - multipart/form-data
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bundle:
+ *                 type: string
+ *                 format: binary
+ *                 description: The .zip or .json bundle to inspect
  *     responses:
  *       200:
- *         description: Import preview returned successfully
+ *         description: >
+ *           Import preview returned successfully. Each entry of `plans` carries `setupId`, the
+ *           setup id stored in the bundle (null when none). Each entry of `setups` carries
+ *           `conflict` (`none`, `identical` or `different`, against the local setup with the same
+ *           id, else the same name) and, unless `none`, `localId`, that local setup's id.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 plans:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string }
+ *                       name: { type: string }
+ *                       exists: { type: boolean }
+ *                       setupId: { type: string, nullable: true }
+ *                 setups:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string }
+ *                       name: { type: string }
+ *                       exists: { type: boolean }
+ *                       conflict: { type: string, enum: [none, identical, different] }
+ *                       localId: { type: string }
+ *       400:
+ *         description: No file, unsupported format or invalid manifest
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
  */
 // Import preview (dry-run) — inspect ZIP contents and report what can be imported
 backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) => {
@@ -272,11 +326,35 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
         (await gearService.listCustomNames()).map((g) => `${g.type}\u001f${g.name}`),
       );
 
-      const plans = inspect.planItems.map((p) => ({ ...p, exists: existingPlanNames.has(p.name) }));
-      const setups = inspect.setupItems.map((s) => ({
-        ...s,
-        exists: existingSetupNames.has(s.name),
+      // Each setup of the bundle is compared with the local ones (same id, else same name);
+      // each plan carries the setup id stored in the bundle.
+      const readJson = async (entryPath: string): Promise<unknown> => {
+        const entry = zipDir.files.find((f) => f.path === entryPath);
+        if (!entry) return null;
+        try {
+          return JSON.parse((await entry.buffer()).toString('utf8'));
+        } catch {
+          return null;
+        }
+      };
+      const bundleSetups = parseBundleSetups(await readJson('gear-setups.json'));
+      const planSetupIds = new Map(
+        parseBundlePlanSetupIds(await readJson('plans.json')).map((p) => [p.id, p.setupId]),
+      );
+      const localSetups = await gearService.listSetups();
+
+      const plans = inspect.planItems.map((p) => ({
+        ...p,
+        exists: existingPlanNames.has(p.name),
+        setupId: planSetupIds.get(p.id) ?? null,
       }));
+      const setups = inspect.setupItems.map((s) => {
+        const bundleSetup = bundleSetups.find((b) => b.id === s.id);
+        const state = bundleSetup
+          ? classifyBundleSetup(bundleSetup, localSetups)
+          : { conflict: 'none' as const };
+        return { ...s, exists: existingSetupNames.has(s.name), ...state };
+      });
       const gear = inspect.gearItems.map((g) => ({
         ...g,
         exists: existingGearKeys.has(`${g.type}\u001f${g.name}`),
@@ -320,15 +398,65 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
  * /api/import:
  *   post:
  *     summary: Import photos and optional DSO overrides from a bundle
+ *     description: >
+ *       A ticked plan brings its setup (and the custom gear that setup uses, when the bundle has
+ *       them and this machine does not). A setup identical to a local one is not imported and the
+ *       plans are pointed at the local setup. A setup that differs from a local one follows
+ *       `setupConflicts`; with no choice sent it is replaced when ticked and skipped when only a
+ *       plan pulled it in.
  *     consumes:
  *       - multipart/form-data
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bundle:
+ *                 type: string
+ *                 format: binary
+ *                 description: The .zip or .json bundle to import
+ *               importMetadata: { type: string, description: "'1' to import photo metadata" }
+ *               importDsoOverrides: { type: string, description: "'1' to import DSO overrides" }
+ *               importPoiCategories: { type: string, description: "'1' to import POI categories" }
+ *               importSkyRegions: { type: string, description: "'1' to import sky regions" }
+ *               selectedImages: { type: string, description: "JSON string[] of image file names" }
+ *               selectedPlans: { type: string, description: "JSON string[] of plan ids" }
+ *               selectedSetups: { type: string, description: "JSON string[] of setup ids" }
+ *               selectedGear: { type: string, description: "JSON string[] of custom gear ids" }
+ *               setupConflicts:
+ *                 type: string
+ *                 description: >
+ *                   JSON object mapping a bundle setup id to `replace`, `keepBoth` (imported under
+ *                   a new id, name followed by " (import)") or `skip`. Only read for setups whose
+ *                   content differs from a local one.
  *     responses:
  *       200:
  *         description: Import completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 imported: { type: integer }
+ *                 skipped: { type: integer }
+ *                 dsoOverridesImported: { type: integer }
+ *       400:
+ *         description: No file, unsupported format, invalid ZIP entry path or invalid manifest
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *       500:
+ *         description: Server error
  */
 // Import photos from ZIP (full) or JSON (metadata only)
 // Form fields: bundle (file), importMetadata, importDsoOverrides, selectedImages,
-//              selectedPlans, selectedSetups, selectedGear (all JSON string[])
+//              selectedPlans, selectedSetups, selectedGear (all JSON string[]),
+//              setupConflicts (JSON object: bundle setup id -> replace | keepBoth | skip)
 backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
   try {
     const file = req.file;
@@ -352,6 +480,11 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
     const selectedPlans = parseIdSet(req.body?.selectedPlans);
     const selectedSetups = parseIdSet(req.body?.selectedSetups);
     const selectedGear = parseIdSet(req.body?.selectedGear);
+    // Choice per bundle setup id for a setup whose content differs from a local one.
+    const setupChoices: Record<string, string> =
+      typeof req.body?.setupConflicts === 'string'
+        ? (JSON.parse(req.body.setupConflicts) as Record<string, string>)
+        : {};
 
     const ext = path.extname(file.originalname).toLowerCase();
     let photos: any[] = [];
@@ -420,12 +553,42 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
         }
       }
 
-      // Import custom gear (only the ids the user selected). Name-based override:
-      // existing gear of the same type + name is deleted before the imported one is
-      // written, so a re-imported item replaces rather than duplicates.
-      if (customGearEntry && selectedGear.size > 0) {
+      // Decide what happens to the setups first: a ticked plan brings its setup, and the custom
+      // gear that setup uses, when the bundle has them and this machine does not.
+      const readBundleJson = async (entry: typeof plansEntry): Promise<unknown> => {
+        if (!entry) return null;
         try {
-          const rawGear = JSON.parse((await customGearEntry.buffer()).toString('utf8'));
+          return JSON.parse((await entry.buffer()).toString('utf8'));
+        } catch {
+          return null;
+        }
+      };
+      const rawGearList = await readBundleJson(customGearEntry);
+      const rawSetupList = await readBundleJson(gearSetupsEntry);
+      const rawPlanList = await readBundleJson(plansEntry);
+      const setupPlan = planSetupImportActions({
+        bundleSetups: parseBundleSetups(rawSetupList),
+        bundlePlans: parseBundlePlanSetupIds(rawPlanList),
+        bundleGearIds: Array.isArray(rawGearList)
+          ? rawGearList.filter((g) => typeof g?.id === 'string').map((g) => g.id as string)
+          : [],
+        selectedPlans,
+        selectedSetups,
+        selectedGear,
+        choices: setupChoices,
+        localSetups: await gearService.listSetups(),
+        localGearIds: new Set((await gearService.listCustomNames()).map((g) => g.id)),
+        newId: uuidv4,
+      });
+      const gearToImport = new Set([...selectedGear, ...setupPlan.extraGearIds]);
+
+      // Import custom gear (only the ids the user selected, plus the gear a written setup
+      // needs). Name-based override: existing gear of the same type + name is deleted
+      // before the imported one is written, so a re-imported item replaces rather than
+      // duplicates.
+      if (customGearEntry && gearToImport.size > 0) {
+        try {
+          const rawGear = rawGearList;
           if (Array.isArray(rawGear)) {
             // Snapshot existing gear once, before importing, so name-based replacement
             // targets only pre-import rows — two same-type+name items within this bundle
@@ -434,7 +597,7 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
             for (const g of rawGear) {
               if (
                 typeof g.id === 'string' &&
-                selectedGear.has(g.id) &&
+                gearToImport.has(g.id) &&
                 ['telescope', 'camera', 'accessory'].includes(g.type)
               ) {
                 const { id, type, ...data } = g;
@@ -452,43 +615,15 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
         }
       }
 
-      // Import gear setups (only the ids the user selected). Name-based override:
-      // an existing setup with the same name is deleted before the imported one is
-      // written, so a re-imported setup replaces rather than duplicates.
-      if (gearSetupsEntry && selectedSetups.size > 0) {
-        try {
-          const rawSetups = JSON.parse((await gearSetupsEntry.buffer()).toString('utf8'));
-          if (Array.isArray(rawSetups)) {
-            // Snapshot once (so same-name siblings in this bundle don't delete each
-            // other) and only replace by name when the name is non-empty — an empty
-            // name must not match, and delete, every existing unnamed setup. Same-id
-            // re-imports are still handled by the setup write.
-            const existingSetups = await gearService.listSetups();
-            for (const s of rawSetups) {
-              if (
-                typeof s.id === 'string' &&
-                selectedSetups.has(s.id) &&
-                typeof s.telescopeId === 'string' &&
-                typeof s.cameraId === 'string'
-              ) {
-                const name = typeof s.name === 'string' ? s.name : '';
-                await gearService.importSetup(
-                  {
-                    id: s.id,
-                    name: typeof s.name === 'string' ? s.name : '',
-                    telescopeId: s.telescopeId,
-                    cameraId: s.cameraId,
-                    accessoryId: typeof s.accessoryId === 'string' ? s.accessoryId : null,
-                    enabled: s.enabled !== false,
-                  },
-                  name ? idsToReplaceByName(existingSetups, name) : [],
-                );
-              }
-            }
-          }
-        } catch {
-          /* ignore invalid gear-setups.json */
+      // Import gear setups: the ticked ones and the setups of ticked plans, as decided by
+      // planSetupImportActions (replace by name only when the name is non-empty — an empty
+      // name must not match, and delete, every existing unnamed setup).
+      try {
+        for (const a of setupPlan.actions) {
+          if (a.setup) await gearService.importSetup(a.setup, a.replaceIds);
         }
+      } catch (setupErr) {
+        console.error('[Import] Failed to import gear setups', setupErr);
       }
 
       // Import POI categories (id-based upsert: a re-imported category with the same
@@ -547,7 +682,7 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
       // we also delete any same-id row to avoid a primary-key collision on recreate.
       if (plansEntry && selectedPlans.size > 0) {
         try {
-          const rawPlans = JSON.parse((await plansEntry.buffer()).toString('utf8'));
+          const rawPlans = rawPlanList;
           if (Array.isArray(rawPlans)) {
             // Snapshot once so two same-name plans in this bundle don't delete each
             // other; replace by name only when non-empty. Same-id collisions are
@@ -564,7 +699,11 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
                 position: typeof p.position === 'number' ? p.position : pi,
                 created_at: new Date().toISOString(),
                 night_of: typeof p.nightOf === 'string' ? p.nightOf : null,
-                setup_id: typeof p.setupId === 'string' ? p.setupId : null,
+                // A setup this import skipped or kept under another id is pointed at its local twin.
+                setup_id:
+                  typeof p.setupId === 'string'
+                    ? (setupPlan.setupIdRemap[p.setupId] ?? p.setupId)
+                    : null,
                 lat: typeof p.lat === 'number' ? p.lat : null,
                 lon: typeof p.lon === 'number' ? p.lon : null,
                 sort_by: PLAN_SORT_KEYS.includes(p.sortBy) ? p.sortBy : 'transit',

@@ -23,6 +23,7 @@ import { createRequire } from 'module';
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import sharp from 'sharp';
+import { ZipArchive } from 'archiver';
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 
 const nodeRequire = createRequire(import.meta.url);
@@ -534,8 +535,12 @@ describe('export and import round trip', () => {
         }))
         .sort(byFilename),
     );
-    expect(previewOnEmpty.plans).toEqual([{ id: planId, name: 'Night Zed', exists: false }]);
-    expect(previewOnEmpty.setups).toEqual([{ id: setupId, name: 'Rig Zed', exists: false }]);
+    expect(previewOnEmpty.plans).toEqual([
+      { id: planId, name: 'Night Zed', exists: false, setupId },
+    ]);
+    expect(previewOnEmpty.setups).toEqual([
+      { id: setupId, name: 'Rig Zed', exists: false, conflict: 'none' },
+    ]);
     // Gear order follows the database scan; compare sorted by type.
     expect([...previewOnEmpty.gear].sort((a: any, b: any) => a.type.localeCompare(b.type))).toEqual(
       [
@@ -590,6 +595,9 @@ describe('export and import round trip', () => {
     expect(preview.images.map((i: any) => i.exists)).toEqual([true, true]);
     expect(preview.plans.map((p: any) => p.exists)).toEqual([true]);
     expect(preview.setups.map((s: any) => s.exists)).toEqual([true]);
+    expect(preview.setups.map((s: any) => [s.conflict, s.localId])).toEqual([
+      ['identical', setupId],
+    ]);
     expect(preview.gear.map((g: any) => g.exists)).toEqual([true, true]);
 
     const r = await instanceB.call(
@@ -606,7 +614,7 @@ describe('export and import round trip', () => {
     }
   }, 30_000);
 
-  it('imports only the plans on a third instance C: plans arrive, photos do not', async () => {
+  it('imports only the plans on a third instance C: the plan brings its setup and its custom gear', async () => {
     await instanceB.stop();
     const c = await startInstance();
     const r = await c.call(
@@ -616,12 +624,15 @@ describe('export and import round trip', () => {
     );
     expect(r).toEqual({ status: 200, body: { imported: 0, skipped: 0, dsoOverridesImported: 0 } });
 
-    const plans = (await c.call('GET', '/api/plans')).body;
-    // The plan keeps its setupId although the setup itself was not imported: the reference
-    // dangles until the setup arrives (no foreign key, no error).
-    expect(plans).toEqual(snapA.plans);
+    // The plan's setup is not ticked, but it arrives with the plan, with the custom telescope
+    // and camera it uses (they are in the bundle and absent on C). The plan still points at it.
+    const snapC = await snapshot(c);
+    expect(snapC.plans).toEqual(snapA.plans);
+    expect(snapC.gearSetups).toEqual(snapA.gearSetups);
+    expect(snapC.telescopes).toEqual(snapA.telescopes);
+    expect(snapC.cameras).toEqual(snapA.cameras);
+    expect(snapC.accessories).toEqual(snapA.accessories);
     expect((await c.call('GET', '/api/photos')).body).toEqual([]);
-    expect((await c.call('GET', '/api/gear-setups')).body).toEqual([]);
     expect((await c.call('GET', '/api/sky-regions')).body).toEqual([]);
     expect((await c.call('GET', '/api/dso-overrides')).body).toEqual({});
     expect((await c.call('GET', '/api/poi-categories')).body).toHaveLength(5);
@@ -652,5 +663,163 @@ describe('export and import round trip', () => {
     expect(r).toEqual({ status: 200, body: { imported: 0, skipped: 2, dsoOverridesImported: 0 } });
     expect((await e.call('GET', '/api/photos')).body).toEqual([]);
     expect(fs.readdirSync(e.uploadsDir)).toEqual([]);
+  }, 30_000);
+
+  // ─── A plan's setup, and the setups that differ from a local one ───────────
+
+  /** A local setup on a fresh instance, named like the bundle's setup ("Rig Zed"). */
+  async function freshWithLocalSetup(
+    cameraId: string,
+  ): Promise<{ inst: Instance; localId: string }> {
+    await live!.stop();
+    const inst = await startInstance();
+    const made = await inst.call('POST', '/api/gear-setups', {
+      name: 'Rig Zed',
+      telescopeId: customIds.telescope,
+      cameraId,
+      accessoryId: 'askar-130phq-reducer',
+    });
+    expect(made.status).toBe(200);
+    return { inst, localId: made.body.id };
+  }
+
+  const importPlanAndSetup = (
+    inst: Instance,
+    extra: Record<string, string> = {},
+    selectedSetups: string[] = [setupId],
+  ) =>
+    inst.call(
+      'POST',
+      '/api/import',
+      bundleForm(zip, {
+        selectedPlans: JSON.stringify([planId]),
+        selectedSetups: JSON.stringify(selectedSetups),
+        ...extra,
+      }),
+    );
+
+  const previewOf = async (inst: Instance, body: Buffer = zip) =>
+    (
+      await fetch(`${inst.base}/api/import/preview`, {
+        method: 'POST',
+        body: bundleForm(body, {}),
+      })
+    ).json();
+  const planSetupId = async (inst: Instance) =>
+    (await inst.call('GET', '/api/plans')).body.map((p: any) => p.setupId);
+  const setupNames = async (inst: Instance) =>
+    (await inst.call('GET', '/api/gear-setups')).body.map((s: any) => [s.id, s.name]);
+
+  it('an identical local setup is not imported and the plan is pointed at it', async () => {
+    const { inst, localId } = await freshWithLocalSetup(customIds.camera);
+    expect(localId).not.toBe(setupId);
+
+    expect((await previewOf(inst)).setups).toEqual([
+      { id: setupId, name: 'Rig Zed', exists: true, conflict: 'identical', localId },
+    ]);
+
+    const r = await importPlanAndSetup(inst);
+    expect(r.status).toBe(200);
+    expect(await setupNames(inst)).toEqual([[localId, 'Rig Zed']]);
+    expect(await planSetupId(inst)).toEqual([localId]);
+    // The setup was not written, so the custom gear it uses did not come along.
+    expect((await snapshot(inst)).telescopes).toEqual([]);
+  }, 30_000);
+
+  it('a different local setup: the preview reports it, replace overwrites it', async () => {
+    const { inst, localId } = await freshWithLocalSetup('atik-314l-plus');
+
+    const preview = await previewOf(inst);
+    expect(preview.setups).toEqual([
+      { id: setupId, name: 'Rig Zed', exists: true, conflict: 'different', localId },
+    ]);
+    expect(preview.plans.map((p: any) => p.setupId)).toEqual([setupId]);
+
+    const r = await importPlanAndSetup(inst, {
+      setupConflicts: JSON.stringify({ [setupId]: 'replace' }),
+    });
+    expect(r.status).toBe(200);
+    expect(await setupNames(inst)).toEqual([[setupId, 'Rig Zed']]);
+    expect((await snapshot(inst)).gearSetups).toEqual(snapA.gearSetups);
+    expect(await planSetupId(inst)).toEqual([setupId]);
+  }, 30_000);
+
+  it('a different local setup: keepBoth imports it under a new id with " (import)"', async () => {
+    const { inst, localId } = await freshWithLocalSetup('atik-314l-plus');
+    const r = await importPlanAndSetup(inst, {
+      setupConflicts: JSON.stringify({ [setupId]: 'keepBoth' }),
+    });
+    expect(r.status).toBe(200);
+
+    const setups = (await inst.call('GET', '/api/gear-setups')).body;
+    expect(setups).toHaveLength(2);
+    // The local setup is untouched.
+    expect(setups.find((s: any) => s.id === localId)).toMatchObject({
+      name: 'Rig Zed',
+      cameraId: 'atik-314l-plus',
+    });
+    const added = setups.find((s: any) => s.id !== localId);
+    expect(added.id).toMatch(/^setup-/);
+    expect(added.id).not.toBe(setupId);
+    expect(added).toMatchObject({
+      name: 'Rig Zed (import)',
+      telescopeId: customIds.telescope,
+      cameraId: customIds.camera,
+    });
+    expect(await planSetupId(inst)).toEqual([added.id]);
+    // The setup was written, so its custom gear came along.
+    expect((await snapshot(inst)).cameras).toEqual(snapA.cameras);
+  }, 30_000);
+
+  it('a different local setup: skip leaves it alone and points the plan at it', async () => {
+    const { inst, localId } = await freshWithLocalSetup('atik-314l-plus');
+    const r = await importPlanAndSetup(inst, {
+      setupConflicts: JSON.stringify({ [setupId]: 'skip' }),
+    });
+    expect(r.status).toBe(200);
+    expect(await setupNames(inst)).toEqual([[localId, 'Rig Zed']]);
+    expect((await inst.call('GET', '/api/gear-setups')).body[0].cameraId).toBe('atik-314l-plus');
+    expect(await planSetupId(inst)).toEqual([localId]);
+    expect((await snapshot(inst)).telescopes).toEqual([]);
+  }, 30_000);
+
+  it('a different local setup with no choice sent: replaced when ticked, skipped when only the plan pulls it in', async () => {
+    const ticked = await freshWithLocalSetup('atik-314l-plus');
+    expect((await importPlanAndSetup(ticked.inst)).status).toBe(200);
+    expect(await setupNames(ticked.inst)).toEqual([[setupId, 'Rig Zed']]);
+    expect(await planSetupId(ticked.inst)).toEqual([setupId]);
+
+    const pulled = await freshWithLocalSetup('atik-314l-plus');
+    expect((await importPlanAndSetup(pulled.inst, {}, [])).status).toBe(200);
+    expect(await setupNames(pulled.inst)).toEqual([[pulled.localId, 'Rig Zed']]);
+    expect(await planSetupId(pulled.inst)).toEqual([pulled.localId]);
+  }, 30_000);
+
+  it('a bundle exported without setups imports its plan with the setupId kept', async () => {
+    const plansJson = (await (await openZip(zip)).read('plans.json')).toString('utf8');
+    const noSetups = await new Promise<Buffer>((resolve, reject) => {
+      const archive = new ZipArchive();
+      const chunks: Buffer[] = [];
+      archive.on('data', (c: Buffer) => chunks.push(c));
+      archive.on('end', () => resolve(Buffer.concat(chunks)));
+      archive.on('error', reject);
+      archive.append(Buffer.from(plansJson), { name: 'plans.json' });
+      void archive.finalize();
+    });
+
+    await live!.stop();
+    const inst = await startInstance();
+    const preview = await previewOf(inst, noSetups);
+    expect(preview.setups).toEqual([]);
+    expect(preview.plans).toEqual([{ id: planId, name: 'Night Zed', exists: false, setupId }]);
+
+    const r = await inst.call(
+      'POST',
+      '/api/import',
+      bundleForm(noSetups, { selectedPlans: JSON.stringify([planId]) }),
+    );
+    expect(r.status).toBe(200);
+    expect(await planSetupId(inst)).toEqual([setupId]);
+    expect((await inst.call('GET', '/api/gear-setups')).body).toEqual([]);
   }, 30_000);
 });

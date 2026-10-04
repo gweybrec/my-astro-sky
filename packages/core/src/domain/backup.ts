@@ -24,13 +24,27 @@ export interface ImportPreviewPlan {
   name: string;
   /** true if a plan with the same name already exists (will be replaced if imported). */
   exists: boolean;
+  /** The setup id stored in the bundle for this plan (null when the plan has none). */
+  setupId: string | null;
 }
+
+/**
+ * How a setup of the bundle stands against this machine: `none` (no corresponding local setup),
+ * `identical` (same name, telescope, camera and accessory) or `different`.
+ */
+export type SetupConflict = 'none' | 'identical' | 'different';
+
+/** What to do with a bundle setup whose content differs from the local one. */
+export type SetupImportChoice = 'replace' | 'keepBoth' | 'skip';
 
 export interface ImportPreviewSetup {
   id: string;
   name: string;
   /** true if a setup with the same name already exists (will be replaced if imported). */
   exists: boolean;
+  conflict: SetupConflict;
+  /** The corresponding local setup's id (same id, else same name); absent when `conflict` is `none`. */
+  localId?: string;
 }
 
 export interface ImportPreviewGear {
@@ -78,4 +92,6 @@ export interface ImportOptions {
   selectedSetups: string[] | null;
   /** ids of custom gear to import (type+name-collisions are replaced); null/empty ⇒ none. */
   selectedGear: string[] | null;
+  /** Choice per bundle setup id, for the setups whose content differs from a local one. */
+  setupConflicts?: Record<string, SetupImportChoice>;
 }

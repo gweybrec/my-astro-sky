@@ -336,6 +336,12 @@ const en: Translations = {
     importSetupsSection: 'Setups ({n})',
     importGearSection: 'Telescopes/cameras ({n})',
     importSelectAll: 'Select all',
+    importSetupReplace: 'Replace',
+    importSetupKeepBoth: 'Keep both',
+    importSetupSkip: 'Do not import',
+    importSetupIdentical: 'Already present, identical',
+    importSetupWithPlan: 'Imported with the plan “{name}”',
+    importSetupChoose: 'A different setup with the same name already exists. Choose what to do.',
     importReplaceWarning:
       'An item with the same name already exists and will be replaced if you import it.',
     importBackupWarning: 'Recommended: create a backup of your current data before restoring.',

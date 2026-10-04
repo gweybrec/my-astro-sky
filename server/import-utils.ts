@@ -1,4 +1,6 @@
 import path from 'path';
+import type { SetupConflict, SetupImportChoice } from '@myastrosky/core/domain/backup';
+import type { GearSetupData } from '@myastrosky/core/domain/gear';
 
 const WINDOWS_ABSOLUTE_RE = /^[a-zA-Z]:(?:[\\/]|$)|^[\\/]{2}/;
 
@@ -46,6 +48,8 @@ export interface PreviewPlanEntry {
   name: string;
   /** true if a plan with the same name already exists (will be replaced if imported). */
   exists: boolean;
+  /** The setup id stored in the bundle (null when the plan has none). */
+  setupId: string | null;
 }
 
 /** A gear-setup entry as surfaced to the import-preview client. */
@@ -54,6 +58,9 @@ export interface PreviewSetupEntry {
   name: string;
   /** true if a setup with the same name already exists (will be replaced if imported). */
   exists: boolean;
+  conflict: SetupConflict;
+  /** The corresponding local setup's id; present when `conflict` is not `none`. */
+  localId?: string;
 }
 
 /** A custom-gear entry as surfaced to the import-preview client. */
@@ -129,10 +136,184 @@ export function buildZipPreviewResponse(
  * since a telescope and an accessory may legitimately share a name.
  */
 export function idsToReplaceByName(
-  existing: { id: string; name: string }[],
+  existing: readonly { id: string; name: string }[],
   name: string,
 ): string[] {
   return existing.filter((e) => e.name === name).map((e) => e.id);
+}
+
+// ─── Setups: what an import does with them ────────────────────────────────────
+
+/**
+ * The importable setups of a `gear-setups.json`: those with a string id, telescope id and camera id.
+ * A missing name becomes `''`, a missing accessory `null`, and `enabled` is true unless it is `false`.
+ */
+export function parseBundleSetups(raw: unknown): GearSetupData[] {
+  if (!Array.isArray(raw)) return [];
+  const out: GearSetupData[] = [];
+  for (const s of raw) {
+    if (
+      typeof s?.id === 'string' &&
+      typeof s.telescopeId === 'string' &&
+      typeof s.cameraId === 'string'
+    ) {
+      out.push({
+        id: s.id,
+        name: typeof s.name === 'string' ? s.name : '',
+        telescopeId: s.telescopeId,
+        cameraId: s.cameraId,
+        accessoryId: typeof s.accessoryId === 'string' ? s.accessoryId : null,
+        enabled: s.enabled !== false,
+      });
+    }
+  }
+  return out;
+}
+
+/** The setup id each plan of a `plans.json` points at (null when it has none), by plan id. */
+export function parseBundlePlanSetupIds(
+  raw: unknown,
+): Array<{ id: string; setupId: string | null }> {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{ id: string; setupId: string | null }> = [];
+  for (const p of raw) {
+    if (typeof p?.id === 'string') {
+      out.push({ id: p.id, setupId: typeof p.setupId === 'string' ? p.setupId : null });
+    }
+  }
+  return out;
+}
+
+/**
+ * How a setup of the bundle stands against the local setups. The corresponding local setup is the one
+ * with the same id, failing that the first with the same non-empty name. Two corresponding setups are
+ * identical when name, telescope, camera and accessory are equal (`enabled` is not compared).
+ */
+export function classifyBundleSetup(
+  bundle: GearSetupData,
+  locals: readonly GearSetupData[],
+): { conflict: SetupConflict; localId?: string } {
+  const local =
+    locals.find((l) => l.id === bundle.id) ??
+    (bundle.name ? locals.find((l) => l.name === bundle.name) : undefined);
+  if (!local) return { conflict: 'none' };
+  const identical =
+    local.name === bundle.name &&
+    local.telescopeId === bundle.telescopeId &&
+    local.cameraId === bundle.cameraId &&
+    (local.accessoryId ?? null) === (bundle.accessoryId ?? null);
+  return { conflict: identical ? 'identical' : 'different', localId: local.id };
+}
+
+export interface SetupImportAction {
+  /** The setup's id in the bundle. */
+  bundleId: string;
+  conflict: SetupConflict;
+  /**
+   * `import`: a setup with no local counterpart, written as is. `replace` / `keepBoth`: a different
+   * setup, written over the local one / under a new id. `useLocal`: an identical setup, nothing written.
+   * `skip`: a different setup left out.
+   */
+  action: 'import' | 'replace' | 'keepBoth' | 'useLocal' | 'skip';
+  /** The setup to write (`import`, `replace`, `keepBoth`); absent otherwise. */
+  setup?: GearSetupData;
+  /** Local setups to delete before the write. */
+  replaceIds: string[];
+}
+
+export interface SetupImportPlan {
+  /** One entry per setup the import handles, in the bundle's order. */
+  actions: SetupImportAction[];
+  /** For the plans of this import: bundle setup id to the id they must point at (only ids that change). */
+  setupIdRemap: Record<string, string>;
+  /** Custom gear the written setups use, present in the bundle and absent here, and not already selected. */
+  extraGearIds: string[];
+}
+
+const SETUP_CHOICES: readonly string[] = ['replace', 'keepBoth', 'skip'];
+
+/**
+ * Decides what an import does with the setups of a bundle. A setup is handled when it is ticked or is
+ * the setup of a ticked plan. With no local counterpart it is imported; an identical one is left alone
+ * and the plans are pointed at the local setup; a different one follows the user's choice (no choice:
+ * `replace` when ticked, `skip` when only a plan pulled it in). Plans that are not ticked pull nothing.
+ * The custom gear a written setup uses, when it is in the bundle and absent here, is imported too.
+ */
+export function planSetupImportActions(input: {
+  bundleSetups: readonly GearSetupData[];
+  bundlePlans: ReadonlyArray<{ id: string; setupId: string | null }>;
+  bundleGearIds: Iterable<string>;
+  selectedPlans: ReadonlySet<string>;
+  selectedSetups: ReadonlySet<string>;
+  selectedGear: ReadonlySet<string>;
+  choices: Readonly<Record<string, string>>;
+  localSetups: readonly GearSetupData[];
+  localGearIds: ReadonlySet<string>;
+  /** A fresh unique id (without the `setup-` prefix). */
+  newId: () => string;
+}): SetupImportPlan {
+  const requiredByPlan = new Set<string>();
+  for (const p of input.bundlePlans) {
+    if (input.selectedPlans.has(p.id) && p.setupId) requiredByPlan.add(p.setupId);
+  }
+  const bundleGearIds = new Set(input.bundleGearIds);
+  const actions: SetupImportAction[] = [];
+  const setupIdRemap: Record<string, string> = {};
+  const extraGearIds = new Set<string>();
+  const handled = new Set<string>();
+
+  for (const setup of input.bundleSetups) {
+    if (handled.has(setup.id)) continue;
+    const ticked = input.selectedSetups.has(setup.id);
+    if (!ticked && !requiredByPlan.has(setup.id)) continue;
+    handled.add(setup.id);
+
+    const { conflict, localId } = classifyBundleSetup(setup, input.localSetups);
+    const base = { bundleId: setup.id, conflict, replaceIds: [] as string[] };
+    let action: SetupImportAction;
+    if (conflict === 'none') {
+      action = { ...base, action: 'import', setup };
+    } else if (conflict === 'identical') {
+      action = { ...base, action: 'useLocal' };
+      if (localId && localId !== setup.id) setupIdRemap[setup.id] = localId;
+    } else {
+      const sent = input.choices[setup.id];
+      const choice = SETUP_CHOICES.includes(sent) ? sent : ticked ? 'replace' : 'skip';
+      if (choice === 'replace') {
+        const replaceIds = new Set<string>(localId ? [localId] : []);
+        if (setup.name) {
+          idsToReplaceByName(input.localSetups, setup.name).forEach((id) => replaceIds.add(id));
+        }
+        action = { ...base, action: 'replace', setup, replaceIds: [...replaceIds] };
+      } else if (choice === 'keepBoth') {
+        const id = `setup-${input.newId()}`;
+        action = {
+          ...base,
+          action: 'keepBoth',
+          setup: { ...setup, id, name: `${setup.name} (import)` },
+        };
+        setupIdRemap[setup.id] = id;
+      } else {
+        action = { ...base, action: 'skip' };
+        if (localId && localId !== setup.id) setupIdRemap[setup.id] = localId;
+      }
+    }
+    actions.push(action);
+
+    if (action.setup) {
+      for (const gid of [setup.telescopeId, setup.cameraId, setup.accessoryId]) {
+        if (
+          gid &&
+          bundleGearIds.has(gid) &&
+          !input.localGearIds.has(gid) &&
+          !input.selectedGear.has(gid)
+        ) {
+          extraGearIds.add(gid);
+        }
+      }
+    }
+  }
+  return { actions, setupIdRemap, extraGearIds: [...extraGearIds] };
 }
 
 const ALLOWED_IMG_EXT = new Set(['.jpg', '.jpeg', '.png', '.fits', '.webp']);

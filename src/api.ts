@@ -69,6 +69,8 @@ export type {
   ImportPreviewResult,
   ImportResult,
   ImportOptions,
+  SetupConflict,
+  SetupImportChoice,
 } from '@myastrosky/core/domain/backup';
 export type { GearSetupData } from '@myastrosky/core/domain/gear';
 export type { SkyRegionData } from '@myastrosky/core/domain/regions';
@@ -667,6 +669,8 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
   if (opts.selectedSetups !== null)
     fd.append('selectedSetups', JSON.stringify(opts.selectedSetups));
   if (opts.selectedGear !== null) fd.append('selectedGear', JSON.stringify(opts.selectedGear));
+  if (opts.setupConflicts && Object.keys(opts.setupConflicts).length > 0)
+    fd.append('setupConflicts', JSON.stringify(opts.setupConflicts));
   const res = await fetch('/api/import', { method: 'POST', body: fd });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
