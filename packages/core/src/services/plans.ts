@@ -137,6 +137,7 @@ const UPDATE_ENTRY_POSITION = 'UPDATE plan_entries SET position = ? WHERE id = ?
 // (mosaic tiles carry a mosaic_id; standalone entries don't).
 const DELETE_STANDALONE_ENTRY_BY_DSO =
   'DELETE FROM plan_entries WHERE plan_id = ? AND dso_id = ? AND mosaic_id IS NULL';
+const DELETE_ENTRY_IN_PLAN = 'DELETE FROM plan_entries WHERE id = ? AND plan_id = ?';
 const DELETE_MOSAIC_TILES = 'DELETE FROM plan_entries WHERE mosaic_id = ?';
 
 const SELECT_MOSAICS = 'SELECT * FROM plan_mosaics ORDER BY position ASC, rowid ASC';
@@ -577,7 +578,9 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
         if (parsed.dsoId) {
           writes.push({ sql: DELETE_STANDALONE_ENTRY_BY_DSO, params: [planId, parsed.dsoId] });
         }
-        for (const id of parsed.replaceEntryIds) writes.push({ sql: DELETE_ENTRY, params: [id] });
+        for (const id of parsed.replaceEntryIds) {
+          writes.push({ sql: DELETE_ENTRY_IN_PLAN, params: [id, planId] });
+        }
         writes.push({
           sql: INSERT_MOSAIC_AT_END,
           params: [
@@ -608,7 +611,9 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
         const parsed = parseMosaicParams(params);
         const writes: SqlStatement[] = [];
         // Absorb standalone frames merged into this mosaic.
-        for (const id of parsed.replaceEntryIds) writes.push({ sql: DELETE_ENTRY, params: [id] });
+        for (const id of parsed.replaceEntryIds) {
+          writes.push({ sql: DELETE_ENTRY_IN_PLAN, params: [id, planId] });
+        }
         // Only overwrite the name when the caller provided one (the modal save).
         if (parsed.name !== undefined) {
           writes.push({

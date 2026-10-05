@@ -893,13 +893,13 @@ describe('mosaics', () => {
     expect(ids).toHaveLength(4);
   });
 
-  it('lets replaceEntryIds remove an entry of another plan', async () => {
+  it('does not let replaceEntryIds remove an entry of another plan', async () => {
     const id = await mkPlan();
     const other = await mkPlan('Other');
     const foreign = await mkEntry(other, { dsoId: 'M9' });
     await mkMosaic(id, { replaceEntryIds: [foreign] });
-    // KNOWN GAP: replaceEntryIds is not limited to the plan of the mosaic.
-    expect((await readPlan(other)).entries).toEqual([]);
+    // fixed in WP2.7a: replaceEntryIds is limited to the plan of the mosaic.
+    expect((await readPlan(other)).entries.map((e: any) => e.id)).toEqual([foreign]);
   });
 
   it('answers 404 for PUT and DELETE with the mosaic of another plan or an unknown id', async () => {
@@ -1421,7 +1421,7 @@ describe('POST /api/photos', () => {
     expect([thumb.width, thumb.height]).toEqual([20, 40]);
   });
 
-  it('answers 500 for two correspondences with the same pointIndex and leaves the files behind', async () => {
+  it('rejects two correspondences with the same pointIndex before any file is written', async () => {
     const r = await call(
       'POST',
       '/api/photos',
@@ -1432,15 +1432,13 @@ describe('POST /api/photos', () => {
         ],
       }),
     );
-    // KNOWN GAP: the UNIQUE(photo_id, point_index) constraint surfaces as a 500 with the SQLite message.
-    expect(r.status).toBe(500);
-    expect(r.body).toEqual({ error: expect.stringContaining('UNIQUE constraint failed') });
+    // fixed in WP2.7a: a 400 with a code, and nothing is written.
+    expect(r).toEqual({
+      status: 400,
+      body: { error: 'pointIndex en double', code: 'DUPLICATE_POINT_INDEX' },
+    });
     expect((await call('GET', '/api/photos')).body).toEqual([]);
-    // KNOWN GAP: the image and its thumbnail were already written and are not removed.
-    const files = uploadsList();
-    expect(files).toHaveLength(2);
-    expect(files.filter((f) => f.endsWith('.png'))).toHaveLength(1);
-    expect(files.filter((f) => f.endsWith('_thumb.jpg'))).toHaveLength(1);
+    expect(uploadsList()).toEqual([]);
   });
 
   it('keeps the metadata fields of the upload form', async () => {
@@ -1799,7 +1797,7 @@ describe('DELETE /api/photos (bulk)', () => {
 });
 
 describe('DELETE /api/photo-metadata', () => {
-  it('removes the rows and their correspondences but leaves the files', async () => {
+  it('removes the rows, their correspondences and the files', async () => {
     const a = await upload();
     const b = await upload();
     expect(await call('DELETE', '/api/photo-metadata')).toEqual({
@@ -1807,10 +1805,8 @@ describe('DELETE /api/photo-metadata', () => {
       body: { ok: true, deleted: 2 },
     });
     expect((await call('GET', '/api/photos')).body).toEqual([]);
-    // KNOWN GAP: the image and thumbnail files stay in the uploads folder, with nothing that refers to them.
-    expect(uploadsList()).toEqual(
-      [a.filename, a.thumbFilename, b.filename, b.thumbFilename].sort(),
-    );
+    // fixed in WP2.7a: the image and thumbnail files are removed with the rows.
+    expect(uploadsList()).toEqual([]);
     // correspondences went with the rows (ON DELETE CASCADE): a new photo holds only its own
     const c = await upload({
       corr: [{ pointIndex: 0, photoX: 1, photoY: 1, starHip: 5 }, GOOD_CORR[1]],

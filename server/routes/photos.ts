@@ -225,7 +225,7 @@ photosRouter.delete('/api/photos', async (req, res) => {
  */
 photosRouter.delete('/api/photo-metadata', async (_req, res) => {
   try {
-    const deleted = await photos.removeAllRows();
+    const deleted = await photos.removeAll();
     res.json({ ok: true, deleted });
   } catch (err) {
     console.error('[DeleteAll] Photo metadata delete failed', err);

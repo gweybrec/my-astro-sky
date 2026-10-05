@@ -109,6 +109,8 @@ export interface PhotoService {
   removeRows(ids: readonly string[]): Promise<number>;
   /** Deletes every photo row (not the files). Returns how many there were. */
   removeAllRows(): Promise<number>;
+  /** Deletes every photo: the rows, the images and the thumbnails. Returns how many there were. */
+  removeAll(): Promise<number>;
   /** For each of `names` that is the display name of a stored photo, the id of that photo (the first one), in the order of `names`. */
   findByOriginalNames(names: readonly string[]): Promise<{ originalName: string; id: string }[]>;
   /**
@@ -392,24 +394,32 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       }
 
       const meta = service.readUploadMetadata(file.name, fields ?? {});
-      const photo = await service.insert({
-        id,
-        filename,
-        originalName: meta.displayName,
-        width,
-        height,
-        correspondences,
-        manualPlacement: meta.manualPlacement,
-        dsoIds: meta.dsoIds,
-        labels: meta.labels,
-        notes: meta.notes,
-        integrations: meta.integrations,
-        thumbFilename,
-        observationDate: meta.observationDate,
-        pointsOfInterest: meta.pointsOfInterest,
-        captureDetails: meta.captureDetails,
-        gearSetupId: meta.gearSetupId,
-      });
+      let photo: Photo;
+      try {
+        photo = await service.insert({
+          id,
+          filename,
+          originalName: meta.displayName,
+          width,
+          height,
+          correspondences,
+          manualPlacement: meta.manualPlacement,
+          dsoIds: meta.dsoIds,
+          labels: meta.labels,
+          notes: meta.notes,
+          integrations: meta.integrations,
+          thumbFilename,
+          observationDate: meta.observationDate,
+          pointsOfInterest: meta.pointsOfInterest,
+          captureDetails: meta.captureDetails,
+          gearSetupId: meta.gearSetupId,
+        });
+      } catch (error) {
+        // Nothing refers to the files of this upload any more: do not leave them behind.
+        await blobs.remove(filename).catch(() => undefined);
+        await blobs.remove(thumbFilename).catch(() => undefined);
+        throw error;
+      }
       return {
         photo,
         source: {
@@ -532,6 +542,11 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
         } else if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
           throw invalidUpload('starHip invalide (entier positif attendu)', 'INVALID_STAR_HIP');
         }
+      }
+
+      // The table has UNIQUE(photo_id, point_index): refuse a repeat before any file is written.
+      if (new Set(correspondences.map((c) => c.pointIndex)).size !== correspondences.length) {
+        throw invalidUpload('pointIndex en double', 'DUPLICATE_POINT_INDEX');
       }
 
       return correspondences.map((c) => ({
@@ -698,6 +713,15 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
         }
         return doomed.length;
       });
+    },
+
+    async removeAll() {
+      const rows = await db.all<{ id: string; filename: string }>(SELECT_IDS_FILENAMES);
+      for (const r of rows) {
+        await blobs.remove(r.filename);
+        await blobs.remove(thumbnailNameOf(r.filename));
+      }
+      return service.removeAllRows();
     },
 
     async removeAllRows() {

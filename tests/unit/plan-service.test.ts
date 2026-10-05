@@ -404,6 +404,15 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
       ]);
     });
 
+    it('never deletes an entry of another plan through replaceEntryIds, on create or update', async () => {
+      const other = (await svc.create({ name: 'B' })).id;
+      const foreign = (await svc.addEntry(other, { ra: 1, dec: 2 })).id;
+      await svc.createMosaic(planId, mosaic({ replaceEntryIds: [foreign] }));
+      const { id } = await svc.createMosaic(planId, mosaic());
+      await svc.updateMosaic(planId, id, mosaic({ replaceEntryIds: [foreign] }));
+      expect((await plan(other)).entries.map((e) => e.id)).toEqual([foreign]);
+    });
+
     it('rejects an unknown plan before it checks the body', async () => {
       await expectRejected(
         svc.addEntry('nope', {}),

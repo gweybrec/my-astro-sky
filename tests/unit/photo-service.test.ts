@@ -459,6 +459,17 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       ]);
     });
 
+    it('rejects a repeated pointIndex, after the checks of each item', () => {
+      const ok = { pointIndex: 0, photoX: 1, photoY: 1, starHip: 5 };
+      const e = invalid(() =>
+        svc.validateUpload('a.png', {
+          correspondences: JSON.stringify([ok, { ...ok, starHip: 6 }]),
+        }),
+      );
+      expect([e.kind, e.code]).toEqual(['invalid', 'DUPLICATE_POINT_INDEX']);
+      expect(e.body).toEqual({ error: 'pointIndex en double', code: 'DUPLICATE_POINT_INDEX' });
+    });
+
     it('checks every item, in the order pointIndex, photoX, photoY, starHip', () => {
       const ok = { pointIndex: 0, photoX: 1, photoY: 1, starHip: 5 };
       const check = (item: Record<string, unknown>) =>
@@ -498,7 +509,10 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       // a direct RA/Dec correspondence is accepted
       expect(() =>
         svc.validateUpload('a.png', {
-          correspondences: JSON.stringify([ok, { ...ok, starHip: 0, starRa: 10, starDec: -5 }]),
+          correspondences: JSON.stringify([
+            ok,
+            { ...ok, pointIndex: 1, starHip: 0, starRa: 10, starDec: -5 },
+          ]),
         }),
       ).not.toThrow();
     });
@@ -1073,16 +1087,34 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await rows()).toEqual(['id-1']);
     });
 
-    it('leaves the stored files, as before, when the insert fails, and no row', async () => {
+    it('rejects a repeated pointIndex before any file is written', async () => {
       const dup = JSON.stringify([
         { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1 },
         { pointIndex: 0, photoX: 2, photoY: 2, starHip: 2 },
       ]);
-      await expect(svc.upload(file(), validFields({ correspondences: dup }))).rejects.toThrow(
-        /UNIQUE constraint failed/,
-      );
+      const e = await rejection(svc.upload(file(), validFields({ correspondences: dup })));
+      expect(e.kind).toBe('invalid');
+      expect(e.code).toBe('DUPLICATE_POINT_INDEX');
+      expect(e.body).toEqual({ error: 'pointIndex en double', code: 'DUPLICATE_POINT_INDEX' });
       expect(await rows()).toEqual([]);
-      expect(stored()).toEqual(['id-1.png', 'id-1_thumb.jpg']);
+      expect(stored()).toEqual([]);
+    });
+
+    it('removes the image and the thumbnail when the insert fails, and reports the error', async () => {
+      const failing = createPhotoService({
+        db: {
+          ...counting,
+          batch: async () => {
+            throw new Error('insert failed');
+          },
+        } as SqlDb,
+        newId: () => 'id-9',
+        images: codec,
+        blobs,
+      });
+      await expect(failing.upload(file(), validFields())).rejects.toThrow('insert failed');
+      expect(stored()).toEqual([]);
+      expect(await rows()).toEqual([]);
     });
 
     it('makes the same number of round trips whatever the number of correspondences', async () => {
@@ -1156,6 +1188,17 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await rows()).toEqual(['id-2', 'id-4', 'id-5']);
       const three = await calls(() => svc.removeMany(['id-2', 'id-4', 'id-5']));
       expect(three).toBe(two);
+    });
+
+    it('removeAll deletes every row with its image and thumbnail, in a fixed number of round trips', async () => {
+      expect(await svc.removeAll()).toBe(0);
+      for (const n of ['a', 'b']) await svc.upload(file(`${n}.png`), validFields());
+      const two = await calls(() => svc.removeAll());
+      expect(stored()).toEqual([]);
+      expect(await rows()).toEqual([]);
+      for (const n of ['a', 'b', 'c', 'd']) await svc.upload(file(`${n}.png`), validFields());
+      expect(await calls(() => svc.removeAll())).toBe(two);
+      expect(stored()).toEqual([]);
     });
 
     it('returns how many were removed, and nothing for an empty or unusable list', async () => {
