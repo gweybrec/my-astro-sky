@@ -78,90 +78,24 @@ async function loadModule(env: Record<string, string>) {
   return import('../../server/star-search.js');
 }
 
+function byHip(mod: { loadDeepCatalog(): { hip: number; name?: string }[] }, hip: number) {
+  return mod.loadDeepCatalog().find((s) => s.hip === hip);
+}
+
 describe('catalog resolution', () => {
   it('uses STAR_CATALOG_PATH when set', async () => {
     const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-    expect(mod.getDeepStarByHip(VEGA)?.name).toBe('Vega');
+    expect(byHip(mod, VEGA)?.name).toBe('Vega');
   });
 
   it('defaults to stars.14.json under PUBLIC_DATA_DIR when STAR_CATALOG_PATH is unset', async () => {
     // tmpDir contains stars.14.json (written as primaryPath), so the default resolves to it.
     const mod = await loadModule({ PUBLIC_DATA_DIR: tmpDir });
-    expect(mod.getDeepStarByHip(VEGA)?.name).toBe('Vega');
+    expect(byHip(mod, VEGA)?.name).toBe('Vega');
   });
 
   it('excludes stars fainter than magnitude 11', async () => {
     const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-    expect(mod.getDeepStarByHip(FAINT)).toBeUndefined();
-  });
-});
-
-describe('searchDeepStars', () => {
-  it('resolves a direct HIP lookup with a perfect score', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-
-    const byNumber = mod.searchDeepStars('91262');
-    expect(byNumber).toHaveLength(1);
-    expect(byNumber[0].hip).toBe(VEGA);
-    expect(byNumber[0].score).toBe(100);
-
-    expect(mod.searchDeepStars('HIP 91262')[0].hip).toBe(VEGA);
-    expect(mod.searchDeepStars('99999999')).toEqual([]);
-  });
-
-  it('matches by proper name and labels the result', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-
-    const res = mod.searchDeepStars('vega');
-    expect(res[0].hip).toBe(VEGA);
-    expect(res[0].label).toBe('Vega (α Lyr)');
-  });
-
-  it('normalizes Latin Greek letter names before matching designations', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-
-    // "epsilon lyr" -> "ε lyr" should hit the unnamed ε Lyr neighbour.
-    const res = mod.searchDeepStars('epsilon lyr');
-    expect(res.some((r) => r.hip === NEIGHBOUR)).toBe(true);
-  });
-
-  it('returns an empty array for an empty query', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-    expect(mod.searchDeepStars('')).toEqual([]);
-  });
-
-  it('honours the result limit', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-    // "lyr" matches both Lyra stars; cap to 1.
-    expect(mod.searchDeepStars('lyr', 1)).toHaveLength(1);
-  });
-});
-
-describe('searchStarsByPosition', () => {
-  it('returns stars within the radius sorted brightest-first', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-
-    // 2° around Vega: includes Vega (mag 0.03) and the ε Lyr neighbour, excludes FAR.
-    const res = mod.searchStarsByPosition(279.2347, 38.7837, 2);
-    const hips = res.map((r) => r.hip);
-    expect(hips).toContain(VEGA);
-    expect(hips).toContain(NEIGHBOUR);
-    expect(hips).not.toContain(FAR);
-    // sorted by magnitude ascending
-    expect(res[0].hip).toBe(VEGA);
-    expect(res.map((r) => r.mag)).toEqual([...res.map((r) => r.mag)].sort((a, b) => a - b));
-  });
-
-  it('respects the magnitude limit', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-
-    // magLimit 1 keeps Vega (0.03) but drops the ε Lyr neighbour (4.2).
-    const res = mod.searchStarsByPosition(279.2347, 38.7837, 2, 1);
-    expect(res.map((r) => r.hip)).toEqual([VEGA]);
-  });
-
-  it('returns nothing when no star falls inside the radius', async () => {
-    const mod = await loadModule({ STAR_CATALOG_PATH: primaryPath, PUBLIC_DATA_DIR: tmpDir });
-    expect(mod.searchStarsByPosition(0, 0, 0.5)).toEqual([]);
+    expect(byHip(mod, FAINT)).toBeUndefined();
   });
 });

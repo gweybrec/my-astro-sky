@@ -2,91 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { normalizeRA } from '@myastrosky/core/angles';
+import type { DeepStar } from '@myastrosky/core/domain/stars';
+import type { StarMultiplicity } from '@myastrosky/core/types';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Greek letter mapping for Latin input (alpha -> α, beta -> β, etc.)
-const greekLetterMap: Record<string, string> = {
-  alpha: 'α',
-  beta: 'β',
-  gamma: 'γ',
-  delta: 'δ',
-  epsilon: 'ε',
-  zeta: 'ζ',
-  eta: 'η',
-  theta: 'θ',
-  iota: 'ι',
-  kappa: 'κ',
-  lambda: 'λ',
-  mu: 'μ',
-  nu: 'ν',
-  xi: 'ξ',
-  omicron: 'ο',
-  pi: 'π',
-  rho: 'ρ',
-  sigma: 'σ',
-  tau: 'τ',
-  upsilon: 'υ',
-  phi: 'φ',
-  chi: 'χ',
-  psi: 'ψ',
-  omega: 'ω',
-};
+let deepStars: DeepStar[] | null = null;
 
 /**
- * Normalize a search query by replacing Latin Greek letter names with Greek characters.
- * E.g., "alpha ori" -> "α ori", "beta per" -> "β per"
+ * Reads the deep star catalogue from disk on first use (then caches it) and returns it sorted by
+ * magnitude. The search itself lives in the star-search service of `@myastrosky/core`.
  */
-function normalizeGreekLetters(query: string): string {
-  let normalized = query;
-  for (const [latin, greek] of Object.entries(greekLetterMap)) {
-    // Match whole word boundaries to avoid partial replacements
-    const regex = new RegExp(`\\b${latin}\\b`, 'gi');
-    normalized = normalized.replace(regex, greek);
-  }
-  return normalized;
-}
-
-export interface StarMultiplicity {
-  components: number;
-  sep?: string;
-}
-
-export interface DeepStar {
-  hip: number;
-  ra: number;
-  dec: number;
-  mag: number;
-  bv: number;
-  name?: string;
-  bayer?: string;
-  flam?: string;
-  constellation?: string;
-  desig?: string;
-  multiplicity?: StarMultiplicity;
-}
-
-export interface StarSearchResult {
-  hip: number;
-  ra: number;
-  dec: number;
-  mag: number;
-  bv: number;
-  name?: string;
-  bayer?: string;
-  flam?: string;
-  constellation?: string;
-  desig?: string;
-  multiplicity?: StarMultiplicity;
-  label: string;
-  score: number;
-}
-
-let deepStars: DeepStar[] | null = null;
-let starsByHip: Map<number, DeepStar> | null = null;
-
-export function loadDeepCatalog(): void {
-  if (deepStars) return;
+export function loadDeepCatalog(): DeepStar[] {
+  if (deepStars) return deepStars;
 
   const publicDataDir = process.env.PUBLIC_DATA_DIR || path.join(__dirname, '..', 'public', 'data');
   // The shipped deep catalog (stars.14.json, ~118k stars), shared with WCS matching
@@ -117,8 +45,7 @@ export function loadDeepCatalog(): void {
     for (const member of e.members ?? []) multByHip.set(member, meta);
   }
 
-  deepStars = [];
-  starsByHip = new Map();
+  const stars: DeepStar[] = [];
 
   for (const f of starsData.features) {
     const mag: number = f.properties.mag;
@@ -128,7 +55,7 @@ export function loadDeepCatalog(): void {
     const [ra, dec]: [number, number] = f.geometry.coordinates;
     const info = namesData[String(hip)];
 
-    const star: DeepStar = {
+    stars.push({
       hip,
       ra: normalizeRA(ra),
       dec,
@@ -140,160 +67,11 @@ export function loadDeepCatalog(): void {
       constellation: info?.c || undefined,
       desig: info?.desig || undefined,
       multiplicity: multByHip.get(hip),
-    };
-
-    deepStars.push(star);
-    starsByHip.set(hip, star);
+    });
   }
 
-  deepStars.sort((a, b) => a.mag - b.mag);
-  console.log(`Catalogue chargé : ${deepStars.length} étoiles (mag ≤ 11)`);
-}
-
-function starLabel(star: DeepStar): string {
-  if (star.name) {
-    if (star.bayer && star.constellation) {
-      return `${star.name} (${star.bayer} ${star.constellation})`;
-    }
-    return star.name;
-  }
-  if (star.desig && star.constellation) {
-    return `${star.desig} ${star.constellation}`;
-  }
-  if (star.flam && star.constellation) {
-    return `${star.flam} ${star.constellation}`;
-  }
-  return `HIP ${star.hip} (${star.constellation || '?'}, mag ${star.mag.toFixed(1)})`;
-}
-
-export function searchDeepStars(query: string, limit = 10): StarSearchResult[] {
-  loadDeepCatalog();
-  if (!query || query.length < 1) return [];
-
-  const normalized = normalizeGreekLetters(query);
-  const q = normalized.toLowerCase().trim();
-
-  // Direct HIP lookup
-  const hipMatch = q.match(/^hip\s*(\d+)$/i) || q.match(/^(\d+)$/);
-  if (hipMatch) {
-    const hip = parseInt(hipMatch[1], 10);
-    const star = starsByHip!.get(hip);
-    if (star) {
-      return [{ ...star, label: starLabel(star), score: 100 }];
-    }
-    return [];
-  }
-
-  const results: StarSearchResult[] = [];
-
-  for (const star of deepStars!) {
-    let score = 0;
-
-    // Match by proper name
-    if (star.name) {
-      const n = star.name.toLowerCase();
-      if (n === q) score = 100;
-      else if (n.startsWith(q)) score = 80;
-      else if (n.includes(q)) score = 60;
-    }
-
-    // Match by Bayer designation
-    if (score === 0 && star.desig) {
-      const d = star.desig.toLowerCase();
-      const full = star.constellation ? `${star.desig} ${star.constellation}`.toLowerCase() : d;
-
-      if (full.startsWith(q) || d.startsWith(q)) score = 50;
-      else if (full.includes(q) || d.includes(q)) score = 30;
-    }
-
-    // Match by Flamsteed designation
-    if (score === 0 && star.flam && star.constellation) {
-      const flamFull = `${star.flam} ${star.constellation}`.toLowerCase();
-      if (flamFull.startsWith(q)) score = 45;
-      else if (flamFull.includes(q)) score = 25;
-    }
-
-    // Match by constellation
-    if (score === 0 && star.constellation) {
-      if (star.constellation.toLowerCase().startsWith(q)) {
-        score = 20;
-      }
-    }
-
-    if (score > 0) {
-      // Boost brighter stars
-      score += Math.max(0, (6 - star.mag) * 2);
-      results.push({ ...star, label: starLabel(star), score });
-    }
-  }
-
-  results.sort((a, b) => b.score - a.score);
-  return results.slice(0, limit);
-}
-
-export function getDeepStarByHip(hip: number): DeepStar | undefined {
-  loadDeepCatalog();
-  return starsByHip!.get(hip);
-}
-
-/**
- * Search stars by position (RA/Dec) within a given radius
- * @param ra Right Ascension in degrees
- * @param dec Declination in degrees
- * @param radius Search radius in degrees
- * @param magLimit Maximum magnitude (only return stars brighter than this)
- * @param limit Maximum number of results
- * @returns Array of stars within the radius, sorted by magnitude
- */
-export function searchStarsByPosition(
-  ra: number,
-  dec: number,
-  radius: number,
-  magLimit: number = 10,
-  limit: number = 20,
-): StarSearchResult[] {
-  loadDeepCatalog();
-  if (!deepStars) return [];
-
-  const results: StarSearchResult[] = [];
-  const radiusRad = (radius * Math.PI) / 180;
-  const raRad = (ra * Math.PI) / 180;
-  const decRad = (dec * Math.PI) / 180;
-
-  // Calculate angular distance using haversine formula
-  for (const star of deepStars) {
-    if (star.mag > magLimit) continue;
-
-    const starRaRad = (star.ra * Math.PI) / 180;
-    const starDecRad = (star.dec * Math.PI) / 180;
-
-    // Haversine formula for angular distance
-    const dRa = starRaRad - raRad;
-    const dDec = starDecRad - decRad;
-    const a =
-      Math.sin(dDec / 2) ** 2 + Math.cos(decRad) * Math.cos(starDecRad) * Math.sin(dRa / 2) ** 2;
-    const angularDistance = 2 * Math.asin(Math.sqrt(a));
-
-    if (angularDistance <= radiusRad) {
-      results.push({
-        hip: star.hip,
-        ra: star.ra,
-        dec: star.dec,
-        mag: star.mag,
-        bv: star.bv,
-        name: star.name,
-        bayer: star.bayer,
-        flam: star.flam,
-        constellation: star.constellation,
-        desig: star.desig,
-        multiplicity: star.multiplicity,
-        label: starLabel(star),
-        score: 0,
-      });
-    }
-  }
-
-  // Sort by magnitude (brightest first) and limit results
-  results.sort((a, b) => a.mag - b.mag);
-  return results.slice(0, limit);
+  stars.sort((a, b) => a.mag - b.mag);
+  console.log(`Catalogue chargé : ${stars.length} étoiles (mag ≤ 11)`);
+  deepStars = stars;
+  return stars;
 }

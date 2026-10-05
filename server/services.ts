@@ -7,6 +7,7 @@ import { createServerSecretCodec } from './secret-codec.js';
 import { createFsBlobStore } from './blob-store.js';
 import { createSharpImageCodec } from './image-codec.js';
 import { createBetterSqliteDb } from './sqlite-adapter.js';
+import { loadDeepCatalog } from './star-search.js';
 
 const services = createServices({
   db: createBetterSqliteDb(getConnection()),
@@ -16,6 +17,9 @@ const services = createServices({
   gearCatalog: loadBuiltInGearCatalog(),
   images: createSharpImageCodec(),
   blobs: createFsBlobStore(UPLOADS_DIR),
+  // Read from disk on the first star request, as before.
+  stars: loadDeepCatalog,
 });
 
-export const { gear, dsoOverrides, poiCategories, skyRegions, settings, plans, photos } = services;
+export const { gear, dsoOverrides, poiCategories, skyRegions, settings, plans, photos, stars } =
+  services;

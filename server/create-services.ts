@@ -10,6 +10,10 @@ import { createPhotoService } from '@myastrosky/core/services/photos';
 import { createPlanService } from '@myastrosky/core/services/plans';
 import { createPoiCategoryService } from '@myastrosky/core/services/poi-categories';
 import { createSettingsService } from '@myastrosky/core/services/settings';
+import {
+  createStarSearchService,
+  type StarCatalogSource,
+} from '@myastrosky/core/services/star-search';
 import { createSkyRegionService } from '@myastrosky/core/services/sky-regions';
 
 export interface ServiceDeps {
@@ -20,11 +24,13 @@ export interface ServiceDeps {
   gearCatalog: GearCatalog;
   images: ImageCodec;
   blobs: BlobStore;
+  /** The deep star catalogue, or a function that loads it on first use. */
+  stars: StarCatalogSource;
 }
 
 /** Builds every service on one database. Later service cards add theirs here. */
 export function createServices(deps: ServiceDeps) {
-  const { db, newId, secrets, env, gearCatalog, images, blobs } = deps;
+  const { db, newId, secrets, env, gearCatalog, images, blobs, stars } = deps;
   return {
     dsoOverrides: createDsoOverrideService({ db }),
     skyRegions: createSkyRegionService({ db, newId }),
@@ -33,6 +39,7 @@ export function createServices(deps: ServiceDeps) {
     gear: createGearService({ db, newId, catalog: gearCatalog }),
     plans: createPlanService({ db, newId }),
     photos: createPhotoService({ db, newId, images, blobs }),
+    stars: createStarSearchService({ stars }),
   };
 }
 

@@ -1,5 +1,6 @@
 import express from 'express';
-import { searchDeepStars, getDeepStarByHip, searchStarsByPosition } from '../star-search.js';
+import { stars } from '../services.js';
+import { sendError } from './http-errors.js';
 
 export const starsRouter = express.Router();
 
@@ -13,14 +14,13 @@ export const starsRouter = express.Router();
  *         description: Star search results returned successfully
  */
 // --- Star search API ---
-starsRouter.get('/api/stars/search', (req, res) => {
+starsRouter.get('/api/stars/search', async (req, res) => {
   try {
     const q = String(req.query.q || '');
-    const limit = Math.min(Math.max(1, parseInt(String(req.query.limit || '10'), 10) || 10), 50);
-    const results = searchDeepStars(q, limit);
-    res.json(results);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const limit = parseInt(String(req.query.limit || '10'), 10) || 10;
+    res.json(await stars.search(q, limit));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -33,18 +33,17 @@ starsRouter.get('/api/stars/search', (req, res) => {
  *       200:
  *         description: Nearby stars returned successfully
  */
-starsRouter.get('/api/stars/nearby', (req, res) => {
+starsRouter.get('/api/stars/nearby', async (req, res) => {
   try {
     const ra = parseFloat(String(req.query.ra || '0'));
     const dec = parseFloat(String(req.query.dec || '0'));
     const radius = parseFloat(String(req.query.radius || '5'));
     const magLimit = parseFloat(String(req.query.magLimit || '10'));
-    const limit = Math.min(Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20), 100);
+    const limit = parseInt(String(req.query.limit || '20'), 10) || 20;
 
-    const results = searchStarsByPosition(ra, dec, radius, magLimit, limit);
-    res.json(results);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await stars.nearby({ ra, dec, radius, magLimit, limit }));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -63,20 +62,10 @@ starsRouter.get('/api/stars/nearby', (req, res) => {
  *       200:
  *         description: Star details returned successfully
  */
-starsRouter.get('/api/stars/:hip', (req, res) => {
+starsRouter.get('/api/stars/:hip', async (req, res) => {
   try {
-    const hip = parseInt(req.params.hip, 10);
-    if (isNaN(hip)) {
-      res.status(400).json({ error: 'HIP invalide', code: 'INVALID_HIP' });
-      return;
-    }
-    const star = getDeepStarByHip(hip);
-    if (!star) {
-      res.status(404).json({ error: 'Étoile introuvable', code: 'STAR_NOT_FOUND' });
-      return;
-    }
-    res.json(star);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json(await stars.getByHip(parseInt(req.params.hip, 10)));
+  } catch (err) {
+    sendError(res, err);
   }
 });

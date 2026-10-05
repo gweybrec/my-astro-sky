@@ -25,6 +25,7 @@ async function makeServices() {
     gearCatalog: { telescopes: [], cameras: [], accessories: [], filters: [] },
     images: fakeImageCodec(),
     blobs: memoryBlobStore(),
+    stars: [],
   });
 }
 
