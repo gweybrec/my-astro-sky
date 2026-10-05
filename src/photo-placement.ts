@@ -525,7 +525,7 @@ export function derivePlacementFromMatrix(
  * (larger = bigger photo); `initialValue` is the slider value when the mode opened, which reads
  * "100 %". Whole percent, non-breaking space before the sign (French typography).
  */
-export function formatZoomPercent(value: number, initialValue = 0): string {
+export function formatZoomPercent(projPerPx: number, initialProjPerPx: number): string {
   const nbsp = String.fromCharCode(160);
-  return `${Math.round(Math.pow(2, value - initialValue) * 100)}${nbsp}%`;
+  return `${Math.round((projPerPx / initialProjPerPx) * 100)}${nbsp}%`;
 }

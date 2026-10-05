@@ -443,15 +443,14 @@ describe('extractMatrixFromTransform', () => {
 const NBSP = String.fromCharCode(160);
 
 describe('formatZoomPercent', () => {
-  it('reads 100 % at the value the mode opened with', () => {
-    expect(formatZoomPercent(0)).toBe(`100${NBSP}%`);
-    expect(formatZoomPercent(-1.3, -1.3)).toBe(`100${NBSP}%`);
+  it('reads 100 % at the size the mode opened with', () => {
+    expect(formatZoomPercent(0.004, 0.004)).toBe(`100${NBSP}%`);
   });
 
-  it('doubles per slider unit and rounds to a whole percent', () => {
-    expect(formatZoomPercent(1)).toBe(`200${NBSP}%`);
-    expect(formatZoomPercent(-1)).toBe(`50${NBSP}%`);
-    expect(formatZoomPercent(0.5, -0.5)).toBe(`200${NBSP}%`);
-    expect(formatZoomPercent(-6)).toBe(`2${NBSP}%`);
+  it('is the ratio of the current size to the opening size, whatever changed it', () => {
+    expect(formatZoomPercent(0.008, 0.004)).toBe(`200${NBSP}%`);
+    expect(formatZoomPercent(0.002, 0.004)).toBe(`50${NBSP}%`);
+    // three wheel notches of 1.1
+    expect(formatZoomPercent(0.004 * 1.1 ** 3, 0.004)).toBe(`133${NBSP}%`);
   });
 });
