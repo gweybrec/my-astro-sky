@@ -1,26 +1,16 @@
-import { createDsoOverrideService } from '@myastrosky/core/services/dso-overrides';
-import { createGearService } from '@myastrosky/core/services/gear';
-import { createPoiCategoryService } from '@myastrosky/core/services/poi-categories';
-import { createSettingsService } from '@myastrosky/core/services/settings';
-import { createSkyRegionService } from '@myastrosky/core/services/sky-regions';
 import { v4 as uuidv4 } from 'uuid';
+import { createServices } from './create-services.js';
 import { getConnection } from './db.js';
 import { loadBuiltInGearCatalog } from './gear-catalog.js';
 import { createServerSecretCodec } from './secret-codec.js';
 import { createBetterSqliteDb } from './sqlite-adapter.js';
 
-const db = createBetterSqliteDb(getConnection());
-
-export const gear = createGearService({
-  db,
+const services = createServices({
+  db: createBetterSqliteDb(getConnection()),
   newId: uuidv4,
-  catalog: loadBuiltInGearCatalog(),
-});
-export const dsoOverrides = createDsoOverrideService({ db });
-export const poiCategories = createPoiCategoryService({ db, newId: uuidv4 });
-export const skyRegions = createSkyRegionService({ db, newId: uuidv4 });
-export const settings = createSettingsService({
-  db,
   secrets: createServerSecretCodec(),
   env: (k) => process.env[k],
+  gearCatalog: loadBuiltInGearCatalog(),
 });
+
+export const { gear, dsoOverrides, poiCategories, skyRegions, settings } = services;
