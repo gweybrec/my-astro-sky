@@ -6,18 +6,24 @@
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  SQL_LEGACY_CALL_IN_TX,
-  SQL_TX_AWAITED_NON_DB,
-  SQL_TX_NESTED,
-  SQL_TX_OUTER_CALL,
-} from '@myastrosky/core/ports/sql-db';
-import type { SqlDb, SqlTx } from '@myastrosky/core/ports/sql-db';
+import { SQL_LEGACY_CALL_IN_TX, SQL_TX_AWAITED_NON_DB } from '@myastrosky/core/ports/sql-db';
+import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { describeSqlDbConformance } from '../helpers/sql-db-conformance';
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-describe('createBetterSqliteDb', () => {
+describeSqlDbConformance('better-sqlite3 adapter', async () => {
+  const conn = new Database(':memory:');
+  return {
+    db: createBetterSqliteDb(conn),
+    close: async () => {
+      conn.close();
+    },
+  };
+});
+
+describe('createBetterSqliteDb (specific to better-sqlite3)', () => {
   let conn: Database.Database;
   let db: SqlDb;
 
@@ -31,79 +37,6 @@ describe('createBetterSqliteDb', () => {
   afterEach(() => conn.close());
 
   const count = async () => (await db.get<{ c: number }>('SELECT COUNT(*) AS c FROM t'))!.c;
-
-  it('a. run / get / all / exec', async () => {
-    const r1 = await db.run('INSERT INTO t (name, n) VALUES (?, ?)', ['a', 1]);
-    expect(r1).toEqual({ changes: 1, lastInsertRowid: 1 });
-    const r2 = await db.run('INSERT INTO t (name, n) VALUES (?, ?)', ['b', 2]);
-    expect(r2.lastInsertRowid).toBe(2);
-    const upd = await db.run('UPDATE t SET n = n + 10');
-    expect(upd.changes).toBe(2);
-    expect(upd.lastInsertRowid).toBeUndefined();
-    expect(await db.get<{ name: string }>('SELECT name FROM t WHERE id = ?', [2])).toEqual({
-      name: 'b',
-    });
-    expect(await db.get('SELECT * FROM t WHERE id = ?', [99])).toBeUndefined();
-    const rows = await db.all<{ name: string; n: number }>('SELECT name, n FROM t ORDER BY id');
-    expect(rows).toEqual([
-      { name: 'a', n: 11 },
-      { name: 'b', n: 12 },
-    ]);
-    await db.exec("INSERT INTO t (name) VALUES ('x'); INSERT INTO t (name) VALUES ('y');");
-    expect(await count()).toBe(4);
-    await expect(db.run('INSERT INTO nope VALUES (1)')).rejects.toThrow();
-  });
-
-  it('b. null and Uint8Array binding', async () => {
-    const bytes = new Uint8Array([0, 1, 2, 255, 128]);
-    // A view over a larger buffer: only the viewed bytes must be bound.
-    const big = new Uint8Array([9, 9, 0, 1, 2, 255, 128, 9]);
-    await db.run('INSERT INTO t (name, data) VALUES (?, ?)', [null, bytes]);
-    await db.run('INSERT INTO t (name, data) VALUES (?, ?)', ['v', big.subarray(2, 7)]);
-    const rows = await db.all<{ name: string | null; data: Uint8Array }>(
-      'SELECT name, data FROM t ORDER BY id',
-    );
-    expect(rows[0].name).toBeNull();
-    expect(Array.from(rows[0].data)).toEqual(Array.from(bytes));
-    expect(Array.from(rows[1].data)).toEqual(Array.from(bytes));
-    expect(await db.get('SELECT 1 AS x WHERE ? IS NULL', [null])).toEqual({ x: 1 });
-  });
-
-  it('c. batch is atomic outside a transaction', async () => {
-    await db.batch([
-      { sql: 'INSERT INTO t (name) VALUES (?)', params: ['a'] },
-      { sql: 'INSERT INTO t (name) VALUES (?)', params: ['b'] },
-    ]);
-    expect(await count()).toBe(2);
-    await expect(
-      db.batch([
-        { sql: 'INSERT INTO t (name) VALUES (?)', params: ['c'] },
-        { sql: 'INSERT INTO nope VALUES (1)' },
-      ]),
-    ).rejects.toThrow();
-    expect(await count()).toBe(2);
-  });
-
-  it('d. transaction commits and returns the value; rolls back on a throw', async () => {
-    const value = await db.transaction(async (tx) => {
-      await tx.run('INSERT INTO t (name) VALUES (?)', ['a']);
-      const row = await tx.get<{ name: string }>('SELECT name FROM t');
-      await tx.batch([{ sql: 'INSERT INTO t (name) VALUES (?)', params: ['b'] }]);
-      return row!.name;
-    });
-    expect(value).toBe('a');
-    expect(await count()).toBe(2);
-
-    const boom = new Error('boom');
-    await expect(
-      db.transaction(async (tx) => {
-        await tx.run('INSERT INTO t (name) VALUES (?)', ['c']);
-        throw boom;
-      }),
-    ).rejects.toBe(boom);
-    expect(await count()).toBe(2);
-    expect(conn.inTransaction).toBe(false);
-  });
 
   it('e. a body that awaits a timer is rolled back with SQL_TX_AWAITED_NON_DB', async () => {
     let lateError: unknown;
@@ -130,50 +63,6 @@ describe('createBetterSqliteDb', () => {
     expect(await count()).toBe(1);
   });
 
-  it('f. concurrent transactions do not overlap', async () => {
-    const log: string[] = [];
-    const make = (label: string) =>
-      db.transaction(async (tx) => {
-        log.push(`${label}:start`);
-        await tx.run('INSERT INTO t (name) VALUES (?)', [label]);
-        await tx.get('SELECT 1');
-        log.push(`${label}:end`);
-        return label;
-      });
-    const results = await Promise.all([
-      make('a'),
-      make('b'),
-      db.run('INSERT INTO t (name) VALUES (?)', ['plain']),
-    ]);
-    expect(results.slice(0, 2)).toEqual(['a', 'b']);
-    expect(log).toEqual(['a:start', 'a:end', 'b:start', 'b:end']);
-    expect(await count()).toBe(3);
-  });
-
-  it('g. a nested transaction rejects with SQL_TX_NESTED; the outer one can commit', async () => {
-    let nested: unknown;
-    await db.transaction(async (tx) => {
-      await tx.run('INSERT INTO t (name) VALUES (?)', ['outer']);
-      await db.transaction(async () => {}).catch((e) => (nested = e));
-    });
-    expect((nested as { code?: string }).code).toBe(SQL_TX_NESTED);
-    expect(await count()).toBe(1);
-  });
-
-  it('i. a plain call on the outer SqlDb inside a body rejects with SQL_TX_OUTER_CALL', async () => {
-    let outer: unknown;
-    await db.transaction(async (tx) => {
-      await tx.run('INSERT INTO t (name) VALUES (?)', ['inside']);
-      await db.run('INSERT INTO t (name) VALUES (?)', ['outer']).catch((e) => (outer = e));
-      await db.get('SELECT 1').catch(() => {});
-      await tx.run('INSERT INTO t (name) VALUES (?)', ['inside2']);
-    });
-    expect((outer as { code?: string }).code).toBe(SQL_TX_OUTER_CALL);
-    const names = await db.all<{ name: string }>('SELECT name FROM t ORDER BY id');
-    expect(names.map((r) => r.name)).toEqual(['inside', 'inside2']);
-    expect(conn.inTransaction).toBe(false);
-  });
-
   it('j. an outer call after the body awaited a timer rejects with SQL_TX_AWAITED_NON_DB', async () => {
     let late: unknown;
     const p = db.transaction(async (tx) => {
@@ -191,18 +80,6 @@ describe('createBetterSqliteDb', () => {
     expect((late as { code?: string }).code).toBe(SQL_TX_AWAITED_NON_DB);
     expect(conn.inTransaction).toBe(false);
     expect(await count()).toBe(0);
-  });
-
-  it('k. a function taking a SqlTx works with tx and with the outer SqlDb', async () => {
-    const addRow = async (target: SqlTx, name: string) => {
-      await target.run('INSERT INTO t (name) VALUES (?)', [name]);
-    };
-    await db.transaction(async (tx) => {
-      await addRow(tx, 'via-tx');
-    });
-    await addRow(db, 'via-db');
-    const names = await db.all<{ name: string }>('SELECT name FROM t ORDER BY id');
-    expect(names.map((r) => r.name)).toEqual(['via-tx', 'via-db']);
   });
 
   it('l. 250 different SQL texts in a row all work (statement cache cap)', async () => {

@@ -12,6 +12,7 @@ import {
 } from '@myastrosky/core/services/poi-categories';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 const DEFAULTS = [
@@ -22,7 +23,7 @@ const DEFAULTS = [
   { id: 'cat-supernova', name: 'Supernova', color: '#ff5a5a', position: 4 },
 ];
 
-describe('PoiCategoryService', () => {
+describe.each(SQL_ADAPTERS)('PoiCategoryService (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: SqlDb;
   let svc: PoiCategoryService;
@@ -30,7 +31,7 @@ describe('PoiCategoryService', () => {
 
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = createBetterSqliteDb(conn);
+    db = wrap(createBetterSqliteDb(conn));
     await initSchema(db);
     counter = 0;
     svc = createPoiCategoryService({ db, newId: () => `id${++counter}` });
@@ -209,12 +210,12 @@ describe('PoiCategoryService', () => {
   });
 });
 
-describe('PoiCategoryService round trips', () => {
+describe.each(SQL_ADAPTERS)('PoiCategoryService round trips (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: CountingSqlDb;
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = countingSqlDb(createBetterSqliteDb(conn));
+    db = countingSqlDb(wrap(createBetterSqliteDb(conn)));
     await initSchema(db);
     db.reset();
   });

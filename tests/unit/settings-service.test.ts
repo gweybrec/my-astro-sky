@@ -17,6 +17,7 @@ import {
   type SettingsService,
 } from '@myastrosky/core/services/settings';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 const LOCKED_BODY = {
@@ -39,7 +40,7 @@ function fakeCodec(state: { enabled: boolean }): SecretCodec {
   };
 }
 
-describe('SettingsService', () => {
+describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: SqlDb;
   let svc: SettingsService;
@@ -48,7 +49,7 @@ describe('SettingsService', () => {
 
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = createBetterSqliteDb(conn);
+    db = wrap(createBetterSqliteDb(conn));
     await initSchema(db);
     codec = { enabled: false };
     env = {};
@@ -520,12 +521,12 @@ describe('SettingsService and the old getSetting/setSetting of server/db.ts', ()
   });
 });
 
-describe('SettingsService round trips', () => {
+describe.each(SQL_ADAPTERS)('SettingsService round trips (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: CountingSqlDb;
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = countingSqlDb(createBetterSqliteDb(conn));
+    db = countingSqlDb(wrap(createBetterSqliteDb(conn)));
     await initSchema(db);
     db.reset();
   });

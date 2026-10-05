@@ -10,6 +10,7 @@ import type { CustomGearType, GearCatalog } from '@myastrosky/core/domain/gear';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createGearService, type GearService } from '@myastrosky/core/services/gear';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 const CATALOG: GearCatalog = {
@@ -22,7 +23,7 @@ const CATALOG: GearCatalog = {
   filters: [{ id: 'fil-1', brand: 'Optolong', model: 'L-eXtreme' }],
 };
 
-describe('GearService', () => {
+describe.each(SQL_ADAPTERS)('GearService (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: SqlDb;
   let svc: GearService;
@@ -33,7 +34,7 @@ describe('GearService', () => {
 
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = createBetterSqliteDb(conn);
+    db = wrap(createBetterSqliteDb(conn));
     await initSchema(db);
     counter = 0;
     svc = make();
@@ -464,12 +465,12 @@ describe('GearService', () => {
   });
 });
 
-describe('GearService round trips', () => {
+describe.each(SQL_ADAPTERS)('GearService round trips (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: CountingSqlDb;
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = countingSqlDb(createBetterSqliteDb(conn));
+    db = countingSqlDb(wrap(createBetterSqliteDb(conn)));
     await initSchema(db);
     db.reset();
   });

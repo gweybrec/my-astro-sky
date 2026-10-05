@@ -13,16 +13,17 @@ import {
 } from '@myastrosky/core/services/dso-overrides';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
-describe('DsoOverrideService', () => {
+describe.each(SQL_ADAPTERS)('DsoOverrideService (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: SqlDb;
   let svc: DsoOverrideService;
 
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = createBetterSqliteDb(conn);
+    db = wrap(createBetterSqliteDb(conn));
     await initSchema(db);
     svc = createDsoOverrideService({ db });
   });
@@ -150,12 +151,12 @@ describe('validateDsoOverrideCoords', () => {
   });
 });
 
-describe('DsoOverrideService round trips', () => {
+describe.each(SQL_ADAPTERS)('DsoOverrideService round trips (%s)', (_adapter, wrap) => {
   let conn: Database.Database;
   let db: CountingSqlDb;
   beforeEach(async () => {
     conn = new Database(':memory:');
-    db = countingSqlDb(createBetterSqliteDb(conn));
+    db = countingSqlDb(wrap(createBetterSqliteDb(conn)));
     await initSchema(db);
     db.reset();
   });
