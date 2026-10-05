@@ -40,7 +40,7 @@ This workflow does **not** build or run Electron — it only validates that the 
 
 ## Docker (`docker.yml`)
 
-**Trigger:** push or PR to `master`, **path-filtered** — only runs when something that affects the image changes (`Dockerfile`, `docker-compose.yml`, `.dockerignore`, `server/**`, `public/**`, `resources/**`, `src/**`, `packages/**`, `index.html`, `package*.json`, `vite.config.ts`, `uno.config.ts`, `tsconfig*.json`, or the workflow itself). Doc-only changes don't trigger a build.
+**Trigger:** push or PR to `master` or `dev`, **path-filtered** — only runs when something that affects the image changes (`Dockerfile`, `docker-compose.yml`, `.dockerignore`, `server/**`, `public/**`, `resources/**`, `src/**`, `packages/**`, `index.html`, `package*.json`, `vite.config.ts`, `uno.config.ts`, `tsconfig*.json`, or the workflow itself). Doc-only changes don't trigger a build.
 
 **Runner:** `ubuntu-latest`
 
