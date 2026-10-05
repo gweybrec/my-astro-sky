@@ -1057,13 +1057,9 @@ body {
   z-index: var(--z-modal);
 }
 
-/* Ensure modal/export, labels-dropdown, and FOV popup checkboxes (and modal radios) use the same accent color */
-.modal input[type='checkbox'],
-.modal input[type='radio'],
-.modal-panel input[type='checkbox'],
-.search-dropdown.labels-dropdown input[type='checkbox'],
-.dropdown-panel input[type='checkbox'],
-.fov-popup input[type='checkbox'] {
+/* Every native checkbox and radio: drawn dark (unticked = dark box, as on the phone design) with the accent colour when ticked. :where() keeps specificity at 0 so the danger/gear variants below still win. */
+:where(input[type='checkbox'], input[type='radio']) {
+  color-scheme: dark;
   accent-color: var(--accent-color);
 }
 .modal input[type='checkbox'].checkbox-danger,
