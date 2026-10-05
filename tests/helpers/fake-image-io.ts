@@ -49,6 +49,9 @@ export function fakeImageCodec(): FakeImageCodec {
     async encode() {
       return new Uint8Array([1]);
     },
+    async decode() {
+      throw new Error('the fake codec does not decode');
+    },
   };
   return codec;
 }

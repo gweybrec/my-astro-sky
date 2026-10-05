@@ -8,6 +8,7 @@ import { createFsBlobStore } from './blob-store.js';
 import { createSharpImageCodec } from './image-codec.js';
 import { createFetchHttpClient } from './http-client.js';
 import { createBetterSqliteDb } from './sqlite-adapter.js';
+import { logServerError } from './logger.js';
 import { loadDeepCatalog } from './star-search.js';
 
 const services = createServices({
@@ -22,6 +23,7 @@ const services = createServices({
   stars: loadDeepCatalog,
   http: createFetchHttpClient(),
   now: Date.now,
+  log: logServerError,
 });
 
 export const {
@@ -34,4 +36,5 @@ export const {
   photos,
   stars,
   identify,
+  horizon,
 } = services;

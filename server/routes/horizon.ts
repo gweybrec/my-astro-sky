@@ -1,6 +1,7 @@
 import express from 'express';
-import { horizonCacheKey, getCachedHorizon, setCachedHorizon } from '../db.js';
-import { computeHorizon } from '../horizon.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import { horizon } from '../services.js';
+import { sendError } from './http-errors.js';
 import { logServerError } from '../logger.js';
 
 export const horizonRouter = express.Router();
@@ -41,31 +42,23 @@ export const horizonRouter = express.Router();
  *         description: Failed to fetch or process elevation data
  */
 horizonRouter.get('/api/horizon', async (req, res) => {
-  const lat = Number(req.query.lat);
-  const lon = Number(req.query.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90) {
-    res.status(400).json({ error: 'Invalid or missing lat/lon' });
-    return;
-  }
-  const radiusKm = Number.isFinite(Number(req.query.radiusKm)) ? Number(req.query.radiusKm) : 40;
-  const obsHeightM =
-    req.query.obsHeightM !== undefined && Number.isFinite(Number(req.query.obsHeightM))
-      ? Number(req.query.obsHeightM)
-      : null;
-
-  const key = horizonCacheKey(lat, lon, radiusKm, obsHeightM);
-  const cached = getCachedHorizon(key);
-  if (cached) {
-    res.json(cached);
-    return;
-  }
-
+  const radiusKm = Number(req.query.radiusKm);
   try {
-    const profile = await computeHorizon(lat, lon, { radiusKm, obsHeightM });
-    setCachedHorizon(key, profile);
+    const profile = await horizon.getProfile({
+      lat: Number(req.query.lat),
+      lon: Number(req.query.lon),
+      radiusKm: Number.isFinite(radiusKm) ? radiusKm : 40,
+      obsHeightM:
+        req.query.obsHeightM !== undefined && Number.isFinite(Number(req.query.obsHeightM))
+          ? Number(req.query.obsHeightM)
+          : null,
+    });
     res.json(profile);
   } catch (err) {
-    logServerError('horizon_compute_failed', err);
-    res.status(502).json({ error: 'Failed to compute horizon from elevation data' });
+    // The compute failure carries the original error as its cause, which is what the log wants.
+    if (isDomainError(err) && err.code === 'HORIZON_COMPUTE_FAILED') {
+      logServerError('horizon_compute_failed', err.cause ?? err);
+    }
+    sendError(res, err);
   }
 });

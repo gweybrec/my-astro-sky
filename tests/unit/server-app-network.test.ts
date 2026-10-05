@@ -14,6 +14,7 @@ import path from 'path';
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import type express from 'express';
+import sharp from 'sharp';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 
 const FIXTURES = path.join(__dirname, '../fixtures');
@@ -28,10 +29,14 @@ interface Recorded {
   url: string;
   method: string;
   headers: Record<string, string>;
+  body?: string;
 }
 
-type Upstream =
-  { status: number; body: string; headers?: Record<string, string> } | { reject: string };
+type UpstreamReply =
+  | { status: number; body: string | Uint8Array; headers?: Record<string, string> }
+  | { reject: string };
+/** One reply for every request, or a function that answers each URL (the horizon needs several). */
+type Upstream = UpstreamReply | ((url: string) => UpstreamReply);
 
 let app: express.Express;
 let server: Server;
@@ -70,9 +75,15 @@ beforeAll(async () => {
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
     if (url.startsWith(base)) return realFetch(input as string, init);
-    recorded.push({ url, method: init?.method ?? 'GET', headers: headersOf(init) });
-    if ('reject' in upstream) throw new Error(upstream.reject);
-    return new Response(upstream.body, { status: upstream.status, headers: upstream.headers });
+    recorded.push({
+      url,
+      method: init?.method ?? 'GET',
+      headers: headersOf(init),
+      body: typeof init?.body === 'string' ? init.body : undefined,
+    });
+    const reply = typeof upstream === 'function' ? upstream(url) : upstream;
+    if ('reject' in reply) throw new Error(reply.reject);
+    return new Response(reply.body as BodyInit, { status: reply.status, headers: reply.headers });
   });
 }, 30_000);
 
@@ -388,4 +399,191 @@ describe('GET /api/comets/elements', () => {
     expect(second).toEqual(first);
     expect(recorded).toHaveLength(1);
   });
+});
+// ─── GET /api/horizon ─────────────────────────────────────────────────────────
+
+describe('GET /api/horizon', () => {
+  const TILE_URL =
+    /^https:\/\/s3\.amazonaws\.com\/elevation-tiles-prod\/terrarium\/12\/\d+\/\d+\.png$/;
+  const OVERPASS_URLS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+  ];
+  const PEAKS = JSON.stringify({
+    elements: [
+      {
+        type: 'node',
+        lat: 45.123,
+        lon: 6.48,
+        tags: { name: 'Pic Test', ele: '2500' },
+      },
+      { type: 'node', lat: 45.1, lon: 6.4, tags: { ele: '900' } },
+    ],
+  });
+
+  /** A Terrarium tile: elevation rises from 500 m (west edge) to 1010 m (east edge), 2 m per pixel. */
+  async function terrainTile(): Promise<Uint8Array> {
+    const raw = Buffer.alloc(256 * 256 * 3);
+    for (let y = 0; y < 256; y++) {
+      for (let x = 0; x < 256; x++) {
+        const v = 32768 + 500 + x * 2;
+        const i = (y * 256 + x) * 3;
+        raw[i] = v >> 8;
+        raw[i + 1] = v & 255;
+      }
+    }
+    return new Uint8Array(
+      await sharp(raw, { raw: { width: 256, height: 256, channels: 3 } })
+        .png()
+        .toBuffer(),
+    );
+  }
+
+  let tile: Uint8Array;
+  beforeAll(async () => {
+    tile = await terrainTile();
+  });
+
+  const answer =
+    (overpass: UpstreamReply, tileReply?: UpstreamReply) =>
+    (url: string): UpstreamReply =>
+      TILE_URL.test(url) ? (tileReply ?? { status: 200, body: tile }) : overpass;
+
+  const tileRequests = () => recorded.filter((r) => TILE_URL.test(r.url));
+  const overpassRequests = () => recorded.filter((r) => r.url.includes('/api/interpreter'));
+
+  it.each([
+    ['lat missing', '?lon=6'],
+    ['lon missing', '?lat=45'],
+    ['lat not a number', '?lat=abc&lon=6'],
+    ['lat above 90', '?lat=91&lon=6'],
+    ['lat below -90', '?lat=-91&lon=6'],
+  ])('rejects %s with 400 and calls nobody', async (_label, query) => {
+    const r = await call('GET', `/api/horizon${query}`);
+    expect(r).toEqual({
+      status: 400,
+      body: { error: 'Invalid or missing lat/lon' },
+    });
+    expect(recorded).toHaveLength(0);
+  });
+
+  it('fetches the DEM tiles and the peaks, answers with the profile, then serves the cache', async () => {
+    upstream = answer({ status: 200, body: PEAKS });
+    const r = await call('GET', '/api/horizon?lat=45.123&lon=6.456&radiusKm=3&obsHeightM=2');
+    expect(r.status).toBe(200);
+    expect(Object.keys(r.body)).toEqual([
+      'lat',
+      'lon',
+      'obsHeightM',
+      'azStepDeg',
+      'alts',
+      'layers',
+      'summits',
+      'source',
+    ]);
+    expect(r.body).toMatchObject({
+      lat: 45.123,
+      lon: 6.456,
+      obsHeightM: 2,
+      azStepDeg: 1,
+      source: 'auto',
+    });
+    expect(r.body.alts).toHaveLength(360);
+    expect(r.body.layers.map((l: any) => l.maxDistKm)).toEqual([2, 3]);
+    expect(r.body.layers[1].alts).toEqual(r.body.alts);
+    expect(r.body.alts[90]).toBeCloseTo(4.1967, 3);
+    expect(r.body.alts[270]).toBeCloseTo(-4.296, 3);
+    expect(r.body.layers[0].alts[90]).toBeCloseTo(4.1811, 3);
+    expect(r.body.summits).toHaveLength(1);
+    expect(r.body.summits[0]).toMatchObject({ name: 'Pic Test', elevationM: 2500 });
+
+    expect(tileRequests().length).toBeGreaterThan(0);
+    for (const t of tileRequests()) {
+      expect(t.method).toBe('GET');
+      expect(t.headers).toEqual({});
+    }
+    const peaks = overpassRequests();
+    expect(peaks).toHaveLength(1);
+    expect(peaks[0].url).toBe(OVERPASS_URLS[0]);
+    expect(peaks[0].method).toBe('POST');
+    expect(peaks[0].headers['content-type']).toBe('application/x-www-form-urlencoded');
+    expect(peaks[0].headers['user-agent']).toBe('MyAstroSky (astro horizon feature)');
+    const query = decodeURIComponent(peaks[0].body!.replace(/^data=/, ''));
+    expect(query).toMatch(/^\[out:json\]\[timeout:30\];node\[natural=peak\]\(/);
+    expect(query).toMatch(/\);out;$/);
+
+    // Same rounded location (3 decimals), radius and eye height: the cache answers.
+    recorded = [];
+    const again = await call('GET', '/api/horizon?lat=45.1231&lon=6.4561&radiusKm=3&obsHeightM=2');
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(r.body);
+    expect(recorded).toHaveLength(0);
+  });
+
+  it('keys the cache on the eye height: no obsHeightM is a new computation answering null', async () => {
+    upstream = answer({ status: 200, body: PEAKS });
+    const r = await call('GET', '/api/horizon?lat=45.123&lon=6.456&radiusKm=3');
+    expect(r.status).toBe(200);
+    expect(r.body.obsHeightM).toBeNull();
+    expect(tileRequests().length).toBeGreaterThan(0);
+  });
+
+  it('treats a missing tile as sea level and still answers 200', async () => {
+    upstream = answer({ status: 200, body: '{"elements":[]}' }, { status: 404, body: 'nope' });
+    const r = await call('GET', '/api/horizon?lat=10.5&lon=20.5&radiusKm=3');
+    expect(r.status).toBe(200);
+    expect(r.body.summits).toEqual([]);
+    for (const a of r.body.alts) expect(a).toBeCloseTo(-0.0442, 3);
+  });
+
+  it('answers 200 with no summits when every Overpass attempt fails, trying the four endpoints in order', async () => {
+    upstream = answer({ status: 503, body: 'overloaded' });
+    const r = await call('GET', '/api/horizon?lat=30.5&lon=30.5&radiusKm=3');
+    expect(r.status).toBe(200);
+    expect(r.body.summits).toEqual([]);
+    expect(r.body.alts).toHaveLength(360);
+    expect(overpassRequests().map((q) => q.url)).toEqual(OVERPASS_URLS);
+  }, 15_000);
+
+  it('answers 502 when a tile request fails, and caches nothing', async () => {
+    upstream = { reject: 'ECONNRESET' };
+    const r = await call('GET', '/api/horizon?lat=-20.5&lon=140.5&radiusKm=3');
+    expect(r).toEqual({
+      status: 502,
+      body: { error: 'Failed to compute horizon from elevation data' },
+    });
+    upstream = answer({ status: 200, body: '{"elements":[]}' });
+    const retry = await call('GET', '/api/horizon?lat=-20.5&lon=140.5&radiusKm=3');
+    expect(retry.status).toBe(200);
+  });
+
+  it('answers 502 when a tile is not a readable image', async () => {
+    upstream = answer({ status: 200, body: '{"elements":[]}' }, { status: 200, body: 'not a png' });
+    const r = await call('GET', '/api/horizon?lat=-30.5&lon=150.5&radiusKm=3');
+    expect(r).toEqual({
+      status: 502,
+      body: { error: 'Failed to compute horizon from elevation data' },
+    });
+  });
+
+  it('answers 502 before any request when the radius needs more than 400 tiles (clamped to 100 km)', async () => {
+    upstream = answer({ status: 200, body: PEAKS });
+    for (const radius of ['100', '1000']) {
+      const r = await call('GET', `/api/horizon?lat=45.5&lon=7.5&radiusKm=${radius}`);
+      expect(r).toEqual({
+        status: 502,
+        body: { error: 'Failed to compute horizon from elevation data' },
+      });
+    }
+    expect(recorded).toHaveLength(0);
+  });
+
+  it('uses a 40 km radius when radiusKm is not a number', async () => {
+    upstream = answer({ status: 200, body: '{"elements":[]}' });
+    const r = await call('GET', '/api/horizon?lat=60.5&lon=10.5&radiusKm=abc');
+    expect(r.status).toBe(200);
+    expect(r.body.layers.map((l: any) => l.maxDistKm)).toEqual([2, 4, 7, 11, 16, 23, 40]);
+  }, 30_000);
 });

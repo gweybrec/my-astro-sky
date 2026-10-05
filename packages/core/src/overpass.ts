@@ -2,7 +2,9 @@
 //
 // The DEM used to trace the horizon carries no place names, so summit labels come
 // from OSM. The parser is a pure function kept out of the fetch wrapper so it can
-// be unit-tested without the network (mirrors server/github-release.ts).
+// be unit-tested without the network. The requests go through the `HttpClient` port.
+
+import type { HttpClient } from './ports/http-client';
 
 export interface OverpassPeak {
   name: string;
@@ -61,51 +63,50 @@ export function parseOverpassPeaks(data: unknown): OverpassPeak[] {
 }
 
 async function fetchFromMirror(
+  http: HttpClient,
   url: string,
   query: string,
-  signal?: AbortSignal,
 ): Promise<OverpassPeak[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  const onAbort = () => controller.abort();
-  if (signal) signal.addEventListener('abort', onAbort, { once: true });
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'MyAstroSky (astro horizon feature)',
-      },
-      body: `data=${encodeURIComponent(query)}`,
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`Overpass ${url} responded ${res.status}`);
-    return parseOverpassPeaks(await res.json());
-  } finally {
-    clearTimeout(timeout);
-    if (signal) signal.removeEventListener('abort', onAbort);
+  const res = await http({
+    method: 'POST',
+    url,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'MyAstroSky (astro horizon feature)',
+    },
+    body: `data=${encodeURIComponent(query)}`,
+    timeoutMs: FETCH_TIMEOUT_MS,
+  });
+  if (res.status < 200 || res.status > 299) {
+    throw new Error(`Overpass ${url} responded ${res.status}`);
   }
+  return parseOverpassPeaks(JSON.parse(await res.text()));
 }
 
 const RETRY_BACKOFF_MS = 800;
+
+const sleepMs = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Fetch named peaks inside a bounding box from Overpass, retrying across
  * {@link ATTEMPT_URLS} until one succeeds. Best-effort by contract: the caller
  * catches and treats a throw as "no summits" (the horizon must never fail over
  * missing peaks), so we only throw once every attempt has failed. A per-attempt
- * 12 s timeout applies; the optional `signal` cancels the whole thing.
+ * 12 s timeout applies; `sleep` waits between attempts.
  */
-export async function fetchPeaks(bbox: BBox, signal?: AbortSignal): Promise<OverpassPeak[]> {
+export async function fetchPeaks(
+  http: HttpClient,
+  bbox: BBox,
+  sleep: (ms: number) => Promise<void> = sleepMs,
+): Promise<OverpassPeak[]> {
   const query = `[out:json][timeout:30];node[natural=peak](${bbox.south},${bbox.west},${bbox.north},${bbox.east});out;`;
   let lastErr: unknown = new Error('No Overpass endpoint configured');
   for (let i = 0; i < ATTEMPT_URLS.length; i++) {
-    if (signal?.aborted) break;
     try {
-      return await fetchFromMirror(ATTEMPT_URLS[i], query, signal);
+      return await fetchFromMirror(http, ATTEMPT_URLS[i], query);
     } catch (err) {
       lastErr = err;
-      if (i < ATTEMPT_URLS.length - 1) await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
+      if (i < ATTEMPT_URLS.length - 1) await sleep(RETRY_BACKOFF_MS);
     }
   }
   throw lastErr;

@@ -7,6 +7,7 @@ import type { SecretCodec } from '@myastrosky/core/ports/secret-codec';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createDsoOverrideService } from '@myastrosky/core/services/dso-overrides';
 import { createGearService } from '@myastrosky/core/services/gear';
+import { createHorizonService } from '@myastrosky/core/services/horizon';
 import { createIdentifyService } from '@myastrosky/core/services/identify';
 import { createPhotoService } from '@myastrosky/core/services/photos';
 import { createPlanService } from '@myastrosky/core/services/plans';
@@ -31,11 +32,16 @@ export interface ServiceDeps {
   http: HttpClient;
   /** The clock, in milliseconds since the epoch. */
   now: () => number;
+  /** Where services report a problem that does not fail the call. */
+  log?: (event: string, error: unknown, context?: Record<string, unknown>) => void;
+  /** Waits between retries of a network call; the services own timer when absent. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /** Builds every service on one database. Later service cards add theirs here. */
 export function createServices(deps: ServiceDeps) {
-  const { db, newId, secrets, env, gearCatalog, images, blobs, stars, http, now } = deps;
+  const { db, newId, secrets, env, gearCatalog, images, blobs, stars, http, now, log, sleep } =
+    deps;
   return {
     dsoOverrides: createDsoOverrideService({ db }),
     skyRegions: createSkyRegionService({ db, newId }),
@@ -46,6 +52,7 @@ export function createServices(deps: ServiceDeps) {
     photos: createPhotoService({ db, newId, images, blobs }),
     stars: createStarSearchService({ stars }),
     identify: createIdentifyService({ http, now }),
+    horizon: createHorizonService({ db, http, images, now, log, sleep }),
   };
 }
 

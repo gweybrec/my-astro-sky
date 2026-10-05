@@ -142,6 +142,16 @@ describe('createSharpImageCodec', () => {
       .toBuffer();
     expect([...back]).toEqual([...data]);
   });
+  it('decodes a PNG (RGB and RGBA) to its raw pixels, and rejects bytes that are not an image', async () => {
+    for (const channels of [3, 4] as const) {
+      const data = new Uint8Array(3 * 2 * channels).map((_, i) => (i * 11 + 5) % 256);
+      const png = await codec.encode({ width: 3, height: 2, channels, data }, 'png');
+      const decoded = await codec.decode(png);
+      expect([decoded.width, decoded.height, decoded.channels]).toEqual([3, 2, channels]);
+      expect([...decoded.data]).toEqual([...data]);
+    }
+    await expect(codec.decode(new Uint8Array([1, 2, 3]))).rejects.toThrow();
+  });
 });
 
 describe('createFsBlobStore', () => {

@@ -42,6 +42,16 @@ export function createSharpImageCodec(): ImageCodec {
       );
     },
 
+    async decode(bytes) {
+      const { data, info } = await sharp(bytes).raw().toBuffer({ resolveWithObject: true });
+      return {
+        width: info.width,
+        height: info.height,
+        channels: info.channels as 1 | 3 | 4,
+        data: toBytes(data),
+      };
+    },
+
     async encode(raw, format, quality) {
       const img = sharp(raw.data, {
         raw: { width: raw.width, height: raw.height, channels: raw.channels },

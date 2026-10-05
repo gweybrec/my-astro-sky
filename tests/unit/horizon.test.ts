@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { traceHorizonAngles, selectSkylineSummits } from '../../server/horizon';
-import type { OverpassPeak } from '../../server/overpass';
+import { traceHorizonAngles, selectSkylineSummits } from '@myastrosky/core/horizon-trace';
+import type { OverpassPeak } from '@myastrosky/core/overpass';
 
 const EARTH_R = 6371000;
 const DEG = Math.PI / 180;

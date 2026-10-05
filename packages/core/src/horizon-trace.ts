@@ -10,15 +10,13 @@
  * DEM source: AWS "elevation-tiles-prod" Terrarium PNG tiles (open data, no key),
  * RGB-encoded as `elevation_m = R*256 + G + B/256 - 32768`.
  *
- * Tiles are fetched server-side (avoiding browser CORS) and this whole loop runs
- * off the render thread — the same rationale as proxying astrometry.net in
- * server/astrometry.ts. Results are cached by the caller (see /api/horizon).
+ * The tiles are fetched and the result cached by the horizon service
+ * (services/horizon.ts); this module holds the pure parts: the tile maths, the ray
+ * trace and the choice of the summits on the skyline.
  */
 
-import sharp from 'sharp';
-import { fetchPeaks, type OverpassPeak } from './overpass.js';
-import { logServerError } from './logger.js';
-import type { HorizonSummit } from '@myastrosky/core/horizon-io';
+import type { OverpassPeak } from './overpass';
+import type { HorizonSummit } from './horizon-io';
 
 export type { HorizonSummit };
 
@@ -42,168 +40,30 @@ export interface HorizonProfileResult {
   source: 'auto';
 }
 
-const EARTH_R = 6371000; // m
+export const EARTH_R = 6371000; // m
 const REFRACTION_K = 0.13; // standard atmospheric refraction coefficient
 const R_EFF = EARTH_R / (1 - REFRACTION_K);
-const DEG = Math.PI / 180;
-const DEFAULT_EYE_HEIGHT_M = 1.7;
+export const DEG = Math.PI / 180;
+export const DEFAULT_EYE_HEIGHT_M = 1.7;
 const ALT_FLOOR_DEG = -5; // clamp valley-floor / below-observer horizons
-const TILE_ZOOM = 12; // ~38 m/px at the equator
-const TILE_SIZE = 256;
-const MAX_TILES = 400; // guardrail against an over-large radius
+export const TILE_ZOOM = 12; // ~38 m/px at the equator
+export const TILE_SIZE = 256;
+export const MAX_TILES = 400; // guardrail against an over-large radius
 const STEP_M = 30; // ray-march step distance
-const PEAK_QUERY_RADIUS_M = 30000; // cap the Overpass peak bbox (lighter query)
+export const PEAK_QUERY_RADIUS_M = 30000; // cap the Overpass peak bbox (lighter query)
 // Fine distance shells (km) so the near→far tone reads as continuous atmospheric
 // haze rather than a few chunky bands. The full radius is always appended as the
 // last shell (the true horizon).
-const SHELL_KM = [2, 4, 7, 11, 16, 23];
+export const SHELL_KM = [2, 4, 7, 11, 16, 23];
 
-const TILE_BASE = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
+export const TILE_BASE = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 
-function lon2tileX(lon: number, z: number): number {
+export function lon2tileX(lon: number, z: number): number {
   return ((lon + 180) / 360) * 2 ** z;
 }
-function lat2tileY(lat: number, z: number): number {
+export function lat2tileY(lat: number, z: number): number {
   const r = lat * DEG;
   return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z;
-}
-
-async function fetchTile(z: number, x: number, y: number): Promise<Float32Array | null> {
-  const url = `${TILE_BASE}/${z}/${x}/${y}.png`;
-  const res = await fetch(url);
-  if (!res.ok) return null; // missing tile (e.g. out of coverage) → treated as sea level
-  const buf = Buffer.from(await res.arrayBuffer());
-  const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true });
-  const ch = info.channels;
-  const out = new Float32Array(TILE_SIZE * TILE_SIZE);
-  for (let i = 0; i < TILE_SIZE * TILE_SIZE; i++) {
-    const r = data[i * ch];
-    const g = data[i * ch + 1];
-    const b = data[i * ch + 2];
-    out[i] = r * 256 + g + b / 256 - 32768;
-  }
-  return out;
-}
-
-/**
- * Compute a horizon profile for the given location.
- * @param radiusKm  search radius for terrain (default 40 km).
- * @param obsHeightM eye height above local ground (m); default 1.7 m.
- */
-export async function computeHorizon(
-  lat: number,
-  lon: number,
-  opts: { radiusKm?: number; obsHeightM?: number | null } = {},
-): Promise<HorizonProfileResult> {
-  const radiusKm = Math.max(1, Math.min(100, opts.radiusKm ?? 40));
-  const radiusM = radiusKm * 1000;
-  const z = TILE_ZOOM;
-
-  // Bounding box in degrees, padded so rays never leave the fetched grid.
-  const dLat = radiusM / EARTH_R / DEG;
-  const dLon = radiusM / (EARTH_R * Math.cos(lat * DEG)) / DEG;
-  const north = lat + dLat;
-  const south = lat - dLat;
-  const west = lon - dLon;
-  const east = lon + dLon;
-
-  const tx0 = Math.floor(lon2tileX(west, z));
-  const tx1 = Math.floor(lon2tileX(east, z));
-  const ty0 = Math.floor(lat2tileY(north, z)); // north = smaller tile-y
-  const ty1 = Math.floor(lat2tileY(south, z));
-  const tilesX = tx1 - tx0 + 1;
-  const tilesY = ty1 - ty0 + 1;
-  if (tilesX * tilesY > MAX_TILES) {
-    throw new Error(`Horizon radius too large: ${tilesX * tilesY} tiles exceeds ${MAX_TILES}`);
-  }
-
-  // Assemble one combined elevation grid covering the tile range.
-  const gw = tilesX * TILE_SIZE;
-  const gh = tilesY * TILE_SIZE;
-  const grid = new Float32Array(gw * gh);
-  const jobs: Promise<void>[] = [];
-  for (let ty = ty0; ty <= ty1; ty++) {
-    for (let tx = tx0; tx <= tx1; tx++) {
-      jobs.push(
-        fetchTile(z, tx, ty).then((tile) => {
-          if (!tile) return; // leave as 0 (sea level)
-          const ox = (tx - tx0) * TILE_SIZE;
-          const oy = (ty - ty0) * TILE_SIZE;
-          for (let py = 0; py < TILE_SIZE; py++) {
-            const dst = (oy + py) * gw + ox;
-            const src = py * TILE_SIZE;
-            grid.set(tile.subarray(src, src + TILE_SIZE), dst);
-          }
-        }),
-      );
-    }
-  }
-  await Promise.all(jobs);
-
-  // Global-pixel origin of the grid, so a lat/lon maps into it directly.
-  const gx0 = tx0 * TILE_SIZE;
-  const gy0 = ty0 * TILE_SIZE;
-
-  function elevationAt(latD: number, lonD: number): number {
-    const gx = lon2tileX(lonD, z) * TILE_SIZE - gx0;
-    const gy = lat2tileY(latD, z) * TILE_SIZE - gy0;
-    const x0 = Math.floor(gx);
-    const y0 = Math.floor(gy);
-    if (x0 < 0 || y0 < 0 || x0 >= gw - 1 || y0 >= gh - 1) return 0;
-    const fx = gx - x0;
-    const fy = gy - y0;
-    const i = y0 * gw + x0;
-    const h00 = grid[i];
-    const h10 = grid[i + 1];
-    const h01 = grid[i + gw];
-    const h11 = grid[i + gw + 1];
-    return h00 * (1 - fx) * (1 - fy) + h10 * fx * (1 - fy) + h01 * (1 - fx) * fy + h11 * fx * fy;
-  }
-
-  const obsGround = elevationAt(lat, lon);
-  const eyeHeight = opts.obsHeightM ?? DEFAULT_EYE_HEIGHT_M;
-  const obsElev = obsGround + eyeHeight;
-
-  // Ray-trace the skyline at nested distance shells (near→far). The last shell is
-  // the full radius = the true horizon; the nearer shells give the foreground
-  // ridges the renderer layers back-to-front for depth.
-  const shellsKm = [...new Set([...SHELL_KM.filter((k) => k < radiusKm), radiusKm])];
-  const shellsM = shellsKm.map((k) => k * 1000);
-  const shellAlts = traceHorizonAngles(elevationAt, lat, lon, { radiusM, obsElev, shellsM });
-  const alts = shellAlts[shellAlts.length - 1]; // farthest = true horizon
-  const layers: HorizonLayer[] = shellsKm.map((k, i) => ({ maxDistKm: k, alts: shellAlts[i] }));
-
-  // Named summits are best-effort: a failed/absent Overpass response must never
-  // fail the horizon itself (which is the important product here). The peak query
-  // is capped to a smaller radius than the terrain trace — distant peaks sit low
-  // on the sky, and a tighter bbox is far less likely to time out the public
-  // Overpass API.
-  let summits: HorizonSummit[] = [];
-  try {
-    const peakRadiusM = Math.min(radiusM, PEAK_QUERY_RADIUS_M);
-    const pdLat = peakRadiusM / EARTH_R / DEG;
-    const pdLon = peakRadiusM / (EARTH_R * Math.cos(lat * DEG)) / DEG;
-    const peaks = await fetchPeaks({
-      south: lat - pdLat,
-      west: lon - pdLon,
-      north: lat + pdLat,
-      east: lon + pdLon,
-    });
-    summits = selectSkylineSummits(peaks, alts, { lat, lon, obsElev }, elevationAt, { radiusM });
-  } catch (err) {
-    logServerError('overpass_fetch_failed', err, { lat, lon });
-  }
-
-  return {
-    lat,
-    lon,
-    obsHeightM: opts.obsHeightM ?? null,
-    azStepDeg: 1,
-    alts,
-    layers,
-    summits,
-    source: 'auto',
-  };
 }
 
 /**
