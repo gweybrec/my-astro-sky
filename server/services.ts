@@ -13,4 +13,4 @@ const services = createServices({
   gearCatalog: loadBuiltInGearCatalog(),
 });
 
-export const { gear, dsoOverrides, poiCategories, skyRegions, settings, plans } = services;
+export const { gear, dsoOverrides, poiCategories, skyRegions, settings, plans, photos } = services;

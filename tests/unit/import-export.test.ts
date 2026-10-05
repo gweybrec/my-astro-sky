@@ -9,6 +9,9 @@ import {
 } from '../../server/import-utils';
 import type { ZipEntry, ZipInspectResult } from '../../server/import-utils';
 import { createGearService } from '@myastrosky/core/services/gear';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import type { ManualPlacement } from '@myastrosky/core/types';
+import { createPhotoService, type PhotoService } from '@myastrosky/core/services/photos';
 import { createPlanService } from '@myastrosky/core/services/plans';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 
@@ -98,6 +101,76 @@ const MANIFEST_FIXTURE = [
     manualPlacement: { ra: 10.6847, dec: 41.2692, projPerPx: 0.00125, rotDeg: 22.5 },
   },
 ];
+
+// The photo service on the same in-memory database as the legacy `db` module.
+const photosOn = (db: typeof import('../../server/db.js')): PhotoService =>
+  createPhotoService({ db: createBetterSqliteDb(db.getConnection()) });
+
+/** The positional arguments of the old `createPhotoWithId`, as the object `importPhoto` takes. */
+function seedPhoto(
+  photos: PhotoService,
+  id: string,
+  filename: string,
+  originalName: string,
+  width: number,
+  height: number,
+  correspondences: unknown[],
+  createdAt?: string | null,
+  manualPlacement?: string | null,
+  dsoIds?: string[],
+  labels?: string[],
+  notes?: string,
+  strategy: 'skip' | 'replace' = 'skip',
+  integrations?: unknown[],
+) {
+  return photos.importPhoto(
+    {
+      id,
+      filename,
+      originalName,
+      width,
+      height,
+      correspondences,
+      createdAt,
+      manualPlacement: manualPlacement ? (JSON.parse(manualPlacement) as ManualPlacement) : null,
+      dsoIds,
+      labels,
+      notes,
+      integrations,
+    },
+    strategy,
+  );
+}
+
+/** `updateMetadata` as the old `updatePhotoMetadata` answered: true when the photo was updated, false when it does not exist. */
+async function updateMeta(
+  photos: PhotoService,
+  id: string,
+  dsoIds: string[],
+  labels: string[],
+  notes: string,
+  originalName?: string,
+  integrations?: unknown[],
+): Promise<boolean> {
+  try {
+    await photos.updateMetadata(id, { dsoIds, labels, notes, originalName, integrations } as never);
+    return true;
+  } catch (e) {
+    if (isDomainError(e) && e.code === 'PHOTO_NOT_FOUND') return false;
+    throw e;
+  }
+}
+
+/** `setOrder` as the old `updatePhotoDrawOrder` answered: true when the order was written, false when the list was refused. */
+async function reorder(photos: PhotoService, ids: string[]): Promise<boolean> {
+  try {
+    await photos.setOrder(ids);
+    return true;
+  } catch (e) {
+    if (isDomainError(e) && e.code === 'INVALID_PHOTO_ORDER') return false;
+    throw e;
+  }
+}
 
 // ─── isValidZipEntryPath ──────────────────────────────────────────────────────
 
@@ -206,10 +279,11 @@ describe('DB import/export round-trip', () => {
     vi.unstubAllEnvs();
   });
 
-  it('createPhotoWithId inserts all fields and getAllPhotos returns them correctly', async () => {
-    const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
+  it('importPhoto inserts all fields and list returns them correctly', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
 
-    const result = createPhotoWithId(
+    const result = await seedPhoto(
+      photos,
       'test-id-1',
       'test-id-1.jpg',
       'M101.jpg',
@@ -227,7 +301,7 @@ describe('DB import/export round-trip', () => {
 
     expect(result).toBe('imported');
 
-    const all = getAllPhotos();
+    const all = await photos.list();
     expect(all).toHaveLength(1);
 
     const p = all[0];
@@ -246,11 +320,12 @@ describe('DB import/export round-trip', () => {
     expect(p.correspondences[1].starDec).toBeCloseTo(-8.2016, 4);
   });
 
-  it('createPhotoWithId preserves manualPlacement', async () => {
-    const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
+  it('importPhoto preserves manualPlacement', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
     const mp = { ra: 83.82, dec: -5.39, projPerPx: 0.002, rotDeg: 0 };
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'mp-test',
       'mp-test.jpg',
       'Orion.jpg',
@@ -265,14 +340,14 @@ describe('DB import/export round-trip', () => {
       'skip',
     );
 
-    const p = getAllPhotos()[0];
+    const p = (await photos.list())[0];
     expect(p.manualPlacement).toBeDefined();
     expect(p.manualPlacement!.ra).toBeCloseTo(83.82, 2);
     expect(p.manualPlacement!.dec).toBeCloseTo(-5.39, 2);
   });
 
   it('strategy=skip returns "skipped" and leaves existing photo unchanged', async () => {
-    const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
     const minCorrs = [
       {
         pointIndex: 0,
@@ -294,7 +369,8 @@ describe('DB import/export round-trip', () => {
       },
     ];
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'dup-id',
       'original.jpg',
       'original.jpg',
@@ -309,7 +385,8 @@ describe('DB import/export round-trip', () => {
       'skip',
     );
 
-    const r2 = createPhotoWithId(
+    const r2 = await seedPhoto(
+      photos,
       'dup-id',
       'updated.jpg',
       'updated.jpg',
@@ -325,7 +402,7 @@ describe('DB import/export round-trip', () => {
     );
     expect(r2).toBe('skipped');
 
-    const all = getAllPhotos();
+    const all = await photos.list();
     expect(all).toHaveLength(1);
     expect(all[0].filename).toBe('original.jpg');
     expect(all[0].width).toBe(100);
@@ -334,7 +411,7 @@ describe('DB import/export round-trip', () => {
   });
 
   it('strategy=replace returns "imported" and overwrites the existing photo', async () => {
-    const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
     const minCorrs = [
       {
         pointIndex: 0,
@@ -356,7 +433,8 @@ describe('DB import/export round-trip', () => {
       },
     ];
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'rep-id',
       'original.jpg',
       'original.jpg',
@@ -372,7 +450,8 @@ describe('DB import/export round-trip', () => {
       [{ frames: 1, seconds: 30, filter: 'R' }],
     );
 
-    const r2 = createPhotoWithId(
+    const r2 = await seedPhoto(
+      photos,
       'rep-id',
       'replaced.jpg',
       'replaced.jpg',
@@ -389,7 +468,7 @@ describe('DB import/export round-trip', () => {
     );
     expect(r2).toBe('imported');
 
-    const all = getAllPhotos();
+    const all = await photos.list();
     expect(all).toHaveLength(1);
     expect(all[0].filename).toBe('replaced.jpg');
     expect(all[0].width).toBe(800);
@@ -399,8 +478,8 @@ describe('DB import/export round-trip', () => {
     expect(all[0].notes).toBe('updated');
   });
 
-  it('createPhotoWithId/getAllPhotos sanitizes invalid integrations on read', async () => {
-    const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
+  it('importPhoto/list sanitizes invalid integrations on read', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
     const minCorrs = [
       {
         pointIndex: 0,
@@ -422,7 +501,8 @@ describe('DB import/export round-trip', () => {
       },
     ];
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'int-invalid',
       'invalid.jpg',
       'invalid.jpg',
@@ -443,13 +523,13 @@ describe('DB import/export round-trip', () => {
       ],
     );
 
-    const all = getAllPhotos();
+    const all = await photos.list();
     expect(all).toHaveLength(1);
     expect(all[0].integrations).toEqual([{ frames: 5, seconds: 120, filter: 'R' }]);
   });
 
-  it('checkPhotosExist returns only IDs present in the DB', async () => {
-    const { createPhotoWithId, checkPhotosExist } = await import('../../server/db.js');
+  it('findByOriginalNames returns entries whose original_name matches', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
     const minCorrs = [
       {
         pointIndex: 0,
@@ -471,72 +551,8 @@ describe('DB import/export round-trip', () => {
       },
     ];
 
-    createPhotoWithId(
-      'exists-1',
-      'f1.jpg',
-      'f1.jpg',
-      1,
-      1,
-      minCorrs,
-      null,
-      null,
-      [],
-      [],
-      '',
-      'skip',
-    );
-    createPhotoWithId(
-      'exists-2',
-      'f2.jpg',
-      'f2.jpg',
-      1,
-      1,
-      minCorrs,
-      null,
-      null,
-      [],
-      [],
-      '',
-      'skip',
-    );
-
-    const result = checkPhotosExist(['exists-1', 'ghost-a', 'exists-2', 'ghost-b']);
-    expect(result).toHaveLength(2);
-    expect(result).toContain('exists-1');
-    expect(result).toContain('exists-2');
-    expect(result).not.toContain('ghost-a');
-    expect(result).not.toContain('ghost-b');
-  });
-
-  it('checkPhotosExist returns empty array when no IDs match', async () => {
-    const { checkPhotosExist } = await import('../../server/db.js');
-    expect(checkPhotosExist(['no-such-id', 'also-missing'])).toEqual([]);
-  });
-
-  it('checkPhotosExistByName returns entries whose original_name matches', async () => {
-    const { createPhotoWithId, checkPhotosExistByName } = await import('../../server/db.js');
-    const minCorrs = [
-      {
-        pointIndex: 0,
-        photoX: 0,
-        photoY: 0,
-        starHip: 1,
-        starName: 'X',
-        starRa: null,
-        starDec: null,
-      },
-      {
-        pointIndex: 1,
-        photoX: 1,
-        photoY: 1,
-        starHip: 2,
-        starName: 'Y',
-        starRa: null,
-        starDec: null,
-      },
-    ];
-
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'byname-id-1',
       'uuid-a.jpg',
       'M42.jpg',
@@ -550,7 +566,8 @@ describe('DB import/export round-trip', () => {
       '',
       'skip',
     );
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'byname-id-2',
       'uuid-b.jpg',
       'M31.jpg',
@@ -565,20 +582,20 @@ describe('DB import/export round-trip', () => {
       'skip',
     );
 
-    const result = checkPhotosExistByName(['M42.jpg', 'ghost.jpg', 'M31.jpg']);
+    const result = await photos.findByOriginalNames(['M42.jpg', 'ghost.jpg', 'M31.jpg']);
     expect(result).toHaveLength(2);
     expect(result).toContainEqual({ originalName: 'M42.jpg', id: 'byname-id-1' });
     expect(result).toContainEqual({ originalName: 'M31.jpg', id: 'byname-id-2' });
     expect(result.map((r) => r.originalName)).not.toContain('ghost.jpg');
   });
 
-  it('checkPhotosExistByName returns empty array when no names match', async () => {
-    const { checkPhotosExistByName } = await import('../../server/db.js');
-    expect(checkPhotosExistByName(['no-such-file.jpg', 'also-missing.jpg'])).toEqual([]);
+  it('findByOriginalNames returns empty array when no names match', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
+    expect(await photos.findByOriginalNames(['no-such-file.jpg', 'also-missing.jpg'])).toEqual([]);
   });
 
-  it('checkPhotosExistByName matches on original_name, not id or filename column', async () => {
-    const { createPhotoWithId, checkPhotosExistByName } = await import('../../server/db.js');
+  it('findByOriginalNames matches on original_name, not id or filename column', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
     const minCorrs = [
       {
         pointIndex: 0,
@@ -591,7 +608,8 @@ describe('DB import/export round-trip', () => {
       },
     ];
     // Insert with id='the-uuid', filename='the-uuid.jpg', originalName='original.jpg'
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'the-uuid',
       'the-uuid.jpg',
       'original.jpg',
@@ -607,20 +625,21 @@ describe('DB import/export round-trip', () => {
     );
 
     // Should NOT match by id or filename column value
-    expect(checkPhotosExistByName(['the-uuid'])).toEqual([]);
-    expect(checkPhotosExistByName(['the-uuid.jpg'])).toEqual([]);
+    expect(await photos.findByOriginalNames(['the-uuid'])).toEqual([]);
+    expect(await photos.findByOriginalNames(['the-uuid.jpg'])).toEqual([]);
     // Should match by originalName
-    const result = checkPhotosExistByName(['original.jpg']);
+    const result = await photos.findByOriginalNames(['original.jpg']);
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ originalName: 'original.jpg', id: 'the-uuid' });
   });
 
-  it('full round-trip: import manifest → getAllPhotos → JSON matches original fields', async () => {
-    const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
+  it('full round-trip: import manifest → list → JSON matches original fields', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
 
     // Simulate the server-side import loop
     for (const p of MANIFEST_FIXTURE) {
-      const result = createPhotoWithId(
+      const result = await seedPhoto(
+        photos,
         p.id,
         p.filename,
         p.originalName,
@@ -638,7 +657,7 @@ describe('DB import/export round-trip', () => {
       expect(result).toBe('imported');
     }
 
-    const exported = getAllPhotos();
+    const exported = await photos.list();
     expect(exported).toHaveLength(2);
 
     // Photo A
@@ -670,7 +689,7 @@ describe('DB import/export round-trip', () => {
     expect(eB.manualPlacement!.ra).toBeCloseTo(10.6847, 4);
     expect(eB.manualPlacement!.dec).toBeCloseTo(41.2692, 4);
 
-    // Simulate the server export: JSON.stringify(getAllPhotos()) → parse → verify
+    // Simulate the server export: JSON.stringify((await photos.list())) → parse → verify
     const exportJson = JSON.stringify(exported);
     const reimported = JSON.parse(exportJson);
     expect(reimported).toHaveLength(2);
@@ -909,7 +928,7 @@ describe('Name-based override on import (replace, else add)', () => {
 
 // ─── updatePhotoMetadata ───────────────────────────────────────────────────────
 
-describe('updatePhotoMetadata', () => {
+describe('updateMetadata', () => {
   const minCorrs = [
     {
       pointIndex: 0,
@@ -941,10 +960,10 @@ describe('updatePhotoMetadata', () => {
   });
 
   it('updates dsoIds, labels and notes without touching originalName', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
-      await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'upd-1',
       'upd-1.jpg',
       'Orion.jpg',
@@ -959,7 +978,8 @@ describe('updatePhotoMetadata', () => {
       'skip',
     );
 
-    const changed = updatePhotoMetadata(
+    const changed = await updateMeta(
+      photos,
       'upd-1',
       ['M42', 'NGC1977'],
       ['narrowband'],
@@ -969,7 +989,7 @@ describe('updatePhotoMetadata', () => {
     );
     expect(changed).toBe(true);
 
-    const p = getAllPhotos()[0];
+    const p = (await photos.list())[0];
     expect(p.dsoIds).toEqual(['M42', 'NGC1977']);
     expect(p.labels).toEqual(['narrowband']);
     expect(p.integrations).toEqual([{ frames: 10, seconds: 180, filter: 'Halpha' }]);
@@ -978,10 +998,10 @@ describe('updatePhotoMetadata', () => {
   });
 
   it('drops invalid integrations during metadata update', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
-      await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'upd-int',
       'upd-int.jpg',
       'Integration.jpg',
@@ -996,7 +1016,7 @@ describe('updatePhotoMetadata', () => {
       'skip',
     );
 
-    const changed = updatePhotoMetadata('upd-int', [], [], '', undefined, [
+    const changed = await updateMeta(photos, 'upd-int', [], [], '', undefined, [
       { frames: 18, seconds: 240, filter: 'OIII' },
       { frames: 0, seconds: 100, filter: 'R' } as any,
       { frames: 4, seconds: 0, filter: 'G' } as any,
@@ -1004,15 +1024,15 @@ describe('updatePhotoMetadata', () => {
     ]);
     expect(changed).toBe(true);
 
-    const p = getAllPhotos()[0];
+    const p = (await photos.list())[0];
     expect(p.integrations).toEqual([{ frames: 18, seconds: 240, filter: 'OIII' }]);
   });
 
   it('updates originalName when provided', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
-      await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'upd-2',
       'upd-2.jpg',
       'M42 original.jpg',
@@ -1027,34 +1047,41 @@ describe('updatePhotoMetadata', () => {
       'skip',
     );
 
-    const changed = updatePhotoMetadata('upd-2', ['M42'], [], 'some notes', 'M42 renamed.jpg');
+    const changed = await updateMeta(photos, 'upd-2', ['M42'], [], 'some notes', 'M42 renamed.jpg');
     expect(changed).toBe(true);
 
-    const p = getAllPhotos()[0];
+    const p = (await photos.list())[0];
     expect(p.originalName).toBe('M42 renamed.jpg');
     expect(p.dsoIds).toEqual(['M42']);
     expect(p.notes).toBe('some notes');
   });
 
   it('returns false for a non-existent photo ID', async () => {
-    const { updatePhotoMetadata } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    const changed = updatePhotoMetadata('no-such-id', [], [], '');
+    const changed = await updateMeta(photos, 'no-such-id', [], [], '');
     expect(changed).toBe(false);
   });
 
   it('returns false for a non-existent ID even when originalName is supplied', async () => {
-    const { updatePhotoMetadata } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    const changed = updatePhotoMetadata('no-such-id', ['M1'], ['label'], 'note', 'NewName.jpg');
+    const changed = await updateMeta(
+      photos,
+      'no-such-id',
+      ['M1'],
+      ['label'],
+      'note',
+      'NewName.jpg',
+    );
     expect(changed).toBe(false);
   });
 
   it('does not affect other photos when updating one', async () => {
-    const { createPhotoWithId, updatePhotoMetadata, getAllPhotos } =
-      await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'photo-a',
       'a.jpg',
       'PhotoA.jpg',
@@ -1068,7 +1095,8 @@ describe('updatePhotoMetadata', () => {
       '',
       'skip',
     );
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'photo-b',
       'b.jpg',
       'PhotoB.jpg',
@@ -1083,9 +1111,9 @@ describe('updatePhotoMetadata', () => {
       'skip',
     );
 
-    updatePhotoMetadata('photo-a', ['M1'], ['red'], 'note a', 'PhotoA renamed.jpg');
+    await updateMeta(photos, 'photo-a', ['M1'], ['red'], 'note a', 'PhotoA renamed.jpg');
 
-    const all = getAllPhotos();
+    const all = await photos.list();
     const b = all.find((p) => p.id === 'photo-b')!;
     expect(b.originalName).toBe('PhotoB.jpg');
     expect(b.dsoIds).toEqual([]);
@@ -1095,7 +1123,7 @@ describe('updatePhotoMetadata', () => {
 
 // ─── updatePhotoDrawOrder ────────────────────────────────────────────────────
 
-describe('updatePhotoDrawOrder', () => {
+describe('setOrder', () => {
   const minCorrs = [
     {
       pointIndex: 0,
@@ -1126,25 +1154,66 @@ describe('updatePhotoDrawOrder', () => {
     vi.unstubAllEnvs();
   });
 
-  it('persists explicit draw order and getAllPhotos returns photos in that order', async () => {
-    const { createPhotoWithId, updatePhotoDrawOrder, getAllPhotos } =
-      await import('../../server/db.js');
+  it('persists explicit draw order and list returns photos in that order', async () => {
+    const photos = photosOn(await import('../../server/db.js'));
 
-    createPhotoWithId('ord-a', 'a.jpg', 'A.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('ord-b', 'b.jpg', 'B.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('ord-c', 'c.jpg', 'C.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
+    await seedPhoto(
+      photos,
+      'ord-a',
+      'a.jpg',
+      'A.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    await seedPhoto(
+      photos,
+      'ord-b',
+      'b.jpg',
+      'B.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    await seedPhoto(
+      photos,
+      'ord-c',
+      'c.jpg',
+      'C.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
-    const changed = updatePhotoDrawOrder(['ord-b', 'ord-c', 'ord-a']);
+    const changed = await reorder(photos, ['ord-b', 'ord-c', 'ord-a']);
     expect(changed).toBe(true);
 
-    const ordered = getAllPhotos().map((p) => p.id);
+    const ordered = (await photos.list()).map((p) => p.id);
     expect(ordered).toEqual(['ord-b', 'ord-c', 'ord-a']);
   });
 
   it('returns false when none of the IDs exist', async () => {
-    const { updatePhotoDrawOrder } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    const changed = updatePhotoDrawOrder(['nope-1', 'nope-2']);
+    const changed = await reorder(photos, ['nope-1', 'nope-2']);
     expect(changed).toBe(false);
   });
 });
@@ -1206,7 +1275,7 @@ describe('Error serialization in catch blocks', () => {
 // ─── Export with stale / deleted IDs ─────────────────────────────────────────
 // Regression for the empty-manifest export bug:
 // If the overlay holds IDs of photos that were already deleted from the DB,
-// getAllPhotos().filter(p => ids.includes(p.id)) returns [] → manifest is [].
+// (await photos.list()).filter(p => ids.includes(p.id)) returns [] → manifest is [].
 
 describe('Export filtering with stale IDs', () => {
   const minCorrs = [
@@ -1224,19 +1293,20 @@ describe('Export filtering with stale IDs', () => {
   });
 
   it('returns empty array when all requested IDs are absent from the DB', async () => {
-    const { getAllPhotos } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
     const staleIds = ['deleted-a', 'deleted-b'];
     // No photos inserted — simulates post-deletion state
-    const selected = getAllPhotos().filter((p) => staleIds.includes(p.id));
+    const selected = (await photos.list()).filter((p) => staleIds.includes(p.id));
     expect(selected).toEqual([]);
     // The manifest written to ZIP would be [] — the source of the bug
     expect(JSON.stringify(selected)).toBe('[]');
   });
 
   it('returns only the photos whose IDs still exist in the DB', async () => {
-    const { createPhotoWithId, deletePhoto, getAllPhotos } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'keep-1',
       'k1.jpg',
       'Keep1.jpg',
@@ -1250,7 +1320,8 @@ describe('Export filtering with stale IDs', () => {
       '',
       'skip',
     );
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'deleted-1',
       'd1.jpg',
       'Deleted1.jpg',
@@ -1264,7 +1335,8 @@ describe('Export filtering with stale IDs', () => {
       '',
       'skip',
     );
-    createPhotoWithId(
+    await seedPhoto(
+      photos,
       'keep-2',
       'k2.jpg',
       'Keep2.jpg',
@@ -1280,10 +1352,10 @@ describe('Export filtering with stale IDs', () => {
     );
 
     // Simulate user deleting one photo between export-button click and server handling
-    deletePhoto('deleted-1');
+    await photos.removeRow('deleted-1');
 
     const requestedIds = ['keep-1', 'deleted-1', 'keep-2']; // stale: still includes deleted-1
-    const selected = getAllPhotos().filter((p) => requestedIds.includes(p.id));
+    const selected = (await photos.list()).filter((p) => requestedIds.includes(p.id));
 
     expect(selected).toHaveLength(2);
     expect(selected.map((p) => p.id)).toContain('keep-1');
@@ -1292,17 +1364,45 @@ describe('Export filtering with stale IDs', () => {
   });
 
   it('exports all photos when ids array is empty (backup-button behaviour)', async () => {
-    const { createPhotoWithId, getAllPhotos } = await import('../../server/db.js');
+    const photos = photosOn(await import('../../server/db.js'));
 
-    createPhotoWithId('all-1', 'a1.jpg', 'A1.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
-    createPhotoWithId('all-2', 'a2.jpg', 'A2.jpg', 1, 1, minCorrs, null, null, [], [], '', 'skip');
+    await seedPhoto(
+      photos,
+      'all-1',
+      'a1.jpg',
+      'A1.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
+    await seedPhoto(
+      photos,
+      'all-2',
+      'a2.jpg',
+      'A2.jpg',
+      1,
+      1,
+      minCorrs,
+      null,
+      null,
+      [],
+      [],
+      '',
+      'skip',
+    );
 
     const ids: string[] = [];
     // Server logic: if ids is empty → export everything
     const selected =
       Array.isArray(ids) && ids.length > 0
-        ? getAllPhotos().filter((p) => ids.includes(p.id))
-        : getAllPhotos();
+        ? (await photos.list()).filter((p) => ids.includes(p.id))
+        : await photos.list();
 
     expect(selected).toHaveLength(2);
   });

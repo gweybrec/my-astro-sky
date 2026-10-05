@@ -5,18 +5,11 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { UPLOADS_DIR } from '../server-paths.js';
-import { ALLOWED_PHOTO_EXTENSIONS, uploadBundle, sanitizeIntegrationRows } from './shared.js';
-import {
-  getAllPhotos,
-  deletePhoto,
-  createPhotoWithId,
-  checkPhotosExistByName,
-  sanitizePois,
-  sanitizeCaptureDetails,
-} from '../db.js';
+import { ALLOWED_PHOTO_EXTENSIONS, uploadBundle } from './shared.js';
 import {
   dsoOverrides as dsoOverridesService,
   gear as gearService,
+  photos as photosService,
   plans as plansService,
   poiCategories as poiCategoriesService,
   skyRegions as skyRegionsService,
@@ -89,7 +82,7 @@ backupRouter.post('/api/export', async (req, res) => {
     const includeSkyRegions = options.includeSkyRegions === true;
 
     const { ids } = body;
-    const allPhotos = getAllPhotos();
+    const allPhotos = await photosService.list();
     const selected =
       Array.isArray(ids) && ids.length > 0
         ? allPhotos.filter((p) => ids.includes(p.id))
@@ -257,7 +250,7 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
       const originalNames = inspect.photos.map((p) => p.originalName).filter(Boolean);
       const existingSet = new Set(
         originalNames.length > 0
-          ? checkPhotosExistByName(originalNames).map((r) => r.originalName)
+          ? (await photosService.findByOriginalNames(originalNames)).map((r) => r.originalName)
           : [],
       );
 
@@ -719,7 +712,7 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
     if (importMetadata && photos.length > 0) {
       const allNames = photos.map((p: any) => p.originalName ?? p.filename ?? p.id).filter(Boolean);
       const existingByName = new Map(
-        checkPhotosExistByName(allNames).map((r) => [r.originalName, r.id]),
+        (await photosService.findByOriginalNames(allNames)).map((r) => [r.originalName, r.id]),
       );
 
       for (const p of photos) {
@@ -736,31 +729,9 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
         }
 
         const existingId = existingByName.get(origName);
-        if (existingId) deletePhoto(existingId);
+        if (existingId) await photosService.removeRow(existingId);
 
-        const corrs = Array.isArray(p.correspondences) ? p.correspondences : [];
-        const thumbFilename =
-          typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null;
-        const result = createPhotoWithId(
-          p.id,
-          p.filename ?? `${p.id}.jpg`,
-          origName,
-          p.width ?? 0,
-          p.height ?? 0,
-          corrs,
-          p.createdAt ?? null,
-          p.manualPlacement ? JSON.stringify(p.manualPlacement) : null,
-          Array.isArray(p.dsoIds) ? p.dsoIds : [],
-          Array.isArray(p.labels) ? p.labels : [],
-          typeof p.notes === 'string' ? p.notes : '',
-          'skip',
-          sanitizeIntegrationRows(p.integrations),
-          thumbFilename,
-          typeof p.observationDate === 'string' ? p.observationDate : null,
-          sanitizePois(p.pointsOfInterest),
-          sanitizeCaptureDetails(p.captureDetails),
-          typeof p.gearSetupId === 'string' ? p.gearSetupId : null,
-        );
+        const result = await photosService.importPhoto(p, 'skip');
         if (result === 'imported') imported++;
         else skipped++;
       }

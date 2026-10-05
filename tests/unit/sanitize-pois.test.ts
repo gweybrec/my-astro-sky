@@ -1,22 +1,11 @@
 /**
- * Tests for server/db.ts `sanitizePois`: the gate every POI write goes through
+ * Tests for `sanitizePois` (packages/core/src/services/photos.ts): the gate every POI write goes through
  * (upload, metadata update, import). A POI identified on the photo (e.g. a
  * supernova) carries an ra/dec position that must survive; malformed positions
  * are dropped without losing the POI itself.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-
-let sanitizePois: typeof import('../../server/db.js').sanitizePois;
-
-beforeAll(async () => {
-  vi.resetModules();
-  vi.stubEnv('DB_PATH', ':memory:');
-  ({ sanitizePois } = await import('../../server/db.js'));
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+import { describe, it, expect } from 'vitest';
+import { sanitizePois } from '@myastrosky/core/services/photos';
 
 describe('sanitizePois()', () => {
   it('keeps name + categoryId only for a POI without position', () => {

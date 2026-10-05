@@ -1,28 +1,7 @@
 import multer from 'multer';
 
-export const ALLOWED_PHOTO_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+export { ALLOWED_PHOTO_EXTENSIONS } from '@myastrosky/core/services/photos';
 export const ALLOWED_WCS_EXTENSIONS = new Set(['.tif', '.tiff', '.fits', '.fit']);
-
-export interface IntegrationRow {
-  frames: number;
-  seconds: number;
-  filter: string;
-}
-
-export function sanitizeIntegrationRows(input: unknown): IntegrationRow[] {
-  if (!Array.isArray(input)) return [];
-  return input.map((entry: any) => ({
-    frames:
-      Number.isInteger(Number(entry?.frames)) && Number(entry?.frames) >= 1
-        ? Number(entry.frames)
-        : 0,
-    seconds:
-      Number.isInteger(Number(entry?.seconds)) && Number(entry?.seconds) >= 1
-        ? Number(entry.seconds)
-        : 0,
-    filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
-  }));
-}
 
 // In Electron the server runs inside the Electron main process (process.versions.electron is set).
 // Rate limiting is meaningless there (single-user local app).

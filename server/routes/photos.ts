@@ -3,34 +3,15 @@ import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import type { PhotoMetadataChanges } from '@myastrosky/core/domain/photos';
+import { photoNotFound } from '@myastrosky/core/services/photos';
 import { UPLOADS_DIR } from '../server-paths.js';
-import {
-  ALLOWED_PHOTO_EXTENSIONS,
-  isElectron,
-  UPLOAD_LIMIT,
-  checkRateLimit,
-  upload,
-  sanitizeIntegrationRows,
-  type IntegrationRow,
-} from './shared.js';
-import {
-  createPhoto,
-  getAllPhotos,
-  getPhotoById,
-  deletePhoto,
-  getPhotoFilename,
-  updatePhotoManualPlacement,
-  updatePhotoMetadata,
-  updatePhotoDrawOrder,
-  deleteAllPhotoMetadata as deleteAllPhotoMetadataDB,
-  sanitizePois,
-  sanitizeCaptureDetails,
-  type PointOfInterestInput,
-} from '../db.js';
+import { isElectron, UPLOAD_LIMIT, checkRateLimit, upload } from './shared.js';
+import { photos } from '../services.js';
+import { sendError } from './http-errors.js';
 
 export const photosRouter = express.Router();
-
-const MAX_CORRESPONDENCES = 100;
 
 /**
  * @swagger
@@ -62,85 +43,9 @@ photosRouter.post('/api/photos', upload.single('photo'), async (req, res) => {
       return;
     }
 
-    // Validate file extension
+    // The checks that need no image (extension, correspondences), in their order.
+    const correspondences = photos.validateUpload(file.originalname, req.body ?? {});
     const fileExt = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_PHOTO_EXTENSIONS.has(fileExt)) {
-      res
-        .status(400)
-        .json({ error: `Extension non autorisée : ${fileExt}`, code: 'INVALID_EXTENSION' });
-      return;
-    }
-
-    const corrJson = req.body?.correspondences;
-    if (!corrJson) {
-      res
-        .status(400)
-        .json({ error: 'Correspondances manquantes', code: 'MISSING_CORRESPONDENCES' });
-      return;
-    }
-
-    let correspondences: any[];
-    try {
-      correspondences = JSON.parse(corrJson);
-    } catch {
-      res.status(400).json({ error: 'JSON des correspondances invalide', code: 'INVALID_JSON' });
-      return;
-    }
-    if (!Array.isArray(correspondences) || correspondences.length < 2) {
-      res
-        .status(400)
-        .json({ error: 'Au moins 2 correspondances requises', code: 'MIN_CORRESPONDENCES' });
-      return;
-    }
-    if (correspondences.length > MAX_CORRESPONDENCES) {
-      res.status(400).json({
-        error: `Trop de correspondances (max ${MAX_CORRESPONDENCES})`,
-        code: 'MAX_CORRESPONDENCES',
-      });
-      return;
-    }
-
-    // Validate each correspondence field
-    for (const c of correspondences) {
-      if (!Number.isInteger(c.pointIndex) || c.pointIndex < 0) {
-        res.status(400).json({
-          error: 'pointIndex invalide (entier >= 0 attendu)',
-          code: 'INVALID_POINT_INDEX',
-        });
-        return;
-      }
-      if (typeof c.photoX !== 'number' || !Number.isFinite(c.photoX) || c.photoX < 0) {
-        res
-          .status(400)
-          .json({ error: 'photoX invalide (nombre positif attendu)', code: 'INVALID_PHOTO_X' });
-        return;
-      }
-      if (typeof c.photoY !== 'number' || !Number.isFinite(c.photoY) || c.photoY < 0) {
-        res
-          .status(400)
-          .json({ error: 'photoY invalide (nombre positif attendu)', code: 'INVALID_PHOTO_Y' });
-        return;
-      }
-      // starHip=0 is allowed when starRa/starDec are provided (direct RA/Dec input)
-      if (c.starHip === 0) {
-        if (
-          typeof c.starRa !== 'number' ||
-          !Number.isFinite(c.starRa) ||
-          typeof c.starDec !== 'number' ||
-          !Number.isFinite(c.starDec)
-        ) {
-          res
-            .status(400)
-            .json({ error: 'starRa/starDec requis quand starHip=0', code: 'INVALID_STAR_HIP' });
-          return;
-        }
-      } else if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
-        res
-          .status(400)
-          .json({ error: 'starHip invalide (entier positif attendu)', code: 'INVALID_STAR_HIP' });
-        return;
-      }
-    }
 
     // Get original dimensions — Sharp throws for non-image or corrupt files
     let metadata: Awaited<ReturnType<ReturnType<typeof sharp>['metadata']>>;
@@ -194,96 +99,6 @@ photosRouter.post('/api/photos', upload.single('photo'), async (req, res) => {
       newHeight,
     );
 
-    // Scale correspondences from browser dimensions to final dimensions
-    const scaleX = newWidth / browserWidth;
-    const scaleY = newHeight / browserHeight;
-
-    const scaledCorrespondences = correspondences.map((c: any) => ({
-      pointIndex: c.pointIndex,
-      photoX: c.photoX * scaleX,
-      photoY: c.photoY * scaleY,
-      starHip: c.starHip,
-      starName: c.starName || '',
-      starRa: c.starRa ?? null,
-      starDec: c.starDec ?? null,
-    }));
-
-    // Handle manual placement if provided
-    let scaledManualPlacement: string | null = null;
-    if (req.body?.manualPlacement) {
-      try {
-        const placement = JSON.parse(req.body.manualPlacement);
-        //Scale projPerPx from browser dimensions to final dimensions
-        // Browser used browserWidth x browserHeight, we scale to newWidth x newHeight
-        const avgScale = (scaleX + scaleY) / 2;
-        const scaledPlacement = {
-          ...placement,
-          projPerPx: placement.projPerPx / avgScale,
-        };
-        console.log(
-          '[Upload] Scaling projPerPx from',
-          placement.projPerPx,
-          'by 1/',
-          avgScale.toFixed(4),
-          '=',
-          scaledPlacement.projPerPx,
-        );
-        scaledManualPlacement = JSON.stringify(scaledPlacement);
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-
-    // Parse photo metadata fields
-    let dsoIds: string[] = [];
-    let labels: string[] = [];
-    let integrations: IntegrationRow[] = [];
-    let notes = '';
-    try {
-      dsoIds = JSON.parse(req.body?.dsoIds || '[]');
-      if (!Array.isArray(dsoIds)) dsoIds = [];
-    } catch {
-      dsoIds = [];
-    }
-    try {
-      labels = JSON.parse(req.body?.labels || '[]');
-      if (!Array.isArray(labels)) labels = [];
-    } catch {
-      labels = [];
-    }
-    let pointsOfInterest: PointOfInterestInput[] = [];
-    try {
-      pointsOfInterest = sanitizePois(JSON.parse(req.body?.pointsOfInterest || '[]'));
-    } catch {
-      pointsOfInterest = [];
-    }
-    try {
-      integrations = sanitizeIntegrationRows(JSON.parse(req.body?.integrations || '[]'));
-    } catch {
-      integrations = [];
-    }
-    if (typeof req.body?.notes === 'string') notes = req.body.notes.slice(0, 5000);
-    let observationDate: string | null = null;
-    if (typeof req.body?.observationDate === 'string' && req.body.observationDate.trim()) {
-      observationDate = req.body.observationDate.trim().slice(0, 50);
-    }
-    let captureDetails: Record<string, number | string> = {};
-    try {
-      captureDetails = sanitizeCaptureDetails(JSON.parse(req.body?.captureDetails || '{}'));
-    } catch {
-      captureDetails = {};
-    }
-    const gearSetupId =
-      typeof req.body?.gearSetupId === 'string' && req.body.gearSetupId.trim()
-        ? req.body.gearSetupId.trim().slice(0, 64)
-        : null;
-
-    // Allow caller to override the display name
-    const displayName =
-      typeof req.body?.displayName === 'string' && req.body.displayName.trim()
-        ? req.body.displayName.trim().slice(0, 255)
-        : file.originalname;
-
     // Generate low-res thumbnail (400px on longest side, JPEG q75)
     const THUMB_SIZE = 400;
     const thumbFilename = `${id}_thumb.jpg`;
@@ -299,33 +114,32 @@ photosRouter.post('/api/photos', upload.single('photo'), async (req, res) => {
       console.warn('[Upload] Thumbnail generation failed:', thumbErr);
     }
 
-    // Store in database
-    createPhoto(
-      id,
-      filename,
-      displayName,
-      newWidth,
-      newHeight,
-      scaledCorrespondences,
-      scaledManualPlacement,
-      dsoIds,
-      labels,
-      notes,
-      integrations,
-      thumbFilename,
-      observationDate,
-      pointsOfInterest,
-      captureDetails,
-      gearSetupId,
+    // Store in database, and answer with the row as GET /api/photos returns it, so the client's
+    // in-memory photo matches what a reload would fetch and no metadata field is silently dropped.
+    const meta = photos.readUploadMetadata(file.originalname, req.body ?? {});
+    res.json(
+      await photos.insert({
+        id,
+        filename,
+        originalName: meta.displayName,
+        width: newWidth,
+        height: newHeight,
+        correspondences,
+        manualPlacement: meta.manualPlacement,
+        dsoIds: meta.dsoIds,
+        labels: meta.labels,
+        notes: meta.notes,
+        integrations: meta.integrations,
+        thumbFilename,
+        observationDate: meta.observationDate,
+        pointsOfInterest: meta.pointsOfInterest,
+        captureDetails: meta.captureDetails,
+        gearSetupId: meta.gearSetupId,
+      }),
     );
-
-    // Return the freshly persisted row through the same serializer GET /api/photos
-    // uses, so the client's in-memory photo matches what a reload would fetch and no
-    // metadata field can be silently dropped from the response.
-    res.json(getPhotoById(id));
-  } catch (err: any) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('Upload error:', err);
+    sendError(res, err);
   }
 });
 
@@ -339,10 +153,9 @@ photosRouter.post('/api/photos', upload.single('photo'), async (req, res) => {
  *         description: Photo list returned successfully
  */
 // List all photos (includes fileSize from disk for export size estimation)
-photosRouter.get('/api/photos', (_req, res) => {
+photosRouter.get('/api/photos', async (_req, res) => {
   try {
-    const photos = getAllPhotos();
-    const photosWithSize = photos.map((p) => {
+    const photosWithSize = (await photos.list()).map((p) => {
       const filePath = path.join(UPLOADS_DIR, p.filename);
       let fileSize: number | null = null;
       try {
@@ -353,8 +166,8 @@ photosRouter.get('/api/photos', (_req, res) => {
       return { ...p, fileSize };
     });
     res.json(photosWithSize);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -368,48 +181,13 @@ photosRouter.get('/api/photos', (_req, res) => {
  *         description: Photo order persisted successfully
  */
 // Persist photo draw order (array order = bottom to top stack order)
-photosRouter.patch('/api/photos/order', (req, res) => {
+photosRouter.patch('/api/photos/order', async (req, res) => {
   try {
     const { photoIds } = req.body as { photoIds?: unknown };
-
-    if (
-      !Array.isArray(photoIds) ||
-      photoIds.some((id) => typeof id !== 'string' || id.length === 0)
-    ) {
-      res.status(400).json({
-        error: 'photoIds must be a non-empty array of strings',
-        code: 'INVALID_PHOTO_ORDER',
-      });
-      return;
-    }
-
-    const unique = new Set(photoIds);
-    if (unique.size !== photoIds.length) {
-      res.status(400).json({ error: 'photoIds contains duplicates', code: 'INVALID_PHOTO_ORDER' });
-      return;
-    }
-
-    const allPhotos = getAllPhotos();
-    const allIds = new Set(allPhotos.map((p) => p.id));
-    if (photoIds.length !== allIds.size || photoIds.some((id) => !allIds.has(id))) {
-      res.status(400).json({
-        error: 'photoIds must include all existing photos exactly once',
-        code: 'INVALID_PHOTO_ORDER',
-      });
-      return;
-    }
-
-    const ok = updatePhotoDrawOrder(photoIds);
-    if (!ok && photoIds.length > 0) {
-      res
-        .status(500)
-        .json({ error: 'Failed to persist photo order', code: 'PHOTO_ORDER_UPDATE_FAILED' });
-      return;
-    }
-
+    await photos.setOrder(photoIds as string[]);
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -454,15 +232,12 @@ photosRouter.patch('/api/photos/order', (req, res) => {
  *         description: Server error
  */
 // Delete a photo
-photosRouter.delete('/api/photos/:id', (req, res) => {
+photosRouter.delete('/api/photos/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const filename = getPhotoFilename(id);
+    const filename = await photos.fileNameOf(id);
 
-    if (!filename) {
-      res.status(404).json({ error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' });
-      return;
-    }
+    if (!filename) throw photoNotFound();
 
     // Delete main file and thumbnail from disk
     const filePath = path.join(UPLOADS_DIR, filename);
@@ -470,10 +245,10 @@ photosRouter.delete('/api/photos/:id', (req, res) => {
     const thumbPath = path.join(UPLOADS_DIR, filename.replace(/(\.[^.]+)$/, '_thumb.jpg'));
     if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
 
-    deletePhoto(id);
+    await photos.removeRow(id);
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -519,7 +294,7 @@ photosRouter.delete('/api/photos/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-photosRouter.delete('/api/photos', (req, res) => {
+photosRouter.delete('/api/photos', async (req, res) => {
   try {
     const { ids } = req.body as { ids?: unknown };
     if (!Array.isArray(ids)) {
@@ -529,19 +304,19 @@ photosRouter.delete('/api/photos', (req, res) => {
     let deleted = 0;
     for (const id of ids) {
       if (typeof id !== 'string') continue;
-      const filename = getPhotoFilename(id);
+      const filename = await photos.fileNameOf(id);
       if (!filename) continue;
       const filePath = path.join(UPLOADS_DIR, filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       const thumbPath = path.join(UPLOADS_DIR, filename.replace(/(\.[^.]+)$/, '_thumb.jpg'));
       if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
-      deletePhoto(id);
+      await photos.removeRow(id);
       deleted++;
     }
     res.json({ ok: true, deleted });
-  } catch (err: any) {
+  } catch (err) {
     console.error('[DeleteAll] Bulk photo delete failed', err);
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -567,13 +342,13 @@ photosRouter.delete('/api/photos', (req, res) => {
  *       500:
  *         description: Server error
  */
-photosRouter.delete('/api/photo-metadata', (_req, res) => {
+photosRouter.delete('/api/photo-metadata', async (_req, res) => {
   try {
-    const deleted = deleteAllPhotoMetadataDB();
+    const deleted = await photos.removeAllRows();
     res.json({ ok: true, deleted });
-  } catch (err: any) {
+  } catch (err) {
     console.error('[DeleteAll] Photo metadata delete failed', err);
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -628,26 +403,14 @@ photosRouter.delete('/api/photo-metadata', (_req, res) => {
  *         description: Server error
  */
 // Update photo manual placement
-photosRouter.patch('/api/photos/:id/manual-placement', (req, res) => {
+photosRouter.patch('/api/photos/:id/manual-placement', async (req, res) => {
   try {
     const { id } = req.params;
     const { manualPlacement } = req.body;
-
-    if (!getPhotoFilename(id)) {
-      res.status(404).json({ error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' });
-      return;
-    }
-
-    const manualPlacementJson = manualPlacement ? JSON.stringify(manualPlacement) : null;
-    const success = updatePhotoManualPlacement(id, manualPlacementJson);
-
-    if (success) {
-      res.json({ ok: true });
-    } else {
-      res.status(500).json({ error: 'Failed to update photo' });
-    }
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    await photos.setManualPlacement(id, manualPlacement);
+    res.json({ ok: true });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -730,63 +493,14 @@ photosRouter.patch('/api/photos/:id/manual-placement', (req, res) => {
  *         description: Server error
  */
 // Update photo metadata (dsoIds, labels, notes)
-photosRouter.patch('/api/photos/:id/metadata', (req, res) => {
+photosRouter.patch('/api/photos/:id/metadata', async (req, res) => {
   try {
-    const { id } = req.params;
-
-    if (!getPhotoFilename(id)) {
-      res.status(404).json({ error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' });
-      return;
-    }
-
-    let {
-      dsoIds,
-      labels,
-      integrations,
-      notes,
-      originalName,
-      observationDate,
-      pointsOfInterest,
-      captureDetails,
-      gearSetupId,
-    } = req.body;
-    if (!Array.isArray(dsoIds)) dsoIds = [];
-    if (!Array.isArray(labels)) labels = [];
-    pointsOfInterest = sanitizePois(pointsOfInterest);
-    integrations = sanitizeIntegrationRows(integrations);
-    captureDetails = sanitizeCaptureDetails(captureDetails);
-    if (typeof notes !== 'string') notes = '';
-    notes = notes.slice(0, 5000);
-    const resolvedOriginalName: string | undefined =
-      typeof originalName === 'string' && originalName.trim()
-        ? originalName.trim().slice(0, 255)
-        : undefined;
-    const resolvedObsDate: string | null =
-      typeof observationDate === 'string' && observationDate.trim()
-        ? observationDate.trim().slice(0, 50)
-        : null;
-    const resolvedSetupId: string | null =
-      typeof gearSetupId === 'string' && gearSetupId.trim()
-        ? gearSetupId.trim().slice(0, 64)
-        : null;
-
-    updatePhotoMetadata(
-      id,
-      dsoIds,
-      labels,
-      notes,
-      resolvedOriginalName,
-      integrations,
-      resolvedObsDate,
-      pointsOfInterest,
-      captureDetails,
-      resolvedSetupId,
+    const { originalName } = await photos.updateMetadata(
+      req.params.id,
+      req.body as PhotoMetadataChanges,
     );
-    res.json({
-      ok: true,
-      ...(resolvedOriginalName !== undefined ? { originalName: resolvedOriginalName } : {}),
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json({ ok: true, ...(originalName !== undefined ? { originalName } : {}) });
+  } catch (err) {
+    sendError(res, err);
   }
 });
