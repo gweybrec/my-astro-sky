@@ -21,7 +21,7 @@ leave the field absent or broken in part of the UI.
 Before writing any code, the plan must explicitly address unit tests:
 
 - **List every test file to create or update**, with a brief description of what each test covers.
-- The following changes always require tests: DB helper changes in `server/db.ts` (new columns, sanitization logic), new parse/transform logic in `server/wcs-reader.ts`, new extraction logic in `server/astrometry.ts`.
+- The following changes always require tests: DB helper changes in `server/db.ts` (new columns, sanitization logic), new parse/transform logic in `server/wcs-reader.ts`, new extraction logic in `packages/core/src/services/nova-solve.ts`.
 - UI-only changes (adding an `<input>` element and wiring it to an existing save call) do not require new tests if the underlying DB/API logic is already covered.
 - If no unit test changes are needed, the plan must **state the justification** (e.g. "field is a plain string passthrough; DB/API layer has no new logic, existing tests cover the path").
 - Identifying tests is part of the plan, not an afterthought. A plan that omits this section is incomplete.
@@ -317,9 +317,9 @@ Neither path currently extracts FITS headers from the astrometry.net WCS
 response — so neither returns `dateObs`, `expTime`, or `stackCnt`.
 
 The astrometry.net API does provide a downloadable WCS FITS file for a solved
-job (via `server/astrometry.ts`). To add pre-fill support:
+job (via `packages/core/src/services/nova-solve.ts`). To add pre-fill support:
 
-1. After `reuseSubmission()` succeeds in `server/astrometry.ts`, fetch and
+1. After `reuseSubmission()` succeeds in `packages/core/src/services/nova-solve.ts`, fetch and
    parse the WCS FITS file with `extractWCS()` to get the new field.
 2. Return the field in the `PlateSolveResult` from `reuseSubmission()`.
 3. In `server/routes/nova-solve.ts` at `POST /api/astrometry/reuse`, spread the field into

@@ -41,4 +41,5 @@ export const {
   identify,
   horizon,
   solvedImport,
+  novaSolve,
 } = services;

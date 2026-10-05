@@ -75,12 +75,18 @@ beforeAll(async () => {
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
     if (url.startsWith(base)) return realFetch(input as string, init);
-    recorded.push({
-      url,
-      method: init?.method ?? 'GET',
-      headers: headersOf(init),
-      body: typeof init?.body === 'string' ? init.body : undefined,
-    });
+    const headers = headersOf(init);
+    let body: string | undefined;
+    if (typeof init?.body === 'string') body = init.body;
+    else if (init?.body instanceof FormData) {
+      // What `fetch` would put on the wire: the multipart text and its content type.
+      const wire = new Response(init.body);
+      headers['content-type'] ??= wire.headers.get('content-type') ?? '';
+      body = Buffer.from(await wire.arrayBuffer()).toString('latin1');
+    } else if (init?.body) body = Buffer.from(init.body as Uint8Array).toString('latin1');
+    // The background polling of a submitted astrometry.net job (3 s after the upload) is not a request of the case that is running.
+    if (!url.startsWith('https://nova.astrometry.net/api/submissions/'))
+      recorded.push({ url, method: init?.method ?? 'GET', headers, body });
     const reply = typeof upstream === 'function' ? upstream(url) : upstream;
     if ('reject' in reply) throw new Error(reply.reject);
     return new Response(reply.body as BodyInit, { status: reply.status, headers: reply.headers });
@@ -88,7 +94,8 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  vi.unstubAllGlobals();
+  // Never back to the real `fetch`: a polling timer of an online-solving job may still fire.
+  vi.stubGlobal('fetch', () => Promise.reject(new Error('network blocked after the tests')));
   if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
   closeDatabase?.();
   fs.rmSync(uploadsDir, { recursive: true, force: true });
@@ -907,6 +914,446 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(r.body.success).toBe(true);
       expect(r.body.correspondences[0].starName).toBe('Synthetic 1');
       expect(r.body.pngBase64.length).toBeGreaterThan(10);
+    });
+  });
+});
+// ─── Online solving (astrometry.net) ─────────────────────────────────────────
+
+describe('online solving routes (astrometry.net)', () => {
+  const API = 'https://nova.astrometry.net/api';
+  const WCS_FIXTURE = fs.readFileSync(
+    path.join(FIXTURES, 'astrometry/10796000-wcs.fits'),
+    'latin1',
+  );
+  const OBJECTS_FIXTURE = fs.readFileSync(
+    path.join(FIXTURES, 'astrometry/10796000-objects.json'),
+    'utf8',
+  );
+  const CAL_FIXTURE = fs.readFileSync(
+    path.join(FIXTURES, 'astrometry/10796000-calibration.json'),
+    'utf8',
+  );
+  let savedCatalog: string | undefined;
+  let png: Uint8Array;
+
+  beforeAll(async () => {
+    savedCatalog = process.env.STAR_CATALOG_PATH;
+    process.env.STAR_CATALOG_PATH = path.join(FIXTURES, 'stars.test.json');
+    png = new Uint8Array(
+      await sharp({
+        create: {
+          width: 8,
+          height: 6,
+          channels: 3,
+          background: { r: 9, g: 9, b: 9 },
+        },
+      })
+        .png()
+        .toBuffer(),
+    );
+  });
+  afterAll(() => {
+    if (savedCatalog === undefined) delete process.env.STAR_CATALOG_PATH;
+    else process.env.STAR_CATALOG_PATH = savedCatalog;
+  });
+
+  async function post(
+    url: string,
+    file: { name: string; bytes: Uint8Array } | null,
+    fields: Record<string, string> = {},
+  ) {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) form.append(k, v);
+    if (file)
+      form.append('photo', new Blob([file.bytes as BlobPart], { type: 'image/png' }), file.name);
+    const res = await realFetch(base + url, { method: 'POST', body: form });
+    return { status: res.status, body: (await res.json()) as any };
+  }
+
+  const json = (data: unknown): UpstreamReply => ({
+    status: 200,
+    body: JSON.stringify(data),
+  });
+  /** The body of the multipart part called `name`, without its trailing CRLF. */
+  const partOf = (multipart: string, name: string) =>
+    new RegExp(
+      `name="${name}"(?:[^\\r\\n]*)\\r\\n(?:[^\\r\\n]+\\r\\n)*\\r\\n([\\s\\S]*?)\\r\\n--`,
+    ).exec(multipart)?.[1];
+  const formJson = (body: string) =>
+    JSON.parse(decodeURIComponent(body.replace('request-json=', '')));
+
+  it('refuses every route with ASTROMETRY_NOT_CONFIGURED while no key is set', async () => {
+    const solve = await post('/api/solve-plate', { name: 'a.png', bytes: png });
+    expect(solve.status).toBe(400);
+    expect(solve.body).toEqual({
+      error: 'ASTROMETRY_API_KEY not configured on server',
+      code: 'ASTROMETRY_NOT_CONFIGURED',
+    });
+    const fr = await post('/api/solve-plate', { name: 'a.png', bytes: png }, { lang: 'fr' });
+    expect(fr.body.error).toBe('ASTROMETRY_API_KEY non configurée sur le serveur');
+    const list = await call('GET', '/api/astrometry/submissions');
+    expect(list.status).toBe(400);
+    expect(list.body).toEqual({
+      error: 'ASTROMETRY_API_KEY not configured',
+      code: 'ASTROMETRY_NOT_CONFIGURED',
+    });
+    const reuse = await post('/api/astrometry/reuse', {
+      name: 'a.png',
+      bytes: png,
+    });
+    expect(reuse.status).toBe(400);
+    expect(reuse.body).toEqual({
+      error: 'ASTROMETRY_API_KEY not configured',
+      code: 'ASTROMETRY_NOT_CONFIGURED',
+    });
+    expect((await post('/api/astrometry/reuse', null, { lang: 'fr' })).body.error).toBe(
+      'ASTROMETRY_API_KEY non configurée',
+    );
+    expect(recorded).toHaveLength(0);
+  });
+
+  it('answers 404 JOB_NOT_FOUND for an unknown job', async () => {
+    const r = await call('GET', '/api/solve-plate/nope');
+    expect(r.status).toBe(404);
+    expect(r.body).toEqual({ error: 'Job introuvable', code: 'JOB_NOT_FOUND' });
+  });
+
+  describe('with an API key', () => {
+    beforeAll(async () => {
+      const r = await call('PUT', '/api/settings', { apiKey: 'test-key' });
+      expect(r.status).toBe(200);
+    });
+
+    it('rejects a missing file, an unreadable image and an invalid job id before any request', async () => {
+      const none = await post('/api/solve-plate', null, { lang: 'fr' });
+      expect(none.status).toBe(400);
+      expect(none.body).toEqual({
+        error: 'Aucun fichier fourni',
+        code: 'NO_FILE',
+      });
+      expect((await post('/api/solve-plate', null)).body.error).toBe('No file provided');
+
+      const bad = await post('/api/solve-plate', {
+        name: 'x.txt',
+        bytes: new Uint8Array([1, 2, 3]),
+      });
+      expect(bad.status).toBe(400);
+      expect(bad.body).toEqual({
+        error: 'Cannot determine image dimensions',
+        code: 'CANNOT_DETERMINE_DIMENSIONS',
+      });
+      const badFr = await post(
+        '/api/solve-plate',
+        { name: 'x.txt', bytes: new Uint8Array([1]) },
+        { lang: 'fr' },
+      );
+      expect(badFr.body.error).toBe("Impossible de déterminer les dimensions de l'image");
+
+      const noJob = await post('/api/astrometry/reuse', {
+        name: 'a.png',
+        bytes: png,
+      });
+      expect(noJob.status).toBe(400);
+      expect(noJob.body).toEqual({
+        error: 'Invalid job ID',
+        code: 'INVALID_JOB_ID',
+      });
+      const noJobFr = await post(
+        '/api/astrometry/reuse',
+        { name: 'a.png', bytes: png },
+        { jobId: 'abc', lang: 'fr' },
+      );
+      expect(noJobFr.body.error).toBe('Job ID invalide');
+      const reuseBad = await post(
+        '/api/astrometry/reuse',
+        { name: 'x.txt', bytes: new Uint8Array([1]) },
+        { jobId: '5' },
+      );
+      expect(reuseBad.status).toBe(400);
+      expect(reuseBad.body).toEqual({
+        error: 'Cannot determine image dimensions',
+        code: 'CANNOT_DETERMINE_DIMENSIONS',
+      });
+      expect(recorded).toHaveLength(0);
+    });
+
+    it('answers 500 with the message when the login is refused', async () => {
+      upstream = json({ status: 'error', errormessage: 'bad apikey' });
+      const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
+      expect(r.status).toBe(500);
+      expect(r.body).toEqual({
+        error: "Échec de l'authentification astrometry.net: bad apikey",
+      });
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0].url).toBe(`${API}/login`);
+      expect(recorded[0].method).toBe('POST');
+      expect(recorded[0].headers['content-type']).toBe('application/x-www-form-urlencoded');
+      expect(recorded[0].body).toMatch(/^request-json=/);
+      expect(formJson(recorded[0].body!).apikey).toBe('test-key');
+    });
+
+    it('logs in, uploads the file with the request and answers with a local job id', async () => {
+      upstream = (url) =>
+        url === `${API}/login`
+          ? json({ status: 'success', session: 'sess-1' })
+          : url === `${API}/upload`
+            ? json({ status: 'success', subid: 77 })
+            : { status: 404, body: '' };
+      const r = await post(
+        '/api/solve-plate',
+        { name: 'm13.png', bytes: png },
+        {
+          ra: '250.4',
+          dec: '36.5',
+          radius: '1.5',
+          scale_lower: '1',
+          scale_upper: '3',
+        },
+      );
+      expect(r.status).toBe(200);
+      expect(Object.keys(r.body)).toEqual(['jobId']);
+      expect(r.body.jobId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(recorded.map((x) => `${x.method} ${x.url}`)).toEqual([
+        `POST ${API}/login`,
+        `POST ${API}/upload`,
+      ]);
+      const up = recorded[1];
+      expect(up.headers['content-type']).toMatch(/^multipart\/form-data; boundary=/);
+      expect(JSON.parse(partOf(up.body!, 'request-json')!)).toEqual({
+        session: 'sess-1',
+        publicly_visible: 'n',
+        allow_modifications: 'n',
+        allow_commercial_use: 'n',
+        center_ra: 250.4,
+        center_dec: 36.5,
+        radius: 1.5,
+        scale_lower: 1,
+        scale_upper: 3,
+      });
+      expect(up.body).toContain('name="file"; filename="m13.png"');
+      expect(up.body).toContain('Content-Type: application/octet-stream');
+      expect(up.body).toContain(Buffer.from(png).toString('latin1'));
+
+      const status = await call('GET', `/api/solve-plate/${r.body.jobId}`);
+      expect(status.status).toBe(200);
+      expect(status.body).toEqual({ jobId: r.body.jobId, status: 'solving' });
+    });
+
+    it('reuses the session and estimates the scale from the picture when no hint is given', async () => {
+      upstream = json({ status: 'success', subid: 78 });
+      const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
+      expect(r.status).toBe(200);
+      expect(recorded.map((x) => x.url)).toEqual([`${API}/upload`]);
+      const request = JSON.parse(partOf(recorded[0].body!, 'request-json')!);
+      expect(request.session).toBe('sess-1');
+      // 8x6 picture: 2 degrees over the smaller side, from half to double.
+      const perPx = (2 * 3600) / 6;
+      expect(request).toMatchObject({
+        scale_lower: perPx * 0.5,
+        scale_upper: perPx * 2,
+        scale_units: 'arcsecperpix',
+      });
+      expect(request.center_ra).toBeUndefined();
+    });
+
+    it('turns a rejected upload into a failed job carrying the upstream message', async () => {
+      upstream = json({ status: 'error', errormessage: 'bad image format' });
+      const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
+      expect(r.status).toBe(200);
+      const status = await call('GET', `/api/solve-plate/${r.body.jobId}`);
+      expect(status.body).toEqual({
+        jobId: r.body.jobId,
+        status: 'failed',
+        error: 'bad image format',
+      });
+      upstream = json({ status: 'error' });
+      const r2 = await post('/api/solve-plate', { name: 'a.png', bytes: png });
+      expect((await call('GET', `/api/solve-plate/${r2.body.jobId}`)).body.error).toBe(
+        'Upload rejected',
+      );
+    });
+
+    it('turns a network failure of the upload into a failed job', async () => {
+      upstream = { reject: 'connection refused' };
+      const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
+      expect(r.status).toBe(200);
+      const status = await call('GET', `/api/solve-plate/${r.body.jobId}`);
+      expect(status.body.status).toBe('failed');
+      expect(status.body.error).toBe('connection refused');
+    });
+
+    it('lists the past submissions, most recent first, with the sizes of their solution', async () => {
+      upstream = (url) => {
+        if (url === `${API}/myjobs/`) return json({ jobs: [101, null, 200, 150] });
+        if (url === `${API}/jobs/101/info/`)
+          return json({
+            status: 'success',
+            original_filename: 'M42.jpg',
+            image_width: 800,
+            image_height: 600,
+          });
+        if (url === `${API}/jobs/200/info/`)
+          return json({ status: 'success', original_filename: 'M31.jpg' });
+        if (url === `${API}/jobs/150/info/`) return { status: 500, body: '' };
+        if (url === 'https://nova.astrometry.net/wcs_file/200/')
+          return { status: 200, body: WCS_FIXTURE };
+        return { status: 404, body: '' };
+      };
+      const r = await call('GET', '/api/astrometry/submissions');
+      expect(r.status).toBe(200);
+      expect(r.body.submissions).toEqual([
+        {
+          submissionId: 200,
+          jobId: 200,
+          status: 'success',
+          filename: 'M31.jpg',
+          width: 3840,
+          height: 2160,
+        },
+        { submissionId: 150, jobId: 150, status: 'unknown' },
+        {
+          submissionId: 101,
+          jobId: 101,
+          status: 'success',
+          filename: 'M42.jpg',
+          width: 800,
+          height: 600,
+        },
+      ]);
+      const myjobs = recorded.find((x) => x.url === `${API}/myjobs/`)!;
+      expect(myjobs.method).toBe('POST');
+      expect(myjobs.headers['content-type']).toBe('application/x-www-form-urlencoded');
+      expect(formJson(myjobs.body!)).toEqual({ session: 'sess-1' });
+    });
+
+    it('answers an empty list when the upstream refuses or fails', async () => {
+      upstream = { status: 403, body: '' };
+      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual({
+        submissions: [],
+      });
+      upstream = { reject: 'network down' };
+      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual({
+        submissions: [],
+      });
+      upstream = json({ something: 'else' });
+      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual({
+        submissions: [],
+      });
+    });
+
+    it('reuses a solved job from its WCS file and lists the objects of the field', async () => {
+      upstream = (url) => {
+        if (url === `${API}/jobs/10796000`) return json({ status: 'success' });
+        if (url === 'https://nova.astrometry.net/wcs_file/10796000/')
+          return { status: 200, body: WCS_FIXTURE };
+        if (url === `${API}/jobs/10796000/objects_in_field/`)
+          return { status: 200, body: OBJECTS_FIXTURE };
+        return { status: 404, body: '' };
+      };
+      // A 3840x2160 picture, the size of the solved one.
+      const big = new Uint8Array(
+        await sharp({
+          create: {
+            width: 3840,
+            height: 2160,
+            channels: 3,
+            background: { r: 0, g: 0, b: 0 },
+          },
+        })
+          .png({ compressionLevel: 9 })
+          .toBuffer(),
+      );
+      const r = await post(
+        '/api/astrometry/reuse',
+        { name: 'm13.png', bytes: big },
+        { jobId: '10796000' },
+      );
+      expect(r.status).toBe(200);
+      expect(Object.keys(r.body)).toEqual(['success', 'correspondences']);
+      expect(r.body.success).toBe(true);
+      expect(r.body.correspondences.length).toBeGreaterThanOrEqual(3);
+      expect(recorded.map((x) => `${x.method} ${x.url}`)).toEqual([
+        `GET ${API}/jobs/10796000`,
+        'GET https://nova.astrometry.net/wcs_file/10796000/',
+        `GET ${API}/jobs/10796000/objects_in_field/`,
+      ]);
+    });
+
+    it('refuses a solution that belongs to a picture of another shape', async () => {
+      upstream = (url) =>
+        url === `${API}/jobs/10796000`
+          ? json({ status: 'success' })
+          : { status: 200, body: WCS_FIXTURE };
+      const r = await post(
+        '/api/astrometry/reuse',
+        { name: 'a.png', bytes: png },
+        { jobId: '10796000' },
+      );
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({
+        success: false,
+        error:
+          'Selected astrometry solution appears to be for a different image (solution 3840x2160, current 8x6).',
+      });
+    });
+
+    it('falls back to the calibration when the job has no WCS file', async () => {
+      upstream = (url) => {
+        if (url === `${API}/jobs/10796000`) return json({ status: 'success' });
+        if (url === 'https://nova.astrometry.net/wcs_file/10796000/')
+          return { status: 200, body: 'SIMPLE  = T' };
+        if (url === `${API}/jobs/10796000/calibration/`) return { status: 200, body: CAL_FIXTURE };
+        if (url === `${API}/jobs/10796000/objects_in_field/`)
+          return { status: 200, body: OBJECTS_FIXTURE };
+        return { status: 404, body: '' };
+      };
+      const r = await post(
+        '/api/astrometry/reuse',
+        { name: 'a.png', bytes: png },
+        { jobId: '10796000' },
+      );
+      expect(r.status).toBe(200);
+      expect(typeof r.body.success).toBe('boolean');
+      expect(recorded.map((x) => x.url).slice(0, 3)).toEqual([
+        `${API}/jobs/10796000`,
+        'https://nova.astrometry.net/wcs_file/10796000/',
+        `${API}/jobs/10796000/calibration/`,
+      ]);
+    });
+
+    it('reports a job that is not solved, and an upstream failure, as success false', async () => {
+      upstream = json({ status: 'failure' });
+      const failed = await post(
+        '/api/astrometry/reuse',
+        { name: 'a.png', bytes: png },
+        { jobId: '99' },
+      );
+      expect(failed.status).toBe(200);
+      expect(failed.body).toEqual({
+        success: false,
+        error: 'Job 99 status: failure',
+      });
+      upstream = { reject: 'timeout' };
+      const down = await post(
+        '/api/astrometry/reuse',
+        { name: 'a.png', bytes: png },
+        { jobId: '99' },
+      );
+      expect(down.status).toBe(200);
+      expect(down.body).toEqual({ success: false, error: 'timeout' });
+    });
+
+    it('logs in again after the key is changed', async () => {
+      await call('PUT', '/api/settings', { apiKey: 'other-key' });
+      upstream = (url) =>
+        url === `${API}/login`
+          ? json({ status: 'success', session: 'sess-2' })
+          : json({ status: 'success', subid: 90 });
+      const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
+      expect(r.status).toBe(200);
+      expect(recorded.map((x) => x.url)).toEqual([`${API}/login`, `${API}/upload`]);
+      expect(formJson(recorded[0].body!).apikey).toBe('other-key');
+      expect(JSON.parse(partOf(recorded[1].body!, 'request-json')!).session).toBe('sess-2');
     });
   });
 });

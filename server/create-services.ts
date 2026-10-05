@@ -9,6 +9,7 @@ import { createDsoOverrideService } from '@myastrosky/core/services/dso-override
 import { createGearService } from '@myastrosky/core/services/gear';
 import { createHorizonService } from '@myastrosky/core/services/horizon';
 import { createIdentifyService } from '@myastrosky/core/services/identify';
+import { createNovaSolveService } from '@myastrosky/core/services/nova-solve';
 import { createPhotoService } from '@myastrosky/core/services/photos';
 import { createPlanService } from '@myastrosky/core/services/plans';
 import { createPoiCategoryService } from '@myastrosky/core/services/poi-categories';
@@ -61,11 +62,12 @@ export function createServices(deps: ServiceDeps) {
     log,
     sleep,
   } = deps;
+  const settings = createSettingsService({ db, secrets, env });
   return {
     dsoOverrides: createDsoOverrideService({ db }),
     skyRegions: createSkyRegionService({ db, newId }),
     poiCategories: createPoiCategoryService({ db, newId }),
-    settings: createSettingsService({ db, secrets, env }),
+    settings,
     gear: createGearService({ db, newId, catalog: gearCatalog }),
     plans: createPlanService({ db, newId }),
     photos: createPhotoService({ db, newId, images, blobs }),
@@ -73,6 +75,16 @@ export function createServices(deps: ServiceDeps) {
     identify: createIdentifyService({ http, now }),
     solvedImport: createSolvedImportService({ images, stars: catalogStars }),
     horizon: createHorizonService({ db, http, images, now, log, sleep }),
+    novaSolve: createNovaSolveService({
+      http,
+      settings,
+      images,
+      stars: catalogStars,
+      now,
+      newId,
+      log,
+      sleep,
+    }),
   };
 }
 
