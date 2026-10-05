@@ -519,3 +519,13 @@ export function derivePlacementFromMatrix(
     mirrorY: det < 0,
   };
 }
+
+/**
+ * Manual-placement zoom read-out. The slider value is log2 of the photo scale relative to the map
+ * (larger = bigger photo); `initialValue` is the slider value when the mode opened, which reads
+ * "100 %". Whole percent, non-breaking space before the sign (French typography).
+ */
+export function formatZoomPercent(value: number, initialValue = 0): string {
+  const nbsp = String.fromCharCode(160);
+  return `${Math.round(Math.pow(2, value - initialValue) * 100)}${nbsp}%`;
+}

@@ -21,6 +21,7 @@ import {
   extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
+  formatZoomPercent,
 } from '../../src/photo-placement';
 import {
   project,
@@ -436,5 +437,21 @@ describe('extractMatrixFromTransform', () => {
     expect(extractMatrixFromTransform('')).toBeNull();
     expect(extractMatrixFromTransform('translate(1px, 2px)')).toBeNull();
     expect(extractMatrixFromTransform('matrix(1, 2, 3)')).toBeNull();
+  });
+});
+
+const NBSP = String.fromCharCode(160);
+
+describe('formatZoomPercent', () => {
+  it('reads 100 % at the value the mode opened with', () => {
+    expect(formatZoomPercent(0)).toBe(`100${NBSP}%`);
+    expect(formatZoomPercent(-1.3, -1.3)).toBe(`100${NBSP}%`);
+  });
+
+  it('doubles per slider unit and rounds to a whole percent', () => {
+    expect(formatZoomPercent(1)).toBe(`200${NBSP}%`);
+    expect(formatZoomPercent(-1)).toBe(`50${NBSP}%`);
+    expect(formatZoomPercent(0.5, -0.5)).toBe(`200${NBSP}%`);
+    expect(formatZoomPercent(-6)).toBe(`2${NBSP}%`);
   });
 });
