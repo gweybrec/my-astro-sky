@@ -347,6 +347,7 @@ const fr = {
     deleteBackupWarning: 'Recommandé : créez une sauvegarde de vos données avant de supprimer.',
     importBackupBtn: 'Créer une sauvegarde (ZIP)',
     importSuccess: 'Restauré : {n} photo(s) ({s} ignorée(s))',
+    importFailedItems: 'Non restauré : {names}',
     importError: 'Erreur de sauvegarde / restauration',
     exportView: {
       button: 'Exporter',

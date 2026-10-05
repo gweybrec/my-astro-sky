@@ -350,6 +350,7 @@ const es: Translations = {
       'Recomendado: crea una copia de seguridad de tus datos antes de eliminar nada.',
     importBackupBtn: 'Crear una copia de seguridad (ZIP)',
     importSuccess: 'Restaurado: {n} foto(s) ({s} omitida(s))',
+    importFailedItems: 'No restaurado: {names}',
     importError: 'Error de copia / restauración',
     exportView: {
       button: 'Exportar',

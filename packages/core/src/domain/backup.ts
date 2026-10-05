@@ -73,10 +73,18 @@ export interface ImportPreviewResult {
   gear: ImportPreviewGear[];
 }
 
+/** An item of a backup that could not be restored. */
+export interface ImportFailure {
+  kind: 'plan' | 'setup' | 'gear' | 'photo';
+  name: string;
+}
+
 export interface ImportResult {
   imported: number;
   skipped: number;
   dsoOverridesImported?: number;
+  /** Items that failed; the others were imported. Empty when nothing failed. */
+  failed?: ImportFailure[];
 }
 
 export interface ImportOptions {

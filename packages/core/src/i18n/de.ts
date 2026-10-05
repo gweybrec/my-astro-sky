@@ -350,6 +350,7 @@ const de: Translations = {
     deleteBackupWarning: 'Empfohlen: Erstelle eine Sicherung deiner Daten, bevor du etwas löschst.',
     importBackupBtn: 'Sicherung erstellen (ZIP)',
     importSuccess: 'Wiederhergestellt: {n} Foto(s) ({s} übersprungen)',
+    importFailedItems: 'Nicht wiederhergestellt: {names}',
     importError: 'Sicherungs-/Wiederherstellungsfehler',
     exportView: {
       button: 'Exportieren',

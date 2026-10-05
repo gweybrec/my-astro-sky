@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
 import ImportModal from '../../src/components/modals/ImportModal.vue';
+import { showToast } from '../../src/toast';
 
 const api = vi.hoisted(() => ({
   importPreview: vi.fn(),
@@ -10,7 +11,12 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/i18n', () => ({
-  t: (key: string) => (key === 'settings.importSetupWithPlan' ? `with plan {name}` : key),
+  t: (key: string) =>
+    key === 'settings.importSetupWithPlan'
+      ? `with plan {name}`
+      : key === 'settings.importFailedItems'
+        ? 'failed: {names}'
+        : key,
 }));
 vi.mock('../../src/api', () => api);
 vi.mock('../../src/toast', () => ({ showToast: vi.fn() }));
@@ -190,5 +196,39 @@ describe('ImportModal setups', () => {
     await confirmButton(w).trigger('click');
     await flushPromises();
     expect(api.importData.mock.calls[0][1].setupConflicts).toEqual({ 'setup-diff': 'skip' });
+  });
+});
+
+describe('ImportModal failed items', () => {
+  const toasts = () => vi.mocked(showToast).mock.calls.map((c) => c[0]);
+
+  it('follows the result message with one line naming the items that failed', async () => {
+    const w = await openDialog();
+    api.importData.mockResolvedValue({
+      imported: 1,
+      skipped: 0,
+      failed: [
+        { kind: 'plan', name: 'Plan A' },
+        { kind: 'photo', name: 'm31.jpg' },
+      ],
+    });
+    await radioFor(w, 'Diff rig', 'replace').setValue(true);
+    await confirmButton(w).trigger('click');
+    await flushPromises();
+
+    const messages = toasts().map((o) => o.message);
+    expect(messages[0]).toBe('settings.importSuccess');
+    expect(messages[1]).toBe('failed: Plan A, m31.jpg');
+    expect(toasts()[1].type).toBe('error');
+    expect(messages).toHaveLength(2);
+  });
+
+  it('adds no line when nothing failed', async () => {
+    const w = await openDialog();
+    api.importData.mockResolvedValue({ imported: 1, skipped: 0, failed: [] });
+    await radioFor(w, 'Diff rig', 'replace').setValue(true);
+    await confirmButton(w).trigger('click');
+    await flushPromises();
+    expect(toasts().map((o) => o.message)).toEqual(['settings.importSuccess']);
   });
 });

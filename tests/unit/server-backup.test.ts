@@ -558,7 +558,7 @@ describe('export and import round trip', () => {
     );
     expect(r).toEqual({
       status: 200,
-      body: { imported: 2, skipped: 0, dsoOverridesImported: 1 },
+      body: { imported: 2, skipped: 0, dsoOverridesImported: 1, failed: [] },
     });
 
     snapB = await snapshot(instanceB);
@@ -606,7 +606,7 @@ describe('export and import round trip', () => {
       bundleForm(zip, selectEverything(preview)),
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ imported: 2, skipped: 0, dsoOverridesImported: 1 });
+    expect(r.body).toEqual({ imported: 2, skipped: 0, dsoOverridesImported: 1, failed: [] });
 
     const again = await snapshot(instanceB);
     for (const key of Object.keys(snapB) as (keyof typeof snapB)[]) {
@@ -622,7 +622,10 @@ describe('export and import round trip', () => {
       '/api/import',
       bundleForm(zip, { selectedPlans: JSON.stringify([planId]) }),
     );
-    expect(r).toEqual({ status: 200, body: { imported: 0, skipped: 0, dsoOverridesImported: 0 } });
+    expect(r).toEqual({
+      status: 200,
+      body: { imported: 0, skipped: 0, dsoOverridesImported: 0, failed: [] },
+    });
 
     // The plan's setup is not ticked, but it arrives with the plan, with the custom telescope
     // and camera it uses (they are in the bundle and absent on C). The plan still points at it.
@@ -644,7 +647,10 @@ describe('export and import round trip', () => {
     await live!.stop();
     const d = await startInstance();
     const r = await d.call('POST', '/api/import', bundleForm(zip, { importMetadata: '1' }));
-    expect(r).toEqual({ status: 200, body: { imported: 2, skipped: 0, dsoOverridesImported: 0 } });
+    expect(r).toEqual({
+      status: 200,
+      body: { imported: 2, skipped: 0, dsoOverridesImported: 0, failed: [] },
+    });
 
     expect((await d.call('GET', '/api/photos')).body.map((p: any) => p.id).sort()).toEqual(
       [...photoIds].sort(),
@@ -660,7 +666,10 @@ describe('export and import round trip', () => {
       '/api/import',
       bundleForm(zip, { importMetadata: '1', selectedImages: JSON.stringify([]) }),
     );
-    expect(r).toEqual({ status: 200, body: { imported: 0, skipped: 2, dsoOverridesImported: 0 } });
+    expect(r).toEqual({
+      status: 200,
+      body: { imported: 0, skipped: 2, dsoOverridesImported: 0, failed: [] },
+    });
     expect((await e.call('GET', '/api/photos')).body).toEqual([]);
     expect(fs.readdirSync(e.uploadsDir)).toEqual([]);
   }, 30_000);
@@ -821,5 +830,99 @@ describe('export and import round trip', () => {
     expect(r.status).toBe(200);
     expect(await planSetupId(inst)).toEqual([setupId]);
     expect((await inst.call('GET', '/api/gear-setups')).body).toEqual([]);
+  }, 30_000);
+
+  // ─── An item that cannot be restored is reported, the others still arrive ──
+
+  /** The ZIP of the round trip with some JSON entries replaced (images are kept). */
+  async function zipWith(replaced: Record<string, unknown>): Promise<Buffer> {
+    const dir = await unzipper.Open.buffer(zip);
+    const archive = new ZipArchive();
+    const chunks: Buffer[] = [];
+    const done = new Promise<Buffer>((resolve, reject) => {
+      archive.on('data', (c: Buffer) => chunks.push(c));
+      archive.on('end', () => resolve(Buffer.concat(chunks)));
+      archive.on('error', reject);
+    });
+    for (const entry of dir.files.filter((f) => f.type === 'File')) {
+      const body =
+        entry.path in replaced
+          ? Buffer.from(JSON.stringify(replaced[entry.path]))
+          : await entry.buffer();
+      archive.append(body, { name: entry.path });
+    }
+    void archive.finalize();
+    return done;
+  }
+
+  it('lists a photo, a plan, a setup and a custom gear item that failed, and imports the rest', async () => {
+    const z = await openZip(zip);
+    const plans = JSON.parse((await z.read('plans.json')).toString('utf8'));
+    const gear = JSON.parse((await z.read('custom-gear.json')).toString('utf8'));
+    const setups = JSON.parse((await z.read('gear-setups.json')).toString('utf8'));
+
+    // Photo 0 repeats a point number: the database refuses it. Photo 1 is untouched.
+    const badPhoto = {
+      ...manifest.photos[0],
+      originalName: 'broken-photo.png',
+      correspondences: [
+        { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starName: 'A' },
+        { pointIndex: 0, photoX: 2, photoY: 2, starHip: 2, starName: 'B' },
+      ],
+    };
+    const photos = [badPhoto, manifest.photos[1]];
+    // A second plan whose two entries share an id: the database refuses it.
+    const brokenPlan = {
+      id: 'plan-broken',
+      name: 'Broken plan',
+      entries: [
+        { id: 'dup', dsoId: 'M31', position: 0 },
+        { id: 'dup', dsoId: 'M42', position: 1 },
+      ],
+    };
+
+    await live!.stop();
+    const inst = await startInstance();
+    const svc = await import('../../server/services.js');
+    const brokenSetup = setups[0];
+    vi.spyOn(svc.gear, 'importSetup').mockRejectedValueOnce(new Error('setup refused'));
+    vi.spyOn(svc.gear, 'importCustom').mockRejectedValueOnce(new Error('gear refused'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const bundle = await zipWith({
+      'manifest.json': { manifestVersion: 1, photos },
+      'plans.json': [...plans, brokenPlan],
+    });
+    const preview = await previewOf(inst, bundle);
+    const r = await inst.call(
+      'POST',
+      '/api/import',
+      bundleForm(bundle, {
+        ...selectEverything(preview),
+        selectedPlans: JSON.stringify([...plans.map((p: any) => p.id), brokenPlan.id]),
+        selectedSetups: JSON.stringify([brokenSetup.id]),
+        selectedGear: JSON.stringify([gear[0].id]),
+      }),
+    );
+    vi.restoreAllMocks();
+
+    expect(r.status).toBe(200);
+    expect(r.body.imported).toBe(1);
+    expect(r.body.failed).toHaveLength(4);
+    expect(r.body.failed).toEqual(
+      expect.arrayContaining([
+        { kind: 'photo', name: 'broken-photo.png' },
+        { kind: 'plan', name: 'Broken plan' },
+        { kind: 'setup', name: brokenSetup.name },
+        { kind: 'gear', name: gear[0].name ?? gear[0].id },
+      ]),
+    );
+    // The others arrived.
+    expect((await inst.call('GET', '/api/photos')).body.map((p: any) => p.id)).toEqual([
+      manifest.photos[1].id,
+    ]);
+    expect((await inst.call('GET', '/api/plans')).body.map((p: any) => p.id)).toEqual(
+      plans.map((p: any) => p.id),
+    );
   }, 30_000);
 });

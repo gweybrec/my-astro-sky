@@ -348,6 +348,7 @@ const en: Translations = {
       'Recommended: create a backup of your current data before deleting anything.',
     importBackupBtn: 'Create a backup (ZIP)',
     importSuccess: 'Restored: {n} photo(s) ({s} skipped)',
+    importFailedItems: 'Not restored: {names}',
     importError: 'Backup / restore error',
     exportView: {
       button: 'Export',

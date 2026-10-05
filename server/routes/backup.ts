@@ -15,6 +15,7 @@ import {
   poiCategories as poiCategoriesService,
   skyRegions as skyRegionsService,
 } from '../services.js';
+import type { ImportFailure } from '@myastrosky/core/domain/backup';
 import { ZipArchive } from 'archiver';
 import { createRequire } from 'module';
 import {
@@ -403,6 +404,14 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
  *                 imported: { type: integer }
  *                 skipped: { type: integer }
  *                 dsoOverridesImported: { type: integer }
+ *                 failed:
+ *                   type: array
+ *                   description: Items that could not be restored (the others were imported)
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       kind: { type: string, enum: [plan, setup, gear, photo] }
+ *                       name: { type: string }
  *       400:
  *         description: No file, unsupported format, invalid ZIP entry path or invalid manifest
  *         content:
@@ -450,6 +459,12 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
     const ext = path.extname(file.originalname).toLowerCase();
     let photos: any[] = [];
     let dsoOverridesImported = 0;
+    // Items that could not be restored; the others are still imported.
+    const failed: ImportFailure[] = [];
+    const recordFailure = (kind: ImportFailure['kind'], name: string, err: unknown) => {
+      failed.push({ kind, name });
+      console.error(`[Import] Failed to import ${kind} "${name}"`, err);
+    };
     // Tracks which image basenames were successfully written to UPLOADS_DIR.
     // null means no image extraction happened (JSON import), so don't filter by it.
     let writtenFiles: Set<string> | null = null;
@@ -564,10 +579,14 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
                 const { id, type, ...data } = g;
                 const name = typeof data.name === 'string' ? data.name : id;
                 const sameType = existingGear.filter((r) => r.type === type);
-                await gearService.importCustom(
-                  { id, type: type as CustomGearType, data },
-                  idsToReplaceByName(sameType, name),
-                );
+                try {
+                  await gearService.importCustom(
+                    { id, type: type as CustomGearType, data },
+                    idsToReplaceByName(sameType, name),
+                  );
+                } catch (itemErr) {
+                  recordFailure('gear', name, itemErr);
+                }
               }
             }
           }
@@ -579,12 +598,13 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
       // Import gear setups: the ticked ones and the setups of ticked plans, as decided by
       // planSetupImportActions (replace by name only when the name is non-empty — an empty
       // name must not match, and delete, every existing unnamed setup).
-      try {
-        for (const a of setupPlan.actions) {
-          if (a.setup) await gearService.importSetup(a.setup, a.replaceIds);
+      for (const a of setupPlan.actions) {
+        if (!a.setup) continue;
+        try {
+          await gearService.importSetup(a.setup, a.replaceIds);
+        } catch (setupErr) {
+          recordFailure('setup', a.setup.name || a.setup.id, setupErr);
         }
-      } catch (setupErr) {
-        console.error('[Import] Failed to import gear setups', setupErr);
       }
 
       // Import POI categories (id-based upsert: a re-imported category with the same
@@ -652,15 +672,19 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
             for (const [pi, p] of rawPlans.entries()) {
               if (typeof p.id !== 'string' || typeof p.name !== 'string') continue;
               if (!selectedPlans.has(p.id)) continue;
-              await plansService.importPlan(p, {
-                replaceIds: p.name ? idsToReplaceByName(existingPlans, p.name) : [],
-                // A setup this import skipped or kept under another id is pointed at its local twin.
-                setupId:
-                  typeof p.setupId === 'string'
-                    ? (setupPlan.setupIdRemap[p.setupId] ?? p.setupId)
-                    : null,
-                index: pi,
-              });
+              try {
+                await plansService.importPlan(p, {
+                  replaceIds: p.name ? idsToReplaceByName(existingPlans, p.name) : [],
+                  // A setup this import skipped or kept under another id is pointed at its local twin.
+                  setupId:
+                    typeof p.setupId === 'string'
+                      ? (setupPlan.setupIdRemap[p.setupId] ?? p.setupId)
+                      : null,
+                  index: pi,
+                });
+              } catch (planErr) {
+                recordFailure('plan', p.name || p.id, planErr);
+              }
             }
           }
         } catch {
@@ -729,12 +753,16 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
           continue;
         }
 
-        const existingId = existingByName.get(origName);
-        if (existingId) await photosService.removeRow(existingId);
+        try {
+          const existingId = existingByName.get(origName);
+          if (existingId) await photosService.removeRow(existingId);
 
-        const result = await photosService.importPhoto(p, 'skip');
-        if (result === 'imported') imported++;
-        else skipped++;
+          const result = await photosService.importPhoto(p, 'skip');
+          if (result === 'imported') imported++;
+          else skipped++;
+        } catch (photoErr) {
+          recordFailure('photo', origName, photoErr);
+        }
       }
     }
 
@@ -753,7 +781,7 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
       }
     }
 
-    res.json({ imported, skipped, dsoOverridesImported });
+    res.json({ imported, skipped, dsoOverridesImported, failed });
   } catch (err: any) {
     res.status(500).json({ error: err?.message ?? String(err) });
   }

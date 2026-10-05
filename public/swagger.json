@@ -3648,6 +3648,27 @@
                     },
                     "dsoOverridesImported": {
                       "type": "integer"
+                    },
+                    "failed": {
+                      "type": "array",
+                      "description": "Items that could not be restored (the others were imported)",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "plan",
+                              "setup",
+                              "gear",
+                              "photo"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }

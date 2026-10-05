@@ -547,6 +547,13 @@ async function onImport() {
       .replace('{n}', String(result.imported))
       .replace('{s}', String(result.skipped));
     showToast({ message: msg, type: 'info' });
+    if (result.failed?.length) {
+      const names = result.failed.map((f) => f.name).join(', ');
+      showToast({
+        message: t('settings.importFailedItems').replace('{names}', names),
+        type: 'error',
+      });
+    }
 
     // Reload photos into overlay and gallery without a full page refresh
     try {
