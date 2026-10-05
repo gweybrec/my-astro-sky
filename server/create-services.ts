@@ -5,6 +5,7 @@ import type { HttpClient } from '@myastrosky/core/ports/http-client';
 import type { ImageCodec } from '@myastrosky/core/ports/image-codec';
 import type { SecretCodec } from '@myastrosky/core/ports/secret-codec';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
+import { createBackupService } from '@myastrosky/core/services/backup';
 import { createDsoOverrideService } from '@myastrosky/core/services/dso-overrides';
 import { createGearService } from '@myastrosky/core/services/gear';
 import { createHorizonService } from '@myastrosky/core/services/horizon';
@@ -64,14 +65,30 @@ export function createServices(deps: ServiceDeps) {
     sleep,
   } = deps;
   const settings = createSettingsService({ db, secrets, env });
+  const dsoOverrides = createDsoOverrideService({ db });
+  const skyRegions = createSkyRegionService({ db, newId });
+  const poiCategories = createPoiCategoryService({ db, newId });
+  const gear = createGearService({ db, newId, catalog: gearCatalog });
+  const plans = createPlanService({ db, newId });
+  const photos = createPhotoService({ db, newId, images, blobs });
   return {
-    dsoOverrides: createDsoOverrideService({ db }),
-    skyRegions: createSkyRegionService({ db, newId }),
-    poiCategories: createPoiCategoryService({ db, newId }),
+    dsoOverrides,
+    skyRegions,
+    poiCategories,
     settings,
-    gear: createGearService({ db, newId, catalog: gearCatalog }),
-    plans: createPlanService({ db, newId }),
-    photos: createPhotoService({ db, newId, images, blobs }),
+    gear,
+    plans,
+    photos,
+    backup: createBackupService({
+      photos,
+      plans,
+      gear,
+      dsoOverrides,
+      poiCategories,
+      skyRegions,
+      blobs,
+      newId,
+    }),
     stars: createStarSearchService({ stars }),
     identify: createIdentifyService({ http, now }),
     solvedImport: createSolvedImportService({ images, stars: catalogStars }),

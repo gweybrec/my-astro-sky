@@ -30,6 +30,7 @@ const services = createServices({
 });
 
 export const {
+  backup,
   gear,
   dsoOverrides,
   poiCategories,
