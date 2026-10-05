@@ -97,7 +97,7 @@ Express 5 server with multiple modules:
   | `nova-solve.ts`     | `novaSolveRouter`     | `/api/solve-plate`, `/api/astrometry/submissions`, `/api/astrometry/reuse` (astrometry.net online)     |
   | `backup.ts`         | `backupRouter`        | `POST /api/export`, `POST /api/import/preview`, `POST /api/import`                                     |
 
-  `routes/shared.ts` holds what several routers share (allowed file extensions, `sanitizeIntegrationRows`, `isElectron`, the in-memory rate limiter and its limits, the multer setup). `routes/mappers.ts` holds the DB-row to API-shape mappers and the plan sort keys.
+  `routes/shared.ts` holds what several routers share (allowed file extensions, `sanitizeIntegrationRows`, `isElectron`, the in-memory rate limiter and its limits, the multer setup).
 
 - **Notable routes** (details; the table above is the full map):
   - `POST /api/photos` — Upload; Sharp only bakes the EXIF orientation into the file (`.rotate()`, no resizing — the original resolution is kept); generate `{uuid}_thumb.jpg` (400 px, JPEG q75) via Sharp, scale correspondences proportionally, store in SQLite + disk; returns `thumbFilename` in response. Sharp errors on invalid/corrupt image files return **HTTP 400** with `{ code: 'INVALID_IMAGE' }` rather than 500.

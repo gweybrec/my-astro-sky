@@ -6,7 +6,6 @@ import path from 'path';
 import fs from 'fs';
 import { UPLOADS_DIR } from '../server-paths.js';
 import { ALLOWED_PHOTO_EXTENSIONS, uploadBundle, sanitizeIntegrationRows } from './shared.js';
-import { planEntryToApi, planMosaicToApi, PLAN_SORT_KEYS } from './mappers.js';
 import {
   getAllPhotos,
   deletePhoto,
@@ -14,20 +13,11 @@ import {
   checkPhotosExistByName,
   sanitizePois,
   sanitizeCaptureDetails,
-  getPlans,
-  getAllPlanEntries,
-  createPlan,
-  deletePlan,
-  addPlanEntry,
-  sanitizeObservationWindows,
-  getAllPlanMosaics,
-  addPlanMosaic,
-  type PlanEntryRow,
-  type PlanMosaicRow,
 } from '../db.js';
 import {
   dsoOverrides as dsoOverridesService,
   gear as gearService,
+  plans as plansService,
   poiCategories as poiCategoriesService,
   skyRegions as skyRegionsService,
 } from '../services.js';
@@ -170,31 +160,8 @@ backupRouter.post('/api/export', async (req, res) => {
       });
     }
     if (includePlans) {
-      const entriesByPlan = new Map<string, PlanEntryRow[]>();
-      for (const e of getAllPlanEntries()) {
-        const list = entriesByPlan.get(e.plan_id) ?? [];
-        list.push(e);
-        entriesByPlan.set(e.plan_id, list);
-      }
-      const mosaicsByPlan = new Map<string, PlanMosaicRow[]>();
-      for (const m of getAllPlanMosaics()) {
-        const list = mosaicsByPlan.get(m.plan_id) ?? [];
-        list.push(m);
-        mosaicsByPlan.set(m.plan_id, list);
-      }
-      const plans = getPlans().map((p) => ({
-        id: p.id,
-        name: p.name,
-        position: p.position,
-        nightOf: p.night_of ?? null,
-        setupId: p.setup_id ?? null,
-        lat: p.lat ?? null,
-        lon: p.lon ?? null,
-        sortBy: p.sort_by ?? 'transit',
-        // planEntryToApi carries mosaicId/mosaicWDeg/mosaicHDeg so tiles re-group on import.
-        entries: (entriesByPlan.get(p.id) ?? []).map(planEntryToApi),
-        mosaics: (mosaicsByPlan.get(p.id) ?? []).map(planMosaicToApi),
-      }));
+      // The plan list carries mosaicId/mosaicWDeg/mosaicHDeg so tiles re-group on import.
+      const plans = await plansService.list();
       archive.append(Buffer.from(JSON.stringify(plans, null, 2)), { name: 'plans.json' });
     }
     if (includeShortcuts && body.shortcuts && typeof body.shortcuts === 'object') {
@@ -320,7 +287,7 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
 
       // Resolve name-based conflicts: a plan/setup/gear whose name already exists
       // will be replaced (not duplicated) if the user selects it for import.
-      const existingPlanNames = new Set(getPlans().map((p) => p.name));
+      const existingPlanNames = new Set((await plansService.listNames()).map((p) => p.name));
       const existingSetupNames = new Set((await gearService.listSetups()).map((s) => s.name));
       const existingGearKeys = new Set(
         (await gearService.listCustomNames()).map((g) => `${g.type}\u001f${g.name}`),
@@ -686,72 +653,21 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
           if (Array.isArray(rawPlans)) {
             // Snapshot once so two same-name plans in this bundle don't delete each
             // other; replace by name only when non-empty. Same-id collisions are
-            // handled by the explicit deletePlan(p.id) below.
-            const existingPlans = getPlans();
-            rawPlans.forEach((p, pi) => {
-              if (typeof p.id !== 'string' || typeof p.name !== 'string') return;
-              if (!selectedPlans.has(p.id)) return;
-              if (p.name) idsToReplaceByName(existingPlans, p.name).forEach(deletePlan);
-              deletePlan(p.id);
-              createPlan({
-                id: p.id,
-                name: p.name,
-                position: typeof p.position === 'number' ? p.position : pi,
-                created_at: new Date().toISOString(),
-                night_of: typeof p.nightOf === 'string' ? p.nightOf : null,
+            // handled by importPlan, which also deletes any plan with the same id.
+            const existingPlans = await plansService.listNames();
+            for (const [pi, p] of rawPlans.entries()) {
+              if (typeof p.id !== 'string' || typeof p.name !== 'string') continue;
+              if (!selectedPlans.has(p.id)) continue;
+              await plansService.importPlan(p, {
+                replaceIds: p.name ? idsToReplaceByName(existingPlans, p.name) : [],
                 // A setup this import skipped or kept under another id is pointed at its local twin.
-                setup_id:
+                setupId:
                   typeof p.setupId === 'string'
                     ? (setupPlan.setupIdRemap[p.setupId] ?? p.setupId)
                     : null,
-                lat: typeof p.lat === 'number' ? p.lat : null,
-                lon: typeof p.lon === 'number' ? p.lon : null,
-                sort_by: PLAN_SORT_KEYS.includes(p.sortBy) ? p.sortBy : 'transit',
+                index: pi,
               });
-              if (Array.isArray(p.entries)) {
-                p.entries.forEach((e: any, ei: number) => {
-                  if (typeof e.id !== 'string') return;
-                  const hasDso = typeof e.dsoId === 'string';
-                  const hasCoords = typeof e.ra === 'number' && typeof e.dec === 'number';
-                  // An entry needs either a DSO target or explicit frame coords.
-                  if (!hasDso && !hasCoords) return;
-                  addPlanEntry({
-                    id: e.id,
-                    plan_id: p.id,
-                    dso_id: hasDso ? e.dsoId : null,
-                    position: typeof e.position === 'number' ? e.position : ei,
-                    pa_deg: typeof e.paDeg === 'number' ? e.paDeg : null,
-                    ra: hasCoords ? e.ra : null,
-                    dec: hasCoords ? e.dec : null,
-                    notes: typeof e.notes === 'string' ? e.notes : null,
-                    // Keep the tile→mosaic grouping (the mosaic row is recreated below).
-                    mosaic_id: typeof e.mosaicId === 'string' ? e.mosaicId : null,
-                    mosaic_w_deg: typeof e.mosaicWDeg === 'number' ? e.mosaicWDeg : null,
-                    mosaic_h_deg: typeof e.mosaicHDeg === 'number' ? e.mosaicHDeg : null,
-                    observation_windows: sanitizeObservationWindows(e.observationWindows),
-                  });
-                });
-              }
-              if (Array.isArray(p.mosaics)) {
-                p.mosaics.forEach((m: any, mi: number) => {
-                  if (typeof m.id !== 'string') return;
-                  if (typeof m.centerRa !== 'number' || typeof m.centerDec !== 'number') return;
-                  addPlanMosaic({
-                    id: m.id,
-                    plan_id: p.id,
-                    dso_id: typeof m.dsoId === 'string' ? m.dsoId : null,
-                    name: typeof m.name === 'string' ? m.name : null,
-                    center_ra: m.centerRa,
-                    center_dec: m.centerDec,
-                    pa_deg: typeof m.paDeg === 'number' ? m.paDeg : 0,
-                    overlap_pct: typeof m.overlapPct === 'number' ? m.overlapPct : 20,
-                    cols: Number.isInteger(m.cols) ? m.cols : 1,
-                    rows: Number.isInteger(m.rows) ? m.rows : 1,
-                    position: typeof m.position === 'number' ? m.position : mi,
-                  });
-                });
-              }
-            });
+            }
           }
         } catch {
           /* ignore invalid plans.json */

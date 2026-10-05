@@ -9,6 +9,7 @@ import {
 } from '../../server/import-utils';
 import type { ZipEntry, ZipInspectResult } from '../../server/import-utils';
 import { createGearService } from '@myastrosky/core/services/gear';
+import { createPlanService } from '@myastrosky/core/services/plans';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -694,6 +695,10 @@ describe('DB import/export round-trip', () => {
 // mirrors the server's plan import/export mapping at the DB layer (the Express
 // route in server/index.ts is integration-only and excluded from the suite).
 
+// The plan service on the same in-memory database as the legacy `db` module.
+const plansOn = (db: typeof import('../../server/db.js')) =>
+  createPlanService({ db: createBetterSqliteDb(db.getConnection()), newId: () => 'unused' });
+
 describe('Plan + mosaic export/import round-trip', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -706,157 +711,61 @@ describe('Plan + mosaic export/import round-trip', () => {
 
   it('preserves a mosaic (grouping + tiles) and a smart-scope frame size across a round-trip', async () => {
     const db = await import('../../server/db.js');
+    const plans = plansOn(db);
 
     // ── Seed: a plan with a 2-tile mosaic plus a standalone smart-scope frame. ──
-    db.createPlan({
-      id: 'plan-1',
-      name: 'Night A',
-      position: 0,
-      created_at: '2026-01-01T00:00:00.000Z',
-      night_of: '2026-06-20',
-      setup_id: null,
-      lat: 48.85,
-      lon: 2.35,
-    });
-    db.createPlanMosaic(
-      {
-        id: 'mo-1',
-        plan_id: 'plan-1',
-        dso_id: 'M31',
-        name: 'Andromeda mosaic',
-        center_ra: 10.68,
-        center_dec: 41.27,
-        pa_deg: 15,
-        overlap_pct: 20,
-        cols: 2,
-        rows: 1,
-      },
-      [
+    await plans.importPlan(
+      { id: 'plan-1', name: 'Night A', position: 0, nightOf: '2026-06-20', lat: 48.85, lon: 2.35 },
+      { replaceIds: [], setupId: null, index: 0 },
+    );
+    await plans.createMosaic('plan-1', {
+      dsoId: 'M31',
+      name: 'Andromeda mosaic',
+      centerRa: 10.68,
+      centerDec: 41.27,
+      paDeg: 15,
+      overlapPct: 20,
+      cols: 2,
+      rows: 1,
+      tiles: [
         { ra: 10.4, dec: 41.27, paDeg: 15 },
         { ra: 10.9, dec: 41.27, paDeg: 15 },
       ],
-    );
-    db.addPlanEntry({
-      id: 'pe-smart',
-      plan_id: 'plan-1',
-      dso_id: 'M42',
-      position: 99,
-      pa_deg: null,
-      ra: null,
-      dec: null,
-      notes: null,
-      mosaic_id: null,
-      mosaic_w_deg: 3.25,
-      mosaic_h_deg: 3.25,
     });
+    const { id: smartId } = await plans.addEntry('plan-1', { dsoId: 'M42' });
+    await plans.updateEntry(smartId, { mosaicWDeg: 3.25, mosaicHDeg: 3.25 });
 
-    // ── Export (mirrors the /api/export plan mapping). ──
-    const allEntries = db.getAllPlanEntries();
-    const exported = db.getPlans().map((p) => ({
-      id: p.id,
-      name: p.name,
-      position: p.position,
-      nightOf: p.night_of,
-      setupId: p.setup_id,
-      lat: p.lat,
-      lon: p.lon,
-      entries: allEntries
-        .filter((e) => e.plan_id === p.id)
-        .map((e) => ({
-          id: e.id,
-          dsoId: e.dso_id,
-          position: e.position,
-          paDeg: e.pa_deg,
-          ra: e.ra,
-          dec: e.dec,
-          notes: e.notes,
-          mosaicId: e.mosaic_id,
-          mosaicWDeg: e.mosaic_w_deg,
-          mosaicHDeg: e.mosaic_h_deg,
-        })),
-      mosaics: db.getPlanMosaics(p.id).map((m) => ({
-        id: m.id,
-        dsoId: m.dso_id,
-        name: m.name,
-        centerRa: m.center_ra,
-        centerDec: m.center_dec,
-        paDeg: m.pa_deg,
-        overlapPct: m.overlap_pct,
-        cols: m.cols,
-        rows: m.rows,
-        position: m.position,
-      })),
-    }));
-    const bundle = JSON.parse(JSON.stringify(exported)); // survives JSON serialization
+    // ── Export (the plan list is the plans.json shape). ──
+    const bundle = JSON.parse(JSON.stringify(await plans.list())); // survives JSON serialization
 
-    // ── Wipe, then re-import (mirrors the /api/import plan loop). ──
-    db.deletePlan('plan-1');
-    expect(db.getAllPlanMosaics()).toHaveLength(0);
-    expect(db.getAllPlanEntries()).toHaveLength(0);
+    // ── Wipe, then re-import (the /api/import plan loop). ──
+    await plans.remove('plan-1');
+    expect(await plans.list()).toEqual([]);
 
-    for (const p of bundle) {
-      db.createPlan({
-        id: p.id,
-        name: p.name,
-        position: p.position,
-        created_at: '2026-02-02T00:00:00.000Z',
-        night_of: p.nightOf,
-        setup_id: p.setupId,
-        lat: p.lat,
-        lon: p.lon,
-      });
-      for (const e of p.entries) {
-        db.addPlanEntry({
-          id: e.id,
-          plan_id: p.id,
-          dso_id: e.dsoId,
-          position: e.position,
-          pa_deg: e.paDeg,
-          ra: e.ra,
-          dec: e.dec,
-          notes: e.notes,
-          mosaic_id: e.mosaicId,
-          mosaic_w_deg: e.mosaicWDeg,
-          mosaic_h_deg: e.mosaicHDeg,
-        });
-      }
-      for (const m of p.mosaics) {
-        db.addPlanMosaic({
-          id: m.id,
-          plan_id: p.id,
-          dso_id: m.dsoId,
-          name: m.name,
-          center_ra: m.centerRa,
-          center_dec: m.centerDec,
-          pa_deg: m.paDeg,
-          overlap_pct: m.overlapPct,
-          cols: m.cols,
-          rows: m.rows,
-          position: m.position,
-        });
-      }
+    for (const [i, p] of bundle.entries()) {
+      expect(await plans.importPlan(p, { replaceIds: [], setupId: p.setupId, index: i })).toBe(
+        true,
+      );
     }
 
     // ── The mosaic record survived with its params. ──
-    const mosaics = db.getAllPlanMosaics();
-    expect(mosaics).toHaveLength(1);
-    expect(mosaics[0].id).toBe('mo-1');
-    expect(mosaics[0].name).toBe('Andromeda mosaic');
-    expect(mosaics[0].cols).toBe(2);
+    const [plan] = await plans.list();
+    expect(plan.mosaics).toHaveLength(1);
+    expect(plan.mosaics[0].id).toMatch(/^mo-/);
+    expect(plan.mosaics[0].name).toBe('Andromeda mosaic');
+    expect(plan.mosaics[0].cols).toBe(2);
 
-    // ── Its two tiles stayed grouped (mosaic_id preserved, not nulled). ──
-    const entries = db.getAllPlanEntries();
-    const tiles = entries.filter((e) => e.mosaic_id === 'mo-1');
+    // ── Its two tiles stayed grouped (mosaic id preserved, not nulled). ──
+    const tiles = plan.entries.filter((e) => e.mosaicId === plan.mosaics[0].id);
     expect(tiles).toHaveLength(2);
 
     // ── The standalone smart-scope frame kept its single-frame size. ──
-    const smart = entries.find((e) => e.id === 'pe-smart')!;
-    expect(smart.mosaic_id).toBeNull();
-    expect(smart.mosaic_w_deg).toBe(3.25);
-    expect(smart.mosaic_h_deg).toBe(3.25);
+    const smart = plan.entries.find((e) => e.id === smartId)!;
+    expect(smart.mosaicId).toBeNull();
+    expect(smart.mosaicWDeg).toBe(3.25);
+    expect(smart.mosaicHDeg).toBe(3.25);
 
     // ── Per-plan observing location survived too. ──
-    const plan = db.getPlans()[0];
     expect(plan.lat).toBeCloseTo(48.85, 2);
     expect(plan.lon).toBeCloseTo(2.35, 2);
   });
@@ -865,8 +774,8 @@ describe('Plan + mosaic export/import round-trip', () => {
 // ─── Name-based override on import ───────────────────────────────────────────
 // The /api/import route matches plans/setups/gear by NAME (not internal id) so a
 // re-imported item replaces the hand-recreated one instead of duplicating it.
-// The Express route is integration-only/excluded; this mirrors its DB loop using
-// the same `idsToReplaceByName` helper the route calls.
+// The Express route is integration-only/excluded; this mirrors its loop using
+// the same `idsToReplaceByName` helper the route calls and the plan service.
 
 describe('Name-based override on import (replace, else add)', () => {
   beforeEach(() => {
@@ -879,70 +788,49 @@ describe('Name-based override on import (replace, else add)', () => {
 
   it('plan with a colliding name replaces the existing one (by name, not id)', async () => {
     const db = await import('../../server/db.js');
+    const plans = plansOn(db);
     // User hand-created a plan named "Winter" with its own id.
-    db.createPlan({
-      id: 'local-id',
-      name: 'Winter',
-      position: 0,
-      created_at: 'x',
-      night_of: null,
-      setup_id: null,
-      lat: null,
-      lon: null,
-    });
+    await plans.importPlan(
+      { id: 'local-id', name: 'Winter', position: 0 },
+      { replaceIds: [], setupId: null, index: 0 },
+    );
 
     // Import a backup plan also named "Winter" but with a different (bundle) id.
     const importedName = 'Winter';
-    idsToReplaceByName(db.getPlans(), importedName).forEach(db.deletePlan);
-    db.deletePlan('bundle-id');
-    db.createPlan({
-      id: 'bundle-id',
-      name: importedName,
-      position: 0,
-      created_at: 'y',
-      night_of: '2026-06-24',
-      setup_id: null,
-      lat: null,
-      lon: null,
-    });
+    await plans.importPlan(
+      { id: 'bundle-id', name: importedName, position: 0, nightOf: '2026-06-24' },
+      {
+        replaceIds: idsToReplaceByName(await plans.listNames(), importedName),
+        setupId: null,
+        index: 0,
+      },
+    );
 
-    const plans = db.getPlans();
-    expect(plans).toHaveLength(1);
-    expect(plans[0].id).toBe('bundle-id');
-    expect(plans[0].name).toBe('Winter');
+    const list = await plans.list();
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe('bundle-id');
+    expect(list[0].name).toBe('Winter');
   });
 
   it('plan with no name match is added alongside existing plans', async () => {
     const db = await import('../../server/db.js');
-    db.createPlan({
-      id: 'local-id',
-      name: 'Winter',
-      position: 0,
-      created_at: 'x',
-      night_of: null,
-      setup_id: null,
-      lat: null,
-      lon: null,
-    });
+    const plans = plansOn(db);
+    await plans.importPlan(
+      { id: 'local-id', name: 'Winter', position: 0 },
+      { replaceIds: [], setupId: null, index: 0 },
+    );
 
     const importedName = 'Summer';
-    idsToReplaceByName(db.getPlans(), importedName).forEach(db.deletePlan);
-    db.deletePlan('bundle-id');
-    db.createPlan({
-      id: 'bundle-id',
-      name: importedName,
-      position: 1,
-      created_at: 'y',
-      night_of: null,
-      setup_id: null,
-      lat: null,
-      lon: null,
-    });
+    await plans.importPlan(
+      { id: 'bundle-id', name: importedName, position: 1 },
+      {
+        replaceIds: idsToReplaceByName(await plans.listNames(), importedName),
+        setupId: null,
+        index: 1,
+      },
+    );
 
-    const names = db
-      .getPlans()
-      .map((p) => p.name)
-      .sort();
+    const names = (await plans.list()).map((p) => p.name).sort();
     expect(names).toEqual(['Summer', 'Winter']);
   });
 

@@ -255,14 +255,14 @@ describe('PUT /api/plans/:id', () => {
     expect((await readPlan(id)).name).toBe('Renamed');
   });
 
-  it('applies the earlier parts of a body before it rejects a later one', async () => {
+  it('writes nothing when a later part of the body is rejected', async () => {
     const id = await mkPlan('Before');
     expect(await call('PUT', `/api/plans/${id}`, { name: 'After', lat: 95 })).toEqual({
       status: 400,
       body: { error: 'lat must be between -90 and 90' },
     });
-    // KNOWN GAP: the rename is written before the latitude is checked, so a rejected request still renames.
-    expect((await readPlan(id)).name).toBe('After');
+    // Every check runs before the first write (WP2.3f): the rejected request leaves the name alone.
+    expect((await readPlan(id)).name).toBe('Before');
 
     expect(await call('PUT', `/api/plans/${id}`, { lat: 12, sortBy: 'nope' })).toEqual({
       status: 400,
@@ -271,8 +271,8 @@ describe('PUT /api/plans/:id', () => {
           'sortBy must be one of: transit, altitude, rating, magnitude, size, name, difficulty, window',
       },
     });
-    // KNOWN GAP: the settings are written before sortBy is checked, so a rejected request still stores them.
-    expect((await readPlan(id)).lat).toBe(12);
+    // Same for the settings: they are not stored when sortBy is rejected.
+    expect((await readPlan(id)).lat).toBeNull();
   });
 });
 

@@ -1,31 +1,14 @@
 import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { planEntryToApi, planMosaicToApi, PLAN_SORT_KEYS } from './mappers.js';
-import {
-  getPlans,
-  getPlan,
-  getAllPlanEntries,
-  createPlan,
-  renamePlan,
-  updatePlanSettings,
-  updatePlanSort,
-  deletePlan,
-  reorderPlans,
-  planEntryExists,
-  addPlanEntry,
-  nextPlanEntryPosition,
-  removePlanEntry,
-  reorderPlanEntries,
-  updatePlanEntryFrame,
-  getAllPlanMosaics,
-  getPlanMosaic,
-  createPlanMosaic,
-  updatePlanMosaic,
-  deletePlanMosaic,
-  type PlanEntryRow,
-  type PlanMosaicRow,
-  type MosaicTileInput,
-} from '../db.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import type {
+  MosaicParams,
+  PlanChanges,
+  PlanEntryChanges,
+  PlanEntryInput,
+  PlanInput,
+} from '@myastrosky/core/domain/plans';
+import { plans } from '../services.js';
+import { sendError } from './http-errors.js';
 
 export const plansRouter = express.Router();
 
@@ -62,38 +45,12 @@ export const plansRouter = express.Router();
  *       500:
  *         description: Server error
  */
-plansRouter.get('/api/plans', (_req, res) => {
+plansRouter.get('/api/plans', async (_req, res) => {
   try {
-    const entries = getAllPlanEntries();
-    const byPlan = new Map<string, PlanEntryRow[]>();
-    for (const e of entries) {
-      const list = byPlan.get(e.plan_id) ?? [];
-      list.push(e);
-      byPlan.set(e.plan_id, list);
-    }
-    const mosaicsByPlan = new Map<string, PlanMosaicRow[]>();
-    for (const m of getAllPlanMosaics()) {
-      const list = mosaicsByPlan.get(m.plan_id) ?? [];
-      list.push(m);
-      mosaicsByPlan.set(m.plan_id, list);
-    }
-    res.json(
-      getPlans().map((p) => ({
-        id: p.id,
-        name: p.name,
-        position: p.position,
-        nightOf: p.night_of ?? null,
-        setupId: p.setup_id ?? null,
-        lat: p.lat ?? null,
-        lon: p.lon ?? null,
-        sortBy: p.sort_by ?? 'transit',
-        entries: (byPlan.get(p.id) ?? []).map(planEntryToApi),
-        mosaics: (mosaicsByPlan.get(p.id) ?? []).map(planMosaicToApi),
-      })),
-    );
-  } catch (err: any) {
-    console.error('[Plans] Failed to list plans', err);
-    res.status(500).json({ error: err.message });
+    res.json(await plans.list());
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to list plans', err);
+    sendError(res, err);
   }
 });
 
@@ -133,29 +90,13 @@ plansRouter.get('/api/plans', (_req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.post('/api/plans', (req, res) => {
+plansRouter.post('/api/plans', async (req, res) => {
   try {
-    const { name } = req.body as any;
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'name is required' });
-      return;
-    }
-    const id = `plan-${uuidv4()}`;
-    const position = getPlans().length;
-    createPlan({
-      id,
-      name: name.trim(),
-      position,
-      created_at: new Date().toISOString(),
-      night_of: null,
-      setup_id: null,
-      lat: null,
-      lon: null,
-    });
-    res.json({ id });
-  } catch (err: any) {
-    console.error('[Plans] Failed to create plan', err);
-    res.status(500).json({ error: err.message });
+    const { name } = req.body as PlanInput;
+    res.json(await plans.create({ name }));
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to create plan', err);
+    sendError(res, err);
   }
 });
 
@@ -196,18 +137,14 @@ plansRouter.post('/api/plans', (req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.put('/api/plans/order', (req, res) => {
+plansRouter.put('/api/plans/order', async (req, res) => {
   try {
-    const { ids } = req.body as any;
-    if (!Array.isArray(ids)) {
-      res.status(400).json({ error: 'ids must be an array' });
-      return;
-    }
-    reorderPlans(ids);
+    const { ids } = req.body as { ids: string[] };
+    await plans.reorder(ids);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to reorder plans', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to reorder plans', err);
+    sendError(res, err);
   }
 });
 
@@ -266,61 +203,13 @@ plansRouter.put('/api/plans/order', (req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.put('/api/plans/:id', (req, res) => {
+plansRouter.put('/api/plans/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const body = (req.body ?? {}) as any;
-    const hasName = 'name' in body;
-    const hasSettings = 'nightOf' in body || 'setupId' in body || 'lat' in body || 'lon' in body;
-    const hasSort = 'sortBy' in body;
-    if (!hasName && !hasSettings && !hasSort) {
-      res
-        .status(400)
-        .json({ error: 'name, settings (nightOf/setupId/lat/lon), or sortBy required' });
-      return;
-    }
-    const existing = getPlan(id);
-    if (!existing) {
-      res.status(404).json({ error: 'Plan not found' });
-      return;
-    }
-    if (hasName) {
-      const { name } = body;
-      if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        res.status(400).json({ error: 'name is required' });
-        return;
-      }
-      renamePlan(id, name.trim());
-    }
-    if (hasSettings) {
-      const nightOf = 'nightOf' in body ? body.nightOf || null : (existing.night_of ?? null);
-      const setupId = 'setupId' in body ? body.setupId || null : (existing.setup_id ?? null);
-      const lat =
-        'lat' in body ? (typeof body.lat === 'number' ? body.lat : null) : (existing.lat ?? null);
-      const lon =
-        'lon' in body ? (typeof body.lon === 'number' ? body.lon : null) : (existing.lon ?? null);
-      if (lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) {
-        res.status(400).json({ error: 'lat must be between -90 and 90' });
-        return;
-      }
-      if (lon !== null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) {
-        res.status(400).json({ error: 'lon must be between -180 and 180' });
-        return;
-      }
-      updatePlanSettings(id, nightOf, setupId, lat, lon);
-    }
-    if (hasSort) {
-      const sortBy = body.sortBy;
-      if (typeof sortBy !== 'string' || !PLAN_SORT_KEYS.includes(sortBy as any)) {
-        res.status(400).json({ error: `sortBy must be one of: ${PLAN_SORT_KEYS.join(', ')}` });
-        return;
-      }
-      updatePlanSort(id, sortBy);
-    }
+    await plans.update(req.params.id, (req.body ?? {}) as PlanChanges);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to update plan', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to update plan', err);
+    sendError(res, err);
   }
 });
 
@@ -355,17 +244,13 @@ plansRouter.put('/api/plans/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.delete('/api/plans/:id', (req, res) => {
+plansRouter.delete('/api/plans/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!deletePlan(id)) {
-      res.status(404).json({ error: 'Plan not found' });
-      return;
-    }
+    await plans.remove(req.params.id);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to delete plan', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to delete plan', err);
+    sendError(res, err);
   }
 });
 
@@ -429,46 +314,13 @@ plansRouter.delete('/api/plans/:id', (req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.post('/api/plans/:id/entries', (req, res) => {
+plansRouter.post('/api/plans/:id/entries', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { dsoId, ra, dec, paDeg } = req.body as any;
-    if (!getPlan(id)) {
-      res.status(404).json({ error: 'Plan not found' });
-      return;
-    }
-    if (dsoId == null) {
-      // Custom-location entry (framed on empty sky): no DSO, ra/dec required.
-      if (typeof ra !== 'number' || typeof dec !== 'number') {
-        res.status(400).json({ error: 'dsoId or ra/dec is required' });
-        return;
-      }
-    } else {
-      if (typeof dsoId !== 'string') {
-        res.status(400).json({ error: 'dsoId must be a string' });
-        return;
-      }
-      if (planEntryExists(id, dsoId)) {
-        res.status(409).json({ error: 'Target already in plan', code: 'DUPLICATE_ENTRY' });
-        return;
-      }
-    }
-    const entryId = `pe-${uuidv4()}`;
-    addPlanEntry({
-      id: entryId,
-      plan_id: id,
-      dso_id: dsoId ?? null,
-      position: nextPlanEntryPosition(id),
-      pa_deg: typeof paDeg === 'number' ? paDeg : null,
-      ra: typeof ra === 'number' ? ra : null,
-      dec: typeof dec === 'number' ? dec : null,
-      notes: null,
-      mosaic_id: null,
-    });
-    res.json({ id: entryId });
-  } catch (err: any) {
-    console.error('[Plans] Failed to add entry', err);
-    res.status(500).json({ error: err.message });
+    const { dsoId, ra, dec, paDeg } = req.body as PlanEntryInput;
+    res.json(await plans.addEntry(req.params.id, { dsoId, ra, dec, paDeg }));
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to add entry', err);
+    sendError(res, err);
   }
 });
 
@@ -515,19 +367,14 @@ plansRouter.post('/api/plans/:id/entries', (req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.put('/api/plans/:id/entries/order', (req, res) => {
+plansRouter.put('/api/plans/:id/entries/order', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { ids } = req.body as any;
-    if (!Array.isArray(ids)) {
-      res.status(400).json({ error: 'ids must be an array' });
-      return;
-    }
-    reorderPlanEntries(id, ids);
+    const { ids } = req.body as { ids: string[] };
+    await plans.reorderEntries(req.params.id, ids);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to reorder entries', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to reorder entries', err);
+    sendError(res, err);
   }
 });
 
@@ -567,17 +414,13 @@ plansRouter.put('/api/plans/:id/entries/order', (req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.delete('/api/plans/:id/entries/:entryId', (req, res) => {
+plansRouter.delete('/api/plans/:id/entries/:entryId', async (req, res) => {
   try {
-    const { entryId } = req.params;
-    if (!removePlanEntry(entryId)) {
-      res.status(404).json({ error: 'Entry not found' });
-      return;
-    }
+    await plans.removeEntry(req.params.entryId);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to remove entry', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to remove entry', err);
+    sendError(res, err);
   }
 });
 
@@ -660,140 +503,15 @@ plansRouter.delete('/api/plans/:id/entries/:entryId', (req, res) => {
  *       500:
  *         description: Server error
  */
-plansRouter.patch('/api/plans/:id/entries/:entryId', (req, res) => {
+plansRouter.patch('/api/plans/:id/entries/:entryId', async (req, res) => {
   try {
-    const { entryId } = req.params;
-    const body = req.body as Record<string, unknown>;
-    const fields: {
-      ra?: number | null;
-      dec?: number | null;
-      paDeg?: number | null;
-      dsoId?: string | null;
-      mosaicWDeg?: number | null;
-      mosaicHDeg?: number | null;
-      observationWindows?: unknown;
-    } = {};
-
-    if ('paDeg' in body) {
-      if (body.paDeg !== null && typeof body.paDeg !== 'number') {
-        res.status(400).json({ error: 'paDeg must be a number or null' });
-        return;
-      }
-      fields.paDeg = body.paDeg as number | null;
-    }
-    if ('ra' in body) {
-      if (body.ra !== null && typeof body.ra !== 'number') {
-        res.status(400).json({ error: 'ra must be a number or null' });
-        return;
-      }
-      fields.ra = body.ra as number | null;
-    }
-    if ('dec' in body) {
-      if (body.dec !== null && typeof body.dec !== 'number') {
-        res.status(400).json({ error: 'dec must be a number or null' });
-        return;
-      }
-      fields.dec = body.dec as number | null;
-    }
-    if ('dsoId' in body) {
-      if (body.dsoId !== null && typeof body.dsoId !== 'string') {
-        res.status(400).json({ error: 'dsoId must be a string or null' });
-        return;
-      }
-      fields.dsoId = body.dsoId as string | null;
-    }
-    if ('mosaicWDeg' in body) {
-      if (body.mosaicWDeg !== null && typeof body.mosaicWDeg !== 'number') {
-        res.status(400).json({ error: 'mosaicWDeg must be a number or null' });
-        return;
-      }
-      fields.mosaicWDeg = body.mosaicWDeg as number | null;
-    }
-    if ('mosaicHDeg' in body) {
-      if (body.mosaicHDeg !== null && typeof body.mosaicHDeg !== 'number') {
-        res.status(400).json({ error: 'mosaicHDeg must be a number or null' });
-        return;
-      }
-      fields.mosaicHDeg = body.mosaicHDeg as number | null;
-    }
-    if ('observationWindows' in body) {
-      if (!Array.isArray(body.observationWindows)) {
-        res.status(400).json({ error: 'observationWindows must be an array' });
-        return;
-      }
-      // Re-validated and serialised inside updatePlanEntryFrame via sanitizeObservationWindows.
-      fields.observationWindows = body.observationWindows;
-    }
-
-    if (Object.keys(fields).length === 0) {
-      res.status(400).json({ error: 'No updatable fields provided' });
-      return;
-    }
-    if (!updatePlanEntryFrame(entryId, fields)) {
-      res.status(404).json({ error: 'Entry not found' });
-      return;
-    }
+    await plans.updateEntry(req.params.entryId, req.body as PlanEntryChanges);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to update entry PA', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to update entry PA', err);
+    sendError(res, err);
   }
 });
-
-/** Validate and coerce a mosaic request body (shared by POST and PUT). */
-function parseMosaicBody(body: Record<string, unknown>):
-  | { error: string }
-  | {
-      dsoId: string | null;
-      name: string | undefined;
-      centerRa: number;
-      centerDec: number;
-      paDeg: number;
-      overlapPct: number;
-      cols: number;
-      rows: number;
-      tiles: MosaicTileInput[];
-      replaceEntryIds: string[];
-    } {
-  const {
-    dsoId,
-    name,
-    centerRa,
-    centerDec,
-    paDeg,
-    overlapPct,
-    cols,
-    rows,
-    tiles,
-    replaceEntryIds,
-  } = body as any;
-  if (typeof centerRa !== 'number' || typeof centerDec !== 'number')
-    return { error: 'centerRa/centerDec must be numbers' };
-  if (!Array.isArray(tiles) || tiles.length === 0)
-    return { error: 'tiles must be a non-empty array' };
-  const cleanTiles: MosaicTileInput[] = [];
-  for (const t of tiles) {
-    if (typeof t?.ra !== 'number' || typeof t?.dec !== 'number')
-      return { error: 'each tile needs numeric ra/dec' };
-    cleanTiles.push({ ra: t.ra, dec: t.dec, paDeg: typeof t.paDeg === 'number' ? t.paDeg : null });
-  }
-  return {
-    dsoId: typeof dsoId === 'string' ? dsoId : null,
-    // undefined → "don't touch the stored name" (background drags/transforms).
-    name: typeof name === 'string' ? name : undefined,
-    centerRa,
-    centerDec,
-    paDeg: typeof paDeg === 'number' ? paDeg : 0,
-    // Clamp to the same sane ranges mosaic.ts enforces at compute time.
-    overlapPct: typeof overlapPct === 'number' ? Math.min(90, Math.max(0, overlapPct)) : 20,
-    cols: Number.isInteger(cols) ? Math.max(1, cols) : Math.max(1, cleanTiles.length),
-    rows: Number.isInteger(rows) ? Math.max(1, rows) : 1,
-    tiles: cleanTiles,
-    replaceEntryIds: Array.isArray(replaceEntryIds)
-      ? replaceEntryIds.filter((x: unknown): x is string => typeof x === 'string')
-      : [],
-  };
-}
 
 /**
  * @swagger
@@ -848,39 +566,12 @@ function parseMosaicBody(body: Record<string, unknown>):
  *       404: { description: Plan not found }
  *       500: { description: Server error }
  */
-plansRouter.post('/api/plans/:id/mosaics', (req, res) => {
+plansRouter.post('/api/plans/:id/mosaics', async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!getPlan(id)) {
-      res.status(404).json({ error: 'Plan not found' });
-      return;
-    }
-    const parsed = parseMosaicBody(req.body as Record<string, unknown>);
-    if ('error' in parsed) {
-      res.status(400).json({ error: parsed.error });
-      return;
-    }
-    const mosaicId = `mo-${uuidv4()}`;
-    createPlanMosaic(
-      {
-        id: mosaicId,
-        plan_id: id,
-        dso_id: parsed.dsoId,
-        name: parsed.name ?? null,
-        center_ra: parsed.centerRa,
-        center_dec: parsed.centerDec,
-        pa_deg: parsed.paDeg,
-        overlap_pct: parsed.overlapPct,
-        cols: parsed.cols,
-        rows: parsed.rows,
-      },
-      parsed.tiles,
-      parsed.replaceEntryIds,
-    );
-    res.json({ id: mosaicId });
-  } catch (err: any) {
-    console.error('[Plans] Failed to create mosaic', err);
-    res.status(500).json({ error: err.message });
+    res.json(await plans.createMosaic(req.params.id, req.body as MosaicParams));
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to create mosaic', err);
+    sendError(res, err);
   }
 });
 
@@ -935,42 +626,14 @@ plansRouter.post('/api/plans/:id/mosaics', (req, res) => {
  *       404: { description: Mosaic not found }
  *       500: { description: Server error }
  */
-plansRouter.put('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
+plansRouter.put('/api/plans/:id/mosaics/:mosaicId', async (req, res) => {
   try {
     const { id, mosaicId } = req.params;
-    const existing = getPlanMosaic(mosaicId);
-    if (!existing || existing.plan_id !== id) {
-      res.status(404).json({ error: 'Mosaic not found' });
-      return;
-    }
-    const parsed = parseMosaicBody(req.body as Record<string, unknown>);
-    if ('error' in parsed) {
-      res.status(400).json({ error: parsed.error });
-      return;
-    }
-    const ok = updatePlanMosaic(
-      mosaicId,
-      {
-        dsoId: parsed.dsoId,
-        name: parsed.name,
-        centerRa: parsed.centerRa,
-        centerDec: parsed.centerDec,
-        paDeg: parsed.paDeg,
-        overlapPct: parsed.overlapPct,
-        cols: parsed.cols,
-        rows: parsed.rows,
-      },
-      parsed.tiles,
-      parsed.replaceEntryIds,
-    );
-    if (!ok) {
-      res.status(404).json({ error: 'Mosaic not found' });
-      return;
-    }
+    await plans.updateMosaic(id, mosaicId, req.body as MosaicParams);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to update mosaic', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to update mosaic', err);
+    sendError(res, err);
   }
 });
 
@@ -995,21 +658,13 @@ plansRouter.put('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
  *       404: { description: Mosaic not found }
  *       500: { description: Server error }
  */
-plansRouter.delete('/api/plans/:id/mosaics/:mosaicId', (req, res) => {
+plansRouter.delete('/api/plans/:id/mosaics/:mosaicId', async (req, res) => {
   try {
     const { id, mosaicId } = req.params;
-    const existing = getPlanMosaic(mosaicId);
-    if (!existing || existing.plan_id !== id) {
-      res.status(404).json({ error: 'Mosaic not found' });
-      return;
-    }
-    if (!deletePlanMosaic(mosaicId)) {
-      res.status(404).json({ error: 'Mosaic not found' });
-      return;
-    }
+    await plans.removeMosaic(id, mosaicId);
     res.json({ ok: true });
-  } catch (err: any) {
-    console.error('[Plans] Failed to delete mosaic', err);
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to delete mosaic', err);
+    sendError(res, err);
   }
 });

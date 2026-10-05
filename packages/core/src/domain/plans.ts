@@ -90,8 +90,65 @@ export interface MosaicParams {
  * meaningful subset of the Targets-search sort values plus `window` (order by
  * each entry's earliest observation window). `transit` is the default.
  */
-export type PlanSortKey =
-  'transit' | 'altitude' | 'rating' | 'magnitude' | 'size' | 'name' | 'difficulty' | 'window';
+export const PLAN_SORT_KEYS = [
+  'transit',
+  'altitude',
+  'rating',
+  'magnitude',
+  'size',
+  'name',
+  'difficulty',
+  'window',
+] as const;
+
+export type PlanSortKey = (typeof PLAN_SORT_KEYS)[number];
+
+/** What a client sends to create a plan. */
+export interface PlanInput {
+  name: string;
+}
+
+/** The fields of `PUT /api/plans/:id`; only the keys present are changed. */
+export interface PlanChanges {
+  name?: string;
+  nightOf?: string | null;
+  setupId?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  sortBy?: PlanSortKey;
+}
+
+/** A new plan entry: a catalogue target (`dsoId`) or a custom location (`ra` and `dec`). */
+export interface PlanEntryInput {
+  dsoId?: string | null;
+  ra?: number;
+  dec?: number;
+  paDeg?: number;
+}
+
+/** The fields of `PATCH /api/plans/:id/entries/:entryId`; only the keys present are changed. */
+export interface PlanEntryChanges {
+  ra?: number | null;
+  dec?: number | null;
+  paDeg?: number | null;
+  dsoId?: string | null;
+  mosaicWDeg?: number | null;
+  mosaicHDeg?: number | null;
+  observationWindows?: ObservationWindow[];
+}
+
+/** A plan as a backup file stores it (`plans.json`): the API shape, read back with every field unchecked. */
+export type BackupPlan = Record<string, unknown>;
+
+/** What an import decides about one plan before it is written. */
+export interface PlanImportOptions {
+  /** Plans deleted first (with their entries and mosaics): the ones with the same name. */
+  replaceIds: readonly string[];
+  /** The setup id the plan points at, after the import's remap, or null. */
+  setupId: string | null;
+  /** Position of the plan in the backup list, used when the plan has no position of its own. */
+  index: number;
+}
 
 export interface Plan {
   id: string;
