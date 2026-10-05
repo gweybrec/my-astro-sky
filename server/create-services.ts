@@ -1,11 +1,13 @@
 import type { GearCatalog } from '@myastrosky/core/domain/gear';
 import type { BlobStore } from '@myastrosky/core/ports/blob-store';
 import type { EnvSource } from '@myastrosky/core/ports/env-source';
+import type { HttpClient } from '@myastrosky/core/ports/http-client';
 import type { ImageCodec } from '@myastrosky/core/ports/image-codec';
 import type { SecretCodec } from '@myastrosky/core/ports/secret-codec';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createDsoOverrideService } from '@myastrosky/core/services/dso-overrides';
 import { createGearService } from '@myastrosky/core/services/gear';
+import { createIdentifyService } from '@myastrosky/core/services/identify';
 import { createPhotoService } from '@myastrosky/core/services/photos';
 import { createPlanService } from '@myastrosky/core/services/plans';
 import { createPoiCategoryService } from '@myastrosky/core/services/poi-categories';
@@ -26,11 +28,14 @@ export interface ServiceDeps {
   blobs: BlobStore;
   /** The deep star catalogue, or a function that loads it on first use. */
   stars: StarCatalogSource;
+  http: HttpClient;
+  /** The clock, in milliseconds since the epoch. */
+  now: () => number;
 }
 
 /** Builds every service on one database. Later service cards add theirs here. */
 export function createServices(deps: ServiceDeps) {
-  const { db, newId, secrets, env, gearCatalog, images, blobs, stars } = deps;
+  const { db, newId, secrets, env, gearCatalog, images, blobs, stars, http, now } = deps;
   return {
     dsoOverrides: createDsoOverrideService({ db }),
     skyRegions: createSkyRegionService({ db, newId }),
@@ -40,6 +45,7 @@ export function createServices(deps: ServiceDeps) {
     plans: createPlanService({ db, newId }),
     photos: createPhotoService({ db, newId, images, blobs }),
     stars: createStarSearchService({ stars }),
+    identify: createIdentifyService({ http, now }),
   };
 }
 

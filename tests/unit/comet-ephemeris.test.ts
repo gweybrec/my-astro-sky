@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { parseCometEls } from '../../server/comets';
+import { parseCometEls } from '@myastrosky/core/services/identify';
 import {
   cometRaDec,
   cometTotalMag,

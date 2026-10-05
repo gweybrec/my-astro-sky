@@ -27,7 +27,7 @@ import {
   candidateToPoi,
   type SkybotCandidate,
 } from '../../src/asteroid-identify';
-import { parseRaHms, parseDecDms } from '../../server/skybot';
+import { parseRaHms, parseDecDms } from '@myastrosky/core/services/identify';
 
 const FIXTURE_PATH = join(__dirname, '../fixtures/skybot/ngc4438-conesearch.json');
 

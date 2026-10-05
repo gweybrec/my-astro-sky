@@ -1,7 +1,7 @@
 import express from 'express';
-import { skybotConesearch } from '../skybot.js';
-import { tnsConesearch, TnsRateLimitError } from '../tns.js';
-import { fetchCometElements } from '../comets.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import { TnsRateLimitError } from '@myastrosky/core/services/identify';
+import { identify } from '../services.js';
 import { msg } from '../messages.js';
 import type { ServerLang } from '../messages.js';
 import { logServerError } from '../logger.js';
@@ -40,31 +40,18 @@ export const identifyRouter = express.Router();
 identifyRouter.post('/api/skybot/conesearch', async (req, res) => {
   const lang: ServerLang = req.body.lang === 'fr' ? 'fr' : 'en';
   try {
-    const raDeg = Number(req.body.raDeg);
-    const decDeg = Number(req.body.decDeg);
-    const radiusArcmin = Number(req.body.radiusArcmin);
-    const epochJd = Number(req.body.epochJd);
-
-    if (
-      !Number.isFinite(raDeg) ||
-      raDeg < 0 ||
-      raDeg > 360 ||
-      !Number.isFinite(decDeg) ||
-      decDeg < -90 ||
-      decDeg > 90 ||
-      !Number.isFinite(radiusArcmin) ||
-      radiusArcmin <= 0 ||
-      radiusArcmin > 60 ||
-      !Number.isFinite(epochJd) ||
-      epochJd <= 0
-    ) {
-      res.status(400).json({ error: msg.api.invalidSkybotParams(lang), code: 'INVALID_PARAMS' });
-      return;
-    }
-
-    const candidates = await skybotConesearch({ raDeg, decDeg, radiusArcmin, epochJd });
+    const candidates = await identify.searchAsteroids({
+      raDeg: Number(req.body.raDeg),
+      decDeg: Number(req.body.decDeg),
+      radiusArcmin: Number(req.body.radiusArcmin),
+      epochJd: Number(req.body.epochJd),
+    });
     res.json({ candidates });
   } catch (err) {
+    if (isDomainError(err) && err.kind === 'invalid') {
+      res.status(400).json({ error: msg.api.invalidSkybotParams(lang), code: err.code });
+      return;
+    }
     logServerError('skybot_conesearch_failed', err);
     res.status(502).json({ error: msg.api.skybotError(lang, (err as Error).message) });
   }
@@ -108,34 +95,19 @@ identifyRouter.post('/api/skybot/conesearch', async (req, res) => {
 identifyRouter.post('/api/tns/conesearch', async (req, res) => {
   const lang: ServerLang = req.body.lang === 'fr' ? 'fr' : 'en';
   try {
-    const raDeg = Number(req.body.raDeg);
-    const decDeg = Number(req.body.decDeg);
-    const radiusArcmin = Number(req.body.radiusArcmin);
-    const dateStart = String(req.body.dateStart ?? '');
-    const dateEnd = String(req.body.dateEnd ?? '');
-    const isDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
-
-    if (
-      !Number.isFinite(raDeg) ||
-      raDeg < 0 ||
-      raDeg > 360 ||
-      !Number.isFinite(decDeg) ||
-      decDeg < -90 ||
-      decDeg > 90 ||
-      !Number.isFinite(radiusArcmin) ||
-      radiusArcmin <= 0 ||
-      radiusArcmin > 60 ||
-      !isDay(dateStart) ||
-      !isDay(dateEnd) ||
-      dateStart > dateEnd
-    ) {
-      res.status(400).json({ error: msg.api.invalidTnsParams(lang), code: 'INVALID_PARAMS' });
-      return;
-    }
-
-    const candidates = await tnsConesearch({ raDeg, decDeg, radiusArcmin, dateStart, dateEnd });
+    const candidates = await identify.searchTransients({
+      raDeg: Number(req.body.raDeg),
+      decDeg: Number(req.body.decDeg),
+      radiusArcmin: Number(req.body.radiusArcmin),
+      dateStart: String(req.body.dateStart ?? ''),
+      dateEnd: String(req.body.dateEnd ?? ''),
+    });
     res.json({ candidates });
   } catch (err) {
+    if (isDomainError(err) && err.kind === 'invalid') {
+      res.status(400).json({ error: msg.api.invalidTnsParams(lang), code: err.code });
+      return;
+    }
     if (err instanceof TnsRateLimitError) {
       res.status(429).json({
         error: msg.api.tnsRateLimited(lang, err.retryAfterSeconds),
@@ -221,7 +193,7 @@ identifyRouter.post('/api/tns/conesearch', async (req, res) => {
 identifyRouter.get('/api/comets/elements', async (req, res) => {
   const lang: ServerLang = req.query.lang === 'fr' ? 'fr' : 'en';
   try {
-    const comets = await fetchCometElements();
+    const comets = await identify.getCometElements();
     res.json({ comets });
   } catch (err) {
     logServerError('comet_elements_failed', err);

@@ -17,3 +17,8 @@ declare class TextDecoder {
 
 declare function setTimeout(handler: () => void, timeout?: number): number;
 declare function clearTimeout(id: number | undefined): void;
+
+declare class URLSearchParams {
+  constructor(init?: Record<string, string>);
+  toString(): string;
+}

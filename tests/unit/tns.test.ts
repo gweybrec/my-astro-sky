@@ -1,5 +1,5 @@
 /**
- * Tests for server/tns.ts: the IAU Transient Name Server cone-search proxy used by
+ * Tests for the TNS part of the identify service (`packages/core/src/services/identify.ts`): the IAU Transient Name Server cone-search proxy used by
  * the supernova identification modal.
  *  - colon-separated sexagesimal RA/Dec parsing
  *  - the quoted CSV parser (commas inside fields)
@@ -7,7 +7,7 @@
  *    SN 2025rbs (the two test-photo supernovae) plus unclassified AT rows
  *  - query parameters, 429 → TnsRateLimitError, HTML body rejected, in-memory cache
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
@@ -15,11 +15,10 @@ import {
   parseSexagesimalDec,
   parseCsv,
   parseTnsCsv,
-  tnsConesearch,
-  clearTnsCache,
+  createIdentifyService,
   TnsRateLimitError,
   snapCone,
-} from '../../server/tns';
+} from '@myastrosky/core/services/identify';
 
 const FIXTURE = readFileSync(join(__dirname, '../fixtures/tns/ngc7331-search.csv'), 'utf-8');
 
@@ -32,24 +31,15 @@ const PARAMS = {
 };
 
 function resp(text: string, status = 200, headers: Record<string, string> = {}) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    text: async () => text,
-    headers: { get: (k: string) => headers[k.toLowerCase()] ?? null },
-  };
+  return { status, text: async () => text, bytes: async () => new Uint8Array(), headers };
 }
 
 let fetchMock: ReturnType<typeof vi.fn>;
+let identify: ReturnType<typeof createIdentifyService>;
 
 beforeEach(() => {
-  clearTnsCache();
   fetchMock = vi.fn();
-  vi.stubGlobal('fetch', fetchMock);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
+  identify = createIdentifyService({ http: fetchMock, now: () => 0 });
 });
 
 describe('sexagesimal parsing', () => {
@@ -138,11 +128,11 @@ describe('snapCone()', () => {
   });
 });
 
-describe('tnsConesearch()', () => {
+describe('searchTransients()', () => {
   it('sends the cone + discovery-date window as CSV search params', async () => {
     fetchMock.mockResolvedValue(resp(FIXTURE));
-    await tnsConesearch(PARAMS);
-    const url = new URL(fetchMock.mock.calls[0][0]);
+    await identify.searchTransients(PARAMS);
+    const url = new URL(fetchMock.mock.calls[0][0].url);
     expect(url.origin + url.pathname).toBe('https://www.wis-tns.org/search');
     // Centre snapped to 0.01°, radius padded for the snap and rounded up (snapCone).
     expect(url.searchParams.get('ra')).toBe('339.27');
@@ -156,8 +146,8 @@ describe('tnsConesearch()', () => {
 
   it('serves a search whose centre jittered by a few arcseconds from the cache', async () => {
     fetchMock.mockResolvedValue(resp(FIXTURE));
-    await tnsConesearch(PARAMS);
-    await tnsConesearch({
+    await identify.searchTransients(PARAMS);
+    await identify.searchTransients({
       ...PARAMS,
       raDeg: PARAMS.raDeg + 0.0008,
       decDeg: PARAMS.decDeg - 0.0006,
@@ -167,8 +157,8 @@ describe('tnsConesearch()', () => {
 
   it('serves a repeated search from the cache', async () => {
     fetchMock.mockResolvedValue(resp(FIXTURE));
-    const first = await tnsConesearch(PARAMS);
-    const second = await tnsConesearch({ ...PARAMS });
+    const first = await identify.searchTransients(PARAMS);
+    const second = await identify.searchTransients({ ...PARAMS });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(second).toBe(first);
   });
@@ -179,24 +169,26 @@ describe('tnsConesearch()', () => {
         'x-cone-rate-limit-reset': '42',
       }),
     );
-    const err = await tnsConesearch(PARAMS).catch((e) => e);
+    const err = await identify.searchTransients(PARAMS).catch((e) => e);
     expect(err).toBeInstanceOf(TnsRateLimitError);
     expect(err.retryAfterSeconds).toBe(42);
   });
 
   it('does not cache a failed search', async () => {
     fetchMock.mockResolvedValueOnce(resp('', 429)).mockResolvedValueOnce(resp(FIXTURE));
-    await expect(tnsConesearch(PARAMS)).rejects.toBeInstanceOf(TnsRateLimitError);
-    await expect(tnsConesearch(PARAMS)).resolves.toHaveLength(8);
+    await expect(identify.searchTransients(PARAMS)).rejects.toBeInstanceOf(TnsRateLimitError);
+    await expect(identify.searchTransients(PARAMS)).resolves.toHaveLength(8);
   });
 
   it('rejects an HTML page returned with status 200', async () => {
     fetchMock.mockResolvedValue(resp('<html><body>Maintenance</body></html>'));
-    await expect(tnsConesearch(PARAMS)).rejects.toThrow(/unexpected response/);
+    await expect(identify.searchTransients(PARAMS)).rejects.toThrow(/unexpected response/);
   });
 
   it('wraps network failures', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
-    await expect(tnsConesearch(PARAMS)).rejects.toThrow(/TNS request failed: ECONNRESET/);
+    await expect(identify.searchTransients(PARAMS)).rejects.toThrow(
+      /TNS request failed: ECONNRESET/,
+    );
   });
 });

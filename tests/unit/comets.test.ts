@@ -1,39 +1,35 @@
 /**
- * Tests for server/comets.ts: the cached proxy over the MPC's CometEls.txt used
+ * Tests for the comet part of the identify service (`packages/core/src/services/identify.ts`): the cached proxy over the MPC's CometEls.txt used
  * by the comet identification modal.
  *  - fixed-width parsing of real MPC lines (tests/fixtures/comets/CometEls-sample.txt):
  *    elliptic, hyperbolic and near-parabolic orbits, numbered/fragment designations
  *  - perihelion calendar date → Julian Date
  *  - 24 h in-memory cache, stale cache served when the MPC is down, HTTP/empty errors
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
   parseCometEls,
   calendarToJd,
   designationFromName,
-  fetchCometElements,
-  clearCometCache,
-} from '../../server/comets';
+  createIdentifyService,
+} from '@myastrosky/core/services/identify';
 
 const FIXTURE = readFileSync(join(__dirname, '../fixtures/comets/CometEls-sample.txt'), 'utf-8');
 
 function resp(text: string, status = 200) {
-  return { ok: status >= 200 && status < 300, status, text: async () => text };
+  return { status, headers: {}, text: async () => text, bytes: async () => new Uint8Array() };
 }
 
 let fetchMock: ReturnType<typeof vi.fn>;
+let clock: number;
+let identify: ReturnType<typeof createIdentifyService>;
 
 beforeEach(() => {
-  clearCometCache();
   fetchMock = vi.fn();
-  vi.stubGlobal('fetch', fetchMock);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
+  clock = 0;
+  identify = createIdentifyService({ http: fetchMock, now: () => clock });
 });
 
 describe('calendarToJd()', () => {
@@ -95,37 +91,36 @@ describe('parseCometEls()', () => {
   });
 });
 
-describe('fetchCometElements()', () => {
+describe('getCometElements()', () => {
   it('fetches the MPC file once and serves the cache afterwards', async () => {
     fetchMock.mockResolvedValue(resp(FIXTURE));
-    const first = await fetchCometElements();
-    const second = await fetchCometElements();
+    const first = await identify.getCometElements();
+    const second = await identify.getCometElements();
     expect(first).toHaveLength(7);
     expect(second).toBe(first);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe(
+    expect(fetchMock.mock.calls[0][0].url).toBe(
       'https://www.minorplanetcenter.net/iau/MPCORB/CometEls.txt',
     );
   });
 
   it('refetches after a day, and falls back to the stale cache when the MPC is down', async () => {
-    vi.useFakeTimers();
     fetchMock.mockResolvedValueOnce(resp(FIXTURE));
-    const first = await fetchCometElements();
+    const first = await identify.getCometElements();
 
-    vi.advanceTimersByTime(25 * 60 * 60 * 1000);
+    clock += 25 * 60 * 60 * 1000;
     fetchMock.mockRejectedValueOnce(new Error('ECONNRESET'));
-    expect(await fetchCometElements()).toBe(first);
+    expect(await identify.getCometElements()).toBe(first);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('throws on an HTTP error with nothing cached', async () => {
     fetchMock.mockResolvedValue(resp('Service Unavailable', 503));
-    await expect(fetchCometElements()).rejects.toThrow('MPC request failed (503)');
+    await expect(identify.getCometElements()).rejects.toThrow('MPC request failed (503)');
   });
 
   it('throws when the body holds no comet (e.g. an HTML maintenance page)', async () => {
     fetchMock.mockResolvedValue(resp('<html>maintenance</html>'));
-    await expect(fetchCometElements()).rejects.toThrow('MPC returned no comet elements');
+    await expect(identify.getCometElements()).rejects.toThrow('MPC returned no comet elements');
   });
 });

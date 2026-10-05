@@ -27,7 +27,7 @@ export const MAX_SEARCH_RADIUS_ARCMIN = 60;
 
 const DAY_MS = 86_400_000;
 
-/** One TNS transient — mirrors `TnsCandidate` in server/tns.ts. */
+/** One TNS transient returned by the identify service (`services/identify.ts`). */
 export interface TnsCandidate {
   name: string;
   raDeg: number;
