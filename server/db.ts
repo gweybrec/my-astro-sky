@@ -3,17 +3,13 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { applyMigrations } from './db-migrations.js';
-import { ENC_PREFIX, encryptSecret, decryptSecret } from './secret-codec.js';
-import { wrapLegacyConnection } from './db-tx-guard.js';
 
 export { applyMigrations };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data.db');
 
-const rawDb = new Database(dbPath);
-// Old synchronous code goes through this wrapper; it throws while a SqlDb service transaction is open.
-const db = wrapLegacyConnection(rawDb);
+const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
@@ -148,57 +144,9 @@ db.exec(`
   );
 `);
 
-// ─── User-configurable settings ───────────────────────────────────────────────
-// Reads from the settings table first, falls back to process.env for
-// backward-compat with Docker / .env deployments.
-
-const getSettingStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
-const setSettingStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-const deleteSettingStmt = db.prepare('DELETE FROM settings WHERE key = ?');
-const SECRET_SETTINGS = new Set(['ASTROMETRY_API_KEY']);
-
-// Kept for the solver modules until they move to services (astap, solve-field, astrometry). The rules
-// are also in `packages/core/src/services/settings.ts`; `tests/unit/settings-service.test.ts` proves the
-// two agree.
-export function getSetting(key: string): string | undefined {
-  if (SECRET_SETTINGS.has(key) && process.env[key] !== undefined) {
-    return process.env[key];
-  }
-  const row = getSettingStmt.get(key) as { value: string } | undefined;
-  if (row !== undefined) {
-    if (!SECRET_SETTINGS.has(key)) return row.value;
-
-    const decrypted = decryptSecret(row.value);
-    if (decrypted !== null) return decrypted;
-
-    // Encrypted row exists but no valid key available -> do not leak ciphertext.
-    if (row.value.startsWith(ENC_PREFIX)) return undefined;
-
-    // Best-effort migration of plaintext secrets to encrypted storage when key is configured.
-    const encrypted = encryptSecret(row.value);
-    if (encrypted !== row.value) {
-      setSettingStmt.run(key, encrypted);
-    }
-    return row.value;
-  }
-  return process.env[key];
-}
-
-export function setSetting(key: string, value: string): void {
-  if (SECRET_SETTINGS.has(key)) {
-    setSettingStmt.run(key, encryptSecret(value));
-    return;
-  }
-  setSettingStmt.run(key, value);
-}
-
-export function deleteSetting(key: string): void {
-  deleteSettingStmt.run(key);
-}
-
-/** The raw better-sqlite3 handle, for the `SqlDb` adapter only (not guarded against service transactions). */
+/** The better-sqlite3 handle, for the `SqlDb` adapter. */
 export function getConnection(): Database.Database {
-  return rawDb;
+  return db;
 }
 
 export function closeDatabase(): void {

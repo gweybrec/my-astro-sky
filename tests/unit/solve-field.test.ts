@@ -65,8 +65,8 @@ vi.mock('../../server/dso-utils', () => ({
   normalizeDSOAliases: mockNormalizeDSOAliases,
 }));
 
-vi.mock('../../server/db', () => ({
-  getSetting: mockGetSetting,
+vi.mock('../../server/services', () => ({
+  settings: { get: mockGetSetting },
 }));
 
 vi.mock('../../server/wsl-utils', () => ({
@@ -81,7 +81,7 @@ describe('solveWithSolveField()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockGetSetting.mockImplementation((key: string) => {
+    mockGetSetting.mockImplementation(async (key: string) => {
       if (key === 'SOLVE_FIELD_PATH') return null;
       if (key === 'ASTROMETRY_DATA_DIR') return null;
       if (key === 'USE_WSL_FOR_SOLVE_FIELD') return null;
@@ -237,7 +237,7 @@ describe('solveWithSolveField()', () => {
   });
 
   it('adds --config argument when ASTROMETRY_DATA_DIR is configured', async () => {
-    mockGetSetting.mockImplementation((key: string) => {
+    mockGetSetting.mockImplementation(async (key: string) => {
       if (key === 'SOLVE_FIELD_PATH') return null;
       if (key === 'ASTROMETRY_DATA_DIR') return '/usr/share/astrometry';
       if (key === 'USE_WSL_FOR_SOLVE_FIELD') return null;

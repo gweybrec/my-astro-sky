@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import { parseFITSHeader, wcsToCorrespondences } from './wcs-reader.js';
 import type { WCSData } from './wcs-reader.js';
 import { normalizeDSOAliases } from './dso-utils.js';
-import { getSetting } from './db.js';
+import { settings } from './services.js';
 import { shouldUseWSL, wrapExecForWSL, wslPath } from './wsl-utils.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
@@ -61,16 +61,16 @@ interface SolveResult {
   dsoIds?: string[];
 }
 
-function getSolveFieldBin(): string {
-  return getSetting('SOLVE_FIELD_PATH') || 'solve-field';
+async function getSolveFieldBin(): Promise<string> {
+  return (await settings.get('SOLVE_FIELD_PATH')) || 'solve-field';
 }
 
-function getAstrometryDataDir(): string | undefined {
-  return getSetting('ASTROMETRY_DATA_DIR');
+function getAstrometryDataDir(): Promise<string | undefined> {
+  return settings.get('ASTROMETRY_DATA_DIR');
 }
 
-function useWSLForSolveField(): boolean {
-  return shouldUseWSL(getSetting('USE_WSL_FOR_SOLVE_FIELD'));
+async function useWSLForSolveField(): Promise<boolean> {
+  return shouldUseWSL(await settings.get('USE_WSL_FOR_SOLVE_FIELD'));
 }
 
 export async function solveWithSolveField(
@@ -83,8 +83,8 @@ export async function solveWithSolveField(
   signal?: AbortSignal,
   originalName?: string,
 ): Promise<SolveResult> {
-  const bin = getSolveFieldBin();
-  const useWSL = useWSLForSolveField();
+  const bin = await getSolveFieldBin();
+  const useWSL = await useWSLForSolveField();
   void logSolverVersion(bin, ['--version'], useWSL);
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'solve-field-'));
   const imgName = `input${ext}`;
@@ -162,7 +162,7 @@ export async function solveWithSolveField(
     }
 
     // Add data directory if specified
-    const dataDir = getAstrometryDataDir();
+    const dataDir = await getAstrometryDataDir();
     if (dataDir) {
       args.push('--config', '/etc/astrometry.cfg');
     }

@@ -5,7 +5,7 @@ import os from 'os';
 import path from 'path';
 import { parseFITSHeader, wcsToCorrespondences } from './wcs-reader.js';
 import type { WCSData } from './wcs-reader.js';
-import { getSetting } from './db.js';
+import { settings } from './services.js';
 import { shouldUseWSL, wrapExecForWSL, wslPath } from './wsl-utils.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
@@ -82,12 +82,12 @@ interface SolveResult {
   diagnostics?: string;
 }
 
-function getASTAPBin(): string {
-  return getSetting('ASTAP_PATH') || '/opt/astap/astap_cli';
+async function getASTAPBin(): Promise<string> {
+  return (await settings.get('ASTAP_PATH')) || '/opt/astap/astap_cli';
 }
 
-function useWSLForASTAP(): boolean {
-  return shouldUseWSL(getSetting('USE_WSL_FOR_ASTAP'));
+async function useWSLForASTAP(): Promise<boolean> {
+  return shouldUseWSL(await settings.get('USE_WSL_FOR_ASTAP'));
 }
 
 export async function solveWithASTAP(
@@ -100,8 +100,8 @@ export async function solveWithASTAP(
   signal?: AbortSignal,
   originalName?: string,
 ): Promise<SolveResult> {
-  const bin = getASTAPBin();
-  const useWSL = useWSLForASTAP();
+  const bin = await getASTAPBin();
+  const useWSL = await useWSLForASTAP();
   void logSolverVersion(bin, ['-v'], useWSL);
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'astap-'));
   const imgName = `input${ext}`;

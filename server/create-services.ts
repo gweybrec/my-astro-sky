@@ -22,6 +22,7 @@ import {
   createStarSearchService,
   type StarCatalogSource,
 } from '@myastrosky/core/services/star-search';
+import { createVersionService } from '@myastrosky/core/services/version';
 import { createSkyRegionService } from '@myastrosky/core/services/sky-regions';
 
 export interface ServiceDeps {
@@ -74,6 +75,7 @@ export function createServices(deps: ServiceDeps) {
     stars: createStarSearchService({ stars }),
     identify: createIdentifyService({ http, now }),
     solvedImport: createSolvedImportService({ images, stars: catalogStars }),
+    version: createVersionService({ http, now }),
     horizon: createHorizonService({ db, http, images, now, log, sleep }),
     novaSolve: createNovaSolveService({
       http,

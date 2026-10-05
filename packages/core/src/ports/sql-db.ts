@@ -53,7 +53,5 @@ export interface SqlDb extends SqlTx {
 export const SQL_TX_AWAITED_NON_DB = 'SQL_TX_AWAITED_NON_DB';
 /** `transaction` was called from inside a transaction body. */
 export const SQL_TX_NESTED = 'SQL_TX_NESTED';
-/** Old synchronous database code ran while a service transaction was open. */
-export const SQL_LEGACY_CALL_IN_TX = 'SQL_LEGACY_CALL_IN_TX';
 /** A call was made on the outer `SqlDb` from inside a transaction body; use `tx`. */
 export const SQL_TX_OUTER_CALL = 'SQL_TX_OUTER_CALL';

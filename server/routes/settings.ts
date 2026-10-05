@@ -3,19 +3,12 @@ import { promisify } from 'util';
 import path from 'path';
 import express from 'express';
 import { isDomainError } from '@myastrosky/core/domain/errors';
-import { settings, novaSolve } from '../services.js';
+import { settings, novaSolve, version } from '../services.js';
 import { logServerError } from '../logger.js';
 import { sendError } from './http-errors.js';
 import { probeAstap, probeSolveField, probeDataDir } from '../probe-utils.js';
-import { parseLatestRelease, type LatestRelease } from '../github-release.js';
 
 export const settingsRouter = express.Router();
-
-// GitHub repository that publishes releases, used by the in-app update check.
-const GITHUB_RELEASES_REPO = 'gweybrec/my-astro-sky';
-const LATEST_RELEASE_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-let latestReleaseCache: { value: LatestRelease | null; fetchedAt: number } | null = null;
 
 /**
  * @swagger
@@ -47,30 +40,7 @@ let latestReleaseCache: { value: LatestRelease | null; fetchedAt: number } | nul
  *                   description: ISO 8601 publication timestamp
  */
 settingsRouter.get('/api/version/latest', async (_req, res) => {
-  const now = Date.now();
-  if (latestReleaseCache && now - latestReleaseCache.fetchedAt < LATEST_RELEASE_TTL_MS) {
-    res.json(latestReleaseCache.value);
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_RELEASES_REPO}/releases/latest`,
-      { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'MyAstroSky' } },
-    );
-    if (!response.ok) throw new Error(`GitHub responded ${response.status}`);
-    const value = parseLatestRelease(await response.json());
-    latestReleaseCache = { value, fetchedAt: now };
-    res.json(value);
-  } catch (err) {
-    // Network error, rate limit, or no releases yet: fail silently with null so
-    // the update check never disrupts startup. Being offline is an expected
-    // condition, so warn rather than error. Cache the null briefly to avoid
-    // hammering GitHub when offline.
-    console.warn('[VersionCheck] Could not fetch latest release', err);
-    latestReleaseCache = { value: null, fetchedAt: now };
-    res.json(null);
-  }
+  res.json(await version.getLatest());
 });
 
 /**

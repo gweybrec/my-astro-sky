@@ -10,7 +10,6 @@ import {
   type SqlTx,
   type SqlValue,
 } from '@myastrosky/core/ports/sql-db';
-import { setServiceTxOpen } from './db-tx-guard.js';
 
 type Conn = Database.Database;
 
@@ -47,7 +46,7 @@ const INSERT_RE = /^\s*(?:insert|replace)\b/i;
 
 /**
  * Adapts a better-sqlite3 connection to the asynchronous `SqlDb` port.
- * Pass the RAW connection (`getConnection()` from `db.ts`), not the guarded legacy wrapper.
+ * Pass the connection from `getConnection()` in `db.ts`.
  *
  * better-sqlite3 is synchronous and there is one connection, so every call does its work at
  * once and returns a settled promise. A transaction body that awaits only `tx` calls therefore
@@ -146,12 +145,10 @@ export function createBetterSqliteDb(conn: Conn): SqlDb {
       }
       const ctx: TxContext = { open: true };
       current = ctx;
-      setServiceTxOpen(true);
 
       const close = (): void => {
         ctx.open = false;
         if (current === ctx) current = null;
-        setServiceTxOpen(false);
         clearImmediate(watchdog);
       };
       const rollback = (): void => {

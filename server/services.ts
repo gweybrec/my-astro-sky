@@ -25,7 +25,7 @@ const services = createServices({
   // The catalogue that solved files are matched against; read on first use, as before.
   catalogStars: loadServerCatalog,
   http: createFetchHttpClient(),
-  now: Date.now,
+  now: () => Date.now(),
   log: logServerError,
 });
 
@@ -42,4 +42,5 @@ export const {
   horizon,
   solvedImport,
   novaSolve,
+  version,
 } = services;

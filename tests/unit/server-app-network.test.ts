@@ -1357,3 +1357,89 @@ describe('online solving routes (astrometry.net)', () => {
     });
   });
 });
+
+// ─── GET /api/version/latest ─────────────────────────────────────────────────
+
+describe('GET /api/version/latest', () => {
+  const RELEASES_URL = 'https://api.github.com/repos/gweybrec/my-astro-sky/releases/latest';
+  const HOUR = 60 * 60 * 1000;
+  const RELEASE = {
+    tag_name: 'v9.9.9',
+    html_url: 'https://github.com/gweybrec/my-astro-sky/releases/tag/v9.9.9',
+    published_at: '2026-01-02T03:04:05Z',
+  };
+  let clock: number;
+
+  beforeAll(() => {
+    // The answer is cached for an hour: only the date is faked, so the test can move past the cache.
+    clock = Date.now() + 10 * 24 * HOUR;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(clock);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+  const later = (ms: number) => {
+    clock += ms;
+    vi.setSystemTime(clock);
+  };
+
+  it('sends one GET to GitHub and answers with the release, then serves the cache for an hour', async () => {
+    upstream = { status: 200, body: JSON.stringify(RELEASE) };
+    const r = await call('GET', '/api/version/latest');
+    expect(r).toEqual({
+      status: 200,
+      body: { version: 'v9.9.9', url: RELEASE.html_url, publishedAt: '2026-01-02T03:04:05Z' },
+    });
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0].url).toBe(RELEASES_URL);
+    expect(recorded[0].method).toBe('GET');
+    expect(recorded[0].headers).toMatchObject({
+      accept: 'application/vnd.github+json',
+      'user-agent': 'MyAstroSky',
+    });
+
+    later(HOUR - 1);
+    upstream = { status: 500, body: 'would fail' };
+    const cached = await call('GET', '/api/version/latest');
+    expect(cached.body.version).toBe('v9.9.9');
+    expect(recorded).toHaveLength(1);
+  });
+
+  it('answers null when GitHub answers an error status, and caches the null for an hour', async () => {
+    later(2 * HOUR);
+    upstream = { status: 403, body: 'rate limited' };
+    const r = await call('GET', '/api/version/latest');
+    expect(r).toEqual({ status: 200, body: null });
+    expect(recorded).toHaveLength(1);
+
+    later(HOUR - 1);
+    upstream = { status: 200, body: JSON.stringify(RELEASE) };
+    expect((await call('GET', '/api/version/latest')).body).toBeNull();
+    expect(recorded).toHaveLength(1);
+  });
+
+  it('answers null when the request itself fails', async () => {
+    later(2 * HOUR);
+    upstream = { reject: 'ENOTFOUND' };
+    const r = await call('GET', '/api/version/latest');
+    expect(r).toEqual({ status: 200, body: null });
+    expect(recorded).toHaveLength(1);
+  });
+
+  it('answers null when the payload has no usable tag, and fills the url and date with defaults', async () => {
+    later(2 * HOUR);
+    upstream = { status: 200, body: JSON.stringify({ name: 'no tag' }) };
+    expect((await call('GET', '/api/version/latest')).body).toBeNull();
+
+    later(2 * HOUR);
+    upstream = { status: 200, body: JSON.stringify({ tag_name: 'v1.0.0' }) };
+    expect((await call('GET', '/api/version/latest')).body).toEqual({
+      version: 'v1.0.0',
+      url: '',
+      publishedAt: null,
+    });
+  });
+});

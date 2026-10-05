@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * The settings service (WP2.3d): the rules on a private in-memory database with a fake codec and
- * environment, then against the old `getSetting` / `setSetting` of `server/db.ts` with the real codec.
+ * environment. The real codec is exercised by settings-security.test.ts.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -384,139 +384,6 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
       expect(err.kind).toBe('conflict');
       expect(err.body).toEqual(LOCKED_BODY);
       expect(stored('ASTROMETRY_API_KEY')).toBe('k');
-    });
-  });
-});
-
-// The old synchronous functions stay for the solver modules; the service must read and write the same rows.
-describe('SettingsService and the old getSetting/setSetting of server/db.ts', () => {
-  const KEY = Buffer.alloc(32, 5).toString('base64');
-  let dbModule: typeof import('../../server/db.js');
-  let svc: SettingsService;
-
-  async function open(encryptionKey: string | undefined): Promise<void> {
-    vi.resetModules();
-    vi.stubEnv('DB_PATH', ':memory:');
-    if (encryptionKey) vi.stubEnv('SETTINGS_ENCRYPTION_KEY', encryptionKey);
-    else vi.stubEnv('SETTINGS_ENCRYPTION_KEY', '');
-    dbModule = await import('../../server/db.js');
-    const { createServerSecretCodec } = await import('../../server/secret-codec.js');
-    svc = createSettingsService({
-      db: createBetterSqliteDb(dbModule.getConnection()),
-      secrets: createServerSecretCodec(),
-      env: (k) => process.env[k],
-    });
-  }
-
-  const rawValue = (key: string): string | undefined =>
-    (
-      dbModule.getConnection().prepare('SELECT value FROM settings WHERE key = ?').get(key) as
-        { value: string } | undefined
-    )?.value;
-
-  afterEach(() => {
-    dbModule.closeDatabase();
-    vi.unstubAllEnvs();
-  });
-
-  describe.each([
-    ['without an encryption key', undefined],
-    ['with an encryption key', KEY],
-  ])('%s', (_label, encryptionKey) => {
-    beforeEach(() => open(encryptionKey));
-
-    it('reads a secret written by the service, like the old getSetting', async () => {
-      await svc.set('ASTROMETRY_API_KEY', 'service-secret');
-      expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBe('service-secret');
-      expect(await svc.get('ASTROMETRY_API_KEY')).toBe('service-secret');
-    });
-
-    it('reads a secret written by the old setSetting, like the old getSetting', async () => {
-      dbModule.setSetting('ASTROMETRY_API_KEY', 'old-secret');
-      expect(await svc.get('ASTROMETRY_API_KEY')).toBe('old-secret');
-      expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBe('old-secret');
-    });
-
-    it('reads a plain key written by the service, like the old getSetting', async () => {
-      await svc.set('ASTAP_PATH', '/service/astap');
-      expect(dbModule.getSetting('ASTAP_PATH')).toBe('/service/astap');
-      expect(await svc.get('ASTAP_PATH')).toBe('/service/astap');
-    });
-
-    it('reads a plain key written by the old setSetting, like the old getSetting', async () => {
-      dbModule.setSetting('ASTAP_PATH', '/old/astap');
-      expect(await svc.get('ASTAP_PATH')).toBe('/old/astap');
-      expect(dbModule.getSetting('ASTAP_PATH')).toBe('/old/astap');
-    });
-
-    it('stores the secret the same way as the old setSetting', async () => {
-      await svc.set('ASTROMETRY_API_KEY', 'secret');
-      const viaService = rawValue('ASTROMETRY_API_KEY');
-      dbModule.setSetting('ASTROMETRY_API_KEY', 'secret');
-      const viaOld = rawValue('ASTROMETRY_API_KEY');
-      if (encryptionKey) {
-        expect(viaService!.startsWith('enc:v1:aesgcm:')).toBe(true);
-        expect(viaService).not.toContain('secret');
-        expect(viaOld!.startsWith('enc:v1:aesgcm:')).toBe(true);
-      } else {
-        expect(viaService).toBe('secret');
-        expect(viaOld).toBe('secret');
-      }
-    });
-
-    it('agrees on the environment rules', async () => {
-      await svc.set('ASTROMETRY_API_KEY', 'db-key');
-      await svc.set('ASTAP_PATH', '/db/astap');
-      vi.stubEnv('ASTROMETRY_API_KEY', 'env-key');
-      vi.stubEnv('ASTAP_PATH', '/env/astap');
-      vi.stubEnv('SOLVE_FIELD_PATH', '/env/solve-field');
-      for (const key of [
-        'ASTROMETRY_API_KEY',
-        'ASTAP_PATH',
-        'SOLVE_FIELD_PATH',
-        'MAX_PARALLEL_SOLVES',
-      ]) {
-        expect(await svc.get(key), key).toBe(dbModule.getSetting(key));
-      }
-    });
-
-    it('agrees on removal', async () => {
-      await svc.set('ASTROMETRY_API_KEY', 'k');
-      await svc.remove('ASTROMETRY_API_KEY');
-      expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBeUndefined();
-      dbModule.setSetting('ASTROMETRY_API_KEY', 'k2');
-      dbModule.deleteSetting('ASTROMETRY_API_KEY');
-      expect(await svc.get('ASTROMETRY_API_KEY')).toBeUndefined();
-    });
-
-    it('answers an update through the old getSetting', async () => {
-      await svc.update({ apiKey: ' k ', ASTAP_PATH: ' /a ', USE_WSL_FOR_ASTAP: true });
-      expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBe('k');
-      expect(dbModule.getSetting('ASTAP_PATH')).toBe('/a');
-      expect(dbModule.getSetting('USE_WSL_FOR_ASTAP')).toBe('1');
-    });
-  });
-
-  describe('an encrypted secret that cannot be decrypted', () => {
-    it('is undefined for both implementations', async () => {
-      await open(KEY);
-      await svc.set('ASTROMETRY_API_KEY', 'secret');
-      vi.stubEnv('SETTINGS_ENCRYPTION_KEY', '');
-      expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBeUndefined();
-      expect(await svc.get('ASTROMETRY_API_KEY')).toBeUndefined();
-    });
-  });
-
-  describe('a plain stored secret once a key is configured', () => {
-    it('is returned by both; the service also re-encrypts it in place', async () => {
-      await open(undefined);
-      dbModule.setSetting('ASTROMETRY_API_KEY', 'plain');
-      vi.stubEnv('SETTINGS_ENCRYPTION_KEY', KEY);
-      expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBe('plain');
-      expect(rawValue('ASTROMETRY_API_KEY')).toBe('plain');
-      expect(await svc.get('ASTROMETRY_API_KEY')).toBe('plain');
-      expect(rawValue('ASTROMETRY_API_KEY')!.startsWith('enc:v1:aesgcm:')).toBe(true);
-      expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBe('plain');
     });
   });
 });
