@@ -30,6 +30,15 @@ Check `git branch --show-current` is `mobile/phase-2`, that `git status --short`
    - `tests/unit/server-app.test.ts` passes **unedited**.
 8. **Docs:** add the service to the table of services in `docs/dev/mobile-architecture.md` (create the table in WP2.3a if there is none: service, file, what it owns, routes that use it).
 
+## Rules added on 2026-10-05 (they apply to every service card from WP2.3f on)
+
+9. **Group the database calls.** On the phone each call costs about 35 ms. A method never awaits a database call inside a loop: several reads are one query, several writes are one `batch` (inside a transaction: `tx.batch`). Its test states the method's number of round trips with `countingSqlDb` (`tests/helpers/counting-sql-db.ts`), as a fixed number that does not grow with the number of rows.
+10. **Every `DomainError` has a `code`** (upper snake case, stable). The HTTP response does not change: carry today's exact body in `body`.
+11. **Typed parameters.** The service interfaces are what the phone UI and the desktop UI will both call. A method takes typed parameters declared in `packages/core/src/domain/` (for example `update(id: string, changes: PlanChanges)`), and still checks them at run time, because the HTTP route passes what a client sent. It returns domain values. A method does not take "the request body" as `unknown`.
+12. **Register the service in `createServices`** (`server/create-services.ts`), with its dependencies.
+13. **The service tests run on both adapters**: the better-sqlite3 one and the asynchronous test adapter of `tests/helpers/`.
+14. **Status row.** Update your card's row in the status table at the end of `.claude/work-packages/README.md` in your own commit.
+
 ## Must NOT (every sub-card)
 
 - Change what a route accepts or returns, an error message, a status code, or a `@swagger` block.

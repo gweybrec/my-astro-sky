@@ -1,6 +1,6 @@
 # WP2.4b — Pin the plan and photo routes more tightly before they move
 
-Model: sonnet · Depends on: WP2.5a · Parallel-safe with: nothing · Needs device: no · Needs browser: no
+Model: sonnet · Depends on: WP2.6c · Parallel-safe with: nothing · Needs device: no · Needs browser: no
 
 ## Goal
 
@@ -58,7 +58,7 @@ Keep the file under 40 seconds. No network.
 ## Commits
 
 - `CLAUDE.md` forbids committing without the user's explicit permission. **The user gave it on 2026-10-03: commits are allowed on the new branches only.** That means the `mobile/*` and `spike/*` branches. Never on `master` or `dev`. Never push.
-- **One commit**, with files staged by explicit path. Before committing, check `git branch --show-current` is `mobile/phase-2`.
+- **One commit**, with files staged by explicit path, including this card's row in the status table at the end of `.claude/work-packages/README.md` (state `done`, a note of at most 30 words). Before committing, check `git branch --show-current` is `mobile/phase-2`.
 - Message: `test: cover the remaining branches of the plan and photo routes`.
 - **Never add a `Co-Authored-By` line or any AI attribution.**
 

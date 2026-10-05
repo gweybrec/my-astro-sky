@@ -1,6 +1,6 @@
 # WP2.3f to WP2.3h — The plan service and the photo service
 
-Model: sonnet for all · One sub-card at a time, in order · Depends on: WP2.4b · Needs device: no · Needs browser: no
+Model: sonnet for all · One sub-card at a time, in order · Depends on: WP2.6c, WP2.4b · Needs device: no · Needs browser: no
 
 Each sub-card is run by its own worker and makes **one commit**. The worker's prompt is this whole file plus the line "Run sub-card WP2.3x only".
 
@@ -8,6 +8,7 @@ Each sub-card is run by its own worker and makes **one commit**. The worker's pr
 
 `.claude/work-packages/phase-2/WP2.3-first-services.md`: its sections "Goal", "The pattern", "Must NOT", "Acceptance" and "Escalate if" apply here word for word, with these additions:
 
+- **The rules 9 to 14 of the pattern file ("Rules added on 2026-10-05") apply:** grouped database calls with asserted round-trip counts, a code on every error, typed parameters, registration in `createServices`, tests on both adapters, the status row in your own commit. Where a method signature below shows `body` or `input`, give it a named type in `packages/core/src/domain/`.
 - **Three tests pin the behaviour and must pass unedited:** `tests/unit/server-app.test.ts`, `tests/unit/server-app-plans-photos.test.ts` and `tests/unit/server-backup.test.ts`. The only exceptions are the ones a sub-card names.
 - Models to copy: `packages/core/src/services/gear.ts` with `server/routes/gear.ts` (a service with backup helpers and a transaction), `server/services.ts`, `server/routes/http-errors.ts`.
 - A handler that logs with `console.error` or `console.log` today keeps that log, in the route, for the same cases.
@@ -98,6 +99,12 @@ The phone will store files and resize images with its own means. This sub-card p
      bakeOrientation(bytes: Uint8Array, ext: string): Promise<Uint8Array>;
      /** A JPEG no larger than `maxSize` on its longer side (never enlarged), at the given quality. */
      thumbnail(bytes: Uint8Array, maxSize: number, quality: number): Promise<Uint8Array>;
+     /** Encodes raw pixels (8-bit, `channels` 1, 3 or 4, row by row) as an image. Used to turn a decoded FITS, TIFF or XISF into a picture; the server implements it with `sharp`. */
+     encode(
+       raw: { width: number; height: number; channels: 1 | 3 | 4; data: Uint8Array },
+       format: 'jpeg' | 'png',
+       quality?: number,
+     ): Promise<Uint8Array>;
    }
 
    // blob-store.ts
@@ -110,6 +117,8 @@ The phone will store files and resize images with its own means. This sub-card p
      remove(name: string): Promise<void>;
    }
    ```
+
+   **What is stored (decided by the user on 2026-10-05):** on every platform, the original image with its orientation baked in, and a thumbnail. No reduced copy. The phone will implement the same two ports with its own means.
 
 2. **Server adapters:** `server/image-codec.ts` (`createSharpImageCodec()`), with exactly the `sharp` calls the route makes today (`metadata()`; `rotate()` for the orientation; `resize` then `jpeg({ quality })` for the thumbnail), and `server/blob-store.ts` (`createFsBlobStore(dir)`) over `UPLOADS_DIR`. A thumbnail made from the baked bytes must be byte-identical to today's, which is made from the saved file: prove it in a test on two images (one with EXIF orientation 6).
 3. **The service** (`createPhotoService({ db, newId, images, blobs })`) gains:
