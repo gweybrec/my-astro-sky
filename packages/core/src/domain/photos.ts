@@ -1,5 +1,11 @@
 // Photo service inputs: what a caller hands to `PhotoService` (the Photo output shape is in `../types`).
-import type { CaptureDetails, ManualPlacement, PhotoIntegration, PointOfInterest } from '../types';
+import type {
+  CaptureDetails,
+  ManualPlacement,
+  Photo,
+  PhotoIntegration,
+  PointOfInterest,
+} from '../types';
 
 /** How a backup import treats a photo whose id is already in the database. */
 export type PhotoImportStrategy = 'skip' | 'replace';
@@ -106,3 +112,26 @@ export interface BackupPhoto {
   captureDetails?: unknown;
   gearSetupId?: unknown;
 }
+
+/** The image of an upload: the name it had on the sender's side and its bytes. */
+export interface PhotoUploadFile {
+  name: string;
+  bytes: Uint8Array;
+}
+
+/** A problem of an upload that did not stop it. The photo is stored; the caller reports it. */
+export interface PhotoUploadWarning {
+  code: 'THUMBNAIL_FAILED';
+  error: unknown;
+}
+
+/** What `upload` returns: the stored photo, the size the picture had as read, and the warnings. */
+export interface PhotoUploadResult {
+  photo: Photo;
+  /** Pixel size and EXIF orientation of the file as it was sent. */
+  source: { width: number; height: number; orientation?: number };
+  warnings: PhotoUploadWarning[];
+}
+
+/** A photo as the list route returns it: the size of its image file, or null when the file is missing. */
+export type PhotoWithSize = Photo & { fileSize: number | null };

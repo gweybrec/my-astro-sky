@@ -11,6 +11,9 @@ import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import {
   ALLOWED_PHOTO_EXTENSIONS,
   MAX_CORRESPONDENCES,
+  THUMB_QUALITY,
+  THUMB_SIZE,
+  thumbnailNameOf,
   createPhotoService,
   photoNotFound,
   sanitizeIntegrationRows,
@@ -18,6 +21,7 @@ import {
   type PhotoService,
 } from '@myastrosky/core/services/photos';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
@@ -176,13 +180,24 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
   let db: SqlDb;
   let counting: CountingSqlDb;
   let svc: PhotoService;
+  let codec: ReturnType<typeof fakeImageCodec>;
+  let blobs: ReturnType<typeof memoryBlobStore>;
+  let idCount: number;
 
   beforeEach(async () => {
     conn = new Database(':memory:');
     db = wrap(createBetterSqliteDb(conn));
     await initSchema(db);
     counting = countingSqlDb(db);
-    svc = createPhotoService({ db: counting });
+    codec = fakeImageCodec();
+    blobs = memoryBlobStore();
+    idCount = 0;
+    svc = createPhotoService({
+      db: counting,
+      newId: () => `id-${++idCount}`,
+      images: codec,
+      blobs,
+    });
   });
   afterEach(() => conn.close());
 
@@ -947,6 +962,223 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       ).toBe(5);
       // skipped: begin, the ignored insert, commit
       expect(await calls(() => svc.importPhoto(backup({ id: 'x3' }), 'skip'))).toBe(3);
+    });
+  });
+  describe('upload, list with sizes and delete (WP2.3h)', () => {
+    const file = (name = 'm31.png') => ({
+      name,
+      bytes: new Uint8Array([1, 2, 3]),
+    });
+    const stored = () => [...blobs.store.keys()].sort();
+    const rows = async () => (await svc.list()).map((p) => p.id);
+
+    it('exposes the thumbnail constants and the thumbnail name rule', () => {
+      expect(THUMB_SIZE).toBe(400);
+      expect(THUMB_QUALITY).toBe(75);
+      expect(thumbnailNameOf('abc.png')).toBe('abc_thumb.jpg');
+      expect(thumbnailNameOf('a.b.webp')).toBe('a.b_thumb.jpg');
+    });
+
+    it('stores the image and its thumbnail under the id, then the row', async () => {
+      const r = await svc.upload(file(), validFields({ displayName: 'Andromeda' }));
+      expect(r.photo).toMatchObject({
+        id: 'id-1',
+        filename: 'id-1.png',
+        thumbFilename: 'id-1_thumb.jpg',
+        originalName: 'Andromeda',
+        width: 100,
+        height: 50,
+      });
+      expect(r.warnings).toEqual([]);
+      expect(r.source).toEqual({ width: 100, height: 50 });
+      expect(stored()).toEqual(['id-1.png', 'id-1_thumb.jpg']);
+      expect(await rows()).toEqual(['id-1']);
+      expect(await svc.get('id-1')).toEqual(r.photo);
+    });
+
+    it('swaps width and height for orientations 5 to 8 only', async () => {
+      for (const [o, swapped] of [
+        [1, false],
+        [4, false],
+        [5, true],
+        [6, true],
+        [8, true],
+      ] as const) {
+        codec.info = { width: 100, height: 50, orientation: o };
+        const { photo, source } = await svc.upload(file(), validFields());
+        expect([photo.width, photo.height]).toEqual(swapped ? [50, 100] : [100, 50]);
+        expect(source).toEqual({ width: 100, height: 50, orientation: o });
+      }
+    });
+
+    it('keeps the lower-cased extension of the file name', async () => {
+      const { photo } = await svc.upload(file('SKY.JPEG'), validFields());
+      expect(photo.filename).toBe('id-1.jpeg');
+    });
+
+    it('refuses a bad extension or bad correspondences before touching the image', async () => {
+      let probed = 0;
+      codec.probe = async () => {
+        probed++;
+        return { width: 1, height: 1 };
+      };
+      expect((await rejection(svc.upload(file('x.gif'), validFields()))).code).toBe(
+        'INVALID_EXTENSION',
+      );
+      expect((await rejection(svc.upload(file(), {}))).code).toBe('MISSING_CORRESPONDENCES');
+      expect(probed).toBe(0);
+      expect(stored()).toEqual([]);
+    });
+
+    it('answers INVALID_IMAGE with the first body when the probe fails, and stores nothing', async () => {
+      codec.info = null;
+      const e = await rejection(svc.upload(file(), validFields()));
+      expect(e.kind).toBe('invalid');
+      expect(e.body).toEqual({
+        error: 'Fichier image invalide ou corrompu',
+        code: 'INVALID_IMAGE',
+      });
+      expect(stored()).toEqual([]);
+      expect(await rows()).toEqual([]);
+    });
+
+    it('answers INVALID_IMAGE with the other body when the orientation cannot be baked', async () => {
+      codec.failBake = true;
+      const e = await rejection(svc.upload(file(), validFields()));
+      expect(e.body).toEqual({
+        error: "Impossible de traiter l'image (format non supporté ou fichier corrompu)",
+        code: 'INVALID_IMAGE',
+      });
+      expect(stored()).toEqual([]);
+      expect(await rows()).toEqual([]);
+    });
+
+    it('answers the same body when the image cannot be written', async () => {
+      blobs.put = async () => {
+        throw new Error('disk full');
+      };
+      const e = await rejection(svc.upload(file(), validFields()));
+      expect(e.code).toBe('INVALID_IMAGE');
+      expect(await rows()).toEqual([]);
+    });
+
+    it('goes on when the thumbnail fails: a warning, the row, the image and no thumbnail file', async () => {
+      codec.failThumbnail = true;
+      const r = await svc.upload(file(), validFields());
+      expect(r.warnings).toHaveLength(1);
+      expect(r.warnings[0].code).toBe('THUMBNAIL_FAILED');
+      expect((r.warnings[0].error as Error).message).toBe('thumbnail failed');
+      expect(r.photo.thumbFilename).toBe('id-1_thumb.jpg');
+      expect(stored()).toEqual(['id-1.png']);
+      expect(await rows()).toEqual(['id-1']);
+    });
+
+    it('leaves the stored files, as before, when the insert fails, and no row', async () => {
+      const dup = JSON.stringify([
+        { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1 },
+        { pointIndex: 0, photoX: 2, photoY: 2, starHip: 2 },
+      ]);
+      await expect(svc.upload(file(), validFields({ correspondences: dup }))).rejects.toThrow(
+        /UNIQUE constraint failed/,
+      );
+      expect(await rows()).toEqual([]);
+      expect(stored()).toEqual(['id-1.png', 'id-1_thumb.jpg']);
+    });
+
+    it('makes the same number of round trips whatever the number of correspondences', async () => {
+      const many = (n: number) =>
+        validFields({
+          correspondences: JSON.stringify(
+            Array.from({ length: n }, (_, i) => ({
+              pointIndex: i,
+              photoX: i,
+              photoY: i,
+              starHip: i + 1,
+            })),
+          ),
+        });
+      // the batch (photo and correspondences), then the two reads
+      expect(await calls(() => svc.upload(file(), many(2)))).toBe(3);
+      expect(await calls(() => svc.upload(file(), many(50)))).toBe(3);
+    });
+
+    it('lists with the size of each image, null when the image is missing', async () => {
+      const a = await svc.upload(file(), validFields());
+      const b = await svc.upload(file('b.png'), validFields());
+      blobs.store.delete(b.photo.filename);
+      const list = await svc.listWithSizes();
+      expect(list.map((p) => [p.id, p.fileSize])).toEqual([
+        [a.photo.id, 3],
+        [b.photo.id, null],
+      ]);
+      expect(await calls(() => svc.listWithSizes())).toBe(2);
+    });
+
+    it('removes the image, its thumbnail and the row; a missing photo is PHOTO_NOT_FOUND', async () => {
+      const a = await svc.upload(file(), validFields());
+      await svc.upload(file('b.png'), validFields());
+      await svc.remove(a.photo.id);
+      expect(stored()).toEqual(['id-2.png', 'id-2_thumb.jpg']);
+      expect(await rows()).toEqual(['id-2']);
+      const e = await rejection(svc.remove('nope'));
+      expect(e.code).toBe('PHOTO_NOT_FOUND');
+      expect(e.kind).toBe('notFound');
+      expect(stored()).toEqual(['id-2.png', 'id-2_thumb.jpg']);
+    });
+
+    it('removes a photo whose files are already gone', async () => {
+      const a = await svc.upload(file(), validFields());
+      blobs.store.clear();
+      await svc.remove(a.photo.id);
+      expect(await rows()).toEqual([]);
+    });
+
+    it('keeps the row when a file cannot be removed (files go first)', async () => {
+      const a = await svc.upload(file(), validFields());
+      blobs.remove = async () => {
+        throw new Error('locked');
+      };
+      await expect(svc.remove(a.photo.id)).rejects.toThrow('locked');
+      expect(await rows()).toEqual([a.photo.id]);
+    });
+
+    it('removes several photos, counting the ones that existed, in a fixed number of round trips', async () => {
+      for (const n of ['a', 'b', 'c', 'd', 'e']) await svc.upload(file(`${n}.png`), validFields());
+      const two = await calls(() => svc.removeMany(['id-1', 'id-3', 'id-3', 'ghost', 7 as any]));
+      expect(stored()).toEqual([
+        'id-2.png',
+        'id-2_thumb.jpg',
+        'id-4.png',
+        'id-4_thumb.jpg',
+        'id-5.png',
+        'id-5_thumb.jpg',
+      ]);
+      expect(await rows()).toEqual(['id-2', 'id-4', 'id-5']);
+      const three = await calls(() => svc.removeMany(['id-2', 'id-4', 'id-5']));
+      expect(three).toBe(two);
+    });
+
+    it('returns how many were removed, and nothing for an empty or unusable list', async () => {
+      await svc.upload(file(), validFields());
+      expect(await svc.removeMany(['ghost'])).toBe(0);
+      expect(await svc.removeMany([])).toBe(0);
+      expect(await svc.removeMany([1 as any])).toBe(0);
+      expect(await svc.removeMany(['id-1', 'id-1'])).toBe(1);
+      expect(stored()).toEqual([]);
+    });
+
+    it('ensureThumbnail makes a missing thumbnail, leaves an existing one, ignores a missing image', async () => {
+      await blobs.put('x.png', new Uint8Array([9]));
+      await svc.ensureThumbnail('x.png', 'x_thumb.jpg');
+      expect(stored()).toEqual(['x.png', 'x_thumb.jpg']);
+      blobs.store.set('x_thumb.jpg', new Uint8Array([5, 5]));
+      await svc.ensureThumbnail('x.png', 'x_thumb.jpg');
+      expect(blobs.store.get('x_thumb.jpg')).toEqual(new Uint8Array([5, 5]));
+      await svc.ensureThumbnail('none.png', 'none_thumb.jpg');
+      expect(stored()).toEqual(['x.png', 'x_thumb.jpg']);
+      codec.failThumbnail = true;
+      await blobs.put('y.png', new Uint8Array([9]));
+      await expect(svc.ensureThumbnail('y.png', 'y_thumb.jpg')).rejects.toThrow();
     });
   });
 });

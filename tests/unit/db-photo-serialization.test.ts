@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { initSchema } from '@myastrosky/core/db/schema';
 import { createPhotoService, type PhotoService } from '@myastrosky/core/services/photos';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 
 // The POST /api/photos response is built by the photo service's `get`, and the
 // GET /api/photos list by `list`. Both go through the shared `rowToPhoto`
@@ -50,7 +51,15 @@ async function makeService(): Promise<{ photos: PhotoService; conn: Database.Dat
   const conn = new Database(':memory:');
   const db = createBetterSqliteDb(conn);
   await initSchema(db);
-  return { photos: createPhotoService({ db }), conn };
+  return {
+    photos: createPhotoService({
+      db,
+      newId: () => 'unused',
+      images: fakeImageCodec(),
+      blobs: memoryBlobStore(),
+    }),
+    conn,
+  };
 }
 
 describe('photo serialization — get / list parity', () => {

@@ -14,6 +14,7 @@ import type { ManualPlacement } from '@myastrosky/core/types';
 import { createPhotoService, type PhotoService } from '@myastrosky/core/services/photos';
 import { createPlanService } from '@myastrosky/core/services/plans';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,12 @@ const MANIFEST_FIXTURE = [
 
 // The photo service on the same in-memory database as the legacy `db` module.
 const photosOn = (db: typeof import('../../server/db.js')): PhotoService =>
-  createPhotoService({ db: createBetterSqliteDb(db.getConnection()) });
+  createPhotoService({
+    db: createBetterSqliteDb(db.getConnection()),
+    newId: () => 'unused',
+    images: fakeImageCodec(),
+    blobs: memoryBlobStore(),
+  });
 
 /** The positional arguments of the old `createPhotoWithId`, as the object `importPhoto` takes. */
 function seedPhoto(

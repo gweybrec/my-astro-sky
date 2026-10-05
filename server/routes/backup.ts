@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+import { thumbnailNameOf } from '@myastrosky/core/services/photos';
 import { UPLOADS_DIR } from '../server-paths.js';
 import { ALLOWED_PHOTO_EXTENSIONS, uploadBundle } from './shared.js';
 import {
@@ -738,29 +739,17 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
     }
 
     // Regenerate any missing thumbnails
-    const THUMB_SIZE = 400;
     const photosToThumb = importMetadata
       ? photos.filter((p: any) => writtenFiles === null || writtenFiles.has(p.filename))
       : [];
     for (const p of photosToThumb) {
       if (!p.id || typeof p.id !== 'string') continue;
       const filename: string = p.filename ?? `${p.id}.jpg`;
-      const thumbFilename: string = p.thumbFilename ?? filename.replace(/(\.[^.]+)$/, '_thumb.jpg');
-      const fullPath = path.join(UPLOADS_DIR, filename);
-      const thumbPath = path.join(UPLOADS_DIR, thumbFilename);
-      if (fs.existsSync(fullPath) && !fs.existsSync(thumbPath)) {
-        try {
-          const meta = await sharp(fullPath).metadata();
-          const w = meta.width ?? 0;
-          const h = meta.height ?? 0;
-          const scale = Math.min(1, THUMB_SIZE / Math.max(w, h, 1));
-          await sharp(fullPath)
-            .resize(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)))
-            .jpeg({ quality: 75 })
-            .toFile(thumbPath);
-        } catch (thumbErr) {
-          console.warn(`[Import] Thumbnail regeneration failed for ${filename}:`, thumbErr);
-        }
+      const thumbFilename: string = p.thumbFilename ?? thumbnailNameOf(filename);
+      try {
+        await photosService.ensureThumbnail(filename, thumbFilename);
+      } catch (thumbErr) {
+        console.warn(`[Import] Thumbnail regeneration failed for ${filename}:`, thumbErr);
       }
     }
 

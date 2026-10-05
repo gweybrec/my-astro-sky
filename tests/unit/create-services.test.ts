@@ -5,6 +5,8 @@ import { describe, it, expect } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
 import { createServices } from '../../server/create-services';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
+import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 
 async function makeServices() {
   const db = createBetterSqliteDb(new Database(':memory:'));
@@ -21,6 +23,8 @@ async function makeServices() {
     },
     env: () => undefined,
     gearCatalog: { telescopes: [], cameras: [], accessories: [], filters: [] },
+    images: fakeImageCodec(),
+    blobs: memoryBlobStore(),
   });
 }
 

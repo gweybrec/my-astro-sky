@@ -7,6 +7,9 @@
 import { DomainError } from '../domain/errors';
 import type {
   BackupPhoto,
+  PhotoUploadFile,
+  PhotoUploadResult,
+  PhotoWithSize,
   ManualPlacementInput,
   NewPhotoInput,
   PhotoCorrespondenceInput,
@@ -15,6 +18,8 @@ import type {
   UploadFields,
   UploadMetadata,
 } from '../domain/photos';
+import type { BlobStore } from '../ports/blob-store';
+import type { ImageCodec, ImageInfo } from '../ports/image-codec';
 import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
 import type { CaptureDetails, Photo, PhotoIntegration, PointOfInterest } from '../types';
 import { sanitizeCaptureDetails } from '../wcs';
@@ -30,8 +35,20 @@ export const ALLOWED_PHOTO_EXTENSIONS: ReadonlySet<string> = new Set([
 /** The most correspondences one upload may carry. */
 export const MAX_CORRESPONDENCES = 100;
 
+/** The longer side of a thumbnail, in pixels. */
+export const THUMB_SIZE = 400;
+/** The JPEG quality of a thumbnail. */
+export const THUMB_QUALITY = 75;
+
+/** The name of the thumbnail of the image file `filename` (the extension becomes `_thumb.jpg`). */
+export const thumbnailNameOf = (filename: string): string =>
+  filename.replace(/(\.[^.]+)$/, '_thumb.jpg');
+
 export interface PhotoServiceDeps {
   db: SqlDb;
+  newId: () => string;
+  images: ImageCodec;
+  blobs: BlobStore;
 }
 
 export interface PhotoService {
@@ -56,6 +73,27 @@ export interface PhotoService {
   validateUpload(fileName: string, fields: UploadFields): PhotoCorrespondenceInput[];
   /** Parses and cleans the other fields of the upload form; a field that does not parse falls back to its empty value. */
   readUploadMetadata(fileName: string, fields: UploadFields): UploadMetadata;
+  /**
+   * The whole of `POST /api/photos`, in order: the checks that need no image, the probe (`INVALID_IMAGE`), the
+   * orientation baked into the stored image `<id><ext>` (`INVALID_IMAGE`), the thumbnail `<id>_thumb.jpg` (a failure
+   * is a warning in the result, the upload goes on), then the insert. Files are written outside any transaction and
+   * are not removed when the insert fails.
+   */
+  upload(file: PhotoUploadFile, fields: UploadFields): Promise<PhotoUploadResult>;
+  /** The list with `fileSize` read from the blob store (null when the image is missing). */
+  listWithSizes(): Promise<PhotoWithSize[]>;
+  /**
+   * Deletes a photo: its image and its thumbnail, then its row. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no
+   * such photo.
+   */
+  remove(id: string): Promise<void>;
+  /** Deletes the photos with these ids (files, then rows). Returns how many existed. Ids that are not strings are ignored. */
+  removeMany(ids: readonly string[]): Promise<number>;
+  /**
+   * Makes the thumbnail `thumbFilename` from the image `filename` when the image exists and the thumbnail does not.
+   * Rejects when the picture cannot be read or written; used after a backup import.
+   */
+  ensureThumbnail(filename: string, thumbFilename: string): Promise<void>;
   /** Replaces the metadata of a photo. Returns the cleaned `originalName` when one was given. Throws `notFound` (`PHOTO_NOT_FOUND`). */
   updateMetadata(id: string, changes: PhotoMetadataChanges): Promise<{ originalName?: string }>;
   /** Stores the placement as JSON, or clears it when `placement` is falsy. Throws `notFound` (`PHOTO_NOT_FOUND`). */
@@ -123,6 +161,7 @@ const SELECT_CORRESPONDENCES_FOR =
   'SELECT * FROM star_correspondences WHERE photo_id = ? ORDER BY point_index';
 const SELECT_FILENAME = 'SELECT filename FROM photos WHERE id = ?';
 const SELECT_IDS = 'SELECT id FROM photos';
+const SELECT_IDS_FILENAMES = 'SELECT id, filename FROM photos';
 const SELECT_NAMES = 'SELECT id, original_name FROM photos ORDER BY rowid ASC';
 const DELETE_PHOTO = 'DELETE FROM photos WHERE id = ?';
 const DELETE_ALL_PHOTOS = 'DELETE FROM photos';
@@ -287,7 +326,7 @@ function correspondenceStatements(
 }
 
 export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
-  const { db } = deps;
+  const { db, newId, images, blobs } = deps;
 
   async function readOne(id: string): Promise<Photo | undefined> {
     const row = await db.get<PhotoRow>(SELECT_PHOTO, [id]);
@@ -295,7 +334,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     return rowToPhoto(row, await db.all<CorrespondenceRow>(SELECT_CORRESPONDENCES_FOR, [id]));
   }
 
-  return {
+  const service: PhotoService = {
     async list() {
       const photos = await db.all<PhotoRow>(SELECT_PHOTOS);
       const byPhoto = new Map<string, CorrespondenceRow[]>();
@@ -311,6 +350,111 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
 
     async fileNameOf(id) {
       return (await db.get<{ filename: string }>(SELECT_FILENAME, [id]))?.filename;
+    },
+
+    async upload(file, fields) {
+      // The checks that need no image (extension, correspondences), in their order.
+      const correspondences = service.validateUpload(file.name, fields ?? {});
+      const fileExt = extensionOf(file.name);
+
+      // Reading the size fails for a file that is not an image.
+      let source: ImageInfo;
+      try {
+        source = await images.probe(file.bytes);
+      } catch {
+        throw invalidUpload('Fichier image invalide ou corrompu', 'INVALID_IMAGE');
+      }
+      // The browser shows the picture with its EXIF rotation applied: orientations 5 to 8 swap width and height.
+      const swap = !!source.orientation && source.orientation >= 5 && source.orientation <= 8;
+      const width = swap ? source.height : source.width;
+      const height = swap ? source.width : source.height;
+
+      // The orientation is baked into the stored file, which keeps the coordinate space consistent.
+      const id = newId();
+      const filename = `${id}${fileExt || '.jpg'}`;
+      let baked: Uint8Array;
+      try {
+        baked = await images.bakeOrientation(file.bytes, fileExt || '.jpg');
+        await blobs.put(filename, baked);
+      } catch {
+        throw invalidUpload(
+          "Impossible de traiter l'image (format non supporté ou fichier corrompu)",
+          'INVALID_IMAGE',
+        );
+      }
+
+      const warnings: PhotoUploadResult['warnings'] = [];
+      const thumbFilename = `${id}_thumb.jpg`;
+      try {
+        await blobs.put(thumbFilename, await images.thumbnail(baked, THUMB_SIZE, THUMB_QUALITY));
+      } catch (error) {
+        warnings.push({ code: 'THUMBNAIL_FAILED', error });
+      }
+
+      const meta = service.readUploadMetadata(file.name, fields ?? {});
+      const photo = await service.insert({
+        id,
+        filename,
+        originalName: meta.displayName,
+        width,
+        height,
+        correspondences,
+        manualPlacement: meta.manualPlacement,
+        dsoIds: meta.dsoIds,
+        labels: meta.labels,
+        notes: meta.notes,
+        integrations: meta.integrations,
+        thumbFilename,
+        observationDate: meta.observationDate,
+        pointsOfInterest: meta.pointsOfInterest,
+        captureDetails: meta.captureDetails,
+        gearSetupId: meta.gearSetupId,
+      });
+      return {
+        photo,
+        source: {
+          width: source.width,
+          height: source.height,
+          ...(source.orientation ? { orientation: source.orientation } : {}),
+        },
+        warnings,
+      };
+    },
+
+    async listWithSizes() {
+      const list = await service.list();
+      const sizes = await Promise.all(list.map((p) => blobs.size(p.filename).catch(() => null)));
+      return list.map((p, i) => ({ ...p, fileSize: sizes[i] }));
+    },
+
+    async remove(id) {
+      const filename = await service.fileNameOf(id);
+      if (!filename) throw photoNotFound();
+      await blobs.remove(filename);
+      await blobs.remove(thumbnailNameOf(filename));
+      await service.removeRow(id);
+    },
+
+    async removeMany(ids) {
+      const wanted = new Set(ids.filter((id): id is string => typeof id === 'string'));
+      if (wanted.size === 0) return 0;
+      const doomed = (await db.all<{ id: string; filename: string }>(SELECT_IDS_FILENAMES)).filter(
+        (r) => wanted.has(r.id),
+      );
+      for (const r of doomed) {
+        await blobs.remove(r.filename);
+        await blobs.remove(thumbnailNameOf(r.filename));
+      }
+      return service.removeRows(doomed.map((r) => r.id));
+    },
+
+    async ensureThumbnail(filename, thumbFilename) {
+      if ((await blobs.size(filename)) === null || (await blobs.size(thumbFilename)) !== null) {
+        return;
+      }
+      const bytes = await blobs.get(filename);
+      if (!bytes) return;
+      await blobs.put(thumbFilename, await images.thumbnail(bytes, THUMB_SIZE, THUMB_QUALITY));
     },
 
     async insert(input) {
@@ -608,4 +752,5 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       });
     },
   };
+  return service;
 }
