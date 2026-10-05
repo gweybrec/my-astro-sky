@@ -12,6 +12,10 @@ import { createIdentifyService } from '@myastrosky/core/services/identify';
 import { createPhotoService } from '@myastrosky/core/services/photos';
 import { createPlanService } from '@myastrosky/core/services/plans';
 import { createPoiCategoryService } from '@myastrosky/core/services/poi-categories';
+import {
+  createSolvedImportService,
+  type CatalogStarSource,
+} from '@myastrosky/core/services/solved-import';
 import { createSettingsService } from '@myastrosky/core/services/settings';
 import {
   createStarSearchService,
@@ -29,6 +33,8 @@ export interface ServiceDeps {
   blobs: BlobStore;
   /** The deep star catalogue, or a function that loads it on first use. */
   stars: StarCatalogSource;
+  /** The catalogue (every magnitude, with names) that solved files are matched against, or a function that loads it on first use. */
+  catalogStars: CatalogStarSource;
   http: HttpClient;
   /** The clock, in milliseconds since the epoch. */
   now: () => number;
@@ -40,8 +46,21 @@ export interface ServiceDeps {
 
 /** Builds every service on one database. Later service cards add theirs here. */
 export function createServices(deps: ServiceDeps) {
-  const { db, newId, secrets, env, gearCatalog, images, blobs, stars, http, now, log, sleep } =
-    deps;
+  const {
+    db,
+    newId,
+    secrets,
+    env,
+    gearCatalog,
+    images,
+    blobs,
+    stars,
+    catalogStars,
+    http,
+    now,
+    log,
+    sleep,
+  } = deps;
   return {
     dsoOverrides: createDsoOverrideService({ db }),
     skyRegions: createSkyRegionService({ db, newId }),
@@ -52,6 +71,7 @@ export function createServices(deps: ServiceDeps) {
     photos: createPhotoService({ db, newId, images, blobs }),
     stars: createStarSearchService({ stars }),
     identify: createIdentifyService({ http, now }),
+    solvedImport: createSolvedImportService({ images, stars: catalogStars }),
     horizon: createHorizonService({ db, http, images, now, log, sleep }),
   };
 }

@@ -53,9 +53,11 @@ export function createSharpImageCodec(): ImageCodec {
     },
 
     async encode(raw, format, quality) {
-      const img = sharp(raw.data, {
+      let img = sharp(raw.data, {
         raw: { width: raw.width, height: raw.height, channels: raw.channels },
       });
+      // Without this, sharp upsamples a single-channel raw buffer to an RGB image on encode.
+      if (raw.channels === 1) img = img.toColourspace('b-w');
       return toBytes(
         await (format === 'jpeg' ? img.jpeg(quality ? { quality } : {}) : img.png()).toBuffer(),
       );

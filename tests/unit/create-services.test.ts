@@ -26,6 +26,7 @@ async function makeServices() {
     images: fakeImageCodec(),
     blobs: memoryBlobStore(),
     stars: [],
+    catalogStars: [],
     http: async () => {
       throw new Error('no network in this test');
     },

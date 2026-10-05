@@ -587,3 +587,326 @@ describe('GET /api/horizon', () => {
     expect(r.body.layers.map((l: any) => l.maxDistKm)).toEqual([2, 4, 7, 11, 16, 23, 40]);
   }, 30_000);
 });
+// ─── Already-solved files (WP2.7f): no network, synthetic FITS and TIFF ──────
+
+describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', async () => {
+  const { buildFits } = await import('../fixtures/fits-builders');
+  const { buildTiff } = await import('../fixtures/tiff-builders');
+
+  // A 40x30 mono FITS whose WCS (0.1 deg per pixel, centred on star 99001) holds the three
+  // northern stars of tests/fixtures/stars.test.json.
+  const WCS_CARDS = [
+    'CRPIX1  = 20.5',
+    'CRPIX2  = 15.5',
+    'CRVAL1  = 330.21217',
+    'CRVAL2  = 73.08178',
+    'CD1_1   = -0.1',
+    'CD1_2   = 0',
+    'CD2_1   = 0',
+    'CD2_2   = 0.1',
+    "DATE-OBS= '2025-09-04T21:30:00'",
+    'EXPTIME = 300',
+    'STACKCNT= 12',
+    "FILTER  = 'Ha'",
+  ];
+  const EMPTY_SKY_CARDS = WCS_CARDS.map((c) =>
+    c.startsWith('CRVAL1') ? 'CRVAL1  = 10' : c.startsWith('CRVAL2') ? 'CRVAL2  = -40' : c,
+  );
+  const fits = (extraCards: string[] = WCS_CARDS, naxis1 = 40) =>
+    buildFits({
+      bitpix: -32,
+      naxis1,
+      naxis2: 30,
+      roworder: 'TOP-DOWN',
+      pixels: Array.from({ length: naxis1 * 30 }, (_, i) => (i % 7) / 7),
+      extraCards,
+    });
+  const tiff = () =>
+    buildTiff({
+      width: 4,
+      height: 3,
+      bitsPerSample: 8,
+      sampleFormat: 1,
+      samplesPerPixel: 1,
+      photometric: 1,
+      pixels: Array.from({ length: 12 }, (_, i) => i * 20),
+    });
+
+  let savedCatalog: string | undefined;
+  beforeAll(() => {
+    savedCatalog = process.env.STAR_CATALOG_PATH;
+    process.env.STAR_CATALOG_PATH = path.join(FIXTURES, 'stars.test.json');
+  });
+  afterAll(() => {
+    if (savedCatalog === undefined) delete process.env.STAR_CATALOG_PATH;
+    else process.env.STAR_CATALOG_PATH = savedCatalog;
+  });
+
+  async function upload(
+    url: string,
+    file: { name: string; bytes: Uint8Array } | null,
+    fields: Record<string, string> = {},
+  ) {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) form.append(k, v);
+    if (file) form.append('photo', new Blob([file.bytes as BlobPart]), file.name);
+    const res = await realFetch(base + url, { method: 'POST', body: form });
+    return { status: res.status, body: (await res.json()) as any };
+  }
+
+  describe('POST /api/solve-wcs', () => {
+    it('answers 400 NO_FILE, in English by default and in French when asked', async () => {
+      const en = await upload('/api/solve-wcs', null);
+      expect(en.status).toBe(400);
+      expect(en.body).toEqual({
+        success: false,
+        error: 'No file provided',
+        code: 'NO_FILE',
+      });
+      const fr = await upload('/api/solve-wcs', null, { lang: 'fr' });
+      expect(fr.body.error).toBe('Aucun fichier fourni');
+    });
+
+    it('answers 400 UNSUPPORTED_FORMAT for an extension that is not FITS or TIFF', async () => {
+      const r = await upload('/api/solve-wcs', {
+        name: 'photo.jpg',
+        bytes: fits(),
+      });
+      expect(r.status).toBe(400);
+      expect(r.body).toEqual({
+        success: false,
+        error: 'Unsupported format. Use TIFF or FITS.',
+        code: 'UNSUPPORTED_FORMAT',
+      });
+    });
+
+    it('answers 200 NO_WCS_DATA for a FITS and a TIFF without a solution', async () => {
+      for (const file of [
+        { name: 'a.fits', bytes: fits([]) },
+        { name: 'a.TIF', bytes: tiff() },
+      ]) {
+        const r = await upload('/api/solve-wcs', file);
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({
+          success: false,
+          error: 'No WCS metadata found in this file. The file was not plate-solved.',
+          code: 'NO_WCS_DATA',
+        });
+      }
+    });
+
+    it('answers 200 NO_IMAGE_DIMENSIONS when the header holds a solution but no size', async () => {
+      const r = await upload(
+        '/api/solve-wcs',
+        { name: 'a.fit', bytes: fits(WCS_CARDS, 0) },
+        { lang: 'fr' },
+      );
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({
+        success: false,
+        error: "Dimensions de l'image introuvables",
+        code: 'NO_IMAGE_DIMENSIONS',
+      });
+    });
+
+    it('falls back to synthetic points when the field holds no catalogue star', async () => {
+      const r = await upload('/api/solve-wcs', {
+        name: 'a.fits',
+        bytes: fits(EMPTY_SKY_CARDS),
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(r.body.correspondences.length).toBeGreaterThanOrEqual(3);
+      expect(r.body.correspondences[0].starName).toBe('Synthetic 1');
+      expect(r.body.correspondences[0].starHip).toBe(0);
+    });
+
+    it('answers the correspondences and the header metadata for a solved FITS', async () => {
+      const r = await upload('/api/solve-wcs', {
+        name: 'a.fits',
+        bytes: fits(),
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(r.body.sourceWidth).toBe(40);
+      expect(r.body.sourceHeight).toBe(30);
+      expect(r.body.dimensionWarning).toBeUndefined();
+      expect(r.body.dateObs).toBe('2025-09-04T21:30:00Z');
+      expect(r.body.expTime).toBe(300);
+      expect(r.body.stackCnt).toBe(12);
+      expect(r.body.filter).toBe('Ha');
+      const hips = r.body.correspondences.map((c: any) => c.starHip).sort();
+      expect(hips).toEqual([99001, 99002, 99003]);
+      const first = r.body.correspondences.find((c: any) => c.starHip === 99001);
+      expect(first.photoX).toBeCloseTo(19.5, 3);
+      expect(first.photoY).toBeCloseTo(14.5, 3);
+      expect(Object.keys(r.body)).toEqual([
+        'success',
+        'correspondences',
+        'sourceWidth',
+        'sourceHeight',
+        'dateObs',
+        'expTime',
+        'stackCnt',
+        'filter',
+      ]);
+    });
+
+    it('rescales to the target size and flags an aspect mismatch', async () => {
+      const same = await upload(
+        '/api/solve-wcs',
+        { name: 'a.fits', bytes: fits() },
+        { targetWidth: '80', targetHeight: '60' },
+      );
+      expect(same.body.dimensionWarning).toEqual({
+        sourceW: 40,
+        sourceH: 30,
+        targetW: 80,
+        targetH: 60,
+        aspectMismatch: false,
+      });
+      const c1 = same.body.correspondences.find((c: any) => c.starHip === 99001);
+      expect(c1.photoX).toBeCloseTo(39, 3);
+      expect(c1.photoY).toBeCloseTo(29, 3);
+      const skew = await upload(
+        '/api/solve-wcs',
+        { name: 'a.fits', bytes: fits() },
+        { targetWidth: '80', targetHeight: '30' },
+      );
+      expect(skew.body.dimensionWarning.aspectMismatch).toBe(true);
+      // a target equal to the source, or an unusable one, changes nothing
+      for (const fields of [
+        { targetWidth: '40', targetHeight: '30' },
+        { targetWidth: 'abc', targetHeight: '30' },
+      ]) {
+        const r = await upload('/api/solve-wcs', { name: 'a.fits', bytes: fits() }, fields);
+        expect(r.body.dimensionWarning).toBeUndefined();
+      }
+    });
+  });
+
+  describe('POST /api/photos/convert', () => {
+    it('answers 400 NO_FILE and 400 UNSUPPORTED_FORMAT', async () => {
+      const none = await upload('/api/photos/convert', null);
+      expect(none.status).toBe(400);
+      expect(none.body).toEqual({
+        success: false,
+        error: 'No file provided',
+        code: 'NO_FILE',
+      });
+      const jpg = await upload('/api/photos/convert', {
+        name: 'x.jpg',
+        bytes: tiff(),
+      });
+      expect(jpg.status).toBe(400);
+      expect(jpg.body).toEqual({
+        success: false,
+        error: 'Unsupported raw format: .jpg. Use TIFF or FITS.',
+        code: 'UNSUPPORTED_FORMAT',
+      });
+    });
+
+    it('answers 400 UNSUPPORTED_RAW_FORMAT when the pixel layout cannot be decoded', async () => {
+      const cube = buildFits({
+        bitpix: -32,
+        naxis1: 2,
+        naxis2: 2,
+        naxis3: 2,
+        pixels: new Array(8).fill(0.5),
+      });
+      const r = await upload('/api/photos/convert', {
+        name: 'x.fits',
+        bytes: cube,
+      });
+      expect(r.status).toBe(400);
+      expect(r.body).toEqual({
+        success: false,
+        error: 'Could not convert the raw file: Unsupported FITS axis layout: NAXIS=3, NAXIS3=2',
+        code: 'UNSUPPORTED_RAW_FORMAT',
+      });
+    });
+
+    it("answers 500 with the decoder's message when the file is not decodable at all", async () => {
+      const r = await upload('/api/photos/convert', {
+        name: 'x.tif',
+        bytes: new Uint8Array([1, 2, 3, 4]),
+      });
+      expect(r.status).toBe(500);
+      expect(r.body).toEqual({
+        success: false,
+        error: 'Buffer too small to be a TIFF file',
+      });
+    });
+
+    it('returns the PNG with success:false and NO_WCS_DATA for a TIFF without a solution', async () => {
+      const r = await upload('/api/photos/convert', {
+        name: 'x.tiff',
+        bytes: tiff(),
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(false);
+      expect(r.body.code).toBe('NO_WCS_DATA');
+      expect(r.body.error).toBe(
+        'No WCS metadata found in this file. The file was not plate-solved.',
+      );
+      expect(r.body.correspondences).toBeUndefined();
+      expect([r.body.sourceWidth, r.body.sourceHeight, r.body.width, r.body.height]).toEqual([
+        4, 3, 4, 3,
+      ]);
+      const png = Buffer.from(r.body.pngBase64, 'base64');
+      expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+      const meta = await sharp(png).metadata();
+      expect([meta.width, meta.height, meta.channels]).toEqual([4, 3, 1]);
+      expect([...(await sharp(png).greyscale().raw().toBuffer())]).toEqual(
+        Array.from({ length: 12 }, (_, i) => i * 20),
+      );
+    });
+
+    it('returns the PNG, the correspondences and the metadata for a solved FITS', async () => {
+      const r = await upload('/api/photos/convert', {
+        name: 'x.fits',
+        bytes: fits(),
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(r.body.error).toBeUndefined();
+      expect(r.body.correspondences.map((c: any) => c.starHip).sort()).toEqual([
+        99001, 99002, 99003,
+      ]);
+      expect([r.body.sourceWidth, r.body.sourceHeight, r.body.width, r.body.height]).toEqual([
+        40, 30, 40, 30,
+      ]);
+      expect(r.body.dateObs).toBe('2025-09-04T21:30:00Z');
+      expect(r.body.expTime).toBe(300);
+      expect(r.body.stackCnt).toBe(12);
+      expect(r.body.filter).toBe('Ha');
+      const png = Buffer.from(r.body.pngBase64, 'base64');
+      const meta = await sharp(png).metadata();
+      expect([meta.format, meta.width, meta.height, meta.channels]).toEqual(['png', 40, 30, 1]);
+      expect(Object.keys(r.body)).toEqual([
+        'success',
+        'correspondences',
+        'sourceWidth',
+        'sourceHeight',
+        'width',
+        'height',
+        'pngBase64',
+        'dateObs',
+        'expTime',
+        'stackCnt',
+        'filter',
+      ]);
+    });
+
+    it('returns synthetic points with the PNG when the field holds no catalogue star', async () => {
+      const r = await upload('/api/photos/convert', {
+        name: 'x.fits',
+        bytes: fits(EMPTY_SKY_CARDS),
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(r.body.correspondences[0].starName).toBe('Synthetic 1');
+      expect(r.body.pngBase64.length).toBeGreaterThan(10);
+    });
+  });
+});

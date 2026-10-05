@@ -1,24 +1,21 @@
 import express from 'express';
-import sharp from 'sharp';
 import path from 'path';
-import {
-  ALLOWED_WCS_EXTENSIONS,
-  isElectron,
-  UPLOAD_LIMIT,
-  checkRateLimit,
-  uploadWCS,
-  uploadRaw,
-} from './shared.js';
-import { extractWCS, wcsToCorrespondences, loadServerCatalog } from '../wcs-reader.js';
-import {
-  decodeRawAstroImage,
-  UnsupportedRawFormatError,
-  UnsupportedTiffError,
-  UnsupportedFitsError,
-} from '../raw-decode/index.js';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import type { SolvedCaptureMetadata } from '@myastrosky/core/domain/solved-import';
+import { isElectron, UPLOAD_LIMIT, checkRateLimit, uploadWCS, uploadRaw } from './shared.js';
+import { solvedImport } from '../services.js';
 import { msg } from '../messages.js';
 import type { ServerLang } from '../messages.js';
 import { logServerError } from '../logger.js';
+
+/** The capture fields of a result, in the order the API has always sent them. */
+const captureFields = (r: SolvedCaptureMetadata): SolvedCaptureMetadata => ({
+  ...(r.dateObs ? { dateObs: r.dateObs } : {}),
+  ...(r.expTime !== undefined ? { expTime: r.expTime } : {}),
+  ...(r.stackCnt !== undefined ? { stackCnt: r.stackCnt } : {}),
+  ...(r.filter ? { filter: r.filter } : {}),
+  ...(r.captureDetails ? { captureDetails: r.captureDetails } : {}),
+});
 
 export const solvedImportRouter = express.Router();
 
@@ -79,118 +76,50 @@ solvedImportRouter.post('/api/solve-wcs', uploadWCS.single('photo'), async (req,
       return;
     }
 
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_WCS_EXTENSIONS.has(ext)) {
-      res.status(400).json({
-        success: false,
-        error: msg.api.unsupportedWcsFormat(lang),
-        code: 'UNSUPPORTED_FORMAT',
+    let result;
+    try {
+      result = await solvedImport.solveWcs({
+        fileName: file.originalname,
+        bytes: file.buffer,
+        targetWidth: parseInt(req.body.targetWidth || '0', 10),
+        targetHeight: parseInt(req.body.targetHeight || '0', 10),
       });
-      return;
-    }
-
-    const wcs = extractWCS(file.buffer, ext);
-    if (!wcs) {
-      res.json({ success: false, error: msg.api.noWcsData(lang), code: 'NO_WCS_DATA' });
-      return;
-    }
-
-    // Get image dimensions from NAXIS header keywords
-    let imageWidth = wcs.NAXIS1;
-    let imageHeight = wcs.NAXIS2;
-
-    // For TIFF, try to get dimensions from sharp if NAXIS not in header
-    if ((ext === '.tif' || ext === '.tiff') && (!imageWidth || !imageHeight)) {
-      try {
-        const metadata = await sharp(file.buffer).metadata();
-        imageWidth = metadata.width || imageWidth;
-        imageHeight = metadata.height || imageHeight;
-      } catch {
-        // Ignore sharp errors
+    } catch (err) {
+      if (isDomainError(err) && err.code === 'UNSUPPORTED_FORMAT') {
+        res.status(400).json({
+          success: false,
+          error: msg.api.unsupportedWcsFormat(lang),
+          code: 'UNSUPPORTED_FORMAT',
+        });
+        return;
       }
+      throw err;
     }
 
-    if (!imageWidth || !imageHeight) {
-      res.json({
-        success: false,
-        error: msg.api.noImageDimensions(lang),
-        code: 'NO_IMAGE_DIMENSIONS',
-      });
+    if (!result.success) {
+      const error = {
+        NO_WCS_DATA: msg.api.noWcsData(lang),
+        NO_IMAGE_DIMENSIONS: msg.api.noImageDimensions(lang),
+        NOT_ENOUGH_CATALOG_STARS: msg.api.notEnoughCatalogStars(lang),
+      }[result.code];
+      res.json({ success: false, error, code: result.code });
       return;
     }
 
-    loadServerCatalog();
-    // Standard FITS files from PixInsight/Siril use FITS Y convention (Y=1 = bottom row,
-    // Y increases upward), which is opposite to display/screen convention (Y=0 = top row).
-    // Pass fitsYConvention=true so pixel positions are correctly flipped when mapping
-    // catalog stars into the image's display coordinate space.
-    const correspondences = wcsToCorrespondences(wcs, imageWidth, imageHeight, true);
-
-    if (correspondences.length < 3) {
-      res.json({
-        success: false,
-        error: msg.api.notEnoughCatalogStars(lang),
-        code: 'NOT_ENOUGH_CATALOG_STARS',
-      });
-      return;
-    }
-
-    // Rescale correspondences to target (display image) dimensions if provided
-    const targetWidth = parseInt(req.body.targetWidth || '0', 10);
-    const targetHeight = parseInt(req.body.targetHeight || '0', 10);
-
-    let finalCorrespondences = correspondences;
-    let dimensionWarning:
-      | {
-          sourceW: number;
-          sourceH: number;
-          targetW: number;
-          targetH: number;
-          aspectMismatch: boolean;
-        }
-      | undefined;
-
-    if (
-      targetWidth > 0 &&
-      targetHeight > 0 &&
-      (targetWidth !== imageWidth || targetHeight !== imageHeight)
-    ) {
-      const sourceAspect = imageWidth / imageHeight;
-      const targetAspect = targetWidth / targetHeight;
-      const aspectDiff = Math.abs(sourceAspect - targetAspect) / sourceAspect;
-      const aspectMismatch = aspectDiff > 0.01; // >1% aspect ratio difference
-
-      dimensionWarning = {
-        sourceW: imageWidth,
-        sourceH: imageHeight,
-        targetW: targetWidth,
-        targetH: targetHeight,
-        aspectMismatch,
-      };
-
-      const scaleX = targetWidth / imageWidth;
-      const scaleY = targetHeight / imageHeight;
-      finalCorrespondences = correspondences.map((c) => ({
-        ...c,
-        photoX: c.photoX * scaleX,
-        photoY: c.photoY * scaleY,
-      }));
+    if (result.dimensionWarning) {
+      const w = result.dimensionWarning;
       console.log(
-        `[WCS] Rescaled correspondences: source ${imageWidth}x${imageHeight} → target ${targetWidth}x${targetHeight} (aspectMismatch=${aspectMismatch})`,
+        `[WCS] Rescaled correspondences: source ${w.sourceW}x${w.sourceH} → target ${w.targetW}x${w.targetH} (aspectMismatch=${w.aspectMismatch})`,
       );
     }
 
     res.json({
       success: true,
-      correspondences: finalCorrespondences,
-      sourceWidth: imageWidth,
-      sourceHeight: imageHeight,
-      ...(dimensionWarning ? { dimensionWarning } : {}),
-      ...(wcs.dateObs ? { dateObs: wcs.dateObs } : {}),
-      ...(wcs.expTime !== undefined ? { expTime: wcs.expTime } : {}),
-      ...(wcs.stackCnt !== undefined ? { stackCnt: wcs.stackCnt } : {}),
-      ...(wcs.filter ? { filter: wcs.filter } : {}),
-      ...(wcs.captureDetails ? { captureDetails: wcs.captureDetails } : {}),
+      correspondences: result.correspondences,
+      sourceWidth: result.sourceWidth,
+      sourceHeight: result.sourceHeight,
+      ...(result.dimensionWarning ? { dimensionWarning: result.dimensionWarning } : {}),
+      ...captureFields(result),
     });
   } catch (err: any) {
     console.error('WCS solve error:', err);
@@ -242,24 +171,19 @@ solvedImportRouter.post('/api/photos/convert', uploadRaw.single('photo'), async 
     }
 
     const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_WCS_EXTENSIONS.has(ext)) {
-      res.status(400).json({
-        success: false,
-        error: msg.api.unsupportedRawFormat(lang, ext),
-        code: 'UNSUPPORTED_FORMAT',
-      });
-      return;
-    }
-
-    let decoded: Awaited<ReturnType<typeof decodeRawAstroImage>>;
+    let result;
     try {
-      decoded = await decodeRawAstroImage(file.buffer, ext);
+      result = await solvedImport.convert({ fileName: file.originalname, bytes: file.buffer });
     } catch (err) {
-      if (
-        err instanceof UnsupportedRawFormatError ||
-        err instanceof UnsupportedTiffError ||
-        err instanceof UnsupportedFitsError
-      ) {
+      if (isDomainError(err) && err.code === 'UNSUPPORTED_FORMAT') {
+        res.status(400).json({
+          success: false,
+          error: msg.api.unsupportedRawFormat(lang, ext),
+          code: 'UNSUPPORTED_FORMAT',
+        });
+        return;
+      }
+      if (isDomainError(err) && err.code === 'UNSUPPORTED_RAW_FORMAT') {
         logServerError('raw_convert_unsupported', err, { ext });
         res.status(400).json({
           success: false,
@@ -271,30 +195,17 @@ solvedImportRouter.post('/api/photos/convert', uploadRaw.single('photo'), async 
       throw err;
     }
 
-    // WCS + capture metadata, exactly like /api/solve-wcs — no rescale is ever needed
-    // here since the PNG has the raw file's own exact dimensions.
-    const wcs = extractWCS(file.buffer, ext);
-    let success = false;
-    let correspondences: ReturnType<typeof wcsToCorrespondences> = [];
-    if (wcs) {
-      loadServerCatalog();
-      correspondences = wcsToCorrespondences(wcs, decoded.width, decoded.height, true);
-      success = correspondences.length >= 3;
-    }
-
     res.json({
-      success,
-      ...(success ? { correspondences } : { error: msg.api.noWcsData(lang), code: 'NO_WCS_DATA' }),
-      sourceWidth: decoded.width,
-      sourceHeight: decoded.height,
-      width: decoded.width,
-      height: decoded.height,
-      pngBase64: decoded.png.toString('base64'),
-      ...(wcs?.dateObs ? { dateObs: wcs.dateObs } : {}),
-      ...(wcs?.expTime !== undefined ? { expTime: wcs.expTime } : {}),
-      ...(wcs?.stackCnt !== undefined ? { stackCnt: wcs.stackCnt } : {}),
-      ...(wcs?.filter ? { filter: wcs.filter } : {}),
-      ...(wcs?.captureDetails ? { captureDetails: wcs.captureDetails } : {}),
+      success: result.success,
+      ...(result.success
+        ? { correspondences: result.correspondences }
+        : { error: msg.api.noWcsData(lang), code: 'NO_WCS_DATA' }),
+      sourceWidth: result.sourceWidth,
+      sourceHeight: result.sourceHeight,
+      width: result.width,
+      height: result.height,
+      pngBase64: Buffer.from(result.png).toString('base64'),
+      ...captureFields(result),
     });
   } catch (err: any) {
     logServerError('raw_convert_failed', err);

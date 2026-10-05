@@ -10,6 +10,7 @@ import { createFetchHttpClient } from './http-client.js';
 import { createBetterSqliteDb } from './sqlite-adapter.js';
 import { logServerError } from './logger.js';
 import { loadDeepCatalog } from './star-search.js';
+import { loadServerCatalog } from './wcs-reader.js';
 
 const services = createServices({
   db: createBetterSqliteDb(getConnection()),
@@ -21,6 +22,8 @@ const services = createServices({
   blobs: createFsBlobStore(UPLOADS_DIR),
   // Read from disk on the first star request, as before.
   stars: loadDeepCatalog,
+  // The catalogue that solved files are matched against; read on first use, as before.
+  catalogStars: loadServerCatalog,
   http: createFetchHttpClient(),
   now: Date.now,
   log: logServerError,
@@ -37,4 +40,5 @@ export const {
   stars,
   identify,
   horizon,
+  solvedImport,
 } = services;
