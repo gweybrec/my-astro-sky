@@ -66,10 +66,10 @@ export function createDsoOverrideService(deps: DsoOverrideServiceDeps): DsoOverr
 
     async upsert(id, data) {
       if (typeof id !== 'string' || !id || id.length > 100) {
-        throw new DomainError('invalid', 'Invalid DSO id');
+        throw new DomainError('invalid', 'Invalid DSO id', { code: 'INVALID_DSO_ID' });
       }
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        throw new DomainError('invalid', 'Invalid override data');
+        throw new DomainError('invalid', 'Invalid override data', { code: 'INVALID_DSO_DATA' });
       }
       const coordError = validateDsoOverrideCoords(data as Record<string, unknown>);
       if (coordError) {

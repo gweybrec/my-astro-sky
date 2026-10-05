@@ -77,23 +77,28 @@ export function createPoiCategoryService(deps: PoiCategoryServiceDeps): PoiCateg
         });
       }
       const id = `cat-${newId()}`;
-      await db.transaction(async (tx) => {
-        const rows = await tx.all<PoiCategoryRow>(SELECT_ALL);
-        await writeRow(tx, {
+      // One statement: the new category goes after the existing ones (its position is the row count).
+      await db.run(
+        `INSERT OR REPLACE INTO poi_categories (id, name, color, position)
+         SELECT ?, ?, ?, COUNT(*) FROM poi_categories`,
+        [
           id,
-          name: name.trim(),
-          color: typeof color === 'string' && color.trim() ? color.trim() : DEFAULT_COLOR,
-          position: rows.length,
-        });
-      });
+          name.trim().slice(0, 60),
+          (typeof color === 'string' && color.trim() ? color.trim() : DEFAULT_COLOR).slice(0, 32),
+        ],
+      );
       return { id };
     },
 
     async update(id, input) {
       const { name, color, position } = (input ?? {}) as Record<string, unknown>;
       await db.transaction(async (tx) => {
-        const existing = (await tx.all<PoiCategoryRow>(SELECT_ALL)).find((c) => c.id === id);
-        if (!existing) throw new DomainError('notFound', 'Category not found');
+        const existing = await tx.get<PoiCategoryRow>('SELECT * FROM poi_categories WHERE id = ?', [
+          id,
+        ]);
+        if (!existing) {
+          throw new DomainError('notFound', 'Category not found', { code: 'CATEGORY_NOT_FOUND' });
+        }
         await writeRow(tx, {
           id,
           name: typeof name === 'string' && name.trim() ? name.trim() : existing.name,
@@ -105,7 +110,9 @@ export function createPoiCategoryService(deps: PoiCategoryServiceDeps): PoiCateg
 
     async remove(id) {
       const { changes } = await db.run('DELETE FROM poi_categories WHERE id = ?', [id]);
-      if (changes === 0) throw new DomainError('notFound', 'Category not found');
+      if (changes === 0) {
+        throw new DomainError('notFound', 'Category not found', { code: 'CATEGORY_NOT_FOUND' });
+      }
     },
 
     async removeAll() {
@@ -117,11 +124,14 @@ export function createPoiCategoryService(deps: PoiCategoryServiceDeps): PoiCateg
     },
 
     async ensureDefaults() {
-      await db.transaction(async (tx) => {
-        const row = await tx.get<{ cnt: number }>('SELECT COUNT(*) AS cnt FROM poi_categories');
-        if ((row?.cnt ?? 0) !== 0) return;
-        for (const c of DEFAULT_CATEGORIES) await writeRow(tx, c);
-      });
+      // One statement: the five rows are inserted only when the table is empty.
+      const values = DEFAULT_CATEGORIES.map(() => '(?, ?, ?, ?)').join(', ');
+      await db.run(
+        `INSERT INTO poi_categories (id, name, color, position)
+         SELECT column1, column2, column3, column4 FROM (VALUES ${values})
+         WHERE NOT EXISTS (SELECT 1 FROM poi_categories)`,
+        DEFAULT_CATEGORIES.flatMap((c) => [c.id, c.name, c.color, c.position]),
+      );
     },
   };
 }

@@ -96,27 +96,32 @@ export function createSkyRegionService(deps: SkyRegionServiceDeps): SkyRegionSer
         });
       }
       if (!isValidRegionPoints(points)) {
-        throw new DomainError('invalid', 'points must have at least 3 {azDeg,altDeg} vertices');
+        throw new DomainError('invalid', 'points must have at least 3 {azDeg,altDeg} vertices', {
+          code: 'INVALID_REGION_POINTS',
+        });
       }
       const id = `region-${newId()}`;
-      await db.transaction(async (tx) => {
-        const rows = await tx.all<SkyRegionRow>(SELECT_ALL);
-        await writeRow(tx, {
+      // One statement: the new region goes after the existing ones (its position is the row count).
+      await db.run(
+        `INSERT OR REPLACE INTO sky_regions (id, name, color, points, position)
+         SELECT ?, ?, ?, ?, COUNT(*) FROM sky_regions`,
+        [
           id,
-          name: name.trim(),
-          color: typeof color === 'string' && color.trim() ? color.trim() : DEFAULT_COLOR,
-          points: JSON.stringify(points),
-          position: rows.length,
-        });
-      });
+          name.trim().slice(0, 60),
+          (typeof color === 'string' && color.trim() ? color.trim() : DEFAULT_COLOR).slice(0, 32),
+          JSON.stringify(points),
+        ],
+      );
       return { id };
     },
 
     async update(id, input) {
       const { name, color, points, position } = (input ?? {}) as Record<string, unknown>;
       await db.transaction(async (tx) => {
-        const existing = (await tx.all<SkyRegionRow>(SELECT_ALL)).find((r) => r.id === id);
-        if (!existing) throw new DomainError('notFound', 'Region not found');
+        const existing = await tx.get<SkyRegionRow>('SELECT * FROM sky_regions WHERE id = ?', [id]);
+        if (!existing) {
+          throw new DomainError('notFound', 'Region not found', { code: 'REGION_NOT_FOUND' });
+        }
         await writeRow(tx, {
           id,
           name: typeof name === 'string' && name.trim() ? name.trim() : existing.name,
@@ -129,7 +134,9 @@ export function createSkyRegionService(deps: SkyRegionServiceDeps): SkyRegionSer
 
     async remove(id) {
       const { changes } = await db.run('DELETE FROM sky_regions WHERE id = ?', [id]);
-      if (changes === 0) throw new DomainError('notFound', 'Region not found');
+      if (changes === 0) {
+        throw new DomainError('notFound', 'Region not found', { code: 'REGION_NOT_FOUND' });
+      }
     },
 
     async importOne(region) {

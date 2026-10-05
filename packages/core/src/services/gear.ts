@@ -141,10 +141,13 @@ export function createGearService(deps: GearServiceDeps): GearService {
         throw new DomainError(
           'invalid',
           'Invalid type — must be telescope, camera, accessory, or filter',
+          { code: 'INVALID_GEAR_TYPE' },
         );
       }
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        throw new DomainError('invalid', 'Invalid data — must be a non-null object');
+        throw new DomainError('invalid', 'Invalid data — must be a non-null object', {
+          code: 'INVALID_GEAR_DATA',
+        });
       }
       const id = `custom-${newId()}`;
       await db.run(UPSERT_CUSTOM, [id, type as string, JSON.stringify({ ...data, id })]);
@@ -153,10 +156,12 @@ export function createGearService(deps: GearServiceDeps): GearService {
 
     async removeCustom(id) {
       if (!id.startsWith('custom-')) {
-        throw new DomainError('invalid', 'Only custom gear items can be deleted');
+        throw new DomainError('invalid', 'Only custom gear items can be deleted', {
+          code: 'GEAR_NOT_CUSTOM',
+        });
       }
       const { changes } = await db.run(DELETE_CUSTOM, [id]);
-      if (changes === 0) throw new DomainError('notFound', 'Not found');
+      if (changes === 0) throw new DomainError('notFound', 'Not found', { code: 'GEAR_NOT_FOUND' });
     },
 
     async removeAllCustom() {
@@ -210,7 +215,9 @@ export function createGearService(deps: GearServiceDeps): GearService {
         !telescopeId ||
         !cameraId
       ) {
-        throw new DomainError('invalid', 'name, telescopeId, and cameraId are required');
+        throw new DomainError('invalid', 'name, telescopeId, and cameraId are required', {
+          code: 'SETUP_FIELDS_REQUIRED',
+        });
       }
       await db.run(
         UPSERT_SETUP,
@@ -220,15 +227,21 @@ export function createGearService(deps: GearServiceDeps): GearService {
 
     async setSetupEnabled(id, enabled) {
       if (typeof enabled !== 'boolean') {
-        throw new DomainError('invalid', 'enabled must be boolean');
+        throw new DomainError('invalid', 'enabled must be boolean', {
+          code: 'SETUP_ENABLED_NOT_BOOLEAN',
+        });
       }
       const { changes } = await db.run(UPDATE_SETUP_ENABLED, [enabled ? 1 : 0, id]);
-      if (changes === 0) throw new DomainError('notFound', 'Setup not found');
+      if (changes === 0) {
+        throw new DomainError('notFound', 'Setup not found', { code: 'SETUP_NOT_FOUND' });
+      }
     },
 
     async removeSetup(id) {
       const { changes } = await db.run(DELETE_SETUP, [id]);
-      if (changes === 0) throw new DomainError('notFound', 'Setup not found');
+      if (changes === 0) {
+        throw new DomainError('notFound', 'Setup not found', { code: 'SETUP_NOT_FOUND' });
+      }
     },
 
     async removeAllSetups() {
@@ -257,22 +270,23 @@ export function createGearService(deps: GearServiceDeps): GearService {
     },
 
     async importCustom(item, replaceIds) {
-      await db.transaction(async (tx) => {
-        for (const id of replaceIds) await tx.run(DELETE_CUSTOM, [id]);
-        await tx.run(UPSERT_CUSTOM, [
-          item.id,
-          item.type,
-          JSON.stringify({ ...item.data, id: item.id }),
-        ]);
-      });
+      // One atomic batch: the replaced items are deleted, then the item is written.
+      await db.batch([
+        ...replaceIds.map((id) => ({ sql: DELETE_CUSTOM, params: [id] })),
+        {
+          sql: UPSERT_CUSTOM,
+          params: [item.id, item.type, JSON.stringify({ ...item.data, id: item.id })],
+        },
+      ]);
     },
 
     async importSetup(setup, replaceIds) {
-      await db.transaction(async (tx) => {
-        for (const id of replaceIds) await tx.run(DELETE_SETUP, [id]);
-        await tx.run(
-          UPSERT_SETUP,
-          setupParams(
+      // One atomic batch: the replaced setups are deleted, then the setup is written.
+      await db.batch([
+        ...replaceIds.map((id) => ({ sql: DELETE_SETUP, params: [id] })),
+        {
+          sql: UPSERT_SETUP,
+          params: setupParams(
             setup.id,
             setup.name,
             setup.telescopeId,
@@ -280,8 +294,8 @@ export function createGearService(deps: GearServiceDeps): GearService {
             setup.accessoryId,
             setup.enabled,
           ),
-        );
-      });
+        },
+      ]);
     },
   };
 }

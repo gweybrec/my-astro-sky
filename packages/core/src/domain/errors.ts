@@ -3,21 +3,21 @@ export type DomainErrorKind = 'invalid' | 'notFound' | 'conflict' | 'rateLimited
 /** A rule of the domain was not met. Routes and the phone UI turn it into a response or a message. */
 export class DomainError extends Error {
   readonly kind: DomainErrorKind;
-  /** Stable machine code, when the client translates the message. */
-  readonly code?: string;
+  /** Stable machine code (upper snake case) that the client translates into the user's language. */
+  readonly code: string;
   /** The exact response body to send, when it is not `{ error: message }`. */
   readonly body?: Readonly<Record<string, unknown>>;
 
   constructor(
     kind: DomainErrorKind,
     message: string,
-    options?: { code?: string; body?: Readonly<Record<string, unknown>> },
+    options: { code: string; body?: Readonly<Record<string, unknown>> },
   ) {
     super(message);
     this.name = 'DomainError';
     this.kind = kind;
-    this.code = options?.code;
-    this.body = options?.body;
+    this.code = options.code;
+    this.body = options.body;
   }
 }
 

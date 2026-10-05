@@ -10,6 +10,7 @@ import type { CustomGearType, GearCatalog } from '@myastrosky/core/domain/gear';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createGearService, type GearService } from '@myastrosky/core/services/gear';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 const CATALOG: GearCatalog = {
   telescopes: [
@@ -289,7 +290,7 @@ describe('GearService', () => {
       const err = await rejection(svc.replaceSetup('setup-1', input));
       expect(err.kind).toBe('invalid');
       expect(err.message).toBe('name, telescopeId, and cameraId are required');
-      expect(err.code).toBeUndefined();
+      expect(err.code).toBe('SETUP_FIELDS_REQUIRED');
       expect(err.body).toBeUndefined();
       expect(await svc.listSetups()).toEqual([]);
     });
@@ -460,5 +461,62 @@ describe('GearService', () => {
       ).rejects.toThrow();
       expect((await svc.listSetups()).map((s) => s.id)).toEqual(['a']);
     });
+  });
+});
+
+describe('GearService round trips', () => {
+  let conn: Database.Database;
+  let db: CountingSqlDb;
+  beforeEach(async () => {
+    conn = new Database(':memory:');
+    db = countingSqlDb(createBetterSqliteDb(conn));
+    await initSchema(db);
+    db.reset();
+  });
+  afterEach(() => conn.close());
+
+  /** Round trips made by `fn`. */
+  const trips = async (fn: () => Promise<unknown>): Promise<number> => {
+    db.reset();
+    await fn();
+    return db.calls();
+  };
+
+  it('makes one round trip per method, whatever the number of rows', async () => {
+    let n = 0;
+    const svc = createGearService({ db, newId: () => `t${++n}`, catalog: CATALOG });
+    const setup = { name: 'S', telescopeId: 't', cameraId: 'c' };
+    const { id: customId } = await svc.addCustom('camera', { name: 'Mine' });
+    const { id: setupId } = await svc.createSetup(setup);
+
+    expect(await trips(() => svc.listCatalog('camera'))).toBe(1);
+    expect(await trips(() => svc.addCustom('camera', { name: 'X' }))).toBe(1);
+    expect(await trips(() => svc.removeCustom(customId))).toBe(1);
+    expect(await trips(() => svc.removeAllCustom())).toBe(1);
+    expect(await trips(() => svc.listSetups())).toBe(1);
+    expect(await trips(() => svc.createSetup(setup))).toBe(1);
+    expect(await trips(() => svc.replaceSetup(setupId, setup))).toBe(1);
+    expect(await trips(() => svc.setSetupEnabled(setupId, false))).toBe(1);
+    expect(await trips(() => svc.removeSetup(setupId))).toBe(1);
+    expect(await trips(() => svc.removeAllSetups())).toBe(1);
+    expect(await trips(() => svc.exportCustom())).toBe(1);
+    expect(await trips(() => svc.listCustomNames())).toBe(1);
+  });
+
+  it('imports an item or a setup in one batch, whatever the number of replaced ids', async () => {
+    const svc = createGearService({ db, newId: () => 'x', catalog: CATALOG });
+    const item = { id: 'custom-1', type: 'camera' as const, data: { name: 'N' } };
+    const setup = {
+      id: 'setup-1',
+      name: 'S',
+      telescopeId: 't',
+      cameraId: 'c',
+      accessoryId: null,
+      enabled: true,
+    };
+    expect(await trips(() => svc.importCustom(item, []))).toBe(1);
+    expect(await trips(() => svc.importCustom(item, ['custom-a', 'custom-b', 'custom-c']))).toBe(1);
+    expect(await trips(() => svc.importSetup(setup, []))).toBe(1);
+    expect(await trips(() => svc.importSetup(setup, ['setup-a', 'setup-b', 'setup-c']))).toBe(1);
   });
 });

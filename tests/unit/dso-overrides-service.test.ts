@@ -13,6 +13,7 @@ import {
 } from '@myastrosky/core/services/dso-overrides';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 describe('DsoOverrideService', () => {
   let conn: Database.Database;
@@ -146,5 +147,34 @@ describe('validateDsoOverrideCoords', () => {
     expect(validateDsoOverrideCoords({ ra: '180' })).toBeNull();
     expect(validateDsoOverrideCoords({ ra: -1 })?.code).toBe('INVALID_DSO_RA');
     expect(validateDsoOverrideCoords({ ra: -5, dec: 999 })?.code).toBe('INVALID_DSO_RA');
+  });
+});
+
+describe('DsoOverrideService round trips', () => {
+  let conn: Database.Database;
+  let db: CountingSqlDb;
+  beforeEach(async () => {
+    conn = new Database(':memory:');
+    db = countingSqlDb(createBetterSqliteDb(conn));
+    await initSchema(db);
+    db.reset();
+  });
+  afterEach(() => conn.close());
+
+  /** Round trips made by `fn`. */
+  const trips = async (fn: () => Promise<unknown>): Promise<number> => {
+    db.reset();
+    await fn();
+    return db.calls();
+  };
+
+  it('makes one round trip per method, whatever the number of rows', async () => {
+    const svc = createDsoOverrideService({ db });
+    for (const id of ['a', 'b', 'c']) await svc.importOne(id, { name: id });
+    expect(await trips(() => svc.getAll())).toBe(1);
+    expect(await trips(() => svc.upsert('d', { name: 'd' }))).toBe(1);
+    expect(await trips(() => svc.importOne('e', { name: 'e' }))).toBe(1);
+    expect(await trips(() => svc.remove('a'))).toBe(1);
+    expect(await trips(() => svc.removeAll())).toBe(1);
   });
 });

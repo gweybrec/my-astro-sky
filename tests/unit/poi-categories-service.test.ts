@@ -12,6 +12,7 @@ import {
 } from '@myastrosky/core/services/poi-categories';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 const DEFAULTS = [
   { id: 'cat-comet', name: 'Comet', color: '#4ea1ff', position: 0 },
@@ -205,5 +206,40 @@ describe('PoiCategoryService', () => {
       expect(c.name).toHaveLength(60);
       expect(c.color).toHaveLength(32);
     });
+  });
+});
+
+describe('PoiCategoryService round trips', () => {
+  let conn: Database.Database;
+  let db: CountingSqlDb;
+  beforeEach(async () => {
+    conn = new Database(':memory:');
+    db = countingSqlDb(createBetterSqliteDb(conn));
+    await initSchema(db);
+    db.reset();
+  });
+  afterEach(() => conn.close());
+
+  /** Round trips made by `fn`. */
+  const trips = async (fn: () => Promise<unknown>): Promise<number> => {
+    db.reset();
+    await fn();
+    return db.calls();
+  };
+
+  it('makes a fixed number of round trips per method, whatever the number of rows', async () => {
+    let n = 0;
+    const svc = createPoiCategoryService({ db, newId: () => `t${++n}` });
+    expect(await trips(() => svc.ensureDefaults())).toBe(1); // empty table
+    expect(await trips(() => svc.ensureDefaults())).toBe(1); // already filled
+    expect(await trips(() => svc.list())).toBe(1);
+    expect(await trips(() => svc.create({ name: 'N' }))).toBe(1);
+    // begin + read the row + write it + commit
+    expect(await trips(() => svc.update('cat-comet', { name: 'C2' }))).toBe(4);
+    expect(
+      await trips(() => svc.importOne({ id: 'z', name: 'z', color: '#fff', position: 9 })),
+    ).toBe(1);
+    expect(await trips(() => svc.remove('z'))).toBe(1);
+    expect(await trips(() => svc.removeAll())).toBe(1);
   });
 });

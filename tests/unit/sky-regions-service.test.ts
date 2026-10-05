@@ -12,6 +12,7 @@ import {
 } from '@myastrosky/core/services/sky-regions';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 const points = [
   { azDeg: 0, altDeg: 10 },
@@ -210,5 +211,46 @@ describe('SkyRegionService', () => {
       expect(r.name).toHaveLength(60);
       expect(r.color).toHaveLength(32);
     });
+  });
+});
+
+describe('SkyRegionService round trips', () => {
+  let conn: Database.Database;
+  let db: CountingSqlDb;
+  beforeEach(async () => {
+    conn = new Database(':memory:');
+    db = countingSqlDb(createBetterSqliteDb(conn));
+    await initSchema(db);
+    db.reset();
+  });
+  afterEach(() => conn.close());
+
+  /** Round trips made by `fn`. */
+  const trips = async (fn: () => Promise<unknown>): Promise<number> => {
+    db.reset();
+    await fn();
+    return db.calls();
+  };
+
+  const points = [
+    { azDeg: 0, altDeg: 10 },
+    { azDeg: 90, altDeg: 10 },
+    { azDeg: 180, altDeg: 10 },
+  ];
+
+  it('makes a fixed number of round trips per method, whatever the number of rows', async () => {
+    let n = 0;
+    const svc = createSkyRegionService({ db, newId: () => `t${++n}` });
+    for (const id of ['a', 'b', 'c']) {
+      await svc.importOne({ id, name: id, color: '#fff', points, position: 0 });
+    }
+    expect(await trips(() => svc.list())).toBe(1);
+    expect(await trips(() => svc.create({ name: 'N', points }))).toBe(1);
+    // begin + read the row + write it + commit
+    expect(await trips(() => svc.update('a', { name: 'A2' }))).toBe(4);
+    expect(
+      await trips(() => svc.importOne({ id: 'z', name: 'z', color: '#fff', points, position: 9 })),
+    ).toBe(1);
+    expect(await trips(() => svc.remove('b'))).toBe(1);
   });
 });

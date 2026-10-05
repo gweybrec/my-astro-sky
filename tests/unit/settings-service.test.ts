@@ -17,6 +17,7 @@ import {
   type SettingsService,
 } from '@myastrosky/core/services/settings';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
 const LOCKED_BODY = {
   error: 'ASTROMETRY_API_KEY is managed via environment variable and cannot be changed here',
@@ -516,5 +517,66 @@ describe('SettingsService and the old getSetting/setSetting of server/db.ts', ()
       expect(rawValue('ASTROMETRY_API_KEY')!.startsWith('enc:v1:aesgcm:')).toBe(true);
       expect(dbModule.getSetting('ASTROMETRY_API_KEY')).toBe('plain');
     });
+  });
+});
+
+describe('SettingsService round trips', () => {
+  let conn: Database.Database;
+  let db: CountingSqlDb;
+  beforeEach(async () => {
+    conn = new Database(':memory:');
+    db = countingSqlDb(createBetterSqliteDb(conn));
+    await initSchema(db);
+    db.reset();
+  });
+  afterEach(() => conn.close());
+
+  /** Round trips made by `fn`. */
+  const trips = async (fn: () => Promise<unknown>): Promise<number> => {
+    db.reset();
+    await fn();
+    return db.calls();
+  };
+
+  const make = (): SettingsService =>
+    createSettingsService({
+      db,
+      secrets: fakeCodec({ enabled: false }),
+      env: () => undefined,
+    });
+
+  it('makes a fixed number of round trips per method', async () => {
+    const svc = make();
+    expect(await trips(() => svc.get('ASTAP_PATH'))).toBe(1);
+    expect(await trips(() => svc.get('ASTROMETRY_API_KEY'))).toBe(1);
+    expect(await trips(() => svc.set('ASTAP_PATH', '/x'))).toBe(1);
+    expect(await trips(() => svc.remove('ASTAP_PATH'))).toBe(1);
+    expect(await trips(() => svc.removeApiKey())).toBe(1);
+  });
+
+  it('reads every public setting in one query', async () => {
+    const svc = make();
+    expect(await trips(() => svc.readPublic())).toBe(1);
+    await svc.update({ ASTAP_PATH: '/a', SOLVE_FIELD_PATH: '/b', USE_WSL_FOR_ASTAP: true });
+    expect(await trips(() => svc.readPublic())).toBe(1);
+  });
+
+  it('writes all the changed settings of an update in one batch', async () => {
+    const svc = make();
+    expect(await trips(() => svc.update({}))).toBe(0);
+    expect(await trips(() => svc.update({ ASTAP_PATH: '/a' }))).toBe(1);
+    expect(
+      await trips(() =>
+        svc.update({
+          apiKey: 'k',
+          ASTAP_PATH: '/a',
+          SOLVE_FIELD_PATH: '/b',
+          ASTROMETRY_DATA_DIR: '/c',
+          MAX_PARALLEL_SOLVES: '2',
+          USE_WSL_FOR_SOLVE_FIELD: true,
+          USE_WSL_FOR_ASTAP: false,
+        }),
+      ),
+    ).toBe(1);
   });
 });

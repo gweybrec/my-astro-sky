@@ -63,11 +63,12 @@ function lockedByEnv(): DomainError {
 export function createSettingsService(deps: SettingsServiceDeps): SettingsService {
   const { db, secrets, env } = deps;
 
-  async function get(key: string): Promise<string | undefined> {
+  /** The value of a setting given its stored value (`undefined` when no row). May re-encrypt a plain secret. */
+  async function resolve(key: string, stored: string | undefined): Promise<string | undefined> {
     const secret = SECRET_SETTINGS.has(key);
     if (secret && env(key) !== undefined) return env(key);
 
-    const row = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', [key]);
+    const row = stored === undefined ? undefined : { value: stored };
     if (row === undefined) return env(key);
     if (!secret) return row.value;
 
@@ -83,6 +84,12 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
     return decrypted;
   }
 
+  async function get(key: string): Promise<string | undefined> {
+    if (SECRET_SETTINGS.has(key) && env(key) !== undefined) return env(key);
+    const row = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', [key]);
+    return resolve(key, row?.value);
+  }
+
   return {
     get,
 
@@ -96,12 +103,21 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
     },
 
     async readPublic() {
-      const apiKeySet = !!(await get(API_KEY));
+      // One query for every key; the rule for each value is the one of `get`.
+      const keys = [API_KEY, ...EDITABLE_STRING_SETTINGS, ...EDITABLE_BOOLEAN_SETTINGS];
+      const rows = await db.all<{ key: string; value: string }>(
+        `SELECT key, value FROM settings WHERE key IN (${keys.map(() => '?').join(', ')})`,
+        keys,
+      );
+      const stored = new Map(rows.map((r) => [r.key, r.value]));
+      const apiKeySet = !!(await resolve(API_KEY, stored.get(API_KEY)));
       const strings: Record<string, string> = {};
-      for (const key of EDITABLE_STRING_SETTINGS) strings[key] = (await get(key)) ?? '';
+      for (const key of EDITABLE_STRING_SETTINGS) {
+        strings[key] = (await resolve(key, stored.get(key))) ?? '';
+      }
       const flags: Record<string, boolean> = {};
       for (const key of EDITABLE_BOOLEAN_SETTINGS) {
-        const value = ((await get(key)) ?? '').trim().toLowerCase();
+        const value = ((await resolve(key, stored.get(key))) ?? '').trim().toLowerCase();
         flags[key] = value === '1' || value === 'true' || value === 'yes' || value === 'on';
       }
       return { apiKeySet, ...strings, ...flags } as Omit<ServerSettings, 'isWindows'>;
@@ -129,7 +145,7 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
           writes.push({ sql: SET_SQL, params: [key, value ? '1' : '0'] });
       }
 
-      if (writes.length > 0) await db.transaction((tx) => tx.batch(writes));
+      if (writes.length > 0) await db.batch(writes);
       return { apiKeyChanged };
     },
 

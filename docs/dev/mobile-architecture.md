@@ -75,6 +75,8 @@ The interface lives in core, so it cannot use browser types:
 
 Each service throws a `DomainError`. Its kinds are `invalid`, `notFound`, `conflict`, `rateLimited` and `upstream`, and it keeps the existing `code` strings that `parseServerError` (`api.ts:23`) translates. Long-running work returns a job handle, not an error.
 
+**Two rules for every service method.** (1) Group the database calls: on the phone each call costs about 35 ms, so a method never awaits a call inside a loop; several reads are one query and several writes are one `batch`. Its test states its round trips with `countingSqlDb` (`tests/helpers/counting-sql-db.ts`) as a fixed number. (2) Every `DomainError` has a required, stable upper-snake-case `code`, which the phone translates; the HTTP body does not change (`body` carries today's exact body).
+
 | Service                                                        | Responsibility                                                           | Note                                                                |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
 | `PlanService`                                                  | Plans, entries, mosaics                                                  | Absorbs the row mappers and `parseMosaicBody`                       |
