@@ -519,3 +519,38 @@ The JS heap stayed at 48.1 MB through every step of both photos (limit 954 MB), 
 - The cascade count bug (the plugin counting foreign-key cascade rows) is fixed in commit 27180f8 and the backend contract now passes 24 of 24 in both runs.
 
 ### Decisions
+
+### After optimisation
+
+Same phone and photos (Galaxy A16, WebView 153), final defaults: file pieces of 8 MB, thumbnail resize quality `high`. Durations in ms; "after" is run 1 / run 2.
+
+| Step, LDN1235.jpg (9.4 MB) | Before | After       |
+| -------------------------- | ------ | ----------- |
+| photos.upload              | 7482   | 2146 / 2036 |
+| backup.exportToUser        | 4335   | 1723 / 1754 |
+| backup.restore             | 7789   | 2277 / 2302 |
+
+| Step, M26.jpg (5.5 MB) | After       |
+| ---------------------- | ----------- |
+| photos.upload          | 1301 / 1325 |
+| backup.exportToUser    | 1157 / 1101 |
+| backup.restore         | 1488 / 1509 |
+
+Targets: upload under 2 s narrowly missed (2.0 to 2.15 s); export and restore under 3 s met.
+
+Upload of LDN1235 (run 2): file writes about 1436 (writeFile 1211, appendFile 225, base64 gap 23), thumbnail 431, mkdir 29, SQL about 42, the rest reading and other.
+
+#### What changed
+
+- **The 4.4 s "codec" time was a stall.** `OffscreenCanvas.convertToBlob` (and `canvas.toBlob`) waits about 4.0 s on this WebView whenever no animation frames are produced, and about 40 ms when a `requestAnimationFrame` loop runs during the call (one frame before the call does not help). `browser-image-codec.ts` now runs such a loop during `convertToBlob` (commit 2f8bb34).
+- **The backup stores the picture uncompressed** in the ZIP: `zipSync` of 9.4 MB took 1381 ms at level 1 against 38 ms stored. The JSON files stay compressed.
+- **Piece size** (9.4 MB write time, ms): 1 MB 2130, 2 MB 1670, 4 MB 1615, 8 MB 1511. The plugin costs about 225 ms/MB at 1 MB pieces and 160 ms/MB at 8 MB; the heap stayed at 48 to 54 MB at every size. 8 MB chosen.
+- **Thumbnail resize quality** (decode, draw and encode in ms, LDN1235 / M26): pixelated 353 / 179, low 343 / 200, medium 383 / 219, high 380 / 233. At 2x `low` is visibly aliased; medium and high look the same and are not meaningfully slower. `high` kept.
+- `createImageBitmap` with a resize takes 280 to 320 ms, the same as a full-size decode (278 ms): the decode is the cost, not the resize.
+- `Uint8Array.prototype.toBase64` exists natively on this WebView: 1 MB in 0.4 ms against 84 ms in JS.
+
+#### What remains
+
+About 1.2 to 1.4 s of each 9.4 MB write is the Filesystem plugin itself (bridge transfer and native base64 decode). Going lower needs another way to write a file from the WebView (a plugin that accepts a blob or binary, or a local HTTP write). The thumbnail decode (about 0.43 s) could overlap with the file write; not done.
+
+Suites on the phone after the change: picture files 7/7, pictures 16/16, network 8/8, secret 4/4, backend contract 24/24, timings 2/2.
