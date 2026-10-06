@@ -783,6 +783,7 @@ const es: Translations = {
     CANNOT_DETERMINE_DIMENSIONS: 'No se pueden determinar las dimensiones de la imagen',
     INVALID_IMAGE: 'Archivo de imagen no válido o corrupto',
     JOB_NOT_FOUND: 'Trabajo no encontrado',
+    LOCAL_SOLVERS_UNAVAILABLE: 'Los solvers locales no están disponibles en este dispositivo.',
     INVALID_HIP: 'HIP no válido',
     STAR_NOT_FOUND: 'Estrella no encontrada',
 

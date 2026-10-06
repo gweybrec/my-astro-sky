@@ -50,6 +50,7 @@ See [docs/dev/ui-guidelines.md](docs/dev/ui-guidelines.md) — the UI hub — fo
 - `DSO_CATALOGS_ALL` is exported from `dso-catalog.ts` — do not redefine it locally in `ui.ts` or elsewhere.
 - **Smart telescopes:** never read a gear setup's `cameraId` directly — resolve it through `resolveSetupCamera()` in `gear-catalog.ts`, which substitutes the scope's `integrated_camera_id`. `tests/unit/gear-catalog-integrity.test.ts` pins each smart scope's FOV to its published spec; extend its table when adding one.
 - The runtime DSO density gate ranks by **intrinsic quality** (`dsoImportance` = rating/brightness, in `src/dso-catalog.ts`), area-weighted so on-screen density tracks the true sky (Milky Way denser) with the stereographic projection bias removed — it no longer uses the blue-noise `priority` column, which is retained but currently only informational. See `scripts/CLAUDE.md` for how the derived columns are regenerated.
+- **Screens never call `fetch` on the server or build `/uploads/` addresses.** They call a function of `src/api.ts` (`photoFileUrl()` for a stored picture), which calls the backend; an ESLint rule enforces it outside `src/api.ts` and `src/backend.ts`.
 
 ## Tests
 

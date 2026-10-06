@@ -121,6 +121,36 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
 
+  // Screens reach their data through src/api.ts (which calls the backend), never the server directly:
+  // no fetch of an /api/ or /uploads/ address, and no hand-built /uploads/ address (use photoFileUrl).
+  {
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/api.ts', 'src/backend.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.name='fetch'] > Literal.arguments:first-child[value=/^\\/(api|uploads)\\//]",
+          message: 'Do not fetch the server directly: add a function to src/api.ts.',
+        },
+        {
+          selector:
+            "CallExpression[callee.name='fetch'] > TemplateLiteral.arguments:first-child > TemplateElement:first-child[value.raw=/^\\/(api|uploads)\\//]",
+          message: 'Do not fetch the server directly: add a function to src/api.ts.',
+        },
+        {
+          selector: 'Literal[value=/^\\/uploads\\//]',
+          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+        },
+        {
+          selector: 'TemplateLiteral > TemplateElement:first-child[value.raw=/^\\/uploads\\//]',
+          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+        },
+      ],
+    },
+  },
+
   // @myastrosky/core must stay platform-neutral (browser, worker, Node, Electron, Capacitor):
   // no framework, no Node built-ins, and no imports back into the app. This block gets neither
   // the browser nor the Node globals above. `error`, not `warn`: a violation must fail CI.

@@ -120,6 +120,16 @@ ASTAP and solve-field stay server-only and are exposed through **capabilities**.
 - A new `photoUrl(name)` replaces the hard-coded `/uploads/` paths.
 - `export()` returns bytes instead of downloading.
 
+### How a screen reaches its data
+
+A screen calls a function of `src/api.ts` (`getPlans()`, `uploadPhoto()`, `photoFileUrl()` ...). That file is a facade: every function calls `getBackend()` (`src/backend.ts`) and turns the `DomainError` the backend rejects with into the plain `Error` the screen shows (`t('serverErrors.' + code)`, else the error's message, else the function's own text). Outside `src/api.ts` and `src/backend.ts`, nothing in `src/` knows a server exists; an ESLint rule fails on a `fetch` of `/api/` or `/uploads/` and on any `/uploads/` address.
+
+- **Desktop and web:** `getBackend()` installs the HTTP backend on first use (`packages/backend-http/src/http-backend.ts`, `createHttpBackend({ lang, saveFile })`), which calls the Express routes.
+- **Phone:** the start-up code calls `setBackend()` with the local backend (`packages/backend-local`), which calls the services directly, with no server. `Backend.localSolvers` is absent there; the local-solver functions of `src/api.ts` then fail with `LOCAL_SOLVERS_UNAVAILABLE`.
+- **Contract:** `packages/core/src/testing/backend-contract.ts` runs against both backends. `tests/unit/api-facade.test.ts` checks the facade against a fake backend.
+
+To add a data function: (1) the service method in `packages/core/src/services/`; (2) the member in `Backend` (`packages/core/src/backend.ts`); (3) its method in the HTTP backend; (4) a case in the contract suite; (5) the function in `src/api.ts`, with its fallback error text.
+
 ### SQL portability
 
 The schema already avoids `RETURNING`, `json_*` and `STRICT`. The mobile adapter must:

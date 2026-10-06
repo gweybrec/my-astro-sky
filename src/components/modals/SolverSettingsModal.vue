@@ -183,6 +183,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { useSettingsStore } from '../../stores/settings';
+import { probeLocalSolver } from '../../api';
 import { useI18n } from '../../composables/useI18n';
 import { showToast } from '../../toast';
 import trashSvg from '../../icons/trash.svg?raw';
@@ -260,16 +261,11 @@ async function probeAstap() {
   const gen = ++astapGen;
   astapProbe.value = { state: 'loading', summary: '', detail: '' };
   try {
-    const res = await fetch('/api/settings/probe-astap', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, useWSL }),
-    });
-    const data = await res.json();
+    const data = await probeLocalSolver('astap', { path, useWSL });
     if (gen !== astapGen) return;
     if (data.ok) {
       const lines = (data.output as string).split('\n');
-      astapProbe.value = { state: 'ok', summary: lines[0] ?? '', detail: data.output };
+      astapProbe.value = { state: 'ok', summary: lines[0] ?? '', detail: data.output ?? '' };
     } else {
       const summary =
         data.code === -1 ? t('settings.probePathNotFound') : t('settings.astapProbeError');
@@ -302,12 +298,7 @@ async function probeSolveField() {
   const gen = ++sfGen;
   sfProbe.value = { state: 'loading', summary: '', detail: '' };
   try {
-    const res = await fetch('/api/settings/probe-solve-field', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, useWSL }),
-    });
-    const data = await res.json();
+    const data = await probeLocalSolver('solve-field', { path, useWSL });
     if (gen !== sfGen) return;
     if (data.ok) {
       sfProbe.value = { state: 'ok', summary: `Version ${data.version}`, detail: '' };
@@ -343,12 +334,7 @@ async function probeDataDir() {
   const gen = ++dataDirGen;
   dataDirProbe.value = { state: 'loading', summary: '', detail: '' };
   try {
-    const res = await fetch('/api/settings/probe-data-dir', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dir, useWSL }),
-    });
-    const data = await res.json();
+    const data = await probeLocalSolver('data-dir', { dir, useWSL });
     if (gen !== dataDirGen) return;
     if (data.ok) {
       const count = (data.output as string)
@@ -358,7 +344,7 @@ async function probeDataDir() {
       dataDirProbe.value = {
         state: 'ok',
         summary: t('settings.probeFileCount').replace('{n}', String(count)),
-        detail: data.output,
+        detail: data.output ?? '',
       };
     } else {
       const summary =

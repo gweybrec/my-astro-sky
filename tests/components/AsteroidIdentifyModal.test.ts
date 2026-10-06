@@ -16,6 +16,7 @@ import { setCenterMode, setProjectionObserver } from '../../src/projection';
 
 vi.mock('../../src/api', () => ({
   skybotConesearchAPI: vi.fn(),
+  photoFileUrl: (fileName: string) => `/uploads/${fileName}`,
 }));
 
 import { skybotConesearchAPI } from '../../src/api';

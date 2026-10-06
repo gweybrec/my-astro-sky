@@ -1180,12 +1180,6 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
         'UNSUPPORTED_FORMAT',
         `submitting a .gif to ${solver}`,
       );
-      const failed = await solvers.solve(solver, gif);
-      expectEqual(
-        [failed.success, failed.code],
-        [false, 'UNSUPPORTED_FORMAT'],
-        `a .gif solved by ${solver} is a failed result, not an error`,
-      );
     }
   });
 

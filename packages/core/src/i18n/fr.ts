@@ -781,6 +781,7 @@ const fr = {
     CANNOT_DETERMINE_DIMENSIONS: "Impossible de déterminer les dimensions de l'image",
     INVALID_IMAGE: 'Fichier image invalide ou corrompu',
     JOB_NOT_FOUND: 'Job introuvable',
+    LOCAL_SOLVERS_UNAVAILABLE: 'Les solveurs locaux ne sont pas disponibles sur cet appareil.',
     INVALID_HIP: 'HIP invalide',
     STAR_NOT_FOUND: 'Étoile introuvable',
 

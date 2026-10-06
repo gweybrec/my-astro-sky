@@ -50,7 +50,7 @@
         <div ref="photoContainerEl" class="modal-photo-container select-none" @click="onImageClick">
           <img
             ref="imgEl"
-            :src="`/uploads/${photo.filename}`"
+            :src="photoFileUrl(photo.filename)"
             :alt="photo.originalName"
             class="modal-photo"
             draggable="false"
@@ -94,6 +94,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { t } from '../../i18n';
+import { photoFileUrl } from '../../api';
 import { computePhotoToProjMatrix } from '../../photo-placement';
 import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
 import type { Photo } from '../../types';

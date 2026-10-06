@@ -46,8 +46,6 @@ import {
   solveWCS,
   submitPlateSolve,
   pollPlateSolve,
-  solveWithASTAP,
-  solveWithSolveField,
   searchStarsAPI,
   searchStarsByPosition,
   listAstrometrySubmissions,
@@ -56,8 +54,12 @@ import {
   updatePhotoManualPlacement,
   loadServerSettings,
   getSolverAvailability,
+  photoFileUrl,
 } from './api';
 import { searchUnified, searchDSOs } from './search';
+
+/** A (possibly relative) address as an `<img>`'s `src` reports it. */
+const absoluteUrl = (url: string): string => new URL(url, document.baseURI).href;
 import { showToast } from './toast';
 import { getDSOById, findDSOsInImage } from './dso-catalog';
 import { renderSharedSolveStatus } from './solve-status-widget';
@@ -893,7 +895,7 @@ export class PhotoOverlay {
     }
 
     const img = document.createElement('img');
-    img.src = `/uploads/${photo.filename}`;
+    img.src = photoFileUrl(photo.filename);
     img.className = 'photo-overlay-img';
     img.draggable = false;
     img.style.visibility = 'hidden'; // Hide until loaded
@@ -920,7 +922,7 @@ export class PhotoOverlay {
       // Only validate dimensions for the full-resolution image. The LOD swap loads a 400px
       // thumbnail (server/index.ts) which is intentionally smaller, so assert dims only when
       // the currently loaded src is the full image.
-      const isFullImage = img.src.endsWith(`/uploads/${photo.filename}`);
+      const isFullImage = img.src === absoluteUrl(photoFileUrl(photo.filename));
       if (isFullImage && (img.naturalWidth !== photo.width || img.naturalHeight !== photo.height)) {
         reportUnknownRendererError(
           'photo_dimension_mismatch',
@@ -986,9 +988,9 @@ export class PhotoOverlay {
       if (photo.thumbFilename) {
         const renderedWidth = Math.sqrt(matrix.a ** 2 + matrix.b ** 2) * photo.width;
         const wantThumb = renderedWidth < 300;
-        const thumbSrc = `/uploads/${photo.thumbFilename}`;
-        const fullSrc = `/uploads/${photo.filename}`;
-        const currentSrc = imgEl.src.endsWith(thumbSrc) ? thumbSrc : fullSrc;
+        const thumbSrc = photoFileUrl(photo.thumbFilename);
+        const fullSrc = photoFileUrl(photo.filename);
+        const currentSrc = imgEl.src === absoluteUrl(thumbSrc) ? thumbSrc : fullSrc;
         const desiredSrc = wantThumb ? thumbSrc : fullSrc;
         if (currentSrc !== desiredSrc) imgEl.src = desiredSrc;
       }

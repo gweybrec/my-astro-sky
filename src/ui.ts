@@ -31,8 +31,6 @@ import { Gallery, smartSortPhotos } from './gallery';
 import { getDSOTypeName, searchUnified, searchDSOs } from './search';
 import {
   uploadPhoto,
-  solveWithSolveField,
-  solveWithASTAP,
   submitPlateSolve,
   pollPlateSolve,
   solveWCS,

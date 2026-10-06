@@ -118,7 +118,7 @@ export interface ProbeResponse {
 
 /**
  * The solvers installed next to the server (ASTAP, solve-field). A failed request rejects with a
- * `DomainError`; `solve` is the exception: a failed response comes back as `{ success: false }`.
+ * `DomainError`.
  */
 export interface LocalSolverApi {
   /** Starts a solve in the background and returns its job id. A 429 rejects with kind `rateLimited`. */
@@ -132,16 +132,6 @@ export interface LocalSolverApi {
   poll(solver: LocalSolverName, jobId: string): Promise<LocalSolveJobStatus>;
   /** Asks the server to stop a job. */
   cancel(solver: LocalSolverName, jobId: string): Promise<void>;
-  /**
-   * Solves in one call. A response that is not a success is returned, not thrown:
-   * `{ success: false, error, code, errorDetails }`, with `error` the server's own text, untranslated.
-   */
-  solve(
-    solver: LocalSolverName,
-    file: FileSource,
-    hints?: LocalSolveHints,
-    options?: Pick<TransferOptions, 'cancel'>,
-  ): Promise<PlateSolveResult>;
   /** Checks that a program runs (or that a folder lists), as the settings dialog does. */
   probe(kind: ProbeKind, request: ProbeRequest): Promise<ProbeResponse>;
 }

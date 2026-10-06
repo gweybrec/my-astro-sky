@@ -781,6 +781,7 @@ const de: Translations = {
     CANNOT_DETERMINE_DIMENSIONS: 'Bildabmessungen können nicht bestimmt werden',
     INVALID_IMAGE: 'Ungültige oder beschädigte Bilddatei',
     JOB_NOT_FOUND: 'Auftrag nicht gefunden',
+    LOCAL_SOLVERS_UNAVAILABLE: 'Die lokalen Solver sind auf diesem Gerät nicht verfügbar.',
     INVALID_HIP: 'Ungültiger HIP',
     STAR_NOT_FOUND: 'Stern nicht gefunden',
 

@@ -774,6 +774,7 @@ const en: Translations = {
     CANNOT_DETERMINE_DIMENSIONS: 'Cannot determine image dimensions',
     INVALID_IMAGE: 'Invalid or corrupt image file',
     JOB_NOT_FOUND: 'Job not found',
+    LOCAL_SOLVERS_UNAVAILABLE: 'Local solvers are not available on this device.',
     INVALID_HIP: 'Invalid HIP',
     STAR_NOT_FOUND: 'Star not found',
 

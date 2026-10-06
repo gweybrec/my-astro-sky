@@ -17,7 +17,6 @@ import type {
 } from '@myastrosky/core/domain/solve';
 import type { ConvertSolvedResult, SolveWcsResult } from '@myastrosky/core/domain/solved-import';
 import type { ImportOptions } from '@myastrosky/core/domain/backup';
-import type { ApiErrorDetails, PlateSolveResult } from '@myastrosky/core/types';
 
 /** One multipart upload to send, with progress and cancel. */
 export interface UploadRequest {
@@ -248,35 +247,6 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
     poll: (solver, jobId) => call('GET', `${LOCAL_SOLVER_ENDPOINT[solver]}/${id(jobId)}`),
     async cancel(solver, jobId) {
       await call('DELETE', `${LOCAL_SOLVER_ENDPOINT[solver]}/${id(jobId)}`);
-    },
-    async solve(solver, file, hints, opts) {
-      const endpoint = LOCAL_SOLVER_ENDPOINT[solver];
-      const form = await formOf('photo', file, { ...hintFields(hints), lang: options.lang() });
-      const { signal, stop } = followCancel(opts?.cancel);
-      let reply: UploadReply;
-      try {
-        reply = await raw('POST', endpoint, { body: form, signal });
-      } finally {
-        stop();
-      }
-      if (reply.status >= 200 && reply.status < 300) return jsonOf<PlateSolveResult>(reply);
-      const parsed = parseJson(reply.text) as { error?: unknown; code?: unknown } | undefined;
-      const code = typeof parsed?.code === 'string' ? parsed.code.trim() : undefined;
-      const responseBody = (parsed ? JSON.stringify(parsed, null, 2) : reply.text).trim();
-      const errorDetails: ApiErrorDetails = {
-        method: 'POST',
-        endpoint,
-        httpStatus: reply.status,
-        httpStatusText: reply.statusText,
-        code,
-        ...(responseBody ? { responseBody: responseBody.slice(0, 8000) } : {}),
-      };
-      return {
-        success: false,
-        error: typeof parsed?.error === 'string' ? parsed.error.trim() : '',
-        code,
-        errorDetails,
-      };
     },
     probe: (kind, request) =>
       call(

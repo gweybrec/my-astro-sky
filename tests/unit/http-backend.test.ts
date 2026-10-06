@@ -4,7 +4,7 @@
  * how it turns a failed response or a lost connection into a `DomainError`, and how it sends a file.
  * A recording `fetch` stands in for the server.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { createHttpBackend } from '@myastrosky/backend-http/http-backend';
 import { DomainError } from '@myastrosky/core/domain/errors';
 import type { FileSource } from '@myastrosky/core/backend';
@@ -218,6 +218,133 @@ describe('uploads with progress', () => {
   });
 });
 
+/** A small stand-in for the browser's `XMLHttpRequest`: the test drives what the request sees. */
+class FakeXhr {
+  static last: FakeXhr | undefined;
+  upload: {
+    onprogress?: (e: { lengthComputable: boolean; loaded: number; total: number }) => void;
+  } = {};
+  onload?: () => void;
+  onerror?: () => void;
+  onabort?: () => void;
+  status = 0;
+  statusText = '';
+  responseText = '';
+  opened?: [string, string];
+  sent?: unknown;
+  aborted = false;
+  constructor() {
+    FakeXhr.last = this;
+  }
+  open(method: string, url: string) {
+    this.opened = [method, url];
+  }
+  send(body: unknown) {
+    this.sent = body;
+  }
+  abort() {
+    this.aborted = true;
+    this.onabort?.();
+  }
+  reply(status: number, text: string, statusText = '') {
+    this.status = status;
+    this.statusText = statusText;
+    this.responseText = text;
+    this.onload?.();
+  }
+}
+
+/** A cancel signal that records its listeners. */
+function makeCancel() {
+  const listeners = new Set<() => void>();
+  return {
+    listeners,
+    aborted: false,
+    addEventListener: (_type: 'abort', l: () => void) => void listeners.add(l),
+    removeEventListener: (_type: 'abort', l: () => void) => void listeners.delete(l),
+    fire() {
+      this.aborted = true;
+      for (const l of [...listeners]) l();
+    },
+  };
+}
+
+describe('the default upload (XMLHttpRequest)', () => {
+  const real = (globalThis as { XMLHttpRequest?: unknown }).XMLHttpRequest;
+  afterEach(() => {
+    (globalThis as { XMLHttpRequest?: unknown }).XMLHttpRequest = real;
+  });
+
+  function start(cancel = makeCancel()) {
+    FakeXhr.last = undefined;
+    (globalThis as { XMLHttpRequest?: unknown }).XMLHttpRequest = FakeXhr;
+    const backend = createHttpBackend({
+      baseUrl: 'http://app',
+      lang: () => 'en',
+      saveFile: () => {},
+    });
+    const progress: number[] = [];
+    const promise = backend.photos.upload(
+      { name: 'a.jpg', size: 1, read: async () => new Uint8Array([1]) },
+      { correspondences: '[]' },
+      { onProgress: (f) => progress.push(f), cancel },
+    );
+    return { promise, progress, cancel };
+  }
+
+  /** The request is only created once the form is built, a few microtasks after the call. */
+  const request = async () => {
+    for (let i = 0; i < 10 && !FakeXhr.last?.sent; i++) await Promise.resolve();
+    return FakeXhr.last!;
+  };
+
+  it('reports the fractions sent, and resolves with the stored photo', async () => {
+    const { promise, progress } = start();
+    const xhr = await request();
+    expect(xhr.opened).toEqual(['POST', 'http://app/api/photos']);
+    xhr.upload.onprogress?.({ lengthComputable: true, loaded: 25, total: 100 });
+    xhr.upload.onprogress?.({ lengthComputable: false, loaded: 50, total: 0 });
+    xhr.upload.onprogress?.({ lengthComputable: true, loaded: 100, total: 100 });
+    xhr.reply(201, JSON.stringify({ id: 'p1' }));
+    expect(await promise).toEqual({ id: 'p1' });
+    expect(progress).toEqual([0.25, 1]);
+  });
+
+  it('rejects with AbortError on a cancel during the upload, and removes its listener', async () => {
+    const { promise, cancel } = start();
+    const xhr = await request();
+    expect(cancel.listeners.size).toBe(1);
+    cancel.fire();
+    expect(xhr.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+    expect(cancel.listeners.size).toBe(0);
+  });
+
+  it('rejects with NETWORK_ERROR when the request cannot be made', async () => {
+    const { promise, cancel } = start();
+    const xhr = await request();
+    xhr.onerror?.();
+    const e = await rejection(promise);
+    expect([e.kind, e.code]).toEqual(['upstream', 'NETWORK_ERROR']);
+    expect(cancel.listeners.size).toBe(0);
+  });
+
+  it('gives the code of a 400 answer', async () => {
+    const { promise } = start();
+    const xhr = await request();
+    xhr.reply(400, JSON.stringify({ error: 'bad', code: 'INVALID_IMAGE' }), 'Bad Request');
+    const e = await rejection(promise);
+    expect([e.kind, e.code, e.message]).toEqual(['invalid', 'INVALID_IMAGE', 'bad']);
+  });
+
+  it('does not start when it is already cancelled', async () => {
+    const cancel = makeCancel();
+    cancel.aborted = true;
+    const { promise } = start(cancel);
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});
+
 describe('export', () => {
   it('hands the file to the user under the name the server gave it', async () => {
     const { backend, saved } = makeBackend(
@@ -246,31 +373,6 @@ describe('export', () => {
 });
 
 describe('local solvers', () => {
-  it('returns a failed solve instead of throwing, with what the response said', async () => {
-    const body = { error: 'Bad format ', code: 'UNSUPPORTED_FORMAT' };
-    const { backend } = makeBackend(
-      () => new Response(JSON.stringify(body), { status: 400, statusText: 'Bad Request' }),
-    );
-    const result = await backend.localSolvers!.solve('astap', {
-      name: 'a.gif',
-      size: 1,
-      read: async () => new Uint8Array([1]),
-    });
-    expect(result).toEqual({
-      success: false,
-      error: 'Bad format',
-      code: 'UNSUPPORTED_FORMAT',
-      errorDetails: {
-        method: 'POST',
-        endpoint: '/api/solve-astap',
-        httpStatus: 400,
-        httpStatusText: 'Bad Request',
-        code: 'UNSUPPORTED_FORMAT',
-        responseBody: JSON.stringify(body, null, 2),
-      },
-    });
-  });
-
   it('probes with the body each probe expects', async () => {
     const { backend, sent } = makeBackend();
     await backend.localSolvers!.probe('astap', { path: '/a', useWSL: true });
