@@ -1,7 +1,7 @@
 // @vitest-environment node
 /** `createServices` builds independent service sets: each set sees only its own database. */
 import Database from 'better-sqlite3';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
 import { createServices } from '../../server/create-services';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
@@ -22,6 +22,7 @@ async function makeServices() {
       isEncrypted: () => false,
     },
     env: () => undefined,
+    platform: { isWindows: false },
     gearCatalog: { telescopes: [], cameras: [], accessories: [], filters: [] },
     images: fakeImageCodec(),
     blobs: memoryBlobStore(),
@@ -41,5 +42,16 @@ describe('createServices', () => {
     await a.dsoOverrides.upsert('M31', { name: 'Andromeda' });
     expect(Object.keys(await a.dsoOverrides.getAll())).toEqual(['M31']);
     expect(await b.dsoOverrides.getAll()).toEqual({});
+  });
+
+  it('drops the online-solving session when the API key changes, and only then', async () => {
+    const services = await makeServices();
+    const reset = vi.spyOn(services.novaSolve, 'resetSession');
+    await services.settings.update({ ASTAP_PATH: '/astap' });
+    expect(reset).not.toHaveBeenCalled();
+    await services.settings.update({ apiKey: 'a-key' });
+    expect(reset).toHaveBeenCalledTimes(1);
+    await services.settings.removeApiKey();
+    expect(reset).toHaveBeenCalledTimes(2);
   });
 });

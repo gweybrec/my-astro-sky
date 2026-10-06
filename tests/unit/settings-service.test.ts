@@ -46,6 +46,7 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
   let svc: SettingsService;
   let codec: { enabled: boolean };
   let env: Record<string, string | undefined>;
+  let keyChanges: number;
 
   beforeEach(async () => {
     conn = new Database(':memory:');
@@ -53,7 +54,16 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
     await initSchema(db);
     codec = { enabled: false };
     env = {};
-    svc = createSettingsService({ db, secrets: fakeCodec(codec), env: (k) => env[k] });
+    keyChanges = 0;
+    svc = createSettingsService({
+      db,
+      secrets: fakeCodec(codec),
+      env: (k) => env[k],
+      platform: { isWindows: false },
+      onApiKeyChanged: () => {
+        keyChanges++;
+      },
+    });
   });
   afterEach(() => conn.close());
 
@@ -212,6 +222,7 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
       const result = await svc.readPublic();
       expect(result).toEqual({
         apiKeySet: false,
+        isWindows: false,
         ASTAP_PATH: '',
         SOLVE_FIELD_PATH: '',
         ASTROMETRY_DATA_DIR: '',
@@ -221,6 +232,7 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
       });
       expect(Object.keys(result)).toEqual([
         'apiKeySet',
+        'isWindows',
         'ASTAP_PATH',
         'SOLVE_FIELD_PATH',
         'ASTROMETRY_DATA_DIR',
@@ -228,7 +240,16 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
         'USE_WSL_FOR_SOLVE_FIELD',
         'USE_WSL_FOR_ASTAP',
       ]);
-      expect(result).not.toHaveProperty('isWindows');
+    });
+
+    it('reports the platform it was given', async () => {
+      const windows = createSettingsService({
+        db,
+        secrets: fakeCodec(codec),
+        env: (k) => env[k],
+        platform: { isWindows: true },
+      });
+      expect((await windows.readPublic()).isWindows).toBe(true);
     });
 
     it('reports stored values and environment fallbacks', async () => {
@@ -365,6 +386,28 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
     });
   });
 
+  describe('onApiKeyChanged', () => {
+    it('is called once when update writes a key, and not when it does not', async () => {
+      await svc.update({ ASTAP_PATH: '/p' });
+      await svc.update({ apiKey: '  ' });
+      expect(keyChanges).toBe(0);
+      await svc.update({ apiKey: 'k' });
+      expect(keyChanges).toBe(1);
+    });
+
+    it('is not called when the environment locks the key', async () => {
+      env.ASTROMETRY_API_KEY = 'env-key';
+      await expect(svc.update({ apiKey: 'x' })).rejects.toThrow();
+      await expect(svc.removeApiKey()).rejects.toThrow();
+      expect(keyChanges).toBe(0);
+    });
+
+    it('is called when removeApiKey removes the key', async () => {
+      await svc.removeApiKey();
+      expect(keyChanges).toBe(1);
+    });
+  });
+
   describe('removeApiKey', () => {
     it('removes the stored key', async () => {
       await svc.set('ASTROMETRY_API_KEY', 'k');
@@ -411,6 +454,7 @@ describe.each(SQL_ADAPTERS)('SettingsService round trips (%s)', (_adapter, wrap)
       db,
       secrets: fakeCodec({ enabled: false }),
       env: () => undefined,
+      platform: { isWindows: false },
     });
 
   it('makes a fixed number of round trips per method', async () => {

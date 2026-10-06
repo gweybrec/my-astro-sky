@@ -4,7 +4,7 @@
  * wins over the stored one for it.
  */
 import { DomainError } from '../domain/errors';
-import type { ServerSettings } from '../domain/settings';
+import type { ServerSettings, SettingsChanges } from '../domain/settings';
 import type { EnvSource } from '../ports/env-source';
 import type { SecretCodec } from '../ports/secret-codec';
 import type { SqlDb, SqlStatement } from '../ports/sql-db';
@@ -13,6 +13,10 @@ export interface SettingsServiceDeps {
   db: SqlDb;
   secrets: SecretCodec;
   env: EnvSource;
+  /** What the host runs on; the settings screen shows WSL switches on Windows only. */
+  platform: { isWindows: boolean };
+  /** Called after the API key was written or removed, so a session opened with the old key can be dropped. */
+  onApiKeyChanged?: () => void;
 }
 
 export interface SettingsService {
@@ -26,14 +30,15 @@ export interface SettingsService {
   set(key: string, value: string): Promise<void>;
   /** Removes the stored value (an environment value stays visible through `get`). */
   remove(key: string): Promise<void>;
-  /** What `GET /api/settings` returns, without `isWindows`. The secret's value is never returned, only `apiKeySet`. */
-  readPublic(): Promise<Omit<ServerSettings, 'isWindows'>>;
+  /** What `GET /api/settings` returns, `isWindows` included. The secret's value is never returned, only `apiKeySet`. */
+  readPublic(): Promise<ServerSettings>;
   /**
    * Applies a `PUT /api/settings` body in one transaction. Throws `conflict` (code `SETTING_LOCKED_BY_ENV`)
-   * for a new API key when the environment defines it. `apiKeyChanged` is true when a key was written.
+   * for a new API key when the environment defines it. `apiKeyChanged` is true when a key was written
+   * (`onApiKeyChanged` has then been called).
    */
-  update(body: unknown): Promise<{ apiKeyChanged: boolean }>;
-  /** Removes the stored API key. Throws `conflict` (code `SETTING_LOCKED_BY_ENV`) when the environment defines it. */
+  update(body: SettingsChanges): Promise<{ apiKeyChanged: boolean }>;
+  /** Removes the stored API key and calls `onApiKeyChanged`. Throws `conflict` (code `SETTING_LOCKED_BY_ENV`) when the environment defines it. */
   removeApiKey(): Promise<void>;
 }
 
@@ -61,7 +66,7 @@ function lockedByEnv(): DomainError {
 }
 
 export function createSettingsService(deps: SettingsServiceDeps): SettingsService {
-  const { db, secrets, env } = deps;
+  const { db, secrets, env, platform, onApiKeyChanged } = deps;
 
   /** The value of a setting given its stored value (`undefined` when no row). May re-encrypt a plain secret. */
   async function resolve(key: string, stored: string | undefined): Promise<string | undefined> {
@@ -120,10 +125,16 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
         const value = ((await resolve(key, stored.get(key))) ?? '').trim().toLowerCase();
         flags[key] = value === '1' || value === 'true' || value === 'yes' || value === 'on';
       }
-      return { apiKeySet, ...strings, ...flags } as Omit<ServerSettings, 'isWindows'>;
+      return {
+        apiKeySet,
+        isWindows: platform.isWindows,
+        ...strings,
+        ...flags,
+      } as ServerSettings;
     },
 
     async update(input) {
+      // Typed for callers, still checked at run time: a screen or a restored backup can pass anything.
       const body = (input ?? {}) as Record<string, unknown>;
       const writes: SqlStatement[] = [];
       let apiKeyChanged = false;
@@ -146,12 +157,14 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
       }
 
       if (writes.length > 0) await db.batch(writes);
+      if (apiKeyChanged) onApiKeyChanged?.();
       return { apiKeyChanged };
     },
 
     async removeApiKey() {
       if (env(API_KEY) !== undefined) throw lockedByEnv();
       await db.run('DELETE FROM settings WHERE key = ?', [API_KEY]);
+      onApiKeyChanged?.();
     },
   };
 }

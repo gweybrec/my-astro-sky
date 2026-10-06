@@ -17,6 +17,7 @@ const services = createServices({
   newId: uuidv4,
   secrets: createServerSecretCodec(),
   env: (k) => process.env[k],
+  platform: { isWindows: process.platform === 'win32' },
   gearCatalog: loadBuiltInGearCatalog(),
   images: createSharpImageCodec(),
   blobs: createFsBlobStore(UPLOADS_DIR),

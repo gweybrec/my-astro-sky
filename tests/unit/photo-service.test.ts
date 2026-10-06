@@ -1210,6 +1210,18 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(stored()).toEqual([]);
     });
 
+    it.each([['x'], [{}], [null], [5], [undefined]])(
+      'refuses ids %j that is not an array',
+      async (ids) => {
+        const err = await svc.removeMany(ids as any).catch((e) => e);
+        expect(err).toMatchObject({
+          kind: 'invalid',
+          code: 'IDS_NOT_ARRAY',
+          message: 'ids must be an array',
+        });
+      },
+    );
+
     it('ensureThumbnail makes a missing thumbnail, leaves an existing one, ignores a missing image', async () => {
       await blobs.put('x.png', new Uint8Array([9]));
       await svc.ensureThumbnail('x.png', 'x_thumb.jpg');

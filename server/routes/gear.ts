@@ -1,5 +1,6 @@
 import express from 'express';
 import { isDomainError } from '@myastrosky/core/domain/errors';
+import type { CustomGearInput, CustomGearType, GearSetupInput } from '@myastrosky/core/domain/gear';
 import { gear } from '../services.js';
 import { sendError } from './http-errors.js';
 
@@ -159,7 +160,7 @@ gearRouter.get('/api/filters', async (_req, res) => {
  */
 gearRouter.post('/api/custom-gear', async (req, res) => {
   try {
-    const { type, data } = req.body as { type?: string; data?: object };
+    const { type, data } = req.body as { type: CustomGearType; data: CustomGearInput };
     res.json(await gear.addCustom(type, data));
   } catch (err) {
     sendError(res, err);
@@ -322,7 +323,7 @@ gearRouter.get('/api/gear-setups', async (_req, res) => {
  */
 gearRouter.post('/api/gear-setups', async (req, res) => {
   try {
-    res.json(await gear.createSetup(req.body));
+    res.json(await gear.createSetup(req.body as GearSetupInput));
   } catch (err) {
     if (!isDomainError(err)) console.error('[GearSetups] Failed to create setup', err);
     sendError(res, err);
@@ -375,7 +376,7 @@ gearRouter.post('/api/gear-setups', async (req, res) => {
  */
 gearRouter.put('/api/gear-setups/:id', async (req, res) => {
   try {
-    await gear.replaceSetup(req.params.id, req.body);
+    await gear.replaceSetup(req.params.id, req.body as GearSetupInput);
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) console.error('[GearSetups] Failed to update setup', err);
@@ -433,7 +434,7 @@ gearRouter.put('/api/gear-setups/:id', async (req, res) => {
  */
 gearRouter.patch('/api/gear-setups/:id/enabled', async (req, res) => {
   try {
-    const { enabled } = req.body as any;
+    const { enabled } = req.body as { enabled: boolean };
     await gear.setSetupEnabled(req.params.id, enabled);
     res.json({ ok: true });
   } catch (err) {

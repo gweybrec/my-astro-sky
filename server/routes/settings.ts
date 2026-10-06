@@ -3,7 +3,8 @@ import { promisify } from 'util';
 import path from 'path';
 import express from 'express';
 import { isDomainError } from '@myastrosky/core/domain/errors';
-import { settings, novaSolve, version } from '../services.js';
+import type { SettingsChanges } from '@myastrosky/core/domain/settings';
+import { settings, version } from '../services.js';
 import { logServerError } from '../logger.js';
 import { sendError } from './http-errors.js';
 import { probeAstap, probeSolveField, probeDataDir } from '../probe-utils.js';
@@ -73,8 +74,7 @@ settingsRouter.get('/api/config', (_req, res) => {
  */
 settingsRouter.get('/api/settings', async (_req, res) => {
   try {
-    const { apiKeySet, ...rest } = await settings.readPublic();
-    res.json({ apiKeySet, isWindows: process.platform === 'win32', ...rest });
+    res.json(await settings.readPublic());
   } catch (err) {
     if (!isDomainError(err)) logServerError('settings_read_failed', err);
     sendError(res, err);
@@ -92,8 +92,7 @@ settingsRouter.get('/api/settings', async (_req, res) => {
  */
 settingsRouter.put('/api/settings', async (req, res) => {
   try {
-    const { apiKeyChanged } = await settings.update(req.body);
-    if (apiKeyChanged) novaSolve.resetSession(); // invalidate cached session for the old key
+    await settings.update(req.body as SettingsChanges);
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) logServerError('settings_update_failed', err);
@@ -113,7 +112,6 @@ settingsRouter.put('/api/settings', async (req, res) => {
 settingsRouter.delete('/api/settings/astrometry-api-key', async (_req, res) => {
   try {
     await settings.removeApiKey();
-    novaSolve.resetSession();
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) logServerError('settings_delete_key_failed', err);

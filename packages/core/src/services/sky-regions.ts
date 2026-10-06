@@ -3,7 +3,7 @@
  * used as a Targets search filter.
  */
 import { DomainError } from '../domain/errors';
-import type { SkyRegionData } from '../domain/regions';
+import type { SkyRegionChanges, SkyRegionData, SkyRegionInput } from '../domain/regions';
 import type { SqlDb, SqlTx } from '../ports/sql-db';
 
 export interface SkyRegionServiceDeps {
@@ -26,9 +26,9 @@ export interface SkyRegionService {
   /** Every region ordered by position. A row whose polygon cannot be read comes back with no points. */
   list(): Promise<SkyRegionData[]>;
   /** Creates a region at the end of the list. Throws `invalid` for a missing name or fewer than 3 vertices. */
-  create(input: unknown): Promise<{ id: string }>;
+  create(input: SkyRegionInput): Promise<{ id: string }>;
   /** Changes the fields that are given and valid; others keep their value. Throws `notFound` for an unknown id. */
-  update(id: string, input: unknown): Promise<void>;
+  update(id: string, input: SkyRegionChanges): Promise<void>;
   /** Removes a region. Throws `notFound` for an unknown id. */
   remove(id: string): Promise<void>;
   /** Writes a region from a backup file, replacing the one with the same id, without the checks of `create`. */

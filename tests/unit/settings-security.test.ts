@@ -15,6 +15,7 @@ async function openSettings(): Promise<{ settings: SettingsService; closeDatabas
     db: createBetterSqliteDb(getConnection()),
     secrets: createServerSecretCodec(),
     env: (k) => process.env[k],
+    platform: { isWindows: false },
   });
   return { settings, closeDatabase };
 }

@@ -5,7 +5,13 @@
  */
 import { DomainError } from '../domain/errors';
 import { customGearName } from '../domain/gear';
-import type { CustomGearType, GearCatalog, GearSetupData } from '../domain/gear';
+import type {
+  CustomGearInput,
+  CustomGearType,
+  GearCatalog,
+  GearSetupData,
+  GearSetupInput,
+} from '../domain/gear';
 import type { SqlDb, SqlValue } from '../ports/sql-db';
 
 export interface GearServiceDeps {
@@ -23,7 +29,7 @@ export interface GearService {
   /** The built-in items of a type plus the custom ones, sorted by "brand model". */
   listCatalog(type: CustomGearType): Promise<object[]>;
   /** Stores a custom item with a new `custom-` id (the id is also written into its data). Throws `invalid` for a bad type or data. */
-  addCustom(type: unknown, data: unknown): Promise<{ id: string }>;
+  addCustom(type: CustomGearType, data: CustomGearInput): Promise<{ id: string }>;
   /** Removes a custom item. Throws `invalid` for an id without the `custom-` prefix, `notFound` for an unknown id. */
   removeCustom(id: string): Promise<void>;
   /** Removes every custom item whose id starts with `custom-` and returns how many. */
@@ -31,11 +37,11 @@ export interface GearService {
   /** Every setup, oldest write first. */
   listSetups(): Promise<GearSetupData[]>;
   /** Creates a setup with a new `setup-` id. Throws `invalid` (codes `MISSING_NAME`, `MISSING_TELESCOPE`, `MISSING_CAMERA`). */
-  createSetup(input: unknown): Promise<{ id: string }>;
+  createSetup(input: GearSetupInput): Promise<{ id: string }>;
   /** Replaces a setup, creating it when the id is unknown (the row moves to the end of the list). Throws `invalid`. */
-  replaceSetup(id: string, input: unknown): Promise<void>;
+  replaceSetup(id: string, input: GearSetupInput): Promise<void>;
   /** Shows or hides a setup's frame. Throws `invalid` for a non-boolean, `notFound` for an unknown id. */
-  setSetupEnabled(id: string, enabled: unknown): Promise<void>;
+  setSetupEnabled(id: string, enabled: boolean): Promise<void>;
   /** Removes a setup. Throws `notFound` for an unknown id. */
   removeSetup(id: string): Promise<void>;
   /** Removes every setup and returns how many. */
@@ -138,6 +144,7 @@ export function createGearService(deps: GearServiceDeps): GearService {
     },
 
     async addCustom(type, data) {
+      // Typed for callers, still checked at run time: a screen or a restored backup can pass anything.
       if (!type || !CUSTOM_GEAR_TYPES.includes(type as string)) {
         throw new DomainError(
           'invalid',

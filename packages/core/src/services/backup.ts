@@ -49,6 +49,15 @@ export interface BackupServiceDeps {
   newId: () => string;
 }
 
+/** An uploaded backup file. The caller says how to open it as a ZIP, so nothing is unpacked unless the file is one. */
+export interface BackupFile {
+  /** The file's name; its extension (`.zip` or `.json`) says what it is. */
+  name: string;
+  bytes: Uint8Array;
+  /** Opens the file as a ZIP archive. Called at most once, and only for a `.zip` file. */
+  openZip(): Promise<BundleReader>;
+}
+
 export interface BackupService {
   /** The photos an export takes: those whose id is in `ids`, or all of them when `ids` is absent or empty. */
   selectPhotos(ids?: readonly string[]): Promise<Photo[]>;
@@ -61,6 +70,7 @@ export interface BackupService {
   /** What an archive holds and which of it already exists here; writes nothing. */
   preview(reader: BundleReader): Promise<ImportPreviewResult>;
   /** The preview of a plain JSON list of photos. Throws `invalid` (`INVALID_MANIFEST_FORMAT`) when it is not a list. */
+  // `unknown`: the content of an uploaded file, not an argument a caller builds; it is checked at run time.
   previewPhotoList(photos: unknown): ImportPreviewResult;
   /**
    * Imports what `selection` asks for from an archive. Throws `invalid` for an entry path that could leave its
@@ -68,8 +78,28 @@ export interface BackupService {
    * cannot be written is listed in `failed` and the others are imported.
    */
   importFrom(reader: BundleReader, selection: ImportOptions): Promise<ImportResult>;
+  /**
+   * The preview of an uploaded file: `preview` for a `.zip`, `previewPhotoList` for a `.json` list. Throws `invalid`
+   * (`UNSUPPORTED_BUNDLE_FORMAT`) for any other extension; a `.json` that is not valid JSON throws the parser's error.
+   */
+  previewFile(file: BackupFile): Promise<ImportPreviewResult>;
+  /** The import of an uploaded file: `importFrom` for a `.zip`, `importPhotoList` for a `.json` list. Throws as `previewFile`. */
+  importFile(file: BackupFile, selection: ImportOptions): Promise<ImportResult>;
   /** Imports a plain JSON list of photos (metadata only). Throws `invalid` (`INVALID_MANIFEST_FORMAT`) when it is not a list. */
+  // `unknown` for the same reason as `previewPhotoList`.
   importPhotoList(photos: unknown, selection: ImportOptions): Promise<ImportResult>;
+}
+
+const unsupportedFormat = (): DomainError =>
+  new DomainError('invalid', 'Format non supporté (.zip ou .json attendu)', {
+    code: 'UNSUPPORTED_BUNDLE_FORMAT',
+  });
+
+/** The extension of a file name, lower-cased, with its dot ('' when there is none), as `path.extname` gives it. */
+function extensionOf(name: string): string {
+  const base = name.slice(Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')) + 1);
+  const dot = base.lastIndexOf('.');
+  return dot <= 0 ? '' : base.slice(dot).toLowerCase();
 }
 
 const invalidManifest = (): DomainError =>
@@ -596,6 +626,23 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         recordFailure,
       );
       return { imported, skipped, dsoOverridesImported, failed };
+    },
+
+    async previewFile(file) {
+      const extension = extensionOf(file.name);
+      if (extension === '.zip') return service.preview(await file.openZip());
+      if (extension === '.json')
+        return service.previewPhotoList(JSON.parse(decodeUtf8(file.bytes)));
+      throw unsupportedFormat();
+    },
+
+    async importFile(file, selection) {
+      const extension = extensionOf(file.name);
+      if (extension === '.zip') return service.importFrom(await file.openZip(), selection);
+      if (extension === '.json') {
+        return service.importPhotoList(JSON.parse(decodeUtf8(file.bytes)), selection);
+      }
+      throw unsupportedFormat();
     },
 
     async importPhotoList(list, selection) {

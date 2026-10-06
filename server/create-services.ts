@@ -31,6 +31,8 @@ export interface ServiceDeps {
   newId: () => string;
   secrets: SecretCodec;
   env: EnvSource;
+  /** What the host runs on. */
+  platform: { isWindows: boolean };
   gearCatalog: GearCatalog;
   images: ImageCodec;
   blobs: BlobStore;
@@ -54,6 +56,7 @@ export function createServices(deps: ServiceDeps) {
     newId,
     secrets,
     env,
+    platform,
     gearCatalog,
     images,
     blobs,
@@ -64,13 +67,33 @@ export function createServices(deps: ServiceDeps) {
     log,
     sleep,
   } = deps;
-  const settings = createSettingsService({ db, secrets, env });
+  // The settings service is built before the online-solving one, which reads settings: a holder breaks the cycle.
+  let resetNovaSession: () => void = () => {};
+  const settings = createSettingsService({
+    db,
+    secrets,
+    env,
+    platform,
+    // The session was opened with the old key; drop it.
+    onApiKeyChanged: () => resetNovaSession(),
+  });
   const dsoOverrides = createDsoOverrideService({ db });
   const skyRegions = createSkyRegionService({ db, newId });
   const poiCategories = createPoiCategoryService({ db, newId });
   const gear = createGearService({ db, newId, catalog: gearCatalog });
   const plans = createPlanService({ db, newId });
   const photos = createPhotoService({ db, newId, images, blobs });
+  const novaSolve = createNovaSolveService({
+    http,
+    settings,
+    images,
+    stars: catalogStars,
+    now,
+    newId,
+    log,
+    sleep,
+  });
+  resetNovaSession = () => novaSolve.resetSession();
   return {
     dsoOverrides,
     skyRegions,
@@ -94,16 +117,7 @@ export function createServices(deps: ServiceDeps) {
     solvedImport: createSolvedImportService({ images, stars: catalogStars }),
     version: createVersionService({ http, now }),
     horizon: createHorizonService({ db, http, images, now, log, sleep }),
-    novaSolve: createNovaSolveService({
-      http,
-      settings,
-      images,
-      stars: catalogStars,
-      now,
-      newId,
-      log,
-      sleep,
-    }),
+    novaSolve,
   };
 }
 

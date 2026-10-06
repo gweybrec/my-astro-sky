@@ -4,6 +4,7 @@
  */
 import { DomainError } from '../domain/errors';
 import type { SqlDb } from '../ports/sql-db';
+import type { DSOUserOverride } from '../types';
 
 export interface DsoOverrideServiceDeps {
   db: SqlDb;
@@ -11,9 +12,9 @@ export interface DsoOverrideServiceDeps {
 
 export interface DsoOverrideService {
   /** Every stored override by DSO id. A row whose JSON cannot be read is left out. */
-  getAll(): Promise<Record<string, object>>;
+  getAll(): Promise<Record<string, DSOUserOverride>>;
   /** Creates or replaces an override. Throws `invalid` for a bad id, bad data or out-of-range RA/Dec. */
-  upsert(id: unknown, data: unknown): Promise<void>;
+  upsert(id: string, data: DSOUserOverride): Promise<void>;
   /** Removes one override; a missing id is not an error. */
   remove(id: string): Promise<void>;
   /** Removes every override and returns how many rows were deleted. */
@@ -53,7 +54,7 @@ export function createDsoOverrideService(deps: DsoOverrideServiceDeps): DsoOverr
   return {
     async getAll() {
       const rows = await db.all<{ id: string; data: string }>('SELECT id, data FROM dso_overrides');
-      const result: Record<string, object> = {};
+      const result: Record<string, DSOUserOverride> = {};
       for (const row of rows) {
         try {
           result[row.id] = JSON.parse(row.data);
@@ -65,13 +66,14 @@ export function createDsoOverrideService(deps: DsoOverrideServiceDeps): DsoOverr
     },
 
     async upsert(id, data) {
+      // Typed for callers, still checked at run time: a restored backup or a screen can pass anything.
       if (typeof id !== 'string' || !id || id.length > 100) {
         throw new DomainError('invalid', 'Invalid DSO id', { code: 'INVALID_DSO_ID' });
       }
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
         throw new DomainError('invalid', 'Invalid override data', { code: 'INVALID_DSO_DATA' });
       }
-      const coordError = validateDsoOverrideCoords(data as Record<string, unknown>);
+      const coordError = validateDsoOverrideCoords(data as unknown as Record<string, unknown>);
       if (coordError) {
         throw new DomainError('invalid', coordError.error, {
           code: coordError.code,

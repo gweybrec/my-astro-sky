@@ -116,6 +116,12 @@ export interface ExportRequest {
 
 // ─── Bundle rules (pure) ───────────────────────────────────────────────────────
 
+/** The file name of an export made at `now` (UTC): `sky-export-2026-10-06-14-03-59.zip`, or `.json` for the metadata-only list. */
+export function backupFileName(now: Date, extension: 'zip' | 'json' = 'zip'): string {
+  const stamp = now.toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '-');
+  return `sky-export-${stamp}.${extension}`;
+}
+
 /** UTF-8 text of some bytes; a leading byte-order mark is kept, as `Buffer.toString` does. */
 export function decodeUtf8(bytes: Uint8Array): string {
   return new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
