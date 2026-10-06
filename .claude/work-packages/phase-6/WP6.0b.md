@@ -1,0 +1,71 @@
+# WP6.0b — The phone app's frame
+
+Model: sonnet · Branch: `mobile/phase-3b` · Depends on: WP6.0a · Part A needs no device · Part B (the orchestrator) needs the user's phone
+
+## Goal
+
+Create the real phone app, `apps/mobile/`: an Android project (Capacitor) with Ionic Vue, the five tabs, the approved look with bundled fonts, the four languages, and the phone's data layer running. Each tab shows only what the approved mockups show for an app with no data yet. No other screen is built in this card.
+
+## Read first
+
+- `docs/dev/ui/mobile.md` (the rules that bind every phone screen, and the list of boards), `.claude/work-packages/design/decisions.md`.
+- The boards this card builds, source and picture (`design/mobile/boards/<Name>.dc.html`, `docs/dev/ui/mobile/<Name>.png`, and the `…Landscape` twins): find in the tables of `docs/dev/ui/mobile.md` the board of the five tabs' frame (the main sky screen, for its tab bar and safe areas) and the boards of the empty states: the first start with nothing configured, the empty gallery, the empty plans, no target matching. Read their HTML: the structure, the class names (`.mob-*`) and the icons are the specification. Start `design/mobile/tools/serve.mjs` to look at them rendered if useful (stop it afterwards).
+- `design/mobile/ds/myastrosky/components/bundle.css` and its tokens: the look.
+- `packages/backend-local/src/phone-backend.ts` (`createPhoneBackend`), `packages/app-state/src/backend.ts` and `api.ts`, `src/platform-init.ts` (what the desktop configures at start-up: the phone needs the same hooks), `packages/core/src/platform/`.
+- `spikes/mobile/` (untracked test app, read-only here): `capacitor.config.ts`, `package.json`, `android/variables.gradle`, `android/gradle.properties`, `android/build.gradle` (the pinned build tools), `src/lib/backend-harness.ts` (how the real plugins are handed to `createPhoneBackend`), `src/routes/Backend.vue`. The Android settings that work on this machine are there: reuse them.
+
+## Part A — the app (worker, no device)
+
+1. **Workspace.** Add `"apps/*"` to the root `workspaces`. `apps/mobile/package.json` (`@myastrosky/mobile`, private): `vue`, `pinia`, `vue-router` at the root's versions, `@ionic/vue`, `@ionic/vue-router`, `@capacitor/core`, `@capacitor/android`, `@capacitor/cli` (dev), the plugins `@capacitor-community/sqlite`, `@capacitor/filesystem`, `@capacitor/share`, `@capacitor/preferences`, `@capacitor/app`, at the versions of the test app where it has them, and the font packages `@fontsource/outfit` and `@fontsource/dm-mono`. Run `npm install` at the root; the lockfile's diff must contain only this workspace's packages.
+   - **The desktop must not pick these up.** Check and report each: the production build of the desktop (`npm run build`) has the same size as before, within 1 %; `npm run electron:package` succeeds and the packaged app contains no `@ionic`, `@capacitor` or `@fontsource` folder (then `npm run clean`; check no dev server is running first); the `Dockerfile` copies the new workspace's `package.json` where it copies the others' so that `npm ci` works, and the image's runtime stage does not install the phone's dependencies (find the npm option that leaves a workspace out; verify with `npm ci --dry-run` in a temporary copy of exactly the files the Dockerfile copies, never with a local Docker build). If the runtime stage cannot leave them out, stop and report the options.
+2. **Vite app** in `apps/mobile/` (`index.html`, `vite.config.ts`, `tsconfig.json` with `vue-tsc`, `src/main.ts`, `src/App.vue`, `src/router.ts`). `webDir` is `apps/mobile/dist`. A script copies what the phone bundles into the build's public files before each build: `public/data/` of the repository (the star, name, constellation and deep-sky files the registries load) and `resources/telescopes.json`, `cameras.json`, `accessories.json`, `filters.json` as `gear/*.json` (the paths `createBundledCatalogs` fetches). Copied files are git-ignored.
+3. **Start-up**, `apps/mobile/src/platform-init.ts`, awaited before the app is mounted, in this order:
+   - the device storage: a `KeyValueStore` over the Preferences plugin. Write the adapter in `packages/backend-local/src/preferences-store.ts` (`createPreferencesStore(preferences): Promise<KeyValueStore>`: reads every key once into memory, then `get` is synchronous and `set`/`remove` update memory and write behind, in order; the plugin object is a parameter, as for the other adapters), with a Node test using a fake plugin; `configureStorage` with it;
+   - the language: `configureI18n` with the stored language, the phone's preferred languages (`navigator.languages`) and a reload that reloads the page;
+   - the backend: `createPhoneBackend` with the real plugins (as the test app's harness does), then `setBackend`;
+   - the same hooks as the desktop's `platform-init`: error reporter (console for now), device hints, gear catalogue loader, star search;
+   - a failure of any step shows a plain full-screen message with the error's text and a "Réessayer" button (translated), not a blank page.
+   - **In a desktop browser** (not a native platform), the app uses the HTTP backend against the desktop's server through a Vite proxy of `/api`, `/uploads` and `/data` to `localhost:3001`, and `localStorage` for the device storage, so that screens can be developed and checked in a phone-sized browser window. One function decides (`Capacitor.isNativePlatform()`), nowhere else.
+4. **The look.** Import the design system's stylesheet and tokens from `design/mobile/ds/…` (import them from there; do not copy them, so that there is one source), the bundled fonts (no network font), and Ionic's core stylesheet. Map Ionic's own variables (background, text, toolbar, tab bar, item, primary colour, fonts) to the design system's tokens in one file, `apps/mobile/src/theme/ionic-tokens.css`, so that Ionic's components take the look without per-screen overrides. Dark only (no light theme, no red theme).
+5. **The frame.** Ionic tabs (`IonTabs`, `IonTabBar`, `IonTabButton`, `IonRouterOutlet`) with five tabs in this order: Ciel, Galerie, Cibles, Plans, Réglages, with the icons and labels of the board (icons come from `src/icons/` of the repository or the design system's assets; import the same SVG files, do not redraw). Portrait: the bar at the bottom as on the board. Landscape: as the landscape board shows (follow it exactly: position, size, labels or not). Safe areas for the status bar, the gesture bar and a display cut-out, as the boards' system-bar areas show. No title on these top-level screens (decision). The Android back button on a top-level tab leaves the app (Ionic's default).
+6. **The five pages, with no data**: each shows what its empty-state board shows, and nothing more.
+   - Ciel: the dark sky background only (the map is a later card). No placeholder text.
+   - Galerie: calls `getPhotos()`; with none, the empty-gallery board (its text, its "add photos" button present but showing, when tapped, nothing yet: no handler, no toast).
+   - Cibles: the board for the case its mockup shows when nothing is configured (no setup yet).
+   - Plans: calls `getPlans()`; with none, the empty-plans board.
+   - Réglages: the settings board's list **entries only as static rows**, except the language row, which works (opens Ionic's own select with the four languages and switches language through the i18n module).
+   - Every text goes through `t('…')` with keys in the four languages, in a new module `packages/core/src/i18n/mobile/{fr,en,es,de}.ts` merged into the dictionaries (so that the desktop files do not grow and the parity test covers them); reuse an existing key when the same text already exists.
+   - **Never invent a text, a description or an icon** that is not on a board (rule of the user, see `decisions.md`).
+7. **Android project.** `npx cap add android` in `apps/mobile`; `capacitor.config.ts`: `appId: 'com.myastrosky.app'`, `appName: 'MyAstroSky'`, `androidScheme: 'https'`, `CapacitorHttp.enabled: true`, web debugging enabled in debug builds only. Same SDK levels, `android.builder.sdkDownload=false` and pinned build tools as the test app; `local.properties` git-ignored, with `sdk.dir`. Portrait and landscape both allowed. The launcher icon is generated from `design/mobile/design-system/assets/icon.png` by a small script using `sharp` (the densities Android needs, plus the adaptive icon's foreground on the app's dark background). Commit the Android project's sources, not its build outputs (check `.gitignore`; add `**/android/**` and `**/ios/**` exclusions to ESLint and Prettier if WP0.0's patterns do not already cover `apps/mobile/android`).
+8. **Tooling.** `npm run mobile:dev` (Vite), `mobile:build` (`vue-tsc` then Vite build), `mobile:sync` (build then `cap sync android`), `typecheck:mobile` added to the root `typecheck` and to `ci.yml`; an ESLint block for `apps/mobile/**` (browser globals; `no-restricted-imports` at error: nothing from the repository's `src/` or `server/`; the shared packages by their `@myastrosky/*` names); Vitest picks up `apps/mobile/tests/**/*.test.ts` if you put component tests there (at least: the tab bar renders five tabs in order with translated labels; the gallery page shows the empty state when the backend returns no photo; the start-up error screen). `apps/mobile/CLAUDE.md` (at most 25 lines): the device rule (no emulator, no SDK installation, `--target <serial>` always), "no screen before its board is approved in `docs/dev/ui/mobile.md`", "Ionic's components first, `.mob-*` for the look, tokens only", "texts only from the boards", where the start-up is, how to run in a phone-sized browser and on the device. Add its row to the root `CLAUDE.md` table and the package to `docs/dev/mobile-architecture.md`.
+9. **Check in a phone-sized browser** (you, with the Playwright tools, viewport 412 × 915 then 915 × 412): ports 5173 and 3001 free, otherwise skip and report; start the desktop's server only (`npm run dev:server`) with `DB_PATH` and `UPLOADS_DIR` in an empty scratchpad folder, and `npm run mobile:dev` on another port; open the five tabs in both orientations; screenshots in `.playwright-mcp/mobile-frame/browser-<tab>-<portrait|landscape>.png`; measure and report for the tab bar: height, each tab's touch area (at least 48 × 48 px), font, colours against the board's CSS values. Stop both processes (your own process trees only) and check the ports.
+10. **Build the debug app** without a device: free space on `C:` at least 6 GB; `ANDROID_HOME` for the command only; `./gradlew assembleDebug`. If Gradle names a missing SDK package, stop and report its name.
+
+Acceptance: `npm run verify` green (it must now include the phone app's type check; add the phone app's build to `verify` only if it adds less than 30 s, otherwise leave it to the phone's own script and say so).
+
+**Commit:** `feat(mobile): add the phone app's frame with its five tabs` (one commit; the status row stays `part A done`).
+
+## Part B — on the phone (orchestrator, when the planner confirms the phone is plugged in and unlocked)
+
+1. `adb devices`: exactly one device in state `device` (serial `R58Y90H5QPX`); keyguard not showing, otherwise stop. Record and set stay-awake (`settings get global stay_on_while_plugged_in`, then `svc power stayon usb`); restore the recorded value at the end, whatever happens. **Never an emulator; never sdkmanager or avdmanager.** Every adb command carries `-s <serial>`. Never a tap without reading the screen first.
+2. Install the debug app (`adb -s <serial> install -r …`), start it. For each of the five tabs, in portrait and in landscape (rotate with `adb shell settings put system accelerometer_rotation 0` and `user_rotation 0|1`; restore both settings at the end): a screenshot (`adb exec-out screencap -p`) into `.playwright-mcp/mobile-frame/device-<tab>-<portrait|landscape>.png`. Over the debugging connection (as `spikes/mobile/scripts/cdp-forward.ps1` does, for the app's package): check the console has no error, that the fonts are the bundled ones, that the backend is the local one (`getPhotos()` and `getPlans()` return empty lists; create and delete one plan through the api functions), and that the language row switches the labels and survives restarting the app.
+3. Make one comparison picture per tab and orientation: the board's picture beside the device screenshot at the same scale (`sharp`), in `.playwright-mcp/mobile-frame/compare-<tab>-<orientation>.png`, and list every visible difference (position, size, colour, text, icon, safe area) with its measured value. A difference that is a defect goes back to the part A worker (a fix is a commit `fix(mobile): …`), then rebuild, reinstall and re-check that tab. At most three rounds.
+4. A worker fills the "As built" table of `docs/dev/ui/mobile.md` (status `to review by the user`) with links to the device pictures copied into `docs/dev/ui/mobile/as-built/`, sets the status row to `done`, commit `docs: record the phone frame as built`.
+5. Clean-up: rotation settings and stay-awake restored and read back, forward removed. Leave the app installed. The old test app `com.myastrosky.spike` stays too.
+
+## Must NOT
+
+- Build any screen, sheet or dialog beyond the frame and the five empty pages.
+- Add a text, description, icon or control that no board shows.
+- Import from the repository's `src/` (desktop screens) into the phone app; if something needed is there, stop and report it (it should move to a shared package first).
+- Add a plugin not listed in step 1.
+
+## Escalate if
+
+- The landscape board of the frame cannot be reproduced with Ionic's tab bar (say what differs and propose the smallest custom element).
+- An empty-state board does not exist for a tab (name it; do not invent one).
+- The desktop's build, the Electron package or the Docker install is affected by the new workspace.
+
+## Report
+
+Part A: files and folders created; each check of step 1 with its figures; the boards used per tab; the measurements of step 9 against the boards; the build result and the app file's size; free disk space before and after; tests added; `npm run verify` summary line and exit code. Part B: per tab and orientation, the differences found and their fate; the console, font, backend and language checks; the clean-up.
