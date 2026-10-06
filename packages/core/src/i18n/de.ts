@@ -1,4 +1,5 @@
 import type { Translations } from './fr';
+import deMobile from './mobile/de';
 
 const de: Translations = {
   app: {
@@ -1483,6 +1484,7 @@ const de: Translations = {
     labelsForAll: 'Etiketten für alle Fotos',
     setupForAll: 'Ausrüstung für alle Fotos',
   },
+  mobile: deMobile,
 };
 
 export default de;

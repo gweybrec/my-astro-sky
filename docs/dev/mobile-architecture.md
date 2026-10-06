@@ -31,6 +31,12 @@ These are enforced by an ESLint `no-restricted-imports` rule set to _error_, plu
 - Apps import packages and never each other.
 - `server` imports `core` only.
 
+### The phone app (`apps/mobile`)
+
+- `@myastrosky/mobile` (private workspace): Vite + Vue 3 + Ionic Vue + Capacitor Android, five tabs (Ciel, Galerie, Cibles, Plans, Réglages) on Ionic's tabs, the look from `design/mobile/ds/` mapped to Ionic's variables in `src/theme/ionic-tokens.css`, bundled fonts (`@fontsource/outfit`, `@fontsource/dm-mono`).
+- Start-up (`src/platform-init.ts`): device storage (`createPreferencesStore` over the Preferences plugin), language, backend (`createPhoneBackend` on the real plugins; the HTTP backend through a Vite proxy in a desktop browser), then the shared hooks.
+- The desktop does not pick it up: the Docker runtime stage installs only the root and `packages/*` (`npm ci --workspace=…`), and the Electron package contains none of its dependencies.
+
 ### Catalog registries
 
 The DSO and star catalogs get a home in core:

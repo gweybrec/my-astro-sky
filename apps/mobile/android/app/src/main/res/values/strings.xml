@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MyAstroSky</string>
+    <string name="title_activity_main">MyAstroSky</string>
+    <string name="package_name">com.gweybrec.myastrosky.app</string>
+    <string name="custom_url_scheme">com.gweybrec.myastrosky.app</string>
+</resources>

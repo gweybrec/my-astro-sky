@@ -1,0 +1,7 @@
+/* The two fonts of the design system, bundled (no network font). Outfit for text, DM Mono for numbers. */
+@import '@fontsource/outfit/300.css';
+@import '@fontsource/outfit/400.css';
+@import '@fontsource/outfit/500.css';
+@import '@fontsource/outfit/600.css';
+@import '@fontsource/dm-mono/400.css';
+@import '@fontsource/dm-mono/500.css';
