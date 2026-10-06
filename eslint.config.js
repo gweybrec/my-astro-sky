@@ -59,6 +59,9 @@ export default tseslint.config(
       'coverage/**',
       'uploads/**',
       'public/data/**',
+      'apps/mobile/dist/**',
+      'apps/mobile/public/data/**',
+      'apps/mobile/public/gear/**',
       'public/swagger.json',
       'resources/**',
       'other-resources/**',
@@ -99,7 +102,14 @@ export default tseslint.config(
   // (tsconfig.json → src incl. .vue, tsconfig.server.json → server, tsconfig.test.json
   // → src/server/tests). This is what makes `no-floating-promises` possible.
   {
-    files: ['src/**/*.{ts,vue}', 'server/**/*.ts', 'tests/**/*.ts', 'packages/**/*.ts'],
+    files: [
+      'src/**/*.{ts,vue}',
+      'server/**/*.ts',
+      'tests/**/*.ts',
+      'packages/**/*.ts',
+      'apps/mobile/src/**/*.{ts,vue}',
+      'apps/mobile/tests/**/*.ts',
+    ],
     languageOptions: {
       parserOptions: {
         // Explicit list rather than `projectService` — the repo has one root
@@ -113,6 +123,7 @@ export default tseslint.config(
           './packages/backend-local/tsconfig.json',
           './packages/backend-http/tsconfig.json',
           './packages/app-state/tsconfig.json',
+          './apps/mobile/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],
@@ -155,7 +166,13 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
-    files: ['server/**/*.ts', 'electron/**/*.ts', 'tests/**/*.ts', '*.config.{ts,js,mjs}'],
+    files: [
+      'server/**/*.ts',
+      'electron/**/*.ts',
+      'tests/**/*.ts',
+      '*.config.{ts,js,mjs}',
+      'apps/mobile/*.config.ts',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
 
@@ -271,10 +288,31 @@ export default tseslint.config(
     },
   },
 
+  // The phone app (apps/mobile): browser globals. It may import the shared packages by their @myastrosky/* names,
+  // never the desktop's src/ or server/ (what both need goes to a shared package first).
+  {
+    files: ['apps/mobile/**/*.{ts,vue}'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(../){3,}(src|server)(/|$)',
+              message:
+                'The phone app may not import src/ or server/ of the desktop: move what it needs to a shared package.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Build/CLI scripts: plain ES modules, no type information, and console output is
   // their whole job — so silence `no-console` here.
   {
-    files: ['scripts/**/*.mjs', 'tests/helpers/*.mjs'],
+    files: ['scripts/**/*.mjs', 'tests/helpers/*.mjs', 'apps/mobile/scripts/**/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: { ...globals.node },
