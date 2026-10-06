@@ -6,7 +6,11 @@ import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
 import { DomainError, isDomainError } from '@myastrosky/core/domain/errors';
-import type { CustomGearType, GearCatalog } from '@myastrosky/core/domain/gear';
+import {
+  customGearName,
+  type CustomGearType,
+  type GearCatalog,
+} from '@myastrosky/core/domain/gear';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createGearService, type GearService } from '@myastrosky/core/services/gear';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
@@ -367,14 +371,16 @@ describe.each(SQL_ADAPTERS)('GearService (%s)', (_adapter, wrap) => {
       expect((await svc.exportCustom()).map((g) => g.type)).toEqual(['filter']);
     });
 
-    it('names an item by its name field, else by its id', async () => {
+    it('names an item by brand and model, else its name field, else its id', async () => {
       const named = await svc.addCustom('camera', { name: 'Cam' });
       const unnamed = await svc.addCustom('camera', { model: 'M' });
       const numeric = await svc.addCustom('camera', { name: 7 });
+      const branded = await svc.addCustom('camera', { brand: 'Zed', model: 'Cam 7' });
       expect(await svc.listCustomNames()).toEqual([
         { id: named.id, type: 'camera', name: 'Cam' },
-        { id: unnamed.id, type: 'camera', name: unnamed.id },
+        { id: unnamed.id, type: 'camera', name: 'M' },
         { id: numeric.id, type: 'camera', name: numeric.id },
+        { id: branded.id, type: 'camera', name: 'Zed Cam 7' },
       ]);
     });
 
@@ -519,5 +525,21 @@ describe.each(SQL_ADAPTERS)('GearService round trips (%s)', (_adapter, wrap) => 
     expect(await trips(() => svc.importCustom(item, ['custom-a', 'custom-b', 'custom-c']))).toBe(1);
     expect(await trips(() => svc.importSetup(setup, []))).toBe(1);
     expect(await trips(() => svc.importSetup(setup, ['setup-a', 'setup-b', 'setup-c']))).toBe(1);
+  });
+});
+
+describe('customGearName', () => {
+  it('is brand and model, then name, then the id', () => {
+    expect(customGearName('telescope', { brand: 'Zed', model: 'T 100', name: 'x' }, 'id')).toBe(
+      'Zed T 100',
+    );
+    expect(customGearName('camera', { model: 'Only model' }, 'id')).toBe('Only model');
+    expect(customGearName('camera', { name: 'Named' }, 'id')).toBe('Named');
+    expect(customGearName('accessory', {}, 'custom-1')).toBe('custom-1');
+  });
+
+  it('names a custom filter by its name, then its model', () => {
+    expect(customGearName('filter', { brand: 'B', model: 'M', name: 'N' }, 'id')).toBe('N');
+    expect(customGearName('filter', { brand: 'B', model: 'M' }, 'id')).toBe('M');
   });
 });

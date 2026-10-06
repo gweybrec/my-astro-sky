@@ -1,6 +1,6 @@
 // Export / import (sky data bundle) API shapes, and the pure rules of a bundle.
 
-import type { GearSetupData } from './gear';
+import { customGearName, type GearSetupData } from './gear';
 
 export interface ExportOptions {
   includeImages?: boolean;
@@ -500,7 +500,7 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
               result.gearItems.push({
                 id: g.id,
                 type: g.type,
-                name: typeof g.name === 'string' ? g.name : g.id,
+                name: customGearName(g.type, g, g.id),
               });
             }
           }

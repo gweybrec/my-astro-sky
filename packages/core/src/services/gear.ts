@@ -4,6 +4,7 @@
  * cascaded to plans or photos when a setup or a gear item is deleted.
  */
 import { DomainError } from '../domain/errors';
+import { customGearName } from '../domain/gear';
 import type { CustomGearType, GearCatalog, GearSetupData } from '../domain/gear';
 import type { SqlDb, SqlValue } from '../ports/sql-db';
 
@@ -261,7 +262,7 @@ export function createGearService(deps: GearServiceDeps): GearService {
         let name = g.id;
         try {
           const d = JSON.parse(g.data);
-          if (typeof d?.name === 'string') name = d.name;
+          if (d && typeof d === 'object') name = customGearName(g.type, d, g.id);
         } catch {
           /* keep the id */
         }

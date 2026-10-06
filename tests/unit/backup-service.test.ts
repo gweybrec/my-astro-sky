@@ -532,6 +532,60 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(differs.setups[0]).toMatchObject({ conflict: 'different', localId: 'setup-1' });
     });
 
+    it('names custom gear by brand and model, then name, then id', async () => {
+      const a = await seed();
+      const reader = memoryReader([
+        [
+          'custom-gear.json',
+          json([
+            { id: 'g1', type: 'telescope', brand: 'Zed', model: 'Test 100' },
+            { id: 'g2', type: 'camera', name: 'Named only' },
+            { id: 'g3', type: 'accessory' },
+            { id: 'g4', type: 'camera', brand: 'Zed', model: 'Cam 7', name: 'Old name' },
+          ]),
+        ],
+      ]);
+      const preview = await createBackupService({ ...a, newId: () => 'y' }).preview(reader);
+      expect(preview.gear.map((g) => [g.id, g.name])).toEqual([
+        ['g1', 'Zed Test 100'],
+        ['g2', 'Named only'],
+        ['g3', 'g3'],
+        ['g4', 'Zed Cam 7'],
+      ]);
+    });
+
+    it('matches custom gear without a name by brand and model, and replaces it on import', async () => {
+      const a = await seed();
+      await a.gear.importCustom(
+        { id: 'custom-brand', type: 'telescope', data: { brand: 'Zed', model: 'Test 100' } },
+        [],
+      );
+      const reader = memoryReader([
+        [
+          'custom-gear.json',
+          json([
+            {
+              id: 'other-id',
+              type: 'telescope',
+              brand: 'Zed',
+              model: 'Test 100',
+              focalLength: 600,
+            },
+          ]),
+        ],
+      ]);
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      expect((await svc.preview(reader)).gear).toEqual([
+        { id: 'other-id', type: 'telescope', name: 'Zed Test 100', exists: true },
+      ]);
+      const before = (await a.gear.listCustomNames()).length;
+      const result = await svc.importFrom(reader, { ...everything, selectedGear: ['other-id'] });
+      expect(result.failed).toEqual([]);
+      const after = await a.gear.listCustomNames();
+      expect(after).toHaveLength(before);
+      expect(after.filter((g) => g.name === 'Zed Test 100').map((g) => g.id)).toEqual(['other-id']);
+    });
+
     it('previews an empty archive as empty, and a JSON list of photos without images', async () => {
       const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
       expect(await svc.preview(memoryReader([]))).toMatchObject({

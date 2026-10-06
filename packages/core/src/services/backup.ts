@@ -25,7 +25,7 @@ import {
   type ZipEntry,
 } from '../domain/backup';
 import { DomainError } from '../domain/errors';
-import type { CustomGearType } from '../domain/gear';
+import { customGearName, type CustomGearType } from '../domain/gear';
 import type { BlobStore } from '../ports/blob-store';
 import type { BundleReader, BundleWriter } from '../ports/bundle';
 import type { Photo } from '../types';
@@ -451,7 +451,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
                 ['telescope', 'camera', 'accessory'].includes(g.type)
               ) {
                 const { id, type, ...data } = g;
-                const name = typeof data.name === 'string' ? data.name : id;
+                const name = customGearName(type, data, id);
                 const sameType = existingGear.filter((r) => r.type === type);
                 try {
                   await gear.importCustom(
