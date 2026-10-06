@@ -2542,7 +2542,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 12000;
+  z-index: var(--z-meta-editor);
 }
 
 .meta-editor-modal {

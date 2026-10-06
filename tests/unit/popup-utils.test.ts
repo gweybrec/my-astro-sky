@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { trackAnchoredPosition, attachAnchoredPanel } from '../../src/popup-utils';
+import {
+  trackAnchoredPosition,
+  attachAnchoredPanel,
+  isTopmostOverlay,
+  hasOpenOverlay,
+} from '../../src/popup-utils';
 
 /** Build an anchor element whose getBoundingClientRect returns the given box. */
 function makeAnchor(box: Partial<DOMRect>): HTMLElement {
@@ -164,5 +169,41 @@ describe('trackAnchoredPosition', () => {
     window.dispatchEvent(new Event('scroll'));
     expect(panel.style.top).toBe('74px');
     cleanup();
+  });
+});
+
+describe('isTopmostOverlay', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function addOverlay(cls: string): HTMLElement {
+    const el = document.createElement('div');
+    el.className = cls;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it('hasOpenOverlay reflects the presence of any overlay', () => {
+    expect(hasOpenOverlay()).toBe(false);
+    addOverlay('dialog-overlay');
+    expect(hasOpenOverlay()).toBe(true);
+  });
+
+  it('is true for the only overlay', () => {
+    expect(isTopmostOverlay(addOverlay('modal-backdrop'))).toBe(true);
+  });
+
+  it('is false when another overlay was added after it', () => {
+    const editor = addOverlay('meta-editor-overlay');
+    const dialog = addOverlay('modal-backdrop');
+    expect(isTopmostOverlay(editor)).toBe(false);
+    expect(isTopmostOverlay(dialog)).toBe(true);
+  });
+
+  it('ignores elements that are not overlays', () => {
+    const editor = addOverlay('meta-editor-overlay');
+    addOverlay('something-else');
+    expect(isTopmostOverlay(editor)).toBe(true);
   });
 });

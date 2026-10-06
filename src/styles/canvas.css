@@ -496,14 +496,14 @@ input:focus-visible {
   height: 0.95rem;
 }
 
-/* AsteroidIdentifyModal can be opened from the gallery detail view's own button,
-   while the gallery's fullscreen overlay (--z-gallery) is on screen — without
-   this override the modal-backdrop's --z-modal renders it invisibly behind the
-   gallery. Same fix as .dropdown-panel.gallery-dso-catalog-dropdown in style.css.
+/* The identify and POI-add dialogs open from the photo metadata editor
+   (.meta-editor-overlay, --z-meta-editor), on the map and in the gallery detail
+   view; without this override the modal-backdrop's --z-modal renders them
+   invisibly behind it. Same idea as .dropdown-panel.gallery-dso-catalog-dropdown.
    :has() is the only way to target the backdrop from the modal's own class. */
 .modal-backdrop:has(.asteroid-identify-modal),
 .modal-backdrop:has(.supernova-identify-modal),
 .modal-backdrop:has(.comet-identify-modal),
 .modal-backdrop:has(.poi-add-modal) {
-  z-index: calc(var(--z-gallery) + 1);
+  z-index: var(--z-over-meta-editor);
 }

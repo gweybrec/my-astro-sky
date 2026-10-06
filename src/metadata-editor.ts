@@ -9,6 +9,7 @@ import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
 import { pinia } from './pinia-instance';
 import { RAW_COMPANION_ACCEPT } from './photo-formats';
+import { isTopmostOverlay } from './popup-utils';
 
 const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];
 
@@ -364,7 +365,7 @@ export function showMetadataEditor(
 
   // Trap Escape key
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape' && isTopmostOverlay(overlay)) close();
   };
   document.addEventListener('keydown', onKey);
 

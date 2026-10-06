@@ -272,16 +272,18 @@ Section headers use `font-size: var(--font-size-body); font-weight: 600; letter-
 
 ### 1.5 Z-index scale
 
-| Token         | Value   | Use                                  |
-| ------------- | ------- | ------------------------------------ |
-| `--z-base`    | `1`     | Normal stacking                      |
-| `--z-panel`   | `10`    | Side panel                           |
-| `--z-toggle`  | `11`    | Panel toggle tab                     |
-| `--z-sidebar` | `20`    | Sidebar z-context                    |
-| `--z-modal`   | `200`   | Modal backdrop + content             |
-| `--z-meta`    | `210`   | Metadata editor (above `.modal`)     |
-| `--z-gallery` | `220`   | Gallery detail overlay               |
-| `--z-tooltip` | `10000` | Floating tooltips (above everything) |
+| Token                  | Value   | Use                                                         |
+| ---------------------- | ------- | ----------------------------------------------------------- |
+| `--z-base`             | `1`     | Normal stacking                                             |
+| `--z-panel`            | `10`    | Side panel                                                  |
+| `--z-toggle`           | `11`    | Panel toggle tab                                            |
+| `--z-sidebar`          | `20`    | Sidebar z-context                                           |
+| `--z-modal`            | `200`   | Modal backdrop + content                                    |
+| `--z-meta`             | `210`   | Metadata editor (above `.modal`)                            |
+| `--z-gallery`          | `220`   | Gallery detail overlay                                      |
+| `--z-tooltip`          | `10000` | Floating tooltips (above everything)                        |
+| `--z-meta-editor`      | `12000` | Photo metadata editor overlay                               |
+| `--z-over-meta-editor` | `12500` | Dialogs opened from the metadata editor (POI add, identify) |
 
 ---
 

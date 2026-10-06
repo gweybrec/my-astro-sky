@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="modal-backdrop">
+    <div ref="backdrop" class="modal-backdrop">
       <div class="modal" :class="[sizeClass, modalClass]">
         <div class="modal-header">
           <slot name="title">
@@ -20,7 +20,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue';
+import { onMounted, onUnmounted, computed, ref } from 'vue';
+import { isTopmostOverlay } from '../../popup-utils';
 
 const props = withDefaults(
   defineProps<{
@@ -49,8 +50,10 @@ function close() {
   emit('close');
 }
 
+const backdrop = ref<HTMLElement | null>(null);
+
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') close();
+  if (e.key === 'Escape' && (!backdrop.value || isTopmostOverlay(backdrop.value))) close();
 }
 
 onMounted(() => {

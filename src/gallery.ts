@@ -26,6 +26,7 @@ import { poiTypeIcon } from './poi-icons';
 import { pinia } from './pinia-instance';
 import { useDisplayStore } from './stores/display';
 import PhotoDsoCatalogFilter from './components/panels/PhotoDsoCatalogFilter.vue';
+import { hasOpenOverlay } from './popup-utils';
 import mapPinSvg from './icons/map-pin.svg?raw';
 import dsoGalaxySvg from './icons/dso-galaxy.svg?raw';
 import poiCometSvg from './icons/poi-comet.svg?raw';
@@ -741,7 +742,8 @@ export class Gallery {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        close();
+        // A dialog opened from the detail view (POI, identify…) handles its own Escape.
+        if (!hasOpenOverlay()) close();
         return;
       }
       // Don't hijack arrow keys while typing in the metadata editor fields.

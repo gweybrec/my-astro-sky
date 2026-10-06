@@ -108,6 +108,8 @@
   --z-meta: 210;
   --z-gallery: 220;
   --z-tooltip: 10000;
+  --z-meta-editor: 12000;
+  --z-over-meta-editor: 12500;
 
   /* Layout */
   --panel-width: 280px;
