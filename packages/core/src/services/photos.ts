@@ -4,6 +4,7 @@
  * (reading the picture, writing it to disk, thumbnails) is not here: the route still does it.
  * A photo's correspondences are deleted with it by `ON DELETE CASCADE` (foreign keys must be on).
  */
+import type { ErrorCode } from '../domain/error-codes';
 import { DomainError } from '../domain/errors';
 import type {
   BackupPhoto,
@@ -183,7 +184,7 @@ export const photoNotFound = (): DomainError =>
     body: photoNotFoundBody,
   });
 
-const invalidUpload = (message: string, code: string): DomainError =>
+const invalidUpload = (message: string, code: ErrorCode): DomainError =>
   new DomainError('invalid', message, { code, body: { error: message, code } });
 
 const invalidOrder = (message: string): DomainError =>

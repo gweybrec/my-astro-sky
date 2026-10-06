@@ -1,17 +1,19 @@
+import type { ErrorCode } from './error-codes';
+
 export type DomainErrorKind = 'invalid' | 'notFound' | 'conflict' | 'rateLimited' | 'upstream';
 
 /** A rule of the domain was not met. Routes and the phone UI turn it into a response or a message. */
 export class DomainError extends Error {
   readonly kind: DomainErrorKind;
   /** Stable machine code (upper snake case) that the client translates into the user's language. */
-  readonly code: string;
+  readonly code: ErrorCode;
   /** The exact response body to send, when it is not `{ error: message }`. */
   readonly body?: Readonly<Record<string, unknown>>;
 
   constructor(
     kind: DomainErrorKind,
     message: string,
-    options: { code: string; body?: Readonly<Record<string, unknown>> },
+    options: { code: ErrorCode; body?: Readonly<Record<string, unknown>> },
   ) {
     super(message);
     this.name = 'DomainError';

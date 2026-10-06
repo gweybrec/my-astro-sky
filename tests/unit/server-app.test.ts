@@ -515,29 +515,30 @@ describe('plans', () => {
   it('rejects bad requests', async () => {
     expect(await call('POST', '/api/plans', {})).toEqual({
       status: 400,
-      body: { error: 'name is required' },
+      body: { error: 'name is required', code: 'PLAN_NAME_REQUIRED' },
     });
     expect(await call('PUT', '/api/plans/nope', { name: 'x' })).toEqual({
       status: 404,
-      body: { error: 'Plan not found' },
+      body: { error: 'Plan not found', code: 'PLAN_NOT_FOUND' },
     });
     expect(await call('PUT', '/api/plans/nope', {})).toEqual({
       status: 400,
       body: {
         error: 'name, settings (nightOf/setupId/lat/lon), or sortBy required',
+        code: 'PLAN_UPDATE_EMPTY',
       },
     });
     expect(await call('PUT', '/api/plans/order', { ids: 'x' })).toEqual({
       status: 400,
-      body: { error: 'ids must be an array' },
+      body: { error: 'ids must be an array', code: 'PLAN_IDS_NOT_ARRAY' },
     });
     expect(await call('POST', '/api/plans/nope/entries', { dsoId: 'M1' })).toEqual({
       status: 404,
-      body: { error: 'Plan not found' },
+      body: { error: 'Plan not found', code: 'PLAN_NOT_FOUND' },
     });
     expect(await call('DELETE', '/api/plans/nope')).toEqual({
       status: 404,
-      body: { error: 'Plan not found' },
+      body: { error: 'Plan not found', code: 'PLAN_NOT_FOUND' },
     });
   });
 });
@@ -602,19 +603,22 @@ describe('gear setups', () => {
     });
     expect(await call('PUT', '/api/gear-setups/nope', { name: 'x' })).toEqual({
       status: 400,
-      body: { error: 'name, telescopeId, and cameraId are required' },
+      body: {
+        error: 'name, telescopeId, and cameraId are required',
+        code: 'SETUP_FIELDS_REQUIRED',
+      },
     });
     expect(await call('PATCH', '/api/gear-setups/nope/enabled', { enabled: 'yes' })).toEqual({
       status: 400,
-      body: { error: 'enabled must be boolean' },
+      body: { error: 'enabled must be boolean', code: 'SETUP_ENABLED_NOT_BOOLEAN' },
     });
     expect(await call('PATCH', '/api/gear-setups/nope/enabled', { enabled: true })).toEqual({
       status: 404,
-      body: { error: 'Setup not found' },
+      body: { error: 'Setup not found', code: 'SETUP_NOT_FOUND' },
     });
     expect(await call('DELETE', '/api/gear-setups/nope')).toEqual({
       status: 404,
-      body: { error: 'Setup not found' },
+      body: { error: 'Setup not found', code: 'SETUP_NOT_FOUND' },
     });
   });
 });
@@ -648,19 +652,20 @@ describe('custom gear', () => {
       status: 400,
       body: {
         error: 'Invalid type — must be telescope, camera, accessory, or filter',
+        code: 'INVALID_GEAR_TYPE',
       },
     });
     expect(await call('POST', '/api/custom-gear', { type: 'camera', data: [] })).toEqual({
       status: 400,
-      body: { error: 'Invalid data — must be a non-null object' },
+      body: { error: 'Invalid data — must be a non-null object', code: 'INVALID_GEAR_DATA' },
     });
     expect(await call('DELETE', '/api/custom-gear/askar-130phq')).toEqual({
       status: 400,
-      body: { error: 'Only custom gear items can be deleted' },
+      body: { error: 'Only custom gear items can be deleted', code: 'GEAR_NOT_CUSTOM' },
     });
     expect(await call('DELETE', '/api/custom-gear/custom-missing')).toEqual({
       status: 404,
-      body: { error: 'Not found' },
+      body: { error: 'Not found', code: 'GEAR_NOT_FOUND' },
     });
   });
 });
@@ -708,11 +713,11 @@ describe('POI categories', () => {
     });
     expect(await call('PATCH', '/api/poi-categories/nope', { name: 'x' })).toEqual({
       status: 404,
-      body: { error: 'Category not found' },
+      body: { error: 'Category not found', code: 'CATEGORY_NOT_FOUND' },
     });
     expect(await call('DELETE', '/api/poi-categories/nope')).toEqual({
       status: 404,
-      body: { error: 'Category not found' },
+      body: { error: 'Category not found', code: 'CATEGORY_NOT_FOUND' },
     });
   });
 });
@@ -761,15 +766,18 @@ describe('sky regions', () => {
       }),
     ).toEqual({
       status: 400,
-      body: { error: 'points must have at least 3 {azDeg,altDeg} vertices' },
+      body: {
+        error: 'points must have at least 3 {azDeg,altDeg} vertices',
+        code: 'INVALID_REGION_POINTS',
+      },
     });
     expect(await call('PATCH', '/api/sky-regions/nope', { name: 'x' })).toEqual({
       status: 404,
-      body: { error: 'Region not found' },
+      body: { error: 'Region not found', code: 'REGION_NOT_FOUND' },
     });
     expect(await call('DELETE', '/api/sky-regions/nope')).toEqual({
       status: 404,
-      body: { error: 'Region not found' },
+      body: { error: 'Region not found', code: 'REGION_NOT_FOUND' },
     });
   });
 });
@@ -788,11 +796,11 @@ describe('DSO overrides', () => {
   it('rejects bad requests', async () => {
     expect(await call('PUT', '/api/dso-overrides/M31', [])).toEqual({
       status: 400,
-      body: { error: 'Invalid override data' },
+      body: { error: 'Invalid override data', code: 'INVALID_DSO_DATA' },
     });
     expect(await call('PUT', `/api/dso-overrides/${'x'.repeat(101)}`, { name: 'x' })).toEqual({
       status: 400,
-      body: { error: 'Invalid DSO id' },
+      body: { error: 'Invalid DSO id', code: 'INVALID_DSO_ID' },
     });
   });
 });

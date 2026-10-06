@@ -94,9 +94,22 @@ export function parseServerError(
 ): string {
   if (data.code) {
     const translated = t('serverErrors.' + data.code);
-    if (!translated.startsWith('serverErrors.')) return translated;
+    // A message with a {placeholder} needs details the response only carries in `error`.
+    const needsDetail = /\{\w+\}/.test(translated) && !!data.error;
+    if (!translated.startsWith('serverErrors.') && !needsDetail) return translated;
   }
   return data.error || t(fallbackKey);
+}
+
+/** The message for a failed response: its `code` translated, else its `error`, else `fallbackKey`. */
+async function failureMessage(res: Response, fallbackKey: string): Promise<string> {
+  let data: { error?: string; code?: string } = {};
+  try {
+    data = await res.json();
+  } catch {
+    // the body is not JSON (or there is none): the fallback message is used
+  }
+  return parseServerError(data ?? {}, fallbackKey);
 }
 
 /**
@@ -240,13 +253,13 @@ export function uploadPhoto(
 
 export async function getPhotos(): Promise<Photo[]> {
   const res = await fetch('/api/photos');
-  if (!res.ok) throw new Error(t('errors.loadPhotos'));
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.loadPhotos'));
   return res.json();
 }
 
 export async function deletePhotoAPI(id: string): Promise<void> {
   const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error(t('errors.deletePhoto'));
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.deletePhoto'));
 }
 
 export async function updatePhotoManualPlacement(
@@ -258,7 +271,7 @@ export async function updatePhotoManualPlacement(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ manualPlacement }),
   });
-  if (!res.ok) throw new Error(t('errors.updatePhoto'));
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.updatePhoto'));
 }
 
 export async function updatePhotoMetadata(
@@ -280,7 +293,7 @@ export async function updatePhotoMetadata(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(metadata),
   });
-  if (!res.ok) throw new Error(t('errors.updatePhoto'));
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.updatePhoto'));
 }
 
 export async function updatePhotoOrder(photoIds: string[]): Promise<void> {
@@ -289,7 +302,7 @@ export async function updatePhotoOrder(photoIds: string[]): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ photoIds }),
   });
-  if (!res.ok) throw new Error(t('errors.updatePhoto'));
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.updatePhoto'));
 }
 
 export async function solveWCS(
@@ -310,7 +323,15 @@ export async function solveWCS(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(t('errors.wcsError', { text }));
+    let data: { error?: string; code?: string } | null = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // not JSON: the raw text is shown as before
+    }
+    throw new Error(
+      t('errors.wcsError', { text: data?.code ? parseServerError(data, 'errors.wcsError') : text }),
+    );
   }
 
   return res.json();
@@ -422,7 +443,7 @@ export async function pollPlateSolve(jobId: string): Promise<AstrometrySolveStat
   // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
   // still running server-side, so report it as in-progress and let the caller retry.
   if (res.status === 429) return { jobId, status: 'solving' };
-  if (!res.ok) throw new Error(t('errors.pollFailed'));
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.pollFailed'));
   return res.json();
 }
 
@@ -455,7 +476,7 @@ export async function pollLocalSolveJob(
   // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
   // still running server-side, so report it as pending and let the caller retry.
   if (res.status === 429) return { status: 'pending' };
-  if (!res.ok) throw new Error(t('errors.pollFailed'));
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.pollFailed'));
   return res.json();
 }
 
@@ -608,7 +629,7 @@ export async function reuseAstrometrySubmission(
   const res = await fetch('/api/astrometry/reuse', { method: 'POST', body: fd });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    return { success: false, error: data.error ?? t('errors.reuseSubmissionFailed') };
+    return { success: false, error: parseServerError(data, 'errors.reuseSubmissionFailed') };
   }
   return res.json();
 }
@@ -634,7 +655,7 @@ export async function exportData(
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
+    throw new Error(parseServerError(data, 'settings.importError'));
   }
   const blob = await res.blob();
   // Filename comes from Content-Disposition; fall back to a sensible default
@@ -650,7 +671,7 @@ export async function importPreview(file: File): Promise<ImportPreviewResult> {
   const res = await fetch('/api/import/preview', { method: 'POST', body: fd });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
+    throw new Error(parseServerError(data, 'settings.importError'));
   }
   return res.json();
 }
@@ -674,7 +695,7 @@ export async function importData(file: File, opts: ImportOptions): Promise<Impor
   const res = await fetch('/api/import', { method: 'POST', body: fd });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
+    throw new Error(parseServerError(data, 'settings.importError'));
   }
   return res.json();
 }
@@ -690,7 +711,7 @@ export function getSolverAvailability(settings: ServerSettings): SolverAvailabil
 
 export async function loadServerSettings(): Promise<ServerSettings> {
   const res = await fetch('/api/settings');
-  if (!res.ok) throw new Error('Failed to load settings');
+  if (!res.ok) throw new Error(await failureMessage(res, 'errors.loadSettings'));
   return res.json();
 }
 
@@ -710,7 +731,7 @@ export async function saveServerSettings(settings: {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
+    throw new Error(parseServerError(data, 'settings.importError'));
   }
 }
 
@@ -718,7 +739,7 @@ export async function clearAstrometryApiKey(): Promise<void> {
   const res = await fetch('/api/settings/astrometry-api-key', { method: 'DELETE' });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
+    throw new Error(parseServerError(data, 'settings.importError'));
   }
 }
 
@@ -738,7 +759,7 @@ export async function upsertDsoOverride(id: string, data: DSOUserOverride): Prom
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to save DSO override');
+    throw new Error(parseServerError(d, 'errors.saveDsoOverride'));
   }
 }
 
@@ -746,7 +767,7 @@ export async function deleteDsoOverride(id: string): Promise<void> {
   const res = await fetch(`/api/dso-overrides/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete DSO override');
+    throw new Error(parseServerError(d, 'errors.deleteDsoOverride'));
   }
 }
 
@@ -763,7 +784,7 @@ export async function createCustomGear(
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create custom gear');
+    throw new Error(parseServerError(d, 'errors.createCustomGear'));
   }
   return res.json();
 }
@@ -772,7 +793,7 @@ export async function deleteCustomGear(id: string): Promise<void> {
   const res = await fetch(`/api/custom-gear/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete custom gear');
+    throw new Error(parseServerError(d, 'errors.deleteCustomGear'));
   }
 }
 
@@ -784,7 +805,7 @@ export async function deleteBulkPhotos(ids: string[]): Promise<void> {
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? t('errors.deletePhoto'));
+    throw new Error(parseServerError(d, 'errors.deletePhoto'));
   }
 }
 
@@ -792,7 +813,7 @@ export async function deleteAllPhotoMetadata(): Promise<void> {
   const res = await fetch('/api/photo-metadata', { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? t('errors.deletePhoto'));
+    throw new Error(parseServerError(d, 'errors.deletePhoto'));
   }
 }
 
@@ -800,7 +821,7 @@ export async function deleteAllDsoOverrides(): Promise<void> {
   const res = await fetch('/api/dso-overrides', { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete DSO overrides');
+    throw new Error(parseServerError(d, 'errors.deleteDsoOverrides'));
   }
 }
 
@@ -808,7 +829,7 @@ export async function deleteAllCustomGear(): Promise<void> {
   const res = await fetch('/api/custom-gear', { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete custom gear');
+    throw new Error(parseServerError(d, 'errors.deleteCustomGear'));
   }
 }
 
@@ -818,7 +839,7 @@ export async function getGearSetups(): Promise<GearSetupData[]> {
   const res = await fetch('/api/gear-setups');
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load gear setups');
+    throw new Error(parseServerError(d, 'errors.loadGearSetups'));
   }
   return res.json();
 }
@@ -831,7 +852,7 @@ export async function createGearSetup(data: Omit<GearSetupData, 'id'>): Promise<
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create gear setup');
+    throw new Error(parseServerError(d, 'errors.createGearSetup'));
   }
   return res.json();
 }
@@ -844,7 +865,7 @@ export async function updateGearSetup(id: string, data: Omit<GearSetupData, 'id'
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update gear setup');
+    throw new Error(parseServerError(d, 'errors.updateGearSetup'));
   }
 }
 
@@ -856,7 +877,7 @@ export async function patchGearSetupEnabled(id: string, enabled: boolean): Promi
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update gear setup enabled state');
+    throw new Error(parseServerError(d, 'errors.updateGearSetupEnabled'));
   }
 }
 
@@ -864,7 +885,7 @@ export async function deleteGearSetupAPI(id: string): Promise<void> {
   const res = await fetch(`/api/gear-setups/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete gear setup');
+    throw new Error(parseServerError(d, 'errors.deleteGearSetup'));
   }
 }
 
@@ -872,7 +893,7 @@ export async function deleteAllGearSetupsAPI(): Promise<void> {
   const res = await fetch('/api/gear-setups', { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete all gear setups');
+    throw new Error(parseServerError(d, 'errors.deleteAllGearSetups'));
   }
 }
 
@@ -882,7 +903,7 @@ export async function getPoiCategories(): Promise<PoiCategory[]> {
   const res = await fetch('/api/poi-categories');
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load POI categories');
+    throw new Error(parseServerError(d, 'errors.loadPoiCategories'));
   }
   return res.json();
 }
@@ -898,7 +919,7 @@ export async function createPoiCategory(data: {
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create POI category');
+    throw new Error(parseServerError(d, 'errors.createPoiCategory'));
   }
   return res.json();
 }
@@ -914,7 +935,7 @@ export async function updatePoiCategory(
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update POI category');
+    throw new Error(parseServerError(d, 'errors.updatePoiCategory'));
   }
 }
 
@@ -922,7 +943,7 @@ export async function deletePoiCategoryAPI(id: string): Promise<void> {
   const res = await fetch(`/api/poi-categories/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete POI category');
+    throw new Error(parseServerError(d, 'errors.deletePoiCategory'));
   }
 }
 
@@ -932,7 +953,7 @@ export async function getSkyRegions(): Promise<SkyRegionData[]> {
   const res = await fetch('/api/sky-regions');
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load sky regions');
+    throw new Error(parseServerError(d, 'errors.loadSkyRegions'));
   }
   return res.json();
 }
@@ -947,7 +968,7 @@ export async function createSkyRegion(
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create sky region');
+    throw new Error(parseServerError(d, 'errors.createSkyRegion'));
   }
   return res.json();
 }
@@ -963,7 +984,7 @@ export async function updateSkyRegion(
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update sky region');
+    throw new Error(parseServerError(d, 'errors.updateSkyRegion'));
   }
 }
 
@@ -971,7 +992,7 @@ export async function deleteSkyRegionAPI(id: string): Promise<void> {
   const res = await fetch(`/api/sky-regions/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete sky region');
+    throw new Error(parseServerError(d, 'errors.deleteSkyRegion'));
   }
 }
 
@@ -981,7 +1002,7 @@ export async function getPlans(): Promise<Plan[]> {
   const res = await fetch('/api/plans');
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load plans');
+    throw new Error(parseServerError(d, 'errors.loadPlans'));
   }
   return res.json();
 }
@@ -994,7 +1015,7 @@ export async function createPlanAPI(name: string): Promise<{ id: string }> {
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create plan');
+    throw new Error(parseServerError(d, 'errors.createPlan'));
   }
   return res.json();
 }
@@ -1007,7 +1028,7 @@ export async function renamePlanAPI(id: string, name: string): Promise<void> {
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to rename plan');
+    throw new Error(parseServerError(d, 'errors.renamePlan'));
   }
 }
 
@@ -1025,7 +1046,7 @@ export async function updatePlanSettingsAPI(
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan settings');
+    throw new Error(parseServerError(d, 'errors.updatePlanSettings'));
   }
 }
 
@@ -1038,7 +1059,7 @@ export async function updatePlanSortAPI(id: string, sortBy: PlanSortKey): Promis
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan sort');
+    throw new Error(parseServerError(d, 'errors.updatePlanSort'));
   }
 }
 
@@ -1046,7 +1067,7 @@ export async function deletePlanAPI(id: string): Promise<void> {
   const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete plan');
+    throw new Error(parseServerError(d, 'errors.deletePlan'));
   }
 }
 
@@ -1058,7 +1079,7 @@ export async function reorderPlansAPI(ids: string[]): Promise<void> {
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to reorder plans');
+    throw new Error(parseServerError(d, 'errors.reorderPlans'));
   }
 }
 
@@ -1070,7 +1091,7 @@ export async function addPlanEntryAPI(planId: string, dsoId: string): Promise<{ 
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to add target to plan');
+    throw new Error(parseServerError(d, 'errors.addPlanTarget'));
   }
   return res.json();
 }
@@ -1088,7 +1109,7 @@ export async function addCustomPlanEntryAPI(
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to add custom frame to plan');
+    throw new Error(parseServerError(d, 'errors.addPlanFrame'));
   }
   return res.json();
 }
@@ -1100,7 +1121,7 @@ export async function removePlanEntryAPI(planId: string, entryId: string): Promi
   );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to remove target from plan');
+    throw new Error(parseServerError(d, 'errors.removePlanTarget'));
   }
 }
 
@@ -1116,7 +1137,7 @@ export async function createPlanMosaicAPI(
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create mosaic');
+    throw new Error(parseServerError(d, 'errors.createMosaic'));
   }
   return res.json();
 }
@@ -1137,7 +1158,7 @@ export async function updatePlanMosaicAPI(
   );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update mosaic');
+    throw new Error(parseServerError(d, 'errors.updateMosaic'));
   }
 }
 
@@ -1148,7 +1169,7 @@ export async function deletePlanMosaicAPI(planId: string, mosaicId: string): Pro
   );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete mosaic');
+    throw new Error(parseServerError(d, 'errors.deleteMosaic'));
   }
 }
 
@@ -1160,7 +1181,7 @@ export async function reorderPlanEntriesAPI(planId: string, ids: string[]): Prom
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to reorder plan entries');
+    throw new Error(parseServerError(d, 'errors.reorderPlanEntries'));
   }
 }
 
@@ -1179,7 +1200,7 @@ export async function updatePlanEntryPAAPI(
   );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan entry position angle');
+    throw new Error(parseServerError(d, 'errors.updatePlanEntryAngle'));
   }
 }
 
@@ -1211,7 +1232,7 @@ export async function updatePlanEntryPositionAPI(
   );
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan entry position');
+    throw new Error(parseServerError(d, 'errors.updatePlanEntryPosition'));
   }
 }
 

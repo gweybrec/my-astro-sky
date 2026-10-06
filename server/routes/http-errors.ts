@@ -15,7 +15,10 @@ const STATUS_BY_KIND: Record<DomainErrorKind, number> = {
  */
 export function sendError(res: Response, err: unknown, fallbackStatus = 500): void {
   if (isDomainError(err)) {
-    res.status(STATUS_BY_KIND[err.kind]).json(err.body ?? { error: err.message });
+    res.status(STATUS_BY_KIND[err.kind]).json({
+      ...(err.body ?? { error: err.message }),
+      ...(err.body?.code ? {} : { code: err.code }),
+    });
     return;
   }
   res.status(fallbackStatus).json({ error: (err as Error).message });

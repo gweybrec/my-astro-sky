@@ -2,6 +2,7 @@
  * DSO overrides: the user's own corrections to catalog objects (name, type, coordinates),
  * stored as one JSON document per catalog id.
  */
+import type { ErrorCode } from '../domain/error-codes';
 import { DomainError } from '../domain/errors';
 import type { SqlDb } from '../ports/sql-db';
 import type { DSOUserOverride } from '../types';
@@ -31,7 +32,7 @@ export interface DsoOverrideService {
  */
 export function validateDsoOverrideCoords(
   data: Record<string, unknown>,
-): { error: string; code: string } | null {
+): { error: string; code: ErrorCode } | null {
   if (typeof data.ra === 'number' && (data.ra < 0 || data.ra >= 360)) {
     return { error: 'RA must be in [0, 360)', code: 'INVALID_DSO_RA' };
   }
