@@ -32,7 +32,7 @@ vi.mock('../../src/api', () => ({
   updatePlanMosaicAPI: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../src/gear-catalog', () => ({
+vi.mock('@myastrosky/core/gear-catalog', () => ({
   getTelescopes: vi.fn().mockResolvedValue([
     { id: 't1', focal_length_mm: 500, aperture_mm: 80, is_smart_telescope: false },
     {
@@ -82,7 +82,7 @@ vi.mock('../../src/gear-catalog', () => ({
   ),
 }));
 
-vi.mock('../../src/gear-presets', () => ({
+vi.mock('@myastrosky/core/gear-presets', () => ({
   fovDeg: vi.fn().mockReturnValue({ wDeg: 2.5, hDeg: 1.7 }),
   formatSetupCanvasLabel: vi.fn().mockReturnValue('Setup 1 · 2.5° × 1.7°'),
 }));
@@ -98,8 +98,8 @@ vi.mock('../../src/dso-catalog', () => ({
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { useFovFramesStore } from '../../src/stores/fov-frames';
-import { usePlansStore } from '../../src/stores/plans';
-import { framePointToSky, tileCenters } from '../../src/mosaic';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { framePointToSky, tileCenters } from '@myastrosky/core/mosaic';
 
 describe('fov-frames store', () => {
   beforeEach(() => {
@@ -1640,7 +1640,7 @@ describe('fov-frames store — smart-scope single-frame mosaics', () => {
     // Regression: setups saved for a smart scope carried an arbitrary cameraId (the
     // camera picker is disabled, so it never got updated), and loadSpecs used it
     // verbatim — every smart scope of the same focal length rendered the same wrong FOV.
-    const { buildGearPreset } = await import('../../src/gear-catalog');
+    const { buildGearPreset } = await import('@myastrosky/core/gear-catalog');
     (buildGearPreset as ReturnType<typeof vi.fn>).mockClear();
     await useFovFramesStore().loadSpecs();
 

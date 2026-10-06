@@ -256,14 +256,19 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { filterLabelCandidates } from '../../autocomplete-utils';
 import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
-import type { Photo, PhotoIntegration, PointOfInterest, CaptureDetails } from '../../types';
+import type {
+  Photo,
+  PhotoIntegration,
+  PointOfInterest,
+  CaptureDetails,
+} from '@myastrosky/core/types';
 import type { GearSetupData } from '../../api';
-import { CAPTURE_FIELDS } from '../../capture-fields';
+import { CAPTURE_FIELDS } from '@myastrosky/core/capture-fields';
 import { t } from '../../i18n';
-import { searchDSOs } from '../../search';
+import { searchDSOs } from '@myastrosky/core/search';
 import { showToast } from '../../toast';
 import { formatIntegrationTotal, normalizeIntegrationFilterKey } from '../../batch-utils';
-import { isoToDatetimeLocal, datetimeLocalToIso } from '../../datetime-local';
+import { isoToDatetimeLocal, datetimeLocalToIso } from '@myastrosky/core/datetime-local';
 import FilterInput from './FilterInput.vue';
 import PoiEditor from './PoiEditor.vue';
 import trashSvg from '../../icons/trash.svg?raw';

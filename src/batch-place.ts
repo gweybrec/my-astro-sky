@@ -4,10 +4,10 @@ import type {
   PhotoIntegration,
   PointOfInterest,
   CaptureDetails,
-} from './types';
+} from '@myastrosky/core/types';
 import type { BatchItem } from './batch-types';
 import { sanitizeIntegrationRows } from './batch-utils';
-import { sanitizeCaptureDetails } from './capture-fields';
+import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
 
 type UploadFn = (
   file: File,

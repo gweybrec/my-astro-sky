@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseVersion, compareVersions, isUpdateAvailable } from '../../src/version-check';
+import { parseVersion, compareVersions, isUpdateAvailable } from '@myastrosky/core/version-check';
 
 describe('parseVersion', () => {
   it('parses a plain semver string', () => {

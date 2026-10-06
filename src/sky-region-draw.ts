@@ -13,7 +13,7 @@
  * The Alt/Az conversion is injected (`toAltAz`) so the gesture carries no projection or
  * observer state of its own.
  */
-import type { AltAzPoint } from './sky-map-types';
+import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
 
 /** Minimum captured points for a region to be considered drawn rather than cancelled. */
 export const REGION_MIN_POINTS = 3;

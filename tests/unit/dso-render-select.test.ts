@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DSO, DSOType, ViewState } from '../../src/types';
+import type { DSO, DSOType, ViewState } from '@myastrosky/core/types';
 
 /**
  * DSO render selection: the single source of truth for which DSOs are drawn in a
@@ -23,7 +23,7 @@ vi.mock('../../src/dso-catalog', () => ({
 }));
 
 import { DsoRenderSelection } from '../../src/dso-render-select';
-import { setCenterMode, setHemisphere, setProjectionMode } from '../../src/projection';
+import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';
 
 function makeDSO(over: Partial<DSO> & { id: string }): DSO {
   return {

@@ -6,7 +6,7 @@ import {
   wrapAz,
   HORIZON_ALT_FLOOR_DEG,
   type HorizonProfile,
-} from '../../src/horizon-io';
+} from '@myastrosky/core/horizon-io';
 
 describe('wrapAz', () => {
   it('normalises into [0,360)', () => {

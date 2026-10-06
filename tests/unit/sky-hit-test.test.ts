@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DSO, DSOType, Star, ViewState } from '../../src/types';
-import type { HorizonProfile } from '../../src/horizon-io';
+import type { DSO, DSOType, Star, ViewState } from '@myastrosky/core/types';
+import type { HorizonProfile } from '@myastrosky/core/horizon-io';
 
 /**
  * Cursor hit-testing against the star/DSO spatial indexes and the terrain summits.
@@ -38,9 +38,9 @@ import {
   setProjectionMode,
   project,
   toCanvas,
-} from '../../src/projection';
-import { raDecFromAltAz } from '../../src/sky-geometry';
-import { starAreaBudget } from '../../src/star-budget';
+} from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import { starAreaBudget } from '@myastrosky/core/star-budget';
 
 function makeStar(over: Partial<Star> & { hip: number }): Star {
   return { ra: 0, dec: 85, mag: 4, bv: 0.5, ...over };

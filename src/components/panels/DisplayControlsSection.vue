@@ -275,9 +275,9 @@ import { useDisplayStore } from '../../stores/display';
 import { useFisheyeStore } from '../../stores/fisheye';
 import { useSkyTimeStore } from '../../stores/sky-time';
 import { useI18n } from '../../composables/useI18n';
-import { isIAUStyle } from '../../types';
-import type { ConstellationStyle } from '../../types';
-import { DSO_TYPES_ALL } from '../../display-settings';
+import { isIAUStyle } from '@myastrosky/core/types';
+import type { ConstellationStyle } from '@myastrosky/core/types';
+import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 
 const { t } = useI18n();

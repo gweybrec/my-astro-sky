@@ -17,12 +17,12 @@
  *
  * The pan state lives here because only these handlers touch it.
  */
-import type { Star, ViewState } from './types';
-import type { PhotoOutline } from './photo-outline';
-import type { AltAzPoint } from './sky-map-types';
-import { fromCanvas, isInsideBorderCircle } from './projection';
-import { zoomAboutPoint } from './sky-view-math';
-import { findTopPhotoOutlineAtPoint } from './photo-outline';
+import type { Star, ViewState } from '@myastrosky/core/types';
+import type { PhotoOutline } from '@myastrosky/core/photo-outline';
+import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
+import { fromCanvas, isInsideBorderCircle } from '@myastrosky/core/projection';
+import { zoomAboutPoint } from '@myastrosky/core/sky-view-math';
+import { findTopPhotoOutlineAtPoint } from '@myastrosky/core/photo-outline';
 
 /** One registered listener, so the caller can remove them all on destroy. */
 export interface EventBinding {

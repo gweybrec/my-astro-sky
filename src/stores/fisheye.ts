@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { setProjectionMode } from '../projection';
+import { setProjectionMode } from '@myastrosky/core/projection';
 import { useCanvasStore } from './canvas';
 import { useDisplayStore } from './display';
 

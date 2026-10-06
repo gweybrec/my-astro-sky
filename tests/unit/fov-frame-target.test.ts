@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { frameTargetDso } from '../../src/fov-frame-target';
+import { frameTargetDso } from '@myastrosky/core/fov-frame-target';
 
 describe('frameTargetDso — target of a freely-placed plan frame', () => {
   it('a single DSO inside the frame becomes the target', () => {

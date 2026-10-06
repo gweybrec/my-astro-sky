@@ -1,8 +1,8 @@
 import { watch } from 'vue';
 import { t } from './i18n';
-import { angularSeparationDeg } from './sky-geometry';
-import type { FovFrameSpec } from './sky-map-types';
-import type { DSO } from './types';
+import { angularSeparationDeg } from '@myastrosky/core/sky-geometry';
+import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
+import type { DSO } from '@myastrosky/core/types';
 import { buildGearSectionContent, type GearSectionPrefs } from './targets-view';
 import {
   getTelescopes,
@@ -10,19 +10,19 @@ import {
   getAccessories,
   buildGearPreset,
   resolveSetupCamera,
-} from './gear-catalog';
-import { formatSetupCanvasLabel, formatFov, fovDeg } from './gear-presets';
-import { formatPaDeg } from './frame-orientation';
+} from '@myastrosky/core/gear-catalog';
+import { formatSetupCanvasLabel, formatFov, fovDeg } from '@myastrosky/core/gear-presets';
+import { formatPaDeg } from '@myastrosky/core/frame-orientation';
 import { reportUnknownRendererError } from './error-reporter';
 import { useFovFramesStore } from './stores/fov-frames';
 import { useCanvasStore } from './stores/canvas';
-import { usePlansStore } from './stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useUiStore } from './stores/ui';
 import { getDSOById } from './dso-catalog';
 import { customLocationLabel } from './star-catalog';
-import { autoRegionForDsos, planGrid, tileCenters } from './mosaic';
+import { autoRegionForDsos, planGrid, tileCenters } from '@myastrosky/core/mosaic';
 import { requestSetupSwitch } from './setup-switch';
-import { searchDSOs } from './search';
+import { searchDSOs } from '@myastrosky/core/search';
 import type { MosaicParams } from './api';
 import {
   getGearSetups,

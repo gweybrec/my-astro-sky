@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { StarSpriteAtlas, ATLAS_REBUILD_RATIO, type StarSprite } from '../../src/star-sprite-atlas';
-import { atlasScaleBucket } from '../../src/star-render-math';
+import { atlasScaleBucket } from '@myastrosky/core/star-render-math';
 
 /**
  * The sprite-atlas rebuild policy. Baking a sprite draws a ~15-stop gradient, so the

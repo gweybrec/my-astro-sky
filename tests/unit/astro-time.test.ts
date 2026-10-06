@@ -12,7 +12,7 @@ import {
   planetRaDecDeg,
   PLANET_KEYS,
   type PlanetKey,
-} from '../../src/astro-time';
+} from '@myastrosky/core/astro-time';
 
 describe('dateToJD', () => {
   // Meeus, Astronomical Algorithms, Table 7.a

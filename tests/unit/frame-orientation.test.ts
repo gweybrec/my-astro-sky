@@ -3,9 +3,13 @@ import {
   paToCanvasRotationDeg,
   canvasRotationToPaDeg,
   formatPaDeg,
-} from '../../src/frame-orientation';
-import { setCenterMode, setProjectionObserver, setProjectionMode } from '../../src/projection';
-import { raDecFromAltAz } from '../../src/sky-geometry';
+} from '@myastrosky/core/frame-orientation';
+import {
+  setCenterMode,
+  setProjectionObserver,
+  setProjectionMode,
+} from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
 
 /** Smallest signed difference between two angles, in (-180, 180]. */
 function angDiff(a: number, b: number): number {

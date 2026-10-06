@@ -19,7 +19,7 @@ vi.mock('../../src/dso-catalog', () => ({
 }));
 
 import { SkyMap } from '../../src/sky-map';
-import type { ViewState } from '../../src/types';
+import type { ViewState } from '@myastrosky/core/types';
 
 /**
  * The per-frame render context.

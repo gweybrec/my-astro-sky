@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyStarColor, SKY_THEME, type SkyThemeConfig } from '../../src/sky-themes';
+import { applyStarColor, SKY_THEME, type SkyThemeConfig } from '@myastrosky/core/sky-themes';
 
 function makeTheme(overrides: Partial<SkyThemeConfig>): SkyThemeConfig {
   return {

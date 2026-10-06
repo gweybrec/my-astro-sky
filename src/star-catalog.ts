@@ -1,4 +1,9 @@
-import type { Star, StarMultiplicity, ConstellationInfo, ConstellationStyle } from './types';
+import type {
+  Star,
+  StarMultiplicity,
+  ConstellationInfo,
+  ConstellationStyle,
+} from '@myastrosky/core/types';
 import { getLang, t } from './i18n';
 import { getStarCatalogUrl } from './api';
 import { normalizeRA } from '@myastrosky/core/angles';

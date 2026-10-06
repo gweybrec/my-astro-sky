@@ -99,9 +99,9 @@ import {
   deleteAllGearSetupsAPI,
 } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
-import { buildDeleteSummaryLines } from '../../delete-utils';
+import { buildDeleteSummaryLines } from '@myastrosky/core/delete-utils';
 import { showToast } from '../../toast';
-import { formatBytes } from '../../format-utils';
+import { formatBytes } from '@myastrosky/core/format-utils';
 import BulkDeleteConfirmDialog from './BulkDeleteConfirmDialog.vue';
 
 const emit = defineEmits<{ close: [] }>();

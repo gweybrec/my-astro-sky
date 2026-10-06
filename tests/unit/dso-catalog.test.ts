@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
-import type { AffineMatrix } from '../../src/types';
+import type { AffineMatrix } from '@myastrosky/core/types';
 
 vi.mock('../../src/i18n', () => ({
   getLang: vi.fn(() => 'en'),
@@ -7,12 +7,12 @@ vi.mock('../../src/i18n', () => ({
 
 // Simple linear projection mock: project(ra, dec) → {x: ra/360, y: dec/90}
 // Makes it easy to reason about which DSOs fall inside a given image region.
-vi.mock('../../packages/core/src/projection', () => ({
+vi.mock('@myastrosky/core/projection', () => ({
   project: vi.fn((ra: number, dec: number) => ({ x: ra / 360, y: dec / 90 })),
   invalidateProjections: vi.fn(),
 }));
 
-import type { PhotoCorrespondence } from '../../src/types';
+import type { PhotoCorrespondence } from '@myastrosky/core/types';
 import {
   loadDSOCatalog,
   getDSOs,

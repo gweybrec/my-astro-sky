@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decodeTiffToBytes, UnsupportedTiffError } from '../../server/raw-decode/tiff-decoder';
+import { decodeTiffToBytes, UnsupportedTiffError } from '@myastrosky/core/raw-decode/tiff-decoder';
 import { buildTiff } from '../fixtures/tiff-builders';
 
 describe('decodeTiffToBytes — 8-bit unsigned mono, uncompressed', () => {

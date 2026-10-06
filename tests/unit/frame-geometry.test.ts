@@ -8,11 +8,11 @@ import {
   framePinGlyphPos,
   paToCanvasRotDeg,
   canvasRotDegToPa,
-} from '../../src/frame-geometry';
-import { setHemisphere, setCenterMode, setProjectionObserver } from '../../src/projection';
-import { raDecFromAltAz } from '../../src/sky-geometry';
-import type { RenderableFrame } from '../../src/sky-map-types';
-import type { ViewState } from '../../src/types';
+} from '@myastrosky/core/frame-geometry';
+import { setHemisphere, setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import type { RenderableFrame } from '@myastrosky/core/sky-map-types';
+import type { ViewState } from '@myastrosky/core/types';
 
 const view: ViewState = {
   centerX: 0,

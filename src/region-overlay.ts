@@ -1,6 +1,6 @@
 import { t } from './i18n';
 import type { SkyMap } from './sky-map';
-import { useSkyRegionsStore } from './stores/sky-regions';
+import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { confirmSkyRegionDelete } from './photo-delete-confirm';
 import { showToast } from './toast';
 import { reportUnknownRendererError } from './error-reporter';

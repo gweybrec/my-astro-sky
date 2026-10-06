@@ -5,7 +5,7 @@ import type {
   PointOfInterest,
   CaptureDetails,
   Photo,
-} from './types';
+} from '@myastrosky/core/types';
 
 export type SolverType = 'solve-field' | 'astap' | 'astrometry';
 export type BatchItemStatus =

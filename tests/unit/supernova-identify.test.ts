@@ -23,9 +23,9 @@ import {
   SUPERNOVA_CATEGORY_ID,
   type TnsCandidate,
   type PlacedTransient,
-} from '../../src/supernova-identify';
-import { fitPhotoAffine } from '../../src/photo-placement';
-import { project } from '../../src/projection';
+} from '@myastrosky/core/supernova-identify';
+import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
+import { project } from '@myastrosky/core/projection';
 import { parseTnsCsv } from '@myastrosky/core/services/identify';
 
 const CANDIDATES: TnsCandidate[] = parseTnsCsv(

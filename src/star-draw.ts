@@ -4,7 +4,7 @@
  * `ctx` half: painting a resolved {@link StarPaint} and baking it into an offscreen
  * sprite for the atlas. Not unit-tested (canvas).
  */
-import type { StarPaint } from './star-render-math';
+import type { StarPaint } from '@myastrosky/core/star-render-math';
 
 /**
  * Paint a single star at (cx, cy). A one-gradient opaque-core→halo for glowing stars,

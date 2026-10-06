@@ -10,17 +10,17 @@
  * Everything the queries depend on is passed in per call, so no view or display state
  * is duplicated here.
  */
-import type { DSO, Point, Star, ViewState } from './types';
-import type { HorizonProfile, HorizonSummit } from './horizon-io';
-import type { HorizonParams } from './sky-map-types';
-import { project, projectCached, toCanvas, fromCanvas } from './projection';
+import type { DSO, Point, Star, ViewState } from '@myastrosky/core/types';
+import type { HorizonProfile, HorizonSummit } from '@myastrosky/core/horizon-io';
+import type { HorizonParams } from '@myastrosky/core/sky-map-types';
+import { project, projectCached, toCanvas, fromCanvas } from '@myastrosky/core/projection';
 import { getStars } from './star-catalog';
 import { getDSOs } from './dso-catalog';
-import { SpatialIndex } from './spatial-index';
-import { pickDsoAtCursor } from './hover-hit-test';
-import { pointInConvexPolygon } from './photo-outline';
-import { raDecFromAltAz } from './sky-geometry';
-import { starFaintLimitAt, type StarAreaBudget } from './star-budget';
+import { SpatialIndex } from '@myastrosky/core/spatial-index';
+import { pickDsoAtCursor } from '@myastrosky/core/hover-hit-test';
+import { pointInConvexPolygon } from '@myastrosky/core/photo-outline';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import { starFaintLimitAt, type StarAreaBudget } from '@myastrosky/core/star-budget';
 
 /** Display state the DSO index depends on (mirrors the render-pass filters). */
 export interface DsoIndexFilters {

@@ -21,11 +21,20 @@
  * mirrors the sibling app's `AnnotationOverlay.kt`: "Outlines scale with the zoom;
  * labels do not."
  */
-import type { DSO, DSOType } from './types';
+import type { DSO, DSOType } from '@myastrosky/core/types';
 import type { PhotoDsoPlacement } from './dso-catalog';
-import { placeLabel, type Rect, type Clearance, type Size } from './dso-label-placement';
-import { formatCatalogId } from './dso-label';
-import { DSO_MARKER_STYLES, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR } from './canvas-theme';
+import {
+  placeLabel,
+  type Rect,
+  type Clearance,
+  type Size,
+} from '@myastrosky/core/dso-label-placement';
+import { formatCatalogId } from '@myastrosky/core/dso-label';
+import {
+  DSO_MARKER_STYLES,
+  DSO_LABEL_COLORS,
+  DEFAULT_DSO_LABEL_COLOR,
+} from '@myastrosky/core/canvas-theme';
 
 const MIN_RADIUS_PX = 2;
 /** Breathing room between a label and the outline it clears. The label-clearance

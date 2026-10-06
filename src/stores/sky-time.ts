@@ -7,8 +7,8 @@ import {
   saveSkyTimeSettings,
   RATE_LADDER,
   type SkyTimeSettings,
-} from '../sky-time-settings';
-import { twilightWindow } from '../astro-time';
+} from '@myastrosky/core/sky-time-settings';
+import { twilightWindow } from '@myastrosky/core/astro-time';
 
 // Read-only, one-shot default seed for the location fields — see seedLocationIfNeeded().
 // Not imported from targets-view.ts to avoid coupling the two features; this store never

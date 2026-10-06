@@ -182,7 +182,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
-import { useSettingsStore } from '../../stores/settings';
+import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import { probeLocalSolver } from '../../api';
 import { useI18n } from '../../composables/useI18n';
 import { showToast } from '../../toast';

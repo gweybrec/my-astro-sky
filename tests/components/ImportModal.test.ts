@@ -30,10 +30,12 @@ vi.mock('../../src/stores/canvas', () => ({
 vi.mock('../../src/stores/shortcuts', () => ({
   useShortcutsStore: () => ({ importJSON: vi.fn() }),
 }));
-vi.mock('../../src/stores/poi-categories', () => ({
+vi.mock('@myastrosky/app-state/stores/poi-categories', () => ({
   usePoiCategoriesStore: () => ({ load: vi.fn() }),
 }));
-vi.mock('../../src/stores/sky-regions', () => ({ useSkyRegionsStore: () => ({ load: vi.fn() }) }));
+vi.mock('@myastrosky/app-state/stores/sky-regions', () => ({
+  useSkyRegionsStore: () => ({ load: vi.fn() }),
+}));
 
 /** One plan per setup state: none, identical, different. */
 const PREVIEW = {

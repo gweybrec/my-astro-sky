@@ -6,7 +6,7 @@ import { useShortcutsStore } from '../stores/shortcuts';
 import { useSkyTimeStore } from '../stores/sky-time';
 import { openVueModal } from '../modal-host';
 import { focusSearchInput } from '../ui';
-import { normalizeKey, type ShortcutActionId } from '../keyboard-shortcuts';
+import { normalizeKey, type ShortcutActionId } from '@myastrosky/core/keyboard-shortcuts';
 
 export function useKeyboardShortcuts() {
   const canvasStore = useCanvasStore();

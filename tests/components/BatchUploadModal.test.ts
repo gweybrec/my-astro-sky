@@ -36,7 +36,7 @@ vi.mock('../../src/batch-utils', () => ({
 vi.mock('../../src/stores/canvas', () => ({
   useCanvasStore: () => ({ overlay: null, gallery: null }),
 }));
-vi.mock('../../src/stores/settings', () => ({
+vi.mock('@myastrosky/app-state/stores/settings', () => ({
   useSettingsStore: () => ({
     serverSettings: { MAX_PARALLEL_SOLVES: state.maxParallel },
     load: vi.fn(),

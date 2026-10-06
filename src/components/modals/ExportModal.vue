@@ -86,7 +86,7 @@ import { useShortcutsStore } from '../../stores/shortcuts';
 import { exportData } from '../../api';
 import type { ExportOptions } from '../../api';
 import { showToast } from '../../toast';
-import { formatBytes } from '../../format-utils';
+import { formatBytes } from '@myastrosky/core/format-utils';
 
 const emit = defineEmits<{ close: [] }>();
 

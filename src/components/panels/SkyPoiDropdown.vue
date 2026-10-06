@@ -77,8 +77,8 @@ import { t } from '../../i18n';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { useDisplayStore } from '../../stores/display';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { buildPoiFilterGroups, poiKey, type PoiFilterGroup } from '../../poi';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { buildPoiFilterGroups, poiKey, type PoiFilterGroup } from '@myastrosky/core/poi';
 import { poiTypeIcon } from '../../poi-icons';
 
 /** Greyed out + inert while "Show points of interest" is off (like DSO Types/Catalogs). */

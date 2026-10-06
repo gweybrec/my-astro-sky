@@ -9,7 +9,7 @@ vi.mock('@myastrosky/app-state/api', () => ({
 }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
-import { usePlansStore } from '../../src/stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { getPlans, updatePlanSortAPI, type Plan } from '../../src/api';
 
 function makePlan(id: string, setupId: string | null): Plan {

@@ -4,14 +4,14 @@ import {
   filterBadgeAttrs,
   buildIntegrationFilterField,
 } from '../../src/chip-utils';
-import { resolveCatalogFilter } from '../../src/gear-catalog';
+import { resolveCatalogFilter } from '@myastrosky/core/gear-catalog';
 import type { FilterCatalogEntry } from '../../src/autocomplete-utils';
 
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
 
 // The catalog is fetched at runtime; stub the two lookups chip-utils performs so
 // badge colouring can be tested without a network round-trip.
-vi.mock('../../src/gear-catalog', () => ({
+vi.mock('@myastrosky/core/gear-catalog', () => ({
   resolveCatalogFilter: vi.fn(() => null),
   getVisibleFilterEntries: vi.fn(() => []),
 }));

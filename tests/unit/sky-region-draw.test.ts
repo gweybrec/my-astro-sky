@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { RegionDrawGesture, REGION_DEDUPE_DEG, REGION_MIN_POINTS } from '../../src/sky-region-draw';
-import type { AltAzPoint } from '../../src/sky-map-types';
+import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
 
 /**
  * The freehand sky-region gesture. Points are captured in Alt/Az (time-invariant, so a

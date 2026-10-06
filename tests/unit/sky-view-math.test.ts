@@ -4,9 +4,9 @@ import {
   navigateDurationMs,
   navigateProfile,
   zoomAboutPoint,
-} from '../../src/sky-view-math';
-import { fromCanvas, setHemisphere } from '../../src/projection';
-import type { ViewState } from '../../src/types';
+} from '@myastrosky/core/sky-view-math';
+import { fromCanvas, setHemisphere } from '@myastrosky/core/projection';
+import type { ViewState } from '@myastrosky/core/types';
 
 const view: ViewState = {
   centerX: 0.1,

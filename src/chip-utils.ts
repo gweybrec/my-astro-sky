@@ -3,9 +3,13 @@ import {
   type FilterCandidate,
   type FilterCatalogEntry,
 } from './autocomplete-utils';
-import { filterBadgeColors } from './color-utils';
+import { filterBadgeColors } from '@myastrosky/core/color-utils';
 import { filterCssKey } from '@myastrosky/core/filter-keys';
-import { resolveCatalogFilter, getVisibleFilterEntries, filterDetail } from './gear-catalog';
+import {
+  resolveCatalogFilter,
+  getVisibleFilterEntries,
+  filterDetail,
+} from '@myastrosky/core/gear-catalog';
 
 /**
  * Creates a colored filter badge identical to the ones shown in the

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useSkyTimeStore } from '../../src/stores/sky-time';
-import { SKY_TIME_SETTINGS_KEY, RATE_LADDER } from '../../src/sky-time-settings';
-import { twilightWindow } from '../../src/astro-time';
+import { SKY_TIME_SETTINGS_KEY, RATE_LADDER } from '@myastrosky/core/sky-time-settings';
+import { twilightWindow } from '@myastrosky/core/astro-time';
 
 describe('sky-time store', () => {
   beforeEach(() => {

@@ -11,7 +11,7 @@ import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBackupService, type BackupFile } from '@myastrosky/core/services/backup';
-import { createServices } from '../../server/create-services';
+import { createServices } from '@myastrosky/core/services/create-services';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 import { SQL_ADAPTERS } from '../helpers/sql-adapters';

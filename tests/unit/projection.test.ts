@@ -22,8 +22,8 @@ import {
   setProjectionObserver,
   getCenterMode,
   getProjectionMode,
-} from '../../src/projection';
-import { altAzFromRaDec } from '../../src/sky-geometry';
+} from '@myastrosky/core/projection';
+import { altAzFromRaDec } from '@myastrosky/core/sky-geometry';
 
 const EPSILON = 1e-9;
 

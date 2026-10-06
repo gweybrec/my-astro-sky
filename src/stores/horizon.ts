@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { useCanvasStore } from './canvas';
 import { useSkyTimeStore } from './sky-time';
 import { fetchHorizonProfile } from '../api';
-import { parseHorizonFile, type HorizonProfile } from '../horizon-io';
+import { parseHorizonFile, type HorizonProfile } from '@myastrosky/core/horizon-io';
 import { t } from '../i18n';
 
 const HORIZON_SETTINGS_KEY = 'horizon-settings-v1';

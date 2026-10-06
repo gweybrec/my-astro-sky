@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DSO, DSOType, ViewState } from '../../src/types';
-import type { RenderableFrame, FovFrameChange } from '../../src/sky-map-types';
+import type { DSO, DSOType, ViewState } from '@myastrosky/core/types';
+import type { RenderableFrame, FovFrameChange } from '@myastrosky/core/sky-map-types';
 import { FrameController, type FrameHost } from '../../src/frame-controller';
-import { frameGeometry, framePinGlyphPos } from '../../src/frame-geometry';
-import { rotateHandlePos } from '../../src/fov-frame-geometry';
-import { setCenterMode, setHemisphere, setProjectionMode } from '../../src/projection';
+import { frameGeometry, framePinGlyphPos } from '@myastrosky/core/frame-geometry';
+import { rotateHandlePos } from '@myastrosky/core/fov-frame-geometry';
+import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';
 
 /**
  * The interactive FOV-frame state machine, driven against a stub host — no canvas.

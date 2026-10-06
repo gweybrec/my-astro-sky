@@ -33,7 +33,7 @@ import { watch, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
 import { useFovFramesStore } from '../../stores/fov-frames';
-import { usePlansStore } from '../../stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { buildFovPopup } from '../../fov-overlay';
 import { positionPopup } from '../../ui';
 import { useUiStore } from '../../stores/ui';

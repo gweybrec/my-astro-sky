@@ -52,12 +52,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Photo, PointOfInterest } from '../../types';
+import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 import { t } from '../../i18n';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { resolveCategory } from '../../poi';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { resolveCategory } from '@myastrosky/core/poi';
 import { poiTypeIcon } from '../../poi-icons';
-import { computePhotoToProjMatrix } from '../../photo-placement';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
 import {
   triggerAsteroidModal,
   triggerSupernovaModal,

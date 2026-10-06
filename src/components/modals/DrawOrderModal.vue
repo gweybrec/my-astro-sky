@@ -51,7 +51,7 @@ import { t } from '../../i18n';
 import BaseModal from '../base/BaseModal.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
-import { filterDrawOrderPhotos } from '../../photo-draw-order';
+import { filterDrawOrderPhotos } from '@myastrosky/core/photo-draw-order';
 import { updatePhotoOrder } from '../../api';
 import { showToast } from '../../toast';
 

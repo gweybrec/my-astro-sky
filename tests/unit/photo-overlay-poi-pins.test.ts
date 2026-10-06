@@ -8,8 +8,8 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PhotoOverlay } from '../../src/photo-overlay';
-import type { PoiCategory } from '../../src/types';
-import { poiKey } from '../../src/poi';
+import type { PoiCategory } from '@myastrosky/core/types';
+import { poiKey } from '@myastrosky/core/poi';
 
 const CATEGORIES: PoiCategory[] = [
   { id: 'cat-supernova', name: 'Supernova', color: '#ff5a5a', position: 4 },

@@ -8,16 +8,16 @@
  * run inline against the main context — which is now simply "a scene with a different
  * `ctx`" rather than a temporary reassignment of the map's own context.
  */
-import type { HorizonParams } from './sky-map-types';
+import type { HorizonParams } from '@myastrosky/core/sky-map-types';
 import type { SkyScene } from './sky-scene';
 import { t } from './i18n';
-import { project, toCanvas, unproject, borderRadiusPU } from './projection';
-import { raDecFromAltAz } from './sky-geometry';
-import { canvasPxPerDeg, isSkyPointVisible, OFF_PROJECTION } from './sky-axes';
+import { project, toCanvas, unproject, borderRadiusPU } from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import { canvasPxPerDeg, isSkyPointVisible, OFF_PROJECTION } from '@myastrosky/core/sky-axes';
 import { drawBodyMarker, drawBodyLabel } from './body-draw';
-import { computeFovFrameCorners } from './frame-geometry';
-import { angularSizeToCanvasPx } from './dso-render-math';
-import { photoLabelEdgeIndex } from './photo-outline';
+import { computeFovFrameCorners } from '@myastrosky/core/frame-geometry';
+import { angularSizeToCanvasPx } from '@myastrosky/core/dso-render-math';
+import { photoLabelEdgeIndex } from '@myastrosky/core/photo-outline';
 import {
   drawMountainHorizon,
   drawSummitDots,
@@ -32,7 +32,7 @@ import {
   drawResizeDraftRect,
   drawElasticSnapLine,
 } from './frame-draw';
-import { FRAME, PHOTO_OUTLINE, TRAJECTORY } from './canvas-theme';
+import { FRAME, PHOTO_OUTLINE, TRAJECTORY } from '@myastrosky/core/canvas-theme';
 import { drawPoiPin } from './poi-pins';
 
 /** Frame stroke/label colours resolved from CSS custom properties. */

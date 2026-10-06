@@ -10,7 +10,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import SkyPoiDropdown from '../../src/components/panels/SkyPoiDropdown.vue';
 import { useDisplayStore } from '../../src/stores/display';
-import { poiKey } from '../../src/poi';
+import { poiKey } from '@myastrosky/core/poi';
 
 const setVisiblePois = vi.fn();
 const photos = [

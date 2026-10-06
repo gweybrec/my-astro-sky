@@ -50,9 +50,9 @@ import { computed } from 'vue';
 import { t } from '../../i18n';
 import type { StarSearchResult } from '../../api';
 import { formatMultiplicity } from '../../star-catalog';
-import { formatRA, formatDec, formatAlt } from '../../format-utils';
+import { formatRA, formatDec, formatAlt } from '@myastrosky/core/format-utils';
 import StarActions from './StarActions.vue';
-import { altitudeAtDeg } from '../../sky-geometry';
+import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
 import { useSkyTimeStore } from '../../stores/sky-time';
 
 const props = defineProps<{ star: StarSearchResult }>();

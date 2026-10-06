@@ -10,7 +10,7 @@ import type {
   PointOfInterest,
   PoiCategory,
   AffineMatrix,
-} from './types';
+} from '@myastrosky/core/types';
 import {
   project,
   toCanvas,
@@ -18,9 +18,9 @@ import {
   unproject,
   borderRadiusPU,
   getProjectionGeneration,
-} from './projection';
+} from '@myastrosky/core/projection';
 import { reportUnknownRendererError } from './error-reporter';
-import { affineToCSS } from './affine';
+import { affineToCSS } from '@myastrosky/core/affine';
 import {
   fitPhotoAffine,
   buildPhotoPoints,
@@ -39,7 +39,7 @@ import {
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
   formatZoomPercent,
-} from './photo-placement';
+} from '@myastrosky/core/photo-placement';
 import {
   uploadPhoto,
   deletePhotoAPI,
@@ -56,7 +56,7 @@ import {
   getSolverAvailability,
   photoFileUrl,
 } from './api';
-import { searchUnified, searchDSOs } from './search';
+import { searchUnified, searchDSOs } from '@myastrosky/core/search';
 
 /** A (possibly relative) address as an `<img>`'s `src` reports it. */
 const absoluteUrl = (url: string): string => new URL(url, document.baseURI).href;
@@ -64,15 +64,15 @@ import { showToast } from './toast';
 import { getDSOById, findDSOsInImage } from './dso-catalog';
 import { renderSharedSolveStatus } from './solve-status-widget';
 import type { SkyMap } from './sky-map';
-import type { ViewChangeCallback } from './sky-map-types';
+import type { ViewChangeCallback } from '@myastrosky/core/sky-map-types';
 import { t } from './i18n';
 import { stripExtension } from './file-utils';
-import type { PhotoCanvasQuad } from './photo-draw-order';
+import type { PhotoCanvasQuad } from '@myastrosky/core/photo-draw-order';
 import { buildIntegrationFilterField } from './chip-utils';
 import trashSvg from './icons/trash.svg?raw';
 import { createImageZoomPan } from './image-zoom';
 import { hasPosition, type SkyPoiPin } from './poi-pins';
-import { resolveCategory, isPoiVisible } from './poi';
+import { resolveCategory, isPoiVisible } from '@myastrosky/core/poi';
 
 /** Result of the manual star-identification sub-modal (see openManualIdentifyModal). */
 export type ManualIdentifyResult =

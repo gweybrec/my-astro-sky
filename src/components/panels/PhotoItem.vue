@@ -74,9 +74,9 @@ import PhotoChip from './PhotoChip.vue';
 import EyeToggleButton from '../base/EyeToggleButton.vue';
 import imageSvg from '../../icons/image.svg?raw';
 import type { PlacedPhoto } from '../../photo-overlay';
-import type { PointOfInterest } from '../../types';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { resolveCategory } from '../../poi';
+import type { PointOfInterest } from '@myastrosky/core/types';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { resolveCategory } from '@myastrosky/core/poi';
 import { poiTypeIcon } from '../../poi-icons';
 
 const props = withDefaults(

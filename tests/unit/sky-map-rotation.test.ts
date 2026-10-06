@@ -11,9 +11,9 @@ vi.mock('../../src/dso-catalog', () => ({
   getDSOCatalog: () => null,
 }));
 
-import { fromCanvas } from '../../src/projection';
+import { fromCanvas } from '@myastrosky/core/projection';
 import { SkyMap } from '../../src/sky-map';
-import { normalizeRotationDeg } from '../../src/sky-map-types';
+import { normalizeRotationDeg } from '@myastrosky/core/sky-map-types';
 
 describe('SkyMap rotation', () => {
   let originalGetContext: typeof HTMLCanvasElement.prototype.getContext;

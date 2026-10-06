@@ -14,7 +14,10 @@ import {
   sanitizeCaptureDetails as serverSanitize,
   CAPTURE_FITS_MAP,
 } from '../../server/wcs-reader';
-import { CAPTURE_FIELDS, sanitizeCaptureDetails as clientSanitize } from '../../src/capture-fields';
+import {
+  CAPTURE_FIELDS,
+  sanitizeCaptureDetails as clientSanitize,
+} from '@myastrosky/core/capture-fields';
 
 // ─── Date placeholder handling ─────────────────────────────────────────────────
 

@@ -165,7 +165,7 @@ vi.mock('../../src/stores/canvas', () => ({
   }),
 }));
 
-vi.mock('../../src/display-settings', () => ({
+vi.mock('@myastrosky/core/display-settings', () => ({
   DSO_TYPES_ALL: ['GxS', 'GxE', 'GxI', 'Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?'],
   DSO_CATALOGS_DEFAULT_ON: new Set(['M', 'NGC', 'IC', 'SH2']),
   loadSettings: () => ({

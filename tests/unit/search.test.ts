@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import type { Star, DSO } from '../../src/types';
+import type { Star, DSO } from '@myastrosky/core/types';
 
 vi.mock('@myastrosky/core/i18n/index', () => ({ t: (key: string) => key }));
 
@@ -19,7 +19,7 @@ vi.mock('../../src/api', () => ({
 import { getStars, getStarByHip } from '@myastrosky/core/catalog/star-registry';
 import { getDSOs } from '@myastrosky/core/catalog/dso-registry';
 import { searchStarsAPI } from '../../src/api';
-import { searchStars, searchDSOs, getDSOTypeName, searchUnified } from '../../src/search';
+import { searchStars, searchDSOs, getDSOTypeName, searchUnified } from '@myastrosky/core/search';
 
 const mockGetStars = vi.mocked(getStars);
 const mockGetStarByHip = vi.mocked(getStarByHip);

@@ -1,8 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { ConstellationStyle } from '../types';
-import { isIAUStyle } from '../types';
-import { loadSettings, saveSettings, normalizeRotationDeg } from '../display-settings';
+import type { ConstellationStyle } from '@myastrosky/core/types';
+import { isIAUStyle } from '@myastrosky/core/types';
+import {
+  loadSettings,
+  saveSettings,
+  normalizeRotationDeg,
+} from '@myastrosky/core/display-settings';
 import { AUTO_STAR_BUDGET } from '../density-slider';
 import { useCanvasStore } from './canvas';
 

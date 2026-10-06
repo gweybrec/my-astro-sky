@@ -6,7 +6,7 @@ import {
   PHOTO_PICKER_ACCEPT,
   RAW_COMPANION_ACCEPT,
   isRawAstroFile,
-} from '../../src/photo-formats';
+} from '@myastrosky/core/photo-formats';
 
 describe('RASTER_PHOTO_EXT_RE', () => {
   it('accepts jpg/jpeg/png/webp, case-insensitively', () => {

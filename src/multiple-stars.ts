@@ -1,6 +1,6 @@
-import type { DSO, StarMultiplicity } from './types';
-import type { GearPreset } from './gear-presets';
-import { resolvingLimitArcsec } from './gear-presets';
+import type { DSO, StarMultiplicity } from '@myastrosky/core/types';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
+import { resolvingLimitArcsec } from '@myastrosky/core/gear-presets';
 import { getStarByHip, getMultipleSystems, starDisplayName } from './star-catalog';
 
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));

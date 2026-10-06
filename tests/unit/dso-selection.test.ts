@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectDSOsToRender, type SelectableDSO } from '../../src/dso-selection';
+import { selectDSOsToRender, type SelectableDSO } from '@myastrosky/core/dso-selection';
 
 const mk = (id: string, priority: number, isHighlighted = false): SelectableDSO => ({
   id,

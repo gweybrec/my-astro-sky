@@ -13,7 +13,7 @@
  * self-limiting: each rebuild resets the drift to ~1, so a continuous zoom rebuilds
  * once per ~1.3x step regardless of frame rate — no time-floor feedback loop.
  */
-import { atlasScaleBucket } from './star-render-math';
+import { atlasScaleBucket } from '@myastrosky/core/star-render-math';
 
 /** One baked sprite: the offscreen canvas and half its size (its centre offset). */
 export interface StarSprite {

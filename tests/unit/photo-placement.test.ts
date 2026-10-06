@@ -22,7 +22,7 @@ import {
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
   formatZoomPercent,
-} from '../../src/photo-placement';
+} from '@myastrosky/core/photo-placement';
 import {
   project,
   toCanvas,
@@ -30,8 +30,13 @@ import {
   setHemisphere,
   setProjectionMode,
   setCenterMode,
-} from '../../src/projection';
-import type { Photo, PhotoCorrespondence, ManualPlacement, ViewState } from '../../src/types';
+} from '@myastrosky/core/projection';
+import type {
+  Photo,
+  PhotoCorrespondence,
+  ManualPlacement,
+  ViewState,
+} from '@myastrosky/core/types';
 
 const VIEW: ViewState = {
   centerX: 0,

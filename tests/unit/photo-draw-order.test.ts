@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Photo } from '../../src/types';
+import type { Photo } from '@myastrosky/core/types';
 import {
   filterDrawOrderPhotos,
   findOverlappingPhotoIds,
   polygonsOverlap,
   type PhotoCanvasQuad,
-} from '../../src/photo-draw-order';
+} from '@myastrosky/core/photo-draw-order';
 
 function makePhoto(id: string, overrides: Partial<Photo> = {}): Photo {
   return {

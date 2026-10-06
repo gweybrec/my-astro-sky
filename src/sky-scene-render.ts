@@ -6,9 +6,9 @@
  * The maths these call is already unit-tested elsewhere (star-budget, star-render-math,
  * dso-render-math, dso-render-select); what remains here is canvas painting.
  */
-import type { PlanetKey } from './astro-time';
+import type { PlanetKey } from '@myastrosky/core/astro-time';
 import type { SkyScene } from './sky-scene';
-import type { SkyThemeConfig } from './sky-themes';
+import type { SkyThemeConfig } from '@myastrosky/core/sky-themes';
 import { t } from './i18n';
 import {
   dateToJD,
@@ -17,20 +17,34 @@ import {
   sunRaDecDeg,
   planetRaDecDeg,
   PLANET_KEYS,
-} from './astro-time';
-import { project, projectCached, toCanvas, isBelowHorizonCached } from './projection';
-import { altAzFromRaDec } from './sky-geometry';
+} from '@myastrosky/core/astro-time';
+import {
+  project,
+  projectCached,
+  toCanvas,
+  isBelowHorizonCached,
+} from '@myastrosky/core/projection';
+import { altAzFromRaDec } from '@myastrosky/core/sky-geometry';
 import { getStars } from './star-catalog';
-import { starFaintLimitAt } from './star-budget';
-import { starRadius, computeStarPaint } from './star-render-math';
+import { starFaintLimitAt } from '@myastrosky/core/star-budget';
+import { starRadius, computeStarPaint } from '@myastrosky/core/star-render-math';
 import { paintStar, buildStarSprite } from './star-draw';
 import { StarSpriteAtlas } from './star-sprite-atlas';
-import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle } from './dso-render-math';
+import {
+  angularSizeToCanvasPx,
+  dsoSizeCos2,
+  dsoCanvasAngle,
+} from '@myastrosky/core/dso-render-math';
 import { drawDsoMarker, drawDsoHighlightRing } from './dso-draw';
-import { formatDsoLabel, dsoLabelVisible } from './dso-label';
+import { formatDsoLabel, dsoLabelVisible } from '@myastrosky/core/dso-label';
 import { drawMoonMarker } from './moon-draw';
 import { drawBodyMarker, drawBodyLabel } from './body-draw';
-import { FONTS, HIGHLIGHT_RING, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR } from './canvas-theme';
+import {
+  FONTS,
+  HIGHLIGHT_RING,
+  DSO_LABEL_COLORS,
+  DEFAULT_DSO_LABEL_COLOR,
+} from '@myastrosky/core/canvas-theme';
 
 const DEG2RAD = Math.PI / 180;
 

@@ -3,7 +3,7 @@ import {
   trajectoryWindow,
   computeTrajectory,
   resetTrajectoryCache,
-} from '../../src/sky-trajectory';
+} from '@myastrosky/core/sky-trajectory';
 
 // Observer: mid-northern latitude (Chamonix-ish), so declination alone decides
 // circumpolar vs rise/set.

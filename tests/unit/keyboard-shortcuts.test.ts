@@ -13,7 +13,7 @@ import {
   saveBindings,
   importBindings,
   SHORTCUTS_KEY,
-} from '../../src/keyboard-shortcuts';
+} from '@myastrosky/core/keyboard-shortcuts';
 
 describe('normalizeKey', () => {
   it('lowercases plain letters', () => {

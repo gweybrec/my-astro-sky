@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import MetadataEditorPanel from '../../src/components/modals/MetadataEditorPanel.vue';
-import type { PhotoIntegration } from '../../src/types';
+import type { PhotoIntegration } from '@myastrosky/core/types';
 
 const showToast = vi.fn();
 vi.mock('../../src/toast', () => ({ showToast: (...args: unknown[]) => showToast(...args) }));

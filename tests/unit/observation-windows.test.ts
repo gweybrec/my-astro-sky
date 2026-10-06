@@ -13,7 +13,7 @@ import {
   hexToRgba,
   toBandFill,
   MIN_WINDOW_FRAC,
-} from '../../src/observation-windows';
+} from '@myastrosky/core/observation-windows';
 
 describe('sanitizeObservationWindows', () => {
   it('drops non-array and malformed entries', () => {

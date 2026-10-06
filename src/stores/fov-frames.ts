@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { RenderableFrame, FovFrameChange, FovFrameResizeRegion } from '../sky-map-types';
+import type {
+  RenderableFrame,
+  FovFrameChange,
+  FovFrameResizeRegion,
+} from '@myastrosky/core/sky-map-types';
 import {
   planGrid,
   tileCenters,
@@ -11,8 +15,8 @@ import {
   smartMosaicEnvelope,
   clampSmartMosaicSize,
   autoRegionForDsos,
-} from '../mosaic';
-import type { SmartMosaicEnvelope } from '../mosaic';
+} from '@myastrosky/core/mosaic';
+import type { SmartMosaicEnvelope } from '@myastrosky/core/mosaic';
 import { getGearSetups, updatePlanMosaicAPI } from '../api';
 import {
   getTelescopes,
@@ -20,11 +24,11 @@ import {
   getAccessories,
   buildGearPreset,
   resolveSetupCamera,
-} from '../gear-catalog';
-import { fovDeg, formatSetupCanvasLabel } from '../gear-presets';
+} from '@myastrosky/core/gear-catalog';
+import { fovDeg, formatSetupCanvasLabel } from '@myastrosky/core/gear-presets';
 import { getDSOById } from '../dso-catalog';
-import { usePlansStore } from './plans';
-import { orderPlanEntryIds } from '../plan-order';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { orderPlanEntryIds } from '@myastrosky/core/plan-order';
 import { reportUnknownRendererError } from '../error-reporter';
 
 /** Resolved angular size + labels for a gear setup. `wDeg`/`hDeg` are the native

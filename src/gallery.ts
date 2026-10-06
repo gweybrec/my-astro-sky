@@ -1,6 +1,6 @@
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
-import type { Photo, PoiCategory, PointOfInterest } from './types';
+import type { Photo, PoiCategory, PointOfInterest } from '@myastrosky/core/types';
 import type { GearSetupData } from './api';
 import { photoFileUrl } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
@@ -8,15 +8,20 @@ import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
 import { createLazyObserver } from './lazy-image';
 import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
-import { computePhotoToProjMatrix } from './photo-placement';
-import { withCanonicalProjection } from './projection';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { withCanonicalProjection } from '@myastrosky/core/projection';
 import {
   computePhotoDsoOverlayLayout,
   renderPhotoDsoOverlay,
   LABEL_FONT,
 } from './photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
-import { buildPoiFilterGroups, poisMatchFilter, resolveCategory, type PoiFilterGroup } from './poi';
+import {
+  buildPoiFilterGroups,
+  poisMatchFilter,
+  resolveCategory,
+  type PoiFilterGroup,
+} from '@myastrosky/core/poi';
 import {
   poiPinsInImage,
   computePoiPinLayout,
@@ -383,7 +388,7 @@ export class Gallery {
   private buildChips(
     dsoIds: string[],
     labels: string[],
-    pois: import('./types').PointOfInterest[] = [],
+    pois: import('@myastrosky/core/types').PointOfInterest[] = [],
     setupName?: string,
   ): HTMLElement {
     const wrap = document.createElement('div');

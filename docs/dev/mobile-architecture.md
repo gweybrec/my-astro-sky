@@ -17,7 +17,7 @@ packages/render/                Canvas 2D painters + scene + Pointer-Events gest
 packages/backend-http/          HttpBackend(baseUrl, token?) — today's api.ts behind the Backend interface.
 packages/backend-local/         LocalBackend = core services + ports (adapters supplied by the shell).
 packages/app-state/             The data functions (api.ts), the backend holder (backend.ts) and the stores of backend data
-                                (plans, poi-categories, sky-regions, settings). Vue + Pinia + core only; `src/` keeps one-line re-exports.
+                                (plans, poi-categories, sky-regions, settings). Vue + Pinia + core only; import it as `@myastrosky/app-state/<name>`.
 apps/mobile/                    Capacitor + Ionic Vue. LocalBackend (standalone) or HttpBackend (LAN connect).
 ```
 

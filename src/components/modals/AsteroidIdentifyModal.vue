@@ -171,8 +171,8 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { computePhotoToProjMatrix } from '../../photo-placement';
-import { withCanonicalProjection } from '../../projection';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { skybotConesearchAPI } from '../../api';
 import { buildPageList } from '../../targets-view';
 import {
@@ -187,8 +187,8 @@ import {
   isoToUtcParts,
   utcPartsToIso,
   type RankedCandidate,
-} from '../../asteroid-identify';
-import type { Photo, PointOfInterest } from '../../types';
+} from '@myastrosky/core/asteroid-identify';
+import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const ASTEROID_CATEGORY_ID = 'cat-asteroid';
 const RESULTS_PAGE_SIZE = 6;

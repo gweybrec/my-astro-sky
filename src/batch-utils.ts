@@ -1,4 +1,4 @@
-import type { PhotoIntegration } from './types';
+import type { PhotoIntegration } from '@myastrosky/core/types';
 import type { BatchItem } from './batch-types';
 
 export const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];

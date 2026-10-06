@@ -5,8 +5,8 @@ import {
   ellipseBoundExtent,
   ellipseLabelClearance,
 } from '../../src/photo-dso-overlay-render';
-import { overlaps } from '../../src/dso-label-placement';
-import type { DSO } from '../../src/types';
+import { overlaps } from '@myastrosky/core/dso-label-placement';
+import type { DSO } from '@myastrosky/core/types';
 import type { PhotoDsoPlacement } from '../../src/dso-catalog';
 
 function makeDso(id: string, extra?: Partial<DSO>): DSO {

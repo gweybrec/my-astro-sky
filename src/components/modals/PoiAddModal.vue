@@ -63,13 +63,13 @@ import { ref, computed, watch } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import PoiTypesModal from './PoiTypesModal.vue';
 import { t } from '../../i18n';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { resolveCategory } from '../../poi';
-import { computePhotoToProjMatrix } from '../../photo-placement';
-import { withCanonicalProjection } from '../../projection';
-import { photoPixelToRaDec } from '../../asteroid-identify';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { resolveCategory } from '@myastrosky/core/poi';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { withCanonicalProjection } from '@myastrosky/core/projection';
+import { photoPixelToRaDec } from '@myastrosky/core/asteroid-identify';
 import penSvg from '../../icons/pen.svg?raw';
-import type { Photo, PointOfInterest } from '../../types';
+import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const props = defineProps<{ photo: Photo }>();
 // The modal never persists: `identified` hands the photo and the new POI to the caller

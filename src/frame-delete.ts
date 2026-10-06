@@ -2,7 +2,7 @@ import { pinia } from './pinia-instance';
 import { t } from './i18n';
 import { showToast } from './toast';
 import { useFovFramesStore, type AdhocFrame } from './stores/fov-frames';
-import { usePlansStore } from './stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 
 /**
  * Which single frame to delete. Mosaics are NOT handled here — they keep their

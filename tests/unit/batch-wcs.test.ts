@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { BatchItem } from '../../src/batch-types';
-import type { PlateSolveResult } from '../../src/types';
+import type { PlateSolveResult } from '@myastrosky/core/types';
 
 const mockFindDSOIds = vi.fn(() => ['DERIVED_DSO']);
 vi.mock('../../src/dso-catalog', () => ({

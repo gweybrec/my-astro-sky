@@ -5,7 +5,7 @@ import {
   computeFramedViewScale,
   computeLegendLayout,
 } from '../../src/export-render';
-import { angularSizeToCanvasPxForDSO } from '../../src/dso-highlight';
+import { angularSizeToCanvasPxForDSO } from '@myastrosky/core/dso-highlight';
 
 describe('scaleMatrixForDpr', () => {
   it('multiplies all six coefficients by the device pixel ratio', () => {

@@ -14,8 +14,8 @@
  * - **Per-frame cache** — the selection is computed lazily on first use in a frame and
  *   reused by the later consumers; `invalidate()` clears it at the top of each render.
  */
-import type { DSO, ViewState } from './types';
-import type { HorizonParams } from './sky-map-types';
+import type { DSO, ViewState } from '@myastrosky/core/types';
+import type { HorizonParams } from '@myastrosky/core/sky-map-types';
 import {
   projectCached,
   getProjectionGeneration,
@@ -23,16 +23,20 @@ import {
   borderRadiusPU,
   isBelowHorizonCached,
   projectionAreaFactor,
-} from './projection';
+} from '@myastrosky/core/projection';
 import { getDSOs, getDSOById, getDSOImportanceRank } from './dso-catalog';
 import {
   selectDSOsToRender,
   DSO_CONTAINER_VISIBLE_RADIUS_PX,
   type SelectableDSO,
-} from './dso-selection';
-import { areaNormForBorderRadius } from './render-budget';
-import { angularSizeToCanvasPx, dsoSizeCos2, DSO_GIANT_BODY_PU } from './dso-render-math';
-import { SpatialIndex } from './spatial-index';
+} from '@myastrosky/core/dso-selection';
+import { areaNormForBorderRadius } from '@myastrosky/core/render-budget';
+import {
+  angularSizeToCanvasPx,
+  dsoSizeCos2,
+  DSO_GIANT_BODY_PU,
+} from '@myastrosky/core/dso-render-math';
+import { SpatialIndex } from '@myastrosky/core/spatial-index';
 
 const DEG2RAD = Math.PI / 180;
 

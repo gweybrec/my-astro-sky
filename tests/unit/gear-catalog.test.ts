@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildGearPreset, resolveSetupCamera } from '../../src/gear-catalog';
-import { fovDeg, pixelScaleArcsec } from '../../src/gear-presets';
-import type { TelescopeData, CameraData, AccessoryData } from '../../src/gear-catalog';
+import { buildGearPreset, resolveSetupCamera } from '@myastrosky/core/gear-catalog';
+import { fovDeg, pixelScaleArcsec } from '@myastrosky/core/gear-presets';
+import type { TelescopeData, CameraData, AccessoryData } from '@myastrosky/core/gear-catalog';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 

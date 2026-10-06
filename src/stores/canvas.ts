@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia';
 import { shallowRef } from 'vue';
 import type { SkyMap } from '../sky-map';
-import type { FovFrameSpec } from '../sky-map-types';
+import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOverlay } from '../photo-overlay';
-import type { Photo } from '../types';
-import type { PoiFilterGroup } from '../poi';
+import type { Photo } from '@myastrosky/core/types';
+import type { PoiFilterGroup } from '@myastrosky/core/poi';
 import type { GearSetupData } from '../api';
 
 /** Minimal interface for objects that can show/hide themselves. */

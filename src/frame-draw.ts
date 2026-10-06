@@ -6,11 +6,11 @@
  * (canvas), but isolating them shrinks the renderer and removes the last hardcoded
  * frame colors/sizes. Behavior is byte-identical to the old inline code.
  */
-import type { Point } from './types';
-import { photoLabelEdgeIndex, photoLabelTransform } from './photo-outline';
-import { rotateHandlePos } from './fov-frame-geometry';
+import type { Point } from '@myastrosky/core/types';
+import { photoLabelEdgeIndex, photoLabelTransform } from '@myastrosky/core/photo-outline';
+import { rotateHandlePos } from '@myastrosky/core/fov-frame-geometry';
 import { drawPinGlyph } from './sky-draw';
-import { FRAME, FONTS } from './canvas-theme';
+import { FRAME, FONTS } from '@myastrosky/core/canvas-theme';
 
 const DEG2RAD = Math.PI / 180;
 const TWO_PI = Math.PI * 2;

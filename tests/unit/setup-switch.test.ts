@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia';
 
 // Keep the heavy gear/catalog modules out of the flow under test; the mosaic
 // math is real (pure functions) so the transform proposals are exercised.
-vi.mock('../../src/gear-presets', () => ({
+vi.mock('@myastrosky/core/gear-presets', () => ({
   formatFov: vi.fn().mockReturnValue('5.0° × 3.0°'),
 }));
 vi.mock('../../src/dso-catalog', () => ({
@@ -15,7 +15,7 @@ vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn()
 
 import { requestSetupSwitch } from '../../src/setup-switch';
 import { useFovFramesStore } from '../../src/stores/fov-frames';
-import { usePlansStore } from '../../src/stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 
 type SpecLite = {
   name: string;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Photo } from '../../src/types';
-import { buildPhotoQueryMatches } from '../../src/photo-search';
+import type { Photo } from '@myastrosky/core/types';
+import { buildPhotoQueryMatches } from '@myastrosky/core/photo-search';
 
 function makePhoto(overrides: Partial<Photo> = {}): Photo {
   return {

@@ -10,7 +10,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import { h } from 'vue';
 import IdentifyModalShell from '../../src/components/modals/IdentifyModalShell.vue';
-import type { Photo, ManualPlacement } from '../../src/types';
+import type { Photo, ManualPlacement } from '@myastrosky/core/types';
 
 const W = 800;
 const H = 600;

@@ -63,8 +63,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { t } from '../../i18n';
-import type { DSO } from '../../types';
-import { getDSOTypeName } from '../../search';
+import type { DSO } from '@myastrosky/core/types';
+import { getDSOTypeName } from '@myastrosky/core/search';
 import {
   formatSize,
   formatRating,
@@ -72,8 +72,8 @@ import {
   formatRA,
   formatDec,
   formatAlt,
-} from '../../format-utils';
-import { altitudeAtDeg } from '../../sky-geometry';
+} from '@myastrosky/core/format-utils';
+import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
 import { useSkyTimeStore } from '../../stores/sky-time';
 import DSOActions from './DSOActions.vue';
 

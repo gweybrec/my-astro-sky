@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decodeFitsToBytes, UnsupportedFitsError } from '../../server/raw-decode/fits-decoder';
+import { decodeFitsToBytes, UnsupportedFitsError } from '@myastrosky/core/raw-decode/fits-decoder';
 import { buildFits } from '../fixtures/fits-builders';
 
 describe('decodeFitsToBytes — BITPIX -32 (float), 2D mono', () => {

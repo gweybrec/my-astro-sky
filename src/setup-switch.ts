@@ -1,12 +1,12 @@
 import { t } from './i18n';
-import { formatFov } from './gear-presets';
+import { formatFov } from '@myastrosky/core/gear-presets';
 import { reportUnknownRendererError } from './error-reporter';
 import { useFovFramesStore } from './stores/fov-frames';
-import { usePlansStore } from './stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { getDSOById } from './dso-catalog';
 import { customLocationLabel } from './star-catalog';
-import { tileCenters, outlineFromGrid, transformMosaicToSetup } from './mosaic';
-import type { TargetFov, MosaicTransform } from './mosaic';
+import { tileCenters, outlineFromGrid, transformMosaicToSetup } from '@myastrosky/core/mosaic';
+import type { TargetFov, MosaicTransform } from '@myastrosky/core/mosaic';
 import type { Plan } from './api';
 import { updatePlanEntryPositionAPI } from './api';
 

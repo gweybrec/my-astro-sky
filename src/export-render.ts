@@ -1,27 +1,27 @@
 import { jsPDF } from 'jspdf';
 import type { SkyMap } from './sky-map';
-import { computeFovFrameCorners } from './frame-geometry';
-import type { FovFrameSpec } from './sky-map-types';
+import { computeFovFrameCorners } from '@myastrosky/core/frame-geometry';
+import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
-import type { Photo, DSO, ViewState } from './types';
-import { project, toCanvas } from './projection';
-import { angularSizeToCanvasPxForDSO } from './dso-highlight';
-import { paToCanvasRotationDeg } from './frame-orientation';
+import type { Photo, DSO, ViewState } from '@myastrosky/core/types';
+import { project, toCanvas } from '@myastrosky/core/projection';
+import { angularSizeToCanvasPxForDSO } from '@myastrosky/core/dso-highlight';
+import { paToCanvasRotationDeg } from '@myastrosky/core/frame-orientation';
 import { getConstellationInfos } from './star-catalog';
 import { t } from './i18n';
-import { formatAlt, cardinalLetter } from './format-utils';
-import { buildSetupInfoRows } from './setup-info';
-import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
-import { catalogFilterColor } from './gear-catalog';
+import { formatAlt, cardinalLetter } from '@myastrosky/core/format-utils';
+import { buildSetupInfoRows } from '@myastrosky/core/setup-info';
+import type { TelescopeData, CameraData, AccessoryData } from '@myastrosky/core/gear-catalog';
+import { catalogFilterColor } from '@myastrosky/core/gear-catalog';
 import {
   moonDangerLevel,
   azimuthCrossings,
   thinCrossingsByX,
   isCardinalAz,
   type AltSample,
-} from './sky-geometry';
+} from '@myastrosky/core/sky-geometry';
 import { drawMoonMarker } from './moon-draw';
-import { CARDINAL_POINTS } from './canvas-theme';
+import { CARDINAL_POINTS } from '@myastrosky/core/canvas-theme';
 import {
   resolveWindowColor,
   toBandFill,
@@ -30,7 +30,7 @@ import {
   framesInWindow,
   formatWindowDuration,
   cssColorToHex,
-} from './observation-windows';
+} from '@myastrosky/core/observation-windows';
 import type { ObservationWindow } from './api';
 import { photoFileUrl } from './api';
 

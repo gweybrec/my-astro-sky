@@ -9,8 +9,8 @@
  * with `scale(1, ry/rx)` around the pre-scaled `arc(0,0,rx)` and then unscaled; a
  * circle marker skips the scale.
  */
-import type { DSOType } from './types';
-import { DSO_MARKER_STYLES, HIGHLIGHT_RING } from './canvas-theme';
+import type { DSOType } from '@myastrosky/core/types';
+import { DSO_MARKER_STYLES, HIGHLIGHT_RING } from '@myastrosky/core/canvas-theme';
 
 const TWO_PI = Math.PI * 2;
 

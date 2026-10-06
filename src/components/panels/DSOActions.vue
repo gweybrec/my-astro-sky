@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { t } from '../../i18n';
-import type { DSO } from '../../types';
+import type { DSO } from '@myastrosky/core/types';
 import { useUiStore } from '../../stores/ui';
 import { useFovFramesStore } from '../../stores/fov-frames';
 import { useCanvasStore } from '../../stores/canvas';

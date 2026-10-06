@@ -135,10 +135,14 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { computePhotoToProjMatrix } from '../../photo-placement';
-import { withCanonicalProjection } from '../../projection';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { cometElementsAPI } from '../../api';
-import { isoToUtcParts, utcPartsToIso, photoPixelToRaDec } from '../../asteroid-identify';
+import {
+  isoToUtcParts,
+  utcPartsToIso,
+  photoPixelToRaDec,
+} from '@myastrosky/core/asteroid-identify';
 import {
   findComets,
   candidateToPoi,
@@ -146,12 +150,12 @@ import {
   COMET_CATEGORY_ID,
   type CometSearchResult,
   type PlacedComet,
-} from '../../comet-identify';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { resolveCategory } from '../../poi';
+} from '@myastrosky/core/comet-identify';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { resolveCategory } from '@myastrosky/core/poi';
 import { reportUnknownRendererError } from '../../error-reporter';
 import pinSvg from '../../icons/supernova-pin.svg?raw';
-import type { Photo, PointOfInterest } from '../../types';
+import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const props = defineProps<{ photo: Photo }>();
 // The modal never persists: the caller (PoiEditor.vue) pushes the POIs into its own

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { placeBatchItem } from '../../src/batch-place';
 import type { BatchItem } from '../../src/batch-types';
-import type { Photo } from '../../src/types';
+import type { Photo } from '@myastrosky/core/types';
 
 const t = (key: string) => key;
 

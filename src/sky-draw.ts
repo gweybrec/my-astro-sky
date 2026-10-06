@@ -6,19 +6,19 @@
  * edit glyphs. They are imperative canvas code (not unit-tested), but isolating them
  * shrinks the coordinator and makes the render pipeline easier to read.
  */
-import type { Point, ViewState, ConstellationStyle } from './types';
+import type { Point, ViewState, ConstellationStyle } from '@myastrosky/core/types';
 import {
   project,
   toCanvas,
   getHemisphere,
   getCenterMode,
   zenithHorizonCrossing,
-} from './projection';
+} from '@myastrosky/core/projection';
 import { getConstellationLines, getConstellationInfos } from './star-catalog';
-import { raDecFromAltAz } from './sky-geometry';
-import { sampleDenseAz, type HorizonProfile, type HorizonLayer } from './horizon-io';
-import { lerpColor } from './color-utils';
-import type { SKY_THEME } from './sky-themes';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import { sampleDenseAz, type HorizonProfile, type HorizonLayer } from '@myastrosky/core/horizon-io';
+import { lerpColor } from '@myastrosky/core/color-utils';
+import type { SKY_THEME } from '@myastrosky/core/sky-themes';
 import {
   FONTS,
   GRID,
@@ -28,7 +28,7 @@ import {
   MOUNTAIN_HORIZON,
   CARDINAL_POINTS,
   SUMMIT_DOT,
-} from './canvas-theme';
+} from '@myastrosky/core/canvas-theme';
 import pinSvgRaw from './icons/pin.svg?raw';
 
 type SkyTheme = typeof SKY_THEME;

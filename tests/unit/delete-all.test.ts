@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDeleteSummaryLines, type DeleteOptions } from '../../src/delete-utils';
+import { buildDeleteSummaryLines, type DeleteOptions } from '@myastrosky/core/delete-utils';
 
 // Minimal stub: returns the key with simple {n}/{total} substitution
 function t(key: string): string {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { nextTick } from 'vue';
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
 import BatchPhotoEditModal from '../../src/components/modals/BatchPhotoEditModal.vue';
-import type { Photo } from '../../src/types';
+import type { Photo } from '@myastrosky/core/types';
 
 // ─── Shared mutable state for the mocks ───────────────────────────────────────
 const state = vi.hoisted(() => ({

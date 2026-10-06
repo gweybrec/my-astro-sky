@@ -16,7 +16,7 @@ vi.mock('../../src/api', () => ({
   createGearSetup: vi.fn(),
   updateGearSetup: vi.fn(),
 }));
-vi.mock('../../src/gear-catalog', () => ({
+vi.mock('@myastrosky/core/gear-catalog', () => ({
   getTelescopes: vi.fn().mockResolvedValue([{ id: 't1', focal_length_mm: 500, aperture_mm: 80 }]),
   getCameras: vi.fn().mockResolvedValue([
     {
@@ -43,7 +43,7 @@ vi.mock('../../src/gear-catalog', () => ({
     },
   ),
 }));
-vi.mock('../../src/gear-presets', () => ({
+vi.mock('@myastrosky/core/gear-presets', () => ({
   fovDeg: vi.fn().mockReturnValue({ wDeg: 2.5, hDeg: 1.7 }),
   formatSetupCanvasLabel: vi.fn().mockReturnValue('Setup 1 · 2.5° × 1.7°'),
   formatFov: vi.fn().mockReturnValue('5.0° × 3.0°'),
@@ -58,7 +58,7 @@ vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn()
 
 import { buildFovPopup } from '../../src/fov-overlay';
 import { useFovFramesStore } from '../../src/stores/fov-frames';
-import { usePlansStore } from '../../src/stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useUiStore } from '../../src/stores/ui';
 import { useCanvasStore } from '../../src/stores/canvas';
 

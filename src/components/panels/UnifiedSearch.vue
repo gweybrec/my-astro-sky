@@ -73,8 +73,8 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
 import { useUiStore } from '../../stores/ui';
 import { useCanvasStore } from '../../stores/canvas';
-import { searchUnified } from '../../search';
-import type { UnifiedSearchResult } from '../../search';
+import { searchUnified } from '@myastrosky/core/search';
+import type { UnifiedSearchResult } from '@myastrosky/core/search';
 import { getDSOById } from '../../dso-catalog';
 import { getStars } from '../../star-catalog';
 import { openDSOEditModal } from '../../dso-editor';
@@ -84,7 +84,7 @@ import {
   normalizeChipKey,
   shouldApplyChipSearchResults,
 } from '../../dso-chip-search';
-import type { Star, DSO } from '../../types';
+import type { Star, DSO } from '@myastrosky/core/types';
 import type { StarSearchResult } from '../../api';
 import {
   setDSOHighlight,

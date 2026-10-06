@@ -159,10 +159,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import type { BatchItem, SolverType } from '../../batch-types';
-import type { PlateSolveResult } from '../../types';
+import type { PlateSolveResult } from '@myastrosky/core/types';
 import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
-import { useSettingsStore } from '../../stores/settings';
+import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import { useUiStore } from '../../stores/ui';
 import {
   submitPlateSolve,
@@ -187,7 +187,11 @@ import { filterLabelCandidates } from '../../autocomplete-utils';
 import { placeBatchItem } from '../../batch-place';
 import { confirmDiscardUnsavedSolves } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
-import { ANY_PHOTO_EXT_RE, PHOTO_PICKER_ACCEPT, isRawAstroFile } from '../../photo-formats';
+import {
+  ANY_PHOTO_EXT_RE,
+  PHOTO_PICKER_ACCEPT,
+  isRawAstroFile,
+} from '@myastrosky/core/photo-formats';
 import { convertRawPhoto } from '../../api';
 import { applyWcsResultToItem } from '../../batch-wcs';
 import BatchCard from './BatchCard.vue';

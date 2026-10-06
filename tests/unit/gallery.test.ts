@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Photo } from '../../src/types';
+import type { Photo } from '@myastrosky/core/types';
 
 const mockBuildMetadataEditorPanel = vi.fn();
 
@@ -20,7 +20,7 @@ vi.mock('../../src/poi-pins', async (importOriginal) => {
 
 import { Gallery } from '../../src/gallery';
 import { poiPinsInImage } from '../../src/poi-pins';
-import { setCenterMode, setProjectionObserver } from '../../src/projection';
+import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
 function makePhoto(overrides: Partial<Photo> = {}): Photo {
   return {

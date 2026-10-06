@@ -97,11 +97,11 @@ import DrawOrderModal from '../modals/DrawOrderModal.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
 import { useUiStore } from '../../stores/ui';
-import { buildPhotoQueryMatches } from '../../photo-search';
+import { buildPhotoQueryMatches } from '@myastrosky/core/photo-search';
 import { smartSortPhotos } from '../../gallery';
 import { triggerSelectDSOForPhotoChip, triggerBatchModal } from '../../ui';
 import { showToast } from '../../toast';
-import { ANY_PHOTO_EXT_RE, PHOTO_PICKER_ACCEPT } from '../../photo-formats';
+import { ANY_PHOTO_EXT_RE, PHOTO_PICKER_ACCEPT } from '@myastrosky/core/photo-formats';
 
 const canvasStore = useCanvasStore();
 const photosStore = usePhotosStore();

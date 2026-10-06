@@ -10,8 +10,8 @@ import {
   setProjectionObserver,
   getProjectionGeneration,
   zenithHorizonCrossing,
-} from '../../src/projection';
-import { raDecFromAltAz } from '../../src/sky-geometry';
+} from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
 
 const DEG2RAD = Math.PI / 180;
 const LST_H = 5;

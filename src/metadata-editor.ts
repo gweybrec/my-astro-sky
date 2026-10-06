@@ -1,14 +1,19 @@
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
-import type { Photo, PhotoIntegration, PointOfInterest, CaptureDetails } from './types';
+import type {
+  Photo,
+  PhotoIntegration,
+  PointOfInterest,
+  CaptureDetails,
+} from '@myastrosky/core/types';
 import type { GearSetupData } from './api';
 import { updatePhotoMetadata, getGearSetups, solveWCS } from './api';
-import { sanitizeCaptureDetails } from './capture-fields';
+import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
 import { showToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
 import { pinia } from './pinia-instance';
-import { RAW_COMPANION_ACCEPT } from './photo-formats';
+import { RAW_COMPANION_ACCEPT } from '@myastrosky/core/photo-formats';
 import { isTopmostOverlay } from './popup-utils';
 
 const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];

@@ -6,7 +6,7 @@ import {
   setProjectionMode,
   getProjectionMode,
   setHemisphere,
-} from '../../src/projection';
+} from '@myastrosky/core/projection';
 
 const DEG2RAD = Math.PI / 180;
 

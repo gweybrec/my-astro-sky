@@ -17,7 +17,6 @@ export default defineConfig({
         'src/style.css',
         // Type-only files
         'src/app-meta.d.ts',
-        'src/types.ts',
         // Canvas painting — untestable in a unit env. Everything that *decides* what to
         // paint has been pulled out into covered modules (star-budget, dso-render-select,
         // hover-resolve, sky-hit-test, frame-controller, sky-map-events, star-sprite-atlas,

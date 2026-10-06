@@ -295,13 +295,13 @@ import { t } from '../../i18n';
 import { usePhotosStore } from '../../stores/photos';
 import { useCanvasStore } from '../../stores/canvas';
 import { useShortcutsStore } from '../../stores/shortcuts';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { useSkyRegionsStore } from '../../stores/sky-regions';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { importPreview, importData, exportData, getPhotos } from '../../api';
 import type { ImportPreviewResult, ImportPreviewSetup, SetupImportChoice } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
 import { showToast } from '../../toast';
-import { formatBytes } from '../../format-utils';
+import { formatBytes } from '@myastrosky/core/format-utils';
 
 const emit = defineEmits<{ close: [] }>();
 

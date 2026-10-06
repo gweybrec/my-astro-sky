@@ -9,16 +9,16 @@
  *
  * A scene is built once per render pass and thrown away.
  */
-import type { DSO, ViewState } from './types';
-import type { HorizonParams, AltAzPoint, FovFrameSpec } from './sky-map-types';
-import type { PhotoOutline } from './photo-outline';
+import type { DSO, ViewState } from '@myastrosky/core/types';
+import type { HorizonParams, AltAzPoint, FovFrameSpec } from '@myastrosky/core/sky-map-types';
+import type { PhotoOutline } from '@myastrosky/core/photo-outline';
 import type { SkyPoiPin } from './poi-pins';
-import type { HorizonProfile } from './horizon-io';
-import type { SkyThemeConfig } from './sky-themes';
-import type { StarAreaBudget } from './star-budget';
+import type { HorizonProfile } from '@myastrosky/core/horizon-io';
+import type { SkyThemeConfig } from '@myastrosky/core/sky-themes';
+import type { StarAreaBudget } from '@myastrosky/core/star-budget';
 import type { StarSpriteAtlas } from './star-sprite-atlas';
 import type { FrameController } from './frame-controller';
-import type { Trajectory } from './sky-trajectory';
+import type { Trajectory } from '@myastrosky/core/sky-trajectory';
 
 /** Layers that the export path can override per render. */
 export interface SkyLayerFlags {

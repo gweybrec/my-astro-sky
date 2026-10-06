@@ -1,8 +1,8 @@
 import { detectStars } from './star-detector';
 import { searchStarsByPosition } from './api';
-import type { DetectedSpot } from './types';
+import type { DetectedSpot } from '@myastrosky/core/types';
 import { t } from './i18n';
-import { angularSeparationDeg } from './sky-geometry';
+import { angularSeparationDeg } from '@myastrosky/core/sky-geometry';
 import { reportUnknownRendererError } from './error-reporter';
 
 /**

@@ -1,16 +1,20 @@
 import { openVueModal } from './modal-host';
 import { pinia } from './pinia-instance';
 import { useDisplayStore } from './stores/display';
-import { useSettingsStore } from './stores/settings';
+import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
 import { useSkyTimeStore } from './stores/sky-time';
 import { useHorizonStore } from './stores/horizon';
-import { altitudeAtDeg } from './sky-geometry';
-import { formatAlt } from './format-utils';
+import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
+import { formatAlt } from '@myastrosky/core/format-utils';
 import { starDisplayName, formatMultiplicity } from './star-catalog';
-import { loadSettings, saveSettings, normalizeRotationDeg } from './display-settings';
-import { loadSkyTimeSettings } from './sky-time-settings';
+import {
+  loadSettings,
+  saveSettings,
+  normalizeRotationDeg,
+} from '@myastrosky/core/display-settings';
+import { loadSkyTimeSettings } from '@myastrosky/core/sky-time-settings';
 import mountainSvg from './icons/mountain.svg?raw';
 import type {
   Star,
@@ -22,13 +26,13 @@ import type {
   PhotoIntegration,
   ConstellationStyle,
   PointOfInterest,
-} from './types';
-import { isIAUStyle } from './types';
+} from '@myastrosky/core/types';
+import { isIAUStyle } from '@myastrosky/core/types';
 import { SkyMap } from './sky-map';
-import type { ViewChangeCallback } from './sky-map-types';
+import type { ViewChangeCallback } from '@myastrosky/core/sky-map-types';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery, smartSortPhotos } from './gallery';
-import { getDSOTypeName, searchUnified, searchDSOs } from './search';
+import { getDSOTypeName, searchUnified, searchDSOs } from '@myastrosky/core/search';
 import {
   uploadPhoto,
   submitPlateSolve,
@@ -42,16 +46,16 @@ import {
 import type { ServerSettings, SolverAvailability } from './api';
 import { getSolverAvailability } from './api';
 import { DSO_CATALOGS_ALL, findDSOsInImage, getDSOById } from './dso-catalog';
-import { computeAffineTransform } from './affine';
-import { project, setHemisphere, toCanvas } from './projection';
+import { computeAffineTransform } from '@myastrosky/core/affine';
+import { project, setHemisphere, toCanvas } from '@myastrosky/core/projection';
 import { showToast } from './toast';
 import { t, getLang, setLang } from './i18n';
 import { showMetadataEditor } from './metadata-editor';
 import { stripExtension } from './file-utils';
 import { openDSOEditModal } from './dso-editor';
-import { buildPhotoQueryMatches } from './photo-search';
-import { filterDrawOrderPhotos } from './photo-draw-order';
-import { computeDSOHighlightShape } from './dso-highlight';
+import { buildPhotoQueryMatches } from '@myastrosky/core/photo-search';
+import { filterDrawOrderPhotos } from '@myastrosky/core/photo-draw-order';
+import { computeDSOHighlightShape } from '@myastrosky/core/dso-highlight';
 import { confirmPhotoDelete } from './photo-delete-confirm';
 
 function formatRA(raDeg: number): string {

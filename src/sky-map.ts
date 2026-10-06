@@ -1,5 +1,5 @@
-import type { Star, DSO, ViewState, Point, ConstellationStyle } from './types';
-import type { HorizonProfile, HorizonSummit } from './horizon-io';
+import type { Star, DSO, ViewState, Point, ConstellationStyle } from '@myastrosky/core/types';
+import type { HorizonProfile, HorizonSummit } from '@myastrosky/core/horizon-io';
 import {
   normalizeRotationDeg,
   type FovFrameSpec,
@@ -14,7 +14,7 @@ import {
   type StarPickedCallback,
   type ViewChangeCallback,
   type ViewChangeReason,
-} from './sky-map-types';
+} from '@myastrosky/core/sky-map-types';
 import {
   project,
   toCanvas,
@@ -26,27 +26,35 @@ import {
   bumpObsGeneration,
   setCenterMode,
   setProjectionObserver,
-} from './projection';
-import { dateToJD, lstHours } from './astro-time';
-import { altAzFromRaDec } from './sky-geometry';
+} from '@myastrosky/core/projection';
+import { dateToJD, lstHours } from '@myastrosky/core/astro-time';
+import { altAzFromRaDec } from '@myastrosky/core/sky-geometry';
 import { getStarMagsSorted, loadConstellationStyle, getStarByHip } from './star-catalog';
 import { getDSOs, getDSOById } from './dso-catalog';
-import { computeTrajectory, type Trajectory } from './sky-trajectory';
-import { targetRenderCount, DSO_DENSITY_K, MIN_BUDGET_MULT } from './render-budget';
-import { starAreaBudget, starMagThreshold, type StarAreaBudget } from './star-budget';
-import { SKY_THEME } from './sky-themes';
-import { computeMaxMag } from './star-render-math';
-import { InteractionLod } from './interaction-lod';
+import { computeTrajectory, type Trajectory } from '@myastrosky/core/sky-trajectory';
+import { targetRenderCount, DSO_DENSITY_K, MIN_BUDGET_MULT } from '@myastrosky/core/render-budget';
+import {
+  starAreaBudget,
+  starMagThreshold,
+  type StarAreaBudget,
+} from '@myastrosky/core/star-budget';
+import { SKY_THEME } from '@myastrosky/core/sky-themes';
+import { computeMaxMag } from '@myastrosky/core/star-render-math';
+import { InteractionLod } from '@myastrosky/core/interaction-lod';
 import {
   pointInConvexPolygon,
   photoLabelEdgeIndex,
   photoLabelTransform,
   findTopPhotoOutlineAtPoint,
   type PhotoOutline,
-} from './photo-outline';
-import { computeFovFrameCorners } from './frame-geometry';
-import { easeInOutCubic, navigateDurationMs, navigateProfile } from './sky-view-math';
-import { resolveHover } from './hover-resolve';
+} from '@myastrosky/core/photo-outline';
+import { computeFovFrameCorners } from '@myastrosky/core/frame-geometry';
+import {
+  easeInOutCubic,
+  navigateDurationMs,
+  navigateProfile,
+} from '@myastrosky/core/sky-view-math';
+import { resolveHover } from '@myastrosky/core/hover-resolve';
 import { StarSpriteAtlas } from './star-sprite-atlas';
 import type { SkyScene, SkyLayerFlags } from './sky-scene';
 import {
@@ -83,7 +91,7 @@ import {
   drawHorizonLine,
   drawAzimuthGrid,
 } from './sky-draw';
-import { BORDER_RING } from './canvas-theme';
+import { BORDER_RING } from '@myastrosky/core/canvas-theme';
 
 // Photo-outline geometry now lives in ./photo-outline; re-exported here for the
 // existing import sites (tests, export-render, overlays) that reference sky-map.

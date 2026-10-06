@@ -7,10 +7,10 @@
  * Shared by the gallery detail overlay (photo pixels) and the sky map overlay
  * (canvas pixels); both call {@link drawPoiPin}.
  */
-import type { AffineMatrix, PointOfInterest } from './types';
-import { applyAffine, invertAffine } from './affine';
-import { project } from './projection';
-import { placeLabel, type Rect, type Size } from './dso-label-placement';
+import type { AffineMatrix, PointOfInterest } from '@myastrosky/core/types';
+import { applyAffine, invertAffine } from '@myastrosky/core/affine';
+import { project } from '@myastrosky/core/projection';
+import { placeLabel, type Rect, type Size } from '@myastrosky/core/dso-label-placement';
 
 /** A POI known to have a sky position. */
 export type PositionedPoi = PointOfInterest & { ra: number; dec: number };

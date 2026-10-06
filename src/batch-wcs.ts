@@ -1,5 +1,5 @@
 import type { BatchItem } from './batch-types';
-import type { PlateSolveResult } from './types';
+import type { PlateSolveResult } from '@myastrosky/core/types';
 import { findDSOIdsFromCorrespondences } from './dso-catalog';
 
 export interface ApplyWcsResult {

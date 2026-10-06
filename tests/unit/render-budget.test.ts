@@ -4,7 +4,7 @@ import {
   magThresholdForCount,
   areaNormForBorderRadius,
   areaWeightedBudget,
-} from '../../src/render-budget';
+} from '@myastrosky/core/render-budget';
 
 // Generous clamps so the core formula is exercised, not the clamps, unless stated.
 const WIDE = { min: 0, max: 1e9 };

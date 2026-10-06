@@ -58,7 +58,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { filterCandidatesWithCatalog } from '../../autocomplete-utils';
 import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
-import { getVisibleFilterEntries } from '../../gear-catalog';
+import { getVisibleFilterEntries } from '@myastrosky/core/gear-catalog';
 
 const badgeAttrs = filterBadgeAttrs;
 

@@ -23,18 +23,32 @@ import {
   setHiddenFilterIds,
   filterLabel,
   catalogFilterColor,
-} from './gear-catalog';
-import type { TelescopeData, CameraData, AccessoryData, CustomGearType } from './gear-catalog';
-import { formatGearFovLabel, fovDeg, formatFov, computeFovTargetScale } from './gear-presets';
-import { getHemisphere } from './projection';
-import { buildSetupInfoRows } from './setup-info';
-import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
+} from '@myastrosky/core/gear-catalog';
+import type {
+  TelescopeData,
+  CameraData,
+  AccessoryData,
+  CustomGearType,
+} from '@myastrosky/core/gear-catalog';
+import {
+  formatGearFovLabel,
+  fovDeg,
+  formatFov,
+  computeFovTargetScale,
+} from '@myastrosky/core/gear-presets';
+import { getHemisphere } from '@myastrosky/core/projection';
+import { buildSetupInfoRows } from '@myastrosky/core/setup-info';
+import {
+  recommendTargets,
+  scoreDso,
+  type ObserverLocation,
+} from '@myastrosky/core/target-recommender';
 import { buildMultipleStarTargets } from './multiple-stars';
-import { formatPaDeg } from './frame-orientation';
-import { formatRA, formatDec, formatAlt, cardinalLetter } from './format-utils';
+import { formatPaDeg } from '@myastrosky/core/frame-orientation';
+import { formatRA, formatDec, formatAlt, cardinalLetter } from '@myastrosky/core/format-utils';
 import { attachAnchoredPanel } from './popup-utils';
-import type { GearPreset } from './gear-presets';
-import { recommendRecipe } from './imaging-recipe';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
+import { recommendRecipe } from '@myastrosky/core/imaging-recipe';
 import {
   createCustomGear,
   deleteCustomGear,
@@ -49,8 +63,8 @@ import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
 import { showToast } from './toast';
 import type { SkyMap } from './sky-map';
-import type { TargetSuggestion } from './target-recommender';
-import type { DSO } from './types';
+import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
+import type { DSO } from '@myastrosky/core/types';
 import { createTargetsChip, createFilterBadge, buildIntegrationFilterField } from './chip-utils';
 import {
   newObservationWindow,
@@ -64,7 +78,7 @@ import {
   toBandFill,
   cssColorToHex,
   MIN_WINDOW_FRAC,
-} from './observation-windows';
+} from '@myastrosky/core/observation-windows';
 import type { ObservationWindow } from './api';
 import exportSvg from './icons/export.svg?raw';
 import trashSvg from './icons/trash.svg?raw';
@@ -75,16 +89,22 @@ import targetSvg from './icons/target.svg?raw';
 import trajectorySvg from './icons/trajectory.svg?raw';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
-import { usePlansStore } from './stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useFovFramesStore } from './stores/fov-frames';
 import { useUiStore } from './stores/ui';
 import { useHorizonStore } from './stores/horizon';
-import { useSkyRegionsStore } from './stores/sky-regions';
-import { isAltAzInRegion } from './region-geometry';
+import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
+import { isAltAzInRegion } from '@myastrosky/core/region-geometry';
 import { openManageRegionsModal } from './region-overlay';
 import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
-import { twilightWindow, dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
+import {
+  twilightWindow,
+  dateToJD,
+  lstHours,
+  moonRaDecDeg,
+  moonPhase,
+} from '@myastrosky/core/astro-time';
 import {
   maxAltDuringWindow,
   sampleAltCurve,
@@ -96,9 +116,9 @@ import {
   thinCrossingsByX,
   isCardinalAz,
   type AltSample,
-} from './sky-geometry';
-import { outlineFromGrid } from './mosaic';
-import { sortPlanTargets, firstWindowFracByEntry } from './plan-sort';
+} from '@myastrosky/core/sky-geometry';
+import { outlineFromGrid } from '@myastrosky/core/mosaic';
+import { sortPlanTargets, firstWindowFracByEntry } from '@myastrosky/core/plan-sort';
 import type { PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';

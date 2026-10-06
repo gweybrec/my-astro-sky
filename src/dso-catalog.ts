@@ -1,4 +1,4 @@
-import type { DSOUserOverride } from './types';
+import type { DSOUserOverride } from '@myastrosky/core/types';
 import { getLang } from './i18n';
 import { getDsoOverrides } from './api';
 import { replaceUserOverrides, setDsoCatalog } from '@myastrosky/core/catalog/dso-registry';

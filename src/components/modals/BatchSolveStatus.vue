@@ -92,7 +92,7 @@
 import { computed } from 'vue';
 import type { BatchItem } from '../../batch-types';
 import { t } from '../../i18n';
-import { useSettingsStore } from '../../stores/settings';
+import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import closeXSvg from '../../icons/close-x.svg?raw';
 
 const props = defineProps<{ item: BatchItem }>();

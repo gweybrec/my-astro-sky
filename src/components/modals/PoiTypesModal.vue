@@ -72,7 +72,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { createPoiCategory, updatePoiCategory, deletePoiCategoryAPI } from '../../api';
 import { poiTypeIcon } from '../../poi-icons';
 import { confirmUnsavedChanges } from '../../photo-delete-confirm';

@@ -11,6 +11,42 @@ import vue from 'eslint-plugin-vue';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
+const noReexport = {
+  selector: 'Program > ExportAllDeclaration[source.value=/^@myastrosky[/]/]',
+  message:
+    "Do not add a shim that re-exports an @myastrosky/* module: import '@myastrosky/<package>/<path>' directly.",
+};
+
+const REEXPORT_EXEMPT = [
+  'src/density-slider.ts',
+  'src/dso-catalog.ts',
+  'src/frame-controller.ts',
+  'src/star-catalog.ts',
+  'src/i18n/index.ts',
+  'server/wcs-reader.ts',
+];
+
+const fetchRules = [
+  {
+    selector:
+      "CallExpression[callee.name='fetch'] > Literal.arguments:first-child[value=/^\\/(api|uploads)\\//]",
+    message: 'Do not fetch the server directly: add a function to src/api.ts.',
+  },
+  {
+    selector:
+      "CallExpression[callee.name='fetch'] > TemplateLiteral.arguments:first-child > TemplateElement:first-child[value.raw=/^\\/(api|uploads)\\//]",
+    message: 'Do not fetch the server directly: add a function to src/api.ts.',
+  },
+  {
+    selector: 'Literal[value=/^\\/uploads\\//]',
+    message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+  },
+  {
+    selector: 'TemplateLiteral > TemplateElement:first-child[value.raw=/^\\/uploads\\//]',
+    message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+  },
+];
+
 export default tseslint.config(
   {
     // Anything generated, vendored, or non-source. Mirrors .prettierignore.
@@ -124,32 +160,21 @@ export default tseslint.config(
 
   // Screens reach their data through src/api.ts (which calls the backend), never the server directly:
   // no fetch of an /api/ or /uploads/ address, and no hand-built /uploads/ address (use photoFileUrl).
+  // Also: no one-line `export * from '@myastrosky/...'` shim files — import the package path directly. The files of
+  // REEXPORT_EXEMPT re-export a package module AND add something of their own (a wrapper, a platform-init import).
   {
     files: ['src/**/*.{ts,vue}'],
-    ignores: ['src/api.ts', 'src/backend.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            "CallExpression[callee.name='fetch'] > Literal.arguments:first-child[value=/^\\/(api|uploads)\\//]",
-          message: 'Do not fetch the server directly: add a function to src/api.ts.',
-        },
-        {
-          selector:
-            "CallExpression[callee.name='fetch'] > TemplateLiteral.arguments:first-child > TemplateElement:first-child[value.raw=/^\\/(api|uploads)\\//]",
-          message: 'Do not fetch the server directly: add a function to src/api.ts.',
-        },
-        {
-          selector: 'Literal[value=/^\\/uploads\\//]',
-          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
-        },
-        {
-          selector: 'TemplateLiteral > TemplateElement:first-child[value.raw=/^\\/uploads\\//]',
-          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
-        },
-      ],
-    },
+    ignores: ['src/api.ts', 'src/backend.ts', ...REEXPORT_EXEMPT],
+    rules: { 'no-restricted-syntax': ['error', ...fetchRules, noReexport] },
+  },
+  {
+    files: REEXPORT_EXEMPT.filter((f) => f.startsWith('src/')),
+    rules: { 'no-restricted-syntax': ['error', ...fetchRules] },
+  },
+  {
+    files: ['server/**/*.ts', 'tests/**/*.ts'],
+    ignores: REEXPORT_EXEMPT,
+    rules: { 'no-restricted-syntax': ['error', noReexport] },
   },
 
   // @myastrosky/core must stay platform-neutral (browser, worker, Node, Electron, Capacitor):

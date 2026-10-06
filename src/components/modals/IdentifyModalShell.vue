@@ -95,9 +95,9 @@ import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { t } from '../../i18n';
 import { photoFileUrl } from '../../api';
-import { computePhotoToProjMatrix } from '../../photo-placement';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
 import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
-import type { Photo } from '../../types';
+import type { Photo } from '@myastrosky/core/types';
 
 const props = defineProps<{
   photo: Photo;

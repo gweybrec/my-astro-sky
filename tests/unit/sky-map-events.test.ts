@@ -6,9 +6,9 @@ import {
   type EventBinding,
   type SkyEventHost,
 } from '../../src/sky-map-events';
-import type { PhotoOutline } from '../../src/photo-outline';
-import type { Star, ViewState } from '../../src/types';
-import { setCenterMode, setHemisphere, setProjectionMode } from '../../src/projection';
+import type { PhotoOutline } from '@myastrosky/core/photo-outline';
+import type { Star, ViewState } from '@myastrosky/core/types';
+import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';
 
 /**
  * Pointer/keyboard routing for the sky map. These handlers decide *which subsystem

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { pickDsoAtCursor } from '../../src/hover-hit-test';
-import { project, toCanvas, setHemisphere } from '../../src/projection';
-import type { DSO, ViewState } from '../../src/types';
+import { pickDsoAtCursor } from '@myastrosky/core/hover-hit-test';
+import { project, toCanvas, setHemisphere } from '@myastrosky/core/projection';
+import type { DSO, ViewState } from '@myastrosky/core/types';
 
 const view: ViewState = {
   centerX: 0,

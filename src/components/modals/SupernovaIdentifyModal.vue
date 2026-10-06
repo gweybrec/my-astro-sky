@@ -103,10 +103,10 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { computePhotoToProjMatrix } from '../../photo-placement';
-import { withCanonicalProjection } from '../../projection';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { tnsConesearchAPI } from '../../api';
-import { isoToUtcParts, utcPartsToIso } from '../../asteroid-identify';
+import { isoToUtcParts, utcPartsToIso } from '@myastrosky/core/asteroid-identify';
 import {
   photoFieldCircle,
   searchWindow,
@@ -117,11 +117,11 @@ import {
   SUPERNOVA_CATEGORY_ID,
   type FieldCircle,
   type PlacedTransient,
-} from '../../supernova-identify';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
-import { resolveCategory } from '../../poi';
+} from '@myastrosky/core/supernova-identify';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { resolveCategory } from '@myastrosky/core/poi';
 import pinSvg from '../../icons/supernova-pin.svg?raw';
-import type { Photo, PointOfInterest } from '../../types';
+import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const props = defineProps<{ photo: Photo }>();
 // The modal never persists: the caller (PoiEditor.vue) pushes the POIs into its own

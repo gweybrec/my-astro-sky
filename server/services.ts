@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createServices } from './create-services.js';
+import { createServices } from '@myastrosky/core/services/create-services';
 import { UPLOADS_DIR } from './server-paths.js';
 import { getConnection } from './db.js';
 import { loadBuiltInGearCatalog } from './gear-catalog.js';
