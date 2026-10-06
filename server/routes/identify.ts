@@ -53,7 +53,10 @@ identifyRouter.post('/api/skybot/conesearch', async (req, res) => {
       return;
     }
     logServerError('skybot_conesearch_failed', err);
-    res.status(502).json({ error: msg.api.skybotError(lang, (err as Error).message) });
+    res.status(502).json({
+      error: msg.api.skybotError(lang, (err as Error).message),
+      ...(isDomainError(err) ? { code: err.code } : {}),
+    });
   }
 });
 
@@ -116,7 +119,10 @@ identifyRouter.post('/api/tns/conesearch', async (req, res) => {
       return;
     }
     logServerError('tns_conesearch_failed', err);
-    res.status(502).json({ error: msg.api.tnsError(lang, (err as Error).message) });
+    res.status(502).json({
+      error: msg.api.tnsError(lang, (err as Error).message),
+      ...(isDomainError(err) ? { code: err.code } : {}),
+    });
   }
 });
 
@@ -197,6 +203,9 @@ identifyRouter.get('/api/comets/elements', async (req, res) => {
     res.json({ comets });
   } catch (err) {
     logServerError('comet_elements_failed', err);
-    res.status(502).json({ error: msg.api.cometElementsError(lang, (err as Error).message) });
+    res.status(502).json({
+      error: msg.api.cometElementsError(lang, (err as Error).message),
+      ...(isDomainError(err) ? { code: err.code } : {}),
+    });
   }
 });

@@ -21,6 +21,7 @@ import type { Photo, ManualPlacement } from '../../src/types';
 
 vi.mock('../../src/api', () => ({
   cometElementsAPI: vi.fn(),
+  photoFileUrl: (fileName: string) => `/uploads/${fileName}`,
 }));
 
 import { cometElementsAPI } from '../../src/api';

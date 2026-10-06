@@ -3,6 +3,7 @@
  * per photo. A fresh database gets five default rows from `ensureDefaults`.
  */
 import { DomainError } from '../domain/errors';
+import type { PoiCategoryChanges, PoiCategoryInput } from '../domain/poi-categories';
 import type { SqlDb, SqlTx } from '../ports/sql-db';
 import type { PoiCategory } from '../types';
 
@@ -16,9 +17,9 @@ export interface PoiCategoryService {
   /** Every category ordered by position. */
   list(): Promise<PoiCategory[]>;
   /** Creates a category at the end of the list. Throws `invalid` for a missing name. */
-  create(input: unknown): Promise<{ id: string }>;
+  create(input: PoiCategoryInput): Promise<{ id: string }>;
   /** Changes the fields that are given and valid; others keep their value. Throws `notFound` for an unknown id. */
-  update(id: string, input: unknown): Promise<void>;
+  update(id: string, input: PoiCategoryChanges): Promise<void>;
   /** Removes a category. Throws `notFound` for an unknown id. */
   remove(id: string): Promise<void>;
   /** Removes every category and returns how many there were. */

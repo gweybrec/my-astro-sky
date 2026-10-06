@@ -8,3 +8,9 @@ export interface SkyRegionData {
   points: { azDeg: number; altDeg: number }[];
   position: number;
 }
+
+/** What a caller sends to create a region (the id and position are given by the service). */
+export type SkyRegionInput = Omit<SkyRegionData, 'id' | 'position'>;
+
+/** What a caller sends to change a region; a field that is absent is left alone. */
+export type SkyRegionChanges = Partial<Omit<SkyRegionData, 'id'>>;

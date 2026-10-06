@@ -4,22 +4,22 @@ import type {
   PlateSolveResult,
   AstrometrySolveStatus,
   ManualPlacement,
-  ApiErrorDetails,
   DSOUserOverride,
   PhotoIntegration,
   PointOfInterest,
   PoiCategory,
   CaptureDetails,
 } from './types';
-import { t, getLang } from './i18n';
-import { reportRendererError } from './error-reporter';
-import { downloadBlob } from './file-utils';
+import { t } from './i18n';
+import { getBackend } from './backend';
 import type { HorizonProfile } from './horizon-io';
 import type { SkybotCandidate } from './asteroid-identify';
 import type { TnsCandidate } from './supernova-identify';
 import type { CometElements } from './comet-ephemeris';
 
 // ─── Shared domain types (live in @myastrosky/core; re-exported so importers are unchanged) ───
+import type { FileSource } from '@myastrosky/core/backend';
+import { DomainError } from '@myastrosky/core/domain/errors';
 import type {
   LatestRelease,
   ServerSettings,
@@ -29,6 +29,11 @@ import type { StarSearchResult } from '@myastrosky/core/domain/stars';
 import type {
   ConvertRawPhotoResult as CoreConvertRawPhotoResult,
   AstrometrySubmission,
+  LocalSolverApi,
+  LocalSolverName,
+  ProbeKind,
+  ProbeRequest,
+  ProbeResponse,
 } from '@myastrosky/core/domain/solve';
 import type {
   ExportOptions,
@@ -40,7 +45,8 @@ import type {
   ImportResult,
   ImportOptions,
 } from '@myastrosky/core/domain/backup';
-import type { GearSetupData } from '@myastrosky/core/domain/gear';
+import type { CustomGearType, GearSetupData } from '@myastrosky/core/domain/gear';
+import type { UploadFields } from '@myastrosky/core/domain/photos';
 import type { SkyRegionData } from '@myastrosky/core/domain/regions';
 import type {
   ObservationWindow,
@@ -94,9 +100,58 @@ export function parseServerError(
 ): string {
   if (data.code) {
     const translated = t('serverErrors.' + data.code);
-    if (!translated.startsWith('serverErrors.')) return translated;
+    // A message with a {placeholder} needs details the response only carries in `error`.
+    const needsDetail = /\{\w+\}/.test(translated) && !!data.error;
+    if (!translated.startsWith('serverErrors.') && !needsDetail) return translated;
   }
   return data.error || t(fallbackKey);
+}
+
+/**
+ * What a function of this module throws: the backend's `DomainError` becomes a plain `Error` whose
+ * message is its `code` translated, else its own message, else `fallbackKey`. Anything else (a
+ * cancelled transfer, a bug) passes through as it is.
+ */
+function toUserError(err: unknown, fallbackKey: string): Error {
+  if (err instanceof DomainError) {
+    return new Error(parseServerError({ error: err.message, code: err.code }, fallbackKey));
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+/** Runs a backend call, throwing `toUserError(...)` when it fails. */
+async function guard<T>(fallbackKey: string, call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    throw toUserError(err, fallbackKey);
+  }
+}
+
+/** A browser `File` as the backend takes it. */
+function fileSource(file: File): FileSource {
+  return {
+    name: file.name,
+    size: file.size,
+    read: async () => new Uint8Array(await file.arrayBuffer()),
+    native: file,
+  };
+}
+
+/** The solvers installed next to the server; absent on a backend without them. */
+function localSolvers(): LocalSolverApi {
+  const solvers = getBackend().localSolvers;
+  if (!solvers) {
+    throw new DomainError('invalid', 'Local solvers are not available on this device.', {
+      code: 'LOCAL_SOLVERS_UNAVAILABLE',
+    });
+  }
+  return solvers;
+}
+
+/** Which solver a screen means by the route it used to name. */
+function solverOf(endpoint: string): LocalSolverName {
+  return endpoint.includes('astap') ? 'astap' : 'solve-field';
 }
 
 /**
@@ -105,9 +160,7 @@ export function parseServerError(
  */
 export async function getLatestVersion(): Promise<LatestRelease | null> {
   try {
-    const res = await fetch('/api/version/latest');
-    if (!res.ok) return null;
-    return (await res.json()) as LatestRelease | null;
+    return await getBackend().version.getLatest();
   } catch {
     // Silent by design — a failed update check must never surface an error.
     return null;
@@ -124,27 +177,18 @@ export async function fetchHorizonProfile(
   lon: number,
   opts: { radiusKm?: number; obsHeightM?: number | null } = {},
 ): Promise<HorizonProfile> {
-  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
-  if (opts.radiusKm != null) params.set('radiusKm', String(opts.radiusKm));
-  if (opts.obsHeightM != null) params.set('obsHeightM', String(opts.obsHeightM));
-  const res = await fetch(`/api/horizon?${params.toString()}`);
-  if (!res.ok) {
-    let data: { error?: string; code?: string } = {};
-    try {
-      data = await res.json();
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new Error(parseServerError(data, 'horizon.error.compute'));
-  }
-  return (await res.json()) as HorizonProfile;
+  return guard(
+    'horizon.error.compute',
+    () => getBackend().horizon.getProfile({ lat, lon, ...opts }) as Promise<HorizonProfile>,
+  );
 }
 
 export async function searchStarsAPI(query: string, limit = 10): Promise<StarSearchResult[]> {
-  const params = new URLSearchParams({ q: query, limit: String(limit) });
-  const res = await fetch(`/api/stars/search?${params}`);
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    return await getBackend().stars.search(query, limit);
+  } catch {
+    return [];
+  }
 }
 
 export async function searchStarsByPosition(options: {
@@ -154,16 +198,11 @@ export async function searchStarsByPosition(options: {
   magLimit?: number;
   limit?: number;
 }): Promise<StarSearchResult[]> {
-  const params = new URLSearchParams({
-    ra: String(options.ra),
-    dec: String(options.dec),
-    radius: String(options.radius),
-    magLimit: String(options.magLimit ?? 10),
-    limit: String(options.limit ?? 20),
-  });
-  const res = await fetch(`/api/stars/nearby?${params}`);
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    return await getBackend().stars.nearby(options);
+  } catch {
+    return [];
+  }
 }
 
 export function uploadPhoto(
@@ -183,82 +222,39 @@ export function uploadPhoto(
     gearSetupId?: string | null;
   },
 ): Promise<Photo> {
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append('photo', file);
-    formData.append('correspondences', JSON.stringify(correspondences));
-    if (manualPlacement) {
-      formData.append('manualPlacement', JSON.stringify(manualPlacement));
-    }
-    if (metadata?.dsoIds) formData.append('dsoIds', JSON.stringify(metadata.dsoIds));
-    if (metadata?.labels) formData.append('labels', JSON.stringify(metadata.labels));
-    if (metadata?.pointsOfInterest)
-      formData.append('pointsOfInterest', JSON.stringify(metadata.pointsOfInterest));
-    if (metadata?.integrations)
-      formData.append('integrations', JSON.stringify(metadata.integrations));
-    if (metadata?.notes !== undefined) formData.append('notes', metadata.notes);
-    if (metadata?.displayName) formData.append('displayName', metadata.displayName);
-    if (metadata?.observationDate) formData.append('observationDate', metadata.observationDate);
-    if (metadata?.captureDetails && Object.keys(metadata.captureDetails).length > 0)
-      formData.append('captureDetails', JSON.stringify(metadata.captureDetails));
-    if (metadata?.gearSetupId) formData.append('gearSetupId', metadata.gearSetupId);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/photos');
-
-    if (onProgress) {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress(e.loaded / e.total);
-        }
-      };
-    }
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error(t('errors.invalidResponse')));
-        }
-      } else {
-        let errorMsg = t('errors.uploadFailed', { response: xhr.responseText });
-        try {
-          const body = JSON.parse(xhr.responseText);
-          errorMsg = parseServerError(body, 'errors.uploadFailed');
-        } catch {
-          /* non-JSON response, keep default */
-        }
-        reject(new Error(errorMsg));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error(t('errors.networkError')));
-    xhr.send(formData);
-  });
+  const fields: UploadFields = { correspondences: JSON.stringify(correspondences) };
+  if (manualPlacement) fields.manualPlacement = JSON.stringify(manualPlacement);
+  if (metadata?.dsoIds) fields.dsoIds = JSON.stringify(metadata.dsoIds);
+  if (metadata?.labels) fields.labels = JSON.stringify(metadata.labels);
+  if (metadata?.pointsOfInterest)
+    fields.pointsOfInterest = JSON.stringify(metadata.pointsOfInterest);
+  if (metadata?.integrations) fields.integrations = JSON.stringify(metadata.integrations);
+  if (metadata?.notes !== undefined) fields.notes = metadata.notes;
+  if (metadata?.displayName) fields.displayName = metadata.displayName;
+  if (metadata?.observationDate) fields.observationDate = metadata.observationDate;
+  if (metadata?.captureDetails && Object.keys(metadata.captureDetails).length > 0)
+    fields.captureDetails = JSON.stringify(metadata.captureDetails);
+  if (metadata?.gearSetupId) fields.gearSetupId = metadata.gearSetupId;
+  return guard('errors.uploadFailed', () =>
+    getBackend().photos.upload(fileSource(file), fields, { onProgress }),
+  );
 }
 
 export async function getPhotos(): Promise<Photo[]> {
-  const res = await fetch('/api/photos');
-  if (!res.ok) throw new Error(t('errors.loadPhotos'));
-  return res.json();
+  return guard('errors.loadPhotos', () => getBackend().photos.listWithSizes());
 }
 
 export async function deletePhotoAPI(id: string): Promise<void> {
-  const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error(t('errors.deletePhoto'));
+  return guard('errors.deletePhoto', () => getBackend().photos.remove(id));
 }
 
 export async function updatePhotoManualPlacement(
   photoId: string,
   manualPlacement: ManualPlacement | null,
 ): Promise<void> {
-  const res = await fetch(`/api/photos/${photoId}/manual-placement`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ manualPlacement }),
-  });
-  if (!res.ok) throw new Error(t('errors.updatePhoto'));
+  return guard('errors.updatePhoto', () =>
+    getBackend().photos.setManualPlacement(photoId, manualPlacement),
+  );
 }
 
 export async function updatePhotoMetadata(
@@ -275,21 +271,11 @@ export async function updatePhotoMetadata(
     gearSetupId?: string | null;
   },
 ): Promise<void> {
-  const res = await fetch(`/api/photos/${photoId}/metadata`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(metadata),
-  });
-  if (!res.ok) throw new Error(t('errors.updatePhoto'));
+  await guard('errors.updatePhoto', () => getBackend().photos.updateMetadata(photoId, metadata));
 }
 
 export async function updatePhotoOrder(photoIds: string[]): Promise<void> {
-  const res = await fetch('/api/photos/order', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ photoIds }),
-  });
-  if (!res.ok) throw new Error(t('errors.updatePhoto'));
+  return guard('errors.updatePhoto', () => getBackend().photos.setOrder(photoIds));
 }
 
 export async function solveWCS(
@@ -297,93 +283,55 @@ export async function solveWCS(
   targetWidth?: number,
   targetHeight?: number,
 ): Promise<PlateSolveResult> {
-  const formData = new FormData();
-  formData.append('photo', file);
-  formData.append('lang', getLang());
-  if (targetWidth !== undefined) formData.append('targetWidth', String(targetWidth));
-  if (targetHeight !== undefined) formData.append('targetHeight', String(targetHeight));
-
-  const res = await fetch('/api/solve-wcs', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(t('errors.wcsError', { text }));
+  let result;
+  try {
+    result = await getBackend().solvedImport.solveWcs(fileSource(file), {
+      width: targetWidth,
+      height: targetHeight,
+    });
+  } catch (err) {
+    if (err instanceof DomainError) {
+      throw new Error(
+        t('errors.wcsError', {
+          text: parseServerError({ error: err.message, code: err.code }, 'errors.wcsError'),
+        }),
+        { cause: err },
+      );
+    }
+    throw toUserError(err, 'errors.wcsError');
   }
-
-  return res.json();
+  if (result.success === false) {
+    const translated = t('serverErrors.' + result.code);
+    return {
+      success: false,
+      code: result.code,
+      ...(translated.startsWith('serverErrors.') ? {} : { error: translated }),
+    };
+  }
+  return result as PlateSolveResult;
 }
 
 /**
  * Convert a raw astro image (TIFF/FITS) to a PNG on the server — the raw file is never
  * stored. Returns the converted PNG as a `File` (ready to flow through the normal upload
  * pipeline) plus any WCS/capture metadata found in the raw file's header, in the same
- * shape `solveWCS` returns. XHR (not fetch) is used because the raw upload is the slow
- * part and only XHR exposes upload progress.
+ * shape `solveWCS` returns. The raw upload is the slow part, so its progress is reported.
  */
-export function convertRawPhoto(
+export async function convertRawPhoto(
   file: File,
   onUploadProgress?: (fraction: number) => void,
   signal?: AbortSignal,
 ): Promise<ConvertRawPhotoResult> {
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append('photo', file);
-    formData.append('lang', getLang());
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/photos/convert');
-
-    if (onUploadProgress) {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onUploadProgress(e.loaded / e.total);
-      };
-    }
-
-    if (signal) {
-      if (signal.aborted) {
-        reject(new DOMException('Aborted', 'AbortError'));
-        return;
-      }
-      signal.addEventListener('abort', () => xhr.abort());
-    }
-
-    xhr.onload = () => {
-      if (xhr.status < 200 || xhr.status >= 300) {
-        let errorMsg = t('errors.uploadFailed', { response: xhr.responseText });
-        try {
-          errorMsg = parseServerError(JSON.parse(xhr.responseText), 'errors.uploadFailed');
-        } catch {
-          /* non-JSON response, keep default */
-        }
-        reject(new Error(errorMsg));
-        return;
-      }
-      try {
-        const body = JSON.parse(xhr.responseText) as PlateSolveResult & {
-          width: number;
-          height: number;
-          pngBase64: string;
-        };
-        const bytes = atob(body.pngBase64);
-        const arr = new Uint8Array(bytes.length);
-        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-        const pngFile = new File([arr], `${file.name.replace(/\.[^.]+$/, '')}.png`, {
-          type: 'image/png',
-        });
-        const { pngBase64: _pngBase64, ...meta } = body;
-        resolve({ png: pngFile, meta });
-      } catch {
-        reject(new Error(t('errors.invalidResponse')));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error(t('errors.networkError')));
-    xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'));
-    xhr.send(formData);
+  const { png, ...meta } = await guard('errors.uploadFailed', () =>
+    getBackend().solvedImport.convert(fileSource(file), {
+      onProgress: onUploadProgress,
+      cancel: signal,
+    }),
+  );
+  const pngFile = new File([png as BlobPart], `${file.name.replace(/\.[^.]+$/, '')}.png`, {
+    type: 'image/png',
   });
+  return { png: pngFile, meta: meta as ConvertRawPhotoResult['meta'] };
 }
 
 export async function submitPlateSolve(
@@ -396,34 +344,23 @@ export async function submitPlateSolve(
     scale_upper?: number;
   },
 ): Promise<{ jobId: string }> {
-  const formData = new FormData();
-  formData.append('photo', file);
-  if (hints?.ra !== undefined) formData.append('ra', String(hints.ra));
-  if (hints?.dec !== undefined) formData.append('dec', String(hints.dec));
-  if (hints?.radius !== undefined) formData.append('radius', String(hints.radius));
-  if (hints?.scale_lower !== undefined) formData.append('scale_lower', String(hints.scale_lower));
-  if (hints?.scale_upper !== undefined) formData.append('scale_upper', String(hints.scale_upper));
-
-  const res = await fetch('/api/solve-plate', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(parseServerError(data, 'errors.submitFailed'));
-  }
-
-  return res.json();
+  const jobId = await guard('errors.submitFailed', () =>
+    getBackend().novaSolve.submit(fileSource(file), hints),
+  );
+  return { jobId };
 }
 
 export async function pollPlateSolve(jobId: string): Promise<AstrometrySolveStatus> {
-  const res = await fetch(`/api/solve-plate/${jobId}`);
-  // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
-  // still running server-side, so report it as in-progress and let the caller retry.
-  if (res.status === 429) return { jobId, status: 'solving' };
-  if (!res.ok) throw new Error(t('errors.pollFailed'));
-  return res.json();
+  try {
+    return (await getBackend().novaSolve.getJob(jobId)) as AstrometrySolveStatus;
+  } catch (err) {
+    // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
+    // still running, so report it as in-progress and let the caller retry.
+    if (err instanceof DomainError && err.kind === 'rateLimited') {
+      return { jobId, status: 'solving' };
+    }
+    throw toUserError(err, 'errors.pollFailed');
+  }
 }
 
 export async function submitLocalSolveJob(
@@ -432,185 +369,62 @@ export async function submitLocalSolveJob(
   hints?: { ra?: number; dec?: number; fov?: number; radius?: number },
   signal?: AbortSignal,
 ): Promise<{ jobId: string }> {
-  const fd = new FormData();
-  fd.append('photo', file);
-  if (hints?.ra !== undefined) fd.append('ra', String(hints.ra));
-  if (hints?.dec !== undefined) fd.append('dec', String(hints.dec));
-  if (hints?.fov !== undefined) fd.append('fov', String(hints.fov));
-  if (hints?.radius !== undefined) fd.append('radius', String(hints.radius));
-  fd.append('lang', getLang());
-  const res = await fetch(endpoint, { method: 'POST', body: fd, signal });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(parseServerError(data, 'errors.submitFailed'));
-  }
-  return res.json();
+  const jobId = await guard('errors.submitFailed', async () =>
+    localSolvers().submit(solverOf(endpoint), fileSource(file), hints, { cancel: signal }),
+  );
+  return { jobId };
 }
 
 export async function pollLocalSolveJob(
   endpoint: '/api/solve-field' | '/api/solve-astap',
   jobId: string,
 ): Promise<{ status: string; result?: PlateSolveResult; error?: string }> {
-  const res = await fetch(`${endpoint}/${jobId}`);
-  // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
-  // still running server-side, so report it as pending and let the caller retry.
-  if (res.status === 429) return { status: 'pending' };
-  if (!res.ok) throw new Error(t('errors.pollFailed'));
-  return res.json();
+  try {
+    return await localSolvers().poll(solverOf(endpoint), jobId);
+  } catch (err) {
+    // A 429 is transient (batch polling briefly exceeded the rate limit). The job is
+    // still running, so report it as pending and let the caller retry.
+    if (err instanceof DomainError && err.kind === 'rateLimited') return { status: 'pending' };
+    throw toUserError(err, 'errors.pollFailed');
+  }
 }
 
 export async function cancelLocalSolveJob(
   endpoint: '/api/solve-field' | '/api/solve-astap',
   jobId: string,
 ): Promise<void> {
-  await fetch(`${endpoint}/${jobId}`, { method: 'DELETE' }).catch(() => undefined);
-}
-
-async function parseSolverFailure(
-  res: Response,
-  method: 'POST',
-  endpoint: '/api/solve-astap' | '/api/solve-field',
-  fallbackMessage: string,
-): Promise<{ message: string; code?: string; details: ApiErrorDetails }> {
-  const details: ApiErrorDetails = {
-    method,
-    endpoint,
-    httpStatus: res.status,
-    httpStatusText: res.statusText,
-  };
-
-  let bodyText = '';
-  let parsed: any = null;
-
   try {
-    const clone = res.clone();
-    parsed = await clone.json();
-    bodyText = JSON.stringify(parsed, null, 2);
+    await localSolvers().cancel(solverOf(endpoint), jobId);
   } catch {
-    try {
-      bodyText = await res.text();
-    } catch {
-      bodyText = '';
-    }
+    // Cancelling is best effort.
   }
-
-  if (bodyText.trim()) {
-    details.responseBody = bodyText.trim().slice(0, 8000);
-  }
-
-  const serverError = typeof parsed?.error === 'string' ? parsed.error.trim() : '';
-  const serverCode = typeof parsed?.code === 'string' ? parsed.code.trim() : undefined;
-  details.code = serverCode;
-
-  const translatedCode = serverCode ? t('serverErrors.' + serverCode) : '';
-  const hasCodeTranslation = translatedCode && !translatedCode.startsWith('serverErrors.');
-  const isGeneric = /^(error|erreur)$/i.test(serverError);
-  const message = hasCodeTranslation
-    ? translatedCode
-    : serverError && !isGeneric
-      ? serverError
-      : `${fallbackMessage} (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''})`;
-
-  reportRendererError({
-    category: 'api_solver_http_error',
-    message,
-    context: {
-      method,
-      endpoint,
-      httpStatus: res.status,
-      httpStatusText: res.statusText,
-      code: serverCode,
-      responseBody: details.responseBody,
-    },
-  });
-
-  return { message, code: serverCode, details };
 }
 
-export async function solveWithASTAP(
-  file: File,
-  hints?: { ra?: number; dec?: number; fov?: number; radius?: number },
-  signal?: AbortSignal,
-): Promise<PlateSolveResult> {
-  const fd = new FormData();
-  fd.append('photo', file);
-  if (hints?.ra !== undefined) fd.append('ra', String(hints.ra));
-  if (hints?.dec !== undefined) fd.append('dec', String(hints.dec));
-  if (hints?.fov !== undefined) fd.append('fov', String(hints.fov));
-  if (hints?.radius !== undefined) fd.append('radius', String(hints.radius));
-  fd.append('lang', getLang());
-  const res = await fetch('/api/solve-astap', { method: 'POST', body: fd, signal });
-  if (!res.ok) {
-    const parsed = await parseSolverFailure(
-      res,
-      'POST',
-      '/api/solve-astap',
-      t('errors.astapError'),
-    );
-    return {
-      success: false,
-      error: parsed.message,
-      code: parsed.code,
-      errorDetails: parsed.details,
-    };
-  }
-  return res.json();
-}
-
-export async function solveWithSolveField(
-  file: File,
-  hints?: { ra?: number; dec?: number; fov?: number; radius?: number },
-  signal?: AbortSignal,
-): Promise<PlateSolveResult> {
-  const fd = new FormData();
-  fd.append('photo', file);
-  if (hints?.ra !== undefined) fd.append('ra', String(hints.ra));
-  if (hints?.dec !== undefined) fd.append('dec', String(hints.dec));
-  if (hints?.fov !== undefined) fd.append('fov', String(hints.fov));
-  if (hints?.radius !== undefined) fd.append('radius', String(hints.radius));
-  fd.append('lang', getLang());
-  const res = await fetch('/api/solve-field', { method: 'POST', body: fd, signal });
-  if (!res.ok) {
-    const parsed = await parseSolverFailure(
-      res,
-      'POST',
-      '/api/solve-field',
-      t('errors.solveFieldError'),
-    );
-    return {
-      success: false,
-      error: parsed.message,
-      code: parsed.code,
-      errorDetails: parsed.details,
-    };
-  }
-  return res.json();
+/** Checks that a solver program runs (or that a folder lists), as the solver settings do. */
+export async function probeLocalSolver(
+  kind: ProbeKind,
+  request: ProbeRequest,
+): Promise<ProbeResponse> {
+  return guard('errors.networkError', async () => localSolvers().probe(kind, request));
 }
 
 export async function listAstrometrySubmissions(): Promise<AstrometrySubmission[]> {
-  const res = await fetch('/api/astrometry/submissions');
-  if (!res.ok) {
-    throw new Error(t('errors.listSubmissionsFailed'));
+  try {
+    return await getBackend().novaSolve.listSubmissions();
+  } catch (err) {
+    throw new Error(t('errors.listSubmissionsFailed'), { cause: err });
   }
-  const data = await res.json();
-  return data.submissions || [];
 }
 
 export async function reuseAstrometrySubmission(
   file: File,
   jobId: number,
 ): Promise<PlateSolveResult> {
-  const fd = new FormData();
-  fd.append('photo', file);
-  fd.append('jobId', String(jobId));
-  fd.append('lang', getLang());
-
-  const res = await fetch('/api/astrometry/reuse', { method: 'POST', body: fd });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    return { success: false, error: data.error ?? t('errors.reuseSubmissionFailed') };
+  try {
+    return (await getBackend().novaSolve.reuse(fileSource(file), jobId)) as PlateSolveResult;
+  } catch (err) {
+    return { success: false, error: toUserError(err, 'errors.reuseSubmissionFailed').message };
   }
-  return res.json();
 }
 
 // ─── Export / Import ──────────────────────────────────────────────────────────
@@ -627,56 +441,19 @@ export async function exportData(
   ids: string[],
   shortcuts?: unknown,
 ): Promise<void> {
-  const res = await fetch('/api/export', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ options, ids, shortcuts }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
-  }
-  const blob = await res.blob();
-  // Filename comes from Content-Disposition; fall back to a sensible default
-  const disposition = res.headers.get('Content-Disposition') ?? '';
-  const match = disposition.match(/filename="?([^"]+)"?/);
-  downloadBlob(blob, match ? match[1] : 'sky-export.zip');
+  return guard('settings.importError', () =>
+    getBackend().backup.exportToUser({ options, ids, shortcuts }),
+  );
 }
 
 /** Dry-run: inspects ZIP/JSON bundle contents without writing to DB. */
 export async function importPreview(file: File): Promise<ImportPreviewResult> {
-  const fd = new FormData();
-  fd.append('bundle', file);
-  const res = await fetch('/api/import/preview', { method: 'POST', body: fd });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
-  }
-  return res.json();
+  return guard('settings.importError', () => getBackend().backup.preview(fileSource(file)));
 }
 
 /** Import a sky bundle (.zip or .json) with the given options. */
 export async function importData(file: File, opts: ImportOptions): Promise<ImportResult> {
-  const fd = new FormData();
-  fd.append('bundle', file);
-  if (opts.importMetadata) fd.append('importMetadata', '1');
-  if (opts.importDsoOverrides) fd.append('importDsoOverrides', '1');
-  if (opts.importPoiCategories) fd.append('importPoiCategories', '1');
-  if (opts.importSkyRegions) fd.append('importSkyRegions', '1');
-  if (opts.selectedImages !== null)
-    fd.append('selectedImages', JSON.stringify(opts.selectedImages));
-  if (opts.selectedPlans !== null) fd.append('selectedPlans', JSON.stringify(opts.selectedPlans));
-  if (opts.selectedSetups !== null)
-    fd.append('selectedSetups', JSON.stringify(opts.selectedSetups));
-  if (opts.selectedGear !== null) fd.append('selectedGear', JSON.stringify(opts.selectedGear));
-  if (opts.setupConflicts && Object.keys(opts.setupConflicts).length > 0)
-    fd.append('setupConflicts', JSON.stringify(opts.setupConflicts));
-  const res = await fetch('/api/import', { method: 'POST', body: fd });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
-  }
-  return res.json();
+  return guard('settings.importError', () => getBackend().backup.restore(fileSource(file), opts));
 }
 
 /** A solver is considered available if the user explicitly provided a path (or API key). */
@@ -689,9 +466,7 @@ export function getSolverAvailability(settings: ServerSettings): SolverAvailabil
 }
 
 export async function loadServerSettings(): Promise<ServerSettings> {
-  const res = await fetch('/api/settings');
-  if (!res.ok) throw new Error('Failed to load settings');
-  return res.json();
+  return guard('errors.loadSettings', () => getBackend().settings.readPublic());
 }
 
 export async function saveServerSettings(settings: {
@@ -703,51 +478,46 @@ export async function saveServerSettings(settings: {
   USE_WSL_FOR_ASTAP: boolean;
   MAX_PARALLEL_SOLVES?: string;
 }): Promise<void> {
-  const res = await fetch('/api/settings', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(settings),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
-  }
+  await guard('settings.importError', () => getBackend().settings.update(settings));
 }
 
 export async function clearAstrometryApiKey(): Promise<void> {
-  const res = await fetch('/api/settings/astrometry-api-key', { method: 'DELETE' });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? t('settings.importError'));
-  }
+  return guard('settings.importError', () => getBackend().settings.removeApiKey());
+}
+
+// ─── Stored files and catalogues ─────────────────────────────────────────────
+
+/** The address of a stored photo or thumbnail file, for an image's `src` or a download. */
+export function photoFileUrl(fileName: string): string {
+  return getBackend().files.url(fileName);
+}
+
+/** The address of the star catalogue file to load. */
+export function getStarCatalogUrl(): Promise<string> {
+  return getBackend().catalog.starCatalogUrl();
+}
+
+/** The built-in and custom gear of one kind (telescopes, cameras, accessories or filters). */
+export async function getGearCatalog(type: CustomGearType): Promise<object[]> {
+  return guard('errors.loadGearSetups', () => getBackend().gear.listCatalog(type));
 }
 
 // ─── DSO user overrides ──────────────────────────────────────────────────────
 
 export async function getDsoOverrides(): Promise<Record<string, DSOUserOverride>> {
-  const res = await fetch('/api/dso-overrides');
-  if (!res.ok) return {};
-  return res.json();
+  try {
+    return await getBackend().dsoOverrides.getAll();
+  } catch {
+    return {};
+  }
 }
 
 export async function upsertDsoOverride(id: string, data: DSOUserOverride): Promise<void> {
-  const res = await fetch(`/api/dso-overrides/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to save DSO override');
-  }
+  return guard('errors.saveDsoOverride', () => getBackend().dsoOverrides.upsert(id, data));
 }
 
 export async function deleteDsoOverride(id: string): Promise<void> {
-  const res = await fetch(`/api/dso-overrides/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete DSO override');
-  }
+  return guard('errors.deleteDsoOverride', () => getBackend().dsoOverrides.remove(id));
 }
 
 // ─── Custom gear ──────────────────────────────────────────────────────────────
@@ -756,259 +526,118 @@ export async function createCustomGear(
   type: 'telescope' | 'camera' | 'accessory' | 'filter',
   data: object,
 ): Promise<{ id: string }> {
-  const res = await fetch('/api/custom-gear', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, data }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create custom gear');
-  }
-  return res.json();
+  return guard('errors.createCustomGear', () =>
+    getBackend().gear.addCustom(type, data as Record<string, unknown>),
+  );
 }
 
 export async function deleteCustomGear(id: string): Promise<void> {
-  const res = await fetch(`/api/custom-gear/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete custom gear');
-  }
+  return guard('errors.deleteCustomGear', () => getBackend().gear.removeCustom(id));
 }
 
 export async function deleteBulkPhotos(ids: string[]): Promise<void> {
-  const res = await fetch('/api/photos', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? t('errors.deletePhoto'));
-  }
+  await guard('errors.deletePhoto', () => getBackend().photos.removeMany(ids));
 }
 
 export async function deleteAllPhotoMetadata(): Promise<void> {
-  const res = await fetch('/api/photo-metadata', { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? t('errors.deletePhoto'));
-  }
+  await guard('errors.deletePhoto', () => getBackend().photos.removeAll());
 }
 
 export async function deleteAllDsoOverrides(): Promise<void> {
-  const res = await fetch('/api/dso-overrides', { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete DSO overrides');
-  }
+  await guard('errors.deleteDsoOverrides', () => getBackend().dsoOverrides.removeAll());
 }
 
 export async function deleteAllCustomGear(): Promise<void> {
-  const res = await fetch('/api/custom-gear', { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete custom gear');
-  }
+  await guard('errors.deleteCustomGear', () => getBackend().gear.removeAllCustom());
 }
 
 // ─── Gear setups ──────────────────────────────────────────────────────────────
 
 export async function getGearSetups(): Promise<GearSetupData[]> {
-  const res = await fetch('/api/gear-setups');
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load gear setups');
-  }
-  return res.json();
+  return guard('errors.loadGearSetups', () => getBackend().gear.listSetups());
 }
 
 export async function createGearSetup(data: Omit<GearSetupData, 'id'>): Promise<{ id: string }> {
-  const res = await fetch('/api/gear-setups', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create gear setup');
-  }
-  return res.json();
+  return guard('errors.createGearSetup', () => getBackend().gear.createSetup(data));
 }
 
 export async function updateGearSetup(id: string, data: Omit<GearSetupData, 'id'>): Promise<void> {
-  const res = await fetch(`/api/gear-setups/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update gear setup');
-  }
+  return guard('errors.updateGearSetup', () => getBackend().gear.replaceSetup(id, data));
 }
 
 export async function patchGearSetupEnabled(id: string, enabled: boolean): Promise<void> {
-  const res = await fetch(`/api/gear-setups/${encodeURIComponent(id)}/enabled`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update gear setup enabled state');
-  }
+  return guard('errors.updateGearSetupEnabled', () =>
+    getBackend().gear.setSetupEnabled(id, enabled),
+  );
 }
 
 export async function deleteGearSetupAPI(id: string): Promise<void> {
-  const res = await fetch(`/api/gear-setups/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete gear setup');
-  }
+  return guard('errors.deleteGearSetup', () => getBackend().gear.removeSetup(id));
 }
 
 export async function deleteAllGearSetupsAPI(): Promise<void> {
-  const res = await fetch('/api/gear-setups', { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete all gear setups');
-  }
+  await guard('errors.deleteAllGearSetups', () => getBackend().gear.removeAllSetups());
 }
 
 // ─── Points of Interest categories ───────────────────────────────────────────
 
 export async function getPoiCategories(): Promise<PoiCategory[]> {
-  const res = await fetch('/api/poi-categories');
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load POI categories');
-  }
-  return res.json();
+  return guard('errors.loadPoiCategories', () => getBackend().poiCategories.list());
 }
 
 export async function createPoiCategory(data: {
   name: string;
   color: string;
 }): Promise<{ id: string }> {
-  const res = await fetch('/api/poi-categories', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create POI category');
-  }
-  return res.json();
+  return guard('errors.createPoiCategory', () => getBackend().poiCategories.create(data));
 }
 
 export async function updatePoiCategory(
   id: string,
   data: Partial<{ name: string; color: string; position: number }>,
 ): Promise<void> {
-  const res = await fetch(`/api/poi-categories/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update POI category');
-  }
+  return guard('errors.updatePoiCategory', () => getBackend().poiCategories.update(id, data));
 }
 
 export async function deletePoiCategoryAPI(id: string): Promise<void> {
-  const res = await fetch(`/api/poi-categories/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete POI category');
-  }
+  return guard('errors.deletePoiCategory', () => getBackend().poiCategories.remove(id));
 }
 
 // ─── Sky regions ────────────────────────────────────────────────────────────
 
 export async function getSkyRegions(): Promise<SkyRegionData[]> {
-  const res = await fetch('/api/sky-regions');
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load sky regions');
-  }
-  return res.json();
+  return guard('errors.loadSkyRegions', () => getBackend().skyRegions.list());
 }
 
 export async function createSkyRegion(
   data: Omit<SkyRegionData, 'id' | 'position'>,
 ): Promise<{ id: string }> {
-  const res = await fetch('/api/sky-regions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create sky region');
-  }
-  return res.json();
+  return guard('errors.createSkyRegion', () => getBackend().skyRegions.create(data));
 }
 
 export async function updateSkyRegion(
   id: string,
   data: Partial<Omit<SkyRegionData, 'id'>>,
 ): Promise<void> {
-  const res = await fetch(`/api/sky-regions/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update sky region');
-  }
+  return guard('errors.updateSkyRegion', () => getBackend().skyRegions.update(id, data));
 }
 
 export async function deleteSkyRegionAPI(id: string): Promise<void> {
-  const res = await fetch(`/api/sky-regions/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete sky region');
-  }
+  return guard('errors.deleteSkyRegion', () => getBackend().skyRegions.remove(id));
 }
 
 // ─── Night plans ───────────────────────────────────────────────────────────
 
 export async function getPlans(): Promise<Plan[]> {
-  const res = await fetch('/api/plans');
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to load plans');
-  }
-  return res.json();
+  return guard('errors.loadPlans', () => getBackend().plans.list());
 }
 
 export async function createPlanAPI(name: string): Promise<{ id: string }> {
-  const res = await fetch('/api/plans', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create plan');
-  }
-  return res.json();
+  return guard('errors.createPlan', () => getBackend().plans.create({ name }));
 }
 
 export async function renamePlanAPI(id: string, name: string): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to rename plan');
-  }
+  return guard('errors.renamePlan', () => getBackend().plans.update(id, { name }));
 }
 
 export async function updatePlanSettingsAPI(
@@ -1018,61 +647,26 @@ export async function updatePlanSettingsAPI(
   lat: number | null,
   lon: number | null,
 ): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nightOf, setupId, lat, lon }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan settings');
-  }
+  return guard('errors.updatePlanSettings', () =>
+    getBackend().plans.update(id, { nightOf, setupId, lat, lon }),
+  );
 }
 
 /** Persist just a plan's objects-list sort key (partial update of the plan). */
 export async function updatePlanSortAPI(id: string, sortBy: PlanSortKey): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sortBy }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan sort');
-  }
+  return guard('errors.updatePlanSort', () => getBackend().plans.update(id, { sortBy }));
 }
 
 export async function deletePlanAPI(id: string): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete plan');
-  }
+  return guard('errors.deletePlan', () => getBackend().plans.remove(id));
 }
 
 export async function reorderPlansAPI(ids: string[]): Promise<void> {
-  const res = await fetch('/api/plans/order', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to reorder plans');
-  }
+  return guard('errors.reorderPlans', () => getBackend().plans.reorder(ids));
 }
 
 export async function addPlanEntryAPI(planId: string, dsoId: string): Promise<{ id: string }> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dsoId }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to add target to plan');
-  }
-  return res.json();
+  return guard('errors.addPlanTarget', () => getBackend().plans.addEntry(planId, { dsoId }));
 }
 
 /** Add a custom-location entry (no DSO) framed on empty sky at the given centre. */
@@ -1081,27 +675,11 @@ export async function addCustomPlanEntryAPI(
   ra: number,
   dec: number,
 ): Promise<{ id: string }> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ra, dec }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to add custom frame to plan');
-  }
-  return res.json();
+  return guard('errors.addPlanFrame', () => getBackend().plans.addEntry(planId, { ra, dec }));
 }
 
 export async function removePlanEntryAPI(planId: string, entryId: string): Promise<void> {
-  const res = await fetch(
-    `/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`,
-    { method: 'DELETE' },
-  );
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to remove target from plan');
-  }
+  return guard('errors.removePlanTarget', () => getBackend().plans.removeEntry(entryId, planId));
 }
 
 /** Create a mosaic in a plan from client-computed tiles. Returns the mosaic id. */
@@ -1109,16 +687,7 @@ export async function createPlanMosaicAPI(
   planId: string,
   params: MosaicParams,
 ): Promise<{ id: string }> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/mosaics`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to create mosaic');
-  }
-  return res.json();
+  return guard('errors.createMosaic', () => getBackend().plans.createMosaic(planId, params));
 }
 
 /** Replace a mosaic's parameters and tile set. */
@@ -1127,41 +696,17 @@ export async function updatePlanMosaicAPI(
   mosaicId: string,
   params: MosaicParams,
 ): Promise<void> {
-  const res = await fetch(
-    `/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    },
+  return guard('errors.updateMosaic', () =>
+    getBackend().plans.updateMosaic(planId, mosaicId, params),
   );
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update mosaic');
-  }
 }
 
 export async function deletePlanMosaicAPI(planId: string, mosaicId: string): Promise<void> {
-  const res = await fetch(
-    `/api/plans/${encodeURIComponent(planId)}/mosaics/${encodeURIComponent(mosaicId)}`,
-    { method: 'DELETE' },
-  );
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to delete mosaic');
-  }
+  return guard('errors.deleteMosaic', () => getBackend().plans.removeMosaic(planId, mosaicId));
 }
 
 export async function reorderPlanEntriesAPI(planId: string, ids: string[]): Promise<void> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(planId)}/entries/order`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to reorder plan entries');
-  }
+  return guard('errors.reorderPlanEntries', () => getBackend().plans.reorderEntries(planId, ids));
 }
 
 export async function updatePlanEntryPAAPI(
@@ -1169,18 +714,9 @@ export async function updatePlanEntryPAAPI(
   entryId: string,
   paDeg: number | null,
 ): Promise<void> {
-  const res = await fetch(
-    `/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paDeg }),
-    },
+  return guard('errors.updatePlanEntryAngle', () =>
+    getBackend().plans.updateEntry(entryId, { paDeg }, planId),
   );
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan entry position angle');
-  }
 }
 
 /**
@@ -1201,24 +737,15 @@ export async function updatePlanEntryPositionAPI(
     observationWindows?: ObservationWindow[];
   },
 ): Promise<void> {
-  const res = await fetch(
-    `/api/plans/${encodeURIComponent(planId)}/entries/${encodeURIComponent(entryId)}`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fields),
-    },
+  return guard('errors.updatePlanEntryPosition', () =>
+    getBackend().plans.updateEntry(entryId, fields, planId),
   );
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error ?? 'Failed to update plan entry position');
-  }
 }
 
 /**
- * Cone-searches IMCCE SkyBoT (via the server proxy, `POST /api/skybot/conesearch`)
- * for known asteroids near a sky position and epoch. Used by the asteroid
- * identification modal to match the user's marked trail against a candidate.
+ * Cone-searches IMCCE SkyBoT (through the backend) for known asteroids near a sky
+ * position and epoch. Used by the asteroid identification modal to match the
+ * user's marked trail against a candidate.
  */
 export async function skybotConesearchAPI(params: {
   raDeg: number;
@@ -1226,23 +753,13 @@ export async function skybotConesearchAPI(params: {
   radiusArcmin: number;
   epochJd: number;
 }): Promise<SkybotCandidate[]> {
-  const res = await fetch('/api/skybot/conesearch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...params, lang: getLang() }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(parseServerError(data, 'errors.skybotSearch'));
-  }
-  return data.candidates ?? [];
+  return guard('errors.skybotSearch', () => getBackend().identify.searchAsteroids(params));
 }
 
 /**
- * Cone-searches the IAU Transient Name Server (via the server proxy,
- * `POST /api/tns/conesearch`) for transients discovered in a date window. Used by
- * the supernova identification modal. The proxy caches results — TNS allows only
- * ~2 anonymous cone searches a minute, surfaced as a translated 429 message.
+ * Cone-searches the IAU Transient Name Server (through the backend) for transients
+ * discovered in a date window. Used by the supernova identification modal. TNS
+ * allows only ~2 anonymous cone searches a minute, surfaced as a translated message.
  */
 export async function tnsConesearchAPI(params: {
   raDeg: number;
@@ -1251,35 +768,20 @@ export async function tnsConesearchAPI(params: {
   dateStart: string;
   dateEnd: string;
 }): Promise<TnsCandidate[]> {
-  const res = await fetch('/api/tns/conesearch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...params, lang: getLang() }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(parseServerError(data, 'errors.tnsSearch'));
-  }
-  return data.candidates ?? [];
+  return guard('errors.tnsSearch', () => getBackend().identify.searchTransients(params));
 }
 
 let cometElementsPromise: Promise<CometElements[]> | null = null;
 
 /**
- * Current MPC comet orbital elements (via the server's cached proxy,
- * `GET /api/comets/elements`). Memoised for the session — the comet
- * identification modal re-propagates them on every date edit. A failed load
- * is not memoised, so reopening the modal retries.
+ * Current MPC comet orbital elements (through the backend's cache). Memoised for the
+ * session — the comet identification modal re-propagates them on every date edit.
+ * A failed load is not memoised, so reopening the modal retries.
  */
 export function cometElementsAPI(): Promise<CometElements[]> {
-  cometElementsPromise ??= (async () => {
-    const res = await fetch(`/api/comets/elements?lang=${getLang()}`);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(parseServerError(data, 'errors.cometElements'));
-    }
-    return (data.comets ?? []) as CometElements[];
-  })().catch((err: unknown) => {
+  cometElementsPromise ??= guard('errors.cometElements', () =>
+    getBackend().identify.getCometElements(),
+  ).catch((err: unknown) => {
     cometElementsPromise = null;
     throw err;
   });

@@ -1,4 +1,5 @@
 import express from 'express';
+import type { DSOUserOverride } from '@myastrosky/core/types';
 import { dsoOverrides } from '../services.js';
 import { sendError } from './http-errors.js';
 
@@ -61,7 +62,7 @@ dsoOverridesRouter.get('/api/dso-overrides', async (_req, res) => {
  */
 dsoOverridesRouter.put('/api/dso-overrides/:id', async (req, res) => {
   try {
-    await dsoOverrides.upsert(req.params.id, req.body);
+    await dsoOverrides.upsert(req.params.id, req.body as DSOUserOverride);
     res.json({ ok: true });
   } catch (err) {
     sendError(res, err);

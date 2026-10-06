@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { normalizeRA } from '@myastrosky/core/angles';
+import { buildCatalogStars } from '@myastrosky/core/catalog/star-lists';
 import { wcsToCorrespondencesWithCatalog } from '@myastrosky/core/wcs';
 import type { CatalogStar, Correspondence, WCSData } from '@myastrosky/core/wcs';
 import path from 'path';
@@ -49,23 +49,7 @@ export function loadServerCatalog(): CatalogStar[] {
   const starsData = JSON.parse(fs.readFileSync(starsPath, 'utf-8'));
   const namesData = fs.existsSync(namesPath) ? JSON.parse(fs.readFileSync(namesPath, 'utf-8')) : {};
 
-  serverStars = [];
-  for (const f of starsData.features) {
-    const hip: number = f.id;
-    const [ra, dec]: [number, number] = f.geometry.coordinates;
-    const info = namesData[String(hip)];
-    serverStars.push({
-      hip,
-      ra: normalizeRA(ra),
-      dec,
-      mag: f.properties.mag,
-      name: info?.name || undefined,
-      bayer: info?.bayer || undefined,
-      constellation: info?.c || undefined,
-    });
-  }
-
-  serverStars.sort((a, b) => a.mag - b.mag);
+  serverStars = buildCatalogStars(starsData, namesData);
 
   const catalogName = path.basename(usedPath);
   const maxMag = Math.max(...serverStars.map((s) => s.mag));

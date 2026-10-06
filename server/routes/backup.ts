@@ -1,7 +1,11 @@
 import express from 'express';
-import path from 'path';
 import sharp from 'sharp';
-import type { ExportRequest, ImportOptions } from '@myastrosky/core/domain/backup';
+import {
+  backupFileName,
+  type ExportRequest,
+  type ImportOptions,
+} from '@myastrosky/core/domain/backup';
+import type { BackupFile } from '@myastrosky/core/services/backup';
 import { uploadBundle } from './shared.js';
 import { backup as backupService } from '../services.js';
 import { createZipResponseWriter, openZipBundle } from '../bundle-zip.js';
@@ -14,6 +18,15 @@ export const backupRouter = express.Router();
 function fail(res: express.Response, err: unknown): void {
   if (isDomainError(err)) sendError(res, err);
   else res.status(500).json({ error: (err as Error)?.message ?? String(err) });
+}
+
+/** The uploaded file as the service reads it; the ZIP is only opened if the service asks. */
+function backupFileOf(file: Express.Multer.File): BackupFile {
+  return {
+    name: file.originalname,
+    bytes: file.buffer,
+    openZip: () => openZipBundle(file.buffer),
+  };
 }
 
 /**
@@ -36,12 +49,11 @@ backupRouter.post('/api/export', async (req, res) => {
     // Support legacy mode='metadata' for backward compat with backup button
     const legacyMetadataOnly = body.mode === 'metadata';
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '-');
 
     if (legacyMetadataOnly) {
       const selected = await backupService.selectPhotos(body.ids);
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="sky-export-${dateStr}.json"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${backupFileName(now, 'json')}"`);
       res.json(selected);
       return;
     }
@@ -49,7 +61,7 @@ backupRouter.post('/api/export', async (req, res) => {
     // Always produce a ZIP, streamed to the response; the headers go out with the first file.
     zip = createZipResponseWriter(res, () => {
       res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename="sky-export-${dateStr}.zip"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${backupFileName(now, 'zip')}"`);
     });
     await backupService.exportTo(zip, {
       options: body.options,
@@ -132,16 +144,7 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
       return;
     }
 
-    const ext = path.extname(file.originalname).toLowerCase();
-
-    if (ext === '.zip') {
-      res.json(await backupService.preview(await openZipBundle(file.buffer)));
-    } else if (ext === '.json') {
-      res.json(backupService.previewPhotoList(JSON.parse(file.buffer.toString('utf8'))));
-    } else {
-      res.status(400).json({ error: 'Format non supporté (.zip ou .json attendu)' });
-      return;
-    }
+    res.json(await backupService.previewFile(backupFileOf(file)));
   } catch (err: any) {
     fail(res, err);
   }
@@ -247,21 +250,10 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
         typeof req.body?.setupConflicts === 'string' ? JSON.parse(req.body.setupConflicts) : {},
     };
 
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (ext === '.zip') {
-      const reader = await openZipBundle(file.buffer);
-      // Flush libvips handle cache before writing to avoid Windows sharing violations
-      // when re-importing the same files that sharp processed in a previous request.
-      sharp.cache(false);
-      res.json(await backupService.importFrom(reader, selection));
-    } else if (ext === '.json') {
-      res.json(
-        await backupService.importPhotoList(JSON.parse(file.buffer.toString('utf8')), selection),
-      );
-    } else {
-      res.status(400).json({ error: 'Format non supporté (.zip ou .json attendu)' });
-      return;
-    }
+    // Flush libvips handle cache before writing to avoid Windows sharing violations
+    // when re-importing the same files that sharp processed in a previous request.
+    sharp.cache(false);
+    res.json(await backupService.importFile(backupFileOf(file), selection));
   } catch (err: any) {
     fail(res, err);
   }

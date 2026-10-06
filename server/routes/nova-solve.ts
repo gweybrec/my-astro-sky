@@ -165,16 +165,12 @@ novaSolveRouter.get('/api/solve-plate/:id', async (req, res) => {
 // --- List user's astrometry.net submissions ---
 novaSolveRouter.get('/api/astrometry/submissions', async (req, res) => {
   try {
-    if (!(await novaSolve.isConfigured())) {
-      res
-        .status(400)
-        .json({ error: 'ASTROMETRY_API_KEY not configured', code: 'ASTROMETRY_NOT_CONFIGURED' });
-      return;
-    }
-
     const submissions = await novaSolve.listSubmissions();
     res.json({ submissions });
   } catch (err: any) {
+    if (sendRule(res, err, { ASTROMETRY_NOT_CONFIGURED: 'ASTROMETRY_API_KEY not configured' })) {
+      return;
+    }
     console.error('List submissions error:', err);
     res.status(500).json({ error: err.message });
   }
@@ -196,17 +192,16 @@ novaSolveRouter.post('/api/astrometry/reuse', upload.single('photo'), async (req
   try {
     const lang = langOf(req.body);
 
-    if (!(await novaSolve.isConfigured())) {
-      res.status(400).json({
-        error:
-          lang === 'fr' ? 'ASTROMETRY_API_KEY non configurée' : 'ASTROMETRY_API_KEY not configured',
-        code: 'ASTROMETRY_NOT_CONFIGURED',
-      });
-      return;
-    }
+    const notConfigured =
+      lang === 'fr' ? 'ASTROMETRY_API_KEY non configurée' : 'ASTROMETRY_API_KEY not configured';
 
     const file = req.file;
     if (!file) {
+      // Without a file there is no service call to refuse for a missing key, and the key comes first.
+      if (!(await novaSolve.isConfigured())) {
+        res.status(400).json({ error: notConfigured, code: 'ASTROMETRY_NOT_CONFIGURED' });
+        return;
+      }
       res.status(400).json({
         error: lang === 'fr' ? 'Aucun fichier fourni' : 'No file provided',
         code: 'NO_FILE',
@@ -223,6 +218,7 @@ novaSolveRouter.post('/api/astrometry/reuse', upload.single('photo'), async (req
     } catch (err) {
       if (
         sendRule(res, err, {
+          ASTROMETRY_NOT_CONFIGURED: notConfigured,
           INVALID_JOB_ID: lang === 'fr' ? 'Job ID invalide' : 'Invalid job ID',
           CANNOT_DETERMINE_DIMENSIONS:
             lang === 'fr'

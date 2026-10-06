@@ -17,6 +17,7 @@ import { setCenterMode, setProjectionObserver } from '../../src/projection';
 
 vi.mock('../../src/api', () => ({
   tnsConesearchAPI: vi.fn(),
+  photoFileUrl: (fileName: string) => `/uploads/${fileName}`,
 }));
 
 import { tnsConesearchAPI } from '../../src/api';

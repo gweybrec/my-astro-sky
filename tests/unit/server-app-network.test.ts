@@ -162,7 +162,10 @@ describe('POST /api/skybot/conesearch', () => {
     const r = await call('POST', '/api/skybot/conesearch', GOOD);
     expect(r).toEqual({
       status: 502,
-      body: { error: 'SkyBoT error: SkyBoT request failed (503): down for maintenance' },
+      body: {
+        error: 'SkyBoT error: SkyBoT request failed (503): down for maintenance',
+        code: 'SKYBOT_FAILED',
+      },
     });
   });
 
@@ -171,7 +174,10 @@ describe('POST /api/skybot/conesearch', () => {
     const r = await call('POST', '/api/skybot/conesearch', { ...GOOD, lang: 'fr' });
     expect(r).toEqual({
       status: 502,
-      body: { error: 'Erreur SkyBoT : SkyBoT error: calceph_compute_unit error #0' },
+      body: {
+        error: 'Erreur SkyBoT : SkyBoT error: calceph_compute_unit error #0',
+        code: 'SKYBOT_FAILED',
+      },
     });
   });
 
@@ -180,7 +186,7 @@ describe('POST /api/skybot/conesearch', () => {
     const r = await call('POST', '/api/skybot/conesearch', GOOD);
     expect(r).toEqual({
       status: 502,
-      body: { error: 'SkyBoT error: SkyBoT request failed: ECONNRESET' },
+      body: { error: 'SkyBoT error: SkyBoT request failed: ECONNRESET', code: 'SKYBOT_FAILED' },
     });
   });
 
@@ -293,7 +299,7 @@ describe('POST /api/tns/conesearch', () => {
     const r = await call('POST', '/api/tns/conesearch', { ...GOOD, raDeg: 20 });
     expect(r).toEqual({
       status: 502,
-      body: { error: 'TNS error: TNS request failed (500): boom' },
+      body: { error: 'TNS error: TNS request failed (500): boom', code: 'TNS_FAILED' },
     });
   });
 
@@ -302,13 +308,16 @@ describe('POST /api/tns/conesearch', () => {
     const html = await call('POST', '/api/tns/conesearch', { ...GOOD, raDeg: 30 });
     expect(html).toEqual({
       status: 502,
-      body: { error: 'TNS error: TNS returned an unexpected response: <html>Maintenance</html>' },
+      body: {
+        error: 'TNS error: TNS returned an unexpected response: <html>Maintenance</html>',
+        code: 'TNS_FAILED',
+      },
     });
     upstream = { reject: 'ECONNRESET' };
     const failed = await call('POST', '/api/tns/conesearch', { ...GOOD, raDeg: 40, lang: 'fr' });
     expect(failed).toEqual({
       status: 502,
-      body: { error: 'Erreur TNS : TNS request failed: ECONNRESET' },
+      body: { error: 'Erreur TNS : TNS request failed: ECONNRESET', code: 'TNS_FAILED' },
     });
   });
 
@@ -366,6 +375,7 @@ describe('GET /api/comets/elements', () => {
       status: 502,
       body: {
         error: 'Could not load comet orbits (MPC): MPC request failed (503): Service Unavailable',
+        code: 'COMET_ELEMENTS_FAILED',
       },
     });
     expect(recorded).toHaveLength(1);
@@ -381,13 +391,17 @@ describe('GET /api/comets/elements', () => {
       body: {
         error:
           'Impossible de charger les orbites des comètes (MPC) : MPC returned no comet elements: <html>maintenance</html>',
+        code: 'COMET_ELEMENTS_FAILED',
       },
     });
     upstream = { reject: 'ECONNRESET' };
     const failed = await call('GET', '/api/comets/elements');
     expect(failed).toEqual({
       status: 502,
-      body: { error: 'Could not load comet orbits (MPC): MPC request failed: ECONNRESET' },
+      body: {
+        error: 'Could not load comet orbits (MPC): MPC request failed: ECONNRESET',
+        code: 'COMET_ELEMENTS_FAILED',
+      },
     });
   });
 
@@ -471,7 +485,7 @@ describe('GET /api/horizon', () => {
     const r = await call('GET', `/api/horizon${query}`);
     expect(r).toEqual({
       status: 400,
-      body: { error: 'Invalid or missing lat/lon' },
+      body: { error: 'Invalid or missing lat/lon', code: 'INVALID_LAT_LON' },
     });
     expect(recorded).toHaveLength(0);
   });
@@ -559,7 +573,10 @@ describe('GET /api/horizon', () => {
     const r = await call('GET', '/api/horizon?lat=-20.5&lon=140.5&radiusKm=3');
     expect(r).toEqual({
       status: 502,
-      body: { error: 'Failed to compute horizon from elevation data' },
+      body: {
+        error: 'Failed to compute horizon from elevation data',
+        code: 'HORIZON_COMPUTE_FAILED',
+      },
     });
     upstream = answer({ status: 200, body: '{"elements":[]}' });
     const retry = await call('GET', '/api/horizon?lat=-20.5&lon=140.5&radiusKm=3');
@@ -571,7 +588,10 @@ describe('GET /api/horizon', () => {
     const r = await call('GET', '/api/horizon?lat=-30.5&lon=150.5&radiusKm=3');
     expect(r).toEqual({
       status: 502,
-      body: { error: 'Failed to compute horizon from elevation data' },
+      body: {
+        error: 'Failed to compute horizon from elevation data',
+        code: 'HORIZON_COMPUTE_FAILED',
+      },
     });
   });
 
@@ -581,7 +601,10 @@ describe('GET /api/horizon', () => {
       const r = await call('GET', `/api/horizon?lat=45.5&lon=7.5&radiusKm=${radius}`);
       expect(r).toEqual({
         status: 502,
-        body: { error: 'Failed to compute horizon from elevation data' },
+        body: {
+          error: 'Failed to compute horizon from elevation data',
+          code: 'HORIZON_COMPUTE_FAILED',
+        },
       });
     }
     expect(recorded).toHaveLength(0);

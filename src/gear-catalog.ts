@@ -9,6 +9,7 @@
 import type { GearPreset } from './gear-presets';
 import type { SmartMosaicCapability } from './mosaic';
 import type { FilterCatalogEntry } from './autocomplete-utils';
+import { getGearCatalog } from './api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,40 +109,28 @@ let _filterByLabel: Map<string, FilterData> | null = null;
 
 export async function getTelescopes(): Promise<TelescopeData[]> {
   if (!_telescopes) {
-    _telescopes = await fetch('/api/telescopes').then((r) => {
-      if (!r.ok) throw new Error(`Failed to load telescopes: ${r.status}`);
-      return r.json();
-    });
+    _telescopes = (await getGearCatalog('telescope')) as TelescopeData[];
   }
   return _telescopes!;
 }
 
 export async function getCameras(): Promise<CameraData[]> {
   if (!_cameras) {
-    _cameras = await fetch('/api/cameras').then((r) => {
-      if (!r.ok) throw new Error(`Failed to load cameras: ${r.status}`);
-      return r.json();
-    });
+    _cameras = (await getGearCatalog('camera')) as CameraData[];
   }
   return _cameras!;
 }
 
 export async function getAccessories(): Promise<AccessoryData[]> {
   if (!_accessories) {
-    _accessories = await fetch('/api/accessories').then((r) => {
-      if (!r.ok) throw new Error(`Failed to load accessories: ${r.status}`);
-      return r.json();
-    });
+    _accessories = (await getGearCatalog('accessory')) as AccessoryData[];
   }
   return _accessories!;
 }
 
 export async function getFilters(): Promise<FilterData[]> {
   if (!_filters) {
-    _filters = await fetch('/api/filters').then((r) => {
-      if (!r.ok) throw new Error(`Failed to load filters: ${r.status}`);
-      return r.json();
-    });
+    _filters = (await getGearCatalog('filter')) as FilterData[];
     _filterByLabel = null;
   }
   return _filters!;

@@ -1,5 +1,6 @@
 import express from 'express';
 import { isDomainError } from '@myastrosky/core/domain/errors';
+import type { SkyRegionChanges, SkyRegionInput } from '@myastrosky/core/domain/regions';
 import { skyRegions } from '../services.js';
 import { sendError } from './http-errors.js';
 
@@ -86,7 +87,7 @@ skyRegionsRouter.get('/api/sky-regions', async (_req, res) => {
  */
 skyRegionsRouter.post('/api/sky-regions', async (req, res) => {
   try {
-    res.json(await skyRegions.create(req.body));
+    res.json(await skyRegions.create(req.body as SkyRegionInput));
   } catch (err) {
     if (!isDomainError(err)) console.error('[SkyRegions] Failed to create region', err);
     sendError(res, err);
@@ -136,7 +137,7 @@ skyRegionsRouter.post('/api/sky-regions', async (req, res) => {
  */
 skyRegionsRouter.patch('/api/sky-regions/:id', async (req, res) => {
   try {
-    await skyRegions.update(req.params.id, req.body);
+    await skyRegions.update(req.params.id, req.body as SkyRegionChanges);
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) console.error('[SkyRegions] Failed to update region', err);

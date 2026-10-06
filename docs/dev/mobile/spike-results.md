@@ -364,3 +364,193 @@ Real core services (settings, plans, photos; fake image codec and blob store) on
 - A transaction costs two extra hops (begin and commit). Services should keep transactions for writes that really need several reads between statements, and prefer one `batch` (one `executeSet`, atomic on its own) otherwise.
 - `exec` must be one statement per line for the plugin; the adapter does it. A trigger body with inner semicolons is not supported by the splitter (the schema has none). A `batch` holding a `Uint8Array` falls back to one `run` per statement inside a transaction, because `executeSet` binds raw JSON and cannot carry a BLOB; keep BLOBs out of batches (the services keep images in the blob store).
 - Outer-db calls and nested `transaction()` inside a body cannot be told apart from a legitimate wait without `AsyncLocalStorage`: they time out (`lockTimeoutMs`) instead of failing at once, and the body's transaction only rolls back if the body lets the rejection propagate. A waiter behind a busy transaction does not time out as long as the transaction keeps making `tx` calls.
+
+## Phone backend (2026-10-06)
+
+The assembled phone backend (`createPhoneBackend` on the Capacitor SQLite adapter and the phone adapters), run on the phone through the spike app's `/#/backend` route: the four adapter conformance suites, the backend contract, and a timing run on two real photos. Raw results: `spikes/mobile/results/backend-*.json` (gitignored with the rest of `spikes/`).
+
+**Device.** Samsung Galaxy A16 (SM-A165F), Android 16 (API 36), Android System WebView 153.0.8010.36. Run 1 is a cold start of the app, run 2 a second run in the same process with the photos picked again.
+
+**History.** A first attempt passed 23 of 24 cases of the backend contract (`removeAll counts: expected 2 but got 6`): the plugin's run count includes the rows deleted by foreign-key cascades. Fixed in commit 27180f8: after a DELETE, UPDATE or REPLACE that changed rows, the adapter reads `SELECT changes()` (about 19 ms extra). Its photo uploads were also refused because the test page sent no correspondences; the page is fixed, it was not an app defect.
+
+### Suites
+
+All five suites pass in both runs.
+
+| Suite            | Passed, run 1 | Passed, run 2 | Run 1 (ms) | Run 2 (ms) |
+| ---------------- | ------------- | ------------- | ---------- | ---------- |
+| Picture files    | 7/7           | 7/7           | 1573       | 2313       |
+| Pictures         | 16/16         | 16/16         | 453        | 283        |
+| Network          | 8/8           | 8/8           | 605        | 563        |
+| Secret           | 4/4           | 4/4           | 120        | 91         |
+| Backend contract | 24/24         | 24/24         | 54083      | 49150      |
+
+The secret suite's reload check passes: after a page reload the stored secret still decrypts (`value read`).
+
+#### Picture files
+
+| Case                                                                        | Run 1 (ms) | Run 2 (ms) |
+| --------------------------------------------------------------------------- | ---------- | ---------- |
+| put then get returns the same bytes, and size is their length               | 175        | 157        |
+| a missing blob: get and size give null                                      | 38         | 85         |
+| remove deletes the blob; removing a missing one is not an error             | 92         | 237        |
+| put on an existing name replaces the content (a shorter one leaves no tail) | 74         | 203        |
+| a 3 MB blob comes back byte for byte                                        | 971        | 1145       |
+| an empty blob exists, with size 0                                           | 64         | 155        |
+| the two name forms of the services: <id>.jpg and <id>_thumb.jpg             | 157        | 326        |
+
+#### Pictures
+
+| Case                                                                                          | Run 1 (ms) | Run 2 (ms) |
+| --------------------------------------------------------------------------------------------- | ---------- | ---------- |
+| probe: the stored size of a JPEG, with no orientation                                         | 2          | 0          |
+| probe: the stored size (before rotation) and the orientation of a rotated JPEG                | 1          | 1          |
+| probe: the size of a PNG                                                                      | 1          | 1          |
+| probe rejects bytes that are not a picture                                                    | 6          | 1          |
+| bakeOrientation: a rotated JPEG comes back upright, in the same format, with the corner moved | 130        | 38         |
+| bakeOrientation: PNG and the extension .jpeg are accepted, .gif and .tiff are refused         | 2          | 1          |
+| thumbnail: longer side at most maxSize, ratio kept, JPEG                                      | 59         | 46         |
+| thumbnail: a picture smaller than maxSize is not enlarged                                     | 51         | 48         |
+| thumbnail: a PNG gives a JPEG; a very small maxSize keeps at least 1 pixel                    | 30         | 32         |
+| thumbnail rejects bytes that are not a picture                                                | 1          | 1          |
+| encode: raw RGB to PNG (pixels exact) and to JPEG (pixels within a tolerance)                 | 106        | 54         |
+| encode: one channel (grey) and four channels (with alpha) to PNG                              | 53         | 49         |
+| decode: the size, a channel count of 1, 3 or 4 and data of width x height x channels          | 7          | 8          |
+| decode rejects bytes that are not a picture                                                   | 1          | 1          |
+| probe and bakeOrientation accept a WebP                                                       | 1          | 0          |
+| bakeOrientation returns the original bytes when there is no orientation                       | 1          | 0          |
+
+#### Network
+
+| Case                                                                                     | Run 1 (ms) | Run 2 (ms) |
+| ---------------------------------------------------------------------------------------- | ---------- | ---------- |
+| GET: method, custom headers sent, status 200 and a JSON body                             | 90         | 46         |
+| response header names are lower-case                                                     | 21         | 25         |
+| POST with a text body: the body arrives as it is (UTF-8)                                 | 38         | 30         |
+| POST with a form: text fields and a file with its name, type, size and checksum          | 120        | 106        |
+| an error status (503, 404) resolves with that status and does not reject                 | 50         | 56         |
+| bytes(): a binary body comes back byte for byte, and text() and bytes() can both be read | 45         | 63         |
+| timeoutMs: a slow answer rejects after about the timeout, a quick one passes             | 194        | 204        |
+| an address that cannot be reached rejects                                                | 46         | 32         |
+
+#### Secret
+
+| Case                                                                                            | Run 1 (ms) | Run 2 (ms) |
+| ----------------------------------------------------------------------------------------------- | ---------- | ---------- |
+| encrypts to the enc:v2:webcrypto form and decrypts back                                         | 83         | 52         |
+| a second codec on the same IndexedDB key opens what the first wrote                             | 10         | 13         |
+| the stored key is non-extractable                                                               | 16         | 11         |
+| a value without the prefix comes back unchanged; the server form and a tampered value give null | 10         | 14         |
+
+#### Backend contract
+
+| Case                                                                               | Run 1 (ms) | Run 2 (ms) |
+| ---------------------------------------------------------------------------------- | ---------- | ---------- |
+| plans: a full life cycle (plans, entries, mosaics, order)                          | 2044       | 2276       |
+| gear set-ups: a full life cycle                                                    | 1147       | 847        |
+| custom gear: add, list in its own catalogue, remove                                | 919        | 659        |
+| DSO corrections: a full life cycle                                                 | 964        | 919        |
+| point-of-interest categories: a full life cycle                                    | 948        | 850        |
+| sky regions: a full life cycle                                                     | 882        | 832        |
+| photos: upload, list with size, metadata, placement, order, removal                | 22802      | 19029      |
+| files: an address for a stored file and for the star catalogue                     | 657        | 651        |
+| settings: read, change, set and remove the API key                                 | 916        | 833        |
+| stars: search by name, nearby, by number                                           | 1479       | 1366       |
+| solved files: read the solution of a FITS file, and convert it                     | 5375       | 5383       |
+| solved files: a file that is not FITS or TIFF is refused                           | 640        | 626        |
+| solved files: a conversion can be cancelled                                        | 602        | 561        |
+| backup: export, preview, and restore into an empty backend                         | 7552       | 7416       |
+| errors: invalid, notFound and conflict carry their kind and code                   | 1762       | 1727       |
+| horizon: a latitude out of range is refused                                        | 617        | 549        |
+| identification: a cone out of range is refused                                     | 612        | 563        |
+| identification: asteroids, transients and comets from the recorded answers         | 639        | 584        |
+| identification: an upstream failure is an upstream error, a TNS limit a rate limit | 622        | 551        |
+| version: the latest release from the recorded answer                               | 619        | 565        |
+| online solving: an unknown job and a missing key are refused                       | 560        | 610        |
+| online solving: the list of past submissions and the reuse need a key too          | 599        | 598        |
+| photos: a file that is not a picture is refused with a code that has a message     | 607        | 605        |
+| local solvers: probes of nothing, unknown jobs, a file that cannot be solved       | 511        | 546        |
+
+### Timings
+
+One photo at a time through the real services: upload, display, listing, backup export, preview and restore into a second fresh backend, remove. "Calls" are bridge calls; both runs make the same number. Durations in ms, run 1 / run 2.
+
+#### LDN1235.jpg (9,443,394 bytes, 5760x3239)
+
+| Step                                       | Calls | Run 1 (ms) | Run 2 (ms) |
+| ------------------------------------------ | ----- | ---------- | ---------- |
+| photos.upload                              | 15    | 7482       | 7428       |
+| files.url(picture); displayed, 5760x3239   | 0     | 197        | 170        |
+| files.url(thumbnail); displayed, 400x225   | 0     | 7          | 8          |
+| photos.listWithSizes                       | 3     | 51         | 29         |
+| backup.exportToUser                        | 16    | 4335       | 4282       |
+| backup.preview in a second fresh backend   | 4     | 48         | 45         |
+| backup.restore in the second fresh backend | 22    | 7789       | 7822       |
+| photos.remove                              | 5     | 151        | 125        |
+
+Stored picture 9,443,394 bytes (the full-size original, not downscaled), thumbnail 8,869 bytes. Upload 831 / 825 ms per MB. Restore brought back 1 photo with the same file size; after remove both files are gone.
+
+#### M26.jpg (5,778,809 bytes, 3331x1791)
+
+| Step                                       | Calls | Run 1 (ms) | Run 2 (ms) |
+| ------------------------------------------ | ----- | ---------- | ---------- |
+| photos.upload                              | 11    | 6213       | 6038       |
+| files.url(picture); displayed, 3331x1791   | 0     | 103        | 114        |
+| files.url(thumbnail); displayed, 400x215   | 0     | 9          | 13         |
+| photos.listWithSizes                       | 3     | 46         | 50         |
+| backup.exportToUser                        | 13    | 2767       | 2756       |
+| backup.preview in a second fresh backend   | 4     | 52         | 42         |
+| backup.restore in the second fresh backend | 18    | 6555       | 6494       |
+| photos.remove                              | 5     | 151        | 132        |
+
+Stored picture 5,778,809 bytes (the full-size original, not downscaled), thumbnail 16,817 bytes. Upload 1127 / 1096 ms per MB. Restore brought back 1 photo with the same file size; after remove both files are gone.
+
+### Memory
+
+The JS heap stayed at 48.1 MB through every step of both photos (limit 954 MB), and the app was not killed. This says nothing about native image memory, which was not measured.
+
+### Findings
+
+- Upload of LDN1235.jpg (9.4 MB) takes 7.5 s (7482 / 7428 ms), about 0.8 s per MB, under the card limit of 1 s per MB, in 15 bridge calls. M26.jpg (5.8 MB) takes 6.2 s (6213 / 6038 ms), 1.1 s per MB, slightly above that limit although the results file flags it as within it. Most of the time is the picture codec (probe, bake orientation, thumbnail: about 4.3 to 4.5 s) and the file writes in chunks (1.2 to 1.9 s).
+- Restore is as slow as upload (7.8 s and 6.5 s): it writes the picture again and rebuilds the thumbnail (4.4 s and 4.3 s in the codec). Export takes 4.3 s and 2.8 s.
+- Display, listing, preview and remove are quick: the picture shows in 170 to 197 ms (LDN1235) and 103 to 114 ms (M26), the thumbnail in under 15 ms, `listWithSizes` 29 to 51 ms, preview 42 to 52 ms, remove 125 to 151 ms.
+- The two runs agree within about 10 % on every step, so the cold start adds nothing noticeable.
+- The picked photo is dropped when the page reloads: after a reload the app must ask for the file again.
+- The cascade count bug (the plugin counting foreign-key cascade rows) is fixed in commit 27180f8 and the backend contract now passes 24 of 24 in both runs.
+
+### Decisions
+
+### After optimisation
+
+Same phone and photos (Galaxy A16, WebView 153), final defaults: file pieces of 8 MB, thumbnail resize quality `high`. Durations in ms; "after" is run 1 / run 2.
+
+| Step, LDN1235.jpg (9.4 MB) | Before | After       |
+| -------------------------- | ------ | ----------- |
+| photos.upload              | 7482   | 2146 / 2036 |
+| backup.exportToUser        | 4335   | 1723 / 1754 |
+| backup.restore             | 7789   | 2277 / 2302 |
+
+| Step, M26.jpg (5.5 MB) | After       |
+| ---------------------- | ----------- |
+| photos.upload          | 1301 / 1325 |
+| backup.exportToUser    | 1157 / 1101 |
+| backup.restore         | 1488 / 1509 |
+
+Targets: upload under 2 s narrowly missed (2.0 to 2.15 s); export and restore under 3 s met.
+
+Upload of LDN1235 (run 2): file writes about 1436 (writeFile 1211, appendFile 225, base64 gap 23), thumbnail 431, mkdir 29, SQL about 42, the rest reading and other.
+
+#### What changed
+
+- **The 4.4 s "codec" time was a stall.** `OffscreenCanvas.convertToBlob` (and `canvas.toBlob`) waits about 4.0 s on this WebView whenever no animation frames are produced, and about 40 ms when a `requestAnimationFrame` loop runs during the call (one frame before the call does not help). `browser-image-codec.ts` now runs such a loop during `convertToBlob` (commit 2f8bb34).
+- **The backup stores the picture uncompressed** in the ZIP: `zipSync` of 9.4 MB took 1381 ms at level 1 against 38 ms stored. The JSON files stay compressed.
+- **Piece size** (9.4 MB write time, ms): 1 MB 2130, 2 MB 1670, 4 MB 1615, 8 MB 1511. The plugin costs about 225 ms/MB at 1 MB pieces and 160 ms/MB at 8 MB; the heap stayed at 48 to 54 MB at every size. 8 MB chosen.
+- **Thumbnail resize quality** (decode, draw and encode in ms, LDN1235 / M26): pixelated 353 / 179, low 343 / 200, medium 383 / 219, high 380 / 233. At 2x `low` is visibly aliased; medium and high look the same and are not meaningfully slower. `high` kept.
+- `createImageBitmap` with a resize takes 280 to 320 ms, the same as a full-size decode (278 ms): the decode is the cost, not the resize.
+- `Uint8Array.prototype.toBase64` exists natively on this WebView: 1 MB in 0.4 ms against 84 ms in JS.
+
+#### What remains
+
+About 1.2 to 1.4 s of each 9.4 MB write is the Filesystem plugin itself (bridge transfer and native base64 decode). Going lower needs another way to write a file from the WebView (a plugin that accepts a blob or binary, or a local HTTP write). The thumbnail decode (about 0.43 s) could overlap with the file write; not done.
+
+Suites on the phone after the change: picture files 7/7, pictures 16/16, network 8/8, secret 4/4, backend contract 24/24, timings 2/2.

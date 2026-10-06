@@ -105,3 +105,23 @@ describe('parseServerError — code-based error translation', () => {
     expect(result).toBe('Something specific went wrong');
   });
 });
+
+describe('parseServerError — messages with a placeholder', () => {
+  it('uses data.error when the translated message needs details the code cannot give', async () => {
+    localStorage.setItem('lang', 'en');
+    const { parseServerError } = await import('../../src/api');
+    const result = parseServerError(
+      { code: 'SKYBOT_FAILED', error: 'SkyBoT error: request failed (503)' },
+      'errors.skybotSearch',
+    );
+    expect(result).toBe('SkyBoT error: request failed (503)');
+  });
+
+  it('translates the code of a message with no placeholder, whatever data.error says', async () => {
+    localStorage.setItem('lang', 'fr');
+    const { parseServerError } = await import('../../src/api');
+    expect(parseServerError({ code: 'PLAN_NOT_FOUND', error: 'Plan not found' }, 'x')).toBe(
+      "Ce plan n'existe plus.",
+    );
+  });
+});

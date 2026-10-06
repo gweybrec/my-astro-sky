@@ -40,6 +40,7 @@ describe('DomainError codes', () => {
         isEncrypted: () => false,
       },
       env: (k) => (k === 'ASTROMETRY_API_KEY' ? 'from-env' : undefined),
+      platform: { isWindows: false },
     });
     paths = {
       'dso.upsert id': () => dso.upsert('', {}),

@@ -13,6 +13,15 @@ export interface GearSetupData {
 export type CustomGearType = 'telescope' | 'camera' | 'accessory' | 'filter';
 
 /**
+ * The fields of a custom gear item a caller sends. The service requires a non-null object and stores it
+ * as given (it adds the `id`); which fields each type carries is the editor's business.
+ */
+export type CustomGearInput = Record<string, unknown>;
+
+/** A setup a caller sends: the same fields as a stored one, without its id. */
+export type GearSetupInput = Omit<GearSetupData, 'id'>;
+
+/**
  * The name a custom gear item goes by in a backup preview and in the "already exists" match: "brand model"
  * (the label the app shows for telescopes, cameras and accessories), else its `name`, else its id. A custom
  * filter has no brand worth showing, so it goes by its `name`, then its `model`.

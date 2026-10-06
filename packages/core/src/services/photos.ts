@@ -4,6 +4,7 @@
  * (reading the picture, writing it to disk, thumbnails) is not here: the route still does it.
  * A photo's correspondences are deleted with it by `ON DELETE CASCADE` (foreign keys must be on).
  */
+import type { ErrorCode } from '../domain/error-codes';
 import { DomainError } from '../domain/errors';
 import type {
   BackupPhoto,
@@ -87,7 +88,7 @@ export interface PhotoService {
    * such photo.
    */
   remove(id: string): Promise<void>;
-  /** Deletes the photos with these ids (files, then rows). Returns how many existed. Ids that are not strings are ignored. */
+  /** Deletes the photos with these ids (files, then rows). Returns how many existed. Ids that are not strings are ignored. Throws `invalid` (`IDS_NOT_ARRAY`) when `ids` is not an array. */
   removeMany(ids: readonly string[]): Promise<number>;
   /**
    * Makes the thumbnail `thumbFilename` from the image `filename` when the image exists and the thumbnail does not.
@@ -183,7 +184,7 @@ export const photoNotFound = (): DomainError =>
     body: photoNotFoundBody,
   });
 
-const invalidUpload = (message: string, code: string): DomainError =>
+const invalidUpload = (message: string, code: ErrorCode): DomainError =>
   new DomainError('invalid', message, { code, body: { error: message, code } });
 
 const invalidOrder = (message: string): DomainError =>
@@ -446,6 +447,9 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     },
 
     async removeMany(ids) {
+      if (!Array.isArray(ids)) {
+        throw new DomainError('invalid', 'ids must be an array', { code: 'IDS_NOT_ARRAY' });
+      }
       const wanted = new Set(ids.filter((id): id is string => typeof id === 'string'));
       if (wanted.size === 0) return 0;
       const doomed = (await db.all<{ id: string; filename: string }>(SELECT_IDS_FILENAMES)).filter(

@@ -2,6 +2,7 @@ import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
 import type { Photo, PoiCategory, PointOfInterest } from './types';
 import type { GearSetupData } from './api';
+import { photoFileUrl } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
@@ -476,9 +477,7 @@ export class Gallery {
       item.className = 'gallery-item';
 
       const img = document.createElement('img');
-      const src = photo.thumbFilename
-        ? `/uploads/${photo.thumbFilename}`
-        : `/uploads/${photo.filename}`;
+      const src = photoFileUrl(photo.thumbFilename || photo.filename);
       img.dataset.src = src;
       img.alt = photo.originalName;
       img.style.visibility = 'hidden';
@@ -611,13 +610,13 @@ export class Gallery {
       if (animate) {
         imgEl.style.opacity = '0';
         setTimeout(() => {
-          imgEl.src = `/uploads/${photo.filename}`;
+          imgEl.src = photoFileUrl(photo.filename);
           imgEl.alt = photo.originalName;
           updateCaption(photo);
           imgEl.style.opacity = '';
         }, 250);
       } else {
-        imgEl.src = `/uploads/${photo.filename}`;
+        imgEl.src = photoFileUrl(photo.filename);
         imgEl.alt = photo.originalName;
         updateCaption(photo);
       }
@@ -772,7 +771,7 @@ export class Gallery {
       'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;padding-right:340px;box-sizing:border-box;';
 
     const img = document.createElement('img');
-    img.src = `/uploads/${photo.filename}`;
+    img.src = photoFileUrl(photo.filename);
     img.alt = photo.originalName;
     img.className = 'gallery-cinematic-img';
     img.draggable = false;

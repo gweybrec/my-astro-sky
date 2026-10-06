@@ -8,6 +8,7 @@
  * TNS: https://www.wis-tns.org/search (anonymous cone search, about 2 queries a minute)
  * MPC: https://www.minorplanetcenter.net/iau/info/CometOrbitFormat.html
  */
+import type { ErrorCode } from '../domain/error-codes';
 import { DomainError } from '../domain/errors';
 import type {
   CometElements,
@@ -337,7 +338,7 @@ function coneInRange(raDeg: number, decDeg: number, radiusArcmin: number): boole
   );
 }
 
-function upstream(code: string, message: string, cause?: unknown): DomainError {
+function upstream(code: ErrorCode, message: string, cause?: unknown): DomainError {
   const err = new DomainError('upstream', message, { code });
   if (cause !== undefined) err.cause = cause;
   return err;
@@ -345,7 +346,7 @@ function upstream(code: string, message: string, cause?: unknown): DomainError {
 
 async function request(
   http: HttpClient,
-  code: string,
+  code: ErrorCode,
   label: string,
   req: HttpRequest,
 ): Promise<HttpResponse> {

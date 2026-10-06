@@ -189,11 +189,7 @@ photosRouter.delete('/api/photos/:id', async (req, res) => {
 photosRouter.delete('/api/photos', async (req, res) => {
   try {
     const { ids } = req.body as { ids?: unknown };
-    if (!Array.isArray(ids)) {
-      res.status(400).json({ error: 'ids must be an array' });
-      return;
-    }
-    const deleted = await photos.removeMany(ids);
+    const deleted = await photos.removeMany(ids as string[]);
     res.json({ ok: true, deleted });
   } catch (err) {
     console.error('[DeleteAll] Bulk photo delete failed', err);

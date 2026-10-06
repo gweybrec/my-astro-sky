@@ -32,6 +32,7 @@ import {
   cssColorToHex,
 } from './observation-windows';
 import type { ObservationWindow } from './api';
+import { photoFileUrl } from './api';
 
 /** Read a CSS custom property off the document root (theme-aware colour lookup). */
 function readVar(cssVar: string): string {
@@ -134,7 +135,7 @@ async function drawPlacedPhoto(
   // Load full-resolution image for quality (on-screen img may be a thumbnail via LOD swap).
   let img: HTMLImageElement;
   try {
-    img = await loadImage(`/uploads/${placed.photo.filename}`);
+    img = await loadImage(photoFileUrl(placed.photo.filename));
   } catch {
     img = placed.imgEl; // fall back to whatever is on screen
   }
@@ -267,7 +268,7 @@ export async function renderGalleryPdf(photos: Photo[]): Promise<Blob> {
     const y = margin + row * (layout.cellH + gap);
 
     // Thumbnail, contained within the image box preserving aspect ratio.
-    const src = `/uploads/${photo.thumbFilename ?? photo.filename}`;
+    const src = photoFileUrl(photo.thumbFilename ?? photo.filename);
     try {
       const img = await loadImage(src);
       const scale = Math.min(layout.cellW / img.naturalWidth, layout.imgH / img.naturalHeight);

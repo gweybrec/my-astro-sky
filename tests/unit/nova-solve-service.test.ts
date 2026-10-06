@@ -127,6 +127,16 @@ describe('isConfigured() and the API key', () => {
     expect(await failure(t.service.submit(t.file))).toBe('invalid:ASTROMETRY_NOT_CONFIGURED');
     expect(t.http).not.toHaveBeenCalled();
   });
+
+  it('refuses to list the submissions or reuse one without a key, before any request', async () => {
+    const t = setup({ key: undefined });
+    expect(await failure(t.service.listSubmissions())).toBe('invalid:ASTROMETRY_NOT_CONFIGURED');
+    // The key is checked before the job id.
+    expect(await failure(t.service.reuse(t.file, Number.NaN))).toBe(
+      'invalid:ASTROMETRY_NOT_CONFIGURED',
+    );
+    expect(t.http).not.toHaveBeenCalled();
+  });
 });
 
 describe('submit()', () => {

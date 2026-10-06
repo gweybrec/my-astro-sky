@@ -1,5 +1,6 @@
 import type { Star, StarMultiplicity, ConstellationInfo, ConstellationStyle } from './types';
 import { getLang, t } from './i18n';
+import { getStarCatalogUrl } from './api';
 import { normalizeRA } from '@myastrosky/core/angles';
 import {
   expandMultiples,
@@ -29,8 +30,7 @@ async function fetchJSON(url: string): Promise<any> {
 async function fetchCatalog(): Promise<any> {
   // Ask the server which catalog to use (driven by STAR_CATALOG_PATH in .env)
   try {
-    const config = await fetchJSON('/api/config');
-    const url = config.starCatalog as string;
+    const url = await getStarCatalogUrl();
     const data = await fetchJSON(url);
     console.log(`[Catalog] Loaded star catalog from ${url}`);
     return data;

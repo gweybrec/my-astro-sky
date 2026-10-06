@@ -17,7 +17,7 @@ export const starsRouter = express.Router();
 starsRouter.get('/api/stars/search', async (req, res) => {
   try {
     const q = String(req.query.q || '');
-    const limit = parseInt(String(req.query.limit || '10'), 10) || 10;
+    const limit = parseInt(String(req.query.limit), 10);
     res.json(await stars.search(q, limit));
   } catch (err) {
     sendError(res, err);
@@ -39,7 +39,7 @@ starsRouter.get('/api/stars/nearby', async (req, res) => {
     const dec = parseFloat(String(req.query.dec || '0'));
     const radius = parseFloat(String(req.query.radius || '5'));
     const magLimit = parseFloat(String(req.query.magLimit || '10'));
-    const limit = parseInt(String(req.query.limit || '20'), 10) || 20;
+    const limit = parseInt(String(req.query.limit), 10);
 
     res.json(await stars.nearby({ ra, dec, radius, magLimit, limit }));
   } catch (err) {

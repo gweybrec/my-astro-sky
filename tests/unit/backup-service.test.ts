@@ -6,11 +6,11 @@
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
-import type { ImportOptions } from '@myastrosky/core/domain/backup';
+import { backupFileName, type ImportOptions } from '@myastrosky/core/domain/backup';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
-import { createBackupService } from '@myastrosky/core/services/backup';
+import { createBackupService, type BackupFile } from '@myastrosky/core/services/backup';
 import { createServices } from '../../server/create-services';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
@@ -93,6 +93,7 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
         isEncrypted: () => false,
       },
       env: () => undefined,
+      platform: { isWindows: false },
       gearCatalog: { telescopes: [], cameras: [], accessories: [], filters: [] },
       images,
       blobs,
@@ -629,6 +630,97 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
     });
   });
 
+  describe('an uploaded file', () => {
+    const photoList = [
+      { id: 'j1', filename: 'j1.jpg', originalName: 'j1.jpg', width: 1, height: 1 },
+    ];
+    /** A file whose ZIP is a fixed reader; `opened` counts how many times the service asked to open it. */
+    function fileOf(name: string, bytes: Uint8Array, reader?: BundleReader) {
+      const file = {
+        opened: 0,
+        name,
+        bytes,
+        async openZip() {
+          file.opened++;
+          if (!reader) throw new Error('not a zip');
+          return reader;
+        },
+      };
+      return file satisfies BackupFile;
+    }
+    const zipReader = () =>
+      memoryReader([
+        ['manifest.json', JSON.stringify(photoList)],
+        ['images/j1.jpg', 'x'],
+      ]);
+
+    it('previews a ZIP through its reader, opened once', async () => {
+      const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
+      const file = fileOf('Backup.ZIP', new Uint8Array(), zipReader());
+      const result = await svc.previewFile(file);
+      expect(result).toEqual(await svc.preview(zipReader()));
+      expect(result.photos).toBe(1);
+      expect(file.opened).toBe(1);
+    });
+
+    it('previews a JSON list without opening a ZIP', async () => {
+      const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
+      const file = fileOf('list.json', json(photoList));
+      expect(await svc.previewFile(file)).toEqual(svc.previewPhotoList(photoList));
+      expect(file.opened).toBe(0);
+    });
+
+    it('imports a ZIP through its reader', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      const file = fileOf('a.zip', new Uint8Array(), zipReader());
+      expect(await svc.importFile(file, everything)).toMatchObject({ imported: 1, failed: [] });
+      expect((await b.photos.list()).map((p) => p.id)).toEqual(['j1']);
+      expect(file.opened).toBe(1);
+    });
+
+    it('imports a JSON list without opening a ZIP', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      const file = fileOf('a.json', json(photoList));
+      expect(await svc.importFile(file, everything)).toEqual({
+        imported: 1,
+        skipped: 0,
+        dsoOverridesImported: 0,
+        failed: [],
+      });
+      expect(file.opened).toBe(0);
+    });
+
+    it.each(['notes.txt', 'archive', 'archive.zip.bak', '.zip'])(
+      'refuses %s, which is neither a ZIP nor a JSON list, and opens nothing',
+      async (name) => {
+        const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
+        const file = fileOf(name, json(photoList), zipReader());
+        for (const run of [() => svc.previewFile(file), () => svc.importFile(file, everything)]) {
+          const err = await run().catch((e) => e);
+          expect(err).toMatchObject({
+            kind: 'invalid',
+            code: 'UNSUPPORTED_BUNDLE_FORMAT',
+            message: 'Format non supporté (.zip ou .json attendu)',
+          });
+        }
+        expect(file.opened).toBe(0);
+      },
+    );
+
+    it('lets a JSON file that is not JSON fail with the parser error, and a JSON that is not a list with the manifest error', async () => {
+      const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
+      await expect(svc.previewFile(fileOf('a.json', text('{oops')))).rejects.toBeInstanceOf(
+        SyntaxError,
+      );
+      const err = await svc
+        .importFile(fileOf('a.json', json({ photos: [] })), everything)
+        .catch((e) => e);
+      expect(err).toMatchObject({ kind: 'invalid', code: 'INVALID_MANIFEST_FORMAT' });
+    });
+  });
+
   describe('round trips', () => {
     let counted: CountingSqlDb;
     async function makeCounted() {
@@ -710,5 +802,13 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(await calls(1, 6)).toBe(base + 5 * perPhoto);
       expect(await calls(4, 3)).toBe(base + 3 * perPlan + 2 * perPhoto);
     });
+  });
+});
+
+describe('backupFileName', () => {
+  it('names an export after the UTC time, as a ZIP by default', () => {
+    const now = new Date('2026-10-06T14:03:59.123Z');
+    expect(backupFileName(now)).toBe('sky-export-2026-10-06-14-03-59.zip');
+    expect(backupFileName(now, 'json')).toBe('sky-export-2026-10-06-14-03-59.json');
   });
 });

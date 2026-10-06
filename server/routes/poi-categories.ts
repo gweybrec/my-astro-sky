@@ -1,5 +1,6 @@
 import express from 'express';
 import { isDomainError } from '@myastrosky/core/domain/errors';
+import type { PoiCategoryChanges, PoiCategoryInput } from '@myastrosky/core/domain/poi-categories';
 import { poiCategories } from '../services.js';
 import { sendError } from './http-errors.js';
 
@@ -69,7 +70,7 @@ poiCategoriesRouter.get('/api/poi-categories', async (_req, res) => {
  */
 poiCategoriesRouter.post('/api/poi-categories', async (req, res) => {
   try {
-    res.json(await poiCategories.create(req.body));
+    res.json(await poiCategories.create(req.body as PoiCategoryInput));
   } catch (err) {
     if (!isDomainError(err)) console.error('[PoiCategories] Failed to create category', err);
     sendError(res, err);
@@ -112,7 +113,7 @@ poiCategoriesRouter.post('/api/poi-categories', async (req, res) => {
  */
 poiCategoriesRouter.patch('/api/poi-categories/:id', async (req, res) => {
   try {
-    await poiCategories.update(req.params.id, req.body);
+    await poiCategories.update(req.params.id, req.body as PoiCategoryChanges);
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) console.error('[PoiCategories] Failed to update category', err);

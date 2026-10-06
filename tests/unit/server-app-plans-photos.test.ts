@@ -143,7 +143,7 @@ describe('PUT /api/plans/:id', () => {
     for (const name of ['', '   ', 5, null]) {
       expect(await call('PUT', `/api/plans/${id}`, { name })).toEqual({
         status: 400,
-        body: { error: 'name is required' },
+        body: { error: 'name is required', code: 'PLAN_NAME_REQUIRED' },
       });
     }
     expect((await readPlan(id)).name).toBe('Keep me');
@@ -154,13 +154,13 @@ describe('PUT /api/plans/:id', () => {
     for (const lat of [91, -90.5]) {
       expect(await call('PUT', `/api/plans/${id}`, { lat })).toEqual({
         status: 400,
-        body: { error: 'lat must be between -90 and 90' },
+        body: { error: 'lat must be between -90 and 90', code: 'PLAN_LAT_OUT_OF_RANGE' },
       });
     }
     // 1e999 is valid JSON that parses to Infinity.
     expect(await callRaw('PUT', `/api/plans/${id}`, '{"lat":1e999}')).toEqual({
       status: 400,
-      body: { error: 'lat must be between -90 and 90' },
+      body: { error: 'lat must be between -90 and 90', code: 'PLAN_LAT_OUT_OF_RANGE' },
     });
     expect((await readPlan(id)).lat).toBeNull();
   });
@@ -170,12 +170,12 @@ describe('PUT /api/plans/:id', () => {
     for (const lon of [181, -180.1]) {
       expect(await call('PUT', `/api/plans/${id}`, { lon })).toEqual({
         status: 400,
-        body: { error: 'lon must be between -180 and 180' },
+        body: { error: 'lon must be between -180 and 180', code: 'PLAN_LON_OUT_OF_RANGE' },
       });
     }
     expect(await callRaw('PUT', `/api/plans/${id}`, '{"lon":-1e999}')).toEqual({
       status: 400,
-      body: { error: 'lon must be between -180 and 180' },
+      body: { error: 'lon must be between -180 and 180', code: 'PLAN_LON_OUT_OF_RANGE' },
     });
     expect((await readPlan(id)).lon).toBeNull();
   });
@@ -193,7 +193,7 @@ describe('PUT /api/plans/:id', () => {
     for (const sortBy of ['bogus', 5, null]) {
       expect(await call('PUT', `/api/plans/${id}`, { sortBy })).toEqual({
         status: 400,
-        body: { error: message },
+        body: { error: message, code: 'PLAN_SORT_INVALID' },
       });
     }
     expect((await readPlan(id)).sortBy).toBe('transit');
@@ -207,7 +207,7 @@ describe('PUT /api/plans/:id', () => {
     for (const body of [{}, { foo: 1 }, { notes: 'x' }]) {
       expect(await call('PUT', `/api/plans/${id}`, body)).toEqual({
         status: 400,
-        body: { error: message },
+        body: { error: message, code: 'PLAN_UPDATE_EMPTY' },
       });
     }
   });
@@ -259,7 +259,7 @@ describe('PUT /api/plans/:id', () => {
     const id = await mkPlan('Before');
     expect(await call('PUT', `/api/plans/${id}`, { name: 'After', lat: 95 })).toEqual({
       status: 400,
-      body: { error: 'lat must be between -90 and 90' },
+      body: { error: 'lat must be between -90 and 90', code: 'PLAN_LAT_OUT_OF_RANGE' },
     });
     // Every check runs before the first write (WP2.3f): the rejected request leaves the name alone.
     expect((await readPlan(id)).name).toBe('Before');
@@ -269,6 +269,7 @@ describe('PUT /api/plans/:id', () => {
       body: {
         error:
           'sortBy must be one of: transit, altitude, rating, magnitude, size, name, difficulty, window',
+        code: 'PLAN_SORT_INVALID',
       },
     });
     // Same for the settings: they are not stored when sortBy is rejected.
@@ -282,13 +283,13 @@ describe('POST /api/plans/:id/entries', () => {
     for (const body of [{}, { ra: 10 }, { ra: '10', dec: 20 }, { ra: 10, dec: null }]) {
       expect(await call('POST', `/api/plans/${id}/entries`, body)).toEqual({
         status: 400,
-        body: { error: 'dsoId or ra/dec is required' },
+        body: { error: 'dsoId or ra/dec is required', code: 'ENTRY_TARGET_REQUIRED' },
       });
     }
     // dsoId null counts as absent
     expect(await call('POST', `/api/plans/${id}/entries`, { dsoId: null })).toEqual({
       status: 400,
-      body: { error: 'dsoId or ra/dec is required' },
+      body: { error: 'dsoId or ra/dec is required', code: 'ENTRY_TARGET_REQUIRED' },
     });
     expect((await readPlan(id)).entries).toEqual([]);
   });
@@ -298,7 +299,7 @@ describe('POST /api/plans/:id/entries', () => {
     for (const dsoId of [5, true, ['M1'], {}]) {
       expect(await call('POST', `/api/plans/${id}/entries`, { dsoId })).toEqual({
         status: 400,
-        body: { error: 'dsoId must be a string' },
+        body: { error: 'dsoId must be a string', code: 'ENTRY_DSO_NOT_STRING' },
       });
     }
   });
@@ -363,7 +364,7 @@ describe('POST /api/plans/:id/entries', () => {
   it('checks the plan before the body', async () => {
     expect(await call('POST', '/api/plans/nope/entries', {})).toEqual({
       status: 404,
-      body: { error: 'Plan not found' },
+      body: { error: 'Plan not found', code: 'PLAN_NOT_FOUND' },
     });
   });
 });
@@ -387,7 +388,7 @@ describe('PATCH /api/plans/:id/entries/:entryId', () => {
     for (const [key, value, error] of cases) {
       expect(await call('PATCH', `/api/plans/${id}/entries/${entryId}`, { [key]: value })).toEqual({
         status: 400,
-        body: { error },
+        body: { error, code: 'ENTRY_FIELD_INVALID' },
       });
     }
     expect((await readPlan(id)).entries[0]).toMatchObject({ dsoId: 'M1', paDeg: null, ra: null });
@@ -441,7 +442,7 @@ describe('PATCH /api/plans/:id/entries/:entryId', () => {
       // KNOWN GAP: notes cannot be changed through this route (no route writes plan_entries.notes).
       expect(await call('PATCH', `/api/plans/${id}/entries/${entryId}`, body)).toEqual({
         status: 400,
-        body: { error: 'No updatable fields provided' },
+        body: { error: 'No updatable fields provided', code: 'ENTRY_NO_FIELDS' },
       });
     }
     expect((await readPlan(id)).entries[0].notes).toBeNull();
@@ -451,7 +452,7 @@ describe('PATCH /api/plans/:id/entries/:entryId', () => {
     const id = await mkPlan();
     expect(await call('PATCH', `/api/plans/${id}/entries/nope`, { paDeg: 1 })).toEqual({
       status: 404,
-      body: { error: 'Entry not found' },
+      body: { error: 'Entry not found', code: 'ENTRY_NOT_FOUND' },
     });
   });
 
@@ -652,12 +653,12 @@ describe('PUT /api/plans/:id/entries/order', () => {
     for (const ids of ['x', {}, null, 5]) {
       expect(await call('PUT', `/api/plans/${plan}/entries/order`, { ids })).toEqual({
         status: 400,
-        body: { error: 'ids must be an array' },
+        body: { error: 'ids must be an array', code: 'PLAN_IDS_NOT_ARRAY' },
       });
     }
     expect(await call('PUT', `/api/plans/${plan}/entries/order`, {})).toEqual({
       status: 400,
-      body: { error: 'ids must be an array' },
+      body: { error: 'ids must be an array', code: 'PLAN_IDS_NOT_ARRAY' },
     });
   });
 
@@ -720,7 +721,7 @@ describe('DELETE /api/plans/:id/entries/:entryId', () => {
     const id = await mkPlan();
     expect(await call('DELETE', `/api/plans/${id}/entries/nope`)).toEqual({
       status: 404,
-      body: { error: 'Entry not found' },
+      body: { error: 'Entry not found', code: 'ENTRY_NOT_FOUND' },
     });
   });
 
@@ -730,7 +731,7 @@ describe('DELETE /api/plans/:id/entries/:entryId', () => {
     expect(await call('DELETE', `/api/plans/${id}/entries/${entryId}`)).toEqual(OK);
     expect(await call('DELETE', `/api/plans/${id}/entries/${entryId}`)).toEqual({
       status: 404,
-      body: { error: 'Entry not found' },
+      body: { error: 'Entry not found', code: 'ENTRY_NOT_FOUND' },
     });
   });
 
@@ -750,20 +751,20 @@ describe('mosaics', () => {
     const centre = 'centerRa/centerDec must be numbers';
     expect(await call('POST', url, { centerDec: 1, tiles: MOSAIC_TILES })).toEqual({
       status: 400,
-      body: { error: centre },
+      body: { error: centre, code: 'MOSAIC_CENTER_INVALID' },
     });
     expect(await call('POST', url, { centerRa: 1, tiles: MOSAIC_TILES })).toEqual({
       status: 400,
-      body: { error: centre },
+      body: { error: centre, code: 'MOSAIC_CENTER_INVALID' },
     });
     expect(await call('POST', url, { centerRa: '1', centerDec: 1, tiles: MOSAIC_TILES })).toEqual({
       status: 400,
-      body: { error: centre },
+      body: { error: centre, code: 'MOSAIC_CENTER_INVALID' },
     });
     for (const tiles of [undefined, [], 'x', {}]) {
       expect(await call('POST', url, { centerRa: 1, centerDec: 1, tiles })).toEqual({
         status: 400,
-        body: { error: 'tiles must be a non-empty array' },
+        body: { error: 'tiles must be a non-empty array', code: 'MOSAIC_TILES_INVALID' },
       });
     }
     for (const tile of [{}, { ra: 1 }, { ra: '1', dec: 2 }, null, 5]) {
@@ -771,7 +772,7 @@ describe('mosaics', () => {
         await call('POST', url, { centerRa: 1, centerDec: 1, tiles: [{ ra: 1, dec: 2 }, tile] }),
       ).toEqual({
         status: 400,
-        body: { error: 'each tile needs numeric ra/dec' },
+        body: { error: 'each tile needs numeric ra/dec', code: 'MOSAIC_TILE_COORDS_INVALID' },
       });
     }
     expect(await readPlan(id)).toMatchObject({ entries: [], mosaics: [] });
@@ -780,7 +781,7 @@ describe('mosaics', () => {
   it('checks the plan before the body', async () => {
     expect(await call('POST', '/api/plans/nope/mosaics', {})).toEqual({
       status: 404,
-      body: { error: 'Plan not found' },
+      body: { error: 'Plan not found', code: 'PLAN_NOT_FOUND' },
     });
   });
 
@@ -907,7 +908,7 @@ describe('mosaics', () => {
     const b = await mkPlan('B');
     const mosaicId = await mkMosaic(a);
     const body = { centerRa: 1, centerDec: 1, tiles: [{ ra: 1, dec: 1 }] };
-    const notFound = { status: 404, body: { error: 'Mosaic not found' } };
+    const notFound = { status: 404, body: { error: 'Mosaic not found', code: 'MOSAIC_NOT_FOUND' } };
     expect(await call('PUT', `/api/plans/${b}/mosaics/${mosaicId}`, body)).toEqual(notFound);
     expect(await call('PUT', `/api/plans/${a}/mosaics/nope`, body)).toEqual(notFound);
     expect(await call('PUT', `/api/plans/nope/mosaics/${mosaicId}`, body)).toEqual(notFound);
@@ -923,11 +924,11 @@ describe('mosaics', () => {
     const mosaicId = await mkMosaic(id);
     expect(await call('PUT', `/api/plans/${id}/mosaics/nope`, {})).toEqual({
       status: 404,
-      body: { error: 'Mosaic not found' },
+      body: { error: 'Mosaic not found', code: 'MOSAIC_NOT_FOUND' },
     });
     expect(await call('PUT', `/api/plans/${id}/mosaics/${mosaicId}`, { tiles: [] })).toEqual({
       status: 400,
-      body: { error: 'centerRa/centerDec must be numbers' },
+      body: { error: 'centerRa/centerDec must be numbers', code: 'MOSAIC_CENTER_INVALID' },
     });
     expect(
       await call('PUT', `/api/plans/${id}/mosaics/${mosaicId}`, {
@@ -935,7 +936,10 @@ describe('mosaics', () => {
         centerDec: 1,
         tiles: [],
       }),
-    ).toEqual({ status: 400, body: { error: 'tiles must be a non-empty array' } });
+    ).toEqual({
+      status: 400,
+      body: { error: 'tiles must be a non-empty array', code: 'MOSAIC_TILES_INVALID' },
+    });
     expect((await readPlan(id)).entries).toHaveLength(3);
   });
 
@@ -1032,7 +1036,7 @@ describe('mosaics', () => {
     expect(plan.entries.map((e: any) => e.id)).toEqual([standalone]);
     expect(await call('DELETE', `/api/plans/${id}/mosaics/${mosaicId}`)).toEqual({
       status: 404,
-      body: { error: 'Mosaic not found' },
+      body: { error: 'Mosaic not found', code: 'MOSAIC_NOT_FOUND' },
     });
   });
 });
@@ -1062,19 +1066,19 @@ describe('deleting a plan', () => {
     // what the API still answers for the old ids
     expect(await call('PATCH', `/api/plans/${fresh}/entries/${entryId}`, { paDeg: 1 })).toEqual({
       status: 404,
-      body: { error: 'Entry not found' },
+      body: { error: 'Entry not found', code: 'ENTRY_NOT_FOUND' },
     });
     expect(await call('PATCH', `/api/plans/${fresh}/entries/${tileId}`, { paDeg: 1 })).toEqual({
       status: 404,
-      body: { error: 'Entry not found' },
+      body: { error: 'Entry not found', code: 'ENTRY_NOT_FOUND' },
     });
     expect(await call('DELETE', `/api/plans/${old}/mosaics/${mosaicId}`)).toEqual({
       status: 404,
-      body: { error: 'Mosaic not found' },
+      body: { error: 'Mosaic not found', code: 'MOSAIC_NOT_FOUND' },
     });
     expect(await call('DELETE', `/api/plans/${old}`)).toEqual({
       status: 404,
-      body: { error: 'Plan not found' },
+      body: { error: 'Plan not found', code: 'PLAN_NOT_FOUND' },
     });
   });
 });
@@ -1159,7 +1163,10 @@ describe('requests with no body', () => {
     const id = await mkPlan();
     expect(await callRaw('PUT', `/api/plans/${id}`)).toEqual({
       status: 400,
-      body: { error: 'name, settings (nightOf/setupId/lat/lon), or sortBy required' },
+      body: {
+        error: 'name, settings (nightOf/setupId/lat/lon), or sortBy required',
+        code: 'PLAN_UPDATE_EMPTY',
+      },
     });
   });
 });
@@ -1363,10 +1370,12 @@ describe('POST /api/photos', () => {
     expect(uploadsList()).toEqual([]);
   });
 
-  it('rejects a MIME type the upload filter refuses, with no code', async () => {
+  it('rejects a MIME type the upload filter refuses, with its code', async () => {
     const r = await call('POST', '/api/photos', await photoForm({ type: 'text/plain' }));
-    // KNOWN GAP: the global error handler drops the code INVALID_FILE_TYPE, so the body is only { error }.
-    expect(r).toEqual({ status: 400, body: { error: 'Invalid file type' } });
+    expect(r).toEqual({
+      status: 400,
+      body: { error: 'Invalid file type', code: 'INVALID_FILE_TYPE' },
+    });
     expect(uploadsList()).toEqual([]);
   });
 
@@ -1760,12 +1769,12 @@ describe('DELETE /api/photos (bulk)', () => {
     for (const ids of ['x', {}, null, 5]) {
       expect(await call('DELETE', '/api/photos', { ids })).toEqual({
         status: 400,
-        body: { error: 'ids must be an array' },
+        body: { error: 'ids must be an array', code: 'IDS_NOT_ARRAY' },
       });
     }
     expect(await call('DELETE', '/api/photos', {})).toEqual({
       status: 400,
-      body: { error: 'ids must be an array' },
+      body: { error: 'ids must be an array', code: 'IDS_NOT_ARRAY' },
     });
   });
 

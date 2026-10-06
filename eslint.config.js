@@ -74,6 +74,7 @@ export default tseslint.config(
           './tsconfig.test.json',
           './packages/core/tsconfig.json',
           './packages/backend-local/tsconfig.json',
+          './packages/backend-http/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],
@@ -120,6 +121,36 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
 
+  // Screens reach their data through src/api.ts (which calls the backend), never the server directly:
+  // no fetch of an /api/ or /uploads/ address, and no hand-built /uploads/ address (use photoFileUrl).
+  {
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/api.ts', 'src/backend.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.name='fetch'] > Literal.arguments:first-child[value=/^\\/(api|uploads)\\//]",
+          message: 'Do not fetch the server directly: add a function to src/api.ts.',
+        },
+        {
+          selector:
+            "CallExpression[callee.name='fetch'] > TemplateLiteral.arguments:first-child > TemplateElement:first-child[value.raw=/^\\/(api|uploads)\\//]",
+          message: 'Do not fetch the server directly: add a function to src/api.ts.',
+        },
+        {
+          selector: 'Literal[value=/^\\/uploads\\//]',
+          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+        },
+        {
+          selector: 'TemplateLiteral > TemplateElement:first-child[value.raw=/^\\/uploads\\//]',
+          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+        },
+      ],
+    },
+  },
+
   // @myastrosky/core must stay platform-neutral (browser, worker, Node, Electron, Capacitor):
   // no framework, no Node built-ins, and no imports back into the app. This block gets neither
   // the browser nor the Node globals above. `error`, not `warn`: a violation must fail CI.
@@ -149,10 +180,53 @@ export default tseslint.config(
     },
   },
 
+  // @myastrosky/backend-http runs in the browser: browser globals, and it may import only core and its own
+  // files (what it needs from the app arrives through the options of createHttpBackend).
+  {
+    files: ['packages/backend-http/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|\\./)',
+              message: 'backend-http may import only @myastrosky/core/* and its own files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // @myastrosky/backend-local runs in the phone's WebView: browser globals, and it may import only core, fflate
+  // and its own files. The Capacitor plugin is imported by `capacitor-sqlite-db.ts` alone; everything else of
+  // the platform arrives through the options of createLocalBackend.
+  {
+    files: ['packages/backend-local/**/*.ts'],
+    ignores: ['packages/backend-local/src/capacitor-sqlite-db.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|fflate$|\./)',
+              message:
+                'backend-local may import only @myastrosky/core/*, fflate and its own files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Build/CLI scripts: plain ES modules, no type information, and console output is
   // their whole job — so silence `no-console` here.
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'tests/helpers/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: { ...globals.node },
