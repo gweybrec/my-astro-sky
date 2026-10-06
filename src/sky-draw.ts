@@ -23,6 +23,7 @@ import {
   FONTS,
   GRID,
   TILE_BUTTON,
+  TILE_TRASH_R,
   HORIZON_LINE,
   MOUNTAIN_HORIZON,
   CARDINAL_POINTS,
@@ -740,7 +741,7 @@ function getTrashPath(): Path2D {
 }
 
 /** Radius of a tile's delete/add button (re-exported for hit-testing in sky-map). */
-export const TILE_TRASH_R = TILE_BUTTON.radius;
+export { TILE_TRASH_R };
 
 /** Draw the pushpin glyph centred at `at`, filled when pinned. Source path is a 24×24 box. */
 export function drawPinGlyph(

@@ -4,6 +4,7 @@ import {
   type FilterCatalogEntry,
 } from './autocomplete-utils';
 import { filterBadgeColors } from './color-utils';
+import { filterCssKey } from '@myastrosky/core/filter-keys';
 import { resolveCatalogFilter, getVisibleFilterEntries, filterDetail } from './gear-catalog';
 
 /**
@@ -11,27 +12,6 @@ import { resolveCatalogFilter, getVisibleFilterEntries, filterDetail } from './g
  * "Suggested filters" section of Targets result cards.
  * The CSS class `filter-{name}` drives the color (e.g. filter-ha, filter-oiii).
  */
-const KNOWN_FILTER_CSS_KEYS = new Set([
-  'ha',
-  'oiii',
-  'sii',
-  'l',
-  'r',
-  'g',
-  'b',
-  'rgb',
-  'dual-band',
-]);
-
-/**
- * Maps a filter name to its CSS token key: a known filter → its own key
- * (e.g. 'Ha' → 'ha'), anything else → 'custom'. Both `.filter-{key}` classes
- * and the `--filter-{key}` colour tokens follow this key.
- */
-export function filterCssKey(name: string | null | undefined): string {
-  const key = (name ?? '').toLowerCase();
-  return KNOWN_FILTER_CSS_KEYS.has(key) ? key : 'custom';
-}
 
 /**
  * The class and CSS custom properties that colour a filter badge.
@@ -273,3 +253,5 @@ export function createTargetsChip(
   chip.appendChild(text);
   return chip;
 }
+
+export { filterCssKey };

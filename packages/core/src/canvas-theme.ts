@@ -299,6 +299,9 @@ export const SUMMIT_DOT = {
 /** Circular background disc + radius for a mosaic tile's delete/add button. */
 export const TILE_BUTTON = { bg: 'rgba(15, 15, 18, 0.78)', radius: 11 } as const;
 
+/** Radius of a tile's delete/add button. */
+export const TILE_TRASH_R = TILE_BUTTON.radius;
+
 // ── FOV frame UI ─────────────────────────────────────────────────────────────
 // Frames prefer live CSS variables (--fov-frame-stroke, --accent-color, …); these
 // are the fallbacks + the structural sizes/dashes for handles and overlays.
