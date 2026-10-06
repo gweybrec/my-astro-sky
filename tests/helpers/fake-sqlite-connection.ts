@@ -29,7 +29,10 @@ function plugBind(values: unknown[] | undefined): unknown[] {
 }
 
 /** Mimics the plugin: asynchronous, string rejections, BLOBs out as arrays of byte values. */
-export function createFakeConnection(): FakeConnection {
+export function createFakeConnection(options: { inflateChanges?: boolean } = {}): FakeConnection {
+  // Like the real plugin, `run` reports SQLite's total_changes difference, which counts the rows
+  // changed by foreign-key actions (ON DELETE CASCADE) too. `changes()` stays the statement's own.
+  const inflate = options.inflateChanges ?? true;
   const raw = new Database(':memory:');
   const calls: Call[] = [];
   const record = async (method: string, ...args: unknown[]): Promise<void> => {
@@ -40,8 +43,12 @@ export function createFakeConnection(): FakeConnection {
     throw (err as Error).message;
   };
   const runOne = (sql: string, values: unknown[]): CapacitorSqliteChanges => {
+    const before = (raw.prepare('SELECT total_changes() AS n').get() as { n: number }).n;
     const r = raw.prepare(sql).run(...values);
-    return { changes: { changes: r.changes, lastId: Number(r.lastInsertRowid) } };
+    const after = (raw.prepare('SELECT total_changes() AS n').get() as { n: number }).n;
+    return {
+      changes: { changes: inflate ? after - before : r.changes, lastId: Number(r.lastInsertRowid) },
+    };
   };
   return {
     calls,

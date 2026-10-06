@@ -120,6 +120,27 @@ export const sqlDbConformanceCases: SqlDbConformanceCase[] = [
     await rejection(db.run('INSERT INTO nope VALUES (1)'), 'insert into a missing table');
   }),
 
+  withDb('changes counts only its own rows, not foreign-key cascades', async (db) => {
+    await db.exec('PRAGMA foreign_keys = ON');
+    await db.exec('CREATE TABLE parent (id INTEGER PRIMARY KEY)');
+    await db.exec(
+      'CREATE TABLE child (id INTEGER PRIMARY KEY, pid INTEGER REFERENCES parent(id) ON DELETE CASCADE)',
+    );
+    await db.exec('INSERT INTO parent (id) VALUES (1); INSERT INTO parent (id) VALUES (2);');
+    await db.exec(
+      'INSERT INTO child (pid) VALUES (1); INSERT INTO child (pid) VALUES (1); INSERT INTO child (pid) VALUES (2);',
+    );
+    const one = await db.run('DELETE FROM parent WHERE id = 1');
+    toBe(one.changes, 1, 'delete one parent with two children');
+    const all = await db.run('DELETE FROM parent');
+    toBe(all.changes, 1, 'delete the last parent with one child');
+    toBe(
+      (await db.get<{ c: number }>('SELECT COUNT(*) AS c FROM child'))!.c,
+      0,
+      'children cascaded',
+    );
+  }),
+
   withDb('round-trips strings, numbers, null and Uint8Array', async (db) => {
     await db.exec(T_DDL);
     const bytes = new Uint8Array([0, 1, 2, 255, 128]);

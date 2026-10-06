@@ -131,6 +131,12 @@ export function splitStatements(script: string): string[] {
 }
 
 const INSERT_RE = /^\s*(?:insert|replace)\b/i;
+/**
+ * Statements whose plugin count may include rows changed by foreign-key actions: the plugin
+ * reports SQLite's total_changes difference, not the statement's own count. A plain INSERT cannot
+ * trigger one, so it is not corrected.
+ */
+const MAY_CASCADE_RE = /^\s*(?:delete|update|replace|insert\s+or\s+replace)\b/i;
 
 const isBytes = (p: SqlValue | undefined): p is Uint8Array => p instanceof Uint8Array;
 
@@ -253,7 +259,17 @@ export function createCapacitorSqliteDb(
     } catch (err) {
       throw toError(err);
     }
-    const changes = res.changes?.changes ?? 0;
+    let changes = res.changes?.changes ?? 0;
+    if (changes > 0 && MAY_CASCADE_RE.test(sql)) {
+      // One more bridge hop, only when a cascade could have inflated the count.
+      try {
+        const own = await conn.query('SELECT changes() AS c');
+        const c = (own.values?.[0] as { c?: unknown } | undefined)?.c;
+        if (typeof c === 'number') changes = c;
+      } catch (err) {
+        throw toError(err);
+      }
+    }
     const out: SqlRunResult = { changes };
     const lastId = res.changes?.lastId;
     if (INSERT_RE.test(sql) && changes > 0 && lastId !== undefined) out.lastInsertRowid = lastId;
