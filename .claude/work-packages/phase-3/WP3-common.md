@@ -29,7 +29,7 @@ At the end of this phase:
 
 ## Step 0 (every card)
 
-Check `git branch --show-current` is `mobile/phase-3` and that `git status --short` shows no modified tracked files. If not, stop and report.
+Check `git branch --show-current` is the branch named in your instructions (`mobile/phase-3` for WP3.1 to WP3.8, `mobile/phase-3b` from WP3.9 on) and that `git status --short` shows no modified tracked files. If not, stop and report.
 
 ## Acceptance (every card)
 
