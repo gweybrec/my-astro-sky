@@ -16,6 +16,7 @@ All workflows live in `.github/workflows/`. They are independent — each serves
 2. `npm run typecheck:server` (`tsc --noEmit -p tsconfig.server.json`) — type-checks the Express backend
 3. `npm run typecheck:core` (`tsc --noEmit -p packages/core/tsconfig.json`) — type-checks the platform-neutral `@myastrosky/core` workspace package with `lib: ["ES2022"]` and `types: []`, so any use of a DOM or Node global there fails
 4. `npm run typecheck:backend-http` and `npm run typecheck:backend-local` (`tsc --noEmit -p packages/backend-http/tsconfig.json`, `packages/backend-local/tsconfig.json`) — type-check the two `Backend` implementations (the desktop's HTTP one and the phone's local one)
+   � `npm run typecheck:app-state` (`tsc --noEmit -p packages/app-state/tsconfig.json`) likewise type-checks the shared data functions and stores
 5. `cmp public/icon.png docs/icon.png` — **blocking**: `docs/icon.png` is a committed copy kept in sync by `npm run generate-icons` (see [Building the packages](distribution.md#building-the-packages)); this catches drift since the workflow-free GitHub Pages docs site can't regenerate it at deploy time
 6. `npm run lint` (`eslint .`) — **warn-only**: every rule is `warn`, so ESLint exits 0 and this step surfaces issues in the log without failing the build (see `eslint.config.js` and `CLAUDE.md`)
 7. `npm run format:check` (`prettier --check .`) — **blocking**: fails if any file isn't Prettier-formatted

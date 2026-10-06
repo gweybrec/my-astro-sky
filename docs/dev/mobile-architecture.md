@@ -16,7 +16,8 @@ packages/core/                  Pure TS. tsconfig lib ["ES2022"], types [] → c
 packages/render/                Canvas 2D painters + scene + Pointer-Events gesture controller (theme injected).
 packages/backend-http/          HttpBackend(baseUrl, token?) — today's api.ts behind the Backend interface.
 packages/backend-local/         LocalBackend = core services + ports (adapters supplied by the shell).
-packages/app-state/             Shared Pinia stores that depend only on Backend + PrefsStore + core registries.
+packages/app-state/             The data functions (api.ts), the backend holder (backend.ts) and the stores of backend data
+                                (plans, poi-categories, sky-regions, settings). Vue + Pinia + core only; `src/` keeps one-line re-exports.
 apps/mobile/                    Capacitor + Ionic Vue. LocalBackend (standalone) or HttpBackend (LAN connect).
 ```
 
@@ -130,10 +131,10 @@ ASTAP and solve-field stay server-only and are exposed through **capabilities**.
 
 ### How a screen reaches its data
 
-A screen calls a function of `src/api.ts` (`getPlans()`, `uploadPhoto()`, `photoFileUrl()` ...). That file is a facade: every function calls `getBackend()` (`src/backend.ts`) and turns the `DomainError` the backend rejects with into the plain `Error` the screen shows (`t('serverErrors.' + code)`, else the error's message, else the function's own text). Outside `src/api.ts` and `src/backend.ts`, nothing in `src/` knows a server exists; an ESLint rule fails on a `fetch` of `/api/` or `/uploads/` and on any `/uploads/` address.
+A screen calls a function of `src/api.ts` (`getPlans()`, `uploadPhoto()`, `photoFileUrl()` ...). That path is a one-line re-export of `packages/app-state/src/api.ts` (`@myastrosky/app-state/api`), a facade: every function calls `getBackend()` (`packages/app-state/src/backend.ts`, re-exported by `src/backend.ts`) and turns the `DomainError` the backend rejects with into the plain `Error` the screen shows (`t('serverErrors.' + code)`, else the error's message, else the function's own text). Outside `packages/app-state/src/api.ts`, nothing in `src/` knows a server exists; an ESLint rule fails on a `fetch` of `/api/` or `/uploads/` and on any `/uploads/` address.
 
-- **Desktop and web:** `getBackend()` installs the HTTP backend on first use (`packages/backend-http/src/http-backend.ts`, `createHttpBackend({ lang, saveFile })`), which calls the Express routes.
-- **Phone:** the start-up code calls `setBackend()` with the local backend (`packages/backend-local`), which calls the services directly, with no server. `Backend.localSolvers` is absent there; the local-solver functions of `src/api.ts` then fail with `LOCAL_SOLVERS_UNAVAILABLE`.
+- **Desktop and web:** `src/platform-init.ts` installs the HTTP backend at start-up (`setBackend(createHttpBackend({ lang, saveFile }))`, `packages/backend-http/src/http-backend.ts`), which calls the Express routes. The package never installs a default: `getBackend()` throws if nothing was set. `platform-init` also sets the error hook (with the optional details argument) used by the package's stores.
+- **Phone:** the phone's own start-up code (later) calls `setBackend()` with the local backend (`packages/backend-local`), which calls the services directly, with no server. `Backend.localSolvers` is absent there; the local-solver functions of `src/api.ts` then fail with `LOCAL_SOLVERS_UNAVAILABLE`.
   The local backend (`createLocalBackend(deps)` in `packages/backend-local/src/local-backend.ts`) hands out the services as they are (`plans: services.plans` ...) and wraps only the members that take a file (`FileSource`): it reads the file and calls the service. `createServices` (`packages/core/src/services/create-services.ts`) is the same wiring the server uses. The phone's shell must supply: the database (`SqlDb`, async), the blob store, the image codec, the HTTP client, the secret codec, the two star catalogues, the built-in gear lists, `openZip` / `newZip` (`bundle-fflate.ts`), `files.url` (the address of a stored file), `starCatalogUrl`, `saveFile` (the share sheet) and the clock. Nothing in the package but `capacitor-sqlite-db.ts` imports a Capacitor plugin.
 - **Contract:** `packages/core/src/testing/backend-contract.ts` runs against both backends (`tests/unit/backend-http-contract.test.ts`, and `tests/unit/backend-local-contract.test.ts` on the synchronous and on the asynchronous database). `tests/unit/api-facade.test.ts` checks the facade against a fake backend.
 

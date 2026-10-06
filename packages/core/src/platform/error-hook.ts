@@ -1,4 +1,8 @@
-export type ErrorReporter = (context: string, error: unknown) => void;
+export type ErrorReporter = (
+  context: string,
+  error: unknown,
+  details?: Record<string, unknown>,
+) => void;
 
 const defaultReporter: ErrorReporter = (context, error) => {
   console.error(context, error);
@@ -11,6 +15,11 @@ export function configureErrorReporter(fn: ErrorReporter): void {
   reporter = fn;
 }
 
-export function reportError(context: string, error: unknown): void {
-  reporter(context, error);
+export function reportError(
+  context: string,
+  error: unknown,
+  details?: Record<string, unknown>,
+): void {
+  if (details === undefined) reporter(context, error);
+  else reporter(context, error, details);
 }

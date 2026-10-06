@@ -75,6 +75,7 @@ export default tseslint.config(
           './packages/core/tsconfig.json',
           './packages/backend-local/tsconfig.json',
           './packages/backend-http/tsconfig.json',
+          './packages/app-state/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],
@@ -193,6 +194,27 @@ export default tseslint.config(
             {
               regex: '^(?!@myastrosky/core/|\\./)',
               message: 'backend-http may import only @myastrosky/core/* and its own files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // @myastrosky/app-state is shared by the desktop and the phone: browser globals, and it may import only core,
+  // vue, pinia and its own files (relative paths).
+  {
+    files: ['packages/app-state/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|vue$|pinia$|\.{1,2}/)',
+              message:
+                'app-state may import only @myastrosky/core/*, vue, pinia and relative paths.',
             },
           ],
         },

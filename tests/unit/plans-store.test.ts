@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia';
 
 // The store only imports these for its async CRUD; the pure getters under test
 // never call them, but they must resolve as mocks so the module loads.
-vi.mock('../../src/api', () => ({
+vi.mock('@myastrosky/app-state/api', () => ({
   getPlans: vi.fn().mockResolvedValue([]),
   updatePlanSortAPI: vi.fn().mockResolvedValue(undefined),
 }));
