@@ -15,6 +15,7 @@ It holds only **cross-cutting** guidance. Task-specific rules live in per-direct
 | `scripts/CLAUDE.md`            | DSO catalog regeneration (`dso:generate`) and filter catalog colour seeding                                                        |
 | `docs/CLAUDE.md`               | The two-audience documentation-file map and its rules                                                                              |
 | `packages/core/CLAUDE.md`      | Platform-neutral `@myastrosky/core` workspace package: no DOM/Node globals, import restrictions, shims, tests                      |
+| `apps/mobile/CLAUDE.md`        | Phone app (Capacitor + Ionic Vue): device rule, boards-only screens, theming, start-up, browser and device runs                    |
 | `packages/app-state/CLAUDE.md` | Shared `@myastrosky/app-state` package (data functions, backend holder, stores of backend data): what goes in, import restrictions |
 | `test-photos/CLAUDE.md`        | Raw local test-image inventory (gitignored; present only on machines that have it)                                                 |
 

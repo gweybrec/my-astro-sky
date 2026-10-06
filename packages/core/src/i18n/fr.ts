@@ -1,3 +1,4 @@
+import frMobile from './mobile/fr';
 const fr = {
   app: {
     title: 'MyAstroSky',
@@ -1483,6 +1484,7 @@ const fr = {
     labelsForAll: 'Étiquettes pour toutes les photos',
     setupForAll: 'Équipement pour toutes les photos',
   },
+  mobile: frMobile,
 };
 
 // Recursive type: same structure with string leaves

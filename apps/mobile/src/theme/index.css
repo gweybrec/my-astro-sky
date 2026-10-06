@@ -1,0 +1,8 @@
+/* Order matters: Ionic's structure, the design system (tokens, then its `.mob-*` classes), the fonts, and last the
+   file that maps Ionic's variables to the design system's tokens. */
+@import '@ionic/vue/css/core.css';
+@import '@ionic/vue/css/structure.css';
+@import '../../../../design/mobile/ds/myastrosky/tokens.css';
+@import '../../../../design/mobile/ds/myastrosky/components/bundle.css';
+@import './fonts.css';
+@import './ionic-tokens.css';

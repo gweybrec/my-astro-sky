@@ -36,3 +36,7 @@ spikes
 
 # Phone mockups source (generated HTML and scripts, not app code)
 design
+
+# Phone app: bundled copies and native project
+apps/mobile/public/data
+apps/mobile/public/gear

@@ -1,4 +1,5 @@
 import type { Translations } from './fr';
+import esMobile from './mobile/es';
 
 const es: Translations = {
   app: {
@@ -1482,6 +1483,7 @@ const es: Translations = {
     labelsForAll: 'Etiquetas para todas las fotos',
     setupForAll: 'Equipo para todas las fotos',
   },
+  mobile: esMobile,
 };
 
 export default es;
