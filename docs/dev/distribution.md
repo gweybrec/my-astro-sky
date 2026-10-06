@@ -210,6 +210,6 @@ The regression was reverted upstream and confirmed fixed in **Node.js 24.18.0** 
 
 `scripts/install-astap.ps1` is the native Windows installer. It prompts for an install directory, downloads `astap_cli.exe` and the D50 star catalog from SourceForge, and instructs the user to set the path in the app Settings.
 
-The ASTAP binary path is stored in the settings DB via `getSetting('ASTAP_PATH')` (`server/astap.ts`). The Linux default (`/opt/astap/astap_cli`) does not apply on Windows — users must set the path explicitly via Settings after running the installer.
+The ASTAP binary path is stored in the settings DB as the `ASTAP_PATH` setting (read by `server/astap.ts` through the settings service). The Linux default (`/opt/astap/astap_cli`) does not apply on Windows — users must set the path explicitly via Settings after running the installer.
 
 The macOS column remains manual (no script yet); users download from [www.hnsky.org/astap.htm](https://www.hnsky.org/astap.htm) and configure the path in Settings.

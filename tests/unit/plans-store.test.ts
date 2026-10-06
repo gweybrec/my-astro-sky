@@ -10,7 +10,7 @@ vi.mock('../../src/api', () => ({
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { usePlansStore } from '../../src/stores/plans';
-import { updatePlanSortAPI, type Plan } from '../../src/api';
+import { getPlans, updatePlanSortAPI, type Plan } from '../../src/api';
 
 function makePlan(id: string, setupId: string | null): Plan {
   return {
@@ -72,5 +72,37 @@ describe('plans store · setPlanSort', () => {
 
     expect(store.plans[0].sortBy).toBe('transit');
     expect(updatePlanSortAPI).toHaveBeenCalledWith('missing', 'altitude');
+  });
+});
+
+describe('plans store · load', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('replaces the cache with the latest server list', async () => {
+    const store = usePlansStore();
+    store.plans = [makePlan('old', null)];
+    vi.mocked(getPlans).mockResolvedValueOnce([makePlan('a', null), makePlan('b', null)]);
+
+    await store.load();
+
+    expect(store.plans.map((p) => p.id)).toEqual(['a', 'b']);
+    expect(store.loaded).toBe(true);
+  });
+
+  it('ignores a slow earlier load that resolves after a newer one', async () => {
+    const store = usePlansStore();
+    let resolveSlow: (v: Plan[]) => void = () => {};
+    vi.mocked(getPlans)
+      .mockReturnValueOnce(new Promise<Plan[]>((r) => (resolveSlow = r)))
+      .mockResolvedValueOnce([makePlan('new', null)]);
+
+    const slow = store.load();
+    await store.load();
+    resolveSlow([]);
+    await slow;
+
+    expect(store.plans.map((p) => p.id)).toEqual(['new']);
   });
 });

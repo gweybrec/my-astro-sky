@@ -337,6 +337,11 @@ const es: Translations = {
     importSetupsSection: 'Configuraciones ({n})',
     importGearSection: 'Telescopios/cámaras ({n})',
     importSelectAll: 'Seleccionar todo',
+    importSetupReplace: 'Reemplazar',
+    importSetupKeepBoth: 'Conservar ambas',
+    importSetupSkip: 'No importar',
+    importSetupIdentical: 'Ya existe, idéntica',
+    importSetupWithPlan: 'Importada con el plan «{name}»',
     importReplaceWarning:
       'Ya existe un elemento con el mismo nombre y será reemplazado si lo importas.',
     importBackupWarning:
@@ -345,6 +350,7 @@ const es: Translations = {
       'Recomendado: crea una copia de seguridad de tus datos antes de eliminar nada.',
     importBackupBtn: 'Crear una copia de seguridad (ZIP)',
     importSuccess: 'Restaurado: {n} foto(s) ({s} omitida(s))',
+    importFailedItems: 'No restaurado: {names}',
     importError: 'Error de copia / restauración',
     exportView: {
       button: 'Exportar',

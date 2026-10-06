@@ -1057,12 +1057,9 @@ body {
   z-index: var(--z-modal);
 }
 
-/* Ensure modal/export, labels-dropdown, and FOV popup checkboxes use the same accent color */
-.modal input[type='checkbox'],
-.modal-panel input[type='checkbox'],
-.search-dropdown.labels-dropdown input[type='checkbox'],
-.dropdown-panel input[type='checkbox'],
-.fov-popup input[type='checkbox'] {
+/* Every native checkbox and radio: drawn dark (unticked = dark box, as on the phone design) with the accent colour when ticked. :where() keeps specificity at 0 so the danger/gear variants below still win. */
+:where(input[type='checkbox'], input[type='radio']) {
+  color-scheme: dark;
   accent-color: var(--accent-color);
 }
 .modal input[type='checkbox'].checkbox-danger,
@@ -2545,7 +2542,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 12000;
+  z-index: var(--z-meta-editor);
 }
 
 .meta-editor-modal {
@@ -4015,7 +4012,7 @@ details.targets-form-details[open] .targets-form-summary::before {
 
 .target-card-type {
   font-size: var(--font-size-small);
-  color: var(--text-dim);
+  color: var(--text-secondary);
   background: var(--target-type-bg);
   border: 1px solid var(--accent-fill-md);
   border-radius: var(--radius-sm);

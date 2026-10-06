@@ -65,4 +65,13 @@ describe('BaseModal', () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted('close')).toBeTruthy();
   });
+
+  it('closes only the topmost modal on Escape', async () => {
+    wrapper = mountModal({ title: 'Below' });
+    const above = mountModal({ title: 'Above' });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(wrapper.emitted('close')).toBeUndefined();
+    expect(above.emitted('close')).toHaveLength(1);
+    above.unmount();
+  });
 });

@@ -1,25 +1,21 @@
 /**
- * Tests for the HTTP layer of server/astrometry.ts:
+ * Tests for the HTTP layer of the online-solving service (packages/core/src/services/nova-solve.ts),
+ * run on a fake `HttpClient` (no network):
  *  - login request payload and response handling
- *  - submitJob upload payload (with/without hints)
- *  - submitJob response handling (success, rejection, network error)
- *  - listUserSubmissions (success, empty, non-ok, network error)
- *  - reuseSubmission (job failure, WCS path, calibration fallback, network error)
+ *  - submit upload payload (with/without hints)
+ *  - submit response handling (success, rejection, network error)
+ *  - listSubmissions (success, empty, non-ok, network error)
+ *  - reuse (job failure, WCS path, calibration fallback, network error)
  *
- * vi.useFakeTimers() is used so the background pollJob timers never fire
- * and make real HTTP calls after test teardown.
+ * vi.useFakeTimers() is used so the background polling timers only fire when a test advances them.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ─── Module mocks (hoisted before imports) ───────────────────────────────────
 
-vi.mock('../../server/db', () => ({
-  getSetting: vi.fn(),
-}));
-
-vi.mock('../../server/wcs-reader', () => ({
-  loadServerCatalog: vi.fn(),
-  wcsToCorrespondences: vi.fn(() => []),
+vi.mock('@myastrosky/core/wcs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/wcs')>()),
+  wcsToCorrespondencesWithCatalog: vi.fn(() => []),
   parseFITSHeader: vi.fn(() => ({
     CRPIX1: 960,
     CRPIX2: 540,
@@ -30,84 +26,135 @@ vi.mock('../../server/wcs-reader', () => ({
     CD2_1: 0,
     CD2_2: 0.001,
   })),
-  extractFITSHeaderFromFITS: vi.fn(() => ''),
 }));
 
-vi.mock('../../server/dso-utils', () => ({
+vi.mock('@myastrosky/core/dso-aliases', () => ({
   normalizeDSOAliases: vi.fn((ids: string[]) => ids),
 }));
 
-import { getSetting } from '../../server/db';
-import { wcsToCorrespondences, parseFITSHeader } from '../../server/wcs-reader';
-import {
-  resetSession,
-  isConfigured,
-  getJobStatus,
-  submitJob,
-  listUserSubmissions,
-  reuseSubmission,
-} from '../../server/astrometry';
+import { isDomainError } from '@myastrosky/core/domain/errors';
+import type { HttpRequest, HttpResponse } from '@myastrosky/core/ports/http-client';
+import type { NovaSolveHints } from '@myastrosky/core/domain/solve';
+import { createNovaSolveService } from '@myastrosky/core/services/nova-solve';
+import { wcsToCorrespondencesWithCatalog, parseFITSHeader } from '@myastrosky/core/wcs';
 
-const mockGetSetting = vi.mocked(getSetting);
-const mockWcsCorrs = vi.mocked(wcsToCorrespondences);
+const mockWcsCorrs = vi.mocked(wcsToCorrespondencesWithCatalog);
 const mockParseFITSHeader = vi.mocked(parseFITSHeader);
 
 const API_BASE = 'https://nova.astrometry.net/api';
 const LOGIN_URL = `${API_BASE}/login`;
 const UPLOAD_URL = `${API_BASE}/upload`;
 
-// ─── Fetch mock helpers ───────────────────────────────────────────────────────
+// ─── Fake HTTP helpers ────────────────────────────────────────────────────────
+
+function resp(status: number, text: string): HttpResponse {
+  return {
+    status,
+    headers: {},
+    text: async () => text,
+    bytes: async () => new Uint8Array(),
+  };
+}
 
 function jsonResp(data: unknown) {
-  return { ok: true, status: 200, json: async () => data, text: async () => JSON.stringify(data) };
+  return resp(200, JSON.stringify(data));
 }
 
 function textResp(text: string) {
-  return { ok: true, status: 200, text: async () => text, json: async () => ({}) };
+  return resp(200, text);
 }
 
 function failResp(status = 500) {
-  return { ok: false, status, json: async () => ({}), text: async () => '' };
+  return resp(status, '');
 }
 
 // ─── Test setup ───────────────────────────────────────────────────────────────
 
-let fetchMock: ReturnType<typeof vi.fn>;
+let fetchMock: ReturnType<typeof vi.fn<(req: HttpRequest) => Promise<HttpResponse>>>;
+let getSetting: ReturnType<typeof vi.fn<(key: string) => Promise<string | undefined>>>;
+let probe: ReturnType<typeof vi.fn>;
+let clock: number;
+let ids: number;
+let service: ReturnType<typeof createNovaSolveService>;
+
+const mockGetSetting = {
+  mockReturnValue: (v: string | null) => getSetting.mockResolvedValue(v ?? undefined),
+};
 
 beforeEach(() => {
-  fetchMock = vi.fn();
-  vi.stubGlobal('fetch', fetchMock);
   vi.useFakeTimers();
-  resetSession();
   vi.clearAllMocks();
+  fetchMock = vi.fn();
+  getSetting = vi.fn();
+  probe = vi.fn();
+  clock = 1_000;
+  ids = 0;
+  service = createNovaSolveService({
+    http: fetchMock,
+    settings: { get: getSetting },
+    images: { probe } as never,
+    stars: [],
+    now: () => clock,
+    newId: () => `job-${++ids}`,
+  });
   // Restore default mock implementations cleared by clearAllMocks
   mockWcsCorrs.mockReturnValue([]);
 });
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.unstubAllGlobals();
 });
 
+const bytesOf = (s: string) => new TextEncoder().encode(s);
+
+// The picture handed to the service is `w` x `h` pixels, whatever its bytes.
+function submitJob(
+  bytes: Uint8Array,
+  fileName: string,
+  w: number,
+  h: number,
+  hints?: NovaSolveHints,
+) {
+  probe.mockResolvedValue({ width: w, height: h });
+  return service.submit({ fileName, bytes }, hints);
+}
+const getJobStatus = (id: string) => service.getJob(id);
+const listUserSubmissions = () => service.listSubmissions();
+const reuseSubmission = (jobId: number, w: number, h: number) => {
+  probe.mockResolvedValue({ width: w, height: h });
+  return service.reuse({ fileName: 'photo.jpg', bytes: new Uint8Array([1]) }, jobId);
+};
+/** The `request-json` text of an upload request. */
+const requestJsonOf = (req: HttpRequest): string => {
+  const body = req.body as { form: Array<{ name: string; value?: string }> };
+  return body.form.find((p) => p.name === 'request-json')!.value!;
+};
 // ─── isConfigured ─────────────────────────────────────────────────────────────
 
 describe('isConfigured()', () => {
-  it('returns false when API key is not set', () => {
+  it('returns false when API key is not set', async () => {
     mockGetSetting.mockReturnValue(null);
-    expect(isConfigured()).toBe(false);
+    expect(await service.isConfigured()).toBe(false);
   });
 
-  it('returns true when API key is configured', () => {
+  it('returns true when API key is configured', async () => {
     mockGetSetting.mockReturnValue('mykey123');
-    expect(isConfigured()).toBe(true);
+    expect(await service.isConfigured()).toBe(true);
+    expect(getSetting).toHaveBeenCalledWith('ASTROMETRY_API_KEY');
   });
 });
 
 // ─── getJobStatus ─────────────────────────────────────────────────────────────
 
 describe('getJobStatus()', () => {
-  it('returns undefined for an unknown localId', () => {
-    expect(getJobStatus('nonexistent-id')).toBeUndefined();
+  it('throws notFound JOB_NOT_FOUND for an unknown localId', async () => {
+    const err = await getJobStatus('nonexistent-id').catch((e) => e);
+    expect(isDomainError(err)).toBe(true);
+    expect([err.kind, err.code, err.body]).toEqual([
+      'notFound',
+      'JOB_NOT_FOUND',
+      { error: 'Job introuvable', code: 'JOB_NOT_FOUND' },
+    ]);
   });
 });
 
@@ -120,14 +167,14 @@ describe('login — request payload', () => {
       .mockResolvedValueOnce(jsonResp({ status: 'success', session: 'sess-abc' }))
       .mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
 
-    await submitJob(Buffer.from('img'), 'test.jpg', 800, 600);
+    await submitJob(bytesOf('img'), 'test.jpg', 800, 600);
 
-    const [loginUrl, loginOpts] = fetchMock.mock.calls[0];
-    expect(loginUrl).toBe(LOGIN_URL);
+    const loginOpts = fetchMock.mock.calls[0][0];
+    expect(loginOpts.url).toBe(LOGIN_URL);
     expect(loginOpts.method).toBe('POST');
-    expect(loginOpts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+    expect(loginOpts.headers!['Content-Type']).toBe('application/x-www-form-urlencoded');
 
-    const body: string = loginOpts.body;
+    const body = loginOpts.body as string;
     expect(body).toMatch(/^request-json=/);
     const payload = JSON.parse(decodeURIComponent(body.replace('request-json=', '')));
     expect(payload.apikey).toBe('test-api-key');
@@ -145,34 +192,32 @@ describe('login — response handling', () => {
       // Second submitJob — only upload, no login
       .mockResolvedValueOnce(jsonResp({ status: 'success', subid: 43 }));
 
-    await submitJob(Buffer.from('img'), 'test.jpg', 100, 100);
-    await submitJob(Buffer.from('img'), 'test.jpg', 100, 100);
+    await submitJob(bytesOf('img'), 'test.jpg', 100, 100);
+    await submitJob(bytesOf('img'), 'test.jpg', 100, 100);
 
     // login (1) + upload (1) + upload (1) = 3 total calls
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[0][0]).toBe(LOGIN_URL);
-    expect(fetchMock.mock.calls[1][0]).toBe(UPLOAD_URL);
-    expect(fetchMock.mock.calls[2][0]).toBe(UPLOAD_URL);
+    expect(fetchMock.mock.calls[0][0].url).toBe(LOGIN_URL);
+    expect(fetchMock.mock.calls[1][0].url).toBe(UPLOAD_URL);
+    expect(fetchMock.mock.calls[2][0].url).toBe(UPLOAD_URL);
   });
 
   it('throws when API returns status != success', async () => {
     mockGetSetting.mockReturnValue('bad-key');
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'error', errormessage: 'bad apikey' }));
-    await expect(submitJob(Buffer.from('img'), 'test.jpg', 100, 100)).rejects.toThrow('bad apikey');
+    await expect(submitJob(bytesOf('img'), 'test.jpg', 100, 100)).rejects.toThrow('bad apikey');
   });
 
   it('throws with "unknown" when errormessage is absent', async () => {
     mockGetSetting.mockReturnValue('some-key');
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'error' }));
-    await expect(submitJob(Buffer.from('img'), 'test.jpg', 100, 100)).rejects.toThrow(/unknown/);
+    await expect(submitJob(bytesOf('img'), 'test.jpg', 100, 100)).rejects.toThrow(/unknown/);
   });
 
   it('propagates network error from login', async () => {
     mockGetSetting.mockReturnValue('some-key');
     fetchMock.mockRejectedValueOnce(new Error('DNS failure'));
-    await expect(submitJob(Buffer.from('img'), 'test.jpg', 100, 100)).rejects.toThrow(
-      'DNS failure',
-    );
+    await expect(submitJob(bytesOf('img'), 'test.jpg', 100, 100)).rejects.toThrow('DNS failure');
   });
 });
 
@@ -186,14 +231,21 @@ describe('submitJob — upload request payload', () => {
 
   it('multipart body includes session and privacy flags', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
-    await submitJob(Buffer.from('fake-image'), 'photo.jpg', 1920, 1080);
+    await submitJob(bytesOf('fake-image'), 'photo.jpg', 1920, 1080);
 
-    const [uploadUrl, uploadOpts] = fetchMock.mock.calls[1];
-    expect(uploadUrl).toBe(UPLOAD_URL);
+    const uploadOpts = fetchMock.mock.calls[1][0];
+    expect(uploadOpts.url).toBe(UPLOAD_URL);
     expect(uploadOpts.method).toBe('POST');
-    expect(uploadOpts.headers['Content-Type']).toContain('multipart/form-data; boundary=');
+    // The multipart body is a form: the request, then the file part (the adapter sets the boundary).
+    const form = (uploadOpts.body as { form: Array<Record<string, unknown>> }).form;
+    expect(form.map((p) => p.name)).toEqual(['request-json', 'file']);
+    expect(form[1]).toMatchObject({
+      fileName: 'photo.jpg',
+      type: 'application/octet-stream',
+      bytes: bytesOf('fake-image'),
+    });
 
-    const body: string = (uploadOpts.body as Buffer).toString('utf8');
+    const body = requestJsonOf(uploadOpts);
     expect(body).toContain('"session":"session-token"');
     expect(body).toContain('"publicly_visible":"n"');
     expect(body).toContain('"allow_modifications":"n"');
@@ -202,9 +254,9 @@ describe('submitJob — upload request payload', () => {
 
   it('auto-estimates scale_lower/scale_upper/scale_units when no hints given', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
-    await submitJob(Buffer.from('fake-image'), 'photo.jpg', 1920, 1080);
+    await submitJob(bytesOf('fake-image'), 'photo.jpg', 1920, 1080);
 
-    const body: string = (fetchMock.mock.calls[1][1].body as Buffer).toString('utf8');
+    const body = requestJsonOf(fetchMock.mock.calls[1][0]);
     expect(body).toContain('"scale_units":"arcsecperpix"');
     expect(body).toContain('"scale_lower"');
     expect(body).toContain('"scale_upper"');
@@ -213,13 +265,13 @@ describe('submitJob — upload request payload', () => {
 
   it('includes center_ra/center_dec/radius when position hints provided', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
-    await submitJob(Buffer.from('img'), 'photo.jpg', 1920, 1080, {
+    await submitJob(bytesOf('img'), 'photo.jpg', 1920, 1080, {
       ra: 84.05,
       dec: -1.2,
       radius: 1.5,
     });
 
-    const body: string = (fetchMock.mock.calls[1][1].body as Buffer).toString('utf8');
+    const body = requestJsonOf(fetchMock.mock.calls[1][0]);
     expect(body).toContain('"center_ra":84.05');
     expect(body).toContain('"center_dec":-1.2');
     expect(body).toContain('"radius":1.5');
@@ -227,20 +279,20 @@ describe('submitJob — upload request payload', () => {
 
   it('uses default radius of 2 when ra/dec given without radius', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
-    await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600, { ra: 10, dec: 20 });
+    await submitJob(bytesOf('img'), 'photo.jpg', 800, 600, { ra: 10, dec: 20 });
 
-    const body: string = (fetchMock.mock.calls[1][1].body as Buffer).toString('utf8');
+    const body = requestJsonOf(fetchMock.mock.calls[1][0]);
     expect(body).toContain('"radius":2');
   });
 
   it('uses explicit scale hints without auto-estimation', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
-    await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600, {
+    await submitJob(bytesOf('img'), 'photo.jpg', 800, 600, {
       scale_lower: 0.5,
       scale_upper: 1.5,
     });
 
-    const body: string = (fetchMock.mock.calls[1][1].body as Buffer).toString('utf8');
+    const body = requestJsonOf(fetchMock.mock.calls[1][0]);
     expect(body).toContain('"scale_lower":0.5');
     expect(body).toContain('"scale_upper":1.5');
     expect(body).not.toContain('"scale_units"');
@@ -257,9 +309,9 @@ describe('submitJob — upload response handling', () => {
 
   it('job.status becomes "solving" and submissionId is set on success', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 12345 }));
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
 
-    const job = getJobStatus(localId);
+    const job = await getJobStatus(localId);
     expect(job).toBeDefined();
     expect(job!.status).toBe('solving');
   });
@@ -268,27 +320,27 @@ describe('submitJob — upload response handling', () => {
     fetchMock.mockResolvedValueOnce(
       jsonResp({ status: 'error', errormessage: 'bad image format' }),
     );
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
 
-    const job = getJobStatus(localId);
+    const job = await getJobStatus(localId);
     expect(job!.status).toBe('failed');
     expect(job!.error).toBe('bad image format');
   });
 
   it('job.status becomes "failed" on network error during upload', async () => {
     fetchMock.mockRejectedValueOnce(new Error('connection refused'));
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
 
-    const job = getJobStatus(localId);
+    const job = await getJobStatus(localId);
     expect(job!.status).toBe('failed');
     expect(job!.error).toContain('connection refused');
   });
 
   it('job.error falls back to "Upload rejected" when errormessage absent', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'error' }));
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
 
-    expect(getJobStatus(localId)!.error).toBe('Upload rejected');
+    expect((await getJobStatus(localId)).error).toBe('Upload rejected');
   });
 
   it('polling marks job as timeout when submission never yields a job ID', async () => {
@@ -301,10 +353,10 @@ describe('submitJob — upload response handling', () => {
       // submissions/<id> checks for all retries: jobs remains null
       .mockResolvedValue(jsonResp({ jobs: [null] }));
 
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
     await vi.advanceTimersByTimeAsync(200000);
 
-    const job = getJobStatus(localId);
+    const job = await getJobStatus(localId);
     expect(job).toBeDefined();
     expect(job!.status).toBe('timeout');
     expect(job!.error).toBeTruthy();
@@ -322,10 +374,10 @@ describe('submitJob — upload response handling', () => {
       // jobs/<id>: failure
       .mockResolvedValueOnce(jsonResp({ status: 'failure' }));
 
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
     await vi.advanceTimersByTimeAsync(200000);
 
-    const job = getJobStatus(localId);
+    const job = await getJobStatus(localId);
     expect(job).toBeDefined();
     expect(job!.status).toBe('failed');
     expect(job!.error).toBeTruthy();
@@ -366,10 +418,10 @@ describe('submitJob — upload response handling', () => {
       // objects_in_field
       .mockResolvedValueOnce(jsonResp({ objects_in_field: ['M 42'] }));
 
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
     await vi.advanceTimersByTimeAsync(200000);
 
-    const job = getJobStatus(localId);
+    const job = await getJobStatus(localId);
     expect(job).toBeDefined();
     expect(job!.status).toBe('solved');
     expect(job!.correspondences).toHaveLength(3);
@@ -414,10 +466,10 @@ describe('submitJob — upload response handling', () => {
       // objects_in_field
       .mockResolvedValueOnce(jsonResp({ objects_in_field: ['NGC 1976'] }));
 
-    const localId = await submitJob(Buffer.from('img'), 'photo.jpg', 800, 600);
+    const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
     await vi.advanceTimersByTimeAsync(200000);
 
-    const job = getJobStatus(localId);
+    const job = await getJobStatus(localId);
     expect(job).toBeDefined();
     expect(job!.status).toBe('solved');
     expect(job!.correspondences).toHaveLength(3);

@@ -59,8 +59,8 @@ vi.mock('../../server/wcs-reader', () => ({
   wcsToCorrespondences: mockWcsToCorrespondences,
 }));
 
-vi.mock('../../server/db', () => ({
-  getSetting: mockGetSetting,
+vi.mock('../../server/services', () => ({
+  settings: { get: mockGetSetting },
 }));
 
 vi.mock('../../server/wsl-utils', () => ({
@@ -96,7 +96,7 @@ describe('solveWithASTAP()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockGetSetting.mockImplementation((key: string) => {
+    mockGetSetting.mockImplementation(async (key: string) => {
       if (key === 'ASTAP_PATH') return null;
       if (key === 'USE_WSL_FOR_ASTAP') return null;
       return null;

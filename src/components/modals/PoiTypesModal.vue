@@ -2,7 +2,7 @@
   <Teleport to="body">
     <!-- modal-backdrop (so it suppresses sky tooltips like every other modal); the
          !z override keeps it above the gallery meta-editor overlay (z-index 12000). -->
-    <div class="modal-backdrop !z-[13000]" @click.self="requestClose">
+    <div ref="backdrop" class="modal-backdrop !z-[13000]" @click.self="requestClose">
       <div class="modal" @click.stop>
         <div class="modal-header">
           <h2>{{ t('poi.typesTitle') }}</h2>
@@ -70,13 +70,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import { createPoiCategory, updatePoiCategory, deletePoiCategoryAPI } from '../../api';
 import { poiTypeIcon } from '../../poi-icons';
 import { confirmUnsavedChanges } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
+import { isTopmostOverlay } from '../../popup-utils';
 import trashSvg from '../../icons/trash.svg?raw';
 
 const emit = defineEmits<{ close: [] }>();
@@ -134,6 +135,15 @@ function addType() {
 function removeType(idx: number) {
   draft.value.splice(idx, 1);
 }
+
+const backdrop = ref<HTMLElement | null>(null);
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && backdrop.value && isTopmostOverlay(backdrop.value)) void requestClose();
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown));
+onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 async function requestClose() {
   if (dirty.value && !(await confirmUnsavedChanges())) return;

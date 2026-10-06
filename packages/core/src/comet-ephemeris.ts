@@ -1,6 +1,6 @@
 /**
  * Two-body comet ephemeris from osculating orbital elements (as served by
- * `GET /api/comets/elements`, see server/comets.ts): heliocentric position by
+ * `GET /api/comets/elements`, see services/identify.ts): heliocentric position by
  * Kepler's equation (elliptic, hyperbolic or parabolic), minus Earth's position,
  * with one light-time iteration. No planetary perturbations, aberration or
  * parallax — good to a few arcminutes near the elements' epoch, which is ample to

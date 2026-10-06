@@ -73,6 +73,7 @@ export default tseslint.config(
           './tsconfig.server.json',
           './tsconfig.test.json',
           './packages/core/tsconfig.json',
+          './packages/backend-local/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],

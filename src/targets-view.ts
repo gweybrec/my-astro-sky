@@ -5929,6 +5929,11 @@ export class TargetsView {
       }
     };
     renderList();
+    // The cache can be out of date (plans created, renamed or deleted from another
+    // window or device), so re-read the plans each time the picker opens.
+    void this.plansStore.load().then(() => {
+      if (this.planPickerEl === picker) renderList();
+    });
 
     const sep = document.createElement('div');
     sep.className = 'border-t border-subtle my-1';

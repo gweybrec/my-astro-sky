@@ -1,5 +1,5 @@
 /**
- * Tests for server/skybot.ts: the IMCCE SkyBoT conesearch proxy used by the
+ * Tests for the SkyBoT part of the identify service (`packages/core/src/services/identify.ts`): the IMCCE SkyBoT conesearch proxy used by the
  * asteroid identification modal.
  *  - sexagesimal RA/Dec parsing
  *  - the "# Flag: -1" IMCCE error body rejected as an error, never JSON.parse'd
@@ -7,26 +7,23 @@
  *  - a real (trimmed) SkyBoT JSON response is parsed into candidates, with 18799
  *    ("1999 JZ73") present — the regression fixture for the asteroid-identify flow
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { parseRaHms, parseDecDms, skybotConesearch } from '../../server/skybot';
+import { createIdentifyService, parseRaHms, parseDecDms } from '@myastrosky/core/services/identify';
 
 const FIXTURE_PATH = join(__dirname, '../fixtures/skybot/ngc4438-conesearch.json');
 
 function jsonResp(text: string) {
-  return { ok: true, status: 200, text: async () => text };
+  return { status: 200, headers: {}, text: async () => text, bytes: async () => new Uint8Array() };
 }
 
 let fetchMock: ReturnType<typeof vi.fn>;
+let identify: ReturnType<typeof createIdentifyService>;
 
 beforeEach(() => {
   fetchMock = vi.fn();
-  vi.stubGlobal('fetch', fetchMock);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
+  identify = createIdentifyService({ http: fetchMock, now: () => 0 });
 });
 
 describe('parseRaHms()', () => {
@@ -46,7 +43,7 @@ describe('parseDecDms()', () => {
   });
 });
 
-describe('skybotConesearch()', () => {
+describe('identify.searchAsteroids()', () => {
   it('throws on an IMCCE error body instead of parsing it as JSON', async () => {
     fetchMock.mockResolvedValue(
       jsonResp(
@@ -54,13 +51,13 @@ describe('skybotConesearch()', () => {
       ),
     );
     await expect(
-      skybotConesearch({ raDeg: 180, decDeg: 10, radiusArcmin: 5, epochJd: 2461139.5 }),
+      identify.searchAsteroids({ raDeg: 180, decDeg: 10, radiusArcmin: 5, epochJd: 2461139.5 }),
     ).rejects.toThrow(/calceph_compute_unit/);
   });
 
   it('returns an empty array for an empty response', async () => {
     fetchMock.mockResolvedValue(jsonResp(''));
-    const result = await skybotConesearch({
+    const result = await identify.searchAsteroids({
       raDeg: 0,
       decDeg: 0,
       radiusArcmin: 1,
@@ -73,7 +70,7 @@ describe('skybotConesearch()', () => {
     const fixture = readFileSync(FIXTURE_PATH, 'utf8');
     fetchMock.mockResolvedValue(jsonResp(fixture));
 
-    const candidates = await skybotConesearch({
+    const candidates = await identify.searchAsteroids({
       raDeg: 186.939296,
       decDeg: 13.00719,
       radiusArcmin: 3,
@@ -93,10 +90,15 @@ describe('skybotConesearch()', () => {
 
   it('sends the required query parameters', async () => {
     fetchMock.mockResolvedValue(jsonResp('[]'));
-    await skybotConesearch({ raDeg: 186.9, decDeg: 13.0, radiusArcmin: 5, epochJd: 2461139.5 });
+    await identify.searchAsteroids({
+      raDeg: 186.9,
+      decDeg: 13.0,
+      radiusArcmin: 5,
+      epochJd: 2461139.5,
+    });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0].url as string);
     expect(url.searchParams.get('-ra')).toBe('186.9');
     expect(url.searchParams.get('-dec')).toBe('13');
     expect(url.searchParams.get('-rd')).toBe('5');

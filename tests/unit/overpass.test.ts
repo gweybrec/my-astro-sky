@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseOverpassPeaks } from '../../server/overpass';
+import { parseOverpassPeaks } from '@myastrosky/core/overpass';
 
 describe('parseOverpassPeaks', () => {
   it('maps named peak nodes with an ele tag', () => {

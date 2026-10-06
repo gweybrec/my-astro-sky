@@ -55,9 +55,16 @@ export const usePlansStore = defineStore('plans', () => {
     return plans.value.filter((p) => p.setupId === setupId);
   }
 
+  // Only the latest load may write the cache, so a slow earlier fetch can never
+  // overwrite a newer list (e.g. one fetched right after a plan was created).
+  let loadSeq = 0;
+
   async function load(): Promise<void> {
+    const seq = ++loadSeq;
     try {
-      plans.value = await getPlans();
+      const fresh = await getPlans();
+      if (seq !== loadSeq) return;
+      plans.value = fresh;
       loaded.value = true;
     } catch (err) {
       reportUnknownRendererError('plans_load_failed', err);

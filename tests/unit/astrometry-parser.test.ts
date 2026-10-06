@@ -2,12 +2,17 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { calibrationToCorrespondences } from '../../server/astrometry';
+import { calibrationToCorrespondences as calibrationToCorrespondencesWith } from '@myastrosky/core/astrometry-solution';
 import {
   parseFITSHeader,
   extractFITSHeaderFromFITS,
   wcsToCorrespondences,
+  loadServerCatalog,
 } from '../../server/wcs-reader';
+
+// The calibration conversion moved to core, which takes the catalogue; the server's catalogue is the one used.
+const calibrationToCorrespondences = (cal: any, w: number, h: number) =>
+  calibrationToCorrespondencesWith(cal, w, h, loadServerCatalog());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(__dirname, '../fixtures');

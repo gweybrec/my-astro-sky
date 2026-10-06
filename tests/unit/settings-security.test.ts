@@ -3,6 +3,21 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
+import type { SettingsService } from '@myastrosky/core/services/settings';
+
+/** The settings service on the real database module and the real secret codec, as the server builds it. */
+async function openSettings(): Promise<{ settings: SettingsService; closeDatabase: () => void }> {
+  const { getConnection, closeDatabase } = await import('../../server/db.js');
+  const { createBetterSqliteDb } = await import('../../server/sqlite-adapter.js');
+  const { createServerSecretCodec } = await import('../../server/secret-codec.js');
+  const { createSettingsService } = await import('@myastrosky/core/services/settings');
+  const settings = createSettingsService({
+    db: createBetterSqliteDb(getConnection()),
+    secrets: createServerSecretCodec(),
+    env: (k) => process.env[k],
+  });
+  return { settings, closeDatabase };
+}
 
 describe('settings security behavior', () => {
   beforeEach(() => {
@@ -16,44 +31,44 @@ describe('settings security behavior', () => {
 
   it('prefers env value for ASTROMETRY_API_KEY over DB value', async () => {
     vi.stubEnv('ASTROMETRY_API_KEY', 'env-key');
-    const { setSetting, getSetting } = await import('../../server/db.js');
-    setSetting('ASTROMETRY_API_KEY', 'db-key');
-    expect(getSetting('ASTROMETRY_API_KEY')).toBe('env-key');
+    const { settings } = await openSettings();
+    await settings.set('ASTROMETRY_API_KEY', 'db-key');
+    expect(await settings.get('ASTROMETRY_API_KEY')).toBe('env-key');
   });
 
   it('falls back to DB value for ASTROMETRY_API_KEY when env is unset', async () => {
-    const { setSetting, getSetting } = await import('../../server/db.js');
-    setSetting('ASTROMETRY_API_KEY', 'db-key');
-    expect(getSetting('ASTROMETRY_API_KEY')).toBe('db-key');
+    const { settings } = await openSettings();
+    await settings.set('ASTROMETRY_API_KEY', 'db-key');
+    expect(await settings.get('ASTROMETRY_API_KEY')).toBe('db-key');
   });
 
   it('keeps DB precedence for non-secret settings', async () => {
     vi.stubEnv('ASTAP_PATH', '/env/astap');
-    const { setSetting, getSetting } = await import('../../server/db.js');
-    setSetting('ASTAP_PATH', '/db/astap');
-    expect(getSetting('ASTAP_PATH')).toBe('/db/astap');
+    const { settings } = await openSettings();
+    await settings.set('ASTAP_PATH', '/db/astap');
+    expect(await settings.get('ASTAP_PATH')).toBe('/db/astap');
   });
 
   it('keeps env fallback for non-secret settings when DB row missing', async () => {
     vi.stubEnv('SOLVE_FIELD_PATH', '/env/solve-field');
-    const { getSetting } = await import('../../server/db.js');
-    expect(getSetting('SOLVE_FIELD_PATH')).toBe('/env/solve-field');
+    const { settings } = await openSettings();
+    expect(await settings.get('SOLVE_FIELD_PATH')).toBe('/env/solve-field');
   });
 
-  it('deleteSetting removes DB value for secret setting', async () => {
-    const { setSetting, getSetting, deleteSetting } = await import('../../server/db.js');
-    setSetting('ASTROMETRY_API_KEY', 'db-key');
-    expect(getSetting('ASTROMETRY_API_KEY')).toBe('db-key');
-    deleteSetting('ASTROMETRY_API_KEY');
-    expect(getSetting('ASTROMETRY_API_KEY')).toBeUndefined();
+  it('remove deletes DB value for secret setting', async () => {
+    const { settings } = await openSettings();
+    await settings.set('ASTROMETRY_API_KEY', 'db-key');
+    expect(await settings.get('ASTROMETRY_API_KEY')).toBe('db-key');
+    await settings.remove('ASTROMETRY_API_KEY');
+    expect(await settings.get('ASTROMETRY_API_KEY')).toBeUndefined();
   });
 
-  it('deleteSetting preserves env-managed secret visibility', async () => {
+  it('remove preserves env-managed secret visibility', async () => {
     vi.stubEnv('ASTROMETRY_API_KEY', 'env-key');
-    const { setSetting, getSetting, deleteSetting } = await import('../../server/db.js');
-    setSetting('ASTROMETRY_API_KEY', 'db-key');
-    deleteSetting('ASTROMETRY_API_KEY');
-    expect(getSetting('ASTROMETRY_API_KEY')).toBe('env-key');
+    const { settings } = await openSettings();
+    await settings.set('ASTROMETRY_API_KEY', 'db-key');
+    await settings.remove('ASTROMETRY_API_KEY');
+    expect(await settings.get('ASTROMETRY_API_KEY')).toBe('env-key');
   });
 
   it('stores secret setting encrypted when SETTINGS_ENCRYPTION_KEY is configured', async () => {
@@ -63,8 +78,8 @@ describe('settings security behavior', () => {
     vi.stubEnv('SETTINGS_ENCRYPTION_KEY', Buffer.alloc(32, 7).toString('base64'));
     vi.resetModules();
 
-    const { setSetting, getSetting, closeDatabase } = await import('../../server/db.js');
-    setSetting('ASTROMETRY_API_KEY', 'super-secret');
+    const { settings, closeDatabase } = await openSettings();
+    await settings.set('ASTROMETRY_API_KEY', 'super-secret');
 
     const db = new Database(dbPath, { readonly: true });
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('ASTROMETRY_API_KEY') as
@@ -74,7 +89,7 @@ describe('settings security behavior', () => {
     expect(row).toBeDefined();
     expect(row!.value.startsWith('enc:v1:aesgcm:')).toBe(true);
     expect(row!.value).not.toContain('super-secret');
-    expect(getSetting('ASTROMETRY_API_KEY')).toBe('super-secret');
+    expect(await settings.get('ASTROMETRY_API_KEY')).toBe('super-secret');
 
     closeDatabase();
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -88,8 +103,8 @@ describe('settings security behavior', () => {
     vi.stubEnv('SETTINGS_ENCRYPTION_KEY', Buffer.alloc(32, 9).toString('base64'));
     vi.resetModules();
     {
-      const { setSetting, closeDatabase } = await import('../../server/db.js');
-      setSetting('ASTROMETRY_API_KEY', 'super-secret');
+      const { settings, closeDatabase } = await openSettings();
+      await settings.set('ASTROMETRY_API_KEY', 'super-secret');
       closeDatabase();
     }
 
@@ -97,8 +112,8 @@ describe('settings security behavior', () => {
     vi.stubEnv('DB_PATH', dbPath);
     vi.resetModules();
 
-    const { getSetting, closeDatabase } = await import('../../server/db.js');
-    expect(getSetting('ASTROMETRY_API_KEY')).toBeUndefined();
+    const { settings, closeDatabase } = await openSettings();
+    expect(await settings.get('ASTROMETRY_API_KEY')).toBeUndefined();
     closeDatabase();
 
     fs.rmSync(tmpDir, { recursive: true, force: true });

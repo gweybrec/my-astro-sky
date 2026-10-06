@@ -151,3 +151,21 @@ export function positionPopup(popup: HTMLElement, anchorRect: DOMRect): void {
     popup.style.left = '4px';
   }
 }
+
+const OVERLAY_SELECTOR = '.modal-backdrop, .meta-editor-overlay, .dialog-overlay';
+
+/** Whether any modal, editor or dialog overlay is currently open. */
+export function hasOpenOverlay(): boolean {
+  return document.querySelector(OVERLAY_SELECTOR) !== null;
+}
+
+/**
+ * Whether `el` is the last full-screen overlay in the document, i.e. no other
+ * modal, editor or dialog was opened on top of it. Escape handlers use it so one
+ * key press closes only the top layer.
+ */
+export function isTopmostOverlay(el: Element): boolean {
+  return !Array.from(document.querySelectorAll(OVERLAY_SELECTOR)).some(
+    (other) => other !== el && el.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+}

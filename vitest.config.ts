@@ -43,6 +43,8 @@ export default defineConfig({
         'src/api.ts',
         // Express server, subprocess, and file-I/O — integration-only
         'server/index.ts',
+        'server/app.ts',
+        'server/routes/**',
         'server/astap.ts',
       ],
     },

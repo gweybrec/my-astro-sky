@@ -21,6 +21,7 @@ import {
   extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
+  formatZoomPercent,
 } from '../../src/photo-placement';
 import {
   project,
@@ -436,5 +437,20 @@ describe('extractMatrixFromTransform', () => {
     expect(extractMatrixFromTransform('')).toBeNull();
     expect(extractMatrixFromTransform('translate(1px, 2px)')).toBeNull();
     expect(extractMatrixFromTransform('matrix(1, 2, 3)')).toBeNull();
+  });
+});
+
+const NBSP = String.fromCharCode(160);
+
+describe('formatZoomPercent', () => {
+  it('reads 100 % at the size the mode opened with', () => {
+    expect(formatZoomPercent(0.004, 0.004)).toBe(`100${NBSP}%`);
+  });
+
+  it('is the ratio of the current size to the opening size, whatever changed it', () => {
+    expect(formatZoomPercent(0.008, 0.004)).toBe(`200${NBSP}%`);
+    expect(formatZoomPercent(0.002, 0.004)).toBe(`50${NBSP}%`);
+    // three wheel notches of 1.1
+    expect(formatZoomPercent(0.004 * 1.1 ** 3, 0.004)).toBe(`133${NBSP}%`);
   });
 });

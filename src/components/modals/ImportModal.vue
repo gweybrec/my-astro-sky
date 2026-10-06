@@ -159,29 +159,79 @@
               <label class="export-select-all-row">
                 <input
                   type="checkbox"
-                  :checked="setupSel.all"
-                  :indeterminate.prop="setupSel.some && !setupSel.all"
-                  @change="setupSel.toggleAll"
+                  :checked="setupAll"
+                  :indeterminate.prop="setupSome && !setupAll"
+                  @change="onSetupToggleAll"
                 />
                 <span class="export-select-all-label">{{
                   t('settings.importSetupsSection').replace('{n}', String(preview.setups.length))
                 }}</span>
               </label>
               <div class="export-scroll-list">
-                <label v-for="s in preview.setups" :key="s.id" class="export-photo-row">
+                <div
+                  v-for="s in preview.setups"
+                  :key="s.id"
+                  class="export-photo-row !items-start"
+                  data-test="import-setup-row"
+                >
                   <input
                     type="checkbox"
-                    :checked="setupSel.selected.has(s.id)"
-                    @change="setupSel.toggle(s.id)"
+                    :id="`import-setup-${s.id}`"
+                    :class="{ invisible: s.conflict === 'identical' }"
+                    :checked="setupTicked(s)"
+                    :disabled="s.conflict === 'identical' || setupLocked(s)"
+                    :aria-hidden="s.conflict === 'identical' ? 'true' : undefined"
+                    @change="onSetupToggle(s)"
                   />
-                  <span class="text-small font-normal truncate min-w-0">{{ s.name }}</span>
-                  <span
-                    v-if="s.exists"
-                    class="import-warn-icon"
-                    :title="t('settings.importReplaceWarning')"
-                    >⚠</span
-                  >
-                </label>
+                  <div class="flex flex-col gap-1 flex-1 min-w-0">
+                    <label
+                      :for="`import-setup-${s.id}`"
+                      class="flex items-center gap-2 cursor-pointer min-w-0"
+                    >
+                      <span class="text-small font-normal truncate min-w-0">{{ s.name }}</span>
+                      <span
+                        v-if="s.conflict === 'different' && !setupChoices[s.id]"
+                        class="import-warn-icon"
+                        :title="t('settings.importReplaceWarning')"
+                        >⚠</span
+                      >
+                    </label>
+                    <span
+                      v-if="s.conflict === 'identical'"
+                      class="text-small text-secondary"
+                      data-test="import-setup-identical"
+                      >{{ t('settings.importSetupIdentical') }}</span
+                    >
+                    <span
+                      v-else-if="setupLocked(s)"
+                      class="text-small text-secondary"
+                      data-test="import-setup-with-plan"
+                      >{{
+                        t('settings.importSetupWithPlan').replace(
+                          '{name}',
+                          requiringPlanNames(s).join(', '),
+                        )
+                      }}</span
+                    >
+                    <div
+                      v-else-if="setupNeedsChoice(s)"
+                      class="flex flex-col gap-2"
+                      role="radiogroup"
+                      data-test="import-setup-choice"
+                    >
+                      <label v-for="c in SETUP_CHOICES" :key="c.value" class="export-photo-row">
+                        <input
+                          type="radio"
+                          :name="`import-setup-choice-${s.id}`"
+                          :value="c.value"
+                          :checked="setupChoices[s.id] === c.value"
+                          @change="onSetupChoice(s, c.value)"
+                        />
+                        <span class="text-small font-normal">{{ t(c.label) }}</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -229,7 +279,7 @@
         <button
           v-if="phase === 'options'"
           class="btn-confirm"
-          :disabled="!canImport || importBusy"
+          :disabled="!canImport || setupChoiceMissing || importBusy"
           @click="onImport"
         >
           {{ importBusy ? '…' : t('settings.importData') }}
@@ -248,7 +298,7 @@ import { useShortcutsStore } from '../../stores/shortcuts';
 import { usePoiCategoriesStore } from '../../stores/poi-categories';
 import { useSkyRegionsStore } from '../../stores/sky-regions';
 import { importPreview, importData, exportData, getPhotos } from '../../api';
-import type { ImportPreviewResult } from '../../api';
+import type { ImportPreviewResult, ImportPreviewSetup, SetupImportChoice } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
 import { showToast } from '../../toast';
 import { formatBytes } from '../../format-utils';
@@ -311,8 +361,9 @@ const planSel = useSelection(
   () => preview.value?.plans ?? [],
   (i) => i.id,
 );
+// A setup identical to a local one has nothing to tick: it is never imported.
 const setupSel = useSelection(
-  () => preview.value?.setups ?? [],
+  () => (preview.value?.setups ?? []).filter((s) => s.conflict !== 'identical'),
   (i) => i.id,
 );
 const gearSel = useSelection(
@@ -328,6 +379,77 @@ const hasAnyList = computed(
       preview.value.setups.length > 0 ||
       preview.value.gear.length > 0),
 );
+
+// ─── Setups: the setups of ticked plans come along; a different one needs a choice ───
+
+const SETUP_CHOICES: { value: SetupImportChoice; label: string }[] = [
+  { value: 'replace', label: 'settings.importSetupReplace' },
+  { value: 'keepBoth', label: 'settings.importSetupKeepBoth' },
+  { value: 'skip', label: 'settings.importSetupSkip' },
+];
+
+/** Choice per setup id; nothing is chosen at first. */
+const setupChoices = reactive<Record<string, SetupImportChoice>>({});
+
+function clearSetupChoices() {
+  for (const k of Object.keys(setupChoices)) delete setupChoices[k];
+}
+
+/** Names of the ticked plans whose setup is `setupId`, by setup id. */
+const tickedPlanNamesBySetup = computed(() => {
+  const map = new Map<string, string[]>();
+  for (const p of preview.value?.plans ?? []) {
+    if (!p.setupId || !planSel.selected.has(p.id)) continue;
+    map.set(p.setupId, [...(map.get(p.setupId) ?? []), p.name]);
+  }
+  return map;
+});
+
+const requiringPlanNames = (s: ImportPreviewSetup) => tickedPlanNamesBySetup.value.get(s.id) ?? [];
+const setupRequired = (s: ImportPreviewSetup) => requiringPlanNames(s).length > 0;
+
+/** A setup with no local counterpart that a ticked plan needs: shown ticked, cannot be unticked. */
+const setupLocked = (s: ImportPreviewSetup) => s.conflict === 'none' && setupRequired(s);
+
+const setupTicked = (s: ImportPreviewSetup) =>
+  s.conflict !== 'identical' && (setupSel.selected.has(s.id) || setupLocked(s));
+
+/** A different setup that will be imported or that a ticked plan needs must be told what to do. */
+const setupNeedsChoice = (s: ImportPreviewSetup) =>
+  s.conflict === 'different' && (setupSel.selected.has(s.id) || setupRequired(s));
+
+const setupChoiceMissing = computed(() =>
+  (preview.value?.setups ?? []).some((s) => setupNeedsChoice(s) && !setupChoices[s.id]),
+);
+
+const selectableSetups = computed(() =>
+  (preview.value?.setups ?? []).filter((s) => s.conflict !== 'identical'),
+);
+const setupAll = computed(
+  () => selectableSetups.value.length > 0 && selectableSetups.value.every(setupTicked),
+);
+const setupSome = computed(() => selectableSetups.value.some(setupTicked));
+
+function onSetupToggle(s: ImportPreviewSetup) {
+  if (setupLocked(s)) return;
+  setupSel.toggle(s.id);
+  if (!setupSel.selected.has(s.id)) delete setupChoices[s.id];
+}
+
+function onSetupToggleAll(e: Event) {
+  setupSel.toggleAll(e);
+  if (!(e.target as HTMLInputElement).checked) clearSetupChoices();
+}
+
+function onSetupChoice(s: ImportPreviewSetup, choice: SetupImportChoice) {
+  // "Do not import" on a setup no ticked plan needs is the same as unticking it.
+  if (choice === 'skip' && !setupRequired(s)) {
+    setupSel.selected.delete(s.id);
+    delete setupChoices[s.id];
+    return;
+  }
+  setupChoices[s.id] = choice;
+}
 
 const canImport = computed(() => {
   if (!preview.value) return false;
@@ -356,6 +478,7 @@ function resetToPick() {
   planSel.reset(false);
   setupSel.reset(false);
   gearSel.reset(false);
+  clearSetupChoices();
 }
 
 async function onFilePicked(e: Event) {
@@ -372,6 +495,7 @@ async function onFilePicked(e: Event) {
     planSel.reset(true);
     setupSel.reset(true);
     gearSel.reset(true);
+    clearSetupChoices();
     importDso.value = true;
     importSkyRegions.value = true;
     importShortcuts.value = true;
@@ -412,12 +536,24 @@ async function onImport() {
       selectedPlans: Array.from(planSel.selected),
       selectedSetups: Array.from(setupSel.selected),
       selectedGear: Array.from(gearSel.selected),
+      setupConflicts: Object.fromEntries(
+        preview.value.setups
+          .filter((s) => setupNeedsChoice(s) && setupChoices[s.id])
+          .map((s) => [s.id, setupChoices[s.id]]),
+      ),
     });
     emit('close');
     const msg = t('settings.importSuccess')
       .replace('{n}', String(result.imported))
       .replace('{s}', String(result.skipped));
     showToast({ message: msg, type: 'info' });
+    if (result.failed?.length) {
+      const names = result.failed.map((f) => f.name).join(', ');
+      showToast({
+        message: t('settings.importFailedItems').replace('{names}', names),
+        type: 'error',
+      });
+    }
 
     // Reload photos into overlay and gallery without a full page refresh
     try {

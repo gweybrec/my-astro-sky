@@ -338,6 +338,11 @@ const de: Translations = {
     importSetupsSection: 'Setups ({n})',
     importGearSection: 'Teleskope/Kameras ({n})',
     importSelectAll: 'Alle auswählen',
+    importSetupReplace: 'Ersetzen',
+    importSetupKeepBoth: 'Beide behalten',
+    importSetupSkip: 'Nicht importieren',
+    importSetupIdentical: 'Bereits vorhanden, identisch',
+    importSetupWithPlan: 'Mit dem Plan „{name}“ importiert',
     importReplaceWarning:
       'Ein Element mit demselben Namen existiert bereits und wird beim Import ersetzt.',
     importBackupWarning:
@@ -345,6 +350,7 @@ const de: Translations = {
     deleteBackupWarning: 'Empfohlen: Erstelle eine Sicherung deiner Daten, bevor du etwas löschst.',
     importBackupBtn: 'Sicherung erstellen (ZIP)',
     importSuccess: 'Wiederhergestellt: {n} Foto(s) ({s} übersprungen)',
+    importFailedItems: 'Nicht wiederhergestellt: {names}',
     importError: 'Sicherungs-/Wiederherstellungsfehler',
     exportView: {
       button: 'Exportieren',

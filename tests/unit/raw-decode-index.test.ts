@@ -2,9 +2,16 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
-import { decodeRawAstroImage, UnsupportedRawFormatError } from '../../server/raw-decode/index';
+import {
+  decodeRawAstroImage as decodeWith,
+  UnsupportedRawFormatError,
+} from '@myastrosky/core/raw-decode/index';
+import { createSharpImageCodec } from '../../server/image-codec';
 import { buildTiff } from '../fixtures/tiff-builders';
 import { buildFits } from '../fixtures/fits-builders';
+
+const images = createSharpImageCodec();
+const decodeRawAstroImage = (bytes: Uint8Array, ext: string) => decodeWith(bytes, ext, images);
 
 describe('decodeRawAstroImage — extension dispatch', () => {
   it('decodes .tif/.tiff via the TIFF decoder', async () => {
@@ -22,7 +29,7 @@ describe('decodeRawAstroImage — extension dispatch', () => {
       expect(r.width).toBe(2);
       expect(r.height).toBe(1);
       expect(r.channels).toBe(1);
-      expect(r.png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a'); // PNG magic
+      expect(Buffer.from(r.png).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a'); // PNG magic
     }
   });
 
@@ -43,7 +50,7 @@ describe('decodeRawAstroImage — extension dispatch', () => {
   });
 
   it('throws UnsupportedRawFormatError for an unknown extension', async () => {
-    await expect(decodeRawAstroImage(Buffer.alloc(10), '.cr2')).rejects.toThrow(
+    await expect(decodeRawAstroImage(new Uint8Array(10), '.cr2')).rejects.toThrow(
       UnsupportedRawFormatError,
     );
   });
@@ -59,11 +66,11 @@ describe('decodeRawAstroImage — extension dispatch', () => {
       pixels: [0, 0.25, 0.5, 1],
     });
     const r = await decodeRawAstroImage(buf, '.tiff');
-    const m = await sharp(r.png).metadata();
+    const m = await sharp(Buffer.from(r.png)).metadata();
     expect(m.channels).toBe(1); // confirms the PNG itself was written as single-channel
     // sharp's raw() extraction defaults to sRGB regardless of the source; ask for the
     // PNG's own (b-w) colourspace back to read the stored bytes as they truly are.
-    const { data, info } = await sharp(r.png)
+    const { data, info } = await sharp(Buffer.from(r.png))
       .toColourspace('b-w')
       .raw()
       .toBuffer({ resolveWithObject: true });

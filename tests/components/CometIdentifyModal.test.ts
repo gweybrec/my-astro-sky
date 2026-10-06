@@ -15,7 +15,7 @@ import { computePhotoToProjMatrix } from '../../src/photo-placement';
 import { photoPixelToRaDec } from '../../src/asteroid-identify';
 import { cometRaDec } from '../../src/comet-ephemeris';
 import { dateToJD } from '../../src/astro-time';
-import { parseCometEls } from '../../server/comets';
+import { parseCometEls } from '@myastrosky/core/services/identify';
 import { setCenterMode, setProjectionObserver } from '../../src/projection';
 import type { Photo, ManualPlacement } from '../../src/types';
 

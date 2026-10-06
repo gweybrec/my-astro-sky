@@ -26,7 +26,7 @@ import {
 } from '../../src/supernova-identify';
 import { fitPhotoAffine } from '../../src/photo-placement';
 import { project } from '../../src/projection';
-import { parseTnsCsv } from '../../server/tns';
+import { parseTnsCsv } from '@myastrosky/core/services/identify';
 
 const CANDIDATES: TnsCandidate[] = parseTnsCsv(
   readFileSync(join(__dirname, '../fixtures/tns/ngc7331-search.csv'), 'utf-8'),

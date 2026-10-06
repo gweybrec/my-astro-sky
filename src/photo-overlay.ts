@@ -38,6 +38,7 @@ import {
   extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
+  formatZoomPercent,
 } from './photo-placement';
 import {
   uploadPhoto,
@@ -2204,6 +2205,7 @@ export class PhotoOverlay {
     placement.centerRa = centerSky.ra;
     placement.centerDec = centerSky.dec;
     placement.projPerPx = (1 / initView.scale) * 0.5;
+    const initialProjPerPx = placement.projPerPx;
 
     // Toolbar
     const toolbar = document.createElement('div');
@@ -2218,6 +2220,7 @@ export class PhotoOverlay {
       <label class="manual-toolbar-item">
         ${t('manual.photoZoom')}&nbsp;
         <input type="range" min="-6" max="2" value="0" step="0.1" class="manual-zoom-range">
+        <span class="manual-rotation-val manual-zoom-val">${formatZoomPercent(1, 1)}</span>
       </label>
       <button class="manual-mirror-btn" data-axis="x">${t('manual.mirrorX')}</button>
       <button class="manual-mirror-btn" data-axis="y">${t('manual.mirrorY')}</button>
@@ -2231,6 +2234,7 @@ export class PhotoOverlay {
     const rotationRange = toolbar.querySelector('.manual-rotation-range') as HTMLInputElement;
     const rotationVal = toolbar.querySelector('.manual-rotation-val') as HTMLSpanElement;
     const zoomRange = toolbar.querySelector('.manual-zoom-range') as HTMLInputElement;
+    const zoomVal = toolbar.querySelector('.manual-zoom-val') as HTMLSpanElement;
     const validateBtn = toolbar.querySelector('.btn-confirm') as HTMLButtonElement;
     const cancelBtn = toolbar.querySelector('.btn-cancel') as HTMLButtonElement;
 
@@ -2290,6 +2294,10 @@ export class PhotoOverlay {
         e.stopPropagation();
         const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
         placement.projPerPx *= factor;
+        zoomVal.textContent = formatZoomPercent(placement.projPerPx, initialProjPerPx);
+        zoomRange.value = String(
+          Math.log2(placement.projPerPx / ((1 / this.getView().scale) * 0.5)),
+        );
         redraw(this.getView());
       },
       { passive: false },
@@ -2306,6 +2314,7 @@ export class PhotoOverlay {
     zoomRange.addEventListener('input', () => {
       const baseScale = (1 / this.getView().scale) * 0.5;
       placement.projPerPx = baseScale * Math.pow(2, parseFloat(zoomRange.value));
+      zoomVal.textContent = formatZoomPercent(placement.projPerPx, initialProjPerPx);
       redraw(this.getView());
     });
 
@@ -2490,6 +2499,8 @@ export class PhotoOverlay {
       }
     }
 
+    const initialProjPerPx = placement.projPerPx;
+
     // Toolbar
     const toolbar = document.createElement('div');
     toolbar.className = 'manual-toolbar';
@@ -2503,6 +2514,7 @@ export class PhotoOverlay {
       <label class="manual-toolbar-item">
         ${t('manual.photoZoom')}&nbsp;
         <input type="range" min="-6" max="2" value="0" step="0.1" class="manual-zoom-range">
+        <span class="manual-rotation-val manual-zoom-val">${formatZoomPercent(1, 1)}</span>
       </label>
       <button class="manual-mirror-btn ${placement.mirrorX ? 'active' : ''}" data-axis="x">${t('manual.mirrorX')}</button>
       <button class="manual-mirror-btn ${placement.mirrorY ? 'active' : ''}" data-axis="y">${t('manual.mirrorY')}</button>
@@ -2516,6 +2528,7 @@ export class PhotoOverlay {
     const rotationRange = toolbar.querySelector('.manual-rotation-range') as HTMLInputElement;
     const rotationVal = toolbar.querySelector('.manual-rotation-val') as HTMLSpanElement;
     const zoomRange = toolbar.querySelector('.manual-zoom-range') as HTMLInputElement;
+    const zoomVal = toolbar.querySelector('.manual-zoom-val') as HTMLSpanElement;
     const validateBtn = toolbar.querySelector('.btn-confirm') as HTMLButtonElement;
     const cancelBtn = toolbar.querySelector('.btn-cancel') as HTMLButtonElement;
 
@@ -2577,6 +2590,10 @@ export class PhotoOverlay {
         e.stopPropagation();
         const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
         placement.projPerPx *= factor;
+        zoomVal.textContent = formatZoomPercent(placement.projPerPx, initialProjPerPx);
+        zoomRange.value = String(
+          Math.log2(placement.projPerPx / ((1 / this.getView().scale) * 0.5)),
+        );
         redraw(this.getView());
       },
       { passive: false },
@@ -2591,11 +2608,11 @@ export class PhotoOverlay {
 
     // Zoom slider (log scale)
     const baseScale = placement.projPerPx / ((1 / view.scale) * 0.5);
-    const initialZoomValue = Math.log2(baseScale);
-    zoomRange.value = String(initialZoomValue);
+    zoomRange.value = String(Math.log2(baseScale));
     zoomRange.addEventListener('input', () => {
       const baseScale = (1 / this.getView().scale) * 0.5;
       placement.projPerPx = baseScale * Math.pow(2, parseFloat(zoomRange.value));
+      zoomVal.textContent = formatZoomPercent(placement.projPerPx, initialProjPerPx);
       redraw(this.getView());
     });
 

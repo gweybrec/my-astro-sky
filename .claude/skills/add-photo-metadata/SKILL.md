@@ -21,7 +21,7 @@ leave the field absent or broken in part of the UI.
 Before writing any code, the plan must explicitly address unit tests:
 
 - **List every test file to create or update**, with a brief description of what each test covers.
-- The following changes always require tests: DB helper changes in `server/db.ts` (new columns, sanitization logic), new parse/transform logic in `server/wcs-reader.ts`, new extraction logic in `server/astrometry.ts`.
+- The following changes always require tests: DB helper changes in `server/db.ts` (new columns, sanitization logic), new parse/transform logic in `server/wcs-reader.ts`, new extraction logic in `packages/core/src/services/nova-solve.ts`.
 - UI-only changes (adding an `<input>` element and wiring it to an existing save call) do not require new tests if the underlying DB/API logic is already covered.
 - If no unit test changes are needed, the plan must **state the justification** (e.g. "field is a plain string passthrough; DB/API layer has no new logic, existing tests cover the path").
 - Identifying tests is part of the plan, not an afterthought. A plan that omits this section is incomplete.
@@ -66,15 +66,16 @@ astrometry.net polling route will return the value (see Step 8).
 
 ### Migration (add column to existing databases)
 
+Do not edit `server/db-migrations.ts` (migrations 1 to 14 are frozen). Add a migration in
+`packages/core/src/db/schema.ts`: a `{ version: <next>, statements: [...] }` entry in
+`MIGRATIONS`, for example:
+
 ```typescript
-try {
-  db.exec('ALTER TABLE photos ADD COLUMN my_field TEXT');
-} catch {
-  /* column exists */
-}
+{ version: 15, statements: ['ALTER TABLE photos ADD COLUMN my_field TEXT'] },
 ```
 
-Add this block after the existing migration block (around line 87).
+In the same commit, add the column (at the end of the table, as `ALTER TABLE` does) to
+`BASELINE_SCHEMA` and bump `SCHEMA_VERSION`; `tests/unit/schema-baseline.test.ts` fails otherwise.
 
 ### `insertPhoto` prepared statement
 
@@ -103,7 +104,7 @@ in both `.run()` calls (same order as the SET clause).
 
 ---
 
-## Step 3 — `server/index.ts`
+## Step 3 — `server/routes/photos.ts`
 
 ### Upload route `POST /api/photos`
 
@@ -288,7 +289,7 @@ When the user uploads a `.wcs`, `.tiff`, or `.fit` WCS companion file:
 
    Extend the `WCSData` interface with the new optional field.
 
-2. `server/index.ts` — `POST /api/solve-wcs` spreads the field into the response:
+2. `server/routes/solved-import.ts` — `POST /api/solve-wcs` (and `POST /api/photos/convert`) spread the field into the response:
 
    ```typescript
    ...(wcs.myField ? { myField: wcs.myField } : {}),
@@ -316,12 +317,12 @@ Neither path currently extracts FITS headers from the astrometry.net WCS
 response — so neither returns `dateObs`, `expTime`, or `stackCnt`.
 
 The astrometry.net API does provide a downloadable WCS FITS file for a solved
-job (via `server/astrometry.ts`). To add pre-fill support:
+job (via `packages/core/src/services/nova-solve.ts`). To add pre-fill support:
 
-1. After `reuseSubmission()` succeeds in `server/astrometry.ts`, fetch and
+1. After `reuseSubmission()` succeeds in `packages/core/src/services/nova-solve.ts`, fetch and
    parse the WCS FITS file with `extractWCS()` to get the new field.
 2. Return the field in the `PlateSolveResult` from `reuseSubmission()`.
-3. In `server/index.ts` at `POST /api/astrometry/reuse`, spread the field into
+3. In `server/routes/nova-solve.ts` at `POST /api/astrometry/reuse`, spread the field into
    `res.json()` the same way `solve-wcs` does.
 4. For the poll route (`GET /api/solve-plate/:id`), extend `AstrometrySolveStatus`
    in `src/types.ts` and populate it the same way.
@@ -346,7 +347,7 @@ If a future metadata field _is_ derivable from the astrometry.net WCS output
 Export is automatic: `getAllPhotos()` includes every column, and the export
 route writes the full `Photo` object to `manifest.json`.
 
-Import requires an explicit change: in the import route in `server/index.ts`,
+Import requires an explicit change: in the `POST /api/import` route in `server/routes/backup.ts`,
 find the `createPhotoWithId()` call and pass the value from the manifest:
 
 ```typescript
@@ -414,14 +415,14 @@ In `photo-overlay.ts` this is not needed — everything is in one big closure.
 ## Checklist
 
 - [ ] `src/types.ts` — `Photo` and `PlateSolveResult` updated
-- [ ] `server/db.ts` — migration, prepared statements, CRUD functions, `getAllPhotos()`
-- [ ] `server/index.ts` — upload route, PATCH route, import route, Swagger annotations
+- [ ] `packages/core/src/db/schema.ts` — migration + `BASELINE_SCHEMA` + `SCHEMA_VERSION`; `server/db.ts` — prepared statements, CRUD functions, `getAllPhotos()`
+- [ ] `server/routes/photos.ts` (upload and PATCH routes), `server/routes/backup.ts` (import route) — Swagger annotations next to each route
 - [ ] `src/api.ts` — `updatePhotoMetadata()` and `uploadPhoto()` param types
 - [ ] i18n — all four language files
 - [ ] `src/photo-overlay.ts` — state variable, UI field, `prefillWCSMeta`, upload calls (both paths)
 - [ ] `src/ui.ts` — `BatchItem` interface + init, `buildCard()`, card ref, WCS handler, `scheduleMetaSave`, upload call
 - [ ] `src/metadata-editor.ts` — state variable, UI field, save handler
-- [ ] WCS extraction — `server/wcs-reader.ts` `WCSData` + `extractWCS()`, `server/index.ts` response spread
+- [ ] WCS extraction — `server/wcs-reader.ts` `WCSData` + `extractWCS()`, `server/routes/solved-import.ts` response spread
 - [ ] Export automatic; Import needs explicit `createPhotoWithId()` argument
 - [ ] `npm run swagger:generate` run
 - [ ] `npm run build` — zero TypeScript errors

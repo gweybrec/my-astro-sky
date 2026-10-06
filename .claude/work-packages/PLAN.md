@@ -2,6 +2,46 @@
 
 _Revision 2. It incorporates two independent reviews: one on architecture and feasibility, one on executability by cheaper models._
 
+## Amendments (read first)
+
+_Last updated 2026-10-05. Where this section and the text below disagree, this section wins. Stretches and the status table are in `README.md`, which replaces the stretch table of §6. The user's decisions are in `design/decisions.md`. The independent review that led to these amendments is `mobile-review-2026-10-04.md`._
+
+**Scope (confirmed by the user on 2026-10-05).** A full port: every feature except the local solvers, in portrait **and landscape**. No reduced first release.
+
+**Mobile UI toolkit (§2, §5).** Ionic Vue is used, and its built-in components are preferred wherever one exists: bottom sheets (modal with breakpoints), tabs and navigation, the Android back button, the keyboard, pickers, alerts, action sheets, toggles, ranges, lists and reorder. Do not rebuild what Ionic provides. The `.mob-*` classes of the design system describe the **look** (tokens, sizes, spacing) that the Ionic components are themed to, and remain for what Ionic has no component for (fact cards, the map overlays). Every per-screen spec maps each element to its Ionic component.
+
+**What the phone stores for a photo (replaces spike decision 6 on this point).** The same as the desktop: the original image (orientation baked in) and a thumbnail. No reduced copy is stored. Decoding a reduced bitmap for display is a drawing concern (the canvas photo layer of Phase 4), not a storage one. A backup made on the phone therefore holds the originals.
+
+**Connection to the computer (§4 "LAN connect").** While connected, a visible switch chooses between two modes: **the computer's gallery and plans**, or **the phone's own photos and plans with only the computer's solvers**. The connection screen explains the two modes in printed text. Every screen shows that the phone is connected and whose data is displayed.
+
+**Icons.** Action buttons whose icon is clear carry no label; the name appears on a long press. An eye means show or hide only; adding is a plus button.
+
+**Service rules added after the review** (details in `phase-2/WP2.3-first-services.md`):
+
+- Database calls are grouped: the phone pays about 35 ms per call. No awaited call inside a loop; several writes are one `batch`; tests assert the number of round trips.
+- Every `DomainError` has a `code`.
+- **The interface between the UI and the data (the `Backend` of §3) is the set of service interfaces**: `Backend = { plans: PlanService; photos: PhotoService; … }`. The local backend is the services themselves; the HTTP backend implements the same interfaces by calling the routes. Service methods therefore take typed parameters from `packages/core/src/domain` (and still validate at run time), not a raw request body, and return domain values, not HTTP responses.
+- Services are built by `createServices(deps)`.
+- Every `SqlDb` adapter passes one shared conformance suite, which also runs on an asynchronous test adapter that behaves like the phone's.
+
+**Changes to §8 (later phases).**
+
+| In §8                        | Now                                                                                                                                                                                                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.0a–h router split          | Done (WP2.0a–k).                                                                                                                                                                                                                                                           |
+| 2.1 database factory         | Replaced by the `SqlDb` port and its adapter (WP2.1, WP2.1b) and `createServices` (WP2.6b). `server/db.ts` disappears as services replace it.                                                                                                                              |
+| 2.2 `SqlDb` port, migrations | Done (WP2.1, WP2.2): one schema definition in core.                                                                                                                                                                                                                        |
+| 2.3 services                 | In progress: five done; plans and photos next (WP2.3f–h); then solved-file import, nova, star search, identification, horizon, backup, version.                                                                                                                            |
+| 2.4 contract-test harness    | Replaced by the pinning tests of the routes (WP2.0a, WP2.4a, WP2.4b) and the adapter conformance suite (WP2.6c). The contract tests on both backends remain in Phase 3.                                                                                                    |
+| _new, end of Phase 2_        | **Phone database adapter prototype**: the Capacitor SQLite adapter written against the conformance suite and run on the user's phone (needs the phone plugged in). Moved earlier from 6.0.                                                                                 |
+| 3.1 `Backend` interface      | Defined by the rule above; card 3.1 writes the HTTP backend and turns `api.ts` into a facade over it.                                                                                                                                                                      |
+| _new, end of Phase 3_        | **Remove the shims**: rewrite imports to `@myastrosky/core/*`, delete the one-line re-export files in `src/` and `server/`, add a lint rule against the old paths.                                                                                                         |
+| 4.5 catalogue format         | Dropped: the spike showed the JSON catalogue is fast enough.                                                                                                                                                                                                               |
+| 5 design                     | D0 and D1 approved. D2 covers portrait and landscape, the red night theme, the missing states (first run, empty lists, errors, permission refused, pending online solves, comets, saved regions), safe areas, and creates `docs/dev/ui/mobile.md` with the approval table. |
+| 6.0 shell                    | Also bundles the fonts (the mockups load them from the web).                                                                                                                                                                                                               |
+
+**Process.** A worker updates its own row of the status table in its card's commit; there are no separate status commits from stretch H on.
+
 ## Context
 
 MyAstroSky is a desktop/web app: a Vue 3 + Vite frontend (`src/`, ~64k lines) that depends on a local

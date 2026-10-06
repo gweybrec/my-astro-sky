@@ -34,10 +34,10 @@ interface HorizonProfile {
 
 ## Auto-compute (backend)
 
-`server/horizon.ts` — `computeHorizon(lat, lon, { radiusKm, obsHeightM })`:
+`packages/core/src/services/horizon.ts` — `createHorizonService(...).getProfile({ lat, lon, radiusKm, obsHeightM })` (the pure ray trace is in `packages/core/src/horizon-trace.ts`):
 
 1. **DEM source:** AWS `elevation-tiles-prod` **Terrarium** PNG tiles (open data, no key)
-   at zoom 12 (~38 m/px at the equator), decoded with `sharp`. Elevation is RGB-encoded:
+   at zoom 12 (~38 m/px at the equator), decoded through the `ImageCodec` port (`sharp` on the server). Elevation is RGB-encoded:
    `h = R*256 + G + B/256 - 32768`. Tiles for the `radiusKm` bounding box are fetched
    (capped at `MAX_TILES`) and assembled into one combined grid; a missing tile (out of
    coverage) is treated as sea level.
@@ -53,7 +53,7 @@ Computation runs server-side (avoids browser CORS on tiles, keeps the heavy loop
 render thread — same rationale as proxying astrometry.net) and is exposed as
 `GET /api/horizon?lat=&lon=&radiusKm=&obsHeightM=`. Results are cached in the
 `horizon_profiles` table keyed by rounded location + params (`horizonCacheKey` in
-`server/db.ts`) — terrain is stable, so a computed skyline is reusable indefinitely.
+`services/horizon.ts`) — terrain is stable, so a computed skyline is reusable indefinitely.
 
 ### Why not PeakFinder (or HeyWhatsThat)?
 
@@ -152,8 +152,8 @@ after `drawHorizonLine`, gated on date mode + observer location + `showMountainH
 ## Named summits
 
 The DEM carries no place names, so summit labels come from **OpenStreetMap** via the
-**Overpass API** (`natural=peak` nodes — free, no key). `server/overpass.ts` holds a pure
-`parseOverpassPeaks(json)` (unit-tested) plus `fetchPeaks(bbox)`. Public Overpass instances
+**Overpass API** (`natural=peak` nodes — free, no key). `packages/core/src/overpass.ts` holds a pure
+`parseOverpassPeaks(json)` (unit-tested) plus `fetchPeaks(http, bbox)`. Public Overpass instances
 frequently 504/429 or briefly hang, so `fetchPeaks` **retries** (primary tried twice, then two
 fallback mirrors) with a 12 s per-attempt timeout and a descriptive `User-Agent`. The peak
 bbox is capped to `PEAK_QUERY_RADIUS_M` (30 km) — a lighter query is far less likely to time out,

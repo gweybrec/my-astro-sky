@@ -313,3 +313,54 @@ From `observations.md` (device session, Galaxy A16 SM-A165F, Android 16, 2026-10
 - Cards 2.3 (nova solve service) and 3.1 (`Backend`/`HttpClient` types): the `HttpClient` port takes a multipart request with named parts, one of which can be a file.
 - Card 4.4 (canvas photo layer): add the bitmap budget.
 - Card 6.0 (app shell): safe areas at the top and bottom on every screen; pin `buildToolsVersion` for all modules to the installed version for local builds, as in the spike.
+
+## Phone database adapter (2026-10-06)
+
+The Capacitor SQLite adapter (`packages/backend-local/src/capacitor-sqlite-db.ts`) and the shared conformance suite (`packages/core/src/testing/sql-db-conformance.ts`), run on the phone through the spike app's `/#/sqldb` route. Raw results: `spikes/mobile/results/sqldb-*.json` (gitignored with the rest of `spikes/`).
+
+**Device.** Samsung Galaxy A16 (SM-A165F), Android 16 (API 36), security patch 2026-08-05, Android System WebView 153.0.8010.36 (`com.google.android.webview`), plugin `@capacitor-community/sqlite` 8.1.1, Capacitor 8. Run 1 is a cold start of the app, run 2 a second run in the same process. The adapter was built with a 1 s lock timeout for the conformance cases (10 s for the timed operations).
+
+### Conformance
+
+11 of 11 cases pass, in both runs. A first attempt passed 9 of 11: the plugin's `execute` splits a script only at a semicolon followed by a newline and silently runs just the first statement of anything else, so `exec("A; B;")` ran `A` only (and `CREATE TABLE parent; CREATE TABLE child` created `parent` only). The adapter now splits scripts itself (outside quotes and comments) and hands the plugin one statement per line.
+
+| Case                                                            | Run 1 (ms) | Run 2 (ms) |
+| --------------------------------------------------------------- | ---------- | ---------- |
+| run / get / all / exec, changes and lastInsertRowid             | 424        | 321        |
+| round-trips strings, numbers, null and Uint8Array               | 248        | 252        |
+| batch is all-or-nothing outside a transaction                   | 236        | 248        |
+| a transaction commits and returns the body value                | 229        | 161        |
+| a transaction rolls back and rethrows when the body throws      | 188        | 185        |
+| a failing batch in a transaction rolls the whole one back       | 141        | 125        |
+| two transactions started together do not overlap                | 314        | 214        |
+| a nested transaction rejects with SQL_TX_NESTED                 | 1192       | 1176       |
+| a call on the outer SqlDb in a body rejects (SQL_TX_OUTER_CALL) | 2234       | 2218       |
+| a function taking a SqlTx works with tx and with the outer db   | 245        | 261        |
+| initSchema builds the schema, foreign keys are enforced         | 815        | 772        |
+
+The two timeout cases include the 1 s (and 2 x 1 s) lock timeout by design.
+
+### Timings
+
+Real core services (settings, plans, photos; fake image codec and blob store) on the adapter, on a fresh database. "Calls" are bridge calls counted around the connection.
+
+| Operation                                                | Calls | Run 1 (ms) | Run 2 (ms) |
+| -------------------------------------------------------- | ----- | ---------- | ---------- |
+| `initSchema` on a fresh database (14 tables, version 14) | 23    | 453        | 410        |
+| `settings.readPublic()`                                  | 1     | 21         | 12         |
+| `plans.create` (empty plan)                              | 1     | 44         | 38         |
+| `plans.addEntry` x 40, one by one                        | 200   | 3893       | 3832       |
+| `plans.createMosaic`, 40 tiles                           | 6     | 178        | 156        |
+| `photos.insert`, 60 correspondences                      | 3     | 110        | 92         |
+| `plans.list()`, 20 plans of 20 entries                   | 3     | 124        | 97         |
+| `plans.importPlan`, 40 entries                           | 1     | 68         | 61         |
+
+`PRAGMA table_list` returns 16 rows on this phone (14 tables plus `sqlite_schema` and `sqlite_temp_schema`); `sqlite_master` holds 14 tables.
+
+### Conclusions
+
+- A bridge call costs about 19 ms here (3.9 s for 200 calls), half of the 35 ms measured in the first spike. Everything that is one `executeSet` or one `query` (plan import, photo insert with 60 correspondences, listing 20 plans) finishes in under 125 ms.
+- The only slow operation is a loop of awaited calls: `addEntry` costs 5 calls (a transaction: begin, two reads, one write, commit), about 95 ms each. 40 of them take 3.8 s. A screen that adds many entries must go through a batched service method (one `importPlan`-like write or `createMosaic`), never a loop of `addEntry`.
+- A transaction costs two extra hops (begin and commit). Services should keep transactions for writes that really need several reads between statements, and prefer one `batch` (one `executeSet`, atomic on its own) otherwise.
+- `exec` must be one statement per line for the plugin; the adapter does it. A trigger body with inner semicolons is not supported by the splitter (the schema has none). A `batch` holding a `Uint8Array` falls back to one `run` per statement inside a transaction, because `executeSet` binds raw JSON and cannot carry a BLOB; keep BLOBs out of batches (the services keep images in the blob store).
+- Outer-db calls and nested `transaction()` inside a body cannot be told apart from a legitimate wait without `AsyncLocalStorage`: they time out (`lockTimeoutMs`) instead of failing at once, and the body's transaction only rolls back if the body lets the rejection propagate. A waiter behind a busy transaction does not time out as long as the transaction keeps making `tx` calls.

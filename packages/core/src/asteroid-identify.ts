@@ -145,7 +145,7 @@ export function buildSearch(
   };
 }
 
-/** A SkyBoT candidate as returned by the server proxy (`server/skybot.ts`). */
+/** A SkyBoT candidate as returned by the identify service (`services/identify.ts`). */
 export interface SkybotCandidate {
   number: string | null;
   name: string;
