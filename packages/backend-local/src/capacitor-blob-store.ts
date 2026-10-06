@@ -38,7 +38,7 @@ export interface CapacitorBlobStore extends BlobStore {
 }
 
 /** Bytes per piece written; each piece is encoded on its own, so no base64 text of a whole file exists. */
-export const BLOB_PIECE_BYTES = 1024 * 1024;
+export const BLOB_PIECE_BYTES = 8 * 1024 * 1024;
 
 /** Base64 of bytes by the engine's own encoder, where it has one (`Uint8Array.prototype.toBase64`). */
 const nativeToBase64 = (bytes: Uint8Array): string | null => {

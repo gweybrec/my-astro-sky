@@ -28,10 +28,20 @@ async function canvasToBytes(
   type: string,
   quality?: number,
 ): Promise<Uint8Array> {
+  // On the phone's WebView `convertToBlob` waits ~4 s when no animation frame is produced, and takes ~40 ms
+  // while a requestAnimationFrame loop runs; workers and Node have no such function and call it directly.
+  let on = typeof requestAnimationFrame === 'function';
+  if (on) {
+    const tick = () => {
+      if (on) requestAnimationFrame(tick);
+    };
+    tick();
+  }
   try {
     const blob = await canvas.convertToBlob(quality === undefined ? { type } : { type, quality });
     return new Uint8Array(await blob.arrayBuffer());
   } finally {
+    on = false;
     canvas.width = 0;
     canvas.height = 0;
   }
