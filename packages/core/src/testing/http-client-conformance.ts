@@ -1,6 +1,6 @@
 /**
  * The contract every `HttpClient` adapter must meet, as plain data (cases that throw on failure), run against
- * an address that answers like `spikes/mobile/scripts/echo-server.mjs`: it returns as JSON the method, the
+ * an address that answers like `tests/helpers/echo-server.mjs`: it returns as JSON the method, the
  * headers (lower-case names) and the text body, and for a multipart form each part's name, file name, type,
  * size and SHA-256; `/status/<n>`; `/slow?ms=<n>`; `/bytes?n=<n>` (byte i is i % 251).
  */

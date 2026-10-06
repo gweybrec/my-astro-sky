@@ -226,7 +226,7 @@ export default tseslint.config(
   // Build/CLI scripts: plain ES modules, no type information, and console output is
   // their whole job — so silence `no-console` here.
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'tests/helpers/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: { ...globals.node },
