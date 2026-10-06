@@ -1,0 +1,248 @@
+<!-- @dsCard group="Desktop — from the code" height=250 subtitle="btn-icon and its three modifiers" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>IconButton — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+      }
+      .stack {
+        display: grid;
+        gap: var(--space-7);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-9);
+        align-items: flex-end;
+      }
+      .cell {
+        display: grid;
+        justify-items: center;
+        gap: var(--space-3);
+      }
+      .cap {
+        color: var(--text-secondary);
+        font-size: var(--font-size-small);
+      }
+      .fill {
+        color: var(--text-secondary);
+        font-size: var(--font-size-micro);
+        font-family: var(--font-mono);
+      }
+      /* static renditions of :hover (a preview cannot force the pseudo-class); same declarations as the rules in bundle.css */
+      .btn-icon.is-hover {
+        background: var(--accent-fill-lg);
+        border-color: var(--border-focus);
+        color: var(--text-bright);
+      }
+      .btn-icon--danger.is-hover {
+        background: var(--btn-danger-hover-bg);
+        border-color: var(--btn-danger-hover-border);
+        color: var(--text-bright);
+      }
+      .btn-icon--active.is-hover {
+        background: var(--accent-bg-hover) !important;
+      }
+      .btn-icon--danger-active.is-hover {
+        background: var(--btn-danger-bg-hover) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <div>
+        <div class="cap">
+          Fill scale of one toggle: rest 0 %, hover 35 %, selected 55 %,
+          selected hover 75 %
+        </div>
+        <div class="row" style="margin-top: var(--space-5)">
+          <div class="cell">
+            <button class="btn-icon" aria-pressed="false" aria-label="Afficher">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 64 64"
+                stroke-width="5"
+                stroke="currentColor"
+                fill="none"
+              >
+                <path
+                  d="M6,32S17,16,32,16,58,32,58,32,47,48,32,48,6,32,6,32Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle cx="32" cy="32" r="7" stroke-linecap="round" />
+              </svg>
+            </button>
+            <span class="cap">Default</span><span class="fill">0 %</span>
+          </div>
+          <div class="cell">
+            <button
+              class="btn-icon is-hover"
+              aria-pressed="false"
+              aria-label="Afficher"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 64 64"
+                stroke-width="5"
+                stroke="currentColor"
+                fill="none"
+              >
+                <path
+                  d="M6,32S17,16,32,16,58,32,58,32,47,48,32,48,6,32,6,32Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle cx="32" cy="32" r="7" stroke-linecap="round" />
+              </svg>
+            </button>
+            <span class="cap">Hover</span><span class="fill">35 %</span>
+          </div>
+          <div class="cell">
+            <button
+              class="btn-icon--active"
+              aria-pressed="true"
+              aria-label="Masquer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 64 64"
+                stroke-width="5"
+                stroke="currentColor"
+                fill="none"
+              >
+                <path
+                  d="M6,32S17,16,32,16,58,32,58,32,47,48,32,48,6,32,6,32Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle cx="32" cy="32" r="7" stroke-linecap="round" />
+              </svg>
+            </button>
+            <span class="cap">Active</span><span class="fill">55 %</span>
+          </div>
+          <div class="cell">
+            <button
+              class="btn-icon--active is-hover"
+              aria-pressed="true"
+              aria-label="Masquer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 64 64"
+                stroke-width="5"
+                stroke="currentColor"
+                fill="none"
+              >
+                <path
+                  d="M6,32S17,16,32,16,58,32,58,32,47,48,32,48,6,32,6,32Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle cx="32" cy="32" r="7" stroke-linecap="round" />
+              </svg>
+            </button>
+            <span class="cap">Active, hover</span><span class="fill">75 %</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="cap">
+          Danger: the trash icon is always red; the selected danger toggle is a
+          red fill
+        </div>
+        <div class="row" style="margin-top: var(--space-5)">
+          <div class="cell">
+            <button class="btn-icon--danger" aria-label="Supprimer">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+            </button>
+            <span class="cap">Danger</span>
+          </div>
+          <div class="cell">
+            <button class="btn-icon--danger is-hover" aria-label="Supprimer">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+            </button>
+            <span class="cap">Danger, hover</span>
+          </div>
+          <div class="cell">
+            <button
+              class="btn-icon--danger-active"
+              aria-pressed="true"
+              aria-label="Supprimer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+            </button>
+            <span class="cap">Danger active</span>
+          </div>
+          <div class="cell">
+            <button class="btn-icon" aria-label="Modifier les métadonnées">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M3 21l0.51 -4.74 14.87 -14.88 4.24 4.24 -14.87 14.88z"
+                />
+                <path d="M3.2 19.1l1.7 1.7" />
+                <path d="M16.63 3.13l4.24 4.24" />
+                <path d="M5.63 18.38l12.25 -12.26" />
+              </svg>
+            </button>
+            <span class="cap">Pen</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

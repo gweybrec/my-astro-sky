@@ -1,0 +1,387 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-03T14:19:36Z"
+  },
+  "title": "MyAstroSky Design System",
+  "namespace": "MyAstroSky",
+  "libraries": [],
+  "sections": {},
+  "groups": [
+    "Logos",
+    "Icons"
+  ],
+  "assetGroups": {
+    "Logos": {
+      "name": "Logos",
+      "tile": "l",
+      "order": [
+        "icon.png"
+      ],
+      "files": {
+        "icon.png": {
+          "name": "icon.png",
+          "blob": "a61495b66fdf81b35e3619e24aebc145",
+          "size": 1036888,
+          "type": "image/png"
+        }
+      }
+    },
+    "Icons": {
+      "name": "Icons",
+      "tile": "s",
+      "order": [
+        "about.svg",
+        "add-frame.svg",
+        "add-mosaic.svg",
+        "add-photo.svg",
+        "anchor.svg",
+        "azimuth-grid.svg",
+        "calendar.svg",
+        "check.svg",
+        "close-x.svg",
+        "credits.svg",
+        "dso-galaxy.svg",
+        "export.svg",
+        "eye-off.svg",
+        "eye.svg",
+        "image.svg",
+        "list-plus.svg",
+        "local-sky.svg",
+        "map-pin.svg",
+        "moon.svg",
+        "mountain.svg",
+        "pen.svg",
+        "pin.svg",
+        "plan-list.svg",
+        "planets.svg",
+        "plus.svg",
+        "poi-asteroid.svg",
+        "poi-comet.svg",
+        "poi-iss.svg",
+        "poi-satellite.svg",
+        "poi-supernova.svg",
+        "privacy.svg",
+        "rotate-m1.svg",
+        "rotate-m15.svg",
+        "rotate-m45.svg",
+        "rotate-m5.svg",
+        "rotate-p1.svg",
+        "rotate-p15.svg",
+        "rotate-p45.svg",
+        "rotate-p5.svg",
+        "rotate-reset.svg",
+        "rotation-reset.svg",
+        "sky-trajectory.svg",
+        "sun.svg",
+        "supernova-pin.svg",
+        "target.svg",
+        "telescope.svg",
+        "trajectory.svg",
+        "trash.svg"
+      ],
+      "files": {
+        "about.svg": {
+          "name": "about.svg",
+          "blob": "de63e61feeb751e17b09f445d435f6a0",
+          "size": 245,
+          "type": "image/svg+xml"
+        },
+        "add-frame.svg": {
+          "name": "add-frame.svg",
+          "blob": "dcbcbea9ef5e276bf39f4ba669ac0acc",
+          "size": 273,
+          "type": "image/svg+xml"
+        },
+        "add-mosaic.svg": {
+          "name": "add-mosaic.svg",
+          "blob": "fbd4233526000e1797d22090bf0c267b",
+          "size": 385,
+          "type": "image/svg+xml"
+        },
+        "add-photo.svg": {
+          "name": "add-photo.svg",
+          "blob": "b4645901f6a56f8e6e38876ff72d61da",
+          "size": 423,
+          "type": "image/svg+xml"
+        },
+        "anchor.svg": {
+          "name": "anchor.svg",
+          "blob": "5c67c8960ad4ec7abe7a454a0cca455c",
+          "size": 273,
+          "type": "image/svg+xml"
+        },
+        "azimuth-grid.svg": {
+          "name": "azimuth-grid.svg",
+          "blob": "f6a5b9e8202c26de30b5cb8cb8293f1c",
+          "size": 279,
+          "type": "image/svg+xml"
+        },
+        "calendar.svg": {
+          "name": "calendar.svg",
+          "blob": "9fa85732c6c4216728b12afd9876643e",
+          "size": 302,
+          "type": "image/svg+xml"
+        },
+        "check.svg": {
+          "name": "check.svg",
+          "blob": "9370019e9bdc72adb56e7cfefdca3d97",
+          "size": 207,
+          "type": "image/svg+xml"
+        },
+        "close-x.svg": {
+          "name": "close-x.svg",
+          "blob": "02fdba835c663b5a988189efb4aa3852",
+          "size": 222,
+          "type": "image/svg+xml"
+        },
+        "credits.svg": {
+          "name": "credits.svg",
+          "blob": "416d7b9fd9a820759cfc7c30d45076d9",
+          "size": 340,
+          "type": "image/svg+xml"
+        },
+        "dso-galaxy.svg": {
+          "name": "dso-galaxy.svg",
+          "blob": "33b29acccd982bcd03dc362ab77415fe",
+          "size": 495,
+          "type": "image/svg+xml"
+        },
+        "export.svg": {
+          "name": "export.svg",
+          "blob": "bb0e337a545c7cfb5a372badf6528ead",
+          "size": 330,
+          "type": "image/svg+xml"
+        },
+        "eye-off.svg": {
+          "name": "eye-off.svg",
+          "blob": "f0ac4b3f3c378db65039a587940fae1b",
+          "size": 568,
+          "type": "image/svg+xml"
+        },
+        "eye.svg": {
+          "name": "eye.svg",
+          "blob": "3bf67ef3a12ef8c75765fdc21606d8f4",
+          "size": 324,
+          "type": "image/svg+xml"
+        },
+        "image.svg": {
+          "name": "image.svg",
+          "blob": "868412d725f91938b0b37648b86bede1",
+          "size": 317,
+          "type": "image/svg+xml"
+        },
+        "list-plus.svg": {
+          "name": "list-plus.svg",
+          "blob": "68010ca110d484429316570bbef33ac6",
+          "size": 322,
+          "type": "image/svg+xml"
+        },
+        "local-sky.svg": {
+          "name": "local-sky.svg",
+          "blob": "dcf18baebf2027be67217ab4e898f96b",
+          "size": 310,
+          "type": "image/svg+xml"
+        },
+        "map-pin.svg": {
+          "name": "map-pin.svg",
+          "blob": "ed80d3085a44676e2d6388a5d08c5d1a",
+          "size": 271,
+          "type": "image/svg+xml"
+        },
+        "moon.svg": {
+          "name": "moon.svg",
+          "blob": "c12b4414d13f835c19b8e38641f4609c",
+          "size": 240,
+          "type": "image/svg+xml"
+        },
+        "mountain.svg": {
+          "name": "mountain.svg",
+          "blob": "de37a195d59234f05da253ed20cf53df",
+          "size": 228,
+          "type": "image/svg+xml"
+        },
+        "pen.svg": {
+          "name": "pen.svg",
+          "blob": "5e8f2bcbfb4350b89b0bfea06d02353b",
+          "size": 353,
+          "type": "image/svg+xml"
+        },
+        "pin.svg": {
+          "name": "pin.svg",
+          "blob": "af60926a66aad1bd6fbec0156c26c0d7",
+          "size": 159,
+          "type": "image/svg+xml"
+        },
+        "plan-list.svg": {
+          "name": "plan-list.svg",
+          "blob": "9ff13317c25982eef8a75265c242e9d2",
+          "size": 405,
+          "type": "image/svg+xml"
+        },
+        "planets.svg": {
+          "name": "planets.svg",
+          "blob": "0f501b42a184f3e4501e910af83ee8fa",
+          "size": 353,
+          "type": "image/svg+xml"
+        },
+        "plus.svg": {
+          "name": "plus.svg",
+          "blob": "cfc6e14e2bee1076f6ba1facb892bcb9",
+          "size": 222,
+          "type": "image/svg+xml"
+        },
+        "poi-asteroid.svg": {
+          "name": "poi-asteroid.svg",
+          "blob": "2c9889aa3256be58d68f919b6232fe55",
+          "size": 437,
+          "type": "image/svg+xml"
+        },
+        "poi-comet.svg": {
+          "name": "poi-comet.svg",
+          "blob": "7355984e279205659ba71e9087ca18dd",
+          "size": 337,
+          "type": "image/svg+xml"
+        },
+        "poi-iss.svg": {
+          "name": "poi-iss.svg",
+          "blob": "7212b1f1a5a59e9b7bb866a121841710",
+          "size": 584,
+          "type": "image/svg+xml"
+        },
+        "poi-satellite.svg": {
+          "name": "poi-satellite.svg",
+          "blob": "af5b6718f8a89438af571b674af2da1a",
+          "size": 1052,
+          "type": "image/svg+xml"
+        },
+        "poi-supernova.svg": {
+          "name": "poi-supernova.svg",
+          "blob": "529c7b2075fc738237adad4f1e976558",
+          "size": 405,
+          "type": "image/svg+xml"
+        },
+        "privacy.svg": {
+          "name": "privacy.svg",
+          "blob": "cde54f5dfe7565b7e1cf005de6d4d821",
+          "size": 264,
+          "type": "image/svg+xml"
+        },
+        "rotate-m1.svg": {
+          "name": "rotate-m1.svg",
+          "blob": "bd38b4837df71a91d6412713357259a0",
+          "size": 466,
+          "type": "image/svg+xml"
+        },
+        "rotate-m15.svg": {
+          "name": "rotate-m15.svg",
+          "blob": "493dd8e6396d28b37371a87db0ff7a55",
+          "size": 467,
+          "type": "image/svg+xml"
+        },
+        "rotate-m45.svg": {
+          "name": "rotate-m45.svg",
+          "blob": "b9bbcba562fa0b57c91becf0c2479338",
+          "size": 467,
+          "type": "image/svg+xml"
+        },
+        "rotate-m5.svg": {
+          "name": "rotate-m5.svg",
+          "blob": "a7311a0e646065c65349833ce2ca7ae0",
+          "size": 460,
+          "type": "image/svg+xml"
+        },
+        "rotate-p1.svg": {
+          "name": "rotate-p1.svg",
+          "blob": "05e543588504d939a9c567d7d6527652",
+          "size": 415,
+          "type": "image/svg+xml"
+        },
+        "rotate-p15.svg": {
+          "name": "rotate-p15.svg",
+          "blob": "bcdd67f052b3ead7402bc111690c9f6a",
+          "size": 416,
+          "type": "image/svg+xml"
+        },
+        "rotate-p45.svg": {
+          "name": "rotate-p45.svg",
+          "blob": "e938d35d5ca4f6b4197955c4bb2ccdcf",
+          "size": 416,
+          "type": "image/svg+xml"
+        },
+        "rotate-p5.svg": {
+          "name": "rotate-p5.svg",
+          "blob": "a882d7c55dd3a23b1766ce7462a54da4",
+          "size": 409,
+          "type": "image/svg+xml"
+        },
+        "rotate-reset.svg": {
+          "name": "rotate-reset.svg",
+          "blob": "084e12add2166e7de0c9b4aed449caa7",
+          "size": 322,
+          "type": "image/svg+xml"
+        },
+        "rotation-reset.svg": {
+          "name": "rotation-reset.svg",
+          "blob": "dcf7b8ec851f3db28027a1b2c353ae2e",
+          "size": 421,
+          "type": "image/svg+xml"
+        },
+        "sky-trajectory.svg": {
+          "name": "sky-trajectory.svg",
+          "blob": "2012bf8fc6cc240f6a015f358e6fb4d9",
+          "size": 344,
+          "type": "image/svg+xml"
+        },
+        "sun.svg": {
+          "name": "sun.svg",
+          "blob": "284713af8301b0dbe8b573b685abc97e",
+          "size": 345,
+          "type": "image/svg+xml"
+        },
+        "supernova-pin.svg": {
+          "name": "supernova-pin.svg",
+          "blob": "fe37a0a922e352e14c35cae011b64cc6",
+          "size": 334,
+          "type": "image/svg+xml"
+        },
+        "target.svg": {
+          "name": "target.svg",
+          "blob": "bb7e22f1822dbe1574b03a2b5f839492",
+          "size": 390,
+          "type": "image/svg+xml"
+        },
+        "telescope.svg": {
+          "name": "telescope.svg",
+          "blob": "533eb1cfaaa35245c67ac48f3051b8ec",
+          "size": 989,
+          "type": "image/svg+xml"
+        },
+        "trajectory.svg": {
+          "name": "trajectory.svg",
+          "blob": "1245d85fc448e348e05112ef320eb718",
+          "size": 256,
+          "type": "image/svg+xml"
+        },
+        "trash.svg": {
+          "name": "trash.svg",
+          "blob": "f05a9ac3322ecffa034175994ecf0ab4",
+          "size": 290,
+          "type": "image/svg+xml"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Guillaume Weybrecht",
+    "at": "2026-10-05T18:05:00Z",
+    "via": "Claude Code",
+    "note": "Safe areas for the system bars; empty and error states"
+  }
+}

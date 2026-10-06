@@ -1,0 +1,117 @@
+<!-- @dsCard group="Mobile — proposed" height=300 subtitle="Proposed: 56px floating action button above the tab bar" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>FAB — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+        display: flex;
+        justify-content: center;
+      }
+      .col {
+        width: 412px;
+        max-width: 100%;
+        display: grid;
+        gap: var(--space-7);
+      }
+      .cap {
+        margin-bottom: var(--space-2);
+        color: var(--text-secondary);
+      }
+      .screen {
+        position: relative;
+        height: calc(var(--space-21) * 2);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        border: 1px solid var(--border-panel);
+        background: var(--bg-app);
+        overflow: hidden;
+      }
+      .tabs {
+        height: var(--mobile-tabbar-height);
+        background: var(--bg-panel);
+        border-top: 1px solid var(--border-panel);
+      }
+      .states {
+        display: flex;
+        gap: var(--space-9);
+        align-items: center;
+      }
+      /* static rendition of the pressed state */
+      .mob-fab.is-pressed {
+        background: var(--accent-bg-hover);
+        border-color: var(--border-focus);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="col">
+      <div>
+        <div class="cap m-caption">
+          Position: mobile-gutter from the right, mobile-gutter above the tab
+          bar
+        </div>
+        <div class="screen">
+          <button
+            class="mob-fab mob-fab--fixed"
+            aria-label="Ajouter des photos"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+          <div class="tabs"></div>
+        </div>
+      </div>
+      <div>
+        <div class="cap m-caption">Rest and pressed</div>
+        <div class="states">
+          <button class="mob-fab" aria-label="Ajouter des photos">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+          <button class="mob-fab is-pressed" aria-label="Ajouter des photos">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

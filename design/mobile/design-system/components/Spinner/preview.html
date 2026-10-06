@@ -1,0 +1,77 @@
+<!-- @dsCard group="Desktop — from the code" height=250 subtitle="loading-spinner, targets-spinner, auto-solve-spinner" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spinner — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-11);
+        align-items: flex-start;
+      }
+      .cell {
+        display: grid;
+        justify-items: center;
+        gap: var(--space-4);
+        width: calc(var(--panel-width) / 2);
+      }
+      .cap {
+        color: var(--text-secondary);
+        font-size: var(--font-size-small);
+        text-align: center;
+      }
+      .cell .targets-spinner {
+        margin: 0;
+      }
+      .wide {
+        width: var(--panel-width);
+      }
+      .wide .modal-loading-placeholder {
+        padding: var(--space-8);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="cell">
+        <div
+          class="loading-spinner"
+          role="status"
+          aria-label="Chargement…"
+        ></div>
+        <div class="cap">loading-spinner<br />36px, app start</div>
+      </div>
+      <div class="cell">
+        <div
+          class="targets-spinner"
+          role="status"
+          aria-label="Chargement…"
+        ></div>
+        <div class="cap">targets-spinner<br />36px, Targets view</div>
+      </div>
+      <div class="cell">
+        <div class="cap">
+          <span class="auto-solve-spinner"></span>Résolution ASTAP en cours…
+        </div>
+        <div class="cap">
+          auto-solve-spinner<br />12px, inline with status text
+        </div>
+      </div>
+      <div class="wide">
+        <div class="modal-loading-placeholder">
+          <span class="auto-solve-spinner"></span>Chargement…
+        </div>
+        <div class="cap">always inside .modal-loading-placeholder</div>
+      </div>
+    </div>
+  </body>
+</html>

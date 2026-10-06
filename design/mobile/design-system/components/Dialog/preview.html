@@ -1,0 +1,83 @@
+<!-- @dsCard group="Mobile — proposed" height=700 subtitle="Proposed: centred delete confirmation, cancel and danger confirm side by side" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dialog — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7) 0;
+        display: flex;
+        justify-content: center;
+      }
+      .col {
+        width: 412px;
+        max-width: 100%;
+        display: grid;
+        gap: var(--space-7);
+      }
+      .cap {
+        padding: 0 var(--space-7);
+        margin-bottom: var(--space-2);
+        color: var(--text-secondary);
+      }
+      /* a 412 x 560 stand-in for the screen behind the dialog */
+      .screen {
+        position: relative;
+        height: 560px;
+        overflow: hidden;
+        border: 1px solid var(--border-panel);
+        background: var(--bg-app);
+      }
+      .behind {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: var(--space-6);
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="col">
+      <div>
+        <div class="cap m-caption">
+          Delete a plan: a card centred over the scrim, cancel then the red
+          confirm, equal buttons
+        </div>
+        <div class="screen">
+          <div class="behind m-secondary">Détail du plan</div>
+          <div class="mob-scrim"></div>
+          <div
+            class="mob-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="del-title"
+            aria-describedby="del-msg"
+          >
+            <h2 id="del-title" class="mob-dialog-title m-title">
+              Supprimer le plan
+            </h2>
+            <p id="del-msg" class="mob-dialog-message m-body">
+              Supprimer le plan « Nuit du 2026-10-03 » ?
+            </p>
+            <div class="mob-dialog-buttons">
+              <button class="mob-btn mob-btn--lg m-body">Annuler</button>
+              <button
+                class="mob-btn mob-btn--danger-fill mob-btn--lg m-body-strong"
+              >
+                Supprimer le plan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,121 @@
+<!-- @dsCard group="Desktop — from the code" height=340 subtitle="target-card and dso-info-panel" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Card — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+      }
+      .cols {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-9);
+        align-items: flex-start;
+      }
+      .col {
+        width: calc(var(--panel-width) + var(--space-9));
+      }
+      .cap {
+        margin-bottom: var(--space-3);
+        color: var(--text-secondary);
+        font-size: var(--font-size-small);
+      }
+      .meta {
+        display: flex;
+        gap: var(--space-4);
+        align-items: baseline;
+        margin-top: var(--space-3);
+        font-size: var(--font-size-base);
+        color: var(--text-secondary);
+      }
+      .panel {
+        width: var(--panel-width);
+        padding: var(--space-8);
+        background: var(--bg-panel);
+        border: 1px solid var(--border-panel);
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4);
+        margin-top: var(--space-3);
+        color: var(--text-secondary);
+        font-size: var(--font-size-small);
+      }
+      .row b {
+        color: var(--text-primary);
+        font-weight: 400;
+      }
+      /* static rendition of :hover */
+      .target-card.is-hover {
+        border-color: var(--border-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cols">
+      <div class="col">
+        <div class="cap">target-card, rest</div>
+        <div class="target-card">
+          <div class="target-card-header">
+            <div class="target-card-title-row">
+              <div class="target-card-title">
+                <span>Galaxie d'Andromède</span
+                ><span class="target-card-catalog-id"> M31</span>
+              </div>
+              <div class="target-card-rating">★★★★★</div>
+            </div>
+            <div class="target-card-chips">
+              <div class="target-card-type">Galaxie spirale</div>
+              <div class="target-card-const">AND</div>
+            </div>
+          </div>
+          <div class="meta">
+            <span>Difficulté</span
+            ><span class="target-card-difficulty">◆◆◇◇◇</span>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="cap">target-card, hover</div>
+        <div class="target-card is-hover">
+          <div class="target-card-header">
+            <div class="target-card-title-row">
+              <div class="target-card-title">
+                <span>Nébuleuse d'Orion</span
+                ><span class="target-card-catalog-id"> M42</span>
+              </div>
+              <div class="target-card-rating">★★★★☆</div>
+            </div>
+            <div class="target-card-chips">
+              <div class="target-card-type">Nébuleuse en émission</div>
+              <div class="target-card-const">ORI</div>
+            </div>
+          </div>
+          <div class="meta">
+            <span>Difficulté</span
+            ><span class="target-card-difficulty">◆◇◇◇◇</span>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="cap">dso-info-panel, in the side panel</div>
+        <div class="panel">
+          <div class="dso-info-panel">
+            <div class="dso-info-name">Galaxie d'Andromède</div>
+            <div class="row"><span>ID</span><b>M31</b></div>
+            <div class="row"><span>Type</span><b>Galaxie spirale</b></div>
+            <div class="row"><span>Constellation</span><b>Andromède</b></div>
+            <div class="row"><span>Magnitude</span><b>3.4</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

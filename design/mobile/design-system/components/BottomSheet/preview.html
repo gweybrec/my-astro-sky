@@ -1,0 +1,212 @@
+<!-- @dsCard group="Mobile — proposed" height=2060 subtitle="Proposed: handle, peek, half and full states, 16px radius" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>BottomSheet — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7) 0;
+        display: flex;
+        justify-content: center;
+      }
+      .col {
+        width: 412px;
+        max-width: 100%;
+        display: grid;
+        gap: var(--space-7);
+      }
+      .cap {
+        padding: 0 var(--space-7);
+        margin-bottom: var(--space-2);
+        color: var(--text-secondary);
+      }
+      /* a stand-in for the screen behind the sheet */
+      .screen {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        border: 1px solid var(--border-panel);
+        background: var(--bg-app);
+        overflow: hidden;
+      }
+      /* each stand-in is a 412 x 640 phone screen (the narrowest width the layer targets, a common height) */
+      .screen {
+        height: 640px;
+      }
+      .behind {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: var(--space-6);
+        color: var(--text-secondary);
+      }
+      .mob-sheet {
+        position: relative;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="col">
+      <div>
+        <div class="cap m-caption">Peek: mobile-sheet-peek (96px) visible, handle and one line</div>
+        <div class="screen">
+          <div class="behind m-secondary">Carte du Ciel</div>
+          <section
+            class="mob-sheet mob-sheet--peek"
+            aria-label="Cibles pour cette nuit"
+          >
+            <button class="mob-sheet-grab" aria-label="Agrandir">
+              <span class="mob-sheet-handle"></span>
+            </button>
+            <div class="mob-sheet-header">
+              <h2 class="m-title">Cibles pour cette nuit</h2>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div>
+        <div class="cap m-caption">Half: 50 % of the screen, the map stays visible</div>
+        <div class="screen">
+          <div class="behind m-secondary">Carte du Ciel</div>
+          <section
+            class="mob-sheet mob-sheet--half"
+            aria-label="Cibles pour cette nuit"
+          >
+            <button class="mob-sheet-grab" aria-label="Agrandir ou réduire">
+              <span class="mob-sheet-handle"></span>
+            </button>
+            <div class="mob-sheet-header">
+              <h2 class="m-title">Cibles pour cette nuit</h2>
+            </div>
+              <div class="mob-sheet-body">
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Galaxie d'Andromède</span
+                    ><span class="mob-row-sub m-secondary">M31 · Galaxie spirale · AND</span></span
+                  >
+                  <span class="mob-row-trail m-mono">58°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Nébuleuse d'Orion</span
+                    ><span class="mob-row-sub m-secondary">M42 · Nébuleuse en émission · ORI</span></span
+                  >
+                  <span class="mob-row-trail m-mono">41°</span>
+                </button>
+              </div>
+          </section>
+        </div>
+      </div>
+      <div>
+        <div class="cap m-caption">Full: 100 % of the screen, the grab area collapses it; the list scrolls inside the sheet</div>
+        <div class="screen">
+          <section
+            class="mob-sheet mob-sheet--full"
+            aria-label="Cibles pour cette nuit"
+          >
+            <button class="mob-sheet-grab" aria-label="Réduire">
+              <span class="mob-sheet-handle"></span>
+            </button>
+            <div class="mob-sheet-header">
+              <h2 class="m-title">Cibles pour cette nuit</h2>
+            </div>
+              <div class="mob-sheet-body">
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Galaxie d'Andromède</span
+                    ><span class="mob-row-sub m-secondary">M31 · Galaxie spirale · AND</span></span
+                  >
+                  <span class="mob-row-trail m-mono">58°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Nébuleuse d'Orion</span
+                    ><span class="mob-row-sub m-secondary">M42 · Nébuleuse en émission · ORI</span></span
+                  >
+                  <span class="mob-row-trail m-mono">41°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Nébuleuse de la Lyre</span
+                    ><span class="mob-row-sub m-secondary">M57 · Nébuleuse planétaire · LYR</span></span
+                  >
+                  <span class="mob-row-trail m-mono">72°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Galaxie du Triangle</span
+                    ><span class="mob-row-sub m-secondary">M33 · Galaxie spirale · TRI</span></span
+                  >
+                  <span class="mob-row-trail m-mono">49°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Nébuleuse de la Lagune</span
+                    ><span class="mob-row-sub m-secondary">M8 · Nébuleuse en émission · SGR</span></span
+                  >
+                  <span class="mob-row-trail m-mono">35°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Nébuleuse de l'Aigle</span
+                    ><span class="mob-row-sub m-secondary">M16 · Nébuleuse en émission · SER</span></span
+                  >
+                  <span class="mob-row-trail m-mono">38°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Grand Amas d'Hercule</span
+                    ><span class="mob-row-sub m-secondary">M13 · Amas globulaire · HER</span></span
+                  >
+                  <span class="mob-row-trail m-mono">66°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Nébuleuse de l'Haltère</span
+                    ><span class="mob-row-sub m-secondary">M27 · Nébuleuse planétaire · VUL</span></span
+                  >
+                  <span class="mob-row-trail m-mono">61°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Galaxie du Tourbillon</span
+                    ><span class="mob-row-sub m-secondary">M51 · Galaxie spirale · CVN</span></span
+                  >
+                  <span class="mob-row-trail m-mono">54°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Petite Nébuleuse de l'Haltère</span
+                    ><span class="mob-row-sub m-secondary">M76 · Nébuleuse planétaire · PER</span></span
+                  >
+                  <span class="mob-row-trail m-mono">47°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Pléiades</span
+                    ><span class="mob-row-sub m-secondary">M45 · Amas ouvert · TAU</span></span
+                  >
+                  <span class="mob-row-trail m-mono">44°</span>
+                </button>
+                <button class="mob-row">
+                  <span class="mob-row-body"
+                    ><span class="mob-row-title m-body">Nébuleuse de la Rosette</span
+                    ><span class="mob-row-sub m-secondary">NGC2237 · Nébuleuse en émission · MON</span></span
+                  >
+                  <span class="mob-row-trail m-mono">29°</span>
+                </button>
+              </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

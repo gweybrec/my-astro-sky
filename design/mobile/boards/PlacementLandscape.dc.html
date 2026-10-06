@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Placer la photo, paysage</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="../ds/myastrosky/tokens.css">
+<link rel="stylesheet" href="../ds/myastrosky/components/bundle.css">
+<link rel="stylesheet" href="../tools/landscape.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div id="root" style="position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;" class="land land--mode"><div class="mob-statusbar" aria-hidden="true"><span class="m-mono">22:15</span><span class="mob-statusbar-icons"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 14h2V10H1zM5 14h2V7H5zM9 14h2V4H9zM13 14h2V1h-2z"></path></svg><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 9a6 6 0 0 1 8 0"></path><circle cx="8" cy="12" r="1" fill="currentColor"></circle></svg><svg viewBox="0 0 20 12"><rect x=".75" y=".75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="2.5" y="2.5" width="10" height="7" rx="1" fill="currentColor"></rect><rect x="17.5" y="4" width="2" height="4" rx="1" fill="currentColor"></rect></svg></span></div><div class="mob-gesturebar" aria-hidden="true"></div><header class="mob-topbar" style="flex:none"><h1 class="mob-topbar-title m-title">Placer la photo</h1></header><main class="mob-map"><div class="mob-map-caption m-secondary" style="position:absolute;left:0;right:0;bottom:var(--mobile-gutter)">Carte du ciel</div><div class="mob-map-hint m-secondary">Un doigt : déplacer · Deux doigts : agrandir et tourner</div><div class="land-layer" style="position:absolute;left:0;top:0;width:412px;height:523px;transform:translate(52px, 6px) scale(1.000);transform-origin:0 0"><div class="mob-map-photo m-secondary" style="left:calc(50% - 110px);top:150px;width:220px;height:150px;transform:rotate(12deg)">M31_2025-09-14_stack.jpg</div></div></main><section class="mob-panel mob-scroll" aria-label="Réglages de placement"><div class="mob-slider-row"><label class="mob-slider-label m-body" for="rot">Rotation</label><input id="rot" class="mob-slider" type="range" min="-180" max="180" value="12"><span class="mob-slider-value m-mono">12°</span></div><div class="mob-slider-row"><label class="mob-slider-label m-body" for="size">Taille</label><input id="size" class="mob-slider" type="range" min="10" max="400" value="100"><span class="mob-slider-value m-mono">100 %</span></div><div class="mob-slider-row"><label class="mob-slider-label m-body" for="opa">Opacité</label><input id="opa" class="mob-slider" type="range" min="0" max="1" value="0.85" step="0.05"><span class="mob-slider-value m-mono">0.85</span></div><label class="mob-row"><span class="mob-row-body"><span class="mob-row-title m-body">Miroir</span></span><input class="mob-switch" type="checkbox" role="switch"></label><div class="mob-sheet-footer"><button class="mob-btn mob-btn--lg m-body">Annuler</button><button class="mob-btn mob-btn--confirm mob-btn--lg m-body-strong">Valider</button></div></section></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":915,"height":412}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

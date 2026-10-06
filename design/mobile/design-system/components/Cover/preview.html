@@ -1,0 +1,95 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MyAstroSky</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; height:100%; }
+  body { background:var(--bg-app); color:var(--text-bright); font-family:var(--font-sans); overflow:hidden; }
+  .cover { position:relative; height:288px; overflow:hidden; }
+  /* the composition: a 480-wide box on the right half of the 960 layout, clear of the name */
+  .art { position:absolute; top:0; left:480px; width:480px; height:288px; overflow:hidden; }
+  .art svg { display:block; width:528px; height:288px; }
+  .accent { fill:var(--accent-color); }
+  .tint { fill:var(--accent-fill-xl); }
+  .ink { fill:var(--text-bright); }
+  .star { fill:var(--target-rating-text); }
+  .blk { rx:var(--radius-xl); }
+  .plus { fill:var(--accent-color); }
+  .plus.cut { fill:var(--bg-app); }
+  /* name and tagline in flow, pinned by the block's bottom edge */
+  .words { position:absolute; left:var(--space-9); right:var(--space-9); bottom:var(--space-9); max-width:440px; }
+  .name { margin:0; font-family:var(--font-display); font-size:72px; line-height:.95; font-weight:500; letter-spacing:-.01em; color:var(--text-bright); }
+  .tag { margin:var(--space-4) 0 0 0; font-size:14px; line-height:20px; color:var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 528 288" width="528" height="288">
+<!--
+  blocks      accent-color 136×236 bled off the top, first in the box (the steel/amber hue the app is known by) · accent-fill-xl 184×184 (the tint, relief) · text-bright 236×88 bled off the right (the pale "star" field) · target-rating-text 40×40 once (the gold of a star rating, signal only) — ≈ 28% of 960×288
+  arrangement blocks snapped to a 10×6 lattice of space-14 cells, a tall slab at the left, the tint stepped down beside it, the pale field high at the right, space-2 inset from every lattice line
+  pattern     plus grid, from "precise, technical, mono": a star-chart registration mark at every free lattice intersection, 1 mark per 48px, 45 in all; marks that land on a block are cut out in the ground colour
+  scales      pitch space-14 (48px); inset space-2; mark arm space-4, thickness space-px; corners radius-xl on every block
+-->
+<rect class="accent blk" x="52" y="-48" width="136" height="236" rx="10"/>
+<rect class="tint blk" x="196" y="100" width="184" height="184" rx="10"/>
+<rect class="ink blk" x="292" y="4" width="236" height="88" rx="10"/>
+<rect class="star blk" x="148" y="196" width="40" height="40" rx="10"/>
+<rect class="plus" x="44" y="47.5" width="8" height="1"/><rect class="plus" x="47.5" y="44" width="1" height="8"/>
+<rect class="plus" x="44" y="95.5" width="8" height="1"/><rect class="plus" x="47.5" y="92" width="1" height="8"/>
+<rect class="plus" x="44" y="143.5" width="8" height="1"/><rect class="plus" x="47.5" y="140" width="1" height="8"/>
+<rect class="plus" x="44" y="191.5" width="8" height="1"/><rect class="plus" x="47.5" y="188" width="1" height="8"/>
+<rect class="plus" x="44" y="239.5" width="8" height="1"/><rect class="plus" x="47.5" y="236" width="1" height="8"/>
+<rect class="plus cut" x="92" y="47.5" width="8" height="1"/><rect class="plus cut" x="95.5" y="44" width="1" height="8"/>
+<rect class="plus cut" x="92" y="95.5" width="8" height="1"/><rect class="plus cut" x="95.5" y="92" width="1" height="8"/>
+<rect class="plus cut" x="92" y="143.5" width="8" height="1"/><rect class="plus cut" x="95.5" y="140" width="1" height="8"/>
+<rect class="plus" x="92" y="191.5" width="8" height="1"/><rect class="plus" x="95.5" y="188" width="1" height="8"/>
+<rect class="plus" x="92" y="239.5" width="8" height="1"/><rect class="plus" x="95.5" y="236" width="1" height="8"/>
+<rect class="plus cut" x="140" y="47.5" width="8" height="1"/><rect class="plus cut" x="143.5" y="44" width="1" height="8"/>
+<rect class="plus cut" x="140" y="95.5" width="8" height="1"/><rect class="plus cut" x="143.5" y="92" width="1" height="8"/>
+<rect class="plus cut" x="140" y="143.5" width="8" height="1"/><rect class="plus cut" x="143.5" y="140" width="1" height="8"/>
+<rect class="plus" x="140" y="191.5" width="8" height="1"/><rect class="plus" x="143.5" y="188" width="1" height="8"/>
+<rect class="plus" x="140" y="239.5" width="8" height="1"/><rect class="plus" x="143.5" y="236" width="1" height="8"/>
+<rect class="plus" x="188" y="47.5" width="8" height="1"/><rect class="plus" x="191.5" y="44" width="1" height="8"/>
+<rect class="plus" x="188" y="95.5" width="8" height="1"/><rect class="plus" x="191.5" y="92" width="1" height="8"/>
+<rect class="plus" x="188" y="143.5" width="8" height="1"/><rect class="plus" x="191.5" y="140" width="1" height="8"/>
+<rect class="plus" x="188" y="191.5" width="8" height="1"/><rect class="plus" x="191.5" y="188" width="1" height="8"/>
+<rect class="plus" x="188" y="239.5" width="8" height="1"/><rect class="plus" x="191.5" y="236" width="1" height="8"/>
+<rect class="plus" x="236" y="47.5" width="8" height="1"/><rect class="plus" x="239.5" y="44" width="1" height="8"/>
+<rect class="plus" x="236" y="95.5" width="8" height="1"/><rect class="plus" x="239.5" y="92" width="1" height="8"/>
+<rect class="plus cut" x="236" y="143.5" width="8" height="1"/><rect class="plus cut" x="239.5" y="140" width="1" height="8"/>
+<rect class="plus cut" x="236" y="191.5" width="8" height="1"/><rect class="plus cut" x="239.5" y="188" width="1" height="8"/>
+<rect class="plus cut" x="236" y="239.5" width="8" height="1"/><rect class="plus cut" x="239.5" y="236" width="1" height="8"/>
+<rect class="plus" x="284" y="47.5" width="8" height="1"/><rect class="plus" x="287.5" y="44" width="1" height="8"/>
+<rect class="plus" x="284" y="95.5" width="8" height="1"/><rect class="plus" x="287.5" y="92" width="1" height="8"/>
+<rect class="plus cut" x="284" y="143.5" width="8" height="1"/><rect class="plus cut" x="287.5" y="140" width="1" height="8"/>
+<rect class="plus cut" x="284" y="191.5" width="8" height="1"/><rect class="plus cut" x="287.5" y="188" width="1" height="8"/>
+<rect class="plus cut" x="284" y="239.5" width="8" height="1"/><rect class="plus cut" x="287.5" y="236" width="1" height="8"/>
+<rect class="plus cut" x="332" y="47.5" width="8" height="1"/><rect class="plus cut" x="335.5" y="44" width="1" height="8"/>
+<rect class="plus" x="332" y="95.5" width="8" height="1"/><rect class="plus" x="335.5" y="92" width="1" height="8"/>
+<rect class="plus cut" x="332" y="143.5" width="8" height="1"/><rect class="plus cut" x="335.5" y="140" width="1" height="8"/>
+<rect class="plus cut" x="332" y="191.5" width="8" height="1"/><rect class="plus cut" x="335.5" y="188" width="1" height="8"/>
+<rect class="plus cut" x="332" y="239.5" width="8" height="1"/><rect class="plus cut" x="335.5" y="236" width="1" height="8"/>
+<rect class="plus cut" x="380" y="47.5" width="8" height="1"/><rect class="plus cut" x="383.5" y="44" width="1" height="8"/>
+<rect class="plus" x="380" y="95.5" width="8" height="1"/><rect class="plus" x="383.5" y="92" width="1" height="8"/>
+<rect class="plus" x="380" y="143.5" width="8" height="1"/><rect class="plus" x="383.5" y="140" width="1" height="8"/>
+<rect class="plus" x="380" y="191.5" width="8" height="1"/><rect class="plus" x="383.5" y="188" width="1" height="8"/>
+<rect class="plus" x="380" y="239.5" width="8" height="1"/><rect class="plus" x="383.5" y="236" width="1" height="8"/>
+<rect class="plus cut" x="428" y="47.5" width="8" height="1"/><rect class="plus cut" x="431.5" y="44" width="1" height="8"/>
+<rect class="plus" x="428" y="95.5" width="8" height="1"/><rect class="plus" x="431.5" y="92" width="1" height="8"/>
+<rect class="plus" x="428" y="143.5" width="8" height="1"/><rect class="plus" x="431.5" y="140" width="1" height="8"/>
+<rect class="plus" x="428" y="191.5" width="8" height="1"/><rect class="plus" x="431.5" y="188" width="1" height="8"/>
+<rect class="plus" x="428" y="239.5" width="8" height="1"/><rect class="plus" x="431.5" y="236" width="1" height="8"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">MyAstroSky</h1>
+<p class="tag">Astrophotos overlaid on an interactive sky map.</p>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,274 @@
+/* Landscape proposal, Android 915 x 412. Applies on top of the design system's mobile layer (.mob-*).
+   Every rule is scoped to a root with .land, so the portrait artboards are untouched. */
+
+.land {
+  --rail-w: 80px;
+  --land-column: 680px;
+  --land-sheet-w: 440px;
+  --land-side-w: 400px;
+}
+
+/* ── Navigation rail: the tab bar moves to the left edge (5 tabs fit the 412px height; the content keeps its height) */
+.land--rail {
+  padding-left: var(--rail-w);
+}
+.land--rail > .mob-tabbar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--rail-w);
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  padding-bottom: 0;
+  padding-left: env(safe-area-inset-left);
+  box-shadow: inset -1px 0 0 var(--border-panel);
+  z-index: var(--z-base);
+}
+.land--rail > .mob-tabbar .mob-tab {
+  flex: none;
+  min-height: 64px;
+}
+
+/* ── Floating action button: no tab bar under it any more */
+.land .mob-fab--fixed {
+  bottom: var(--mobile-gutter);
+}
+
+/* ── Bottom sheets: capped width. A sheet over a scrim (it must be answered) is centred; a sheet over the map
+   (no scrim) sits at the left, next to the rail, so the sky to its right stays visible. Both may grow to nearly
+   the full height, since they no longer cover the full width. */
+.land .mob-sheet {
+  width: var(--land-sheet-w);
+  max-width: calc(100% - 2 * var(--mobile-gutter));
+  border-width: 1px 1px 0;
+}
+.land .mob-sheet--auto,
+.land .mob-sheet--auto-lg {
+  max-height: calc(100% - var(--space-7));
+}
+/* Over the map the sheet stops under the search row, which stays usable */
+.land .mob-map > .mob-sheet {
+  max-height: calc(100% - var(--mobile-touch-min) - 2 * var(--mobile-gutter));
+}
+/* The map's placeholder label moves to the visible part of the sky, right of the sheet, along the bottom edge */
+.land .mob-map:has(> .mob-sheet) > .mob-map-caption {
+  left: calc(var(--land-sheet-w) + 2 * var(--mobile-gutter)) !important;
+  justify-content: flex-end;
+  padding-bottom: var(--mobile-gutter);
+}
+
+/* ── Dialog: a card of fixed width, centred */
+.land .mob-dialog {
+  width: 400px;
+  margin-inline: auto;
+}
+
+/* ── Sky map: the search keeps a phone width at the left; the map controls stay at the right edge */
+.land .mob-map-top {
+  justify-content: space-between;
+}
+.land .mob-map-top .mob-search {
+  flex: 0 1 400px;
+}
+/* The time bar becomes a floating card at the bottom right */
+.land .mob-timebar {
+  left: auto;
+  right: var(--mobile-gutter);
+  bottom: var(--mobile-gutter);
+  width: 480px;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+  box-shadow: 0 var(--space-2) var(--space-8) var(--shadow-lg);
+}
+/* The layers ribbon: 8 buttons do not fit one column in 412px, so two columns under the layers button */
+.land .mob-map-ribbon {
+  display: grid;
+  grid-template-columns: repeat(2, var(--mobile-touch-min));
+  direction: rtl;
+}
+.land .mob-map-ribbon > * {
+  direction: ltr;
+}
+.land .mob-map-ribbon-more {
+  margin-top: 0;
+}
+
+/* ── Modes (placement, star identification, region drawing, asteroid search): the stage takes the left part,
+   the controls move from the bottom panel to a side column with the title bar on top of it. */
+.land--mode {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--land-side-w);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.land--mode > .mob-topbar {
+  grid-column: 2;
+  grid-row: 1;
+  box-shadow: inset 1px 0 0 var(--border-panel);
+}
+.land--mode > .mob-map,
+.land--mode > .mob-stage {
+  grid-column: 1;
+  grid-row: 1 / -1;
+}
+.land--mode > .mob-panel {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  overflow-y: auto;
+  box-shadow: inset 1px 0 0 var(--border-panel);
+}
+.land--mode > .mob-panel > .mob-sheet-footer {
+  margin-top: auto;
+}
+/* With the keyboard open (Android landscape keyboard: about 45 % of the height) */
+.land--kbd {
+  grid-template-rows: auto minmax(0, 1fr) 190px;
+}
+.land--kbd > .mob-keyboard {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  height: auto;
+}
+.land--kbd > .mob-map,
+.land--kbd > .mob-stage {
+  grid-row: 1 / 3;
+}
+/* The search field stays visible above the keyboard; the results scroll above it */
+.land--kbd > .mob-panel {
+  overflow: hidden;
+}
+.land--kbd > .mob-panel > :first-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* The buttons of a mode stay at the bottom of the side column while its content scrolls */
+.land--mode > .mob-panel > .mob-sheet-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-panel);
+}
+
+/* ── Pushed pages: content in a centred column; the footer buttons line up with it, at the right */
+/* The scrolling box itself is the column, so its scroll bar (8px, always visible) sits right next to the content */
+.land--page > .mob-scroll {
+  align-self: center;
+  width: min(100%, var(--land-column));
+}
+.land--page > .mob-scroll > .mob-entry-list {
+  position: relative;
+}
+.land .mob-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-4)
+    max(var(--mobile-gutter), calc((100% - var(--land-column)) / 2));
+}
+.land .mob-footer .mob-btn {
+  flex: 0 0 200px;
+}
+.land .mob-keyboard {
+  height: 190px;
+}
+
+/* ── Grids get more columns. Fact cards: up to 4 per row on a page (fewer cards share the row); unchanged in sheets */
+.land--page > .mob-scroll .mob-facts--2 {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.land .mob-photo-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+/* Target context: the two portrait rows merge into one; every field gets an equal share */
+.land .mob-context > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.land .mob-context > :last-child {
+  flex-grow: 1.5;
+}
+/* Target lists: two columns of rows */
+.land .land-cols2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+}
+.land .land-cols2 > .mob-row:nth-child(odd) {
+  box-shadow: inset -1px 0 0 var(--border-subtle);
+}
+
+/* Revision 15: the ribbon has 8 buttons again: four columns (two rows) keep it clear of the time bar; the long-press label sits left of them, on the first row. */
+.land .mob-map-ribbon {
+  grid-template-columns: repeat(4, var(--mobile-touch-min));
+}
+.land .mob-longpress-label {
+  right: calc(var(--mobile-gutter) + 4 * var(--mobile-touch-min) + 4 * var(--space-4));
+  top: calc(var(--mobile-gutter) + var(--mobile-touch-min) + var(--space-4) + var(--safe-top, 0px)) !important;
+}
+/* The toast: bottom centre above the gesture bar, limited width, as the desktop toast is bottom centre. */
+.land .mob-toast-host {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 440px;
+}
+
+/* ── Revision 13: asteroid results in landscape: the side column does not scroll, the list inside it does. */
+.land--mode > .mob-panel--results {
+  max-height: none;
+  overflow: hidden;
+}
+
+/* Revision 14: an empty state spans both columns of a two-column list; the map prompt keeps a phone width. */
+.land .land-cols2 > .mob-empty {
+  grid-column: 1 / -1;
+}
+.land .mob-map-prompt {
+  right: auto;
+  width: min(400px, calc(100% - 2 * var(--mobile-gutter)));
+  box-sizing: border-box;
+}
+
+/* Revision 14: system bars in landscape (status bar 24 px at the top, gesture bar 24 px at the bottom of the 412 px height). */
+.land--rail > .mob-tabbar {
+  padding-top: var(--safe-top, 0px);
+  padding-bottom: var(--safe-bottom, 0px);
+}
+.land .mob-fab--fixed {
+  bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+}
+.land .mob-timebar {
+  bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+}
+.land--mode > .mob-map .mob-map-top,
+.land--mode > .mob-map .mob-map-hint {
+  top: calc(var(--mobile-gutter) + var(--safe-top, 0px));
+}
+.land--mode > .mob-map .mob-map-cluster {
+  top: calc(var(--mobile-gutter) + var(--mobile-touch-min) + var(--space-7) + var(--safe-top, 0px));
+}
+.land .mob-sheet--auto,
+.land .mob-sheet--auto-lg {
+  max-height: calc(100% - var(--safe-top, 0px) - var(--space-7));
+}
+.land .mob-map > .mob-sheet {
+  max-height: calc(100% - var(--mobile-touch-min) - 2 * var(--mobile-gutter) - var(--safe-top, 0px));
+}
+.land .mob-footer {
+  padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px));
+}
+.land--rail > .mob-scroll {
+  padding-bottom: var(--safe-bottom, 0px);
+}
+/* A sheet over the map that is taller than the room left by the system bars scrolls inside itself */
+.land .mob-map > .mob-sheet {
+  overflow-y: auto;
+}
+.land--page > .mob-scroll:not(:has(+ .mob-footer)) {
+  padding-bottom: var(--safe-bottom, 0px);
+}

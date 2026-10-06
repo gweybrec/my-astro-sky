@@ -1,0 +1,91 @@
+<!-- @dsCard group="Desktop — from the code" height=300 subtitle="tag-chip, tag-chip-sm, removable chips, filter chips" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Chip — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+      }
+      .stack {
+        display: grid;
+        gap: var(--space-7);
+      }
+      .cap {
+        margin-bottom: var(--space-3);
+        color: var(--text-secondary);
+        font-size: var(--font-size-small);
+      }
+      .panel {
+        width: var(--panel-width);
+        padding: var(--space-6) var(--space-8);
+        background: var(--bg-panel);
+        border: 1px solid var(--border-panel);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <div>
+        <div class="cap">
+          tag-chip: DSO id, label and setup, each with the .tag-chip-remove
+          button
+        </div>
+        <div class="tag-chips">
+          <span class="tag-chip"
+            >M31<button class="tag-chip-remove" aria-label="Retirer">
+              ×
+            </button></span
+          >
+          <span class="tag-chip"
+            >NGC 7000<button class="tag-chip-remove" aria-label="Retirer">
+              ×
+            </button></span
+          >
+          <span class="tag-chip label-chip"
+            >Nébuleuse<button class="tag-chip-remove" aria-label="Retirer">
+              ×
+            </button></span
+          >
+          <span class="tag-chip setup-chip"
+            >Équipement 1<button class="tag-chip-remove" aria-label="Retirer">
+              ×
+            </button></span
+          >
+        </div>
+      </div>
+      <div>
+        <div class="cap">
+          tag-chip-sm: compact, in the photo list (no remove button)
+        </div>
+        <div class="tag-chips">
+          <span class="tag-chip-sm">M31</span>
+          <span class="tag-chip-sm">NGC 7000</span>
+          <span class="tag-chip-sm">LDN 1235</span>
+        </div>
+      </div>
+      <div>
+        <div class="cap">
+          Filter chips: fixed colour per filter, identical everywhere
+        </div>
+        <div class="tag-chips">
+          <span class="target-filter-badge filter-l">L</span>
+          <span class="target-filter-badge filter-r">R</span>
+          <span class="target-filter-badge filter-g">G</span>
+          <span class="target-filter-badge filter-b">B</span>
+          <span class="target-filter-badge filter-rgb">RGB</span>
+          <span class="target-filter-badge filter-ha">Hα</span>
+          <span class="target-filter-badge filter-oiii">OIII</span>
+          <span class="target-filter-badge filter-sii">SII</span>
+          <span class="target-filter-badge filter-custom">Custom</span>
+          <span class="target-filter-badge filter-dual-band">Dual-band</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

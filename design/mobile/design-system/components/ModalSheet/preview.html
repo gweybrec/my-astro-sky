@@ -1,0 +1,171 @@
+<!-- @dsCard group="Desktop — from the code" height=480 subtitle="modal-sheet: header, body with a row of filters and target-cards, footer" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>ModalSheet — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+      }
+      /* the real backdrop is position: fixed over the whole window; here it fills a stage */
+      .stage {
+        position: relative;
+        height: 440px;
+        overflow: hidden;
+        border: 1px solid var(--border-panel);
+        background: var(--bg-app);
+      }
+      .stage .modal-backdrop {
+        position: absolute;
+      }
+      .stage .modal-sheet {
+        height: 100%;
+      }
+      /* BaseModal size="sheet" as TargetsOverlay.vue uses it: the body is a column with space-8 padding and one full-width wrapper holding the content */
+      .sheet-body {
+        padding: var(--space-8);
+        flex-direction: column;
+      }
+      .w-full {
+        width: 100%;
+        display: grid;
+        gap: var(--space-8);
+      }
+      .filters,
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-7);
+        align-items: start;
+      }
+      .lab {
+        display: grid;
+        gap: var(--space-4);
+        align-content: start;
+      }
+      .meta {
+        display: flex;
+        gap: var(--space-4);
+        align-items: baseline;
+        margin-top: var(--space-3);
+        font-size: var(--font-size-base);
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="modal-backdrop">
+        <div
+          class="modal modal-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mt"
+        >
+          <div class="modal-header">
+            <h2 id="mt">Trouver des cibles</h2>
+            <button class="modal-close" aria-label="Fermer">×</button>
+          </div>
+          <div class="modal-body sheet-body">
+            <div class="w-full">
+              <div class="filters">
+                <div class="lab">
+                  <label class="input-label" for="m1">Recherche</label>
+                  <input
+                    id="m1"
+                    class="input-base"
+                    type="text"
+                    placeholder="Rechercher M31, NGC 7000…"
+                  />
+                </div>
+                <div class="lab">
+                  <label class="input-label" for="m2">Constellation</label>
+                  <select id="m2" class="input-base">
+                    <option>Toutes</option>
+                    <option>Andromède</option>
+                    <option>Orion</option>
+                  </select>
+                </div>
+                <div class="lab">
+                  <label class="input-label" for="m3">Équipement</label>
+                  <select id="m3" class="input-base">
+                    <option>Équipement 1</option>
+                    <option>Équipement 2</option>
+                  </select>
+                </div>
+              </div>
+              <div class="cards">
+                <div class="target-card">
+                  <div class="target-card-header">
+                    <div class="target-card-title-row">
+                      <div class="target-card-title">
+                        <span>Galaxie d'Andromède</span
+                        ><span class="target-card-catalog-id"> M31</span>
+                      </div>
+                      <div class="target-card-rating">★★★★★</div>
+                    </div>
+                    <div class="target-card-chips">
+                      <div class="target-card-type">Galaxie spirale</div>
+                      <div class="target-card-const">AND</div>
+                    </div>
+                  </div>
+                  <div class="meta">
+                    <span>Difficulté</span
+                    ><span class="target-card-difficulty">◆◆◇◇◇</span>
+                  </div>
+                </div>
+                <div class="target-card">
+                  <div class="target-card-header">
+                    <div class="target-card-title-row">
+                      <div class="target-card-title">
+                        <span>Nébuleuse d'Orion</span
+                        ><span class="target-card-catalog-id"> M42</span>
+                      </div>
+                      <div class="target-card-rating">★★★★☆</div>
+                    </div>
+                    <div class="target-card-chips">
+                      <div class="target-card-type">Nébuleuse en émission</div>
+                      <div class="target-card-const">ORI</div>
+                    </div>
+                  </div>
+                  <div class="meta">
+                    <span>Difficulté</span
+                    ><span class="target-card-difficulty">◆◇◇◇◇</span>
+                  </div>
+                </div>
+                <div class="target-card">
+                  <div class="target-card-header">
+                    <div class="target-card-title-row">
+                      <div class="target-card-title">
+                        <span>Nébuleuse de la Lyre</span
+                        ><span class="target-card-catalog-id"> M57</span>
+                      </div>
+                      <div class="target-card-rating">★★★☆☆</div>
+                    </div>
+                    <div class="target-card-chips">
+                      <div class="target-card-type">Nébuleuse planétaire</div>
+                      <div class="target-card-const">LYR</div>
+                    </div>
+                  </div>
+                  <div class="meta">
+                    <span>Difficulté</span
+                    ><span class="target-card-difficulty">◆◆◆◇◇</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-cancel">Annuler</button>
+            <button class="btn-confirm">Valider</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

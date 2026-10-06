@@ -1,0 +1,73 @@
+<!-- @dsCard group="Desktop — from the code" height=250 subtitle="Native checkbox tinted by accent-color, in dso-toggle-label rows" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Checkbox — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, var(--panel-width));
+        gap: var(--space-7) var(--space-9);
+      }
+      .cap {
+        margin-bottom: var(--space-2);
+        color: var(--text-secondary);
+        font-size: var(--font-size-small);
+      }
+      .panel {
+        padding: var(--space-6) var(--space-8);
+        background: var(--bg-panel);
+        border: 1px solid var(--border-panel);
+      }
+      .disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="cap">In the side panel</div>
+        <div class="panel">
+          <label class="dso-toggle-label"
+            ><input type="checkbox" checked /> Afficher les étoiles</label
+          >
+          <label class="dso-toggle-label"
+            ><input type="checkbox" checked /> Traits des constellations</label
+          >
+          <label class="dso-toggle-label"
+            ><input type="checkbox" /> Noms des constellations</label
+          >
+          <label class="dso-toggle-label"
+            ><input type="checkbox" /> Grille RA/Déc</label
+          >
+        </div>
+      </div>
+      <div>
+        <div class="cap">Disabled, and destructive (checkbox-danger)</div>
+        <div class="panel">
+          <label class="dso-toggle-label disabled"
+            ><input type="checkbox" checked disabled /> Afficher les
+            photos</label
+          >
+          <label class="dso-toggle-label disabled"
+            ><input type="checkbox" disabled /> Cadres des photos</label
+          >
+          <label class="dso-toggle-label"
+            ><input type="checkbox" class="checkbox-danger" checked /> Supprimer les métadonnées
+            des photos</label
+          >
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

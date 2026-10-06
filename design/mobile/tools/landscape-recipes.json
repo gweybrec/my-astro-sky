@@ -1,0 +1,1744 @@
+{
+ "Backup": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "ConfirmDelete": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  },
+  {
+   "at": 208,
+   "before": [
+    "<div class=\"mob-dialog\" role=\"alertdialog\" aria-modal=\"true\" aria-labelledby=\"del-title\" aria-describedby=\"del-msg\">",
+    "<h2 id=\"del-title\" class=\"mob-dialog-title m-title\">Supprimer le plan",
+    "</h2>"
+   ],
+   "old": [
+    "<p id=\"del-msg\" class=\"mob-dialog-message m-body\">Supprimer le plan «&#160;Nuit du "
+   ],
+   "neu": [
+    "<p id=\"del-msg\" class=\"mob-dialog-message m-body\">Supprimer le plan «&nbsp;Nuit du "
+   ],
+   "after": [
+    "<span style=\"white-space:nowrap\">2026-10-03",
+    "</span>&#160;»&#160;?",
+    "</p>"
+   ]
+  },
+  {
+   "at": 210,
+   "before": [
+    "</h2>",
+    "<p id=\"del-msg\" class=\"mob-dialog-message m-body\">Supprimer le plan «&#160;Nuit du ",
+    "<span style=\"white-space:nowrap\">2026-10-03"
+   ],
+   "old": [
+    "</span>&#160;»&#160;?"
+   ],
+   "neu": [
+    "</span>&nbsp;»&nbsp;?"
+   ],
+   "after": [
+    "</p>",
+    "<div class=\"mob-dialog-buttons\">",
+    "<button class=\"mob-btn mob-btn--lg m-body\">Annuler"
+   ]
+  }
+ ],
+ "DrawOrder": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "FrameEdit": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;inset:0\">Carte du ciel",
+    "</div>"
+   ]
+  },
+  {
+   "at": 33,
+   "before": [
+    "</svg>",
+    "</button>",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:859px;transform:translate(460px, 22px) scale(0.902);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<svg class=\"mob-map-drawing\" role=\"img\" aria-label=\"Cadres du setup Équipement 1 : un sélectionné, un non sélectionné\" focusable=\"false\">",
+    "<polygon class=\"mob-fov-frame mob-fov--idle\" points=\"148.27,284.47 312.6,249.54 331.73,339.53 167.4,374.46\">",
+    "</polygon>"
+   ]
+  },
+  {
+   "at": 49,
+   "before": [
+    "<circle class=\"mob-fov-dot\" cx=\"118\" cy=\"190\" r=\"4\">",
+    "</circle>",
+    "</svg>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"frame-title\">"
+   ],
+   "neu": [
+    "</div>",
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: var(--mobile-gutter); right: auto; bottom: 0px;\" aria-labelledby=\"frame-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "FrameMove": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;inset:0\">Carte du ciel",
+    "</div>"
+   ]
+  },
+  {
+   "at": 33,
+   "before": [
+    "</svg>",
+    "</button>",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:859px;transform:translate(463px, -116px) scale(0.768);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<svg class=\"mob-map-drawing\" role=\"img\" aria-label=\"Cadre sélectionné en cours de déplacement vers l'objet le plus proche\" focusable=\"false\">",
+    "<polygon class=\"mob-fov-frame mob-fov--idle\" points=\"148.27,284.47 312.6,249.54 331.73,339.53 167.4,374.46\">",
+    "</polygon>"
+   ]
+  },
+  {
+   "at": 55,
+   "before": [
+    "<circle class=\"mob-fov-touch\" cx=\"170\" cy=\"590\" r=\"24\">",
+    "</circle>",
+    "</svg>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"move-title\">"
+   ],
+   "neu": [
+    "</div>",
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: var(--mobile-gutter); right: auto; bottom: 0px;\" aria-labelledby=\"move-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "GearPicker": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  },
+  {
+   "at": 28,
+   "before": [
+    "<div class=\"mob-form-row\">",
+    "<label class=\"mob-form-label m-secondary\" for=\"gs-tel\">Télescope",
+    "</label>"
+   ],
+   "old": [
+    "<button id=\"gs-tel\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Télescope : Celestron EdgeHD 8\"\">"
+   ],
+   "neu": [
+    "<button id=\"gs-tel\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Télescope : Celestron EdgeHD 8\" \"=\"\">"
+   ],
+   "after": [
+    "<span class=\"mob-btn-label\">Celestron EdgeHD 8\"",
+    "</span>",
+    "<span class=\"mob-btn-caret\" aria-hidden=\"true\">"
+   ]
+  },
+  {
+   "at": 64,
+   "before": [
+    "<div class=\"mob-form-row\">",
+    "<label class=\"mob-form-label m-secondary\" for=\"gs-acc\">Accessoire",
+    "</label>"
+   ],
+   "old": [
+    "<button id=\"gs-acc\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Accessoire : Celestron 0.7x Reducer Lens – EdgeHD 8\"\">"
+   ],
+   "neu": [
+    "<button id=\"gs-acc\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Accessoire : Celestron 0.7x Reducer Lens – EdgeHD 8\" \"=\"\">"
+   ],
+   "after": [
+    "<span class=\"mob-btn-label\">Celestron 0.7x Reducer Lens – EdgeHD 8\"",
+    "</span>",
+    "<span class=\"mob-btn-caret\" aria-hidden=\"true\">"
+   ]
+  },
+  {
+   "at": 152,
+   "before": [
+    "</div>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"tel-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"tel-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "GearSetupEdit": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  },
+  {
+   "at": 28,
+   "before": [
+    "<div class=\"mob-form-row\">",
+    "<label class=\"mob-form-label m-secondary\" for=\"gs-tel\">Télescope",
+    "</label>"
+   ],
+   "old": [
+    "<button id=\"gs-tel\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Télescope : Celestron EdgeHD 8\"\">"
+   ],
+   "neu": [
+    "<button id=\"gs-tel\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Télescope : Celestron EdgeHD 8\" \"=\"\">"
+   ],
+   "after": [
+    "<span class=\"mob-btn-label\">Celestron EdgeHD 8\"",
+    "</span>",
+    "<span class=\"mob-btn-caret\" aria-hidden=\"true\">"
+   ]
+  },
+  {
+   "at": 64,
+   "before": [
+    "<div class=\"mob-form-row\">",
+    "<label class=\"mob-form-label m-secondary\" for=\"gs-acc\">Accessoire",
+    "</label>"
+   ],
+   "old": [
+    "<button id=\"gs-acc\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Accessoire : Celestron 0.7x Reducer Lens – EdgeHD 8\"\">"
+   ],
+   "neu": [
+    "<button id=\"gs-acc\" class=\"mob-btn mob-btn--field mob-btn--block m-body\" aria-label=\"Accessoire : Celestron 0.7x Reducer Lens – EdgeHD 8\" \"=\"\">"
+   ],
+   "after": [
+    "<span class=\"mob-btn-label\">Celestron 0.7x Reducer Lens – EdgeHD 8\"",
+    "</span>",
+    "<span class=\"mob-btn-caret\" aria-hidden=\"true\">"
+   ]
+  }
+ ],
+ "GearSetups": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "IdentifyAsteroid": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--mode\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title mob-topbar-title--grow m-title\">Identifier un astéroïde",
+    "</h1>"
+   ]
+  },
+  {
+   "at": 18,
+   "before": [
+    "<main class=\"mob-stage\">",
+    "<div class=\"mob-stage-caption m-secondary\" style=\"align-items:flex-start;padding-top:var(--mobile-gutter)\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:595px;transform:translate(56px, -97px) scale(1.000);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<svg class=\"mob-map-drawing\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"none\" aria-hidden=\"true\" focusable=\"false\">",
+    "<path vector-effect=\"non-scaling-stroke\" d=\"M30 40 L68 62\">",
+    "</path>"
+   ]
+  },
+  {
+   "at": 30,
+   "before": [
+    "<span class=\"mob-marker-dot m-secondary\">A",
+    "</span>",
+    "</button>"
+   ],
+   "old": [],
+   "neu": [
+    "</div>"
+   ],
+   "after": [
+    "</main>",
+    "<section class=\"mob-panel\" aria-label=\"Recherche d'astéroïdes\">",
+    "<div style=\"padding-top:var(--space-4)\">"
+   ]
+  },
+  {
+   "at": 31,
+   "before": [
+    "</span>",
+    "</button>",
+    "</main>"
+   ],
+   "old": [
+    "<section class=\"mob-panel\" aria-label=\"Recherche d'astéroïdes\">"
+   ],
+   "neu": [
+    "<section class=\"mob-panel mob-scroll\" aria-label=\"Recherche d'astéroïdes\">"
+   ],
+   "after": [
+    "<div style=\"padding-top:var(--space-4)\">",
+    "</div>",
+    "<div class=\"mob-when-row\">"
+   ]
+  }
+ ],
+ "IdentifyAsteroidResults": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--mode\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title mob-topbar-title--grow m-title\">Identifier un astéroïde",
+    "</h1>"
+   ]
+  },
+  {
+   "at": 18,
+   "before": [
+    "<main class=\"mob-stage\">",
+    "<div class=\"mob-stage-caption m-secondary\" style=\"align-items:flex-start;padding-top:var(--mobile-gutter)\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:456px;transform:translate(56px, -27px) scale(1.000);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<svg class=\"mob-map-drawing\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"none\" aria-hidden=\"true\" focusable=\"false\">",
+    "<path vector-effect=\"non-scaling-stroke\" d=\"M30 40 L68 62\">",
+    "</path>"
+   ]
+  },
+  {
+   "at": 30,
+   "before": [
+    "<span class=\"mob-marker-dot m-secondary\">A",
+    "</span>",
+    "</button>"
+   ],
+   "old": [],
+   "neu": [
+    "</div>"
+   ],
+   "after": [
+    "</main>",
+    "<section class=\"mob-panel mob-panel--results\" aria-label=\"Astéroïdes trouvés\">",
+    "<p class=\"mob-helper m-body\">"
+   ]
+  },
+  {
+   "at": 31,
+   "before": [
+    "</span>",
+    "</button>",
+    "</main>"
+   ],
+   "old": [
+    "<section class=\"mob-panel mob-panel--results\" aria-label=\"Astéroïdes trouvés\">"
+   ],
+   "neu": [
+    "<section class=\"mob-panel mob-panel--results\" aria-label=\"Astéroïdes trouvés\">"
+   ],
+   "after": [
+    "<p class=\"mob-helper m-body\">",
+    "<span class=\"mob-status--success\">3 astéroïdes trouvés",
+    "</span>"
+   ]
+  }
+ ],
+ "IdentifyChoose": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--viewer\">"
+   ],
+   "after": [
+    "<div class=\"mob-stage mob-stage--viewer\">",
+    "<div class=\"mob-stage-caption m-secondary\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ]
+  },
+  {
+   "at": 37,
+   "before": [
+    "</div>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"info-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"info-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  },
+  {
+   "at": 157,
+   "before": [
+    "</section>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"choose-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"choose-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "IdentifyInfo": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--viewer\">"
+   ],
+   "after": [
+    "<div class=\"mob-stage mob-stage--viewer\">",
+    "<div class=\"mob-stage-caption m-secondary\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ]
+  },
+  {
+   "at": 37,
+   "before": [
+    "</div>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"sn-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"sn-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  },
+  {
+   "at": 85,
+   "before": [
+    "</section>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"info-sn-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"info-sn-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "IdentifySupernova": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--viewer\">"
+   ],
+   "after": [
+    "<div class=\"mob-stage mob-stage--viewer\">",
+    "<div class=\"mob-stage-caption m-secondary\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ]
+  },
+  {
+   "at": 37,
+   "before": [
+    "</div>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"sn-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"sn-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "ImportMethod": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  },
+  {
+   "at": 85,
+   "before": [
+    "</div>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"method-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"method-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "ImportReview": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "LanConnected": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "LanPairing": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "Library": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<input class=\"mob-search m-body\" type=\"search\" placeholder=\"Rechercher une photo…\" aria-label=\"Rechercher une photo\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Plus de filtres\">"
+   ]
+  }
+ ],
+ "LibraryAdd": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<input class=\"mob-search m-body\" type=\"search\" placeholder=\"Rechercher une photo…\" aria-label=\"Rechercher une photo\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Plus de filtres\">"
+   ]
+  },
+  {
+   "at": 154,
+   "before": [
+    "</nav>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"add-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: var(--rail-w); right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"add-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "Location": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "Main": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;inset:0\">Carte du ciel",
+    "</div>"
+   ]
+  }
+ ],
+ "ObsWindow": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  },
+  {
+   "at": 205,
+   "before": [
+    "</button>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"obs-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"obs-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "PhotoDetail": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--viewer\">"
+   ],
+   "after": [
+    "<div class=\"mob-stage mob-stage--viewer\">",
+    "<div class=\"mob-stage-caption m-secondary\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ]
+  }
+ ],
+ "PhotoEdit": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "PhotoInfo": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--viewer\">"
+   ],
+   "after": [
+    "<div class=\"mob-stage mob-stage--viewer\">",
+    "<div class=\"mob-stage-caption m-secondary\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ]
+  },
+  {
+   "at": 37,
+   "before": [
+    "</div>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"info-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"info-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "Placement": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--mode\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title m-title\">Placer la photo",
+    "</h1>"
+   ]
+  },
+  {
+   "at": 10,
+   "before": [
+    "</div>",
+    "<div class=\"mob-map-hint m-secondary\">Un doigt : déplacer · Deux doigts : agrandir et tourner",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:523px;transform:translate(52px, 6px) scale(1.000);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<div class=\"mob-map-photo m-secondary\" style=\"left:calc(50% - 110px);top:150px;width:220px;height:150px;transform:rotate(12deg)\">M31_2025-09-14_stack.jpg",
+    "</div>",
+    "</main>"
+   ]
+  },
+  {
+   "at": 12,
+   "before": [
+    "</div>",
+    "<div class=\"mob-map-photo m-secondary\" style=\"left:calc(50% - 110px);top:150px;width:220px;height:150px;transform:rotate(12deg)\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "</div>"
+   ],
+   "after": [
+    "</main>",
+    "<section class=\"mob-panel\" aria-label=\"Réglages de placement\">",
+    "<div class=\"mob-slider-row\">"
+   ]
+  },
+  {
+   "at": 13,
+   "before": [
+    "<div class=\"mob-map-photo m-secondary\" style=\"left:calc(50% - 110px);top:150px;width:220px;height:150px;transform:rotate(12deg)\">M31_2025-09-14_stack.jpg",
+    "</div>",
+    "</main>"
+   ],
+   "old": [
+    "<section class=\"mob-panel\" aria-label=\"Réglages de placement\">"
+   ],
+   "neu": [
+    "<section class=\"mob-panel mob-scroll\" aria-label=\"Réglages de placement\">"
+   ],
+   "after": [
+    "<div class=\"mob-slider-row\">",
+    "<label class=\"mob-slider-label m-body\" for=\"rot\">Rotation",
+    "</label>"
+   ]
+  }
+ ],
+ "PlanActions": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  },
+  {
+   "at": 205,
+   "before": [
+    "</button>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"plan-actions-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: 0px; right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"plan-actions-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "PlanDetail": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "PlanEntry": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Retour\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+   ]
+  }
+ ],
+ "Plans": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<input class=\"mob-search m-body\" type=\"search\" placeholder=\"Rechercher un plan…\" aria-label=\"Rechercher un plan\">",
+    "</header>"
+   ]
+  }
+ ],
+ "RegionDraw": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--mode\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title m-title\">Dessiner une région",
+    "</h1>"
+   ]
+  },
+  {
+   "at": 10,
+   "before": [
+    "</div>",
+    "<div class=\"mob-map-hint m-secondary\">Un doigt : dessiner · Deux doigts : déplacer la carte",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:571px;transform:translate(41px, -35px) scale(1.000);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<svg class=\"mob-map-drawing\" viewBox=\"0 0 360 520\" preserveAspectRatio=\"xMidYMid meet\" aria-hidden=\"true\" focusable=\"false\">",
+    "<path d=\"M175.5 153.8 L194.1 152.3 L212.9 160.4 L223.1 168.5 L239.1 174.7 L248.2 185.4 L256.8 192.8 L259.3 207.6 L270.1 211.4 L280.7 224.8 L296.0 238.9 L301.5 250.1 L316.5 268.0 L313.3 283.9 L305.8 301.5 L283.8 306.3 L267.9 311.5 L242.9 313.5 L229.9 315.6 L222.1 322.2 L208.9 331.7 L190.4 333.8 L180.5 342.1 L163.4 342.2 L151.4 340.3 L130.4 339.5 L117.2 339.6 L100.0 326.3 L83.8 318.9 L70.8 308.8 L63.0 295.5 L65.1 276.8 L74.2 263.1 L84.1 251.2 L92.1 239.2 L97.2 230.8 L102.3 217.1 L98.4 201.8 L96.4 186.0 L97.8 169.2 L112.1 159.3 L121.6 149.9 L139.9 143.3 L159.4 142.0 L175.5 153.8 Z\">",
+    "</path>"
+   ]
+  },
+  {
+   "at": 14,
+   "before": [
+    "<path d=\"M175.5 153.8 L194.1 152.3 L212.9 160.4 L223.1 168.5 L239.1 174.7 L248.2 185.4 L256.8 192.8 L259.3 207.6 L270.1 211.4 L280.7 224.8 L296.0 238.9 L301.5 250.1 L316.5 268.0 L313.3 283.9 L305.8 301.5 L283.8 306.3 L267.9 311.5 L242.9 313.5 L229.9 315.6 L222.1 322.2 L208.9 331.7 L190.4 333.8 L180.5 342.1 L163.4 342.2 L151.4 340.3 L130.4 339.5 L117.2 339.6 L100.0 326.3 L83.8 318.9 L70.8 308.8 L63.0 295.5 L65.1 276.8 L74.2 263.1 L84.1 251.2 L92.1 239.2 L97.2 230.8 L102.3 217.1 L98.4 201.8 L96.4 186.0 L97.8 169.2 L112.1 159.3 L121.6 149.9 L139.9 143.3 L159.4 142.0 L175.5 153.8 Z\">",
+    "</path>",
+    "</svg>"
+   ],
+   "old": [],
+   "neu": [
+    "</div>"
+   ],
+   "after": [
+    "</main>",
+    "<section class=\"mob-panel\" aria-label=\"Région du ciel\">",
+    "<div class=\"mob-form-row\">"
+   ]
+  },
+  {
+   "at": 15,
+   "before": [
+    "</path>",
+    "</svg>",
+    "</main>"
+   ],
+   "old": [
+    "<section class=\"mob-panel\" aria-label=\"Région du ciel\">"
+   ],
+   "neu": [
+    "<section class=\"mob-panel mob-scroll\" aria-label=\"Région du ciel\">"
+   ],
+   "after": [
+    "<div class=\"mob-form-row\">",
+    "<label class=\"mob-form-label m-secondary\" for=\"region-name\">Nom",
+    "</label>"
+   ]
+  }
+ ],
+ "Settings": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title m-title\">Réglages",
+    "</h1>"
+   ]
+  }
+ ],
+ "SkyDisplay": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;inset:0\">Carte du ciel",
+    "</div>"
+   ]
+  },
+  {
+   "at": 138,
+   "before": [
+    "</nav>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"display-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position: absolute; left: var(--rail-w); right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"display-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "SkyObject": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;inset:0\">Carte du ciel",
+    "</div>"
+   ]
+  },
+  {
+   "at": 33,
+   "before": [
+    "</svg>",
+    "</button>",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"sheet-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: var(--mobile-gutter); right: auto; bottom: 0px;\" aria-labelledby=\"sheet-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer la fiche\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  },
+  {
+   "at": 70,
+   "before": [
+    "</span>",
+    "</div>",
+    "</div>"
+   ],
+   "old": [
+    "<div class=\"mob-icon-row\" role=\"group\" aria-label=\"Actions sur l&#39;objet\">"
+   ],
+   "neu": [
+    "<div class=\"mob-icon-row\" role=\"group\" aria-label=\"Actions sur l'objet\">"
+   ],
+   "after": [
+    "<button class=\"mob-icon-btn\" aria-label=\"Ajouter un cadre\">",
+    "<svg aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"> ",
+    "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\">"
+   ]
+  }
+ ],
+ "SkyPhoto": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;inset:0\">Carte du ciel",
+    "</div>"
+   ]
+  },
+  {
+   "at": 33,
+   "before": [
+    "</svg>",
+    "</button>",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:859px;transform:translate(450px, -23px) scale(1.000);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<svg class=\"mob-map-drawing\" role=\"img\" aria-label=\"Photo placée : Cygnus_wide_2025-08-23.jpg\" focusable=\"false\">",
+    "<polygon class=\"mob-photo-outline\" points=\"34.39,195.22 281.95,160.43 305.61,328.78 58.05,363.57\">",
+    "</polygon>"
+   ]
+  },
+  {
+   "at": 39,
+   "before": [
+    "<text class=\"mob-photo-label m-caption\" transform=\"translate(34.39 195.22) rotate(-8)\" x=\"4\" y=\"-5\">Cygnus_wide_2025-08-23.jpg",
+    "</text>",
+    "</svg>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"photo-title\">"
+   ],
+   "neu": [
+    "</div>",
+    "<section class=\"mob-sheet mob-sheet--auto\" style=\"position: absolute; left: var(--mobile-gutter); right: auto; bottom: 0px;\" aria-labelledby=\"photo-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer la fiche\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "SkySearch": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--page\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<div class=\"mob-search-wrap\">",
+    "<input id=\"sky-q\" class=\"mob-search m-body\" type=\"text\" inputmode=\"search\" enterkeyhint=\"search\" value=\"andro\" aria-label=\"Rechercher étoile ou DSO\" style=\"border-color:var(--border-focus)\">"
+   ]
+  }
+ ],
+ "SkyToggles": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;inset:0\">Carte du ciel",
+    "</div>"
+   ]
+  }
+ ],
+ "Targets": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<input class=\"mob-search m-body\" type=\"search\" placeholder=\"Rechercher une cible…\" aria-label=\"Rechercher une cible\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Plus de filtres\">"
+   ]
+  },
+  {
+   "at": 41,
+   "before": [
+    "</svg>",
+    "</span>",
+    "</button>"
+   ],
+   "old": [
+    "</div>",
+    "<div class=\"mob-context mob-context--follow\" style=\"flex:none\">"
+   ],
+   "neu": [],
+   "after": [
+    "<button class=\"mob-btn mob-btn--field mob-btn--block m-secondary\" aria-label=\"Types d'objets : 2 types\">",
+    "<span class=\"mob-btn-key\">Types d'objets",
+    "</span>"
+   ]
+  },
+  {
+   "at": 56,
+   "before": [
+    "</span>",
+    "</button>",
+    "</div>"
+   ],
+   "old": [
+    "<div class=\"mob-scroll\" style=\"flex:1;background:var(--bg-panel)\">"
+   ],
+   "neu": [
+    "<div class=\"mob-scroll land-cols2\" style=\"flex:1;background:var(--bg-panel)\">"
+   ],
+   "after": [
+    "<button class=\"mob-row mob-row--roomy\">",
+    "<span class=\"mob-row-body\">",
+    "<span class=\"mob-row-title m-body\">Nébuleuse du Cocon"
+   ]
+  }
+ ],
+ "TargetsFilter": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<input class=\"mob-search m-body\" type=\"search\" placeholder=\"Rechercher une cible…\" aria-label=\"Rechercher une cible\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Plus de filtres\">"
+   ]
+  },
+  {
+   "at": 41,
+   "before": [
+    "</svg>",
+    "</span>",
+    "</button>"
+   ],
+   "old": [
+    "</div>",
+    "<div class=\"mob-context mob-context--follow\" style=\"flex:none\">"
+   ],
+   "neu": [],
+   "after": [
+    "<button class=\"mob-btn mob-btn--field mob-btn--block m-secondary\" aria-label=\"Types d'objets : 2 types\">",
+    "<span class=\"mob-btn-key\">Types d'objets",
+    "</span>"
+   ]
+  },
+  {
+   "at": 56,
+   "before": [
+    "</span>",
+    "</button>",
+    "</div>"
+   ],
+   "old": [
+    "<div class=\"mob-scroll\" style=\"flex:1;background:var(--bg-panel)\">"
+   ],
+   "neu": [
+    "<div class=\"mob-scroll land-cols2\" style=\"flex:1;background:var(--bg-panel)\">"
+   ],
+   "after": [
+    "<button class=\"mob-row mob-row--roomy\">",
+    "<span class=\"mob-row-body\">",
+    "<span class=\"mob-row-title m-body\">Nébuleuse du Cocon"
+   ]
+  },
+  {
+   "at": 334,
+   "before": [
+    "</nav>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"filters-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position: absolute; left: var(--rail-w); right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"filters-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "TargetsTypes": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--rail\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<input class=\"mob-search m-body\" type=\"search\" placeholder=\"Rechercher une cible…\" aria-label=\"Rechercher une cible\">",
+    "<button class=\"mob-icon-btn\" aria-label=\"Plus de filtres\">"
+   ]
+  },
+  {
+   "at": 41,
+   "before": [
+    "</svg>",
+    "</span>",
+    "</button>"
+   ],
+   "old": [
+    "</div>",
+    "<div class=\"mob-context mob-context--follow\" style=\"flex:none\">"
+   ],
+   "neu": [],
+   "after": [
+    "<button class=\"mob-btn mob-btn--field mob-btn--block m-secondary\" aria-label=\"Types d'objets : 2 types\">",
+    "<span class=\"mob-btn-key\">Types d'objets",
+    "</span>"
+   ]
+  },
+  {
+   "at": 56,
+   "before": [
+    "</span>",
+    "</button>",
+    "</div>"
+   ],
+   "old": [
+    "<div class=\"mob-scroll\" style=\"flex:1;background:var(--bg-panel)\">"
+   ],
+   "neu": [
+    "<div class=\"mob-scroll land-cols2\" style=\"flex:1;background:var(--bg-panel)\">"
+   ],
+   "after": [
+    "<button class=\"mob-row mob-row--roomy\">",
+    "<span class=\"mob-row-body\">",
+    "<span class=\"mob-row-title m-body\">Nébuleuse du Cocon"
+   ]
+  },
+  {
+   "at": 334,
+   "before": [
+    "</nav>",
+    "<div class=\"mob-scrim\">",
+    "</div>"
+   ],
+   "old": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position:absolute;left:0;right:0;bottom:0\" aria-labelledby=\"types-title\">"
+   ],
+   "neu": [
+    "<section class=\"mob-sheet mob-sheet--auto-lg\" style=\"position: absolute; left: var(--rail-w); right: 0px; bottom: 0px; margin-inline: auto;\" aria-labelledby=\"types-title\">"
+   ],
+   "after": [
+    "<button class=\"mob-sheet-grab\" aria-label=\"Fermer\">",
+    "<span class=\"mob-sheet-handle\">",
+    "</span>"
+   ]
+  }
+ ],
+ "ThreePoint": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--mode\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title m-title\">Identifier les étoiles",
+    "</h1>"
+   ]
+  },
+  {
+   "at": 8,
+   "before": [
+    "<main class=\"mob-stage\">",
+    "<div class=\"mob-stage-caption m-secondary\" style=\"align-items:flex-start;padding-top:var(--mobile-gutter)\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:548px;transform:translate(52px, -63px) scale(1.000);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<button class=\"mob-marker\" aria-label=\"Point 1\" style=\"left:calc(26% - 24px);top:calc(24% - 24px)\">",
+    "<span class=\"mob-marker-dot m-secondary\">1",
+    "</span>"
+   ]
+  },
+  {
+   "at": 22,
+   "before": [
+    "</button>",
+    "<div class=\"mob-magnifier\" style=\"left:calc(50% - 48px);top:calc(74% - 24px - 16px - 96px)\">",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "</div>"
+   ],
+   "after": [
+    "</main>",
+    "<section class=\"mob-panel\" aria-label=\"Étoiles de repère\">",
+    "<button class=\"mob-row\">"
+   ]
+  },
+  {
+   "at": 23,
+   "before": [
+    "<div class=\"mob-magnifier\" style=\"left:calc(50% - 48px);top:calc(74% - 24px - 16px - 96px)\">",
+    "</div>",
+    "</main>"
+   ],
+   "old": [
+    "<section class=\"mob-panel\" aria-label=\"Étoiles de repère\">"
+   ],
+   "neu": [
+    "<section class=\"mob-panel mob-scroll\" aria-label=\"Étoiles de repère\">"
+   ],
+   "after": [
+    "<button class=\"mob-row\">",
+    "<span class=\"mob-row-lead m-body-strong\">1",
+    "</span>"
+   ]
+  }
+ ],
+ "ThreePointMap": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--mode\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title m-title\">Choisir sur la carte",
+    "</h1>"
+   ]
+  },
+  {
+   "at": 8,
+   "before": [
+    "<main class=\"mob-map\">",
+    "<div class=\"mob-map-caption m-secondary\" style=\"position:absolute;left:0;right:0;bottom:var(--mobile-gutter)\">Carte du ciel",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:715px;transform:translate(112px, -53px) scale(0.747);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<svg class=\"mob-map-drawing\" role=\"img\" aria-label=\"Étoiles de la carte : Deneb (α Cyg) choisie\" focusable=\"false\">",
+    "<circle class=\"mob-sky-star\" cx=\"62\" cy=\"150\" r=\"2\">",
+    "</circle>"
+   ]
+  },
+  {
+   "at": 38,
+   "before": [
+    "<text class=\"mob-sky-label m-caption\" x=\"198\" y=\"302\">Deneb (α Cyg)",
+    "</text>",
+    "</svg>"
+   ],
+   "old": [],
+   "neu": [
+    "</div>"
+   ],
+   "after": [
+    "</main>",
+    "<section class=\"mob-panel\" aria-label=\"Étoile choisie\">",
+    "<div class=\"mob-row\">"
+   ]
+  },
+  {
+   "at": 39,
+   "before": [
+    "</text>",
+    "</svg>",
+    "</main>"
+   ],
+   "old": [
+    "<section class=\"mob-panel\" aria-label=\"Étoile choisie\">"
+   ],
+   "neu": [
+    "<section class=\"mob-panel mob-scroll\" aria-label=\"Étoile choisie\">"
+   ],
+   "after": [
+    "<div class=\"mob-row\">",
+    "<span class=\"mob-row-lead m-body-strong\">3",
+    "</span>"
+   ]
+  }
+ ],
+ "ThreePointSearch": [
+  {
+   "at": 0,
+   "before": [],
+   "old": [
+    "<div id=\"root\" style=\"position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px\">"
+   ],
+   "neu": [
+    "<div id=\"root\" style=\"position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;\" class=\"land land--mode land--kbd\">"
+   ],
+   "after": [
+    "<header class=\"mob-topbar\" style=\"flex:none\">",
+    "<h1 class=\"mob-topbar-title m-title\">Identifier les étoiles",
+    "</h1>"
+   ]
+  },
+  {
+   "at": 8,
+   "before": [
+    "<main class=\"mob-stage\">",
+    "<div class=\"mob-stage-caption m-secondary\" style=\"align-items:flex-start;padding-top:var(--mobile-gutter)\">M31_2025-09-14_stack.jpg",
+    "</div>"
+   ],
+   "old": [],
+   "neu": [
+    "<div class=\"land-layer\" style=\"position:absolute;left:0;top:0;width:412px;height:270px;transform:translate(52px, -32px) scale(1.000);transform-origin:0 0\">"
+   ],
+   "after": [
+    "<button class=\"mob-marker\" aria-label=\"Point 1\" style=\"left:calc(26% - 24px);top:calc(30% - 24px)\">",
+    "<span class=\"mob-marker-dot m-secondary\">1",
+    "</span>"
+   ]
+  },
+  {
+   "at": 20,
+   "before": [
+    "<span class=\"mob-marker-dot m-secondary\">3",
+    "</span>",
+    "</button>"
+   ],
+   "old": [],
+   "neu": [
+    "</div>"
+   ],
+   "after": [
+    "</main>",
+    "<section class=\"mob-panel\" aria-label=\"Étoiles de repère\">",
+    "<div id=\"star-suggest\" role=\"listbox\" aria-label=\"Étoiles proposées\">"
+   ]
+  },
+  {
+   "at": 22,
+   "before": [
+    "</button>",
+    "</main>",
+    "<section class=\"mob-panel\" aria-label=\"Étoiles de repère\">"
+   ],
+   "old": [
+    "<div id=\"star-suggest\" role=\"listbox\" aria-label=\"Étoiles proposées\">"
+   ],
+   "neu": [
+    "<div id=\"star-suggest\" role=\"listbox\" aria-label=\"Étoiles proposées\" class=\"mob-scroll\">"
+   ],
+   "after": [
+    "<button class=\"mob-row\" role=\"option\" aria-selected=\"true\">",
+    "<span class=\"mob-row-body\">",
+    "<span class=\"mob-row-title m-body\">Deneb (α Cyg)"
+   ]
+  }
+ ]
+}

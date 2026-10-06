@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Identifier les étoiles, choisir une étoile</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="../ds/myastrosky/tokens.css">
+<link rel="stylesheet" href="../ds/myastrosky/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div id="root" style="position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-app);width:412px;height:915px"><div class="mob-statusbar" aria-hidden="true"><span class="m-mono">22:15</span><span class="mob-statusbar-icons"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 14h2V10H1zM5 14h2V7H5zM9 14h2V4H9zM13 14h2V1h-2z"></path></svg><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 9a6 6 0 0 1 8 0"></path><circle cx="8" cy="12" r="1" fill="currentColor"></circle></svg><svg viewBox="0 0 20 12"><rect x=".75" y=".75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="2.5" y="2.5" width="10" height="7" rx="1" fill="currentColor"></rect><rect x="17.5" y="4" width="2" height="4" rx="1" fill="currentColor"></rect></svg></span></div><div class="mob-gesturebar" aria-hidden="true"></div><header class="mob-topbar" style="flex:none"><h1 class="mob-topbar-title m-title">Identifier les étoiles</h1></header><main class="mob-stage"><div class="mob-stage-caption m-secondary" style="align-items:flex-start;padding-top:var(--mobile-gutter)">M31_2025-09-14_stack.jpg</div><button class="mob-marker" aria-label="Point 1" style="left:calc(26% - 24px);top:calc(30% - 24px)"><span class="mob-marker-dot m-secondary">1</span></button><button class="mob-marker" aria-label="Point 2" style="left:calc(74% - 24px);top:calc(44% - 24px)"><span class="mob-marker-dot m-secondary">2</span></button><button class="mob-marker" aria-label="Point 3" style="left:calc(50% - 24px);top:calc(76% - 24px)"><span class="mob-marker-dot m-secondary">3</span></button></main><section class="mob-panel" aria-label="Étoiles de repère"><div id="star-suggest" role="listbox" aria-label="Étoiles proposées"><button class="mob-row" role="option" aria-selected="true"><span class="mob-row-body"><span class="mob-row-title m-body">Deneb (α Cyg)</span></span><span class="mob-row-trail m-secondary">mag 1.3</span></button><button class="mob-row" role="option" aria-selected="false"><span class="mob-row-body"><span class="mob-row-title m-body">Denebola (β Leo)</span></span><span class="mob-row-trail m-secondary">mag 2.1</span></button><button class="mob-row" role="option" aria-selected="false"><span class="mob-row-body"><span class="mob-row-title m-body">Deneb Algedi (δ Cap)</span></span><span class="mob-row-trail m-secondary">mag 2.9</span></button><button class="mob-row" role="option" aria-selected="false"><span class="mob-row-body"><span class="mob-row-title m-body">Deneb Kaitos Shemali (ι Cet)</span></span><span class="mob-row-trail m-secondary">mag 3.6</span></button></div><div class="mob-row"><span class="mob-row-lead m-body-strong">3</span><span class="mob-row-body"><div class="mob-search-wrap"><input class="mob-field m-body" type="text" role="combobox" aria-expanded="true" aria-controls="star-suggest" placeholder="Nom de l'étoile…" aria-label="Nom de l'étoile 3" value="den" style="border-color:var(--border-focus)"><button class="mob-search-clear" aria-label="Effacer"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"> <line x1="18" y1="6" x2="6" y2="18"></line> <line x1="6" y1="6" x2="18" y2="18"></line> </svg></button></div></span><button class="mob-btn mob-btn--icon" aria-label="Choisir sur la carte"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"></path><path d="M15 5.764v15"></path><path d="M9 3.236v15"></path></svg></button></div></section><div class="mob-keyboard m-secondary" role="img" aria-label="Emplacement du clavier">Clavier</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":412,"height":915}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

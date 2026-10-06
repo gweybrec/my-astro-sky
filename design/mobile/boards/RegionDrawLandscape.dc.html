@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Dessiner une région, paysage</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="../ds/myastrosky/tokens.css">
+<link rel="stylesheet" href="../ds/myastrosky/components/bundle.css">
+<link rel="stylesheet" href="../tools/landscape.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div id="root" style="position: relative; overflow: hidden; display: grid; flex-direction: column; background: var(--bg-app); width: 915px; height: 412px;" class="land land--mode"><div class="mob-statusbar" aria-hidden="true"><span class="m-mono">22:15</span><span class="mob-statusbar-icons"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 14h2V10H1zM5 14h2V7H5zM9 14h2V4H9zM13 14h2V1h-2z"></path></svg><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 9a6 6 0 0 1 8 0"></path><circle cx="8" cy="12" r="1" fill="currentColor"></circle></svg><svg viewBox="0 0 20 12"><rect x=".75" y=".75" width="16" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="2.5" y="2.5" width="10" height="7" rx="1" fill="currentColor"></rect><rect x="17.5" y="4" width="2" height="4" rx="1" fill="currentColor"></rect></svg></span></div><div class="mob-gesturebar" aria-hidden="true"></div><header class="mob-topbar" style="flex:none"><h1 class="mob-topbar-title m-title">Dessiner une région</h1></header><main class="mob-map"><div class="mob-map-caption m-secondary" style="position:absolute;left:0;right:0;bottom:var(--mobile-gutter)">Carte du ciel</div><div class="mob-map-hint m-secondary">Un doigt : dessiner · Deux doigts : déplacer la carte</div><div class="land-layer" style="position:absolute;left:0;top:0;width:412px;height:571px;transform:translate(41px, -35px) scale(1.000);transform-origin:0 0"><svg class="mob-map-drawing" viewBox="0 0 360 520" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false"><path d="M175.5 153.8 L194.1 152.3 L212.9 160.4 L223.1 168.5 L239.1 174.7 L248.2 185.4 L256.8 192.8 L259.3 207.6 L270.1 211.4 L280.7 224.8 L296.0 238.9 L301.5 250.1 L316.5 268.0 L313.3 283.9 L305.8 301.5 L283.8 306.3 L267.9 311.5 L242.9 313.5 L229.9 315.6 L222.1 322.2 L208.9 331.7 L190.4 333.8 L180.5 342.1 L163.4 342.2 L151.4 340.3 L130.4 339.5 L117.2 339.6 L100.0 326.3 L83.8 318.9 L70.8 308.8 L63.0 295.5 L65.1 276.8 L74.2 263.1 L84.1 251.2 L92.1 239.2 L97.2 230.8 L102.3 217.1 L98.4 201.8 L96.4 186.0 L97.8 169.2 L112.1 159.3 L121.6 149.9 L139.9 143.3 L159.4 142.0 L175.5 153.8 Z"></path></svg></div></main><section class="mob-panel mob-scroll" aria-label="Région du ciel"><div class="mob-form-row"><label class="mob-form-label m-secondary" for="region-name">Nom</label><input id="region-name" class="mob-field m-body" type="text" placeholder="ex. Vue depuis le jardin"></div><div class="mob-form-row" style="padding-bottom:var(--space-4)"><button class="mob-btn mob-btn--field mob-btn--block m-body" aria-label="Couleur : bleu"><span class="mob-btn-key">Couleur</span><span class="mob-btn-value mob-btn-value--swatch"><span class="mob-swatch" style="background:#4ea1ff"></span></span><span class="mob-btn-caret" aria-hidden="true"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></button></div><div class="mob-form-row"><button class="mob-btn mob-btn--block m-body">Effacer le tracé</button></div><div class="mob-sheet-footer"><button class="mob-btn mob-btn--lg m-body">Annuler</button><button class="mob-btn mob-btn--confirm mob-btn--lg m-body-strong">Terminer</button></div></section></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":915,"height":412}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

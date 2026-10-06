@@ -1,0 +1,2928 @@
+/* MyAstroSky component classes.
+   Desktop section: the UnoCSS shortcuts of uno.config.ts and the matching rules of src/style.css / src/styles/canvas.css,
+   expanded into plain CSS. Where the two disagree, the cascade of the app wins (style.css loads after the shortcuts).
+   Mobile section (.mob-*): proposed, not in the code.
+   Every colour, length and radius is a token from tokens.json; tokens.css is loaded before this file. */
+
+/* ── Font sizes ─────────────────────────────────────────────────────────────────────────────
+   The app's --font-size-* custom properties. tokens.json carries them as the type styles ui-*,
+   which become classes, not variables, so the component rules below re-declare the names. */
+:root {
+  --font-size-pico: 8px;
+  --font-size-nano: 9px;
+  --font-size-micro: 10px;
+  --font-size-small: 11px;
+  --font-size-base: 12px;
+  --font-size-body: 13px;
+  --font-size-sub: 14px;
+  --font-size-title: 15px;
+  --font-size-head: 16px;
+  --font-size-large: 18px;
+  --font-size-section: 20px;
+  --font-size-xl: 24px;
+  --font-size-symbol: 28px;
+  --font-size-display: 48px;
+}
+
+/* ── Base (src/style.css top, canvas.css) ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+* {
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  background: transparent;
+  border: 0 solid;
+  color: inherit;
+}
+input[type="checkbox"],
+input[type="radio"],
+select,
+label[for] {
+  cursor: pointer;
+}
+/* Custom scrollbar styling (src/style.css and src/styles/canvas.css, identical in both). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-2h);
+  border: 2px solid var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+/* Keyboard focus ring of the app: 2px solid spinner-active, 2px offset. */
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--spinner-active);
+  outline-offset: 2px;
+}
+
+/* ── Buttons (uno.config.ts shortcuts + style.css) ────────────────────────────────────────── */
+/* Amber filled: panel primary action, open map, trigger solver. */
+.btn-action {
+  padding: var(--space-5) var(--space-8);
+  background: var(--accent-bg);
+  color: var(--text-bright);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  font-weight: 500;
+  transition:
+    color 0.2s,
+    background-color 0.2s,
+    border-color 0.2s;
+}
+.btn-action:hover:not(:disabled) {
+  background: var(--accent-bg-hover);
+  border-color: var(--border-focus);
+}
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-action--full {
+  width: 100%;
+}
+
+/* Green filled: main positive action of a modal footer. */
+.btn-confirm {
+  padding: var(--space-5) var(--space-8);
+  background: var(--btn-confirm-bg);
+  color: var(--btn-confirm-text);
+  border: 1px solid var(--btn-confirm-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  font-weight: 500;
+  transition:
+    color 0.2s,
+    background-color 0.2s,
+    border-color 0.2s;
+}
+.btn-confirm:hover:not(:disabled) {
+  background: var(--btn-confirm-bg-hover);
+}
+.btn-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Dim, transparent: dismiss, go back. */
+.btn-cancel {
+  padding: var(--space-5) var(--space-8);
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  transition:
+    color 0.2s,
+    background-color 0.2s,
+    border-color 0.2s;
+}
+.btn-cancel:hover:not(:disabled) {
+  background: var(--btn-cancel-bg-hover);
+}
+.btn-cancel:disabled {
+  opacity: 0.4;
+}
+
+/* Red: sole destructive choice of a dialog. */
+.btn-danger {
+  padding: var(--space-5) var(--space-8);
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-text);
+  border: 1px solid var(--btn-danger-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  font-weight: 500;
+  transition:
+    color 0.15s,
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--btn-danger-bg-hover);
+  border-color: var(--btn-danger-border-hover);
+}
+.btn-danger:hover {
+  color: var(--btn-danger-hover-text);
+}
+.btn-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Icon buttons: fill 0 -> 35 -> 55 -> 75 % (rest, hover, selected, selected hover) ────── */
+.btn-icon,
+.btn-icon--danger,
+.btn-icon--active,
+.btn-icon--danger-active {
+  background: transparent;
+  border: 1px solid var(--border-white-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  display: inline-grid;
+  grid-template-rows: minmax(1lh, auto);
+  place-items: center;
+  place-content: center;
+  transition:
+    color 0.15s,
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.btn-icon:hover,
+.btn-icon--danger:hover,
+.btn-icon--active:hover,
+.btn-icon--danger-active:hover {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+.btn-icon svg,
+.btn-icon--danger svg,
+.btn-icon--active svg,
+.btn-icon--danger-active svg {
+  width: 1em;
+  height: 1em;
+}
+.btn-icon--danger {
+  color: var(--color-danger);
+}
+.btn-icon--danger:hover {
+  background: var(--btn-danger-hover-bg);
+  border-color: var(--btn-danger-hover-border);
+}
+.btn-icon--active {
+  background: var(--accent-bg) !important;
+  border-color: var(--border-focus) !important;
+  color: var(--text-bright) !important;
+}
+.btn-icon--active:hover {
+  background: var(--accent-bg-hover) !important;
+}
+.btn-icon--danger-active {
+  background: var(--btn-danger-bg) !important;
+  border-color: var(--btn-danger-border) !important;
+  color: var(--btn-danger-text) !important;
+}
+.btn-icon--danger-active:hover {
+  background: var(--btn-danger-bg-hover) !important;
+}
+
+/* ── Inputs ───────────────────────────────────────────────────────────────────────────────── */
+.input-base {
+  width: 100%;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+}
+.input-base:focus {
+  border-color: var(--border-focus);
+  outline: none;
+}
+.input-base:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.input-base::placeholder {
+  color: var(--text-dim);
+}
+.input-error {
+  border-color: var(--status-error-border) !important;
+  outline: 1px solid var(--status-error-text);
+}
+.input-error-msg {
+  color: var(--status-error-text);
+  font-size: var(--font-size-small);
+  margin-top: var(--space-1);
+}
+.input-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--text-label);
+  font-size: var(--font-size-small);
+}
+.required-star {
+  color: var(--status-error-text);
+}
+
+/* Select: a native <select> with input-base; the compact panel variant is display-controls-select. */
+select.input-base {
+  cursor: pointer;
+  height: calc(1.5em + 2 * var(--space-2) + 2 * var(--space-px));
+}
+.display-controls-select {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1h) var(--space-3);
+  font-size: var(--font-size-base);
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  color: var(--text-label);
+  cursor: pointer;
+}
+.display-controls-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+/* Checkbox: native, tinted by accent-color. */
+.dso-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-body);
+  color: var(--text-label);
+  cursor: pointer;
+  user-select: none;
+  padding: var(--space-3) 0;
+}
+.dso-toggle-label input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent-color);
+}
+.dso-toggle-label input[type="checkbox"].checkbox-danger {
+  accent-color: var(--accent-danger);
+}
+
+/* ── Chips ────────────────────────────────────────────────────────────────────────────────── */
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: 0;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1h);
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-fill-lg);
+  border-radius: var(--radius-xs);
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--font-size-micro);
+  line-height: 1.3;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-label);
+}
+.tag-chip.label-chip {
+  background: var(--chip-label-bg);
+  border-color: var(--chip-label-border);
+  color: var(--chip-label-text);
+}
+.tag-chip.setup-chip {
+  background: var(--chip-setup-bg);
+  border-color: var(--chip-setup-border);
+  color: var(--chip-setup-text);
+}
+.tag-chip-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-micro);
+  line-height: 1.3;
+  padding: var(--space-px) var(--space-3);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  border: 1px solid var(--accent-fill-lg);
+  color: var(--text-label);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tag-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: var(--font-size-body);
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.tag-chip-remove:hover {
+  color: var(--btn-danger-hover-text);
+}
+/* Filter chips: fixed colour per filter type. */
+.target-filter-badge {
+  display: inline-block;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-sm);
+  min-width: 38px;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+.filter-ha {
+  background: var(--filter-ha);
+  color: var(--filter-ha-text);
+  border: 1px solid var(--filter-ha-border);
+}
+.filter-oiii {
+  background: var(--filter-oiii);
+  color: var(--filter-oiii-text);
+  border: 1px solid var(--filter-oiii-border);
+}
+.filter-sii {
+  background: var(--filter-sii);
+  color: var(--filter-sii-text);
+  border: 1px solid var(--filter-sii-border);
+}
+.filter-l {
+  background: var(--filter-l);
+  color: var(--filter-l-text);
+  border: 1px solid var(--filter-l-border);
+}
+.filter-r {
+  background: var(--filter-r);
+  color: var(--filter-r-text);
+  border: 1px solid var(--filter-r-border);
+}
+.filter-g {
+  background: var(--filter-g);
+  color: var(--filter-g-text);
+  border: 1px solid var(--filter-g-border);
+}
+.filter-b {
+  background: var(--filter-b);
+  color: var(--filter-b-text);
+  border: 1px solid var(--filter-b-border);
+}
+.filter-rgb {
+  background: var(--filter-rgb);
+  color: var(--filter-rgb-text);
+  border: 1px solid var(--filter-rgb-border);
+}
+.filter-custom {
+  background: var(--filter-custom);
+  color: var(--filter-custom-text);
+  border: 1px solid var(--filter-custom-border);
+}
+.filter-dual-band {
+  background: var(--filter-dual-band);
+  color: var(--filter-dual-band-text);
+  border: 1px solid var(--filter-dual-band-border);
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────────────────────────── */
+.target-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6) var(--space-6h);
+  transition: border-color 0.2s;
+}
+.target-card:hover {
+  border-color: var(--border-accent);
+}
+.target-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2h);
+  margin-bottom: var(--space-5);
+}
+.target-card-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.target-card-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.target-card-title {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  color: var(--text-bright);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.target-card-catalog-id {
+  font-size: var(--font-size-body);
+  font-weight: 400;
+  color: var(--text-label);
+}
+.target-card-name {
+  font-size: var(--font-size-sub);
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.target-card-type {
+  font-size: var(--font-size-small);
+  color: var(--text-dim);
+  background: var(--target-type-bg);
+  border: 1px solid var(--accent-fill-md);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3h);
+  flex-shrink: 0;
+}
+.target-card-const {
+  font-size: var(--font-size-small);
+  color: var(--target-const-text);
+  background: var(--target-const-bg);
+  border: 1px solid var(--target-const-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3h);
+  flex-shrink: 0;
+}
+.target-card-rating {
+  font-size: var(--font-size-body);
+  color: var(--target-rating-text);
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  cursor: default;
+  white-space: nowrap;
+}
+.target-card-difficulty {
+  color: var(--target-difficulty-text);
+  letter-spacing: 1px;
+}
+/* Inline data panel of the side panel. */
+.dso-info-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-base);
+}
+.dso-info-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-body);
+  cursor: pointer;
+}
+.dso-info-name:hover {
+  text-decoration: underline;
+  color: var(--text-bright);
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+.modal {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-xl);
+  width: 90vw;
+  max-width: 960px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: opacity 0.15s ease;
+}
+/* Shortcut modal-sheet: large summoned surface (Find-targets overlay). */
+.modal-sheet {
+  width: 95vw !important;
+  max-width: 95vw !important;
+  max-height: 90vh !important;
+  display: flex;
+  flex-direction: column;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-7) var(--space-8);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.modal-header h2 {
+  font-size: var(--font-size-head);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+  cursor: pointer;
+  padding: 0 var(--space-2);
+  line-height: 1;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.modal-close:hover {
+  color: var(--text-bright);
+  background: var(--accent-fill-lg);
+}
+.modal-body {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+}
+.modal-form-body {
+  padding: var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.modal-footer {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: flex-end;
+  padding: var(--space-5) var(--space-7);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.modal-footer-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-7);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.modal-loading-placeholder {
+  text-align: center;
+  padding: var(--space-18) var(--space-8);
+  color: var(--text-muted);
+}
+.modal-loading-error {
+  text-align: center;
+  padding: var(--space-18) var(--space-8);
+  color: var(--status-error-text);
+}
+
+/* ── Toast ────────────────────────────────────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  bottom: var(--space-9);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  pointer-events: none;
+}
+.toast {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-7);
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  pointer-events: auto;
+  animation: toast-in 0.25s ease;
+}
+.toast-error {
+  border-color: var(--card-status-failed);
+  color: var(--btn-danger-hover-text);
+}
+.toast-warning {
+  border-color: var(--status-warn-border);
+  color: var(--status-warn-text);
+}
+.toast-undo {
+  border-color: var(--border-accent);
+}
+.toast-action {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--text-bright);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toast-action:hover {
+  background: var(--accent-bg-hover);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Status ───────────────────────────────────────────────────────────────────────────────── */
+.status-success {
+  background: var(--status-success-bg);
+  border: 1px solid var(--status-success-border);
+  color: var(--status-success-text);
+}
+.status-error {
+  background: var(--status-error-bg);
+  border: 1px solid var(--status-error-border);
+  color: var(--status-error-text);
+}
+.status-info {
+  background: var(--status-info-bg);
+  border: 1px solid var(--status-info-border);
+  color: var(--status-info-text);
+}
+.status-warn {
+  background: var(--status-warn-bg);
+  border: 1px solid var(--status-warn-border);
+  color: var(--status-warn-text);
+}
+.wcs-status {
+  margin-top: var(--space-4);
+  font-size: var(--font-size-base);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+.wcs-status--info {
+  border-color: var(--wcs-info-border);
+  background: var(--wcs-info-bg);
+  color: var(--wcs-info-text);
+}
+.wcs-status--success {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+.wcs-status--error {
+  border-color: var(--status-error-border);
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+.wcs-status--warning {
+  border-color: var(--status-warn-border);
+  background: var(--status-warn-bg);
+  color: var(--status-warn-text);
+}
+
+/* ── Spinners ─────────────────────────────────────────────────────────────────────────────── */
+.loading-spinner,
+.targets-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--accent-fill-md);
+  border-top-color: var(--spinner-active);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+.targets-spinner {
+  margin: var(--space-13) auto;
+}
+.auto-solve-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent-fill-md);
+  border-top-color: var(--spinner-active);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+  margin-right: var(--space-3);
+  vertical-align: middle;
+}
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════
+   MOBILE LAYER — proposed, not in the code. Built only from tokens.
+   Type comes from the Mobile type styles (class m-body, m-caption, …); focus ring is text-bright.
+   ════════════════════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --mobile-scrollbar-width: var(--space-4);
+  --mobile-gutter-end: var(--mobile-gutter);
+}
+.mob-btn,
+.mob-icon-btn,
+.mob-tab,
+.mob-row,
+.mob-seg-btn,
+.mob-fab,
+.mob-sheet-grab {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-btn:focus-visible,
+.mob-icon-btn:focus-visible,
+.mob-tab:focus-visible,
+.mob-row:focus-visible,
+.mob-seg-btn:focus-visible,
+.mob-fab:focus-visible,
+.mob-sheet-grab:focus-visible,
+.mob-field:focus-visible,
+.mob-select:focus-visible,
+.mob-search:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: -2px;
+}
+
+/* Icon button: touch-sized, fill scale 0 -> 35 (pressed) -> 55 (selected). No hover. */
+.mob-icon-btn {
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-white-md);
+  border-radius: var(--mobile-card-radius);
+  color: var(--text-primary);
+}
+.mob-icon-btn svg {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+.mob-icon-btn:active {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+.mob-icon-btn[aria-pressed="true"] {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+
+/* TabBar */
+.mob-tabbar {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-panel);
+  /* hairline drawn inside the box so the bar is exactly mobile-tabbar-height (a border would add 1px) */
+  box-shadow: inset 0 1px 0 var(--border-panel);
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom));
+}
+.mob-tab {
+  flex: 1 1 0;
+  min-width: var(--mobile-touch-min);
+  min-height: var(--mobile-tabbar-height);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
+}
+.mob-tab-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-14);
+  height: var(--space-11);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+}
+.mob-tab-pill svg {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+.mob-tab[aria-selected="true"] {
+  color: var(--text-bright);
+}
+.mob-tab[aria-selected="true"] .mob-tab-pill {
+  background: var(--accent-bg);
+}
+.mob-tab:active .mob-tab-pill {
+  background: var(--accent-fill-lg);
+}
+
+/* TopBar */
+.mob-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--mobile-topbar-height);
+  padding: var(--safe-top, env(safe-area-inset-top)) var(--mobile-gutter) 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-panel);
+}
+.mob-topbar-title {
+  flex: none;
+  color: var(--text-bright);
+}
+/* Form fields: input, select and the TopBar search share one box. The explicit height makes a native
+   <select> (whose line-height Chromium forces to "normal") exactly as tall as an <input>. */
+.mob-field,
+.mob-select,
+.mob-search {
+  display: block;
+  width: 100%;
+  height: var(--mobile-touch-min);
+  box-sizing: border-box;
+  padding: 0 var(--space-7);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-input);
+  border-radius: var(--mobile-card-radius);
+  font-size: 16px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+}
+.mob-search {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+.mob-field:focus,
+.mob-select:focus,
+.mob-search:focus {
+  border-color: var(--border-focus);
+  outline: none;
+}
+.mob-field::placeholder,
+.mob-search::placeholder {
+  /* a little lighter than text-dim (3.4:1 on bg-input): 58 % text-dim and 42 % text-secondary, about 4.6:1 */
+  color: color-mix(in srgb, var(--text-dim) 58%, var(--text-secondary));
+}
+.mob-field:disabled,
+.mob-select:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* A native <select> adds its own inner inset, which pushes the value ~4px right of a field's text. appearance: none
+   removes it, so the select needs the .mob-select-wrap wrapper to draw the app's chevron-down (pointer-events: none,
+   so a tap still opens the select). The right padding keeps a long value clear of the chevron. */
+.mob-select-wrap {
+  position: relative;
+  display: block;
+}
+.mob-select-wrap::after {
+  /* a drawn chevron-down (revision 5, was the "▾" glyph): a 14px box in the glyph's place, painted in text-secondary through a mask */
+  content: "";
+  position: absolute;
+  right: calc(var(--space-7) - 1px);
+  top: 50%;
+  width: var(--font-size-sub);
+  height: var(--font-size-sub);
+  transform: translateY(-50%);
+  background: var(--text-secondary);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  pointer-events: none;
+}
+.mob-select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: calc(var(--space-7) + var(--font-size-sub) + var(--space-4));
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.mob-field-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--text-label);
+}
+
+/* BottomSheet */
+.mob-sheet {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-deep);
+  /* top hairline only: a left and right border would push the content 1px off the screen gutter */
+  border: 0 solid var(--border-panel);
+  border-top-width: 1px;
+  border-radius: var(--mobile-sheet-radius) var(--mobile-sheet-radius) 0 0;
+  box-shadow: 0 calc(var(--space-2) * -1) var(--space-9) var(--shadow-lg);
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+.mob-sheet--peek {
+  height: var(--mobile-sheet-peek);
+}
+.mob-sheet--half {
+  height: 50%;
+}
+.mob-sheet--full {
+  height: 100%;
+}
+.mob-sheet-grab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 100%;
+  min-height: var(--mobile-touch-min);
+  background: none;
+  border: 0;
+}
+.mob-sheet-handle {
+  width: var(--mobile-sheet-handle-width);
+  height: var(--mobile-sheet-handle-height);
+  border-radius: var(--radius-pill);
+  background: var(--border-white-xl);
+}
+.mob-sheet-header {
+  flex: none;
+  padding: 0 var(--mobile-gutter) var(--space-4);
+}
+.mob-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ListRow */
+.mob-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+  width: 100%;
+  min-height: var(--mobile-list-row-min);
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  text-align: left;
+}
+.mob-row:active {
+  background: var(--bg-hover);
+}
+.mob-row-lead {
+  flex: none;
+  width: var(--space-13);
+  height: var(--space-13);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--accent-fill-md);
+  color: var(--text-bright);
+}
+.mob-row-lead svg {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+.mob-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mob-row-title {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mob-row-sub {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mob-row-trail {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text-secondary);
+}
+.mob-row-chevron {
+  font-size: var(--font-size-base);
+}
+
+/* FAB */
+.mob-fab {
+  width: var(--mobile-fab-size);
+  height: var(--mobile-fab-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-bright);
+  box-shadow: 0 var(--space-2) var(--space-8) var(--shadow-lg);
+}
+.mob-fab svg {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+.mob-fab:active {
+  background: var(--accent-bg-hover);
+  border-color: var(--border-focus);
+}
+.mob-fab--fixed {
+  position: absolute;
+  right: var(--mobile-gutter);
+  bottom: calc(var(--mobile-tabbar-height) + var(--mobile-gutter));
+}
+
+/* SegmentedControl */
+.mob-seg {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--mobile-card-radius);
+}
+.mob-seg-btn {
+  flex: 1 1 0;
+  min-height: var(--mobile-touch-min);
+  padding: 0 var(--space-4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+}
+.mob-seg-btn:active {
+  background: var(--accent-fill-lg);
+}
+.mob-seg-btn[aria-checked="true"] {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+/* ── Mobile layer, round D1 batch 1 (structure and navigation) ───────────────────────────────── */
+.mob-chip {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-chip:focus-visible,
+.mob-drag:focus-visible,
+.mob-switch:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: -2px;
+}
+
+/* Button: text button, touch-sized. Roles follow the desktop (docs/dev/ui/components.md 2.1, uno.config.ts shortcuts): the default is the ghost /
+   cancel button (transparent, neutral border; the desktop btn-cancel label is text-dim, 3.5:1 on bg-panel, so the label stays text-primary);
+   --action is btn-action (accent fill: open, start an operation); --confirm is btn-confirm (green fill: save, validate, apply);
+   --danger is the inline destructive button (outlined) and --danger-fill is btn-danger (red fill, the sole destructive choice of a dialog);
+   --lg is the comfortable 56px height; --block fills the row; --field looks like an input (a readout that opens a picker). */
+.mob-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  height: var(--mobile-touch-min);
+  min-width: var(--mobile-touch-min);
+  padding: 0 var(--space-7);
+  background: transparent;
+  border: 1px solid var(--border-white-md);
+  border-radius: var(--mobile-card-radius);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.mob-btn svg {
+  flex: none;
+  width: var(--space-9);
+  height: var(--space-9);
+}
+.mob-btn:active {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+.mob-btn--action {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-bright);
+}
+.mob-btn--action:active {
+  background: var(--accent-bg-hover);
+  border-color: var(--border-focus);
+}
+.mob-btn--confirm {
+  background: var(--btn-confirm-bg);
+  border-color: var(--btn-confirm-border);
+  color: var(--btn-confirm-text);
+}
+.mob-btn--confirm:active {
+  background: var(--btn-confirm-bg-hover);
+  border-color: var(--btn-confirm-border);
+  color: var(--btn-confirm-text);
+}
+.mob-btn--danger-fill {
+  background: var(--btn-danger-bg);
+  border-color: var(--btn-danger-border);
+  color: var(--btn-danger-text);
+}
+.mob-btn--danger-fill:active {
+  background: var(--btn-danger-bg-hover);
+  border-color: var(--btn-danger-border-hover);
+  color: var(--btn-danger-text);
+}
+.mob-btn--lg {
+  height: var(--mobile-touch-comfortable);
+}
+.mob-btn--block {
+  display: flex;
+  width: 100%;
+}
+.mob-btn--field {
+  min-width: 0;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  background: var(--bg-input);
+  border-color: var(--border-input);
+}
+.mob-btn-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mob-btn-caret {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sub);
+  line-height: 1;
+}
+
+/* Filter chip: a tappable pill (48px tall, so unlike the desktop 10px chip it is a real control).
+   Selected is the accent fill and a strong weight, so it reads without colour. */
+.mob-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--mobile-touch-min);
+  min-width: var(--mobile-touch-min);
+  padding: 0 var(--space-7);
+  background: transparent;
+  border: 1px solid var(--border-white-md);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.mob-chip:active {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
+}
+.mob-chip[aria-pressed="true"] {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+  font-weight: 600;
+}
+.mob-chip-row {
+  display: flex;
+  gap: var(--space-4);
+  padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+
+/* Scroll areas. A horizontal one (chips) shows no bar. A vertical one shows a thin bar, always, as soon as its content is taller than the box, in the colours
+   of the desktop scroll bar (--scrollbar-thumb, --radius-2h); a phone browser hides its bar by default, so the bar is drawn with ::-webkit-scrollbar, which
+   turns Chromium's overlay bar (and the Android WebView's) into a classic always-visible one. The bar sits in the right 16px gutter: its 8px are reserved in
+   both states (scrollbar-gutter: stable, transparent track, so a box that fits shows nothing) and the rows inside take their right inset from
+   --mobile-gutter-end (16px minus the bar), so a control keeps its right edge at the gutter. The desktop rule "* { scrollbar-width: thin; scrollbar-color }"
+   would switch ::-webkit-scrollbar off in Chromium 121+: it is reset to auto here. */
+.mob-scroll,
+.mob-scroll-x {
+  min-height: 0;
+}
+.mob-scroll-x {
+  scrollbar-width: none;
+}
+.mob-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+.mob-scroll {
+  --mobile-gutter-end: calc(var(--mobile-gutter) - var(--mobile-scrollbar-width));
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+  scrollbar-gutter: stable;
+}
+.mob-scroll::-webkit-scrollbar {
+  width: var(--mobile-scrollbar-width);
+  background: transparent;
+}
+.mob-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.mob-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: var(--space-1) solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--radius-2h);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .mob-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+}
+.mob-scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.mob-section-header {
+  padding: var(--space-7) var(--mobile-gutter-end) var(--space-2) var(--mobile-gutter);
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Context row of a list screen: each part is a field-like button. */
+.mob-context {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--mobile-gutter);
+}
+.mob-context .mob-btn--field {
+  flex: 1 1 auto;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+}
+
+/* ListRow variants: three text lines, and a two-line trailing value. */
+.mob-row--roomy {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+.mob-row-trail--stack {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.mob-row-trail-main {
+  color: var(--text-bright);
+}
+
+/* Navigation bar title that gives way to the buttons around it (pushed screens). */
+.mob-topbar-title--grow {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sky map screens: the map fills the area above the tab bar; controls float on it. */
+.mob-map {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-app);
+  overflow: hidden;
+}
+.mob-map-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  text-align: center;
+}
+.mob-map-top {
+  position: absolute;
+  top: var(--mobile-gutter);
+  left: var(--mobile-gutter);
+  right: var(--mobile-gutter);
+  z-index: var(--z-base);
+  display: flex;
+  gap: var(--space-4);
+}
+.mob-map-cluster {
+  position: absolute;
+  top: calc(var(--mobile-gutter) + var(--mobile-touch-min) + var(--space-7));
+  right: var(--mobile-gutter);
+  z-index: var(--z-base);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.mob-icon-btn--float {
+  background: var(--bg-panel);
+}
+.mob-timebar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-base);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--mobile-gutter);
+  background: var(--bg-panel);
+  box-shadow: inset 0 1px 0 var(--border-panel);
+}
+.mob-timebar .mob-btn--field {
+  flex: 1;
+}
+
+/* Facts: small label-over-value cards in an equal-column grid (object sheet, night summary). */
+.mob-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: 0 var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+}
+.mob-facts--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.mob-fact {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-5) var(--space-6);
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+}
+.mob-fact--wide {
+  grid-column: 1 / -1;
+}
+.mob-fact-label {
+  color: var(--text-label);
+}
+.mob-fact-value {
+  color: var(--text-bright);
+}
+
+/* Plan entry: a drag handle (its own 48px target) beside the entry row. */
+.mob-entry {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.mob-entry .mob-row {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0;
+  border-bottom: 0;
+}
+.mob-drag {
+  flex: none;
+  align-self: center;
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+}
+.mob-drag:active {
+  background: var(--bg-hover);
+  color: var(--text-bright);
+}
+
+/* Photo grid of the Library: two equal columns of square tiles with the object id under each. */
+.mob-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-7);
+  padding: var(--space-7) var(--mobile-gutter-end) var(--space-7) var(--mobile-gutter);
+}
+.mob-photo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.mob-photo-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: var(--space-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-photo-tile:active {
+  background: var(--bg-hover);
+}
+.mob-photo-tile:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: -2px;
+}
+.mob-photo-name {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.mob-photo-id {
+  color: var(--text-secondary);
+}
+
+/* Switch-like native checkbox for a settings row (the row is the tap target). */
+.mob-switch {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: var(--space-15);
+  height: var(--space-11);
+  background: var(--bg-input);
+  border: 1px solid var(--border-white-md);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.mob-switch::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--space-2);
+  width: var(--space-9);
+  height: var(--space-9);
+  border-radius: var(--radius-pill);
+  background: var(--text-secondary);
+  transform: translateY(-50%);
+  transition: left 0.15s ease;
+}
+.mob-switch:checked {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+}
+.mob-switch:checked::before {
+  left: calc(100% - var(--space-9) - var(--space-2));
+  background: var(--text-bright);
+}
+
+/* Footer of a pushed screen: holds the one primary button, flush with the bottom edge. */
+.mob-footer {
+  padding: var(--mobile-gutter);
+  padding-bottom: calc(var(--mobile-gutter) + var(--safe-bottom, env(safe-area-inset-bottom)));
+  background: var(--bg-panel);
+  box-shadow: inset 0 1px 0 var(--border-panel);
+}
+
+/* ── Mobile layer, round D1 revision 2 ───────────────────────────────────────────────────────── */
+/* BottomSheet that takes the height of its content: --auto stops at 60 % of the parent, --auto-lg at 70 %; past that
+   the body scrolls. The last row of a sheet body has no separator, so it does not double the line above the tab bar. */
+.mob-sheet--auto,
+.mob-sheet--auto-lg {
+  height: auto;
+  max-height: 60%;
+}
+.mob-sheet--auto-lg {
+  max-height: 70%;
+}
+.mob-sheet--auto .mob-sheet-body,
+.mob-sheet--auto-lg .mob-sheet-body {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+/* One row of icon-only buttons in a sheet (48 x 48, `.mob-icon-btn`, each with an aria-label): spread from gutter to gutter, 8px at least between two. */
+.mob-icon-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--mobile-gutter) var(--mobile-gutter);
+}
+.mob-sheet-body > .mob-row:last-child {
+  border-bottom: 0;
+}
+
+/* Footer of a sheet: two or more buttons side by side, equal widths. */
+.mob-sheet-footer {
+  flex: none;
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--mobile-gutter);
+  box-shadow: inset 0 1px 0 var(--border-panel);
+}
+.mob-sheet-footer .mob-btn {
+  flex: 1 1 0;
+}
+
+/* Scrim behind a sheet that must be answered (a checklist with Appliquer). */
+.mob-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-panel);
+  background: var(--bg-overlay);
+}
+/* The sheet that follows a scrim sits above it (and above floating controls, which are at z-base). */
+.mob-scrim ~ .mob-sheet {
+  z-index: var(--z-toggle);
+}
+
+/* Dialog: a card centred over a .mob-scrim, for a question that has two answers (the desktop's confirmation `.dialog`: `dialog-overlay`, `h3`,
+   `dialog-message`, `dialog-buttons` = two equal columns, cancel then the destructive confirm). Every delete on the phone goes through it. 16px from each screen edge,
+   16px of padding, centred vertically without a transform; the two buttons are equal (`.mob-btn--lg`, 56px) and may wrap their label onto two lines. */
+.mob-dialog {
+  position: absolute;
+  inset: 0 var(--mobile-gutter);
+  height: fit-content;
+  margin-block: auto;
+  z-index: var(--z-toggle);
+  padding: var(--mobile-gutter);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+  box-shadow: 0 var(--space-2) var(--space-9) var(--shadow-md);
+}
+.mob-dialog-title {
+  margin: 0 0 var(--space-7);
+  color: var(--text-primary);
+}
+.mob-dialog-message {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.mob-dialog-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+}
+.mob-dialog-buttons .mob-btn {
+  padding: 0 var(--space-2);
+  white-space: normal;
+  text-align: center;
+}
+/* Trailing checkbox of a checklist row: the row (a label) is the tap target, the box is the native control. */
+.mob-check {
+  flex: none;
+  width: var(--space-9);
+  height: var(--space-9);
+  margin: 0;
+  accent-color: var(--accent-color);
+  color-scheme: dark;
+  cursor: pointer;
+}
+.mob-check:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: 2px;
+}
+
+/* Field-like button with a key and a value: "Types d'objets" ... "2 types" ▾. A second context row follows the first
+   with the same 8px gap. */
+.mob-btn-key {
+  flex: none;
+  color: var(--text-secondary);
+}
+.mob-btn-value {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-bright);
+}
+.mob-context--follow {
+  padding-top: 0;
+}
+
+/* Meaning in colour, as on the desktop target card: rating stars, type and constellation badges, success values. */
+.mob-rating {
+  color: var(--target-rating-text);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.mob-meta {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+}
+.mob-meta > span:first-child {
+  flex: none;
+}
+.mob-badge {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-3h);
+  border: 1px solid var(--accent-fill-md);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mob-badge--type {
+  flex: 0 1 auto;
+  color: var(--text-secondary);
+  background: var(--target-type-bg);
+  border-color: var(--accent-fill-md);
+}
+.mob-badge--const {
+  flex: none;
+  color: var(--target-const-text);
+  background: var(--target-const-bg);
+  border-color: var(--target-const-border);
+}
+.mob-status--success {
+  color: var(--status-success-text);
+}
+.mob-sheet-header .mob-meta {
+  margin-top: var(--space-2);
+}
+
+/* ── Mobile layer, round D1 batch 2a (photo flows) ───────────────────────────────────────────── */
+/* Helper text under a control or a list: the visible home of every explanation and every reason a control is disabled. */
+.mob-helper {
+  margin: 0;
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-7) var(--mobile-gutter);
+  color: var(--text-secondary);
+}
+/* A row second line that may wrap (a reason must never be ellipsised). */
+.mob-row-sub--wrap {
+  white-space: normal;
+  overflow: visible;
+}
+/* Disabled row: the title and the lead dim, the helper line under the title keeps full contrast (it says why). */
+.mob-row:disabled {
+  cursor: default;
+}
+.mob-row:disabled:active {
+  background: transparent;
+}
+.mob-row:disabled .mob-row-title,
+.mob-row:disabled .mob-row-lead {
+  opacity: 0.4;
+}
+.mob-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mob-btn:disabled:active {
+  background: transparent;
+  border-color: var(--border-white-md);
+  color: var(--text-primary);
+}
+.mob-btn--action:disabled:active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-bright);
+}
+.mob-btn--confirm:disabled:active {
+  background: var(--btn-confirm-bg);
+  border-color: var(--btn-confirm-border);
+  color: var(--btn-confirm-text);
+}
+/* Square thumbnail at the start of a row (an imported photo). */
+.mob-row-thumb {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+}
+.mob-row-thumb svg {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+/* Destructive row: lead and title in the danger colour (the trash can marks every per-item delete). */
+.mob-row--danger .mob-row-title {
+  color: var(--color-danger);
+}
+.mob-row--danger .mob-row-lead {
+  background: var(--status-error-bg);
+  color: var(--color-danger);
+}
+
+/* Full-screen viewer (one photo): a stage on the deepest background, with an overlaid top bar. */
+.mob-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+.mob-stage--viewer {
+  background: var(--bg-overlay-heavy);
+}
+.mob-stage-caption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--mobile-gutter);
+  color: var(--text-secondary);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.mob-topbar--overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-base);
+  background: var(--bg-overlay-72);
+  border-bottom: 0;
+}
+/* A floating control pinned to the bottom-right corner of a stage (reset zoom). */
+.mob-float-br {
+  position: absolute;
+  right: var(--mobile-gutter);
+  bottom: calc(var(--mobile-gutter) + var(--safe-bottom, env(safe-area-inset-bottom)));
+  z-index: var(--z-base);
+}
+
+/* Bottom panel of a mode (placement, three-point): fixed at the bottom, takes its content height, never dragged. */
+.mob-panel {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  box-shadow: inset 0 1px 0 var(--border-panel);
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom));
+}
+
+/* Slider row: label | slider | value. The three columns are the same in every row of a panel. */
+.mob-slider-row {
+  display: grid;
+  grid-template-columns: var(--space-19) minmax(0, 1fr) var(--space-16);
+  align-items: center;
+  column-gap: var(--space-4);
+  /* 48px slider + 8px above and below, so it keeps the 8px gap to the next target */
+  min-height: var(--space-18);
+  padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+.mob-slider-label {
+  color: var(--text-primary);
+}
+.mob-slider-value {
+  text-align: right;
+  color: var(--text-bright);
+}
+.mob-slider {
+  display: block;
+  width: 100%;
+  height: var(--mobile-touch-min);
+  margin: 0;
+  accent-color: var(--accent-color);
+  background: transparent;
+  cursor: pointer;
+}
+.mob-slider:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: -2px;
+}
+
+/* Map hint: one line floating over the top of a map or photo stage. */
+.mob-map-hint {
+  position: absolute;
+  top: var(--mobile-gutter);
+  left: var(--mobile-gutter);
+  right: var(--mobile-gutter);
+  z-index: var(--z-base);
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+  color: var(--text-primary);
+  text-align: center;
+}
+/* Outline of the photo being placed on the map. */
+.mob-map-photo {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-fill-sm);
+  border: 2px solid var(--border-accent);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Registration marker on a photo: a 48px touch target holding a numbered ring; the ring centre is the point. */
+.mob-marker {
+  position: absolute;
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-bright);
+  touch-action: none;
+}
+.mob-marker-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-10);
+  height: var(--space-10);
+  background: var(--accent-fill-lg);
+  border: 2px solid var(--text-bright);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+.mob-marker--active .mob-marker-dot {
+  background: var(--accent-bg);
+}
+/* Round magnifier drawn above the finger while a marker is dragged: crosshair over the zoomed pixels. */
+.mob-magnifier {
+  position: absolute;
+  width: calc(var(--mobile-touch-min) * 2);
+  height: calc(var(--mobile-touch-min) * 2);
+  box-sizing: border-box;
+  background:
+    linear-gradient(var(--text-bright), var(--text-bright)) center / 1px 100% no-repeat,
+    linear-gradient(var(--text-bright), var(--text-bright)) center / 100% 1px no-repeat,
+    radial-gradient(circle at 56% 44%, var(--text-bright) 0 var(--space-3), transparent var(--space-3h)),
+    var(--bg-deep);
+  border: 2px solid var(--text-bright);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 var(--space-2) var(--space-8) var(--shadow-lg);
+  pointer-events: none;
+}
+/* A trailing icon of a row (a success check) is a 24px icon like every other. */
+.mob-row-trail svg {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+/* The row just above a panel footer has no separator: the footer draws its own hairline. */
+.mob-panel > .mob-row:has(+ .mob-sheet-footer) {
+  border-bottom: 0;
+}
+
+/* ── Mobile layer, round D1 batch 2b (map modes, plan and filter sheets, computer connection) ─── */
+/* Label over a control (a field, a pair of fields, a group of buttons) in a panel or sheet. */
+.mob-form-row {
+  padding: 0 var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+}
+.mob-form-row--pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-4);
+}
+.mob-form-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+}
+/* A row of equal buttons (rotation steps, directions, 1 to 5): one line, never scrolls. */
+.mob-btn-row {
+  display: flex;
+  gap: var(--space-4);
+  padding: 0 var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+}
+.mob-btn-row .mob-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 var(--space-2);
+}
+.mob-btn[aria-pressed="true"] {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+/* Stepper row: label | minus | value | plus. The three right columns are the same in every stepper row. */
+.mob-stepper-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--mobile-touch-min) var(--space-16) var(--mobile-touch-min);
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: var(--space-18);
+  padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+.mob-stepper-value {
+  text-align: center;
+  color: var(--text-bright);
+}
+/* Input row with a derived count: label | N | x | number field | unit ("30 x [180] s"). */
+.mob-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--space-13) var(--space-7) var(--space-19) var(--space-7);
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: var(--space-18);
+  padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+.mob-input-row .mob-field {
+  text-align: center;
+  padding: 0 var(--space-4);
+}
+.mob-input-row-derived {
+  text-align: right;
+  color: var(--text-secondary);
+}
+.mob-input-row-unit {
+  color: var(--text-secondary);
+}
+/* A row title that may wrap onto a second line (a long desktop label). */
+.mob-row-title--wrap {
+  white-space: normal;
+  overflow: visible;
+}
+/* Colour dot of a user colour (region, observation window); the colour is the element's background. */
+.mob-swatch {
+  flex: none;
+  display: inline-block;
+  width: var(--space-9);
+  height: var(--space-9);
+  border: 2px solid var(--text-bright);
+  border-radius: var(--radius-pill);
+}
+/* Hand-drawn outline over a map (region being drawn): a full-size SVG, drawn in px, never intercepts a touch. */
+.mob-map-drawing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.mob-map-drawing path {
+  fill: var(--accent-fill-sm);
+  stroke: var(--border-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Field-of-view frames on the map, drawn in a `.mob-map-drawing` SVG as the desktop's `renderFovInstances` draws them (they replace the old `.mob-map-frame` box):
+   a dashed 8 4 polygon, the setup name along its longest edge, and, on the selected frame only, the centre dot and the rotation needle with its dot.
+   Selected: the accent colour (`accent-color`), 2px. Unselected (`.mob-fov--idle`): `fov-frame-stroke` / `fov-frame-label`, 1.5px, 50 % opacity (the desktop's
+   globalAlpha), no marks. */
+.mob-fov-frame {
+  fill: none;
+  stroke: var(--accent-color);
+  stroke-width: 2;
+  stroke-dasharray: 8 4;
+  stroke-linejoin: miter;
+}
+.mob-fov-label {
+  fill: var(--accent-color);
+}
+.mob-fov-needle {
+  stroke: var(--accent-color);
+  stroke-width: 1.5;
+}
+.mob-fov-dot {
+  fill: var(--accent-color);
+}
+.mob-fov-frame.mob-fov--idle {
+  stroke: var(--fov-frame-stroke);
+  stroke-width: 1.5;
+  opacity: 0.5;
+}
+.mob-fov-label.mob-fov--idle {
+  fill: var(--fov-frame-label);
+  opacity: 0.5;
+}
+/* While a frame is dragged and a DSO is in snap range: the elastic line from the frame centre to the DSO (width and opacity grow with the tension, set on the element)
+   and the ring at the DSO centre (the desktop's `drawElasticSnapLine`). */
+.mob-fov-elastic {
+  stroke: var(--accent-color);
+  stroke-width: 1.5;
+}
+.mob-fov-snap {
+  fill: none;
+  stroke: var(--accent-color);
+  stroke-width: 1.5;
+}
+/* The finger of a drag gesture, a wireframe annotation (not part of the app): a ring of 48px around the touch point. */
+.mob-fov-touch {
+  fill: var(--accent-fill-md);
+  stroke: var(--text-bright);
+  stroke-width: 2;
+  stroke-opacity: 0.6;
+}
+.mob-btn-value--swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.mob-panel > .mob-form-row:first-child {
+  padding-top: var(--space-4);
+}
+/* A field-like button inside a form row keeps the same 16px text inset as the text fields around it. */
+.mob-form-row .mob-btn--field {
+  padding: 0 var(--space-7);
+}
+.mob-stepper-row .mob-btn {
+  width: 100%;
+  padding: 0;
+}
+/* Destructive secondary button (a delete in a sheet footer): danger text and border, no fill. */
+.mob-btn--danger {
+  border-color: var(--status-error-border);
+  color: var(--color-danger);
+}
+.mob-btn--danger:active {
+  background: var(--status-error-bg);
+  border-color: var(--status-error-border);
+  color: var(--color-danger);
+}
+.mob-input-row-unit {
+  text-align: center;
+}
+/* A label that heads a group of controls (no control of its own): sits close to the controls below. */
+.mob-form-row--title {
+  padding-bottom: 0;
+}
+.mob-form-row--title .mob-form-label {
+  margin-bottom: 0;
+  padding-top: var(--space-4);
+}
+/* A control row straight under a section header keeps a small gap to it. */
+.mob-section-header + .mob-form-row:not(.mob-form-row--title) {
+  padding-top: var(--space-4);
+}
+
+/* Reorderable list (draw order): entries are drag handle + row; the lifted entry floats above the list, the slot marks the drop place. */
+.mob-entry-list {
+  position: relative;
+  background: var(--bg-panel);
+}
+.mob-entry-gap {
+  position: relative;
+  height: 65px;
+}
+.mob-entry-gap::after {
+  content: "";
+  position: absolute;
+  inset: var(--space-2) var(--space-4);
+  border: 2px dashed var(--border-accent);
+  border-radius: var(--mobile-card-radius);
+  background: var(--accent-fill-sm);
+}
+.mob-entry--lifted {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  z-index: var(--z-base);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--mobile-card-radius);
+  box-shadow: 0 var(--space-4) var(--space-9) var(--shadow-xl);
+}
+.mob-entry--lifted .mob-drag {
+  color: var(--text-bright);
+}
+
+/* ── Mobile layer, round D1 batch 2c ─────────────────────────────────────────────────────────── */
+/* A 16px icon next to a number or a word (the difficulty diamond in a button or a fact), where the 24px icon is too big. */
+svg.mob-icon--sm,
+.mob-btn svg.mob-icon--sm {
+  width: var(--space-7);
+  height: var(--space-7);
+}
+.mob-fact-value svg.mob-icon--sm {
+  vertical-align: -2px;
+  margin-left: var(--space-2);
+}
+/* Search field with a clear button inside it (the button is a 48px target at the right end of the field). */
+.mob-search-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.mob-search-wrap .mob-search {
+  width: 100%;
+  padding-right: var(--mobile-touch-min);
+}
+.mob-search-clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-search-clear svg {
+  width: var(--space-8);
+  height: var(--space-8);
+}
+/* Text button: no border, bright text (Annuler next to a search field). */
+.mob-btn.mob-btn--text {
+  padding: 0 var(--space-4);
+  border-color: transparent;
+  color: var(--text-bright);
+}
+/* Placeholder for the system keyboard in a wireframe (a keyboard is not drawn, only its 300px). */
+.mob-keyboard {
+  flex: none;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-deep);
+  box-shadow: inset 0 1px 0 var(--border-panel);
+  color: var(--text-secondary);
+}
+/* Sheet header with a close button at its right end (a sheet without a footer: changes apply at once). */
+.mob-sheet-header--bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.mob-sheet-header--bar > h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+/* Slider row with its label on a line of its own (a long setting name): [label] over [slider | value]. Without a value
+   the slider takes the whole width. */
+.mob-slider-row--stack {
+  grid-template-columns: minmax(0, 1fr) var(--space-16);
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+.mob-slider-row--stack .mob-slider-label {
+  grid-column: 1 / -1;
+}
+.mob-slider-row--stack > .mob-slider:last-child {
+  grid-column: 1 / -1;
+}
+.mob-slider:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* A form row (field, field-like button) straight under a list row keeps the 8px gap to it. */
+.mob-row + .mob-form-row:not(.mob-form-row--title) {
+  padding-top: var(--space-4);
+}
+.mob-sheet-header--bar {
+  padding-top: var(--space-4);
+}
+/* ── Photo metadata form (batch 2c) ──────────────────────────────────────────────────────────── */
+/* Chips that wrap onto several lines (labels, objects of a photo); a removable chip holds its text and a small remove icon, the
+   whole chip is the 48px target. */
+.mob-chip-row--wrap {
+  flex-wrap: wrap;
+  padding-bottom: var(--space-4);
+}
+.mob-chip--remove {
+  gap: var(--space-4);
+  padding-right: var(--space-6);
+  color: var(--text-primary);
+}
+/* A text field and its Ajouter button on one line (a chip is committed by the keyboard's Done key or by this button). */
+.mob-add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+}
+.mob-add-row > .mob-field,
+.mob-add-row > .mob-select-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mob-add-row > .mob-btn {
+  flex: none;
+}
+/* Integration row: the filter on its own line, then  N x sec s = total  and a 48px remove button; the same columns in every row. */
+.mob-integration {
+  display: grid;
+  grid-template-columns: var(--space-18) var(--space-7) var(--space-18) var(--space-7) minmax(0, 1fr) var(--mobile-touch-min);
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-4);
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.mob-integration-filter {
+  grid-column: 1 / -1;
+}
+.mob-integration .mob-field,
+.mob-field-row .mob-field {
+  text-align: center;
+  padding: 0 var(--space-4);
+}
+.mob-integration-filter .mob-field {
+  text-align: left;
+  padding: 0 var(--space-7);
+}
+.mob-integration-unit {
+  text-align: center;
+  color: var(--text-secondary);
+}
+.mob-integration-total {
+  text-align: right;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+/* Capture detail row: label | number field | unit | remove. */
+.mob-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--space-19) var(--space-11) var(
+      --mobile-touch-min
+    );
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: var(--space-18);
+  padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+.mob-field-row > label {
+  color: var(--text-secondary);
+}
+/* Destructive icon button (remove a row). */
+.mob-icon-btn--danger {
+  border-color: var(--status-error-border);
+  color: var(--color-danger);
+}
+/* Multi-line text field (notes). */
+.mob-field--multi {
+  height: auto;
+  min-height: calc(var(--mobile-touch-min) * 2);
+  padding-top: var(--space-5);
+  padding-bottom: var(--space-5);
+  resize: none;
+}
+
+/* Warning text (an uncertain orbit): the desktop's warning colour. */
+.mob-status--warn {
+  color: var(--status-warn-text);
+}
+
+/* ── Mobile layer, round D1 revision 5: drawn icons instead of the text glyphs ▶ ▾ ⠿ ↑ ↓ → ← ───────────────────────── */
+/* The boxes keep the layout footprint of the glyph they replace (width and height of its line box), so no neighbour moves. */
+.mob-row-chevron {
+  /* the span is the glyph's footprint: 10.34px wide, 16px high in a plain trail (the icon is 20px high, pulled back by -2px each side) */
+  display: inline-flex;
+  width: 10.34px;
+  margin-block: -2px;
+}
+.mob-row-chevron svg {
+  width: 10.34px;
+  height: 20px;
+}
+/* in a trail set in m-secondary (a value before the chevron) the glyph's line box was 20px high: no pull-back */
+.mob-row-trail.m-secondary .mob-row-chevron {
+  margin-block: 0;
+}
+.mob-btn-caret {
+  display: inline-flex;
+  width: var(--font-size-sub);
+  height: var(--font-size-sub);
+  margin-inline: -1px;
+}
+.mob-btn-caret svg,
+.mob-btn .mob-btn-caret svg {
+  width: var(--font-size-sub);
+  height: var(--font-size-sub);
+}
+.mob-drag svg {
+  width: var(--space-9);
+  height: var(--space-9);
+  /* the six dots are round-capped zero-length strokes: the stroke width is the dot diameter (2.5px, the chevron's stroke is 1.6px) */
+  stroke-width: 2.5;
+}
+
+/* ── Mobile layer, round D1 batch 2d (identification flows) ──────────────────────────────────────── */
+/* A 48px square button that holds only an icon (the magnifier beside a field); the icon is 24px. */
+.mob-btn.mob-btn--icon {
+  width: var(--mobile-touch-min);
+  padding: 0;
+}
+/* Section header with a trailing 48px button (the "i" that opens the explanation); title and button share their centre line. */
+.mob-section-header--bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-4);
+  padding-bottom: 0;
+}
+/* A form row of "date | time | UTC unit | button": the unit is printed after the time field, outside it. */
+.mob-form-row--search {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto var(--mobile-touch-min);
+  column-gap: var(--space-4);
+  align-items: center;
+}
+/* Rows of the asteroid panel: "marker button | date | time | UTC", then "label | number | unit | search button" (the 32px UTC column and the
+   48px button column both end on the right gutter). The fields take a 12px text inset, and the date column is the wider one (1.6fr : 1fr) so
+   that a date fits at 360px. */
+.mob-when-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1.6fr) minmax(0, 1fr) 32px;
+  column-gap: var(--space-4);
+  align-items: center;
+  padding: 0 var(--mobile-gutter) var(--space-4);
+}
+.mob-when-row--radius {
+  grid-template-columns: 88px 72px minmax(0, 1fr) var(--mobile-touch-min);
+}
+.mob-when-row .mob-field {
+  padding: 0 var(--space-6);
+}
+.mob-when-row > .mob-btn {
+  width: 100%;
+  padding: 0 var(--space-4);
+}
+/* A footer with a long primary label ("Ajouter la sélection (1)", 162px wide in bold, wider than half of 328px): the cancel button takes its
+   content width (at least 96px) and the primary one the rest. */
+.mob-sheet-footer--primary-wide .mob-btn:first-child {
+  flex: none;
+  min-width: 96px;
+}
+
+/* ── Mobile layer, revision 8b ─────────────────────────────────────────────────────────────── */
+/* Display ribbon of the sky map: the seven toggles of the desktop's map toolbar (SkyTimeControl.vue) and the display settings, as a column of
+   48px `.mob-icon-btn--float` buttons, 8px apart, along the right gutter, dropping 8px under the layers button of `.mob-map-top`. The last
+   button (display settings) is set apart by 16px. */
+.mob-map-ribbon {
+  position: absolute;
+  top: calc(var(--mobile-gutter) + var(--mobile-touch-min) + var(--space-4));
+  right: var(--mobile-gutter);
+  z-index: var(--z-base);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.mob-map-ribbon-more {
+  margin-top: var(--space-4);
+}
+/* A floating toggle that is on keeps an opaque ground (the map must not show through the translucent selected fill). */
+.mob-icon-btn--float[aria-pressed="true"] {
+  background:
+    linear-gradient(var(--accent-bg), var(--accent-bg)),
+    var(--bg-panel);
+}
+/* Disabled floating map button: .35 opacity, as the desktop's `.sky-rotation-btn:disabled`. */
+.mob-icon-btn--float:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mob-icon-btn--float:disabled:active {
+  background: var(--bg-panel);
+  border-color: var(--border-white-md);
+  color: var(--text-primary);
+}
+/* A button that opens a popup while it is open: focus border and bright icon, no fill (the fill is the "on" state of a toggle). */
+.mob-icon-btn[aria-expanded="true"] {
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+
+/* Suggestion list of a field (a listbox of `.mob-row` options above the field being typed in): the highlighted option has the 35 % accent fill. */
+.mob-row[role="option"][aria-selected="true"] {
+  background: var(--accent-fill-lg);
+}
+/* On that fill the trailing value (secondary text, 3.96:1) is raised to the primary text colour (8.1:1). */
+.mob-row[role="option"][aria-selected="true"] .mob-row-trail {
+  color: var(--text-primary);
+}
+/* A `.mob-field` can sit in the same clear-button wrapper as a search field. */
+.mob-search-wrap .mob-field {
+  width: 100%;
+  padding-right: var(--mobile-touch-min);
+}
+
+/* A paged list (carousel): the pages sit side by side in a horizontal scroll-snap track with no scroll bar; one finger swipes one page, nothing scrolls freely.
+   A page is three rows of chips high (3 x 48px + 3 x 8px), so the dots under it do not move from one page to the next. */
+.mob-pager-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.mob-pager-track::-webkit-scrollbar {
+  display: none;
+}
+.mob-pager-page {
+  flex: 0 0 100%;
+  min-width: 0;
+  min-height: calc(3 * var(--mobile-touch-min) + 3 * var(--space-4));
+  align-content: flex-start;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+/* Page dots: not buttons (the swipe is the control); the current page is a filled dot, the others hollow, so it reads without colour. */
+.mob-pager-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  height: var(--space-9);
+}
+.mob-pager-dot {
+  box-sizing: border-box;
+  width: var(--space-4);
+  height: var(--space-4);
+  border: 1px solid var(--text-secondary);
+  border-radius: var(--radius-pill);
+}
+.mob-pager-dot--on {
+  background: var(--text-bright);
+  border-color: var(--text-bright);
+}
+/* A placed photo on the map, in a `.mob-map-drawing` SVG: the desktop's photo outline (`PHOTO_OUTLINE`: dashed 6 4, 1.5px, the name along the longest edge). The desktop's
+   colour is a fixed orange (rgba(192,120,48,.55)) in every theme; here it follows the theme (`border-accent`, `accent-color`), identical in `warm`. */
+.mob-photo-outline {
+  fill: var(--accent-fill-sm);
+  stroke: var(--border-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.mob-photo-label {
+  fill: var(--accent-color);
+}
+/* The photo whose draw order is being edited (the desktop's `.zorder-item.current`: accent fill and accent border). */
+.mob-entry--current {
+  background: var(--accent-fill-sm);
+  box-shadow: inset 0 0 0 1px var(--border-accent);
+}
+/* Revision 9. A floating plus on a screen without a tab bar (PlanDetail): it sits one gutter above the bottom edge instead of above the tab bar. */
+.mob-fab--flush {
+  bottom: var(--mobile-gutter);
+}
+/* Revision 9. A trailing icon of a row (the check of a named star) in a 48px cell centred on the same axis as a 48px button in the row being filled
+   (ThreePoint): the body column then has the same width in every row. */
+.mob-row-trail--cell {
+  width: var(--mobile-touch-min);
+  justify-content: center;
+}
+/* Revision 9. Stars on the sky map in "pick a star" mode (ThreePointMap), in a `.mob-map-drawing` SVG: `.mob-sky-star` a dot (radius by magnitude),
+   `.mob-sky-star--picked` the tapped star (bright), `.mob-sky-ring` the ring around it (accent colour, the selection colour of the map), `.mob-sky-label`
+   its label as the desktop writes it (`starDisplayLabel`: "Deneb (α Cyg)"). The desktop's picking mode draws no mark (it picks on the click and closes). */
+.mob-sky-star {
+  fill: var(--text-secondary);
+}
+.mob-sky-star--picked {
+  fill: var(--text-bright);
+}
+.mob-sky-ring {
+  fill: none;
+  stroke: var(--accent-color);
+  stroke-width: 2;
+}
+.mob-sky-label {
+  fill: var(--text-bright);
+}
+/* Revision 11. The "i" button (48 x 48 `.mob-icon-btn`, the explanation itself is not drawn) beside a label that has a desktop tooltip.
+   `.mob-form-row--bar`: a group label row (label left, "i" on the right gutter, same centre line, 8px above the next control).
+   `.mob-row--info`: a switch row whose title has an "i": title, "i", switch (the switch keeps the gutter); 8px above and below the 48px button, so it keeps the 8px gap to the row under it (64px row).
+   `.mob-slider-row--info`: a stacked slider row whose label has an "i" at the right end of the label line (column 2, the value column), 8px above the slider. */
+.mob-form-row--bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-4);
+}
+.mob-form-row--bar .mob-form-label {
+  padding-top: 0;
+  margin-bottom: 0;
+}
+.mob-row--info {
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+.mob-slider-row--info {
+  row-gap: var(--space-4);
+  padding-top: 0;
+}
+.mob-slider-row--stack.mob-slider-row--info .mob-slider-label {
+  grid-column: 1;
+}
+.mob-slider-row--info > .mob-icon-btn {
+  grid-column: 2;
+  justify-self: end;
+}
+
+/* ── Revision 12 ─────────────────────────────────────────────────────────────────────────────────
+   Dialog buttons never wrap their label: side by side when both labels fit on one line each, else stacked full width, confirm above cancel
+   (wrap-reverse stacks the second button above the first). A lone button takes the whole row.
+   Top-bar title: up to two lines before the ellipsis; the bar grows if it needs to.
+   `.mob-btn--wrap`: a field-like button whose value may wrap onto two lines (a long accessory name).
+   `.mob-radio`: trailing radio button of a choice row, as `.mob-check` is the trailing box of a checklist row.
+   `.mob-status-line`: slim, non-interactive line under the top bar (connected to a computer).
+   `.mob-longpress-label` + `.mob-icon-btn--held`: the name of an icon button, shown beside it while it is held. */
+.mob-dialog-buttons {
+  display: flex;
+  flex-wrap: wrap-reverse;
+}
+.mob-dialog-buttons .mob-btn {
+  flex: 1 1 calc(50% - var(--space-2));
+  min-width: max-content;
+  padding: 0 var(--space-7);
+  white-space: nowrap;
+}
+.mob-topbar-title--grow {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin-block: var(--space-2);
+}
+.mob-form-row .mob-btn--field.mob-btn--wrap {
+  height: auto;
+  min-height: var(--mobile-touch-min);
+  padding-block: var(--space-4);
+}
+.mob-btn--wrap .mob-btn-label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.mob-radio {
+  flex: none;
+  width: var(--space-9);
+  height: var(--space-9);
+  margin: 0;
+  accent-color: var(--accent-color);
+  color-scheme: dark;
+  cursor: pointer;
+}
+.mob-radio:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: 2px;
+}
+.mob-status-line {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--space-14);
+  padding: var(--space-2) var(--mobile-gutter);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-panel);
+  color: var(--text-secondary);
+}
+.mob-icon-btn--held {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+.mob-longpress-label {
+  position: absolute;
+  right: calc(var(--mobile-gutter) + var(--mobile-touch-min) + var(--space-4));
+  z-index: var(--z-base);
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - 2 * var(--mobile-gutter) - var(--mobile-touch-min) - var(--space-4));
+  height: var(--mobile-touch-min);
+  padding: 0 var(--space-7);
+  box-sizing: border-box;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+  box-shadow: 0 var(--space-2) var(--space-9) var(--shadow-md);
+  color: var(--text-bright);
+  white-space: nowrap;
+}
+
+/* ── Revision 13 ─────────────────────────────────────────────────────────────────────────────────
+   Asteroid results panel: the status line, "Modifier la recherche" and the footer buttons are fixed; only the list of asteroids scrolls
+   (a `.mob-scroll`, always-visible 8px bar), in the height the panel has left (at most 60 % of the screen in portrait). */
+.mob-panel--results {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 60%;
+  overflow: hidden;
+}
+.mob-panel--results > * {
+  flex: none;
+}
+.mob-panel--results > .mob-results-list {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+/* ── Revision 14 ─────────────────────────────────────────────────────────────────────────────────
+   `.mob-empty`: an empty list or area: one line and at most one button, centred.
+   `.mob-map-prompt`: the same on the map (first start, no position), above the time bar.
+   `.mob-status--danger`: a state line in the danger colour. `.mob-toast-host`: where the desktop `.toast` sits on a phone screen.
+   `.mob-photo-state`: the chip on a gallery tile whose photo is still being solved or waits to be placed.
+   `.mob-row--region`: a saved-region row: the select button and two icon buttons. */
+.mob-empty {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-7);
+  padding: var(--space-9) var(--mobile-gutter);
+  text-align: center;
+}
+.mob-empty-text,
+.mob-map-prompt > p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.mob-empty .mob-btn,
+.mob-map-prompt .mob-btn {
+  min-width: 200px;
+}
+.mob-map-prompt {
+  position: absolute;
+  left: var(--mobile-gutter);
+  right: var(--mobile-gutter);
+  bottom: calc(var(--mobile-touch-min) + 2 * var(--mobile-gutter) + var(--space-9));
+  z-index: var(--z-base);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-7);
+  padding: var(--space-7);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+  text-align: center;
+}
+.mob-status--danger {
+  color: var(--color-danger);
+}
+.mob-toast-host {
+  position: absolute;
+  left: var(--mobile-gutter);
+  right: var(--mobile-gutter);
+  bottom: var(--mobile-gutter);
+  z-index: var(--z-toggle);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.mob-toast-host .toast {
+  box-sizing: border-box;
+  max-width: 100%;
+  animation: none;
+}
+.mob-photo-tile--state {
+  position: relative;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.mob-photo-state {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-sm);
+  color: var(--text-bright);
+  text-align: center;
+}
+.mob-photo-state--busy {
+  border-color: var(--accent-border);
+  color: var(--accent-color);
+}
+.mob-row--region {
+  padding-right: var(--mobile-gutter-end);
+  gap: var(--space-4);
+}
+.mob-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  height: var(--mobile-touch-min);
+  padding: 0;
+  text-align: left;
+  color: var(--text-primary);
+}
+.mob-radio-mark {
+  flex: none;
+  width: var(--space-9);
+  height: var(--space-9);
+  box-sizing: border-box;
+  border: 2px solid var(--text-secondary);
+  border-radius: 50%;
+}
+.mob-row-main[aria-checked="true"] .mob-radio-mark {
+  border-color: var(--accent-color);
+  background: radial-gradient(circle, var(--accent-color) 0 4px, transparent 5px);
+}
+
+/* ── Revision 14: Android system bars ────────────────────────────────────────────────────────────
+   The frame reserves 24 px at the top (status bar) and 24 px at the bottom (gesture bar). The two bars are drawn over the app; the app lays out
+   with `--safe-top` / `--safe-bottom` (on a device these are `env(safe-area-inset-*)`, which the rules above fall back to).
+   Top bars and tab bars keep their background under the bars; the map runs under both. */
+#root {
+  --safe-top: 24px;
+  --safe-bottom: 24px;
+}
+.mob-statusbar,
+.mob-gesturebar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: calc(var(--z-toggle) + 2);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.mob-statusbar {
+  top: 0;
+  height: var(--safe-top);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--mobile-gutter);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1;
+}
+.mob-statusbar-icons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.mob-statusbar-icons svg {
+  width: 14px;
+  height: 14px;
+}
+.mob-statusbar-icons svg:last-child {
+  width: 18px;
+}
+.mob-gesturebar {
+  bottom: 0;
+  height: var(--safe-bottom);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mob-gesturebar::before {
+  content: "";
+  width: 108px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--text-secondary);
+  opacity: 0.8;
+}
+.mob-topbar {
+  min-height: calc(var(--mobile-topbar-height) + var(--safe-top, 0px));
+}
+.mob-fab--fixed {
+  bottom: calc(var(--mobile-tabbar-height) + var(--safe-bottom, 0px) + var(--mobile-gutter));
+}
+/* A map that is the first content of the frame runs under the status bar: its controls start below it. */
+.mob-gesturebar + .mob-map .mob-map-top,
+.mob-gesturebar + .mob-map .mob-map-hint {
+  top: calc(var(--mobile-gutter) + var(--safe-top, 0px));
+}
+.mob-gesturebar + .mob-map .mob-map-cluster {
+  top: calc(var(--mobile-gutter) + var(--mobile-touch-min) + var(--space-7) + var(--safe-top, 0px));
+}
+.mob-gesturebar + .mob-map .mob-map-ribbon {
+  top: calc(var(--mobile-gutter) + var(--mobile-touch-min) + var(--space-4) + var(--safe-top, 0px));
+}
+.mob-toast-host {
+  bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+}
+
+/* Revision 14: what the system bars moved. A page whose scrolling area is the last thing of the frame ends above the gesture bar when scrolled to the
+   end; the footers of a page keep their 16 px below the buttons above the gesture bar. */
+#root > .mob-scroll:last-child {
+  padding-bottom: var(--safe-bottom, 0px);
+}
+.mob-footer.mob-sheet-footer {
+  padding-bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+}
+
+/* Revision 15: the spinner of the desktop (.auto-solve-spinner, 12 px) left of "Résolution", centred on it, one line. */
+.mob-photo-state--busy,
+.mob-row-sub--busy {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.mob-photo-state--busy {
+  justify-content: center;
+}
+.mob-photo-state--busy .auto-solve-spinner,
+.mob-row-sub--busy .auto-solve-spinner {
+  flex: none;
+  margin-right: var(--space-3);
+}
+.mob-row-sub--busy {
+  color: var(--accent-color);
+}

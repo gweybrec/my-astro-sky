@@ -1,0 +1,972 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Backup.dc.html": {
+      "h": 915,
+      "title": "Réglages, exporter et importer",
+      "w": 412,
+      "x": 1968,
+      "y": 5175
+    },
+    "BackupLandscape.dc.html": {
+      "h": 412,
+      "title": "Réglages, exporter et importer, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 12020
+    },
+    "ConfirmDelete.dc.html": {
+      "h": 915,
+      "title": "Plan, confirmer la suppression",
+      "w": 412,
+      "x": 1968,
+      "y": 1035
+    },
+    "ConfirmDeleteLandscape.dc.html": {
+      "h": 412,
+      "title": "Plan, confirmer la suppression, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 7764
+    },
+    "DrawOrder.dc.html": {
+      "h": 915,
+      "title": "Ciel, ordre d'affichage",
+      "w": 412,
+      "x": 1968,
+      "y": 3105
+    },
+    "DrawOrderLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, ordre d'affichage, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 9892
+    },
+    "FrameEdit.dc.html": {
+      "h": 915,
+      "title": "Ciel, cadre sélectionné",
+      "w": 412,
+      "x": 492,
+      "y": 3105
+    },
+    "FrameEditLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, cadre sélectionné, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 9360
+    },
+    "FrameMove.dc.html": {
+      "h": 915,
+      "title": "Ciel, déplacer le cadre",
+      "w": 412,
+      "x": 3444,
+      "y": 3105
+    },
+    "FrameMoveLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, déplacer le cadre, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 10424
+    },
+    "GearPicker.dc.html": {
+      "h": 915,
+      "title": "Équipement, choisir un télescope",
+      "w": 412,
+      "x": 984,
+      "y": 5175
+    },
+    "GearPickerLandscape.dc.html": {
+      "h": 412,
+      "title": "Équipement, choisir un télescope, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 12020
+    },
+    "GearSetupEdit.dc.html": {
+      "h": 915,
+      "title": "Équipement, modifier le setup",
+      "w": 412,
+      "x": 492,
+      "y": 5175
+    },
+    "GearSetupEditLandscape.dc.html": {
+      "h": 412,
+      "title": "Équipement, modifier le setup, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 11488
+    },
+    "GearSetups.dc.html": {
+      "h": 915,
+      "title": "Réglages, setups",
+      "w": 412,
+      "x": 0,
+      "y": 5175
+    },
+    "GearSetupsLandscape.dc.html": {
+      "h": 412,
+      "title": "Réglages, setups, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 11488
+    },
+    "IdentifyAsteroid.dc.html": {
+      "h": 915,
+      "title": "Identifier un astéroïde",
+      "w": 412,
+      "x": 1968,
+      "y": 4140
+    },
+    "IdentifyAsteroidLandscape.dc.html": {
+      "h": 412,
+      "title": "Identifier un astéroïde, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 10956
+    },
+    "IdentifyAsteroidResults.dc.html": {
+      "h": 915,
+      "title": "Astéroïdes trouvés",
+      "w": 412,
+      "x": 2460,
+      "y": 4140
+    },
+    "IdentifyAsteroidResultsLandscape.dc.html": {
+      "h": 412,
+      "title": "Astéroïdes trouvés, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 10956
+    },
+    "IdentifyChoose.dc.html": {
+      "h": 915,
+      "title": "Photo, choisir une identification",
+      "w": 412,
+      "x": 3936,
+      "y": 4140
+    },
+    "IdentifyChooseLandscape.dc.html": {
+      "h": 412,
+      "title": "Photo, choisir une identification, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 11488
+    },
+    "IdentifyInfo.dc.html": {
+      "h": 915,
+      "title": "Identification, explication ouverte",
+      "w": 412,
+      "x": 3444,
+      "y": 4140
+    },
+    "IdentifyInfoLandscape.dc.html": {
+      "h": 412,
+      "title": "Identification, explication ouverte, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 11488
+    },
+    "IdentifySupernova.dc.html": {
+      "h": 915,
+      "title": "Identifier des supernovae",
+      "w": 412,
+      "x": 2952,
+      "y": 4140
+    },
+    "IdentifySupernovaLandscape.dc.html": {
+      "h": 412,
+      "title": "Identifier des supernovae, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 10956
+    },
+    "ImportMethod.dc.html": {
+      "h": 915,
+      "title": "Importer, méthode de placement",
+      "w": 412,
+      "x": 984,
+      "y": 2070
+    },
+    "ImportMethodLandscape.dc.html": {
+      "h": 412,
+      "title": "Importer, méthode de placement, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 8296
+    },
+    "ImportReview.dc.html": {
+      "h": 915,
+      "title": "Importer des photos",
+      "w": 412,
+      "x": 492,
+      "y": 2070
+    },
+    "ImportReviewLandscape.dc.html": {
+      "h": 412,
+      "title": "Importer des photos, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 8296
+    },
+    "LanConnected.dc.html": {
+      "h": 915,
+      "title": "Réglages, ordinateur connecté",
+      "w": 412,
+      "x": 2952,
+      "y": 3105
+    },
+    "LanConnectedLandscape.dc.html": {
+      "h": 412,
+      "title": "Réglages, ordinateur connecté, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 9892
+    },
+    "LanPairing.dc.html": {
+      "h": 915,
+      "title": "Réglages, connexion à l'ordinateur",
+      "w": 412,
+      "x": 2460,
+      "y": 3105
+    },
+    "LanPairingLandscape.dc.html": {
+      "h": 412,
+      "title": "Réglages, connexion à l'ordinateur, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 9892
+    },
+    "Library.dc.html": {
+      "h": 915,
+      "title": "Galerie",
+      "w": 412,
+      "x": 984,
+      "y": 0
+    },
+    "LibraryAdd.dc.html": {
+      "h": 915,
+      "title": "Galerie, ajouter une photo",
+      "w": 412,
+      "x": 0,
+      "y": 2070
+    },
+    "LibraryAddLandscape.dc.html": {
+      "h": 412,
+      "title": "Galerie, ajouter une photo, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 8296
+    },
+    "LibraryLandscape.dc.html": {
+      "h": 412,
+      "title": "Galerie, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 6700
+    },
+    "Location.dc.html": {
+      "h": 915,
+      "title": "Réglages, lieu d'observation",
+      "w": 412,
+      "x": 1476,
+      "y": 5175
+    },
+    "LocationLandscape.dc.html": {
+      "h": 412,
+      "title": "Réglages, lieu d'observation, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 12020
+    },
+    "Main.dc.html": {
+      "h": 915,
+      "title": "Ciel",
+      "w": 412,
+      "x": 0,
+      "y": 0
+    },
+    "MainLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 6700
+    },
+    "ObsWindow.dc.html": {
+      "h": 915,
+      "title": "Plan, fenêtre d'observation",
+      "w": 412,
+      "x": 984,
+      "y": 3105
+    },
+    "ObsWindowLandscape.dc.html": {
+      "h": 412,
+      "title": "Plan, fenêtre d'observation, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 9360
+    },
+    "PhotoDetail.dc.html": {
+      "h": 915,
+      "title": "Photo",
+      "w": 412,
+      "x": 1476,
+      "y": 2070
+    },
+    "PhotoDetailLandscape.dc.html": {
+      "h": 412,
+      "title": "Photo, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 8296
+    },
+    "PhotoEdit.dc.html": {
+      "h": 915,
+      "title": "Photo, modifier les infos",
+      "w": 412,
+      "x": 1476,
+      "y": 4140
+    },
+    "PhotoEditLandscape.dc.html": {
+      "h": 412,
+      "title": "Photo, modifier les infos, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 10956
+    },
+    "PhotoInfo.dc.html": {
+      "h": 915,
+      "title": "Photo, informations",
+      "w": 412,
+      "x": 1968,
+      "y": 2070
+    },
+    "PhotoInfoLandscape.dc.html": {
+      "h": 412,
+      "title": "Photo, informations, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 8828
+    },
+    "Placement.dc.html": {
+      "h": 915,
+      "title": "Placer la photo",
+      "w": 412,
+      "x": 2460,
+      "y": 2070
+    },
+    "PlacementLandscape.dc.html": {
+      "h": 412,
+      "title": "Placer la photo, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 8828
+    },
+    "PlanActions.dc.html": {
+      "h": 915,
+      "title": "Plan, actions",
+      "w": 412,
+      "x": 1476,
+      "y": 1035
+    },
+    "PlanActionsLandscape.dc.html": {
+      "h": 412,
+      "title": "Plan, actions, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 7764
+    },
+    "PlanDetail.dc.html": {
+      "h": 915,
+      "title": "Détail du plan",
+      "w": 412,
+      "x": 492,
+      "y": 1035
+    },
+    "PlanDetailLandscape.dc.html": {
+      "h": 412,
+      "title": "Détail du plan, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 7764
+    },
+    "PlanEntry.dc.html": {
+      "h": 915,
+      "title": "Plan, détail d'une cible",
+      "w": 412,
+      "x": 984,
+      "y": 4140
+    },
+    "PlanEntryLandscape.dc.html": {
+      "h": 412,
+      "title": "Plan, détail d'une cible, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 10424
+    },
+    "Plans.dc.html": {
+      "h": 915,
+      "title": "Plans",
+      "w": 412,
+      "x": 0,
+      "y": 1035
+    },
+    "PlansLandscape.dc.html": {
+      "h": 412,
+      "title": "Plans, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 7232
+    },
+    "RegionDraw.dc.html": {
+      "h": 915,
+      "title": "Dessiner une région",
+      "w": 412,
+      "x": 0,
+      "y": 3105
+    },
+    "RegionDrawLandscape.dc.html": {
+      "h": 412,
+      "title": "Dessiner une région, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 9360
+    },
+    "Settings.dc.html": {
+      "h": 915,
+      "title": "Réglages",
+      "w": 412,
+      "x": 984,
+      "y": 1035
+    },
+    "SettingsLandscape.dc.html": {
+      "h": 412,
+      "title": "Réglages, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 7764
+    },
+    "SkyDisplay.dc.html": {
+      "h": 915,
+      "title": "Ciel, affichage",
+      "w": 412,
+      "x": 492,
+      "y": 4140
+    },
+    "SkyDisplayLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, affichage, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 10424
+    },
+    "SkyObject.dc.html": {
+      "h": 915,
+      "title": "Ciel, objet sélectionné",
+      "w": 412,
+      "x": 492,
+      "y": 0
+    },
+    "SkyObjectLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, objet sélectionné, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 6700
+    },
+    "SkyPhoto.dc.html": {
+      "h": 915,
+      "title": "Ciel, photo sélectionnée",
+      "w": 412,
+      "x": 2952,
+      "y": 0
+    },
+    "SkyPhotoLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, photo sélectionnée, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 7232
+    },
+    "SkySearch.dc.html": {
+      "h": 915,
+      "title": "Ciel, recherche",
+      "w": 412,
+      "x": 0,
+      "y": 4140
+    },
+    "SkySearchLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, recherche, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 10424
+    },
+    "SkyToggles.dc.html": {
+      "h": 915,
+      "title": "Ciel, calques de la carte",
+      "w": 412,
+      "x": 2460,
+      "y": 0
+    },
+    "SkyTogglesLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, calques de la carte, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 7232
+    },
+    "Targets.dc.html": {
+      "h": 915,
+      "title": "Cibles",
+      "w": 412,
+      "x": 1476,
+      "y": 0
+    },
+    "TargetsFilter.dc.html": {
+      "h": 915,
+      "title": "Cibles, filtres",
+      "w": 412,
+      "x": 1476,
+      "y": 3105
+    },
+    "TargetsFilterLandscape.dc.html": {
+      "h": 412,
+      "title": "Cibles, filtres, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 9892
+    },
+    "TargetsLandscape.dc.html": {
+      "h": 412,
+      "title": "Cibles, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 6700
+    },
+    "TargetsTypes.dc.html": {
+      "h": 915,
+      "title": "Cibles, types d'objets",
+      "w": 412,
+      "x": 1968,
+      "y": 0
+    },
+    "TargetsTypesLandscape.dc.html": {
+      "h": 412,
+      "title": "Cibles, types d'objets, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 7232
+    },
+    "ThreePoint.dc.html": {
+      "h": 915,
+      "title": "Identifier les étoiles",
+      "w": 412,
+      "x": 2952,
+      "y": 2070
+    },
+    "ThreePointLandscape.dc.html": {
+      "h": 412,
+      "title": "Identifier les étoiles, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 8828
+    },
+    "ThreePointMap.dc.html": {
+      "h": 915,
+      "title": "Identifier les étoiles, choisir sur la carte",
+      "w": 412,
+      "x": 3936,
+      "y": 2070
+    },
+    "ThreePointMapLandscape.dc.html": {
+      "h": 412,
+      "title": "Identifier les étoiles, choisir sur la carte, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 9360
+    },
+    "ThreePointSearch.dc.html": {
+      "h": 915,
+      "title": "Identifier les étoiles, choisir une étoile",
+      "w": 412,
+      "x": 3444,
+      "y": 2070
+    },
+    "ThreePointSearchLandscape.dc.html": {
+      "h": 412,
+      "title": "Identifier les étoiles, choisir une étoile, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 8828
+    },
+    "LibraryConnected.dc.html": {
+      "h": 915,
+      "title": "Galerie, données de l'ordinateur",
+      "w": 412,
+      "x": 2460,
+      "y": 1035
+    },
+    "PhotoZoomed.dc.html": {
+      "h": 915,
+      "title": "Photo, zoomée",
+      "w": 412,
+      "x": 4428,
+      "y": 2070
+    },
+    "SkyTogglesHint.dc.html": {
+      "h": 915,
+      "title": "Ciel, nom d'un calque (appui long)",
+      "w": 412,
+      "x": 4428,
+      "y": 0
+    },
+    "LibraryConnectedLandscape.dc.html": {
+      "h": 412,
+      "title": "Galerie, données de l'ordinateur, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 12020
+    },
+    "PhotoZoomedLandscape.dc.html": {
+      "h": 412,
+      "title": "Photo, zoomée, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 12552
+    },
+    "SkyTogglesHintLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, nom d'un calque (appui long), paysage",
+      "w": 915,
+      "x": 995,
+      "y": 12552
+    },
+    "MainFirstStart.dc.html": {
+      "h": 915,
+      "title": "Ciel, premier démarrage",
+      "w": 412,
+      "x": 4000,
+      "y": 6210
+    },
+    "MainFirstStartLandscape.dc.html": {
+      "h": 412,
+      "title": "Ciel, premier démarrage, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 13084
+    },
+    "TargetsNoSetup.dc.html": {
+      "h": 915,
+      "title": "Cibles, aucun setup",
+      "w": 412,
+      "x": 4492,
+      "y": 6210
+    },
+    "TargetsNoSetupLandscape.dc.html": {
+      "h": 412,
+      "title": "Cibles, aucun setup, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 13084
+    },
+    "TargetsNoMatch.dc.html": {
+      "h": 915,
+      "title": "Cibles, aucun résultat",
+      "w": 412,
+      "x": 4984,
+      "y": 6210
+    },
+    "TargetsNoMatchLandscape.dc.html": {
+      "h": 412,
+      "title": "Cibles, aucun résultat, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 13084
+    },
+    "LibraryEmpty.dc.html": {
+      "h": 915,
+      "title": "Galerie, aucune photo",
+      "w": 412,
+      "x": 5476,
+      "y": 6210
+    },
+    "LibraryEmptyLandscape.dc.html": {
+      "h": 412,
+      "title": "Galerie, aucune photo, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 13084
+    },
+    "PlansEmpty.dc.html": {
+      "h": 915,
+      "title": "Plans, aucun plan",
+      "w": 412,
+      "x": 5968,
+      "y": 6210
+    },
+    "PlansEmptyLandscape.dc.html": {
+      "h": 412,
+      "title": "Plans, aucun plan, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 13616
+    },
+    "LibrarySolving.dc.html": {
+      "h": 915,
+      "title": "Galerie, résolutions en cours",
+      "w": 412,
+      "x": 6460,
+      "y": 6210
+    },
+    "LibrarySolvingLandscape.dc.html": {
+      "h": 412,
+      "title": "Galerie, résolutions en cours, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 13616
+    },
+    "ImportSolveFailed.dc.html": {
+      "h": 915,
+      "title": "Importer, résolution échouée",
+      "w": 412,
+      "x": 6952,
+      "y": 6210
+    },
+    "ImportSolveFailedLandscape.dc.html": {
+      "h": 412,
+      "title": "Importer, résolution échouée, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 13616
+    },
+    "SolveOffline.dc.html": {
+      "h": 915,
+      "title": "Importer, hors connexion",
+      "w": 412,
+      "x": 7444,
+      "y": 6210
+    },
+    "SolveOfflineLandscape.dc.html": {
+      "h": 412,
+      "title": "Importer, hors connexion, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 13616
+    },
+    "HorizonUnavailable.dc.html": {
+      "h": 915,
+      "title": "Lieu, horizon indisponible",
+      "w": 412,
+      "x": 7936,
+      "y": 6210
+    },
+    "HorizonUnavailableLandscape.dc.html": {
+      "h": 412,
+      "title": "Lieu, horizon indisponible, paysage",
+      "w": 915,
+      "x": 0,
+      "y": 14148
+    },
+    "LocationDenied.dc.html": {
+      "h": 915,
+      "title": "Lieu, position refusée",
+      "w": 412,
+      "x": 8428,
+      "y": 6210
+    },
+    "LocationDeniedLandscape.dc.html": {
+      "h": 412,
+      "title": "Lieu, position refusée, paysage",
+      "w": 915,
+      "x": 995,
+      "y": 14148
+    },
+    "IdentifyComet.dc.html": {
+      "h": 915,
+      "title": "Identifier des comètes",
+      "w": 412,
+      "x": 8920,
+      "y": 6210
+    },
+    "IdentifyCometLandscape.dc.html": {
+      "h": 412,
+      "title": "Identifier des comètes, paysage",
+      "w": 915,
+      "x": 1990,
+      "y": 14148
+    },
+    "Regions.dc.html": {
+      "h": 915,
+      "title": "Cibles, régions du ciel",
+      "w": 412,
+      "x": 9412,
+      "y": 6210
+    },
+    "RegionsLandscape.dc.html": {
+      "h": 412,
+      "title": "Cibles, régions du ciel, paysage",
+      "w": 915,
+      "x": 2985,
+      "y": 14148
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-03T18:48:14.632Z",
+    "v": 1
+  },
+  "designSystems": [
+    {
+      "artifact": "https://claude.ai/artifact/KNrkWbe3JnPVkLozKHPatS",
+      "copiedAt": "2026-10-03T18:48:14.632Z",
+      "namespace": "myastrosky",
+      "title": "MyAstroSky Design System",
+      "version": null
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "d1": {
+      "kind": "title1",
+      "maxW": 2380,
+      "text": "D1 — Structure et navigation : 58 écrans. Rangées 1-2 : onglets ; 3 : photos ; 4 : modes et réglages ; 5 : recherche, affichage, édition, identification ; 6 : équipement, lieu, sauvegarde",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "paysage": {
+      "kind": "title1",
+      "maxW": 3900,
+      "text": "Paysage — propositions (915 × 412) : rail de navigation à gauche, feuilles de largeur limitée, modes avec colonne de réglages à droite",
+      "w": 240,
+      "x": 0,
+      "y": 6400
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "SkyObject.dc.html",
+    "Library.dc.html",
+    "LibraryConnected.dc.html",
+    "Targets.dc.html",
+    "TargetsTypes.dc.html",
+    "Plans.dc.html",
+    "PlanDetail.dc.html",
+    "Settings.dc.html",
+    "LibraryAdd.dc.html",
+    "ImportReview.dc.html",
+    "ImportMethod.dc.html",
+    "PhotoDetail.dc.html",
+    "PhotoZoomed.dc.html",
+    "PhotoInfo.dc.html",
+    "Placement.dc.html",
+    "ThreePoint.dc.html",
+    "RegionDraw.dc.html",
+    "FrameEdit.dc.html",
+    "ObsWindow.dc.html",
+    "TargetsFilter.dc.html",
+    "DrawOrder.dc.html",
+    "LanPairing.dc.html",
+    "LanConnected.dc.html",
+    "SkySearch.dc.html",
+    "SkyDisplay.dc.html",
+    "PlanEntry.dc.html",
+    "PhotoEdit.dc.html",
+    "GearSetups.dc.html",
+    "GearSetupEdit.dc.html",
+    "GearPicker.dc.html",
+    "Location.dc.html",
+    "Backup.dc.html",
+    "IdentifyAsteroid.dc.html",
+    "IdentifyAsteroidResults.dc.html",
+    "IdentifySupernova.dc.html",
+    "IdentifyInfo.dc.html",
+    "IdentifyChoose.dc.html",
+    "PlanActions.dc.html",
+    "ConfirmDelete.dc.html",
+    "SkyToggles.dc.html",
+    "SkyTogglesHint.dc.html",
+    "ThreePointSearch.dc.html",
+    "FrameMove.dc.html",
+    "SkyPhoto.dc.html",
+    "ThreePointMap.dc.html",
+    "MainFirstStart.dc.html",
+    "TargetsNoSetup.dc.html",
+    "TargetsNoMatch.dc.html",
+    "LibraryEmpty.dc.html",
+    "PlansEmpty.dc.html",
+    "LibrarySolving.dc.html",
+    "ImportSolveFailed.dc.html",
+    "SolveOffline.dc.html",
+    "HorizonUnavailable.dc.html",
+    "LocationDenied.dc.html",
+    "IdentifyComet.dc.html",
+    "Regions.dc.html",
+    "MainLandscape.dc.html",
+    "SkyObjectLandscape.dc.html",
+    "LibraryLandscape.dc.html",
+    "LibraryConnectedLandscape.dc.html",
+    "TargetsLandscape.dc.html",
+    "TargetsTypesLandscape.dc.html",
+    "SkyTogglesLandscape.dc.html",
+    "SkyTogglesHintLandscape.dc.html",
+    "SkyPhotoLandscape.dc.html",
+    "PlansLandscape.dc.html",
+    "PlanDetailLandscape.dc.html",
+    "SettingsLandscape.dc.html",
+    "PlanActionsLandscape.dc.html",
+    "ConfirmDeleteLandscape.dc.html",
+    "LibraryAddLandscape.dc.html",
+    "ImportReviewLandscape.dc.html",
+    "ImportMethodLandscape.dc.html",
+    "PhotoDetailLandscape.dc.html",
+    "PhotoZoomedLandscape.dc.html",
+    "PhotoInfoLandscape.dc.html",
+    "PlacementLandscape.dc.html",
+    "ThreePointLandscape.dc.html",
+    "ThreePointSearchLandscape.dc.html",
+    "ThreePointMapLandscape.dc.html",
+    "RegionDrawLandscape.dc.html",
+    "FrameEditLandscape.dc.html",
+    "ObsWindowLandscape.dc.html",
+    "TargetsFilterLandscape.dc.html",
+    "DrawOrderLandscape.dc.html",
+    "LanPairingLandscape.dc.html",
+    "LanConnectedLandscape.dc.html",
+    "FrameMoveLandscape.dc.html",
+    "SkySearchLandscape.dc.html",
+    "SkyDisplayLandscape.dc.html",
+    "PlanEntryLandscape.dc.html",
+    "PhotoEditLandscape.dc.html",
+    "IdentifyAsteroidLandscape.dc.html",
+    "IdentifyAsteroidResultsLandscape.dc.html",
+    "IdentifySupernovaLandscape.dc.html",
+    "IdentifyInfoLandscape.dc.html",
+    "IdentifyChooseLandscape.dc.html",
+    "GearSetupsLandscape.dc.html",
+    "GearSetupEditLandscape.dc.html",
+    "GearPickerLandscape.dc.html",
+    "LocationLandscape.dc.html",
+    "BackupLandscape.dc.html",
+    "MainFirstStartLandscape.dc.html",
+    "TargetsNoSetupLandscape.dc.html",
+    "TargetsNoMatchLandscape.dc.html",
+    "LibraryEmptyLandscape.dc.html",
+    "PlansEmptyLandscape.dc.html",
+    "LibrarySolvingLandscape.dc.html",
+    "ImportSolveFailedLandscape.dc.html",
+    "SolveOfflineLandscape.dc.html",
+    "HorizonUnavailableLandscape.dc.html",
+    "LocationDeniedLandscape.dc.html",
+    "IdentifyCometLandscape.dc.html",
+    "RegionsLandscape.dc.html"
+  ],
+  "pages": [],
+  "title": "MyAstroSky Mobile"
+}

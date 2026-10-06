@@ -1,0 +1,93 @@
+<!-- @dsCard group="Desktop — from the code" height=300 subtitle="btn-action, btn-confirm, btn-cancel, btn-danger" -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Button — preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: var(--space-7);
+      }
+      .stack {
+        display: grid;
+        gap: var(--space-7);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-5);
+        align-items: center;
+      }
+      .cap {
+        margin-bottom: var(--space-3);
+        color: var(--text-secondary);
+        font-size: var(--font-size-small);
+      }
+      .panel {
+        width: var(--panel-width);
+        padding: var(--space-8);
+        background: var(--bg-panel);
+        border: 1px solid var(--border-panel);
+      }
+      /* static renditions of :hover (a preview cannot force the pseudo-class); same declarations as the rules in bundle.css */
+      .btn-action.is-hover {
+        background: var(--accent-bg-hover);
+        border-color: var(--border-focus);
+      }
+      .btn-confirm.is-hover {
+        background: var(--btn-confirm-bg-hover);
+      }
+      .btn-cancel.is-hover {
+        background: var(--btn-cancel-bg-hover);
+      }
+      .btn-danger.is-hover {
+        background: var(--btn-danger-bg-hover);
+        border-color: var(--btn-danger-border-hover);
+        color: var(--btn-danger-hover-text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <div>
+        <div class="cap">Rest</div>
+        <div class="row">
+          <button class="btn-action">+ Ajouter des photos</button>
+          <button class="btn-confirm">Valider</button>
+          <button class="btn-cancel">Annuler</button>
+          <button class="btn-danger">Supprimer</button>
+        </div>
+      </div>
+      <div>
+        <div class="cap">Hover</div>
+        <div class="row">
+          <button class="btn-action is-hover">+ Ajouter des photos</button>
+          <button class="btn-confirm is-hover">Valider</button>
+          <button class="btn-cancel is-hover">Annuler</button>
+          <button class="btn-danger is-hover">Supprimer</button>
+        </div>
+      </div>
+      <div>
+        <div class="cap">Disabled</div>
+        <div class="row">
+          <button class="btn-action" disabled>+ Ajouter des photos</button>
+          <button class="btn-confirm" disabled>Valider</button>
+          <button class="btn-cancel" disabled>Annuler</button>
+          <button class="btn-danger" disabled>Supprimer</button>
+        </div>
+      </div>
+      <div>
+        <div class="cap">Full width, in the side panel</div>
+        <div class="panel">
+          <button class="btn-action btn-action--full">
+            Trouver des cibles
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
