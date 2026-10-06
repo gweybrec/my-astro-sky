@@ -56,3 +56,10 @@ Ports 5173 and 3001 free (otherwise stop and report; never kill a process that i
 ## Report, in addition to the common items
 
 For each exported function: "ordinary" or the special case kept · the new functions and the files they replaced requests in · the mocking tests edited · anything of `src/` that still reaches the server and why.
+
+## Additions after the review of WP3.3 (2026-10-06): they override the text above where they differ
+
+1. **Plan entries.** `plans.removeEntry(entryId, planId?)` and `plans.updateEntry(entryId, changes, planId?)` have an optional last parameter since WP3.3. The facade always passes the real plan id it receives (`removePlanEntryAPI`, `updatePlanEntryPAAPI`, `updatePlanEntryPositionAPI`).
+2. **Two dead functions.** `solveWithASTAP` and `solveWithSolveField` of `src/api.ts` have no caller (only an unused import in `src/ui.ts` and in `src/photo-overlay.ts`), and the routes they call have answered with a job id, not a result, since before this work. Check with a search that there is still no caller, then delete: the two functions, their two unused imports, `parseSolverFailure` and its helpers if nothing else uses them, `LocalSolverApi.solve` with its implementation in `packages/backend-http`, its cases in `tests/unit/http-backend.test.ts` and in the contract suite, and its mention in any `vi.mock` factory. This is the one removal of exports this card allows. If you find a caller, stop and report.
+3. **Star catalogue.** `catalog.starCatalogUrl()` only chooses the address. `src/star-catalog.ts` keeps its own fallback to `/data/stars.14.json` when loading the chosen file fails, exactly as today.
+4. **The default upload is untested.** Add to `tests/unit/http-backend.test.ts` cases for the default `XMLHttpRequest` upload with a small fake `XMLHttpRequest` class installed on `globalThis` for the test: the progress fractions reach `onProgress`; a cancel during the upload rejects with `AbortError` and removes its listener; a network error rejects with code `NETWORK_ERROR`; a 400 answer with a code gives that code.

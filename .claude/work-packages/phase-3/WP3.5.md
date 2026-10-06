@@ -60,3 +60,15 @@ Write the backend the phone will use: the same `Backend`, made of the services t
 ## Report, in addition to the common items
 
 The cases run on each backend, and those skipped with the reason · every difference found between the two backends and its fix · the round-trip counts · what the phone's shell still has to supply.
+
+## Additions after the review of WP3.3 (2026-10-06): they override the text above where they differ
+
+WP3.1 and WP3.3 found places where a route still does something the service does not. Each is a difference between the two backends. Settle them in this card, in the service, so that the route becomes a plain call and its responses do not change:
+
+1. **Default values read by the routes**: the horizon's `radiusKm` (40) and the star search limits (10 for a name, 20 nearby) are applied by the routes. Apply them in the services when the value is absent; the routes pass what they received.
+2. **Online solving without a key**: the route of the past submissions answers 400 and the route of "reuse" checks the key first, while the services do not. `listSubmissions()` and `reuse()` reject with `ASTROMETRY_NOT_CONFIGURED` (kind `invalid`) when no key is configured; the routes drop their own checks. Their responses stay the same (compare with the pinning tests; if a body would change, keep the route's body through the error's `body` option).
+3. **`reuse` and the object list**: the route drops the optional `dsoIds` of the service's result. Leave the route; the contract case compares the fields the route sends.
+4. **The limit of TNS**: the route's code is `RATE_LIMITED`, the service's is `TNS_RATE_LIMITED`; the HTTP backend already maps one to the other. Leave it.
+5. **A picture refused for its type**: over HTTP the refusal comes from the upload filter with no code; locally it comes from the service with `INVALID_EXTENSION`. Make the server's error handler send the code the filter attaches (the test that records its absence as a `KNOWN GAP` is updated: this is the one pinned assertion this card may edit), and add the contract case that both backends refuse a `.txt` file renamed with no picture extension with a code that has a message.
+6. **Continuous integration**: `.github/workflows/ci.yml` has a type-check step for `packages/backend-http` but none for `packages/backend-local`, although the root `typecheck` script runs both. Add the missing step and update `docs/dev/ci.md`.
+7. After WP3.4, `LocalSolverApi` has no `solve` method any more.
