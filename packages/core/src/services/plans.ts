@@ -49,10 +49,13 @@ export interface PlanService {
   addEntry(planId: string, input: PlanEntryInput): Promise<{ id: string }>;
   /** Gives every listed entry of the plan the position of its index. Throws `invalid` (`PLAN_IDS_NOT_ARRAY`). */
   reorderEntries(planId: string, ids: readonly string[]): Promise<void>;
-  /** Removes an entry. Throws `notFound` (`ENTRY_NOT_FOUND`). */
-  removeEntry(entryId: string): Promise<void>;
-  /** Changes the framing fields present in `changes`. Throws `invalid`, `notFound` (`ENTRY_NOT_FOUND`). */
-  updateEntry(entryId: string, changes: PlanEntryChanges): Promise<void>;
+  /**
+   * Removes an entry. Throws `notFound` (`ENTRY_NOT_FOUND`). `planId` is not used here: the HTTP route is
+   * addressed by plan and entry, so a caller that knows the plan passes it.
+   */
+  removeEntry(entryId: string, planId?: string): Promise<void>;
+  /** Changes the framing fields present in `changes`. Throws `invalid`, `notFound` (`ENTRY_NOT_FOUND`). `planId` is not used (see `removeEntry`). */
+  updateEntry(entryId: string, changes: PlanEntryChanges, planId?: string): Promise<void>;
   /** Creates a mosaic and its tile entries in one transaction. Throws `notFound` (`PLAN_NOT_FOUND`), `invalid`. */
   createMosaic(planId: string, params: MosaicParams): Promise<{ id: string }>;
   /** Replaces a mosaic's parameters and its tiles in one transaction. Throws `notFound` (`MOSAIC_NOT_FOUND`), `invalid`. */

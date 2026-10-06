@@ -74,6 +74,7 @@ export default tseslint.config(
           './tsconfig.test.json',
           './packages/core/tsconfig.json',
           './packages/backend-local/tsconfig.json',
+          './packages/backend-http/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],
@@ -142,6 +143,26 @@ export default tseslint.config(
             {
               group: ['@myastrosky/core', '@myastrosky/core/*'],
               message: 'core must import itself with relative paths.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // @myastrosky/backend-http runs in the browser: browser globals, and it may import only core and its own
+  // files (what it needs from the app arrives through the options of createHttpBackend).
+  {
+    files: ['packages/backend-http/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|\\./)',
+              message: 'backend-http may import only @myastrosky/core/* and its own files.',
             },
           ],
         },
