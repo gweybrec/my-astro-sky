@@ -34,4 +34,4 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 - Technical content (implementation, deployment, architecture, build steps) → `docs/dev/`
 - `CLAUDE.md` itself holds only AI-agent guidance (commands, conventions, brief pointers) — it does not duplicate the content of the doc files
 - Do not create new doc files without updating this table and the Copilot instructions (`.github/copilot-instructions.md`)
-- The `docs/dev/ui/` chapters (`tokens.md`, `components.md`, `patterns.md`) are children of the `ui-guidelines.md` hub — reached via its Contents links, intentionally **not** listed separately in `docs/_sidebar.md` or in this table
+- The `docs/dev/ui/` chapters (`tokens.md`, `components.md`, `patterns.md`, `mobile.md`) are children of the `ui-guidelines.md` hub — reached via its Contents links, intentionally **not** listed separately in `docs/_sidebar.md` or in this table
