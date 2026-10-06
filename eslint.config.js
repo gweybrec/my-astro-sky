@@ -62,6 +62,7 @@ export default tseslint.config(
       'public/swagger.json',
       'resources/**',
       'other-resources/**',
+      'design/**',
       '.claude/**',
       'spikes/**',
       '**/android/**',

@@ -33,3 +33,6 @@ smart_telescope_mosaic_capabilities.html
 spikes
 **/android
 **/ios
+
+# Phone mockups source (generated HTML and scripts, not app code)
+design
