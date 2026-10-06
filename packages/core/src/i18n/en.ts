@@ -771,6 +771,7 @@ const en: Translations = {
     NOT_ENOUGH_CATALOG_STARS: 'Not enough catalog stars in the field',
     MISSING_FILE: 'Missing file',
     ASTROMETRY_NOT_CONFIGURED: 'ASTROMETRY_API_KEY not configured on server',
+    BACKUP_TOO_LARGE: 'This backup is too large to be restored on this device.',
     CANNOT_DETERMINE_DIMENSIONS: 'Cannot determine image dimensions',
     INVALID_IMAGE: 'Invalid or corrupt image file',
     JOB_NOT_FOUND: 'Job not found',

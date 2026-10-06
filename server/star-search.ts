@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { normalizeRA } from '@myastrosky/core/angles';
+import { buildDeepStars } from '@myastrosky/core/catalog/star-lists';
 import type { DeepStar } from '@myastrosky/core/domain/stars';
-import type { StarMultiplicity } from '@myastrosky/core/types';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,47 +29,11 @@ export function loadDeepCatalog(): DeepStar[] {
   const starsData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
   const namesData = JSON.parse(fs.readFileSync(namesPath, 'utf-8'));
   // Optional curated binary/multiple-star metadata; absent in minimal data dirs.
-  // Each entry may list companion HIPs (`members`) that inherit the same metadata, so
-  // every present component of a system (e.g. Albireo β1 + β2 Cyg) surfaces it.
-  const multiplesRaw: Record<string, StarMultiplicity & { members?: number[] }> = fs.existsSync(
-    multiplesPath,
-  )
+  const multiplesData = fs.existsSync(multiplesPath)
     ? JSON.parse(fs.readFileSync(multiplesPath, 'utf-8'))
     : {};
-  const multByHip = new Map<number, StarMultiplicity>();
-  for (const [hipStr, e] of Object.entries(multiplesRaw)) {
-    const meta: StarMultiplicity = { components: e.components };
-    if (e.sep) meta.sep = e.sep;
-    multByHip.set(Number(hipStr), meta);
-    for (const member of e.members ?? []) multByHip.set(member, meta);
-  }
 
-  const stars: DeepStar[] = [];
-
-  for (const f of starsData.features) {
-    const mag: number = f.properties.mag;
-    if (mag > 11) continue;
-
-    const hip: number = f.id;
-    const [ra, dec]: [number, number] = f.geometry.coordinates;
-    const info = namesData[String(hip)];
-
-    stars.push({
-      hip,
-      ra: normalizeRA(ra),
-      dec,
-      mag,
-      bv: parseFloat(f.properties.bv) || 0,
-      name: info?.name || undefined,
-      bayer: info?.bayer || undefined,
-      flam: info?.flam || undefined,
-      constellation: info?.c || undefined,
-      desig: info?.desig || undefined,
-      multiplicity: multByHip.get(hip),
-    });
-  }
-
-  stars.sort((a, b) => a.mag - b.mag);
+  const stars = buildDeepStars(starsData, namesData, multiplesData);
   console.log(`Catalogue chargé : ${stars.length} étoiles (mag ≤ 11)`);
   deepStars = stars;
   return stars;

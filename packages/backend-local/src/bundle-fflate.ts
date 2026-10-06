@@ -5,6 +5,7 @@
  */
 import { unzipSync, zipSync, type Zippable } from 'fflate';
 import { isValidZipEntryPath } from '@myastrosky/core/domain/backup';
+import { DomainError } from '@myastrosky/core/domain/errors';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 
 /** Builds an archive in memory: `add` every file, then `finish` for the bytes. */
@@ -22,8 +23,17 @@ export function newZipBundle(): { writer: BundleWriter; finish(): Promise<Uint8A
   };
 }
 
-/** Opens an archive held in memory. Nothing is decompressed until a file is read. */
-export async function openZipBundle(bytes: Uint8Array): Promise<BundleReader> {
+/**
+ * Opens an archive held in memory. Nothing is decompressed until a file is read. An archive larger than
+ * `maxArchiveBytes` (when given) is refused before it is opened: the phone holds it all in memory.
+ */
+export async function openZipBundle(
+  bytes: Uint8Array,
+  options: { maxArchiveBytes?: number } = {},
+): Promise<BundleReader> {
+  if (options.maxArchiveBytes !== undefined && bytes.byteLength > options.maxArchiveBytes) {
+    throw new DomainError('invalid', 'Backup archive too large', { code: 'BACKUP_TOO_LARGE' });
+  }
   const sizes = new Map<string, number>();
   // A filter that keeps nothing lists the entries (their names and sizes) without decompressing any.
   unzipSync(bytes, {
