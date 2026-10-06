@@ -182,7 +182,9 @@ export async function createApp(): Promise<express.Express> {
     const message = err?.message ?? String(err);
     if (status >= 500) logServerError('server_unhandled_error', err);
     if (!res.headersSent) {
-      res.status(status).json({ error: message });
+      // A refusal that carries a code (the upload filter's INVALID_FILE_TYPE) keeps it.
+      const code = status < 500 && typeof err?.code === 'string' ? { code: err.code } : {};
+      res.status(status).json({ error: message, ...code });
     }
   });
 

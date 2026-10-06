@@ -42,12 +42,11 @@ export const horizonRouter = express.Router();
  *         description: Failed to fetch or process elevation data
  */
 horizonRouter.get('/api/horizon', async (req, res) => {
-  const radiusKm = Number(req.query.radiusKm);
   try {
     const profile = await horizon.getProfile({
       lat: Number(req.query.lat),
       lon: Number(req.query.lon),
-      radiusKm: Number.isFinite(radiusKm) ? radiusKm : 40,
+      radiusKm: req.query.radiusKm === undefined ? undefined : Number(req.query.radiusKm),
       obsHeightM:
         req.query.obsHeightM !== undefined && Number.isFinite(Number(req.query.obsHeightM))
           ? Number(req.query.obsHeightM)

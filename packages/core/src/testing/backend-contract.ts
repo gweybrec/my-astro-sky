@@ -11,6 +11,7 @@
  * clock or on the order of the keys of an object.
  */
 import type { Backend, CancelSignal, FileSource } from '../backend';
+import { ERROR_CODES } from '../domain/error-codes';
 import type { ObservationWindow } from '../domain/plans';
 import type { Photo } from '../types';
 
@@ -1137,6 +1138,45 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       'a submission without an API key',
     );
   });
+
+  add('online solving: the list of past submissions and the reuse need a key too', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    await expectDomainError(
+      b.novaSolve.listSubmissions(),
+      'invalid',
+      'ASTROMETRY_NOT_CONFIGURED',
+      'the past submissions without an API key',
+    );
+    await expectDomainError(
+      b.novaSolve.reuse(fixtures.jpeg(), 1),
+      'invalid',
+      'ASTROMETRY_NOT_CONFIGURED',
+      'a reuse without an API key',
+    );
+  });
+
+  add(
+    'photos: a file that is not a picture is refused with a code that has a message',
+    async () => {
+      const { backend: b, fixtures } = await makeBackend();
+      let caught: unknown;
+      try {
+        await b.photos.upload(fixtures.text(), {
+          correspondences: JSON.stringify(CORRESPONDENCES),
+        });
+      } catch (e) {
+        caught = e;
+      }
+      if (caught === undefined) fail('a .txt file as a photo: expected a refusal, but it resolved');
+      const e = caught as ErrorShape;
+      expectEqual(e.kind, 'invalid', 'the kind of the refusal of a .txt file');
+      // The server's upload filter refuses it for its type, the service for its extension.
+      expectTrue(
+        typeof e.code === 'string' && (ERROR_CODES as readonly string[]).includes(e.code),
+        `the refusal carries a known code (got ${String(e.code)})`,
+      );
+    },
+  );
 
   // ── Solvers installed next to the server ─────────────────────────────────
 

@@ -200,6 +200,29 @@ export default tseslint.config(
     },
   },
 
+  // @myastrosky/backend-local runs in the phone's WebView: browser globals, and it may import only core, fflate
+  // and its own files. The Capacitor plugin is imported by `capacitor-sqlite-db.ts` alone; everything else of
+  // the platform arrives through the options of createLocalBackend.
+  {
+    files: ['packages/backend-local/**/*.ts'],
+    ignores: ['packages/backend-local/src/capacitor-sqlite-db.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|fflate$|\./)',
+              message:
+                'backend-local may import only @myastrosky/core/*, fflate and its own files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Build/CLI scripts: plain ES modules, no type information, and console output is
   // their whole job — so silence `no-console` here.
   {

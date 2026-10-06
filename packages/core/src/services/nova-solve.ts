@@ -72,11 +72,11 @@ export interface NovaSolveService {
   submit(file: NovaSolveFile, hints?: NovaSolveHints): Promise<string>;
   /** The state of a local job. Throws `notFound` (`JOB_NOT_FOUND`) for an unknown or expired id. */
   getJob(localId: string): Promise<NovaJobStatus>;
-  /** The jobs of the account, most recent first; an empty list when the account cannot be read. */
+  /** The jobs of the account, most recent first; an empty list when the account cannot be read. Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED`) without a key. */
   listSubmissions(): Promise<AstrometrySubmission[]>;
   /**
    * Builds the correspondences of an already solved astrometry.net job for this picture.
-   * Throws `invalid` (`INVALID_JOB_ID`, `CANNOT_DETERMINE_DIMENSIONS`); a job that is not solved,
+   * Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked first; `INVALID_JOB_ID`, `CANNOT_DETERMINE_DIMENSIONS`); a job that is not solved,
    * a solution of another shape or a network failure is a result with `success: false`.
    */
   reuse(file: NovaSolveFile, jobId: number): Promise<NovaReuseResult>;
@@ -209,11 +209,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
   }
 
   async function submit(file: NovaSolveFile, hints?: NovaSolveHints): Promise<string> {
-    if (!(await isConfigured())) {
-      throw new DomainError('invalid', 'ASTROMETRY_API_KEY not configured', {
-        code: 'ASTROMETRY_NOT_CONFIGURED',
-      });
-    }
+    await requireConfigured();
     const { width: imageWidth, height: imageHeight } = await requireDimensions(file);
 
     const session = await getSession();
@@ -418,7 +414,16 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     }
   }
 
+  async function requireConfigured(): Promise<void> {
+    if (!(await isConfigured())) {
+      throw new DomainError('invalid', 'ASTROMETRY_API_KEY not configured', {
+        code: 'ASTROMETRY_NOT_CONFIGURED',
+      });
+    }
+  }
+
   async function listSubmissions(): Promise<AstrometrySubmission[]> {
+    await requireConfigured();
     try {
       const session = await getSession();
       const res = await http({
@@ -554,6 +559,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     listSubmissions,
 
     async reuse(file, jobId) {
+      await requireConfigured();
       if (typeof jobId !== 'number' || !jobId || Number.isNaN(jobId)) {
         throw new DomainError('invalid', 'Invalid job ID', { code: 'INVALID_JOB_ID' });
       }

@@ -121,6 +121,7 @@ function submitJob(
 const getJobStatus = (id: string) => service.getJob(id);
 const listUserSubmissions = () => service.listSubmissions();
 const reuseSubmission = (jobId: number, w: number, h: number) => {
+  getSetting.mockResolvedValue('test-key'); // a reuse needs a key, though it never logs in
   probe.mockResolvedValue({ width: w, height: h });
   return service.reuse({ fileName: 'photo.jpg', bytes: new Uint8Array([1]) }, jobId);
 };

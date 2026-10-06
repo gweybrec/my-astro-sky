@@ -1370,10 +1370,12 @@ describe('POST /api/photos', () => {
     expect(uploadsList()).toEqual([]);
   });
 
-  it('rejects a MIME type the upload filter refuses, with no code', async () => {
+  it('rejects a MIME type the upload filter refuses, with its code', async () => {
     const r = await call('POST', '/api/photos', await photoForm({ type: 'text/plain' }));
-    // KNOWN GAP: the global error handler drops the code INVALID_FILE_TYPE, so the body is only { error }.
-    expect(r).toEqual({ status: 400, body: { error: 'Invalid file type' } });
+    expect(r).toEqual({
+      status: 400,
+      body: { error: 'Invalid file type', code: 'INVALID_FILE_TYPE' },
+    });
     expect(uploadsList()).toEqual([]);
   });
 
