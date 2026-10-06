@@ -43,7 +43,13 @@ function context2d(canvas: OffscreenCanvas, readBack = false): OffscreenCanvasRe
   return ctx;
 }
 
-export function createBrowserImageCodec(): ImageCodec {
+export interface BrowserImageCodecOptions {
+  /** The quality of the resize that makes a thumbnail (default 'high'). */
+  thumbnailResizeQuality?: 'pixelated' | 'low' | 'medium' | 'high';
+}
+
+export function createBrowserImageCodec(options: BrowserImageCodecOptions = {}): ImageCodec {
+  const resizeQuality = options.thumbnailResizeQuality ?? 'high';
   return {
     async probe(bytes) {
       const h = readImageHeader(bytes);
@@ -81,7 +87,7 @@ export function createBrowserImageCodec(): ImageCodec {
       const bitmap = await createImageBitmap(asBlob(bytes), {
         resizeWidth: width,
         resizeHeight: height,
-        resizeQuality: 'high',
+        resizeQuality,
         imageOrientation: 'none',
       });
       try {

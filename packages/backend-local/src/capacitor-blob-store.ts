@@ -26,6 +26,8 @@ export interface CapacitorBlobStoreOptions {
   directory: string;
   /** The folder inside it. */
   folder: string;
+  /** Bytes per written piece (default `BLOB_PIECE_BYTES`). */
+  pieceBytes?: number;
 }
 
 export interface CapacitorBlobStore extends BlobStore {
@@ -38,7 +40,14 @@ export interface CapacitorBlobStore extends BlobStore {
 /** Bytes per piece written; each piece is encoded on its own, so no base64 text of a whole file exists. */
 export const BLOB_PIECE_BYTES = 1024 * 1024;
 
-function toBase64(bytes: Uint8Array): string {
+/** Base64 of bytes by the engine's own encoder, where it has one (`Uint8Array.prototype.toBase64`). */
+const nativeToBase64 = (bytes: Uint8Array): string | null => {
+  const native = (bytes as Uint8Array & { toBase64?: () => string }).toBase64;
+  return typeof native === 'function' ? native.call(bytes) : null;
+};
+
+/** Base64 in JavaScript: `btoa` over a binary string built from pieces of 32 KB. */
+export function toBase64Js(bytes: Uint8Array): string {
   let binary = '';
   const step = 0x8000;
   for (let i = 0; i < bytes.length; i += step) {
@@ -47,22 +56,27 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** Writes a file in pieces of at most `BLOB_PIECE_BYTES`: the first creates (or replaces) it, the next ones are appended. */
+export function toBase64(bytes: Uint8Array): string {
+  return nativeToBase64(bytes) ?? toBase64Js(bytes);
+}
+
+/** Writes a file in pieces of at most `pieceBytes`: the first creates (or replaces) it, the next ones are appended. */
 export async function writeFileInPieces(
   filesystem: Pick<CapacitorFilesystem, 'writeFile' | 'appendFile'>,
   directory: string,
   path: string,
   bytes: Uint8Array,
+  pieceBytes: number = BLOB_PIECE_BYTES,
 ): Promise<void> {
   await filesystem.writeFile({
     path,
-    data: toBase64(bytes.subarray(0, BLOB_PIECE_BYTES)),
+    data: toBase64(bytes.subarray(0, pieceBytes)),
     directory,
   });
-  for (let at = BLOB_PIECE_BYTES; at < bytes.length; at += BLOB_PIECE_BYTES) {
+  for (let at = pieceBytes; at < bytes.length; at += pieceBytes) {
     await filesystem.appendFile({
       path,
-      data: toBase64(bytes.subarray(at, at + BLOB_PIECE_BYTES)),
+      data: toBase64(bytes.subarray(at, at + pieceBytes)),
       directory,
     });
   }
@@ -70,6 +84,7 @@ export async function writeFileInPieces(
 
 export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): CapacitorBlobStore {
   const { filesystem, convertFileSrc, directory, folder } = options;
+  const pieceBytes = options.pieceBytes ?? BLOB_PIECE_BYTES;
   const doFetch = options.fetch;
 
   const pathOf = (name: string): string => {
@@ -128,7 +143,7 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
       const path = pathOf(name);
       await ensureFolder();
       try {
-        await writeFileInPieces(filesystem, directory, path, bytes);
+        await writeFileInPieces(filesystem, directory, path, bytes, pieceBytes);
       } catch (err) {
         await filesystem.deleteFile({ path, directory }).catch(() => undefined);
         throw err;

@@ -57,6 +57,8 @@ export interface PhonePlatform {
   directories: { data: string; cache: string };
   /** The app's own address, without a trailing slash (`''` for relative addresses): where `data/` and `gear/` are. */
   baseUrl: string;
+  /** Bytes per piece when a file is written (default: the blob store's own). */
+  blobPieceBytes?: number;
   /** Replaces the browser codec (the contract test passes the server's `sharp` one). */
   images?: ImageCodec;
 }
@@ -76,6 +78,7 @@ export async function createPhoneBackend(platform: PhonePlatform): Promise<Backe
     fetch: platform.fetch,
     directory: directories.data,
     folder: BLOB_FOLDER,
+    pieceBytes: platform.blobPieceBytes,
   });
   await blobs.init();
 
@@ -113,7 +116,7 @@ export async function createPhoneBackend(platform: PhonePlatform): Promise<Backe
         .mkdir({ path: 'exports', directory: directories.cache, recursive: true })
         .catch(() => undefined);
       const path = `exports/${name}`;
-      await writeFileInPieces(filesystem, directories.cache, path, bytes);
+      await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
       const { uri } = await filesystem.getUri({ path, directory: directories.cache });
       await platform.share.share({ title: name, url: uri, dialogTitle: name });
     },

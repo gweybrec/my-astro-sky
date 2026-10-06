@@ -15,10 +15,11 @@ export function newZipBundle(): { writer: BundleWriter; finish(): Promise<Uint8A
     writer: {
       async add(name, bytes) {
         if (!isValidZipEntryPath(name)) throw new Error(`Invalid archive entry name: ${name}`);
-        files[name] = bytes;
+        // Pictures are already compressed: stored as they are (level 0); the JSON files are deflated.
+        files[name] = name.startsWith('images/') ? [bytes, { level: 0 }] : bytes;
       },
     },
-    // Level 1, like the server: pictures are already compressed.
+    // Level 1, like the server, for the entries that are not pictures.
     finish: async () => zipSync(files, { level: 1 }),
   };
 }

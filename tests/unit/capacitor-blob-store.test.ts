@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BLOB_PIECE_BYTES,
   createCapacitorBlobStore,
+  toBase64,
+  toBase64Js,
 } from '@myastrosky/backend-local/capacitor-blob-store';
 import { createFsBlobStore } from '../../server/blob-store';
 import { describeBlobStoreConformance } from '../helpers/blob-store-conformance';
@@ -36,6 +38,30 @@ describe('createCapacitorBlobStore', () => {
     await store.put('big.jpg', new Uint8Array(3 * BLOB_PIECE_BYTES + 5).fill(9));
     expect(fake.maxDataLength).toBeLessThanOrEqual(Math.ceil(BLOB_PIECE_BYTES / 3) * 4);
     expect(fake.files.get('uploads/big.jpg')!.length).toBe(3 * BLOB_PIECE_BYTES + 5);
+  });
+
+  it('writes in pieces of the size the adapter is given', async () => {
+    const fake = createFakeFilesystem();
+    const store = createCapacitorBlobStore({
+      filesystem: fake,
+      convertFileSrc: fake.convertFileSrc,
+      fetch: fake.fetch,
+      directory: 'DATA',
+      folder: 'uploads',
+      pieceBytes: 3000,
+    });
+    await store.init();
+    await store.put('p.jpg', new Uint8Array(10_000).fill(7));
+    expect(fake.maxDataLength).toBeLessThanOrEqual(4000);
+    expect(fake.files.get('uploads/p.jpg')!.length).toBe(10_000);
+  });
+
+  it('encodes base64 the same with and without the native encoder', () => {
+    const bytes = new Uint8Array(100_003).map((_, i) => (i * 31 + 5) % 256);
+    const expected = Buffer.from(bytes).toString('base64');
+    expect(toBase64Js(bytes)).toBe(expected);
+    expect(toBase64(bytes)).toBe(expected);
+    expect(toBase64(new Uint8Array(0))).toBe('');
   });
 
   it('removes the partial file and rejects when a write fails', async () => {

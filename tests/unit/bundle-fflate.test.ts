@@ -1,6 +1,7 @@
 // @vitest-environment node
 /** The in-memory ZIP of the phone and the server's archiver/unzipper read each other's archives. */
 import { PassThrough } from 'stream';
+import { unzipSync } from 'fflate';
 import { describe, it, expect } from 'vitest';
 import { newZipBundle, openZipBundle } from '@myastrosky/backend-local/bundle-fflate';
 import { createZipResponseWriter, openZipBundle as openServerZip } from '../../server/bundle-zip';
@@ -53,5 +54,26 @@ describe('bundle-fflate', () => {
   it('writes an empty archive that reads back empty', async () => {
     const reader = await openZipBundle(await newZipBundle().finish());
     expect(await reader.names()).toEqual([]);
+  });
+
+  it('stores the pictures and deflates the other entries', async () => {
+    const zip = newZipBundle();
+    const json = text(JSON.stringify({ photos: Array(200).fill('a photo') }));
+    const picture = new Uint8Array(4096).map((_, i) => (i * 7) % 251);
+    await zip.writer.add('manifest.json', json);
+    await zip.writer.add('images/a.jpg', picture);
+    const methods = new Map<string, number>();
+    const archive = await zip.finish();
+    unzipSync(archive, {
+      filter: (entry) => {
+        methods.set(entry.name, entry.compression);
+        return false;
+      },
+    });
+    expect(methods.get('images/a.jpg')).toBe(0);
+    expect(methods.get('manifest.json')).toBe(8);
+    const reader = await openZipBundle(archive);
+    expect(await reader.read('images/a.jpg')).toEqual(picture);
+    expect(await reader.read('manifest.json')).toEqual(json);
   });
 });
