@@ -121,6 +121,20 @@ export function framesInWindow(w: ObservationWindow, nightSpanMs: number): numbe
   return Math.floor(windowDurationMs(w, nightSpanMs) / 1000 / w.frameSeconds);
 }
 
+/** The single-frame duration typed in a field: a positive number of seconds, or null when empty or not valid. */
+export function parseFrameSeconds(value: string | number): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * The step a drag snaps to, as a fraction of the night: one single frame, or 0 (free drag) when the window has no
+ * frame duration or snapping is off.
+ */
+export function snapStepFrac(w: ObservationWindow, nightSpanMs: number): number {
+  return w.snap && w.frameSeconds ? (w.frameSeconds * 1000) / nightSpanMs : 0;
+}
+
 /**
  * Discrete HH:MM options spanning the night window at `stepMinutes`, for the
  * per-window from/to time dropdown (the same widget the targets search uses).

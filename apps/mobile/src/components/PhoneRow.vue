@@ -12,6 +12,10 @@ withDefaults(
     subs?: string[];
     /** The value before the chevron. */
     value?: string;
+    /** The value and the lines under the title are figures (times, counts): drawn in the mono face. */
+    mono?: boolean;
+    /** A colour dot instead of the leading icon (an observation window's colour; any CSS colour). */
+    swatch?: string;
     chevron?: boolean;
     /** SVG markup of a leading icon in a round tinted holder. */
     lead?: string;
@@ -48,17 +52,21 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
     @click="emit('click', $event)"
   >
     <div class="mob-row-line">
-      <span v-if="lead" class="mob-row-lead"><AppIcon :svg="lead" /></span>
+      <span v-if="swatch" class="mob-row-lead"
+        ><span class="mob-swatch" :style="{ background: swatch }"
+      /></span>
+      <span v-else-if="lead" class="mob-row-lead"><AppIcon :svg="lead" /></span>
       <span class="mob-row-body">
         <span class="mob-row-title m-body" :class="{ 'mob-row-title--wrap': wrap }">{{
           title
         }}</span>
-        <span v-for="line in subs" :key="line" class="mob-row-sub mob-row-sub--wrap m-secondary">{{
-          line
-        }}</span>
+        <span v-for="line in subs" :key="line" class="mob-row-sub mob-row-sub--wrap m-secondary"
+          ><span v-if="mono" class="m-mono">{{ line }}</span
+          ><template v-else>{{ line }}</template></span
+        >
       </span>
       <span v-if="value || chevron || $slots.trail" class="mob-row-trail m-secondary">
-        <span v-if="value">{{ value }}</span>
+        <span v-if="value" :class="{ 'm-mono': mono }">{{ value }}</span>
         <slot name="trail" />
         <span v-if="chevron" class="mob-row-chevron" aria-hidden="true"
           ><AppIcon :svg="chevronIcon"
