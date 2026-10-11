@@ -1,0 +1,47 @@
+<script setup lang="ts">
+import { useId } from 'vue';
+import { IonModal } from '@ionic/vue';
+import { t } from '@myastrosky/core/i18n/index';
+import PhoneIconButton from './PhoneIconButton.vue';
+import AppIcon from './AppIcon.vue';
+import closeIcon from '@icons/close-x.svg?raw';
+
+// A bottom sheet (`.mob-sheet`) on Ionic's modal. It takes the height of its content (60 % of the screen at most, 70 %
+// with `tall`), the body scrolls past that. The Android back button and a tap on the backdrop close it (Ionic's
+// overlay handling). A sheet without a footer applies its changes at once and has the close button in its header.
+defineProps<{ open: boolean; title: string; closable?: boolean; tall?: boolean }>();
+const emit = defineEmits<{ 'update:open': [open: boolean] }>();
+const titleId = useId();
+</script>
+
+<template>
+  <IonModal class="mob-sheet-modal" :is-open="open" @did-dismiss="emit('update:open', false)">
+    <section
+      class="mob-sheet"
+      :class="tall ? 'mob-sheet--auto-lg' : 'mob-sheet--auto'"
+      :aria-labelledby="titleId"
+    >
+      <button
+        type="button"
+        class="mob-sheet-grab"
+        :aria-label="t('modal.close')"
+        @click="emit('update:open', false)"
+      >
+        <span class="mob-sheet-handle" />
+      </button>
+      <div class="mob-sheet-header" :class="{ 'mob-sheet-header--bar': closable }">
+        <h2 :id="titleId" class="mob-sheet-title m-title">{{ title }}</h2>
+        <slot name="header-trail" />
+        <PhoneIconButton
+          v-if="closable"
+          :label="t('modal.close')"
+          @click="emit('update:open', false)"
+        >
+          <AppIcon :svg="closeIcon" />
+        </PhoneIconButton>
+      </div>
+      <div class="mob-sheet-body mob-scroll"><slot /></div>
+      <div v-if="$slots.footer" class="mob-sheet-footer"><slot name="footer" /></div>
+    </section>
+  </IonModal>
+</template>

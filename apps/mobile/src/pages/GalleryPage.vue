@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { IonPage, IonHeader, IonContent } from '@ionic/vue';
+import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { getPhotos } from '@myastrosky/app-state/api';
 import AppIcon from '../components/AppIcon.vue';
+import PhoneTopBar from '../components/PhoneTopBar.vue';
+import PhoneSearch from '../components/PhoneSearch.vue';
+import PhoneIconButton from '../components/PhoneIconButton.vue';
+import PhoneEmptyState from '../components/PhoneEmptyState.vue';
 import filterIcon from '../icons/filter.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 
@@ -22,26 +26,24 @@ onMounted(async () => {
 
 <template>
   <IonPage>
-    <IonHeader class="mob-topbar">
-      <input
-        class="mob-search m-body"
-        type="search"
+    <PhoneTopBar>
+      <PhoneSearch
         :placeholder="t('photos.searchPlaceholder')"
-        :aria-label="t('mobile.gallery.searchLabel')"
+        :label="t('mobile.gallery.searchLabel')"
       />
-      <button type="button" class="mob-icon-btn" :aria-label="t('targets.moreFilters')">
-        <AppIcon :svg="filterIcon" />
-      </button>
-    </IonHeader>
+      <PhoneIconButton :label="t('targets.moreFilters')"
+        ><AppIcon :svg="filterIcon"
+      /></PhoneIconButton>
+    </PhoneTopBar>
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill">
-        <div v-if="photoCount === 0" class="mob-empty">
-          <p class="mob-empty-text m-body">{{ t('mobile.gallery.empty') }}</p>
-          <!-- Adding photos is a later card: the button shows and does nothing yet. -->
-          <button type="button" class="mob-btn mob-btn--action mob-btn--lg m-body-strong">
-            <AppIcon :svg="plusIcon" />{{ t('batch.modalTitle') }}
-          </button>
-        </div>
+        <!-- Adding photos is a later card: the button shows and does nothing yet. -->
+        <PhoneEmptyState
+          v-if="photoCount === 0"
+          :text="t('mobile.gallery.empty')"
+          :button-label="t('batch.modalTitle')"
+          :button-icon="plusIcon"
+        />
       </div>
     </IonContent>
   </IonPage>

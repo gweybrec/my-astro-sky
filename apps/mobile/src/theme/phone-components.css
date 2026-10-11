@@ -1,0 +1,590 @@
+/* The shared phone components (apps/mobile/src/components/Phone*.vue) on Ionic's own components: the design system's
+   `.mob-*` classes sit on the Ionic host element and give the box (border, fill, radius, padding, height); this file only
+   neutralises what Ionic adds inside (its own padding, ripple, upper-casing, colours) and maps the parts Ionic draws
+   itself (switch, slider, spinner, overlays) to the design system's tokens. Ionic's variables for the whole app are in
+   `ionic-tokens.css`. */
+
+/* ── Buttons: `ion-button.mob-btn` and `ion-button.mob-icon-btn`. The host is the box; the native button fills it. */
+ion-button.mob-btn,
+ion-button.mob-icon-btn {
+  --background: transparent;
+  --background-activated: transparent;
+  --background-activated-opacity: 0;
+  --background-focused: transparent;
+  --background-focused-opacity: 0;
+  --background-hover: transparent;
+  --background-hover-opacity: 0;
+  --color: currentcolor;
+  --color-activated: currentcolor;
+  --color-focused: currentcolor;
+  --color-hover: currentcolor;
+  --border-width: 0;
+  --box-shadow: none;
+  --border-radius: calc(var(--mobile-card-radius) - 1px);
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --ripple-color: transparent;
+  box-sizing: border-box;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: var(--font-sans);
+}
+/* The label's padding is inside the native button (see `.mob-btn-content`), so the whole box is the tap target. */
+ion-button.mob-btn {
+  min-height: 0;
+  padding: 0;
+}
+ion-button.mob-btn::part(native),
+ion-button.mob-icon-btn::part(native) {
+  min-height: 0;
+  height: 100%;
+}
+/* Ionic sets the width of a button from its content: the design system's classes size the host. */
+ion-button.mob-btn--block {
+  display: flex;
+}
+.mob-btn-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: 0 var(--space-7);
+}
+ion-button.mob-btn--icon .mob-btn-content {
+  padding: 0;
+}
+ion-button.mob-btn--field {
+  display: flex;
+}
+ion-button.mob-btn--field .mob-btn-content {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+}
+.mob-form-row ion-button.mob-btn--field .mob-btn-content {
+  padding: 0 var(--space-7);
+}
+.mob-context ion-button.mob-btn--field .mob-btn-content {
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+}
+ion-button.mob-btn--text .mob-btn-content {
+  padding: 0 var(--space-4);
+}
+.mob-dialog-buttons ion-button.mob-btn .mob-btn-content {
+  padding: 0 var(--space-2);
+}
+ion-button.mob-btn.button-disabled,
+ion-button.mob-icon-btn.button-disabled {
+  opacity: 0.4;
+}
+ion-button.mob-btn.ion-focused,
+ion-button.mob-icon-btn.ion-focused {
+  outline: 2px solid var(--text-bright);
+  outline-offset: -2px;
+}
+/* The icon button's glyph, and the held state of a long press (the fill of a pressed button). */
+ion-button.mob-icon-btn--held {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+.mob-sheet-footer ion-button.mob-btn {
+  flex: 1 1 0;
+}
+
+/* ── Fields: `ion-input.mob-field` / `ion-input.mob-search` take the design system's box; the native input fills it. */
+ion-input.mob-field,
+ion-input.mob-search {
+  --background: transparent;
+  --color: var(--text-primary);
+  --placeholder-color: color-mix(in srgb, var(--text-dim) 58%, var(--text-secondary));
+  --placeholder-opacity: 1;
+  --padding-start: var(--space-7);
+  --padding-end: var(--space-7);
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --highlight-height: 0;
+  min-height: 0;
+}
+ion-input.mob-field.has-focus,
+ion-input.mob-search.has-focus {
+  border-color: var(--border-focus);
+}
+ion-input.mob-field .native-input,
+ion-input.mob-search .native-input {
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+ion-input.mob-field.input-disabled {
+  opacity: 0.6;
+}
+.phone-field-unit-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.phone-field-unit {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+/* ── Rows: `ion-item.mob-row` and `ion-toggle.mob-row` (the host is the row; Ionic's own padding and lines are off). */
+ion-item.mob-row,
+ion-toggle.mob-row {
+  --background: transparent;
+  --background-activated: transparent;
+  --background-activated-opacity: 0;
+  --background-focused: transparent;
+  --background-hover: transparent;
+  --background-hover-opacity: 0;
+  --color: var(--text-primary);
+  --ripple-color: transparent;
+  --border-width: 0;
+  --inner-border-width: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --inner-padding-end: 0;
+  --min-height: 0;
+  --highlight-height: 0;
+  box-sizing: border-box;
+}
+ion-item.mob-row {
+  display: flex;
+  --inner-padding-start: 0;
+}
+ion-item.mob-row::part(native) {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+ion-item.mob-row.item-disabled {
+  opacity: 1;
+}
+.mob-row-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-4) 0;
+}
+ion-item.mob-row {
+  padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+ion-item.mob-row .mob-row-line {
+  min-height: calc(var(--mobile-list-row-min) - 2 * var(--space-4) - 1px);
+}
+ion-item.mob-row.mob-row--roomy {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+ion-item.mob-row.mob-row--roomy .mob-row-line {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+ion-item.mob-row--disabled .mob-row-title,
+ion-item.mob-row--disabled .mob-row-lead {
+  opacity: 0.4;
+}
+ion-item.mob-row--disabled:active {
+  background: transparent;
+}
+/* A row with a switch: the label is on the left, the switch on the right. */
+ion-toggle.mob-toggle-row {
+  display: flex;
+  align-items: center;
+  /* Ionic forces `content-box` on a toggle: the padding is taken off the width. */
+  border-bottom: 1px solid var(--border-subtle);
+  width: calc(100% - var(--mobile-gutter) - var(--mobile-gutter-end));
+  min-height: calc(var(--mobile-list-row-min) - 2 * var(--space-4) - 1px);
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+}
+ion-toggle.mob-toggle-row .mob-row-title {
+  display: block;
+}
+ion-toggle.mob-toggle-row::part(label) {
+  margin: 0;
+  white-space: normal;
+}
+ion-toggle.mob-toggle-row {
+  --handle-width: var(--space-9);
+  --handle-height: var(--space-9);
+  --handle-spacing: var(--space-2);
+  --handle-border-radius: var(--radius-pill);
+  --handle-box-shadow: none;
+  --handle-background: var(--text-secondary);
+  --handle-background-checked: var(--text-bright);
+  --track-background: var(--bg-input);
+  --track-background-checked: var(--accent-bg);
+}
+ion-toggle.mob-toggle-row::part(track) {
+  width: var(--space-15);
+  height: var(--space-11);
+  border: 1px solid var(--border-white-md);
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+}
+ion-toggle.mob-toggle-row.toggle-checked::part(track) {
+  border-color: var(--border-focus);
+}
+
+/* ── Section header: `ion-list-header.mob-section-header`. */
+ion-list-header.mob-section-header {
+  margin: 0;
+  --background: transparent;
+  --color: var(--text-label);
+  --border-width: 0;
+  min-height: 0;
+  display: block;
+  box-sizing: border-box;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+ion-list-header.mob-section-header--bar {
+  padding-right: var(--mobile-gutter-end);
+}
+.mob-section-header-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+ion-list-header.mob-section-header::part(inner),
+ion-list-header.mob-section-header .list-header-inner {
+  display: block;
+}
+
+/* ── Slider: `ion-range.mob-slider` in a `.mob-slider-row`. */
+ion-range.mob-slider {
+  --bar-background: var(--border-white-md);
+  --bar-background-active: var(--accent-color);
+  --bar-height: 4px;
+  --bar-border-radius: var(--radius-pill);
+  --knob-background: var(--accent-color);
+  --knob-size: var(--space-9);
+  --pin-background: var(--accent-color);
+  height: var(--mobile-touch-min);
+  padding: 0 var(--space-4);
+  min-height: 0;
+}
+ion-range.mob-slider.range-disabled {
+  opacity: 0.4;
+}
+
+/* ── Chip and badge. */
+ion-chip.mob-chip {
+  --background: transparent;
+  --color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+ion-chip.mob-chip[aria-pressed='true'] {
+  --color: var(--text-bright);
+}
+ion-chip.mob-chip:active {
+  color: var(--text-secondary);
+}
+ion-chip.mob-chip[aria-pressed='true']:active {
+  color: var(--text-bright);
+}
+ion-badge.mob-badge {
+  --background: transparent;
+  --color: inherit;
+  --padding-start: var(--space-3h);
+  --padding-end: var(--space-3h);
+  --padding-top: var(--space-1);
+  --padding-bottom: var(--space-1);
+  box-sizing: border-box;
+  display: inline-block;
+  font-weight: 400;
+  text-align: left;
+  vertical-align: baseline;
+}
+ion-badge.mob-badge--type {
+  background: var(--target-type-bg);
+}
+ion-badge.mob-badge--const {
+  background: var(--target-const-bg);
+}
+
+/* ── Busy indicator: `ion-spinner` (the small one is the design system's `auto-solve-spinner`, the large its
+   `loading-spinner`). */
+.mob-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--accent-color);
+  white-space: nowrap;
+}
+.mob-busy--page {
+  flex-direction: column;
+  gap: var(--space-7);
+  margin: var(--space-13) auto;
+}
+ion-spinner.mob-spinner {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--spinner-active);
+  --color: var(--spinner-active);
+  /* the faint ring behind the active arc, as the design system's spinner */
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--accent-fill-md);
+}
+.mob-busy--page ion-spinner.mob-spinner {
+  width: 36px;
+  height: 36px;
+}
+
+/* ── Reorderable list. */
+ion-item.mob-entry {
+  --background: transparent;
+  --border-width: 0;
+  --inner-border-width: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  --inner-padding-end: 0;
+  --min-height: 0;
+  --ripple-color: transparent;
+  border-bottom: 1px solid var(--border-subtle);
+  display: block;
+}
+ion-item.mob-entry::part(native) {
+  padding: 0;
+  min-height: 0;
+}
+.mob-entry-line {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+  flex: 1;
+  min-width: 0;
+}
+.mob-entry-line > .mob-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+}
+ion-reorder.mob-drag {
+  display: flex;
+  --color: var(--text-primary);
+}
+
+/* ── Sheets: `ion-modal.mob-sheet-modal` at the bottom, with the height of its content (the board's `.mob-sheet--auto`). */
+ion-modal.mob-sheet-modal {
+  --width: 100%;
+  --height: auto;
+  --background: transparent;
+  --border-radius: 0;
+  --box-shadow: none;
+  align-items: flex-end;
+}
+ion-modal.mob-sheet-modal::part(content) {
+  max-height: 100%;
+}
+ion-modal.mob-sheet-modal .mob-sheet {
+  width: 100%;
+  box-sizing: border-box;
+  /* The design system sizes `--auto` as a part of its parent; here the parent is the modal, whose height is the content's. */
+  max-height: 60dvh;
+}
+ion-modal.mob-sheet-modal .mob-sheet--auto-lg {
+  max-height: 70dvh;
+}
+.mob-sheet-title {
+  color: var(--text-bright);
+}
+.mob-sheet-modal .mob-sheet-body {
+  overflow-y: auto;
+}
+
+/* ── Dialogs: `ion-alert.mob-dialog-alert` is the design system's `.mob-dialog` (title, message, two equal buttons). */
+ion-alert.mob-dialog-alert {
+  --background: var(--bg-deep);
+  --min-width: 0;
+  --max-width: none;
+  --width: calc(100% - 2 * var(--mobile-gutter));
+  --height: auto;
+  --backdrop-opacity: 1;
+  font-family: var(--font-sans);
+}
+ion-alert.mob-dialog-alert .alert-wrapper {
+  box-sizing: border-box;
+  max-width: none;
+  padding: var(--mobile-gutter);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
+  box-shadow: 0 var(--space-2) var(--space-9) var(--shadow-md);
+}
+ion-alert.mob-dialog-alert .alert-head {
+  padding: 0;
+  margin: 0 0 var(--space-7);
+  text-align: left;
+}
+ion-alert.mob-dialog-alert .alert-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+}
+ion-alert.mob-dialog-alert .alert-message {
+  padding: 0;
+  max-height: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+ion-alert.mob-dialog-alert .alert-button-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+  padding: 0;
+}
+ion-alert.mob-dialog-alert--single .alert-button-group {
+  grid-template-columns: minmax(0, 1fr);
+}
+ion-alert.mob-dialog-alert .alert-wrapper:focus,
+ion-alert.mob-dialog-alert .alert-wrapper:focus-visible {
+  outline: none;
+}
+/* The buttons carry the design system's classes (`mob-btn`, `mob-btn--lg`, ...); Ionic's own alert-button colours and box are replaced. */
+ion-alert.mob-dialog-alert .alert-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--mobile-touch-min);
+  margin: 0;
+  padding: 0 var(--space-2);
+  min-width: var(--mobile-touch-min);
+  background: transparent;
+  border: 1px solid var(--border-white-md);
+  border-radius: var(--mobile-card-radius);
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+ion-alert.mob-dialog-alert .alert-button.mob-btn--lg {
+  height: var(--mobile-touch-comfortable);
+}
+ion-alert.mob-dialog-alert .alert-button.m-body-strong {
+  font-weight: 600;
+}
+ion-alert.mob-dialog-alert .alert-button:active {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+ion-alert.mob-dialog-alert .alert-button.mob-btn--danger-fill {
+  background: var(--btn-danger-bg);
+  border-color: var(--btn-danger-border);
+  color: var(--btn-danger-text);
+}
+ion-alert.mob-dialog-alert .alert-button.mob-btn--danger-fill:active {
+  background: var(--btn-danger-bg-hover);
+  border-color: var(--btn-danger-border-hover);
+  color: var(--btn-danger-text);
+}
+ion-alert.mob-dialog-alert .alert-button.mob-btn--confirm {
+  background: var(--btn-confirm-bg);
+  border-color: var(--btn-confirm-border);
+  color: var(--btn-confirm-text);
+}
+ion-alert.mob-dialog-alert .alert-button.mob-btn--confirm:active {
+  background: var(--btn-confirm-bg-hover);
+}
+ion-alert.mob-dialog-alert .alert-button .alert-button-inner {
+  width: 100%;
+  /* Ionic's own rule for the inner box wins on specificity; the label is centred in the design system's button. */
+  justify-content: center !important;
+  text-align: center;
+}
+ion-alert.mob-dialog-alert .alert-button .ion-activatable,
+ion-alert.mob-dialog-alert ion-ripple-effect {
+  display: none;
+}
+
+/* ── Error toast: `ion-toast.mob-toast-error` is the desktop's `.toast.toast-error` (board "Lieu, horizon indisponible"). */
+ion-toast.mob-toast-error {
+  --background: var(--bg-deep);
+  --color: var(--btn-danger-hover-text);
+  --border-color: var(--card-status-failed);
+  --border-width: 1px;
+  --border-style: solid;
+  --border-radius: var(--radius-lg);
+  --box-shadow: none;
+  --max-width: calc(100% - 2 * var(--mobile-gutter));
+  --min-width: 0;
+  --start: auto;
+  --end: auto;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+}
+ion-toast.mob-toast-error::part(message) {
+  padding: var(--space-5) var(--space-7);
+  font-size: var(--font-size-body);
+  line-height: normal;
+}
+ion-toast.mob-toast-error::part(wrapper) {
+  /* where the board puts the desktop's toast (`.mob-toast-host`): centred, 16 px from the sides, 16 px above the bottom bar */
+  --start: var(--mobile-gutter);
+  --end: var(--mobile-gutter);
+  left: var(--mobile-gutter);
+  right: var(--mobile-gutter);
+  top: auto;
+  bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+  inset-block-end: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+  transform: none;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+ion-toast.mob-toast-error::part(container) {
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  pointer-events: auto;
+}
+ion-toast.mob-toast-error::part(content) {
+  padding: 0;
+  min-height: 0;
+}
+
+/* ── A group of rows on the panel ground. */
+ion-list.mob-list,
+ion-list.mob-list.list-md {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-panel);
+}

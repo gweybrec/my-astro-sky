@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { IonPage, IonHeader, IonContent, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonPage, IonContent, IonList, IonSelect, IonSelectOption } from '@ionic/vue';
 import { getLang, setLang, t, type Lang } from '@myastrosky/core/i18n/index';
-import AppIcon from '../components/AppIcon.vue';
-import chevronIcon from '../icons/chevron-right.svg?raw';
+import PhoneTopBar from '../components/PhoneTopBar.vue';
+import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
+import PhoneRow from '../components/PhoneRow.vue';
 
 const LANGUAGE_ROW = 'settings.languageLabel';
 
@@ -46,32 +47,24 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
 
 <template>
   <IonPage>
-    <IonHeader class="mob-topbar">
+    <PhoneTopBar>
       <h1 class="mob-topbar-title m-title">{{ t('settings.section') }}</h1>
-    </IonHeader>
+    </PhoneTopBar>
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill mob-page-column">
         <template v-for="section in sections" :key="section.title">
-          <h2 class="mob-section-header m-secondary">{{ t(section.title) }}</h2>
-          <div style="background: var(--bg-panel)">
-            <button
+          <PhoneSectionHeader>{{ t(section.title) }}</PhoneSectionHeader>
+          <IonList class="mob-list" lines="none">
+            <PhoneRow
               v-for="row in section.rows"
               :key="row"
-              type="button"
-              class="mob-row"
+              :title="t(row)"
+              :value="row === LANGUAGE_ROW ? t(currentName) : undefined"
+              button
+              chevron
               @click="onRow(row, $event)"
-            >
-              <span class="mob-row-body">
-                <span class="mob-row-title m-body">{{ t(row) }}</span>
-              </span>
-              <span class="mob-row-trail m-secondary">
-                <span v-if="row === LANGUAGE_ROW">{{ t(currentName) }}</span>
-                <span class="mob-row-chevron" aria-hidden="true"
-                  ><AppIcon :svg="chevronIcon"
-                /></span>
-              </span>
-            </button>
-          </div>
+            />
+          </IonList>
         </template>
         <IonSelect
           ref="select"

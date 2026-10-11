@@ -1,4 +1,5 @@
 const fr = {
+  info: { label: 'Informations : {title}' },
   tabs: { sky: 'Ciel', targets: 'Cibles', navLabel: 'Navigation' },
   gallery: { searchLabel: 'Rechercher une photo', empty: "Aucune photo pour l'instant" },
   plans: { searchPlaceholder: 'Rechercher un plan…', searchLabel: 'Rechercher un plan' },
