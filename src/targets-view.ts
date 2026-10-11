@@ -24,6 +24,7 @@ import {
   filterLabel,
   catalogFilterColor,
 } from '@myastrosky/core/gear-catalog';
+import { sortCustomFirst } from '@myastrosky/core/gear-sort';
 import type {
   TelescopeData,
   CameraData,
@@ -235,13 +236,7 @@ function moonPhaseIconSvg(phaseIndex: number): string {
   );
 }
 
-export function sortCustomFirst<T extends { id: string }>(arr: T[]): T[] {
-  return [...arr].sort((a, b) => {
-    const ac = a.id.startsWith('custom-');
-    const bc = b.id.startsWith('custom-');
-    return ac && !bc ? -1 : !ac && bc ? 1 : 0;
-  });
-}
+export { sortCustomFirst };
 
 // ─── DSO type labels ──────────────────────────────────────────────────────────
 

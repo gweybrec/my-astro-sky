@@ -18,6 +18,12 @@ const routes: RouteRecordRaw[] = [
       { path: 'settings', component: () => import('./pages/SettingsPage.vue') },
     ],
   },
+  // The pages pushed from the Réglages tab: full screen, without the tab bar (boards "Réglages, setups", "Équipement,
+  // modifier le setup", "Réglages, lieu d'observation", "Réglages, exporter et importer").
+  { path: '/settings/setups', component: () => import('./pages/SetupsPage.vue') },
+  { path: '/settings/setups/:id', component: () => import('./pages/SetupEditPage.vue') },
+  { path: '/settings/location', component: () => import('./pages/LocationPage.vue') },
+  { path: '/settings/backup', component: () => import('./pages/BackupPage.vue') },
 ];
 
 // The gallery of the shared components, for the checks: development builds only (the condition is replaced at build

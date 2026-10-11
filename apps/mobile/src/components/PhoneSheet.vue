@@ -39,6 +39,7 @@ const titleId = useId();
         >
           <AppIcon :svg="closeIcon" />
         </PhoneIconButton>
+        <slot name="header-extra" />
       </div>
       <div class="mob-sheet-body mob-scroll"><slot /></div>
       <div v-if="$slots.footer" class="mob-sheet-footer"><slot name="footer" /></div>

@@ -22,7 +22,25 @@ const en: Translations['mobile'] = {
     langEn: 'English',
     langEs: 'Español',
     langDe: 'Deutsch',
+    themeValue: 'Cold modern',
+    keyConfigured: '✓ Configured',
+    lan: 'LAN',
   },
+  nav: { back: 'Back' },
+  gear: {
+    addTelescope: 'Add a telescope',
+    aperture: 'Aperture {mm} mm',
+    focal: 'Focal length {mm} mm',
+    searchTelescope: 'Search for a telescope…',
+    searchTelescopeLabel: 'Search for a telescope',
+    searchCamera: 'Search for a camera…',
+    searchCameraLabel: 'Search for a camera',
+    searchAccessory: 'Search for an accessory…',
+    searchAccessoryLabel: 'Search for an accessory',
+    summary: 'Effective focal length: {value}',
+  },
+  location: { horizonSection: 'Terrain horizon', dms: 'DMS (° ′ ″)' },
+  backup: { exportSection: 'Export', importSection: 'Import' },
 };
 
 export default en;

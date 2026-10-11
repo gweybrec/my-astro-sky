@@ -302,6 +302,15 @@ import type { ImportPreviewResult, ImportPreviewSetup, SetupImportChoice } from 
 import { reloadUserOverrides } from '../../dso-catalog';
 import { showToast } from '../../toast';
 import { formatBytes } from '@myastrosky/core/format-utils';
+import {
+  buildImportOptions,
+  canImport as canImportBackup,
+  setupLocked as setupLockedOf,
+  setupNeedsChoice as setupNeedsChoiceOf,
+  setupTicked as setupTickedOf,
+  tickedPlanNamesBySetup as tickedPlanNamesBySetupOf,
+  type ImportSelection,
+} from '@myastrosky/core/backup-selection';
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -396,27 +405,27 @@ function clearSetupChoices() {
 }
 
 /** Names of the ticked plans whose setup is `setupId`, by setup id. */
-const tickedPlanNamesBySetup = computed(() => {
-  const map = new Map<string, string[]>();
-  for (const p of preview.value?.plans ?? []) {
-    if (!p.setupId || !planSel.selected.has(p.id)) continue;
-    map.set(p.setupId, [...(map.get(p.setupId) ?? []), p.name]);
-  }
-  return map;
-});
+const tickedPlanNamesBySetup = computed(() =>
+  preview.value
+    ? tickedPlanNamesBySetupOf(preview.value, planSel.selected)
+    : new Map<string, string[]>(),
+);
 
 const requiringPlanNames = (s: ImportPreviewSetup) => tickedPlanNamesBySetup.value.get(s.id) ?? [];
+const selection = (): Pick<ImportSelection, 'plans' | 'setups'> => ({
+  plans: planSel.selected,
+  setups: setupSel.selected,
+});
 const setupRequired = (s: ImportPreviewSetup) => requiringPlanNames(s).length > 0;
 
 /** A setup with no local counterpart that a ticked plan needs: shown ticked, cannot be unticked. */
-const setupLocked = (s: ImportPreviewSetup) => s.conflict === 'none' && setupRequired(s);
+const setupLocked = (s: ImportPreviewSetup) => setupLockedOf(preview.value!, planSel.selected, s);
 
-const setupTicked = (s: ImportPreviewSetup) =>
-  s.conflict !== 'identical' && (setupSel.selected.has(s.id) || setupLocked(s));
+const setupTicked = (s: ImportPreviewSetup) => setupTickedOf(preview.value!, selection(), s);
 
 /** A different setup that will be imported or that a ticked plan needs must be told what to do. */
 const setupNeedsChoice = (s: ImportPreviewSetup) =>
-  s.conflict === 'different' && (setupSel.selected.has(s.id) || setupRequired(s));
+  setupNeedsChoiceOf(preview.value!, selection(), s);
 
 const setupChoiceMissing = computed(() =>
   (preview.value?.setups ?? []).some((s) => setupNeedsChoice(s) && !setupChoices[s.id]),
@@ -451,19 +460,21 @@ function onSetupChoice(s: ImportPreviewSetup, choice: SetupImportChoice) {
   setupChoices[s.id] = choice;
 }
 
-const canImport = computed(() => {
-  if (!preview.value) return false;
-  return (
-    imgSel.some ||
-    planSel.some ||
-    setupSel.some ||
-    gearSel.some ||
-    (preview.value.hasDsoOverrides && importDso.value) ||
-    (preview.value.hasPoiCategories && importPoiCategories.value) ||
-    (preview.value.hasSkyRegions && importSkyRegions.value) ||
-    (preview.value.hasShortcuts && importShortcuts.value)
-  );
+const importSelection = (): ImportSelection => ({
+  importDso: importDso.value,
+  importPoiCategories: importPoiCategories.value,
+  importSkyRegions: importSkyRegions.value,
+  importShortcuts: importShortcuts.value,
+  images: imgSel.selected,
+  plans: planSel.selected,
+  setups: setupSel.selected,
+  gear: gearSel.selected,
+  setupChoices,
 });
+
+const canImport = computed(() =>
+  preview.value ? canImportBackup(preview.value, importSelection()) : false,
+);
 
 function onClose() {
   if (!importBusy.value) emit('close');
@@ -525,23 +536,10 @@ async function onImport() {
   if (!preview.value || !storedFile.value) return;
   importBusy.value = true;
   try {
-    const hasImages = preview.value.images.length > 0;
-    const result = await importData(storedFile.value, {
-      // Photo metadata always travels with the photos that get imported.
-      importMetadata: preview.value.hasMetadata,
-      importDsoOverrides: preview.value.hasDsoOverrides && importDso.value,
-      importPoiCategories: preview.value.hasPoiCategories && importPoiCategories.value,
-      importSkyRegions: preview.value.hasSkyRegions && importSkyRegions.value,
-      selectedImages: hasImages ? Array.from(imgSel.selected) : null,
-      selectedPlans: Array.from(planSel.selected),
-      selectedSetups: Array.from(setupSel.selected),
-      selectedGear: Array.from(gearSel.selected),
-      setupConflicts: Object.fromEntries(
-        preview.value.setups
-          .filter((s) => setupNeedsChoice(s) && setupChoices[s.id])
-          .map((s) => [s.id, setupChoices[s.id]]),
-      ),
-    });
+    const result = await importData(
+      storedFile.value,
+      buildImportOptions(preview.value, importSelection()),
+    );
     emit('close');
     const msg = t('settings.importSuccess')
       .replace('{n}', String(result.imported))

@@ -24,7 +24,33 @@ const input = defineComponent({
   },
 });
 
+/** A tick box: the stub is a button that reports its new state as Ionic's `ionChange` does. */
+const checkbox = defineComponent({
+  inheritAttrs: true,
+  props: { checked: Boolean, disabled: Boolean },
+  emits: ['ionChange'],
+  setup(props, { slots, emit }) {
+    return () =>
+      h(
+        'button',
+        {
+          role: 'checkbox',
+          'aria-checked': String(props.checked),
+          disabled: props.disabled,
+          onClick: () => emit('ionChange', { detail: { checked: !props.checked } }),
+        },
+        slots.default?.(),
+      );
+  },
+});
+
 export const ionicStubs = {
+  IonCheckbox: checkbox,
+  IonFab: plain('div'),
+  IonFabButton: plain('button'),
+  IonFooter: plain('footer'),
+  IonSelect: plain('div'),
+  IonSelectOption: plain('div'),
   IonPage: plain('div'),
   IonHeader: plain('header'),
   IonContent: plain('div'),

@@ -12,6 +12,7 @@ import {
   resolveSetupCamera,
 } from '@myastrosky/core/gear-catalog';
 import { formatSetupCanvasLabel, formatFov, fovDeg } from '@myastrosky/core/gear-presets';
+import { reconcileSetupGear } from '@myastrosky/core/setup-gear';
 import { formatPaDeg } from '@myastrosky/core/frame-orientation';
 import { reportUnknownRendererError } from './error-reporter';
 import { useFovFramesStore } from './stores/fov-frames';
@@ -297,14 +298,9 @@ function buildSetupModal(opts: {
   // Load gear section
   Promise.all([getTelescopes(), getCameras()])
     .then(([telescopes, cameras]) => {
-      if (!currentPrefs.telescopeId && telescopes.length > 0)
-        currentPrefs.telescopeId = telescopes[0].id;
       // A smart telescope's sealed-in sensor always wins; only fall back to the first
       // catalog camera for scopes where the user actually gets to pick one.
-      const tel = telescopes.find((t) => t.id === currentPrefs.telescopeId);
-      const resolved = tel ? resolveSetupCamera(tel, cameras, currentPrefs.cameraId) : null;
-      if (resolved) currentPrefs.cameraId = resolved.id;
-      else if (!currentPrefs.cameraId && cameras.length > 0) currentPrefs.cameraId = cameras[0].id;
+      Object.assign(currentPrefs, reconcileSetupGear(currentPrefs, telescopes, cameras));
       const rebuild = (container: HTMLElement) => {
         buildGearSectionContent(container, currentPrefs, {
           onPrefsChange: (partial) => {

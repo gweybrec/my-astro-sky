@@ -87,6 +87,12 @@ import { exportData } from '../../api';
 import type { ExportOptions } from '../../api';
 import { showToast } from '../../toast';
 import { formatBytes } from '@myastrosky/core/format-utils';
+import {
+  buildExportOptions,
+  canExport as canExportBackup,
+  selectedPhotoBytes,
+  type ExportFlags,
+} from '@myastrosky/core/backup-selection';
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -113,26 +119,24 @@ const allChecked = computed(
 );
 const someChecked = computed(() => photos.value.some((p) => selected.has(p.id)));
 
-const totalBytes = computed(() =>
-  photos.value.filter((p) => selected.has(p.id)).reduce((s, p) => s + (p.fileSize ?? 0), 0),
-);
+const totalBytes = computed(() => selectedPhotoBytes(photos.value, selected));
 
 const sizeLabel = computed(() => {
   if (!someChecked.value) return '';
   return t('settings.exportEstimatedSize').replace('{size}', formatBytes(totalBytes.value));
 });
 
-const canExport = computed(
-  () =>
-    includeDso.value ||
-    includeGear.value ||
-    includeSetups.value ||
-    includePoiCategories.value ||
-    includeSkyRegions.value ||
-    includePlans.value ||
-    includeShortcuts.value ||
-    someChecked.value,
-);
+const flags = computed<ExportFlags>(() => ({
+  dsoOverrides: includeDso.value,
+  customGear: includeGear.value,
+  setups: includeSetups.value,
+  poiCategories: includePoiCategories.value,
+  skyRegions: includeSkyRegions.value,
+  plans: includePlans.value,
+  shortcuts: includeShortcuts.value,
+}));
+
+const canExport = computed(() => canExportBackup(flags.value, someChecked.value ? 1 : 0));
 
 function update() {
   /* reactivity via v-model */
@@ -155,18 +159,7 @@ function onClose() {
 
 async function onExport() {
   const selectedIds = photos.value.filter((p) => selected.has(p.id)).map((p) => p.id);
-  const options: ExportOptions = {
-    includeImages: selectedIds.length > 0,
-    // Photo metadata always travels with the photos.
-    includeMetadata: true,
-    includeDsoOverrides: includeDso.value,
-    includeCustomGear: includeGear.value,
-    includeSetups: includeSetups.value,
-    includePoiCategories: includePoiCategories.value,
-    includeSkyRegions: includeSkyRegions.value,
-    includePlans: includePlans.value,
-    includeShortcuts: includeShortcuts.value,
-  };
+  const options: ExportOptions = buildExportOptions(flags.value, selectedIds.length);
   busy.value = true;
   try {
     await exportData(

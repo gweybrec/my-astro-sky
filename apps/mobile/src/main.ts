@@ -8,6 +8,7 @@ import App from './App.vue';
 import StartupError from './components/StartupError.vue';
 import router from './router';
 import { initPlatform, installBackButton } from './platform-init';
+import { catalogsReady } from './catalogs';
 
 async function start(): Promise<void> {
   try {
@@ -21,6 +22,8 @@ async function start(): Promise<void> {
   }
   createApp(App).use(IonicVue).use(createPinia()).use(router).mount('#app');
   installBackButton(router);
+  // After the first screen is up: the gear lists and the star and deep-sky registries (screens wait on the same promise).
+  void catalogsReady().catch(() => undefined);
 }
 
 void start();
