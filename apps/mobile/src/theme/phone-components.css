@@ -522,6 +522,13 @@ ion-alert.mob-dialog-alert {
   --backdrop-opacity: 1;
   font-family: var(--font-sans);
 }
+/* Landscape: a card of fixed width, centred (design/mobile/tools/landscape.css, `.land .mob-dialog`). */
+@media (orientation: landscape) {
+  ion-alert.mob-dialog-alert {
+    --width: 400px;
+    --max-width: calc(100% - 2 * var(--mobile-gutter));
+  }
+}
 ion-alert.mob-dialog-alert .alert-wrapper {
   box-sizing: border-box;
   max-width: none;
@@ -822,4 +829,10 @@ ion-fab.mob-fab--flush {
   ion-fab.mob-fab--in-tab {
     bottom: var(--mobile-gutter);
   }
+}
+
+/* The badges of a sheet or page header sit on the first line with the text beside them (the board's spans align on the
+   baseline; an `ion-badge` has none of its own, which would push the text down). */
+.mob-sheet-header .mob-meta > ion-badge.mob-badge {
+  align-self: flex-start;
 }
