@@ -2,9 +2,13 @@
 
 Every worker of a phone screen card reads this file, then `.claude/work-packages/phase-3/WP3-common.md` (step 0, commits, what is always forbidden, the report), then its card. The branch is named in the worker's instructions.
 
+## Never commit a picture
+
+Screenshots, renders of boards, comparison pictures and device pictures are never staged or committed, anywhere in the repository (rule of the user, 2026-10-11): they take space in git and go stale. They live under the git-ignored `.playwright-mcp/`. The only pictures in git are the ones the app itself ships (icons, launcher images). If a board's picture is missing from `.playwright-mcp/mobile-boards/`, render it from its source with `design/mobile/tools/serve.mjs`.
+
 ## The specification is the board
 
-- Each screen has an approved board: its source `design/mobile/boards/<Name>.dc.html` and `<Name>Landscape.dc.html`, and its pictures `docs/dev/ui/mobile/<Name>.png` and `<Name>Landscape.png`. The table of `docs/dev/ui/mobile.md` gives each board's exact title. Read the board's HTML before writing the screen: structure, order, class names (`.mob-*`), icons, texts and states come from there. `design/mobile/tools/serve.mjs` renders a board locally (stop it when done; kill only your own process).
+- Each screen has an approved board: its source `design/mobile/boards/<Name>.dc.html` and `<Name>Landscape.dc.html`, and its pictures `.playwright-mcp/mobile-boards/<Name>.png` and `<Name>Landscape.png`. The table of `docs/dev/ui/mobile.md` gives each board's exact title. Read the board's HTML before writing the screen: structure, order, class names (`.mob-*`), icons, texts and states come from there. `design/mobile/tools/serve.mjs` renders a board locally (stop it when done; kill only your own process).
 - **Never print a text, a description, a helper sentence, an icon or a control that the board does not show.** When something the screen needs is not on a board (a missing state, a missing sheet), stop and report it; do not design it.
 - The rules of `docs/dev/ui/mobile.md` ("Rules that bind every phone screen") apply to every screen. The ones most often broken: an eye icon only shows or hides; adding is a plus button; icon-only action buttons show their name beside the button on a long press; save and validate buttons are green, other actions use the action colour; every delete asks for confirmation; an error is a red toast at the bottom; lists, switches and sliders apply at once, forms use Annuler / Valider; sheets take the height of their content; no horizontal row of chips that scrolls; no keyboard shortcut.
 
