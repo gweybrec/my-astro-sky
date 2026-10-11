@@ -27,6 +27,7 @@ import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneSliderRow from '../components/PhoneSliderRow.vue';
 import PhoneToggleRow from '../components/PhoneToggleRow.vue';
+import PhoneTargetRow from '../components/PhoneTargetRow.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -150,6 +151,21 @@ function raiseError() {
           <PhoneToggleRow v-model="switchOn" title="Interrupteur activé" />
           <PhoneToggleRow v-model="switchOff" title="Interrupteur désactivé" />
           <PhoneToggleRow :model-value="true" title="Interrupteur bloqué" disabled />
+          <PhoneToggleRow
+            v-model="switchOn"
+            title="Interrupteur avec explication"
+            info="Le texte long d'explication."
+          />
+          <PhoneTargetRow
+            title="Nébuleuse de l'Amérique du Nord"
+            designation="NGC7000"
+            type-label="Nébuleuse en émission"
+            constellation="CYG"
+            magnitude="Magnitude 4.0"
+            rating="★★★★★"
+            altitude="86°"
+            time="21:38"
+          />
         </IonList>
         <PhoneSliderRow
           v-model="opacity"

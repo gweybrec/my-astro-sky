@@ -686,3 +686,122 @@ ion-list.mob-list.list-md {
   padding: 0;
   background: var(--bg-panel);
 }
+
+/* A switch row whose title has an "i" (board "Cibles, filtres": `.mob-row--info`): the title and the "i" share the label,
+   the switch keeps the right end. */
+ion-toggle.mob-toggle-row--info::part(label) {
+  flex: 1;
+}
+.mob-toggle-info-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* The choose button of a saved-region row (`ion-button.mob-row-main`, board "Cibles, régions du ciel"): the host is the
+   box the design system sizes, the native button fills it and keeps its content on the left. */
+ion-button.mob-row-main {
+  --background: transparent;
+  --background-activated: transparent;
+  --background-activated-opacity: 0;
+  --background-focused: transparent;
+  --background-focused-opacity: 0;
+  --background-hover: transparent;
+  --background-hover-opacity: 0;
+  --color: var(--text-primary);
+  --color-activated: var(--text-primary);
+  --color-focused: var(--text-primary);
+  --color-hover: var(--text-primary);
+  --border-width: 0;
+  --box-shadow: none;
+  --border-radius: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --ripple-color: transparent;
+  box-sizing: border-box;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: var(--font-sans);
+}
+ion-button.mob-row-main::part(native) {
+  min-height: 0;
+  height: 100%;
+  justify-content: flex-start;
+  gap: var(--space-6);
+}
+
+/* The selected fill of a toggle button (`PhoneButton pressed`): the design system's `.mob-btn[aria-pressed='true']` rule,
+   on a class because Ionic moves the attribute off the host. */
+ion-button.mob-btn--pressed {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+
+/* The chosen region's radio mark: the design system's `.mob-row-main[aria-checked='true']` rule, on a class because Ionic
+   moves the attribute off the host. */
+ion-button.mob-row-main--checked .mob-radio-mark {
+  border-color: var(--accent-color);
+  background: radial-gradient(circle, var(--accent-color) 0 4px, transparent 5px);
+}
+.mob-row-main-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+/* The Cibles context: the setup, the night and the place on one line, the types field on a line of its own; in landscape the
+   four share one line (board "Cibles", landscape). The list is one column, two in landscape. */
+.mob-context--wrap {
+  flex-wrap: wrap;
+}
+.mob-context--wrap > .mob-context-row {
+  display: flex;
+  flex: 1 0 100%;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.mob-context--wrap > .mob-context-types {
+  flex: 1 0 100%;
+}
+.mob-cols2 {
+  display: block;
+}
+@media (orientation: landscape) {
+  .mob-context--wrap {
+    flex-wrap: nowrap;
+  }
+  .mob-context--wrap > .mob-context-row {
+    display: contents;
+  }
+  .mob-context.mob-context--wrap .mob-btn--field {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .mob-context.mob-context--wrap .mob-context-types {
+    flex-grow: 1.5;
+  }
+  .mob-cols2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+  }
+  .mob-cols2 > .mob-row:nth-child(odd) {
+    box-shadow: inset -1px 0 0 var(--border-subtle);
+  }
+}
+
+/* The saved-region list is a centred 680 px column in landscape (board "Cibles, régions du ciel", landscape), which keeps it clear of the plus. */
+@media (orientation: landscape) {
+  .mob-region-list {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+}
