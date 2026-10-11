@@ -1,4 +1,5 @@
 import type { StarMultiplicity, ConstellationStyle } from '@myastrosky/core/types';
+import { formatMultiplicity as formatMultiplicityWith } from '@myastrosky/core/targets/multiplicity';
 import { getLang, t } from './i18n';
 import { getStarCatalogUrl } from './api';
 import { normalizeRA } from '@myastrosky/core/angles';
@@ -30,22 +31,9 @@ export async function loadConstellationStyle(style: ConstellationStyle): Promise
   await loadConstellationStyleData(style, loaderOptions());
 }
 
-/** i18n key for a system's type name, by star count (2 = binary … 8 = octuple). */
-const MULTIPLE_KEY_BY_COUNT: Record<number, string> = {
-  2: 'stars.multiple.binary',
-  3: 'stars.multiple.triple',
-  4: 'stars.multiple.quadruple',
-  5: 'stars.multiple.quintuple',
-  6: 'stars.multiple.sextuple',
-  7: 'stars.multiple.septuple',
-  8: 'stars.multiple.octuple',
-};
-
 /** Localised display string for a star's multiplicity, e.g. "Binary · 34.3″". */
 export function formatMultiplicity(m: StarMultiplicity): string {
-  const key = MULTIPLE_KEY_BY_COUNT[m.components];
-  const typeName = key ? t(key) : t('stars.multiple.system', { n: m.components });
-  return m.sep ? `${typeName} · ${m.sep}″` : typeName;
+  return formatMultiplicityWith(m, t);
 }
 
 /**

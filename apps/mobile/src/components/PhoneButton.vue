@@ -13,6 +13,8 @@ const props = withDefaults(
     /** A 48 px square button that holds only an icon (the magnifier beside a field). */
     icon?: boolean;
     disabled?: boolean;
+    /** A toggle that is on (the selected fill; Ionic keeps aria-pressed off the host, so the class carries it). */
+    pressed?: boolean;
     /** Type style of the label: the filled roles are in the strong weight, a field is in the secondary size. */
     textStyle?: 'body' | 'strong' | 'secondary';
   }>(),
@@ -45,11 +47,17 @@ const typeClass = computed(() => {
   <IonButton
     fill="clear"
     :disabled="disabled"
+    :aria-pressed="pressed === undefined ? undefined : String(pressed)"
     class="mob-btn"
     :class="[
       VARIANT_CLASS[variant],
       typeClass,
-      { 'mob-btn--lg': size === 'lg', 'mob-btn--block': block, 'mob-btn--icon': icon },
+      {
+        'mob-btn--pressed': pressed,
+        'mob-btn--lg': size === 'lg',
+        'mob-btn--block': block,
+        'mob-btn--icon': icon,
+      },
     ]"
   >
     <span class="mob-btn-content" :class="typeClass"><slot /></span>
