@@ -1,0 +1,243 @@
+<script setup lang="ts">
+// Development builds only (route `/dev/components`, absent from the production build): every shared phone component
+// in every state, for the checks against the boards and for later reviews. Its texts are labels for the developer,
+// not screen texts, so they do not go through the dictionaries.
+import { ref } from 'vue';
+import { IonPage, IonContent, IonList } from '@ionic/vue';
+import { t } from '@myastrosky/core/i18n/index';
+import AppIcon from '../components/AppIcon.vue';
+import PhoneBadge from '../components/PhoneBadge.vue';
+import PhoneBusy from '../components/PhoneBusy.vue';
+import PhoneButton from '../components/PhoneButton.vue';
+import PhoneChip from '../components/PhoneChip.vue';
+import PhoneEmptyState from '../components/PhoneEmptyState.vue';
+import PhoneField from '../components/PhoneField.vue';
+import PhoneIconButton from '../components/PhoneIconButton.vue';
+import PhoneInfoButton from '../components/PhoneInfoButton.vue';
+import PhoneReorderList from '../components/PhoneReorderList.vue';
+import PhoneRow from '../components/PhoneRow.vue';
+import PhoneSearch from '../components/PhoneSearch.vue';
+import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
+import PhoneSheet from '../components/PhoneSheet.vue';
+import PhoneSliderRow from '../components/PhoneSliderRow.vue';
+import PhoneToggleRow from '../components/PhoneToggleRow.vue';
+import PhoneTopBar from '../components/PhoneTopBar.vue';
+import { useConfirm } from '../composables/useConfirm';
+import { useErrorToast } from '../composables/useErrorToast';
+import filterIcon from '../icons/filter.svg?raw';
+import caretIcon from '../icons/chevron-down.svg?raw';
+import plusIcon from '@icons/plus.svg?raw';
+import trashIcon from '@icons/trash.svg?raw';
+import eyeIcon from '@icons/eye.svg?raw';
+import telescopeIcon from '@icons/telescope.svg?raw';
+
+const search = ref('');
+const lat = ref('48.58');
+const empty = ref('');
+const switchOn = ref(true);
+const switchOff = ref(false);
+const opacity = ref(0.6);
+const sheet = ref(false);
+const sheetClosable = ref(false);
+const order = ref(['a', 'b', 'c']);
+const pressed = ref(true);
+const answer = ref('');
+const { confirm } = useConfirm();
+const { showError } = useErrorToast();
+
+async function askDelete() {
+  const yes = await confirm({
+    title: 'Supprimer le plan',
+    message: 'Supprimer le plan « Nuit du 2026-10-03 » ?',
+    confirmLabel: 'Supprimer le plan',
+    destructive: true,
+  });
+  answer.value = yes ? 'oui' : 'non';
+}
+function openSheet(closable: boolean) {
+  sheetClosable.value = closable;
+  sheet.value = true;
+}
+function raiseError() {
+  void showError(new Error("Impossible de calculer l'horizon à partir des données d'altitude"));
+}
+</script>
+
+<template>
+  <IonPage>
+    <PhoneTopBar>
+      <PhoneSearch v-model="search" placeholder="Rechercher…" label="Recherche" />
+      <PhoneIconButton label="Filtres"><AppIcon :svg="filterIcon" /></PhoneIconButton>
+    </PhoneTopBar>
+    <IonContent :scroll-y="false">
+      <div class="mob-scroll mob-page-fill" data-testid="gallery">
+        <PhoneSectionHeader>Boutons</PhoneSectionHeader>
+        <div class="mob-form-row" style="display: flex; gap: 8px; flex-wrap: wrap">
+          <PhoneButton>Défaut</PhoneButton>
+          <PhoneButton variant="action">Action</PhoneButton>
+          <PhoneButton variant="confirm">Valider</PhoneButton>
+          <PhoneButton variant="danger">Danger</PhoneButton>
+          <PhoneButton variant="dangerFill">Supprimer</PhoneButton>
+          <PhoneButton variant="text">Texte</PhoneButton>
+          <PhoneButton disabled>Désactivé</PhoneButton>
+          <PhoneButton variant="action" disabled>Action off</PhoneButton>
+          <PhoneButton variant="confirm" disabled>Valider off</PhoneButton>
+        </div>
+        <div class="mob-form-row" style="display: flex; gap: 8px">
+          <PhoneButton size="lg">Grand</PhoneButton>
+          <PhoneButton variant="action" size="lg"
+            ><AppIcon :svg="plusIcon" />Avec icône</PhoneButton
+          >
+          <PhoneButton variant="action" icon aria-label="Icône"
+            ><AppIcon :svg="plusIcon"
+          /></PhoneButton>
+        </div>
+        <div class="mob-form-row">
+          <PhoneButton block>Pleine largeur</PhoneButton>
+        </div>
+        <div class="mob-form-row">
+          <PhoneButton variant="field" block text-style="body">
+            <span class="mob-btn-key">Types d'objets</span>
+            <span class="mob-btn-value">2 types</span>
+            <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+          </PhoneButton>
+        </div>
+
+        <PhoneSectionHeader>Boutons icône (appui long : le nom)</PhoneSectionHeader>
+        <div class="mob-form-row" style="display: flex; gap: 8px">
+          <PhoneIconButton label="Ajouter"><AppIcon :svg="plusIcon" /></PhoneIconButton>
+          <PhoneIconButton label="Afficher" :pressed="pressed" @click="pressed = !pressed"
+            ><AppIcon :svg="eyeIcon"
+          /></PhoneIconButton>
+          <PhoneIconButton label="Supprimer" danger><AppIcon :svg="trashIcon" /></PhoneIconButton>
+          <PhoneIconButton label="Désactivé" disabled><AppIcon :svg="plusIcon" /></PhoneIconButton>
+          <PhoneInfoButton
+            title="Identifier des supernovae"
+            message="Recherche dans le Transient Name Server (TNS) les supernovae découvertes dans le champ de cette photo."
+          />
+        </div>
+
+        <PhoneSectionHeader>Champs</PhoneSectionHeader>
+        <PhoneField v-model="lat" label="Latitude (°N)" inputmode="decimal" />
+        <PhoneField v-model="empty" label="Hauteur des yeux au sol" unit="m" placeholder="1.7" />
+        <PhoneField v-model="lat" label="Désactivé" disabled />
+
+        <PhoneSectionHeader>Lignes</PhoneSectionHeader>
+        <IonList class="mob-list" lines="none">
+          <PhoneRow title="Simple" />
+          <PhoneRow title="Valeur et chevron" value="Français" chevron button />
+          <PhoneRow
+            title="Équipement 1"
+            :subs="[
+              'Askar FRA400 + ZWO ASI533MC',
+              'Focale effective : 400 mm · FOV 1.6° × 1.6° · 1.9″/px',
+            ]"
+            chevron
+            roomy
+            button
+          />
+          <PhoneRow title="Icône" :lead="telescopeIcon" chevron button />
+          <PhoneRow title="Supprimer" :lead="trashIcon" danger button />
+          <PhoneRow title="Désactivée" :subs="['La raison reste lisible']" disabled chevron />
+          <PhoneToggleRow v-model="switchOn" title="Interrupteur activé" />
+          <PhoneToggleRow v-model="switchOff" title="Interrupteur désactivé" />
+          <PhoneToggleRow :model-value="true" title="Interrupteur bloqué" disabled />
+        </IonList>
+        <PhoneSliderRow
+          v-model="opacity"
+          label="Opacité"
+          :display="opacity.toFixed(2)"
+          :min="0"
+          :max="1"
+          :step="0.05"
+        />
+        <PhoneSliderRow
+          v-model="opacity"
+          label="Un nom de réglage plus long sur sa propre ligne"
+          stack
+          :display="opacity.toFixed(2)"
+          :min="0"
+          :max="1"
+          :step="0.05"
+        />
+        <PhoneSliderRow
+          v-model="opacity"
+          label="Désactivé"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          disabled
+        />
+
+        <PhoneSectionHeader bar>
+          Titre avec info
+          <template #trail>
+            <PhoneInfoButton title="Titre avec info" message="Le texte long d'explication." />
+          </template>
+        </PhoneSectionHeader>
+
+        <PhoneSectionHeader>Puces et badges</PhoneSectionHeader>
+        <div
+          class="mob-form-row"
+          style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center"
+        >
+          <PhoneChip>Normale</PhoneChip>
+          <PhoneChip :pressed="true">Choisie</PhoneChip>
+          <PhoneBadge kind="type">Galaxie</PhoneBadge>
+          <PhoneBadge kind="const">Andromède</PhoneBadge>
+        </div>
+
+        <PhoneSectionHeader>Chargement</PhoneSectionHeader>
+        <div class="mob-form-row"><PhoneBusy label="Résolution…" /></div>
+        <PhoneBusy page />
+
+        <PhoneSectionHeader>Liste réordonnable</PhoneSectionHeader>
+        <PhoneReorderList
+          :items="order.map((id) => ({ id, handleLabel: `Déplacer ${id}` }))"
+          @reorder="order = $event"
+        >
+          <template #default="{ id }">
+            <span class="mob-row-body"
+              ><span class="mob-row-title m-body">Entrée {{ id }}</span></span
+            >
+          </template>
+        </PhoneReorderList>
+
+        <PhoneSectionHeader>Fenêtres</PhoneSectionHeader>
+        <div class="mob-form-row" style="display: flex; gap: 8px; flex-wrap: wrap">
+          <PhoneButton @click="openSheet(false)">Feuille</PhoneButton>
+          <PhoneButton @click="openSheet(true)">Feuille avec fermer</PhoneButton>
+          <PhoneButton variant="danger" @click="askDelete">Confirmer</PhoneButton>
+          <PhoneButton variant="danger" @click="raiseError">Erreur</PhoneButton>
+        </div>
+        <p class="mob-helper m-secondary" data-testid="answer">{{ answer }}</p>
+
+        <PhoneSectionHeader>État vide</PhoneSectionHeader>
+        <div style="height: 240px">
+          <PhoneEmptyState
+            text="Aucune photo pour l'instant"
+            :button-label="t('batch.modalTitle')"
+            :button-icon="plusIcon"
+          />
+        </div>
+      </div>
+    </IonContent>
+    <PhoneSheet v-model:open="sheet" title="Affichage" :closable="sheetClosable">
+      <PhoneToggleRow v-model="switchOn" title="Afficher les photos" />
+      <PhoneSliderRow
+        v-model="opacity"
+        label="Opacité"
+        :display="opacity.toFixed(2)"
+        :min="0"
+        :max="1"
+        :step="0.05"
+      />
+      <template v-if="!sheetClosable" #footer>
+        <PhoneButton size="lg" @click="sheet = false">{{ t('modal.cancel') }}</PhoneButton>
+        <PhoneButton variant="confirm" size="lg" @click="sheet = false">{{
+          t('modal.validate')
+        }}</PhoneButton>
+      </template>
+    </PhoneSheet>
+  </IonPage>
+</template>

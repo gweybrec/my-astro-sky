@@ -1,6 +1,7 @@
 import type { Translations } from '../fr';
 
 const en: Translations['mobile'] = {
+  info: { label: 'Information: {title}' },
   tabs: { sky: 'Sky', targets: 'Targets', navLabel: 'Navigation' },
   gallery: { searchLabel: 'Search for a photo', empty: 'No photos yet' },
   plans: { searchPlaceholder: 'Search for a plan…', searchLabel: 'Search for a plan' },

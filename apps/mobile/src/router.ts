@@ -20,4 +20,13 @@ const routes: RouteRecordRaw[] = [
   },
 ];
 
+// The gallery of the shared components, for the checks: development builds only (the condition is replaced at build
+// time, so the page and its route are not in the production bundle).
+if (import.meta.env.DEV) {
+  routes.push({
+    path: '/dev/components',
+    component: () => import('./pages/DevComponentsPage.vue'),
+  });
+}
+
 export default createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes });
