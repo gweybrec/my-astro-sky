@@ -1,26 +1,82 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { IonPage, IonContent, IonList, IonSelect, IonSelectOption } from '@ionic/vue';
+import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import {
+  IonPage,
+  IonContent,
+  IonList,
+  IonSelect,
+  IonSelectOption,
+  onIonViewWillEnter,
+} from '@ionic/vue';
 import { getLang, setLang, t, type Lang } from '@myastrosky/core/i18n/index';
+import { reportError } from '@myastrosky/core/platform/error-hook';
+import { formatLatLon, readObserverLocation } from '@myastrosky/core/observer-location';
+import { getGearSetups, loadServerSettings } from '@myastrosky/app-state/api';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 
 const LANGUAGE_ROW = 'settings.languageLabel';
 
-// The entries of the board "Réglages", as static rows (their screens are later cards), except the language.
-const sections = [
+// The entries of the board "Réglages". A row whose screen is a later card, or has no board yet, is disabled.
+interface RowDef {
+  title: string;
+  /** The route it opens; without one the row is disabled. */
+  to?: string;
+  value?: () => string | undefined;
+  /** Shown instead of `value` in the success colour. */
+  ok?: () => string | undefined;
+}
+
+const setupCount = ref<number | null>(null);
+const location = ref('');
+const keyConfigured = ref(false);
+const version = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
+
+const sections: { title: string; rows: RowDef[] }[] = [
   {
     title: 'mobile.settings.observation',
-    rows: ['mobile.settings.setups', 'targets.location.label'],
+    rows: [
+      {
+        title: 'mobile.settings.setups',
+        to: '/settings/setups',
+        value: () => (setupCount.value === null ? undefined : String(setupCount.value)),
+      },
+      {
+        title: 'targets.location.label',
+        to: '/settings/location',
+        value: () => location.value || undefined,
+      },
+    ],
   },
-  { title: 'settings.appearanceSection', rows: [LANGUAGE_ROW, 'settings.themeLabel'] },
-  { title: 'settings.astrometryNetSection', rows: ['mobile.settings.astrometryKey'] },
+  {
+    title: 'settings.appearanceSection',
+    rows: [
+      { title: LANGUAGE_ROW },
+      { title: 'settings.themeLabel', value: () => t('mobile.settings.themeValue') },
+    ],
+  },
+  {
+    title: 'settings.astrometryNetSection',
+    rows: [
+      {
+        title: 'mobile.settings.astrometryKey',
+        ok: () => (keyConfigured.value ? t('mobile.settings.keyConfigured') : undefined),
+      },
+    ],
+  },
   {
     title: 'mobile.settings.computerSection',
-    rows: ['mobile.settings.computerConnection', 'mobile.settings.exportImport'],
+    rows: [
+      { title: 'mobile.settings.computerConnection', value: () => t('mobile.settings.lan') },
+      { title: 'mobile.settings.exportImport', to: '/settings/backup' },
+    ],
   },
-  { title: 'settings.legalSection', rows: ['mobile.settings.about'] },
+  {
+    title: 'settings.legalSection',
+    rows: [{ title: 'mobile.settings.about', value: () => version }],
+  },
 ];
 
 const languages: { code: Lang; name: string }[] = [
@@ -33,10 +89,28 @@ const languages: { code: Lang; name: string }[] = [
 const current = getLang();
 const currentName = languages.find((l) => l.code === current)?.name ?? '';
 const select = ref<{ $el: HTMLIonSelectElement } | null>(null);
+const router = useRouter();
+
+async function refresh() {
+  location.value = formatLatLon(readObserverLocation());
+  try {
+    setupCount.value = (await getGearSetups()).length;
+  } catch (error) {
+    reportError('SettingsPage.getGearSetups', error);
+  }
+  try {
+    keyConfigured.value = (await loadServerSettings()).apiKeySet;
+  } catch (error) {
+    reportError('SettingsPage.loadServerSettings', error);
+  }
+}
+onMounted(refresh);
+onIonViewWillEnter(refresh);
 
 // Ionic's own select, opened from the row; choosing a language applies it at once (the page reloads).
-function onRow(row: string, event: Event) {
-  if (row === LANGUAGE_ROW) void select.value?.$el.open(event as UIEvent);
+function onRow(row: RowDef, event: Event) {
+  if (row.title === LANGUAGE_ROW) void select.value?.$el.open(event as UIEvent);
+  else if (row.to) void router.push(row.to);
 }
 function onChange(event: CustomEvent<{ value: Lang }>) {
   if (event.detail.value === current) return;
@@ -57,13 +131,18 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
           <IonList class="mob-list" lines="none">
             <PhoneRow
               v-for="row in section.rows"
-              :key="row"
-              :title="t(row)"
-              :value="row === LANGUAGE_ROW ? t(currentName) : undefined"
+              :key="row.title"
+              :title="t(row.title)"
+              :value="row.title === LANGUAGE_ROW ? t(currentName) : row.value?.()"
+              :disabled="row.title !== LANGUAGE_ROW && !row.to"
               button
               chevron
               @click="onRow(row, $event)"
-            />
+            >
+              <template v-if="row.ok?.()" #trail>
+                <span class="mob-status--success">{{ row.ok() }}</span>
+              </template>
+            </PhoneRow>
           </IonList>
         </template>
         <IonSelect

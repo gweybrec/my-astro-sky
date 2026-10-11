@@ -6,20 +6,30 @@ import { IonInput } from '@ionic/vue';
 // printed after it, outside the field.
 defineProps<{
   label?: string;
+  /** The name for assistive technology when the field has no visible label (the search field of a sheet). */
+  ariaLabel?: string;
+  /** The label ends with the red asterisk of a required field. */
+  required?: boolean;
   unit?: string;
   placeholder?: string;
   type?: 'text' | 'number' | 'search';
   inputmode?: 'text' | 'decimal' | 'numeric';
   disabled?: boolean;
   readonly?: boolean;
+  /** Without the form row's inset around it (the field sits in a grid of the page, such as latitude | longitude). */
+  bare?: boolean;
 }>();
+const emit = defineEmits<{ commit: [] }>();
 const model = defineModel<string>({ default: '' });
 const id = useId();
 </script>
 
 <template>
-  <div class="mob-form-row">
-    <label v-if="label" class="mob-form-label m-secondary" :for="id">{{ label }}</label>
+  <div :class="{ 'mob-form-row': !bare }">
+    <label v-if="label" class="mob-form-label m-secondary" :for="id"
+      >{{ label }}{{ required ? ' ' : ''
+      }}<span v-if="required" class="mob-required">*</span></label
+    >
     <div v-if="unit" class="phone-field-unit-line">
       <IonInput
         :id="id"
@@ -28,8 +38,10 @@ const id = useId();
         :type="type ?? 'text'"
         :inputmode="inputmode"
         :placeholder="placeholder"
+        :aria-label="ariaLabel"
         :disabled="disabled"
         :readonly="readonly"
+        @ion-change="emit('commit')"
       />
       <span class="phone-field-unit m-body">{{ unit }}</span>
     </div>
@@ -41,8 +53,10 @@ const id = useId();
       :type="type ?? 'text'"
       :inputmode="inputmode"
       :placeholder="placeholder"
+      :aria-label="ariaLabel"
       :disabled="disabled"
       :readonly="readonly"
+      @ion-change="emit('commit')"
     />
   </div>
 </template>

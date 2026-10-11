@@ -133,11 +133,54 @@ ion-tab-button:active .mob-tab-pill {
   height: 100%;
   box-sizing: border-box;
 }
+/* Layout values the boards fix without a token of their own. */
+/* A pushed page's list starts one small gap under the top bar (boards "Réglages, setups", "Équipement, modifier le setup"). */
+.mob-page-pad {
+  padding-top: var(--space-4);
+}
+/* The delete row of a form stands apart from the rows above it (board "Équipement, modifier le setup"). */
+.mob-section-gap {
+  padding-top: var(--space-7);
+}
+/* Spacing the board "Réglages, exporter et importer" sets between its blocks (no token names these gaps). */
+.mob-section-gap-sm {
+  padding-top: var(--space-4);
+}
+.mob-form-row.mob-form-row--spaced {
+  padding-bottom: var(--space-4);
+}
+.mob-form-row.mob-form-row--restore {
+  padding-top: var(--space-7);
+}
+/* A field in a sheet header has the header's own inset, not the form row's. */
+.mob-form-row.mob-form-row--flush {
+  padding-left: 0;
+  padding-right: 0;
+}
+/* The red asterisk of a required field's label. */
+.mob-required {
+  color: var(--color-danger);
+}
+
 /* Landscape, a page of rows or cards: a centred column of at most 680 px (board land--page). */
 @media (orientation: landscape) {
   .mob-page-column {
     width: min(100%, 680px);
     margin: 0 auto;
+  }
+  /* A pushed form's footer: the buttons line up with the column, at the right, 200 px each (design/mobile/tools/landscape.css). */
+  ion-footer.mob-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--space-4) max(var(--mobile-gutter), calc((100% - 680px) / 2));
+    padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px));
+  }
+  ion-footer.mob-footer > ion-button.mob-btn {
+    flex: 0 0 200px;
+  }
+  /* Fact cards: as many per row as fit. */
+  .mob-page-column .mob-facts--2 {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
   /* The context row of the targets: the fields share one row equally. */
   .mob-context > * {

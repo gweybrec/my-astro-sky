@@ -65,6 +65,10 @@ ion-button.mob-btn--field .mob-btn-content {
   justify-content: space-between;
   padding: 0 var(--space-6);
 }
+.mob-form-row ion-button.mob-btn--field {
+  /* the inset is the label's own (`.mob-btn-content`), not the host's: the design system's rule would add it twice */
+  padding: 0;
+}
 .mob-form-row ion-button.mob-btn--field .mob-btn-content {
   padding: 0 var(--space-7);
 }
@@ -138,7 +142,8 @@ ion-input.mob-field.input-disabled {
 
 /* ── Rows: `ion-item.mob-row` and `ion-toggle.mob-row` (the host is the row; Ionic's own padding and lines are off). */
 ion-item.mob-row,
-ion-toggle.mob-row {
+ion-toggle.mob-row,
+ion-checkbox.mob-row {
   --background: transparent;
   --background-activated: transparent;
   --background-activated-opacity: 0;
@@ -237,6 +242,79 @@ ion-toggle.mob-toggle-row::part(track) {
 }
 ion-toggle.mob-toggle-row.toggle-checked::part(track) {
   border-color: var(--border-focus);
+}
+
+/* A row with a tick box at its right end: same box as the switch row; the box is the design system's `.mob-check`
+   (24 px, the accent colour when ticked, dark when unticked). */
+ion-checkbox.mob-check-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--mobile-list-row-min);
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+  --size: var(--space-9);
+  --border-radius: var(--radius-sm);
+  --border-width: 1px;
+  --border-color: var(--text-dim);
+  --border-color-checked: var(--accent-color);
+  --checkbox-background: var(--border-white-md);
+  --checkbox-background-checked: var(--accent-color);
+  --checkmark-color: var(--bg-app);
+  --checkmark-width: 3px;
+  --transition: none;
+}
+ion-checkbox.mob-check-row::part(label) {
+  margin: 0 var(--space-7) 0 0;
+  white-space: normal;
+  flex: 1;
+  min-width: 0;
+}
+ion-checkbox.mob-check-row.checkbox-disabled {
+  opacity: 1;
+}
+ion-checkbox.mob-check-row.checkbox-disabled::part(container) {
+  opacity: 0.4;
+}
+
+/* ── Floating plus: `ion-fab.mob-fab--fixed` holds `ion-fab-button.mob-fab` (the design system's 56 px button). */
+ion-fab.mob-fab--fixed {
+  left: auto;
+  top: auto;
+  margin: 0;
+  padding: 0;
+}
+/* The host carries the design system's box (fill, border, radius, shadow); the native button is transparent. */
+/* Landscape: the tab bar is a rail at the left, so the plus sits one gutter above the bottom edge (boards "…Landscape"). */
+@media (orientation: landscape) {
+  ion-fab.mob-fab--fixed {
+    bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+  }
+}
+ion-fab-button.mob-fab {
+  --background: transparent;
+  --background-activated: transparent;
+  --background-focused: transparent;
+  --background-hover: transparent;
+  --color: var(--text-bright);
+  --box-shadow: none;
+  --border-width: 0;
+  --border-radius: var(--radius-pill);
+  --ripple-color: transparent;
+  width: var(--mobile-fab-size);
+  height: var(--mobile-fab-size);
+  margin: 0;
+}
+ion-fab-button.mob-fab::part(native) {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+/* ── Footer of a pushed form: `ion-footer.mob-footer` takes the design system's box; Ionic's own top shadow is off. */
+ion-footer.mob-footer::before {
+  display: none;
 }
 
 /* ── Section header: `ion-list-header.mob-section-header`. */
@@ -396,6 +474,13 @@ ion-modal.mob-sheet-modal {
   --box-shadow: none;
   align-items: flex-end;
 }
+/* the scrim behind a sheet is the design system's (`.mob-scrim`) */
+ion-modal.mob-sheet-modal {
+  --backdrop-opacity: 1;
+}
+ion-modal.mob-sheet-modal::part(backdrop) {
+  background: var(--bg-overlay);
+}
 ion-modal.mob-sheet-modal::part(content) {
   max-height: 100%;
 }
@@ -407,6 +492,18 @@ ion-modal.mob-sheet-modal .mob-sheet {
 }
 ion-modal.mob-sheet-modal .mob-sheet--auto-lg {
   max-height: 70dvh;
+}
+@media (orientation: landscape) {
+  /* A sheet over a scrim is a centred card of limited width. */
+  ion-modal.mob-sheet-modal {
+    --width: 440px;
+    --max-width: calc(100% - 2 * var(--mobile-gutter));
+  }
+  ion-modal.mob-sheet-modal .mob-sheet,
+  ion-modal.mob-sheet-modal .mob-sheet--auto-lg {
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--space-7));
+    border-width: 1px 1px 0;
+  }
 }
 .mob-sheet-title {
   color: var(--text-bright);
@@ -548,6 +645,7 @@ ion-toast.mob-toast-error {
   font-size: var(--font-size-body);
 }
 ion-toast.mob-toast-error::part(message) {
+  text-align: left;
   padding: var(--space-5) var(--space-7);
   font-size: var(--font-size-body);
   line-height: normal;

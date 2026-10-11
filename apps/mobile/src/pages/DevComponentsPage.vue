@@ -6,7 +6,13 @@ import { ref } from 'vue';
 import { IonPage, IonContent, IonList } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import AppIcon from '../components/AppIcon.vue';
+import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneBadge from '../components/PhoneBadge.vue';
+import PhoneCheckRow from '../components/PhoneCheckRow.vue';
+import PhoneFab from '../components/PhoneFab.vue';
+import PhoneFacts from '../components/PhoneFacts.vue';
+import PhoneFooter from '../components/PhoneFooter.vue';
+import PhoneHelper from '../components/PhoneHelper.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneChip from '../components/PhoneChip.vue';
@@ -36,6 +42,8 @@ const lat = ref('48.58');
 const empty = ref('');
 const switchOn = ref(true);
 const switchOff = ref(false);
+const tickOn = ref(true);
+const tickOff = ref(false);
 const opacity = ref(0.6);
 const sheet = ref(false);
 const sheetClosable = ref(false);
@@ -220,8 +228,34 @@ function raiseError() {
             :button-icon="plusIcon"
           />
         </div>
+        <PhoneSectionHeader>Cases à cocher, faits, aide, retour</PhoneSectionHeader>
+        <IonList class="mob-list" lines="none">
+          <PhoneCheckRow v-model="tickOn" title="Cochée" />
+          <PhoneCheckRow
+            v-model="tickOff"
+            title="Décochée"
+            :subs="['4.2 MB']"
+            :warn="['Avertissement']"
+          />
+          <PhoneCheckRow :model-value="true" title="Verrouillée" disabled />
+        </IonList>
+        <PhoneFacts
+          :facts="[
+            { label: 'Focale', value: '1422 mm' },
+            { label: 'Résolution', value: '6248 × 4176 px' },
+            { label: 'FOV', value: '57′ × 38′', wide: true },
+          ]"
+        />
+        <PhoneHelper>Ligne d'état</PhoneHelper>
+        <PhoneHelper class="mob-status--warn">Ligne d'avertissement</PhoneHelper>
+        <div class="mob-form-row"><PhoneBackButton fallback="/tabs/settings" /></div>
       </div>
+      <PhoneFab label="Ajouter" />
     </IonContent>
+    <PhoneFooter>
+      <PhoneButton size="lg">Annuler</PhoneButton>
+      <PhoneButton variant="confirm" size="lg">Valider</PhoneButton>
+    </PhoneFooter>
     <PhoneSheet v-model:open="sheet" title="Affichage" :closable="sheetClosable">
       <PhoneToggleRow v-model="switchOn" title="Afficher les photos" />
       <PhoneSliderRow

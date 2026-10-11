@@ -20,7 +20,25 @@ const fr = {
     langEn: 'English',
     langEs: 'Español',
     langDe: 'Deutsch',
+    themeValue: 'Froid moderne',
+    keyConfigured: '✓ Configurée',
+    lan: 'LAN',
   },
+  nav: { back: 'Retour' },
+  gear: {
+    addTelescope: 'Ajouter un télescope',
+    aperture: 'Ouverture {mm} mm',
+    focal: 'Focale {mm} mm',
+    searchTelescope: 'Rechercher un télescope…',
+    searchTelescopeLabel: 'Rechercher un télescope',
+    searchCamera: 'Rechercher une caméra…',
+    searchCameraLabel: 'Rechercher une caméra',
+    searchAccessory: 'Rechercher un accessoire…',
+    searchAccessoryLabel: 'Rechercher un accessoire',
+    summary: 'Focale effective : {value}',
+  },
+  location: { horizonSection: 'Horizon du relief', dms: 'DMS (° ′ ″)' },
+  backup: { exportSection: 'Exporter', importSection: 'Importer' },
 };
 
 export default fr;
