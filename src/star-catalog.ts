@@ -3,7 +3,7 @@ import { formatMultiplicity as formatMultiplicityWith } from '@myastrosky/core/t
 import { getLang, t } from './i18n';
 import { getStarCatalogUrl } from './api';
 import { normalizeRA } from '@myastrosky/core/angles';
-import { nearestNamedStar, starDisplayName } from '@myastrosky/core/catalog/star-registry';
+import { customLocationLabelOr } from '@myastrosky/core/targets/plan';
 import {
   loadConstellationStyleData,
   loadStarCatalogData,
@@ -42,6 +42,5 @@ export function formatMultiplicity(m: StarMultiplicity): string {
  * anchor (dsoId) is unaffected.
  */
 export function customLocationLabel(ra: number, dec: number): string {
-  const s = nearestNamedStar(ra, dec);
-  return s ? starDisplayName(s) : t('fovOverlay.customLocation');
+  return customLocationLabelOr(ra, dec, t('fovOverlay.customLocation'));
 }

@@ -22,6 +22,9 @@ const routes: RouteRecordRaw[] = [
   // modifier le setup", "Réglages, lieu d'observation", "Réglages, exporter et importer").
   // The page pushed from the Cibles tab: full screen, without the tab bar (board "Cibles, régions du ciel").
   { path: '/targets/regions', component: () => import('./pages/RegionsPage.vue') },
+  // The pages pushed from the Plans tab: full screen, without the tab bar (boards "Détail du plan" and "Plan, détail d'une cible").
+  { path: '/plans/:id', component: () => import('./pages/PlanDetailPage.vue') },
+  { path: '/plans/:id/:entryId', component: () => import('./pages/PlanEntryPage.vue') },
   { path: '/settings/setups', component: () => import('./pages/SetupsPage.vue') },
   { path: '/settings/setups/:id', component: () => import('./pages/SetupEditPage.vue') },
   { path: '/settings/location', component: () => import('./pages/LocationPage.vue') },

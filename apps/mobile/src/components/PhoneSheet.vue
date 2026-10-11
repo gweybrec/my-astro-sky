@@ -9,7 +9,14 @@ import closeIcon from '@icons/close-x.svg?raw';
 // A bottom sheet (`.mob-sheet`) on Ionic's modal. It takes the height of its content (60 % of the screen at most, 70 %
 // with `tall`), the body scrolls past that. The Android back button and a tap on the backdrop close it (Ionic's
 // overlay handling). A sheet without a footer applies its changes at once and has the close button in its header.
-defineProps<{ open: boolean; title: string; closable?: boolean; tall?: boolean }>();
+defineProps<{
+  open: boolean;
+  title: string;
+  /** A line under the title (`.mob-meta`): what the sheet is about. */
+  subtitle?: string;
+  closable?: boolean;
+  tall?: boolean;
+}>();
 const emit = defineEmits<{ 'update:open': [open: boolean] }>();
 const titleId = useId();
 </script>
@@ -31,6 +38,9 @@ const titleId = useId();
       </button>
       <div class="mob-sheet-header" :class="{ 'mob-sheet-header--bar': closable }">
         <h2 :id="titleId" class="mob-sheet-title m-title">{{ title }}</h2>
+        <div v-if="subtitle" class="mob-meta m-secondary">
+          <span>{{ subtitle }}</span>
+        </div>
         <slot name="header-trail" />
         <PhoneIconButton
           v-if="closable"

@@ -811,3 +811,15 @@ ion-button.mob-row-main--checked .mob-radio-mark {
 ion-item.mob-row--inert {
   pointer-events: none;
 }
+
+/* A floating plus on a page without the tab bar (board "Détail du plan"): one gutter above the bottom edge. */
+ion-fab.mob-fab--flush {
+  bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
+}
+
+/* A floating plus on a tab's page: the page's content already ends above the tab bar (board "Plans"). */
+@media (orientation: portrait) {
+  ion-fab.mob-fab--in-tab {
+    bottom: var(--mobile-gutter);
+  }
+}

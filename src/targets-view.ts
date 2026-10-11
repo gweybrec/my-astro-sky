@@ -39,7 +39,7 @@ import {
 } from '@myastrosky/core/gear-presets';
 import { getHemisphere } from '@myastrosky/core/projection';
 import { buildSetupInfoRows } from '@myastrosky/core/setup-info';
-import { scoreDso, type ObserverLocation } from '@myastrosky/core/target-recommender';
+import type { ObserverLocation } from '@myastrosky/core/target-recommender';
 import { formatPaDeg } from '@myastrosky/core/frame-orientation';
 import { formatRA, formatDec, formatAlt, cardinalLetter } from '@myastrosky/core/format-utils';
 import { attachAnchoredPanel } from './popup-utils';
@@ -67,6 +67,8 @@ import {
   windowDurationMs,
   framesInWindow,
   windowTimeOptions,
+  parseFrameSeconds,
+  snapStepFrac,
   formatWindowDuration,
   fracToClock,
   clockToFrac,
@@ -93,12 +95,9 @@ import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { openManageRegionsModal } from './region-overlay';
 import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
-import { dateToJD, moonPhase } from '@myastrosky/core/astro-time';
 import {
   maxAltDuringWindow,
   sampleAltCurve,
-  sampleMoonAltCurve,
-  moonDangerLevel,
   azimuthCrossings,
   thinCrossingsByX,
   isCardinalAz,
@@ -136,6 +135,18 @@ import {
   moonEventsInWindow,
   getPlanObserverFor,
 } from '@myastrosky/core/targets/night';
+import {
+  buildMoonOverlay,
+  computePlanTargets,
+  customLocationDso,
+  defaultPlanName,
+  moonPhaseForWindow,
+  moonSeparationRating,
+  planItemCount,
+  scorePlanEntry,
+  type MoonOverlay,
+  type PlanTargetInfo,
+} from '@myastrosky/core/targets/plan';
 import {
   presetForSetupId,
   resolveSetupById,
@@ -1214,28 +1225,6 @@ export function buildGearSectionContent(
 }
 
 // ─── TargetsView class ────────────────────────────────────────────────────────
-
-/** A plan target resolved + scored for the current observer/night. */
-interface PlanTargetInfo {
-  entryId: string;
-  dso: DSO;
-  maxAltDeg: number;
-  bestTimeUtc: Date;
-  curve: AltSample[];
-  /** Moon–target angular separation (°) at the imaging time, or null when the moon overlay is off / moon never rises. */
-  moonSepDeg: number | null;
-}
-
-/**
- * Moon overlay for a plan render — identical for every row of a plan (same
- * night + location), so it is computed once and threaded into each chart.
- * Null when the toggle is off or the Moon never clears the horizon.
- */
-interface MoonOverlay {
-  curve: AltSample[];
-  phaseIndex: number;
-  illum: number;
-}
 
 export class TargetsView {
   private container: HTMLElement;
@@ -3062,7 +3051,7 @@ export class TargetsView {
       const loc = this.lastLocation!;
       const win = nightWindow(loc, this.lastDateNight!);
       const curve = sampleAltCurve(dso.ra, dso.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
-      const moon = this.buildMoonOverlay(loc, win);
+      const moon = buildMoonOverlay(loc, win, this.prefs.showMoon !== false);
 
       // Same three actions as the results card, on the right of the stats
       // row. Nav/edit both navigate away from this view, so — unlike the
@@ -3213,30 +3202,18 @@ export class TargetsView {
    */
   private moonSepMetaItem(sepDeg: number | null, illum: number): HTMLElement | null {
     if (sepDeg == null) return null;
-    const level = moonDangerLevel(sepDeg, illum);
+    const rating = moonSeparationRating(sepDeg, illum);
     // Lead with an adjective so the number reads as a distance from the target,
     // e.g. "Close (34°)" / "Far (109°)".
-    const adj = t(
-      {
-        danger: 'targets.plan.moonClose',
-        warn: 'targets.plan.moonModerate',
-        ok: 'targets.plan.moonFar',
-      }[level],
-    );
     const item = this.metaItem(
       t('targets.plan.moonSeparation'),
-      `${adj} (${formatAlt(sepDeg)})`,
+      `${t(rating.labelKey)} (${formatAlt(sepDeg)})`,
       t('targets.plan.moonSeparationHelp'),
     );
-    const token = {
-      danger: '--color-danger',
-      warn: '--status-warn-text',
-      ok: '--status-success-text',
-    }[level];
     const value = item.querySelector('.target-meta-value') as HTMLElement;
     // Inline style (not a utility class): `.target-meta-value` sets its own colour
     // and would win the cascade tie by source order, so set it directly here.
-    value.style.color = `var(${token})`;
+    value.style.color = `var(${rating.colorToken})`;
     // The "Moon distance" value ("Medium (67°)") is longer than most — keep it
     // on one line too (labels are already nowrap via metaItem).
     value.classList.add('whitespace-nowrap');
@@ -3317,95 +3294,8 @@ export class TargetsView {
     }
   }
 
-  /**
-   * Moon overlay for a plan night, computed once and shared by every row.
-   * Returns null when the toggle is off or the Moon stays below the horizon for
-   * the whole window (no curve, no separation badge).
-   */
-  private buildMoonOverlay(
-    loc: ObserverLocation,
-    win: { start: Date; end: Date },
-  ): MoonOverlay | null {
-    if (this.prefs.showMoon === false) return null;
-    const curve = sampleMoonAltCurve(loc.latDeg, loc.lonDeg, win.start, win.end);
-    if (!curve.some((s) => s.altDeg > 0)) return null; // moon never rises this night
-    const midJd = dateToJD(new Date((win.start.getTime() + win.end.getTime()) / 2));
-    const { phaseIndex, illum } = moonPhase(midJd);
-    return { curve, phaseIndex, illum };
-  }
-
-  private computePlanTargets(
-    plan: {
-      entries: Array<{
-        id: string;
-        dsoId: string | null;
-        ra: number | null;
-        dec: number | null;
-        mosaicId?: string | null;
-      }>;
-    },
-    loc: ObserverLocation,
-    win: { start: Date; end: Date },
-    moonEnabled: boolean,
-  ): PlanTargetInfo[] {
-    const out: PlanTargetInfo[] = [];
-    for (const e of plan.entries) {
-      if (e.mosaicId) continue; // mosaic tiles are summarised as one mosaic, not per-tile rows
-      const realDso = e.dsoId ? getDSOById(e.dsoId) : null;
-      // Effective position: explicit frame-centre override, else the DSO centre.
-      const ra = e.ra ?? realDso?.ra;
-      const dec = e.dec ?? realDso?.dec;
-      if (ra == null || dec == null) continue; // nothing to place
-      // A frame on empty sky keeps a trajectory but has no catalogue metadata.
-      const dso = realDso ?? this.customLocationDso(e.id, ra, dec);
-      const { maxAltDeg, atDate } = maxAltDuringWindow(
-        ra,
-        dec,
-        loc.latDeg,
-        loc.lonDeg,
-        win.start,
-        win.end,
-        10,
-      );
-      const curve = sampleAltCurve(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
-      const moonSepDeg = moonEnabled ? moonSeparationAt(ra, dec, atDate) : null;
-      out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve, moonSepDeg });
-    }
-    // Transit-ordered: earliest culmination first.
-    out.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
-    return out;
-  }
-
-  /** Synthetic DSO for a custom-location plan entry (no catalogued object). */
-  private customLocationDso(entryId: string, ra: number, dec: number): DSO {
-    return {
-      id: `custom:${entryId}`,
-      ra,
-      dec,
-      type: '?',
-      majAxis: null,
-      minAxis: null,
-      pa: 0,
-      mag: null,
-      displayName: customLocationLabel(ra, dec),
-      catalogs: [`${ra.toFixed(1)}°, ${dec.toFixed(1)}°`],
-      emissionLines: null,
-      constellation: null,
-      rating: null,
-      difficulty: null,
-      containerId: null,
-      priority: Number.MAX_SAFE_INTEGER,
-    };
-  }
-
   private defaultPlanName(): string {
-    const dateStr = this.prefs.lastDateISO ?? todayISO();
-    const nice = new Date(dateStr + 'T12:00:00Z').toLocaleDateString([], {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-    return t('targets.plan.defaultName', { date: nice });
+    return defaultPlanName(this.prefs.lastDateISO ?? todayISO(), t);
   }
 
   /**
@@ -3588,8 +3478,7 @@ export class TargetsView {
       count.textContent = `(${t('targets.plan.itemCount', { n })})`;
     };
     // A mosaic counts as one item (its tiles aren't listed individually).
-    const itemCount = () =>
-      plan.entries.filter((e) => !e.mosaicId).length + (plan.mosaics?.length ?? 0);
+    const itemCount = () => planItemCount(plan);
     setCount(itemCount());
 
     nameWrap.appendChild(nameEl);
@@ -3747,13 +3636,16 @@ export class TargetsView {
         return;
       }
       const win = nightWindow(observer.loc, observer.dateNight);
-      const moon = this.buildMoonOverlay(observer.loc, win);
+      const moon = buildMoonOverlay(observer.loc, win, this.prefs.showMoon !== false);
       // computePlanTargets returns a transit-ordered baseline; re-order by the
       // plan's chosen sort key (the exported PDF reads currentInfos, so both the
       // list and the PDF inherit this order).
       const sortKey = (plan.sortBy ?? 'transit') as PlanSortKey;
       const infos = sortPlanTargets(
-        this.computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false),
+        computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false, {
+          getDsoById: getDSOById,
+          customLabel: customLocationLabel,
+        }),
         sortKey,
         firstWindowFracByEntry(plan.entries),
       );
@@ -4058,7 +3950,9 @@ export class TargetsView {
         ]);
 
         // Moon overlay for the PDF charts (same night/location for every page).
-        const moon = observer ? this.buildMoonOverlay(observer.loc, win) : null;
+        const moon = observer
+          ? buildMoonOverlay(observer.loc, win, this.prefs.showMoon !== false)
+          : null;
         const moonShared = moon
           ? { moonCurve: moon.curve, moonPhaseIndex: moon.phaseIndex, moonIllum: moon.illum }
           : {};
@@ -4103,7 +3997,13 @@ export class TargetsView {
             );
             const realDso = m.dsoId ? getDSOById(m.dsoId) : null;
             const dso =
-              realDso ?? this.customLocationDso(`mosaic:${m.id}`, m.centerRa, m.centerDec);
+              realDso ??
+              customLocationDso(
+                `mosaic:${m.id}`,
+                m.centerRa,
+                m.centerDec,
+                customLocationLabel(m.centerRa, m.centerDec),
+              );
             if (!realDso && m.name) dso.displayName = m.name;
             const env = outlineFromGrid(m.cols, m.rows, tileW, tileH, m.overlapPct);
             targets.push({
@@ -4269,8 +4169,7 @@ export class TargetsView {
 
     const riseEvent = moonEventsInWindow(this.lastLocation, win).find((e) => e.type === 'rise');
     if (riseEvent) {
-      const midJd = dateToJD(new Date((win.start.getTime() + win.end.getTime()) / 2));
-      const { phaseIndex } = moonPhase(midJd);
+      const { phaseIndex } = moonPhaseForWindow(win);
       const moonriseGroup = document.createElement('div');
       moonriseGroup.className = 'flex items-center gap-2';
       const icon = document.createElement('span');
@@ -4627,14 +4526,14 @@ export class TargetsView {
 
     const applyPreset = (preset: GearPreset | null): void => {
       if (!preset) return;
-      const { score, fovFitScore } = scoreDso(dso, preset, info.maxAltDeg, {
-        ignoreFovFit: this.prefs.includeOversized ?? false,
-        minAltDeg: this.prefs.minAltDeg ?? 20,
-      });
-      scoreItem.querySelector('.target-meta-value')!.textContent = `${Math.round(score * 100)}%`;
-      fovItem.querySelector('.target-meta-value')!.textContent =
-        `${Math.round(fovFitScore * 100)}%`;
-      const recipe = recommendRecipe(dso, preset);
+      const { scorePct, fovFitPct, recipe } = scorePlanEntry(
+        dso,
+        preset,
+        info.maxAltDeg,
+        this.prefs,
+      );
+      scoreItem.querySelector('.target-meta-value')!.textContent = `${scorePct}%`;
+      fovItem.querySelector('.target-meta-value')!.textContent = `${fovFitPct}%`;
       totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
       filterList.innerHTML = '';
       for (const f of recipe.filters) {
@@ -4804,8 +4703,7 @@ export class TargetsView {
 
     // Snap step as a fraction of the night, or 0 when the window has no frame
     // duration / snap is off (→ free drag).
-    const stepFrac = (w: ObservationWindow): number =>
-      w.snap && w.frameSeconds ? (w.frameSeconds * 1000) / nightSpanMs : 0;
+    const stepFrac = (w: ObservationWindow): number => snapStepFrac(w, nightSpanMs);
 
     const layer = document.createElement('div');
     layer.className = 'obs-window-layer';
@@ -5030,8 +4928,7 @@ export class TargetsView {
           oper.textContent = has ? '×' : '';
         };
         subInput.addEventListener('change', () => {
-          const n = Number(subInput.value);
-          w.frameSeconds = Number.isFinite(n) && n > 0 ? n : null;
+          w.frameSeconds = parseFrameSeconds(subInput.value);
           if (!w.frameSeconds) subInput.value = '';
           refreshFrames();
           persist();
