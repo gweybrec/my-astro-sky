@@ -134,7 +134,7 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
               :key="row.title"
               :title="t(row.title)"
               :value="row.title === LANGUAGE_ROW ? t(currentName) : row.value?.()"
-              :disabled="row.title !== LANGUAGE_ROW && !row.to"
+              :inert="row.title !== LANGUAGE_ROW && !row.to"
               button
               chevron
               @click="onRow(row, $event)"

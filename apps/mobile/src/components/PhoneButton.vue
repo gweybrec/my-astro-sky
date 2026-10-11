@@ -15,6 +15,8 @@ const props = withDefaults(
     disabled?: boolean;
     /** A toggle that is on (the selected fill; Ionic keeps aria-pressed off the host, so the class carries it). */
     pressed?: boolean;
+    /** Waits for a screen that is not built yet: drawn as the board draws it, without a tap. */
+    waiting?: boolean;
     /** Type style of the label: the filled roles are in the strong weight, a field is in the secondary size. */
     textStyle?: 'body' | 'strong' | 'secondary';
   }>(),
@@ -47,6 +49,7 @@ const typeClass = computed(() => {
   <IonButton
     fill="clear"
     :disabled="disabled"
+    :aria-disabled="waiting ? 'true' : undefined"
     :aria-pressed="pressed === undefined ? undefined : String(pressed)"
     class="mob-btn"
     :class="[

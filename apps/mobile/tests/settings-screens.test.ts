@@ -156,7 +156,7 @@ describe('the Réglages page', () => {
     expect(text).toContain('Froid moderne');
     const rows = w.findAll('.mob-row');
     const disabled = rows
-      .filter((r) => r.classes().includes('mob-row--disabled'))
+      .filter((r) => r.classes().includes('mob-row--inert'))
       .map((r) => r.text());
     expect(disabled.some((t) => t.includes('Thème'))).toBe(true);
     expect(disabled.some((t) => t.includes('Setups'))).toBe(false);
@@ -342,17 +342,21 @@ describe('the location page', () => {
       .find((b) => b.text() === "Calculer l'horizon")!
       .trigger('click');
     await flushPromises();
-    expect(showError).toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Impossible de calculer l'horizon à partir des données d'altitude",
+      }),
+    );
   });
 
-  it('has the DMS button waiting for its board, disabled', () => {
+  it('has the DMS button waiting for its board, not dimmed', () => {
     const { global } = app();
     const w = mount(LocationPage, { global });
     expect(
       w
         .findAll('button')
         .find((b) => b.text().startsWith('DMS'))!
-        .attributes('disabled'),
+        .attributes('aria-disabled'),
     ).toBeDefined();
   });
 });

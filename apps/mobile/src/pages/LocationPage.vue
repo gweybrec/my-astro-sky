@@ -78,7 +78,9 @@ function commitEyeHeight() {
 async function compute() {
   const loc = readObserverLocation();
   if (!(await horizon.computeFor(loc.lat, loc.lon)) && horizon.error) {
-    void showError(new Error(horizon.error));
+    // The board "Lieu, horizon indisponible" shows the desktop's text whatever the server answered.
+    const missing = horizon.error === t('horizon.error.noLocation');
+    void showError(new Error(missing ? horizon.error : t('horizon.error.compute')));
   }
 }
 
@@ -125,7 +127,7 @@ async function importHorizon() {
         </div>
         <!-- Entering degrees, minutes and seconds has no board yet: the button shows and does nothing. -->
         <div class="mob-form-row">
-          <PhoneButton block disabled>{{ t('mobile.location.dms') }}</PhoneButton>
+          <PhoneButton block waiting>{{ t('mobile.location.dms') }}</PhoneButton>
         </div>
         <div class="mob-form-row">
           <PhoneButton

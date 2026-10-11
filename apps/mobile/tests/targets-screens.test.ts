@@ -443,13 +443,13 @@ describe('the regions page', () => {
     expect(prefsOf()).not.toHaveProperty('skyRegionId');
   });
 
-  it('shows the pin and the plus disabled: they need the sky map', async () => {
+  it('shows the pin and the plus waiting, as the board draws them: they need the sky map', async () => {
     const w = show(RegionsPage, { global: app().global });
     await settle();
     const pin = w.find('button[aria-label="Voir la région « Vue depuis le jardin »"]');
-    expect(pin.attributes('disabled')).toBeDefined();
+    expect(pin.attributes('aria-disabled')).toBeDefined();
     expect(
-      w.find('button[aria-label="Dessiner une nouvelle région"]').attributes('disabled'),
+      w.find('button[aria-label="Dessiner une nouvelle région"]').attributes('aria-disabled'),
     ).toBeDefined();
   });
 

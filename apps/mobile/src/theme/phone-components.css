@@ -805,3 +805,9 @@ ion-button.mob-row-main--checked .mob-radio-mark {
     margin: 0 auto;
   }
 }
+
+/* A control that waits for a screen that is not built yet is drawn as its board draws it (no dimming) and takes no tap. */
+.mob-waiting,
+ion-item.mob-row--inert {
+  pointer-events: none;
+}

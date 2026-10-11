@@ -75,11 +75,9 @@ onMounted(async () => {
 });
 
 const sizeLabel = computed(() =>
-  photos.value.length
-    ? t('settings.exportEstimatedSize', {
-        size: formatBytes(selectedPhotoBytes(photos.value, photoIds.value)),
-      })
-    : '',
+  t('settings.exportEstimatedSize', {
+    size: formatBytes(selectedPhotoBytes(photos.value, photoIds.value)),
+  }),
 );
 
 async function createBackup() {
@@ -299,7 +297,7 @@ async function restore() {
             variant="field"
             text-style="body"
             block
-            disabled
+            waiting
             :aria-label="`${t('photos.section')} : ${photos.length} / ${photos.length}`"
           >
             <span class="mob-btn-key">{{ t('photos.section') }}</span>
@@ -309,7 +307,7 @@ async function restore() {
             <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
           </PhoneButton>
         </div>
-        <PhoneHelper v-if="sizeLabel">{{ sizeLabel }}</PhoneHelper>
+        <PhoneHelper>{{ sizeLabel }}</PhoneHelper>
         <div class="mob-form-row">
           <PhoneButton
             variant="confirm"

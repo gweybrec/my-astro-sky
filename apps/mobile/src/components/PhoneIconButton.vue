@@ -10,6 +10,8 @@ defineProps<{
   pressed?: boolean;
   danger?: boolean;
   disabled?: boolean;
+  /** Waits for a screen that is not built yet: drawn as the board draws it, without a tap. */
+  waiting?: boolean;
 }>();
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
 
@@ -25,10 +27,15 @@ function onClick(event: MouseEvent) {
   <IonButton
     fill="clear"
     class="mob-icon-btn"
-    :class="{ 'mob-icon-btn--danger': danger, 'mob-icon-btn--held': style !== null }"
+    :class="{
+      'mob-icon-btn--danger': danger,
+      'mob-waiting': waiting,
+      'mob-icon-btn--held': style !== null,
+    }"
     :aria-label="label"
     :aria-pressed="pressed === undefined ? undefined : String(pressed)"
     :disabled="disabled"
+    :aria-disabled="waiting ? 'true' : undefined"
     @pointerdown="start"
     @pointerup="end"
     @pointercancel="end"
