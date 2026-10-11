@@ -7,7 +7,7 @@ import './theme/index.css';
 import App from './App.vue';
 import StartupError from './components/StartupError.vue';
 import router from './router';
-import { initPlatform } from './platform-init';
+import { initPlatform, installBackButton } from './platform-init';
 
 async function start(): Promise<void> {
   try {
@@ -20,6 +20,7 @@ async function start(): Promise<void> {
     return;
   }
   createApp(App).use(IonicVue).use(createPinia()).use(router).mount('#app');
+  installBackButton(router);
 }
 
 void start();

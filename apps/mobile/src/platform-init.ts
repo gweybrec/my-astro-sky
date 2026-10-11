@@ -73,6 +73,47 @@ async function createBackend() {
   return createNativePhoneBackend();
 }
 
+/** The five top-level tabs: a hardware back press there leaves the app, whatever the tab history holds. */
+const TOP_LEVEL_PATHS = [
+  '/tabs/sky',
+  '/tabs/gallery',
+  '/tabs/targets',
+  '/tabs/plans',
+  '/tabs/settings',
+];
+
+/** True when the back button must leave the app: a top-level tab is showing (sub-pages are left to the router). */
+export function shouldExitOnBack(path: string): boolean {
+  return TOP_LEVEL_PATHS.includes(path.replace(/\/+$/, ''));
+}
+
+interface BackRouter {
+  currentRoute: { value: { path: string } };
+}
+type BackRegister = (priority: number, handler: (processNext: () => void) => void) => void;
+
+/** Above Ionic's router (0) and below its overlays and menu (99, 100): runs only when nothing else took the press. */
+const BACK_BUTTON_PRIORITY = 1;
+
+/**
+ * Native only. Ionic's own handler only walks the history back and Capacitor's App plugin listener bypasses its
+ * default exit, so on a top-level tab (with no sheet or dialog open: those register above this priority) the app
+ * has to leave by itself; elsewhere the press goes on to the router.
+ */
+export function installBackButton(router: BackRouter): void {
+  if (!isNativePlatform()) return;
+  document.addEventListener('ionBackButton', (event) => {
+    const { register } = (event as CustomEvent<{ register: BackRegister }>).detail;
+    register(BACK_BUTTON_PRIORITY, (processNext) => {
+      if (shouldExitOnBack(router.currentRoute.value.path)) {
+        void import('@capacitor/app').then(({ App }) => App.exitApp());
+      } else {
+        processNext();
+      }
+    });
+  });
+}
+
 export async function initPlatform(): Promise<void> {
   // 1. The device storage.
   configureStorage(await createDeviceStorage());
@@ -87,6 +128,8 @@ export async function initPlatform(): Promise<void> {
       if (import.meta.env.DEV) console.warn(`[i18n] Missing key: "${k}"`);
     },
   });
+
+  document.documentElement.lang = getLang();
 
   // 3. The backend.
   setBackend(await createBackend());
