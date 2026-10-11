@@ -4,6 +4,10 @@
 :root {
   color-scheme: dark;
   --rail-width: 80px;
+  /* The system bars as insets. The design system only defines these on its board frame (`#root`), and its top bar's
+     `min-height` reads `--safe-top` without a fallback; a browser run overrides them on `<html>`. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 
   --ion-font-family: var(--font-sans);
   --ion-background-color: var(--bg-app);
@@ -100,13 +104,16 @@ ion-tab-button:active .mob-tab-pill {
   ion-tabs {
     box-sizing: border-box;
     padding-left: calc(var(--rail-width) + env(safe-area-inset-left, 0px));
+    /* the navigation bar of a 3-button device sits at the right edge in landscape */
+    padding-right: env(safe-area-inset-right, 0px);
   }
   ion-tab-bar {
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
-    width: calc(var(--rail-width) + env(safe-area-inset-left, 0px));
+    /* Ionic forces `box-sizing: content-box` on the tab bar: the width is the buttons' column, the padding the cut-out. */
+    width: var(--rail-width);
     height: auto;
     flex-direction: column;
     justify-content: center;

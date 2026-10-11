@@ -38,7 +38,9 @@ function onRow(row: string, event: Event) {
   if (row === LANGUAGE_ROW) void select.value?.$el.open(event as UIEvent);
 }
 function onChange(event: CustomEvent<{ value: Lang }>) {
-  if (event.detail.value !== current) setLang(event.detail.value);
+  if (event.detail.value === current) return;
+  document.documentElement.lang = event.detail.value;
+  setLang(event.detail.value);
 }
 </script>
 
