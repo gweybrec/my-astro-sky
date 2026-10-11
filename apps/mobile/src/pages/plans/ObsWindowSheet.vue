@@ -107,6 +107,7 @@ function save() {
     <div class="mob-form-row" style="padding-bottom: var(--space-4)">
       <PhoneButton
         variant="field"
+        text-style="body"
         block
         waiting
         :aria-label="`${t('targets.plan.obsWindowFilter')} : ${filterName}`"
@@ -117,7 +118,7 @@ function save() {
       </PhoneButton>
     </div>
     <div class="mob-form-row" style="padding-bottom: var(--space-4)">
-      <PhoneButton variant="field" block waiting :aria-label="colorAria">
+      <PhoneButton variant="field" text-style="body" block waiting :aria-label="colorAria">
         <span class="mob-btn-key">{{ t('targets.plan.obsWindowColor') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch"
           ><span class="mob-swatch" :style="{ background: swatch }"
