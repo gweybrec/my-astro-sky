@@ -22,6 +22,8 @@ withDefaults(
     /** The title may wrap onto a second line (a long desktop label). */
     wrap?: boolean;
     disabled?: boolean;
+    /** Waits for a screen that is not built yet: drawn as the board draws the row, without a tap. */
+    inert?: boolean;
     /** A tap target (a button); without it the row is only text. */
     button?: boolean;
   }>(),
@@ -37,9 +39,11 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
       'mob-row--danger': danger,
       'mob-row--roomy': roomy,
       'mob-row--disabled': disabled,
+      'mob-row--inert': inert,
     }"
     lines="none"
-    :button="button && !disabled"
+    :button="button && !disabled && !inert"
+    :aria-disabled="inert ? 'true' : undefined"
     :detail="false"
     @click="emit('click', $event)"
   >

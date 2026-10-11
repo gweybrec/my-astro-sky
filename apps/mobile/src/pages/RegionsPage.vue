@@ -15,7 +15,7 @@ import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Cibles, régions du ciel": "Tout le ciel" and the saved regions, one of which filters the targets. A tap on
 // a name chooses it at once; the pin shows the region on the sky map and the plus draws a new one, both of which need
-// the map (a later card), so they are shown disabled.
+// the map (a later card), so they are drawn as the board draws them and do nothing.
 const store = useSkyRegionsStore();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
@@ -91,10 +91,7 @@ async function remove(region: { id: string; name: string }) {
                 <span>{{ region.name }}</span></span
               >
             </IonButton>
-            <PhoneIconButton
-              :label="t('mobile.targets.regionView', { name: region.name })"
-              disabled
-            >
+            <PhoneIconButton :label="t('mobile.targets.regionView', { name: region.name })" waiting>
               <AppIcon :svg="pinIcon" />
             </PhoneIconButton>
             <PhoneIconButton
@@ -107,7 +104,7 @@ async function remove(region: { id: string; name: string }) {
           </div>
         </div>
       </div>
-      <PhoneFab :label="t('mobile.targets.regionDraw')" disabled />
+      <PhoneFab :label="t('mobile.targets.regionDraw')" waiting />
     </IonContent>
   </IonPage>
 </template>

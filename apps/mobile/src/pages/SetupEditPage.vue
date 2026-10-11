@@ -181,6 +181,17 @@ const pickedId = computed(() =>
 function openPicker(kind: 'telescope' | 'camera' | 'accessory') {
   query.value = '';
   picker.value = kind;
+  scrollToPicked();
+}
+
+/** The sheet opens with the ticked item in view (board "Équipement, choisir un télescope"); the sheet's content exists a moment after it opens. */
+function scrollToPicked(tries = 20) {
+  const tick = document.querySelector('.mob-sheet-modal .mob-sheet-body .mob-status--success');
+  if (tick) {
+    tick.scrollIntoView({ block: 'center' });
+  } else if (tries > 0) {
+    setTimeout(() => scrollToPicked(tries - 1), 50);
+  }
 }
 
 function pick(id: string | null) {
@@ -265,7 +276,7 @@ async function remove() {
         </div>
         <!-- The pages that manage the gear lists have no board yet: the row shows and does nothing. -->
         <IonList class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageTelescope')" chevron disabled />
+          <PhoneRow :title="t('targets.gear.manageTelescope')" chevron inert />
         </IonList>
 
         <div class="mob-form-row">
@@ -284,7 +295,7 @@ async function remove() {
           </PhoneButton>
         </div>
         <IonList v-if="!isSmart" class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageCamera')" chevron disabled />
+          <PhoneRow :title="t('targets.gear.manageCamera')" chevron inert />
         </IonList>
 
         <div class="mob-form-row">
@@ -303,10 +314,10 @@ async function remove() {
           </PhoneButton>
         </div>
         <IonList v-if="!isSmart" class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageAccessory')" chevron disabled />
+          <PhoneRow :title="t('targets.gear.manageAccessory')" chevron inert />
         </IonList>
         <IonList class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageFilter')" chevron disabled />
+          <PhoneRow :title="t('targets.gear.manageFilter')" chevron inert />
         </IonList>
 
         <PhoneFacts v-if="facts.length" :facts="facts" />
@@ -361,7 +372,7 @@ async function remove() {
         v-if="picker === 'telescope'"
         :title="t('mobile.gear.addTelescope')"
         :lead="plusIcon"
-        disabled
+        inert
       />
       <PhoneRow
         v-if="picker === 'accessory'"
