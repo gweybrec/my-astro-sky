@@ -31,7 +31,7 @@ describe('the layer buttons ("Ciel, calques de la carte")', () => {
   });
   const mountButtons = () => mount(SkyLayerButtons, { global: { stubs: ionicStubs } });
 
-  it('shows the seven toggles and the display button, in the board order', () => {
+  it('shows the seven toggles of the map, in the board order', () => {
     const labels = mountButtons()
       .findAll('button')
       .map((b) => b.attributes('aria-label'));
@@ -43,7 +43,6 @@ describe('the layer buttons ("Ciel, calques de la carte")', () => {
       'Afficher/masquer la Lune',
       'Afficher/masquer le Soleil',
       'Afficher/masquer les planètes',
-      'Affichage',
     ]);
   });
 
@@ -106,12 +105,6 @@ describe('the layer buttons ("Ciel, calques de la carte")', () => {
     );
     await w.vm.$nextTick();
     expect(relief.attributes('aria-disabled')).toBeUndefined();
-  });
-
-  it('asks for the display sheet from its last button', async () => {
-    const w = mountButtons();
-    await buttonNamed(w, 'Affichage').trigger('click');
-    expect(w.emitted('display')).toHaveLength(1);
   });
 });
 

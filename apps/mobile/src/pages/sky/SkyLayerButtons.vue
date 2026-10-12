@@ -13,13 +13,10 @@ import mountainIcon from '@icons/mountain.svg?raw';
 import moonIcon from '@icons/moon.svg?raw';
 import sunIcon from '@icons/sun.svg?raw';
 import planetsIcon from '@icons/planets.svg?raw';
-import slidersIcon from '../../icons/sliders.svg?raw';
 
 // The board "Ciel, calques de la carte": the map's toggles as a column along the right edge (the desktop's map toolbar),
-// then the display settings. A toggle that needs something the map does not have yet is drawn disabled; its long press
+// shown while the map is in the date mode. A toggle that needs something the map does not have yet is drawn disabled; its long press
 // says what is missing.
-const emit = defineEmits<{ display: [] }>();
-
 const time = useSkyTimeStore();
 const horizon = useHorizonProfileStore();
 const { localSkyMode, showAzimuthGrid, showTrajectory, showMoon, showSun, showPlanets, lat, lon } =
@@ -89,14 +86,6 @@ const noLocation = computed(() => lat.value === null || lon.value === null);
       @click="time.setShowPlanets(!showPlanets)"
     >
       <AppIcon :svg="planetsIcon" />
-    </PhoneIconButton>
-    <PhoneIconButton
-      float
-      class="mob-map-ribbon-more"
-      :label="t('display.section')"
-      @click="emit('display')"
-    >
-      <AppIcon :svg="slidersIcon" />
     </PhoneIconButton>
   </div>
 </template>

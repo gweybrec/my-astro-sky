@@ -37,15 +37,20 @@ const label = computed(() => `${dateValue.value} ${clockValue.value}`);
 const picker = ref<InstanceType<typeof IonInput> | null>(null);
 const pickerValue = computed(() => `${dateValue.value}T${clockValue.value}`);
 
-async function openPicker() {
+async function openNativePicker() {
   const native = await picker.value?.$el?.getInputElement?.();
   native?.showPicker?.();
 }
 
-function openPickers() {
-  // Entering the date mode here is what the desktop does when its date button is pressed.
+/** Opens the phone's picker for the moment shown (the date button calls it after switching to the date mode). */
+function openPicker() {
+  void openNativePicker();
+}
+
+function openFromField() {
+  // Entering the date mode here is what the desktop does when its date field is pressed.
   if (mode.value !== 'date') time.setMode('date');
-  void openPicker();
+  openPicker();
 }
 
 function onPicked(value: string | null | undefined) {
@@ -55,6 +60,7 @@ function onPicked(value: string | null | undefined) {
   const [hh, mm] = (clock || '00:00').split(':').map(Number);
   time.setSimDate(new Date(y, m - 1, d, hh, mm));
 }
+defineExpose({ openPicker });
 </script>
 
 <template>
@@ -62,7 +68,7 @@ function onPicked(value: string | null | undefined) {
     <PhoneButton
       variant="field"
       :aria-label="t('mobile.sky.dateField', { value: label })"
-      @click="openPickers"
+      @click="openFromField"
     >
       <span class="mob-btn-label">{{ label }}</span>
       <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>

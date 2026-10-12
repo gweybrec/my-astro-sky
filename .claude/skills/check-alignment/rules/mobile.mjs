@@ -216,7 +216,7 @@ export const rules = [
     id: 'map-edges',
     type: 'edges',
     within: '.mob-map',
-    rights: '.mob-map-top > ion-button, .mob-map-ribbon > ion-button',
+    rights: '.mob-map-top > ion-button:last-child, .mob-map-ribbon > ion-button',
   },
   // Every button is a touch target of at least 48 by 48.
   {
@@ -289,18 +289,14 @@ export const views = [
     name: 'sky-layers',
     path: '/tabs/sky',
     ready: '.mob-map-top',
-    open: [{ click: '.mob-map-top ion-button.mob-icon-btn' }, { wait: '.mob-map-ribbon' }],
+    // "Ce soir" is how the map is put in the date mode here without opening the phone's picker.
+    open: [{ click: '.mob-timebar ion-button:nth-of-type(2)' }, { wait: '.mob-map-ribbon' }],
   },
   {
     name: 'sky-display',
     path: '/tabs/sky',
     ready: '.mob-map-top',
-    open: [
-      { click: '.mob-map-top ion-button.mob-icon-btn' },
-      { wait: '.mob-map-ribbon' },
-      { click: '.mob-map-ribbon-more' },
-      { wait: '.mob-sheet' },
-    ],
+    open: [{ click: '.mob-map-top ion-button:nth-of-type(1)' }, { wait: '.mob-sheet' }],
     ...SHEET,
   },
   {
