@@ -1,6 +1,6 @@
 # Phone App Mockups
 
-The mockups of the phone app (Capacitor + Ionic Vue): 58 screens, each drawn in portrait (412 x 915) and in landscape (915 x 412). Their source is in `design/mobile/` (see `design/mobile/README.md`). The phone screens are built from them.
+The mockups of the phone app (Capacitor + Ionic Vue) are on the project's Claude Design page, not in this repository: 58 screens, each drawn in portrait (412 x 915) and in landscape (915 x 412). This page holds the rules every phone screen follows and the list of screens. The stylesheet and tokens the app ships are in `apps/mobile/src/theme/design-system/`.
 
 ## Rules that bind every phone screen
 
@@ -66,118 +66,106 @@ The mockups of the phone app (Capacitor + Ionic Vue): 58 screens, each drawn in 
 ## How the phone app gets this look
 
 - The screens are built with Ionic's own components wherever one exists; nothing Ionic provides is rebuilt.
-- The look comes from the design system's stylesheet (`design/mobile/ds/myastrosky/components/bundle.css`, the `.mob-*` classes) and its tokens (`design/mobile/ds/myastrosky/tokens.css`); the Ionic components are themed to it.
+- The look comes from the design system's stylesheet (`apps/mobile/src/theme/design-system/`, the `.mob-*` classes) and its tokens; the Ionic components are themed to it.
 - The fonts (Outfit and DM Mono) are bundled in the app. The mockups load them from Google Fonts, so a picture needs a network connection to be drawn in the right font.
 
-## Mockups
+## Screens
 
-One row per screen. Each mockup is an HTML file; `design/mobile/README.md` explains how to open one in a browser.
+The titles are those of the mockups.
 
 ### Ciel
 
-| Screen                             | Portrait                                      | Landscape                                              |
-| ---------------------------------- | --------------------------------------------- | ------------------------------------------------------ |
-| Ciel                               | `design/mobile/boards/Main.dc.html`           | `design/mobile/boards/MainLandscape.dc.html`           |
-| Ciel, objet sélectionné            | `design/mobile/boards/SkyObject.dc.html`      | `design/mobile/boards/SkyObjectLandscape.dc.html`      |
-| Ciel, recherche                    | `design/mobile/boards/SkySearch.dc.html`      | `design/mobile/boards/SkySearchLandscape.dc.html`      |
-| Ciel, affichage                    | `design/mobile/boards/SkyDisplay.dc.html`     | `design/mobile/boards/SkyDisplayLandscape.dc.html`     |
-| Ciel, calques de la carte          | `design/mobile/boards/SkyToggles.dc.html`     | `design/mobile/boards/SkyTogglesLandscape.dc.html`     |
-| Ciel, nom d'un calque (appui long) | `design/mobile/boards/SkyTogglesHint.dc.html` | `design/mobile/boards/SkyTogglesHintLandscape.dc.html` |
-| Ciel, photo sélectionnée           | `design/mobile/boards/SkyPhoto.dc.html`       | `design/mobile/boards/SkyPhotoLandscape.dc.html`       |
-| Ciel, cadre sélectionné            | `design/mobile/boards/FrameEdit.dc.html`      | `design/mobile/boards/FrameEditLandscape.dc.html`      |
-| Ciel, déplacer le cadre            | `design/mobile/boards/FrameMove.dc.html`      | `design/mobile/boards/FrameMoveLandscape.dc.html`      |
-| Ciel, ordre d'affichage            | `design/mobile/boards/DrawOrder.dc.html`      | `design/mobile/boards/DrawOrderLandscape.dc.html`      |
-| Ciel, premier démarrage            | `design/mobile/boards/MainFirstStart.dc.html` | `design/mobile/boards/MainFirstStartLandscape.dc.html` |
+- Ciel
+- Ciel, objet sélectionné
+- Ciel, recherche
+- Ciel, affichage
+- Ciel, calques de la carte
+- Ciel, nom d'un calque (appui long)
+- Ciel, photo sélectionnée
+- Ciel, cadre sélectionné
+- Ciel, déplacer le cadre
+- Ciel, ordre d'affichage
+- Ciel, premier démarrage
 
 ### Galerie
 
-| Screen                                       | Portrait                                               | Landscape                                                       |
-| -------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------- |
-| Galerie                                      | `design/mobile/boards/Library.dc.html`                 | `design/mobile/boards/LibraryLandscape.dc.html`                 |
-| Galerie, données de l'ordinateur             | `design/mobile/boards/LibraryConnected.dc.html`        | `design/mobile/boards/LibraryConnectedLandscape.dc.html`        |
-| Galerie, ajouter une photo                   | `design/mobile/boards/LibraryAdd.dc.html`              | `design/mobile/boards/LibraryAddLandscape.dc.html`              |
-| Importer des photos                          | `design/mobile/boards/ImportReview.dc.html`            | `design/mobile/boards/ImportReviewLandscape.dc.html`            |
-| Importer, méthode de placement               | `design/mobile/boards/ImportMethod.dc.html`            | `design/mobile/boards/ImportMethodLandscape.dc.html`            |
-| Photo                                        | `design/mobile/boards/PhotoDetail.dc.html`             | `design/mobile/boards/PhotoDetailLandscape.dc.html`             |
-| Photo, zoomée                                | `design/mobile/boards/PhotoZoomed.dc.html`             | `design/mobile/boards/PhotoZoomedLandscape.dc.html`             |
-| Photo, informations                          | `design/mobile/boards/PhotoInfo.dc.html`               | `design/mobile/boards/PhotoInfoLandscape.dc.html`               |
-| Photo, modifier les infos                    | `design/mobile/boards/PhotoEdit.dc.html`               | `design/mobile/boards/PhotoEditLandscape.dc.html`               |
-| Placer la photo                              | `design/mobile/boards/Placement.dc.html`               | `design/mobile/boards/PlacementLandscape.dc.html`               |
-| Identifier les étoiles                       | `design/mobile/boards/ThreePoint.dc.html`              | `design/mobile/boards/ThreePointLandscape.dc.html`              |
-| Identifier les étoiles, choisir une étoile   | `design/mobile/boards/ThreePointSearch.dc.html`        | `design/mobile/boards/ThreePointSearchLandscape.dc.html`        |
-| Identifier les étoiles, choisir sur la carte | `design/mobile/boards/ThreePointMap.dc.html`           | `design/mobile/boards/ThreePointMapLandscape.dc.html`           |
-| Identifier un astéroïde                      | `design/mobile/boards/IdentifyAsteroid.dc.html`        | `design/mobile/boards/IdentifyAsteroidLandscape.dc.html`        |
-| Astéroïdes trouvés                           | `design/mobile/boards/IdentifyAsteroidResults.dc.html` | `design/mobile/boards/IdentifyAsteroidResultsLandscape.dc.html` |
-| Identifier des supernovae                    | `design/mobile/boards/IdentifySupernova.dc.html`       | `design/mobile/boards/IdentifySupernovaLandscape.dc.html`       |
-| Identifier des comètes                       | `design/mobile/boards/IdentifyComet.dc.html`           | `design/mobile/boards/IdentifyCometLandscape.dc.html`           |
-| Galerie, aucune photo                        | `design/mobile/boards/LibraryEmpty.dc.html`            | `design/mobile/boards/LibraryEmptyLandscape.dc.html`            |
-| Galerie, résolutions en cours                | `design/mobile/boards/LibrarySolving.dc.html`          | `design/mobile/boards/LibrarySolvingLandscape.dc.html`          |
-| Importer, résolution échouée                 | `design/mobile/boards/ImportSolveFailed.dc.html`       | `design/mobile/boards/ImportSolveFailedLandscape.dc.html`       |
-| Importer, hors connexion                     | `design/mobile/boards/SolveOffline.dc.html`            | `design/mobile/boards/SolveOfflineLandscape.dc.html`            |
+- Galerie
+- Galerie, données de l'ordinateur
+- Galerie, ajouter une photo
+- Importer des photos
+- Importer, méthode de placement
+- Photo
+- Photo, zoomée
+- Photo, informations
+- Photo, modifier les infos
+- Placer la photo
+- Identifier les étoiles
+- Identifier les étoiles, choisir une étoile
+- Identifier les étoiles, choisir sur la carte
+- Identifier un astéroïde
+- Astéroïdes trouvés
+- Identifier des supernovae
+- Identifier des comètes
+- Galerie, aucune photo
+- Galerie, résolutions en cours
+- Importer, résolution échouée
+- Importer, hors connexion
 
 ### Cibles
 
-| Screen                  | Portrait                                      | Landscape                                              |
-| ----------------------- | --------------------------------------------- | ------------------------------------------------------ |
-| Cibles                  | `design/mobile/boards/Targets.dc.html`        | `design/mobile/boards/TargetsLandscape.dc.html`        |
-| Cibles, types d'objets  | `design/mobile/boards/TargetsTypes.dc.html`   | `design/mobile/boards/TargetsTypesLandscape.dc.html`   |
-| Cibles, filtres         | `design/mobile/boards/TargetsFilter.dc.html`  | `design/mobile/boards/TargetsFilterLandscape.dc.html`  |
-| Dessiner une région     | `design/mobile/boards/RegionDraw.dc.html`     | `design/mobile/boards/RegionDrawLandscape.dc.html`     |
-| Cibles, régions du ciel | `design/mobile/boards/Regions.dc.html`        | `design/mobile/boards/RegionsLandscape.dc.html`        |
-| Cibles, aucun setup     | `design/mobile/boards/TargetsNoSetup.dc.html` | `design/mobile/boards/TargetsNoSetupLandscape.dc.html` |
-| Cibles, aucun résultat  | `design/mobile/boards/TargetsNoMatch.dc.html` | `design/mobile/boards/TargetsNoMatchLandscape.dc.html` |
+- Cibles
+- Cibles, types d'objets
+- Cibles, filtres
+- Dessiner une région
+- Cibles, régions du ciel
+- Cibles, aucun setup
+- Cibles, aucun résultat
 
 ### Plans
 
-| Screen                      | Portrait                                   | Landscape                                           |
-| --------------------------- | ------------------------------------------ | --------------------------------------------------- |
-| Plans                       | `design/mobile/boards/Plans.dc.html`       | `design/mobile/boards/PlansLandscape.dc.html`       |
-| Détail du plan              | `design/mobile/boards/PlanDetail.dc.html`  | `design/mobile/boards/PlanDetailLandscape.dc.html`  |
-| Plan, actions               | `design/mobile/boards/PlanActions.dc.html` | `design/mobile/boards/PlanActionsLandscape.dc.html` |
-| Plan, détail d'une cible    | `design/mobile/boards/PlanEntry.dc.html`   | `design/mobile/boards/PlanEntryLandscape.dc.html`   |
-| Plan, fenêtre d'observation | `design/mobile/boards/ObsWindow.dc.html`   | `design/mobile/boards/ObsWindowLandscape.dc.html`   |
-| Plans, aucun plan           | `design/mobile/boards/PlansEmpty.dc.html`  | `design/mobile/boards/PlansEmptyLandscape.dc.html`  |
+- Plans
+- Détail du plan
+- Plan, actions
+- Plan, détail d'une cible
+- Plan, fenêtre d'observation
+- Plans, aucun plan
 
 ### Réglages
 
-| Screen                                          | Portrait                                                                                                                                                                                                                                                                                                                                                                                                             | Landscape                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Réglages                                        | `design/mobile/boards/Settings.dc.html`                                                                                                                                                                                                                                                                                                                                                                              | `design/mobile/boards/SettingsLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                     |
-| Réglages (Settings)                             | The Setups count, the observation place values and the astrometry key state ("✓ Configurée" absent: no key stored) come from the test data; in landscape the list fills the content width instead of the board's centred column.                                                                                                                                                                                     | The Setups count, the observation place values and the astrometry key state ("✓ Configurée" absent: no key stored) come from the test data; in landscape the list fills the content width instead of the board's centred column.                                                                                                                                                                                     |
-| Réglages, setups (GearSetups)                   | None beyond test data.                                                                                                                                                                                                                                                                                                                                                                                               | None beyond test data.                                                                                                                                                                                                                                                                                                                                                                                               |
-| Équipement, modifier le setup (GearSetupEdit)   | An empty accessory field shows blank (known case: no "Aucun" wording on the board); otherwise none.                                                                                                                                                                                                                                                                                                                  | An empty accessory field shows blank (known case: no "Aucun" wording on the board); otherwise none.                                                                                                                                                                                                                                                                                                                  |
-| Équipement, choisir un télescope (GearPicker)   | None.                                                                                                                                                                                                                                                                                                                                                                                                                | None.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Réglages, lieu d'observation (Location)         | None. The "Calculer l'horizon" request answered in about 8 s.                                                                                                                                                                                                                                                                                                                                                        | None. The "Calculer l'horizon" request answered in about 8 s.                                                                                                                                                                                                                                                                                                                                                        |
-| Lieu, horizon indisponible (HorizonUnavailable) | Not compared: the horizon service answered, so the state could not be produced on the device.                                                                                                                                                                                                                                                                                                                        | Not compared: the horizon service answered, so the state could not be produced on the device.                                                                                                                                                                                                                                                                                                                        |
-| Lieu, position refusée (LocationDenied)         | None.                                                                                                                                                                                                                                                                                                                                                                                                                | None.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Réglages, exporter et importer (Backup)         | The import section before a file is chosen shows a "Choisir un fichier" button that no board shows (the boards only show the state after a file is chosen); setups that differ from a local one show three radio rows Remplacer / Garder les deux / Ne pas importer (the user's rule; the board shows none); plans and photos with an existing name show only the board's warning and tick box (no choice for them). | The import section before a file is chosen shows a "Choisir un fichier" button that no board shows (the boards only show the state after a file is chosen); setups that differ from a local one show three radio rows Remplacer / Garder les deux / Ne pas importer (the user's rule; the board shows none); plans and photos with an existing name show only the board's warning and tick box (no choice for them). |
-| Cibles (Targets)                                | Context buttons truncate long setup names with an ellipsis (e.g. "Setup test A_z" pushes "Ce soir" to "Ce s…") at 384 px; the context fields cannot be changed and there is no sort control (known cases).                                                                                                                                                                                                           | Context buttons truncate long setup names with an ellipsis (e.g. "Setup test A_z" pushes "Ce soir" to "Ce s…") at 384 px; the context fields cannot be changed and there is no sort control (known cases).                                                                                                                                                                                                           |
-| Cibles, types d'objets (TargetsTypes)           | None.                                                                                                                                                                                                                                                                                                                                                                                                                | None.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Cibles, filtres (TargetsFilter)                 | None.                                                                                                                                                                                                                                                                                                                                                                                                                | None.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Cibles, régions du ciel (Regions)               | The list shows only "Tout le ciel" (no saved regions in the test data).                                                                                                                                                                                                                                                                                                                                              | The list shows only "Tout le ciel" (no saved regions in the test data).                                                                                                                                                                                                                                                                                                                                              |
-| Cibles, aucun setup (TargetsNoSetup)            | None.                                                                                                                                                                                                                                                                                                                                                                                                                | None.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Cibles, aucun résultat (TargetsNoMatch)         | Portrait matches; the landscape picture was not obtained (it shows the list), the state was checked in portrait only.                                                                                                                                                                                                                                                                                                | Portrait matches; the landscape picture was not obtained (it shows the list), the state was checked in portrait only.                                                                                                                                                                                                                                                                                                |
-| Plans (Plans)                                   | List rows show "N objets" without the date (test plans have none).                                                                                                                                                                                                                                                                                                                                                   | List rows show "N objets" without the date (test plans have none).                                                                                                                                                                                                                                                                                                                                                   |
-| Détail du plan (PlanDetail)                     | None after the fixes (drag handle at 16 px from the edge, controls clear of the landscape navigation bar).                                                                                                                                                                                                                                                                                                           | None after the fixes (drag handle at 16 px from the edge, controls clear of the landscape navigation bar).                                                                                                                                                                                                                                                                                                           |
-| Plan, actions (PlanActions)                     | "Renommer le plan", "Trier par", "Afficher sur la carte" and "Exporter en PDF" do nothing yet (no board for the rename field and the sort list; the map and the PDF need other screens) (known cases).                                                                                                                                                                                                               | "Renommer le plan", "Trier par", "Afficher sur la carte" and "Exporter en PDF" do nothing yet (no board for the rename field and the sort list; the map and the PDF need other screens) (known cases).                                                                                                                                                                                                               |
-| Plan, détail d'une cible (PlanEntry)            | The window rows show "Fenêtre d'observation" as the title when no filter is set; otherwise none; "Distance Lune" shown whenever the Moon option is on.                                                                                                                                                                                                                                                               | The window rows show "Fenêtre d'observation" as the title when no filter is set; otherwise none; "Distance Lune" shown whenever the Moon option is on.                                                                                                                                                                                                                                                               |
-| Plan, fenêtre d'observation (ObsWindow)         | The "30 × 180 s" preview and the number of exposures in the duration line are absent when no unit exposure is set (test data); start and end cannot be edited (known case).                                                                                                                                                                                                                                          | The "30 × 180 s" preview and the number of exposures in the duration line are absent when no unit exposure is set (test data); start and end cannot be edited (known case).                                                                                                                                                                                                                                          |
-| Plans, aucun plan (PlansEmpty)                  | None.                                                                                                                                                                                                                                                                                                                                                                                                                | None.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Plan, confirmer la suppression (ConfirmDelete)  | The device picture shows the observation-window delete confirmation (same dialog, its own title and text); the plan delete confirmation was checked on the device but not saved as a picture.                                                                                                                                                                                                                        | The device picture shows the observation-window delete confirmation (same dialog, its own title and text); the plan delete confirmation was checked on the device but not saved as a picture.                                                                                                                                                                                                                        |
-| Réglages, connexion à l'ordinateur              | `design/mobile/boards/LanPairing.dc.html`                                                                                                                                                                                                                                                                                                                                                                            | `design/mobile/boards/LanPairingLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                   |
-| Réglages, ordinateur connecté                   | `design/mobile/boards/LanConnected.dc.html`                                                                                                                                                                                                                                                                                                                                                                          | `design/mobile/boards/LanConnectedLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                 |
-| Réglages, setups                                | `design/mobile/boards/GearSetups.dc.html`                                                                                                                                                                                                                                                                                                                                                                            | `design/mobile/boards/GearSetupsLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                   |
-| Équipement, modifier le setup                   | `design/mobile/boards/GearSetupEdit.dc.html`                                                                                                                                                                                                                                                                                                                                                                         | `design/mobile/boards/GearSetupEditLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                |
-| Équipement, choisir un télescope                | `design/mobile/boards/GearPicker.dc.html`                                                                                                                                                                                                                                                                                                                                                                            | `design/mobile/boards/GearPickerLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                   |
-| Réglages, lieu d'observation                    | `design/mobile/boards/Location.dc.html`                                                                                                                                                                                                                                                                                                                                                                              | `design/mobile/boards/LocationLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                     |
-| Lieu, horizon indisponible                      | `design/mobile/boards/HorizonUnavailable.dc.html`                                                                                                                                                                                                                                                                                                                                                                    | `design/mobile/boards/HorizonUnavailableLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                           |
-| Lieu, position refusée                          | `design/mobile/boards/LocationDenied.dc.html`                                                                                                                                                                                                                                                                                                                                                                        | `design/mobile/boards/LocationDeniedLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                               |
-| Réglages, exporter et importer                  | `design/mobile/boards/Backup.dc.html`                                                                                                                                                                                                                                                                                                                                                                                | `design/mobile/boards/BackupLandscape.dc.html`                                                                                                                                                                                                                                                                                                                                                                       |
+- Réglages
+- Réglages (Settings)
+- Réglages, setups (GearSetups)
+- Équipement, modifier le setup (GearSetupEdit)
+- Équipement, choisir un télescope (GearPicker)
+- Réglages, lieu d'observation (Location)
+- Lieu, horizon indisponible (HorizonUnavailable)
+- Lieu, position refusée (LocationDenied)
+- Réglages, exporter et importer (Backup)
+- Cibles (Targets)
+- Cibles, types d'objets (TargetsTypes)
+- Cibles, filtres (TargetsFilter)
+- Cibles, régions du ciel (Regions)
+- Cibles, aucun setup (TargetsNoSetup)
+- Cibles, aucun résultat (TargetsNoMatch)
+- Plans (Plans)
+- Détail du plan (PlanDetail)
+- Plan, actions (PlanActions)
+- Plan, détail d'une cible (PlanEntry)
+- Plan, fenêtre d'observation (ObsWindow)
+- Plans, aucun plan (PlansEmpty)
+- Plan, confirmer la suppression (ConfirmDelete)
+- Réglages, connexion à l'ordinateur
+- Réglages, ordinateur connecté
+- Réglages, setups
+- Équipement, modifier le setup
+- Équipement, choisir un télescope
+- Réglages, lieu d'observation
+- Lieu, horizon indisponible
+- Lieu, position refusée
+- Réglages, exporter et importer
 
 ### Feuilles et dialogues partagés
 
-| Screen                              | Portrait                                      | Landscape                                              |
-| ----------------------------------- | --------------------------------------------- | ------------------------------------------------------ |
-| Plan, confirmer la suppression      | `design/mobile/boards/ConfirmDelete.dc.html`  | `design/mobile/boards/ConfirmDeleteLandscape.dc.html`  |
-| Identification, explication ouverte | `design/mobile/boards/IdentifyInfo.dc.html`   | `design/mobile/boards/IdentifyInfoLandscape.dc.html`   |
-| Photo, choisir une identification   | `design/mobile/boards/IdentifyChoose.dc.html` | `design/mobile/boards/IdentifyChooseLandscape.dc.html` |
+- Plan, confirmer la suppression
+- Identification, explication ouverte
+- Photo, choisir une identification
