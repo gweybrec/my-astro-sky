@@ -94,6 +94,8 @@ const fr = {
     closeSheet: 'Fermer la fiche',
     objectActions: "Actions sur l'objet",
     details: 'Voir les détails',
+    tonight: 'Ce soir',
+    dateField: 'Date et heure, ouvrir les sélecteurs : {value}',
     sectionMap: 'Carte',
     needsLocation: "Définissez d'abord le lieu d'observation (Réglages)",
     needsLocalSky: "Activez d'abord le ciel local",

@@ -1003,3 +1003,13 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
 .mob-icon-row--start {
   justify-content: flex-start;
 }
+
+/* The date and time inputs behind the time bar's field: only their native pickers are used, so they take no room. */
+.mob-picker-inputs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

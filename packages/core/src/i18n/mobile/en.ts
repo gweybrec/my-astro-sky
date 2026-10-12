@@ -96,6 +96,8 @@ const en: Translations['mobile'] = {
     closeSheet: 'Close the card',
     objectActions: 'Object actions',
     details: 'See the details',
+    tonight: 'Tonight',
+    dateField: 'Date and time, open the pickers: {value}',
     sectionMap: 'Map',
     needsLocation: 'Set the observing location first (Settings)',
     needsLocalSky: 'Turn on the local sky first',

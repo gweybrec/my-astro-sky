@@ -96,6 +96,8 @@ const de: Translations['mobile'] = {
     closeSheet: 'Karte schließen',
     objectActions: 'Aktionen für das Objekt',
     details: 'Details ansehen',
+    tonight: 'Heute Abend',
+    dateField: 'Datum und Uhrzeit, Auswahl öffnen: {value}',
     sectionMap: 'Karte',
     needsLocation: 'Lege zuerst den Beobachtungsort fest (Einstellungen)',
     needsLocalSky: 'Schalte zuerst den lokalen Himmel ein',
