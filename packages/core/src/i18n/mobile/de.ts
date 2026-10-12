@@ -24,7 +24,7 @@ const de: Translations['mobile'] = {
     windowEnd: 'Ende',
     colorFromFilter: 'die des Filters',
     frame: 'Einzelbelichtung',
-    snap: 'An Einzelbelichtung ausrichten',
+    snap: 'Ganze Anzahl Einzelbelichtungen',
     durationLine: 'Dauer des Fensters: {duration}',
     durationFrames: 'Dauer des Fensters: {duration} · {n} Aufnahmen à {s} s',
     delete: 'Löschen',

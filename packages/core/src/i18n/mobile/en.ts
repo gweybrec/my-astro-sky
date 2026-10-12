@@ -24,7 +24,7 @@ const en: Translations['mobile'] = {
     windowEnd: 'End',
     colorFromFilter: "the filter's",
     frame: 'Single exposure',
-    snap: 'Align to the single exposure',
+    snap: 'Whole number of frames',
     durationLine: 'Window duration: {duration}',
     durationFrames: 'Window duration: {duration} · {n} exposures of {s} s',
     delete: 'Delete',

@@ -22,7 +22,7 @@ const fr = {
     windowEnd: 'Fin',
     colorFromFilter: 'celle du filtre',
     frame: 'Pose unitaire',
-    snap: 'Aligner sur la pose unitaire',
+    snap: 'Nombre entier de poses',
     durationLine: 'Durée de la fenêtre : {duration}',
     durationFrames: 'Durée de la fenêtre : {duration} · {n} poses de {s} s',
     delete: 'Supprimer',

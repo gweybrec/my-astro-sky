@@ -24,7 +24,7 @@ const es: Translations['mobile'] = {
     windowEnd: 'Fin',
     colorFromFilter: 'la del filtro',
     frame: 'Exposición unitaria',
-    snap: 'Alinear con la exposición unitaria',
+    snap: 'Número entero de tomas',
     durationLine: 'Duración de la ventana: {duration}',
     durationFrames: 'Duración de la ventana: {duration} · {n} tomas de {s} s',
     delete: 'Eliminar',
