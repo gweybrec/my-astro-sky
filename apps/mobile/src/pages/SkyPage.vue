@@ -26,7 +26,6 @@ import mapPinIcon from '@icons/map-pin.svg?raw';
 // button over it; the date button switches the map to the sky at a date and brings the column of the map's toggles.
 const canvas = ref<HTMLCanvasElement | null>(null);
 const photoBox = ref<HTMLDivElement | null>(null);
-const timeBar = ref<InstanceType<typeof SkyTimeBar> | null>(null);
 const displayOpen = ref(false);
 const router = useRouter();
 const { showError } = useErrorToast();
@@ -107,11 +106,7 @@ onBeforeUnmount(() => {
         <main class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
           <div ref="photoBox" class="mob-photo-layer" />
-          <SkyTopBar
-            @search="openSearch"
-            @display="displayOpen = true"
-            @date-mode="timeBar?.openPicker()"
-          />
+          <SkyTopBar @search="openSearch" @display="displayOpen = true" />
           <!-- First start: no observing location yet, the time and place of the sky cannot be shown. -->
           <div v-if="!located" class="mob-map-prompt">
             <p class="m-body">{{ t('targets.location.notSet') }}</p>
@@ -119,8 +114,11 @@ onBeforeUnmount(() => {
               <AppIcon :svg="mapPinIcon" />{{ t('targets.location.label') }}
             </PhoneButton>
           </div>
-          <SkyTimeBar ref="timeBar" />
-          <SkyLayerButtons v-if="time.mode === 'date'" />
+          <!-- The time bar and the toggles of the map belong to the date mode: the live sky has neither. -->
+          <template v-if="time.mode === 'date'">
+            <SkyTimeBar />
+            <SkyLayerButtons />
+          </template>
           <Transition name="mob-sheet-slide">
             <SkyPhotoSheet
               v-if="skySelection?.kind === 'photo' && photoLayer"

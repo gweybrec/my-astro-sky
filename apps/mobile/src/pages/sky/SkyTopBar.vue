@@ -10,17 +10,10 @@ import calendarIcon from '@icons/calendar.svg?raw';
 
 // The top row of the map ("Ciel"): the search field, the display settings and the date button. The date button is the
 // desktop's: it switches the map between the live sky and the sky at a date (pressed in the date mode), and the
-// toggles of the map appear while it is on. Switching to the date mode opens the date picker at once, as the desktop
-// opens its date popover.
-const emit = defineEmits<{ search: []; display: []; dateMode: [] }>();
+// time bar and the toggles of the map appear while it is on; switching to the date mode picks nothing by itself.
+const emit = defineEmits<{ search: []; display: [] }>();
 const time = useSkyTimeStore();
 const { mode } = storeToRefs(time);
-
-function toggleDateMode() {
-  const entering = mode.value !== 'date';
-  time.toggleMode();
-  if (entering) emit('dateMode');
-}
 </script>
 
 <template>
@@ -39,7 +32,7 @@ function toggleDateMode() {
       float
       :label="mode === 'date' ? t('skyTime.liveModeButton') : t('skyTime.dateModeButton')"
       :pressed="mode === 'date'"
-      @click="toggleDateMode"
+      @click="time.toggleMode()"
     >
       <AppIcon :svg="calendarIcon" />
     </PhoneIconButton>
