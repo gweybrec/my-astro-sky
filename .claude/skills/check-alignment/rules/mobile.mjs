@@ -13,7 +13,8 @@
 //   rules       the measurements: { id, type, ...selectors } (types are in the engine; `minimum: true` for a gap)
 //   views       the pages: { name, path (string or ids => string), ready?, open?, scope?, variants? }; `open` is a list of
 //               { click: selector } | { fill: selector, text } | { wait: selector } | { pause: ms }; `scope` limits the measure to one element
-//               (an open sheet); `variants: true` repeats the view in every language and at 130 % text.
+//               (an open sheet); `clearStorage` is a list of storage keys removed before the page loads (a first start);
+//               `variants: true` repeats the view in every language and at 130 % text.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -189,7 +190,7 @@ export const rules = [
   {
     id: 'centre-line',
     type: 'centreLine',
-    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top',
+    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar',
   },
   // The clear button of a search field is centred on the field.
   { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },
@@ -217,7 +218,16 @@ export const rules = [
     within: '.mob-map',
     rights: '.mob-map-top > ion-button, .mob-map-ribbon > ion-button',
   },
-  { id: 'icon-row-gaps', type: 'equalGaps', bars: '.mob-icon-row' },
+  // Every button is a touch target of at least 48 by 48.
+  {
+    id: 'touch-size',
+    type: 'touchSize',
+    items: 'ion-button.mob-btn, ion-button.mob-icon-btn, .mob-search-clear, .mob-sheet-grab',
+    min: 'var(--mobile-touch-min)',
+    minimum: true,
+    word: 'too small',
+  },
+  { id: 'icon-row-gaps', type: 'equalGaps', bars: '.mob-icon-row, .mob-timebar' },
   // A tab bar's buttons start on the same line.
   { id: 'tab-line', type: 'sameStart', bars: 'ion-tab-bar', children: 'ion-tab-button' },
   // An "i" button and the switch beside it are apart by at least the spacing token.
@@ -247,7 +257,7 @@ export const rules = [
     track: SWITCH_TRACK,
   },
   // An empty state's content is centred.
-  { id: 'centred', type: 'centredBlock', boxes: '.mob-empty' },
+  { id: 'centred', type: 'centredBlock', boxes: '.mob-empty, .mob-map-prompt' },
 ];
 
 const SHEET = { scope: '.mob-sheet' };
@@ -292,6 +302,13 @@ export const views = [
       { wait: '.mob-sheet' },
     ],
     ...SHEET,
+  },
+  {
+    name: 'sky-first-start',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    clearStorage: ['targets-prefs-v3', 'sky-time-settings'],
+    open: [{ wait: '.mob-map-prompt' }],
   },
   { name: 'sky-search', path: '/sky/search', ready: '.mob-search-wrap' },
   {
