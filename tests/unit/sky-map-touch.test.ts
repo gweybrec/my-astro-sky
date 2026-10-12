@@ -41,6 +41,8 @@ function makeHost(over: Partial<SkyTouchHost> = {}) {
     viewChanged: vi.fn(),
     findClosestStar: vi.fn(() => null),
     pickDSOAt: vi.fn(() => false),
+    pickStarAt: vi.fn(() => null as unknown),
+    emitStarTap: vi.fn(),
     emitStarPicked: vi.fn(),
     emitPhotoClick: vi.fn(),
     emitDSOClick: vi.fn(),
@@ -309,6 +311,38 @@ describe('tap on an empty spot', () => {
     fire(hit.canvas, 'pointerdown', 1, 500, 400);
     fire(hit.canvas, 'pointerup', 1, 500, 400);
     expect(hit.calls.emitClearSelection).not.toHaveBeenCalled();
+  });
+});
+
+describe('a tap on a star', () => {
+  const star = { hip: 1, ra: 0, dec: 0, mag: 1, bv: 0 };
+
+  it('picks the star under the finger when there is no deep-sky object', () => {
+    const { canvas, calls } = setup({ pickStarAt: vi.fn(() => star) as never });
+    fire(canvas, 'pointerdown', 1, 500, 400);
+    fire(canvas, 'pointerup', 1, 500, 400);
+    expect(calls.emitStarTap).toHaveBeenCalledWith(star);
+    expect(calls.emitClearSelection).not.toHaveBeenCalled();
+  });
+
+  it('prefers a deep-sky object to a star', () => {
+    const { canvas, calls } = setup({
+      pickDSOAt: vi.fn(() => true),
+      pickStarAt: vi.fn(() => star) as never,
+    });
+    fire(canvas, 'pointerdown', 1, 500, 400);
+    fire(canvas, 'pointerup', 1, 500, 400);
+    expect(calls.emitDSOClick).toHaveBeenCalled();
+    expect(calls.emitStarTap).not.toHaveBeenCalled();
+  });
+
+  it('clears the selection when neither is under the finger', () => {
+    const { canvas, calls, state } = setup();
+    state.selection = true;
+    fire(canvas, 'pointerdown', 1, 500, 400);
+    fire(canvas, 'pointerup', 1, 500, 400);
+    expect(calls.emitStarTap).not.toHaveBeenCalled();
+    expect(calls.emitClearSelection).toHaveBeenCalled();
   });
 });
 

@@ -5,13 +5,15 @@ import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter } from '@ion
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { catalogsReady } from '../catalogs';
-import { skyFocus, skySelection } from '../composables/useSkySelection';
+import { clearSkySelection, skyFocus, skySelection } from '../composables/useSkySelection';
+import { useBackClose } from '../composables/useBackClose';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import AppIcon from '../components/AppIcon.vue';
 import SkyLayerButtons from './sky/SkyLayerButtons.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
+import SkyObjectSheet from './sky/SkyObjectSheet.vue';
 import layersIcon from '../icons/layers.svg?raw';
 
 // The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field and the layers button over it;
@@ -43,6 +45,9 @@ onIonViewDidEnter(() => {
   skyFocus.value = null;
   sky?.focus(focus);
 });
+
+// The selected object has its sheet; the back button closes it before anything else.
+useBackClose(() => skySelection.value !== null, clearSkySelection);
 
 const openSearch = () => void router.push('/sky/search');
 
@@ -76,6 +81,11 @@ onBeforeUnmount(() => {
             </PhoneIconButton>
           </div>
           <SkyLayerButtons v-if="layersOpen" @display="displayOpen = true" />
+          <SkyObjectSheet
+            v-if="skySelection"
+            :selection="skySelection"
+            @close="clearSkySelection"
+          />
         </main>
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />

@@ -156,6 +156,14 @@ describe('SkyHitTest', () => {
       expect(new SkyHitTest().findClosestStar(c.x + 200, c.y, v, 6)).toBeNull();
     });
 
+    it('reaches a star further away when given a wider radius, as a finger needs', () => {
+      const v = view();
+      stars = [makeStar({ hip: 1, ra: 0, dec: 85 })];
+      const c = canvasOf(0, 85, v);
+      expect(new SkyHitTest().findClosestStar(c.x + 15, c.y, v, 6)).toBeNull();
+      expect(new SkyHitTest().findClosestStar(c.x + 15, c.y, v, 6, 20)?.hip).toBe(1);
+    });
+
     it('excludes stars fainter than the magnitude limit from the index', () => {
       const v = view();
       stars = [makeStar({ hip: 1, mag: 9 })];

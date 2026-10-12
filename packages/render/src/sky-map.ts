@@ -148,6 +148,8 @@ export interface SkyMapOptions {
 }
 
 export class SkyMap {
+  /** How far from a star a finger may land and still pick it. */
+  private static readonly TOUCH_STAR_RADIUS_PX = 20;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private view: ViewState;
@@ -286,6 +288,7 @@ export class SkyMap {
   private onDSOClick: ((dso: DSO) => void) | null = null;
   // Clear-selection callback: fired on right-click to dismiss the active DSO/star selection.
   private onClearSelection: (() => void) | null = null;
+  private onStarTap: ((star: Star) => void) | null = null;
   private onLongPress: ((press: { dso: DSO | null; mx: number; my: number }) => void) | null = null;
   // One-shot DSO picker: armed by a caller that wants the next DSO click (used
   // to choose a mosaic target). Fires once, alongside the normal click action.
@@ -686,6 +689,10 @@ export class SkyMap {
   }
   setOnDSOClick(cb: (dso: DSO) => void) {
     this.onDSOClick = cb;
+  }
+  /** Touch only: a tap on a star. */
+  setOnStarTap(cb: (star: Star) => void) {
+    this.onStarTap = cb;
   }
   setOnClearSelection(cb: () => void) {
     this.onClearSelection = cb;
@@ -1219,6 +1226,8 @@ export class SkyMap {
       requestRenderInteractive: () => this.requestRenderInteractive(),
       viewChanged: () => this.onViewChange?.('view'),
       findClosestStar: (mx, my) => this.findClosestStar(mx, my),
+      pickStarAt: (mx, my) => this.pickStarAt(mx, my),
+      emitStarTap: (star) => this.onStarTap?.(star),
       pickDSOAt: (mx, my) => this.pickDSOAt(mx, my),
       hasStarPickedHandler: () => this.onStarPicked !== null,
       hasPhotoClickHandler: () => this.onPhotoClick !== null,
@@ -1233,6 +1242,18 @@ export class SkyMap {
         this.onLongPress?.({ dso, mx, my });
       },
     };
+  }
+
+  /** The drawn star within a finger's reach of the point, or null. */
+  private pickStarAt(mx: number, my: number): Star | null {
+    const star = this.hitTest.findClosestStar(
+      mx,
+      my,
+      this.view,
+      this.starMagThreshold(),
+      SkyMap.TOUCH_STAR_RADIUS_PX,
+    );
+    return star && this.isStarRendered(star) ? star : null;
   }
 
   /** The drawn DSO under the point, made the one a click reports; false when none. */

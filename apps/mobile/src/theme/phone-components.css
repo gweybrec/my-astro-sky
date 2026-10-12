@@ -963,3 +963,20 @@ ion-button.mob-icon-btn--pressed {
 ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   background: linear-gradient(var(--accent-bg), var(--accent-bg)), var(--bg-panel);
 }
+
+/* The object sheet of the map (board "Ciel, objet sélectionné"): drawn in the page over the bottom of the map, not in an
+   overlay, so the map stays in view and can be touched. Its handle and header take a drag without scrolling the page. */
+.mob-map-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-base);
+}
+.mob-sheet-drag {
+  display: contents;
+}
+.mob-map-sheet .mob-sheet-grab,
+.mob-map-sheet .mob-sheet-header {
+  touch-action: none;
+}

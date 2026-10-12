@@ -85,14 +85,20 @@ export class SkyHitTest {
   }
 
   /**
-   * Nearest star to the cursor within ~8 px, or null. `maxMag` must match the
+   * Nearest star to the cursor within `radiusPx` (8 for a mouse), or null. `maxMag` must match the
    * renderer's magnitude gate so the index stays a superset of what is drawn
    * ({@link isStarRendered} does the final confirm).
    */
-  findClosestStar(mx: number, my: number, view: ViewState, maxMag: number): Star | null {
+  findClosestStar(
+    mx: number,
+    my: number,
+    view: ViewState,
+    maxMag: number,
+    radiusPx = 8,
+  ): Star | null {
     this.buildStarIndex(maxMag);
     const projPt = fromCanvas(mx, my, view);
-    const threshold = 8 / view.scale;
+    const threshold = radiusPx / view.scale;
     return this.starIndex.findNearest(projPt.x, projPt.y, threshold);
   }
 

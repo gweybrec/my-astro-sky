@@ -55,6 +55,8 @@ export interface SkyTouchHost {
   viewChanged(): void;
   findClosestStar(mx: number, my: number): Star | null;
 
+  /** The star under a finger (a finger is wider than a mouse pointer), when one is drawn there. */
+  pickStarAt(mx: number, my: number): Star | null;
   /** Finds the deep-sky object under the point and makes it the one `emitDSOClick` reports. */
   pickDSOAt(mx: number, my: number): boolean;
   hasStarPickedHandler(): boolean;
@@ -62,6 +64,7 @@ export interface SkyTouchHost {
   emitStarPicked(star: Star): void;
   emitPhotoClick(photoName: string): void;
   emitDSOClick(): void;
+  emitStarTap(star: Star): void;
   emitClearSelection(): void;
   /** Reports a long press at the canvas point, with the object under it when there is one. */
   emitLongPress(mx: number, my: number): void;
@@ -261,8 +264,14 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
       const photoName = findTopPhotoOutlineAtPoint(mx, my, host.photoOutlines);
       if (photoName) host.emitPhotoClick(photoName);
     }
-    if (host.interactionEnabled && host.pickDSOAt(mx, my)) host.emitDSOClick();
-    else if (host.hasSelection()) host.emitClearSelection();
+    if (host.interactionEnabled && host.pickDSOAt(mx, my)) {
+      host.emitDSOClick();
+    } else {
+      // A touch has no hover: a tap on a star is how its information is asked for.
+      const star = host.interactionEnabled ? host.pickStarAt(mx, my) : null;
+      if (star) host.emitStarTap(star);
+      else if (host.hasSelection()) host.emitClearSelection();
+    }
     host.dismissTooltip();
   };
   add('pointerup', ((e: PointerEvent) => lift(e, false)) as EventListener);
