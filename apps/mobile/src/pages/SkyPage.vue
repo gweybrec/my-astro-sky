@@ -29,6 +29,8 @@ onMounted(() => {
     .catch((error) => reportError('SkyPage.catalogsReady', error));
 });
 
+const recenter = () => sky?.resetView();
+
 // The observing location may have changed in Réglages while this tab stayed mounted.
 onIonViewWillEnter(() => sky?.refreshLocation());
 
@@ -62,8 +64,7 @@ onBeforeUnmount(() => {
           </div>
           <SkyLayerButtons v-if="layersOpen" @display="displayOpen = true" />
           <div v-else class="mob-map-cluster">
-            <!-- What recentring does is not decided yet: the button is drawn and does nothing. -->
-            <PhoneIconButton float waiting :label="t('mobile.sky.recenter')">
+            <PhoneIconButton float :label="t('mobile.sky.recenter')" @click="recenter">
               <AppIcon :svg="recenterIcon" />
             </PhoneIconButton>
           </div>

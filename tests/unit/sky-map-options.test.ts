@@ -102,6 +102,21 @@ describe('SkyMap options', () => {
     map = null;
   });
 
+  it('resetView() goes back to the opening view', () => {
+    ratio(1);
+    make();
+    map!.setRotationDeg(40);
+    map!.panBy(100, 50);
+    expect(map!.getView().rotationDeg).toBe(40);
+    expect(map!.getView().centerX).not.toBe(0);
+    map!.resetView();
+    const after = map!.getView();
+    expect(after.centerX).toBe(0);
+    expect(after.centerY).toBe(0);
+    expect(after.rotationDeg).toBe(0);
+    expect(after.scale).toBeCloseTo(600 / 2.2, 6);
+  });
+
   it('sets touch-action none only when touch is on', () => {
     expect(make().style.touchAction).toBe('');
     map!.destroy();

@@ -7,6 +7,7 @@ import { loadSettings } from '@myastrosky/core/display-settings';
 import { isIAUStyle } from '@myastrosky/core/types';
 import { readObserverLocation } from '@myastrosky/core/observer-location';
 import { watch } from 'vue';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
@@ -19,6 +20,8 @@ export interface PhoneSkyMap {
   readonly map: SkyMap;
   /** Re-reads the observing location after it changed in Réglages. */
   refreshLocation(): void;
+  /** Back to the opening view: centred, default zoom, north up. */
+  resetView(): void;
   /** The star and deep-sky catalogues have loaded: the map indexes them and draws again. */
   catalogsLoaded(): void;
   destroy(): void;
@@ -34,6 +37,10 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
 
   const port = useMapPortStore();
   port.skyMap = map;
+
+  const display = useDisplayStore();
+  // The display store keeps the map's rotation, which two fingers can change.
+  map.setOnViewChange(() => display.onMapViewChanged(map.getView().rotationDeg));
 
   const settings = loadSettings();
   map.setHemisphere(settings.hemisphere, settings.borderLatDeg);
@@ -91,6 +98,7 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
   return {
     map,
     refreshLocation,
+    resetView: () => map.resetView(),
     catalogsLoaded: () => map.refreshCatalogs(),
     destroy() {
       stopHorizon();
