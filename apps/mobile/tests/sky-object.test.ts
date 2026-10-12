@@ -158,6 +158,11 @@ describe('the sheet of a star', () => {
     expect(labels).toEqual(['Ajouter un cadre', 'Ajouter une mosaïque', 'Voir les détails']);
   });
 
+  it('keeps its few actions at the start of the row, where the five of an object are spread', () => {
+    expect(mountSheet(star()).find('.mob-icon-row').classes()).toContain('mob-icon-row--start');
+    expect(mountSheet().find('.mob-icon-row').classes()).not.toContain('mob-icon-row--start');
+  });
+
   it('shows the altitude and the transit with a location, like an object', () => {
     writeObserverLocation(48.58, 7.75);
     setActivePinia(createPinia());

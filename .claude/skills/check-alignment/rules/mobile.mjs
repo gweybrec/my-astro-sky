@@ -207,7 +207,7 @@ export const rules = [
     type: 'edges',
     within: '.mob-map-sheet',
     lefts: '.mob-fact:first-child, .mob-icon-row > :first-child',
-    rights: '.mob-fact:last-child, .mob-icon-row > :last-child',
+    rights: '.mob-fact:last-child, .mob-icon-row:not(.mob-icon-row--start) > :last-child',
   },
   // On the map, the layers button and the column of toggles end on the same line, and the toggles are equally spaced
   // (the last one, set apart, is the only exception: it is measured against its own margin).

@@ -81,11 +81,13 @@ onBeforeUnmount(() => {
             </PhoneIconButton>
           </div>
           <SkyLayerButtons v-if="layersOpen" @display="displayOpen = true" />
-          <SkyObjectSheet
-            v-if="skySelection"
-            :selection="skySelection"
-            @close="clearSkySelection"
-          />
+          <Transition name="mob-sheet-slide">
+            <SkyObjectSheet
+              v-if="skySelection"
+              :selection="skySelection"
+              @close="clearSkySelection"
+            />
+          </Transition>
         </main>
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />
