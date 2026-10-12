@@ -94,7 +94,7 @@ export interface PhotoService {
    * Makes the thumbnail `thumbFilename` from the image `filename` when the image exists and the thumbnail does not.
    * Rejects when the picture cannot be read or written; used after a backup import.
    */
-  ensureThumbnail(filename: string, thumbFilename: string): Promise<void>;
+  ensureThumbnail(filename: string, thumbFilename: string, replace?: boolean): Promise<void>;
   /** Replaces the metadata of a photo. Returns the cleaned `originalName` when one was given. Throws `notFound` (`PHOTO_NOT_FOUND`). */
   updateMetadata(id: string, changes: PhotoMetadataChanges): Promise<{ originalName?: string }>;
   /** Stores the placement as JSON, or clears it when `placement` is falsy. Throws `notFound` (`PHOTO_NOT_FOUND`). */
@@ -462,9 +462,13 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       return service.removeRows(doomed.map((r) => r.id));
     },
 
-    async ensureThumbnail(filename, thumbFilename) {
-      if ((await blobs.size(filename)) === null || (await blobs.size(thumbFilename)) !== null) {
-        return;
+    async ensureThumbnail(filename, thumbFilename, replace = false) {
+      // `replace`: the image has just been written and the thumbnail is made again without looking for the old one
+      // (looking for a missing file is an error the phone's file plugin writes to the console).
+      if (!replace) {
+        if ((await blobs.size(filename)) === null || (await blobs.size(thumbFilename)) !== null) {
+          return;
+        }
       }
       const bytes = await blobs.get(filename);
       if (!bytes) return;

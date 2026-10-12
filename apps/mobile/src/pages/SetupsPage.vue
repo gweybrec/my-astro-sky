@@ -61,7 +61,7 @@ onIonViewWillEnter(load);
       </h1>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div class="mob-scroll mob-page-fill mob-page-column mob-page-pad">
+      <div class="mob-scroll mob-page-fill mob-page-column mob-page-pad mob-page-safe">
         <IonList class="mob-list" lines="none">
           <PhoneRow
             v-for="line in lines"

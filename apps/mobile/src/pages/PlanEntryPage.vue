@@ -280,7 +280,7 @@ async function removeFromPlan() {
       <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ name }}</h1>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div v-if="dso" class="mob-scroll mob-page-fill mob-page-column">
+      <div v-if="dso" class="mob-scroll mob-page-fill mob-page-column mob-page-safe">
         <div class="mob-sheet-header" style="padding-top: var(--space-7)">
           <div class="mob-meta m-secondary">
             <span v-if="dso.displayName">{{ dso.catalogs[0] || dso.id }}</span>

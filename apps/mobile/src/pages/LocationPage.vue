@@ -119,7 +119,7 @@ async function importHorizon() {
       </h1>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div class="mob-scroll mob-page-fill mob-page-column">
+      <div class="mob-scroll mob-page-fill mob-page-column mob-page-safe">
         <PhoneSectionHeader>{{ t('skyTime.locationButton') }}</PhoneSectionHeader>
         <div class="mob-form-row mob-form-row--pair">
           <PhoneField

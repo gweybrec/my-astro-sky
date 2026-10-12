@@ -307,8 +307,8 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(await b.poiCategories.list()).toEqual(await a.poiCategories.list());
       expect(await b.dsoOverrides.getAll()).toEqual(await a.dsoOverrides.getAll());
       expect(new TextDecoder().decode(b.blobs.store.get('p1.jpg'))).toBe('image-1');
-      // The thumbnail was in the bundle but is not a selectable image: it is regenerated.
-      expect(b.blobs.store.has('thumb_p1.jpg')).toBe(true);
+      // The thumbnail is not a selectable image, but comes with its image: the archive's own file is written.
+      expect(new TextDecoder().decode(b.blobs.store.get('thumb_p1.jpg'))).toBe('thumb-1');
       expect(b.blobs.store.has('p2.jpg')).toBe(true);
     });
 

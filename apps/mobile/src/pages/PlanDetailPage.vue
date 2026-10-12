@@ -160,7 +160,7 @@ async function remove() {
       /></PhoneIconButton>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div v-if="plan" class="mob-scroll mob-page-fill mob-page-column">
+      <div v-if="plan" class="mob-scroll mob-page-fill mob-page-column mob-page-safe">
         <template v-if="summary.length">
           <PhoneSectionHeader>{{ t('targets.plan.pdf.summary') }}</PhoneSectionHeader>
           <PhoneFacts :facts="summary" />

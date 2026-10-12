@@ -256,7 +256,7 @@ async function remove() {
       </h1>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div class="mob-scroll mob-page-fill mob-page-column mob-page-pad">
+      <div class="mob-scroll mob-page-fill mob-page-column mob-page-pad mob-page-safe">
         <PhoneField v-model="name" :label="t('fovOverlay.setupName')" required />
 
         <PhoneSectionHeader>{{ t('targets.gear.section') }}</PhoneSectionHeader>

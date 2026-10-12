@@ -133,6 +133,11 @@ ion-tab-button:active .mob-tab-pill {
   height: 100%;
   box-sizing: border-box;
 }
+/* A page pushed above the tabs has no tab bar under it: its scrolling area ends above the navigation bar (the frame's
+   `--safe-bottom`, as the design system's `#root > .mob-scroll:last-child`). */
+.mob-page-safe {
+  padding-bottom: var(--safe-bottom, 0px);
+}
 /* Layout values the boards fix without a token of their own. */
 /* A pushed page's list starts one small gap under the top bar (boards "Réglages, setups", "Équipement, modifier le setup"). */
 .mob-page-pad {
