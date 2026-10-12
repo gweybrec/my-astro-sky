@@ -304,11 +304,15 @@ export function scaleText(factor) {
   });
 }
 
-/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { wait } (a selector) or { pause } (milliseconds). */
+/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { tapCentre } (a click at the middle of an element), { wait } (a selector) or { pause } (milliseconds). */
 export async function runActions(page, actions = []) {
   for (const action of actions) {
     if (action.click) await page.locator(action.click).first().click({ timeout: 10000 });
-    else if (action.fill)
+    else if (action.tapCentre) {
+      const box = await page.locator(action.tapCentre).first().boundingBox();
+      if (!box) throw new Error(`"${action.tapCentre}" has no box to click`);
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    } else if (action.fill)
       await page
         .locator(action.fill)
         .first()

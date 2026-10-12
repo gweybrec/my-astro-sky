@@ -1210,7 +1210,6 @@ export class SkyMap {
       get photoOutlines() {
         return photoOutlines();
       },
-      hasSelection: () => this.highlightedDSO !== null || this.highlightedStar !== null,
       regionDrawActive: () => this.regionDraw.active,
       regionDrawCapturing: () => this.regionDraw.capturing,
       regionDrawPress: () => this.regionDraw.press(),

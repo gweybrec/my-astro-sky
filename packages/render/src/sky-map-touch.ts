@@ -34,9 +34,6 @@ export interface SkyTouchHost {
   readonly pickingMode: boolean;
   readonly photoOutlines: PhotoOutline[];
 
-  /** True while a DSO or star is selected. */
-  hasSelection(): boolean;
-
   // Region drawing and frames: the same members as the mouse handling.
   regionDrawActive(): boolean;
   regionDrawCapturing(): boolean;
@@ -260,17 +257,18 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
       }
       return;
     }
-    if (host.hasPhotoClickHandler()) {
-      const photoName = findTopPhotoOutlineAtPoint(mx, my, host.photoOutlines);
-      if (photoName) host.emitPhotoClick(photoName);
-    }
+    // What is tapped, most specific first: a deep-sky object, a star, a photo; a tap on nothing clears the selection.
+    // (A touch has no hover: a tap on a star is how its information is asked for.)
     if (host.interactionEnabled && host.pickDSOAt(mx, my)) {
       host.emitDSOClick();
     } else {
-      // A touch has no hover: a tap on a star is how its information is asked for.
       const star = host.interactionEnabled ? host.pickStarAt(mx, my) : null;
+      const photoName = host.hasPhotoClickHandler()
+        ? findTopPhotoOutlineAtPoint(mx, my, host.photoOutlines)
+        : null;
       if (star) host.emitStarTap(star);
-      else if (host.hasSelection()) host.emitClearSelection();
+      else if (photoName) host.emitPhotoClick(photoName);
+      else host.emitClearSelection();
     }
     host.dismissTooltip();
   };

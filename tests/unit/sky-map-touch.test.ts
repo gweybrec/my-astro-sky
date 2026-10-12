@@ -55,7 +55,7 @@ function makeHost(over: Partial<SkyTouchHost> = {}) {
     frameDragMove: vi.fn(),
     frameMouseUp: vi.fn(),
   };
-  const state = { region: false, capturing: false, frameDrag: false, selection: false };
+  const state = { region: false, capturing: false, frameDrag: false };
   const host = {
     canvas,
     view,
@@ -64,7 +64,6 @@ function makeHost(over: Partial<SkyTouchHost> = {}) {
     photoOutlines: [] as PhotoOutline[],
     hasStarPickedHandler: () => false,
     hasPhotoClickHandler: () => false,
-    hasSelection: () => state.selection,
     regionDrawActive: () => state.region,
     regionDrawCapturing: () => state.capturing,
     canvasToAltAz: () => ({ azDeg: 1, altDeg: 2 }),
@@ -293,24 +292,63 @@ describe('two fingers turning', () => {
 });
 
 describe('tap on an empty spot', () => {
-  it('clears the selection when there is one', () => {
-    const { canvas, calls, state } = setup();
-    state.selection = true;
+  it('clears the selection', () => {
+    const { canvas, calls } = setup();
     fire(canvas, 'pointerdown', 1, 500, 400);
     fire(canvas, 'pointerup', 1, 500, 400);
     expect(calls.emitClearSelection).toHaveBeenCalledTimes(1);
   });
 
-  it('does nothing when nothing is selected, or when an object was tapped', () => {
-    const none = setup();
-    fire(none.canvas, 'pointerdown', 1, 500, 400);
-    fire(none.canvas, 'pointerup', 1, 500, 400);
-    expect(none.calls.emitClearSelection).not.toHaveBeenCalled();
+  it('does not clear it when an object was tapped', () => {
     const hit = setup({ pickDSOAt: vi.fn(() => true) });
-    hit.state.selection = true;
     fire(hit.canvas, 'pointerdown', 1, 500, 400);
     fire(hit.canvas, 'pointerup', 1, 500, 400);
     expect(hit.calls.emitClearSelection).not.toHaveBeenCalled();
+  });
+});
+
+describe('a tap on a photo', () => {
+  const photoOutlines = [
+    {
+      name: 'm31.jpg',
+      corners: [
+        { x: 400, y: 300 },
+        { x: 600, y: 300 },
+        { x: 600, y: 500 },
+        { x: 400, y: 500 },
+      ],
+    },
+  ];
+  const withPhoto = (over = {}) =>
+    setup({ photoOutlines, hasPhotoClickHandler: () => true, ...over } as never);
+  const tap = (canvas: HTMLCanvasElement, x = 500, y = 400) => {
+    fire(canvas, 'pointerdown', 1, x, y);
+    fire(canvas, 'pointerup', 1, x, y);
+  };
+
+  it('selects the photo under the finger when nothing more specific is there', () => {
+    const { canvas, calls } = withPhoto();
+    tap(canvas);
+    expect(calls.emitPhotoClick).toHaveBeenCalledWith('m31.jpg');
+    expect(calls.emitClearSelection).not.toHaveBeenCalled();
+  });
+
+  it('prefers a deep-sky object, then a star, to the photo they lie on', () => {
+    const dso = withPhoto({ pickDSOAt: vi.fn(() => true) });
+    tap(dso.canvas);
+    expect(dso.calls.emitDSOClick).toHaveBeenCalled();
+    expect(dso.calls.emitPhotoClick).not.toHaveBeenCalled();
+    const star = withPhoto({ pickStarAt: vi.fn(() => ({ hip: 1 })) as never });
+    tap(star.canvas);
+    expect(star.calls.emitStarTap).toHaveBeenCalled();
+    expect(star.calls.emitPhotoClick).not.toHaveBeenCalled();
+  });
+
+  it('clears the selection with a tap outside the photo', () => {
+    const { canvas, calls } = withPhoto();
+    tap(canvas, 50, 50);
+    expect(calls.emitPhotoClick).not.toHaveBeenCalled();
+    expect(calls.emitClearSelection).toHaveBeenCalled();
   });
 });
 
@@ -337,8 +375,7 @@ describe('a tap on a star', () => {
   });
 
   it('clears the selection when neither is under the finger', () => {
-    const { canvas, calls, state } = setup();
-    state.selection = true;
+    const { canvas, calls } = setup();
     fire(canvas, 'pointerdown', 1, 500, 400);
     fire(canvas, 'pointerup', 1, 500, 400);
     expect(calls.emitStarTap).not.toHaveBeenCalled();

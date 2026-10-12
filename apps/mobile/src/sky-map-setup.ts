@@ -18,12 +18,35 @@ import {
   type SkySelection,
 } from './composables/useSkySelection';
 import { SkyMap } from '@myastrosky/render/sky-map';
+import { PhotoLayer } from '@myastrosky/render/photo-layer';
+import type { Photo } from '@myastrosky/core/types';
+import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
+import { reportError } from '@myastrosky/core/platform/error-hook';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+
+/** How long the photos stay hidden after the map stopped moving: large images are not painted on every frame. */
+export const PHOTOS_FROZEN_MS = 100;
+
+/** A photo with a placement: two star correspondences or a manual placement. The others are not drawn. */
+export const isPlaced = (photo: Photo) =>
+  Boolean(photo.manualPlacement) || photo.correspondences.length >= 2;
 
 /** The most pixels per CSS pixel the map draws: a phone screen's 2.6 to 3.5 costs more than it shows. */
 export const MAX_PIXEL_RATIO = 2;
 
+export interface PhoneSkyMapOptions {
+  /** The box over the canvas that holds the photos. */
+  photoContainer: HTMLDivElement;
+  /** A photo cannot be placed (its star correspondences do not fit). */
+  onPhotoPlacementError(photo: Photo): void;
+}
+
 export interface PhoneSkyMap {
   readonly map: SkyMap;
+  /** The photos drawn over the sky. */
+  readonly photos: PhotoLayer;
+  /** Reads the placed photos again (they changed in the gallery, an import or a deletion). */
+  reloadPhotos(): Promise<void>;
   /** Re-reads the observing location after it changed in Réglages. */
   refreshLocation(): void;
   /** Highlights the selected object on the map (nothing when null). */
@@ -35,7 +58,10 @@ export interface PhoneSkyMap {
   destroy(): void;
 }
 
-export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
+export function createPhoneSkyMap(
+  canvas: HTMLCanvasElement,
+  options: PhoneSkyMapOptions,
+): PhoneSkyMap {
   const map = new SkyMap(canvas, {
     maxPixelRatio: MAX_PIXEL_RATIO,
     touch: true,
@@ -46,14 +72,58 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
   const port = useMapPortStore();
   port.skyMap = map;
 
+  // The photos: an `<img>` each in the box over the canvas, moved by the map's view.
+  const container = options.photoContainer;
+  const layer = new PhotoLayer(container, () => map.getView(), {
+    skyMap: map,
+    photoUrl: photoFileUrl,
+    onPlacementError: options.onPhotoPlacementError,
+    onDimensionMismatch: (photo, expected, actual) =>
+      reportError(
+        'SkyPage.photoDimensions',
+        new Error(`${photo.originalName}: ${expected}, ${actual}`),
+      ),
+  });
+  port.overlay = layer;
+  map.setPoiPinSource(() => layer.getPoiPins());
+  const categories = usePoiCategoriesStore();
+  const pushCategories = () => layer.setPoiCategories(categories.categories);
+  const stopCategories = categories.$subscribe(pushCategories);
+  void categories
+    .ensureLoaded?.()
+    .then(pushCategories)
+    .catch((e) => reportError('SkyPage.poiCategories', e));
+
   const display = useDisplayStore();
   // The display store keeps the map's rotation, which two fingers can change.
-  map.setOnViewChange(() => display.onMapViewChanged(map.getView().rotationDeg));
 
   // A tap on an object or a star selects it; a tap on an empty spot clears the selection.
   map.setOnDSOClick((dso) => (skySelection.value = { kind: 'dso', dso }));
   map.setOnStarTap((star) => (skySelection.value = { kind: 'star', star }));
   map.setOnClearSelection(clearSkySelection);
+  // A tap on a photo selects it, by the name the map hit-tests.
+  map.setOnPhotoClick((name) => {
+    const placed = layer.getPlacedPhotos().find((p) => p.photo.originalName === name);
+    if (placed) skySelection.value = { kind: 'photo', photo: placed.photo };
+  });
+
+  // The photos follow the view; while it moves they are hidden and come back once it has stopped.
+  let frozenTimer: ReturnType<typeof setTimeout> | null = null;
+  map.setOnViewChange((reason) => {
+    display.onMapViewChanged(map.getView().rotationDeg);
+    // A clock tick is not a move of the view.
+    if (reason !== 'skyClock') {
+      if (!frozenTimer) container.classList.add('photos-frozen');
+      else clearTimeout(frozenTimer);
+    }
+    layer.updateTransforms();
+    map.setPhotoOutlines(layer.getPhotoCanvasOutlines(map.getView()));
+    if (reason === 'skyClock') return;
+    frozenTimer = setTimeout(() => {
+      frozenTimer = null;
+      container.classList.remove('photos-frozen');
+    }, PHOTOS_FROZEN_MS);
+  });
 
   const settings = loadSettings();
   map.setHemisphere(settings.hemisphere, settings.borderLatDeg);
@@ -108,8 +178,18 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
     { immediate: true },
   );
 
+  async function reloadPhotos() {
+    const photos = (await getPhotos()).filter(isPlaced);
+    layer.clearAllPhotos();
+    layer.loadPhotos(photos);
+    map.setPhotoOutlines(layer.getPhotoCanvasOutlines(map.getView()));
+    map.requestRender();
+  }
+
   return {
     map,
+    photos: layer,
+    reloadPhotos,
     refreshLocation,
     select(selection) {
       map.setHighlightedDSO(selection?.kind === 'dso' ? selection.dso.id : null);
@@ -121,7 +201,10 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
     catalogsLoaded: () => map.refreshCatalogs(),
     destroy() {
       stopHorizon();
+      stopCategories();
+      if (frozenTimer) clearTimeout(frozenTimer);
       port.skyMap = null;
+      port.overlay = null;
       map.destroy();
     },
   };

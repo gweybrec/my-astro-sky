@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -8,11 +8,15 @@ import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { catalogsReady } from '../catalogs';
 import { clearSkySelection, skyFocus, skySelection } from '../composables/useSkySelection';
 import { useBackClose } from '../composables/useBackClose';
+import { useErrorToast } from '../composables/useErrorToast';
+import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
+import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import AppIcon from '../components/AppIcon.vue';
 import SkyLayerButtons from './sky/SkyLayerButtons.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
+import SkyPhotoSheet from './sky/SkyPhotoSheet.vue';
 import SkyTimeBar from './sky/SkyTimeBar.vue';
 import SkyTopBar from './sky/SkyTopBar.vue';
 import PhoneButton from '../components/PhoneButton.vue';
@@ -21,14 +25,27 @@ import mapPinIcon from '@icons/map-pin.svg?raw';
 // The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field, the display button and the date
 // button over it; the date button switches the map to the sky at a date and brings the column of the map's toggles.
 const canvas = ref<HTMLCanvasElement | null>(null);
+const photoBox = ref<HTMLDivElement | null>(null);
 const timeBar = ref<InstanceType<typeof SkyTimeBar> | null>(null);
 const displayOpen = ref(false);
 const router = useRouter();
+const { showError } = useErrorToast();
+
+const reloadPhotos = () =>
+  sky?.reloadPhotos().catch((error) => reportError('SkyPage.photos', error));
 let sky: PhoneSkyMap | null = null;
+// The photo layer once the map exists (the sheet of a photo needs it).
+const photoLayer = shallowRef<PhotoLayer | null>(null);
 
 onMounted(() => {
   if (!canvas.value) return;
-  sky = createPhoneSkyMap(canvas.value);
+  sky = createPhoneSkyMap(canvas.value, {
+    photoContainer: photoBox.value!,
+    onPhotoPlacementError: (photo) =>
+      void showError(new Error(t('photos.placementError', { name: photo.originalName }))),
+  });
+  photoLayer.value = sky.photos;
+  void reloadPhotos();
   sky.select(skySelection.value);
   // The catalogues load after the first screen: the map fills in once they are there.
   catalogsReady()
@@ -40,7 +57,11 @@ watch(skySelection, (selection) => sky?.select(selection));
 
 // The observing location may have changed in Réglages while this tab stayed mounted; a search may have chosen an
 // object to go to.
-onIonViewWillEnter(() => sky?.refreshLocation());
+onIonViewWillEnter(() => {
+  sky?.refreshLocation();
+  // Photos may have been added, changed or deleted in the gallery or by an import while another tab was showing.
+  void reloadPhotos();
+});
 onIonViewDidEnter(() => {
   const focus = skyFocus.value;
   if (!focus) return;
@@ -55,11 +76,27 @@ const time = useSkyTimeStore();
 const located = computed(() => time.lat !== null && time.lon !== null);
 const openLocation = () => void router.push('/settings/location');
 
+// A chip of the selected photo goes to that deep-sky object, as a search result does.
+function goToDso(id: string) {
+  const dso = getDSOById(id);
+  if (!dso) return;
+  skySelection.value = { kind: 'dso', dso };
+  skyFocus.value = { ra: dso.ra, dec: dso.dec, scale: 1200 };
+  const focus = skyFocus.value;
+  skyFocus.value = null;
+  sky?.focus(focus);
+}
+const photoRemoved = () => {
+  clearSkySelection();
+  void reloadPhotos();
+};
+
 const openSearch = () => void router.push('/sky/search');
 
 onBeforeUnmount(() => {
   sky?.destroy();
   sky = null;
+  photoLayer.value = null;
 });
 </script>
 
@@ -69,6 +106,7 @@ onBeforeUnmount(() => {
       <div class="mob-page-fill mob-sky-frame">
         <main class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
+          <div ref="photoBox" class="mob-photo-layer" />
           <SkyTopBar
             @search="openSearch"
             @display="displayOpen = true"
@@ -84,8 +122,17 @@ onBeforeUnmount(() => {
           <SkyTimeBar ref="timeBar" />
           <SkyLayerButtons v-if="time.mode === 'date'" />
           <Transition name="mob-sheet-slide">
+            <SkyPhotoSheet
+              v-if="skySelection?.kind === 'photo' && photoLayer"
+              :key="skySelection.photo.id"
+              :photo="skySelection.photo"
+              :layer="photoLayer"
+              @close="clearSkySelection"
+              @removed="photoRemoved"
+              @dso="goToDso"
+            />
             <SkyObjectSheet
-              v-if="skySelection"
+              v-else-if="skySelection && skySelection.kind !== 'photo'"
               :selection="skySelection"
               @close="clearSkySelection"
             />
