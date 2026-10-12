@@ -8,7 +8,8 @@ import closeIcon from '@icons/close-x.svg?raw';
 
 // A bottom sheet (`.mob-sheet`) on Ionic's modal. It takes the height of its content (60 % of the screen at most, 70 %
 // with `tall`), the body scrolls past that. The Android back button and a tap on the backdrop close it (Ionic's
-// overlay handling). A sheet without a footer applies its changes at once and has the close button in its header.
+// overlay handling), and so does dragging it down from its header or handle (Ionic's sheet gesture: breakpoints 0 and 1,
+// the content's height as the 1; the body is a scroll host, so it scrolls first). A sheet without a footer applies its changes at once and has the close button in its header.
 defineProps<{
   open: boolean;
   title: string;
@@ -22,7 +23,14 @@ const titleId = useId();
 </script>
 
 <template>
-  <IonModal class="mob-sheet-modal" :is-open="open" @did-dismiss="emit('update:open', false)">
+  <IonModal
+    class="mob-sheet-modal"
+    :is-open="open"
+    :breakpoints="[0, 1]"
+    :initial-breakpoint="1"
+    :handle="false"
+    @did-dismiss="emit('update:open', false)"
+  >
     <section
       class="mob-sheet"
       :class="tall ? 'mob-sheet--auto-lg' : 'mob-sheet--auto'"
@@ -51,7 +59,7 @@ const titleId = useId();
         </PhoneIconButton>
         <slot name="header-extra" />
       </div>
-      <div class="mob-sheet-body mob-scroll"><slot /></div>
+      <div class="mob-sheet-body mob-scroll ion-content-scroll-host"><slot /></div>
       <div v-if="$slots.footer" class="mob-sheet-footer"><slot name="footer" /></div>
     </section>
   </IonModal>
