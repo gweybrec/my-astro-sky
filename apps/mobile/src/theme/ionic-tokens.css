@@ -1,4 +1,4 @@
-/* Ionic's own variables, mapped to the design system's tokens (design/mobile/ds/myastrosky/tokens.css), in this one
+/* Ionic's own variables, mapped to the design system's tokens (design-system/tokens.css), in this one
    file, so that Ionic's components take the look without per-screen overrides. Dark only. */
 
 :root {
@@ -45,6 +45,16 @@
      `--safe-bottom` and falls back to the same `env()` values. */
   --ion-safe-area-top: var(--safe-top, env(safe-area-inset-top, 0px));
   --ion-safe-area-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px));
+
+  /* Sizes the boards fix and the design system has no token for (board "…Landscape"). */
+  --rail-button-height: 64px;
+  --mobile-column-max: 680px;
+  --mobile-hairline: 1px;
+  --spinner-size-page: 36px;
+  --sheet-max-height: 60dvh;
+  --sheet-max-height-tall: 70dvh;
+  --alert-title-line: 26px;
+  --alert-text-line: 24px;
 }
 
 html,
@@ -126,7 +136,7 @@ ion-tab-button:active .mob-tab-pill {
   }
   ion-tab-button {
     flex: none;
-    height: 64px;
+    height: var(--rail-button-height);
     width: 100%;
   }
 }
@@ -182,14 +192,14 @@ ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page) {
 /* Landscape, a page of rows or cards: a centred column of at most 680 px (board land--page). */
 @media (orientation: landscape) {
   .mob-page-column {
-    width: min(100%, 680px);
+    width: min(100%, var(--mobile-column-max));
     margin: 0 auto;
   }
-  /* A pushed form's footer: the buttons line up with the column, at the right, 200 px each (design/mobile/tools/landscape.css). */
+  /* A pushed form's footer: the buttons line up with the column, at the right, 200 px each (the mockup of the landscape page). */
   ion-footer.mob-footer {
     display: flex;
     justify-content: flex-end;
-    padding: var(--space-4) max(var(--mobile-gutter), calc((100% - 680px) / 2));
+    padding: var(--space-4) max(var(--mobile-gutter), calc((100% - var(--mobile-column-max)) / 2));
     padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px));
   }
   ion-footer.mob-footer > ion-button.mob-btn {
