@@ -88,6 +88,11 @@ describe('the Ciel tab sky map', () => {
     expect(calls.setSimDate.length).toBeGreaterThan(before);
   });
 
+  it('applies the saved photo display settings (outlines are off by default)', () => {
+    make();
+    expect(created[0].calls.setShowPhotoOutlines).toEqual([[false]]);
+  });
+
   it('reads the location again after Réglages changed it', () => {
     const sky = make();
     writeObserverLocation(-33.9, 18.4);

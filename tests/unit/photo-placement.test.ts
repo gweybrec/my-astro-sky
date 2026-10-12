@@ -255,6 +255,29 @@ describe('geometry getters', () => {
     expect(corners).toHaveLength(4);
   });
 
+  it('computePhotoQuadCorners follows the manual placement, not the correspondences', () => {
+    const placement: ManualPlacement = {
+      centerRa: 0,
+      centerDec: 90,
+      rotationDeg: 0,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    // Two correspondences far apart would give a huge outline; the manual placement gives the small one.
+    const photo = makePhoto([corr(0, 0, 0, 0, 80), corr(1, 100, 80, 5, 78)], {
+      manualPlacement: placement,
+      width: 100,
+      height: 80,
+    });
+    const corners = computePhotoQuadCorners(photo, VIEW)!;
+    const expected = mapPhotoCorners(computeManualMatrix(placement, VIEW, 100, 80), 100, 80);
+    expect(corners).toEqual(expected);
+    // A manually placed photo has an outline without any correspondence.
+    const bare = makePhoto([], { manualPlacement: placement, width: 100, height: 80 });
+    expect(computePhotoQuadCorners(bare, VIEW)).toHaveLength(4);
+  });
+
   it('computePhotoMatrixForView returns null when centroid is outside the border', () => {
     // borderRadiusPU = 0 → nothing can be inside.
     const m = computePhotoMatrixForView(

@@ -139,6 +139,13 @@ export function createPhoneSkyMap(
   map.setShowStarLabels(settings.showStarLabels);
   map.setShowDSOLabels(settings.showDSOLabels);
   map.setShowGrid(settings.showGrid);
+  map.setShowPhotoOutlines(settings.showPhotoOutlines);
+  layer.setBorderParams(settings.hemisphere, settings.borderLatDeg);
+  layer.setDefaultOpacity(1.0);
+  layer.setShowPhotos(settings.showPhotos);
+  layer.setShowPois(settings.showPois);
+  layer.setVisiblePois(settings.visiblePois || {});
+  layer.setVisibleLabels(settings.visibleLabels || {});
   map.setSkyOpacity(settings.skyOpacity);
   map.setBackgroundOpacity(settings.backgroundOpacity);
   map.setShowDSOs(settings.showDSOs);

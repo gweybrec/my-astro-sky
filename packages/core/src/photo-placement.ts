@@ -155,10 +155,18 @@ export function mapPhotoCorners(matrix: AffineMatrix, w: number, h: number): Poi
 
 /**
  * Canvas-space corners of a photo's outline at `view`, or null when it can't be
- * placed (fewer than 2 resolvable correspondences, or colinear points). Border /
+ * placed (fewer than 2 resolvable correspondences, or colinear points). A manual
+ * placement wins over the correspondences, as it does for the image itself. Border /
  * visibility filtering is the caller's job — this is pure geometry.
  */
 export function computePhotoQuadCorners(photo: Photo, view: ViewState): Point[] | null {
+  if (photo.manualPlacement) {
+    return mapPhotoCorners(
+      computeManualMatrix(photo.manualPlacement, view, photo.width, photo.height),
+      photo.width,
+      photo.height,
+    );
+  }
   if (photo.correspondences.length < 2) return null;
   const { photoPoints, canvasPoints } = buildPhotoPoints(photo, view);
   if (photoPoints.length < 2) return null;
