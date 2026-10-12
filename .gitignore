@@ -30,3 +30,8 @@ build/
 # Release-notes scratch file (generated at release time, never committed)
 /RELEASE_BODY.md
 
+# Local working material: never committed (see docs/CLAUDE.md)
+/design/
+/.claude/work-packages/
+/.claude/tracking/
+/.playwright-mcp/
