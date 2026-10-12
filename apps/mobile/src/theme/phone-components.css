@@ -188,7 +188,7 @@ ion-item.mob-row {
   padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
 }
 ion-item.mob-row .mob-row-line {
-  min-height: calc(var(--mobile-list-row-min) - 2 * var(--space-4) - 1px);
+  min-height: calc(var(--mobile-list-row-min) - 2 * var(--space-4) - var(--mobile-hairline));
 }
 ion-item.mob-row.mob-row--roomy {
   padding-top: var(--space-6);
@@ -212,7 +212,7 @@ ion-toggle.mob-toggle-row {
   /* Ionic forces `content-box` on a toggle: the padding is taken off the width. */
   border-bottom: 1px solid var(--border-subtle);
   width: calc(100% - var(--mobile-gutter) - var(--mobile-gutter-end));
-  min-height: calc(var(--mobile-list-row-min) - 2 * var(--space-4) - 1px);
+  min-height: calc(var(--mobile-list-row-min) - 2 * var(--space-4) - var(--mobile-hairline));
   padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
 }
 ion-toggle.mob-toggle-row .mob-row-title {
@@ -270,7 +270,7 @@ ion-checkbox.mob-check-row {
 ion-checkbox.mob-check-row::part(mark) {
   /* the part is the svg `path`: its origin is the viewBox corner, so scaling without this pulls the tick to the corner */
   transform-box: view-box;
-  transform-origin: 12px 12px;
+  transform-origin: center;
   transform: scale(0.75);
 }
 ion-checkbox.mob-check-row::part(label) {
@@ -426,6 +426,9 @@ ion-badge.mob-badge {
   --padding-bottom: var(--space-1);
   box-sizing: border-box;
   display: inline-block;
+  /* Ionic's host sets `contain: content`, which gives the badge no baseline of its own: a row aligning on baselines
+     would then put its plain text level with the badge's bottom edge instead of the badge's text. */
+  contain: none;
   font-weight: 400;
   text-align: left;
   vertical-align: baseline;
@@ -446,24 +449,24 @@ ion-badge.mob-badge--const {
   color: var(--accent-color);
   white-space: nowrap;
 }
+.mob-busy {
+  --spinner-size: var(--space-6);
+}
 .mob-busy--page {
+  --spinner-size: var(--spinner-size-page);
   flex-direction: column;
   gap: var(--space-7);
   margin: var(--space-13) auto;
 }
 ion-spinner.mob-spinner {
   flex: none;
-  width: 12px;
-  height: 12px;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
   color: var(--spinner-active);
   --color: var(--spinner-active);
   /* the faint ring behind the active arc, as the design system's spinner */
   border-radius: 50%;
   box-shadow: inset 0 0 0 2px var(--accent-fill-md);
-}
-.mob-busy--page ion-spinner.mob-spinner {
-  width: 36px;
-  height: 36px;
 }
 
 /* ── Reorderable list. */
@@ -495,19 +498,19 @@ ion-item.mob-entry::part(native) {
   align-items: center;
   gap: var(--space-7);
 }
-/* The handle is a 48 px touch box whose 24 px icon starts one page margin (16 px) from the row's edge, so the title follows at
-   56 px (board "Détail du plan"). The icon is placed by the host's start padding, not by centring, which did not apply to the web component. `ion-reorder` is not a button, so the box and the icon size are set here, not left to inheritance. */
+/* The handle is the board's 48 px touch box with its 24 px icon centred in it by layout (board "Détail du plan"); the
+   title follows after the row's gap. `ion-reorder` is not a button, so the box and the icon size are set here. */
 ion-reorder.mob-drag {
   display: flex;
   flex: none;
   align-self: center;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   box-sizing: border-box;
   width: var(--mobile-touch-min);
   height: var(--mobile-touch-min);
   margin: 0;
-  padding: 0 0 0 var(--mobile-gutter);
+  padding: 0;
   --color: var(--text-primary);
 }
 ion-reorder.mob-drag svg {
@@ -525,6 +528,31 @@ ion-modal.mob-sheet-modal {
   --box-shadow: none;
   align-items: flex-end;
 }
+/* Ionic puts the class `modal-sheet` on a modal that has breakpoints; the design system's desktop `.modal-sheet` (a dialog
+   95 vw wide, 90 vh tall, a column) has the same name, so it is undone here.
+   Ionic's sheet gesture reads the modal's own box as the sheet (breakpoint 1 = the whole box, its bottom at the screen's
+   bottom), so the modal is made as tall as its content and sits at the bottom, the scrim is drawn over the whole screen
+   by the backdrop part, and the wrapper takes part in the flow to give the modal its height. */
+ion-modal.mob-sheet-modal.modal-sheet {
+  display: flex;
+  flex-direction: row;
+  inset-block-start: auto;
+  height: auto;
+  width: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  contain: none;
+}
+ion-modal.mob-sheet-modal.modal-sheet.overlay-hidden {
+  display: none;
+}
+ion-modal.mob-sheet-modal.modal-sheet::part(content) {
+  position: relative;
+}
+ion-modal.mob-sheet-modal.modal-sheet::part(backdrop) {
+  position: fixed;
+  inset: 0;
+}
 /* the scrim behind a sheet is the design system's (`.mob-scrim`) */
 ion-modal.mob-sheet-modal {
   --backdrop-opacity: 1;
@@ -539,10 +567,10 @@ ion-modal.mob-sheet-modal .mob-sheet {
   width: 100%;
   box-sizing: border-box;
   /* The design system sizes `--auto` as a part of its parent; here the parent is the modal, whose height is the content's. */
-  max-height: 60dvh;
+  max-height: var(--sheet-max-height);
 }
 ion-modal.mob-sheet-modal .mob-sheet--auto-lg {
-  max-height: 70dvh;
+  max-height: var(--sheet-max-height-tall);
 }
 @media (orientation: landscape) {
   /* A sheet over a scrim is a centred card of limited width. */
@@ -573,7 +601,7 @@ ion-alert.mob-dialog-alert {
   --backdrop-opacity: 1;
   font-family: var(--font-sans);
 }
-/* Landscape: a card of fixed width, centred (design/mobile/tools/landscape.css, `.land .mob-dialog`). */
+/* Landscape: a card of fixed width, centred (the landscape mockup's dialog). */
 @media (orientation: landscape) {
   ion-alert.mob-dialog-alert {
     --width: 400px;
@@ -598,7 +626,7 @@ ion-alert.mob-dialog-alert .alert-title {
   margin: 0;
   color: var(--text-primary);
   font-size: 20px;
-  line-height: 26px;
+  line-height: var(--alert-title-line);
   font-weight: 600;
 }
 ion-alert.mob-dialog-alert .alert-message {
@@ -606,7 +634,7 @@ ion-alert.mob-dialog-alert .alert-message {
   max-height: none;
   color: var(--text-secondary);
   font-size: 16px;
-  line-height: 24px;
+  line-height: var(--alert-text-line);
   font-weight: 400;
 }
 ion-alert.mob-dialog-alert .alert-button-group {
@@ -643,7 +671,7 @@ ion-alert.mob-dialog-alert .alert-button {
   text-align: center;
   font-family: var(--font-sans);
   font-size: 16px;
-  line-height: 24px;
+  line-height: var(--alert-text-line);
   font-weight: 400;
 }
 ion-alert.mob-dialog-alert .alert-button.mob-btn--lg {
@@ -749,6 +777,8 @@ ion-list.mob-list.list-md {
    the switch keeps the right end. */
 ion-toggle.mob-toggle-row--info::part(label) {
   flex: 1;
+  /* the board's row gap between the "i" and the switch (`.mob-row--info { gap: var(--space-4) }`) */
+  margin-inline-end: var(--space-4);
 }
 .mob-toggle-info-line {
   display: flex;
@@ -882,8 +912,19 @@ ion-fab.mob-fab--flush {
   }
 }
 
-/* The badges of a sheet or page header sit on the first line with the text beside them (the board's spans align on the
-   baseline; an `ion-badge` has none of its own, which would push the text down). */
-.mob-sheet-header .mob-meta > ion-badge.mob-badge {
-  align-self: flex-start;
+/* ── The design system's footprint hacks, replaced by layout. Its stylesheet pulls the chevron back by a negative margin
+   and drops an icon after a value by `vertical-align: -2px`; here the box is the icon's own and the row centres it. */
+.mob-row-chevron {
+  margin-block: 0;
+}
+.mob-btn-caret {
+  margin-inline: 0;
+}
+.mob-fact-value:has(svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mob-fact-value svg.mob-icon--sm {
+  margin-left: 0;
 }

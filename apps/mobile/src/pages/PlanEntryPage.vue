@@ -242,8 +242,8 @@ async function saveWindow(changes: { frameSeconds: number | null; snap: boolean 
 
 async function deleteWindow() {
   const id = editingId.value;
-  editorOpen.value = false;
   if (!id) return;
+  // The editor stays open under the question: "Annuler" leaves it as it was.
   const sure = await confirm({
     title: t('targets.plan.obsWindowRemove'),
     message: t('mobile.plans.deleteWindowMessage'),
@@ -251,6 +251,7 @@ async function deleteWindow() {
     destructive: true,
   });
   if (!sure) return;
+  editorOpen.value = false;
   try {
     await saveWindows((entry.value?.observationWindows ?? []).filter((w) => w.id !== id));
   } catch (error) {

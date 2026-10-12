@@ -83,7 +83,7 @@ function raiseError() {
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill" data-testid="gallery">
         <PhoneSectionHeader>Boutons</PhoneSectionHeader>
-        <div class="mob-form-row" style="display: flex; gap: 8px; flex-wrap: wrap">
+        <div class="mob-form-row" style="display: flex; gap: var(--space-4); flex-wrap: wrap">
           <PhoneButton>Défaut</PhoneButton>
           <PhoneButton variant="action">Action</PhoneButton>
           <PhoneButton variant="confirm">Valider</PhoneButton>
@@ -94,7 +94,7 @@ function raiseError() {
           <PhoneButton variant="action" disabled>Action off</PhoneButton>
           <PhoneButton variant="confirm" disabled>Valider off</PhoneButton>
         </div>
-        <div class="mob-form-row" style="display: flex; gap: 8px">
+        <div class="mob-form-row" style="display: flex; gap: var(--space-4)">
           <PhoneButton size="lg">Grand</PhoneButton>
           <PhoneButton variant="action" size="lg"
             ><AppIcon :svg="plusIcon" />Avec icône</PhoneButton
@@ -115,7 +115,7 @@ function raiseError() {
         </div>
 
         <PhoneSectionHeader>Boutons icône (appui long : le nom)</PhoneSectionHeader>
-        <div class="mob-form-row" style="display: flex; gap: 8px">
+        <div class="mob-form-row" style="display: flex; gap: var(--space-4)">
           <PhoneIconButton label="Ajouter"><AppIcon :svg="plusIcon" /></PhoneIconButton>
           <PhoneIconButton label="Afficher" :pressed="pressed" @click="pressed = !pressed"
             ><AppIcon :svg="eyeIcon"
@@ -168,6 +168,37 @@ function raiseError() {
             altitude="86°"
             time="21:38"
           />
+          <!-- The variants the alignment check measures: a long name, no badge, a long type next to a long designation. -->
+          <PhoneTargetRow
+            title="Nébuleuse de la Tête de Cheval et de la Flamme dans la constellation d'Orion"
+            designation="Sh2-277 · Barnard 33 · IC 434"
+            type-label="Nébuleuse en émission très étendue"
+            constellation="ORI"
+            magnitude="Magnitude 6.8"
+            rating="★★★☆☆"
+            altitude="52°"
+            time="01:12"
+          />
+          <PhoneTargetRow
+            title="Sans badge"
+            designation="M31"
+            magnitude="Magnitude 3.4"
+            rating="★★★★★"
+            altitude="70°"
+            time="23:05"
+          />
+          <PhoneRow
+            title="Un nom de ligne très long qui ne tient pas sur une seule ligne de l'écran du téléphone"
+            value="Valeur"
+            chevron
+            button
+            wrap
+          />
+          <PhoneToggleRow
+            v-model="switchOn"
+            title="Un libellé d'interrupteur très long qui passe sur deux lignes avec son explication"
+            info="Le texte long d'explication."
+          />
         </IonList>
         <PhoneSliderRow
           v-model="opacity"
@@ -205,12 +236,35 @@ function raiseError() {
         <PhoneSectionHeader>Puces et badges</PhoneSectionHeader>
         <div
           class="mob-form-row"
-          style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center"
+          style="display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center"
         >
           <PhoneChip>Normale</PhoneChip>
           <PhoneChip :pressed="true">Choisie</PhoneChip>
           <PhoneBadge kind="type">Galaxie</PhoneBadge>
           <PhoneBadge kind="const">Andromède</PhoneBadge>
+        </div>
+        <!-- Rows mixing plain text and chips: `apps/mobile/scripts/check-baselines.mjs` checks their baselines. -->
+        <div class="mob-sheet-header">
+          <div class="mob-meta m-secondary" data-baseline-row>
+            <span>NGC7000</span>
+            <PhoneBadge kind="type">Nébuleuse en émission</PhoneBadge>
+            <PhoneBadge kind="const">CYG</PhoneBadge>
+          </div>
+        </div>
+        <div class="mob-sheet-header">
+          <div class="mob-meta m-secondary" data-baseline-row>
+            <span>M42</span>
+            <PhoneBadge kind="type">Nébuleuse</PhoneBadge>
+            <PhoneBadge kind="type">Émission</PhoneBadge>
+            <PhoneBadge kind="const">ORI</PhoneBadge>
+          </div>
+        </div>
+        <div class="mob-form-row">
+          <div class="mob-meta m-secondary" data-baseline-row>
+            <span>Texte</span>
+            <PhoneChip>Normale</PhoneChip>
+            <PhoneChip :pressed="true">Choisie</PhoneChip>
+          </div>
         </div>
 
         <PhoneSectionHeader>Chargement</PhoneSectionHeader>
@@ -230,7 +284,7 @@ function raiseError() {
         </PhoneReorderList>
 
         <PhoneSectionHeader>Fenêtres</PhoneSectionHeader>
-        <div class="mob-form-row" style="display: flex; gap: 8px; flex-wrap: wrap">
+        <div class="mob-form-row" style="display: flex; gap: var(--space-4); flex-wrap: wrap">
           <PhoneButton @click="openSheet(false)">Feuille</PhoneButton>
           <PhoneButton @click="openSheet(true)">Feuille avec fermer</PhoneButton>
           <PhoneButton variant="danger" @click="askDelete">Confirmer</PhoneButton>
@@ -239,7 +293,7 @@ function raiseError() {
         <p class="mob-helper m-secondary" data-testid="answer">{{ answer }}</p>
 
         <PhoneSectionHeader>État vide</PhoneSectionHeader>
-        <div style="height: 240px">
+        <div style="--demo-height: 240px; height: var(--demo-height)">
           <PhoneEmptyState
             text="Aucune photo pour l'instant"
             :button-label="t('batch.modalTitle')"
@@ -270,6 +324,7 @@ function raiseError() {
             { label: 'Focale', value: '1422 mm' },
             { label: 'Résolution', value: '6248 × 4176 px' },
             { label: 'FOV', value: '57′ × 38′', wide: true },
+            { label: 'Lune', value: 'Dernier quartier · 50 %', wide: true, icon: caretIcon },
           ]"
         />
         <PhoneHelper>Ligne d'état</PhoneHelper>

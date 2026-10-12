@@ -458,6 +458,26 @@ describe('the plan entry page', () => {
     expect(backend.plans.updateEntry.mock.calls[0][1].observationWindows).toEqual([]);
   });
 
+  it('keeps the window editor open, with its values, when the delete is cancelled', async () => {
+    confirm.mockResolvedValue(false);
+    const { w } = await show(PlanEntryPage, '/plans/p1/e1');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Ha'))!
+      .trigger('click');
+    await settle();
+    await w.find('#obs-frame').setValue('420');
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'Supprimer')!
+      .trigger('click');
+    await settle();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(w.text()).toContain('Pose unitaire');
+    expect((w.find('#obs-frame').element as HTMLInputElement).value).toBe('420');
+    expect(backend.plans.updateEntry).not.toHaveBeenCalled();
+  });
+
   it('asks before removing the target from the plan, then removes it', async () => {
     confirm.mockResolvedValue(false);
     const { w } = await show(PlanEntryPage, '/plans/p1/e1');
