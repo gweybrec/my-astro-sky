@@ -1,171 +1,62 @@
-# Phone App Mockups
+# Phone UI Rules
 
-The mockups of the phone app (Capacitor + Ionic Vue) are on the project's Claude Design page, not in this repository: 58 screens, each drawn in portrait (412 x 915) and in landscape (915 x 412). This page holds the rules every phone screen follows and the list of screens. The stylesheet and tokens the app ships are in `apps/mobile/src/theme/design-system/`.
+The rules every screen of the phone app (`apps/mobile/`) follows. The desktop's rules are in the other chapters of [the UI guidelines](../ui-guidelines.md); the two apps share one look.
 
-## Rules that bind every phone screen
+## Building a screen
 
-**Navigation**
+- Use Ionic's own components wherever one exists, through the shared components of `apps/mobile/src/components/`. Do not rebuild from plain elements what Ionic provides.
+- Colours, sizes, fonts and spacing come from the design system's tokens (`apps/mobile/src/theme/design-system/`). A screen does not restyle an Ionic component itself.
+- Every text goes through `t('…')`, in the four languages. A text that exists on the desktop reuses its key.
+- A screen holds no rule of the domain: data comes from `@myastrosky/app-state`, computation from `@myastrosky/core`. Logic needed from a desktop module is moved to a shared package first, and the desktop calls the shared version.
+
+## Layout and alignment
+
+- A phone is 360 to 430 CSS pixels wide. Fixed sizes and margins are constants; flexible elements take the remaining width; nothing is scaled or clipped. Landscape has its own layout: a navigation rail on the left, sheets of limited width.
+- The frame applies the system bars' insets once. A screen never reads `env(safe-area-inset-*)`.
+- **Alignment comes from layout.** Items line up because of how their row arranges them (`align-items`, `gap`, grid tracks). Text beside a chip shares the baseline of the text inside the chip. An icon is aligned by its row and sized by a token or in `em`.
+- **No pixel offsets.** No literal length in a position, margin, transform or fixed height may be used to bring something into line: it would break when the text wraps, grows or is translated. `apps/mobile/scripts/check-no-nudges.mjs` runs in `npm run verify` and fails on them.
+- Trailing items of a row (information button, switch, chevron, handle) are separated by the spacing token; they never touch.
+- Every touch area is at least 48 by 48 CSS pixels.
+
+## Navigation
 
 - Tab order: Ciel, Galerie, Cibles, Plans, Réglages.
-- The Galerie, Cibles and Plans top bars have no title (search field plus button only); Réglages and the plan detail keep theirs.
-- No horizontally scrolling chip rows.
-- The top right of the map holds a ribbon with the desktop's seven map toggles (local sky, azimuth grid, trajectory, terrain horizon, Moon, Sun, planets) and, last, the entry to the full display settings; no eye button on the map.
-- In landscape the ribbon's buttons stay at the top right and are shown only when opened.
-- Tapping a photo on the map opens a bottom sheet: its DSOs (three rows at most, a carousel beyond), and buttons for display order, metadata, gallery details and repositioning.
-- "Placer la photo" and "Identifier les étoiles" are full-screen modes that always show the sky map, whatever screen started them; after Valider the app shows the photo on the Ciel tab.
-- Identification is reachable from the photo's information, on the sky map and in the gallery.
+- The top bars of Galerie, Cibles and Plans have no title, only a search field and its button. Réglages and the sub-pages have a title.
+- The Android back button closes the top-most dialog or sheet, else goes back one page, else, on a tab's first page, leaves the app.
+- No row of chips that scrolls sideways.
+- There are no keyboard shortcuts on the phone.
 
-**Sheets**
+## Sheets and dialogs
 
-- The object sheet takes the height of its content.
-- A scrolling sheet shows a styled scroll bar that is always visible.
-- Long explanatory texts go behind an "i" button that opens a small sheet; state lines, warnings and the one-line reason of a disabled control stay printed.
-- The manual placement mode keeps its fixed bottom panel (about a third of the screen).
-- On the asteroid results screen "Modifier la recherche" is always visible above the footer buttons; only the list scrolls.
+- A sheet takes the height of its content.
+- A sheet closes when dragged down from its header, when its backdrop is tapped, and with the back button. On a sheet with Annuler / Valider this is the same as Annuler.
+- A sheet whose content scrolls shows a styled scroll bar that stays visible.
+- A long explanation goes behind an "i" button that opens a small sheet. State lines, warnings and the one-line reason of a disabled control stay printed.
 
-**Buttons and icons**
+## Buttons and icons
 
-- A button has the colour of its desktop role: save and validate are green (`btn-confirm`), action buttons use `btn-action`, danger stays red.
-- An eye icon means show or hide and nothing else; adding something is a plus button.
-- Icon-only action buttons have no label; their name shows on a long press, beside the pressed button.
-- The object sheet's action buttons (add a frame, add to a plan, details) are icon-only; details uses the info icon.
-- In a search form the search action is a lens icon button at the right end of the input row.
-- The desktop's meaning colours are used (yellow rating stars, etc.).
-- Desktop and phone share one look: unticked tick boxes and option circles are drawn dark on both.
+- A button has the colour of its role: save and validate are green, other actions use the action colour, danger is red.
+- An eye icon means show or hide and nothing else. Adding something is a plus button.
+- An icon-only action button has no label; its name shows beside it on a long press.
+- In a search form the search action is a lens button at the end of the field's row.
 
-**Texts**
+## Texts
 
-- A line of explanation is printed only if the desktop prints that text visibly; nothing is invented, and a control that explains itself gets no text.
-- A value is written as the desktop writes it: same unit, format and decimals (opacity is 0.00 to 1.00).
+- Print a line of explanation only if the desktop prints it. Nothing is invented, and a control that explains itself gets no text.
+- Write a value as the desktop writes it: same unit, format and decimals.
 - "Setup" is the word for an equipment setup, in French too.
 - Wherever a time is entered in UTC, "UTC" is visible next to the field.
-- Field placeholders are very slightly lighter than before (4.59:1), still dimmer than typed text.
-- The star and DSO hover-tooltip settings are not on the phone; that information is in the object sheet.
+- A unit sits outside its field.
 
-**Forms**
+## Forms
 
-- Lists, switches and sliders apply at once; forms and the modes that move something on the map use Annuler / Valider.
-- Date and time use the phone's native pickers.
-- Every mode has visible Cancel and Done buttons: no keyboard shortcuts on the phone.
-- Latitude and longitude sit on one row; there are no named locations.
-- Star identification takes 2 or 3 stars; "Valider" is enabled from two named stars; a star can also be picked on the sky map.
+- Lists, switches and sliders apply at once. Forms, and the modes that move something on the map, use Annuler / Valider.
+- Date and time use the phone's own pickers.
+- Latitude and longitude sit on one row; a location is a pair of coordinates, not a named place.
 
-**Deletes and errors**
+## Deletes and errors
 
-- Every delete (plan, photo, setup, frame,...) asks for confirmation in a confirm/cancel popup; a plan has a visible delete button.
-- The "make a backup first" warning is visible in the import section before a file is chosen.
-- Errors are red toasts at the bottom.
-- Start with nothing configured: the normal screens, empty, each with one button to add what is missing; no guided tour.
-- Regions cannot be renamed, as on the desktop.
-
-**Landscape**
-
-- Landscape is included from the start: a navigation rail on the left, sheets of limited width, modes with a settings column on the right.
-- The status bar and gesture bar areas are part of every screen (24 px each at the top and bottom).
-
-## How the phone app gets this look
-
-- The screens are built with Ionic's own components wherever one exists; nothing Ionic provides is rebuilt.
-- The look comes from the design system's stylesheet (`apps/mobile/src/theme/design-system/`, the `.mob-*` classes) and its tokens; the Ionic components are themed to it.
-- The fonts (Outfit and DM Mono) are bundled in the app. The mockups load them from Google Fonts, so a picture needs a network connection to be drawn in the right font.
-
-## Screens
-
-The titles are those of the mockups.
-
-### Ciel
-
-- Ciel
-- Ciel, objet sélectionné
-- Ciel, recherche
-- Ciel, affichage
-- Ciel, calques de la carte
-- Ciel, nom d'un calque (appui long)
-- Ciel, photo sélectionnée
-- Ciel, cadre sélectionné
-- Ciel, déplacer le cadre
-- Ciel, ordre d'affichage
-- Ciel, premier démarrage
-
-### Galerie
-
-- Galerie
-- Galerie, données de l'ordinateur
-- Galerie, ajouter une photo
-- Importer des photos
-- Importer, méthode de placement
-- Photo
-- Photo, zoomée
-- Photo, informations
-- Photo, modifier les infos
-- Placer la photo
-- Identifier les étoiles
-- Identifier les étoiles, choisir une étoile
-- Identifier les étoiles, choisir sur la carte
-- Identifier un astéroïde
-- Astéroïdes trouvés
-- Identifier des supernovae
-- Identifier des comètes
-- Galerie, aucune photo
-- Galerie, résolutions en cours
-- Importer, résolution échouée
-- Importer, hors connexion
-
-### Cibles
-
-- Cibles
-- Cibles, types d'objets
-- Cibles, filtres
-- Dessiner une région
-- Cibles, régions du ciel
-- Cibles, aucun setup
-- Cibles, aucun résultat
-
-### Plans
-
-- Plans
-- Détail du plan
-- Plan, actions
-- Plan, détail d'une cible
-- Plan, fenêtre d'observation
-- Plans, aucun plan
-
-### Réglages
-
-- Réglages
-- Réglages (Settings)
-- Réglages, setups (GearSetups)
-- Équipement, modifier le setup (GearSetupEdit)
-- Équipement, choisir un télescope (GearPicker)
-- Réglages, lieu d'observation (Location)
-- Lieu, horizon indisponible (HorizonUnavailable)
-- Lieu, position refusée (LocationDenied)
-- Réglages, exporter et importer (Backup)
-- Cibles (Targets)
-- Cibles, types d'objets (TargetsTypes)
-- Cibles, filtres (TargetsFilter)
-- Cibles, régions du ciel (Regions)
-- Cibles, aucun setup (TargetsNoSetup)
-- Cibles, aucun résultat (TargetsNoMatch)
-- Plans (Plans)
-- Détail du plan (PlanDetail)
-- Plan, actions (PlanActions)
-- Plan, détail d'une cible (PlanEntry)
-- Plan, fenêtre d'observation (ObsWindow)
-- Plans, aucun plan (PlansEmpty)
-- Plan, confirmer la suppression (ConfirmDelete)
-- Réglages, connexion à l'ordinateur
-- Réglages, ordinateur connecté
-- Réglages, setups
-- Équipement, modifier le setup
-- Équipement, choisir un télescope
-- Réglages, lieu d'observation
-- Lieu, horizon indisponible
-- Lieu, position refusée
-- Réglages, exporter et importer
-
-### Feuilles et dialogues partagés
-
-- Plan, confirmer la suppression
-- Identification, explication ouverte
-- Photo, choisir une identification
+- Every delete or clear asks for confirmation in a dialog.
+- An error is a red toast at the bottom of the screen.
+- A screen with no data shows its normal layout, empty, with one button to add what is missing.
+- Importing a backup: when a setup or a plan already exists with different content, the user chooses between replacing it, keeping both, and not importing it.

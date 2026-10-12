@@ -1,7 +1,7 @@
 /**
  * The phone's `HttpClient`, over the WebView's `fetch` (the one Capacitor patches to go through the native
  * layer). It behaves like the server's (`server/http-client.ts`): forms are built with `FormData` and `Blob`
- * (the form astrometry.net accepts from the phone, `docs/dev/mobile/spike-results.md` decision 7), response
+ * (the form astrometry.net accepts from the phone, see `docs/dev/mobile-architecture.md`), response
  * header names are lower-case, and a 4xx or 5xx status does not reject.
  *
  * Difference: the patched `fetch` may ignore an abort, so the timeout is a race between the request and a
