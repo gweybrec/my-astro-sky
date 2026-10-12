@@ -8,6 +8,9 @@
      `min-height` reads `--safe-top` without a fallback; a browser run overrides them on `<html>`. */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Landscape: a display cut-out or the 3-button navigation bar sits at the left or the right edge (rotation 1 or 3). */
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 
   --ion-font-family: var(--font-sans);
   --ion-background-color: var(--bg-app);
@@ -103,9 +106,9 @@ ion-tab-button:active .mob-tab-pill {
 @media (orientation: landscape) {
   ion-tabs {
     box-sizing: border-box;
-    padding-left: calc(var(--rail-width) + env(safe-area-inset-left, 0px));
+    padding-left: calc(var(--rail-width) + var(--safe-left, 0px));
     /* the navigation bar of a 3-button device sits at the right edge in landscape */
-    padding-right: env(safe-area-inset-right, 0px);
+    padding-right: var(--safe-right, 0px);
   }
   ion-tab-bar {
     position: absolute;
@@ -118,7 +121,7 @@ ion-tab-button:active .mob-tab-pill {
     flex-direction: column;
     justify-content: center;
     gap: var(--space-2);
-    padding: var(--ion-safe-area-top) 0 var(--ion-safe-area-bottom) env(safe-area-inset-left, 0px);
+    padding: var(--ion-safe-area-top) 0 var(--ion-safe-area-bottom) var(--safe-left, 0px);
     box-shadow: inset -1px 0 0 var(--border-panel);
   }
   ion-tab-button {
@@ -126,6 +129,15 @@ ion-tab-button:active .mob-tab-pill {
     height: 64px;
     width: 100%;
   }
+}
+
+/* ── A page pushed above the tabs (the top-level outlet's pages other than the tabs page, whose `ion-tabs` already
+   keeps the side insets): the top bar, the content, the floating plus and the footer stay clear of the system bars at
+   the left and right edges. */
+ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page) {
+  box-sizing: border-box;
+  padding-left: var(--safe-left, 0px);
+  padding-right: var(--safe-right, 0px);
 }
 
 /* ── Pages: the design system's scrolling area fills the page's content. */

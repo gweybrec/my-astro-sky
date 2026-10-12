@@ -37,6 +37,24 @@ export interface CapacitorBlobStore extends BlobStore {
   url(name: string): string;
 }
 
+/**
+ * Creates a folder unless it exists. The plugin logs every rejected call in the console, and `mkdir` rejects on an
+ * existing folder, so the folder is looked at first. A real problem shows on the write that follows.
+ */
+export async function ensureDirectory(
+  filesystem: Pick<CapacitorFilesystem, 'stat' | 'mkdir'>,
+  directory: string,
+  path: string,
+): Promise<void> {
+  try {
+    await filesystem.stat({ path, directory });
+    return;
+  } catch {
+    // Not there yet.
+  }
+  await filesystem.mkdir({ path, directory, recursive: true }).catch(() => undefined);
+}
+
 /** Bytes per piece written; each piece is encoded on its own, so no base64 text of a whole file exists. */
 export const BLOB_PIECE_BYTES = 8 * 1024 * 1024;
 
@@ -114,11 +132,7 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
 
   let folderReady: Promise<void> | null = null;
   const ensureFolder = (): Promise<void> => {
-    folderReady ??= filesystem.mkdir({ path: folder, directory, recursive: true }).then(
-      () => undefined,
-      // The folder may already exist; a real problem shows on the write that follows.
-      () => undefined,
-    );
+    folderReady ??= ensureDirectory(filesystem, directory, folder);
     return folderReady;
   };
 

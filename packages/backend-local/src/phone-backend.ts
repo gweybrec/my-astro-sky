@@ -13,6 +13,7 @@ import { createBundledCatalogs } from './bundled-catalogs';
 import {
   createCapacitorBlobStore,
   writeFileInPieces,
+  ensureDirectory,
   type CapacitorFilesystem,
 } from './capacitor-blob-store';
 import { createCapacitorSqliteDb, type CapacitorSqliteConnection } from './capacitor-sqlite-db';
@@ -112,9 +113,7 @@ export async function createPhoneBackend(platform: PhonePlatform): Promise<Backe
     newZip: newZipBundle,
     // The share sheet takes a file address: write the file in the cache directory, then share it.
     saveFile: async (name, bytes) => {
-      await filesystem
-        .mkdir({ path: 'exports', directory: directories.cache, recursive: true })
-        .catch(() => undefined);
+      await ensureDirectory(filesystem, directories.cache, 'exports');
       const path = `exports/${name}`;
       await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
       const { uri } = await filesystem.getUri({ path, directory: directories.cache });

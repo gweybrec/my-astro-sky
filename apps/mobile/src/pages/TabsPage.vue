@@ -21,7 +21,7 @@ const tabs = [
 </script>
 
 <template>
-  <IonPage>
+  <IonPage class="mob-tabs-page">
     <IonTabs>
       <IonRouterOutlet />
       <!-- eslint-disable-next-line vue/no-deprecated-slot-attribute -- slot of Ionic's web component, not a Vue 2 slot -->

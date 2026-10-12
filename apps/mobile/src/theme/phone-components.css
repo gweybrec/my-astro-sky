@@ -262,8 +262,13 @@ ion-checkbox.mob-check-row {
   --checkbox-background: var(--border-white-md);
   --checkbox-background-checked: var(--accent-color);
   --checkmark-color: var(--bg-app);
-  --checkmark-width: 3px;
+  /* The board's tick is the browser's own: thin (about 2 px) and about three quarters of the box. Ionic's mark fills
+     the box, so it is scaled down; the stroke is set so that it stays about 2 px after the scale. */
+  --checkmark-width: 2.6px;
   --transition: none;
+}
+ion-checkbox.mob-check-row::part(mark) {
+  transform: scale(0.75);
 }
 ion-checkbox.mob-check-row::part(label) {
   margin: 0 var(--space-7) 0 0;
@@ -487,9 +492,25 @@ ion-item.mob-entry::part(native) {
   align-items: center;
   gap: var(--space-7);
 }
+/* The handle is the board's 48 px touch box with the six dots centred in it (board "Détail du plan": dots 16 px from the
+   edge, title at 56 px). `ion-reorder` is not a button, so the box and the icon size are set here, not left to inheritance. */
 ion-reorder.mob-drag {
   display: flex;
+  flex: none;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+  margin: 0;
+  padding: 0;
   --color: var(--text-primary);
+}
+ion-reorder.mob-drag svg {
+  flex: none;
+  width: var(--space-9);
+  height: var(--space-9);
 }
 
 /* ── Sheets: `ion-modal.mob-sheet-modal` at the bottom, with the height of its content (the board's `.mob-sheet--auto`). */

@@ -3,10 +3,11 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BLOB_PIECE_BYTES,
   createCapacitorBlobStore,
+  ensureDirectory,
   toBase64,
   toBase64Js,
 } from '@myastrosky/backend-local/capacitor-blob-store';
@@ -89,5 +90,21 @@ describe('createCapacitorBlobStore', () => {
   it('refuses names that leave the folder', async () => {
     const store = await openPhoneStore();
     await expect(store.put('../x.jpg', new Uint8Array(1))).rejects.toThrow();
+  });
+});
+
+describe('ensureDirectory', () => {
+  it('does not ask the plugin to create a folder that exists (it would log the refusal)', async () => {
+    const stat = vi.fn().mockResolvedValue({ size: 0 });
+    const mkdir = vi.fn();
+    await ensureDirectory({ stat, mkdir }, 'DATA', 'uploads');
+    expect(mkdir).not.toHaveBeenCalled();
+  });
+
+  it('creates a missing folder and tolerates a refusal', async () => {
+    const stat = vi.fn().mockRejectedValue(new Error('missing'));
+    const mkdir = vi.fn().mockRejectedValue(new Error('exists'));
+    await expect(ensureDirectory({ stat, mkdir }, 'DATA', 'uploads')).resolves.toBeUndefined();
+    expect(mkdir).toHaveBeenCalledWith({ path: 'uploads', directory: 'DATA', recursive: true });
   });
 });
