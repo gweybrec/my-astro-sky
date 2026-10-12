@@ -50,6 +50,7 @@ export function measureInPage([rules, scopeSel]) {
       bPos,
       value: aPos - bPos,
       kind: rule.minimum ? 'min' : 'abs',
+      word: rule.word,
       marks: marks ?? [aPos, bPos],
     });
     els.push([a, b]);
@@ -224,6 +225,16 @@ export function measureInPage([rules, scopeSel]) {
       const hi = ends.reduce((m, l) => (l[1] > m[1] ? l : m));
       for (const [el, x] of ends) add(rule, el, hi[0], 'x', x, hi[1]);
     },
+    // Every matched control is at least `min` wide and high (the phone's touch target), whatever the stylesheet order.
+    touchSize(rule) {
+      const min = length(rule.min);
+      for (const el of all(rule.items)) {
+        if (!shown(el)) continue;
+        const box = R(el);
+        add(rule, el, null, 'x', box.width, min);
+        add(rule, el, null, 'y', box.height, min);
+      }
+    },
     // Inside each container (`within`), the matched boxes share one left edge (`lefts`) and one right edge (`rights`).
     edges(rule) {
       for (const container of all(rule.within)) {
@@ -329,7 +340,7 @@ export const figureOf = (m) => (m.kind === 'min' ? Math.max(0, -m.value) : Math.
 /** "7.0 px lower", "4.0 px to the right", "3.0 px too close". */
 export function describe(m) {
   const px = `${figureOf(m).toFixed(1)} px`;
-  if (m.kind === 'min') return `${px} too close`;
+  if (m.kind === 'min') return `${px} ${m.word ?? 'too close'}`;
   if (m.axis === 'y') return `${px} ${m.value > 0 ? 'lower' : 'higher'}`;
   return `${px} ${m.value > 0 ? 'to the right' : 'to the left'}`;
 }

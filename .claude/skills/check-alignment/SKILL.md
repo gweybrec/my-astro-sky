@@ -39,7 +39,7 @@ It picks free ports, makes a temporary data folder, starts the desktop's server 
 
 ## Adding a view or a rule
 
-- A new screen or sheet: add `{ name, path, ready, open?, scope? }` to `views` in `rules/mobile.mjs` (`open` is a list of `{ click }`, `{ fill, text }`, `{ wait }`, `{ pause }`; `scope` is the sheet's selector). Seed any data it needs in `seed`.
+- A new screen or sheet: add `{ name, path, ready, open?, scope? }` to `views` in `rules/mobile.mjs` (`clearStorage` lists keys removed before the page loads, for a first start; `open` is a list of `{ click }`, `{ fill, text }`, `{ wait }`, `{ pause }`; `scope` is the sheet's selector). Seed any data it needs in `seed`.
 - Every screen with at least two elements on a line or a column needs its views here, including each state reached by typing or tapping (search results, an open sheet, a selected object); a state the views cannot reach yet means extending the actions, not leaving it out.
 - A new kind of row: extend the selectors of the existing rules, or add a rule of an existing type (types are the functions of `scripts/engine.mjs`). A new type is one generic function there, with selectors as parameters.
 - Another app: a new file in `rules/` with the same exports (listed at the top of `rules/mobile.mjs`); the engine is not changed.

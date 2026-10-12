@@ -133,15 +133,16 @@ async function main() {
       deviceScaleFactor,
     });
     await context.addInitScript(
-      ([entries, key, lang]) => {
+      ([entries, key, lang, cleared]) => {
         try {
           for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
           localStorage.setItem(key, lang);
+          for (const k of cleared) localStorage.removeItem(k);
         } catch {
           /* the page then starts with its defaults */
         }
       },
-      [seeded.storage ?? {}, app.language.key, job.lang],
+      [seeded.storage ?? {}, app.language.key, job.lang, job.view.clearStorage ?? []],
     );
     if (app.cachedPrefixes?.length) {
       await context.route(
