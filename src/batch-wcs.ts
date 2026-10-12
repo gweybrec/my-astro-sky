@@ -1,6 +1,6 @@
 import type { BatchItem } from './batch-types';
 import type { PlateSolveResult } from '@myastrosky/core/types';
-import { findDSOIdsFromCorrespondences } from './dso-catalog';
+import { wcsPhotoMetadata } from '@myastrosky/core/wcs-photo-metadata';
 
 export interface ApplyWcsResult {
   /** True when the result carried usable correspondences and the item was placed. */
@@ -26,33 +26,21 @@ export function applyWcsResultToItem(
     return { applied: false, aspectMismatch: false };
   }
 
+  const meta = wcsPhotoMetadata(result, imgWidth, imgHeight)!;
   item.wcsResult = result;
   item.solveCorrespondences = result.correspondences;
   item.status = 'success';
 
-  // WCS solving doesn't return DSOs from the server; derive them from the solved
-  // correspondences against the local catalog (like the async solvers).
-  item.dsoIds =
-    result.dsoIds && result.dsoIds.length > 0
-      ? [...result.dsoIds]
-      : findDSOIdsFromCorrespondences(result.correspondences, imgWidth, imgHeight);
-
-  if (result.dateObs && !item.observationDate) {
-    item.observationDate = result.dateObs;
-  }
-  if (result.expTime && result.stackCnt && item.integrations.length === 0) {
-    item.integrations = [
-      {
-        frames: Math.round(result.stackCnt),
-        seconds: Math.round(result.expTime),
-        filter: result.filter ?? '',
-      },
-    ];
+  // WCS solving doesn't return DSOs from the server; they are derived from the solved correspondences.
+  item.dsoIds = meta.dsoIds;
+  if (meta.observationDate && !item.observationDate) item.observationDate = meta.observationDate;
+  if (meta.integrations.length > 0 && item.integrations.length === 0) {
+    item.integrations = meta.integrations;
   }
   // Merge parsed capture fields, keeping any value the user already entered.
-  if (result.captureDetails) {
+  if (meta.captureDetails) {
     const merged = { ...item.captureDetails };
-    for (const [k, v] of Object.entries(result.captureDetails)) {
+    for (const [k, v] of Object.entries(meta.captureDetails)) {
       if (merged[k] === undefined || merged[k] === '') merged[k] = v;
     }
     item.captureDetails = merged;

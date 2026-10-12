@@ -59,32 +59,48 @@ export const HORIZON_FILE_TYPES: FileTypes = {
   extensions: ['.csv', '.txt', '.hor', '.horizon'],
 };
 
-/** Lets the user pick one file; null when the picker is cancelled. */
-export async function pickFile(types: FileTypes): Promise<File | null> {
+/** Photos: JPEG, PNG, WebP and the solved astro formats. FITS has no MIME type, so the phone's picker offers every file. */
+export const PHOTO_FILE_TYPES: FileTypes = {
+  mimeTypes: [],
+  extensions: ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.fit', '.fits'],
+};
+
+/** Lets the user pick files (one, or several with `multiple`); empty when the picker is cancelled. */
+export async function pickFiles(types: FileTypes, multiple = false): Promise<File[]> {
   if (isNativePlatform()) {
     const { FilePicker } = await import('@capawesome/capacitor-file-picker');
     let result;
     try {
-      result = await FilePicker.pickFiles({ types: types.mimeTypes, limit: 1 });
+      result = await FilePicker.pickFiles({ types: types.mimeTypes, limit: multiple ? 0 : 1 });
     } catch (error) {
       // The plugin rejects when the picker is closed without a choice.
-      if (error instanceof Error && /cancel/i.test(error.message)) return null;
+      if (error instanceof Error && /cancel/i.test(error.message)) return [];
       throw error;
     }
-    const picked = result.files[0];
-    if (!picked) return null;
-    if (picked.blob) return new File([picked.blob], picked.name, { type: picked.mimeType });
-    if (!picked.path) return null;
-    // The file stays where it is: it is read through the WebView's address of the picked content.
-    const blob = await (await fetch(Capacitor.convertFileSrc(picked.path))).blob();
-    return new File([blob], picked.name, { type: picked.mimeType });
+    const files: File[] = [];
+    for (const picked of result.files) {
+      if (picked.blob) {
+        files.push(new File([picked.blob], picked.name, { type: picked.mimeType }));
+      } else if (picked.path) {
+        // The file stays where it is: it is read through the WebView's address of the picked content.
+        const blob = await (await fetch(Capacitor.convertFileSrc(picked.path))).blob();
+        files.push(new File([blob], picked.name, { type: picked.mimeType }));
+      }
+    }
+    return files;
   }
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
+    input.multiple = multiple;
     input.accept = types.extensions.join(',');
-    input.addEventListener('change', () => resolve(input.files?.[0] ?? null));
-    input.addEventListener('cancel', () => resolve(null));
+    input.addEventListener('change', () => resolve(Array.from(input.files ?? [])));
+    input.addEventListener('cancel', () => resolve([]));
     input.click();
   });
+}
+
+/** Lets the user pick one file; null when the picker is cancelled. */
+export async function pickFile(types: FileTypes): Promise<File | null> {
+  return (await pickFiles(types))[0] ?? null;
 }

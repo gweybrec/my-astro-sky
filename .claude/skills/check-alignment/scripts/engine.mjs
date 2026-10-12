@@ -304,11 +304,18 @@ export function scaleText(factor) {
   });
 }
 
-/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { tapCentre } (a click at the middle of an element), { wait } (a selector) or { pause } (milliseconds). */
+/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { tapCentre } (a click at the middle of an element), { chooseFiles, files } (a click that opens the file picker, answered with the files), { wait } (a selector) or { pause } (milliseconds). */
 export async function runActions(page, actions = []) {
   for (const action of actions) {
     if (action.click) await page.locator(action.click).first().click({ timeout: 10000 });
-    else if (action.tapCentre) {
+    else if (action.chooseFiles) {
+      // A click that opens the file picker, answered with the given files (paths from the repository's root).
+      const [chooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 10000 }),
+        page.locator(action.chooseFiles).first().click({ timeout: 10000 }),
+      ]);
+      await chooser.setFiles(action.files);
+    } else if (action.tapCentre) {
       const box = await page.locator(action.tapCentre).first().boundingBox();
       if (!box) throw new Error(`"${action.tapCentre}" has no box to click`);
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);

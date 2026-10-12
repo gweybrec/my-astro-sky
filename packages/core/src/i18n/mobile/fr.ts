@@ -1,7 +1,18 @@
 const fr = {
   info: { label: 'Informations : {title}' },
   tabs: { sky: 'Ciel', targets: 'Cibles', navLabel: 'Navigation' },
-  gallery: { searchLabel: 'Rechercher une photo', empty: "Aucune photo pour l'instant" },
+  gallery: {
+    searchLabel: 'Rechercher une photo',
+    empty: "Aucune photo pour l'instant",
+    chooseFiles: 'Choisir des fichiers',
+    formats: 'JPEG, PNG, TIF, TIFF, FIT, FITS, XISF',
+    fromPhone: 'Depuis la galerie du téléphone',
+    importOne: 'Importer 1 photo',
+    importMany: 'Importer {n} photos',
+    alreadySolved: '✓ Déjà résolue',
+    toPlace: 'À placer',
+    import: 'Importer',
+  },
   plans: {
     searchPlaceholder: 'Rechercher un plan…',
     searchLabel: 'Rechercher un plan',

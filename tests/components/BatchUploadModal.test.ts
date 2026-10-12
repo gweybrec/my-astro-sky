@@ -23,6 +23,9 @@ vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn()
 vi.mock('../../src/batch-place', () => ({ placeBatchItem: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../src/autocomplete-utils', () => ({ filterLabelCandidates: () => [] }));
 vi.mock('../../src/dso-catalog', () => ({ findDSOIdsFromCorrespondences: () => [] }));
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
+  findDSOIdsFromCorrespondences: () => [],
+}));
 vi.mock('../../src/file-utils', () => ({
   stripExtension: (s: string) => s.replace(/\.[^.]+$/, ''),
 }));

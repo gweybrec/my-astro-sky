@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { IonItem } from '@ionic/vue';
 import AppIcon from './AppIcon.vue';
+import PhoneBusy from './PhoneBusy.vue';
 import chevronIcon from '../icons/chevron-right.svg?raw';
 
 // A list row (`.mob-row`) on Ionic's item: title, up to a few lines under it, a leading icon, a trailing value,
@@ -19,6 +20,10 @@ withDefaults(
     chevron?: boolean;
     /** SVG markup of a leading icon in a round tinted holder. */
     lead?: string;
+    /** SVG markup of a picture placeholder in a square holder (a file in a list). */
+    thumb?: string;
+    /** How the line under the title reads: a finished state (green), or a running operation (spinner and accent). */
+    status?: 'success' | 'busy';
     /** The delete row: lead and title in the danger colour. */
     danger?: boolean;
     /** Three-line rows take more room above and below. */
@@ -56,12 +61,23 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
         ><span class="mob-swatch" :style="{ background: swatch }"
       /></span>
       <span v-else-if="lead" class="mob-row-lead"><AppIcon :svg="lead" /></span>
+      <span v-else-if="thumb" class="mob-row-thumb"><AppIcon :svg="thumb" /></span>
       <span class="mob-row-body">
         <span class="mob-row-title m-body" :class="{ 'mob-row-title--wrap': wrap }">{{
           title
         }}</span>
-        <span v-for="line in subs" :key="line" class="mob-row-sub mob-row-sub--wrap m-secondary"
-          ><span v-if="mono" class="m-mono">{{ line }}</span
+        <span
+          v-for="line in subs"
+          :key="line"
+          class="mob-row-sub mob-row-sub--wrap m-secondary"
+          :class="{
+            'mob-status--success': status === 'success',
+            'mob-row-sub--busy': status === 'busy',
+          }"
+          ><PhoneBusy v-if="status === 'busy'" :label="line" /><span
+            v-else-if="mono"
+            class="m-mono"
+            >{{ line }}</span
           ><template v-else>{{ line }}</template></span
         >
       </span>
