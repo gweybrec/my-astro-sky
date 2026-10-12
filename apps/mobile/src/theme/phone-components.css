@@ -980,3 +980,26 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
 .mob-map-sheet .mob-sheet-header {
   touch-action: none;
 }
+
+/* The map's object sheet slides up when it opens and down when it closes, as Ionic's own sheets do. */
+:root {
+  --sheet-slide-duration: 0.3s;
+}
+.mob-sheet-slide-enter-active,
+.mob-sheet-slide-leave-active {
+  transition: transform var(--sheet-slide-duration) ease;
+}
+.mob-sheet-slide-enter-from,
+.mob-sheet-slide-leave-to {
+  transform: translateY(100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mob-sheet-slide-enter-active,
+  .mob-sheet-slide-leave-active {
+    transition: none;
+  }
+}
+/* A row of fewer actions than the board's five sits at the start of the row, not spread from edge to edge. */
+.mob-icon-row--start {
+  justify-content: flex-start;
+}

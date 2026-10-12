@@ -132,7 +132,12 @@ const dragEnd = () => (dragFrom = null);
     </div>
     <PhoneFacts :facts="facts" :columns="facts.length === 3 ? 3 : 2" />
     <!-- The screens behind these actions (frames, mosaics, plan picker, edit, details) have no board yet. -->
-    <div class="mob-icon-row" role="group" :aria-label="t('mobile.sky.objectActions')">
+    <div
+      class="mob-icon-row"
+      :class="{ 'mob-icon-row--start': selection.kind !== 'dso' }"
+      role="group"
+      :aria-label="t('mobile.sky.objectActions')"
+    >
       <PhoneIconButton waiting :label="t('fovOverlay.addFrame')"
         ><AppIcon :svg="addFrameIcon"
       /></PhoneIconButton>
