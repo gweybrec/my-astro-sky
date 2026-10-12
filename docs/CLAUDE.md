@@ -34,3 +34,27 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 - `CLAUDE.md` itself holds only AI-agent guidance (commands, conventions, brief pointers) — it does not duplicate the content of the doc files
 - Do not create new doc files without updating this table and the Copilot instructions (`.github/copilot-instructions.md`)
 - The `docs/dev/ui/` chapters (`tokens.md`, `components.md`, `patterns.md`, `mobile.md`) are children of the `ui-guidelines.md` hub — reached via its Contents links, intentionally **not** listed separately in `docs/_sidebar.md` or in this table
+
+## What documentation is, and what never goes into the repository
+
+Documentation describes **how the software works and the rules to follow when changing it**. It is written in the present tense and stays true until the code changes.
+
+**Never write in a doc file (nor in any tracked file):**
+
+- progress, status or "done / to do" lists; approval or review records; "as built" or test logs; who decided what and when;
+- dates of decisions, work-item or card numbers, plan phases, names of test sessions;
+- references to screenshots or to files that are not in the repository;
+- plans for features that do not exist yet (a doc may state a rule for future code, not a roadmap).
+
+That is ticketing. It belongs in a ticketing system or in local, untracked notes; report it to the user in the conversation instead.
+
+**Never commit, anywhere in the repository:**
+
+- **Screen captures and rendered pictures** of the app or of mockups (before/after, comparison, device captures). They take space for ever and go stale. Keep them under the git-ignored `.playwright-mcp/`. The only pictures in git are those the product ships or its user guide shows.
+- **Mockups and design sources** (mockup files, design-system exports, their generators). They live in Claude Design only. A local copy, when needed to build a screen, stays in the git-ignored `design/`. What the app needs at run time (its stylesheet, tokens, icons) lives in the app as code.
+- **Work tracking**: task cards, plans, status tables, review notes. Local copies stay in the git-ignored `.claude/work-packages/` and `.claude/tracking/`.
+- Generated or bulky files (build outputs, exports, archives, test data dumps).
+
+**Ask the user first, and wait for an explicit yes,** before adding a new top-level folder, a new kind of file, or anything that is not source code, tests, build configuration or documentation as defined above. A plan the user approved is not that yes.
+
+When a finding is worth keeping (a measured constraint, a platform quirk), write it as a timeless fact in the page that explains the code it affects, without the story of how it was found.
