@@ -14,7 +14,7 @@ Read first: `apps/mobile/CLAUDE.md` and `docs/dev/ui/mobile.md` (the rules every
 
 ## Step 1 — Start from the mockup
 
-- Mockups live in Claude Design only. The user gives the screen's title (the table in `docs/dev/ui/mobile.md` lists them). A local, git-ignored copy of their source may exist in `design/`; use it when present.
+- Mockups live in Claude Design only. The user gives the screen's title. A local, git-ignored copy of their source may exist in `design/`; use it when present.
 - Structure, order, texts, icons, states and sheets come from the mockup. If a state, a sheet or a control is missing from it, **ask the user**. Never design it yourself.
 - Never print a text, a description, an icon or a control the mockup does not show.
 
