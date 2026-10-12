@@ -16,8 +16,8 @@ needs it — that keeps context small for small features.
   anti-patterns to avoid. Read when building or changing a widget.
 - **[Layout, Patterns & Known Issues](ui/patterns.md)** — panel/modal layout constants, row-label
   utilities, the input-hints rule, and the live design-debt list.
-- **[Phone App Mockups](ui/mobile.md)** — the rules that bind every phone screen and the list of
-  mockups with their source files. Read before building or changing a phone screen.
+- **[Phone UI Rules](ui/mobile.md)** — the rules every screen of the phone app follows: Ionic components,
+  layout and alignment, navigation, sheets, texts, forms. Read before building or changing a phone screen.
 
 > These chapters live under `docs/dev/ui/` and are intentionally **not** listed in the sidebar —
 > reach them through the links above. Only this hub appears under _Developer Docs_.

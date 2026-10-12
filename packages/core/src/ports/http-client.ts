@@ -2,7 +2,7 @@ export interface HttpRequest {
   method: 'GET' | 'POST';
   url: string;
   headers?: Readonly<Record<string, string>>;
-  /** A text body, or a multipart form (the phone sends a file this way; see `docs/dev/mobile/spike-results.md`). */
+  /** A text body, or a multipart form (the phone sends a file this way; see `docs/dev/mobile-architecture.md`). */
   body?:
     | string
     | {

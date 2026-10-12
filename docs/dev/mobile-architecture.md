@@ -1,259 +1,142 @@
 # Mobile Architecture
 
-This document describes the architecture for the Android app and the shared code strategy.
+How the desktop app and the phone app share their code, and how the phone app runs without a server.
 
-## 3. Target architecture
-
-The desktop app **stays at the repo root** (`src/`, `server/`, `electron/` do not move). This avoids rewriting every config, hook, skill and doc path. New code goes into workspaces.
+## Layout
 
 ```
-src/, server/, electron/        Desktop + server + Electron — unchanged locations, gradually thinned.
-packages/core/                  Pure TS. tsconfig lib ["ES2022"], types [] → compiler-enforced purity.
-                                A hand-written env.d.ts declares only: console, TextEncoder/TextDecoder, timers.
-                                astronomy, projection, affine, mosaic, recommender, identify, WCS/FITS/TIFF/XISF decoders,
-                                domain types, i18n (platform injected), CATALOG REGISTRIES (state + lookups),
-                                Backend + port interfaces, SERVICES, migrations.
-packages/render/                Canvas 2D painters + scene + Pointer-Events gesture controller (theme injected).
-packages/backend-http/          HttpBackend(baseUrl, token?) — today's api.ts behind the Backend interface.
-packages/backend-local/         LocalBackend = core services + ports (adapters supplied by the shell).
-packages/app-state/             The data functions (api.ts), the backend holder (backend.ts) and the stores of backend data
-                                (plans, poi-categories, sky-regions, settings). Vue + Pinia + core only; import it as `@myastrosky/app-state/<name>`.
-apps/mobile/                    Capacitor + Ionic Vue. LocalBackend (standalone) or HttpBackend (LAN connect).
+src/, server/, electron/   The desktop app, its Express server and the Electron shell.
+packages/core/             Platform-neutral TypeScript: astronomy, projection, recommender, file decoders,
+                           domain types, i18n, catalogue registries, the services, the ports, the database schema.
+packages/app-state/        The data functions the screens call (api.ts), the backend holder, and the Pinia
+                           stores that hold backend data (plans, POI categories, sky regions, settings).
+packages/backend-http/     The backend that calls the Express server's routes.
+packages/backend-local/    The backend that calls the services directly, and the phone's platform adapters.
+apps/mobile/               The phone app: Capacitor + Ionic Vue.
 ```
+
+Every package is consumed as TypeScript source (`"exports": { "./*": "./src/*.ts" }`), imported as `@myastrosky/<package>/<module>`.
 
 ### Dependency rules
 
-These are enforced by an ESLint `no-restricted-imports` rule set to _error_, plus the tsconfig `lib` setting:
+Enforced by ESLint (`no-restricted-imports` at error) and, for core, by its `tsconfig` (`lib: ["ES2022"]`, `types: []`).
 
-- `core` imports nothing: no vue, pinia, `@capacitor/*`, `node:*`, `src/` or `server/`.
-- `render` imports `core` only.
-- `app-state` imports `core` plus vue and pinia.
-- Apps import packages and never each other.
-- `server` imports `core` only.
+| Package         | May import                                                                     |
+| --------------- | ------------------------------------------------------------------------------ |
+| `core`          | Nothing outside itself except `fflate`. No DOM, Node, Vue, Pinia or Capacitor. |
+| `app-state`     | `core`, Vue, Pinia.                                                            |
+| `backend-http`  | `core`. Browser APIs are allowed.                                              |
+| `backend-local` | `core`, `fflate`. Browser APIs are allowed; plugin objects are passed in.      |
+| `apps/mobile`   | The packages, Ionic, Capacitor. Never the desktop's `src/` or `server/`.       |
+| `server`        | `core`.                                                                        |
+| `src`           | The packages. A lint rule forbids one-line re-export files of package modules. |
 
-### The phone app (`apps/mobile`)
+## How a screen reaches its data
 
-- `@myastrosky/mobile` (private workspace): Vite + Vue 3 + Ionic Vue + Capacitor Android, five tabs (Ciel, Galerie, Cibles, Plans, Réglages) on Ionic's tabs, the look from the design system's stylesheet (`src/theme/design-system/`) mapped to Ionic's variables in `src/theme/ionic-tokens.css`, bundled fonts (`@fontsource/outfit`, `@fontsource/dm-mono`).
-- Start-up (`src/platform-init.ts`): device storage (`createPreferencesStore` over the Preferences plugin), language, backend (`createPhoneBackend` on the real plugins; the HTTP backend through a Vite proxy in a desktop browser), then the shared hooks.
-- The desktop does not pick it up: the Docker runtime stage installs only the root and `packages/*` (`npm ci --workspace=…`), and the Electron package contains none of its dependencies.
+A screen calls a function of `@myastrosky/app-state/api` (`getPlans()`, `uploadPhoto()`, `photoFileUrl()`…). Each function calls the one **backend** object (`getBackend()` in `packages/app-state/src/backend.ts`) and turns the `DomainError` it rejects with into the `Error` the screen shows: the translated message of the error's code (`serverErrors.<CODE>`), else the error's own message, else the function's fallback text. A screen never knows which backend is installed.
 
-### Catalog registries
+- **Desktop and web**: `src/platform-init.ts` installs the HTTP backend (`createHttpBackend`, `packages/backend-http/src/http-backend.ts`), which calls the Express routes.
+- **Phone**: `apps/mobile/src/platform-init.ts` installs the local backend (`createPhoneBackend`, `packages/backend-local/src/phone-backend.ts`), which calls the services directly on the phone's own database and files. In a desktop browser the phone app uses the HTTP backend through a Vite proxy, so that screens can be developed without a device.
 
-The DSO and star catalogs get a home in core:
+`getBackend()` throws when no backend was installed. Nothing in `src/` or `apps/mobile/src/` may `fetch` the server or build an `/uploads/` address itself; a lint rule fails on it.
 
-- `core/catalog/dso-registry.ts` and `core/catalog/star-registry.ts` hold the state, a setter (`setDsoCatalog(json, overrides, lang)`) and all lookups.
-- Each shell keeps only a loader, which fetches the data through `CatalogSource` and calls the setter.
-- This is what lets `dso-render-select`, `sky-hit-test`, `photo-placement` and the painters move into shared packages.
+### The `Backend` interface
 
-### Ports (platform adapters)
+`packages/core/src/backend.ts`. Its members are the services' own interfaces (`Pick<PlanService, …>`…), so the local backend hands out the services as they are. Only the members that take a file differ:
 
-Signatures were validated against the code.
+- `FileSource { name; size; read(); native? }` stands for a file; the HTTP backend sends `native` (a browser `File`) as it is, the local backend calls `read()`.
+- `TransferOptions { onProgress?; cancel? }`; `CancelSignal` is satisfied by the browser's `AbortSignal`.
+- `capabilities` says what a backend can do (`localSolvers`); screens test it, never the platform. `localSolvers` (ASTAP, solve-field and their probes) exists only on the HTTP backend.
+- Every method rejects with a `DomainError` (`kind`: `invalid`, `notFound`, `conflict`, `rateLimited`, `upstream`; and a `code`).
 
-| Port                                                                                                     | Desktop / server                                                                                          | Mobile                                                                                                                                                                         |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `SqlDb` (`query/get/run/exec/batch/transaction`, mutex)                                                  | better-sqlite3                                                                                            | @capacitor-community/sqlite (`executeSet`)                                                                                                                                     |
-| `BlobStore` (`put/get/size/remove`; `packages/core/src/ports/blob-store.ts`)                             | fs `uploads/` (`server/blob-store.ts`, `createFsBlobStore`)                                               | Filesystem plugin, files in pieces of 1 MB, read with `fetch` (`packages/backend-local/src/capacitor-blob-store.ts`, `createCapacitorBlobStore`, plus `url(name)`)             |
-| `ImageCodec` (`probe/bakeOrientation/thumbnail/encode/decode`; `packages/core/src/ports/image-codec.ts`) | sharp (`server/image-codec.ts`, `createSharpImageCodec`)                                                  | `createImageBitmap` + `OffscreenCanvas`, header parsed by `packages/core/src/image-header.ts` (`packages/backend-local/src/browser-image-codec.ts`, `createBrowserImageCodec`) |
-| `HttpClient`                                                                                             | Node fetch (`server/http-client.ts`)                                                                      | The WebView's `fetch`, which Capacitor patches to go through the native layer (`packages/backend-local/src/fetch-http-client.ts`)                                              |
-| `SecretCodec` (`packages/core/src/ports/secret-codec.ts`)                                                | AES-256-GCM, key from the environment (`server/secret-codec.ts`)                                          | AES-GCM with a non-extractable WebCrypto key kept in IndexedDB (`packages/backend-local/src/webcrypto-secret-codec.ts`)                                                        |
-| `BundleWriter` / `BundleReader` (`add`; `names/read/size`; `packages/core/src/ports/bundle.ts`)          | archiver / unzipper (`server/bundle-zip.ts`, `createZipResponseWriter`, `openZipBundle`)                  | fflate in memory (`packages/backend-local/src/bundle-fflate.ts`, done) + Share                                                                                                 |
-| `CatalogSource` (gear, stars, DSOs)                                                                      | `resources/*.json`, `public/data` (the star lists are built by `packages/core/src/catalog/star-lists.ts`) | the bundled files, fetched once (`packages/backend-local/src/bundled-catalogs.ts`)                                                                                             |
-| `PrefsStore` (the localStorage-only state)                                                               | localStorage                                                                                              | Capacitor Preferences                                                                                                                                                          |
-| `LocationProvider`, `I18nPlatform`                                                                       | navigator / Electron IPC                                                                                  | GPS / Preferences                                                                                                                                                              |
-| `Clock`, `IdGenerator`, `Logger`                                                                         | Date / uuid / `server/logger.ts`                                                                          | Date / `crypto.randomUUID` / console                                                                                                                                           |
+`packages/core/src/testing/backend-contract.ts` is one suite of cases that both backends pass (`tests/unit/backend-http-contract.test.ts`, `tests/unit/backend-local-contract.test.ts` on a synchronous and on an asynchronous database).
 
-**Phone adapters that differ from the server's** (`packages/backend-local/src/`; assembled by `createPhoneBackend` in `phone-backend.ts`, which takes the plugin objects as parameters: no adapter imports `@capacitor/*`).
+### Adding a data function
 
-- **Original picture bytes are kept when there is no orientation.** `bakeOrientation` returns the file unchanged when the EXIF orientation is absent or 1, and re-encodes (JPEG quality 0.9) only to apply a real rotation; the server always re-encodes with `sharp`. `probe` reads the header (`image-header.ts`) and never decodes; `decode` always gives 4 channels (a canvas has no other form), which the horizon service reads from the channel count it is given.
-- **The Astrometry key is protected by a non-extractable WebCrypto key, not the Android Keystore.** It needs no extra plugin, the code is the same on iOS, and the key is created once as non-extractable and kept in IndexedDB, so its bytes cannot be read or exported. A backup does not carry the key (the settings are not in it), so a restored phone asks for the key again. The stored form is `enc:v2:webcrypto:<iv>:<ciphertext>`; a value in the server's `enc:v1:aesgcm:` form decrypts to `null`. This protects against copying the database file, not against code running inside the app.
-- **A backup archive has a size limit.** The phone reads an archive entirely in memory, so `openZipBundle` takes `maxArchiveBytes` (`createPhoneBackend` sets 300 MB) and rejects a larger file before opening it with a `DomainError` `invalid` / `BACKUP_TOO_LARGE`.
-- **Network timeout is a race.** The patched `fetch` may ignore an abort, so the timeout rejects from a timer racing the request.
-- **Conformance suites** (`packages/core/src/testing/`: `blob-store-`, `image-codec-`, `http-client-conformance.ts`) run in Node against the server's adapters and, in WP3.7, on the device against the phone's.
+1. The method on the service, in `packages/core/src/services/`.
+2. The member in `Backend`.
+3. The method in the HTTP backend, and the route in `server/routes/`.
+4. A case in the contract suite.
+5. The function in `packages/app-state/src/api.ts`, with its fallback error text.
 
-### `SqlDb` details
+## Services
 
-- The port lives in `packages/core/src/ports/sql-db.ts`; the server adapter is `server/sqlite-adapter.ts` (`createBetterSqliteDb(getConnection())`).
-- Transaction rule: `SqlDb.transaction(body)` may only await calls on its `tx`; a `setImmediate` watchdog rolls back a body that awaits anything else, and transactions do not nest. Inside a transaction body, use only `tx`; calls on the outer `SqlDb` are rejected, and a function that must work in both places takes a `SqlTx` parameter (`SqlDb` is one).
-- Error codes (exported by the port): `SQL_TX_AWAITED_NON_DB`, `SQL_TX_NESTED`, `SQL_TX_OUTER_CALL`.
-- `getConnection()` in `db.ts` returns the better-sqlite3 handle; only the adapter should use it. `db.ts` itself only opens the file, creates the tables and runs the migrations at import time; it has no function that runs SQL.
+`packages/core/src/services/`, wired by `createServices` (`create-services.ts`) for the server and for the phone alike. The server's routes only transport: they read the request, call one method and send the result (`sendError` in `server/routes/http-errors.ts` maps a `DomainError` to a status and adds its code).
 
-### Backend interface types
+| Service                                                        | Owns                                                                                               |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `PlanService`                                                  | Night plans, their entries, mosaics and observation windows.                                       |
+| `PhotoService`                                                 | Photos and star correspondences; the upload pipeline (probe, orientation, stored file, thumbnail). |
+| `GearService`                                                  | The built-in and custom gear catalogue, gear setups.                                               |
+| `SettingsService`                                              | Settings, including the astrometry.net key through the `SecretCodec` port.                         |
+| `DsoOverrideService`, `PoiCategoryService`, `SkyRegionService` | Their rows and checks.                                                                             |
+| `BackupService`                                                | Export, import preview and import, over the bundle ports.                                          |
+| `StarSearchService`                                            | Star search by name, designation, number and position.                                             |
+| `IdentifyService`                                              | Asteroid (SkyBoT), supernova (TNS) and comet (MPC) lookups, with their caches.                     |
+| `HorizonService`                                               | The terrain horizon of a location, cached.                                                         |
+| `SolvedImportService`                                          | Reading the solution of an already-solved FITS or TIFF file; converting it to a picture.           |
+| `NovaSolveService`                                             | Online solving through astrometry.net.                                                             |
+| `VersionService`                                               | The latest release, cached.                                                                        |
 
-The interface lives in core, so it cannot use browser types:
+Rules for a service method:
 
-- `FileInput { name; type; bytes(): Promise<Uint8Array> }` replaces `File`.
-- A progress callback replaces `XMLHttpRequest` progress, and a `CancelToken` replaces `AbortSignal`.
-- The `api.ts` facade adapts browser types to these.
+- **Group the database calls.** On a phone each call crosses a bridge (about 19 ms on a mid-range device), so a method never awaits a call inside a loop: several reads are one query, several writes are one `batch`. Its test asserts the number of round trips with `tests/helpers/counting-sql-db.ts`.
+- **Typed parameters, validated at run time.** Parameter types come from `packages/core/src/domain/`.
+- **Every error has a code.** `DomainError.code` is an `ErrorCode` (`packages/core/src/domain/error-codes.ts`), and `tests/unit/error-codes.test.ts` requires a `serverErrors` message for every code in the four languages.
+- **No clock, file system or network of its own.** Time, identifiers, HTTP, images and files arrive through dependencies.
 
-### Services in core
+## Ports and adapters
 
-Each service throws a `DomainError`. Its kinds are `invalid`, `notFound`, `conflict`, `rateLimited` and `upstream`, and it keeps the existing `code` strings that `parseServerError` (`api.ts:23`) translates. Long-running work returns a job handle, not an error.
+`packages/core/src/ports/`.
 
-**Two rules for every service method.** (1) Group the database calls: on the phone each call costs about 35 ms, so a method never awaits a call inside a loop; several reads are one query and several writes are one `batch`. Its test states its round trips with `countingSqlDb` (`tests/helpers/counting-sql-db.ts`) as a fixed number. (2) Every `DomainError` has a required, stable upper-snake-case `code`, which the phone translates; the HTTP body does not change (`body` carries today's exact body).
+| Port                            | Server (`server/`)                                | Phone (`packages/backend-local/src/`)                                                     |
+| ------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `SqlDb`                         | `sqlite-adapter.ts` over better-sqlite3           | `capacitor-sqlite-db.ts` over the SQLite plugin                                           |
+| `BlobStore`                     | `blob-store.ts`, files of the uploads folder      | `capacitor-blob-store.ts` over the Filesystem plugin; also gives a file's address (`url`) |
+| `ImageCodec`                    | `image-codec.ts` over sharp                       | `browser-image-codec.ts`: `createImageBitmap` and `OffscreenCanvas`                       |
+| `HttpClient`                    | `http-client.ts` over Node's `fetch`              | `fetch-http-client.ts` over the WebView's `fetch`, which Capacitor routes natively        |
+| `SecretCodec`                   | `secret-codec.ts`, AES-256-GCM, key from env      | `webcrypto-secret-codec.ts`, AES-GCM with a non-extractable key kept in IndexedDB         |
+| `BundleWriter` / `BundleReader` | `bundle-zip.ts`, streaming ZIP                    | `bundle-fflate.ts`, ZIP in memory                                                         |
+| `KeyValueStore`                 | (desktop: `localStorage`, `src/platform-init.ts`) | `preferences-store.ts` over the Preferences plugin, loaded in memory at start-up          |
+| `EnvSource`                     | `process.env`                                     | always undefined                                                                          |
 
-| Service                                                        | Responsibility                                                           | Note                                                                                                                                                                                                |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PlanService`                                                  | Plans, entries, mosaics                                                  | Absorbs the row mappers and `parseMosaicBody`                                                                                                                                                       |
-| `GearService`                                                  | Catalog merge, custom gear, setups                                       |                                                                                                                                                                                                     |
-| `PhotoService`                                                 | Upload pipeline, metadata, placement, order                              | Settles `sanitizeIntegrationRows`                                                                                                                                                                   |
-| `StarSearchService`                                            | `packages/core/src/services/star-search.ts`                              | Deep star catalogue search by name, designation, HIP number and position; scoring and labels (no database: the host passes the catalogue in)                                                        | `GET /api/stars/search`, `GET /api/stars/nearby`, `GET /api/stars/:hip` |
-| `SolvedImportService`                                          | `/api/solve-wcs` and `/api/photos/convert`: read WCS from FITS/TIFF/XISF | The heart of "import already-solved files"                                                                                                                                                          |
-| `NovaSolveService`                                             | nova submit, poll, submissions list, reuse                               | Jobs persisted, so they resume after the app is suspended                                                                                                                                           |
-| `VersionService`                                               | `packages/core/src/services/version.ts`                                  | The in-app update check: latest GitHub release over the `HttpClient` port, `parseLatestRelease`, the one-hour cache (a failure included) in the instance, dated by `now`. No database               | `GET /api/version/latest`                                               |
-| `StarSearchService`                                            | `/api/stars/search`, `nearby`, `:hip`                                    | Runs over the star registry                                                                                                                                                                         |
-| `IdentifyService`                                              | SkyBoT, TNS, MPC comets                                                  | Keeps the existing caches and rate limits                                                                                                                                                           |
-| `HorizonService`                                               | `packages/core/src/services/horizon.ts`                                  | Terrain horizon of a location: Terrarium elevation tiles (HttpClient, decoded by ImageCodec.decode), ray trace, Overpass summits, the `horizon_profiles` cache (1 round trip on a hit, 2 on a miss) | `GET /api/horizon`                                                      |
-| `HorizonService`                                               | Terrain tiles + Overpass peaks, cached                                   | Needs raw PNG decoding (`ImageCodec.decodePngRaw`)                                                                                                                                                  |
-| `SettingsService`                                              | Settings                                                                 | Uses `SecretStore`                                                                                                                                                                                  |
-| `DsoOverrideService`, `PoiCategoryService`, `SkyRegionService` | CRUD                                                                     |                                                                                                                                                                                                     |
-| `BackupService`                                                | Export, import preview, import apply                                     | Atomic; manifest versioned; **now includes the `PrefsStore` state**                                                                                                                                 |
-| `VersionService`                                               | Latest GitHub release                                                    |                                                                                                                                                                                                     |
+No adapter of `backend-local` imports a Capacitor package: each receives the plugin object it needs as a parameter. Each port with two adapters has a conformance suite in `packages/core/src/testing/` that both pass.
 
-Services already moved into `packages/core/src/services/` (built in `server/services.ts`, errors turned into responses by `sendError` in `server/routes/http-errors.ts`):
+Where the phone's adapters differ from the server's on purpose:
 
-| Service               | File                                           | What it owns                                                                                                                                                                                                                                                                                                                                                                                                               | Routes that use it                                                                                                                                                                                                      |
-| --------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DsoOverrideService`  | `packages/core/src/services/dso-overrides.ts`  | DSO override rows, id and RA/Dec checks, `dso_overrides` SQL                                                                                                                                                                                                                                                                                                                                                               | `GET/PUT/DELETE /api/dso-overrides[/:id]`, `POST /api/export` and `POST /api/import` (`backup.ts`)                                                                                                                      |
-| `SkyRegionService`    | `packages/core/src/services/sky-regions.ts`    | Alt/Az polygon regions, name and vertex checks, `sky_regions` SQL                                                                                                                                                                                                                                                                                                                                                          | `GET/POST/PATCH/DELETE /api/sky-regions[/:id]`, `POST /api/export` and `POST /api/import` (`backup.ts`)                                                                                                                 |
-| `PoiCategoryService`  | `packages/core/src/services/poi-categories.ts` | POI categories, name check, `poi_categories` SQL, the five default rows (`ensureDefaults`, called by `createApp`)                                                                                                                                                                                                                                                                                                          | `GET/POST/PATCH/DELETE /api/poi-categories[/:id]`, `DELETE /api/poi-categories`, `POST /api/export` and `POST /api/import` (`backup.ts`)                                                                                |
-| `SettingsService`     | `packages/core/src/services/settings.ts`       | Solver and API settings rows, the secret API key (encrypted through the `SecretCodec` port, environment value first), `settings` SQL                                                                                                                                                                                                                                                                                       | `GET/PUT /api/settings`, `DELETE /api/settings/astrometry-api-key`; online solving reads the key through it; ASTAP and solve-field read their settings through it                                                       |
-| `GearService`         | `packages/core/src/services/gear.ts`           | Built-in plus custom gear catalogue, custom gear, named gear setups, the checks of their routes, `custom_gear` and `gear_setups` SQL; the built-in lists are passed in (`server/gear-catalog.ts` reads them)                                                                                                                                                                                                               | `GET /api/telescopes`, `cameras`, `accessories`, `filters`; `POST/DELETE /api/custom-gear[/:id]`; `GET/POST/PUT/PATCH/DELETE /api/gear-setups[/:id[/enabled]]`; `POST /api/export` and `POST /api/import` (`backup.ts`) |
-| `PlanService`         | `packages/core/src/services/plans.ts`          | Night plans, entries and mosaics, the sort-key list, the observation-window sanitiser, `plans`/`plan_entries`/`plan_mosaics` SQL, one-plan backup import                                                                                                                                                                                                                                                                   | `/api/plans` (12 routes), `POST /api/export` and `POST /api/import` (`backup.ts`)                                                                                                                                       |
-| `PhotoService`        | `packages/core/src/services/photos.ts`         | Photo rows and star correspondences, the upload-form checks and metadata parsing, metadata, placement and draw-order rules, the one `sanitizeIntegrationRows` and `sanitizePois`, `photos`/`star_correspondences` SQL, backup photo import, the whole upload pipeline (probe, orientation, stored image, thumbnail) and the file deletion, through the `ImageCodec` and `BlobStore` ports                                  | `/api/photos` (8 routes), `POST /api/export` and `POST /api/import` (`backup.ts`)                                                                                                                                       |
-| `IdentifyService`     | `packages/core/src/services/identify.ts`       | SkyBoT asteroid, TNS supernova and MPC comet lookups through the `HttpClient` port (`server/http-client.ts`, Node `fetch`); the cone checks, the TNS cache and rate-limit error and the comet cache live in the instance, dated by `now`                                                                                                                                                                                   | `POST /api/skybot/conesearch`, `POST /api/tns/conesearch`, `GET /api/comets/elements`                                                                                                                                   |
-| `SolvedImportService` | `packages/core/src/services/solved-import.ts`  | Already-solved FITS/TIFF files: reads the header solution (`wcs.ts`), matches it to the catalogue the host passes in, rescales to the displayed size; `convert` decodes the pixels (`raw-decode/`) and encodes the PNG through `ImageCodec.encode`. No database                                                                                                                                                            | `POST /api/solve-wcs`, `POST /api/photos/convert`                                                                                                                                                                       |
-| `NovaSolveService`    | `packages/core/src/services/nova-solve.ts`     | Online solving through astrometry.net over the `HttpClient` port: login with the key read through the settings service, multipart upload, background polling, the WCS-file and calibration readers (`astrometry-solution.ts`), past submissions, reuse of a solved job; the session and the jobs live in the instance, dated by `now`. No database                                                                         | `POST /api/solve-plate`, `GET /api/solve-plate/:id`, `GET /api/astrometry/submissions`, `POST /api/astrometry/reuse`; `PUT /api/settings` and `DELETE /api/settings/astrometry-api-key` reset its session               |
-| `BackupService`       | `packages/core/src/services/backup.ts`         | Export to a `BundleWriter`, preview and import from a `BundleReader` (plus plain JSON photo lists): archive layout, name-based replacement, setup rules, per-item failure list. One grouped write per item; an import costs 2 reads + 1 per plan/photo read + 1 per plan + 4 per photo. Routes: `POST /api/export`, `/api/import/preview`, `/api/import` (multer, headers and streaming stay in `server/routes/backup.ts`) |
+- **A picture with no rotation is stored byte for byte.** `bakeOrientation` re-encodes only to apply a real EXIF rotation; the server always re-encodes.
+- **`decode` always returns 4 channels**, since a canvas has no other form.
+- **The astrometry.net key** is encrypted with a key the WebView creates as non-extractable. A backup never contains the key.
+- **A backup archive is read in memory**, so `openZipBundle` rejects an archive above `maxArchiveBytes` (`BACKUP_TOO_LARGE`). Pictures are stored uncompressed in the archive.
+- **A network timeout is a race with a timer**, because the natively routed `fetch` may ignore an abort.
 
-ASTAP and solve-field stay server-only and are exposed through **capabilities**.
+### `SqlDb`
 
-### The seam is `api.ts`
+- `transaction(body)` may only await calls on its `tx`. A body that awaits anything else is rolled back; transactions do not nest; a call on the outer `SqlDb` from inside a body is rejected. A function that must work in both places takes a `SqlTx`.
+- `batch` is one round trip. Keep binary values out of a batch on the phone: the plugin then falls back to one call per statement.
+- The schema is defined once in `packages/core/src/db/schema.ts` (`BASELINE_SCHEMA` at `SCHEMA_VERSION`, `MIGRATIONS` for later versions, `initSchema`). A new migration is SQL added to `MIGRATIONS`, with `BASELINE_SCHEMA` and `SCHEMA_VERSION` updated in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise. The schema avoids `RETURNING`, `json_*` and `STRICT`; foreign keys are switched on explicitly.
 
-- It keeps its exported names as a facade over `getBackend()`, set once with a module-level `setBackend()`.
-- All 39 importers and every `vi.mock('../api')` keep working unchanged while the stores live in `src/`.
-- When a store moves to `app-state` (card 3.5), its test is updated to mock the backend, not `src/api`.
-- A new `photoUrl(name)` replaces the hard-coded `/uploads/` paths.
-- `export()` returns bytes instead of downloading.
+## Platform hooks in core
 
-### How a screen reaches its data
+Core modules that need something of the platform ask a hook that each app configures at start-up (`packages/core/src/platform/`): device storage (`configureStorage`), the error reporter, device hints for the initial map density, the gear catalogue loader and the remote star search. The i18n module is configured the same way (`configureI18n`). The deep-sky and star catalogues live in registries (`packages/core/src/catalog/`): an app loads the files and calls the setter; every lookup reads the registry.
 
-A screen calls a function of `src/api.ts` (`getPlans()`, `uploadPhoto()`, `photoFileUrl()` ...). That path is a one-line re-export of `packages/app-state/src/api.ts` (`@myastrosky/app-state/api`), a facade: every function calls `getBackend()` (`packages/app-state/src/backend.ts`, re-exported by `src/backend.ts`) and turns the `DomainError` the backend rejects with into the plain `Error` the screen shows (`t('serverErrors.' + code)`, else the error's message, else the function's own text). Outside `packages/app-state/src/api.ts`, nothing in `src/` knows a server exists; an ESLint rule fails on a `fetch` of `/api/` or `/uploads/` and on any `/uploads/` address.
+## The phone app
 
-- **Desktop and web:** `src/platform-init.ts` installs the HTTP backend at start-up (`setBackend(createHttpBackend({ lang, saveFile }))`, `packages/backend-http/src/http-backend.ts`), which calls the Express routes. The package never installs a default: `getBackend()` throws if nothing was set. `platform-init` also sets the error hook (with the optional details argument) used by the package's stores.
-- **Phone:** the phone's own start-up code (later) calls `setBackend()` with the local backend (`packages/backend-local`), which calls the services directly, with no server. `Backend.localSolvers` is absent there; the local-solver functions of `src/api.ts` then fail with `LOCAL_SOLVERS_UNAVAILABLE`.
-  The local backend (`createLocalBackend(deps)` in `packages/backend-local/src/local-backend.ts`) hands out the services as they are (`plans: services.plans` ...) and wraps only the members that take a file (`FileSource`): it reads the file and calls the service. `createServices` (`packages/core/src/services/create-services.ts`) is the same wiring the server uses. The phone's shell must supply: the database (`SqlDb`, async), the blob store, the image codec, the HTTP client, the secret codec, the two star catalogues, the built-in gear lists, `openZip` / `newZip` (`bundle-fflate.ts`), `files.url` (the address of a stored file), `starCatalogUrl`, `saveFile` (the share sheet) and the clock. Nothing in the package but `capacitor-sqlite-db.ts` imports a Capacitor plugin.
-- **Contract:** `packages/core/src/testing/backend-contract.ts` runs against both backends (`tests/unit/backend-http-contract.test.ts`, and `tests/unit/backend-local-contract.test.ts` on the synchronous and on the asynchronous database). `tests/unit/api-facade.test.ts` checks the facade against a fake backend.
+- `apps/mobile/`: Vite, Vue 3, Ionic Vue, Capacitor (Android). Five tabs on Ionic's tab bar; sub-pages are routes inside their tab.
+- Start-up (`src/platform-init.ts`), awaited before the app is mounted: device storage, language, backend, hooks. The catalogues load after the first screen is shown.
+- The look: the design system's stylesheet and tokens (`src/theme/design-system/`), mapped onto Ionic's variables (`src/theme/ionic-tokens.css`), with shared components over Ionic's own (`src/components/`). Fonts are bundled. The rules of the screens are in [ui/mobile.md](ui/mobile.md).
+- The star, name, constellation and deep-sky files and the gear lists are copied into the app's build (`scripts/copy-bundled.mjs`).
+- The desktop does not pick the phone app up: the Docker runtime stage installs only the root and `packages/*`, and the Electron package contains none of its dependencies.
 
-To add a data function: (1) the service method in `packages/core/src/services/`; (2) the member in `Backend` (`packages/core/src/backend.ts`); (3) its method in the HTTP backend; (4) a case in the contract suite; (5) the function in `src/api.ts`, with its fallback error text.
+## Constraints measured on a real phone
 
-### SQL portability
+Figures from a mid-range Android phone (Galaxy A16). They explain several rules above.
 
-The schema already avoids `RETURNING`, `json_*` and `STRICT`. The mobile adapter must:
-
-- pass `transaction:false` when it manages the transaction itself;
-- set `PRAGMA foreign_keys=ON` explicitly;
-- keep WAL on the server only;
-- run migrations through our own runner, from a merged v0 baseline.
-
-The schema is defined once in `packages/core/src/db/schema.ts` (`BASELINE_SCHEMA` at `SCHEMA_VERSION`, plus `MIGRATIONS` from version 15 and `initSchema`); migrations 1 to 14 stay frozen in `server/db-migrations.ts`.
-New migrations (version 15 and above) are SQL statements added to `MIGRATIONS`, and `BASELINE_SCHEMA` and `SCHEMA_VERSION` are updated in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise.
-
-On mobile, write as read-then-`batch()`: each bridge round-trip costs 1–5 ms.
-
-### Transaction safety rule during the transition
-
-While old synchronous `db.ts` code and new services share one connection:
-
-- inside `SqlDb.transaction()`, only `tx` calls may be awaited — never sharp, file or zip work;
-- card 2.2 adds a test that proves a legacy statement cannot run inside an open service transaction.
-
----
-
-## 4. Mobile-specific engineering
-
-### Sky map on touch
-
-- A gesture controller in `render/`, built on Pointer Events:
-  - pan with fling;
-  - pinch zoom about the centroid (`sky-view-math.ts`);
-  - tap to select, with a larger hit radius;
-  - long-press to open a sheet;
-  - `touch-action:none` on the canvas.
-- Desktop gets touchscreen support from the same controller.
-- **Catalog:** decided by spike WP0.2. The likely outcome is a compact binary catalog with tiered loading.
-- Cap the DPR at 2, render on demand, and pause the timers while backgrounded.
-
-### Photos on the canvas
-
-- The reusable part is `computePhotoMatrixForView` (`photo-placement.ts:177`). The export routine in `export-render.ts` is **not** a frame painter: it loads a full-resolution image on every call.
-- A new canvas photo layer is needed, with its own ImageBitmap cache, level-of-detail selection and eviction.
-- These parts of `photo-overlay.ts` do not carry over and are redesigned for mobile:
-  - level-of-detail by swapping `img.src`;
-  - hiding photos while panning (`.photos-frozen`) — a canvas must redraw them every frame;
-  - manual repositioning, which reads the transform back from the DOM (`:2469-2483`) and drags with window mouse events;
-  - the layer order: sky canvas, then photos, then the overlay canvas.
-- Spike WP0.2 measures this before any commitment.
-
-### Touch equivalents
-
-These desktop interactions have no touch equivalent yet. Design round D1 must decide each one:
-
-- hover tooltips (`requestHover`);
-- right-click clears the selection (`sky-map-events.ts:177`) — on Android a long-press fires the same event, which collides with "long-press opens a sheet";
-- freehand region drawing uses press-and-drag, which collides with panning;
-- keyboard shortcuts, including the time controls;
-- gallery controls that appear on mouse move;
-- FOV-frame handles sized for a mouse.
-
-A Sonnet card (WP5.0) produces the full inventory from the code, as input to D1.
-
-### Field use
-
-- A night-vision **red theme**, for both the UI tokens and `SKY_THEME`.
-- Keep the screen awake during sessions.
-- GPS location.
-- Offline except for solving and identification.
-
-### Photos and solving on the device
-
-**Import already-solved files** through core decoders (`Uint8Array`/`DataView`, fflate):
-
-- FITS, TIFF, **XISF** (new) and **`.wcs` sidecars** (new).
-- Desktop gets XISF and sidecars too.
-
-**nova.astrometry.net** through `NovaSolveService` + CapacitorHttp:
-
-- downscale to about 2,000 px before upload;
-- API key stored in the Keystore;
-- the plan target is used as the solve hint;
-- jobs resume after the app is suspended.
-
-**Getting files in:**
-
-- a file picker that accepts any MIME type (FITS, XISF);
-- an **Android "Share to MyAstroSky" intent**, for files from the Seestar, ASIAIR or Gallery apps;
-- the camera roll.
-
-**Memory:** decode with `createImageBitmap(resize*)` and keep only a display copy plus a thumbnail.
-
-### LAN connect
-
-- The phone uses `HttpBackend(baseUrl, token)` against the desktop or Docker server.
-- Server side:
-  - an opt-in "Allow LAN devices" setting;
-  - a CORS allowlist for `https://localhost` and `capacitor://localhost`;
-  - a QR pairing token;
-  - an `/api/capabilities` endpoint.
-- Android side: `network_security_config` for private IPs, and `photoUrl()` returns absolute URLs.
-- **Bonus:** while connected, the phone can run **ASTAP or solve-field on the desktop**.
-
-### Information architecture
-
-(A starting point; the design phase decides)
-
-- Bottom tabs: **Sky · Targets · Plans · Library · Settings**.
-- **Sky:** a full-screen canvas, search, a time scrubber, and an object bottom sheet (peek, half, full).
-- **Targets:** filter chips plus a filter sheet, and cards with an altitude sparkline.
-- **Plans:** plan detail, a framing editor with FOV-frame gestures, and mosaics.
-- **Library:** a grid, a photo detail view with metadata and identification, and an import flow (pick, then solved or online solve, then place).
-- **Settings:** gear setups, location, language (FR/EN/ES/DE), theme and night mode, astrometry key, LAN pairing, export/import.
+- **A database call costs about 19 ms**, whatever it does. Forty single inserts take about 4 s; the same rows in one `batch` take under 0.1 s.
+- **The SQLite plugin runs only the first statement of a one-line script**, so the adapter splits scripts itself; and its row counts include rows removed by foreign-key cascades, so the adapter reads `changes()` after a statement that modified rows.
+- **The Filesystem plugin accepts text only.** A file is written in pieces encoded in base64 (about 160 ms per megabyte with 8 MB pieces) and read back through `fetch`, with no encoding. The WebView's native `Uint8Array.prototype.toBase64` is used when present.
+- **`OffscreenCanvas.convertToBlob` waits about 4 s when no frame is being drawn.** The image codec keeps frames running while it encodes; the call then takes about 40 ms.
+- **Decoding a 19-megapixel JPEG takes about 0.3 s**, at any target size.
+- **astrometry.net accepts an upload sent as a form with a file part**, not a hand-built multipart body; and it needs a non-browser `User-Agent`. TNS is reachable only through the native HTTP layer.
+- **The local server of the WebView answers the app's own page with status 200 for an unknown path**, so the existence of a file is checked with `stat`, never with the status of a request.
+- **The page is 360 to 430 CSS pixels wide** depending on the phone, and the system bars' insets differ between gesture and three-button navigation and between the two landscape directions. The frame applies each inset once (`src/theme/ionic-tokens.css`); screens never read `env(safe-area-inset-*)`.
