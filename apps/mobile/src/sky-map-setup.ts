@@ -11,7 +11,12 @@ import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
-import type { SkyFocus, SkySelection } from './composables/useSkySelection';
+import {
+  clearSkySelection,
+  skySelection,
+  type SkyFocus,
+  type SkySelection,
+} from './composables/useSkySelection';
 import { SkyMap } from '@myastrosky/render/sky-map';
 
 /** The most pixels per CSS pixel the map draws: a phone screen's 2.6 to 3.5 costs more than it shows. */
@@ -44,6 +49,11 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
   const display = useDisplayStore();
   // The display store keeps the map's rotation, which two fingers can change.
   map.setOnViewChange(() => display.onMapViewChanged(map.getView().rotationDeg));
+
+  // A tap on an object or a star selects it; a tap on an empty spot clears the selection.
+  map.setOnDSOClick((dso) => (skySelection.value = { kind: 'dso', dso }));
+  map.setOnStarTap((star) => (skySelection.value = { kind: 'star', star }));
+  map.setOnClearSelection(clearSkySelection);
 
   const settings = loadSettings();
   map.setHemisphere(settings.hemisphere, settings.borderLatDeg);
