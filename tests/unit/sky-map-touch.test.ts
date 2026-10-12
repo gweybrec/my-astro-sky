@@ -260,6 +260,36 @@ describe('pinch', () => {
   });
 });
 
+describe('two fingers turning', () => {
+  it('keeps the sky under each finger while the fingers zoom, turn and slide', () => {
+    const { canvas, view } = setup();
+    const a0 = fromCanvas(450, 400, view);
+    const b0 = fromCanvas(550, 400, view);
+    fire(canvas, 'pointerdown', 1, 450, 400);
+    fire(canvas, 'pointerdown', 2, 550, 400);
+    // The pair turns a quarter turn, spreads a little and slides: finger 1 ends at (520, 330), finger 2 at (540, 470).
+    const steps = 20;
+    for (let i = 1; i <= steps; i++) {
+      const f = i / steps;
+      const angle = f * (Math.PI / 2) - 0; // clockwise on screen (y grows downwards)
+      const half = 50 + 20 * f;
+      const cx = 500 + 30 * f;
+      const cy = 400 + 10 * f;
+      fire(canvas, 'pointermove', 1, cx - half * Math.cos(angle), cy - half * Math.sin(angle));
+      fire(canvas, 'pointermove', 2, cx + half * Math.cos(angle), cy + half * Math.sin(angle));
+    }
+    const f1 = { x: 530 - 70 * Math.cos(Math.PI / 2), y: 410 - 70 * Math.sin(Math.PI / 2) };
+    const f2 = { x: 530 + 70 * Math.cos(Math.PI / 2), y: 410 + 70 * Math.sin(Math.PI / 2) };
+    const a1 = fromCanvas(f1.x, f1.y, view);
+    const b1 = fromCanvas(f2.x, f2.y, view);
+    expect(a1.x).toBeCloseTo(a0.x, 3);
+    expect(a1.y).toBeCloseTo(a0.y, 3);
+    expect(b1.x).toBeCloseTo(b0.x, 3);
+    expect(b1.y).toBeCloseTo(b0.y, 3);
+    expect(view.rotationDeg).not.toBe(0);
+  });
+});
+
 describe('tap on an empty spot', () => {
   it('clears the selection when there is one', () => {
     const { canvas, calls, state } = setup();

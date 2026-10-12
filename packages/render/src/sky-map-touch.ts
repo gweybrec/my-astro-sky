@@ -1,5 +1,5 @@
 /**
- * Touch wiring for the sky map: one-finger drag, two-finger pinch (zoom about the
+ * Touch wiring for the sky map: one-finger drag, two-finger pinch (zoom and rotation about the
  * fingers, with pan), tap to select and long press. Attached next to the mouse
  * handlers of `sky-map-events.ts`, which it leaves untouched: it reacts to
  * `pointerType === 'touch'` only, and cancels the browser's follow-up mouse events
@@ -16,6 +16,7 @@ import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
 import type { PhotoOutline } from '@myastrosky/core/photo-outline';
 import { fromCanvas } from '@myastrosky/core/projection';
 import { zoomAboutPoint } from '@myastrosky/core/sky-view-math';
+import { normalizeRotationDeg } from '@myastrosky/core/display-settings';
 import { findTopPhotoOutlineAtPoint } from '@myastrosky/core/photo-outline';
 import type { EventBinding } from './sky-map-events';
 
@@ -89,6 +90,7 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
   let anchorX = 0;
   let anchorY = 0;
   let prevDist = 0;
+  let prevAngle = 0;
   /** What the first finger is doing: the map, a region being drawn or a frame being dragged. */
   let mode: 'view' | 'region' | 'frame' = 'view';
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -103,7 +105,12 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
   };
   const midpoint = () => {
     const [a, b] = [...fingers.values()];
-    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, dist: Math.hypot(a.x - b.x, a.y - b.y) };
+    return {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+      dist: Math.hypot(a.x - b.x, a.y - b.y),
+      angle: Math.atan2(b.y - a.y, b.x - a.x),
+    };
   };
   /** Pins the sky point under the given client position to the finger. */
   const anchorAt = (x: number, y: number) => {
@@ -159,6 +166,7 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
       clearTimer();
       const m = midpoint();
       prevDist = m.dist;
+      prevAngle = m.angle;
       anchorAt(m.x, m.y);
     }
   }) as EventListener);
@@ -197,7 +205,13 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
         host.view.centerY = z.centerY;
       }
       prevDist = m.dist;
-      // Zooming pins the sky point under the midpoint; dragging the midpoint pans.
+      // Turning the fingers turns the sky with them (the view's rotation is counter-clockwise-positive on screen).
+      let turn = m.angle - prevAngle;
+      if (turn > Math.PI) turn -= 2 * Math.PI;
+      if (turn < -Math.PI) turn += 2 * Math.PI;
+      prevAngle = m.angle;
+      host.view.rotationDeg = normalizeRotationDeg(host.view.rotationDeg - (turn * 180) / Math.PI);
+      // Zooming and turning pin the sky point under the midpoint; dragging the midpoint pans.
       dragTo(m.x, m.y);
     } else {
       return;
@@ -229,6 +243,7 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
     if (fingers.size > 0) {
       const m = midpoint();
       prevDist = m.dist;
+      prevAngle = m.angle;
       anchorAt(m.x, m.y);
       return;
     }
