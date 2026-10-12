@@ -30,7 +30,7 @@ import {
 } from '@myastrosky/render/poi-pins';
 import { poiTypeIcon } from './poi-icons';
 import { pinia } from './pinia-instance';
-import { useDisplayStore } from './stores/display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import PhotoDsoCatalogFilter from './components/panels/PhotoDsoCatalogFilter.vue';
 import { hasOpenOverlay } from './popup-utils';
 import mapPinSvg from './icons/map-pin.svg?raw';

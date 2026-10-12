@@ -1,6 +1,6 @@
 import { defineStore, storeToRefs } from 'pinia';
 import { useCanvasStore } from './canvas';
-import { useSkyTimeStore } from './sky-time';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
 import type { HorizonProfile } from '@myastrosky/core/horizon-io';
 

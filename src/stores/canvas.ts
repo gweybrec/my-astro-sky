@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { shallowRef } from 'vue';
+import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOverlay } from '../photo-overlay';
@@ -48,6 +49,10 @@ export const useCanvasStore = defineStore('canvas', () => {
   function init(sm: SkyMap, ov: PhotoOverlay, gal?: GalleryInterface, tv?: TargetsViewInterface) {
     skyMap.value = sm;
     overlay.value = ov;
+    // The shared display and time stores drive the map through this port.
+    const port = useMapPortStore();
+    port.skyMap = sm;
+    port.overlay = ov;
     if (gal) gallery.value = gal;
     if (tv) targetsView.value = tv;
   }

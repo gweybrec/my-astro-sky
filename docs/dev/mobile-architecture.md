@@ -9,7 +9,8 @@ src/, server/, electron/   The desktop app, its Express server and the Electron 
 packages/core/             Platform-neutral TypeScript: astronomy, projection, recommender, file decoders,
                            domain types, i18n, catalogue registries, the services, the ports, the database schema.
 packages/app-state/        The data functions the screens call (api.ts), the backend holder, and the Pinia
-                           stores that hold backend data (plans, POI categories, sky regions, settings).
+                           stores that hold backend data (plans, POI categories, sky regions, settings) or drive
+                           the sky map (display settings, sky time) through a map port (`core/src/map-ports.ts`).
 packages/backend-http/     The backend that calls the Express server's routes.
 packages/render/           The sky map's canvas drawing, hit testing and input handling.
 packages/backend-local/    The backend that calls the services directly, and the phone's platform adapters.

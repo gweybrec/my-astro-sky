@@ -152,8 +152,8 @@ describe('CheckRow', () => {
 const mockSetShowStars = vi.hoisted(() => vi.fn());
 const mockSetShowGrid = vi.hoisted(() => vi.fn());
 
-vi.mock('../../src/stores/canvas', () => ({
-  useCanvasStore: () => ({
+vi.mock('@myastrosky/app-state/stores/map-port', () => ({
+  useMapPortStore: () => ({
     skyMap: {
       setShowStars: mockSetShowStars,
       setShowGrid: mockSetShowGrid,
@@ -201,7 +201,7 @@ vi.mock('@myastrosky/core/display-settings', () => ({
   saveSettings: vi.fn(),
 }));
 
-import { useDisplayStore } from '../../src/stores/display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 
 describe('useDisplayStore', () => {
   beforeEach(() => {
@@ -327,7 +327,7 @@ describe('DSO controls in DisplayControlsSection', () => {
 
   it('Types and Catalogs buttons are disabled when showDSOs is false', async () => {
     const wrapper = mountDSOSection();
-    const { useDisplayStore: useDSStore } = await import('../../src/stores/display');
+    const { useDisplayStore: useDSStore } = await import('@myastrosky/app-state/stores/display');
     const store = useDSStore();
     store.showDSOs = false;
     await wrapper.vm.$nextTick();
@@ -356,7 +356,7 @@ describe('DSO controls in DisplayControlsSection', () => {
 
   it('disables the POI dropdown when "Show points of interest" is off', async () => {
     const wrapper = mountDSOSection();
-    const { useDisplayStore: useDSStore } = await import('../../src/stores/display');
+    const { useDisplayStore: useDSStore } = await import('@myastrosky/app-state/stores/display');
     const store = useDSStore();
     const poiBtn = () =>
       wrapper

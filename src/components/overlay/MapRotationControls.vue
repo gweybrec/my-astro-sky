@@ -43,7 +43,7 @@
 
 <script setup lang="ts">
 import { t } from '../../i18n';
-import { useDisplayStore } from '../../stores/display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useUiStore } from '../../stores/ui';
 import rotationResetSvg from '../../icons/rotation-reset.svg?raw';
 

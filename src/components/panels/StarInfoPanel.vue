@@ -53,7 +53,7 @@ import { formatMultiplicity } from '../../star-catalog';
 import { formatRA, formatDec, formatAlt } from '@myastrosky/core/format-utils';
 import StarActions from './StarActions.vue';
 import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
-import { useSkyTimeStore } from '../../stores/sky-time';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 
 const props = defineProps<{ star: StarSearchResult }>();
 

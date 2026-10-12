@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { setProjectionMode } from '@myastrosky/core/projection';
 import { useCanvasStore } from './canvas';
-import { useDisplayStore } from './display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 
 /**
  * Fisheye projection toggle. This is a pure map projection (orthographic,

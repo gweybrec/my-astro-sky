@@ -74,7 +74,7 @@ import {
   formatAlt,
 } from '@myastrosky/core/format-utils';
 import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
-import { useSkyTimeStore } from '../../stores/sky-time';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import DSOActions from './DSOActions.vue';
 
 const props = defineProps<{ dso: DSO }>();

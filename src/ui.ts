@@ -1,10 +1,10 @@
 import { openVueModal } from './modal-host';
 import { pinia } from './pinia-instance';
-import { useDisplayStore } from './stores/display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
-import { useSkyTimeStore } from './stores/sky-time';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonStore } from './stores/horizon';
 import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
 import { formatAlt } from '@myastrosky/core/format-utils';
