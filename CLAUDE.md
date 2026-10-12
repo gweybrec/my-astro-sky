@@ -23,18 +23,19 @@ It holds only **cross-cutting** guidance. Task-specific rules live in per-direct
 
 Project-specific skills live in `.claude/skills/`. The harness auto-invokes them on matching trigger phrases.
 
-| Skill                   | When to invoke                                                                                                       |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `frontend-feature`      | Adding or changing purely frontend UI (panels, modals, widgets, CSS)                                                 |
-| `fullstack-feature`     | Adding or changing API routes together with frontend UI                                                              |
-| `add-photo-metadata`    | Adding a new optional field to photo metadata (DB, all 3 UI editors, export/import, WCS/astrometry pre-fill)         |
-| `add-dso-catalog`       | Integrating a new DSO catalog (RCW, Barnard, Abell…)                                                                 |
-| `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog                                           |
-| `test-placement`        | Testing astrophoto upload, plate solving, and sky-map placement                                                      |
-| `profile-performance`   | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark   |
-| `mobile-screen`         | Building or changing a screen of the phone app (`apps/mobile`): mockup, shared components, alignment, tests          |
-| `mobile-device-test`    | Testing the phone app on the user's real Android phone (build, install, drive, restore settings; never an emulator)  |
-| `ui-verify`             | Mandatory visual verification of any UI change before presenting it (enforced by the `ui-verify-guard.js` Stop hook) |
+| Skill                   | When to invoke                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `frontend-feature`      | Adding or changing purely frontend UI (panels, modals, widgets, CSS)                                                    |
+| `fullstack-feature`     | Adding or changing API routes together with frontend UI                                                                 |
+| `add-photo-metadata`    | Adding a new optional field to photo metadata (DB, all 3 UI editors, export/import, WCS/astrometry pre-fill)            |
+| `add-dso-catalog`       | Integrating a new DSO catalog (RCW, Barnard, Abell…)                                                                    |
+| `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog                                              |
+| `test-placement`        | Testing astrophoto upload, plate solving, and sky-map placement                                                         |
+| `profile-performance`   | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark      |
+| `mobile-screen`         | Building or changing a screen of the phone app (`apps/mobile`): mockup, shared components, alignment, tests             |
+| `mobile-device-test`    | Testing the phone app on the user's real Android phone (build, install, drive, restore settings; never an emulator)     |
+| `check-alignment`       | Measuring alignment in the phone app with one command (components page and real screens), after any row or theme change |
+| `ui-verify`             | Mandatory visual verification of any UI change before presenting it (enforced by the `ui-verify-guard.js` Stop hook)    |
 
 ---
 

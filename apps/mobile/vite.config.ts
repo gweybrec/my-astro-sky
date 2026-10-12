@@ -9,7 +9,9 @@ const pkg = JSON.parse(readFileSync(fromHere('../../package.json'), 'utf-8')) as
 };
 
 // The phone app. `webDir` of Capacitor is `dist`. In a desktop browser the app talks to the desktop's server
-// (port 3001) through this proxy, so a screen can be developed in a phone-sized browser window.
+// (port 3001, or the address in MOBILE_API_TARGET) through this proxy, so a screen can be developed in a phone-sized browser window.
+const apiTarget = process.env.MOBILE_API_TARGET || 'http://localhost:3001';
+
 export default defineConfig({
   plugins: [vue()],
   // The app's version, written by the release process in the repository's package.json (the "À propos" row).
@@ -23,9 +25,9 @@ export default defineConfig({
     // The desktop's icons (`@icons`) live outside this folder.
     fs: { allow: ['../..'] },
     proxy: {
-      '/api': 'http://localhost:3001',
-      '/uploads': 'http://localhost:3001',
-      '/data': 'http://localhost:3001',
+      '/api': apiTarget,
+      '/uploads': apiTarget,
+      '/data': apiTarget,
     },
   },
   build: { outDir: 'dist', emptyOutDir: true, target: 'es2022' },
