@@ -11,6 +11,7 @@ import {
   writeObserverLocation,
 } from '@myastrosky/core/observer-location';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
+import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { getCurrentPosition, HORIZON_FILE_TYPES, pickFile } from '../platform-device';
 import AppIcon from '../components/AppIcon.vue';
@@ -34,6 +35,7 @@ const horizon = useHorizonProfileStore();
 const { enabled, obsHeightM, loading } = storeToRefs(horizon);
 const eyeHeight = ref(obsHeightM.value === null ? '' : String(obsHeightM.value));
 const { showError } = useErrorToast();
+const { confirm } = useConfirm();
 
 function showStored(latitude: number | null, longitude: number | null) {
   lat.value = latitude === null ? '' : String(latitude);
@@ -82,6 +84,16 @@ async function compute() {
     const missing = horizon.error === t('horizon.error.noLocation');
     void showError(new Error(missing ? horizon.error : t('horizon.error.compute')));
   }
+}
+
+async function clearHorizon() {
+  const sure = await confirm({
+    title: t('horizon.clear'),
+    message: t('mobile.location.clearHorizon'),
+    confirmLabel: t('horizon.clear'),
+    destructive: true,
+  });
+  if (sure) horizon.clear();
 }
 
 async function importHorizon() {
@@ -159,7 +171,7 @@ async function importHorizon() {
           <PhoneButton block @click="importHorizon">{{ t('horizon.import') }}</PhoneButton>
         </div>
         <div class="mob-form-row">
-          <PhoneButton block @click="horizon.clear()">{{ t('horizon.clear') }}</PhoneButton>
+          <PhoneButton block @click="clearHorizon">{{ t('horizon.clear') }}</PhoneButton>
         </div>
         <IonList class="mob-list" lines="none">
           <PhoneToggleRow

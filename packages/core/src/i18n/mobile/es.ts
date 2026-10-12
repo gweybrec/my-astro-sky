@@ -84,7 +84,11 @@ const es: Translations['mobile'] = {
     searchAccessoryLabel: 'Buscar un accesorio',
     summary: 'Distancia focal efectiva: {value}',
   },
-  location: { horizonSection: 'Horizonte del relieve', dms: 'DMS (° ′ ″)' },
+  location: {
+    horizonSection: 'Horizonte del relieve',
+    dms: 'DMS (° ′ ″)',
+    clearHorizon: '¿Borrar el horizonte?',
+  },
   backup: { exportSection: 'Exportar', importSection: 'Importar' },
 };
 

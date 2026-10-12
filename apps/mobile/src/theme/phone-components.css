@@ -278,6 +278,33 @@ ion-checkbox.mob-check-row.checkbox-disabled::part(container) {
   opacity: 0.4;
 }
 
+/* A choice row with a radio button at its right end: same row and 24 px mark as the tick-box row; the mark is the
+   design system's `.mob-radio` (the accent colour when chosen). */
+ion-radio.mob-radio-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--mobile-list-row-min);
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+  --color: var(--text-dim);
+  --color-checked: var(--accent-color);
+  --border-radius: 50%;
+  --inner-border-radius: 50%;
+  --transition: none;
+}
+ion-radio.mob-radio-row::part(container) {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+ion-radio.mob-radio-row::part(label) {
+  margin: 0 var(--space-7) 0 0;
+  white-space: normal;
+  flex: 1;
+  min-width: 0;
+}
+
 /* ── Floating plus: `ion-fab.mob-fab--fixed` holds `ion-fab-button.mob-fab` (the design system's 56 px button). */
 ion-fab.mob-fab--fixed {
   left: auto;

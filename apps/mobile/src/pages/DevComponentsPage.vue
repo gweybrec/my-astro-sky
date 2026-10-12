@@ -9,6 +9,7 @@ import AppIcon from '../components/AppIcon.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneBadge from '../components/PhoneBadge.vue';
 import PhoneCheckRow from '../components/PhoneCheckRow.vue';
+import PhoneRadioGroup from '../components/PhoneRadioGroup.vue';
 import PhoneFab from '../components/PhoneFab.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
 import PhoneFooter from '../components/PhoneFooter.vue';
@@ -44,6 +45,7 @@ const empty = ref('');
 const switchOn = ref(true);
 const switchOff = ref(false);
 const tickOn = ref(true);
+const radioChoice = ref<string>();
 const tickOff = ref(false);
 const opacity = ref(0.6);
 const sheet = ref(false);
@@ -255,6 +257,14 @@ function raiseError() {
           />
           <PhoneCheckRow :model-value="true" title="Verrouillée" disabled />
         </IonList>
+        <PhoneRadioGroup
+          v-model="radioChoice"
+          label="Choix"
+          :options="[
+            { value: 'a', label: 'Première' },
+            { value: 'b', label: 'Seconde' },
+          ]"
+        />
         <PhoneFacts
           :facts="[
             { label: 'Focale', value: '1422 mm' },

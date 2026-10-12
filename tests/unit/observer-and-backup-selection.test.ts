@@ -20,6 +20,9 @@ import {
   canExport,
   canImport,
   selectedPhotoBytes,
+  SETUP_CHOICES,
+  setupChoiceMissing,
+  setupChoiceUnticks,
   setupLocked,
   setupNeedsChoice,
   setupTicked,
@@ -161,5 +164,25 @@ describe('backup selection', () => {
     expect(options.selectedImages).toEqual([]);
     expect(options.setupConflicts).toEqual({ sB: 'replace' });
     expect(buildImportOptions(preview(), sel()).selectedImages).toBeNull();
+  });
+
+  it('offers three choices for a different setup, and waits for one before importing', () => {
+    expect(SETUP_CHOICES.map((c) => c.value)).toEqual(['replace', 'keepBoth', 'skip']);
+    const p = preview();
+    expect(setupChoiceMissing(p, sel())).toBe(false);
+    expect(setupChoiceMissing(p, sel({ setups: new Set(['sB']) }))).toBe(true);
+    expect(
+      setupChoiceMissing(p, sel({ setups: new Set(['sB']), setupChoices: { sB: 'keepBoth' } })),
+    ).toBe(false);
+  });
+
+  it('treats "do not import" as unticking unless a ticked plan needs the setup', () => {
+    const p = preview({
+      plans: [{ id: 'p1', name: 'Plan', exists: false, setupId: 'sB' }],
+    });
+    const sB = p.setups[1];
+    expect(setupChoiceUnticks(p, new Set(), sB, 'skip')).toBe(true);
+    expect(setupChoiceUnticks(p, new Set(['p1']), sB, 'skip')).toBe(false);
+    expect(setupChoiceUnticks(p, new Set(), sB, 'replace')).toBe(false);
   });
 });

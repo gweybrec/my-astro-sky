@@ -10,6 +10,9 @@ import {
   canExport,
   canImport,
   selectedPhotoBytes,
+  SETUP_CHOICES,
+  setupChoiceMissing,
+  setupChoiceUnticks,
   setupLocked,
   setupNeedsChoice,
   setupTicked,
@@ -34,6 +37,7 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneCheckRow from '../components/PhoneCheckRow.vue';
 import PhoneHelper from '../components/PhoneHelper.vue';
+import PhoneRadioGroup from '../components/PhoneRadioGroup.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import caretIcon from '../icons/chevron-down.svg?raw';
@@ -97,6 +101,7 @@ async function createBackup() {
 const file = ref<File | null>(null);
 const preview = ref<ImportPreviewResult | null>(null);
 const importing = ref(false);
+const setupChoices = reactive<Record<string, SetupImportChoice>>({});
 const sel = reactive({
   importDso: true,
   importPoiCategories: true,
@@ -107,20 +112,44 @@ const sel = reactive({
   gear: new Set<string>(),
 });
 
-function selection(choices: Record<string, SetupImportChoice> = {}): ImportSelection {
-  return { ...sel, importShortcuts: false, setupChoices: choices };
+function selection(): ImportSelection {
+  return { ...sel, importShortcuts: false, setupChoices };
 }
 
-/** The board shows no choice for a setup that differs from a local one: it says it will be replaced. */
-function replaceChoices(p: ImportPreviewResult): Record<string, SetupImportChoice> {
-  return Object.fromEntries(
-    p.setups.filter((s) => setupNeedsChoice(p, sel, s)).map((s) => [s.id, 'replace' as const]),
-  );
+function clearSetupChoices() {
+  for (const k of Object.keys(setupChoices)) delete setupChoices[k];
 }
 
 const canRestore = computed(
-  () => !!preview.value && !importing.value && canImport(preview.value, selection()),
+  () =>
+    !!preview.value &&
+    !importing.value &&
+    canImport(preview.value, selection()) &&
+    !setupChoiceMissing(preview.value, selection()),
 );
+
+const setupOptions = computed(() =>
+  SETUP_CHOICES.map((c) => ({ value: c.value, label: t(c.label) })),
+);
+
+/** A setup imported while differing from a local one is told what to do (nothing is chosen at first). */
+function needsChoice(id: string): boolean {
+  const p = preview.value;
+  const s = p?.setups.find((x) => x.id === id);
+  return !!p && !!s && setupNeedsChoice(p, sel, s);
+}
+
+function chooseSetup(id: string, choice: SetupImportChoice | undefined) {
+  const p = preview.value;
+  const s = p?.setups.find((x) => x.id === id);
+  if (!p || !s || !choice) return;
+  // "Do not import" on a setup no ticked plan needs is the same as unticking it.
+  if (setupChoiceUnticks(p, sel.plans, s, choice)) {
+    toggle('setups', id, false);
+    return;
+  }
+  setupChoices[id] = choice;
+}
 
 async function chooseFile() {
   try {
@@ -129,6 +158,7 @@ async function chooseFile() {
     const result = await importPreview(picked);
     file.value = picked;
     preview.value = result;
+    clearSetupChoices();
     // Everything is ticked at first; a setup identical to a local one has nothing to tick.
     sel.importDso = sel.importPoiCategories = sel.importSkyRegions = true;
     sel.images = new Set(result.images.map((i) => i.filename));
@@ -147,6 +177,7 @@ function toggle(list: ListKey, id: string, on: boolean) {
   if (on) next.add(id);
   else next.delete(id);
   sel[list] = next;
+  if (list === 'setups' && !on) delete setupChoices[id];
 }
 
 function allTicked(list: ListKey, ids: string[]) {
@@ -155,6 +186,7 @@ function allTicked(list: ListKey, ids: string[]) {
 
 function toggleAll(list: ListKey, ids: string[], on: boolean) {
   sel[list] = on ? new Set(ids) : new Set();
+  if (list === 'setups' && !on) clearSetupChoices();
 }
 
 interface Section {
@@ -199,7 +231,7 @@ const sections = computed<Section[]>(() => {
         id: s.id,
         title: s.name,
         subs: s.conflict === 'identical' ? [t('settings.importSetupIdentical')] : [],
-        warn: s.conflict === 'different' ? [REPLACE_WARNING()] : [],
+        warn: s.conflict === 'different' && !setupChoices[s.id] ? [REPLACE_WARNING()] : [],
         locked: s.conflict === 'identical' || setupLocked(p, sel.plans, s),
       })),
     });
@@ -238,10 +270,7 @@ async function restore() {
   if (!p || !file.value) return;
   importing.value = true;
   try {
-    const result = await importData(
-      file.value,
-      buildImportOptions(p, selection(replaceChoices(p))),
-    );
+    const result = await importData(file.value, buildImportOptions(p, selection()));
     const lines = [t('settings.importSuccess', { n: result.imported, s: result.skipped })];
     if (result.dsoOverridesImported) {
       lines.push(t('settings.importedDsoOverrides', { n: result.dsoOverridesImported }));
@@ -258,6 +287,7 @@ async function restore() {
     }
     file.value = null;
     preview.value = null;
+    clearSetupChoices();
     photos.value = await getPhotos().catch(() => photos.value);
     await showInfo(t('settings.importTitle'), lines.join('\n'));
   } catch (error) {
@@ -359,16 +389,23 @@ async function restore() {
                 :title="t('settings.importSelectAll')"
                 @update:model-value="toggleAll(section.list, selectableIds(section), $event)"
               />
-              <PhoneCheckRow
-                v-for="row in section.rows"
-                :key="row.id"
-                :model-value="ticked(section, row.id)"
-                :title="row.title"
-                :subs="row.subs"
-                :warn="row.warn"
-                :disabled="row.locked"
-                @update:model-value="toggle(section.list, row.id, $event)"
-              />
+              <template v-for="row in section.rows" :key="row.id">
+                <PhoneCheckRow
+                  :model-value="ticked(section, row.id)"
+                  :title="row.title"
+                  :subs="row.subs"
+                  :warn="row.warn"
+                  :disabled="row.locked"
+                  @update:model-value="toggle(section.list, row.id, $event)"
+                />
+                <PhoneRadioGroup
+                  v-if="section.list === 'setups' && needsChoice(row.id)"
+                  :label="row.title"
+                  :options="setupOptions"
+                  :model-value="setupChoices[row.id]"
+                  @update:model-value="chooseSetup(row.id, $event)"
+                />
+              </template>
             </IonList>
           </template>
           <div class="mob-form-row mob-form-row--restore">

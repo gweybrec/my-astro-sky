@@ -305,6 +305,9 @@ import { formatBytes } from '@myastrosky/core/format-utils';
 import {
   buildImportOptions,
   canImport as canImportBackup,
+  SETUP_CHOICES,
+  setupChoiceMissing as setupChoiceMissingOf,
+  setupChoiceUnticks,
   setupLocked as setupLockedOf,
   setupNeedsChoice as setupNeedsChoiceOf,
   setupTicked as setupTickedOf,
@@ -391,12 +394,6 @@ const hasAnyList = computed(
 
 // ─── Setups: the setups of ticked plans come along; a different one needs a choice ───
 
-const SETUP_CHOICES: { value: SetupImportChoice; label: string }[] = [
-  { value: 'replace', label: 'settings.importSetupReplace' },
-  { value: 'keepBoth', label: 'settings.importSetupKeepBoth' },
-  { value: 'skip', label: 'settings.importSetupSkip' },
-];
-
 /** Choice per setup id; nothing is chosen at first. */
 const setupChoices = reactive<Record<string, SetupImportChoice>>({});
 
@@ -416,7 +413,6 @@ const selection = (): Pick<ImportSelection, 'plans' | 'setups'> => ({
   plans: planSel.selected,
   setups: setupSel.selected,
 });
-const setupRequired = (s: ImportPreviewSetup) => requiringPlanNames(s).length > 0;
 
 /** A setup with no local counterpart that a ticked plan needs: shown ticked, cannot be unticked. */
 const setupLocked = (s: ImportPreviewSetup) => setupLockedOf(preview.value!, planSel.selected, s);
@@ -428,7 +424,7 @@ const setupNeedsChoice = (s: ImportPreviewSetup) =>
   setupNeedsChoiceOf(preview.value!, selection(), s);
 
 const setupChoiceMissing = computed(() =>
-  (preview.value?.setups ?? []).some((s) => setupNeedsChoice(s) && !setupChoices[s.id]),
+  preview.value ? setupChoiceMissingOf(preview.value, importSelection()) : false,
 );
 
 const selectableSetups = computed(() =>
@@ -452,7 +448,7 @@ function onSetupToggleAll(e: Event) {
 
 function onSetupChoice(s: ImportPreviewSetup, choice: SetupImportChoice) {
   // "Do not import" on a setup no ticked plan needs is the same as unticking it.
-  if (choice === 'skip' && !setupRequired(s)) {
+  if (setupChoiceUnticks(preview.value!, planSel.selected, s, choice)) {
     setupSel.selected.delete(s.id);
     delete setupChoices[s.id];
     return;
