@@ -776,17 +776,6 @@ export class SkyMap {
     this.setRotationDeg(0);
   }
 
-  /** Back to the opening view: centred, at the default zoom, north up. */
-  resetView() {
-    this.cancelAnimation();
-    this.view.centerX = 0;
-    this.view.centerY = 0;
-    this.view.scale = Math.min(this.view.width, this.view.height) / 2.2;
-    this.view.rotationDeg = 0;
-    this.onViewChange?.('view');
-    this.requestRenderInteractive();
-  }
-
   panBy(dxPx: number, dyPx: number) {
     this.view.centerX += dxPx / this.view.scale;
     this.view.centerY -= dyPx / this.view.scale;

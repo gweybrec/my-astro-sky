@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@myastrosky/core/i18n/index';
 import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
+import type { ConstellationStyle } from '@myastrosky/core/types';
 import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
 import {
   budgetToSliderPos,
@@ -18,12 +19,15 @@ import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
+import SkyCheckSheet from './SkyCheckSheet.vue';
+import SkyRadioSheet from './SkyRadioSheet.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 
 // The board "Ciel, affichage": the map's display settings of the desktop's side panel. Every change applies at once.
-// The pickers behind the field buttons (points of interest, labels, drawing style, types, catalogues, hemisphere,
-// projection) have no board yet: the fields show the current value only.
+// The field buttons open a choice sheet: tick boxes when several values can be kept (types, catalogues), a radio
+// choice when there is one (drawing style, hemisphere, projection). The points of interest and the photo labels come
+// from the photos placed on the map and have no picker yet.
 const open = defineModel<boolean>('open', { required: true });
 
 const display = useDisplayStore();
@@ -55,6 +59,44 @@ const {
   reduceDetailWhileMoving,
 } = storeToRefs(display);
 
+type Picker = 'types' | 'catalogs' | 'style' | 'hemisphere' | 'projection';
+const pickerOpen = ref<Picker | null>(null);
+const pickerIs = (name: Picker) =>
+  computed({
+    get: () => pickerOpen.value === name,
+    set: (v: boolean) => {
+      if (v) pickerOpen.value = name;
+      else if (pickerOpen.value === name) pickerOpen.value = null;
+    },
+  });
+const typesOpen = pickerIs('types');
+const catalogsOpen = pickerIs('catalogs');
+const styleOpen = pickerIs('style');
+const hemisphereOpen = pickerIs('hemisphere');
+const projectionOpen = pickerIs('projection');
+
+const STYLES: ConstellationStyle[] = ['western', 'stellarium', 'rey', 'chinese', 'arabic'];
+const styleLabel = (style: string) =>
+  t(`display.constellationStyle${style.charAt(0).toUpperCase()}${style.slice(1)}`);
+const styleOptions = STYLES.map((value) => ({ value, label: styleLabel(value) }));
+const hemisphereOptions = [
+  { value: 'north' as const, label: t('display.hemisphereNorth') },
+  { value: 'south' as const, label: t('display.hemisphereSouth') },
+];
+const projectionOptions = [
+  { value: 'stereo' as const, label: t('display.projStereo') },
+  { value: 'fisheye' as const, label: t('display.projFisheye') },
+];
+const typeOptions = DSO_TYPES_ALL.map((value) => ({ value, label: t(`dso.typeLabels.${value}`) }));
+const catalogOptions = DSO_CATALOGS_ALL.map((value) => ({
+  value,
+  label: t(`dso.catalogLabels.${value}`),
+}));
+const projection = computed({
+  get: () => (fisheye.active ? ('fisheye' as const) : ('stereo' as const)),
+  set: (v?: 'stereo' | 'fisheye') => fisheye.setActive(v === 'fisheye'),
+});
+
 const countAria = (label: string, n: number, total: number) =>
   t('mobile.targets.countAria', { label, n, total });
 const countOf = (n: number, total: number) => t('mobile.targets.countOf', { n, total });
@@ -64,10 +106,7 @@ const count = (flags: Record<string, boolean>) => {
 };
 const poi = computed(() => count(visiblePois.value));
 const labels = computed(() => count(visibleLabels.value));
-const styleName = computed(() => {
-  const style = constellationStyle.value;
-  return t(`display.constellationStyle${style.charAt(0).toUpperCase()}${style.slice(1)}`);
-});
+const styleName = computed(() => styleLabel(constellationStyle.value));
 const hemisphereName = computed(() =>
   t(hemisphere.value === 'north' ? 'display.hemisphereNorth' : 'display.hemisphereSouth'),
 );
@@ -165,6 +204,7 @@ const dsoDensity = computed({
         block
         text-style="body"
         :aria-label="`${t('display.constellationStyle')} : ${styleName}`"
+        @click="styleOpen = true"
       >
         <span class="mob-btn-key">{{ t('display.constellationStyle') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{ styleName }}</span>
@@ -189,6 +229,7 @@ const dsoDensity = computed({
         block
         text-style="body"
         :aria-label="countAria(t('gallery.filterTypes'), dsoTypes.length, DSO_TYPES_ALL.length)"
+        @click="typesOpen = true"
       >
         <span class="mob-btn-key">{{ t('gallery.filterTypes') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{
@@ -205,6 +246,7 @@ const dsoDensity = computed({
         :aria-label="
           countAria(t('gallery.filterCatalogs'), dsoCatalogs.length, DSO_CATALOGS_ALL.length)
         "
+        @click="catalogsOpen = true"
       >
         <span class="mob-btn-key">{{ t('gallery.filterCatalogs') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{
@@ -226,6 +268,7 @@ const dsoDensity = computed({
         block
         text-style="body"
         :aria-label="`${t('display.hemisphere')} : ${hemisphereName}`"
+        @click="hemisphereOpen = true"
       >
         <span class="mob-btn-key">{{ t('display.hemisphere') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{ hemisphereName }}</span>
@@ -238,6 +281,7 @@ const dsoDensity = computed({
         block
         text-style="body"
         :aria-label="`${t('display.fisheye')} : ${projectionName}`"
+        @click="projectionOpen = true"
       >
         <span class="mob-btn-key">{{ t('display.fisheye') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{ projectionName }}</span>
@@ -302,6 +346,41 @@ const dsoDensity = computed({
       :model-value="reduceDetailWhileMoving"
       :title="t('performance.smoothMotion')"
       @update:model-value="display.setReduceDetailWhileMoving"
+    />
+
+    <SkyCheckSheet
+      v-model:open="typesOpen"
+      :title="t('gallery.filterTypes')"
+      :options="typeOptions"
+      :selected="dsoTypes"
+      @update:selected="display.setDsoTypes"
+    />
+    <SkyCheckSheet
+      v-model:open="catalogsOpen"
+      :title="t('gallery.filterCatalogs')"
+      :options="catalogOptions"
+      :selected="dsoCatalogs"
+      @update:selected="display.setDsoCatalogs"
+    />
+    <SkyRadioSheet
+      v-model:open="styleOpen"
+      :title="t('display.constellationStyle')"
+      :options="styleOptions"
+      :value="constellationStyle"
+      @update:value="(v) => v && display.setConstellationStyle(v)"
+    />
+    <SkyRadioSheet
+      v-model:open="hemisphereOpen"
+      :title="t('display.hemisphere')"
+      :options="hemisphereOptions"
+      :value="hemisphere"
+      @update:value="(v) => v && display.setHemisphere(v)"
+    />
+    <SkyRadioSheet
+      v-model:open="projectionOpen"
+      :title="t('display.fisheye')"
+      :options="projectionOptions"
+      v-model:value="projection"
     />
   </PhoneSheet>
 </template>

@@ -89,7 +89,6 @@ const fr = {
   },
   sky: {
     layers: 'Calques de la carte',
-    recenter: 'Recentrer la carte',
     sectionStars: 'Étoiles et constellations',
     sectionMap: 'Carte',
     needsLocation: "Définissez d'abord le lieu d'observation (Réglages)",

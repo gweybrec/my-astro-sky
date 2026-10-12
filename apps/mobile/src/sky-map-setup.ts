@@ -20,8 +20,6 @@ export interface PhoneSkyMap {
   readonly map: SkyMap;
   /** Re-reads the observing location after it changed in Réglages. */
   refreshLocation(): void;
-  /** Back to the opening view: centred, default zoom, north up. */
-  resetView(): void;
   /** The star and deep-sky catalogues have loaded: the map indexes them and draws again. */
   catalogsLoaded(): void;
   destroy(): void;
@@ -98,7 +96,6 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
   return {
     map,
     refreshLocation,
-    resetView: () => map.resetView(),
     catalogsLoaded: () => map.refreshCatalogs(),
     destroy() {
       stopHorizon();
