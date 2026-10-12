@@ -90,6 +90,7 @@ const fr = {
   sky: {
     layers: 'Calques de la carte',
     sectionStars: 'Étoiles et constellations',
+    searchClear: 'Effacer la recherche',
     sectionMap: 'Carte',
     needsLocation: "Définissez d'abord le lieu d'observation (Réglages)",
     needsLocalSky: "Activez d'abord le ciel local",
