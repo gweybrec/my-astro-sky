@@ -92,6 +92,7 @@ const de: Translations['mobile'] = {
   sky: {
     layers: 'Kartenebenen',
     sectionStars: 'Sterne und Sternbilder',
+    searchClear: 'Suche löschen',
     sectionMap: 'Karte',
     needsLocation: 'Lege zuerst den Beobachtungsort fest (Einstellungen)',
     needsLocalSky: 'Schalte zuerst den lokalen Himmel ein',

@@ -266,6 +266,7 @@ export const views = [
     ],
     ...SHEET,
   },
+  { name: 'sky-search', path: '/sky/search', ready: '.mob-search-wrap' },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
   { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-entry' },
   { name: 'plan-target', path: (ids) => `/plans/${ids.plan}/${ids.entry}`, ready: '.mob-meta' },

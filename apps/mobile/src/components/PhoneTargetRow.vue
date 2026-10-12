@@ -17,8 +17,9 @@ defineProps<{
   magnitude?: string;
   /** The stars of the rating ("★★★★☆"). */
   rating?: string;
-  altitude: string;
-  time: string;
+  /** The trailing figures; a row without them (a search result) has no trailing column. */
+  altitude?: string;
+  time?: string;
 }>();
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
 </script>
@@ -44,7 +45,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
           ><span v-if="rating" class="mob-rating">{{ rating }}</span></span
         >
       </span>
-      <span class="mob-row-trail mob-row-trail--stack">
+      <span v-if="altitude" class="mob-row-trail mob-row-trail--stack">
         <span class="mob-row-trail-main m-mono">{{ altitude }}</span>
         <span class="m-mono">{{ time }}</span>
       </span>

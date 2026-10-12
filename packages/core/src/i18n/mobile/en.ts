@@ -92,6 +92,7 @@ const en: Translations['mobile'] = {
   sky: {
     layers: 'Map layers',
     sectionStars: 'Stars and constellations',
+    searchClear: 'Clear the search',
     sectionMap: 'Map',
     needsLocation: 'Set the observing location first (Settings)',
     needsLocalSky: 'Turn on the local sky first',

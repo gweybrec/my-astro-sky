@@ -11,6 +11,7 @@ import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
+import type { SkyFocus, SkySelection } from './composables/useSkySelection';
 import { SkyMap } from '@myastrosky/render/sky-map';
 
 /** The most pixels per CSS pixel the map draws: a phone screen's 2.6 to 3.5 costs more than it shows. */
@@ -20,6 +21,10 @@ export interface PhoneSkyMap {
   readonly map: SkyMap;
   /** Re-reads the observing location after it changed in Réglages. */
   refreshLocation(): void;
+  /** Highlights the selected object on the map (nothing when null). */
+  select(selection: SkySelection | null): void;
+  /** Moves the map to a position, zooming in to at least the given scale. */
+  focus(focus: SkyFocus): void;
   /** The star and deep-sky catalogues have loaded: the map indexes them and draws again. */
   catalogsLoaded(): void;
   destroy(): void;
@@ -96,6 +101,13 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
   return {
     map,
     refreshLocation,
+    select(selection) {
+      map.setHighlightedDSO(selection?.kind === 'dso' ? selection.dso.id : null);
+      map.setHighlightedStar(selection?.kind === 'star' ? selection.star.hip : null);
+      // A searched deep-sky object is shown even when the deep-sky layer is off, as on the desktop.
+      if (selection?.kind === 'dso') map.setShowDSOs(true);
+    },
+    focus: ({ ra, dec, scale }) => map.navigateTo(ra, dec, Math.max(map.getView().scale, scale)),
     catalogsLoaded: () => map.refreshCatalogs(),
     destroy() {
       stopHorizon();

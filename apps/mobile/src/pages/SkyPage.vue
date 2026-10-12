@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { catalogsReady } from '../catalogs';
+import { skyFocus, skySelection } from '../composables/useSkySelection';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
@@ -17,19 +19,32 @@ import layersIcon from '../icons/layers.svg?raw';
 const canvas = ref<HTMLCanvasElement | null>(null);
 const layersOpen = ref(false);
 const displayOpen = ref(false);
+const router = useRouter();
 let sky: PhoneSkyMap | null = null;
 
 onMounted(() => {
   if (!canvas.value) return;
   sky = createPhoneSkyMap(canvas.value);
+  sky.select(skySelection.value);
   // The catalogues load after the first screen: the map fills in once they are there.
   catalogsReady()
     .then(() => sky?.catalogsLoaded())
     .catch((error) => reportError('SkyPage.catalogsReady', error));
 });
 
-// The observing location may have changed in Réglages while this tab stayed mounted.
+watch(skySelection, (selection) => sky?.select(selection));
+
+// The observing location may have changed in Réglages while this tab stayed mounted; a search may have chosen an
+// object to go to.
 onIonViewWillEnter(() => sky?.refreshLocation());
+onIonViewDidEnter(() => {
+  const focus = skyFocus.value;
+  if (!focus) return;
+  skyFocus.value = null;
+  sky?.focus(focus);
+});
+
+const openSearch = () => void router.push('/sky/search');
 
 onBeforeUnmount(() => {
   sky?.destroy();
@@ -44,11 +59,12 @@ onBeforeUnmount(() => {
         <main class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
           <div class="mob-map-top">
-            <!-- The search screen is the next one: the field is drawn and does not type yet. -->
+            <!-- Typing happens on the search page: this field only opens it. -->
             <PhoneSearch
               readonly
               :placeholder="t('search.placeholder')"
               :label="t('search.placeholder')"
+              @click="openSearch"
             />
             <PhoneIconButton
               float
