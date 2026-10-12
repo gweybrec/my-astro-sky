@@ -9,21 +9,19 @@ import { catalogsReady } from '../catalogs';
 import { clearSkySelection, skyFocus, skySelection } from '../composables/useSkySelection';
 import { useBackClose } from '../composables/useBackClose';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
-import PhoneSearch from '../components/PhoneSearch.vue';
-import PhoneIconButton from '../components/PhoneIconButton.vue';
 import AppIcon from '../components/AppIcon.vue';
 import SkyLayerButtons from './sky/SkyLayerButtons.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
 import SkyTimeBar from './sky/SkyTimeBar.vue';
+import SkyTopBar from './sky/SkyTopBar.vue';
 import PhoneButton from '../components/PhoneButton.vue';
-import layersIcon from '../icons/layers.svg?raw';
 import mapPinIcon from '@icons/map-pin.svg?raw';
 
-// The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field and the layers button over it;
-// the layers button opens the column of the map's toggles, whose last button opens "Ciel, affichage".
+// The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field, the display button and the date
+// button over it; the date button switches the map to the sky at a date and brings the column of the map's toggles.
 const canvas = ref<HTMLCanvasElement | null>(null);
-const layersOpen = ref(false);
+const timeBar = ref<InstanceType<typeof SkyTimeBar> | null>(null);
 const displayOpen = ref(false);
 const router = useRouter();
 let sky: PhoneSkyMap | null = null;
@@ -71,23 +69,11 @@ onBeforeUnmount(() => {
       <div class="mob-page-fill mob-sky-frame">
         <main class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
-          <div class="mob-map-top">
-            <!-- Typing happens on the search page: this field only opens it. -->
-            <PhoneSearch
-              readonly
-              :placeholder="t('search.placeholder')"
-              :label="t('search.placeholder')"
-              @click="openSearch"
-            />
-            <PhoneIconButton
-              float
-              :label="t('mobile.sky.layers')"
-              :expanded="layersOpen"
-              @click="layersOpen = !layersOpen"
-            >
-              <AppIcon :svg="layersIcon" />
-            </PhoneIconButton>
-          </div>
+          <SkyTopBar
+            @search="openSearch"
+            @display="displayOpen = true"
+            @date-mode="timeBar?.openPicker()"
+          />
           <!-- First start: no observing location yet, the time and place of the sky cannot be shown. -->
           <div v-if="!located" class="mob-map-prompt">
             <p class="m-body">{{ t('targets.location.notSet') }}</p>
@@ -95,8 +81,8 @@ onBeforeUnmount(() => {
               <AppIcon :svg="mapPinIcon" />{{ t('targets.location.label') }}
             </PhoneButton>
           </div>
-          <SkyTimeBar />
-          <SkyLayerButtons v-if="layersOpen" @display="displayOpen = true" />
+          <SkyTimeBar ref="timeBar" />
+          <SkyLayerButtons v-if="time.mode === 'date'" />
           <Transition name="mob-sheet-slide">
             <SkyObjectSheet
               v-if="skySelection"
