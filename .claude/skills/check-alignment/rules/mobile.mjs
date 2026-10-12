@@ -54,6 +54,58 @@ export const servers = ({ ports, tmp }) => [
 
 export const baseUrl = ({ ports }) => `http://localhost:${ports[1]}`;
 
+// A photo placed over the north celestial pole (three stars 20° from it, 120° apart), so that a tap at the middle of the map
+// lands on it.
+async function uploadPhoto(base) {
+  const sharp = (await import('sharp')).default;
+  const width = 400;
+  const height = 300;
+  const bytes = await sharp({
+    create: { width, height, channels: 3, background: { r: 40, g: 70, b: 120 } },
+  })
+    .jpeg()
+    .toBuffer();
+  const stars = [
+    [200, 40, 0],
+    [80, 230, 120],
+    [320, 230, 240],
+  ];
+  const form = new FormData();
+  form.append('photo', new Blob([bytes], { type: 'image/jpeg' }), 'Cygnus_wide_2025-08-23.jpg');
+  form.append(
+    'correspondences',
+    JSON.stringify(
+      stars.map(([x, y, ra], i) => ({
+        pointIndex: i,
+        photoX: x,
+        photoY: y,
+        starHip: 0,
+        starName: `Étoile ${i + 1}`,
+        starRa: ra,
+        starDec: 70,
+      })),
+    ),
+  );
+  form.append(
+    'dsoIds',
+    JSON.stringify([
+      'NGC7000',
+      'IC5070',
+      'NGC6888',
+      'NGC6910',
+      'SH2-112',
+      'SH2-106',
+      'SH2-109',
+      'SH2-108',
+      'LBN270',
+      'NGC6960',
+    ]),
+  );
+  const res = await fetch(`${base}/api/photos`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`POST /api/photos answered ${res.status}`);
+  return res.json();
+}
+
 const api = async (base, method, route, body) => {
   const res = await fetch(`${base}${route}`, {
     method,
@@ -119,6 +171,8 @@ export async function seed({ ports }) {
   await api(base, 'PATCH', `/api/plans/${summer.id}/entries/${summer.entries.M42}`, {
     observationWindows: windows(['w3']),
   });
+
+  await uploadPhoto(base);
 
   await api(base, 'POST', '/api/sky-regions', {
     name: 'Zone dégagée',
@@ -207,7 +261,8 @@ export const rules = [
     id: 'sheet-edges',
     type: 'edges',
     within: '.mob-map-sheet',
-    lefts: '.mob-fact:first-child, .mob-icon-row > :first-child',
+    lefts:
+      '.mob-fact:first-child, .mob-icon-row > :first-child, .mob-pager-page:first-child > :first-child, .mob-slider-label',
     rights: '.mob-fact:last-child, .mob-icon-row:not(.mob-icon-row--start) > :last-child',
   },
   // On the map, the layers button and the column of toggles end on the same line, and the toggles are equally spaced
@@ -305,6 +360,18 @@ export const views = [
     ready: '.mob-map-top',
     clearStorage: ['targets-prefs-v3', 'sky-time-settings'],
     open: [{ wait: '.mob-map-prompt' }],
+  },
+  {
+    name: 'sky-photo',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    open: [
+      { wait: '.photo-overlay-img' },
+      { pause: 800 },
+      { tapCentre: '.mob-sky-canvas' },
+      { wait: '.mob-map-sheet' },
+      { pause: 600 },
+    ],
   },
   { name: 'sky-search', path: '/sky/search', ready: '.mob-search-wrap' },
   {

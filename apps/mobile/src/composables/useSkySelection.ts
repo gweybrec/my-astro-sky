@@ -1,9 +1,10 @@
 import { shallowRef } from 'vue';
 import type { UnifiedSearchResult } from '@myastrosky/core/search';
-import type { DSO, Star } from '@myastrosky/core/types';
+import type { DSO, Photo, Star } from '@myastrosky/core/types';
 
-/** The object selected on the sky map: a deep-sky object or a star (a search result's star is one). */
-export type SkySelection = { kind: 'dso'; dso: DSO } | { kind: 'star'; star: Star };
+/** What is selected on the sky map: a deep-sky object, a star (a search result's star is one) or a placed photo. */
+export type SkySelection =
+  { kind: 'dso'; dso: DSO } | { kind: 'star'; star: Star } | { kind: 'photo'; photo: Photo };
 
 /** Where the map should go: the sky position and the zoom to keep at least. */
 export interface SkyFocus {

@@ -1013,3 +1013,23 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   opacity: 0;
   pointer-events: none;
 }
+
+/* The photos over the map: a box over the canvas holding one image each, placed by a CSS matrix (the render package's
+   photo layer). The images do not take touches: the map's own handling finds a photo from its outline. */
+.mob-photo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.photo-overlay-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  image-rendering: auto;
+}
+.mob-photo-layer.photos-frozen .photo-overlay-img {
+  visibility: hidden;
+}

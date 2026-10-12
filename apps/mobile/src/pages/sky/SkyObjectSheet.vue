@@ -8,6 +8,7 @@ import { formatClock24 } from '@myastrosky/core/targets/format';
 import { formatMultiplicity } from '@myastrosky/core/targets/multiplicity';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import type { SkySelection } from '../../composables/useSkySelection';
+import { useSheetDrag } from '../../composables/useSheetDrag';
 import PhoneBadge from '../../components/PhoneBadge.vue';
 import PhoneFacts from '../../components/PhoneFacts.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
@@ -24,7 +25,7 @@ import infoIcon from '../../icons/info.svg?raw';
 // with a tap on an empty spot of the map and with the back button. The altitude is the object's now in the map's time
 // (as the desktop shows it, in date mode with a location only); the transit is when it is highest during the night at
 // the location.
-const props = defineProps<{ selection: SkySelection }>();
+const props = defineProps<{ selection: Exclude<SkySelection, { kind: 'photo' }> }>();
 const emit = defineEmits<{ close: [] }>();
 const titleId = useId();
 const time = useSkyTimeStore();
@@ -87,30 +88,12 @@ const facts = computed(() => {
   return out;
 });
 
-// Dragging down from the handle or the header closes the sheet.
-const DRAG_CLOSE_PX = 48;
-let dragFrom: number | null = null;
-function dragStart(event: PointerEvent) {
-  dragFrom = event.clientY;
-}
-function dragMove(event: PointerEvent) {
-  if (dragFrom !== null && event.clientY - dragFrom > DRAG_CLOSE_PX) {
-    dragFrom = null;
-    emit('close');
-  }
-}
-const dragEnd = () => (dragFrom = null);
+const drag = useSheetDrag(() => emit('close'));
 </script>
 
 <template>
   <section class="mob-sheet mob-sheet--auto mob-map-sheet" :aria-labelledby="titleId">
-    <div
-      class="mob-sheet-drag"
-      @pointerdown="dragStart"
-      @pointermove="dragMove"
-      @pointerup="dragEnd"
-      @pointercancel="dragEnd"
-    >
+    <div class="mob-sheet-drag" v-on="drag">
       <button
         type="button"
         class="mob-sheet-grab"

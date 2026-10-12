@@ -20,6 +20,14 @@ vi.mock('@myastrosky/render/sky-map', () => ({
   },
 }));
 
+vi.mock('@myastrosky/app-state/stores/poi-categories', () => ({
+  usePoiCategoriesStore: () => ({
+    categories: [],
+    ensureLoaded: () => Promise.resolve(),
+    $subscribe: () => () => {},
+  }),
+}));
+
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import { DEFAULT_SETTINGS } from '@myastrosky/core/sky-time-settings';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
@@ -34,7 +42,11 @@ describe('the Ciel tab sky map', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  const make = () => createPhoneSkyMap(document.createElement('canvas'));
+  const make = () =>
+    createPhoneSkyMap(document.createElement('canvas'), {
+      photoContainer: document.createElement('div'),
+      onPhotoPlacementError: () => {},
+    });
 
   it('is built for a phone: touch, density capped, follows rotation, no side panel', () => {
     make();

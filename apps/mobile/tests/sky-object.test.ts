@@ -42,8 +42,9 @@ const VEGA = {
   mag: 0.03,
   bv: 0,
 };
-const mountSheet = (selection: SkySelection = { kind: 'dso', dso: M31 }) =>
-  mount(SkyObjectSheet, { props: { selection }, global: { stubs: ionicStubs } });
+const mountSheet = (
+  selection: Exclude<SkySelection, { kind: 'photo' }> = { kind: 'dso', dso: M31 },
+) => mount(SkyObjectSheet, { props: { selection }, global: { stubs: ionicStubs } });
 const factsOf = (w: ReturnType<typeof mount>) =>
   w
     .findAll('.mob-fact')
@@ -119,7 +120,10 @@ describe('the sheet of a star', () => {
     configureStorage(createMemoryStore());
     setActivePinia(createPinia());
   });
-  const star = (over: object = {}): SkySelection => ({ kind: 'star', star: { ...VEGA, ...over } });
+  const star = (over: object = {}): Exclude<SkySelection, { kind: 'photo' }> => ({
+    kind: 'star',
+    star: { ...VEGA, ...over },
+  });
 
   it('names the star with its designation and constellation, and no type badge', () => {
     const w = mountSheet(star());
