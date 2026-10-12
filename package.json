@@ -25,6 +25,7 @@
     "mobile:dev": "node apps/mobile/scripts/copy-bundled.mjs && vite apps/mobile",
     "mobile:build": "node apps/mobile/scripts/copy-bundled.mjs && vue-tsc --noEmit -p apps/mobile/tsconfig.json && vite build apps/mobile",
     "mobile:sync": "npm run mobile:build && cd apps/mobile && npx cap sync android",
+    "check:alignment": "node .claude/skills/check-alignment/scripts/run.mjs mobile",
     "mobile:icons": "node apps/mobile/scripts/make-icons.mjs",
     "download-catalog": "bash scripts/download-catalog.sh",
     "typecheck": "npm run typecheck:client && npm run typecheck:server && npm run typecheck:core && npm run typecheck:backend-local && npm run typecheck:backend-http && npm run typecheck:app-state && npm run typecheck:mobile",

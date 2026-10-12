@@ -36,8 +36,7 @@ Read first: `apps/mobile/CLAUDE.md` and `docs/dev/ui/mobile.md` (the rules every
 - Align by layout (`align-items`, `gap`, grid tracks, shared baselines), never by a pixel offset. Text beside a chip shares the baseline of the text inside the chip. Trailing items (information button, switch, chevron, handle) are separated by the spacing token.
 - Add each new kind of row, in its variants (long text, several chips, none), to the dev gallery page `/dev/components`.
 - `npm run verify` includes `apps/mobile/scripts/check-no-nudges.mjs`, which rejects pixel offsets.
-- `node apps/mobile/scripts/check-alignment.mjs`, with `npm run mobile:dev` running, opens the gallery in a browser at three sizes, in four languages and at 130 % text, and measures positions. It prints only the rows that fail (exit code 1) and nothing else. It makes no picture and costs almost nothing, so run it after every change to a row. Options: the environment variables `BASE_URL` (default `http://localhost:5174`) and `BROWSER_CHANNEL` (default `msedge`), and `--boards <folder>` to also print the figures of a local copy of the mockups.
-- Only when it reports a failure, or when the user reports a misalignment: take ONE enlarged crop of that row (and of the mockup's same row if a local copy exists) to understand it. Do not produce crops routinely.
+- Run the `check-alignment` skill's command (`npm run check:alignment`) after every change to a row, a component or a theme file. It starts its own servers and browser, measures the components page and the real screens, and prints figures. Add a screen's views to its rules file (see the skill).
 
 ## Step 5 — Behaviour to keep
 
@@ -63,7 +62,7 @@ Then ask the user whether to test on the real phone with the `mobile-device-test
 ## Step 8 — Definition of done
 
 - `npm run verify` is green: read its test summary line and its exit code.
-- `check-alignment.mjs` reports nothing.
+- `npm run check:alignment` prints `PASS`.
 
 ## What not to do
 
