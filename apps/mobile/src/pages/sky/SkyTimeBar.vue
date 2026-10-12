@@ -42,15 +42,10 @@ async function openNativePicker() {
   native?.showPicker?.();
 }
 
-/** Opens the phone's picker for the moment shown (the date button calls it after switching to the date mode). */
-function openPicker() {
-  void openNativePicker();
-}
-
 function openFromField() {
   // Entering the date mode here is what the desktop does when its date field is pressed.
   if (mode.value !== 'date') time.setMode('date');
-  openPicker();
+  void openNativePicker();
 }
 
 function onPicked(value: string | null | undefined) {
@@ -60,7 +55,6 @@ function onPicked(value: string | null | undefined) {
   const [hh, mm] = (clock || '00:00').split(':').map(Number);
   time.setSimDate(new Date(y, m - 1, d, hh, mm));
 }
-defineExpose({ openPicker });
 </script>
 
 <template>

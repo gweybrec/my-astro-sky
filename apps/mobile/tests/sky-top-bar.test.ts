@@ -37,21 +37,20 @@ describe('the top row of the map', () => {
     expect(w.emitted('display')).toHaveLength(1);
   });
 
-  it('switches to the date mode with the date button, and asks for the date picker', async () => {
+  it('switches to the date mode with the date button, without opening any picker', async () => {
     const w = mountBar();
     const time = useSkyTimeStore();
     await button(w, 'Voir le ciel à une date donnée').trigger('click');
     expect(time.mode).toBe('date');
-    expect(w.emitted('dateMode')).toHaveLength(1);
+    expect(w.emitted()).not.toHaveProperty('dateMode');
     expect(button(w, 'Revenir au ciel en direct')).toBeTruthy();
   });
 
-  it('goes back to the live sky with the same button, without a picker', async () => {
+  it('goes back to the live sky with the same button', async () => {
     const w = mountBar();
     const time = useSkyTimeStore();
     await button(w, 'Voir le ciel à une date donnée').trigger('click');
     await button(w, 'Revenir au ciel en direct').trigger('click');
     expect(time.mode).toBe('live');
-    expect(w.emitted('dateMode')).toHaveLength(1);
   });
 });

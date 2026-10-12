@@ -360,8 +360,12 @@ export const views = [
     name: 'sky-layers',
     path: '/tabs/sky',
     ready: '.mob-map-top',
-    // "Ce soir" is how the map is put in the date mode here without opening the phone's picker.
-    open: [{ click: '.mob-timebar ion-button:nth-of-type(2)' }, { wait: '.mob-map-ribbon' }],
+    // The calendar button puts the map in the date mode: the time bar and the toggles appear.
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-map-ribbon' },
+      { wait: '.mob-timebar' },
+    ],
   },
   {
     name: 'sky-display',
