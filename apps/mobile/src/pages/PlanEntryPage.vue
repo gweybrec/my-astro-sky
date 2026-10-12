@@ -115,8 +115,10 @@ const facts = computed(() => {
   }
   if (d.mag !== null) out.push({ label: t('stars.magnitude'), value: d.mag.toFixed(1) });
   if (d.majAxis) out.push({ label: t('targets.results.size'), value: formatArcmin(d.majAxis) });
-  if (i && night.value?.moon && i.moonSepDeg !== null) {
-    const rating = moonSeparationRating(i.moonSepDeg, night.value.moon.illum);
+  // Shown whenever the Moon is on (as the plan page's "Lune" fact); the phase is the night's, so a Moon that stays
+  // below the horizon all night (no overlay) still gives its distance.
+  if (i && night.value && i.moonSepDeg !== null) {
+    const rating = moonSeparationRating(i.moonSepDeg, night.value.phase.illum);
     out.push({
       label: t('targets.plan.moonSeparation'),
       value: `${t(rating.labelKey)} (${formatAlt(i.moonSepDeg)})`,

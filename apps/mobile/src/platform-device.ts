@@ -16,6 +16,13 @@ export interface DevicePosition {
 export async function getCurrentPosition(): Promise<DevicePosition> {
   if (isNativePlatform()) {
     const { Geolocation } = await import('@capacitor/geolocation');
+    // A refusal is an expected answer: ask for the permission first (it resolves with the state), so that the native
+    // bridge's console error of a rejected position request never happens.
+    const isGranted = (p: { location: string; coarseLocation: string }) =>
+      p.location === 'granted' || p.coarseLocation === 'granted';
+    let permission = await Geolocation.checkPermissions();
+    if (!isGranted(permission)) permission = await Geolocation.requestPermissions();
+    if (!isGranted(permission)) throw new Error('Location permission was denied');
     const { coords } = await Geolocation.getCurrentPosition({
       enableHighAccuracy: false,
       timeout: 15000,
