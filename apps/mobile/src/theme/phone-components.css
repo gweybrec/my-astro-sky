@@ -268,6 +268,9 @@ ion-checkbox.mob-check-row {
   --transition: none;
 }
 ion-checkbox.mob-check-row::part(mark) {
+  /* the part is the svg `path`: its origin is the viewBox corner, so scaling without this pulls the tick to the corner */
+  transform-box: view-box;
+  transform-origin: 12px 12px;
   transform: scale(0.75);
 }
 ion-checkbox.mob-check-row::part(label) {
@@ -492,19 +495,19 @@ ion-item.mob-entry::part(native) {
   align-items: center;
   gap: var(--space-7);
 }
-/* The handle is the board's 48 px touch box with the six dots centred in it (board "Détail du plan": dots 16 px from the
-   edge, title at 56 px). `ion-reorder` is not a button, so the box and the icon size are set here, not left to inheritance. */
+/* The handle is a 48 px touch box whose 24 px icon starts one page margin (16 px) from the row's edge, so the title follows at
+   56 px (board "Détail du plan"). The icon is placed by the host's start padding, not by centring, which did not apply to the web component. `ion-reorder` is not a button, so the box and the icon size are set here, not left to inheritance. */
 ion-reorder.mob-drag {
   display: flex;
   flex: none;
   align-self: center;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   box-sizing: border-box;
   width: var(--mobile-touch-min);
   height: var(--mobile-touch-min);
   margin: 0;
-  padding: 0;
+  padding: 0 0 0 var(--mobile-gutter);
   --color: var(--text-primary);
 }
 ion-reorder.mob-drag svg {
