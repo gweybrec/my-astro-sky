@@ -928,3 +928,38 @@ ion-fab.mob-fab--flush {
 .mob-fact-value svg.mob-icon--sm {
   margin-left: 0;
 }
+
+/* ── A floating map button that cannot be used now: drawn as the board draws its disabled one (`.mob-icon-btn--float:disabled`),
+   but not a disabled button, so its long press still shows the name and the reason. */
+ion-button.mob-icon-btn--unavailable {
+  opacity: 0.35;
+}
+.mob-longpress-reason {
+  display: block;
+  color: var(--text-secondary);
+}
+.mob-longpress-label:has(.mob-longpress-reason) {
+  height: auto;
+  min-height: var(--mobile-touch-min);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding-block: var(--space-4);
+  white-space: normal;
+}
+
+/* A field button (`PhoneButton variant="field"`) in a sheet: a small gap under it before the next control, as the boards set. */
+.mob-form-row--field {
+  padding-bottom: var(--space-4);
+}
+
+/* The selected fill of a toggle icon button (`PhoneIconButton pressed`): the design system's `.mob-icon-btn[aria-pressed='true']`
+   rules, carried by a class because Ionic takes `aria-pressed` off the host when the button is first drawn. */
+ion-button.mob-icon-btn--pressed {
+  background: var(--accent-bg);
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
+  background: linear-gradient(var(--accent-bg), var(--accent-bg)), var(--bg-panel);
+}

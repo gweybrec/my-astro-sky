@@ -87,6 +87,15 @@ const fr = {
     dms: 'DMS (° ′ ″)',
     clearHorizon: "Effacer l'horizon ?",
   },
+  sky: {
+    layers: 'Calques de la carte',
+    recenter: 'Recentrer la carte',
+    sectionStars: 'Étoiles et constellations',
+    sectionMap: 'Carte',
+    needsLocation: "Définissez d'abord le lieu d'observation (Réglages)",
+    needsLocalSky: "Activez d'abord le ciel local",
+    needsHorizon: "Calculez ou importez d'abord l'horizon du relief (Réglages)",
+  },
   backup: { exportSection: 'Exporter', importSection: 'Importer' },
 };
 

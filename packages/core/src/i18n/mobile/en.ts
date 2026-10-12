@@ -89,6 +89,15 @@ const en: Translations['mobile'] = {
     dms: 'DMS (° ′ ″)',
     clearHorizon: 'Clear the horizon?',
   },
+  sky: {
+    layers: 'Map layers',
+    recenter: 'Recenter the map',
+    sectionStars: 'Stars and constellations',
+    sectionMap: 'Map',
+    needsLocation: 'Set the observing location first (Settings)',
+    needsLocalSky: 'Turn on the local sky first',
+    needsHorizon: 'Compute or import the terrain horizon first (Settings)',
+  },
   backup: { exportSection: 'Export', importSection: 'Import' },
 };
 

@@ -89,6 +89,15 @@ const de: Translations['mobile'] = {
     dms: 'DMS (° ′ ″)',
     clearHorizon: 'Horizont löschen?',
   },
+  sky: {
+    layers: 'Kartenebenen',
+    recenter: 'Karte zentrieren',
+    sectionStars: 'Sterne und Sternbilder',
+    sectionMap: 'Karte',
+    needsLocation: 'Lege zuerst den Beobachtungsort fest (Einstellungen)',
+    needsLocalSky: 'Schalte zuerst den lokalen Himmel ein',
+    needsHorizon: 'Berechne oder importiere zuerst den Geländehorizont (Einstellungen)',
+  },
   backup: { exportSection: 'Exportieren', importSection: 'Importieren' },
 };
 
