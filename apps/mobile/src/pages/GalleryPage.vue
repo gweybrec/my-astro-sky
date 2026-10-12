@@ -1,27 +1,69 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { IonPage, IonContent } from '@ionic/vue';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
+import type { Photo } from '@myastrosky/core/types';
 import { getPhotos } from '@myastrosky/app-state/api';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhoneEmptyState from '../components/PhoneEmptyState.vue';
+import PhoneFab from '../components/PhoneFab.vue';
+import PhoneSheet from '../components/PhoneSheet.vue';
+import PhoneRow from '../components/PhoneRow.vue';
+import { addImportFiles } from '../composables/usePhotoImport';
+import { useErrorToast } from '../composables/useErrorToast';
+import { PHOTO_FILE_TYPES, pickFiles } from '../platform-device';
 import filterIcon from '../icons/filter.svg?raw';
+import folderIcon from '../icons/folder.svg?raw';
+import imageIcon from '@icons/image.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 
-// null until the photos are read; the empty state shows only once the backend has answered with none.
-const photoCount = ref<number | null>(null);
+// The Galerie tab, from the boards "Galerie", "Galerie, aucune photo" and "Galerie, ajouter une photo": the photos as
+// tiles with the name and the first object of the photo, and the plus that opens the sheet to add photos. Choosing files
+// opens the import ("Importer des photos").
+const router = useRouter();
+const { showError } = useErrorToast();
 
-onMounted(async () => {
+// null until the photos are read; the empty state shows only once the backend has answered with none.
+const photos = ref<Photo[] | null>(null);
+const adding = ref(false);
+
+const tiles = computed(() =>
+  (photos.value ?? []).map((photo) => ({
+    id: photo.id,
+    name: photo.originalName,
+    object: photo.dsoIds?.[0] ?? '',
+  })),
+);
+
+async function load() {
   try {
-    photoCount.value = (await getPhotos()).length;
+    photos.value = await getPhotos();
   } catch (error) {
     reportError('GalleryPage.getPhotos', error);
   }
-});
+}
+onMounted(load);
+onIonViewWillEnter(load);
+
+async function chooseFiles() {
+  try {
+    const files = await pickFiles(PHOTO_FILE_TYPES, true);
+    if (files.length === 0) return;
+    if (addImportFiles(files) === 0) {
+      void showError(new Error(t('errors.invalidPhotoFormat')));
+      return;
+    }
+    adding.value = false;
+    await router.push('/gallery/import');
+  } catch (error) {
+    void showError(error);
+  }
+}
 </script>
 
 <template>
@@ -37,14 +79,40 @@ onMounted(async () => {
     </PhoneTopBar>
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill">
-        <!-- Adding photos is a later card: the button shows and does nothing yet. -->
         <PhoneEmptyState
-          v-if="photoCount === 0"
+          v-if="photos !== null && photos.length === 0"
           :text="t('mobile.gallery.empty')"
           :button-label="t('batch.modalTitle')"
           :button-icon="plusIcon"
+          @action="adding = true"
         />
+        <div v-else class="mob-photo-grid">
+          <!-- A photo's own screen has no board built yet: the tile shows and does nothing. -->
+          <div v-for="tile in tiles" :key="tile.id" class="mob-photo">
+            <button type="button" class="mob-photo-tile m-secondary" :aria-label="tile.name">
+              <span class="mob-photo-name">{{ tile.name }}</span>
+            </button>
+            <span class="mob-photo-id m-mono">{{ tile.object }}</span>
+          </div>
+        </div>
       </div>
+      <PhoneFab
+        v-if="photos !== null && photos.length > 0"
+        in-tab
+        :label="t('batch.modalTitle')"
+        @click="adding = true"
+      />
     </IonContent>
+    <PhoneSheet v-model:open="adding" :title="t('batch.modalTitle')">
+      <PhoneRow
+        button
+        :lead="folderIcon"
+        :title="t('mobile.gallery.chooseFiles')"
+        :subs="[t('mobile.gallery.formats')]"
+        @click="chooseFiles"
+      />
+      <!-- Needs the phone's own photo picker, which is not added yet: the row shows and does nothing. -->
+      <PhoneRow inert :lead="imageIcon" :title="t('mobile.gallery.fromPhone')" />
+    </PhoneSheet>
   </IonPage>
 </template>

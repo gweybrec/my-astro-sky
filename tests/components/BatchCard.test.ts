@@ -26,7 +26,7 @@ vi.mock('../../src/api', () => ({
 }));
 
 const mockFindDSOIds = vi.fn();
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: (...args: unknown[]) => mockFindDSOIds(...args),
 }));
 

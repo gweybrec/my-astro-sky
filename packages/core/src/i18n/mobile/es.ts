@@ -3,7 +3,18 @@ import type { Translations } from '../fr';
 const es: Translations['mobile'] = {
   info: { label: 'Información: {title}' },
   tabs: { sky: 'Cielo', targets: 'Objetivos', navLabel: 'Navegación' },
-  gallery: { searchLabel: 'Buscar una foto', empty: 'Aún no hay fotos' },
+  gallery: {
+    searchLabel: 'Buscar una foto',
+    empty: 'Aún no hay fotos',
+    chooseFiles: 'Elegir archivos',
+    formats: 'JPEG, PNG, TIF, TIFF, FIT, FITS, XISF',
+    fromPhone: 'Desde la galería del teléfono',
+    importOne: 'Importar 1 foto',
+    importMany: 'Importar {n} fotos',
+    alreadySolved: '✓ Ya resuelta',
+    toPlace: 'Por ubicar',
+    import: 'Importar',
+  },
   plans: {
     searchPlaceholder: 'Buscar un plan…',
     searchLabel: 'Buscar un plan',

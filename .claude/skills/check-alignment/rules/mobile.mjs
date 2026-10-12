@@ -56,7 +56,7 @@ export const baseUrl = ({ ports }) => `http://localhost:${ports[1]}`;
 
 // A photo placed over the north celestial pole (three stars 20° from it, 120° apart), so that a tap at the middle of the map
 // lands on it.
-async function uploadPhoto(base) {
+async function uploadPhoto(base, fileName = 'Cygnus_wide_2025-08-23.jpg') {
   const sharp = (await import('sharp')).default;
   const width = 400;
   const height = 300;
@@ -71,7 +71,7 @@ async function uploadPhoto(base) {
     [320, 230, 240],
   ];
   const form = new FormData();
-  form.append('photo', new Blob([bytes], { type: 'image/jpeg' }), 'Cygnus_wide_2025-08-23.jpg');
+  form.append('photo', new Blob([bytes], { type: 'image/jpeg' }), fileName);
   form.append(
     'correspondences',
     JSON.stringify(
@@ -173,6 +173,14 @@ export async function seed({ ports }) {
   });
 
   await uploadPhoto(base);
+  // Four photos: two rows of the gallery's two columns.
+  for (const fileName of [
+    'Cygnus_close_2025-08-24.jpg',
+    'Lyra_2025-08-25.jpg',
+    'Lacerta_2025-08-26.jpg',
+  ]) {
+    await uploadPhoto(base, fileName);
+  }
 
   await api(base, 'POST', '/api/sky-regions', {
     name: 'Zone dégagée',
@@ -226,7 +234,7 @@ export const rules = [
     type: 'rowCentre',
     rows: ROWS,
     items:
-      '.mob-row-lead, .mob-row-chevron, .mob-drag svg, .mob-btn-caret, .mob-icon-btn, .mob-check',
+      '.mob-row-lead, .mob-row-thumb, .mob-row-chevron, .mob-drag svg, .mob-btn-caret, .mob-icon-btn, .mob-check',
     track: SWITCH_TRACK,
   },
   // A row's content has the same room above and below.
@@ -264,6 +272,14 @@ export const rules = [
     lefts:
       '.mob-fact:first-child, .mob-icon-row > :first-child, .mob-pager-page:first-child > :first-child, .mob-slider-label',
     rights: '.mob-fact:last-child, .mob-icon-row:not(.mob-icon-row--start) > :last-child',
+  },
+  // The gallery's tiles make two columns between the same two edges.
+  {
+    id: 'grid-edges',
+    type: 'edges',
+    within: '.mob-photo-grid',
+    lefts: '.mob-photo:nth-child(odd)',
+    rights: '.mob-photo:nth-child(even)',
   },
   // On the map, the layers button and the column of toggles end on the same line, and the toggles are equally spaced
   // (the last one, set apart, is the only exception: it is measured against its own margin).
@@ -406,6 +422,31 @@ export const views = [
       { click: '.mob-row--roomy' },
       { wait: '.mob-map-sheet' },
       { pause: 600 },
+    ],
+  },
+  { name: 'gallery', path: '/tabs/gallery', ready: '.mob-photo' },
+  {
+    name: 'gallery-add',
+    path: '/tabs/gallery',
+    ready: '.mob-photo',
+    open: [{ click: 'ion-fab-button' }, { wait: '.mob-sheet' }, { pause: 600 }],
+    ...SHEET,
+  },
+  {
+    // A solved FITS (placed by its own WCS) and a JPEG that still has to be placed: the files are the repository's
+    // local test photos.
+    name: 'gallery-import',
+    path: '/tabs/gallery',
+    ready: '.mob-photo',
+    open: [
+      { click: 'ion-fab-button' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+      {
+        chooseFiles: '.mob-sheet ion-item.mob-row',
+        files: ['test-photos/M1-CCD.fit', 'test-photos/M1-CCD.jpg'],
+      },
+      { wait: '.mob-status--success' },
     ],
   },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
