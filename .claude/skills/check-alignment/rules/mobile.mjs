@@ -12,7 +12,7 @@
 //   sizes       the viewport sizes [width, height]
 //   rules       the measurements: { id, type, ...selectors } (types are in the engine; `minimum: true` for a gap)
 //   views       the pages: { name, path (string or ids => string), ready?, open?, scope?, variants? }; `open` is a list of
-//               { click: selector } | { wait: selector } | { pause: ms }; `scope` limits the measure to one element
+//               { click: selector } | { fill: selector, text } | { wait: selector } | { pause: ms }; `scope` limits the measure to one element
 //               (an open sheet); `variants: true` repeats the view in every language and at 130 % text.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -189,8 +189,35 @@ export const rules = [
   {
     id: 'centre-line',
     type: 'centreLine',
-    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .phone-field-unit-line',
+    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top',
   },
+  // The clear button of a search field is centred on the field.
+  { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },
+  // A card's label and value start on one line; the toggles of the map's column start on one line.
+  {
+    id: 'fact-edge',
+    type: 'sameStart',
+    bars: '.mob-fact',
+    children: '.mob-fact-label, .mob-fact-value',
+  },
+  { id: 'ribbon-edge', type: 'sameStart', bars: '.mob-map-ribbon', children: 'ion-button' },
+  // The object sheet's cards and buttons span the same width, between the same two edges as its title.
+  {
+    id: 'sheet-edges',
+    type: 'edges',
+    within: '.mob-map-sheet',
+    lefts: '.mob-fact:first-child, .mob-icon-row > :first-child',
+    rights: '.mob-fact:last-child, .mob-icon-row > :last-child',
+  },
+  // On the map, the layers button and the column of toggles end on the same line, and the toggles are equally spaced
+  // (the last one, set apart, is the only exception: it is measured against its own margin).
+  {
+    id: 'map-edges',
+    type: 'edges',
+    within: '.mob-map',
+    rights: '.mob-map-top > ion-button, .mob-map-ribbon > ion-button',
+  },
+  { id: 'icon-row-gaps', type: 'equalGaps', bars: '.mob-icon-row' },
   // A tab bar's buttons start on the same line.
   { id: 'tab-line', type: 'sameStart', bars: 'ion-tab-bar', children: 'ion-tab-button' },
   // An "i" button and the switch beside it are apart by at least the spacing token.
@@ -208,7 +235,7 @@ export const rules = [
     id: 'left-edge',
     type: 'leadingEdge',
     items:
-      '.mob-section-header, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead)):not(.mob-entry .mob-row) .mob-row-title, ion-toggle.mob-row .mob-row-title',
+      '.mob-section-header, .mob-sheet-title, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead)):not(.mob-entry .mob-row) .mob-row-title, ion-toggle.mob-row .mob-row-title',
   },
   // The chevron (else the switch) of each row ends on one line.
   {
@@ -267,6 +294,40 @@ export const views = [
     ...SHEET,
   },
   { name: 'sky-search', path: '/sky/search', ready: '.mob-search-wrap' },
+  {
+    name: 'sky-search-results',
+    path: '/sky/search',
+    ready: '.mob-search-wrap',
+    open: [{ fill: '.mob-search-wrap input', text: 'andro' }, { wait: '.mob-row--roomy' }],
+  },
+  {
+    name: 'sky-star',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    open: [
+      { click: '.mob-map-top ion-input' },
+      { wait: '.mob-search-wrap' },
+      { fill: '.mob-search-wrap input', text: 'vega' },
+      { wait: '.mob-row--roomy' },
+      { click: '.mob-row--roomy' },
+      { wait: '.mob-map-sheet' },
+      { pause: 600 },
+    ],
+  },
+  {
+    name: 'sky-object',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    open: [
+      { click: '.mob-map-top ion-input' },
+      { wait: '.mob-search-wrap' },
+      { fill: '.mob-search-wrap input', text: 'andro' },
+      { wait: '.mob-row--roomy' },
+      { click: '.mob-row--roomy' },
+      { wait: '.mob-map-sheet' },
+      { pause: 600 },
+    ],
+  },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
   { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-entry' },
   { name: 'plan-target', path: (ids) => `/plans/${ids.plan}/${ids.entry}`, ready: '.mob-meta' },
