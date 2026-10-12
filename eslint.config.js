@@ -10,6 +10,16 @@ import tseslint from 'typescript-eslint';
 import vue from 'eslint-plugin-vue';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import { existsSync, readFileSync } from 'node:fs';
+
+// The folders the repository's .gitignore anchors at the root (`/name/`) are local files, not source: ESLint does not read
+// .gitignore (Prettier does), so they are ignored here from the same lines.
+const rootIgnored = existsSync('.gitignore')
+  ? readFileSync('.gitignore', 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => /^\/[\w.-]+(\/[\w.-]+)*\/$/.test(line))
+      .map((line) => `${line.slice(1)}**`)
+  : [];
 
 const noReexport = {
   selector: 'Program > ExportAllDeclaration[source.value=/^@myastrosky[/]/]',
@@ -51,6 +61,7 @@ export default tseslint.config(
   {
     // Anything generated, vendored, or non-source. Mirrors .prettierignore.
     ignores: [
+      ...rootIgnored,
       'node_modules/**',
       'dist/**',
       'out/**',
@@ -65,7 +76,6 @@ export default tseslint.config(
       'public/swagger.json',
       'resources/**',
       'other-resources/**',
-      'design/**',
       '.claude/**',
       'spikes/**',
       '**/android/**',

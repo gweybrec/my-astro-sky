@@ -20,7 +20,7 @@ export default defineConfig({
   },
   server: {
     port: 5174,
-    // `design/mobile/ds` (the design system) lives outside this folder.
+    // The desktop's icons (`@icons`) live outside this folder.
     fs: { allow: ['../..'] },
     proxy: {
       '/api': 'http://localhost:3001',
