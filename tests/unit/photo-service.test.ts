@@ -1235,5 +1235,12 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       await blobs.put('y.png', new Uint8Array([9]));
       await expect(svc.ensureThumbnail('y.png', 'y_thumb.jpg')).rejects.toThrow();
     });
+
+    it('ensureThumbnail with replace makes the thumbnail again without looking for the old one', async () => {
+      await blobs.put('z.png', new Uint8Array([9]));
+      blobs.store.set('z_thumb.jpg', new Uint8Array([5, 5]));
+      await svc.ensureThumbnail('z.png', 'z_thumb.jpg', true);
+      expect(blobs.store.get('z_thumb.jpg')).not.toEqual(new Uint8Array([5, 5]));
+    });
   });
 });

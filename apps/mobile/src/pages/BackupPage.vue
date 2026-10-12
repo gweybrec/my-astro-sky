@@ -307,7 +307,7 @@ async function restore() {
       </h1>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div class="mob-scroll mob-page-fill mob-page-column">
+      <div class="mob-scroll mob-page-fill mob-page-column mob-page-safe">
         <PhoneSectionHeader>{{ t('mobile.backup.exportSection') }}</PhoneSectionHeader>
         <div class="mob-form-row mob-form-row--title">
           <span class="mob-form-label m-secondary">{{ t('settings.exportOptions') }}</span>

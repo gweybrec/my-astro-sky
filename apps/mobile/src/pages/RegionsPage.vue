@@ -55,7 +55,7 @@ async function remove(region: { id: string; name: string }) {
       </h1>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div class="mob-scroll mob-page-fill" style="padding-top: var(--space-4)">
+      <div class="mob-scroll mob-page-fill mob-page-safe" style="padding-top: var(--space-4)">
         <div
           class="mob-region-list"
           role="radiogroup"
