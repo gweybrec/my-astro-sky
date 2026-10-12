@@ -224,6 +224,38 @@ export function measureInPage([rules, scopeSel]) {
       const hi = ends.reduce((m, l) => (l[1] > m[1] ? l : m));
       for (const [el, x] of ends) add(rule, el, hi[0], 'x', x, hi[1]);
     },
+    // Inside each container (`within`), the matched boxes share one left edge (`lefts`) and one right edge (`rights`).
+    edges(rule) {
+      for (const container of all(rule.within)) {
+        if (!shown(container)) continue;
+        for (const side of ['left', 'right']) {
+          const selector = side === 'left' ? rule.lefts : rule.rights;
+          if (!selector) continue;
+          const items = all(selector, container).filter((e) => R(e).width > 0 && shown(e));
+          if (items.length < 2) continue;
+          const pick = side === 'left' ? Math.min : Math.max;
+          const reference = pick(...items.map((e) => R(e)[side]));
+          const refItem = items.find((e) => R(e)[side] === reference);
+          for (const item of items) add(rule, item, refItem, 'x', R(item)[side], reference);
+        }
+      }
+    },
+    // The gaps between neighbours of a bar (a row, or a column) are all equal.
+    equalGaps(rule) {
+      for (const bar of all(rule.bars)) {
+        if (!shown(bar)) continue;
+        const kids = [...bar.children].filter((k) => R(k).width > 0 && R(k).height > 0);
+        if (kids.length < 3) continue;
+        const column = getComputedStyle(bar).flexDirection === 'column';
+        const start = column ? 'top' : 'left';
+        const end = column ? 'bottom' : 'right';
+        const gaps = kids.slice(1).map((k, i) => R(k)[start] - R(kids[i])[end]);
+        const median = [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)];
+        kids.slice(1).forEach((k, i) => {
+          add(rule, k, kids[i], column ? 'y' : 'x', gaps[i], median);
+        });
+      }
+    },
     // The children of an empty state are centred in it.
     centredBlock(rule) {
       for (const box of all(rule.boxes)) {
@@ -261,10 +293,15 @@ export function scaleText(factor) {
   });
 }
 
-/** Runs a view's actions, described as data: { click }, { wait } (a selector) or { pause } (milliseconds). */
+/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { wait } (a selector) or { pause } (milliseconds). */
 export async function runActions(page, actions = []) {
   for (const action of actions) {
     if (action.click) await page.locator(action.click).first().click({ timeout: 10000 });
+    else if (action.fill)
+      await page
+        .locator(action.fill)
+        .first()
+        .fill(action.text ?? '', { timeout: 10000 });
     else if (action.wait) await page.waitForSelector(action.wait, { timeout: 15000 });
     else if (action.pause) await page.waitForTimeout(action.pause);
   }
