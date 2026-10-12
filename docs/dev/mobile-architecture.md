@@ -11,6 +11,7 @@ packages/core/             Platform-neutral TypeScript: astronomy, projection, r
 packages/app-state/        The data functions the screens call (api.ts), the backend holder, and the Pinia
                            stores that hold backend data (plans, POI categories, sky regions, settings).
 packages/backend-http/     The backend that calls the Express server's routes.
+packages/render/           The sky map's canvas drawing, hit testing and input handling.
 packages/backend-local/    The backend that calls the services directly, and the phone's platform adapters.
 apps/mobile/               The phone app: Capacitor + Ionic Vue.
 ```
@@ -21,15 +22,16 @@ Every package is consumed as TypeScript source (`"exports": { "./*": "./src/*.ts
 
 Enforced by ESLint (`no-restricted-imports` at error) and, for core, by its `tsconfig` (`lib: ["ES2022"]`, `types: []`).
 
-| Package         | May import                                                                     |
-| --------------- | ------------------------------------------------------------------------------ |
-| `core`          | Nothing outside itself except `fflate`. No DOM, Node, Vue, Pinia or Capacitor. |
-| `app-state`     | `core`, Vue, Pinia.                                                            |
-| `backend-http`  | `core`. Browser APIs are allowed.                                              |
-| `backend-local` | `core`, `fflate`. Browser APIs are allowed; plugin objects are passed in.      |
-| `apps/mobile`   | The packages, Ionic, Capacitor. Never the desktop's `src/` or `server/`.       |
-| `server`        | `core`.                                                                        |
-| `src`           | The packages. A lint rule forbids one-line re-export files of package modules. |
+| Package         | May import                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `core`          | Nothing outside itself except `fflate`. No DOM, Node, Vue, Pinia or Capacitor.                   |
+| `app-state`     | `core`, Vue, Pinia.                                                                              |
+| `backend-http`  | `core`. Browser APIs are allowed.                                                                |
+| `render`        | `core`. Browser APIs are allowed (the sky map's canvas drawing, hit testing and input handling). |
+| `backend-local` | `core`, `fflate`. Browser APIs are allowed; plugin objects are passed in.                        |
+| `apps/mobile`   | The packages, Ionic, Capacitor. Never the desktop's `src/` or `server/`.                         |
+| `server`        | `core`.                                                                                          |
+| `src`           | The packages. A lint rule forbids one-line re-export files of package modules.                   |
 
 ## How a screen reaches its data
 

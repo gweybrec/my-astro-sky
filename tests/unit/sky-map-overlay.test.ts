@@ -11,7 +11,7 @@ vi.mock('../../src/dso-catalog', () => ({
   getDSOCatalog: () => null,
 }));
 
-import { SkyMap } from '../../src/sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 
 describe('SkyMap overlay canvas', () => {
   let originalGetContext: typeof HTMLCanvasElement.prototype.getContext;

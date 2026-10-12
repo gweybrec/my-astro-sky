@@ -1,7 +1,7 @@
 import { createApp } from 'vue';
 import { pinia } from './pinia-instance';
 import MyAstroSkyApp from './MyAstroSkyApp.vue';
-import type { SkyMap } from './sky-map';
+import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { PhotoOverlay } from './photo-overlay';
 import { reportUnknownRendererError } from './error-reporter';
 

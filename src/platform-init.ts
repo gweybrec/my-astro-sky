@@ -4,6 +4,7 @@ import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
 import { configureDeviceHints } from '@myastrosky/core/platform/device-hints';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { configureStarSearch } from '@myastrosky/core/platform/star-search';
+import { configureConstellationStyleLoader } from '@myastrosky/core/platform/constellation-style';
 import type { KeyValueStore } from '@myastrosky/core/ports/key-value-store';
 import { createHttpBackend } from '@myastrosky/backend-http/http-backend';
 import { setBackend } from '@myastrosky/app-state/backend';
@@ -56,6 +57,10 @@ configureDeviceHints(() => (typeof navigator !== 'undefined' ? navigator : {}));
 // `src/api` is imported lazily so that start-up does not load it before a test's mock applies.
 configureGearCatalogLoader(async (type) => (await import('./api')).getGearCatalog(type));
 configureStarSearch(async (query, limit) => (await import('./api')).searchStarsAPI(query, limit));
+// The constellation lines come from the desktop's star catalogue module, loaded lazily for the same reason.
+configureConstellationStyleLoader(async (style) =>
+  (await import('./star-catalog')).loadConstellationStyle(style),
+);
 
 // The desktop and the web build run on the HTTP backend; the phone installs its own at start-up.
 setBackend(

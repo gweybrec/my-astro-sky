@@ -12,7 +12,7 @@ vi.mock('../../src/dso-catalog', () => ({
 }));
 
 import { fromCanvas } from '@myastrosky/core/projection';
-import { SkyMap } from '../../src/sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 import { normalizeRotationDeg } from '@myastrosky/core/sky-map-types';
 
 describe('SkyMap rotation', () => {

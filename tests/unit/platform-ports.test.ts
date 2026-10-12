@@ -9,6 +9,10 @@ import { detectInitialDensity } from '@myastrosky/core/density-slider';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { getTelescopes } from '@myastrosky/core/gear-catalog';
 import { configureStarSearch } from '@myastrosky/core/platform/star-search';
+import {
+  configureConstellationStyleLoader,
+  loadConstellationStyle,
+} from '@myastrosky/core/platform/constellation-style';
 import { searchUnified } from '@myastrosky/core/search';
 import { createLocalStorageStore } from '../../src/platform-init';
 
@@ -106,5 +110,20 @@ describe('star search hook', () => {
     configureStarSearch(fn);
     await searchUnified('vega');
     expect(fn).toHaveBeenCalledWith('vega', 8);
+  });
+});
+
+describe('constellation style hook', () => {
+  it('default does nothing and resolves', async () => {
+    // A fresh copy of the module: the test set-up has already configured the desktop loader on the shared one.
+    vi.resetModules();
+    const fresh = await import('@myastrosky/core/platform/constellation-style');
+    await expect(fresh.loadConstellationStyle('western')).resolves.toBeUndefined();
+  });
+  it('a configured loader receives the style', async () => {
+    const load = vi.fn().mockResolvedValue(undefined);
+    configureConstellationStyleLoader(load);
+    await loadConstellationStyle('rey');
+    expect(load).toHaveBeenCalledWith('rey');
   });
 });

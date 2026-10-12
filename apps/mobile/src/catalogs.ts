@@ -12,9 +12,28 @@ import {
   getTelescopes,
 } from '@myastrosky/core/gear-catalog';
 import { getDsoOverrides, getStarCatalogUrl } from '@myastrosky/app-state/api';
-import { loadDsoCatalogData, loadStarCatalogData } from '@myastrosky/app-state/catalog-loaders';
+import {
+  loadConstellationStyleData,
+  loadDsoCatalogData,
+  loadStarCatalogData,
+  type StarLoaderOptions,
+} from '@myastrosky/app-state/catalog-loaders';
+import type { ConstellationStyle } from '@myastrosky/core/types';
 
 let loading: Promise<void> | null = null;
+
+function starLoaderOptions(): StarLoaderOptions {
+  return {
+    lang: getLang(),
+    starCatalogUrl: getStarCatalogUrl,
+    loadError: (url, status, statusText) => t('errors.catalogLoad', { url, status, statusText }),
+  };
+}
+
+/** Loads the lines of one constellation style (the sky map calls it when the style changes). */
+export function loadConstellationStyle(style: ConstellationStyle): Promise<void> {
+  return loadConstellationStyleData(style, starLoaderOptions());
+}
 
 /** Starts the load (once) and returns the promise every screen waits on. */
 export function catalogsReady(): Promise<void> {
@@ -25,12 +44,7 @@ export function catalogsReady(): Promise<void> {
         getCameras(),
         getAccessories(),
         getFilters(),
-        loadStarCatalogData({
-          lang: getLang(),
-          starCatalogUrl: getStarCatalogUrl,
-          loadError: (url, status, statusText) =>
-            t('errors.catalogLoad', { url, status, statusText }),
-        }),
+        loadStarCatalogData(starLoaderOptions()),
         loadDsoCatalogData({ lang: getLang(), getOverrides: getDsoOverrides }),
       ]);
     } catch (error) {

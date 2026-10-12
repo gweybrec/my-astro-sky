@@ -58,7 +58,7 @@ import {
 import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
 import { showToast } from './toast';
-import type { SkyMap } from './sky-map';
+import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
 import type { DSO } from '@myastrosky/core/types';
 import { createTargetsChip, createFilterBadge, buildIntegrationFilterField } from './chip-utils';

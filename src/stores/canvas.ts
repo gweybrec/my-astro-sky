@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { shallowRef } from 'vue';
-import type { SkyMap } from '../sky-map';
+import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOverlay } from '../photo-overlay';
 import type { Photo } from '@myastrosky/core/types';

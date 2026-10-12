@@ -17,21 +17,21 @@ let dsos: DSO[] = [];
 let starScans = 0;
 let dsoScans = 0;
 
-vi.mock('../../src/star-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/star-registry', () => ({
   getStars: () => {
     starScans++;
     return stars;
   },
 }));
 
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   getDSOs: () => {
     dsoScans++;
     return dsos;
   },
 }));
 
-import { SkyHitTest, isStarRendered, type DsoIndexFilters } from '../../src/sky-hit-test';
+import { SkyHitTest, isStarRendered, type DsoIndexFilters } from '@myastrosky/render/sky-hit-test';
 import {
   setCenterMode,
   setHemisphere,

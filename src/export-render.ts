@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import type { SkyMap } from './sky-map';
+import type { SkyMap } from '@myastrosky/render/sky-map';
 import { computeFovFrameCorners } from '@myastrosky/core/frame-geometry';
 import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
@@ -20,7 +20,7 @@ import {
   isCardinalAz,
   type AltSample,
 } from '@myastrosky/core/sky-geometry';
-import { drawMoonMarker } from './moon-draw';
+import { drawMoonMarker } from '@myastrosky/render/moon-draw';
 import { CARDINAL_POINTS } from '@myastrosky/core/canvas-theme';
 import {
   resolveWindowColor,
