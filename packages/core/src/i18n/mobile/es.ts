@@ -96,6 +96,8 @@ const es: Translations['mobile'] = {
     closeSheet: 'Cerrar la ficha',
     objectActions: 'Acciones sobre el objeto',
     details: 'Ver los detalles',
+    tonight: 'Esta noche',
+    dateField: 'Fecha y hora, abrir los selectores: {value}',
     sectionMap: 'Mapa',
     needsLocation: 'Define primero el lugar de observación (Ajustes)',
     needsLocalSky: 'Activa primero el cielo local',

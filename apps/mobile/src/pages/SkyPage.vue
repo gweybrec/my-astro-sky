@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { catalogsReady } from '../catalogs';
 import { clearSkySelection, skyFocus, skySelection } from '../composables/useSkySelection';
 import { useBackClose } from '../composables/useBackClose';
@@ -14,7 +15,10 @@ import AppIcon from '../components/AppIcon.vue';
 import SkyLayerButtons from './sky/SkyLayerButtons.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
+import SkyTimeBar from './sky/SkyTimeBar.vue';
+import PhoneButton from '../components/PhoneButton.vue';
 import layersIcon from '../icons/layers.svg?raw';
+import mapPinIcon from '@icons/map-pin.svg?raw';
 
 // The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field and the layers button over it;
 // the layers button opens the column of the map's toggles, whose last button opens "Ciel, affichage".
@@ -49,6 +53,10 @@ onIonViewDidEnter(() => {
 // The selected object has its sheet; the back button closes it before anything else.
 useBackClose(() => skySelection.value !== null, clearSkySelection);
 
+const time = useSkyTimeStore();
+const located = computed(() => time.lat !== null && time.lon !== null);
+const openLocation = () => void router.push('/settings/location');
+
 const openSearch = () => void router.push('/sky/search');
 
 onBeforeUnmount(() => {
@@ -80,6 +88,14 @@ onBeforeUnmount(() => {
               <AppIcon :svg="layersIcon" />
             </PhoneIconButton>
           </div>
+          <!-- First start: no observing location yet, the time and place of the sky cannot be shown. -->
+          <div v-if="!located" class="mob-map-prompt">
+            <p class="m-body">{{ t('targets.location.notSet') }}</p>
+            <PhoneButton variant="action" size="lg" @click="openLocation">
+              <AppIcon :svg="mapPinIcon" />{{ t('targets.location.label') }}
+            </PhoneButton>
+          </div>
+          <SkyTimeBar />
           <SkyLayerButtons v-if="layersOpen" @display="displayOpen = true" />
           <Transition name="mob-sheet-slide">
             <SkyObjectSheet
