@@ -1,4 +1,4 @@
-import { defineComponent, h } from 'vue';
+import { defineComponent, h, inject, provide } from 'vue';
 
 /** Ionic's web components are not defined in happy-dom: each is replaced by a plain element that renders its slot. */
 const plain = (tag: string) =>
@@ -44,7 +44,44 @@ const checkbox = defineComponent({
   },
 });
 
+/** A radio group: the stub reports the chosen value as Ionic's `ionChange` does. */
+const radioGroup = defineComponent({
+  inheritAttrs: true,
+  props: { value: { type: String, default: undefined } },
+  emits: ['ionChange'],
+  setup(props, { slots, emit }) {
+    provide('stub-radio-group', {
+      value: () => props.value,
+      choose: (value: string) => emit('ionChange', { detail: { value } }),
+    });
+    return () => h('div', { role: 'radiogroup' }, slots.default?.());
+  },
+});
+
+/** A radio: the stub is a button that chooses its value in the enclosing group. */
+const radio = defineComponent({
+  inheritAttrs: true,
+  props: { value: { type: String, default: '' } },
+  setup(props, { slots }) {
+    const group = inject<{ value: () => string | undefined; choose: (v: string) => void }>(
+      'stub-radio-group',
+    )!;
+    return () =>
+      h(
+        'button',
+        {
+          role: 'radio',
+          'aria-checked': String(group.value() === props.value),
+          onClick: () => group.choose(props.value),
+        },
+        slots.default?.(),
+      );
+  },
+});
+
 export const ionicStubs = {
+  IonRadioGroup: radioGroup,
+  IonRadio: radio,
   IonCheckbox: checkbox,
   IonFab: plain('div'),
   IonFabButton: plain('button'),

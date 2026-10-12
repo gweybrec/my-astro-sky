@@ -84,7 +84,11 @@ const en: Translations['mobile'] = {
     searchAccessoryLabel: 'Search for an accessory',
     summary: 'Effective focal length: {value}',
   },
-  location: { horizonSection: 'Terrain horizon', dms: 'DMS (° ′ ″)' },
+  location: {
+    horizonSection: 'Terrain horizon',
+    dms: 'DMS (° ′ ″)',
+    clearHorizon: 'Clear the horizon?',
+  },
   backup: { exportSection: 'Export', importSection: 'Import' },
 };
 

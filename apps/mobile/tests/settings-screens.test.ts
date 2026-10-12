@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { configureStorage, createMemoryStore, storage } from '@myastrosky/core/platform/storage';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { setBackend } from '@myastrosky/app-state/backend';
+import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
 import { ionicStubs } from './helpers';
 
 const showError = vi.fn();
@@ -332,6 +333,25 @@ describe('the location page', () => {
     expect(button().classes()).toContain('mob-btn--danger');
   });
 
+  it('asks before clearing the horizon, and clears it only after a yes', async () => {
+    const { global } = app();
+    const w = mount(LocationPage, { global });
+    const horizon = useHorizonProfileStore(global.plugins[1] as never);
+    horizon.applyProfile({ azimuths: [0], altitudes: [3] } as never, true);
+    const clearButton = () => w.findAll('button').find((b) => b.text() === "Effacer l'horizon")!;
+    confirm.mockResolvedValueOnce(false);
+    await clearButton().trigger('click');
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Effacer l'horizon ?", destructive: true }),
+    );
+    expect(horizon.profile).not.toBeNull();
+    confirm.mockResolvedValueOnce(true);
+    await clearButton().trigger('click');
+    await flushPromises();
+    expect(horizon.profile).toBeNull();
+  });
+
   it('shows the red toast when the horizon cannot be computed', async () => {
     storage().set('targets-prefs-v3', JSON.stringify({ setupId: null, lat: 48.58, lon: 7.75 }));
     backend.horizon.getProfile.mockRejectedValue(new Error('x'));
@@ -386,22 +406,24 @@ describe('the backup page', () => {
     );
   });
 
-  it('previews a file, restores what is ticked (replacing a different setup) and reports the result', async () => {
-    backend.backup.preview.mockResolvedValue({
-      hasMetadata: false,
-      photos: 0,
-      hasDsoOverrides: false,
-      hasCustomGear: false,
-      hasSetups: true,
-      hasPoiCategories: false,
-      hasSkyRegions: false,
-      hasPlans: false,
-      hasShortcuts: false,
-      images: [],
-      plans: [],
-      setups: [{ id: 'sB', name: 'B', exists: true, conflict: 'different' }],
-      gear: [],
-    });
+  const previewWithDifferentSetup = () => ({
+    hasMetadata: false,
+    photos: 0,
+    hasDsoOverrides: false,
+    hasCustomGear: false,
+    hasSetups: true,
+    hasPoiCategories: false,
+    hasSkyRegions: false,
+    hasPlans: false,
+    hasShortcuts: false,
+    images: [],
+    plans: [],
+    setups: [{ id: 'sB', name: 'B', exists: true, conflict: 'different' as const }],
+    gear: [],
+  });
+
+  async function openPreview() {
+    backend.backup.preview.mockResolvedValue(previewWithDifferentSetup());
     backend.backup.restore.mockResolvedValue({ imported: 1, skipped: 0 });
     pickFile.mockResolvedValue(new File(['x'], 'sauvegarde.zip'));
     const { global } = app();
@@ -412,19 +434,53 @@ describe('the backup page', () => {
       .find((b) => b.text() === 'Choisir un fichier')!
       .trigger('click');
     await flushPromises();
+    return w;
+  }
+  const restoreButton = (w: Awaited<ReturnType<typeof openPreview>>) =>
+    w.findAll('button').find((b) => b.text() === 'Restaurer une sauvegarde')!;
+  const radios = (w: Awaited<ReturnType<typeof openPreview>>) => w.findAll('[role="radio"]');
+
+  it('previews a file and offers the three choices for a different setup, none chosen at first', async () => {
+    const w = await openPreview();
     expect(w.text()).toContain('sauvegarde.zip');
     expect(w.text()).toContain('Setups (1)');
     expect(w.text()).toContain('sera remplacé');
-    await w
-      .findAll('button')
-      .find((b) => b.text() === 'Restaurer une sauvegarde')!
+    expect(radios(w).map((r) => r.text())).toEqual([
+      'Remplacer',
+      'Garder les deux',
+      'Ne pas importer',
+    ]);
+    expect(radios(w).every((r) => r.attributes('aria-checked') === 'false')).toBe(true);
+    expect(restoreButton(w).attributes('disabled')).toBeDefined();
+  });
+
+  it.each([
+    ['Remplacer', 'replace'],
+    ['Garder les deux', 'keepBoth'],
+  ])('sends the choice "%s" to the import call and reports the result', async (label, value) => {
+    const w = await openPreview();
+    await radios(w)
+      .find((r) => r.text() === label)!
       .trigger('click');
+    expect(w.text()).not.toContain('sera remplacé');
+    expect(restoreButton(w).attributes('disabled')).toBeUndefined();
+    await restoreButton(w).trigger('click');
     await flushPromises();
     expect(backend.backup.restore).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ selectedSetups: ['sB'], setupConflicts: { sB: 'replace' } }),
+      expect.objectContaining({ selectedSetups: ['sB'], setupConflicts: { sB: value } }),
     );
     expect(showInfo).toHaveBeenCalled();
+  });
+
+  it('treats "Ne pas importer" as unticking the setup: nothing is sent for it', async () => {
+    const w = await openPreview();
+    await radios(w)
+      .find((r) => r.text() === 'Ne pas importer')!
+      .trigger('click');
+    expect(radios(w)).toHaveLength(0);
+    expect(restoreButton(w).attributes('disabled')).toBeDefined();
+    expect(backend.backup.restore).not.toHaveBeenCalled();
   });
 
   it('shows the toast when the file cannot be read', async () => {

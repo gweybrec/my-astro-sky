@@ -84,7 +84,11 @@ const de: Translations['mobile'] = {
     searchAccessoryLabel: 'Zubehör suchen',
     summary: 'Effektive Brennweite: {value}',
   },
-  location: { horizonSection: 'Geländehorizont', dms: 'DMS (° ′ ″)' },
+  location: {
+    horizonSection: 'Geländehorizont',
+    dms: 'DMS (° ′ ″)',
+    clearHorizon: 'Horizont löschen?',
+  },
   backup: { exportSection: 'Exportieren', importSection: 'Importieren' },
 };
 

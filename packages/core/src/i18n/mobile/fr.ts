@@ -82,7 +82,11 @@ const fr = {
     searchAccessoryLabel: 'Rechercher un accessoire',
     summary: 'Focale effective : {value}',
   },
-  location: { horizonSection: 'Horizon du relief', dms: 'DMS (° ′ ″)' },
+  location: {
+    horizonSection: 'Horizon du relief',
+    dms: 'DMS (° ′ ″)',
+    clearHorizon: "Effacer l'horizon ?",
+  },
   backup: { exportSection: 'Exporter', importSection: 'Importer' },
 };
 

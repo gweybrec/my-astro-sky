@@ -119,6 +119,28 @@ export function setupNeedsChoice(
   );
 }
 
+/** The three choices offered for a different setup, in order, with the i18n key of each label. */
+export const SETUP_CHOICES: readonly { value: SetupImportChoice; label: string }[] = [
+  { value: 'replace', label: 'settings.importSetupReplace' },
+  { value: 'keepBoth', label: 'settings.importSetupKeepBoth' },
+  { value: 'skip', label: 'settings.importSetupSkip' },
+];
+
+/** A setup that needs a choice has none yet: the import cannot start. */
+export function setupChoiceMissing(preview: ImportPreviewResult, sel: ImportSelection): boolean {
+  return preview.setups.some((s) => setupNeedsChoice(preview, sel, s) && !sel.setupChoices[s.id]);
+}
+
+/** "Do not import" on a setup no ticked plan needs is the same as unticking it: the choice is not kept. */
+export function setupChoiceUnticks(
+  preview: ImportPreviewResult,
+  tickedPlans: ReadonlySet<string>,
+  s: ImportPreviewSetup,
+  choice: SetupImportChoice,
+): boolean {
+  return choice === 'skip' && !setupRequired(preview, tickedPlans, s);
+}
+
 /** At least one thing is ticked. */
 export function canImport(preview: ImportPreviewResult, sel: ImportSelection): boolean {
   return (
