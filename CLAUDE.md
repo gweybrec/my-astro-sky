@@ -16,6 +16,7 @@ It holds only **cross-cutting** guidance. Task-specific rules live in per-direct
 | `docs/CLAUDE.md`               | The two-audience documentation-file map and its rules                                                                              |
 | `packages/core/CLAUDE.md`      | Platform-neutral `@myastrosky/core` workspace package: no DOM/Node globals, import restrictions, shims, tests                      |
 | `apps/mobile/CLAUDE.md`        | Phone app (Capacitor + Ionic Vue): device rule, boards-only screens, theming, start-up, browser and device runs                    |
+| `packages/render/CLAUDE.md`    | Shared `@myastrosky/render` package: the sky map's canvas drawing and input handling, browser APIs allowed                         |
 | `packages/app-state/CLAUDE.md` | Shared `@myastrosky/app-state` package (data functions, backend holder, stores of backend data): what goes in, import restrictions |
 | `test-photos/CLAUDE.md`        | Raw local test-image inventory (gitignored; present only on machines that have it)                                                 |
 
@@ -51,6 +52,7 @@ npm run typecheck:client  # vue-tsc --noEmit (type-checks .vue SFCs; plain tsc d
 npm run typecheck:server  # tsc --noEmit -p tsconfig.server.json
 npm run typecheck:app-state  # tsc --noEmit -p packages/app-state/tsconfig.json (shared data functions + stores)
 npm run typecheck:core    # tsc --noEmit -p packages/core/tsconfig.json (platform-neutral core package)
+npm run typecheck:render  # tsc --noEmit -p packages/render/tsconfig.json (sky map canvas drawing + input)
 npm run preview      # Preview production build
 npm test             # Run unit test suite (Vitest)
 npm run test:watch   # Vitest in watch mode

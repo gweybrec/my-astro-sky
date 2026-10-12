@@ -27,7 +27,7 @@ import {
   computePoiPinLayout,
   renderPoiPinOverlay,
   type PhotoPoiPin,
-} from './poi-pins';
+} from '@myastrosky/render/poi-pins';
 import { poiTypeIcon } from './poi-icons';
 import { pinia } from './pinia-instance';
 import { useDisplayStore } from './stores/display';

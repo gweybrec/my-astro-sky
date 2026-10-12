@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 /** Long enough that the catalog length never becomes the binding budget constraint. */
 const MAGS = Array.from({ length: 50000 }, (_, i) => 15 * Math.cbrt(i / 50000));
 
-vi.mock('../../src/star-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/star-registry', () => ({
   getStars: () => [],
   getStarMagsSorted: () => MAGS,
   getConstellationLines: () => [],
@@ -11,14 +11,14 @@ vi.mock('../../src/star-catalog', () => ({
   loadConstellationStyle: vi.fn(),
 }));
 
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   getDSOs: () => [],
   getDSOById: () => null,
   getDSOImportanceRank: () => new Map(),
   getDSOCatalog: () => null,
 }));
 
-import { SkyMap } from '../../src/sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 import type { ViewState } from '@myastrosky/core/types';
 
 /**

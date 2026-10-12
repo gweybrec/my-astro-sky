@@ -132,6 +132,7 @@ export default tseslint.config(
           './packages/core/tsconfig.json',
           './packages/backend-local/tsconfig.json',
           './packages/backend-http/tsconfig.json',
+          './packages/render/tsconfig.json',
           './packages/app-state/tsconfig.json',
           './apps/mobile/tsconfig.json',
         ],
@@ -247,6 +248,26 @@ export default tseslint.config(
             {
               regex: '^(?!@myastrosky/core/|\\./)',
               message: 'backend-http may import only @myastrosky/core/* and its own files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // @myastrosky/render is the sky map's canvas drawing: browser globals, and it may import only core and its own
+  // files (what it needs from the app arrives through the platform hooks of core).
+  {
+    files: ['packages/render/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|\./)',
+              message: 'render may import only @myastrosky/core/* and its own files.',
             },
           ],
         },

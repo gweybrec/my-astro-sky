@@ -1,6 +1,6 @@
 /**
  * What the phone app sets up before its first screen, in this order: the device storage, the language, the
- * backend, then the hooks the shared code calls (error reporter, device hints, gear catalogue, star search).
+ * backend, then the hooks the shared code calls (error reporter, device hints, gear catalogue, star search, constellation lines).
  * Awaited by `main.ts` before the app is mounted. In a desktop browser (not a native platform) the same steps run
  * on the HTTP backend of the desktop's server and on `localStorage`, so a screen can be developed in a
  * phone-sized browser window.
@@ -12,6 +12,7 @@ import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
 import { configureDeviceHints } from '@myastrosky/core/platform/device-hints';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { configureStarSearch } from '@myastrosky/core/platform/star-search';
+import { configureConstellationStyleLoader } from '@myastrosky/core/platform/constellation-style';
 import type { KeyValueStore } from '@myastrosky/core/ports/key-value-store';
 import { setBackend } from '@myastrosky/app-state/backend';
 import { createHttpBackend } from '@myastrosky/backend-http/http-backend';
@@ -145,5 +146,8 @@ export async function initPlatform(): Promise<void> {
   );
   configureStarSearch(async (query, limit) =>
     (await import('@myastrosky/app-state/api')).searchStarsAPI(query, limit),
+  );
+  configureConstellationStyleLoader(async (style) =>
+    (await import('./catalogs')).loadConstellationStyle(style),
   );
 }

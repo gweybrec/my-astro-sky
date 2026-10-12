@@ -28,7 +28,7 @@ import type {
   PointOfInterest,
 } from '@myastrosky/core/types';
 import { isIAUStyle } from '@myastrosky/core/types';
-import { SkyMap } from './sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 import type { ViewChangeCallback } from '@myastrosky/core/sky-map-types';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery, smartSortPhotos } from './gallery';

@@ -35,6 +35,9 @@ jobs:
       - name: Type-check local backend
         run: npm run typecheck:backend-local
 
+      - name: Type-check render
+        run: npm run typecheck:render
+
       - name: Type-check app-state
         run: npm run typecheck:app-state
 

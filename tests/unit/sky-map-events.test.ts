@@ -5,7 +5,7 @@ import {
   CLICK_SLOP_PX,
   type EventBinding,
   type SkyEventHost,
-} from '../../src/sky-map-events';
+} from '@myastrosky/render/sky-map-events';
 import type { PhotoOutline } from '@myastrosky/core/photo-outline';
 import type { Star, ViewState } from '@myastrosky/core/types';
 import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';

@@ -24,7 +24,7 @@ import {
   isBelowHorizonCached,
   projectionAreaFactor,
 } from '@myastrosky/core/projection';
-import { getDSOs, getDSOById, getDSOImportanceRank } from './dso-catalog';
+import { getDSOs, getDSOById, getDSOImportanceRank } from '@myastrosky/core/catalog/dso-registry';
 import {
   selectDSOsToRender,
   DSO_CONTAINER_VISIBLE_RADIUS_PX,

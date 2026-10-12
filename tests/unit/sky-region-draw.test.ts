@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { RegionDrawGesture, REGION_DEDUPE_DEG, REGION_MIN_POINTS } from '../../src/sky-region-draw';
+import {
+  RegionDrawGesture,
+  REGION_DEDUPE_DEG,
+  REGION_MIN_POINTS,
+} from '@myastrosky/render/sky-region-draw';
 import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
 
 /**

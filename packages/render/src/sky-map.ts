@@ -29,8 +29,9 @@ import {
 } from '@myastrosky/core/projection';
 import { dateToJD, lstHours } from '@myastrosky/core/astro-time';
 import { altAzFromRaDec } from '@myastrosky/core/sky-geometry';
-import { getStarMagsSorted, loadConstellationStyle, getStarByHip } from './star-catalog';
-import { getDSOs, getDSOById } from './dso-catalog';
+import { getStarMagsSorted, getStarByHip } from '@myastrosky/core/catalog/star-registry';
+import { loadConstellationStyle } from '@myastrosky/core/platform/constellation-style';
+import { getDSOs, getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { computeTrajectory, type Trajectory } from '@myastrosky/core/sky-trajectory';
 import { targetRenderCount, DSO_DENSITY_K, MIN_BUDGET_MULT } from '@myastrosky/core/render-budget';
 import {

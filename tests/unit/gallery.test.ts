@@ -13,13 +13,13 @@ vi.mock('../../src/i18n', () => ({
   setLang: vi.fn(),
 }));
 
-vi.mock('../../src/poi-pins', async (importOriginal) => {
-  const real = await importOriginal<typeof import('../../src/poi-pins')>();
+vi.mock('@myastrosky/render/poi-pins', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@myastrosky/render/poi-pins')>();
   return { ...real, poiPinsInImage: vi.fn(real.poiPinsInImage) };
 });
 
 import { Gallery } from '../../src/gallery';
-import { poiPinsInImage } from '../../src/poi-pins';
+import { poiPinsInImage } from '@myastrosky/render/poi-pins';
 import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
 function makePhoto(overrides: Partial<Photo> = {}): Photo {

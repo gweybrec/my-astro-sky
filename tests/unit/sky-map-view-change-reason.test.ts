@@ -11,7 +11,7 @@ vi.mock('../../src/dso-catalog', () => ({
   getDSOCatalog: () => null,
 }));
 
-import { SkyMap } from '../../src/sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 import type { ViewChangeReason } from '@myastrosky/core/sky-map-types';
 
 /**

@@ -14,7 +14,10 @@ import {
   getCenterMode,
   zenithHorizonCrossing,
 } from '@myastrosky/core/projection';
-import { getConstellationLines, getConstellationInfos } from './star-catalog';
+import {
+  getConstellationLines,
+  getConstellationInfos,
+} from '@myastrosky/core/catalog/star-registry';
 import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
 import { sampleDenseAz, type HorizonProfile, type HorizonLayer } from '@myastrosky/core/horizon-io';
 import { lerpColor } from '@myastrosky/core/color-utils';
@@ -29,7 +32,6 @@ import {
   CARDINAL_POINTS,
   SUMMIT_DOT,
 } from '@myastrosky/core/canvas-theme';
-import pinSvgRaw from './icons/pin.svg?raw';
 
 type SkyTheme = typeof SKY_THEME;
 const DEG2RAD = Math.PI / 180;
@@ -722,7 +724,9 @@ export function drawConstellationNames(
 // ── Frame edit glyphs (pin / trash / add) ────────────────────────────────────
 
 /** Pushpin glyph path (24×24 box) extracted from the shared icon asset. */
-const PIN_PATH_D = pinSvgRaw.match(/\bd="([^"]+)"/)?.[1] ?? '';
+// same path as src/icons/pin.svg
+export const PIN_SVG_PATH_D = 'M16 12V4H17V2H7V4H8V12L6 14V16H11.2V22H12.8V16H18V14L16 12Z';
+const PIN_PATH_D = PIN_SVG_PATH_D;
 /** Lazily-built Path2D for the pushpin glyph. Lazy so module load does not require a
  * DOM (Path2D is absent in the unit-test environment). */
 let pinPath2D: Path2D | null = null;

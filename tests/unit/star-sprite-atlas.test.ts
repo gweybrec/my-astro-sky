@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { StarSpriteAtlas, ATLAS_REBUILD_RATIO, type StarSprite } from '../../src/star-sprite-atlas';
+import {
+  StarSpriteAtlas,
+  ATLAS_REBUILD_RATIO,
+  type StarSprite,
+} from '@myastrosky/render/star-sprite-atlas';
 import { atlasScaleBucket } from '@myastrosky/core/star-render-math';
 
 /**

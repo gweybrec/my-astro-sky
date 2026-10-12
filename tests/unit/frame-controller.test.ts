@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DSO, DSOType, ViewState } from '@myastrosky/core/types';
 import type { RenderableFrame, FovFrameChange } from '@myastrosky/core/sky-map-types';
-import { FrameController, type FrameHost } from '../../src/frame-controller';
+import { FrameController, type FrameHost } from '@myastrosky/render/frame-controller';
 import { frameGeometry, framePinGlyphPos } from '@myastrosky/core/frame-geometry';
 import { rotateHandlePos } from '@myastrosky/core/fov-frame-geometry';
 import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';

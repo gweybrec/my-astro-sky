@@ -10,7 +10,7 @@
  */
 import type { HorizonParams } from '@myastrosky/core/sky-map-types';
 import type { SkyScene } from './sky-scene';
-import { t } from './i18n';
+import { t } from '@myastrosky/core/i18n/index';
 import { project, toCanvas, unproject, borderRadiusPU } from '@myastrosky/core/projection';
 import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
 import { canvasPxPerDeg, isSkyPointVisible, OFF_PROJECTION } from '@myastrosky/core/sky-axes';

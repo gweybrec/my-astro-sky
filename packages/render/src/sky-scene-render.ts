@@ -9,7 +9,7 @@
 import type { PlanetKey } from '@myastrosky/core/astro-time';
 import type { SkyScene } from './sky-scene';
 import type { SkyThemeConfig } from '@myastrosky/core/sky-themes';
-import { t } from './i18n';
+import { t } from '@myastrosky/core/i18n/index';
 import {
   dateToJD,
   moonRaDecDeg,
@@ -25,7 +25,7 @@ import {
   isBelowHorizonCached,
 } from '@myastrosky/core/projection';
 import { altAzFromRaDec } from '@myastrosky/core/sky-geometry';
-import { getStars } from './star-catalog';
+import { getStars } from '@myastrosky/core/catalog/star-registry';
 import { starFaintLimitAt } from '@myastrosky/core/star-budget';
 import { starRadius, computeStarPaint } from '@myastrosky/core/star-render-math';
 import { paintStar, buildStarSprite } from './star-draw';

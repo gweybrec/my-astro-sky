@@ -1,7 +1,7 @@
 import './platform-init';
 import { loadCatalog } from './star-catalog';
 import { loadDSOCatalog } from './dso-catalog';
-import { SkyMap } from './sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery } from './gallery';
 import { TargetsView } from './targets-view';
