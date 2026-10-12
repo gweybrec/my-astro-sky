@@ -122,6 +122,16 @@ function raiseError() {
           /></PhoneIconButton>
           <PhoneIconButton label="Supprimer" danger><AppIcon :svg="trashIcon" /></PhoneIconButton>
           <PhoneIconButton label="Désactivé" disabled><AppIcon :svg="plusIcon" /></PhoneIconButton>
+          <PhoneIconButton float label="Sur la carte"><AppIcon :svg="plusIcon" /></PhoneIconButton>
+          <PhoneIconButton float label="Sur la carte, activé" :pressed="true"
+            ><AppIcon :svg="eyeIcon"
+          /></PhoneIconButton>
+          <PhoneIconButton float label="Sur la carte, ouvert" :expanded="true"
+            ><AppIcon :svg="plusIcon"
+          /></PhoneIconButton>
+          <PhoneIconButton float label="Indisponible" unavailable="La raison, à l'appui long"
+            ><AppIcon :svg="plusIcon"
+          /></PhoneIconButton>
           <PhoneInfoButton
             title="Identifier des supernovae"
             message="Recherche dans le Transient Name Server (TNS) les supernovae découvertes dans le champ de cette photo."
@@ -212,6 +222,15 @@ function raiseError() {
           v-model="opacity"
           label="Un nom de réglage plus long sur sa propre ligne"
           stack
+          :display="opacity.toFixed(2)"
+          :min="0"
+          :max="1"
+          :step="0.05"
+        />
+        <PhoneSliderRow
+          v-model="opacity"
+          label="Un réglage avec explication"
+          info="Le texte long d'explication."
           :display="opacity.toFixed(2)"
           :min="0"
           :max="1"

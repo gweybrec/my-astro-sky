@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
 
 const created: Array<{ options: Record<string, unknown>; calls: Record<string, unknown[][]> }> = [];
 
@@ -21,13 +22,15 @@ vi.mock('@myastrosky/render/sky-map', () => ({
 
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import { DEFAULT_SETTINGS } from '@myastrosky/core/sky-time-settings';
-import { CLOCK_TICK_MS, createPhoneSkyMap, MAX_PIXEL_RATIO } from '../src/sky-map-setup';
+import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
+import { createPhoneSkyMap, MAX_PIXEL_RATIO } from '../src/sky-map-setup';
 
 describe('the Ciel tab sky map', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     created.length = 0;
     localStorage.clear();
+    setActivePinia(createPinia());
   });
   afterEach(() => vi.useRealTimers());
 
@@ -42,31 +45,35 @@ describe('the Ciel tab sky map', () => {
     expect((options.isOverPanel as (x: number) => boolean)(10_000)).toBe(false);
   });
 
-  it('opens on the full sky (live mode) by default and does not run a clock', () => {
+  it('hands the map to the shared stores through the port, and takes it back on destroy', () => {
+    const sky = make();
+    expect(useMapPortStore().skyMap).not.toBeNull();
+    sky.destroy();
+    expect(useMapPortStore().skyMap).toBeNull();
+  });
+
+  it('opens on the full sky (live mode) with the observing location, and no clock', () => {
     writeObserverLocation(48.58, 7.75);
     make();
     const { calls } = created[0];
     expect(calls.setSkyTimeMode).toEqual([['live']]);
-    expect(calls.setObserverLocation).toEqual([[48.58, 7.75]]);
+    expect(calls.setObserverLocation.at(-1)).toEqual([48.58, 7.75]);
     const ticks = calls.setSimDate.length;
-    vi.advanceTimersByTime(CLOCK_TICK_MS * 3);
+    vi.advanceTimersByTime(3000);
     expect(calls.setSimDate.length).toBe(ticks);
   });
 
-  it('follows the clock in saved date mode until it is destroyed', () => {
+  it('follows the clock in saved date mode', () => {
     localStorage.setItem(
       'sky-time-settings',
       JSON.stringify({ ...DEFAULT_SETTINGS, mode: 'date' }),
     );
-    const sky = make();
+    make();
     const { calls } = created[0];
     expect(calls.setSkyTimeMode).toEqual([['date']]);
     const before = calls.setSimDate.length;
-    vi.advanceTimersByTime(CLOCK_TICK_MS * 3);
-    expect(calls.setSimDate.length).toBe(before + 3);
-    sky.destroy();
-    vi.advanceTimersByTime(CLOCK_TICK_MS * 3);
-    expect(calls.setSimDate.length).toBe(before + 3);
+    vi.advanceTimersByTime(3000);
+    expect(calls.setSimDate.length).toBeGreaterThan(before);
   });
 
   it('reads the location again after Réglages changed it', () => {

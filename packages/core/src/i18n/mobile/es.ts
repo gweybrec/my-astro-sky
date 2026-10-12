@@ -89,6 +89,15 @@ const es: Translations['mobile'] = {
     dms: 'DMS (° ′ ″)',
     clearHorizon: '¿Borrar el horizonte?',
   },
+  sky: {
+    layers: 'Capas del mapa',
+    recenter: 'Recentrar el mapa',
+    sectionStars: 'Estrellas y constelaciones',
+    sectionMap: 'Mapa',
+    needsLocation: 'Define primero el lugar de observación (Ajustes)',
+    needsLocalSky: 'Activa primero el cielo local',
+    needsHorizon: 'Calcula o importa primero el horizonte del relieve (Ajustes)',
+  },
   backup: { exportSection: 'Exportar', importSection: 'Importar' },
 };
 

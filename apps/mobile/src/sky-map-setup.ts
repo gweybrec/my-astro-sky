@@ -6,13 +6,14 @@
 import { loadSettings } from '@myastrosky/core/display-settings';
 import { isIAUStyle } from '@myastrosky/core/types';
 import { readObserverLocation } from '@myastrosky/core/observer-location';
-import { loadSkyTimeSettings } from '@myastrosky/core/sky-time-settings';
+import { watch } from 'vue';
+import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
+import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
 import { SkyMap } from '@myastrosky/render/sky-map';
 
 /** The most pixels per CSS pixel the map draws: a phone screen's 2.6 to 3.5 costs more than it shows. */
 export const MAX_PIXEL_RATIO = 2;
-/** How often the simulated clock catches up with the real one. */
-export const CLOCK_TICK_MS = 1000;
 
 export interface PhoneSkyMap {
   readonly map: SkyMap;
@@ -30,6 +31,9 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
     followCanvasSize: true,
     isOverPanel: () => false,
   });
+
+  const port = useMapPortStore();
+  port.skyMap = map;
 
   const settings = loadSettings();
   map.setHemisphere(settings.hemisphere, settings.borderLatDeg);
@@ -56,32 +60,41 @@ export function createPhoneSkyMap(canvas: HTMLCanvasElement): PhoneSkyMap {
   map.setAutoDSODensity(settings.autoDSODensity);
   map.setMotionLOD(settings.reduceDetailWhileMoving);
 
-  // As on the desktop: the full sky (live mode) by default, the sky for a date and place when date mode is saved.
-  // Date mode starts at the real time and follows the clock; the phone has no time controls yet.
-  const time = loadSkyTimeSettings();
+  // The sky-time store owns the mode, the clock and the location: it pushes each change to the map through the port.
+  const time = useSkyTimeStore();
   map.setSkyTimeMode(time.mode);
-  map.setSimDate(new Date());
+  map.setSimDate(time.simDate);
   map.setShowMoon(time.showMoon);
   map.setShowSun(time.showSun);
   map.setShowPlanets(time.showPlanets);
   map.setShowAzimuthGrid(time.showAzimuthGrid);
   map.setShowCardinalPoints(time.showCardinalPoints);
+  map.setShowTrajectory(time.showTrajectory);
   const refreshLocation = () => {
     const { lat, lon } = readObserverLocation();
-    map.setObserverLocation(lat, lon);
+    time.setLocation(lat, lon);
   };
   refreshLocation();
   map.setLocalSkyMode(time.localSkyMode);
 
-  const clock =
-    time.mode === 'date' ? setInterval(() => map.setSimDate(new Date()), CLOCK_TICK_MS) : null;
+  // The terrain horizon of the observing location, and whether it is shown.
+  const horizon = useHorizonProfileStore();
+  const stopHorizon = watch(
+    () => [horizon.profile, horizon.enabled] as const,
+    ([profile, enabled]) => {
+      map.setMountainHorizon(profile);
+      map.setShowMountainHorizon(enabled);
+    },
+    { immediate: true },
+  );
 
   return {
     map,
     refreshLocation,
     catalogsLoaded: () => map.refreshCatalogs(),
     destroy() {
-      if (clock !== null) clearInterval(clock);
+      stopHorizon();
+      port.skyMap = null;
       map.destroy();
     },
   };
