@@ -146,6 +146,19 @@ describe('the shared phone components', () => {
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
   });
 
+  it('PhoneSheet is Ionic sheet with breakpoints 0 and 1, so a drag down closes it like the backdrop', async () => {
+    const w = mount(PhoneSheet, { props: { open: true, title: 'x' }, global });
+    const modal = w.find('.mob-sheet-modal');
+    // The content's height is breakpoint 1; dropping below it dismisses the modal (Ionic's own gesture).
+    expect(modal.attributes('breakpoints')).toBe('0,1');
+    expect(modal.attributes('initial-breakpoint')).toBe('1');
+    expect(modal.attributes('handle')).toBe('false');
+    // The body is a scroll host: Ionic lets it scroll before it lets the sheet move.
+    expect(w.find('.mob-sheet-body').classes()).toContain('ion-content-scroll-host');
+    await modal.trigger('did-dismiss');
+    expect(w.emitted('update:open')?.[0]).toEqual([false]);
+  });
+
   it('PhoneSheet without a footer puts a close button in its header', () => {
     const w = mount(PhoneSheet, { props: { open: true, title: 'x', closable: true }, global });
     expect(w.find('.mob-sheet-header--bar').exists()).toBe(true);
