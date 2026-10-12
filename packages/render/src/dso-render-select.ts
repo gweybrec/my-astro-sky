@@ -71,6 +71,12 @@ export class DsoRenderSelection {
   private cached: DSO[] | null = null;
   private cachedIds: Set<string> | null = null;
 
+  /** Rebuild the position index on next use: the catalogue changed (it loaded after the first frame). */
+  invalidateIndex(): void {
+    this.allIndexGen = -1;
+    this.invalidate();
+  }
+
   /** Drop the per-frame cache; called at the top of each render. */
   invalidate(): void {
     this.cached = null;

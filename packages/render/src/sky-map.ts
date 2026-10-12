@@ -80,6 +80,7 @@ import type { SkyPoiPin } from './poi-pins';
 import { RegionDrawGesture } from './sky-region-draw';
 import { FrameController, type FrameHost } from './frame-controller';
 import { attachSkyMapEvents, type EventBinding, type SkyEventHost } from './sky-map-events';
+import { attachSkyMapTouch, type SkyTouchHost } from './sky-map-touch';
 import { SkyHitTest, isStarRendered, type DsoIndexFilters } from './sky-hit-test';
 import { DsoRenderSelection } from './dso-render-select';
 import {
@@ -131,6 +132,20 @@ export { computeFovFrameCorners };
 // (paintStar) and sprite baking (buildStarSprite) live in ./star-draw.
 
 // DSO angular-size / orientation maths now live in ./dso-render-math (imported above).
+
+/** What an app can change about how the map reads its page. All optional: the desktop passes none. */
+export interface SkyMapOptions {
+  /** Highest pixel density of the backing store; the phone caps it at 2. */
+  maxPixelRatio?: number;
+  /** Reads a design token (the four canvas colours); default: the canvas's computed style. */
+  cssVar?: (name: string, fallback: string) => string;
+  /** Add touch gestures (drag, pinch, tap, long press) next to the mouse handling. */
+  touch?: boolean;
+  /** Whether a panel covers the map at this client x; default: the desktop's side panel. */
+  isOverPanel?: (clientX: number) => boolean;
+  /** Redraw at the new size whenever the canvas box changes (the phone rotating). */
+  followCanvasSize?: boolean;
+}
 
 export class SkyMap {
   private canvas: HTMLCanvasElement;
@@ -271,6 +286,7 @@ export class SkyMap {
   private onDSOClick: ((dso: DSO) => void) | null = null;
   // Clear-selection callback: fired on right-click to dismiss the active DSO/star selection.
   private onClearSelection: (() => void) | null = null;
+  private onLongPress: ((press: { dso: DSO | null; mx: number; my: number }) => void) | null = null;
   // One-shot DSO picker: armed by a caller that wants the next DSO click (used
   // to choose a mosaic target). Fires once, alongside the normal click action.
   private onNextDSOPick: ((dso: DSO) => void) | null = null;
@@ -294,13 +310,30 @@ export class SkyMap {
   // True while renderToCanvas() is active — causes render() to draw frames inline rather than on the overlay
   private _renderingOffscreen = false;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private readonly options: SkyMapOptions;
+  private sizeObserver: ResizeObserver | null = null;
+
+  constructor(canvas: HTMLCanvasElement, options: SkyMapOptions = {}) {
     this.canvas = canvas;
+    this.options = options;
     this.ctx = canvas.getContext('2d')!;
     this.view = { centerX: 0, centerY: 0, scale: 0, rotationDeg: 0, width: 0, height: 0 };
     this.frames = new FrameController(this.frameHost());
     this.eventBindings = attachSkyMapEvents(this.eventHost());
+    if (options.touch) this.eventBindings.push(...attachSkyMapTouch(this.touchHost()));
     this.resize();
+    if (options.followCanvasSize && typeof ResizeObserver !== 'undefined') {
+      this.sizeObserver = new ResizeObserver(() => {
+        const rect = this.canvas.getBoundingClientRect();
+        if (rect.width !== this.view.width || rect.height !== this.view.height) this.resize();
+      });
+      this.sizeObserver.observe(canvas);
+    }
+  }
+
+  /** The backing store's pixel density: the screen's, capped by `maxPixelRatio`. */
+  private pixelRatio(): number {
+    return Math.min(window.devicePixelRatio || 1, this.options.maxPixelRatio ?? Infinity);
   }
 
   setOnViewChange(cb: ViewChangeCallback) {
@@ -657,6 +690,10 @@ export class SkyMap {
   setOnClearSelection(cb: () => void) {
     this.onClearSelection = cb;
   }
+  /** Touch only: a finger held still on the map. `dso` is the object under it, if any. */
+  setOnLongPress(cb: (press: { dso: DSO | null; mx: number; my: number }) => void) {
+    this.onLongPress = cb;
+  }
 
   /** The currently selected/highlighted DSO id on the map, or null. */
   getHighlightedDSOId(): string | null {
@@ -981,7 +1018,7 @@ export class SkyMap {
   }
 
   resize() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = this.pixelRatio();
     const rect = this.canvas.getBoundingClientRect();
     this.canvas.width = rect.width * dpr;
     this.canvas.height = rect.height * dpr;
@@ -1003,8 +1040,18 @@ export class SkyMap {
     if (!this.overlayCanvas || !this.overlayCtx) return;
     this.overlayCanvas.width = this.canvas.width;
     this.overlayCanvas.height = this.canvas.height;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = this.pixelRatio();
     this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /**
+   * The star or deep-sky catalogue was loaded or replaced after the map's first frame: every index built
+   * from it is stale. The desktop loads the catalogues before the map exists and never needs this.
+   */
+  refreshCatalogs(): void {
+    this.hitTest.invalidate();
+    this.dsoSelection.invalidateIndex();
+    this.requestRender();
   }
 
   /** Display state the hover DSO index filters on. */
@@ -1087,6 +1134,7 @@ export class SkyMap {
         return hoveredDSO();
       },
       hasSelection: () => this.highlightedDSO !== null || this.highlightedStar !== null,
+      isOverPanel: this.options.isOverPanel,
 
       regionDrawActive: () => this.regionDraw.active,
       regionDrawCapturing: () => this.regionDraw.capturing,
@@ -1132,6 +1180,68 @@ export class SkyMap {
     };
   }
 
+  /** Adapter handed to ./sky-map-touch — see {@link eventHost}. */
+  private touchHost(): SkyTouchHost {
+    const canvas = () => this.canvas;
+    const view = () => this.view;
+    const interactionEnabled = () => this.interactionEnabled;
+    const pickingMode = () => this.pickingMode;
+    const photoOutlines = () => this.photoOutlines;
+    return {
+      get canvas() {
+        return canvas();
+      },
+      get view() {
+        return view();
+      },
+      get interactionEnabled() {
+        return interactionEnabled();
+      },
+      get pickingMode() {
+        return pickingMode();
+      },
+      get photoOutlines() {
+        return photoOutlines();
+      },
+      hasSelection: () => this.highlightedDSO !== null || this.highlightedStar !== null,
+      regionDrawActive: () => this.regionDraw.active,
+      regionDrawCapturing: () => this.regionDraw.capturing,
+      regionDrawPress: () => this.regionDraw.press(),
+      regionDrawMove: (pt) => this.regionDraw.move(pt),
+      regionDrawFinish: (cancelled) => this.finishRegionDraw(cancelled),
+      canvasToAltAz: (mx, my) => this.canvasToAltAz(mx, my),
+      frameMouseDown: (mx, my) => this.frames.handleMouseDown(mx, my),
+      frameDragActive: () => this.frames.activeDrag !== null,
+      frameDragMove: (mx, my) => this.frames.handleDragMove(mx, my),
+      frameMouseUp: () => this.frames.handleMouseUp(),
+      cancelAnimation: () => this.cancelAnimation(),
+      dismissTooltip: () => this.dismissTooltip(),
+      requestRenderInteractive: () => this.requestRenderInteractive(),
+      viewChanged: () => this.onViewChange?.('view'),
+      findClosestStar: (mx, my) => this.findClosestStar(mx, my),
+      pickDSOAt: (mx, my) => this.pickDSOAt(mx, my),
+      hasStarPickedHandler: () => this.onStarPicked !== null,
+      hasPhotoClickHandler: () => this.onPhotoClick !== null,
+      emitStarPicked: (star) => this.onStarPicked?.(star),
+      emitPhotoClick: (name) => this.onPhotoClick?.(name),
+      emitDSOClick: () => this.eventHost().emitDSOClick(),
+      emitClearSelection: () => this.onClearSelection?.(),
+      emitLongPress: (mx, my) => {
+        this.pickDSOAt(mx, my);
+        const dso = this.hoveredDSO;
+        this.dismissTooltip();
+        this.onLongPress?.({ dso, mx, my });
+      },
+    };
+  }
+
+  /** The drawn DSO under the point, made the one a click reports; false when none. */
+  private pickDSOAt(mx: number, my: number): boolean {
+    const dso = this.findClosestDSO(mx, my);
+    this.hoveredDSO = dso && this.isDSORendered(dso) ? dso : null;
+    return this.hoveredDSO !== null;
+  }
+
   destroy() {
     this.cancelAnimation();
     this.frames.cancelSnapAnim();
@@ -1147,6 +1257,8 @@ export class SkyMap {
       clearTimeout(this.settleTimer);
       this.settleTimer = null;
     }
+    this.sizeObserver?.disconnect();
+    this.sizeObserver = null;
     for (const { target, event, handler } of this.eventBindings) {
       target.removeEventListener(event, handler);
     }
@@ -1403,8 +1515,9 @@ export class SkyMap {
       activeRegionOverlay: this.activeRegionOverlay,
 
       // Canvas has no CSS vars, so design tokens are resolved from computed style.
-      cssVar: (name, fallback) =>
-        getComputedStyle(canvas).getPropertyValue(name).trim() || fallback,
+      cssVar:
+        this.options.cssVar ??
+        ((name, fallback) => getComputedStyle(canvas).getPropertyValue(name).trim() || fallback),
 
       ...over,
     };
