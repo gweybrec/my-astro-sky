@@ -11,7 +11,6 @@ import AppIcon from '../components/AppIcon.vue';
 import SkyLayerButtons from './sky/SkyLayerButtons.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import layersIcon from '../icons/layers.svg?raw';
-import recenterIcon from '../icons/recenter.svg?raw';
 
 // The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field and the layers button over it;
 // the layers button opens the column of the map's toggles, whose last button opens "Ciel, affichage".
@@ -28,8 +27,6 @@ onMounted(() => {
     .then(() => sky?.catalogsLoaded())
     .catch((error) => reportError('SkyPage.catalogsReady', error));
 });
-
-const recenter = () => sky?.resetView();
 
 // The observing location may have changed in Réglages while this tab stayed mounted.
 onIonViewWillEnter(() => sky?.refreshLocation());
@@ -63,11 +60,6 @@ onBeforeUnmount(() => {
             </PhoneIconButton>
           </div>
           <SkyLayerButtons v-if="layersOpen" @display="displayOpen = true" />
-          <div v-else class="mob-map-cluster">
-            <PhoneIconButton float :label="t('mobile.sky.recenter')" @click="recenter">
-              <AppIcon :svg="recenterIcon" />
-            </PhoneIconButton>
-          </div>
         </main>
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />

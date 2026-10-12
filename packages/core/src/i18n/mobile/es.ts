@@ -91,7 +91,6 @@ const es: Translations['mobile'] = {
   },
   sky: {
     layers: 'Capas del mapa',
-    recenter: 'Recentrar el mapa',
     sectionStars: 'Estrellas y constelaciones',
     sectionMap: 'Mapa',
     needsLocation: 'Define primero el lugar de observación (Ajustes)',
