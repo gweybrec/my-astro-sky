@@ -272,7 +272,7 @@ import DropdownPanel from '../base/DropdownPanel.vue';
 import LabelsDropdown from './LabelsDropdown.vue';
 import SkyPoiDropdown from './SkyPoiDropdown.vue';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
-import { useFisheyeStore } from '../../stores/fisheye';
+import { useFisheyeStore } from '@myastrosky/app-state/stores/fisheye';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useI18n } from '../../composables/useI18n';
 import { isIAUStyle } from '@myastrosky/core/types';

@@ -23,6 +23,7 @@ export interface SkyMapPort {
   setHemisphere(h: 'north' | 'south', borderLatDeg?: number): void;
   setBorderLatDeg(deg: number): void;
   setRotationDeg(deg: number): void;
+  setFisheyeMode(v: boolean): void;
 
   setSkyTimeMode(mode: 'live' | 'date'): void;
   setSimDate(date: Date): void;
