@@ -44,6 +44,8 @@ export interface SkyEventHost {
   readonly hoveredDSO: { id: string } | null;
   /** True while a DSO or star is selected — gates the context-menu suppression. */
   hasSelection(): boolean;
+  /** Whether a panel covers the map at this client x. Absent: the desktop's side panel. */
+  isOverPanel?(clientX: number): boolean;
 
   // Region drawing
   regionDrawActive(): boolean;
@@ -84,6 +86,14 @@ export interface SkyEventHost {
 
 /** A click (rather than a drag) is a release within this many px of the press. */
 export const CLICK_SLOP_PX = 3;
+
+/** Whether the pointer is over the desktop's 280 px side panel, on the right. */
+function isOverDesktopSidePanel(e: MouseEvent): boolean {
+  const sidePanel = document.getElementById('side-panel');
+  return (
+    !!sidePanel && !sidePanel.classList.contains('collapsed') && e.clientX > window.innerWidth - 280
+  );
+}
 
 /**
  * Attach every sky-map pointer/keyboard handler and return the bindings so the
@@ -217,12 +227,7 @@ export function attachSkyMapEvents(host: SkyEventHost): EventBinding[] {
 
     const { mx, my } = local(e);
 
-    // Check if mouse is over the side panel by checking if it's on the right side
-    const sidePanel = document.getElementById('side-panel');
-    const isOverPanel =
-      sidePanel &&
-      !sidePanel.classList.contains('collapsed') &&
-      e.clientX > window.innerWidth - 280; // Panel is 280px wide on the right
+    const isOverPanel = host.isOverPanel ? host.isOverPanel(e.clientX) : isOverDesktopSidePanel(e);
 
     const inSky = !isOverPanel && isInsideBorderCircle(mx, my, host.view, host.borderLatDeg);
     if (inSky) {

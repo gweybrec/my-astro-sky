@@ -122,6 +122,18 @@ describe('DsoRenderSelection', () => {
     });
   });
 
+  describe('a catalogue that loads after the first frame', () => {
+    it('is drawn once the index is invalidated, and not before', () => {
+      const sel = fresh();
+      expect(ids(sel.select(options()))).toEqual([]);
+      setCatalog([makeDSO({ id: 'A' })]);
+      sel.invalidate();
+      expect(ids(sel.select(options()))).toEqual([]);
+      sel.invalidateIndex();
+      expect(ids(sel.select(options()))).toEqual(['A']);
+    });
+  });
+
   describe('highlighted DSO', () => {
     it('bypasses the type and catalog filters', () => {
       setCatalog([makeDSO({ id: 'A', type: 'PN', catalog: 'SH2' })]);

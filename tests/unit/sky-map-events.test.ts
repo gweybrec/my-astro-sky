@@ -276,6 +276,22 @@ describe('attachSkyMapEvents', () => {
       expect(calls.requestHover).toHaveBeenCalledWith(500, 400, 500, 400);
     });
 
+    it("uses the host's panel test instead of the desktop side panel", () => {
+      const panel = document.createElement('div');
+      panel.id = 'side-panel';
+      document.body.appendChild(panel);
+      window.innerWidth = 1000;
+      // Desktop default: the 280 px side panel covers the right edge.
+      const desktop = setup();
+      window.dispatchEvent(mouse('mousemove', 900, 400));
+      expect(desktop.calls.requestHover).not.toHaveBeenCalled();
+      // A host that has no panel (the phone) hovers there.
+      const phone = setup({ isOverPanel: () => false });
+      window.dispatchEvent(mouse('mousemove', 900, 400));
+      expect(phone.calls.requestHover).toHaveBeenCalledWith(900, 400, 900, 400);
+      panel.remove();
+    });
+
     it('does nothing at all when interaction is disabled', () => {
       const { calls } = setup({ interactionEnabled: false });
       window.dispatchEvent(mouse('mousemove', 500, 400));
