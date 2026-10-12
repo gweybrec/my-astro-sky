@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { setProjectionMode } from '@myastrosky/core/projection';
-import { useCanvasStore } from './canvas';
-import { useDisplayStore } from '@myastrosky/app-state/stores/display';
+import { useMapPortStore } from './map-port';
+import { useDisplayStore } from './display';
 
 /**
  * Fisheye projection toggle. This is a pure map projection (orthographic,
@@ -10,7 +10,7 @@ import { useDisplayStore } from '@myastrosky/app-state/stores/display';
  * Stellarium-style local-sky view (date + position) will be a separate feature.
  */
 export const useFisheyeStore = defineStore('fisheye', () => {
-  const canvasStore = useCanvasStore();
+  const canvasStore = useMapPortStore();
 
   const active = ref(false);
 
