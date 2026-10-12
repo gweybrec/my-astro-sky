@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { useCanvasStore } from './canvas';
+import { useMapPortStore } from './map-port';
 import { useDisplayStore } from './display';
 import {
   loadSkyTimeSettings,
@@ -9,23 +9,12 @@ import {
   type SkyTimeSettings,
 } from '@myastrosky/core/sky-time-settings';
 import { twilightWindow } from '@myastrosky/core/astro-time';
+import { readTargetsLocation } from '@myastrosky/core/observer-location';
 
 // Read-only, one-shot default seed for the location fields — see seedLocationIfNeeded().
-// Not imported from targets-view.ts to avoid coupling the two features; this store never
-// writes back to it, so the two locations can diverge after the first seed.
-const TARGETS_PREFS_KEY = 'targets-prefs-v3';
-
+// This store never writes back to the Targets preferences, so the two locations can diverge after the first seed.
 function seedLocationFromTargetsPrefs(): { lat: number | null; lon: number | null } {
-  try {
-    const raw = localStorage.getItem(TARGETS_PREFS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return { lat: parsed.lat ?? null, lon: parsed.lon ?? null };
-    }
-  } catch {
-    /* ignore */
-  }
-  return { lat: null, lon: null };
+  return readTargetsLocation();
 }
 
 // Coarse cadence: Moon/horizon motion is slow, so this only needs to be smooth enough
@@ -33,7 +22,7 @@ function seedLocationFromTargetsPrefs(): { lat: number | null; lon: number | nul
 const TICK_MS = 500;
 
 export const useSkyTimeStore = defineStore('sky-time', () => {
-  const canvasStore = useCanvasStore();
+  const canvasStore = useMapPortStore();
   const s = loadSkyTimeSettings();
 
   // ─── State ───────────────────────────────────────────────────────────────────

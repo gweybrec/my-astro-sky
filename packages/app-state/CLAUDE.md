@@ -2,7 +2,7 @@
 
 Auto-loaded under `packages/app-state/`. Shared by the desktop and the phone; may use Vue and Pinia.
 
-- **Goes in:** the data functions (`api.ts`), the backend holder (`backend.ts`), and stores that hold backend data or user data.
+- **Goes in:** the data functions (`api.ts`), the backend holder (`backend.ts`), and stores that hold backend data or user data. The display and sky-time stores drive the map through `useMapPortStore` (an interface from `core/src/map-ports.ts`): the app sets it once its map exists.
 - **Stays out:** anything that builds or reads the page, `document`, `window` events, a store that only describes the desktop's panels.
 - Imports only `@myastrosky/core/*`, `vue`, `pinia` and relative paths (lint error otherwise). Never `src/`, `server/`, `@capacitor/*` or a backend package.
 - Errors go through `reportError` from `@myastrosky/core/platform/error-hook`; the backend is installed by the platform (`src/platform-init.ts`), never here.

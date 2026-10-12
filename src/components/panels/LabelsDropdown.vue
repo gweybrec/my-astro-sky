@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useDisplayStore } from '../../stores/display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useCanvasStore } from '../../stores/canvas';
 import { useI18n } from '../../composables/useI18n';
 import DropdownPanel from '../base/DropdownPanel.vue';

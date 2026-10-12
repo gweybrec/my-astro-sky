@@ -52,6 +52,15 @@ function readTargetsPrefs(): Record<string, unknown> | null {
   return null;
 }
 
+/** The location in the Targets preferences alone (null fields when there are none). */
+export function readTargetsLocation(): ObserverLatLon {
+  const prefs = readTargetsPrefs();
+  return {
+    lat: (prefs?.lat as number | undefined) ?? null,
+    lon: (prefs?.lon as number | undefined) ?? null,
+  };
+}
+
 /**
  * The observer's location: the Targets tab's saved one, else the sky map's. The desktop keeps the two apart; the
  * phone has one location and writes both (`writeObserverLocation`).

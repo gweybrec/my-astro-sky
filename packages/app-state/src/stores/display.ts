@@ -7,11 +7,11 @@ import {
   saveSettings,
   normalizeRotationDeg,
 } from '@myastrosky/core/display-settings';
-import { AUTO_STAR_BUDGET } from '../density-slider';
-import { useCanvasStore } from './canvas';
+import { AUTO_STAR_BUDGET } from '@myastrosky/core/density-slider';
+import { useMapPortStore } from './map-port';
 
 export const useDisplayStore = defineStore('display', () => {
-  const canvasStore = useCanvasStore();
+  const canvasStore = useMapPortStore();
   const s = loadSettings();
 
   // ─── State ───────────────────────────────────────────────────────────────────
