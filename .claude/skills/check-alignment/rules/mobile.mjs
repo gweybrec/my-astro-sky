@@ -184,6 +184,9 @@ export async function seed({ ports }) {
       { frames: 20, seconds: 240, filter: 'OIII' },
     ],
     gearSetupId: setup1.id,
+    // What the gallery card adds to its chips: a label and a point of interest.
+    labels: ['LRGB'],
+    pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
   });
   // Twelve photos: six rows of the gallery's two columns in portrait, two rows of its six columns in landscape.
   for (const fileName of [
@@ -302,6 +305,13 @@ export const rules = [
     within: '.mob-photo-grid',
     lefts: '.mob-photo:nth-child(6n + 1)',
     rights: '.mob-photo:nth-child(6n)',
+  },
+  // In a gallery card, the photo's name and its first chip start on one line.
+  {
+    id: 'card-edge',
+    type: 'edges',
+    within: '.mob-photo-card',
+    lefts: '.mob-photo-card-name, .mob-tags > :first-child',
   },
   // On the map, the layers button and the column of toggles end on the same line, and the toggles are equally spaced
   // (the last one, set apart, is the only exception: it is measured against its own margin).
@@ -458,6 +468,17 @@ export const views = [
     ],
   },
   { name: 'gallery', path: '/tabs/gallery', ready: '.mob-photo' },
+  {
+    name: 'gallery-display',
+    path: '/tabs/gallery',
+    ready: '.mob-photo',
+    open: [
+      { click: '.mob-topbar ion-button.mob-icon-btn:first-of-type' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+    ],
+    ...SHEET,
+  },
   {
     name: 'gallery-add',
     path: '/tabs/gallery',

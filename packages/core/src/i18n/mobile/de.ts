@@ -26,6 +26,7 @@ const de: Translations['mobile'] = {
     placeByHand: 'Von Hand platzieren',
     placeByHandSub: 'Das Foto auf der Karte verschieben, vergrößern und drehen',
     import: 'Importieren',
+    perLine: 'Fotos pro Zeile',
   },
   plans: {
     searchPlaceholder: 'Plan suchen…',

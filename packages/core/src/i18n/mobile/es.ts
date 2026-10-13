@@ -26,6 +26,7 @@ const es: Translations['mobile'] = {
     placeByHand: 'Ubicar a mano',
     placeByHandSub: 'Mover, ampliar y girar la foto sobre el mapa',
     import: 'Importar',
+    perLine: 'Fotos por línea',
   },
   plans: {
     searchPlaceholder: 'Buscar un plan…',

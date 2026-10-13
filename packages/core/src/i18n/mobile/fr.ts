@@ -24,6 +24,7 @@ const fr = {
     placeByHand: 'Placer à la main',
     placeByHandSub: 'Déplacer, agrandir et tourner la photo sur la carte',
     import: 'Importer',
+    perLine: 'Photos par ligne',
   },
   plans: {
     searchPlaceholder: 'Rechercher un plan…',

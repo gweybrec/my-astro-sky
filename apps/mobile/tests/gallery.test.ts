@@ -3,10 +3,12 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { ionicStubs } from './helpers';
 
 const getPhotos = vi.fn();
+const getGearSetups = vi.fn();
 const loadServerSettings = vi.fn();
 const submitPlateSolve = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   getPhotos: () => getPhotos(),
+  getGearSetups: () => getGearSetups(),
   loadServerSettings: () => loadServerSettings(),
   submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
   pollPlateSolve: vi.fn(() => new Promise(() => {})),
@@ -14,6 +16,16 @@ vi.mock('@myastrosky/app-state/api', () => ({
   getPlans: vi.fn(),
   convertRawPhoto: vi.fn(),
   uploadPhoto: vi.fn(),
+}));
+
+vi.mock('@myastrosky/app-state/stores/poi-categories', () => ({
+  usePoiCategoriesStore: () => ({
+    categories: [
+      { id: 'cat-comet', name: 'Comète', color: '#5fd0c0' },
+      { id: 'cat-mine', name: 'Perso', color: '#ff8800' },
+    ],
+    ensureLoaded: () => Promise.resolve(),
+  }),
 }));
 
 const push = vi.fn();
@@ -27,7 +39,9 @@ vi.mock('../src/platform-device', () => ({
   pickGalleryPhotos: () => pickGalleryPhotos(),
 }));
 
+import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import GalleryPage from '../src/pages/GalleryPage.vue';
+import { loadGalleryDisplay } from '../src/gallery-display';
 import { clearImport, importItems } from '../src/composables/usePhotoImport';
 import {
   addPendingPhoto,
@@ -44,6 +58,9 @@ describe('the gallery page', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
     getPhotos.mockReset();
+    getGearSetups.mockReset().mockResolvedValue([{ id: 's1', name: 'Newton 200 + ASI 183' }]);
+    configureStorage(createMemoryStore());
+    loadGalleryDisplay();
     push.mockReset();
     pickFiles.mockReset();
     pickGalleryPhotos.mockReset();
@@ -73,7 +90,7 @@ describe('the gallery page', () => {
     expect(wrapper.find('.mob-empty').exists()).toBe(false);
   });
 
-  it('shows a tile per photo with its thumbnail, its name for a screen reader and its first object', async () => {
+  it('shows a card per photo with its thumbnail and its file name', async () => {
     getPhotos.mockResolvedValue([
       {
         id: 'p1',
@@ -91,14 +108,16 @@ describe('the gallery page', () => {
       '/uploads/a_thumb.jpg',
       '/uploads/b.jpg',
     ]);
-    expect(tiles.map((tile) => tile.find('button').attributes('aria-label'))).toEqual([
+    expect(tiles.map((tile) => tile.attributes('aria-label'))).toEqual([
       'M31_stack.jpg',
       'Wide.jpg',
     ]);
-    expect(wrapper.find('.mob-photo-name').exists()).toBe(false);
-    expect(tiles.map((tile) => tile.find('.mob-photo-id').text())).toEqual(['M31', '']);
+    expect(tiles.map((tile) => tile.find('.mob-photo-card-name').text())).toEqual([
+      'M31_stack.jpg',
+      'Wide.jpg',
+    ]);
     // A tap on a photo opens its own screen.
-    await tiles[1].find('button').trigger('click');
+    await tiles[1].trigger('click');
     expect(push).toHaveBeenCalledWith('/gallery/photo/p2');
     expect(wrapper.find('button[aria-label="Ajouter des photos"]').exists()).toBe(true);
   });
@@ -136,13 +155,15 @@ describe('the gallery page', () => {
     await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
     const wrapper = mountPage();
     await flushPromises();
-    const tiles = wrapper.findAll('.mob-photo-tile');
+    const tiles = wrapper.findAll('.mob-photo-card');
     expect(tiles.map((tile) => tile.attributes('aria-label'))).toEqual([
       'M31_stack.jpg : Résolution',
       'NGC7000.tif : À placer',
       'M42.png',
     ]);
-    expect(tiles[0].classes()).toContain('mob-photo-tile--state');
+    // A waiting photo has its name in the caption, and no chips.
+    expect(tiles[0].find('.mob-photo-card-name').text()).toBe('M31_stack.jpg');
+    expect(tiles[0].find('.mob-tags').exists()).toBe(false);
     expect(tiles[0].find('.mob-photo-state').classes()).toContain('mob-photo-state--busy');
     expect(tiles[0].find('[role=status]').exists()).toBe(true);
     expect(tiles[1].find('.mob-photo-state').text()).toBe('À placer');
@@ -150,7 +171,7 @@ describe('the gallery page', () => {
   });
 
   const openMethods = async (wrapper: ReturnType<typeof mountPage>) => {
-    await wrapper.find('.mob-photo-tile--state').trigger('click');
+    await wrapper.find('.mob-photo-card:has(.mob-photo-state)').trigger('click');
     await flushPromises();
     return rowWith(wrapper, 'Résoudre en ligne');
   };
@@ -169,14 +190,14 @@ describe('the gallery page', () => {
     await online.trigger('click');
     await flushPromises();
     expect(submitPlateSolve.mock.calls[0][0].name).toBe('NGC7000.tif');
-    expect(wrapper.find('.mob-photo-tile--state').attributes('aria-label')).toBe(
+    expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
       'NGC7000.tif : Résolution',
     );
     // A photo being solved does not ask again.
-    await wrapper.find('.mob-photo-tile--state').trigger('click');
+    await wrapper.find('.mob-photo-card').trigger('click');
     await setPendingState(photo.id, 'failed', { error: 'no stars' });
     await flushPromises();
-    expect(wrapper.find('.mob-photo-tile--state').attributes('aria-label')).toBe(
+    expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
       'NGC7000.tif : Échec de la résolution',
     );
   });
@@ -213,13 +234,116 @@ describe('the gallery page', () => {
     expect(wrapper.find('button[aria-label="Ajouter des photos"]').exists()).toBe(true);
   });
 
-  it('shows the name of a photo whose picture cannot be read', async () => {
+  it('keeps the card of a photo whose picture cannot be read, with a placeholder and its name', async () => {
     getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'M31.jpg', filename: 'a.jpg' }]);
     const wrapper = mountPage();
     await flushPromises();
     await wrapper.find('.mob-photo img').trigger('error');
     expect(wrapper.find('.mob-photo img').exists()).toBe(false);
-    expect(wrapper.find('.mob-photo-name').text()).toBe('M31.jpg');
+    expect(wrapper.find('.mob-photo-card-picture svg').exists()).toBe(true);
+    expect(wrapper.find('.mob-photo-card-name').text()).toBe('M31.jpg');
+  });
+
+  it("lists a photo's chips in the desktop's order: equipment, points of interest, labels, objects", async () => {
+    getPhotos.mockResolvedValue([
+      {
+        id: 'p1',
+        originalName: 'M31_stack.jpg',
+        filename: 'a.jpg',
+        gearSetupId: 's1',
+        pointsOfInterest: [
+          { name: 'C/2023 A3', categoryId: 'cat-comet' },
+          { name: 'Repère', categoryId: 'cat-mine' },
+        ],
+        labels: ['LRGB'],
+        dsoIds: ['M31', 'M32'],
+      },
+      { id: 'p2', originalName: 'Wide.jpg', filename: 'b.jpg', gearSetupId: 'gone', dsoIds: [] },
+    ]);
+    const wrapper = mountPage();
+    await flushPromises();
+    const [first, second] = wrapper.findAll('.mob-photo-card');
+    const tags = first.findAll('.mob-tag');
+    expect(tags.map((tag) => tag.text())).toEqual([
+      'Newton 200 + ASI 183',
+      'C/2023 A3',
+      'Repère',
+      'LRGB',
+      'M31',
+      'M32',
+    ]);
+    expect(tags.map((tag) => tag.classes().find((c) => c.startsWith('mob-tag--')))).toEqual([
+      'mob-tag--setup',
+      'mob-tag--poi',
+      'mob-tag--poi',
+      'mob-tag--label',
+      'mob-tag--dso',
+      'mob-tag--dso',
+    ]);
+    // A default kind has its icon in its colour; a kind of the user's has a dot of its colour.
+    expect(tags[1].find('svg').exists()).toBe(true);
+    expect(tags[1].attributes('style')).toContain('--poi-color: #5fd0c0');
+    expect(tags[2].find('svg').exists()).toBe(false);
+    expect(tags[2].classes()).toContain('mob-tag--dot');
+    expect(tags[2].attributes('style')).toContain('--poi-color: #ff8800');
+    // Nothing to show: no chips block, as on the desktop (an equipment that no longer exists is not named).
+    expect(second.find('.mob-tags').exists()).toBe(false);
+  });
+
+  /** Holds the phone one way, as the stylesheet's orientation query would see it. */
+  const held = (way: 'portrait' | 'landscape') =>
+    vi.spyOn(window, 'matchMedia').mockReturnValue({
+      matches: way === 'landscape',
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    } as unknown as MediaQueryList);
+
+  it('offers other numbers of photos per line when the phone is held in landscape', async () => {
+    getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'M31.jpg', filename: 'a.jpg' }]);
+    held('landscape');
+    const wrapper = mountPage();
+    await flushPromises();
+    const group = wrapper.findComponent({ name: 'PhoneRadioGroup' });
+    expect(group.props('options').map((o: { label: string }) => o.label)).toEqual([
+      '3',
+      '4',
+      '5',
+      '6',
+    ]);
+    expect(group.props('modelValue')).toBe('6');
+    group.vm.$emit('update:modelValue', '4');
+    await flushPromises();
+    const style = wrapper.find('.mob-photo-grid').attributes('style');
+    expect(style).toContain('--photos-per-line: 2');
+    expect(style).toContain('--photos-per-line-landscape: 4');
+  });
+
+  it('sets the photos per line from "Affichage", for the way the phone is held, and keeps the choice', async () => {
+    getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'M31.jpg', filename: 'a.jpg' }]);
+    held('portrait');
+    const wrapper = mountPage();
+    await flushPromises();
+    const grid = () => wrapper.find('.mob-photo-grid').attributes('style');
+    expect(grid()).toContain('--photos-per-line: 2');
+    expect(grid()).toContain('--photos-per-line-landscape: 6');
+    expect(wrapper.findAll('header button').map((b) => b.attributes('aria-label'))).toEqual([
+      'Affichage',
+      'Plus de filtres',
+    ]);
+    await wrapper.find('button[aria-label="Affichage"]').trigger('click');
+    const group = wrapper.findComponent({ name: 'PhoneRadioGroup' });
+    expect(group.props('options').map((o: { label: string }) => o.label)).toEqual(['1', '2', '3']);
+    expect(group.props('modelValue')).toBe('2');
+    expect(wrapper.text()).toContain('Photos par ligne');
+    group.vm.$emit('update:modelValue', '3');
+    await flushPromises();
+    expect(grid()).toContain('--photos-per-line: 3');
+    expect(grid()).toContain('--photos-per-line-landscape: 6');
+    // Read again as at the next start.
+    loadGalleryDisplay();
+    const again = mountPage();
+    await flushPromises();
+    expect(again.find('.mob-photo-grid').attributes('style')).toContain('--photos-per-line: 3');
   });
 
   it("opens the import with the pictures chosen in the phone's gallery", async () => {
