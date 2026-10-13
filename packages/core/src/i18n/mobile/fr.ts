@@ -101,6 +101,7 @@ const fr = {
     filters: 'Filtres',
     identify: 'Identifier les objets',
     actions: 'Actions sur la photo',
+    removeChip: 'Retirer {name}',
   },
   gear: {
     addTelescope: 'Ajouter un télescope',

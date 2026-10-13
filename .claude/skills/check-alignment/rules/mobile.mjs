@@ -187,6 +187,9 @@ export async function seed({ ports }) {
     // What the gallery card adds to its chips: a label and a point of interest.
     labels: ['LRGB'],
     pointsOfInterest: [{ name: 'C/2023 A3', categoryId: 'cat-comet' }],
+    // What the photo's edit page adds: capture details (one with a unit, one that is text) and notes.
+    captureDetails: { gain: 100, ccdTemp: -10, binning: '1x1' },
+    notes: 'Seeing moyen',
   });
   // Twelve photos: six rows of the gallery's two columns in portrait, two rows of its six columns in landscape.
   for (const fileName of [
@@ -514,6 +517,11 @@ export const views = [
       { pause: 600 },
     ],
     ...SHEET,
+  },
+  {
+    name: 'photo-edit',
+    path: (ids) => `/gallery/photo/${ids.photo}/edit`,
+    ready: '.mob-integration',
   },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
   { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-entry' },

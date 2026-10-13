@@ -26,6 +26,7 @@ const routes: RouteRecordRaw[] = [
   // "Photo, détail").
   { path: '/gallery/import', component: () => import('./pages/ImportPhotosPage.vue') },
   { path: '/gallery/photo/:id', component: () => import('./pages/PhotoPage.vue') },
+  { path: '/gallery/photo/:id/edit', component: () => import('./pages/PhotoEditPage.vue') },
   // The page pushed from the Cibles tab: full screen, without the tab bar (board "Cibles, régions du ciel").
   { path: '/targets/regions', component: () => import('./pages/RegionsPage.vue') },
   // The pages pushed from the Plans tab: full screen, without the tab bar (boards "Détail du plan" and "Plan, détail d'une cible").

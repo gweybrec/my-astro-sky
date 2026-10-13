@@ -19,15 +19,15 @@ import targetIcon from '@icons/target.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Photo, informations": the first object of the photo with its type and constellation, what is known of the
-// photo (only the facts it has), and its actions. Showing it on the map and deleting it are done here; editing its
-// information and identifying objects wait for their screens.
+// photo (only the facts it has), and its actions. Showing it on the map, editing its information and deleting it are done
+// here; identifying objects waits for its screen.
 const props = defineProps<{
   open: boolean;
   photo: Photo;
   /** The name of the photo's equipment, when it has one. */
   setupName?: string;
 }>();
-const emit = defineEmits<{ 'update:open': [open: boolean]; map: []; removed: [] }>();
+const emit = defineEmits<{ 'update:open': [open: boolean]; map: []; edit: []; removed: [] }>();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
@@ -106,7 +106,7 @@ async function remove() {
       <PhoneIconButton :label="t('gallery.showOnMap')" @click="emit('map')">
         <AppIcon :svg="mapPinIcon" />
       </PhoneIconButton>
-      <PhoneIconButton waiting :label="t('gallery.editMetadata')"
+      <PhoneIconButton :label="t('gallery.editMetadata')" @click="emit('edit')"
         ><AppIcon :svg="penIcon"
       /></PhoneIconButton>
       <PhoneIconButton waiting :label="t('mobile.photo.identify')"

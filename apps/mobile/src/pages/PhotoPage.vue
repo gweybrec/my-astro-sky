@@ -75,6 +75,12 @@ function showOnMap() {
 }
 
 const backToGallery = () => void router.replace('/tabs/gallery');
+
+function edit() {
+  if (!photo.value) return;
+  infoOpen.value = false;
+  void router.push(`/gallery/photo/${photo.value.id}/edit`);
+}
 </script>
 
 <template>
@@ -128,6 +134,7 @@ const backToGallery = () => void router.replace('/tabs/gallery');
         :photo="photo"
         :setup-name="setupName"
         @map="showOnMap"
+        @edit="edit"
         @removed="backToGallery"
       />
     </IonContent>

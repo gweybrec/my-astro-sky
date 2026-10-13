@@ -6,6 +6,9 @@ import { ref } from 'vue';
 import { IonPage, IonContent, IonList } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import AppIcon from '../components/AppIcon.vue';
+import PhoneAddRow from '../components/PhoneAddRow.vue';
+import PhoneRemoveChips from '../components/PhoneRemoveChips.vue';
+import PhoneTextArea from '../components/PhoneTextArea.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneBadge from '../components/PhoneBadge.vue';
 import PhoneCheckRow from '../components/PhoneCheckRow.vue';
@@ -42,6 +45,17 @@ import telescopeIcon from '@icons/telescope.svg?raw';
 const search = ref('');
 const lat = ref('48.58');
 const empty = ref('');
+const notes = ref('Seeing moyen');
+const typed = ref('');
+const removable = ref([
+  { label: 'M31' },
+  { label: 'Grand champ' },
+  { label: 'C/2023 A3', icon: plusIcon, color: 'var(--accent)' },
+]);
+function addTyped() {
+  if (typed.value.trim()) removable.value.push({ label: typed.value.trim() });
+  typed.value = '';
+}
 const switchOn = ref(true);
 const switchOff = ref(false);
 const tickOn = ref(true);
@@ -137,6 +151,14 @@ function raiseError() {
         <PhoneField v-model="lat" label="Latitude (°N)" inputmode="decimal" />
         <PhoneField v-model="empty" label="Hauteur des yeux au sol" unit="m" placeholder="1.7" />
         <PhoneField v-model="lat" label="Désactivé" disabled />
+        <PhoneTextArea v-model="notes" label="Notes" placeholder="Notes, commentaires…" />
+        <PhoneRemoveChips :items="removable" @remove="removable.splice($event, 1)" />
+        <PhoneAddRow
+          v-model="typed"
+          placeholder="Ajouter une étiquette…"
+          aria-label="Ajouter une étiquette"
+          @add="addTyped"
+        />
 
         <PhoneSectionHeader>Lignes</PhoneSectionHeader>
         <IonList class="mob-list" lines="none">
