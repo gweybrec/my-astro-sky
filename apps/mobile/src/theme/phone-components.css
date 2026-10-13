@@ -1013,6 +1013,34 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   object-fit: cover;
 }
 
+/* ── A photo's own screen: the stage takes the whole page, under the status bar (the top bar lies over it), and the
+   photo is fitted inside it. Zooming transforms the picture; the stage takes the touches itself. */
+.mob-photo-frame {
+  display: flex;
+  flex-direction: column;
+}
+.mob-photo-stage {
+  touch-action: none;
+  user-select: none;
+}
+.mob-photo-view {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  pointer-events: none;
+}
+/* The facts that open a sheet's body stand off its header (board "Photo, informations"). The row of actions under them
+   ends where they end: a sheet's body keeps room for its scrollbar, which the end gutter already counts. */
+.mob-sheet-body > .mob-facts:first-child {
+  padding-top: var(--space-4);
+}
+.mob-sheet-body > .mob-icon-row {
+  padding-right: var(--mobile-gutter-end);
+}
+
 /* The photos over the map: a box over the canvas holding one image each, placed by a CSS matrix (the render package's
    photo layer). The images do not take touches: the map's own handling finds a photo from its outline. */
 .mob-photo-layer {

@@ -95,6 +95,14 @@ const es: Translations['mobile'] = {
     lan: 'LAN',
   },
   nav: { back: 'Atrás' },
+  photo: {
+    info: 'Información de la foto',
+    resetZoom: 'Restablecer el zoom',
+    totalExposure: 'Exposición total',
+    filters: 'Filtros',
+    identify: 'Identificar objetos',
+    actions: 'Acciones de la foto',
+  },
   gear: {
     addTelescope: 'Añadir un telescopio',
     aperture: 'Apertura {mm} mm',

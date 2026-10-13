@@ -172,7 +172,19 @@ export async function seed({ ports }) {
     observationWindows: windows(['w3']),
   });
 
-  await uploadPhoto(base);
+  const firstPhoto = await uploadPhoto(base);
+  const photoId = (firstPhoto.photo ?? firstPhoto).id;
+  // What the photo's information sheet lists: a date, two integrations with their filters, an equipment. The objects
+  // are sent again: the route replaces the ones it is not given by none.
+  await api(base, 'PATCH', `/api/photos/${photoId}/metadata`, {
+    dsoIds: (firstPhoto.photo ?? firstPhoto).dsoIds,
+    observationDate: '2025-08-23T21:30:00.000Z',
+    integrations: [
+      { frames: 60, seconds: 180, filter: 'Ha' },
+      { frames: 20, seconds: 240, filter: 'OIII' },
+    ],
+    gearSetupId: setup1.id,
+  });
   // Twelve photos: six rows of the gallery's two columns in portrait, two rows of its six columns in landscape.
   for (const fileName of [
     'Cygnus_close_2025-08-24.jpg',
@@ -205,6 +217,7 @@ export async function seed({ ports }) {
   return {
     ids: {
       setup: setup1.id,
+      photo: photoId,
       plan: summer.id,
       entry: summer.entries.NGC7000,
       longEntry: summer.entries['SH2-308'],
@@ -276,7 +289,7 @@ export const rules = [
   {
     id: 'sheet-edges',
     type: 'edges',
-    within: '.mob-map-sheet',
+    within: '.mob-map-sheet, .mob-sheet',
     lefts:
       '.mob-fact:first-child, .mob-icon-row > :first-child, .mob-pager-page:first-child > :first-child, .mob-slider-label',
     rights: '.mob-fact:last-child, .mob-icon-row:not(.mob-icon-row--start) > :last-child',
@@ -468,6 +481,18 @@ export const views = [
       },
       { wait: '.mob-status--success' },
     ],
+  },
+  { name: 'photo', path: (ids) => `/gallery/photo/${ids.photo}`, ready: '.mob-photo-view' },
+  {
+    name: 'photo-info',
+    path: (ids) => `/gallery/photo/${ids.photo}`,
+    ready: '.mob-photo-view',
+    open: [
+      { click: '.mob-topbar--overlay ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+    ],
+    ...SHEET,
   },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
   { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-entry' },

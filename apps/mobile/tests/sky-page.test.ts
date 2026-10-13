@@ -14,6 +14,7 @@ vi.mock('../src/sky-map-setup', () => ({
     reloadPhotos: () => Promise.resolve(),
     select: () => {},
     focus: () => {},
+    showPhoto: () => {},
     refreshLocation: () => {},
     catalogsLoaded: () => {},
     destroy: () => {},

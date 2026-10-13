@@ -53,6 +53,8 @@ export interface PhoneSkyMap {
   select(selection: SkySelection | null): void;
   /** Moves the map to a position, zooming in to at least the given scale. */
   focus(focus: SkyFocus): void;
+  /** Frames a placed photo in the map, as the desktop's "Voir sur la carte" does. */
+  showPhoto(photoId: string): void;
   /** The star and deep-sky catalogues have loaded: the map indexes them and draws again. */
   catalogsLoaded(): void;
   destroy(): void;
@@ -205,6 +207,11 @@ export function createPhoneSkyMap(
       if (selection?.kind === 'dso') map.setShowDSOs(true);
     },
     focus: ({ ra, dec, scale }) => map.navigateTo(ra, dec, Math.max(map.getView().scale, scale)),
+    showPhoto(photoId) {
+      const view = map.getView();
+      const fit = layer.getPhotoCenterAndScale(photoId, view.width, view.height);
+      if (fit) map.navigateTo(fit.ra, fit.dec, fit.scale);
+    },
     catalogsLoaded: () => map.refreshCatalogs(),
     destroy() {
       stopHorizon();

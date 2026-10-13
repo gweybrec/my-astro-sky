@@ -57,6 +57,16 @@ describe('the Ciel tab sky map', () => {
     expect((options.isOverPanel as (x: number) => boolean)(10_000)).toBe(false);
   });
 
+  it('frames a placed photo as the desktop does, and stays put for a photo that is not on the map', () => {
+    const sky = make();
+    const { calls } = created[0];
+    sky.showPhoto('unknown');
+    expect(calls.navigateTo).toBeUndefined();
+    vi.spyOn(sky.photos, 'getPhotoCenterAndScale').mockReturnValue({ ra: 10, dec: 41, scale: 900 });
+    sky.showPhoto('p1');
+    expect(calls.navigateTo).toEqual([[10, 41, 900]]);
+  });
+
   it('hands the map to the shared stores through the port, and takes it back on destroy', () => {
     const sky = make();
     expect(useMapPortStore().skyMap).not.toBeNull();

@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  clearWcsSolution,
-  formatIntegrationTotal,
-  sanitizeIntegrationRows,
-  wcsErrorMessage,
-} from '../../src/batch-utils';
+import { clearWcsSolution, sanitizeIntegrationRows, wcsErrorMessage } from '../../src/batch-utils';
+import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
 import type { BatchItem } from '../../src/batch-types';
 
 function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {

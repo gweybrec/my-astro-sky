@@ -127,14 +127,15 @@ describe('the photo sheet', () => {
     expect(w.emitted('removed')).toBeUndefined();
   });
 
-  it('draws the four screens that wait as the board does, and ignores their taps', async () => {
+  it('opens the photo in the gallery', async () => {
     const { w } = mountSheet();
-    for (const name of [
-      'Ouvrir dans la galerie',
-      'Repositionner',
-      "Ordre d'affichage",
-      'Modifier les métadonnées',
-    ]) {
+    await button(w, 'Ouvrir dans la galerie').trigger('click');
+    expect(w.emitted('gallery')).toHaveLength(1);
+  });
+
+  it('draws the three screens that wait as the board does, and ignores their taps', async () => {
+    const { w } = mountSheet();
+    for (const name of ['Repositionner', "Ordre d'affichage", 'Modifier les métadonnées']) {
       expect(button(w, name).attributes('aria-disabled')).toBe('true');
     }
     expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([
