@@ -20,7 +20,7 @@ import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
 import SkyCheckSheet from './SkyCheckSheet.vue';
-import SkyRadioSheet from './SkyRadioSheet.vue';
+import PhoneRadioSheet from '../../components/PhoneRadioSheet.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 
@@ -362,21 +362,21 @@ const dsoDensity = computed({
       :selected="dsoCatalogs"
       @update:selected="display.setDsoCatalogs"
     />
-    <SkyRadioSheet
+    <PhoneRadioSheet
       v-model:open="styleOpen"
       :title="t('display.constellationStyle')"
       :options="styleOptions"
       :value="constellationStyle"
       @update:value="(v) => v && display.setConstellationStyle(v)"
     />
-    <SkyRadioSheet
+    <PhoneRadioSheet
       v-model:open="hemisphereOpen"
       :title="t('display.hemisphere')"
       :options="hemisphereOptions"
       :value="hemisphere"
       @update:value="(v) => v && display.setHemisphere(v)"
     />
-    <SkyRadioSheet
+    <PhoneRadioSheet
       v-model:open="projectionOpen"
       :title="t('display.fisheye')"
       :options="projectionOptions"

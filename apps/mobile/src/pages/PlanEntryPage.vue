@@ -227,7 +227,12 @@ async function addWindow() {
   }
 }
 
-async function saveWindow(changes: { frameSeconds: number | null; snap: boolean }) {
+async function saveWindow(changes: {
+  startFrac: number;
+  endFrac: number;
+  frameSeconds: number | null;
+  snap: boolean;
+}) {
   const id = editingId.value;
   editorOpen.value = false;
   if (!id) return;

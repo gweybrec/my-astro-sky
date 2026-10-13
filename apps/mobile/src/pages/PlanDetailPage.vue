@@ -4,10 +4,16 @@ import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { fracToClock } from '@myastrosky/core/observation-windows';
+import { PLAN_SORT_KEYS, type PlanSortKey } from '@myastrosky/core/domain/plans';
 import { formatClock24 } from '@myastrosky/core/targets/format';
 import type { GearLists } from '@myastrosky/core/targets/plan-setup';
 import { planItemCount, resolvePlanNight } from '@myastrosky/core/targets/plan';
-import { deletePlanAPI, reorderPlanEntriesAPI, type Plan } from '@myastrosky/app-state/api';
+import {
+  deletePlanAPI,
+  renamePlanAPI,
+  reorderPlanEntriesAPI,
+  type Plan,
+} from '@myastrosky/app-state/api';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { catalogsReady } from '../catalogs';
 import { useConfirm } from '../composables/useConfirm';
@@ -22,13 +28,16 @@ import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
 import PhoneReorderList from '../components/PhoneReorderList.vue';
 import PhoneFab from '../components/PhoneFab.vue';
+import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import PlanActionsSheet from './plans/PlanActionsSheet.vue';
+import PlanRenameSheet from './plans/PlanRenameSheet.vue';
 import moreIcon from '../icons/more-vertical.svg?raw';
 import chevronIcon from '../icons/chevron-right.svg?raw';
 
 // The boards "Détail du plan", "Plan, actions" and "Plan, confirmer la suppression": the night of the plan, then its
 // targets in the plan's order, each with its first observation window and its setup. A tap opens the target; a drag
-// by its handle puts it elsewhere (one request). Adding a target needs the targets list to pick from (a later card).
+// by its handle puts it elsewhere (one request). The actions rename the plan, choose how its targets are sorted (the
+// desktop's sorts) and delete it. Adding a target needs the targets list to pick from, which cannot add to a plan yet.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -39,6 +48,8 @@ const planId = computed(() => String(route.params.id));
 const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === planId.value));
 const gear = shallowRef<GearLists | null>(null);
 const actionsOpen = ref(false);
+const renameOpen = ref(false);
+const sortOpen = ref(false);
 /** The order a hand drag gave, until the page is entered again. */
 const handOrder = ref<string[] | null>(null);
 
@@ -128,6 +139,48 @@ async function onReorder(ids: string[]) {
   }
 }
 
+/** The desktop's sorts of a plan's targets, in its order. */
+const SORT_LABELS: Record<PlanSortKey, string> = {
+  transit: 'targets.sort.transit',
+  altitude: 'targets.sort.altitude',
+  rating: 'targets.sort.rating',
+  magnitude: 'targets.sort.magnitude',
+  size: 'targets.sort.size',
+  name: 'targets.sort.name',
+  difficulty: 'targets.sort.difficulty',
+  window: 'targets.sort.window',
+};
+const sortOptions = computed(() =>
+  PLAN_SORT_KEYS.map((key) => ({ value: key, label: t(SORT_LABELS[key]) })),
+);
+const sortKey = computed<PlanSortKey>({
+  get: () => plan.value?.sortBy ?? 'transit',
+  set: (key) => {
+    // A hand order no longer applies once a sort is chosen.
+    handOrder.value = null;
+    if (plan.value) store.setPlanSort(plan.value.id, key);
+  },
+});
+
+function openRename() {
+  actionsOpen.value = false;
+  renameOpen.value = true;
+}
+
+function openSort() {
+  actionsOpen.value = false;
+  sortOpen.value = true;
+}
+
+async function rename(name: string) {
+  try {
+    await renamePlanAPI(planId.value, name);
+    await store.load();
+  } catch (error) {
+    void showError(error);
+  }
+}
+
 async function remove() {
   const p = plan.value;
   if (!p) return;
@@ -203,8 +256,17 @@ async function remove() {
       v-if="plan"
       v-model:open="actionsOpen"
       :name="plan.name"
-      :sort-label="t(`targets.sort.${plan.sortBy ?? 'transit'}`)"
+      :sort-label="t(SORT_LABELS[sortKey])"
+      @rename="openRename"
+      @sort="openSort"
       @delete="remove"
+    />
+    <PlanRenameSheet v-if="plan" v-model:open="renameOpen" :name="plan.name" @rename="rename" />
+    <PhoneRadioSheet
+      v-model:open="sortOpen"
+      v-model:value="sortKey"
+      :title="t('targets.sort.label')"
+      :options="sortOptions"
     />
   </IonPage>
 </template>

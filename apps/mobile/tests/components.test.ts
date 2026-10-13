@@ -11,6 +11,7 @@ import PhoneSheet from '../src/components/PhoneSheet.vue';
 import PhoneSearch from '../src/components/PhoneSearch.vue';
 import PhoneField from '../src/components/PhoneField.vue';
 import PhoneBusy from '../src/components/PhoneBusy.vue';
+import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 
 const global = { stubs: ionicStubs };
 
@@ -183,5 +184,17 @@ describe('the shared phone components', () => {
     const w = mount(PhoneBusy, { props: { label: 'Résolution…' }, global });
     expect(w.attributes('role')).toBe('status');
     expect(w.text()).toBe('Résolution…');
+  });
+
+  it('PhoneNativePicker holds a hidden input of its type and passes on the picked value, not an emptied one', () => {
+    const w = mount(PhoneNativePicker, { props: { type: 'time', value: '21:30' }, global });
+    const input = w.find('input');
+    expect(input.attributes('type')).toBe('time');
+    expect(input.attributes('aria-hidden')).toBe('true');
+    expect(w.classes()).toContain('mob-picker-inputs');
+    const stub = w.findComponent(ionicStubs.IonInput);
+    stub.vm.$emit('ionChange', { detail: { value: '22:15' } });
+    stub.vm.$emit('ionChange', { detail: { value: '' } });
+    expect(w.emitted('pick')).toEqual([['22:15']]);
   });
 });
