@@ -11,6 +11,7 @@ const fr = {
     importMany: 'Importer {n} photos',
     alreadySolved: '✓ Déjà résolue',
     toPlace: 'À placer',
+    solving: 'Résolution',
     import: 'Importer',
   },
   plans: {

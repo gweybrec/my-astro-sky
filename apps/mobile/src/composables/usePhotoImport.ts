@@ -4,12 +4,13 @@ import { ANY_PHOTO_EXT_RE, isRawAstroFile } from '@myastrosky/core/photo-formats
 import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
 import { wcsPhotoMetadata, type WcsPhotoMetadata } from '@myastrosky/core/wcs-photo-metadata';
 import { convertRawPhoto, uploadPhoto } from '@myastrosky/app-state/api';
+import { addPendingPhoto } from '../pending-photos';
 
 /**
  * - `converting`: a solved-format file (TIFF, FITS) is being read: its picture is made and its header's WCS is read.
- * - `solved`: the file says where it is on the sky ("Déjà résolue"); it can be imported.
- * - `toPlace`: nothing says where the photo is; it needs a placement method.
- * - `failed`: the file could not be read.
+ * - `solved`: the file says where it is on the sky ("Déjà résolue"); it is imported as a placed photo.
+ * - `toPlace`: nothing says where the photo is; it is imported as a photo waiting for a placement method.
+ * - `failed`: the file could not be read or stored.
  * - `importing` / `imported`: the photo is being stored / is stored.
  */
 export type ImportStatus =
@@ -85,8 +86,13 @@ export function addImportFiles(files: File[]): number {
   return added.length;
 }
 
-/** The number of photos that can be imported now. */
+/** The number of photos whose file says where they are on the sky. */
 export const solvedCount = computed(() => items.value.filter((i) => i.status === 'solved').length);
+
+/** The number of photos "Importer" would take now: the solved ones and the ones still to place. */
+export const importableCount = computed(
+  () => items.value.filter((i) => i.status === 'solved' || i.status === 'toPlace').length,
+);
 
 /** True while a file is being read or stored. */
 export const importBusy = computed(() =>
@@ -94,23 +100,33 @@ export const importBusy = computed(() =>
 );
 
 /**
- * Stores every solved photo, placed where its file says. A photo that cannot be stored stays in the list as failed;
- * the stored ones leave it. Returns the stored photos.
+ * Imports everything at once: a solved photo is stored, placed where its file says; a photo still to place is kept
+ * as a waiting photo, which the gallery shows as "À placer". A photo that cannot be stored stays in the list as
+ * failed; the others leave it. Returns the photos stored with their placement.
  */
-export async function importSolved(): Promise<Photo[]> {
+export async function importAll(): Promise<Photo[]> {
   const stored: Photo[] = [];
-  for (const item of items.value.filter((i) => i.status === 'solved')) {
+  const ready = items.value.filter((i) => i.status === 'solved' || i.status === 'toPlace');
+  for (const item of ready) {
+    const solved = item.status === 'solved';
     update(item, { status: 'importing' });
     try {
-      const meta = item.metadata!;
-      const photo = await uploadPhoto(item.file, item.correspondences!, undefined, undefined, {
-        dsoIds: meta.dsoIds,
-        integrations: meta.integrations,
-        observationDate: meta.observationDate ?? null,
-        captureDetails: meta.captureDetails ? sanitizeCaptureDetails(meta.captureDetails) : null,
-        displayName: stripExtension(item.name),
-      });
-      stored.push(photo);
+      if (solved) {
+        const meta = item.metadata!;
+        stored.push(
+          await uploadPhoto(item.file, item.correspondences!, undefined, undefined, {
+            dsoIds: meta.dsoIds,
+            integrations: meta.integrations,
+            observationDate: meta.observationDate ?? null,
+            captureDetails: meta.captureDetails
+              ? sanitizeCaptureDetails(meta.captureDetails)
+              : null,
+            displayName: stripExtension(item.name),
+          }),
+        );
+      } else {
+        await addPendingPhoto(item.file, item.name);
+      }
       update(item, { status: 'imported' });
     } catch (error) {
       update(item, {

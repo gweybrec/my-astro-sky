@@ -14,17 +14,20 @@ import PhoneEmptyState from '../components/PhoneEmptyState.vue';
 import PhoneFab from '../components/PhoneFab.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneRow from '../components/PhoneRow.vue';
+import PhoneBusy from '../components/PhoneBusy.vue';
 import { addImportFiles } from '../composables/usePhotoImport';
 import { useErrorToast } from '../composables/useErrorToast';
+import { loadPendingPhotos, pendingPhotos, type PendingState } from '../pending-photos';
 import { PHOTO_FILE_TYPES, pickFiles, pickGalleryPhotos } from '../platform-device';
 import filterIcon from '../icons/filter.svg?raw';
 import folderIcon from '../icons/folder.svg?raw';
 import imageIcon from '@icons/image.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 
-// The Galerie tab, from the boards "Galerie", "Galerie, aucune photo" and "Galerie, ajouter une photo": the photos as
-// tiles with their picture and the first object of the photo, and the plus that opens the sheet to add photos. Choosing
-// files, or pictures of the phone's gallery, opens the import ("Importer des photos").
+// The Galerie tab, from the boards "Galerie", "Galerie, aucune photo", "Galerie, résolutions en cours" and "Galerie,
+// ajouter une photo": the photos as tiles with their picture and the first object of the photo, before them the
+// imported photos that are not on the sky yet with where they stand, and the plus that opens the sheet to add photos.
+// Choosing files, or pictures of the phone's gallery, opens the import ("Importer des photos").
 const router = useRouter();
 const { showError } = useErrorToast();
 
@@ -44,7 +47,30 @@ const tiles = computed(() =>
 // A picture that cannot be read leaves the tile with the photo's name.
 const brokenPictures = ref(new Set<string>());
 
+/** What the chip of a waiting photo says. */
+const PENDING_TEXT: Record<PendingState, string> = {
+  toPlace: 'mobile.gallery.toPlace',
+  solving: 'mobile.gallery.solving',
+  failed: 'batch.statusFailed',
+};
+const waiting = computed(() =>
+  pendingPhotos.value.map((p) => ({
+    id: p.id,
+    name: p.name,
+    busy: p.state === 'solving',
+    state: t(PENDING_TEXT[p.state]),
+  })),
+);
+const isEmpty = computed(
+  () => photos.value !== null && photos.value.length === 0 && waiting.value.length === 0,
+);
+
 async function load() {
+  try {
+    await loadPendingPhotos();
+  } catch (error) {
+    reportError('GalleryPage.loadPendingPhotos', error);
+  }
   try {
     photos.value = await getPhotos();
   } catch (error) {
@@ -87,13 +113,31 @@ async function addPicked(pick: () => Promise<File[]>) {
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill">
         <PhoneEmptyState
-          v-if="photos !== null && photos.length === 0"
+          v-if="isEmpty"
           :text="t('mobile.gallery.empty')"
           :button-label="t('batch.modalTitle')"
           :button-icon="plusIcon"
           @action="adding = true"
         />
         <div v-else class="mob-photo-grid">
+          <!-- Choosing how to place a waiting photo is not built yet: the tile shows and does nothing. -->
+          <div v-for="tile in waiting" :key="tile.id" class="mob-photo">
+            <button
+              type="button"
+              class="mob-photo-tile mob-photo-tile--state m-secondary"
+              :aria-label="`${tile.name} : ${tile.state}`"
+            >
+              <span class="mob-photo-name">{{ tile.name }}</span>
+              <span
+                class="mob-photo-state m-caption"
+                :class="{ 'mob-photo-state--busy': tile.busy }"
+                ><PhoneBusy v-if="tile.busy" :label="tile.state" /><template v-else>{{
+                  tile.state
+                }}</template></span
+              >
+            </button>
+            <span class="mob-photo-id m-mono" />
+          </div>
           <!-- A photo's own screen is not built yet: the tile shows and does nothing. -->
           <div v-for="tile in tiles" :key="tile.id" class="mob-photo">
             <button
@@ -117,7 +161,7 @@ async function addPicked(pick: () => Promise<File[]>) {
         </div>
       </div>
       <PhoneFab
-        v-if="photos !== null && photos.length > 0"
+        v-if="photos !== null && !isEmpty"
         in-tab
         :label="t('batch.modalTitle')"
         @click="adding = true"
