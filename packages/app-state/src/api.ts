@@ -23,6 +23,7 @@ import { DomainError } from '@myastrosky/core/domain/errors';
 import type {
   LatestRelease,
   ServerSettings,
+  SettingsChanges,
   SolverAvailability,
 } from '@myastrosky/core/domain/settings';
 import type { StarSearchResult } from '@myastrosky/core/domain/stars';
@@ -469,15 +470,8 @@ export async function loadServerSettings(): Promise<ServerSettings> {
   return guard('errors.loadSettings', () => getBackend().settings.readPublic());
 }
 
-export async function saveServerSettings(settings: {
-  apiKey?: string;
-  ASTAP_PATH: string;
-  SOLVE_FIELD_PATH: string;
-  ASTROMETRY_DATA_DIR: string;
-  USE_WSL_FOR_SOLVE_FIELD: boolean;
-  USE_WSL_FOR_ASTAP: boolean;
-  MAX_PARALLEL_SOLVES?: string;
-}): Promise<void> {
+/** Stores the given settings; one that is left out keeps its value. */
+export async function saveServerSettings(settings: SettingsChanges): Promise<void> {
   await guard('settings.importError', () => getBackend().settings.update(settings));
 }
 

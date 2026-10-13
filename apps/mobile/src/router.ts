@@ -32,6 +32,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/settings/setups', component: () => import('./pages/SetupsPage.vue') },
   { path: '/settings/setups/:id', component: () => import('./pages/SetupEditPage.vue') },
   { path: '/settings/location', component: () => import('./pages/LocationPage.vue') },
+  {
+    path: '/settings/astrometry-key',
+    component: () => import('./pages/AstrometryKeyPage.vue'),
+  },
   { path: '/settings/backup', component: () => import('./pages/BackupPage.vue') },
 ];
 

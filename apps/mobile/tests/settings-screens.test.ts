@@ -31,6 +31,7 @@ import SetupsPage from '../src/pages/SetupsPage.vue';
 import SetupEditPage from '../src/pages/SetupEditPage.vue';
 import LocationPage from '../src/pages/LocationPage.vue';
 import BackupPage from '../src/pages/BackupPage.vue';
+import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
 
 const GEAR = {
   telescope: [
@@ -111,7 +112,7 @@ const backend = {
     listCatalog: vi.fn(),
   },
   plans: { list: vi.fn() },
-  settings: { readPublic: vi.fn() },
+  settings: { readPublic: vi.fn(), update: vi.fn(), removeApiKey: vi.fn() },
   photos: { listWithSizes: vi.fn() },
   backup: { exportToUser: vi.fn(), preview: vi.fn(), restore: vi.fn() },
   horizon: { getProfile: vi.fn() },
@@ -138,9 +139,84 @@ beforeEach(() => {
   backend.gear.listSetups.mockResolvedValue(setups);
   backend.plans.list.mockResolvedValue([]);
   backend.settings.readPublic.mockResolvedValue({ apiKeySet: true });
+  backend.settings.update.mockResolvedValue({ apiKeyChanged: true });
+  backend.settings.removeApiKey.mockResolvedValue(undefined);
   backend.photos.listWithSizes.mockResolvedValue([]);
   backend.dsoOverrides.getAll.mockResolvedValue({});
   setBackend(backend as never);
+});
+
+describe('the astrometry.net key page', () => {
+  const field = (w: ReturnType<typeof mount>) => w.find('input[type=password]');
+  const button = (w: ReturnType<typeof mount>, text: string) =>
+    w.findAll('button').find((b) => b.text() === text)!;
+
+  it('never shows a stored key: dots as the placeholder and the line saying one is configured', async () => {
+    const w = mount(AstrometryKeyPage, { global: app().global });
+    await flushPromises();
+    expect(w.find('h1').text()).toBe('Clé astrometry.net');
+    expect((field(w).element as HTMLInputElement).value).toBe('');
+    expect(field(w).attributes('placeholder')).toBe('••••••••');
+    expect(w.text()).toContain('Clé configurée — saisissez une nouvelle clé pour la remplacer');
+    expect(button(w, 'Enregistrer').attributes('disabled')).toBeDefined();
+    expect(button(w, 'Supprimer la clé API').attributes('disabled')).toBeUndefined();
+  });
+
+  it('without a key shows the invitation to type one, no line, and nothing to delete', async () => {
+    backend.settings.readPublic.mockResolvedValue({ apiKeySet: false });
+    const w = mount(AstrometryKeyPage, { global: app().global });
+    await flushPromises();
+    expect(field(w).attributes('placeholder')).toBe('Saisir la clé API…');
+    expect(w.text()).not.toContain('Clé configurée');
+    expect(button(w, 'Supprimer la clé API').attributes('disabled')).toBeDefined();
+  });
+
+  it('stores only the typed key, trimmed, then goes back to Réglages', async () => {
+    const { global, router } = app();
+    const w = mount(AstrometryKeyPage, { global });
+    await flushPromises();
+    await field(w).setValue('  abcdef123  ');
+    await button(w, 'Enregistrer').trigger('click');
+    await flushPromises();
+    expect(backend.settings.update).toHaveBeenCalledWith({ apiKey: 'abcdef123' });
+    expect(router.currentRoute.value.path).toBe('/tabs/settings');
+  });
+
+  it('shows the toast and stays when the key cannot be stored', async () => {
+    backend.settings.update.mockRejectedValue(new Error('boom'));
+    const w = mount(AstrometryKeyPage, { global: app().global });
+    await flushPromises();
+    await field(w).setValue('abc');
+    await button(w, 'Enregistrer').trigger('click');
+    await flushPromises();
+    expect(showError).toHaveBeenCalled();
+    expect((field(w).element as HTMLInputElement).value).toBe('abc');
+  });
+
+  it('asks before deleting the key, and deletes it only after a yes', async () => {
+    confirm.mockResolvedValueOnce(false);
+    const w = mount(AstrometryKeyPage, { global: app().global });
+    await flushPromises();
+    await button(w, 'Supprimer la clé API').trigger('click');
+    await flushPromises();
+    expect(confirm.mock.calls[0][0]).toMatchObject({ destructive: true });
+    expect(backend.settings.removeApiKey).not.toHaveBeenCalled();
+    confirm.mockResolvedValueOnce(true);
+    await button(w, 'Supprimer la clé API').trigger('click');
+    await flushPromises();
+    expect(backend.settings.removeApiKey).toHaveBeenCalledTimes(1);
+    expect(w.text()).not.toContain('Clé configurée');
+  });
+
+  it('opens the explanation as plain paragraphs behind the "i"', async () => {
+    const w = mount(AstrometryKeyPage, { global: app().global });
+    await flushPromises();
+    await w.find('button[aria-label="Informations : Clé API astrometry.net"]').trigger('click');
+    const [title, message] = showInfo.mock.calls[0];
+    expect(title).toBe('Clé API astrometry.net');
+    expect(message).not.toContain('<br');
+    expect(message).toContain('nova.astrometry.net');
+  });
 });
 
 describe('the Réglages page', () => {

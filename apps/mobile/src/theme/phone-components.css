@@ -630,6 +630,8 @@ ion-alert.mob-dialog-alert .alert-title {
   font-weight: 600;
 }
 ion-alert.mob-dialog-alert .alert-message {
+  /* An explanation in several paragraphs keeps its blank lines. */
+  white-space: pre-line;
   padding: 0;
   max-height: none;
   color: var(--text-secondary);
