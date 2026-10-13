@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { t } from '@myastrosky/core/i18n/index';
 import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
@@ -12,6 +12,7 @@ import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneField from '../../components/PhoneField.vue';
+import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 import arrowUp from '../../icons/arrow-up.svg?raw';
@@ -23,10 +24,13 @@ import { FILTER_PREF_KEYS, targetsPrefs, updateTargetsPrefs } from '../../compos
 
 // The board "Cibles, filtres": the sky (directions, region, altitude), the observation window, the objects (interest,
 // difficulty, catalogues, constellations) and the options. Each change is stored at once; "Réinitialiser" removes every
-// filter and "Appliquer" closes the sheet (the list is searched again then).
+// filter and "Appliquer" closes the sheet (the list is searched again then). The two times of the observation window
+// open the phone's time picker.
 const open = defineModel<boolean>('open', { required: true });
 const router = useRouter();
 const regionsStore = useSkyRegionsStore();
+const fromPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
+const toPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 
 const DIRECTIONS = [
   { key: 'N', label: 'targets.horizon.north', icon: arrowUp },
@@ -146,14 +150,28 @@ const countAria = (label: string, n: number, total: number) =>
         readonly
         :label="t('targets.timeWindowStart')"
         :model-value="targetsPrefs.obsStartTime ?? ''"
+        @click="fromPicker?.open()"
       />
       <PhoneField
         bare
         readonly
         :label="t('targets.timeWindowEnd')"
         :model-value="targetsPrefs.obsEndTime ?? ''"
+        @click="toPicker?.open()"
       />
     </div>
+    <PhoneNativePicker
+      ref="fromPicker"
+      type="time"
+      :value="targetsPrefs.obsStartTime ?? ''"
+      @pick="updateTargetsPrefs({ obsStartTime: $event })"
+    />
+    <PhoneNativePicker
+      ref="toPicker"
+      type="time"
+      :value="targetsPrefs.obsEndTime ?? ''"
+      @pick="updateTargetsPrefs({ obsEndTime: $event })"
+    />
 
     <PhoneSectionHeader>{{ t('mobile.targets.sectionObjects') }}</PhoneSectionHeader>
     <div class="mob-form-row mob-form-row--title">
