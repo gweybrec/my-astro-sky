@@ -436,6 +436,11 @@ describe('the filters sheet', () => {
     to.vm.$emit('pick', '02:00');
     await settle();
     expect(prefsOf()).toMatchObject({ obsStartTime: '22:00', obsEndTime: '02:00' });
+    // The picker's own "Effacer" empties a time, as the empty choice of the desktop's list does.
+    from.vm.$emit('clear');
+    await settle();
+    expect(prefsOf().obsStartTime).toBeUndefined();
+    expect(prefsOf().obsEndTime).toBe('02:00');
   });
 
   it('"Réinitialiser" removes every filter and keeps the rest of the record', async () => {

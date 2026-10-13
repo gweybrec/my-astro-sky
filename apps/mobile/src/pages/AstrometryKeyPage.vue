@@ -71,7 +71,7 @@ async function clear() {
   const sure = await confirm({
     title: t('settings.clearApiKey'),
     message: t('settings.astrometryApiKey'),
-    confirmLabel: t('settings.clearApiKey'),
+    confirmLabel: t('mobile.plans.delete'),
     destructive: true,
   });
   if (!sure) return;

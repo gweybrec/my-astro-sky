@@ -187,7 +187,7 @@ describe('the shared phone components', () => {
     expect(w.text()).toBe('Résolution…');
   });
 
-  it('PhoneNativePicker holds a hidden input of its type and passes on the picked value, not an emptied one', () => {
+  it('PhoneNativePicker holds a hidden input of its type, passes on the picked value and says when it is emptied', () => {
     const w = mount(PhoneNativePicker, { props: { type: 'time', value: '21:30' }, global });
     const input = w.find('input');
     expect(input.attributes('type')).toBe('time');
@@ -197,5 +197,6 @@ describe('the shared phone components', () => {
     stub.vm.$emit('ionChange', { detail: { value: '22:15' } });
     stub.vm.$emit('ionChange', { detail: { value: '' } });
     expect(w.emitted('pick')).toEqual([['22:15']]);
+    expect(w.emitted('clear')).toHaveLength(1);
   });
 });

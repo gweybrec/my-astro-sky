@@ -165,12 +165,14 @@ const countAria = (label: string, n: number, total: number) =>
       type="time"
       :value="targetsPrefs.obsStartTime ?? ''"
       @pick="updateTargetsPrefs({ obsStartTime: $event })"
+      @clear="updateTargetsPrefs({ obsStartTime: undefined })"
     />
     <PhoneNativePicker
       ref="toPicker"
       type="time"
       :value="targetsPrefs.obsEndTime ?? ''"
       @pick="updateTargetsPrefs({ obsEndTime: $event })"
+      @clear="updateTargetsPrefs({ obsEndTime: undefined })"
     />
 
     <PhoneSectionHeader>{{ t('mobile.targets.sectionObjects') }}</PhoneSectionHeader>
