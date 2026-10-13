@@ -62,6 +62,7 @@ const sections: { title: string; rows: RowDef[] }[] = [
     rows: [
       {
         title: 'mobile.settings.astrometryKey',
+        to: '/settings/astrometry-key',
         ok: () => (keyConfigured.value ? t('mobile.settings.keyConfigured') : undefined),
       },
     ],

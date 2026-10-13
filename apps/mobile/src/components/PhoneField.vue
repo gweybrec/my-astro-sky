@@ -12,7 +12,7 @@ defineProps<{
   required?: boolean;
   unit?: string;
   placeholder?: string;
-  type?: 'text' | 'number' | 'search';
+  type?: 'text' | 'number' | 'search' | 'password';
   inputmode?: 'text' | 'decimal' | 'numeric';
   disabled?: boolean;
   readonly?: boolean;
