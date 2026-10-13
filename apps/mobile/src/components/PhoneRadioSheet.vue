@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="V extends string">
-import PhoneSheet from '../../components/PhoneSheet.vue';
-import PhoneRadioGroup from '../../components/PhoneRadioGroup.vue';
+import PhoneSheet from './PhoneSheet.vue';
+import PhoneRadioGroup from './PhoneRadioGroup.vue';
 
 // A choice of one value among a list, in a sheet: one row per value with a radio mark at its end. The choice applies
 // at once; the close button is in the header.

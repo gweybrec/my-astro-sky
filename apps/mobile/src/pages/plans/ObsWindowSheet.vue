@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue';
 import { IonInput } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import {
+  MIN_WINDOW_FRAC,
+  clockToFrac,
   fracToClock,
   parseFrameSeconds,
   windowDurationMs,
@@ -13,14 +15,16 @@ import PhoneField from '../../components/PhoneField.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneHelper from '../../components/PhoneHelper.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
+import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import { formatLongDuration } from '../../composables/usePlans';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 
 // The board "Plan, fenêtre d'observation": the window's start and end, its duration and number of exposures, its
-// filter and colour, the single exposure and the switch that aligns the window on it. "Enregistrer" stores the
-// exposure and the switch; "Supprimer" removes the window (the page asks first). The start and end fields, the filter
-// and the colour open pickers that have no board yet: they show their value and do nothing.
+// filter and colour, the single exposure and the switch that aligns the window on it. A tap on the start or the end
+// opens the phone's time picker; as on the desktop, a window keeps a minimum length. "Enregistrer" stores the times,
+// the exposure and the switch; "Supprimer" removes the window (the page asks first). The filter and the colour open
+// pickers that are not built yet: they show their value and do nothing.
 const props = defineProps<{
   window: ObservationWindow | null;
   /** What the window belongs to: the target and the setup. */
@@ -32,12 +36,18 @@ const props = defineProps<{
 }>();
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{
-  save: [changes: { frameSeconds: number | null; snap: boolean }];
+  save: [
+    changes: { startFrac: number; endFrac: number; frameSeconds: number | null; snap: boolean },
+  ];
   delete: [];
 }>();
 
 const frameText = ref('');
 const snap = ref(false);
+const startFrac = ref(0);
+const endFrac = ref(1);
+const startPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
+const endPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 
 // The draft starts from the stored window each time a window is opened.
 watch(
@@ -45,6 +55,8 @@ watch(
   () => {
     frameText.value = props.window?.frameSeconds != null ? String(props.window.frameSeconds) : '';
     snap.value = props.window?.snap ?? false;
+    startFrac.value = props.window?.startFrac ?? 0;
+    endFrac.value = props.window?.endFrac ?? 1;
   },
   { immediate: true },
 );
@@ -53,7 +65,12 @@ const nightSpanMs = computed(() =>
   props.night ? props.night.end.getTime() - props.night.start.getTime() : 0,
 );
 const durationMs = computed(() =>
-  props.window && props.night ? windowDurationMs(props.window, nightSpanMs.value) : null,
+  props.window && props.night
+    ? windowDurationMs(
+        { ...props.window, startFrac: startFrac.value, endFrac: endFrac.value },
+        nightSpanMs.value,
+      )
+    : null,
 );
 const frameSeconds = computed(() => parseFrameSeconds(frameText.value));
 const frames = computed(() =>
@@ -61,8 +78,16 @@ const frames = computed(() =>
     ? Math.floor(durationMs.value / 1000 / frameSeconds.value)
     : null,
 );
-const clock = (frac: number | undefined) =>
-  props.night && frac !== undefined ? fracToClock(frac, props.night) : '';
+const clock = (frac: number) => (props.night ? fracToClock(frac, props.night) : '');
+
+function pickStart(hhmm: string) {
+  const frac = props.night ? clockToFrac(hhmm, props.night) : null;
+  if (frac !== null) startFrac.value = Math.min(frac, endFrac.value - MIN_WINDOW_FRAC);
+}
+function pickEnd(hhmm: string) {
+  const frac = props.night ? clockToFrac(hhmm, props.night) : null;
+  if (frac !== null) endFrac.value = Math.max(frac, startFrac.value + MIN_WINDOW_FRAC);
+}
 const durationText = computed(() => {
   if (durationMs.value === null) return '';
   const duration = formatLongDuration(durationMs.value);
@@ -78,7 +103,12 @@ const colorAria = computed(() =>
 );
 
 function save() {
-  emit('save', { frameSeconds: frameSeconds.value, snap: snap.value });
+  emit('save', {
+    startFrac: startFrac.value,
+    endFrac: endFrac.value,
+    frameSeconds: frameSeconds.value,
+    snap: snap.value,
+  });
 }
 </script>
 
@@ -91,18 +121,22 @@ function save() {
   >
     <div class="mob-form-row mob-form-row--pair">
       <PhoneField
-        :model-value="clock(window?.startFrac)"
+        :model-value="clock(startFrac)"
         bare
         readonly
         :label="t('mobile.plans.windowStart')"
+        @click="startPicker?.open()"
       />
       <PhoneField
-        :model-value="clock(window?.endFrac)"
+        :model-value="clock(endFrac)"
         bare
         readonly
         :label="t('mobile.plans.windowEnd')"
+        @click="endPicker?.open()"
       />
     </div>
+    <PhoneNativePicker ref="startPicker" type="time" :value="clock(startFrac)" @pick="pickStart" />
+    <PhoneNativePicker ref="endPicker" type="time" :value="clock(endFrac)" @pick="pickEnd" />
     <PhoneHelper v-if="durationText">{{ durationText }}</PhoneHelper>
     <div class="mob-form-row" style="padding-bottom: var(--space-4)">
       <PhoneButton

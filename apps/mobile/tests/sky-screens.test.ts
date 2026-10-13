@@ -15,7 +15,7 @@ import SkyDisplaySheet from '../src/pages/sky/SkyDisplaySheet.vue';
 import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
 import PhoneSliderRow from '../src/components/PhoneSliderRow.vue';
 import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
-import SkyRadioSheet from '../src/pages/sky/SkyRadioSheet.vue';
+import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import { useFisheyeStore } from '@myastrosky/app-state/stores/fisheye';
 
 /** The map's layer buttons and display sheet, driving the shared stores. */
@@ -176,7 +176,7 @@ describe('the display sheet ("Ciel, affichage")', () => {
 
   const sheetTitled = (
     w: ReturnType<typeof mount>,
-    kind: typeof SkyCheckSheet | typeof SkyRadioSheet,
+    kind: typeof SkyCheckSheet | typeof PhoneRadioSheet,
     title: string,
   ) => w.findAllComponents(kind).find((c) => c.props()['title' as never] === title)!;
   const field = (w: ReturnType<typeof mount>, label: string) =>
@@ -202,14 +202,14 @@ describe('the display sheet ("Ciel, affichage")', () => {
     const w = mountSheet();
     const display = useDisplayStore();
     await field(w, 'Hémisphère').trigger('click');
-    const hemisphere = sheetTitled(w, SkyRadioSheet, 'Hémisphère');
+    const hemisphere = sheetTitled(w, PhoneRadioSheet, 'Hémisphère');
     expect(hemisphere.props()['open' as never]).toBe(true);
     hemisphere.vm.$emit('update:value', 'south');
     expect(display.hemisphere).toBe('south');
     const fisheye = useFisheyeStore();
-    sheetTitled(w, SkyRadioSheet, 'Projection').vm.$emit('update:value', 'fisheye');
+    sheetTitled(w, PhoneRadioSheet, 'Projection').vm.$emit('update:value', 'fisheye');
     expect(fisheye.active).toBe(true);
-    sheetTitled(w, SkyRadioSheet, 'Style de tracé').vm.$emit('update:value', 'rey');
+    sheetTitled(w, PhoneRadioSheet, 'Style de tracé').vm.$emit('update:value', 'rey');
     await Promise.resolve();
     expect(display.constellationStyle).toBe('rey');
   });

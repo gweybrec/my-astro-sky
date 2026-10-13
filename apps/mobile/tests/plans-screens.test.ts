@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { configureStorage, createMemoryStore, storage } from '@myastrosky/core/platform/storage';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { setBackend } from '@myastrosky/app-state/backend';
+import type { Component } from 'vue';
 import type { DSO } from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
 
@@ -28,6 +29,8 @@ import PlansPage from '../src/pages/PlansPage.vue';
 import PlanDetailPage from '../src/pages/PlanDetailPage.vue';
 import PlanEntryPage from '../src/pages/PlanEntryPage.vue';
 import PhoneReorderList from '../src/components/PhoneReorderList.vue';
+import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
+import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import { reloadTargetsPrefs } from '../src/composables/useTargets';
 
 const GEAR = {
@@ -130,6 +133,7 @@ const backend = {
     list: vi.fn(),
     create: vi.fn(),
     remove: vi.fn(),
+    update: vi.fn(),
     reorderEntries: vi.fn(),
     removeEntry: vi.fn(),
     updateEntry: vi.fn(),
@@ -202,6 +206,7 @@ beforeEach(() => {
   backend.plans.list.mockResolvedValue(PLANS);
   backend.plans.create.mockResolvedValue({ id: 'p3' });
   backend.plans.remove.mockResolvedValue(undefined);
+  backend.plans.update.mockResolvedValue(undefined);
   backend.plans.reorderEntries.mockResolvedValue(undefined);
   backend.plans.removeEntry.mockResolvedValue(undefined);
   backend.plans.updateEntry.mockResolvedValue(undefined);
@@ -309,6 +314,77 @@ describe('the plan detail page', () => {
   it('draws the controls that wait for another screen without a tap', async () => {
     const { w } = await show(PlanDetailPage, '/plans/p1');
     expect(w.find('button[aria-label="Ajouter une cible"]').classes()).toContain('mob-waiting');
+  });
+
+  it('renames the plan from its actions, and saves neither an empty nor an unchanged name', async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const validate = () => w.findAll('button').find((b) => b.text() === 'Valider')!;
+    const openRename = async () => {
+      await w
+        .findAll('.mob-row')
+        .find((r) => r.text().includes('Renommer le plan'))!
+        .trigger('click');
+      await settle();
+      return w.find('input[aria-label="Renommer le plan"]');
+    };
+
+    let field = await openRename();
+    expect((field.element as HTMLInputElement).value).toBe('Nuit du 2026-10-03');
+    await validate().trigger('click');
+    await settle();
+    field = await openRename();
+    await field.setValue('   ');
+    await validate().trigger('click');
+    await settle();
+    expect(backend.plans.update).not.toHaveBeenCalled();
+
+    field = await openRename();
+    await field.setValue('  Cygne  ');
+    await validate().trigger('click');
+    await settle();
+    expect(backend.plans.update).toHaveBeenCalledWith('p1', { name: 'Cygne' });
+  });
+
+  it('shows the error toast when the rename fails', async () => {
+    backend.plans.update.mockRejectedValue(new Error('boom'));
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Renommer le plan'))!
+      .trigger('click');
+    await settle();
+    await w.find('input[aria-label="Renommer le plan"]').setValue('Autre');
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'Valider')!
+      .trigger('click');
+    await settle();
+    expect(showError).toHaveBeenCalled();
+  });
+
+  it("offers the desktop's eight sorts of a plan and stores the chosen one", async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const sortRow = () => w.findAll('.mob-row').find((r) => r.text().includes('Trier par'))!;
+    expect(sortRow().text()).toContain('Heure de transit');
+    await sortRow().trigger('click');
+    await settle();
+    const sheet = w.findAllComponents(PhoneRadioSheet as Component)[0];
+    const sheetProps = sheet.props() as { open: boolean; options: { label: string }[] };
+    expect(sheetProps.open).toBe(true);
+    expect(sheetProps.options.map((o) => o.label)).toEqual([
+      'Heure de transit',
+      'Altitude max.',
+      'Intérêt photo',
+      'Luminosité',
+      'Taille',
+      'Nom',
+      'Difficulté',
+      "Fenêtre d'observation",
+    ]);
+    sheet.vm.$emit('update:value', 'name');
+    await settle();
+    expect(backend.plans.update).toHaveBeenCalledWith('p1', { sortBy: 'name' });
+    expect(sortRow().text()).toContain('Nom');
   });
 
   it('asks before deleting the plan and does nothing when cancelled', async () => {
@@ -424,9 +500,36 @@ describe('the plan entry page', () => {
     const changes = backend.plans.updateEntry.mock.calls[0][1];
     expect(changes.observationWindows[0]).toMatchObject({
       id: 'w1',
+      startFrac: 0.1,
+      endFrac: 0.2,
       frameSeconds: 300,
       snap: true,
     });
+  });
+
+  it("changes the start and the end of a window with the phone's time picker, keeping a minimum length", async () => {
+    const { w } = await show(PlanEntryPage, '/plans/p1/e1');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Ha'))!
+      .trigger('click');
+    await settle();
+    const [startPicker, endPicker] = w.findAllComponents(PhoneNativePicker);
+    expect(startPicker.props('type')).toBe('time');
+    const startClock = startPicker.props('value') as string;
+    const endClock = endPicker.props('value') as string;
+    expect(startClock).toMatch(/^\d\d:\d\d$/);
+
+    // An end before the start is brought back to the minimum length after the start.
+    endPicker.vm.$emit('pick', startClock);
+    await settle();
+    const save = () => w.findAll('button').find((b) => b.text() === 'Enregistrer')!;
+    await save().trigger('click');
+    await settle();
+    const saved = backend.plans.updateEntry.mock.calls[0][1].observationWindows[0];
+    expect(saved.startFrac).toBe(0.1);
+    expect(saved.endFrac).toBeCloseTo(0.12, 5);
+    expect(endClock).not.toBe(startClock);
   });
 
   it('asks before deleting a window', async () => {
