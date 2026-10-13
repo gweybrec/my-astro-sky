@@ -3,8 +3,13 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { ionicStubs } from './helpers';
 
 const getPhotos = vi.fn();
+const loadServerSettings = vi.fn();
+const submitPlateSolve = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   getPhotos: () => getPhotos(),
+  loadServerSettings: () => loadServerSettings(),
+  submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
+  pollPlateSolve: vi.fn(() => new Promise(() => {})),
   photoFileUrl: (name: string) => `/uploads/${name}`,
   getPlans: vi.fn(),
   convertRawPhoto: vi.fn(),
@@ -42,6 +47,8 @@ describe('the gallery page', () => {
     push.mockReset();
     pickFiles.mockReset();
     pickGalleryPhotos.mockReset();
+    loadServerSettings.mockReset().mockResolvedValue({ apiKeySet: true });
+    submitPlateSolve.mockReset().mockResolvedValue({ jobId: 'job-1' });
     clearImport();
     configurePendingStore(createMemoryPendingStore());
   });
@@ -122,7 +129,7 @@ describe('the gallery page', () => {
   it('shows the imported photos that are not on the sky yet first, with where they stand', async () => {
     getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'M42.png', filename: 'a.png' }]);
     const solving = await addPendingPhoto(new Blob(['x']), 'M31_stack.jpg');
-    await setPendingState(solving.id, 'solving');
+    await setPendingState(solving.id, 'solving', { jobId: 'job-7' });
     await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
     const wrapper = mountPage();
     await flushPromises();
@@ -137,6 +144,60 @@ describe('the gallery page', () => {
     expect(tiles[0].find('[role=status]').exists()).toBe(true);
     expect(tiles[1].find('.mob-photo-state').text()).toBe('À placer');
     expect(tiles[1].find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
+  });
+
+  const openMethods = async (wrapper: ReturnType<typeof mountPage>) => {
+    await wrapper.find('.mob-photo-tile--state').trigger('click');
+    await flushPromises();
+    return rowWith(wrapper, 'Résoudre en ligne');
+  };
+
+  it('asks how to place a waiting photo and sends it to the online solver', async () => {
+    getPhotos.mockResolvedValue([]);
+    const photo = await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+    const wrapper = mountPage();
+    await flushPromises();
+    const online = await openMethods(wrapper);
+    expect(wrapper.text()).toContain('Comment placer cette photo ?');
+    expect(online.text()).toContain('astrometry.net, nécessite une connexion');
+    expect(rowWith(wrapper, "Résoudre sur l'ordinateur").classes()).toContain('mob-row--disabled');
+    expect(rowWith(wrapper, 'Identifier 2–3 étoiles').text()).toContain('Touchez 2 ou 3 étoiles');
+    expect(rowWith(wrapper, 'Placer à la main').text()).toContain('Déplacer, agrandir et tourner');
+    await online.trigger('click');
+    await flushPromises();
+    expect(submitPlateSolve.mock.calls[0][0].name).toBe('NGC7000.tif');
+    expect(wrapper.find('.mob-photo-tile--state').attributes('aria-label')).toBe(
+      'NGC7000.tif : Résolution',
+    );
+    // A photo being solved does not ask again.
+    await wrapper.find('.mob-photo-tile--state').trigger('click');
+    await setPendingState(photo.id, 'failed', { error: 'no stars' });
+    await flushPromises();
+    expect(wrapper.find('.mob-photo-tile--state').attributes('aria-label')).toBe(
+      'NGC7000.tif : Échec de la résolution',
+    );
+  });
+
+  it('greys out the online solve without a connection, and without the astrometry.net key', async () => {
+    getPhotos.mockResolvedValue([]);
+    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const wrapper = mountPage();
+    await flushPromises();
+    let online = await openMethods(wrapper);
+    expect(online.classes()).toContain('mob-row--disabled');
+    expect(online.text()).toContain('Aucune connexion internet');
+    await online.trigger('click');
+    await flushPromises();
+    expect(submitPlateSolve).not.toHaveBeenCalled();
+    onLine.mockRestore();
+
+    loadServerSettings.mockResolvedValue({ apiKeySet: false });
+    const second = mountPage();
+    await flushPromises();
+    online = await openMethods(second);
+    expect(online.classes()).toContain('mob-row--disabled');
+    expect(online.text()).toContain('Clé API non configurée');
   });
 
   it('shows the grid, not the empty state, when the only photos are waiting ones', async () => {

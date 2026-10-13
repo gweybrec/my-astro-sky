@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -18,6 +18,8 @@ import PhoneBusy from '../components/PhoneBusy.vue';
 import { addImportFiles } from '../composables/usePhotoImport';
 import { useErrorToast } from '../composables/useErrorToast';
 import { loadPendingPhotos, pendingPhotos, type PendingState } from '../pending-photos';
+import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pending-solve';
+import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import { PHOTO_FILE_TYPES, pickFiles, pickGalleryPhotos } from '../platform-device';
 import filterIcon from '../icons/filter.svg?raw';
 import folderIcon from '../icons/folder.svg?raw';
@@ -27,13 +29,17 @@ import plusIcon from '@icons/plus.svg?raw';
 // The Galerie tab, from the boards "Galerie", "Galerie, aucune photo", "Galerie, résolutions en cours" and "Galerie,
 // ajouter une photo": the photos as tiles with their picture and the first object of the photo, before them the
 // imported photos that are not on the sky yet with where they stand, and the plus that opens the sheet to add photos.
-// Choosing files, or pictures of the phone's gallery, opens the import ("Importer des photos").
+// Choosing files, or pictures of the phone's gallery, opens the import ("Importer des photos"). A tap on a photo that
+// waits, or whose solve failed, asks how to place it; a photo solved online becomes an ordinary tile.
 const router = useRouter();
 const { showError } = useErrorToast();
 
 // null until the photos are read; the empty state shows only once the backend has answered with none.
 const photos = ref<Photo[] | null>(null);
 const adding = ref(false);
+/** The waiting photo whose placement method is being chosen. */
+const placingId = ref<string | null>(null);
+const methodOpen = ref(false);
 
 const tiles = computed(() =>
   (photos.value ?? []).map((photo) => ({
@@ -61,6 +67,16 @@ const waiting = computed(() =>
     state: t(PENDING_TEXT[p.state]),
   })),
 );
+
+function chooseMethod(tile: { id: string; busy: boolean }) {
+  if (tile.busy) return;
+  placingId.value = tile.id;
+  methodOpen.value = true;
+}
+
+function solveOnline() {
+  if (placingId.value) void solvePendingOnline(placingId.value);
+}
 const isEmpty = computed(
   () => photos.value !== null && photos.value.length === 0 && waiting.value.length === 0,
 );
@@ -68,9 +84,13 @@ const isEmpty = computed(
 async function load() {
   try {
     await loadPendingPhotos();
+    await resumePendingSolves();
   } catch (error) {
     reportError('GalleryPage.loadPendingPhotos', error);
   }
+  await loadPhotos();
+}
+async function loadPhotos() {
   try {
     photos.value = await getPhotos();
   } catch (error) {
@@ -79,6 +99,8 @@ async function load() {
 }
 onMounted(load);
 onIonViewWillEnter(load);
+// A photo solved while the gallery is shown joins the placed ones.
+watch(solvedPhotoCount, loadPhotos);
 
 const chooseFiles = () => addPicked(() => pickFiles(PHOTO_FILE_TYPES, true));
 const chooseFromPhone = () => addPicked(pickGalleryPhotos);
@@ -120,12 +142,12 @@ async function addPicked(pick: () => Promise<File[]>) {
           @action="adding = true"
         />
         <div v-else class="mob-photo-grid">
-          <!-- Choosing how to place a waiting photo is not built yet: the tile shows and does nothing. -->
           <div v-for="tile in waiting" :key="tile.id" class="mob-photo">
             <button
               type="button"
               class="mob-photo-tile mob-photo-tile--state m-secondary"
               :aria-label="`${tile.name} : ${tile.state}`"
+              @click="chooseMethod(tile)"
             >
               <span class="mob-photo-name">{{ tile.name }}</span>
               <span
@@ -167,6 +189,7 @@ async function addPicked(pick: () => Promise<File[]>) {
         @click="adding = true"
       />
     </IonContent>
+    <PlacementMethodSheet v-model:open="methodOpen" @online="solveOnline" />
     <PhoneSheet v-model:open="adding" :title="t('batch.modalTitle')">
       <PhoneRow
         button
