@@ -773,7 +773,7 @@ const fr = {
     INVALID_PHOTO_Y: 'photoY invalide (nombre positif attendu)',
     INVALID_STAR_HIP: 'starHip invalide (entier positif attendu)',
     PHOTO_NOT_FOUND: 'Photo introuvable',
-    UNSUPPORTED_FORMAT: 'Format non supporté. Utilisez TIFF ou FITS.',
+    UNSUPPORTED_FORMAT: 'Format non supporté. Utilisez TIFF, FITS ou XISF.',
     NO_WCS_DATA: 'Aucune donnée WCS trouvée dans le fichier',
     NO_IMAGE_DIMENSIONS: "Dimensions de l'image introuvables",
     NOT_ENOUGH_CATALOG_STARS: "Pas assez d'étoiles du catalogue dans le champ",

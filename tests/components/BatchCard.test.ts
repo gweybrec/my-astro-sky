@@ -87,7 +87,7 @@ function mountCard(item: BatchItem) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function triggerWcsChange(wrapper: ReturnType<typeof mountCard>, wcsFile: File) {
-  const input = wrapper.find<HTMLInputElement>('input[accept=".fit,.fits,.tif,.tiff"]');
+  const input = wrapper.find<HTMLInputElement>('input[accept=".fit,.fits,.tif,.tiff,.xisf"]');
   Object.defineProperty(input.element, 'files', {
     get: () => [wcsFile],
     configurable: true,

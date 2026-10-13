@@ -775,7 +775,7 @@ const es: Translations = {
     INVALID_PHOTO_Y: 'photoY no válido (se esperaba número positivo)',
     INVALID_STAR_HIP: 'starHip no válido (se esperaba entero positivo)',
     PHOTO_NOT_FOUND: 'Foto no encontrada',
-    UNSUPPORTED_FORMAT: 'Formato no compatible. Usa TIFF o FITS.',
+    UNSUPPORTED_FORMAT: 'Formato no compatible. Usa TIFF, FITS o XISF.',
     NO_WCS_DATA: 'No se encontraron datos WCS en el archivo',
     NO_IMAGE_DIMENSIONS: 'Dimensiones de imagen no encontradas',
     NOT_ENOUGH_CATALOG_STARS: 'No hay suficientes estrellas del catálogo en el campo',

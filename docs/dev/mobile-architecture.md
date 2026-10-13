@@ -77,7 +77,7 @@ A screen calls a function of `@myastrosky/app-state/api` (`getPlans()`, `uploadP
 | `StarSearchService`                                            | Star search by name, designation, number and position.                                             |
 | `IdentifyService`                                              | Asteroid (SkyBoT), supernova (TNS) and comet (MPC) lookups, with their caches.                     |
 | `HorizonService`                                               | The terrain horizon of a location, cached.                                                         |
-| `SolvedImportService`                                          | Reading the solution of an already-solved FITS or TIFF file; converting it to a picture.           |
+| `SolvedImportService`                                          | Reading the solution of an already-solved FITS, TIFF or XISF file; converting it to a picture.     |
 | `NovaSolveService`                                             | Online solving through astrometry.net.                                                             |
 | `VersionService`                                               | The latest release, cached.                                                                        |
 
