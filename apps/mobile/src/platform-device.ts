@@ -1,7 +1,8 @@
 /**
  * The two device features the Réglages screens use, behind one function each, so the screens run unchanged in a
  * phone-sized desktop browser: the observer's position (Capacitor Geolocation on the phone, the browser's
- * geolocation otherwise) and picking a file (the file picker plugin on the phone, a file input otherwise).
+ * geolocation otherwise) and picking a file or a picture of the phone's gallery (the file picker plugin on the phone,
+ * a file input otherwise).
  * `isNativePlatform()` of `platform-init.ts` is the only test of which platform this is.
  */
 import { Capacitor } from '@capacitor/core';
@@ -65,39 +66,64 @@ export const PHOTO_FILE_TYPES: FileTypes = {
   extensions: ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.fit', '.fits', '.xisf'],
 };
 
-/** Lets the user pick files (one, or several with `multiple`); empty when the picker is cancelled. */
-export async function pickFiles(types: FileTypes, multiple = false): Promise<File[]> {
-  if (isNativePlatform()) {
-    const { FilePicker } = await import('@capawesome/capacitor-file-picker');
-    let result;
-    try {
-      result = await FilePicker.pickFiles({ types: types.mimeTypes, limit: multiple ? 0 : 1 });
-    } catch (error) {
-      // The plugin rejects when the picker is closed without a choice.
-      if (error instanceof Error && /cancel/i.test(error.message)) return [];
-      throw error;
-    }
-    const files: File[] = [];
-    for (const picked of result.files) {
-      if (picked.blob) {
-        files.push(new File([picked.blob], picked.name, { type: picked.mimeType }));
-      } else if (picked.path) {
-        // The file stays where it is: it is read through the WebView's address of the picked content.
-        const blob = await (await fetch(Capacitor.convertFileSrc(picked.path))).blob();
-        files.push(new File([blob], picked.name, { type: picked.mimeType }));
-      }
-    }
-    return files;
+/** What the plugin's pickers answer with. */
+interface PickedFiles {
+  files: { blob?: Blob; path?: string; name: string; mimeType: string }[];
+}
+
+/** The picked files as `File`s; empty when the picker was closed without a choice (the plugin rejects then). */
+async function pickedFiles(pick: () => Promise<PickedFiles>): Promise<File[]> {
+  let result;
+  try {
+    result = await pick();
+  } catch (error) {
+    if (error instanceof Error && /cancel/i.test(error.message)) return [];
+    throw error;
   }
+  const files: File[] = [];
+  for (const picked of result.files) {
+    if (picked.blob) {
+      files.push(new File([picked.blob], picked.name, { type: picked.mimeType }));
+    } else if (picked.path) {
+      // The file stays where it is: it is read through the WebView's address of the picked content.
+      const blob = await (await fetch(Capacitor.convertFileSrc(picked.path))).blob();
+      files.push(new File([blob], picked.name, { type: picked.mimeType }));
+    }
+  }
+  return files;
+}
+
+/** A file input of the browser, opened at once. */
+function pickWithInput(accept: string, multiple: boolean): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = multiple;
-    input.accept = types.extensions.join(',');
+    input.accept = accept;
     input.addEventListener('change', () => resolve(Array.from(input.files ?? [])));
     input.addEventListener('cancel', () => resolve([]));
     input.click();
   });
+}
+
+/** Lets the user pick files (one, or several with `multiple`); empty when the picker is cancelled. */
+export async function pickFiles(types: FileTypes, multiple = false): Promise<File[]> {
+  if (isNativePlatform()) {
+    const { FilePicker } = await import('@capawesome/capacitor-file-picker');
+    return pickedFiles(() =>
+      FilePicker.pickFiles({ types: types.mimeTypes, limit: multiple ? 0 : 1 }),
+    );
+  }
+  return pickWithInput(types.extensions.join(','), multiple);
+}
+
+/** Lets the user pick pictures in the phone's own photo picker (its gallery); empty when it is cancelled. */
+export async function pickGalleryPhotos(): Promise<File[]> {
+  if (isNativePlatform()) {
+    const { FilePicker } = await import('@capawesome/capacitor-file-picker');
+    return pickedFiles(() => FilePicker.pickImages({ limit: 0 }));
+  }
+  return pickWithInput('image/*', true);
 }
 
 /** Lets the user pick one file; null when the picker is cancelled. */
