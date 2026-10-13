@@ -84,10 +84,12 @@ describe("a photo's own screen", () => {
     skyPhotoFocus.value = null;
   });
 
-  it('shows the photo whole under a top bar with its first object, and no reset button', async () => {
+  it("shows the photo whole under a top bar with the photo's name, and no reset button", async () => {
     const w = mountPage();
     await flushPromises();
-    expect(w.find('h1').text()).toBe('M31');
+    expect(w.find('h1').text()).toBe('M31_2025-09-14_stack.jpg');
+    // The photo's area comes after the bar, not under it: nothing of the whole photo is hidden by the bar.
+    expect(w.find('.mob-photo-bar + .mob-photo-area img.mob-photo-view').exists()).toBe(true);
     const picture = w.find('img.mob-photo-view');
     expect(picture.attributes('src')).toBe('/uploads/m31.jpg');
     expect(picture.attributes('alt')).toBe('M31_2025-09-14_stack.jpg');
@@ -97,7 +99,7 @@ describe("a photo's own screen", () => {
     expect(button(w, 'Réinitialiser le zoom')).toBeUndefined();
   });
 
-  it('is named after the file when the photo has no object, and shows that name when the picture cannot be read', async () => {
+  it('shows the name of the photo when the picture cannot be read', async () => {
     getPhotos.mockResolvedValue([photo({ dsoIds: [] })]);
     const w = mountPage();
     await flushPromises();
@@ -118,7 +120,7 @@ describe("a photo's own screen", () => {
     const w = mountPage();
     await flushPromises();
     const stage = w.find('.mob-photo-stage');
-    (stage.element as HTMLElement).getBoundingClientRect = () =>
+    (w.find('.mob-photo-area').element as HTMLElement).getBoundingClientRect = () =>
       ({ left: 0, top: 0, width: 400, height: 800 }) as DOMRect;
     const tap = async (at: number) => {
       const init = { pointerId: 1, clientX: 200, clientY: 400 };

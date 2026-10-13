@@ -15,9 +15,10 @@ import PhotoInfoSheet from './gallery/PhotoInfoSheet.vue';
 import infoIcon from '../icons/info.svg?raw';
 import resetIcon from '../icons/rotate-ccw.svg?raw';
 
-// A photo's own screen, from the boards "Photo, détail", "Photo, zoom" and "Photo, informations": the photo whole on a
-// dark stage, the top bar over it with the photo's first object, and the sheet of its information. Two fingers and a
-// double tap zoom; the button that shows the photo whole again is there only while it is zoomed.
+// A photo's own screen, from the boards "Photo, détail", "Photo, zoom" and "Photo, informations": the photo on a dark
+// stage, the top bar with the photo's name, and the sheet of its information. The whole photo is fitted under the bar,
+// so that nothing of it stays hidden behind the bar; zoomed, it runs behind the bar, which stays readable over it. Two
+// fingers and a double tap zoom; the button that shows the photo whole again is there only while it is zoomed.
 const route = useRoute();
 const router = useRouter();
 
@@ -27,13 +28,14 @@ const infoOpen = ref(false);
 // A picture that cannot be read leaves the stage with the photo's name.
 const broken = ref(false);
 
-const stage = ref<HTMLElement | null>(null);
-const { zoomed, transform, reset, handlers } = usePhotoZoom(stage, () => ({
+// The part of the stage under the top bar: the whole photo is fitted in it.
+const area = ref<HTMLElement | null>(null);
+const { zoomed, transform, reset, handlers } = usePhotoZoom(area, () => ({
   width: photo.value?.width ?? 0,
   height: photo.value?.height ?? 0,
 }));
 
-const title = computed(() => photo.value?.dsoIds?.[0] ?? photo.value?.originalName ?? '');
+const title = computed(() => photo.value?.originalName ?? '');
 
 async function load() {
   try {
@@ -73,26 +75,34 @@ const backToGallery = () => void router.replace('/tabs/gallery');
   <IonPage>
     <IonContent :scroll-y="false">
       <div class="mob-page-fill mob-photo-frame">
-        <div ref="stage" class="mob-stage mob-stage--viewer mob-photo-stage" v-on="handlers">
-          <template v-if="photo">
-            <div v-if="broken" class="mob-stage-caption m-secondary">{{ photo.originalName }}</div>
-            <img
-              v-else
-              class="mob-photo-view"
-              :src="photoFileUrl(photo.filename)"
-              :alt="photo.originalName"
-              :style="{ transform }"
-              draggable="false"
-              @error="broken = true"
-            />
-          </template>
-          <header class="mob-topbar mob-topbar--overlay" @pointerdown.stop @touchstart.stop>
+        <div class="mob-stage mob-stage--viewer mob-photo-stage" v-on="handlers">
+          <header
+            class="mob-topbar mob-topbar--overlay mob-photo-bar"
+            @pointerdown.stop
+            @touchstart.stop
+          >
             <PhoneBackButton float fallback="/tabs/gallery" />
             <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ title }}</h1>
             <PhoneIconButton float :label="t('mobile.photo.info')" @click="infoOpen = true">
               <AppIcon :svg="infoIcon" />
             </PhoneIconButton>
           </header>
+          <div ref="area" class="mob-photo-area">
+            <template v-if="photo">
+              <div v-if="broken" class="mob-stage-caption m-secondary">
+                {{ photo.originalName }}
+              </div>
+              <img
+                v-else
+                class="mob-photo-view"
+                :src="photoFileUrl(photo.filename)"
+                :alt="photo.originalName"
+                :style="{ transform }"
+                draggable="false"
+                @error="broken = true"
+              />
+            </template>
+          </div>
           <PhoneIconButton
             v-if="zoomed"
             float

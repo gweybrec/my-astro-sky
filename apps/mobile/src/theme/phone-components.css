@@ -1130,8 +1130,21 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   flex-direction: column;
 }
 .mob-photo-stage {
+  display: flex;
+  flex-direction: column;
   touch-action: none;
   user-select: none;
+}
+/* The top bar takes its place above the photo's area instead of lying over it: the whole photo is fitted under the bar.
+   A zoomed photo overflows its area and passes behind the bar, which stays over it. */
+.mob-photo-bar {
+  position: relative;
+  flex: none;
+}
+.mob-photo-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 .mob-photo-view {
   position: absolute;
