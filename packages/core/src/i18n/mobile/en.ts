@@ -14,6 +14,17 @@ const en: Translations['mobile'] = {
     alreadySolved: '✓ Already solved',
     toPlace: 'To place',
     solving: 'Solving',
+    placeHow: 'How should this photo be placed?',
+    solveOnline: 'Solve online',
+    solveOnlineSub: 'astrometry.net, needs a connection',
+    offline: 'No internet connection',
+    solveComputer: 'Solve on the computer',
+    solveComputerSub: 'Connect the app to the computer to use ASTAP',
+    identifyStars: 'Identify 2–3 stars',
+    identifyStarsSub:
+      'Tap 2 or 3 recognisable stars in the photo, then identify each one by its name.',
+    placeByHand: 'Place by hand',
+    placeByHandSub: 'Move, resize and rotate the photo on the map',
     import: 'Import',
   },
   plans: {

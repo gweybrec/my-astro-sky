@@ -12,6 +12,17 @@ const fr = {
     alreadySolved: '✓ Déjà résolue',
     toPlace: 'À placer',
     solving: 'Résolution',
+    placeHow: 'Comment placer cette photo ?',
+    solveOnline: 'Résoudre en ligne',
+    solveOnlineSub: 'astrometry.net, nécessite une connexion',
+    offline: 'Aucune connexion internet',
+    solveComputer: "Résoudre sur l'ordinateur",
+    solveComputerSub: "Connectez l'application à l'ordinateur pour utiliser ASTAP",
+    identifyStars: 'Identifier 2–3 étoiles',
+    identifyStarsSub:
+      'Touchez 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom.',
+    placeByHand: 'Placer à la main',
+    placeByHandSub: 'Déplacer, agrandir et tourner la photo sur la carte',
     import: 'Importer',
   },
   plans: {

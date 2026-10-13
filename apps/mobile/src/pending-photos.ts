@@ -16,6 +16,10 @@ export interface PendingPhoto {
   state: PendingState;
   /** When it was imported (milliseconds); the list is in this order. */
   addedAt: number;
+  /** The online solver's job, while the photo is being solved. */
+  jobId?: string;
+  /** Why the solve did not succeed. */
+  error?: string;
 }
 
 interface StoredPending extends PendingPhoto {
@@ -84,12 +88,7 @@ export function configurePendingStore(next: PendingStore): void {
 /** The photos waiting to be placed, oldest first. Filled by `loadPendingPhotos`. */
 export const pendingPhotos = shallowRef<PendingPhoto[]>([]);
 
-const recordOf = ({ id, name, state, addedAt }: StoredPending): PendingPhoto => ({
-  id,
-  name,
-  state,
-  addedAt,
-});
+const recordOf = ({ picture: _picture, ...record }: StoredPending): PendingPhoto => record;
 
 /** Reads the list again from the store. */
 export async function loadPendingPhotos(): Promise<void> {
@@ -118,12 +117,19 @@ export async function pendingPhotoFile(id: string): Promise<File | null> {
   return found ? new File([found.picture], found.name, { type: found.picture.type }) : null;
 }
 
-/** Changes where a waiting photo stands. */
-export async function setPendingState(id: string, state: PendingState): Promise<void> {
+/** Changes where a waiting photo stands; the solver's job and the failure reason are those given, or none. */
+export async function setPendingState(
+  id: string,
+  state: PendingState,
+  details: { jobId?: string; error?: string } = {},
+): Promise<void> {
   const found = (await store.all()).find((r) => r.id === id);
   if (!found) return;
-  await store.put({ ...found, state });
-  pendingPhotos.value = pendingPhotos.value.map((p) => (p.id === id ? { ...p, state } : p));
+  const { jobId: _jobId, error: _error, ...kept } = found;
+  const next: StoredPending = { ...kept, state, ...details };
+  await store.put(next);
+  const record = recordOf(next);
+  pendingPhotos.value = pendingPhotos.value.map((p) => (p.id === id ? record : p));
 }
 
 /** Forgets a waiting photo (it was placed, or removed). */
