@@ -183,7 +183,7 @@ import {
   DEFAULT_INTEGRATION_FILTERS,
   normalizeIntegrationFilterKey,
 } from '../../batch-utils';
-import { filterLabelCandidates } from '../../autocomplete-utils';
+import { filterLabelCandidates } from '@myastrosky/core/photo-metadata-draft';
 import { placeBatchItem } from '../../batch-place';
 import { confirmDiscardUnsavedSolves } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';

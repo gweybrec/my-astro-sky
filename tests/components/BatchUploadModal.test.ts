@@ -21,7 +21,7 @@ vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
 vi.mock('../../src/toast', () => ({ showToast: vi.fn() }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 vi.mock('../../src/batch-place', () => ({ placeBatchItem: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('../../src/autocomplete-utils', () => ({ filterLabelCandidates: () => [] }));
+vi.mock('@myastrosky/core/photo-metadata-draft', () => ({ filterLabelCandidates: () => [] }));
 vi.mock('../../src/dso-catalog', () => ({ findDSOIdsFromCorrespondences: () => [] }));
 vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: () => [],

@@ -86,22 +86,3 @@ export function filterCandidatesWithCatalog(
 
   return results;
 }
-
-/**
- * Returns labels from `knownLabels` that:
- *   - are not already in `currentLabels` (excluded from suggestions)
- *   - contain `query` as a substring (case-insensitive); all pass when query is empty
- * Results are capped at `maxResults`.
- */
-export function filterLabelCandidates(
-  knownLabels: string[],
-  currentLabels: string[],
-  query: string,
-  maxResults = 8,
-): string[] {
-  const excluded = new Set(currentLabels);
-  const q = query.trim().toLowerCase();
-  return knownLabels
-    .filter((l) => !excluded.has(l) && (!q || l.toLowerCase().includes(q)))
-    .slice(0, maxResults);
-}
