@@ -13,11 +13,18 @@ vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
 import {
   addImportFiles,
   clearImport,
+  importAll,
   importBusy,
   importItems,
-  importSolved,
+  importableCount,
   solvedCount,
 } from '../src/composables/usePhotoImport';
+import {
+  configurePendingStore,
+  createMemoryPendingStore,
+  pendingPhotoFile,
+  pendingPhotos,
+} from '../src/pending-photos';
 
 const corr = [
   { pointIndex: 0, photoX: 1, photoY: 2, starHip: 0, starName: '' },
@@ -40,6 +47,7 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 describe('the photo import', () => {
   beforeEach(() => {
     clearImport();
+    configurePendingStore(createMemoryPendingStore());
     convertRawPhoto.mockReset();
     uploadPhoto.mockReset();
   });
@@ -98,12 +106,14 @@ describe('the photo import', () => {
     expect(convertRawPhoto).toHaveBeenCalledTimes(2);
   });
 
-  it('stores the solved photos with their placement and metadata, and only those', async () => {
+  it('imports everything: the solved photo with its placement and metadata, the other one as a waiting photo', async () => {
     convertRawPhoto.mockResolvedValue({ png, meta: solvedMeta });
     uploadPhoto.mockResolvedValue({ id: 'p1' });
-    addImportFiles([new File(['raw'], 'M1-CCD.fit'), new File(['x'], 'M42.jpg')]);
+    const jpg = new File(['x'], 'M42.jpg', { type: 'image/jpeg' });
+    addImportFiles([new File(['raw'], 'M1-CCD.fit'), jpg]);
     await settle();
-    const stored = await importSolved();
+    expect(importableCount.value).toBe(2);
+    const stored = await importAll();
     expect(stored).toEqual([{ id: 'p1' }]);
     expect(uploadPhoto).toHaveBeenCalledTimes(1);
     const [file, correspondences, manual, , metadata] = uploadPhoto.mock.calls[0];
@@ -115,8 +125,11 @@ describe('the photo import', () => {
       displayName: 'M1-CCD',
       observationDate: '2025-01-01T00:00:00',
     });
-    // The stored photo leaves the list; the one that still has to be placed stays.
-    expect(importItems.value.map((i) => i.name)).toEqual(['M42.jpg']);
+    // Both leave the list; the one without a placement is kept, with its picture, to be placed later.
+    expect(importItems.value).toEqual([]);
+    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M42.jpg', 'toPlace']]);
+    const kept = await pendingPhotoFile(pendingPhotos.value[0].id);
+    expect([kept!.name, kept!.type, await kept!.text()]).toEqual(['M42.jpg', 'image/jpeg', 'x']);
   });
 
   it('a photo that cannot be stored stays as failed', async () => {
@@ -124,7 +137,7 @@ describe('the photo import', () => {
     uploadPhoto.mockRejectedValue(new Error('disk full'));
     addImportFiles([new File(['raw'], 'M1-CCD.fit')]);
     await settle();
-    expect(await importSolved()).toEqual([]);
+    expect(await importAll()).toEqual([]);
     expect(importItems.value[0]).toMatchObject({ status: 'failed', error: 'disk full' });
   });
 });

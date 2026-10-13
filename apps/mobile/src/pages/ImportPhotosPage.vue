@@ -6,10 +6,10 @@ import { t } from '@myastrosky/core/i18n/index';
 import { useErrorToast } from '../composables/useErrorToast';
 import {
   clearImport,
+  importAll,
   importBusy,
   importItems,
-  importSolved,
-  solvedCount,
+  importableCount,
   type ImportItem,
 } from '../composables/usePhotoImport';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
@@ -20,9 +20,9 @@ import PhoneRow from '../components/PhoneRow.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
 import imageIcon from '@icons/image.svg?raw';
 
-// The page "Importer des photos": one row per chosen file with where it stands, and the button that stores the photos.
-// A solved TIFF or FITS says where the photo is on the sky, so it is placed as soon as it is read; the other photos
-// wait for a placement method, which has no screen built yet.
+// The page "Importer des photos": one row per chosen file with where it stands, and the button that imports them all.
+// A solved TIFF, FITS or XISF says where the photo is on the sky, so it is stored placed; the other photos are kept
+// waiting and shown in the gallery as "À placer". Choosing a placement method from a row is not built yet.
 const router = useRouter();
 const { showError } = useErrorToast();
 const importing = ref(false);
@@ -58,7 +58,7 @@ const statusOf = (item: ImportItem) =>
 async function run() {
   importing.value = true;
   try {
-    await importSolved();
+    await importAll();
     if (importItems.value.length === 0) await router.replace('/tabs/gallery');
   } catch (error) {
     void showError(error);
@@ -97,7 +97,7 @@ onIonViewDidLeave(clearImport);
         variant="confirm"
         size="lg"
         block
-        :disabled="solvedCount === 0 || importBusy || importing"
+        :disabled="importableCount === 0 || importBusy || importing"
         @click="run"
         >{{ t('mobile.gallery.import') }}</PhoneButton
       >

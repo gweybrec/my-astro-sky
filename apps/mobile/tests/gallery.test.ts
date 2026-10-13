@@ -24,6 +24,12 @@ vi.mock('../src/platform-device', () => ({
 
 import GalleryPage from '../src/pages/GalleryPage.vue';
 import { clearImport, importItems } from '../src/composables/usePhotoImport';
+import {
+  addPendingPhoto,
+  configurePendingStore,
+  createMemoryPendingStore,
+  setPendingState,
+} from '../src/pending-photos';
 
 const mountPage = () => mount(GalleryPage, { global: { stubs: ionicStubs } });
 const rowWith = (wrapper: ReturnType<typeof mountPage>, text: string) =>
@@ -37,6 +43,7 @@ describe('the gallery page', () => {
     pickFiles.mockReset();
     pickGalleryPhotos.mockReset();
     clearImport();
+    configurePendingStore(createMemoryPendingStore());
   });
 
   it('shows the empty state when the backend returns no photo', async () => {
@@ -110,6 +117,36 @@ describe('the gallery page', () => {
     await rowWith(wrapper, 'Choisir des fichiers').trigger('click');
     await flushPromises();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('shows the imported photos that are not on the sky yet first, with where they stand', async () => {
+    getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'M42.png', filename: 'a.png' }]);
+    const solving = await addPendingPhoto(new Blob(['x']), 'M31_stack.jpg');
+    await setPendingState(solving.id, 'solving');
+    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+    const wrapper = mountPage();
+    await flushPromises();
+    const tiles = wrapper.findAll('.mob-photo-tile');
+    expect(tiles.map((tile) => tile.attributes('aria-label'))).toEqual([
+      'M31_stack.jpg : Résolution',
+      'NGC7000.tif : À placer',
+      'M42.png',
+    ]);
+    expect(tiles[0].classes()).toContain('mob-photo-tile--state');
+    expect(tiles[0].find('.mob-photo-state').classes()).toContain('mob-photo-state--busy');
+    expect(tiles[0].find('[role=status]').exists()).toBe(true);
+    expect(tiles[1].find('.mob-photo-state').text()).toBe('À placer');
+    expect(tiles[1].find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
+  });
+
+  it('shows the grid, not the empty state, when the only photos are waiting ones', async () => {
+    getPhotos.mockResolvedValue([]);
+    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.find('.mob-empty').exists()).toBe(false);
+    expect(wrapper.findAll('.mob-photo')).toHaveLength(1);
+    expect(wrapper.find('button[aria-label="Ajouter des photos"]').exists()).toBe(true);
   });
 
   it('shows the name of a photo whose picture cannot be read', async () => {

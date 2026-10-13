@@ -13,6 +13,7 @@ const en: Translations['mobile'] = {
     importMany: 'Import {n} photos',
     alreadySolved: '✓ Already solved',
     toPlace: 'To place',
+    solving: 'Solving',
     import: 'Import',
   },
   plans: {
