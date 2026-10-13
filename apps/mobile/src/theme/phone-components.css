@@ -847,37 +847,15 @@ ion-button.mob-row-main--checked .mob-radio-mark {
   text-align: left;
 }
 
-/* The Cibles context: the setup, the night and the place on one line, the types field on a line of its own; in landscape the
-   four share one line (board "Cibles", landscape). The list is one column, two in landscape. */
-.mob-context--wrap {
-  flex-wrap: wrap;
-}
-.mob-context--wrap > .mob-context-row {
-  display: flex;
-  flex: 1 0 100%;
-  gap: var(--space-4);
-  min-width: 0;
-}
-.mob-context--wrap > .mob-context-types {
-  flex: 1 0 100%;
+/* The Cibles context (board "Cibles"): the setup takes the width of the line, the number of object types keeps its own.
+   The list is one column, two in landscape. */
+.mob-context > .mob-context-types {
+  flex: none;
 }
 .mob-cols2 {
   display: block;
 }
 @media (orientation: landscape) {
-  .mob-context--wrap {
-    flex-wrap: nowrap;
-  }
-  .mob-context--wrap > .mob-context-row {
-    display: contents;
-  }
-  .mob-context.mob-context--wrap .mob-btn--field {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-  .mob-context.mob-context--wrap .mob-context-types {
-    flex-grow: 1.5;
-  }
   .mob-cols2 {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

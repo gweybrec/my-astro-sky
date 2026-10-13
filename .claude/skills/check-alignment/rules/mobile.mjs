@@ -358,10 +358,17 @@ export const views = [
     ...SHEET,
   },
   {
+    name: 'targets-settings',
+    path: '/tabs/targets',
+    ready: '.mob-row--roomy',
+    open: [{ click: '.mob-topbar ion-button.mob-icon-btn:first-of-type' }, { wait: '.mob-sheet' }],
+    ...SHEET,
+  },
+  {
     name: 'targets-filters',
     path: '/tabs/targets',
     ready: '.mob-row--roomy',
-    open: [{ click: '.mob-topbar ion-button.mob-icon-btn' }, { wait: '.mob-sheet' }],
+    open: [{ click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' }, { wait: '.mob-sheet' }],
     ...SHEET,
   },
   { name: 'sky', path: '/tabs/sky', ready: '.mob-map-top' },

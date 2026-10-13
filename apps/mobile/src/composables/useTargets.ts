@@ -2,6 +2,7 @@ import { reactive, toRaw } from 'vue';
 import {
   loadTargetsPrefs,
   saveTargetsPrefs,
+  type SortKey,
   type TargetsPrefs,
 } from '@myastrosky/core/targets/prefs';
 
@@ -33,19 +34,39 @@ export function updateTargetsPrefs(patch: Partial<TargetsPrefs>): void {
   replacePrefs(next);
 }
 
-/** The filters the "Réinitialiser" button of the filters sheet puts back to the desktop's defaults (the keys it removes). */
-export const FILTER_PREF_KEYS = [
+/**
+ * What "Réinitialiser" of the search settings sheet puts back to the desktop's defaults (the keys it removes): the sky,
+ * the observation window and the three switches. The night and the location are kept.
+ */
+export const SEARCH_PREF_KEYS = [
   'horizonDirs',
   'skyRegionId',
   'minAltDeg',
   'maxAltDeg',
   'obsStartTime',
   'obsEndTime',
-  'enabledRatings',
-  'enabledDifficulties',
-  'enabledCatalogs',
-  'enabledConstellations',
   'includeOversized',
   'excludePhotographed',
   'respectHorizon',
 ] as const satisfies readonly (keyof TargetsPrefs)[];
+
+/** What "Réinitialiser" of the filters sheet removes: the four filters on the objects. The sort is kept. */
+export const FILTER_PREF_KEYS = [
+  'enabledRatings',
+  'enabledDifficulties',
+  'enabledCatalogs',
+  'enabledConstellations',
+] as const satisfies readonly (keyof TargetsPrefs)[];
+
+/** The desktop's sorts of the targets list, in its order, with the key of each one's name. */
+export const TARGET_SORTS: readonly { key: SortKey; label: string }[] = [
+  { key: 'rating', label: 'targets.sort.rating' },
+  { key: 'score', label: 'targets.sort.score' },
+  { key: 'altitude', label: 'targets.sort.altitude' },
+  { key: 'transit', label: 'targets.sort.transit' },
+  { key: 'magnitude', label: 'targets.sort.magnitude' },
+  { key: 'size', label: 'targets.sort.size' },
+  { key: 'fov-fit', label: 'targets.sort.fovFit' },
+  { key: 'name', label: 'targets.sort.name' },
+  { key: 'difficulty', label: 'targets.sort.difficulty' },
+];

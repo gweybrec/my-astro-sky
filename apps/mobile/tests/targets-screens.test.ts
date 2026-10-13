@@ -27,10 +27,11 @@ vi.mock('@myastrosky/core/targets/recommend', () => ({
 import TargetsPage from '../src/pages/TargetsPage.vue';
 import TypesSheet from '../src/pages/targets/TypesSheet.vue';
 import FiltersSheet from '../src/pages/targets/FiltersSheet.vue';
+import SearchSettingsSheet from '../src/pages/targets/SearchSettingsSheet.vue';
 import RegionsPage from '../src/pages/RegionsPage.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
-import { reloadTargetsPrefs } from '../src/composables/useTargets';
+import { reloadTargetsPrefs, updateTargetsPrefs } from '../src/composables/useTargets';
 
 const GEAR = {
   telescope: [
@@ -202,12 +203,31 @@ describe('the Cibles page', () => {
     expect(rows[0].text()).toContain('86°');
     expect(rows[0].text()).toContain('21:38');
     expect(rows[1].text()).toContain('★★★★☆');
-    const text = w.text();
-    expect(text).toContain('Équipement 1');
-    expect(text).toContain('Ce soir');
-    expect(text).toContain('48.58, 7.75');
-    expect(text).toContain("Types d'objets");
-    expect(text).toContain('1 types');
+    // One row under the search field: the setup, and the number of types alone.
+    const fields = w.findAll('.mob-context > button');
+    expect(fields.map((b) => b.text())).toEqual(['Équipement 1', '1 types']);
+    expect(fields[1].attributes('aria-label')).toBe("Types d'objets : 1 types");
+    // Beside the search field: the search settings, then the filters.
+    expect(w.findAll('.mob-topbar button').map((b) => b.attributes('aria-label'))).toEqual([
+      'Paramètres de recherche',
+      'Filtres',
+    ]);
+  });
+
+  it('opens the search settings and the filters from their buttons, and searches again when one closes', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    const settings = w.findComponent(SearchSettingsSheet);
+    const filters = w.findComponent(FiltersSheet);
+    expect([settings.props('open'), filters.props('open')]).toEqual([false, false]);
+    await w.find('button[aria-label="Paramètres de recherche"]').trigger('click');
+    expect(settings.props('open')).toBe(true);
+    await w.find('button[aria-label="Filtres"]').trigger('click');
+    expect(filters.props('open')).toBe(true);
+    updateTargetsPrefs({ minAltDeg: 40 });
+    settings.vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(2);
   });
 
   it('searches with the stored preferences, the setups and the gear', async () => {
@@ -257,9 +277,11 @@ describe('the Cibles page', () => {
     const w = show(TargetsPage, { global: app().global });
     await settle();
     await w.find('button[aria-label^="Équipement"]').trigger('click');
-    const sheet = w.findAllComponents(PhoneRadioSheet as Component)[0];
-    const props = sheet.props() as { open: boolean; title: string; options: { label: string }[] };
-    expect([props.open, props.title]).toEqual([true, 'Setup']);
+    const sheet = w
+      .findAllComponents(PhoneRadioSheet as Component)
+      .find((c) => (c.props() as { title: string }).title === 'Setup')!;
+    const props = sheet.props() as { open: boolean; options: { label: string }[] };
+    expect(props.open).toBe(true);
     expect(props.options.map((o) => o.label)).toEqual(['Équipement 1', 'Lunette 72']);
     sheet.vm.$emit('update:value', 's2');
     sheet.vm.$emit('update:open', false);
@@ -270,28 +292,15 @@ describe('the Cibles page', () => {
     expect(w.find('button[aria-label^="Équipement"]').text()).toContain('Lunette 72');
   });
 
-  it("searches for the night chosen in the phone's date picker, kept for the next time", async () => {
+  it('searches for the night stored by the search settings, and for today when none is', async () => {
     const w = show(TargetsPage, { global: app().global });
     await settle();
     const today = search.mock.calls[0][0].dateStr;
-    const picker = w.findComponent(PhoneNativePicker);
-    expect([picker.props('type'), picker.props('value')]).toEqual(['date', today]);
-    picker.vm.$emit('pick', '2031-03-09');
+    expect(today).toMatch(/^\d{4}-\d\d-\d\d$/);
+    updateTargetsPrefs({ lastDateISO: '2031-03-09' });
+    w.findComponent(SearchSettingsSheet).vm.$emit('update:open', false);
     await settle();
-    expect(prefsOf().lastDateISO).toBe('2031-03-09');
     expect(search.mock.calls[1][0].dateStr).toBe('2031-03-09');
-    const night = w.find('button[aria-label^="Nuit"]');
-    expect(night.text()).not.toContain('Ce soir');
-    expect(night.text()).toContain('2031');
-  });
-
-  it('opens the observing location from the third field', async () => {
-    const { router, global } = app();
-    const w = show(TargetsPage, { global });
-    await settle();
-    await w.find('button[aria-label^="Lieu"]').trigger('click');
-    await settle();
-    expect(router.currentRoute.value.path).toBe('/settings/location');
   });
 
   it('filters the rows by the typed text', async () => {
@@ -384,13 +393,23 @@ describe('the types sheet', () => {
   });
 });
 
-describe('the filters sheet', () => {
-  it('shows every control of the board', async () => {
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+describe('the search settings sheet', () => {
+  const mountSheet = () => {
+    const made = app();
+    const w = show(SearchSettingsSheet, { props: { open: true }, global: made.global });
+    return { w, router: made.router };
+  };
+
+  it('shows every control of the board, in its order, without the "Options" title', async () => {
+    const { w } = mountSheet();
     await settle();
     const text = w.text();
-    for (const label of [
-      'Filtres',
+    const labels = [
+      'Paramètres de recherche',
+      'Nuit',
+      'Ce soir',
+      'Lieu',
+      '48.58, 7.75',
       'Ciel observable',
       'Nord',
       'Ouest',
@@ -400,37 +419,81 @@ describe('the filters sheet', () => {
       'Min',
       'Max',
       "Fenêtre d'observation",
-      'Intérêt DSO',
-      'Difficulté',
-      'Catalogues',
-      'Constellations',
       'Inclure les objets trop grands pour le champ',
       'Exclure les objets déjà photographiés',
       "Respecter l'horizon",
       'Réinitialiser',
       'Appliquer',
-    ]) {
-      expect(text).toContain(label);
-    }
+    ];
+    const places = labels.map((label) => text.indexOf(label));
+    expect(places.every((at) => at >= 0)).toBe(true);
+    expect([...places].sort((a, b) => a - b)).toEqual(places);
     expect(text).toContain('20°');
     expect(text).toContain('80°');
+    expect(w.findAll('.mob-section-header').map((h) => h.text())).toEqual([
+      'Ciel',
+      "Fenêtre d'observation",
+    ]);
+    for (const absent of ['Intérêt DSO', 'Difficulté', 'Catalogues', 'Trier par']) {
+      expect(text).not.toContain(absent);
+    }
   });
 
-  it('stores a direction, a rating and a difficulty at once', async () => {
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+  it('has an "i" for the three switches and none for the sky directions', async () => {
+    const { w } = mountSheet();
+    await settle();
+    const infos = w
+      .findAll('button')
+      .map((b) => b.attributes('aria-label') ?? '')
+      .filter((label) => label.startsWith('Informations'));
+    expect(infos).toEqual([
+      'Informations : Inclure les objets trop grands pour le champ',
+      'Informations : Exclure les objets déjà photographiés',
+      "Informations : Respecter l'horizon",
+    ]);
+    await w
+      .findAll('button')
+      .find((b) => b.attributes('aria-label') === "Informations : Respecter l'horizon")!
+      .trigger('click');
+    expect(showInfo).toHaveBeenCalledWith(
+      "Respecter l'horizon",
+      'Exclure les cibles cachées par le relief à leur culmination',
+    );
+  });
+
+  it("stores the night chosen in the phone's date picker and shows it", async () => {
+    const { w } = mountSheet();
+    await settle();
+    const night = w.findAllComponents(PhoneNativePicker)[0];
+    expect(night.props('type')).toBe('date');
+    night.vm.$emit('pick', '2031-03-09');
+    await settle();
+    expect(prefsOf().lastDateISO).toBe('2031-03-09');
+    const field = w.find('button[aria-label^="Nuit"]');
+    expect(field.text()).not.toContain('Ce soir');
+    expect(field.text()).toContain('2031');
+  });
+
+  it('opens the observing location from the "Lieu" field and closes the sheet', async () => {
+    const { w, router } = mountSheet();
+    await settle();
+    await w.find('button[aria-label^="Lieu"]').trigger('click');
+    await settle();
+    expect(router.currentRoute.value.path).toBe('/settings/location');
+    expect(w.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('stores a direction at once', async () => {
+    const { w } = mountSheet();
     await settle();
     await w.find('button[aria-label="Ouest"]').trigger('click');
     expect(prefsOf().horizonDirs).toEqual(['N', 'S', 'E']);
-    await w.find('button[aria-label="Intérêt 1 sur 5"]').trigger('click');
-    expect(prefsOf().enabledRatings).toEqual([2, 3, 4, 5]);
-    await w.find('button[aria-label="Difficulté 5 sur 5"]').trigger('click');
-    expect(prefsOf().enabledDifficulties).toEqual([1, 2, 3, 4]);
   });
 
   it("stores the two times of the observation window chosen in the phone's time picker", async () => {
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+    const { w } = mountSheet();
     await settle();
-    const [from, to] = w.findAllComponents(PhoneNativePicker);
+    const [, from, to] = w.findAllComponents(PhoneNativePicker);
     expect([from.props('type'), to.props('type')]).toEqual(['time', 'time']);
     from.vm.$emit('pick', '22:00');
     to.vm.$emit('pick', '02:00');
@@ -443,7 +506,111 @@ describe('the filters sheet', () => {
     expect(prefsOf().obsEndTime).toBe('02:00');
   });
 
-  it('"Réinitialiser" removes every filter and keeps the rest of the record', async () => {
+  it('"Réinitialiser" puts the sky, the window and the switches back, and keeps the night, the place and the filters', async () => {
+    storage().set(
+      'targets-prefs-v3',
+      JSON.stringify({
+        setupId: 's1',
+        lat: 48.58,
+        lon: 7.75,
+        lastDateISO: '2031-03-09',
+        enabledTypes: ['EN'],
+        horizonDirs: ['N'],
+        minAltDeg: 30,
+        obsStartTime: '22:00',
+        respectHorizon: true,
+        skyRegionId: 'r1',
+        enabledRatings: [5],
+        sortBy: 'name',
+      }),
+    );
+    reloadTargetsPrefs();
+    const { w } = mountSheet();
+    await settle();
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'Réinitialiser')!
+      .trigger('click');
+    const stored = prefsOf();
+    expect(stored).toMatchObject({
+      setupId: 's1',
+      lat: 48.58,
+      lastDateISO: '2031-03-09',
+      enabledTypes: ['EN'],
+      enabledRatings: [5],
+      sortBy: 'name',
+    });
+    for (const key of [
+      'horizonDirs',
+      'minAltDeg',
+      'obsStartTime',
+      'respectHorizon',
+      'skyRegionId',
+    ]) {
+      expect(stored).not.toHaveProperty(key);
+    }
+  });
+});
+
+describe('the filters sheet', () => {
+  it('shows the sort, then the four filters of the board, and nothing of the search settings', async () => {
+    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+    await settle();
+    const text = w.text();
+    const labels = [
+      'Filtres',
+      'Trier par',
+      'Intérêt DSO',
+      'Difficulté',
+      'Catalogues',
+      'Constellations',
+    ];
+    const places = labels.map((label) => text.indexOf(label));
+    expect(places.every((at) => at >= 0)).toBe(true);
+    expect([...places].sort((a, b) => a - b)).toEqual(places);
+    expect(text).toContain('Réinitialiser');
+    expect(text).toContain('Appliquer');
+    for (const absent of ['Ciel observable', 'Région du ciel', "Respecter l'horizon", 'Nuit']) {
+      expect(text).not.toContain(absent);
+    }
+  });
+
+  it("offers the desktop's nine sorts and stores the chosen one", async () => {
+    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+    await settle();
+    const sortRow = () => w.findAll('.mob-row').find((r) => r.text().includes('Trier par'))!;
+    expect(sortRow().text()).toContain('Intérêt photo');
+    await sortRow().trigger('click');
+    const list = w.findAllComponents(PhoneRadioSheet as Component)[0];
+    const props = list.props() as { open: boolean; title: string; options: { label: string }[] };
+    expect([props.open, props.title]).toEqual([true, 'Trier par']);
+    expect(props.options.map((o) => o.label)).toEqual([
+      'Intérêt photo',
+      'Score global',
+      'Altitude max.',
+      'Heure de transit',
+      'Luminosité',
+      'Taille',
+      'Remplissage du champ',
+      'Nom',
+      'Difficulté',
+    ]);
+    list.vm.$emit('update:value', 'fov-fit');
+    await settle();
+    expect(prefsOf().sortBy).toBe('fov-fit');
+    expect(sortRow().text()).toContain('Remplissage du champ');
+  });
+
+  it('stores a rating and a difficulty at once', async () => {
+    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+    await settle();
+    await w.find('button[aria-label="Intérêt 1 sur 5"]').trigger('click');
+    expect(prefsOf().enabledRatings).toEqual([2, 3, 4, 5]);
+    await w.find('button[aria-label="Difficulté 5 sur 5"]').trigger('click');
+    expect(prefsOf().enabledDifficulties).toEqual([1, 2, 3, 4]);
+  });
+
+  it('"Réinitialiser" removes the four filters and keeps the sort and the search settings', async () => {
     storage().set(
       'targets-prefs-v3',
       JSON.stringify({
@@ -451,11 +618,12 @@ describe('the filters sheet', () => {
         lat: 48.58,
         lon: 7.75,
         lastDateISO: null,
-        enabledTypes: ['EN'],
         horizonDirs: ['N'],
-        minAltDeg: 30,
-        respectHorizon: true,
-        skyRegionId: 'r1',
+        enabledRatings: [5],
+        enabledDifficulties: [1],
+        enabledCatalogs: ['M'],
+        enabledConstellations: ['CYG'],
+        sortBy: 'name',
       }),
     );
     reloadTargetsPrefs();
@@ -466,17 +634,15 @@ describe('the filters sheet', () => {
       .find((b) => b.text() === 'Réinitialiser')!
       .trigger('click');
     const stored = prefsOf();
-    expect(stored).toMatchObject({ setupId: 's1', lat: 48.58, enabledTypes: ['EN'] });
-    for (const key of ['horizonDirs', 'minAltDeg', 'respectHorizon', 'skyRegionId']) {
+    expect(stored).toMatchObject({ setupId: 's1', horizonDirs: ['N'], sortBy: 'name' });
+    for (const key of [
+      'enabledRatings',
+      'enabledDifficulties',
+      'enabledCatalogs',
+      'enabledConstellations',
+    ]) {
       expect(stored).not.toHaveProperty(key);
     }
-  });
-
-  it('opens the explanation behind the "i" of the sky directions', async () => {
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
-    await settle();
-    await w.find('button[aria-label="Informations : Ciel observable"]').trigger('click');
-    expect(showInfo).toHaveBeenCalledWith('Ciel observable', expect.stringContaining('Décochez'));
   });
 });
 
