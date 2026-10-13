@@ -5,7 +5,7 @@
  * a file input otherwise).
  * `isNativePlatform()` of `platform-init.ts` is the only test of which platform this is.
  */
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, SystemBars, SystemBarType } from '@capacitor/core';
 import { isNativePlatform } from './platform-init';
 
 export interface DevicePosition {
@@ -129,4 +129,18 @@ export async function pickGalleryPhotos(): Promise<File[]> {
 /** Lets the user pick one file; null when the picker is cancelled. */
 export async function pickFile(types: FileTypes): Promise<File | null> {
   return (await pickFiles(types))[0] ?? null;
+}
+
+/**
+ * Hides or shows Android's status bar (the clock and the battery). A photo's own screen hides it, so that its top bar
+ * and the photo have the room; nothing happens in a browser. Capacitor's own system bars tool, no extra plugin.
+ */
+export async function setStatusBarHidden(hidden: boolean): Promise<void> {
+  if (!isNativePlatform()) return;
+  try {
+    const options = { bar: SystemBarType.StatusBar };
+    await (hidden ? SystemBars.hide(options) : SystemBars.show(options));
+  } catch {
+    // The bar stays as it is: the screen works with it shown.
+  }
 }

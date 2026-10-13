@@ -1140,6 +1140,8 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
 .mob-photo-bar {
   position: relative;
   flex: none;
+  /* As low as its buttons: the room goes to the photo. */
+  min-height: calc(var(--mobile-touch-min) + var(--safe-top, 0px));
 }
 .mob-photo-area {
   position: relative;

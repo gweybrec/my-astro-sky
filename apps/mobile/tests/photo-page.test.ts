@@ -19,6 +19,11 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { id: 'p1' } }),
 }));
 
+const setStatusBarHidden = vi.fn();
+vi.mock('../src/platform-device', () => ({
+  setStatusBarHidden: (hidden: boolean) => setStatusBarHidden(hidden),
+}));
+
 const confirm = vi.fn();
 const showError = vi.fn();
 vi.mock('../src/composables/useConfirm', () => ({
@@ -107,6 +112,14 @@ describe("a photo's own screen", () => {
     await w.find('img.mob-photo-view').trigger('error');
     expect(w.find('img.mob-photo-view').exists()).toBe(false);
     expect(w.find('.mob-stage-caption').text()).toBe('M31_2025-09-14_stack.jpg');
+  });
+
+  it("gives Android's status bar back when the page goes away", async () => {
+    setStatusBarHidden.mockClear();
+    const w = mountPage();
+    await flushPromises();
+    w.unmount();
+    expect(setStatusBarHidden).toHaveBeenLastCalledWith(false);
   });
 
   it('goes back to the gallery when the photo no longer exists', async () => {
