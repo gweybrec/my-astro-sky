@@ -303,6 +303,24 @@ describe('the Cibles page', () => {
     expect(search.mock.calls[1][0].dateStr).toBe('2031-03-09');
   });
 
+  it('sorts again from what the search found, so a sort chosen twice gives the same order', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    const names = () => w.findAll('.mob-row--roomy .mob-row-title').map((r) => r.text());
+    const filters = w.findComponent(FiltersSheet);
+    // The two test targets have the ratings 5 and 4: by interest the first one leads, by name the second (M27).
+    const byRating = names();
+    updateTargetsPrefs({ sortBy: 'name' });
+    filters.vm.$emit('update:open', false);
+    await settle();
+    expect(names()).toEqual([...byRating].reverse());
+    updateTargetsPrefs({ sortBy: 'rating' });
+    filters.vm.$emit('update:open', false);
+    await settle();
+    expect(names()).toEqual(byRating);
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
   it('filters the rows by the typed text', async () => {
     const w = show(TargetsPage, { global: app().global });
     await settle();
