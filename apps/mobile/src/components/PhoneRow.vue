@@ -22,8 +22,8 @@ withDefaults(
     lead?: string;
     /** SVG markup of a picture placeholder in a square holder (a file in a list). */
     thumb?: string;
-    /** How the line under the title reads: a finished state (green), or a running operation (spinner and accent). */
-    status?: 'success' | 'busy';
+    /** How the line under the title reads: a finished state (green), a running operation (spinner and accent), or a failure (red). */
+    status?: 'success' | 'busy' | 'danger';
     /** The delete row: lead and title in the danger colour. */
     danger?: boolean;
     /** Three-line rows take more room above and below. */
@@ -72,6 +72,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
           class="mob-row-sub mob-row-sub--wrap m-secondary"
           :class="{
             'mob-status--success': status === 'success',
+            'mob-status--danger': status === 'danger',
             'mob-row-sub--busy': status === 'busy',
           }"
           ><PhoneBusy v-if="status === 'busy'" :label="line" /><span

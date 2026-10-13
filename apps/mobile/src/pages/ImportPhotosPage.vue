@@ -10,6 +10,7 @@ import {
   importBusy,
   importItems,
   importableCount,
+  solveImportOnline,
   type ImportItem,
 } from '../composables/usePhotoImport';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
@@ -17,15 +18,32 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneFooter from '../components/PhoneFooter.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneRow from '../components/PhoneRow.vue';
-import PhoneBusy from '../components/PhoneBusy.vue';
+import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import imageIcon from '@icons/image.svg?raw';
 
 // The page "Importer des photos": one row per chosen file with where it stands, and the button that imports them all.
 // A solved TIFF, FITS or XISF says where the photo is on the sky, so it is stored placed; the other photos are kept
-// waiting and shown in the gallery as "À placer". Choosing a placement method from a row is not built yet.
+// waiting and shown in the gallery as "À placer". A tap on a photo to place, or on one whose solve failed, asks how to
+// place it (boards "Importer, méthode de placement" and "Importer, échec de la résolution"); solved online from here,
+// the row shows "Résolution" and leaves the list once the photo is placed.
 const router = useRouter();
 const { showError } = useErrorToast();
 const importing = ref(false);
+/** The photo whose placement method is being chosen. */
+const placing = ref<ImportItem | null>(null);
+const methodOpen = ref(false);
+
+const canChoose = (item: ImportItem) => item.status === 'toPlace' || item.status === 'solveFailed';
+
+function chooseMethod(item: ImportItem) {
+  if (!canChoose(item)) return;
+  placing.value = item;
+  methodOpen.value = true;
+}
+
+function solveOnline() {
+  if (placing.value) void solveImportOnline(placing.value);
+}
 
 const title = computed(() =>
   importItems.value.length === 1
@@ -43,17 +61,24 @@ const stateOf = (item: ImportItem) => {
       return t('batch.statusPlacing');
     case 'failed':
       return item.error || t('batch.statusFailed');
+    case 'solving':
+      return t('mobile.gallery.solving');
+    case 'solveFailed':
+      return t('batch.statusFailed');
     default:
       return t('mobile.gallery.toPlace');
   }
 };
 
+const BUSY = new Set(['converting', 'importing', 'solving']);
 const statusOf = (item: ImportItem) =>
   item.status === 'solved'
     ? 'success'
-    : item.status === 'converting' || item.status === 'importing'
+    : BUSY.has(item.status)
       ? 'busy'
-      : undefined;
+      : item.status === 'solveFailed'
+        ? 'danger'
+        : undefined;
 
 async function run() {
   importing.value = true;
@@ -86,8 +111,9 @@ onIonViewDidLeave(clearImport);
             :title="item.name"
             :subs="[stateOf(item)]"
             :status="statusOf(item)"
-            :inert="item.status === 'toPlace'"
-            :chevron="item.status === 'toPlace'"
+            :button="canChoose(item)"
+            :chevron="canChoose(item)"
+            @click="chooseMethod(item)"
           />
         </IonList>
       </div>
@@ -102,5 +128,6 @@ onIonViewDidLeave(clearImport);
         >{{ t('mobile.gallery.import') }}</PhoneButton
       >
     </PhoneFooter>
+    <PlacementMethodSheet v-model:open="methodOpen" @online="solveOnline" />
   </IonPage>
 </template>
