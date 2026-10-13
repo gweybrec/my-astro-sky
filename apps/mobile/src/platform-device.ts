@@ -62,7 +62,7 @@ export const HORIZON_FILE_TYPES: FileTypes = {
 /** Photos: JPEG, PNG, WebP and the solved astro formats. FITS has no MIME type, so the phone's picker offers every file. */
 export const PHOTO_FILE_TYPES: FileTypes = {
   mimeTypes: [],
-  extensions: ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.fit', '.fits'],
+  extensions: ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.fit', '.fits', '.xisf'],
 };
 
 /** Lets the user pick files (one, or several with `multiple`); empty when the picker is cancelled. */

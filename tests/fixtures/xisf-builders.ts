@@ -1,7 +1,7 @@
 /**
- * Minimal hand-rolled XISF monolithic-file builder for header-decoder tests. Not a general
- * encoder — only the signature, header length and XML header (no pixel blocks). Not a
- * `.test.ts` file, so vitest does not collect it as a suite.
+ * Minimal hand-rolled XISF monolithic-file builder for decoder tests. Not a general
+ * encoder — the signature, header length and XML header, and optionally one pixel block
+ * placed right after the header. Not a `.test.ts` file, so vitest does not collect it as a suite.
  */
 
 export interface XisfKeyword {
@@ -26,6 +26,10 @@ export interface BuildXisfOptions {
   headerLength?: number;
   /** Extra raw XML placed after the first Image element (e.g. a second Image). */
   trailingXml?: string;
+  /** Extra raw attributes of the Image element (e.g. `bounds="0:1"`). */
+  imageAttrs?: string;
+  /** The pixel block, appended after the header; `location` is then computed. */
+  pixels?: Uint8Array;
 }
 
 function esc(s: string): string {
@@ -48,7 +52,29 @@ export function buildXisf(opts: BuildXisfOptions = {}): Uint8Array {
     signature = 'XISF0100',
     headerLength,
     trailingXml = '',
+    imageAttrs = '',
+    pixels,
   } = opts;
+
+  if (pixels) {
+    // The block's position depends on the header's length, which depends on the position's digits:
+    // build with a fixed-width placeholder first.
+    const probe = buildXisf({
+      ...opts,
+      pixels: undefined,
+      location: `attachment:${'0'.repeat(10)}:${pixels.length}`,
+    });
+    const position = String(probe.length).padStart(10, '0');
+    const header = buildXisf({
+      ...opts,
+      pixels: undefined,
+      location: `attachment:${position}:${pixels.length}`,
+    });
+    const file = new Uint8Array(header.length + pixels.length);
+    file.set(header);
+    file.set(pixels, header.length);
+    return file;
+  }
 
   const kw = keywords
     .map(
@@ -60,7 +86,7 @@ export function buildXisf(opts: BuildXisfOptions = {}): Uint8Array {
     ? ''
     : `<Image geometry="${geometry}" sampleFormat="${sampleFormat}" colorSpace="${colorSpace}" location="${location}"${
         compression ? ` compression="${compression}"` : ''
-      }>${kw}</Image>`;
+      }${imageAttrs ? ` ${imageAttrs}` : ''}>${kw}</Image>`;
   const xml = `<?xml version="1.0" encoding="UTF-8"?><xisf version="1.0" xmlns="http://www.pixinsight.com/xisf">${image}${trailingXml}</xisf>`;
   const xmlBytes = new TextEncoder().encode(xml);
 

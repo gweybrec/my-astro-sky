@@ -39,7 +39,7 @@ A collapsible side panel on the right holds Photos, Search, DSO info, Display se
 ## Uploading and placing a photo
 
 1. Click the **+** button in the Photos section of the side panel.
-2. Pick one or more files in the file picker (dropping files onto the app is not supported). Supported formats: JPEG, PNG, WEBP, TIFF, FITS. Max size: 200 MB.
+2. Pick one or more files in the file picker (dropping files onto the app is not supported). Supported formats: JPEG, PNG, WEBP, TIFF, FITS, XISF (PixInsight; uncompressed or zlib-compressed). Max size: 200 MB.
 3. Choose a plate-solving method (see below) or place the photo manually.
 4. Once solved or placed, the photo appears on the map at the correct position.
 
