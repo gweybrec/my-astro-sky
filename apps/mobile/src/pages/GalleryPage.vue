@@ -158,7 +158,8 @@ async function addPicked(pick: () => Promise<File[]>) {
                 }}</template></span
               >
             </button>
-            <span class="mob-photo-id m-mono" />
+            <!-- No object is known yet: the line is kept, so that the rows of the grid keep one height. -->
+            <span class="mob-photo-id m-mono" aria-hidden="true">&nbsp;</span>
           </div>
           <!-- A photo's own screen is not built yet: the tile shows and does nothing. -->
           <div v-for="tile in tiles" :key="tile.id" class="mob-photo">
