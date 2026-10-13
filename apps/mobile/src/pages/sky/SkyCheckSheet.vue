@@ -5,7 +5,7 @@ import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneCheckRow from '../../components/PhoneCheckRow.vue';
 
 // A choice of several values among a list, in a sheet: "Tous" and one tick box per value. Each change applies at
-// once; the close button is in the header.
+// once.
 const props = defineProps<{
   title: string;
   options: readonly { value: string; label: string }[];
@@ -26,7 +26,7 @@ const setAll = (on: boolean) => (selected.value = on ? props.options.map((o) => 
 </script>
 
 <template>
-  <PhoneSheet v-model:open="open" :title="title" closable tall>
+  <PhoneSheet v-model:open="open" :title="title" tall>
     <PhoneCheckRow
       :title="t('mobile.targets.all')"
       :model-value="allOn"

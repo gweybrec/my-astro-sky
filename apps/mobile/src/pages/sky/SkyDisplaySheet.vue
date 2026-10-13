@@ -133,7 +133,7 @@ const dsoDensity = computed({
 </script>
 
 <template>
-  <PhoneSheet v-model:open="open" :title="t('display.section')" closable tall>
+  <PhoneSheet v-model:open="open" :title="t('display.section')" tall>
     <PhoneSectionHeader>{{ t('display.photos') }}</PhoneSectionHeader>
     <PhoneToggleRow
       :model-value="showPhotos"
