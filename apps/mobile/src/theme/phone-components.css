@@ -994,23 +994,133 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   pointer-events: none;
 }
 
-/* The gallery in landscape: six tiles to a row, as the board "Galerie, paysage" draws it. */
+/* ── The gallery (boards "Galerie", "Galerie, affichage"): as many photos to a line as chosen in "Affichage", one number
+   for each way of holding the phone (two and six unless chosen otherwise). */
+.mob-photo-grid {
+  grid-template-columns: repeat(var(--photos-per-line, 2), minmax(0, 1fr));
+}
 @media (orientation: landscape) {
   .mob-photo-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--photos-per-line-landscape, 6), minmax(0, 1fr));
   }
 }
 
-/* A gallery tile holding its photo's picture: the picture fills the tile, cropped to the square. */
-.mob-photo-tile--picture {
+/* A photo of the gallery: one card. The picture is its square top, flush with the border; under it, in the same
+   border, the file name on one line and the chips. The cards of a line share its height (the grid stretches them). */
+.mob-photo-card {
+  flex-direction: column;
+  gap: 0;
   padding: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--mobile-card-radius);
   overflow: hidden;
+  color: var(--text-secondary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+.mob-photo-card:active {
+  background: var(--bg-hover);
+}
+.mob-photo-card:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: -2px;
+}
+.mob-photo-card-picture {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  background: var(--bg-deep);
+  color: var(--text-dim);
+}
+.mob-photo-card-picture > .mob-icon-holder > svg {
+  width: var(--space-11);
+  height: var(--space-11);
+}
+/* The picture fills the square, cropped to it. */
 .mob-photo-picture {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.mob-photo-card-caption {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--border-panel);
+}
+.mob-photo-card-name {
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The chips of a photo, in the desktop's colours (`.tag-chip`, `.setup-chip`, `.label-chip`, `.poi-chip`). A chip
+   wider than the card is cut with an ellipsis. */
+.mob-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.mob-tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3h);
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-fill-lg);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+.mob-tag-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A point of interest's mark, in its kind's colour: the icon of a default kind, a dot for a kind of the user's. */
+.mob-tag svg {
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  color: var(--poi-color, var(--text-dim));
+}
+.mob-tag--dot::before {
+  content: '';
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: 50%;
+  background: var(--poi-color, var(--text-dim));
+}
+.mob-tag--setup {
+  background: var(--chip-setup-bg);
+  border-color: var(--chip-setup-border);
+  color: var(--chip-setup-text);
+}
+.mob-tag--label {
+  background: var(--chip-label-bg);
+  border-color: var(--chip-label-border);
+  color: var(--chip-label-text);
+}
+.mob-tag--more {
+  flex: none;
+  background: transparent;
+  border-color: var(--border-white-md);
 }
 
 /* ── A photo's own screen: the stage takes the whole page, under the status bar (the top bar lies over it), and the
