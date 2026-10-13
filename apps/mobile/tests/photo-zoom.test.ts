@@ -69,7 +69,7 @@ describe('the photo zoom', () => {
     (wrapper.element as HTMLElement).getBoundingClientRect = () =>
       ({ left: 0, top: 0, width: 400, height: 800 }) as DOMRect;
     const send = (type: string, id: number, x: number, y: number, at = 0) =>
-      (zoom.handlers as Record<string, (e: PointerEvent) => void>)[type]({
+      (zoom.handlers as unknown as Record<string, (e: PointerEvent) => void>)[type]({
         pointerId: id,
         clientX: x,
         clientY: y,
@@ -93,6 +93,13 @@ describe('the photo zoom', () => {
     tap(200, 400, 1000);
     tap(200, 400, 1150);
     expect(zoom.zoomed.value).toBe(false);
+  });
+
+  it('keeps its touches from the browser, whose fling after a drag would swallow the next tap', () => {
+    const { zoom } = mountViewer();
+    let prevented = false;
+    zoom.handlers.touchstart({ preventDefault: () => (prevented = true) } as unknown as TouchEvent);
+    expect(prevented).toBe(true);
   });
 
   it('does not take two slow taps for a double tap', () => {
