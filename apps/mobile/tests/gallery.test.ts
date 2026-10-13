@@ -303,7 +303,7 @@ describe('the gallery page', () => {
     held('landscape');
     const wrapper = mountPage();
     await flushPromises();
-    const group = wrapper.findComponent({ name: 'PhoneRadioGroup' });
+    const group = wrapper.findComponent({ name: 'PhoneSegmented' });
     expect(group.props('options').map((o: { label: string }) => o.label)).toEqual([
       '3',
       '4',
@@ -331,7 +331,7 @@ describe('the gallery page', () => {
       'Plus de filtres',
     ]);
     await wrapper.find('button[aria-label="Affichage"]').trigger('click');
-    const group = wrapper.findComponent({ name: 'PhoneRadioGroup' });
+    const group = wrapper.findComponent({ name: 'PhoneSegmented' });
     expect(group.props('options').map((o: { label: string }) => o.label)).toEqual(['1', '2', '3']);
     expect(group.props('modelValue')).toBe('2');
     expect(wrapper.text()).toContain('Photos par ligne');
