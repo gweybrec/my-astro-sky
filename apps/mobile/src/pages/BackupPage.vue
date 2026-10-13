@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { IonPage, IonContent, IonList } from '@ionic/vue';
+import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import { replaceUserOverrides } from '@myastrosky/core/catalog/dso-registry';
@@ -70,13 +70,16 @@ const photos = ref<{ id: string; fileSize?: number | null }[]>([]);
 const photoIds = computed(() => new Set(photos.value.map((p) => p.id)));
 const exporting = ref(false);
 
-onMounted(async () => {
+// Read each time the page is shown: photos may have been added or deleted since it was last open.
+async function loadPhotos() {
   try {
     photos.value = await getPhotos();
   } catch (error) {
     void showError(error);
   }
-});
+}
+onMounted(loadPhotos);
+onIonViewWillEnter(loadPhotos);
 
 const sizeLabel = computed(() =>
   t('settings.exportEstimatedSize', {
