@@ -52,6 +52,8 @@ const CHUNK = 15;
 const search = ref('');
 const loading = ref(true);
 const gear = shallowRef<GearLists | null>(null);
+/** What the search found, in its own order: every sort starts from it, as on the desktop. */
+let found: TargetSuggestion[] = [];
 const sorted = shallowRef<TargetSuggestion[]>([]);
 const emptyKind = ref<'no-setup' | 'no-match'>('no-match');
 const visible = ref(CHUNK);
@@ -185,15 +187,18 @@ async function runSearch() {
     );
     lastKey = key;
     if (result.kind === 'ok') {
-      sorted.value = sortSuggestions(result.suggestions, targetsPrefs.sortBy ?? 'rating');
+      found = result.suggestions;
+      sorted.value = sortSuggestions(found, targetsPrefs.sortBy ?? 'rating');
       emptyKind.value = 'no-match';
     } else {
+      found = [];
       sorted.value = [];
       emptyKind.value = result.reason === 'no-setup' ? 'no-setup' : 'no-match';
     }
     visible.value = CHUNK;
   } catch (error) {
     lastKey = '';
+    found = [];
     sorted.value = [];
     void showError(error);
   } finally {
@@ -202,7 +207,7 @@ async function runSearch() {
 }
 
 function sort() {
-  sorted.value = sortSuggestions(sorted.value, targetsPrefs.sortBy ?? 'rating');
+  sorted.value = sortSuggestions(found, targetsPrefs.sortBy ?? 'rating');
   loading.value = false;
 }
 
