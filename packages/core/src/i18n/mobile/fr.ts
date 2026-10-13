@@ -93,6 +93,14 @@ const fr = {
     lan: 'LAN',
   },
   nav: { back: 'Retour' },
+  photo: {
+    info: 'Informations sur la photo',
+    resetZoom: 'Réinitialiser le zoom',
+    totalExposure: 'Exposition totale',
+    filters: 'Filtres',
+    identify: 'Identifier les objets',
+    actions: 'Actions sur la photo',
+  },
   gear: {
     addTelescope: 'Ajouter un télescope',
     aperture: 'Ouverture {mm} mm',

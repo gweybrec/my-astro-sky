@@ -21,10 +21,11 @@ import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Ciel, photo sélectionnée": a placed photo picked on the map, in a sheet over the bottom of the map. Its name,
 // the objects it shows (a chip each, nine to a page, pages swiped), its opacity on the map and its actions. Hiding the
-// photo and deleting it are done here; the gallery, repositioning, the display order and the metadata wait for their screens.
+// photo, opening it in the gallery and deleting it are done here; repositioning, the display order and the metadata wait
+// for their screens.
 // It closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button.
 const props = defineProps<{ photo: Photo; layer: PhotoLayer }>();
-const emit = defineEmits<{ close: []; removed: []; dso: [id: string] }>();
+const emit = defineEmits<{ close: []; removed: []; dso: [id: string]; gallery: [] }>();
 const titleId = useId();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
@@ -129,7 +130,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       :step="0.05"
       :display="opacity.toFixed(2)"
     />
-    <!-- The screens behind the gallery, repositioning, display order and metadata have no board yet. -->
+    <!-- The screens behind repositioning, display order and metadata are not built yet. -->
     <div class="mob-icon-row" role="group" :aria-label="t('mobile.sky.photoActions')">
       <PhoneIconButton
         :label="visible ? t('photos.hide') : t('photos.show')"
@@ -137,7 +138,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       >
         <AppIcon :svg="visible ? eyeOffIcon : eyeIcon" />
       </PhoneIconButton>
-      <PhoneIconButton waiting :label="t('photos.openInGallery')"
+      <PhoneIconButton :label="t('photos.openInGallery')" @click="emit('gallery')"
         ><AppIcon :svg="imageIcon"
       /></PhoneIconButton>
       <PhoneIconButton waiting :label="t('photos.reposition')"

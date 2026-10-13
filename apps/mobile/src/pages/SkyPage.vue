@@ -6,7 +6,12 @@ import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { catalogsReady } from '../catalogs';
-import { clearSkySelection, skyFocus, skySelection } from '../composables/useSkySelection';
+import {
+  clearSkySelection,
+  skyFocus,
+  skyPhotoFocus,
+  skySelection,
+} from '../composables/useSkySelection';
 import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
@@ -30,8 +35,12 @@ const displayOpen = ref(false);
 const router = useRouter();
 const { showError } = useErrorToast();
 
+// The last reading of the placed photos: going to a photo waits for it.
+let photosRead: Promise<void> = Promise.resolve();
 const reloadPhotos = () =>
-  sky?.reloadPhotos().catch((error) => reportError('SkyPage.photos', error));
+  (photosRead =
+    sky?.reloadPhotos().catch((error) => reportError('SkyPage.photos', error)) ??
+    Promise.resolve());
 let sky: PhoneSkyMap | null = null;
 // The photo layer once the map exists (the sheet of a photo needs it).
 const photoLayer = shallowRef<PhotoLayer | null>(null);
@@ -62,6 +71,12 @@ onIonViewWillEnter(() => {
   void reloadPhotos();
 });
 onIonViewDidEnter(() => {
+  // "Voir sur la carte" of a photo's screen: the map frames that photo.
+  const photoId = skyPhotoFocus.value;
+  if (photoId) {
+    skyPhotoFocus.value = null;
+    void photosRead.then(() => sky?.showPhoto(photoId));
+  }
   const focus = skyFocus.value;
   if (!focus) return;
   skyFocus.value = null;
@@ -91,6 +106,7 @@ const photoRemoved = () => {
 };
 
 const openSearch = () => void router.push('/sky/search');
+const openInGallery = (photoId: string) => void router.push(`/gallery/photo/${photoId}`);
 
 onBeforeUnmount(() => {
   sky?.destroy();
@@ -128,6 +144,7 @@ onBeforeUnmount(() => {
               @close="clearSkySelection"
               @removed="photoRemoved"
               @dso="goToDso"
+              @gallery="openInGallery(skySelection.photo.id)"
             />
             <SkyObjectSheet
               v-else-if="skySelection && skySelection.kind !== 'photo'"

@@ -30,7 +30,8 @@ import plusIcon from '@icons/plus.svg?raw';
 // ajouter une photo": the photos as tiles with their picture and the first object of the photo, before them the
 // imported photos that are not on the sky yet with where they stand, and the plus that opens the sheet to add photos.
 // Choosing files, or pictures of the phone's gallery, opens the import ("Importer des photos"). A tap on a photo that
-// waits, or whose solve failed, asks how to place it; a photo solved online becomes an ordinary tile.
+// waits, or whose solve failed, asks how to place it; a photo solved online becomes an ordinary tile. A tap on a
+// placed photo opens its own screen.
 const router = useRouter();
 const { showError } = useErrorToast();
 
@@ -161,13 +162,13 @@ async function addPicked(pick: () => Promise<File[]>) {
             <!-- No object is known yet: the line is kept, so that the rows of the grid keep one height. -->
             <span class="mob-photo-id m-mono" aria-hidden="true">&nbsp;</span>
           </div>
-          <!-- A photo's own screen is not built yet: the tile shows and does nothing. -->
           <div v-for="tile in tiles" :key="tile.id" class="mob-photo">
             <button
               type="button"
               class="mob-photo-tile m-secondary"
               :class="{ 'mob-photo-tile--picture': !brokenPictures.has(tile.id) }"
               :aria-label="tile.name"
+              @click="router.push(`/gallery/photo/${tile.id}`)"
             >
               <span v-if="brokenPictures.has(tile.id)" class="mob-photo-name">{{ tile.name }}</span>
               <img

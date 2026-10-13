@@ -97,6 +97,9 @@ describe('the gallery page', () => {
     ]);
     expect(wrapper.find('.mob-photo-name').exists()).toBe(false);
     expect(tiles.map((tile) => tile.find('.mob-photo-id').text())).toEqual(['M31', '']);
+    // A tap on a photo opens its own screen.
+    await tiles[1].find('button').trigger('click');
+    expect(push).toHaveBeenCalledWith('/gallery/photo/p2');
     expect(wrapper.find('button[aria-label="Ajouter des photos"]').exists()).toBe(true);
   });
 

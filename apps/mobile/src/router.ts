@@ -22,8 +22,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/sky/search', component: () => import('./pages/SkySearchPage.vue') },
   // The pages pushed from the Réglages tab: full screen, without the tab bar (boards "Réglages, setups", "Équipement,
   // modifier le setup", "Réglages, lieu d'observation", "Réglages, exporter et importer").
-  // The page pushed from the Galerie tab: full screen, without the tab bar (board "Importer des photos").
+  // The pages pushed from the Galerie tab: full screen, without the tab bar (boards "Importer des photos" and
+  // "Photo, détail").
   { path: '/gallery/import', component: () => import('./pages/ImportPhotosPage.vue') },
+  { path: '/gallery/photo/:id', component: () => import('./pages/PhotoPage.vue') },
   // The page pushed from the Cibles tab: full screen, without the tab bar (board "Cibles, régions du ciel").
   { path: '/targets/regions', component: () => import('./pages/RegionsPage.vue') },
   // The pages pushed from the Plans tab: full screen, without the tab bar (boards "Détail du plan" and "Plan, détail d'une cible").
