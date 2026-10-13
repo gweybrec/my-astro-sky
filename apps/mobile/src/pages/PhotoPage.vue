@@ -86,7 +86,7 @@ const backToGallery = () => void router.replace('/tabs/gallery');
               @error="broken = true"
             />
           </template>
-          <header class="mob-topbar mob-topbar--overlay" @pointerdown.stop>
+          <header class="mob-topbar mob-topbar--overlay" @pointerdown.stop @touchstart.stop>
             <PhoneBackButton float fallback="/tabs/gallery" />
             <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ title }}</h1>
             <PhoneIconButton float :label="t('mobile.photo.info')" @click="infoOpen = true">
@@ -99,6 +99,7 @@ const backToGallery = () => void router.replace('/tabs/gallery');
             class="mob-float-br"
             :label="t('mobile.photo.resetZoom')"
             @pointerdown.stop
+            @touchstart.stop
             @click="reset"
           >
             <AppIcon :svg="resetIcon" />

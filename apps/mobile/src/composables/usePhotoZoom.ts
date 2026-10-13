@@ -156,6 +156,9 @@ export function usePhotoZoom(viewer: Ref<HTMLElement | null>, photo: () => Size)
     transform,
     reset,
     handlers: {
+      // The viewer handles its touches itself. Left to the browser, a finger lifted while moving starts a fling, and
+      // the browser then swallows the next tap: the button that shows the photo whole did nothing after a drag.
+      touchstart: (event: TouchEvent) => event.preventDefault(),
       pointerdown: onPointerDown,
       pointermove: onPointerMove,
       pointerup: onPointerUp,
