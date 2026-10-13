@@ -160,10 +160,11 @@ describe('the shared phone components', () => {
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
   });
 
-  it('PhoneSheet without a footer puts a close button in its header', () => {
-    const w = mount(PhoneSheet, { props: { open: true, title: 'x', closable: true }, global });
-    expect(w.find('.mob-sheet-header--bar').exists()).toBe(true);
+  it('PhoneSheet has no close button, with or without a footer', () => {
+    const w = mount(PhoneSheet, { props: { open: true, title: 'x' }, global });
     expect(w.find('.mob-sheet-footer').exists()).toBe(false);
+    // The only button is the handle that the sheet is dragged down by.
+    expect(w.findAll('button').map((b) => b.classes())).toEqual([['mob-sheet-grab']]);
   });
 
   it('PhoneSearch and PhoneField are text inputs with the design system classes', () => {

@@ -29,7 +29,7 @@ The rules every screen of the phone app (`apps/mobile/`) follows. The desktop's 
 ## Sheets and dialogs
 
 - A sheet takes the height of its content.
-- A sheet closes when dragged down from its header, when its backdrop is tapped, and with the back button. On a sheet with Annuler / Valider this is the same as Annuler.
+- A sheet closes when dragged down from its header, when its backdrop is tapped, and with the back button; it has no close button. On a sheet with Annuler / Valider this is the same as Annuler.
 - A sheet whose content scrolls shows a styled scroll bar that stays visible.
 - A long explanation goes behind an "i" button that opens a small sheet. State lines, warnings and the one-line reason of a disabled control stay printed.
 

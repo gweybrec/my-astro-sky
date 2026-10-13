@@ -49,7 +49,6 @@ const radioChoice = ref<string>();
 const tickOff = ref(false);
 const opacity = ref(0.6);
 const sheet = ref(false);
-const sheetClosable = ref(false);
 const order = ref(['a', 'b', 'c']);
 const pressed = ref(true);
 const answer = ref('');
@@ -64,10 +63,6 @@ async function askDelete() {
     destructive: true,
   });
   answer.value = yes ? 'oui' : 'non';
-}
-function openSheet(closable: boolean) {
-  sheetClosable.value = closable;
-  sheet.value = true;
 }
 function raiseError() {
   void showError(new Error("Impossible de calculer l'horizon à partir des données d'altitude"));
@@ -304,8 +299,7 @@ function raiseError() {
 
         <PhoneSectionHeader>Fenêtres</PhoneSectionHeader>
         <div class="mob-form-row" style="display: flex; gap: var(--space-4); flex-wrap: wrap">
-          <PhoneButton @click="openSheet(false)">Feuille</PhoneButton>
-          <PhoneButton @click="openSheet(true)">Feuille avec fermer</PhoneButton>
+          <PhoneButton @click="sheet = true">Feuille</PhoneButton>
           <PhoneButton variant="danger" @click="askDelete">Confirmer</PhoneButton>
           <PhoneButton variant="danger" @click="raiseError">Erreur</PhoneButton>
         </div>
@@ -356,7 +350,7 @@ function raiseError() {
       <PhoneButton size="lg">Annuler</PhoneButton>
       <PhoneButton variant="confirm" size="lg">Valider</PhoneButton>
     </PhoneFooter>
-    <PhoneSheet v-model:open="sheet" title="Affichage" :closable="sheetClosable">
+    <PhoneSheet v-model:open="sheet" title="Affichage">
       <PhoneToggleRow v-model="switchOn" title="Afficher les photos" />
       <PhoneSliderRow
         v-model="opacity"
@@ -366,7 +360,7 @@ function raiseError() {
         :max="1"
         :step="0.05"
       />
-      <template v-if="!sheetClosable" #footer>
+      <template #footer>
         <PhoneButton size="lg" @click="sheet = false">{{ t('modal.cancel') }}</PhoneButton>
         <PhoneButton variant="confirm" size="lg" @click="sheet = false">{{
           t('modal.validate')
