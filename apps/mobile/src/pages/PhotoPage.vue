@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
 import { getGearSetups, getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { usePhotoZoom } from '../composables/usePhotoZoom';
+import { setStatusBarHidden } from '../platform-device';
 import { skyPhotoFocus } from '../composables/useSkySelection';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
@@ -59,6 +60,11 @@ async function load() {
 }
 onMounted(load);
 onIonViewWillEnter(load);
+
+// The photo has the screen: Android's status bar is hidden while this page shows, and comes back when it is left.
+onIonViewWillEnter(() => void setStatusBarHidden(true));
+onIonViewWillLeave(() => void setStatusBarHidden(false));
+onBeforeUnmount(() => void setStatusBarHidden(false));
 
 // As the desktop does: the viewer closes and the map goes to the photo.
 function showOnMap() {
