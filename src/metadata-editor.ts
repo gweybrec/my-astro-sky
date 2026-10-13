@@ -8,7 +8,12 @@ import type {
 } from '@myastrosky/core/types';
 import type { GearSetupData } from './api';
 import { updatePhotoMetadata, getGearSetups, solveWCS } from './api';
-import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
+import {
+  draftFromPhoto,
+  draftToMetadata,
+  fillDraftFromWcs,
+  isDraftDirty,
+} from '@myastrosky/core/photo-metadata-draft';
 import { showToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
@@ -20,16 +25,6 @@ const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'R
 
 function normalizeFilterKey(value: string): string {
   return value.trim().toLowerCase();
-}
-
-function sanitizeIntegrations(rows: PhotoIntegration[]): PhotoIntegration[] {
-  return rows.map((row) => ({
-    frames:
-      Number.isInteger(Number(row.frames)) && Number(row.frames) >= 0 ? Number(row.frames) : 0,
-    seconds:
-      Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
-    filter: row.filter.trim(),
-  }));
 }
 
 /**
@@ -53,30 +48,9 @@ export function buildMetadataEditorPanel(
    * just-identified supernova on the photo before the user saves. */
   onPoisChange?: (pois: PointOfInterest[]) => void,
 ): { teardown: () => void; isDirty: () => boolean } {
-  const original = {
-    displayName: photo.originalName,
-    dsoIds: [...photo.dsoIds],
-    labels: [...photo.labels],
-    pointsOfInterest: (photo.pointsOfInterest ?? []).map((p) => ({ ...p })),
-    integrations: sanitizeIntegrations(photo.integrations ?? []),
-    observationDate: photo.observationDate ?? '',
-    captureDetails: sanitizeCaptureDetails(photo.captureDetails ?? {}),
-    gearSetupId: photo.gearSetupId ?? null,
-    notes: photo.notes ?? '',
-  };
+  const original = draftFromPhoto(photo);
 
-  const state = reactive({
-    displayName: original.displayName,
-    dsoIds: [...original.dsoIds],
-    labels: [...original.labels],
-    pointsOfInterest: original.pointsOfInterest.map((p) => ({ ...p })),
-    integrations: original.integrations.map((r) => ({ ...r })),
-    observationDate: original.observationDate,
-    captureDetails: { ...original.captureDetails } as CaptureDetails,
-    gearSetupId: original.gearSetupId,
-    notes: original.notes,
-    gearSetups: [] as GearSetupData[],
-  });
+  const state = reactive({ ...draftFromPhoto(photo), gearSetups: [] as GearSetupData[] });
 
   // Gear-setup list loads asynchronously; the reactive assignment re-renders the picker.
   void getGearSetups()
@@ -87,43 +61,7 @@ export function buildMetadataEditorPanel(
       /* leave empty on failure — the picker just shows "none" */
     });
 
-  function isDirty(): boolean {
-    if (state.displayName !== original.displayName) return true;
-    if (state.observationDate !== original.observationDate) return true;
-    if (state.gearSetupId !== original.gearSetupId) return true;
-    if (
-      JSON.stringify(sanitizeCaptureDetails(state.captureDetails)) !==
-      JSON.stringify(original.captureDetails)
-    )
-      return true;
-    if (state.notes !== original.notes) return true;
-    if (
-      state.dsoIds.length !== original.dsoIds.length ||
-      state.dsoIds.some((v, i) => v !== original.dsoIds[i])
-    )
-      return true;
-    if (
-      state.labels.length !== original.labels.length ||
-      state.labels.some((v, i) => v !== original.labels[i])
-    )
-      return true;
-    if (
-      state.pointsOfInterest.length !== original.pointsOfInterest.length ||
-      state.pointsOfInterest.some(
-        (v, i) =>
-          v.name !== original.pointsOfInterest[i].name ||
-          v.categoryId !== original.pointsOfInterest[i].categoryId,
-      )
-    )
-      return true;
-    if (state.integrations.length !== original.integrations.length) return true;
-    for (let i = 0; i < state.integrations.length; i++) {
-      const a = state.integrations[i],
-        b = original.integrations[i];
-      if (a.frames !== b.frames || a.seconds !== b.seconds || a.filter !== b.filter) return true;
-    }
-    return false;
-  }
+  const isDirty = (): boolean => isDraftDirty(state, original);
 
   const knownFilterMap = new Map<string, string>();
   const rememberFilters = (candidates: string[]) => {
@@ -229,32 +167,9 @@ export function buildMetadataEditorPanel(
         showToast({ message: t('gallery.loadFromWcsError'), type: 'error', duration: 4000 });
         return;
       }
-      let filled = 0;
-      if (result.dateObs && !state.observationDate) {
-        state.observationDate = result.dateObs;
-        filled++;
-      }
-      if (result.expTime && result.stackCnt && state.integrations.length === 0) {
-        state.integrations = [
-          {
-            frames: Math.round(result.stackCnt),
-            seconds: Math.round(result.expTime),
-            filter: result.filter ?? '',
-          },
-        ];
-        rememberFilters([result.filter ?? '']);
-        filled++;
-      }
-      if (result.captureDetails) {
-        const merged: CaptureDetails = { ...state.captureDetails };
-        for (const [k, v] of Object.entries(result.captureDetails)) {
-          if (merged[k] === undefined || merged[k] === '') {
-            merged[k] = v;
-            filled++;
-          }
-        }
-        state.captureDetails = merged;
-      }
+      const { patch, filled } = fillDraftFromWcs(state, result);
+      Object.assign(state, patch);
+      if (patch.integrations) rememberFilters(patch.integrations.map((row) => row.filter));
       showToast({
         message: filled > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
         type: 'info',
@@ -295,34 +210,9 @@ export function buildMetadataEditorPanel(
     saveBtn.disabled = true;
     saveBtn.textContent = '…';
     try {
-      const resolvedName = state.displayName.trim() || photo.originalName;
-      const sanitizedIntegrations = sanitizeIntegrations(state.integrations);
-      const resolvedObsDate = state.observationDate || null;
-      const resolvedCapture = sanitizeCaptureDetails(state.captureDetails);
-      const resolvedSetupId = state.gearSetupId || null;
-      await updatePhotoMetadata(photo.id, {
-        dsoIds: state.dsoIds,
-        labels: state.labels,
-        pointsOfInterest: state.pointsOfInterest,
-        integrations: sanitizedIntegrations,
-        observationDate: resolvedObsDate,
-        captureDetails: resolvedCapture,
-        gearSetupId: resolvedSetupId,
-        notes: state.notes,
-        originalName: resolvedName,
-      });
-      const updated: Photo = {
-        ...photo,
-        dsoIds: state.dsoIds,
-        labels: state.labels,
-        pointsOfInterest: state.pointsOfInterest,
-        integrations: sanitizedIntegrations,
-        observationDate: resolvedObsDate,
-        captureDetails: resolvedCapture,
-        gearSetupId: resolvedSetupId,
-        notes: state.notes,
-        originalName: resolvedName,
-      };
+      const metadata = draftToMetadata(state, photo.originalName);
+      await updatePhotoMetadata(photo.id, metadata);
+      const updated: Photo = { ...photo, ...metadata };
       onClose();
       onSaved(updated);
     } catch (err: any) {

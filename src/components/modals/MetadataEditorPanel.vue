@@ -254,7 +254,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { filterLabelCandidates } from '../../autocomplete-utils';
+import { filterLabelCandidates } from '@myastrosky/core/photo-metadata-draft';
 import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
 import type {
   Photo,
