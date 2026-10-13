@@ -1014,6 +1014,18 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   pointer-events: none;
 }
 
+/* A gallery tile holding its photo's picture: the picture fills the tile, cropped to the square. */
+.mob-photo-tile--picture {
+  padding: 0;
+  overflow: hidden;
+}
+.mob-photo-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* The photos over the map: a box over the canvas holding one image each, placed by a CSS matrix (the render package's
    photo layer). The images do not take touches: the map's own handling finds a photo from its outline. */
 .mob-photo-layer {

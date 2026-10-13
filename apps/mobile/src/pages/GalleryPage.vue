@@ -5,7 +5,7 @@ import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
-import { getPhotos } from '@myastrosky/app-state/api';
+import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
@@ -16,15 +16,15 @@ import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import { addImportFiles } from '../composables/usePhotoImport';
 import { useErrorToast } from '../composables/useErrorToast';
-import { PHOTO_FILE_TYPES, pickFiles } from '../platform-device';
+import { PHOTO_FILE_TYPES, pickFiles, pickGalleryPhotos } from '../platform-device';
 import filterIcon from '../icons/filter.svg?raw';
 import folderIcon from '../icons/folder.svg?raw';
 import imageIcon from '@icons/image.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 
 // The Galerie tab, from the boards "Galerie", "Galerie, aucune photo" and "Galerie, ajouter une photo": the photos as
-// tiles with the name and the first object of the photo, and the plus that opens the sheet to add photos. Choosing files
-// opens the import ("Importer des photos").
+// tiles with their picture and the first object of the photo, and the plus that opens the sheet to add photos. Choosing
+// files, or pictures of the phone's gallery, opens the import ("Importer des photos").
 const router = useRouter();
 const { showError } = useErrorToast();
 
@@ -37,8 +37,12 @@ const tiles = computed(() =>
     id: photo.id,
     name: photo.originalName,
     object: photo.dsoIds?.[0] ?? '',
+    picture: photoFileUrl(photo.thumbFilename ?? photo.filename),
   })),
 );
+
+// A picture that cannot be read leaves the tile with the photo's name.
+const brokenPictures = ref(new Set<string>());
 
 async function load() {
   try {
@@ -50,9 +54,12 @@ async function load() {
 onMounted(load);
 onIonViewWillEnter(load);
 
-async function chooseFiles() {
+const chooseFiles = () => addPicked(() => pickFiles(PHOTO_FILE_TYPES, true));
+const chooseFromPhone = () => addPicked(pickGalleryPhotos);
+
+async function addPicked(pick: () => Promise<File[]>) {
   try {
-    const files = await pickFiles(PHOTO_FILE_TYPES, true);
+    const files = await pick();
     if (files.length === 0) return;
     if (addImportFiles(files) === 0) {
       void showError(new Error(t('errors.invalidPhotoFormat')));
@@ -87,10 +94,23 @@ async function chooseFiles() {
           @action="adding = true"
         />
         <div v-else class="mob-photo-grid">
-          <!-- A photo's own screen has no board built yet: the tile shows and does nothing. -->
+          <!-- A photo's own screen is not built yet: the tile shows and does nothing. -->
           <div v-for="tile in tiles" :key="tile.id" class="mob-photo">
-            <button type="button" class="mob-photo-tile m-secondary" :aria-label="tile.name">
-              <span class="mob-photo-name">{{ tile.name }}</span>
+            <button
+              type="button"
+              class="mob-photo-tile m-secondary"
+              :class="{ 'mob-photo-tile--picture': !brokenPictures.has(tile.id) }"
+              :aria-label="tile.name"
+            >
+              <span v-if="brokenPictures.has(tile.id)" class="mob-photo-name">{{ tile.name }}</span>
+              <img
+                v-else
+                class="mob-photo-picture"
+                :src="tile.picture"
+                alt=""
+                loading="lazy"
+                @error="brokenPictures.add(tile.id)"
+              />
             </button>
             <span class="mob-photo-id m-mono">{{ tile.object }}</span>
           </div>
@@ -111,8 +131,12 @@ async function chooseFiles() {
         :subs="[t('mobile.gallery.formats')]"
         @click="chooseFiles"
       />
-      <!-- Needs the phone's own photo picker, which is not added yet: the row shows and does nothing. -->
-      <PhoneRow inert :lead="imageIcon" :title="t('mobile.gallery.fromPhone')" />
+      <PhoneRow
+        button
+        :lead="imageIcon"
+        :title="t('mobile.gallery.fromPhone')"
+        @click="chooseFromPhone"
+      />
     </PhoneSheet>
   </IonPage>
 </template>
