@@ -2,15 +2,13 @@
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
-import { getLang, t } from '@myastrosky/core/i18n/index';
+import { t } from '@myastrosky/core/i18n/index';
 import { getAccessories, getCameras, getTelescopes } from '@myastrosky/core/gear-catalog';
 import { formatAlt } from '@myastrosky/core/format-utils';
-import { formatLatLon } from '@myastrosky/core/observer-location';
 import { formatMultiplicity } from '@myastrosky/core/targets/multiplicity';
 import { ALL_DSO_TYPES } from '@myastrosky/core/targets/filters';
 import { formatClock24, todayISO } from '@myastrosky/core/targets/format';
 import { matchesTargetQuery } from '@myastrosky/core/targets/query';
-import { formatPlanDate } from '@myastrosky/core/targets/plan';
 import type { GearLists } from '@myastrosky/core/targets/plan-setup';
 import { runTargetRecommendationSliced } from '@myastrosky/core/targets/recommend';
 import { sortSuggestions } from '@myastrosky/core/targets/sorting';
@@ -29,18 +27,20 @@ import PhoneButton from '../components/PhoneButton.vue';
 import PhoneEmptyState from '../components/PhoneEmptyState.vue';
 import PhoneTargetRow from '../components/PhoneTargetRow.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
-import PhoneNativePicker from '../components/PhoneNativePicker.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import TypesSheet from './targets/TypesSheet.vue';
 import FiltersSheet from './targets/FiltersSheet.vue';
+import SearchSettingsSheet from './targets/SearchSettingsSheet.vue';
 import filterIcon from '../icons/filter.svg?raw';
+import slidersIcon from '../icons/sliders.svg?raw';
 import caretIcon from '../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 
-// The Cibles tab, from the boards "Cibles", "Cibles, types d'objets", "Cibles, filtres", "Cibles, aucun setup" and
-// "Cibles, aucun résultat": the targets worth imaging on the chosen night with the chosen setup, searched again when the
-// setup, the night, the location or a filter has changed. The three fields at the top are the desktop form's setup,
-// date and location: a list of the setups, the phone's date picker, and the "Lieu d'observation" page.
+// The Cibles tab, from the boards "Cibles", "Cibles, types d'objets", "Cibles, paramètres de recherche", "Cibles,
+// filtres", "Cibles, aucun setup" and "Cibles, aucun résultat": the targets worth imaging on the chosen night with the
+// chosen setup. Beside the search field, one button opens the search settings (night, location, sky, observation
+// window) and one the filters (sort, interest, difficulty, catalogues, constellations); under it, the setup and the
+// number of object types. The list is searched again when one of them has changed.
 const router = useRouter();
 const { showError } = useErrorToast();
 const horizonStore = useHorizonProfileStore();
@@ -57,24 +57,17 @@ const emptyKind = ref<'no-setup' | 'no-match'>('no-match');
 const visible = ref(CHUNK);
 const typesOpen = ref(false);
 const filtersOpen = ref(false);
+const settingsOpen = ref(false);
 const setupsOpen = ref(false);
-const nightPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 let lastKey = '';
 
 const setup = computed(() => gear.value?.setups.find((s) => s.id === targetsPrefs.setupId));
 const setupName = computed(() => setup.value?.name ?? t('targets.gear.noSetup'));
-const place = computed(() =>
-  formatLatLon({ lat: targetsPrefs.lat ?? null, lon: targetsPrefs.lon ?? null }),
-);
 const typeCount = computed(() => targetsPrefs.enabledTypes?.length ?? ALL_DSO_TYPES.length);
 const typesValue = computed(() => t('mobile.targets.typesValue', { n: typeCount.value }));
+const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { name, value });
 /** The night searched: the last one chosen, as on the desktop, else today. */
 const nightISO = computed(() => targetsPrefs.lastDateISO ?? todayISO());
-const nightLabel = computed(() =>
-  nightISO.value === todayISO()
-    ? t('mobile.targets.tonight')
-    : formatPlanDate(nightISO.value, getLang()),
-);
 const setupOptions = computed(() =>
   (gear.value?.setups ?? []).map((s) => ({ value: s.id, label: s.name })),
 );
@@ -86,12 +79,6 @@ const chosenSetupId = computed<string | undefined>({
     setupsOpen.value = false;
   },
 });
-
-function pickNight(dateISO: string) {
-  updateTargetsPrefs({ lastDateISO: dateISO });
-  void runSearch();
-}
-const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { name, value });
 
 const shown = computed(() => {
   const query = search.value.trim();
@@ -236,47 +223,29 @@ function closed(open: boolean) {
         :placeholder="t('mobile.targets.searchPlaceholder')"
         :label="t('mobile.targets.searchLabel')"
       />
-      <PhoneIconButton :label="t('targets.moreFilters')" @click="filtersOpen = true"
+      <PhoneIconButton :label="t('targets.formTitle')" @click="settingsOpen = true"
+        ><AppIcon :svg="slidersIcon"
+      /></PhoneIconButton>
+      <PhoneIconButton :label="t('mobile.targets.filtersTitle')" @click="filtersOpen = true"
         ><AppIcon :svg="filterIcon"
       /></PhoneIconButton>
     </PhoneTopBar>
-    <div class="mob-context mob-context--wrap" style="flex: none">
-      <div class="mob-context-row">
-        <PhoneButton
-          variant="field"
-          :aria-label="aria(t('mobile.targets.fieldGear'), setupName)"
-          @click="setupsOpen = true"
-        >
-          <span class="mob-btn-label">{{ setupName }}</span>
-          <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-        </PhoneButton>
-        <PhoneButton
-          variant="field"
-          :aria-label="aria(t('mobile.targets.fieldNight'), nightLabel.toLowerCase())"
-          @click="nightPicker?.open()"
-        >
-          <span class="mob-btn-label">{{ nightLabel }}</span>
-          <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-        </PhoneButton>
-        <PhoneButton
-          variant="field"
-          :aria-label="aria(t('mobile.targets.fieldPlace'), place)"
-          @click="router.push('/settings/location')"
-        >
-          <span class="mob-btn-label">{{ place }}</span>
-          <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-        </PhoneButton>
-        <PhoneNativePicker ref="nightPicker" type="date" :value="nightISO" @pick="pickNight" />
-      </div>
+    <div class="mob-context" style="flex: none">
+      <PhoneButton
+        variant="field"
+        :aria-label="aria(t('mobile.targets.fieldGear'), setupName)"
+        @click="setupsOpen = true"
+      >
+        <span class="mob-btn-label">{{ setupName }}</span>
+        <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+      </PhoneButton>
       <PhoneButton
         class="mob-context-types"
         variant="field"
-        block
         :aria-label="aria(t('targets.typeFilter'), typesValue)"
         @click="typesOpen = true"
       >
-        <span class="mob-btn-key">{{ t('targets.typeFilter') }}</span>
-        <span class="mob-btn-value">{{ typesValue }}</span>
+        <span class="mob-btn-label">{{ typesValue }}</span>
         <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
       </PhoneButton>
     </div>
@@ -315,6 +284,7 @@ function closed(open: boolean) {
       </div>
     </IonContent>
     <TypesSheet v-model:open="typesOpen" @update:open="closed" />
+    <SearchSettingsSheet v-model:open="settingsOpen" @update:open="closed" />
     <FiltersSheet v-model:open="filtersOpen" @update:open="closed" />
     <PhoneRadioSheet
       v-model:open="setupsOpen"
