@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { configureStorage, createMemoryStore, storage } from '@myastrosky/core/platform/storage';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { setBackend } from '@myastrosky/app-state/backend';
+import type { Component } from 'vue';
 import type { DSO } from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
 
@@ -27,6 +28,8 @@ import TargetsPage from '../src/pages/TargetsPage.vue';
 import TypesSheet from '../src/pages/targets/TypesSheet.vue';
 import FiltersSheet from '../src/pages/targets/FiltersSheet.vue';
 import RegionsPage from '../src/pages/RegionsPage.vue';
+import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
+import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import { reloadTargetsPrefs } from '../src/composables/useTargets';
 
 const GEAR = {
@@ -246,6 +249,51 @@ describe('the Cibles page', () => {
     expect(prefsOf().setupId).toBe('s1');
   });
 
+  it('lists the setups from the first field and searches again with the chosen one', async () => {
+    backend.gear.listSetups.mockResolvedValue([
+      ...setups,
+      { id: 's2', name: 'Lunette 72', telescopeId: 't1', cameraId: 'c1', accessoryId: null },
+    ]);
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    await w.find('button[aria-label^="Équipement"]').trigger('click');
+    const sheet = w.findAllComponents(PhoneRadioSheet as Component)[0];
+    const props = sheet.props() as { open: boolean; title: string; options: { label: string }[] };
+    expect([props.open, props.title]).toEqual([true, 'Setup']);
+    expect(props.options.map((o) => o.label)).toEqual(['Équipement 1', 'Lunette 72']);
+    sheet.vm.$emit('update:value', 's2');
+    sheet.vm.$emit('update:open', false);
+    await settle();
+    expect(prefsOf().setupId).toBe('s2');
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(search.mock.calls[1][0].prefs.setupId).toBe('s2');
+    expect(w.find('button[aria-label^="Équipement"]').text()).toContain('Lunette 72');
+  });
+
+  it("searches for the night chosen in the phone's date picker, kept for the next time", async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    const today = search.mock.calls[0][0].dateStr;
+    const picker = w.findComponent(PhoneNativePicker);
+    expect([picker.props('type'), picker.props('value')]).toEqual(['date', today]);
+    picker.vm.$emit('pick', '2031-03-09');
+    await settle();
+    expect(prefsOf().lastDateISO).toBe('2031-03-09');
+    expect(search.mock.calls[1][0].dateStr).toBe('2031-03-09');
+    const night = w.find('button[aria-label^="Nuit"]');
+    expect(night.text()).not.toContain('Ce soir');
+    expect(night.text()).toContain('2031');
+  });
+
+  it('opens the observing location from the third field', async () => {
+    const { router, global } = app();
+    const w = show(TargetsPage, { global });
+    await settle();
+    await w.find('button[aria-label^="Lieu"]').trigger('click');
+    await settle();
+    expect(router.currentRoute.value.path).toBe('/settings/location');
+  });
+
   it('filters the rows by the typed text', async () => {
     const w = show(TargetsPage, { global: app().global });
     await settle();
@@ -377,6 +425,17 @@ describe('the filters sheet', () => {
     expect(prefsOf().enabledRatings).toEqual([2, 3, 4, 5]);
     await w.find('button[aria-label="Difficulté 5 sur 5"]').trigger('click');
     expect(prefsOf().enabledDifficulties).toEqual([1, 2, 3, 4]);
+  });
+
+  it("stores the two times of the observation window chosen in the phone's time picker", async () => {
+    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+    await settle();
+    const [from, to] = w.findAllComponents(PhoneNativePicker);
+    expect([from.props('type'), to.props('type')]).toEqual(['time', 'time']);
+    from.vm.$emit('pick', '22:00');
+    to.vm.$emit('pick', '02:00');
+    await settle();
+    expect(prefsOf()).toMatchObject({ obsStartTime: '22:00', obsEndTime: '02:00' });
   });
 
   it('"Réinitialiser" removes every filter and keeps the rest of the record', async () => {
