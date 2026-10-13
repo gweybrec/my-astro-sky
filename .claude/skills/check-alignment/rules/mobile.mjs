@@ -173,11 +173,19 @@ export async function seed({ ports }) {
   });
 
   await uploadPhoto(base);
-  // Four photos: two rows of the gallery's two columns.
+  // Twelve photos: six rows of the gallery's two columns in portrait, two rows of its six columns in landscape.
   for (const fileName of [
     'Cygnus_close_2025-08-24.jpg',
     'Lyra_2025-08-25.jpg',
     'Lacerta_2025-08-26.jpg',
+    'Cepheus_2025-08-27.jpg',
+    'Draco_2025-08-28.jpg',
+    'Cassiopeia_2025-08-29.jpg',
+    'Andromeda_2025-08-30.jpg',
+    'Pegasus_2025-08-31.jpg',
+    'Perseus_2025-09-01.jpg',
+    'Auriga_2025-09-02.jpg',
+    'Taurus_2025-09-03.jpg',
   ]) {
     await uploadPhoto(base, fileName);
   }
@@ -273,13 +281,14 @@ export const rules = [
       '.mob-fact:first-child, .mob-icon-row > :first-child, .mob-pager-page:first-child > :first-child, .mob-slider-label',
     rights: '.mob-fact:last-child, .mob-icon-row:not(.mob-icon-row--start) > :last-child',
   },
-  // The gallery's tiles make two columns between the same two edges.
+  // The gallery's tiles make columns between the same two edges: two in portrait, six in landscape. The first tile of
+  // every sixth is in the first column in both, and the sixth of every six in the last.
   {
     id: 'grid-edges',
     type: 'edges',
     within: '.mob-photo-grid',
-    lefts: '.mob-photo:nth-child(odd)',
-    rights: '.mob-photo:nth-child(even)',
+    lefts: '.mob-photo:nth-child(6n + 1)',
+    rights: '.mob-photo:nth-child(6n)',
   },
   // On the map, the layers button and the column of toggles end on the same line, and the toggles are equally spaced
   // (the last one, set apart, is the only exception: it is measured against its own margin).

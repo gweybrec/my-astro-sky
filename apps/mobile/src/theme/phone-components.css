@@ -1016,6 +1016,13 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   pointer-events: none;
 }
 
+/* The gallery in landscape: six tiles to a row, as the board "Galerie, paysage" draws it. */
+@media (orientation: landscape) {
+  .mob-photo-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 /* A gallery tile holding its photo's picture: the picture fills the tile, cropped to the square. */
 .mob-photo-tile--picture {
   padding: 0;

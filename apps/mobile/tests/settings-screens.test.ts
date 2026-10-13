@@ -199,7 +199,11 @@ describe('the astrometry.net key page', () => {
     await flushPromises();
     await button(w, 'Supprimer la clé API').trigger('click');
     await flushPromises();
-    expect(confirm.mock.calls[0][0]).toMatchObject({ destructive: true });
+    expect(confirm.mock.calls[0][0]).toMatchObject({
+      title: 'Supprimer la clé API',
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    });
     expect(backend.settings.removeApiKey).not.toHaveBeenCalled();
     confirm.mockResolvedValueOnce(true);
     await button(w, 'Supprimer la clé API').trigger('click');
