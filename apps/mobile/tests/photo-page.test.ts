@@ -14,8 +14,9 @@ vi.mock('@myastrosky/app-state/api', () => ({
 }));
 
 const replace = vi.fn();
+const push = vi.fn();
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ replace, push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ replace, push, back: vi.fn() }),
   useRoute: () => ({ params: { id: 'p1' } }),
 }));
 
@@ -223,11 +224,17 @@ describe("a photo's own screen", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('draws the two screens that wait as the board does', async () => {
+  it('opens the edit page of the photo from the pen', async () => {
+    push.mockReset();
     const w = mountPage();
     await flushPromises();
-    for (const name of ['Modifier les métadonnées', 'Identifier les objets']) {
-      expect(button(w, name).attributes('aria-disabled')).toBe('true');
-    }
+    await button(w, 'Modifier les métadonnées').trigger('click');
+    expect(push).toHaveBeenCalledWith('/gallery/photo/p1/edit');
+  });
+
+  it('draws the screen that waits as the board does', async () => {
+    const w = mountPage();
+    await flushPromises();
+    expect(button(w, 'Identifier les objets').attributes('aria-disabled')).toBe('true');
   });
 });

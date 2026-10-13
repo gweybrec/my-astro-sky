@@ -107,6 +107,7 @@ const photoRemoved = () => {
 
 const openSearch = () => void router.push('/sky/search');
 const openInGallery = (photoId: string) => void router.push(`/gallery/photo/${photoId}`);
+const editPhoto = (photoId: string) => void router.push(`/gallery/photo/${photoId}/edit`);
 
 onBeforeUnmount(() => {
   sky?.destroy();
@@ -145,6 +146,7 @@ onBeforeUnmount(() => {
               @removed="photoRemoved"
               @dso="goToDso"
               @gallery="openInGallery(skySelection.photo.id)"
+              @edit="editPhoto(skySelection.photo.id)"
             />
             <SkyObjectSheet
               v-else-if="skySelection && skySelection.kind !== 'photo'"

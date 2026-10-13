@@ -97,6 +97,7 @@ export const ionicStubs = {
   IonRouterOutlet: plain('div'),
   IonButton: plain('button'),
   IonInput: input,
+  IonTextarea: input,
   IonItem: plain('div'),
   IonList: plain('div'),
   IonListHeader: plain('div'),

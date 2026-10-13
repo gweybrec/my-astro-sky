@@ -103,6 +103,7 @@ const es: Translations['mobile'] = {
     filters: 'Filtros',
     identify: 'Identificar objetos',
     actions: 'Acciones de la foto',
+    removeChip: 'Quitar {name}',
   },
   gear: {
     addTelescope: 'Añadir un telescopio',

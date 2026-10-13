@@ -130,6 +130,39 @@ ion-input.mob-search .native-input {
 ion-input.mob-field.input-disabled {
   opacity: 0.6;
 }
+/* The notes: `ion-textarea.mob-field` takes the design system's box and its inset; Ionic's own inset is taken out. */
+ion-textarea.mob-field {
+  --background: transparent;
+  --color: var(--text-primary);
+  --placeholder-color: color-mix(in srgb, var(--text-dim) 58%, var(--text-secondary));
+  --placeholder-opacity: 1;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --highlight-height: 0;
+}
+ion-textarea.mob-field.has-focus {
+  border-color: var(--border-focus);
+}
+/* Ionic repeats the host's minimum height on its inner wrapper, inside the host's inset, and resets the line height. */
+ion-textarea.mob-field .textarea-wrapper {
+  min-height: 0;
+  line-height: inherit;
+}
+ion-textarea.mob-field .native-textarea {
+  font-size: inherit;
+  line-height: inherit;
+}
+/* A readout that opens a list, in the place of the text field of an add row (the capture field to add): it fills the
+   row as the field does, with the field's text inset. */
+.mob-add-row > ion-button.mob-btn--field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mob-add-row > ion-button.mob-btn--field .mob-btn-content {
+  padding: 0 var(--space-7);
+}
 .phone-field-unit-line {
   display: flex;
   align-items: center;
