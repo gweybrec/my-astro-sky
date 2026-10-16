@@ -56,6 +56,42 @@ const placement = reactive<ManualPlacement>({
 });
 let firstProjPerPx = 1;
 const opacity = ref(0.85);
+
+// ── The panel folded down (portrait) ─────────────────────────────────────────────────────────────
+// As a bottom sheet, the panel folds down to its handle and its buttons, by a tap on the handle or a drag down from it,
+// and opens again the same way: the map then has the room to place the photo by hand. In landscape the panel is a
+// column beside the map and does not fold.
+const FOLD_DRAG_PX = 48;
+const folded = ref(false);
+const landscapeQuery =
+  typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
+const landscape = ref(landscapeQuery?.matches ?? false);
+const onTurn = () => (landscape.value = landscapeQuery?.matches ?? false);
+landscapeQuery?.addEventListener('change', onTurn);
+const settingsShown = computed(() => landscape.value || !folded.value);
+let grabFrom: number | null = null;
+/** A drag on the handle ends with a click on it, which must not fold it back. */
+let dragged = false;
+const grab = {
+  pointerdown(e: PointerEvent) {
+    grabFrom = e.clientY;
+    dragged = false;
+  },
+  pointermove(e: PointerEvent) {
+    if (grabFrom === null) return;
+    const dy = e.clientY - grabFrom;
+    if (Math.abs(dy) < FOLD_DRAG_PX) return;
+    folded.value = dy > 0;
+    grabFrom = null;
+    dragged = true;
+  },
+  pointerup: () => (grabFrom = null),
+  pointercancel: () => (grabFrom = null),
+};
+function toggleFold() {
+  if (dragged) dragged = false;
+  else folded.value = !folded.value;
+}
 const view = shallowRef<ViewState>(props.map.getView());
 const saving = ref(false);
 
@@ -102,6 +138,7 @@ onMounted(async () => {
   url.value = URL.createObjectURL(file.value);
 });
 onBeforeUnmount(() => {
+  landscapeQuery?.removeEventListener('change', onTurn);
   stopView?.();
   clearTimeout(followTimer);
   if (url.value) URL.revokeObjectURL(url.value);
@@ -277,8 +314,21 @@ async function validate() {
     />
   </Teleport>
   <section class="mob-panel mob-placing-panel" :aria-label="t('manual.modeLabel')">
+    <div class="mob-placing-grab" v-on="grab">
+      <button
+        type="button"
+        class="mob-sheet-grab"
+        :aria-label="
+          folded ? t('mobile.gallery.placeShowSettings') : t('mobile.gallery.placeHideSettings')
+        "
+        :aria-expanded="!folded"
+        @click="toggleFold"
+      >
+        <span class="mob-sheet-handle" />
+      </button>
+    </div>
     <!-- The settings scroll when the panel is short (landscape); Annuler and Valider stay under them. -->
-    <div class="mob-placing-settings mob-scroll">
+    <div v-show="settingsShown" class="mob-placing-settings mob-scroll">
       <div class="mob-form-row mob-placing-search">
         <!-- Typing happens on the search page: this field only opens it, as the Ciel map's own. -->
         <PhoneSearch
