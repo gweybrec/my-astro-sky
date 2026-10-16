@@ -432,7 +432,12 @@ describe('manual placement math', () => {
       expect(onTurned[i].starDec).toBeCloseTo(straight[i].starDec!, 6);
     }
     // And reading it back from the turned map's matrix gives the same placement.
-    const back = derivePlacementFromMatrix(computeManualMatrix(p, turned, 100, 80), turned, 100, 80);
+    const back = derivePlacementFromMatrix(
+      computeManualMatrix(p, turned, 100, 80),
+      turned,
+      100,
+      80,
+    );
     expect(back.rotationDeg).toBeCloseTo(25, 6);
     expect(back.centerRa).toBeCloseTo(0, 3);
     expect(back.centerDec).toBeCloseTo(80, 3);
