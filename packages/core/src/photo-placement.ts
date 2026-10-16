@@ -473,8 +473,12 @@ export function derivePlacementFromCorrespondences(
     const centerProjY = matrix.b * cx + matrix.d * cy + matrix.f;
     const centerSky = unproject(centerProjX, centerProjY);
 
-    // matrix maps [1,0] to [a,b], so rotation = atan2(b, a).
-    const rotationDeg = (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+    // The inverse of computeManualProjMatrix: a = cos·mx·p, b = −sin·mx·p, c = −sin·my·p, d = −cos·my·p (projection
+    // space has y up, the photo y down). Its determinant is −mx·my·p², so a positive one is a mirrored photo, given here
+    // as mirrorX.
+    const det = matrix.a * matrix.d - matrix.b * matrix.c;
+    const mx = det > 0 ? -1 : 1;
+    const rotationDeg = (Math.atan2(-matrix.b * mx, matrix.a * mx) * 180) / Math.PI;
     const scaleX = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
     const scaleY = Math.sqrt(matrix.c * matrix.c + matrix.d * matrix.d);
     const projPerPx = (scaleX + scaleY) / 2;
@@ -484,7 +488,7 @@ export function derivePlacementFromCorrespondences(
       centerDec: centerSky.dec,
       rotationDeg,
       projPerPx,
-      mirrorX: false,
+      mirrorX: mx < 0,
       mirrorY: false,
     };
   } catch (err) {
