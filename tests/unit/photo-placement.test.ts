@@ -415,6 +415,29 @@ describe('manual placement math', () => {
     expect(back.mirrorY).toBe(false);
   });
 
+  it('places a photo on the sky whatever the rotation of the map', () => {
+    const p: ManualPlacement = {
+      centerRa: 0,
+      centerDec: 80,
+      rotationDeg: 25,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const turned = { ...VIEW, rotationDeg: 40 };
+    const straight = buildSyntheticCorrespondences(p, 100, 80, VIEW);
+    const onTurned = buildSyntheticCorrespondences(p, 100, 80, turned);
+    for (let i = 0; i < 3; i++) {
+      expect(onTurned[i].starRa).toBeCloseTo(straight[i].starRa!, 6);
+      expect(onTurned[i].starDec).toBeCloseTo(straight[i].starDec!, 6);
+    }
+    // And reading it back from the turned map's matrix gives the same placement.
+    const back = derivePlacementFromMatrix(computeManualMatrix(p, turned, 100, 80), turned, 100, 80);
+    expect(back.rotationDeg).toBeCloseTo(25, 6);
+    expect(back.centerRa).toBeCloseTo(0, 3);
+    expect(back.centerDec).toBeCloseTo(80, 3);
+  });
+
   it('manual → synthetic correspondences → derive round-trips the placement', () => {
     const p: ManualPlacement = {
       centerRa: 40,
