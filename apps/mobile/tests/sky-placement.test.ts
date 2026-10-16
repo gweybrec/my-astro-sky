@@ -251,8 +251,7 @@ describe('placing a photo by hand', () => {
     })) as unknown as typeof window.matchMedia;
     const { w } = await mountPlacement();
     const grab = () => w.find('.mob-placing-grab .mob-sheet-grab');
-    const shown = () =>
-      (w.find('.mob-placing-settings').element as HTMLElement).style.display !== 'none';
+    const shown = () => !w.find('.mob-placing-fold').classes().includes('mob-placing-fold--closed');
     expect(grab().attributes('aria-label')).toBe('Masquer les réglages');
     await grab().trigger('click');
     expect(shown()).toBe(false);

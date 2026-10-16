@@ -1248,8 +1248,23 @@ ion-tab-bar.mob-tabbar-hidden {
 .mob-placing-panel {
   min-height: 0;
 }
-.mob-placing-settings {
+/* The fold: a one-row grid whose row goes from its content's height to none, so that folding is animated. */
+.mob-placing-fold {
   flex: 0 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  transition: grid-template-rows var(--sheet-slide-duration) ease;
+}
+.mob-placing-fold--closed {
+  grid-template-rows: minmax(0, 0fr);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mob-placing-fold {
+    transition: none;
+  }
+}
+.mob-placing-settings {
   min-height: 0;
 }
 /* The handle that folds the panel down (portrait); the search row comes right under it. */

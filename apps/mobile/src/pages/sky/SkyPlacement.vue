@@ -328,40 +328,47 @@ async function validate() {
       </button>
     </div>
     <!-- The settings scroll when the panel is short (landscape); Annuler and Valider stay under them. -->
-    <div v-show="settingsShown" class="mob-placing-settings mob-scroll">
-      <div class="mob-form-row mob-placing-search">
-        <!-- Typing happens on the search page: this field only opens it, as the Ciel map's own. -->
-        <PhoneSearch
-          readonly
-          :placeholder="t('search.placeholder')"
-          :label="t('search.placeholder')"
-          @click="emit('search')"
+    <!-- Folding slides the settings away under the handle (their height goes to the map). -->
+    <div
+      class="mob-placing-fold"
+      :class="{ 'mob-placing-fold--closed': !settingsShown }"
+      :inert="!settingsShown"
+    >
+      <div class="mob-placing-settings mob-scroll">
+        <div class="mob-form-row mob-placing-search">
+          <!-- Typing happens on the search page: this field only opens it, as the Ciel map's own. -->
+          <PhoneSearch
+            readonly
+            :placeholder="t('search.placeholder')"
+            :label="t('search.placeholder')"
+            @click="emit('search')"
+          />
+        </div>
+        <PhoneSliderRow
+          v-model="rotation"
+          :label="t('manual.rotation')"
+          :display="`${rotation}°`"
+          :min="-180"
+          :max="180"
         />
+        <PhoneSliderRow
+          v-model="zoom"
+          :label="t('manual.photoZoom')"
+          :display="formatZoomPercent(placement.projPerPx, firstProjPerPx)"
+          :min="ZOOM_MIN"
+          :max="ZOOM_MAX"
+          :step="0.1"
+        />
+        <PhoneSliderRow
+          v-model="opacity"
+          :label="t('photos.opacity')"
+          :display="opacity.toFixed(2)"
+          :min="0.1"
+          :max="1"
+          :step="0.05"
+        />
+        <PhoneToggleRow v-model="mirror" :title="t('manual.mirrorX')" />
       </div>
-      <PhoneSliderRow
-        v-model="rotation"
-        :label="t('manual.rotation')"
-        :display="`${rotation}°`"
-        :min="-180"
-        :max="180"
-      />
-      <PhoneSliderRow
-        v-model="zoom"
-        :label="t('manual.photoZoom')"
-        :display="formatZoomPercent(placement.projPerPx, firstProjPerPx)"
-        :min="ZOOM_MIN"
-        :max="ZOOM_MAX"
-        :step="0.1"
-      />
-      <PhoneSliderRow
-        v-model="opacity"
-        :label="t('photos.opacity')"
-        :display="opacity.toFixed(2)"
-        :min="0.1"
-        :max="1"
-        :step="0.05"
-      />
-      <PhoneToggleRow v-model="mirror" :title="t('manual.mirrorX')" />
     </div>
     <div class="mob-sheet-footer">
       <PhoneButton size="lg" @click="emit('cancel')">{{ t('manual.cancel') }}</PhoneButton>
