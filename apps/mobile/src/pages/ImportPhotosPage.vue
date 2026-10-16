@@ -4,12 +4,14 @@ import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewDidLeave } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { useErrorToast } from '../composables/useErrorToast';
+import { skyPlacement } from '../sky-modes';
 import {
   clearImport,
   importAll,
   importBusy,
   importItems,
   importableCount,
+  keepImportPending,
   solveImportOnline,
   type ImportItem,
 } from '../composables/usePhotoImport';
@@ -43,6 +45,17 @@ function chooseMethod(item: ImportItem) {
 
 function solveOnline() {
   if (placing.value) void solveImportOnline(placing.value);
+}
+
+// Placing by hand is done on the sky map: the photo is kept as a waiting photo first, as for a solve.
+async function placeByHand() {
+  if (!placing.value) return;
+  try {
+    skyPlacement.value = { pendingId: await keepImportPending(placing.value) };
+    await router.push('/tabs/sky');
+  } catch (error) {
+    void showError(error);
+  }
 }
 
 const title = computed(() =>
@@ -128,6 +141,6 @@ onIonViewDidLeave(clearImport);
         >{{ t('mobile.gallery.import') }}</PhoneButton
       >
     </PhoneFooter>
-    <PlacementMethodSheet v-model:open="methodOpen" @online="solveOnline" />
+    <PlacementMethodSheet v-model:open="methodOpen" @online="solveOnline" @hand="placeByHand" />
   </IonPage>
 </template>

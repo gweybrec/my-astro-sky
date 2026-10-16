@@ -57,6 +57,8 @@ export interface PhoneSkyMap {
   showPhoto(photoId: string): void;
   /** The star and deep-sky catalogues have loaded: the map indexes them and draws again. */
   catalogsLoaded(): void;
+  /** Calls back on each change of the view (a photo being placed follows the map); returns the function that stops it. */
+  onView(listener: () => void): () => void;
   destroy(): void;
 }
 
@@ -111,7 +113,9 @@ export function createPhoneSkyMap(
 
   // The photos follow the view; while it moves they are hidden and come back once it has stopped.
   let frozenTimer: ReturnType<typeof setTimeout> | null = null;
+  const viewListeners = new Set<() => void>();
   map.setOnViewChange((reason) => {
+    for (const listener of viewListeners) listener();
     display.onMapViewChanged(map.getView().rotationDeg);
     // A clock tick is not a move of the view.
     if (reason !== 'skyClock') {
@@ -213,6 +217,10 @@ export function createPhoneSkyMap(
       if (fit) map.navigateTo(fit.ra, fit.dec, fit.scale);
     },
     catalogsLoaded: () => map.refreshCatalogs(),
+    onView(listener) {
+      viewListeners.add(listener);
+      return () => viewListeners.delete(listener);
+    },
     destroy() {
       stopHorizon();
       stopCategories();

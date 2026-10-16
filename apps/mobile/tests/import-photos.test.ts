@@ -17,10 +17,12 @@ vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: () => [],
 }));
 const replace = vi.fn();
-vi.mock('vue-router', () => ({ useRouter: () => ({ replace }) }));
+const push = vi.fn();
+vi.mock('vue-router', () => ({ useRouter: () => ({ replace, push }) }));
 
 import ImportPhotosPage from '../src/pages/ImportPhotosPage.vue';
 import { addImportFiles, clearImport } from '../src/composables/usePhotoImport';
+import { skyPlacement } from '../src/sky-modes';
 import {
   configurePendingStore,
   createMemoryPendingStore,
@@ -127,6 +129,29 @@ describe('the import page', () => {
       .trigger('click');
     await flushPromises();
   };
+
+  it('keeps a photo placed by hand as a waiting photo, and opens the sky map to place it', async () => {
+    push.mockReset();
+    skyPlacement.value = null;
+    addImportFiles([new File(['x'], 'M101.jpg')]);
+    const wrapper = mountPage();
+    await flushPromises();
+    await fileRows(wrapper)[0].trigger('click');
+    await flushPromises();
+    await wrapper
+      .findAll('.mob-sheet .mob-row')
+      .find((r) => r.text().includes('Placer à la main'))!
+      .trigger('click');
+    await flushPromises();
+    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M101.jpg', 'toPlace']]);
+    expect(skyPlacement.value).toEqual({ pendingId: pendingPhotos.value[0].id });
+    expect(push).toHaveBeenCalledWith('/tabs/sky');
+    // Placed (it leaves the waiting photos), it leaves the list.
+    await removePendingPhoto(pendingPhotos.value[0].id);
+    await flushPromises();
+    expect(fileRows(wrapper)).toHaveLength(0);
+    skyPlacement.value = null;
+  });
 
   it('asks how to place a photo, sends it to the online solver and shows "Résolution"', async () => {
     addImportFiles([new File(['x'], 'M45.jpg')]);

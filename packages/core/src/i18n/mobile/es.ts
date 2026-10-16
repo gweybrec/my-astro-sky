@@ -25,6 +25,7 @@ const es: Translations['mobile'] = {
       'Toca 2 o 3 estrellas reconocibles en la foto y luego identifica cada una por su nombre.',
     placeByHand: 'Ubicar a mano',
     placeByHandSub: 'Mover, ampliar y girar la foto sobre el mapa',
+    placeHint: 'Un dedo: mover · Dos dedos: ampliar y girar',
     import: 'Importar',
     perLine: 'Fotos por línea',
   },

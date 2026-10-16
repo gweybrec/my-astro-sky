@@ -8,10 +8,10 @@ import PhoneRow from '../../components/PhoneRow.vue';
 
 // The boards "Importer, méthode de placement" and "Résolution en ligne, hors connexion": the four ways to place a
 // photo. Solving online needs a connection and the astrometry.net key; without one of them the row is greyed out with
-// the reason under it. Solving on the computer needs the connection to the computer, and the two manual methods their
-// screens on the sky map: those three rows are drawn and do nothing yet.
+// the reason under it. Placing by hand is done on the sky map. Solving on the computer needs the connection to the
+// computer, and identifying stars its screens: those two rows are drawn and do nothing yet.
 const open = defineModel<boolean>('open', { required: true });
-const emit = defineEmits<{ online: [] }>();
+const emit = defineEmits<{ online: []; hand: [] }>();
 
 const online = ref(true);
 const keySet = ref(true);
@@ -37,6 +37,11 @@ const onlineReason = () =>
     : !keySet.value
       ? t('modal.solverNoApiKey')
       : t('mobile.gallery.solveOnlineSub');
+
+function chooseHand() {
+  open.value = false;
+  emit('hand');
+}
 
 function chooseOnline() {
   // A greyed-out row still receives the tap.
@@ -69,10 +74,11 @@ function chooseOnline() {
       :subs="[t('mobile.gallery.identifyStarsSub')]"
     />
     <PhoneRow
-      inert
+      button
       wrap
       :title="t('mobile.gallery.placeByHand')"
       :subs="[t('mobile.gallery.placeByHandSub')]"
+      @click="chooseHand"
     />
   </PhoneSheet>
 </template>

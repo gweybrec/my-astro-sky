@@ -114,13 +114,24 @@ export const importableCount = computed(
 );
 
 /**
+ * Keeps a photo of the list as a waiting photo (once), so that it is in the gallery whatever happens to this list;
+ * returns its id. It then follows that waiting photo: it leaves the list once the photo is placed.
+ */
+export async function keepImportPending(item: ImportItem): Promise<string> {
+  if (item.pendingId) return item.pendingId;
+  const pendingId = (await addPendingPhoto(item.file, item.name)).id;
+  update(item, { pendingId });
+  return pendingId;
+}
+
+/**
  * Sends a photo of the list to the online solver. It is kept as a waiting photo first, so that it is in the gallery
  * whatever happens to this list; the row then shows "Résolution".
  */
 export async function solveImportOnline(item: ImportItem): Promise<void> {
   if (item.status !== 'toPlace' && item.status !== 'solveFailed') return;
   try {
-    const pendingId = item.pendingId ?? (await addPendingPhoto(item.file, item.name)).id;
+    const pendingId = await keepImportPending(item);
     update(item, { pendingId, status: 'solving', error: '' });
     await solvePendingOnline(pendingId);
   } catch (error) {

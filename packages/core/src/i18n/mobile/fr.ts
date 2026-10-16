@@ -23,6 +23,7 @@ const fr = {
       'Touchez 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom.',
     placeByHand: 'Placer à la main',
     placeByHandSub: 'Déplacer, agrandir et tourner la photo sur la carte',
+    placeHint: 'Un doigt : déplacer · Deux doigts : agrandir et tourner',
     import: 'Importer',
     perLine: 'Photos par ligne',
   },

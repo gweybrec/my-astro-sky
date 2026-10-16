@@ -42,6 +42,7 @@ vi.mock('../src/platform-device', () => ({
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import GalleryPage from '../src/pages/GalleryPage.vue';
 import { loadGalleryDisplay } from '../src/gallery-display';
+import { skyPlacement } from '../src/sky-modes';
 import { clearImport, importItems } from '../src/composables/usePhotoImport';
 import {
   addPendingPhoto,
@@ -200,6 +201,18 @@ describe('the gallery page', () => {
     expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
       'NGC7000.tif : Échec de la résolution',
     );
+  });
+
+  it('places a waiting photo by hand on the sky map', async () => {
+    getPhotos.mockResolvedValue([]);
+    const photo = await addPendingPhoto(new Blob(['y']), 'M101.jpg');
+    const wrapper = mountPage();
+    await flushPromises();
+    await openMethods(wrapper);
+    await rowWith(wrapper, 'Placer à la main').trigger('click');
+    expect(skyPlacement.value).toEqual({ pendingId: photo.id });
+    expect(push).toHaveBeenCalledWith('/tabs/sky');
+    skyPlacement.value = null;
   });
 
   it('greys out the online solve without a connection, and without the astrometry.net key', async () => {
