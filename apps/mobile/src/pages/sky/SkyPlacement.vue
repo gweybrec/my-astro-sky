@@ -18,6 +18,7 @@ import { catalogsReady } from '../../catalogs';
 import { useErrorToast } from '../../composables/useErrorToast';
 import { pendingPhotoFile, removePendingPhoto } from '../../pending-photos';
 import PhoneButton from '../../components/PhoneButton.vue';
+import PhoneSearch from '../../components/PhoneSearch.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 
@@ -33,7 +34,7 @@ const props = defineProps<{
   /** Calls back on each change of the map's view; returns the function that stops it. */
   onView: (listener: () => void) => () => void;
 }>();
-const emit = defineEmits<{ cancel: []; placed: [photo: Photo] }>();
+const emit = defineEmits<{ cancel: []; placed: [photo: Photo]; search: [] }>();
 const { showError } = useErrorToast();
 
 /** The photo's first size: its longer side over this part of the map's shorter side. */
@@ -59,8 +60,40 @@ const view = shallowRef<ViewState>(props.map.getView());
 const saving = ref(false);
 
 let stopView: (() => void) | null = null;
+
+// ── The map moved by the app (a search): the photo goes along ────────────────────────────────────────
+// While the map moves to a searched object, the photo stays at the centre of the screen and keeps its size there, so
+// that the zoom of the search does not blow it up: only a gesture changes its size on screen. It follows until the map
+// has stopped for a moment, or until a finger takes it.
+const FOLLOW_SETTLE_MS = 300;
+let following: { onScreen: number } | null = null;
+let followTimer: ReturnType<typeof setTimeout> | undefined;
+
+function onViewChange() {
+  const v = props.map.getView();
+  if (following) {
+    const ratio = following.onScreen / v.scale / placement.projPerPx;
+    const centre = props.map.viewCenterSky();
+    placement.centerRa = centre.ra;
+    placement.centerDec = centre.dec;
+    placement.projPerPx *= ratio;
+    // "Zoom photo" reads the size on screen: the same before and after.
+    firstProjPerPx *= ratio;
+    clearTimeout(followTimer);
+    followTimer = setTimeout(() => (following = null), FOLLOW_SETTLE_MS);
+  }
+  view.value = v;
+}
+
+/** Runs a move of the map that the photo follows (the screen goes to a searched object). */
+function follow(move: () => void) {
+  following = { onScreen: placement.projPerPx * props.map.getView().scale };
+  move();
+  onViewChange();
+}
+defineExpose({ follow });
 onMounted(async () => {
-  stopView = props.onView(() => (view.value = props.map.getView()));
+  stopView = props.onView(onViewChange);
   file.value = await pendingPhotoFile(props.pendingId);
   if (!file.value) {
     emit('cancel');
@@ -70,6 +103,7 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   stopView?.();
+  clearTimeout(followTimer);
   if (url.value) URL.revokeObjectURL(url.value);
 });
 
@@ -140,6 +174,7 @@ function rebase() {
 }
 
 function onDown(e: PointerEvent) {
+  following = null;
   e.stopPropagation();
   (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   pointers.set(e.pointerId, posOf(e));
@@ -242,30 +277,42 @@ async function validate() {
     />
   </Teleport>
   <section class="mob-panel mob-placing-panel" :aria-label="t('manual.modeLabel')">
-    <PhoneSliderRow
-      v-model="rotation"
-      :label="t('manual.rotation')"
-      :display="`${rotation}°`"
-      :min="-180"
-      :max="180"
-    />
-    <PhoneSliderRow
-      v-model="zoom"
-      :label="t('manual.photoZoom')"
-      :display="formatZoomPercent(placement.projPerPx, firstProjPerPx)"
-      :min="ZOOM_MIN"
-      :max="ZOOM_MAX"
-      :step="0.1"
-    />
-    <PhoneSliderRow
-      v-model="opacity"
-      :label="t('photos.opacity')"
-      :display="opacity.toFixed(2)"
-      :min="0.1"
-      :max="1"
-      :step="0.05"
-    />
-    <PhoneToggleRow v-model="mirror" :title="t('manual.mirrorX')" />
+    <!-- The settings scroll when the panel is short (landscape); Annuler and Valider stay under them. -->
+    <div class="mob-placing-settings mob-scroll">
+      <div class="mob-form-row mob-placing-search">
+        <!-- Typing happens on the search page: this field only opens it, as the Ciel map's own. -->
+        <PhoneSearch
+          readonly
+          :placeholder="t('search.placeholder')"
+          :label="t('search.placeholder')"
+          @click="emit('search')"
+        />
+      </div>
+      <PhoneSliderRow
+        v-model="rotation"
+        :label="t('manual.rotation')"
+        :display="`${rotation}°`"
+        :min="-180"
+        :max="180"
+      />
+      <PhoneSliderRow
+        v-model="zoom"
+        :label="t('manual.photoZoom')"
+        :display="formatZoomPercent(placement.projPerPx, firstProjPerPx)"
+        :min="ZOOM_MIN"
+        :max="ZOOM_MAX"
+        :step="0.1"
+      />
+      <PhoneSliderRow
+        v-model="opacity"
+        :label="t('photos.opacity')"
+        :display="opacity.toFixed(2)"
+        :min="0.1"
+        :max="1"
+        :step="0.05"
+      />
+      <PhoneToggleRow v-model="mirror" :title="t('manual.mirrorX')" />
+    </div>
     <div class="mob-sheet-footer">
       <PhoneButton size="lg" @click="emit('cancel')">{{ t('manual.cancel') }}</PhoneButton>
       <PhoneButton variant="confirm" size="lg" :disabled="!size || saving" @click="validate">

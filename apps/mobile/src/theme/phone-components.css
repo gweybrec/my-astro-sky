@@ -1244,6 +1244,20 @@ ion-tab-bar.mob-tabbar-hidden {
 .mob-placing-photo--ready {
   visibility: visible;
 }
+/* The settings of the panel scroll in their own box when it is short; the footer is outside it, always shown. */
+.mob-placing-panel {
+  min-height: 0;
+}
+.mob-placing-settings {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.mob-placing-settings > .mob-placing-search {
+  padding-top: var(--space-4);
+}
+.mob-placing-panel > .mob-sheet-footer {
+  flex: none;
+}
 /* The desktop's "Zoom photo" is longer than the label column of a slider panel: this panel's column is wider, the same
    in its three rows. */
 .mob-placing-panel .mob-slider-row {
@@ -1271,14 +1285,9 @@ ion-tab-bar.mob-tabbar-hidden {
     grid-column: 2;
     grid-row: 2;
     min-height: 0;
-    overflow-y: auto;
     box-shadow: inset 1px 0 0 var(--border-panel);
   }
-  /* A panel taller than the column scrolls; its Annuler and Valider stay at the bottom of the column. */
   .mob-map-mode > .mob-panel > .mob-sheet-footer {
-    position: sticky;
-    bottom: 0;
     margin-top: auto;
-    background: var(--bg-panel);
   }
 }
