@@ -38,6 +38,7 @@ export type { PlacedPhoto };
 import type { ViewChangeCallback } from '@myastrosky/core/sky-map-types';
 import { t } from './i18n';
 import { stripExtension } from './file-utils';
+import { raDecFromSexagesimal, starDisplayLabel } from '@myastrosky/core/star-identify';
 
 import trashSvg from './icons/trash.svg?raw';
 import { createImageZoomPan } from './image-zoom';
@@ -120,22 +121,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function starDisplayLabel(star: Star): string {
-  if (star.name) {
-    if (star.bayer && star.constellation) {
-      return `${star.name} (${star.bayer} ${star.constellation})`;
-    }
-    return star.name;
-  }
-  if (star.desig && star.constellation) {
-    return `${star.desig} ${star.constellation}`;
-  }
-  if (star.flam && star.constellation) {
-    return `${star.flam} ${star.constellation}`;
-  }
-  return `HIP ${star.hip} (${star.constellation || '?'}, mag ${star.mag.toFixed(1)})`;
 }
 
 let _currentTooltipAnchor: HTMLElement | null = null;
@@ -1300,37 +1285,20 @@ export class PhotoOverlay extends PhotoLayer {
         });
 
         raDecOk.addEventListener('click', () => {
-          const h = parseFloat(raHours.value);
-          const m = parseFloat(raMinutes.value);
-          const s = parseFloat(raSeconds.value);
-          const d = parseFloat(decDegrees.value);
-          const dm = parseFloat(decMinutes.value);
-          const ds = parseFloat(decSeconds.value);
-
-          if (isNaN(h) || isNaN(m) || isNaN(s) || isNaN(d) || isNaN(dm) || isNaN(ds)) {
-            showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
-            return;
-          }
-          if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) {
-            showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
-            return;
-          }
-          if (d < -89 || d > 89 || dm < 0 || dm > 59 || ds < 0 || ds > 59) {
+          const typed = raDecFromSexagesimal({
+            raHours: raHours.value,
+            raMinutes: raMinutes.value,
+            raSeconds: raSeconds.value,
+            decDegrees: decDegrees.value,
+            decMinutes: decMinutes.value,
+            decSeconds: decSeconds.value,
+          });
+          if (!typed) {
             showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
             return;
           }
 
-          const ra = (h + m / 60 + s / 3600) * 15;
-          const sign = d < 0 ? -1 : 1;
-          const dec = Math.abs(d) + dm / 60 + ds / 3600;
-          const decDeg = sign * dec;
-
-          if (ra < 0 || ra >= 360 || decDeg < -90 || decDeg > 90) {
-            showToast({ message: t('modal.invalidCoordinates'), type: 'error', duration: 3000 });
-            return;
-          }
-
-          selectRaDec(i, ra, decDeg);
+          selectRaDec(i, typed.ra, typed.dec);
         });
 
         const dropdown = document.createElement('div');
