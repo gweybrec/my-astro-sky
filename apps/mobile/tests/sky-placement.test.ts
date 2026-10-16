@@ -204,6 +204,43 @@ describe('placing a photo by hand', () => {
     expect(w.emitted('placed')).toBeUndefined();
   });
 
+  it('goes along to a searched object at the same size on screen, then keeps to the sky again', async () => {
+    vi.useFakeTimers();
+    try {
+      const { w, img } = await mountPlacement();
+      const before = matrixOf(img);
+      expect(w.find('.mob-placing-search').exists()).toBe(true);
+      await w.find('.mob-placing-search .mob-search').trigger('click');
+      expect(w.emitted('search')).toHaveLength(1);
+      // The search zooms in four times on NGC 5474.
+      const target = project(211.2575, 53.6623);
+      const zoomed = { ...VIEW, centerX: target.x, centerY: target.y, scale: 4000 };
+      const centre = map.viewCenterSky;
+      (w.vm as unknown as { follow(move: () => void): void }).follow(() => {
+        map.getView = () => zoomed;
+        map.viewCenterSky = () => ({ ra: 211.2575, dec: 53.6623 });
+        viewListener?.();
+      });
+      await flushPromises();
+      const after = matrixOf(img);
+      // Same size and place on screen; "Zoom photo" still reads 100 %.
+      expect(after[0]).toBeCloseTo(before[0]);
+      expect(after[4]).toBeCloseTo(before[4], 0);
+      expect(after[5]).toBeCloseTo(before[5], 0);
+      expect(values(w)[1]).toBe('100 %');
+      // Once the map has stopped, a zoom of the map makes the photo larger with the sky again.
+      vi.advanceTimersByTime(400);
+      map.getView = () => ({ ...zoomed, scale: 8000 });
+      viewListener?.();
+      await flushPromises();
+      expect(matrixOf(img)[0]).toBeCloseTo(before[0] * 2);
+      map.getView = () => VIEW;
+      map.viewCenterSky = centre;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('gives up with Annuler', async () => {
     const { w } = await mountPlacement();
     await w

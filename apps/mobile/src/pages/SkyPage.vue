@@ -35,6 +35,7 @@ import mapPinIcon from '@icons/map-pin.svg?raw';
 // button over it; the date button switches the map to the sky at a date and brings the column of the map's toggles.
 const canvas = ref<HTMLCanvasElement | null>(null);
 const mapEl = ref<HTMLElement | null>(null);
+const placement = ref<InstanceType<typeof SkyPlacement> | null>(null);
 const photoBox = ref<HTMLDivElement | null>(null);
 const displayOpen = ref(false);
 const router = useRouter();
@@ -88,7 +89,9 @@ onIonViewDidEnter(() => {
   const focus = skyFocus.value;
   if (!focus) return;
   skyFocus.value = null;
-  sky?.focus(focus);
+  // A photo being placed goes along to the searched object, at the same size on screen.
+  if (placement.value) placement.value.follow(() => sky?.focus(focus));
+  else sky?.focus(focus);
 });
 
 // The selected object has its sheet; the back button closes it before anything else.
@@ -190,6 +193,7 @@ onBeforeUnmount(() => {
         </main>
         <SkyPlacement
           v-if="placing && skyMap && mapEl"
+          ref="placement"
           :key="placing.pendingId"
           :map="skyMap"
           :map-el="mapEl"
@@ -197,6 +201,7 @@ onBeforeUnmount(() => {
           :on-view="onSkyView"
           @cancel="cancelPlacement"
           @placed="photoPlaced"
+          @search="openSearch"
         />
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />
