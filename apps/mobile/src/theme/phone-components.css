@@ -127,6 +127,10 @@ ion-input.mob-search .native-input {
   font-size: inherit;
   line-height: inherit;
 }
+/* A clearable field: once it has text, the clear button shows at its right end and the text stops before it. */
+.mob-search-wrap ion-input.mob-field.has-value {
+  --padding-end: var(--mobile-touch-min);
+}
 ion-input.mob-field.input-disabled {
   opacity: 0.6;
 }
@@ -1313,5 +1317,76 @@ ion-tab-bar.mob-tabbar-hidden {
   }
   .mob-placing-settings > .mob-placing-search {
     padding-top: var(--space-4);
+  }
+}
+
+/* ── Identifying stars (boards "Identifier les étoiles"): the photo on its stage and the panel of the points under it,
+   with the title bar of a mode; in landscape the title and the panel are a column at the right of the photo, as the
+   modes of the map. */
+.mob-identify-frame {
+  display: flex;
+  flex-direction: column;
+}
+/* A point of the photo: a box of no size at the point, which centres the marker (and the magnifier across) on it. The
+   magnifier is above the marker, or under it near the top of the photo, the board's 16px from the marker's edge. */
+.mob-identify-anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mob-identify-above {
+  bottom: calc(var(--mobile-touch-min) / 2 + var(--space-7));
+}
+.mob-identify-below {
+  top: calc(var(--mobile-touch-min) / 2 + var(--space-7));
+}
+/* The photo keeps the height of four touch targets above a tall panel (the list of found stars, the coordinates);
+   the panel's points scroll in their own box, Annuler and Valider stay under them. */
+.mob-identify-frame > .mob-stage {
+  min-height: calc(var(--mobile-touch-min) * 4);
+}
+.mob-identify-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.mob-identify-points {
+  flex: 0 1 auto;
+}
+/* A point's star name sits beside two buttons: its field takes the 8px inset of the design system's small fields (an
+   integration row's), so that the board's "Nom de l'étoile…" fits in the side column of landscape. */
+.mob-identify-points ion-input.mob-field {
+  --padding-start: var(--space-4);
+}
+.mob-identify-points ion-input.mob-field:not(.has-value) {
+  --padding-end: var(--space-4);
+}
+.mob-identify-panel > .mob-sheet-footer {
+  flex: none;
+}
+@media (orientation: landscape) {
+  .mob-identify-frame {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--mobile-side-panel);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .mob-map-mode > .mob-stage {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+  .mob-identify-frame > .mob-topbar {
+    grid-column: 2;
+    grid-row: 1;
+    box-shadow: inset 1px 0 0 var(--border-panel);
+  }
+  .mob-identify-panel {
+    grid-column: 2;
+    grid-row: 2;
+    box-shadow: inset 1px 0 0 var(--border-panel);
+  }
+  .mob-identify-panel > .mob-sheet-footer {
+    margin-top: auto;
   }
 }
