@@ -306,7 +306,9 @@ export function computeManualMatrix(
   const pxPerPx = placement.projPerPx * view.scale;
   const mx = placement.mirrorX ? -1 : 1;
   const my = placement.mirrorY ? -1 : 1;
-  const rotRad = (placement.rotationDeg * Math.PI) / 180;
+  // The placement's angle is on the sky: a map turned by the view's rotation (toCanvas turns the sky by −rotationDeg)
+  // turns the photo with it.
+  const rotRad = ((placement.rotationDeg - view.rotationDeg) * Math.PI) / 180;
 
   // The photo pixel (cx, cy) maps to the placed centre.
   const cx = natW / 2;
@@ -513,8 +515,8 @@ export function derivePlacementFromMatrix(
   const projCenter = fromCanvas(canvasCenterX, canvasCenterY, view);
   const centerSky = unproject(projCenter.x, projCenter.y);
 
-  // a=cos*scale, b=sin*scale → rotation = atan2(b, a).
-  const rotationDeg = (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+  // a=cos*scale, b=sin*scale → the angle on screen is atan2(b, a); on the sky it is that plus the map's rotation.
+  const rotationDeg = (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI + view.rotationDeg;
   // |first column| = canvas px per photo px; ÷ view.scale → projection units per photo px.
   const pxPerPx = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
   const projPerPx = pxPerPx / view.scale;
