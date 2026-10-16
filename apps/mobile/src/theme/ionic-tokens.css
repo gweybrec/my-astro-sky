@@ -49,6 +49,8 @@
   /* Sizes the boards fix and the design system has no token for (board "…Landscape"). */
   --rail-button-height: 64px;
   --mobile-column-max: 680px;
+  /* The settings column beside the map of a map mode in landscape (boards "…Landscape" of the map modes). */
+  --mobile-side-panel: 400px;
   --mobile-hairline: 1px;
   --spinner-size-page: 36px;
   --sheet-max-height: 60dvh;

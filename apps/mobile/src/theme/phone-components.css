@@ -1218,3 +1218,67 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
 .mob-photo-layer.photos-frozen .photo-overlay-img {
   visibility: hidden;
 }
+
+/* ── A mode of the Ciel map (board "Placer la photo"): its title bar, the map, and the panel of its settings under the
+   map; the tab bar is hidden meanwhile. In landscape the title and the panel are a column at the right of the map. */
+ion-tab-bar.mob-tabbar-hidden {
+  display: none;
+}
+.mob-map-mode > .mob-topbar {
+  flex: none;
+}
+/* The title bar takes the status bar's height itself: the frame does not add it again. */
+.mob-sky-frame.mob-map-mode {
+  padding-top: 0;
+}
+/* The photo being placed: moved by its own CSS matrix over the map, under the fingers that hold it. */
+.mob-placing-photo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  touch-action: none;
+  user-select: none;
+  visibility: hidden;
+}
+.mob-placing-photo--ready {
+  visibility: visible;
+}
+/* The desktop's "Zoom photo" is longer than the label column of a slider panel: this panel's column is wider, the same
+   in its three rows. */
+.mob-placing-panel .mob-slider-row {
+  grid-template-columns: var(--space-21) minmax(0, 1fr) var(--space-16);
+}
+@media (orientation: landscape) {
+  ion-tabs:has(ion-tab-bar.mob-tabbar-hidden) {
+    padding-left: var(--safe-left, 0px);
+  }
+  .mob-sky-frame.mob-map-mode {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--mobile-side-panel);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .mob-map-mode > .mob-topbar {
+    grid-column: 2;
+    grid-row: 1;
+    box-shadow: inset 1px 0 0 var(--border-panel);
+  }
+  .mob-map-mode > .mob-map {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+  .mob-map-mode > .mob-panel {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+    overflow-y: auto;
+    box-shadow: inset 1px 0 0 var(--border-panel);
+  }
+  /* A panel taller than the column scrolls; its Annuler and Valider stay at the bottom of the column. */
+  .mob-map-mode > .mob-panel > .mob-sheet-footer {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    background: var(--bg-panel);
+  }
+}

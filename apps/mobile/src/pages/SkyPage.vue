@@ -16,12 +16,16 @@ import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
+import { skyPlacement } from '../sky-modes';
+import type { SkyMap } from '@myastrosky/render/sky-map';
+import type { Photo } from '@myastrosky/core/types';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import AppIcon from '../components/AppIcon.vue';
 import SkyLayerButtons from './sky/SkyLayerButtons.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
 import SkyPhotoSheet from './sky/SkyPhotoSheet.vue';
+import SkyPlacement from './sky/SkyPlacement.vue';
 import SkyTimeBar from './sky/SkyTimeBar.vue';
 import SkyTopBar from './sky/SkyTopBar.vue';
 import PhoneButton from '../components/PhoneButton.vue';
@@ -30,6 +34,7 @@ import mapPinIcon from '@icons/map-pin.svg?raw';
 // The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field, the display button and the date
 // button over it; the date button switches the map to the sky at a date and brings the column of the map's toggles.
 const canvas = ref<HTMLCanvasElement | null>(null);
+const mapEl = ref<HTMLElement | null>(null);
 const photoBox = ref<HTMLDivElement | null>(null);
 const displayOpen = ref(false);
 const router = useRouter();
@@ -44,6 +49,8 @@ const reloadPhotos = () =>
 let sky: PhoneSkyMap | null = null;
 // The photo layer once the map exists (the sheet of a photo needs it).
 const photoLayer = shallowRef<PhotoLayer | null>(null);
+// The map itself once it exists (a photo being placed needs it).
+const skyMap = shallowRef<SkyMap | null>(null);
 
 onMounted(() => {
   if (!canvas.value) return;
@@ -53,6 +60,7 @@ onMounted(() => {
       void showError(new Error(t('photos.placementError', { name: photo.originalName }))),
   });
   photoLayer.value = sky.photos;
+  skyMap.value = sky.map;
   void reloadPhotos();
   sky.select(skySelection.value);
   // The catalogues load after the first screen: the map fills in once they are there.
@@ -85,6 +93,28 @@ onIonViewDidEnter(() => {
 
 // The selected object has its sheet; the back button closes it before anything else.
 useBackClose(() => skySelection.value !== null, clearSkySelection);
+
+// Placing a waiting photo by hand (board "Placer la photo"): the map takes the whole screen with the photo over it and
+// its settings under it. Annuler and the back button go back to where the placement was asked; a placed photo stays on
+// the map.
+const placing = computed(() => skyPlacement.value);
+watch(placing, (now) => {
+  if (now) clearSkySelection();
+});
+// A tap on the map does not select anything while a photo is placed.
+watch(skySelection, (selection) => {
+  if (selection && placing.value) clearSkySelection();
+});
+function cancelPlacement() {
+  skyPlacement.value = null;
+  if (window.history.state?.back) router.back();
+}
+function photoPlaced(photo: Photo) {
+  skyPlacement.value = null;
+  void reloadPhotos().then(() => sky?.showPhoto(photo.id));
+}
+useBackClose(() => placing.value !== null, cancelPlacement);
+const onSkyView = (listener: () => void) => sky?.onView(listener) ?? (() => undefined);
 
 const time = useSkyTimeStore();
 const located = computed(() => time.lat !== null && time.lon !== null);
@@ -119,20 +149,23 @@ onBeforeUnmount(() => {
 <template>
   <IonPage>
     <IonContent :scroll-y="false">
-      <div class="mob-page-fill mob-sky-frame">
-        <main class="mob-map">
+      <div class="mob-page-fill mob-sky-frame" :class="{ 'mob-map-mode': placing }">
+        <header v-if="placing" class="mob-topbar">
+          <h1 class="mob-topbar-title m-title">{{ t('manual.modeLabel') }}</h1>
+        </header>
+        <main ref="mapEl" class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
           <div ref="photoBox" class="mob-photo-layer" />
-          <SkyTopBar @search="openSearch" @display="displayOpen = true" />
+          <SkyTopBar v-if="!placing" @search="openSearch" @display="displayOpen = true" />
           <!-- First start: no observing location yet, the time and place of the sky cannot be shown. -->
-          <div v-if="!located" class="mob-map-prompt">
+          <div v-if="!located && !placing" class="mob-map-prompt">
             <p class="m-body">{{ t('targets.location.notSet') }}</p>
             <PhoneButton variant="action" size="lg" @click="openLocation">
               <AppIcon :svg="mapPinIcon" />{{ t('targets.location.label') }}
             </PhoneButton>
           </div>
           <!-- The time bar and the toggles of the map belong to the date mode: the live sky has neither. -->
-          <template v-if="time.mode === 'date'">
+          <template v-if="time.mode === 'date' && !placing">
             <SkyTimeBar />
             <SkyLayerButtons />
           </template>
@@ -155,6 +188,16 @@ onBeforeUnmount(() => {
             />
           </Transition>
         </main>
+        <SkyPlacement
+          v-if="placing && skyMap && mapEl"
+          :key="placing.pendingId"
+          :map="skyMap"
+          :map-el="mapEl"
+          :pending-id="placing.pendingId"
+          :on-view="onSkyView"
+          @cancel="cancelPlacement"
+          @placed="photoPlaced"
+        />
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />
     </IonContent>

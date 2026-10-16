@@ -25,6 +25,7 @@ const de: Translations['mobile'] = {
       'Tippen Sie auf 2 oder 3 erkennbare Sterne im Foto und benennen Sie dann jeden.',
     placeByHand: 'Von Hand platzieren',
     placeByHandSub: 'Das Foto auf der Karte verschieben, vergrößern und drehen',
+    placeHint: 'Ein Finger: verschieben · Zwei Finger: vergrößern und drehen',
     import: 'Importieren',
     perLine: 'Fotos pro Zeile',
   },

@@ -2,6 +2,7 @@
 import { IonPage, IonTabs, IonTabBar, IonTabButton, IonRouterOutlet } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import AppIcon from '../components/AppIcon.vue';
+import { tabBarHidden } from '../sky-modes';
 import skyIcon from '@icons/local-sky.svg?raw';
 import galleryIcon from '@icons/image.svg?raw';
 import targetsIcon from '@icons/target.svg?raw';
@@ -24,8 +25,13 @@ const tabs = [
   <IonPage class="mob-tabs-page">
     <IonTabs>
       <IonRouterOutlet />
-      <!-- eslint-disable-next-line vue/no-deprecated-slot-attribute -- slot of Ionic's web component, not a Vue 2 slot -->
-      <IonTabBar slot="bottom" :aria-label="t('mobile.tabs.navLabel')">
+      <!-- eslint-disable vue/no-deprecated-slot-attribute -- slot of Ionic's web component, not a Vue 2 slot -->
+      <IonTabBar
+        slot="bottom"
+        :class="{ 'mob-tabbar-hidden': tabBarHidden }"
+        :aria-label="t('mobile.tabs.navLabel')"
+      >
+        <!-- eslint-enable vue/no-deprecated-slot-attribute -->
         <IonTabButton
           v-for="item in tabs"
           :key="item.tab"

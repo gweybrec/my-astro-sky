@@ -25,6 +25,7 @@ const en: Translations['mobile'] = {
       'Tap 2 or 3 recognisable stars in the photo, then identify each one by its name.',
     placeByHand: 'Place by hand',
     placeByHandSub: 'Move, resize and rotate the photo on the map',
+    placeHint: 'One finger: move · Two fingers: resize and rotate',
     import: 'Import',
     perLine: 'Photos per line',
   },
