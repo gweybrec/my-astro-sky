@@ -433,6 +433,30 @@ describe('manual placement math', () => {
     expect(derived.centerRa).toBeCloseTo(p.centerRa, 2);
     expect(derived.centerDec).toBeCloseTo(p.centerDec, 2);
     expect(derived.projPerPx).toBeCloseTo(p.projPerPx, 4);
+    expect(derived.rotationDeg).toBeCloseTo(p.rotationDeg, 2);
+    expect(derived.mirrorX).toBe(false);
+  });
+
+  it('derive gives back the angle and the mirror of a mirrored placement', () => {
+    const p: ManualPlacement = {
+      centerRa: 210.85,
+      centerDec: 54.34,
+      rotationDeg: -66,
+      projPerPx: 0.0015,
+      mirrorX: true,
+      mirrorY: false,
+    };
+    const synth = buildSyntheticCorrespondences(p, 100, 80, VIEW);
+    const derived = derivePlacementFromCorrespondences(makePhoto(synth), 100, 80);
+    expect(derived.rotationDeg).toBeCloseTo(p.rotationDeg, 2);
+    expect(derived.mirrorX).toBe(true);
+    // The derived placement puts every photo point where the correspondences say.
+    const m = computeManualProjMatrix(derived, 100, 80);
+    for (const c of synth) {
+      const sky = project(c.starRa!, c.starDec!);
+      expect(m.a * c.photoX + m.c * c.photoY + m.e).toBeCloseTo(sky.x, 6);
+      expect(m.b * c.photoX + m.d * c.photoY + m.f).toBeCloseTo(sky.y, 6);
+    }
   });
 
   it('derivePlacementFromCorrespondences falls back to the default with <3 points', () => {
