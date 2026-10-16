@@ -241,6 +241,41 @@ describe('placing a photo by hand', () => {
     }
   });
 
+  it('folds its settings down to the handle and the buttons, by a tap or a drag, and opens again', async () => {
+    // In portrait (the test window is wider than tall).
+    const media = window.matchMedia;
+    window.matchMedia = (() => ({
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
+    const { w } = await mountPlacement();
+    const grab = () => w.find('.mob-placing-grab .mob-sheet-grab');
+    const shown = () =>
+      (w.find('.mob-placing-settings').element as HTMLElement).style.display !== 'none';
+    expect(grab().attributes('aria-label')).toBe('Masquer les réglages');
+    await grab().trigger('click');
+    expect(shown()).toBe(false);
+    expect(grab().attributes('aria-label')).toBe('Afficher les réglages');
+    expect(w.findAll('.mob-sheet-footer button').map((b) => b.text())).toEqual([
+      'Annuler',
+      'Valider',
+    ]);
+    await grab().trigger('click');
+    expect(shown()).toBe(true);
+    // A drag down from the handle folds it; the click that ends the drag does not open it again.
+    const handle = w.find('.mob-placing-grab');
+    await handle.trigger('pointerdown', { clientY: 100 });
+    await handle.trigger('pointermove', { clientY: 170 });
+    await handle.trigger('pointerup', { clientY: 170 });
+    await grab().trigger('click');
+    expect(shown()).toBe(false);
+    await handle.trigger('pointerdown', { clientY: 170 });
+    await handle.trigger('pointermove', { clientY: 100 });
+    expect(shown()).toBe(true);
+    window.matchMedia = media;
+  });
+
   it('gives up with Annuler', async () => {
     const { w } = await mountPlacement();
     await w

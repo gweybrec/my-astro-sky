@@ -24,6 +24,8 @@ const fr = {
     placeByHand: 'Placer à la main',
     placeByHandSub: 'Déplacer, agrandir et tourner la photo sur la carte',
     placeHint: 'Un doigt : déplacer · Deux doigts : agrandir et tourner',
+    placeHideSettings: 'Masquer les réglages',
+    placeShowSettings: 'Afficher les réglages',
     import: 'Importer',
     perLine: 'Photos par ligne',
   },

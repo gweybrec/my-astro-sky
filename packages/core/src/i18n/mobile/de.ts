@@ -26,6 +26,8 @@ const de: Translations['mobile'] = {
     placeByHand: 'Von Hand platzieren',
     placeByHandSub: 'Das Foto auf der Karte verschieben, vergrößern und drehen',
     placeHint: 'Ein Finger: verschieben · Zwei Finger: vergrößern und drehen',
+    placeHideSettings: 'Einstellungen ausblenden',
+    placeShowSettings: 'Einstellungen anzeigen',
     import: 'Importieren',
     perLine: 'Fotos pro Zeile',
   },

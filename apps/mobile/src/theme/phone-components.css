@@ -1252,8 +1252,10 @@ ion-tab-bar.mob-tabbar-hidden {
   flex: 0 1 auto;
   min-height: 0;
 }
-.mob-placing-settings > .mob-placing-search {
-  padding-top: var(--space-4);
+/* The handle that folds the panel down (portrait); the search row comes right under it. */
+.mob-placing-grab {
+  flex: none;
+  touch-action: none;
 }
 .mob-placing-panel > .mob-sheet-footer {
   flex: none;
@@ -1289,5 +1291,12 @@ ion-tab-bar.mob-tabbar-hidden {
   }
   .mob-map-mode > .mob-panel > .mob-sheet-footer {
     margin-top: auto;
+  }
+  /* A column beside the map does not fold: no handle, the search row starts the column. */
+  .mob-placing-grab {
+    display: none;
+  }
+  .mob-placing-settings > .mob-placing-search {
+    padding-top: var(--space-4);
   }
 }
