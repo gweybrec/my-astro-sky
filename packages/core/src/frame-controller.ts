@@ -64,6 +64,12 @@ export interface FrameHost {
   readonly interactionEnabled: boolean;
   /** Star-picking mode swallows frame interaction. */
   readonly pickingMode: boolean;
+  /**
+   * A finger, not a mouse (the phone): the handles take a finger-sized press, the selected frame moves from
+   * anywhere inside it, and the pin glyph and corner squares are neither drawn nor pressed (the phone's frame
+   * sheet holds pinning and the mosaic size).
+   */
+  readonly touch?: boolean;
   findClosestDSO(mx: number, my: number): DSO | null;
   dsosInFrame(f: RenderableFrame): DSO[];
   requestRenderInteractive(): void;
@@ -86,6 +92,11 @@ export interface SnapCandidate {
   majAxis: number;
 }
 
+/** How far from a handle (the rotation dot, the move dot) a finger may land, in CSS px. */
+export const TOUCH_HANDLE_RADIUS_PX = 22;
+/** How far from the selected frame's border a finger may land and move it, in CSS px. */
+export const TOUCH_BORDER_PX = 16;
+
 export class FrameController {
   private host: FrameHost;
 
@@ -107,6 +118,7 @@ export class FrameController {
   private onTileRemove: ((tileId: string) => void) | null = null;
   private onTileAdd: ((ra: number, dec: number) => void) | null = null;
   private onMerge: ((movedId: string, targetId: string) => void) | null = null;
+  private onDragChange: ((dragging: boolean) => void) | null = null;
 
   constructor(host: FrameHost, timing: FrameTiming = DEFAULT_FRAME_TIMING) {
     this.host = host;
@@ -133,6 +145,11 @@ export class FrameController {
 
   get snapCandidate(): SnapCandidate | null {
     return this.snap;
+  }
+
+  /** True on a touch screen: the renderer then draws no pin glyph and no corner squares. */
+  get touch(): boolean {
+    return !!this.host.touch;
   }
 
   get mosaicAddCandidates(): Array<{ ra: number; dec: number }> {
@@ -165,6 +182,11 @@ export class FrameController {
 
   setOnMerge(cb: (movedId: string, targetId: string) => void): void {
     this.onMerge = cb;
+  }
+
+  /** Called with true when a drag of a frame starts and false when it ends (the phone shrinks the frame's sheet). */
+  setOnDragChange(cb: (dragging: boolean) => void): void {
+    this.onDragChange = cb;
   }
 
   // ── Frame canvas geometry ─────────────────────────────────────────────────
@@ -253,20 +275,28 @@ export class FrameController {
 
   /** Hit-test the active/instance frames on mousedown. Returns true if the event was consumed (no pan). */
   handleMouseDown(mx: number, my: number): boolean {
+    const consumed = this.press(mx, my);
+    if (this.drag) this.onDragChange?.(true);
+    return consumed;
+  }
+
+  private press(mx: number, my: number): boolean {
     if (!this.host.interactionEnabled || this.host.pickingMode || this.instances.length === 0)
       return false;
 
+    const touch = this.touch;
+    const handleR = touch ? TOUCH_HANDLE_RADIUS_PX : 9;
     const active = this.instances.find((f) => f.active);
     if (active && active.visible !== false) {
       const geo = this.frameGeometry(active);
       const handlesVisible = this.frameHandlesVisible(geo.halfW, geo.halfH);
       if (handlesVisible) {
         const rh = rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24);
-        if (isNearHandle(mx, my, rh, 9)) {
+        if (isNearHandle(mx, my, rh, handleR)) {
           this.drag = { id: active.id, mode: 'rotate' };
           return true;
         }
-        if (active.pinnable) {
+        if (active.pinnable && !touch) {
           const pinPos = this.framePinGlyphPos(geo.corners[1], geo.rotDeg);
           if (isNearHandle(mx, my, pinPos, 10)) {
             this.toggleFramePin(active);
@@ -275,7 +305,7 @@ export class FrameController {
         }
         // Corner resize handles (drag-to-extend into a mosaic) take priority over
         // the centre move dot and border move.
-        if (active.resizable) {
+        if (active.resizable && !touch) {
           for (let i = 0; i < geo.corners.length; i++) {
             if (isNearHandle(mx, my, geo.corners[i], 9)) {
               this.drag = { id: active.id, mode: 'resize', corner: i };
@@ -283,13 +313,13 @@ export class FrameController {
             }
           }
         }
-        if (active.movable && isNearHandle(mx, my, { x: geo.cx, y: geo.cy }, 9)) {
+        if (active.movable && isNearHandle(mx, my, { x: geo.cx, y: geo.cy }, handleR)) {
           this.drag = { id: active.id, mode: 'move' };
           return true;
         }
       }
       // Dragging the border moves the active frame at any size.
-      if (active.movable && isNearPolygonBorder(mx, my, geo.corners, 6)) {
+      if (active.movable && isNearPolygonBorder(mx, my, geo.corners, touch ? TOUCH_BORDER_PX : 6)) {
         this.drag = { id: active.id, mode: 'move' };
         return true;
       }
@@ -315,6 +345,18 @@ export class FrameController {
           }
         }
       }
+    }
+
+    // A finger drags the selected frame from anywhere inside it (a mouse pans there).
+    if (
+      touch &&
+      active &&
+      active.visible !== false &&
+      active.movable &&
+      pointInConvexPolygon(mx, my, this.frameGeometry(active).corners)
+    ) {
+      this.drag = { id: active.id, mode: 'move' };
+      return true;
     }
 
     // Select a frame by clicking anywhere inside it (topmost first). Mosaic tiles
@@ -447,6 +489,7 @@ export class FrameController {
     if (!this.drag) return;
     const drag = this.drag;
     this.drag = null;
+    this.onDragChange?.(false);
     const snap = this.snap;
     this.snap = null;
     if (drag.mode === 'resize') this.finalizeResize(drag.id);
@@ -469,6 +512,7 @@ export class FrameController {
    * deselecting can't leave a dangling elastic overlay or rAF.
    */
   clearInteraction(): void {
+    if (this.drag) this.onDragChange?.(false);
     this.drag = null;
     this.snap = null;
     this.cancelSnapAnim();

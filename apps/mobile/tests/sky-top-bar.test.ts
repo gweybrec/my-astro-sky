@@ -20,21 +20,24 @@ describe('the top row of the map', () => {
     setActivePinia(createPinia());
   });
 
-  it('has the search field, then the display button, then the date button', () => {
+  it('has the search field, then the display, frames and date buttons', () => {
     const w = mountBar();
     expect(w.find('input[type=search]').exists()).toBe(true);
     expect(w.findAll('button').map((b) => b.attributes('aria-label'))).toEqual([
       'Affichage',
+      'Contours de champ',
       'Voir le ciel à une date donnée',
     ]);
   });
 
-  it('asks for the search and the display sheet', async () => {
+  it('asks for the search, the display sheet and the frames sheet', async () => {
     const w = mountBar();
     await w.find('input[type=search]').trigger('click');
     await button(w, 'Affichage').trigger('click');
+    await button(w, 'Contours de champ').trigger('click');
     expect(w.emitted('search')).toHaveLength(1);
     expect(w.emitted('display')).toHaveLength(1);
+    expect(w.emitted('frames')).toHaveLength(1);
   });
 
   it('switches to the date mode with the date button, without opening any picker', async () => {

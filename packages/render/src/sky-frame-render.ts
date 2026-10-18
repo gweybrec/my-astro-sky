@@ -378,8 +378,9 @@ export function renderFovInstances(s: SkyScene): void {
         { corners, cx, cy, rotDeg, halfH },
         {
           movable: f.movable,
-          pinnable: !!f.pinnable,
-          resizable: !!f.resizable,
+          // A finger pins and resizes from the frame's sheet: no glyph, no corner squares.
+          pinnable: !!f.pinnable && !frames.touch,
+          resizable: !!f.resizable && !frames.touch,
           anchorSky: f.anchorKind === 'sky',
         },
         col.active,

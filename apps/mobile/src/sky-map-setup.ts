@@ -23,6 +23,7 @@ import type { Photo } from '@myastrosky/core/types';
 import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { connectFrames } from './sky-frames';
 
 /** How long the photos stay hidden after the map stopped moving: large images are not painted on every frame. */
 export const PHOTOS_FROZEN_MS = 100;
@@ -37,6 +38,8 @@ export const MAX_PIXEL_RATIO = 2;
 export interface PhoneSkyMapOptions {
   /** The box over the canvas that holds the photos. */
   photoContainer: HTMLDivElement;
+  /** The canvas above the photos, where the map draws the frames, the terrain, the trajectory, regions and pins. */
+  overlayCanvas?: HTMLCanvasElement;
   /** A photo cannot be placed (its star correspondences do not fit). */
   onPhotoPlacementError(photo: Photo): void;
 }
@@ -73,6 +76,8 @@ export function createPhoneSkyMap(
     isOverPanel: () => false,
   });
 
+  if (options.overlayCanvas) map.setOverlayCanvas(options.overlayCanvas);
+
   const port = useMapPortStore();
   port.skyMap = map;
 
@@ -104,7 +109,12 @@ export function createPhoneSkyMap(
   // A tap on an object or a star selects it; a tap on an empty spot clears the selection.
   map.setOnDSOClick((dso) => (skySelection.value = { kind: 'dso', dso }));
   map.setOnStarTap((star) => (skySelection.value = { kind: 'star', star }));
-  map.setOnClearSelection(clearSkySelection);
+  // A tap on an empty spot also lets go of the selected frame (its sheet closes).
+  map.setOnClearSelection(() => {
+    clearSkySelection();
+    map.selectFrame(null);
+  });
+  const disconnectFrames = connectFrames(map);
   // A tap on a photo selects it, by the name the map hit-tests.
   map.setOnPhotoClick((name) => {
     const placed = layer.getPlacedPhotos().find((p) => p.photo.originalName === name);
@@ -222,6 +232,7 @@ export function createPhoneSkyMap(
       return () => viewListeners.delete(listener);
     },
     destroy() {
+      disconnectFrames();
       stopHorizon();
       stopCategories();
       if (frozenTimer) clearTimeout(frozenTimer);

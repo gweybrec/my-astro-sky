@@ -147,6 +147,33 @@ export interface SkyMapOptions {
   followCanvasSize?: boolean;
 }
 
+/** CSS px of the map hidden by a sheet: along its left edge (the phone in landscape) and its bottom (portrait). */
+export interface MapCover {
+  left: number;
+  bottom: number;
+}
+
+/**
+ * The view centre that puts a projected point in the middle of the part of the map a sheet leaves uncovered: the
+ * point sits half the covered width right of the middle and half the covered height above it, in the map's rotation.
+ */
+export function centreBesideCover(
+  target: { x: number; y: number },
+  cover: MapCover,
+  scale: number,
+  view: Pick<ViewState, 'rotationDeg'>,
+): { x: number; y: number } {
+  if ((cover.left <= 0 && cover.bottom <= 0) || !(scale > 0)) return target;
+  const theta = (view.rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  const rx = Math.max(0, cover.left) / 2;
+  const ry = -Math.max(0, cover.bottom) / 2;
+  const dx = rx * cos - ry * sin;
+  const dy = rx * sin + ry * cos;
+  return { x: target.x - dx / scale, y: target.y + dy / scale };
+}
+
 export class SkyMap {
   /** How far from a star a finger may land and still pick it. */
   private static readonly TOUCH_STAR_RADIUS_PX = 20;
@@ -310,6 +337,8 @@ export class SkyMap {
   // Overlay canvas — sits above the photo layer in the DOM, used to draw frames on top of photos
   private overlayCanvas: HTMLCanvasElement | null = null;
   private overlayCtx: CanvasRenderingContext2D | null = null;
+  /** The part of the map covered by a sheet (see setCover). */
+  private cover: MapCover = { left: 0, bottom: 0 };
   // True while renderToCanvas() is active — causes render() to draw frames inline rather than on the overlay
   private _renderingOffscreen = false;
 
@@ -652,6 +681,10 @@ export class SkyMap {
   setOnFrameMerge(cb: (movedId: string, targetId: string) => void) {
     this.frames.setOnMerge(cb);
   }
+  /** Called when a drag of a frame starts (true) and ends (false). */
+  setOnFrameDragChange(cb: (dragging: boolean) => void) {
+    this.frames.setOnDragChange(cb);
+  }
 
   /** Toggle the pin state of a frame by id (used by the frame-manager popup). */
   toggleFramePinById(id: string): void {
@@ -841,8 +874,16 @@ export class SkyMap {
     }
   }
 
+  /**
+   * How much of the map a sheet covers (the phone): the map then brings a target to the middle of the part left
+   * uncovered. Nothing covered (the default) is the whole map.
+   */
+  setCover(cover: MapCover): void {
+    this.cover = cover;
+  }
+
   navigateTo(ra: number, dec: number, targetScale = 600, animate = true) {
-    const target = project(ra, dec);
+    const target = centreBesideCover(project(ra, dec), this.cover, targetScale, this.view);
     // Guard against a caller-supplied non-finite target/scale (e.g. a degenerate
     // photo fit): a NaN/Infinity here propagates into `view.scale` via the `step`
     // interpolation and floods the DSO renderer with non-finite radii.
@@ -1088,7 +1129,9 @@ export class SkyMap {
     const view = () => this.view;
     const interactionEnabled = () => this.interactionEnabled;
     const pickingMode = () => this.pickingMode;
+    const touch = !!this.options.touch;
     return {
+      touch,
       get view() {
         return view();
       },

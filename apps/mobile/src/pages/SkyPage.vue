@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -17,6 +17,8 @@ import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
 import { skyPlacement, skyStarPick } from '../sky-modes';
+import { framesSheetOpen } from '../sky-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { Photo, Star } from '@myastrosky/core/types';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
@@ -25,6 +27,9 @@ import SkyLayerButtons from './sky/SkyLayerButtons.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
 import SkyPhotoSheet from './sky/SkyPhotoSheet.vue';
+import SkyFrameSheet from './sky/SkyFrameSheet.vue';
+import SkyFramesSheet from './sky/SkyFramesSheet.vue';
+import SkyFramePicker, { type FrameTarget } from './sky/SkyFramePicker.vue';
 import SkyPlacement from './sky/SkyPlacement.vue';
 import SkyStarPick from './sky/SkyStarPick.vue';
 import SkyTimeBar from './sky/SkyTimeBar.vue';
@@ -39,6 +44,7 @@ const canvas = ref<HTMLCanvasElement | null>(null);
 const mapEl = ref<HTMLElement | null>(null);
 const placement = ref<InstanceType<typeof SkyPlacement> | null>(null);
 const photoBox = ref<HTMLDivElement | null>(null);
+const overlayCanvas = ref<HTMLCanvasElement | null>(null);
 const displayOpen = ref(false);
 const router = useRouter();
 const { showError } = useErrorToast();
@@ -59,6 +65,7 @@ onMounted(() => {
   if (!canvas.value) return;
   sky = createPhoneSkyMap(canvas.value, {
     photoContainer: photoBox.value!,
+    overlayCanvas: overlayCanvas.value ?? undefined,
     onPhotoPlacementError: (photo) =>
       void showError(new Error(t('photos.placementError', { name: photo.originalName }))),
   });
@@ -78,6 +85,8 @@ watch(skySelection, (selection) => sky?.select(selection));
 // object to go to.
 onIonViewWillEnter(() => {
   sky?.refreshLocation();
+  // A setup may have been added or changed in Réglages: the frames take its size again.
+  void fov.loadSpecs();
   // Photos may have been added, changed or deleted in the gallery or by an import while another tab was showing.
   void reloadPhotos();
 });
@@ -172,6 +181,76 @@ const photoRemoved = () => {
   void reloadPhotos();
 };
 
+// The frames (fields of view). The selected frame has its sheet (board "Ciel, cadre sélectionné"); a frame and an
+// object are not selected together. "Ajouter un cadre" of an object opens "Créer un cadre".
+const fov = useFovFramesStore();
+const activeFrame = computed(() =>
+  fov.framesVisible && !inMode.value ? (fov.renderables.find((f) => f.active) ?? null) : null,
+);
+watch(
+  () => activeFrame.value?.id,
+  (id) => {
+    if (id) clearSkySelection();
+  },
+);
+watch(skySelection, (selection) => {
+  if (selection && activeFrame.value) sky?.map.selectFrame(null);
+});
+const releaseFrame = () => sky?.map.selectFrame(null);
+useBackClose(() => activeFrame.value !== null, releaseFrame);
+
+const pickerOpen = ref(false);
+const pickerTarget = ref<FrameTarget | null>(null);
+function openFramePicker() {
+  const s = skySelection.value;
+  if (!s || s.kind === 'photo') return;
+  pickerTarget.value =
+    s.kind === 'dso'
+      ? { dsoId: s.dso.id, ra: s.dso.ra, dec: s.dso.dec, name: s.dso.displayName || s.dso.id }
+      : { dsoId: null, ra: s.star.ra, dec: s.star.dec, name: s.star.name || `HIP ${s.star.hip}` };
+  pickerOpen.value = true;
+}
+// A plan picked: the map goes to the object and "Contours de champ" shows that plan's frames, as the desktop opens
+// its frame manager. A free frame: the map frames it, and its sheet opens.
+function framePlanPicked() {
+  const target = pickerTarget.value;
+  clearSkySelection();
+  if (target) sky?.focus({ ra: target.ra, dec: target.dec, scale: 1200 });
+  framesSheetOpen.value = true;
+}
+function frameFreeAdded() {
+  clearSkySelection();
+  if (fov.activeId) showFrame(fov.activeId);
+}
+// Brings a selected frame to the middle of the part of the map its sheet leaves free (above it in portrait, right of
+// it in landscape): once the map has the frame (Vue's next update) and the sheet has its size (the next drawn frame).
+function showFrame(id: string) {
+  void nextTick(() =>
+    requestAnimationFrame(() => {
+      const map = sky?.map;
+      if (!map) return;
+      map.setCover(sheetCover());
+      map.centerFrameInView(id);
+      map.setCover({ left: 0, bottom: 0 });
+    }),
+  );
+}
+// The sheet's place in the map from its layout box, not its box on screen: it is still sliding in.
+function sheetCover() {
+  const map = mapEl.value;
+  const sheet = map?.querySelector<HTMLElement>('.mob-map-sheet');
+  if (!map || !sheet) return { left: 0, bottom: 0 };
+  const width = map.clientWidth;
+  const height = map.clientHeight;
+  const sheetRight = sheet.offsetLeft + sheet.offsetWidth;
+  const above = Math.max(0, sheet.offsetTop);
+  const right = Math.max(0, width - sheetRight);
+  // The larger free part: right of the sheet, or above it.
+  return right * height > above * width
+    ? { left: sheetRight, bottom: 0 }
+    : { left: 0, bottom: height - sheet.offsetTop };
+}
+
 const openSearch = () => void router.push('/sky/search');
 const openInGallery = (photoId: string) => void router.push(`/gallery/photo/${photoId}`);
 const editPhoto = (photoId: string) => void router.push(`/gallery/photo/${photoId}/edit`);
@@ -196,7 +275,13 @@ onBeforeUnmount(() => {
         <main ref="mapEl" class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
           <div ref="photoBox" class="mob-photo-layer" />
-          <SkyTopBar v-if="!inMode" @search="openSearch" @display="displayOpen = true" />
+          <canvas ref="overlayCanvas" class="mob-sky-overlay" />
+          <SkyTopBar
+            v-if="!inMode"
+            @search="openSearch"
+            @display="displayOpen = true"
+            @frames="framesSheetOpen = true"
+          />
           <!-- First start: no observing location yet, the time and place of the sky cannot be shown. -->
           <div v-if="!located && !inMode" class="mob-map-prompt">
             <p class="m-body">{{ t('targets.location.notSet') }}</p>
@@ -225,6 +310,14 @@ onBeforeUnmount(() => {
               v-else-if="skySelection && skySelection.kind !== 'photo'"
               :selection="skySelection"
               @close="clearSkySelection"
+              @add-frame="openFramePicker"
+            />
+            <SkyFrameSheet
+              v-else-if="activeFrame && skyMap"
+              :key="activeFrame.id"
+              :frame="activeFrame"
+              :map="skyMap"
+              @close="releaseFrame"
             />
           </Transition>
         </main>
@@ -249,6 +342,14 @@ onBeforeUnmount(() => {
         />
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />
+      <SkyFramesSheet v-model:open="framesSheetOpen" :map="skyMap" @show="showFrame" />
+      <SkyFramePicker
+        v-if="pickerTarget"
+        v-model:open="pickerOpen"
+        :target="pickerTarget"
+        @plan="framePlanPicked"
+        @free="frameFreeAdded"
+      />
     </IonContent>
   </IonPage>
 </template>

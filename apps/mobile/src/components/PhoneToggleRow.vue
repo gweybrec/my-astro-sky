@@ -4,7 +4,13 @@ import PhoneInfoButton from './PhoneInfoButton.vue';
 
 // A settings row with a switch: the whole row is the tap target and the change applies at once. With `info` the title
 // is followed by the "i" button (its explanation opens in the small dialog), the switch keeps the right end.
-defineProps<{ title: string; disabled?: boolean; info?: string }>();
+defineProps<{
+  title: string;
+  /** A line under the title (the board's switch row with a helper). */
+  sub?: string;
+  disabled?: boolean;
+  info?: string;
+}>();
 const model = defineModel<boolean>({ default: false });
 </script>
 
@@ -24,6 +30,10 @@ const model = defineModel<boolean>({ default: false });
       <span class="mob-toggle-info" @click.stop.prevent
         ><PhoneInfoButton :title="title" :message="info"
       /></span>
+    </span>
+    <span v-else-if="sub" class="mob-row-body">
+      <span class="mob-row-title mob-row-title--wrap m-body">{{ title }}</span>
+      <span class="mob-row-sub mob-row-sub--wrap m-secondary">{{ sub }}</span>
     </span>
     <span v-else class="mob-row-title mob-row-title--wrap m-body">{{ title }}</span>
   </IonToggle>

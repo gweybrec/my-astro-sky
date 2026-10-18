@@ -147,6 +147,11 @@ const fr = {
     needsLocation: "Définissez d'abord le lieu d'observation (Réglages)",
     needsLocalSky: "Activez d'abord le ciel local",
     needsHorizon: "Calculez ou importez d'abord l'horizon du relief (Réglages)",
+    frameSet: 'Cadres',
+    framePin: 'Épingler',
+    frameAnchor: 'Ancrage',
+    frameAnchorSub: "Aimantation à l'objet le plus proche",
+    frameRotateBy: 'Tourner de {value}',
   },
   backup: { exportSection: 'Exporter', importSection: 'Importer' },
 };
