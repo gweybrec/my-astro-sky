@@ -32,6 +32,19 @@ vi.mock('../src/composables/useSetupLines', async () => {
   };
 });
 
+const andromeda = {
+  id: 'M31',
+  ra: 10.68,
+  dec: 41.27,
+  majAxis: 190,
+  minAxis: 60,
+  pa: 35,
+  displayName: "Galaxie d'Andromède",
+};
+vi.mock('@myastrosky/core/search', () => ({
+  searchDSOs: () => [{ dso: andromeda, label: 'M31' }],
+}));
+
 import SkyFrameSheet from '../src/pages/sky/SkyFrameSheet.vue';
 import SkyFramesSheet from '../src/pages/sky/SkyFramesSheet.vue';
 import SkyFramePicker from '../src/pages/sky/SkyFramePicker.vue';
@@ -102,6 +115,9 @@ const fakeMap = () =>
 
 const byText = (w: ReturnType<typeof mount>, text: string) =>
   w.findAll('.mob-row, button, ion-button').find((b) => b.text().includes(text));
+/** Hidden by v-show (display: none on the element). */
+const hidden = (w: { attributes: (k: string) => string | undefined }) =>
+  (w.attributes('style') ?? '').includes('display: none');
 const confirmButton = (w: ReturnType<typeof mount>) =>
   w.findAll('ion-button, button').find((b) => b.classes('mob-btn--confirm'))!;
 
@@ -258,6 +274,26 @@ describe('the mosaic form', () => {
     );
     expect(create.mock.calls[0][0].tiles).toHaveLength(cols * rows);
     expect(w.emitted('done')).toHaveLength(1);
+  });
+
+  it('lists the objects found in place of the other fields and the buttons, above the keyboard', async () => {
+    withSpecs();
+    const w = mount(SkyMosaicSheet, {
+      props: { open: true, dest: { kind: 'free', setupId: 's1' } },
+      global: { stubs: ionicStubs },
+    });
+    const fields = w.findAllComponents({ name: 'PhoneField' });
+    fields[1].vm.$emit('update:modelValue', 'M31');
+    await new Promise((r) => setTimeout(r, 250));
+    await flushPromises();
+    expect(hidden(w.find('.mob-sheet-footer'))).toBe(true);
+    expect(hidden(fields[0])).toBe(true);
+    expect(w.findAllComponents(PhoneStepperRow).every(hidden)).toBe(true);
+    await byText(w, 'M31 — Galaxie')!.trigger('click');
+    await flushPromises();
+    expect(w.text()).toContain("Galaxie d'Andromède");
+    expect(hidden(w.find('.mob-sheet-footer'))).toBe(false);
+    expect(hidden(fields[0])).toBe(false);
   });
 
   it('opens filled to edit a plan mosaic and saves its grid', async () => {
