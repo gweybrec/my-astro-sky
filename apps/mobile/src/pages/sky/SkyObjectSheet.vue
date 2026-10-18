@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue';
+import { computed } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { twilightWindow } from '@myastrosky/core/astro-time';
 import { altitudeAtDeg, maxAltDuringWindow } from '@myastrosky/core/sky-geometry';
@@ -8,7 +8,7 @@ import { formatClock24 } from '@myastrosky/core/targets/format';
 import { formatMultiplicity } from '@myastrosky/core/targets/multiplicity';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import type { SkySelection } from '../../composables/useSkySelection';
-import { useSheetDrag } from '../../composables/useSheetDrag';
+import PhoneMapSheet from '../../components/PhoneMapSheet.vue';
 import PhoneBadge from '../../components/PhoneBadge.vue';
 import PhoneFacts from '../../components/PhoneFacts.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
@@ -27,7 +27,6 @@ import infoIcon from '../../icons/info.svg?raw';
 // the location.
 const props = defineProps<{ selection: Exclude<SkySelection, { kind: 'photo' }> }>();
 const emit = defineEmits<{ close: []; addFrame: []; addMosaic: [] }>();
-const titleId = useId();
 const time = useSkyTimeStore();
 
 const shown = computed(() => {
@@ -87,32 +86,19 @@ const facts = computed(() => {
   if (magnitude !== null) out.push({ label: t('stars.magnitude'), value: magnitude });
   return out;
 });
-
-const drag = useSheetDrag(() => emit('close'));
 </script>
 
 <template>
-  <section class="mob-sheet mob-sheet--auto mob-map-sheet" :aria-labelledby="titleId">
-    <div class="mob-sheet-drag" v-on="drag">
-      <button
-        type="button"
-        class="mob-sheet-grab"
-        :aria-label="t('mobile.sky.closeSheet')"
-        @click="emit('close')"
-      >
-        <span class="mob-sheet-handle" />
-      </button>
-      <div class="mob-sheet-header">
-        <h2 :id="titleId" class="mob-sheet-title m-title">{{ shown.title }}</h2>
-        <div class="mob-meta m-secondary">
-          <span v-if="shown.designation">{{ shown.designation }}</span>
-          <PhoneBadge v-if="shown.typeLabel" kind="type">{{ shown.typeLabel }}</PhoneBadge>
-          <PhoneBadge v-if="shown.constellation" kind="const">{{
-            shown.constellation.toUpperCase()
-          }}</PhoneBadge>
-        </div>
+  <PhoneMapSheet :title="shown.title" @close="emit('close')">
+    <template #meta>
+      <div class="mob-meta m-secondary">
+        <span v-if="shown.designation">{{ shown.designation }}</span>
+        <PhoneBadge v-if="shown.typeLabel" kind="type">{{ shown.typeLabel }}</PhoneBadge>
+        <PhoneBadge v-if="shown.constellation" kind="const">{{
+          shown.constellation.toUpperCase()
+        }}</PhoneBadge>
       </div>
-    </div>
+    </template>
     <PhoneFacts :facts="facts" :columns="facts.length === 3 ? 3 : 2" />
     <!-- "Ajouter un cadre" and "Ajouter une mosaïque" open "Créer un cadre" / "Créer une mosaïque"; the screens behind
          the others (plan picker, edit, details) are not built yet. -->
@@ -140,5 +126,5 @@ const drag = useSheetDrag(() => emit('close'));
         ><AppIcon :svg="infoIcon"
       /></PhoneIconButton>
     </div>
-  </section>
+  </PhoneMapSheet>
 </template>

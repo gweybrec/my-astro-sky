@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import type { Photo } from '@myastrosky/core/types';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
-import { ionicStubs } from './helpers';
+import { ionicStubs, mapSheetHost } from './helpers';
 
 const deletePhotoAPI = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
@@ -46,7 +46,10 @@ function fakeLayer(state = { opacity: 1, visible: true }) {
 
 const mountSheet = (p = photo(), layer = fakeLayer()) => ({
   layer,
-  w: mount(SkyPhotoSheet, { props: { photo: p, layer }, global: { stubs: ionicStubs } }),
+  w: mount(SkyPhotoSheet, {
+    props: { photo: p, layer },
+    global: { stubs: ionicStubs, provide: mapSheetHost },
+  }),
 });
 const button = (w: ReturnType<typeof mount>, name: string) =>
   w.findAll('button').find((b) => b.attributes('aria-label') === name)!;

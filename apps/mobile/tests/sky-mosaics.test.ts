@@ -8,7 +8,7 @@ import type { SkyMap } from '@myastrosky/render/sky-map';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import type { Plan } from '@myastrosky/app-state/api';
-import { ionicStubs } from './helpers';
+import { ionicStubs, mapSheetHost } from './helpers';
 
 const showError = vi.fn();
 vi.mock('../src/composables/useConfirm', () => ({
@@ -136,7 +136,7 @@ describe('the sheet of a selected mosaic', () => {
     const grid = vi.spyOn(fov, 'setMosaicGrid').mockImplementation(() => {});
     const w = mount(SkyFrameSheet, {
       props: { frame: outline('mosaic:p1:mo1'), map: fakeMap() },
-      global: { stubs: ionicStubs },
+      global: { stubs: ionicStubs, provide: mapSheetHost },
     });
     expect(w.find('.mob-sheet-title').text()).toBe('Amérique du Nord · Mosaïque');
     const steppers = w.findAllComponents(PhoneStepperRow);
@@ -157,7 +157,7 @@ describe('the sheet of a selected mosaic', () => {
     fov.adhocMosaics.push({ ...planMosaic(), id: 'fm', setupId: 's1', tiles: [] } as never);
     const w = mount(SkyFrameSheet, {
       props: { frame: outline('mosaic:free:fm'), map: fakeMap() },
-      global: { stubs: ionicStubs },
+      global: { stubs: ionicStubs, provide: mapSheetHost },
     });
     expect(w.findAllComponents(PhoneStepperRow)).toHaveLength(2);
     expect(byText(w, 'Modifier la mosaïque')).toBeUndefined();
@@ -228,7 +228,7 @@ describe('Créer une mosaïque', () => {
     } as unknown as DSO;
     const w = mount(SkyObjectSheet, {
       props: { selection: { kind: 'dso', dso } },
-      global: { stubs: ionicStubs },
+      global: { stubs: ionicStubs, provide: mapSheetHost },
     });
     const mosaic = w
       .findAll('ion-button, button')

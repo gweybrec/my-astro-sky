@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useId } from 'vue';
+import { computed, ref } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import type { RenderableFrame } from '@myastrosky/core/sky-map-types';
 import type { SkyMap } from '@myastrosky/render/sky-map';
@@ -9,7 +9,7 @@ import { frameDragging } from '../../sky-frames';
 import { formatFrameSide, frameKind, frameName, frameRotation } from '../../frame-text';
 import { useConfirm } from '../../composables/useConfirm';
 import { useErrorToast } from '../../composables/useErrorToast';
-import { useSheetDrag } from '../../composables/useSheetDrag';
+import PhoneMapSheet from '../../components/PhoneMapSheet.vue';
 import PhoneRow from '../../components/PhoneRow.vue';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
@@ -28,12 +28,10 @@ import resetIcon from '../../icons/rotate-ccw.svg?raw';
 // centre, and for a plan's mosaic "Modifier la mosaïque" (the desktop's edit button), which the page opens.
 const props = defineProps<{ frame: RenderableFrame; map: SkyMap }>();
 const emit = defineEmits<{ close: []; editMosaic: [planId: string, mosaicId: string] }>();
-const titleId = useId();
 const fov = useFovFramesStore();
 const plans = usePlansStore();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
-const drag = useSheetDrag(() => emit('close'));
 
 const kind = computed(() => frameKind(props.frame));
 const title = computed(() =>
@@ -207,24 +205,13 @@ async function remove() {
 </script>
 
 <template>
-  <section class="mob-sheet mob-sheet--auto mob-map-sheet" :aria-labelledby="titleId">
-    <div class="mob-sheet-drag" v-on="drag">
-      <button
-        type="button"
-        class="mob-sheet-grab"
-        :aria-label="t('mobile.sky.closeSheet')"
-        @click="emit('close')"
-      >
-        <span class="mob-sheet-handle" />
-      </button>
-      <div class="mob-sheet-header">
-        <h2 :id="titleId" class="mob-sheet-title m-title">{{ title }}</h2>
-        <!-- A floating free frame is titled by its setup already: the line would only repeat it. -->
-        <div v-if="frame.label !== title" v-show="!frameDragging" class="mob-meta m-secondary">
-          <span>{{ frame.label }}</span>
-        </div>
+  <PhoneMapSheet :title="title" @close="emit('close')">
+    <template #meta>
+      <!-- A floating free frame is titled by its setup already: the line would only repeat it. -->
+      <div v-if="frame.label !== title" v-show="!frameDragging" class="mob-meta m-secondary">
+        <span>{{ frame.label }}</span>
       </div>
-    </div>
+    </template>
     <div v-show="!frameDragging" class="mob-sheet-body mob-scroll">
       <template v-if="smart">
         <PhoneSliderRow
@@ -313,5 +300,5 @@ async function remove() {
         @click="moveTo(p.id)"
       />
     </PhoneSheet>
-  </section>
+  </PhoneMapSheet>
 </template>
