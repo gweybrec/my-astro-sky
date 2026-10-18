@@ -1027,6 +1027,12 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   bottom: 0;
   z-index: var(--z-base);
 }
+/* Portrait: the sheet of the map sits on the tab bar, which already keeps clear of the system's navigation bar. */
+@media (orientation: portrait) {
+  .mob-map-sheet {
+    padding-bottom: 0;
+  }
+}
 /* Landscape (boards "Ciel, objet sélectionné" and "Ciel, cadre sélectionné", landscape): the sheet of the map is as
    wide as a sheet over a scrim, at the left one gutter from the rail, and stops under the search row. */
 @media (orientation: landscape) {
