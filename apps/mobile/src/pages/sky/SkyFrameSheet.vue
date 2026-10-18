@@ -6,7 +6,7 @@ import type { SkyMap } from '@myastrosky/render/sky-map';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { frameDragging } from '../../sky-frames';
-import { frameKind, frameName, frameRotation } from '../../frame-text';
+import { formatFrameSide, frameKind, frameName, frameRotation } from '../../frame-text';
 import { useConfirm } from '../../composables/useConfirm';
 import { useErrorToast } from '../../composables/useErrorToast';
 import { useSheetDrag } from '../../composables/useSheetDrag';
@@ -18,6 +18,7 @@ import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import listPlusIcon from '@icons/list-plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 import penIcon from '@icons/pen.svg?raw';
+import resetIcon from '../../icons/rotate-ccw.svg?raw';
 
 // The board "Ciel, cadre sélectionné": the selected frame in a sheet over the bottom of the map. Its rotation (slider),
 // pinning, the anchor (a pinned frame snaps to the nearest object), moving a free frame into a plan,
@@ -48,6 +49,53 @@ const rotation = computed({
     else fov.applyChange(props.frame.id, { screenRotationDeg: d > 180 ? d - 360 : d });
   },
 });
+
+// A smart telescope's frame (board "Ciel, cadre agrandi, taille en premier"): its width and height from the native
+// field to the telescope's maximum, and back to the native field (the desktop drags a corner). Under an area cap
+// (Vaonis) the other side gives way to the one moved.
+const smart = computed(() =>
+  props.frame.isMosaicOutline ? null : (props.frame.smartMosaic ?? null),
+);
+const SIZE_STEP_DEG = 0.05;
+function resize(side: 'w' | 'h', deg: number) {
+  const s = smart.value;
+  if (!s) return;
+  let w = side === 'w' ? deg : props.frame.wDeg;
+  let h = side === 'h' ? deg : props.frame.hDeg;
+  const area = s.env.maxAreaDeg2;
+  if (area != null && w * h > area) {
+    if (side === 'w') h = Math.max(s.nativeHDeg, area / w);
+    else w = Math.max(s.nativeWDeg, area / h);
+  }
+  const { ra, dec, paDeg } = props.frame;
+  void fov.applyResize(props.frame.id, {
+    centerRa: ra ?? 0,
+    centerDec: dec ?? 0,
+    paDeg: paDeg ?? 0,
+    wDeg: w,
+    hDeg: h,
+  });
+}
+const width = computed({ get: () => props.frame.wDeg, set: (d: number) => resize('w', d) });
+const height = computed({ get: () => props.frame.hDeg, set: (d: number) => resize('h', d) });
+const isNative = computed(
+  () =>
+    !!smart.value &&
+    props.frame.wDeg <= smart.value.nativeWDeg * 1.01 &&
+    props.frame.hDeg <= smart.value.nativeHDeg * 1.01,
+);
+function nativeSize() {
+  const s = smart.value;
+  if (!s) return;
+  const { ra, dec, paDeg } = props.frame;
+  void fov.applyResize(props.frame.id, {
+    centerRa: ra ?? 0,
+    centerDec: dec ?? 0,
+    paDeg: paDeg ?? 0,
+    wDeg: s.nativeWDeg,
+    hDeg: s.nativeHDeg,
+  });
+}
 
 const pinned = computed({
   get: () => props.frame.anchorKind === 'sky',
@@ -174,6 +222,31 @@ async function remove() {
       </div>
     </div>
     <div v-show="!frameDragging" class="mob-sheet-body mob-scroll">
+      <template v-if="smart">
+        <PhoneSliderRow
+          v-model="width"
+          :label="t('mobile.sky.frameWidth')"
+          :min="smart.nativeWDeg"
+          :max="smart.env.maxWDeg"
+          :step="SIZE_STEP_DEG"
+          :display="formatFrameSide(width)"
+        />
+        <PhoneSliderRow
+          v-model="height"
+          :label="t('mobile.sky.frameHeight')"
+          :min="smart.nativeHDeg"
+          :max="smart.env.maxHDeg"
+          :step="SIZE_STEP_DEG"
+          :display="formatFrameSide(height)"
+        />
+        <PhoneRow
+          :title="t('mobile.sky.frameNativeSize')"
+          :lead="resetIcon"
+          :disabled="isNative"
+          button
+          @click="nativeSize"
+        />
+      </template>
       <PhoneSliderRow
         v-model="rotation"
         :label="t('manual.rotation')"
