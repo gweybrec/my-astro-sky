@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { defineComponent, h, ref, nextTick } from 'vue';
 import { ionicStubs } from './helpers';
 import PhoneButton from '../src/components/PhoneButton.vue';
 import PhoneIconButton from '../src/components/PhoneIconButton.vue';
@@ -8,6 +9,8 @@ import PhoneEmptyState from '../src/components/PhoneEmptyState.vue';
 import PhoneChip from '../src/components/PhoneChip.vue';
 import PhoneBadge from '../src/components/PhoneBadge.vue';
 import PhoneSheet from '../src/components/PhoneSheet.vue';
+import PhoneMapSheet from '../src/components/PhoneMapSheet.vue';
+import PhoneMapSheetHost from '../src/components/PhoneMapSheetHost.vue';
 import PhoneSearch from '../src/components/PhoneSearch.vue';
 import PhoneField from '../src/components/PhoneField.vue';
 import PhoneBusy from '../src/components/PhoneBusy.vue';
@@ -198,5 +201,40 @@ describe('the shared phone components', () => {
     stub.vm.$emit('ionChange', { detail: { value: '' } });
     expect(w.emitted('pick')).toEqual([['22:15']]);
     expect(w.emitted('clear')).toHaveLength(1);
+  });
+});
+
+describe('the map sheets', () => {
+  it('refuses to draw a map sheet outside a PhoneMapSheetHost (it would neither slide in nor out)', () => {
+    const errors = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      mount(PhoneMapSheet, { props: { title: 'M31' }, global: { stubs: ionicStubs } }),
+    ).toThrow(/PhoneMapSheetHost/);
+    errors.mockRestore();
+  });
+
+  it('slides a sheet in and out through its host, and draws the handle and the title', async () => {
+    const shown = ref(true);
+    const Page = defineComponent({
+      setup: () => () =>
+        h(PhoneMapSheetHost, null, {
+          default: () => (shown.value ? h(PhoneMapSheet, { title: 'M31' }) : null),
+        }),
+    });
+    const w = mount(Page, { global: { stubs: ionicStubs } });
+    expect(w.find('.mob-map-sheet .mob-sheet-grab').exists()).toBe(true);
+    expect(w.find('.mob-sheet-title').text()).toBe('M31');
+    shown.value = false;
+    await nextTick();
+    expect(w.find('.mob-map-sheet').exists()).toBe(false);
+  });
+
+  it('closes from its handle', async () => {
+    const w = mount(PhoneMapSheetHost, {
+      slots: { default: () => h(PhoneMapSheet, { title: 'M31' }) },
+      global: { stubs: ionicStubs },
+    });
+    await w.find('.mob-sheet-grab').trigger('click');
+    expect(w.findComponent(PhoneMapSheet).emitted('close')).toHaveLength(1);
   });
 });

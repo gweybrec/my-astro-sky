@@ -28,6 +28,7 @@ import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
 import SkyPhotoSheet from './sky/SkyPhotoSheet.vue';
 import SkyFrameSheet from './sky/SkyFrameSheet.vue';
+import PhoneMapSheetHost from '../components/PhoneMapSheetHost.vue';
 import SkyFramesSheet from './sky/SkyFramesSheet.vue';
 import SkyFramePicker, { type FrameTarget } from './sky/SkyFramePicker.vue';
 import SkyMosaicSheet from './sky/SkyMosaicSheet.vue';
@@ -309,7 +310,7 @@ onBeforeUnmount(() => {
             <SkyTimeBar />
             <SkyLayerButtons />
           </template>
-          <Transition name="mob-sheet-slide">
+          <PhoneMapSheetHost>
             <SkyPhotoSheet
               v-if="skySelection?.kind === 'photo' && photoLayer"
               :key="skySelection.photo.id"
@@ -336,7 +337,7 @@ onBeforeUnmount(() => {
               @close="releaseFrame"
               @edit-mosaic="openMosaicEdit"
             />
-          </Transition>
+          </PhoneMapSheetHost>
         </main>
         <SkyPlacement
           v-if="placing && skyMap && mapEl"

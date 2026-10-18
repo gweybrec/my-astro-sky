@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, useId, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import type { Photo } from '@myastrosky/core/types';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import { deletePhotoAPI } from '@myastrosky/app-state/api';
 import { useConfirm } from '../../composables/useConfirm';
 import { useErrorToast } from '../../composables/useErrorToast';
-import { useSheetDrag } from '../../composables/useSheetDrag';
+import PhoneMapSheet from '../../components/PhoneMapSheet.vue';
 import PhoneChip from '../../components/PhoneChip.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
@@ -26,10 +26,8 @@ import trashIcon from '@icons/trash.svg?raw';
 // It closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button.
 const props = defineProps<{ photo: Photo; layer: PhotoLayer }>();
 const emit = defineEmits<{ close: []; removed: []; dso: [id: string]; gallery: []; edit: [] }>();
-const titleId = useId();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
-const drag = useSheetDrag(() => emit('close'));
 
 const placed = () => props.layer.getPlacedPhotos().find((p) => p.photo.id === props.photo.id);
 const opacity = ref(placed()?.opacity ?? 1);
@@ -76,20 +74,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
 </script>
 
 <template>
-  <section class="mob-sheet mob-sheet--auto mob-map-sheet" :aria-labelledby="titleId">
-    <div class="mob-sheet-drag" v-on="drag">
-      <button
-        type="button"
-        class="mob-sheet-grab"
-        :aria-label="t('mobile.sky.closeSheet')"
-        @click="emit('close')"
-      >
-        <span class="mob-sheet-handle" />
-      </button>
-      <div class="mob-sheet-header">
-        <h2 :id="titleId" class="mob-sheet-title m-title">{{ photo.originalName }}</h2>
-      </div>
-    </div>
+  <PhoneMapSheet :title="photo.originalName" @close="emit('close')">
     <div
       v-if="pages.length"
       class="mob-pager"
@@ -154,5 +139,5 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
         <AppIcon :svg="trashIcon" />
       </PhoneIconButton>
     </div>
-  </section>
+  </PhoneMapSheet>
 </template>

@@ -1056,24 +1056,18 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
 .mob-map-sheet .mob-sheet-header {
   touch-action: none;
 }
+/* The rows of a map sheet have no dividers: they sit between sliders, steppers and cards, which have none (boards of
+   the map's sheets). */
+.mob-map-sheet ion-item.mob-row,
+.mob-map-sheet ion-toggle.mob-row,
+.mob-map-sheet .mob-row {
+  border-bottom: 0;
+}
 
-/* The map's object sheet slides up when it opens and down when it closes, as Ionic's own sheets do. */
+/* Ionic's sheet speed: the map's sheets slide in and out at it (PhoneMapSheetHost, map-sheet.ts), and the placement
+   panel folds at it. */
 :root {
   --sheet-slide-duration: 0.3s;
-}
-.mob-sheet-slide-enter-active,
-.mob-sheet-slide-leave-active {
-  transition: transform var(--sheet-slide-duration) ease;
-}
-.mob-sheet-slide-enter-from,
-.mob-sheet-slide-leave-to {
-  transform: translateY(100%);
-}
-@media (prefers-reduced-motion: reduce) {
-  .mob-sheet-slide-enter-active,
-  .mob-sheet-slide-leave-active {
-    transition: none;
-  }
 }
 /* A row of fewer actions than the board's five sits at the start of the row, not spread from edge to edge. */
 .mob-icon-row--start {

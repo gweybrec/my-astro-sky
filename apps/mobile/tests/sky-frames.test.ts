@@ -7,7 +7,7 @@ import type { SkyMap } from '@myastrosky/render/sky-map';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import type { Plan } from '@myastrosky/app-state/api';
-import { ionicStubs } from './helpers';
+import { ionicStubs, mapSheetHost } from './helpers';
 
 const confirm = vi.fn();
 const showError = vi.fn();
@@ -119,7 +119,10 @@ describe('the words of a frame', () => {
 describe('the sheet of the selected frame', () => {
   const mountSheet = (f: RenderableFrame, map = fakeMap()) => ({
     map,
-    w: mount(SkyFrameSheet, { props: { frame: f, map }, global: { stubs: ionicStubs } }),
+    w: mount(SkyFrameSheet, {
+      props: { frame: f, map },
+      global: { stubs: ionicStubs, provide: mapSheetHost },
+    }),
   });
 
   it('shows the target, the setup, then the rotation, pin, anchor and delete', () => {
@@ -231,7 +234,10 @@ describe('the size of a smart telescope frame', () => {
       ...over,
     });
   const mountSheet = (f: RenderableFrame) =>
-    mount(SkyFrameSheet, { props: { frame: f, map: fakeMap() }, global: { stubs: ionicStubs } });
+    mount(SkyFrameSheet, {
+      props: { frame: f, map: fakeMap() },
+      global: { stubs: ionicStubs, provide: mapSheetHost },
+    });
 
   it('shows Largeur, Hauteur and Taille d’origine first, before the rotation', () => {
     const w = mountSheet(seestar());

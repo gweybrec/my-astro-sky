@@ -6,7 +6,7 @@ import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/s
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import type { DSO } from '@myastrosky/core/types';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
-import { ionicStubs } from './helpers';
+import { ionicStubs, mapSheetHost } from './helpers';
 
 // The page's own lifecycle hooks run at once in these tests.
 vi.mock('@ionic/vue', async (importOriginal) => ({
@@ -44,7 +44,11 @@ const VEGA = {
 };
 const mountSheet = (
   selection: Exclude<SkySelection, { kind: 'photo' }> = { kind: 'dso', dso: M31 },
-) => mount(SkyObjectSheet, { props: { selection }, global: { stubs: ionicStubs } });
+) =>
+  mount(SkyObjectSheet, {
+    props: { selection },
+    global: { stubs: ionicStubs, provide: mapSheetHost },
+  });
 const factsOf = (w: ReturnType<typeof mount>) =>
   w
     .findAll('.mob-fact')
