@@ -687,6 +687,19 @@ describe('fov-frames store', () => {
     expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(25);
   });
 
+  it('a frame added while a mosaic is selected takes the selection from it', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.setActive('mosaic:p1:mo1');
+    vi.spyOn(plans, 'addCustomEntry').mockResolvedValue('e-new');
+    await store.addPlanFrame('p1', 84, -5);
+    expect(store.activeId).toBe('plan:p1:e-new');
+    expect(store.activeMosaicId).toBeNull();
+    store.setActive('mosaic:p1:mo1');
+    store.addAdhocFrame('s1');
+    expect(store.activeMosaicId).toBeNull();
+  });
+
   // ── mosaicIsBorderTile: only outer tiles show the delete button ─────────────
   it('all tiles in a 2×2 mosaic are border tiles (every tile has a free neighbor)', async () => {
     const store = await withSpecs();

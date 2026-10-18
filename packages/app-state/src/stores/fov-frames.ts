@@ -1308,7 +1308,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     plansStore.setEntryPosition(planId, entryId, { dsoId, paDeg: f.rotationDeg });
     removeFrame(adhocId);
     setSelection({ kind: 'plan', planId });
-    activeId.value = `plan:${planId}:${entryId}`;
+    setActive(`plan:${planId}:${entryId}`);
   }
 
   /** Move a free mosaic into a plan (re-creating it as a plan mosaic with the same
@@ -1463,7 +1463,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     }
     const id = genId();
     adhoc.value.push({ id, setupId, anchor: { kind: 'screen', nx: 0.5, ny: 0.5 }, rotationDeg: 0 });
-    activeId.value = id;
+    setActive(id);
     persist();
   }
 
@@ -1484,7 +1484,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     }
     const id = genId();
     adhoc.value.push({ id, setupId, anchor: { kind: 'sky', ra, dec, dsoId }, rotationDeg: 0 });
-    activeId.value = id;
+    setActive(id);
     persist();
   }
 
@@ -1497,7 +1497,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     }
     if (adhoc.value.some((f) => f.id === frame.id)) return;
     adhoc.value.push(frame);
-    activeId.value = frame.id;
+    setActive(frame.id);
     persist();
   }
 
@@ -1512,7 +1512,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       persistSelection();
     }
     const entryId = await plansStore.addCustomEntry(planId, ra, dec);
-    if (entryId) activeId.value = `plan:${planId}:${entryId}`;
+    if (entryId) setActive(`plan:${planId}:${entryId}`);
   }
 
   /** Remove an ad-hoc frame (plan frames are deleted via deletePlanFrame). */
