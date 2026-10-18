@@ -1,52 +1,23 @@
 import { t } from './i18n';
-import { formatFov } from '@myastrosky/core/gear-presets';
 import { reportUnknownRendererError } from './error-reporter';
-import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
-import { usePlansStore } from '@myastrosky/app-state/stores/plans';
-import { getDSOById } from './dso-catalog';
-import { customLocationLabel } from './star-catalog';
-import { tileCenters, outlineFromGrid, transformMosaicToSetup } from '@myastrosky/core/mosaic';
-import type { TargetFov, MosaicTransform } from '@myastrosky/core/mosaic';
+import {
+  commitSetupSwitch,
+  setupSwitchItems,
+  switchProposalText,
+  switchSetupDirectly,
+  type SwitchDecision,
+  type SwitchItem,
+} from '@myastrosky/app-state/setup-switch';
 import type { Plan } from './api';
-import { updatePlanEntryPositionAPI } from './api';
 
 /**
  * Shared "switch a plan's gear setup" flow, used both by the sky-view FOV popup
  * and the Plans list in the Targets tab. Changing a setup re-sizes every frame;
  * mosaics (tile grids and smart-scope enlarged frames) can't always re-fit
- * cleanly, so this module detects them and surfaces a per-mosaic Apply/Drop
- * confirmation modal before committing the switch.
+ * cleanly, so the shared part (packages/app-state/src/setup-switch.ts) finds them
+ * and this module surfaces a per-mosaic Apply/Drop confirmation modal before
+ * committing the switch.
  */
-
-/** Sky centre of a plan entry: its explicit frame centre, else its DSO position. */
-function entryCenter(e: {
-  ra: number | null;
-  dec: number | null;
-  dsoId: string | null;
-}): { ra: number; dec: number } | null {
-  if (e.ra != null && e.dec != null) return { ra: e.ra, dec: e.dec };
-  const dso = e.dsoId ? getDSOById(e.dsoId) : undefined;
-  return dso ? { ra: dso.ra, dec: dso.dec } : null;
-}
-
-/** Resolved angular size + envelope for a setup, read from the fov-frames store. */
-export type SetupSpecLite = {
-  wDeg: number;
-  hDeg: number;
-  smart: boolean;
-  mosaic: TargetFov['envelope'];
-};
-
-/** A mosaic (tile grid or enlarged smart frame) that doesn't map cleanly onto a
- * new setup: its proposed best transformation, plus the actions to commit or
- * drop it. Surfaced as one decision row in the setup-switch modal. */
-export type SwitchItem = {
-  id: string;
-  label: string;
-  transform: MosaicTransform;
-  apply: () => Promise<void>;
-  drop: () => Promise<void>;
-};
 
 /** Callbacks the host call site supplies so this module stays UI-agnostic. */
 export type SetupSwitchHooks = {
@@ -57,175 +28,23 @@ export type SetupSwitchHooks = {
 };
 
 /**
- * Mosaics in `plan` that need a decision when moving from `oldSpec` to
- * `newSpec`: every tile-grid mosaic, plus every standalone frame a smart scope
- * enlarged beyond native. Each carries the best transformation (re-grid for a
- * classical target, clamp-to-envelope for a smart one) and the apply/drop ops.
- * Plain native-FOV single frames re-fit silently, so they're excluded.
- */
-export function collectSwitchItems(
-  plan: Plan,
-  oldSpec: SetupSpecLite,
-  newSpec: SetupSpecLite,
-): SwitchItem[] {
-  const plansStore = usePlansStore();
-  const planId = plan.id;
-  const target: TargetFov = {
-    wDeg: newSpec.wDeg,
-    hDeg: newSpec.hDeg,
-    envelope: newSpec.mosaic,
-    tileable: !newSpec.smart,
-  };
-  const newW = newSpec.wDeg,
-    newH = newSpec.hDeg;
-  // A transformed size within 1% of the new native FOV renders un-enlarged.
-  const nearNative = (w: number, h: number): boolean => w <= newW * 1.01 && h <= newH * 1.01;
-  const items: SwitchItem[] = [];
-
-  for (const mosaic of plan.mosaics ?? []) {
-    const outline = outlineFromGrid(
-      mosaic.cols,
-      mosaic.rows,
-      oldSpec.wDeg,
-      oldSpec.hDeg,
-      mosaic.overlapPct,
-    );
-    const transform = transformMosaicToSetup(outline.wDeg, outline.hDeg, mosaic.overlapPct, target);
-    const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
-    items.push({
-      id: `mosaic:${mosaic.id}`,
-      label:
-        mosaic.name ??
-        (dso
-          ? (dso.displayName ?? dso.id)
-          : customLocationLabel(mosaic.centerRa, mosaic.centerDec)),
-      transform,
-      drop: () => plansStore.deleteMosaic(planId, mosaic.id),
-      apply: async () => {
-        if (transform.kind === 'grid') {
-          // Re-tile the same centre/PA/overlap with the new gear FOV.
-          const tiles = tileCenters(
-            { ra: mosaic.centerRa, dec: mosaic.centerDec },
-            mosaic.paDeg,
-            transform.cols,
-            transform.rows,
-            newW,
-            newH,
-            mosaic.overlapPct,
-          ).map((tl) => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
-          await plansStore.updateMosaic(planId, mosaic.id, {
-            dsoId: mosaic.dsoId,
-            name: mosaic.name ?? undefined,
-            centerRa: mosaic.centerRa,
-            centerDec: mosaic.centerDec,
-            paDeg: mosaic.paDeg,
-            overlapPct: mosaic.overlapPct,
-            cols: transform.cols,
-            rows: transform.rows,
-            tiles,
-          });
-        } else {
-          // Collapse to a single (smart-enlarged or native) frame on the target.
-          await plansStore.deleteMosaic(planId, mosaic.id);
-          const newId = await plansStore.addCustomEntry(planId, mosaic.centerRa, mosaic.centerDec);
-          if (newId) {
-            const native = nearNative(transform.wDeg, transform.hDeg);
-            await updatePlanEntryPositionAPI(planId, newId, {
-              dsoId: mosaic.dsoId,
-              paDeg: mosaic.paDeg,
-              mosaicWDeg: native ? null : transform.wDeg,
-              mosaicHDeg: native ? null : transform.hDeg,
-            });
-          }
-        }
-      },
-    });
-  }
-
-  for (const entry of plan.entries) {
-    if (entry.mosaicId) continue;
-    if (entry.mosaicWDeg == null || entry.mosaicHDeg == null) continue; // not an enlarged frame
-    const transform = transformMosaicToSetup(entry.mosaicWDeg, entry.mosaicHDeg, 20, target);
-    const dso = entry.dsoId ? getDSOById(entry.dsoId) : undefined;
-    const center = entryCenter(entry);
-    items.push({
-      id: `entry:${entry.id}`,
-      label: dso
-        ? (dso.displayName ?? dso.id)
-        : center
-          ? customLocationLabel(center.ra, center.dec)
-          : t('fovOverlay.customLocation'),
-      transform,
-      drop: () => plansStore.removeEntry(planId, entry.id),
-      apply: async () => {
-        if (transform.kind === 'single' || !center) {
-          // Re-clamp (or clear) the single-frame enlargement for the new scope.
-          const native = transform.kind === 'single' && !nearNative(transform.wDeg, transform.hDeg);
-          await updatePlanEntryPositionAPI(planId, entry.id, {
-            mosaicWDeg: native ? transform.wDeg : null,
-            mosaicHDeg: native ? transform.hDeg : null,
-          });
-        } else {
-          // Classical target: tile the enlarged frame into a mosaic.
-          const paDeg = entry.paDeg ?? 0;
-          const tiles = tileCenters(
-            center,
-            paDeg,
-            transform.cols,
-            transform.rows,
-            newW,
-            newH,
-            20,
-          ).map((tl) => ({ ra: tl.ra, dec: tl.dec, paDeg: tl.paDeg }));
-          await plansStore.createMosaic(planId, {
-            dsoId: entry.dsoId,
-            centerRa: center.ra,
-            centerDec: center.dec,
-            paDeg,
-            overlapPct: 20,
-            cols: transform.cols,
-            rows: transform.rows,
-            tiles,
-            replaceEntryIds: [entry.id],
-          });
-        }
-      },
-    });
-  }
-  return items;
-}
-
-/**
  * Entry point for a setup switch. Reads the plan's current setup as the "old"
- * one, resolves both specs, and either commits the switch directly (no mosaics
- * to reconcile, or clearing the setup) or opens the confirmation modal.
+ * one, and either commits the switch directly (no mosaics to reconcile, or
+ * clearing the setup) or opens the confirmation modal.
  */
 export async function requestSetupSwitch(
   plan: Plan,
   newSetupId: string | null,
   hooks: SetupSwitchHooks,
 ): Promise<void> {
-  const plansStore = usePlansStore();
-  const fovStore = useFovFramesStore();
-  const oldSetupId = plan.setupId;
-  if (newSetupId === oldSetupId) return;
-
-  const proceed = (): void => {
-    plansStore.updatePlanSettings(plan.id, plan.nightOf, newSetupId, plan.lat, plan.lon);
-    fovStore.loadSpecs().then(() => hooks.onApplied());
-  };
-
-  // Switching to no setup (or with both setups resolved) — build the list of
-  // mosaics that need a decision. None ⇒ apply the switch directly.
-  await fovStore.loadSpecs();
-  const oldSpec = oldSetupId ? fovStore.specs.get(oldSetupId) : undefined;
-  const newSpec = newSetupId ? fovStore.specs.get(newSetupId) : undefined;
-  const items = newSpec && oldSpec ? collectSwitchItems(plan, oldSpec, newSpec) : [];
+  if (newSetupId === plan.setupId) return;
+  // Switching to no setup, or no mosaic needs a decision: apply the switch directly.
+  const items = await setupSwitchItems(plan, newSetupId);
   if (items.length === 0 || !newSetupId) {
-    proceed();
+    void switchSetupDirectly(plan, newSetupId).then(() => hooks.onApplied());
     return;
   }
-  openSetupSwitchModal(plan, oldSetupId, newSetupId, items, hooks);
+  openSetupSwitchModal(plan, newSetupId, items, hooks);
 }
 
 /**
@@ -236,19 +55,11 @@ export async function requestSetupSwitch(
  */
 export function openSetupSwitchModal(
   plan: Plan,
-  oldSetupId: string | null,
   newSetupId: string,
   items: SwitchItem[],
   hooks: SetupSwitchHooks,
 ): void {
-  const plansStore = usePlansStore();
-  const fovStore = useFovFramesStore();
-  const decisions = new Map<string, 'apply' | 'drop'>();
-
-  const proposalText = (tr: MosaicTransform): string =>
-    tr.kind === 'grid'
-      ? `${tr.cols}×${tr.rows} · ${formatFov(tr.wDeg, tr.hDeg)}`
-      : `${t('fovOverlay.switchSingleFrame')} · ${formatFov(tr.wDeg, tr.hDeg)}`;
+  const decisions = new Map<string, SwitchDecision>();
 
   // The `.modal-backdrop` below is auto-detected as an open modal, so the sky
   // tooltip stays suppressed for the whole lifetime of this dialog.
@@ -314,7 +125,7 @@ export function openSetupSwitchModal(
     name.textContent = item.label;
     const proposal = document.createElement('div');
     proposal.className = 'text-micro text-muted';
-    proposal.textContent = proposalText(item.transform);
+    proposal.textContent = switchProposalText(item.transform);
     info.append(name, proposal);
 
     const toggle = document.createElement('div');
@@ -353,14 +164,7 @@ export function openSetupSwitchModal(
     ok.disabled = true;
     cancel.disabled = true;
     try {
-      // Persist the new setup first so the spec context matches the new gear.
-      await plansStore.updatePlanSettings(plan.id, plan.nightOf, newSetupId, plan.lat, plan.lon);
-      for (const item of items) {
-        if (decisions.get(item.id) === 'drop') await item.drop();
-        else await item.apply();
-      }
-      await plansStore.load();
-      await fovStore.loadSpecs();
+      await commitSetupSwitch(plan, newSetupId, items, decisions);
       hooks.onApplied();
       close(false);
     } catch (err) {
