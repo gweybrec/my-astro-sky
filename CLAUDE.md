@@ -174,4 +174,6 @@ scaffolding. It is real work, but nothing an astronomer reading the release note
 would recognise, so it is skipped. Reserve plain `refactor:` for restructuring you
 _do_ want announced.
 
+A follow-up to a not-yet-released feature (a fix, a tweak) is part of that feature: amend its commit if unpushed, else commit it as `internal(...)`, never as its own `feat:`/`fix:`/`improvement:`.
+
 Append `!` (e.g. `feat!:`) or a `BREAKING CHANGE:` footer for breaking changes. Preview the _unreleased_ section (since the last tag) to the console with `npm run changelog:preview`; regenerate the actual files with `npm run changelog` (runs `scripts/generate-changelog.mjs`). `CHANGELOG.md` is scoped to the **current major version series**; completed majors are frozen into `CHANGELOG.v<n>.md` archives automatically at the next major release. See [docs/dev/ci.md](docs/dev/ci.md#release-release-yml) for how the release pipeline consumes commits.
