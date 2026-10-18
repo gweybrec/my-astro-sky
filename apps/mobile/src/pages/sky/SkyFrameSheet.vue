@@ -10,7 +10,6 @@ import { frameKind, frameName, frameRotation } from '../../frame-text';
 import { useConfirm } from '../../composables/useConfirm';
 import { useErrorToast } from '../../composables/useErrorToast';
 import { useSheetDrag } from '../../composables/useSheetDrag';
-import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneRow from '../../components/PhoneRow.vue';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
@@ -20,8 +19,8 @@ import listPlusIcon from '@icons/list-plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 import penIcon from '@icons/pen.svg?raw';
 
-// The board "Ciel, cadre sélectionné": the selected frame in a sheet over the bottom of the map. Its rotation (slider,
-// ±1° and ±5°), pinning, the anchor (a pinned frame snaps to the nearest object), moving a free frame into a plan,
+// The board "Ciel, cadre sélectionné": the selected frame in a sheet over the bottom of the map. Its rotation (slider),
+// pinning, the anchor (a pinned frame snaps to the nearest object), moving a free frame into a plan,
 // deleting it. While a finger drags the frame the sheet shrinks to its title (board "Ciel, déplacer le cadre"). It
 // closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button, and the frame
 // is let go of. A mosaic (board "Ciel, mosaïque sélectionnée") adds its Lignes / Colonnes, which re-tile it about its
@@ -40,8 +39,6 @@ const title = computed(() =>
   kind.value === 'free' ? (props.frame.anchorLabel ?? props.frame.label) : frameName(props.frame),
 );
 
-const ROTATE_STEPS = [-5, -1, 1, 5] as const;
-const signed = (n: number) => (n > 0 ? `+${n}°` : `−${-n}°`);
 const rotation = computed({
   get: () => frameRotation(props.frame),
   set: (deg: number) => {
@@ -184,15 +181,6 @@ async function remove() {
         :max="359"
         :display="`${rotation}°`"
       />
-      <div class="mob-btn-row">
-        <PhoneButton
-          v-for="step in ROTATE_STEPS"
-          :key="step"
-          :aria-label="t('mobile.sky.frameRotateBy', { value: signed(step) })"
-          @click="rotation = rotation + step"
-          >{{ signed(step) }}</PhoneButton
-        >
-      </div>
       <PhoneToggleRow v-if="frame.pinnable" v-model="pinned" :title="t('mobile.sky.framePin')" />
       <PhoneToggleRow
         v-model="anchored"

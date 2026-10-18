@@ -152,7 +152,6 @@ const fr = {
     framePin: 'Épingler',
     frameAnchor: 'Ancrage',
     frameAnchorSub: "Aimantation à l'objet le plus proche",
-    frameRotateBy: 'Tourner de {value}',
     rowsLess: 'Moins de lignes',
     rowsMore: 'Plus de lignes',
     colsLess: 'Moins de colonnes',
