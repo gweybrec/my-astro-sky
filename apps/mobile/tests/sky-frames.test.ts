@@ -219,6 +219,79 @@ describe('the sheet of the selected frame', () => {
   });
 });
 
+describe('the size of a smart telescope frame', () => {
+  const seestar = (over: Partial<RenderableFrame> = {}) =>
+    frame({
+      id: 'adhoc-s',
+      label: 'Seestar S50 · 2.1° × 1.2°',
+      wDeg: 2.1,
+      hDeg: 1.2,
+      paDeg: 0,
+      smartMosaic: { env: { maxWDeg: 2.6, maxHDeg: 1.4 }, nativeWDeg: 1.3, nativeHDeg: 0.7 },
+      ...over,
+    });
+  const mountSheet = (f: RenderableFrame) =>
+    mount(SkyFrameSheet, { props: { frame: f, map: fakeMap() }, global: { stubs: ionicStubs } });
+
+  it('shows Largeur, Hauteur and Taille d’origine first, before the rotation', () => {
+    const w = mountSheet(seestar());
+    const sliders = w.findAllComponents(PhoneSliderRow);
+    expect(sliders.map((r) => [r.props('label'), r.props('display')])).toEqual([
+      ['Largeur', '2.1°'],
+      ['Hauteur', '1.2°'],
+      ['Rotation', '0°'],
+    ]);
+    expect(sliders[0].props('min')).toBe(1.3);
+    expect(sliders[0].props('max')).toBe(2.6);
+    expect(byText(w, 'Taille d’origine')).toBeTruthy();
+    expect(
+      mountSheet(seestar({ hDeg: 0.73 }))
+        .findAllComponents(PhoneSliderRow)[1]
+        .props('display'),
+    ).toBe('0.73°');
+  });
+
+  it('resizes one side, and back to the native field', async () => {
+    const apply = vi.spyOn(useFovFramesStore(), 'applyResize').mockResolvedValue();
+    const w = mountSheet(seestar());
+    w.findAllComponents(PhoneSliderRow)[0].vm.$emit('update:modelValue', 2.4);
+    expect(apply).toHaveBeenLastCalledWith(
+      'adhoc-s',
+      expect.objectContaining({ wDeg: 2.4, hDeg: 1.2 }),
+    );
+    await byText(w, 'Taille d’origine')!.trigger('click');
+    expect(apply).toHaveBeenLastCalledWith(
+      'adhoc-s',
+      expect.objectContaining({ wDeg: 1.3, hDeg: 0.7 }),
+    );
+  });
+
+  it('gives way on the other side under an area cap (Vaonis)', () => {
+    const apply = vi.spyOn(useFovFramesStore(), 'applyResize').mockResolvedValue();
+    const w = mountSheet(
+      seestar({
+        wDeg: 3,
+        hDeg: 3,
+        smartMosaic: {
+          env: { maxWDeg: 4.33, maxHDeg: 4.33, maxAreaDeg2: 10.56 },
+          nativeWDeg: 2.5,
+          nativeHDeg: 1.6,
+        },
+      }),
+    );
+    w.findAllComponents(PhoneSliderRow)[1].vm.$emit('update:modelValue', 4.2);
+    const region = apply.mock.calls[0][1];
+    expect(region.hDeg).toBe(4.2);
+    expect(region.wDeg).toBeCloseTo(10.56 / 4.2, 6);
+  });
+
+  it('has no size rows for a frame of a classical telescope', () => {
+    const w = mountSheet(frame({ id: 'adhoc-1' }));
+    expect(w.findAllComponents(PhoneSliderRow)).toHaveLength(1);
+    expect(byText(w, 'Taille d’origine')).toBeUndefined();
+  });
+});
+
 describe('Contours de champ', () => {
   const mountSheet = (map = fakeMap()) => ({
     map,

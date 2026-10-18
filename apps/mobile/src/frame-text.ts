@@ -56,3 +56,8 @@ export function newPlanName(now = new Date()): string {
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   return defaultPlanName(today, t);
 }
+
+/** One side of a smart telescope frame in degrees, as its Largeur / Hauteur show it: "2.1°", "0.73°" under a degree. */
+export function formatFrameSide(deg: number): string {
+  return `${deg.toFixed(deg < 1 ? 2 : 1)}°`;
+}
