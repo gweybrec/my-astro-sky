@@ -149,6 +149,11 @@ const es: Translations['mobile'] = {
     needsLocation: 'Define primero el lugar de observación (Ajustes)',
     needsLocalSky: 'Activa primero el cielo local',
     needsHorizon: 'Calcula o importa primero el horizonte del relieve (Ajustes)',
+    frameSet: 'Marcos',
+    framePin: 'Fijar',
+    frameAnchor: 'Anclaje',
+    frameAnchorSub: 'Ajuste al objeto más cercano',
+    frameRotateBy: 'Girar {value}',
   },
   backup: { exportSection: 'Exportar', importSection: 'Importar' },
 };

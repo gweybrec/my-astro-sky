@@ -7,11 +7,13 @@ import PhoneIconButton from '../../components/PhoneIconButton.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import slidersIcon from '../../icons/sliders.svg?raw';
 import calendarIcon from '@icons/calendar.svg?raw';
+import telescopeIcon from '@icons/telescope.svg?raw';
 
-// The top row of the map ("Ciel"): the search field, the display settings and the date button. The date button is the
+// The top row of the map ("Ciel"): the search field, the display settings, the frames ("Contours de champ", the desktop's
+// telescope button) and the date button. The date button is the
 // desktop's: it switches the map between the live sky and the sky at a date (pressed in the date mode), and the
 // time bar and the toggles of the map appear while it is on; switching to the date mode picks nothing by itself.
-const emit = defineEmits<{ search: []; display: [] }>();
+const emit = defineEmits<{ search: []; display: []; frames: [] }>();
 const time = useSkyTimeStore();
 const { mode } = storeToRefs(time);
 </script>
@@ -27,6 +29,9 @@ const { mode } = storeToRefs(time);
     />
     <PhoneIconButton float :label="t('display.section')" @click="emit('display')">
       <AppIcon :svg="slidersIcon" />
+    </PhoneIconButton>
+    <PhoneIconButton float :label="t('fovOverlay.btnTitle')" @click="emit('frames')">
+      <AppIcon :svg="telescopeIcon" />
     </PhoneIconButton>
     <PhoneIconButton
       float

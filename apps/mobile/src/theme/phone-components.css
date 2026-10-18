@@ -323,6 +323,43 @@ ion-checkbox.mob-check-row.checkbox-disabled::part(container) {
   opacity: 0.4;
 }
 
+/* A row with its tick box at the start, in the lead holder (PhoneCheckLeadRow): the box is the tick-box row's. The text
+   beside it may be a button of its own, which takes the rest of the row's height. */
+.mob-check-lead-row {
+  align-items: stretch;
+}
+.mob-check-lead-row > .mob-row-lead {
+  align-self: center;
+}
+.mob-check-lead-row > .mob-row-body {
+  justify-content: center;
+}
+ion-checkbox.mob-lead-check {
+  --size: var(--space-9);
+  --border-radius: var(--radius-sm);
+  --border-width: 1px;
+  --border-color: var(--text-dim);
+  --border-color-checked: var(--accent-color);
+  --checkbox-background: var(--border-white-md);
+  --checkbox-background-checked: var(--accent-color);
+  --checkmark-color: var(--bg-app);
+  --checkmark-width: 2.6px;
+  --transition: none;
+}
+ion-checkbox.mob-lead-check::part(mark) {
+  transform-box: view-box;
+  transform-origin: center;
+  transform: scale(0.75);
+}
+.mob-check-lead-text {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
 /* A choice row with a radio button at its right end: same row and 24 px mark as the tick-box row; the mark is the
    design system's `.mob-radio` (the accent colour when chosen). */
 ion-radio.mob-radio-row {
@@ -990,6 +1027,19 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   bottom: 0;
   z-index: var(--z-base);
 }
+/* Landscape (boards "Ciel, objet sélectionné" and "Ciel, cadre sélectionné", landscape): the sheet of the map is as
+   wide as a sheet over a scrim, at the left one gutter from the rail, and stops under the search row. */
+@media (orientation: landscape) {
+  .mob-map-sheet {
+    left: var(--mobile-gutter);
+    right: auto;
+    width: 440px;
+    max-width: calc(100% - 2 * var(--mobile-gutter));
+    max-height: calc(100% - var(--mobile-touch-min) - 2 * var(--mobile-gutter));
+    box-sizing: border-box;
+    border-width: 1px 1px 0;
+  }
+}
 .mob-sheet-drag {
   display: contents;
 }
@@ -1221,6 +1271,15 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
 }
 .mob-photo-layer.photos-frozen .photo-overlay-img {
   visibility: hidden;
+}
+/* The map's second canvas, above the photos: frames, the terrain, the trajectory, regions and pins. */
+.mob-sky-overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* ── A mode of the Ciel map (board "Placer la photo"): its title bar, the map, and the panel of its settings under the

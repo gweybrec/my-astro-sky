@@ -21,12 +21,12 @@ import infoIcon from '../../icons/info.svg?raw';
 
 // The board "Ciel, objet sélectionné": the object picked on the map or in the search, in a sheet over the bottom of the
 // map. A deep-sky object has the board's five actions; a star, which the board does not draw, has the desktop's: a
-// frame, a mosaic, and its details. The sheet closes by dragging it down from its handle or header, with the handle,
+// frame, a mosaic, and its details. "Ajouter un cadre" is handed to the page (it opens "Créer un cadre"). The sheet closes by dragging it down from its handle or header, with the handle,
 // with a tap on an empty spot of the map and with the back button. The altitude is the object's now in the map's time
 // (as the desktop shows it, in date mode with a location only); the transit is when it is highest during the night at
 // the location.
 const props = defineProps<{ selection: Exclude<SkySelection, { kind: 'photo' }> }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; addFrame: [] }>();
 const titleId = useId();
 const time = useSkyTimeStore();
 
@@ -114,14 +114,15 @@ const drag = useSheetDrag(() => emit('close'));
       </div>
     </div>
     <PhoneFacts :facts="facts" :columns="facts.length === 3 ? 3 : 2" />
-    <!-- The screens behind these actions (frames, mosaics, plan picker, edit, details) have no board yet. -->
+    <!-- "Ajouter un cadre" opens "Créer un cadre"; the screens behind the others (mosaics, plan picker, edit, details)
+         are not built yet. -->
     <div
       class="mob-icon-row"
       :class="{ 'mob-icon-row--start': selection.kind !== 'dso' }"
       role="group"
       :aria-label="t('mobile.sky.objectActions')"
     >
-      <PhoneIconButton waiting :label="t('fovOverlay.addFrame')"
+      <PhoneIconButton :label="t('fovOverlay.addFrame')" @click="emit('addFrame')"
         ><AppIcon :svg="addFrameIcon"
       /></PhoneIconButton>
       <PhoneIconButton waiting :label="t('fovOverlay.addMosaic')"

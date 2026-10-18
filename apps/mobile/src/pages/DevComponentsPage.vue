@@ -31,6 +31,7 @@ import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneSliderRow from '../components/PhoneSliderRow.vue';
 import PhoneToggleRow from '../components/PhoneToggleRow.vue';
+import PhoneCheckLeadRow from '../components/PhoneCheckLeadRow.vue';
 import PhoneTargetRow from '../components/PhoneTargetRow.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import { useConfirm } from '../composables/useConfirm';
@@ -179,6 +180,11 @@ function raiseError() {
           <PhoneRow title="Désactivée" :subs="['La raison reste lisible']" disabled chevron />
           <PhoneToggleRow v-model="switchOn" title="Interrupteur activé" />
           <PhoneToggleRow v-model="switchOff" title="Interrupteur désactivé" />
+          <PhoneToggleRow
+            v-model="switchOn"
+            title="Ancrage"
+            sub="Aimantation à l'objet le plus proche, une ligne longue qui passe à la ligne"
+          />
           <PhoneToggleRow :model-value="true" title="Interrupteur bloqué" disabled />
           <PhoneToggleRow
             v-model="switchOn"
@@ -345,6 +351,19 @@ function raiseError() {
             :warn="['Avertissement']"
           />
           <PhoneCheckRow :model-value="true" title="Verrouillée" disabled />
+          <PhoneCheckLeadRow v-model="tickOn" title="Tout sélectionner" indeterminate />
+          <PhoneCheckLeadRow
+            v-model="tickOff"
+            title="Équipement 1 · 2.5° × 1.7°"
+            :subs="[`Épinglé sur Galaxie d'Andromède · Angle 24°`]"
+            button
+          />
+          <PhoneCheckLeadRow
+            v-model="tickOn"
+            title="Nébuleuse de l'Amérique du Nord et du Pélican · Mosaïque, un titre très long"
+            :subs="['3×2 · Angle 0°']"
+            button
+          />
         </IonList>
         <PhoneRadioGroup
           v-model="radioChoice"

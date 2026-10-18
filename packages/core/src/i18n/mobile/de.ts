@@ -149,6 +149,11 @@ const de: Translations['mobile'] = {
     needsLocation: 'Lege zuerst den Beobachtungsort fest (Einstellungen)',
     needsLocalSky: 'Schalte zuerst den lokalen Himmel ein',
     needsHorizon: 'Berechne oder importiere zuerst den Geländehorizont (Einstellungen)',
+    frameSet: 'Rahmen',
+    framePin: 'Anheften',
+    frameAnchor: 'Anker',
+    frameAnchorSub: 'Am nächsten Objekt einrasten',
+    frameRotateBy: 'Um {value} drehen',
   },
   backup: { exportSection: 'Exportieren', importSection: 'Importieren' },
 };

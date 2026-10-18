@@ -81,7 +81,12 @@ interface Harness {
 }
 
 function harness(
-  over: { v?: ViewState; interactionEnabled?: boolean; pickingMode?: boolean } = {},
+  over: {
+    v?: ViewState;
+    interactionEnabled?: boolean;
+    pickingMode?: boolean;
+    touch?: boolean;
+  } = {},
 ) {
   const state = {
     nearDso: null as DSO | null,
@@ -103,6 +108,7 @@ function harness(
     },
     interactionEnabled: over.interactionEnabled ?? true,
     pickingMode: over.pickingMode ?? false,
+    touch: over.touch,
     findClosestDSO: () => state.nearDso,
     dsosInFrame: () => state.framedDsos,
     requestRenderInteractive: vi.fn(),
@@ -170,6 +176,63 @@ describe('FrameController', () => {
       h.fc.setFrames([bigActiveFrame()]);
       expect(h.fc.handleMouseDown(5, 5)).toBe(false);
       expect(h.fc.activeDrag).toBeNull();
+    });
+  });
+
+  describe('handleMouseDown — touch', () => {
+    it('a finger moves the selected frame from anywhere inside it', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      // Halfway between the centre and a corner: neither a handle nor the border.
+      const x = (geo.cx + geo.corners[0].x) / 2;
+      const y = (geo.cy + geo.corners[0].y) / 2;
+      expect(h.fc.handleMouseDown(x, y)).toBe(true);
+      expect(h.fc.activeDrag).toEqual({ id: 'f1', mode: 'move' });
+    });
+
+    it('a mouse pans from the same spot', () => {
+      const h = harness();
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      const x = (geo.cx + geo.corners[0].x) / 2;
+      const y = (geo.cy + geo.corners[0].y) / 2;
+      expect(h.fc.handleMouseDown(x, y)).toBe(false);
+    });
+
+    it('takes the rotation dot from a finger-sized distance', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      const rh = rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24);
+      expect(h.fc.handleMouseDown(rh.x + 18, rh.y)).toBe(true);
+      expect(h.fc.activeDrag).toEqual({ id: 'f1', mode: 'rotate' });
+    });
+
+    it('reports when a drag starts and ends', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const states: boolean[] = [];
+      h.fc.setOnDragChange((d) => states.push(d));
+      const geo = frameGeometry(f, h.state.v);
+      h.fc.handleMouseDown(geo.cx, geo.cy);
+      h.fc.handleMouseUp();
+      expect(states).toEqual([true, false]);
+    });
+
+    it('neither pins from the glyph nor resizes from a corner', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame({ pinnable: true, resizable: true });
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      h.fc.handleMouseDown(geo.corners[2].x, geo.corners[2].y);
+      expect(h.fc.activeDrag?.mode).toBe('move');
+      expect(h.changes).toHaveLength(0);
+      expect(h.fc.touch).toBe(true);
     });
   });
 
