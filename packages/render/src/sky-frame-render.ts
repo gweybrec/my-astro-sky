@@ -355,7 +355,7 @@ export function renderFovInstances(s: SkyScene): void {
         frames.tileTrashVisible(halfW, halfH)
       ) {
         ctx.globalAlpha = 1;
-        drawTileTrash(ctx, { x: cx, y: cy }, col.danger);
+        drawTileTrash(ctx, { x: cx, y: cy }, col.danger, frames.tileButtonRadius);
       }
       ctx.restore();
       continue; // tiles: outline only, no label/handles
@@ -428,6 +428,6 @@ export function renderFovInstances(s: SkyScene): void {
   ) {
     const avoid = frames.activeOutlineRotateAvoid();
     for (const c of frames.mosaicAddCandidates)
-      drawTileAdd(ctx, frames.candidateCanvasPoint(c, avoid), col.active);
+      drawTileAdd(ctx, frames.candidateCanvasPoint(c, avoid), col.active, frames.tileButtonRadius);
   }
 }

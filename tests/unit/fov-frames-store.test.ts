@@ -687,6 +687,32 @@ describe('fov-frames store', () => {
     expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(25);
   });
 
+  it('setMosaicGrid re-tiles a plan mosaic to the new rows and columns about its centre', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.setMosaicGrid('mo1', 3, 1);
+    const mosaic = plans.plans[0].mosaics[0];
+    expect([mosaic.cols, mosaic.rows]).toEqual([3, 1]);
+    expect(mosaic.centerRa).toBe(83.8);
+    const tiles = plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1');
+    expect(tiles).toHaveLength(3);
+    // The middle tile of a 3 × 1 row sits on the centre.
+    expect(
+      tiles.some((t: any) => Math.abs(t.ra - 83.8) < 1e-9 && Math.abs(t.dec + 5.4) < 1e-9),
+    ).toBe(true);
+  });
+
+  it('setMosaicGrid re-tiles a free mosaic and keeps at least one row and column', async () => {
+    const store = await withSpecs();
+    store.addAdhocMosaic('s1', 84, -5, 'M42');
+    const id = store.adhocMosaics[0].id;
+    store.setMosaicGrid(id, 2, 0);
+    const m = store.adhocMosaics[0];
+    expect([m.cols, m.rows]).toEqual([2, 1]);
+    expect(m.tiles).toHaveLength(2);
+    expect(JSON.parse(localStorage.getItem('fov-adhoc-mosaics-v1')!)[0].tiles).toHaveLength(2);
+  });
+
   it('a frame added while a mosaic is selected takes the selection from it', async () => {
     const store = await withSpecs();
     const plans = withMosaicPlan(store);

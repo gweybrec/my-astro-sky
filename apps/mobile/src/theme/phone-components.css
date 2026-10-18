@@ -276,6 +276,9 @@ ion-toggle.mob-toggle-row::part(track) {
   border: 1px solid var(--border-white-md);
   border-radius: var(--radius-pill);
   box-sizing: border-box;
+  /* Ionic's handle holder keeps the width of its own, wider track: clipped here, it no longer widens a sheet's body
+     (which a scroll into view then shifted sideways). */
+  overflow: hidden;
 }
 ion-toggle.mob-toggle-row.toggle-checked::part(track) {
   border-color: var(--border-focus);

@@ -30,6 +30,7 @@ import SkyPhotoSheet from './sky/SkyPhotoSheet.vue';
 import SkyFrameSheet from './sky/SkyFrameSheet.vue';
 import SkyFramesSheet from './sky/SkyFramesSheet.vue';
 import SkyFramePicker, { type FrameTarget } from './sky/SkyFramePicker.vue';
+import SkyMosaicSheet from './sky/SkyMosaicSheet.vue';
 import SkyPlacement from './sky/SkyPlacement.vue';
 import SkyStarPick from './sky/SkyStarPick.vue';
 import SkyTimeBar from './sky/SkyTimeBar.vue';
@@ -201,7 +202,9 @@ useBackClose(() => activeFrame.value !== null, releaseFrame);
 
 const pickerOpen = ref(false);
 const pickerTarget = ref<FrameTarget | null>(null);
-function openFramePicker() {
+const pickerKind = ref<'frame' | 'mosaic'>('frame');
+function openFramePicker(kind: 'frame' | 'mosaic') {
+  pickerKind.value = kind;
   const s = skySelection.value;
   if (!s || s.kind === 'photo') return;
   pickerTarget.value =
@@ -220,7 +223,19 @@ function framePlanPicked() {
 }
 function frameFreeAdded() {
   clearSkySelection();
-  if (fov.activeId) showFrame(fov.activeId);
+  const added = fov.renderables.find((f) => f.active);
+  if (added) showFrame(added.id);
+}
+// "Modifier la mosaïque" of a plan mosaic's sheet: the mosaic form, filled.
+const mosaicEdit = ref<{ planId: string; mosaicId: string } | null>(null);
+const mosaicEditOpen = ref(false);
+function openMosaicEdit(planId: string, mosaicId: string) {
+  mosaicEdit.value = { planId, mosaicId };
+  mosaicEditOpen.value = true;
+}
+function mosaicEdited() {
+  const edited = fov.renderables.find((f) => f.active);
+  if (edited) showFrame(edited.id);
 }
 // Brings a selected frame to the middle of the part of the map its sheet leaves free (above it in portrait, right of
 // it in landscape): once the map has the frame (Vue's next update) and the sheet has its size (the next drawn frame).
@@ -310,7 +325,8 @@ onBeforeUnmount(() => {
               v-else-if="skySelection && skySelection.kind !== 'photo'"
               :selection="skySelection"
               @close="clearSkySelection"
-              @add-frame="openFramePicker"
+              @add-frame="openFramePicker('frame')"
+              @add-mosaic="openFramePicker('mosaic')"
             />
             <SkyFrameSheet
               v-else-if="activeFrame && skyMap"
@@ -318,6 +334,7 @@ onBeforeUnmount(() => {
               :frame="activeFrame"
               :map="skyMap"
               @close="releaseFrame"
+              @edit-mosaic="openMosaicEdit"
             />
           </Transition>
         </main>
@@ -347,8 +364,16 @@ onBeforeUnmount(() => {
         v-if="pickerTarget"
         v-model:open="pickerOpen"
         :target="pickerTarget"
+        :kind="pickerKind"
         @plan="framePlanPicked"
         @free="frameFreeAdded"
+      />
+      <SkyMosaicSheet
+        v-if="mosaicEdit"
+        v-model:open="mosaicEditOpen"
+        :dest="{ kind: 'plan', planId: mosaicEdit.planId }"
+        :mosaic-id="mosaicEdit.mosaicId"
+        @done="mosaicEdited"
       />
     </IonContent>
   </IonPage>

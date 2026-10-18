@@ -30,6 +30,7 @@ import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneSliderRow from '../components/PhoneSliderRow.vue';
+import PhoneStepperRow from '../components/PhoneStepperRow.vue';
 import PhoneToggleRow from '../components/PhoneToggleRow.vue';
 import PhoneCheckLeadRow from '../components/PhoneCheckLeadRow.vue';
 import PhoneTargetRow from '../components/PhoneTargetRow.vue';
@@ -63,6 +64,7 @@ const tickOn = ref(true);
 const radioChoice = ref<string>();
 const tickOff = ref(false);
 const opacity = ref(0.6);
+const steps = ref(2);
 const sheet = ref(false);
 const order = ref(['a', 'b', 'c']);
 const pressed = ref(true);
@@ -266,6 +268,20 @@ function raiseError() {
           :max="1"
           :step="0.05"
           disabled
+        />
+        <PhoneStepperRow
+          v-model="steps"
+          label="Lignes"
+          less-label="Moins de lignes"
+          more-label="Plus de lignes"
+          :min="1"
+        />
+        <PhoneStepperRow
+          v-model="steps"
+          label="Un nom de compteur assez long pour passer sur deux lignes"
+          less-label="Moins"
+          more-label="Plus"
+          :min="1"
         />
 
         <PhoneSectionHeader bar>
