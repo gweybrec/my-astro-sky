@@ -228,7 +228,24 @@ export async function seed({ ports }) {
       entry: summer.entries.NGC7000,
       longEntry: summer.entries['SH2-308'],
     },
-    storage: { 'targets-prefs-v3': JSON.stringify(prefs) },
+    storage: {
+      'targets-prefs-v3': JSON.stringify(prefs),
+      // Two free frames: one pinned on M31, one floating in the middle of the map.
+      'fov-frames-v1': JSON.stringify([
+        {
+          id: 'adhoc-m31',
+          setupId: setup1.id,
+          anchor: { kind: 'sky', ra: 10.68, dec: 41.27, dsoId: 'M31' },
+          rotationDeg: 24,
+        },
+        {
+          id: 'adhoc-float',
+          setupId: setup2.id,
+          anchor: { kind: 'screen', nx: 0.5, ny: 0.4 },
+          rotationDeg: 0,
+        },
+      ]),
+    },
   };
 }
 
@@ -244,7 +261,7 @@ export const sizes = [
 ];
 
 const ROWS =
-  'ion-item.mob-row, ion-toggle.mob-row, ion-radio.mob-row, ion-checkbox.mob-row, .mob-entry';
+  'ion-item.mob-row, ion-toggle.mob-row, ion-radio.mob-row, ion-checkbox.mob-row, .mob-entry, .mob-check-lead-row';
 const SWITCH_TRACK = '.toggle-icon-wrapper, .native-wrapper';
 
 export const rules = [
@@ -272,6 +289,13 @@ export const rules = [
     type: 'boxCentre',
     boxes: '.mob-drag, .mob-icon-btn, .mob-fab, ion-fab-button, .mob-btn--icon',
     icon: 'svg',
+  },
+  // A tick box in a row's lead holder (PhoneCheckLeadRow) is centred in it.
+  {
+    id: 'lead-check',
+    type: 'boxCentre',
+    boxes: '.mob-check-lead-row > .mob-row-lead',
+    icon: 'ion-checkbox',
   },
   // An icon after a text is centred on the text's line.
   { id: 'icon-text', type: 'iconOnLine', lines: '.mob-fact-value', icon: 'svg' },
@@ -367,6 +391,8 @@ export const rules = [
 ];
 
 const SHEET = { scope: '.mob-sheet' };
+// The sheet of the modal that is open, when the map's own sheet or other (closed) modals are also on the page.
+const OPEN_SHEET = 'ion-modal.show-modal .mob-sheet';
 
 export const views = [
   {
@@ -404,7 +430,7 @@ export const views = [
     ready: '.mob-map-top',
     // The calendar button puts the map in the date mode: the time bar and the toggles appear.
     open: [
-      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { click: '.mob-map-top ion-button:nth-of-type(3)' },
       { wait: '.mob-map-ribbon' },
       { wait: '.mob-timebar' },
     ],
@@ -434,6 +460,44 @@ export const views = [
       { wait: '.mob-map-sheet' },
       { pause: 600 },
     ],
+  },
+  {
+    name: 'sky-frames',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // The telescope button opens "Contours de champ".
+    open: [{ click: '.mob-map-top ion-button:nth-of-type(2)' }, { wait: '.mob-check-lead-row' }],
+    scope: OPEN_SHEET,
+  },
+  {
+    name: 'sky-frame',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // A frame tapped in "Contours de champ" is selected: its sheet opens over the map.
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-check-lead-text' },
+      { click: '.mob-check-lead-text' },
+      { wait: '.mob-map-sheet .mob-slider-row' },
+      { pause: 600 },
+    ],
+  },
+  {
+    name: 'sky-frame-picker',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    open: [
+      { click: '.mob-map-top ion-input' },
+      { wait: '.mob-search-wrap' },
+      { fill: '.mob-search-wrap input', text: 'andro' },
+      { wait: '.mob-row--roomy' },
+      { click: '.mob-row--roomy' },
+      { wait: '.mob-map-sheet' },
+      { click: '.mob-map-sheet .mob-icon-row ion-button:nth-of-type(1)' },
+      { wait: 'ion-modal .mob-section-header' },
+      { pause: 600 },
+    ],
+    scope: OPEN_SHEET,
   },
   { name: 'sky-search', path: '/sky/search', ready: '.mob-search-wrap' },
   {
