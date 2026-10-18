@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
 // Keep the heavy gear/catalog/targets modules out of the popup under test.
-vi.mock('../../src/api', () => ({
+vi.mock('@myastrosky/app-state/api', () => ({
   getGearSetups: vi.fn().mockResolvedValue([
     {
       id: 's1',
@@ -53,11 +53,16 @@ vi.mock('../../src/dso-catalog', () => ({
     id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, displayName: 'Orion Nebula' } : undefined,
   ),
 }));
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
+  getDSOById: vi.fn((id: string) =>
+    id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, displayName: 'Orion Nebula' } : undefined,
+  ),
+}));
 vi.mock('../../src/targets-view', () => ({ buildGearSectionContent: vi.fn() }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { buildFovPopup } from '../../src/fov-overlay';
-import { useFovFramesStore } from '../../src/stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useUiStore } from '../../src/stores/ui';
 import { useCanvasStore } from '../../src/stores/canvas';

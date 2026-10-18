@@ -14,7 +14,7 @@ vi.mock('../../src/dso-catalog', () => ({
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { requestSetupSwitch } from '../../src/setup-switch';
-import { useFovFramesStore } from '../../src/stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 
 type SpecLite = {

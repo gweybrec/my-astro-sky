@@ -1,7 +1,7 @@
 import { pinia } from './pinia-instance';
 import { t } from './i18n';
 import { showToast } from './toast';
-import { useFovFramesStore, type AdhocFrame } from './stores/fov-frames';
+import { useFovFramesStore, type AdhocFrame } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 
 /**
