@@ -6,7 +6,7 @@ import { setActivePinia, createPinia } from 'pinia';
 vi.mock('@myastrosky/core/gear-presets', () => ({
   formatFov: vi.fn().mockReturnValue('5.0° × 3.0°'),
 }));
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   getDSOById: vi.fn((id: string) =>
     id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, displayName: 'Orion Nebula' } : undefined,
   ),
@@ -14,6 +14,7 @@ vi.mock('../../src/dso-catalog', () => ({
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { requestSetupSwitch } from '../../src/setup-switch';
+import { commitSetupSwitch, setupSwitchItems } from '@myastrosky/app-state/setup-switch';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 
@@ -164,5 +165,62 @@ describe('requestSetupSwitch', () => {
 
     expect(h.onRevert).toHaveBeenCalled();
     expect(document.querySelector('.modal-backdrop')).toBeNull();
+  });
+});
+
+const m42Mosaic = () => ({
+  id: 'm1',
+  dsoId: 'M42',
+  name: null,
+  centerRa: 83.8,
+  centerDec: -5.4,
+  paDeg: 0,
+  overlapPct: 20,
+  cols: 2,
+  rows: 1,
+  tiles: [],
+});
+
+describe('setupSwitchItems / commitSetupSwitch (shared part)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    localStorage.clear();
+  });
+
+  it('proposes a re-grid named after the mosaic target onto a smaller setup', async () => {
+    const plan = seedPlan('s1', { mosaics: [m42Mosaic()] });
+    seedSpecs();
+    const items = await setupSwitchItems(plan as any, 's2');
+    expect(items).toHaveLength(1);
+    expect(items[0].label).toBe('Orion Nebula');
+    // A 2×1 grid of 2.5° × 1.7° tiles re-fitted with 1.2° × 0.8° tiles needs more of them.
+    expect(items[0].transform.kind).toBe('grid');
+  });
+
+  it('asks nothing when the setup is cleared or unchanged', async () => {
+    const plan = seedPlan('s1', { mosaics: [m42Mosaic()] });
+    seedSpecs();
+    expect(await setupSwitchItems(plan as any, null)).toEqual([]);
+    expect(await setupSwitchItems(plan as any, 's1')).toEqual([]);
+  });
+
+  it('saves the new setup first, then applies or drops each mosaic as decided', async () => {
+    const plan = seedPlan('s1', { mosaics: [m42Mosaic(), { ...m42Mosaic(), id: 'm2' }] });
+    seedSpecs();
+    const plans = usePlansStore();
+    const calls: string[] = [];
+    vi.spyOn(plans, 'updatePlanSettings').mockImplementation(async () => {
+      calls.push('settings');
+    });
+    vi.spyOn(plans, 'updateMosaic').mockImplementation(async (_p, id) => {
+      calls.push(`update:${id}`);
+    });
+    vi.spyOn(plans, 'deleteMosaic').mockImplementation(async (_p, id) => {
+      calls.push(`delete:${id}`);
+    });
+    vi.spyOn(plans, 'load').mockResolvedValue();
+    const items = await setupSwitchItems(plan as any, 's2');
+    await commitSetupSwitch(plan as any, 's2', items, new Map([['mosaic:m2', 'drop' as const]]));
+    expect(calls).toEqual(['settings', 'update:m1', 'delete:m2']);
   });
 });
