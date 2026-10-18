@@ -172,6 +172,23 @@ export async function seed({ ports }) {
     observationWindows: windows(['w3']),
   });
 
+  // A mosaic in the summer plan: what "Changer d’équipement" asks about when the plan's setup changes.
+  // No object: a mosaic on one of the plan's objects would replace that object's frame (the views below use it).
+  await api(base, 'POST', `/api/plans/${summer.id}/mosaics`, {
+    dsoId: null,
+    name: 'Amérique du Nord',
+    centerRa: 314.7,
+    centerDec: 44.3,
+    paDeg: 0,
+    overlapPct: 20,
+    cols: 2,
+    rows: 1,
+    tiles: [
+      { ra: 314.4, dec: 44.3, paDeg: 0 },
+      { ra: 315.0, dec: 44.3, paDeg: 0 },
+    ],
+  });
+
   const firstPhoto = await uploadPhoto(base);
   const photoId = (firstPhoto.photo ?? firstPhoto).id;
   // What the photo's information sheet lists: a date, two integrations with their filters, an equipment. The objects
@@ -245,6 +262,27 @@ export async function seed({ ports }) {
           rotationDeg: 0,
         },
       ]),
+      // A free 2 × 2 mosaic on M33: its sheet has the Lignes / Colonnes steppers.
+      'fov-adhoc-mosaics-v1': JSON.stringify([
+        {
+          id: 'adhoc-mosaic',
+          setupId: setup1.id,
+          dsoId: 'M33',
+          name: null,
+          centerRa: 23.46,
+          centerDec: 30.66,
+          paDeg: 0,
+          overlapPct: 20,
+          cols: 2,
+          rows: 2,
+          tiles: [
+            { ra: 23.2, dec: 30.85, paDeg: 0 },
+            { ra: 23.72, dec: 30.85, paDeg: 0 },
+            { ra: 23.2, dec: 30.47, paDeg: 0 },
+            { ra: 23.72, dec: 30.47, paDeg: 0 },
+          ],
+        },
+      ]),
     },
   };
 }
@@ -303,7 +341,7 @@ export const rules = [
   {
     id: 'centre-line',
     type: 'centreLine',
-    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar',
+    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar',
   },
   // The clear button of a search field is centred on the field.
   { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },
@@ -375,7 +413,7 @@ export const rules = [
     id: 'left-edge',
     type: 'leadingEdge',
     items:
-      '.mob-section-header, .mob-sheet-title, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead)):not(.mob-entry .mob-row) .mob-row-title, ion-toggle.mob-row .mob-row-title',
+      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead)):not(.mob-entry .mob-row) .mob-row-title, ion-toggle.mob-row .mob-row-title',
   },
   // The chevron (else the switch) of each row ends on one line.
   {
@@ -393,6 +431,8 @@ export const rules = [
 const SHEET = { scope: '.mob-sheet' };
 // The sheet of the modal that is open, when the map's own sheet or other (closed) modals are also on the page.
 const OPEN_SHEET = 'ion-modal.show-modal .mob-sheet';
+// The setup picker opened over "Contours de champ".
+const PICK_SETUP = 'ion-modal.show-modal:has(.mob-sheet-title:text-is("Choisir un setup"))';
 
 export const views = [
   {
@@ -481,6 +521,75 @@ export const views = [
       { wait: '.mob-map-sheet .mob-slider-row' },
       { pause: 600 },
     ],
+  },
+  {
+    name: 'sky-mosaic',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // The free mosaic tapped in "Contours de champ": its sheet with Lignes / Colonnes.
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-check-lead-text' },
+      { click: '.mob-check-lead-row:has-text("Mosaïque") .mob-check-lead-text' },
+      { wait: '.mob-map-sheet .mob-stepper-row' },
+      { pause: 600 },
+    ],
+  },
+  {
+    name: 'sky-mosaic-new',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // "Ajouter une mosaïque" with the free frames: a setup, then the mosaic form with an object picked.
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-check-lead-text' },
+      { click: 'ion-modal.show-modal .mob-row:has-text("Ajouter une mosaïque")' },
+      { wait: `${PICK_SETUP} .mob-row:has-text("Newton 200")` },
+      { click: `${PICK_SETUP} .mob-row:has-text("Newton 200")` },
+      { wait: 'ion-modal.show-modal .mob-stepper-row' },
+      { fill: 'ion-modal.show-modal input[type="search"]', text: 'M31' },
+      { wait: 'ion-modal.show-modal .mob-row:has-text("M31 —")' },
+      { click: 'ion-modal.show-modal .mob-row:has-text("M31 —")' },
+      { wait: 'ion-modal.show-modal .mob-chip' },
+      { pause: 600 },
+    ],
+    scope: '.mob-sheet:has(> .mob-sheet-body > .mob-stepper-row)',
+  },
+  {
+    name: 'sky-frames-plan',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // "Contours de champ" of a plan: its "Setup" field under "Cadres".
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-check-lead-text' },
+      { click: 'ion-modal.show-modal .mob-form-row--field ion-button' },
+      { wait: 'ion-modal.show-modal ion-radio' },
+      { click: 'ion-modal.show-modal ion-radio:has-text("Nuit d’été")' },
+      { wait: 'ion-modal.show-modal .mob-form-row--field:has-text("Setup")' },
+      { pause: 800 },
+    ],
+    scope: OPEN_SHEET,
+  },
+  {
+    name: 'sky-setup-switch',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // The summer plan's setup changed: its mosaic asks Appliquer / Supprimer.
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-check-lead-text' },
+      { click: 'ion-modal.show-modal .mob-form-row--field ion-button' },
+      { wait: 'ion-modal.show-modal ion-radio' },
+      { click: 'ion-modal.show-modal ion-radio:has-text("Nuit d’été")' },
+      { pause: 800 },
+      { click: 'ion-modal.show-modal .mob-form-row--field:has-text("Setup") ion-button' },
+      { wait: 'ion-modal.show-modal ion-radio:has-text("C6")' },
+      { click: 'ion-modal.show-modal ion-radio:has-text("C6")' },
+      { wait: 'ion-modal.show-modal .mob-seg' },
+      { pause: 600 },
+    ],
+    scope: '.mob-sheet:has(> .mob-sheet-body > .mob-panel .mob-seg)',
   },
   {
     name: 'sky-frame-picker',
