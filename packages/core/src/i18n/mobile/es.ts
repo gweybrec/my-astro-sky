@@ -154,7 +154,6 @@ const es: Translations['mobile'] = {
     framePin: 'Fijar',
     frameAnchor: 'Anclaje',
     frameAnchorSub: 'Ajuste al objeto más cercano',
-    frameRotateBy: 'Girar {value}',
     rowsLess: 'Menos filas',
     rowsMore: 'Más filas',
     colsLess: 'Menos columnas',

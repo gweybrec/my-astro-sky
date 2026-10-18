@@ -132,10 +132,10 @@ describe('the sheet of the selected frame', () => {
     expect(byText(w, 'Supprimer le cadre')).toBeTruthy();
   });
 
-  it('turns a pinned frame by its position angle with the buttons', async () => {
+  it('turns a pinned frame by its position angle with the slider', async () => {
     const { w } = mountSheet(frame({ id: 'adhoc-1' }));
     const apply = vi.spyOn(useFovFramesStore(), 'applyChange');
-    await byLabel(w, 'Tourner de −5°').trigger('click');
+    w.findComponent(PhoneSliderRow).vm.$emit('update:modelValue', 19);
     expect(apply).toHaveBeenCalledWith('adhoc-1', { paDeg: 19 });
   });
 
@@ -144,7 +144,7 @@ describe('the sheet of the selected frame', () => {
       frame({ id: 'adhoc-1', anchorKind: 'screen', screenRotationDeg: 178 }),
     );
     const apply = vi.spyOn(useFovFramesStore(), 'applyChange');
-    await byLabel(w, 'Tourner de +5°').trigger('click');
+    w.findComponent(PhoneSliderRow).vm.$emit('update:modelValue', 183);
     expect(apply).toHaveBeenCalledWith('adhoc-1', { screenRotationDeg: -177 });
   });
 
