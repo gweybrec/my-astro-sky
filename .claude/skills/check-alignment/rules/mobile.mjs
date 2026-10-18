@@ -137,6 +137,15 @@ export async function seed({ ports }) {
     enabled: true,
   });
 
+  // A smart telescope with a mosaic mode: its frame's sheet has Largeur / Hauteur.
+  const smartSetup = await api(base, 'POST', '/api/gear-setups', {
+    name: 'Seestar S50',
+    telescopeId: 'seestar-s50',
+    cameraId: 'seestar-s50-camera',
+    accessoryId: null,
+    enabled: true,
+  });
+
   const makePlan = async (planName, setupId, dsoIds) => {
     const plan = await api(base, 'POST', '/api/plans', { name: planName });
     await api(base, 'PUT', `/api/plans/${plan.id}`, { nightOf: night, setupId, lat, lon });
@@ -254,6 +263,14 @@ export async function seed({ ports }) {
           setupId: setup1.id,
           anchor: { kind: 'sky', ra: 10.68, dec: 41.27, dsoId: 'M31' },
           rotationDeg: 24,
+        },
+        {
+          id: 'adhoc-smart',
+          setupId: smartSetup.id,
+          anchor: { kind: 'sky', ra: 83.82, dec: -5.39, dsoId: 'M42' },
+          rotationDeg: 0,
+          mosaicWDeg: 2.1,
+          mosaicHDeg: 1.2,
         },
         {
           id: 'adhoc-float',
@@ -532,6 +549,19 @@ export const views = [
       { wait: '.mob-check-lead-text' },
       { click: '.mob-check-lead-row:has-text("Mosaïque") .mob-check-lead-text' },
       { wait: '.mob-map-sheet .mob-stepper-row' },
+      { pause: 600 },
+    ],
+  },
+  {
+    name: 'sky-smart-frame',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // The enlarged Seestar frame tapped in "Contours de champ": Largeur / Hauteur first in its sheet.
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-check-lead-text' },
+      { click: '.mob-check-lead-row:has-text("Seestar") .mob-check-lead-text' },
+      { wait: '.mob-map-sheet .mob-slider-row' },
       { pause: 600 },
     ],
   },
