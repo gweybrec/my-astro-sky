@@ -586,6 +586,24 @@ export const views = [
     scope: '.mob-sheet:has(> .mob-sheet-body > .mob-stepper-row)',
   },
   {
+    name: 'sky-mosaic-new-results',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    // The mosaic form while objects are listed: they take the place of the other fields and of the buttons.
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(2)' },
+      { wait: '.mob-check-lead-text' },
+      { click: 'ion-modal.show-modal .mob-row:has-text("Ajouter une mosaïque")' },
+      { wait: `${PICK_SETUP} .mob-row:has-text("Newton 200")` },
+      { click: `${PICK_SETUP} .mob-row:has-text("Newton 200")` },
+      { wait: 'ion-modal.show-modal .mob-stepper-row' },
+      { fill: 'ion-modal.show-modal input[type="search"]', text: 'M3' },
+      { wait: 'ion-modal.show-modal .mob-row:has-text("M31 —")' },
+      { pause: 600 },
+    ],
+    scope: '.mob-sheet:has(> .mob-sheet-body > .mob-stepper-row)',
+  },
+  {
     name: 'sky-frames-plan',
     path: '/tabs/sky',
     ready: '.mob-map-top',
