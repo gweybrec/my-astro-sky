@@ -16,9 +16,9 @@ import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
-import { skyPlacement } from '../sky-modes';
+import { skyPlacement, skyStarPick } from '../sky-modes';
 import type { SkyMap } from '@myastrosky/render/sky-map';
-import type { Photo } from '@myastrosky/core/types';
+import type { Photo, Star } from '@myastrosky/core/types';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import AppIcon from '../components/AppIcon.vue';
 import SkyLayerButtons from './sky/SkyLayerButtons.vue';
@@ -26,8 +26,10 @@ import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
 import SkyPhotoSheet from './sky/SkyPhotoSheet.vue';
 import SkyPlacement from './sky/SkyPlacement.vue';
+import SkyStarPick from './sky/SkyStarPick.vue';
 import SkyTimeBar from './sky/SkyTimeBar.vue';
 import SkyTopBar from './sky/SkyTopBar.vue';
+import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import mapPinIcon from '@icons/map-pin.svg?raw';
 
@@ -79,19 +81,29 @@ onIonViewWillEnter(() => {
   // Photos may have been added, changed or deleted in the gallery or by an import while another tab was showing.
   void reloadPhotos();
 });
+// While a page above the tabs covered it, the map measured nothing; back, it may not have measured itself again yet. A
+// move of the map waits for its size (a few frames at most), else it would frame nothing.
+const MAP_SIZE_FRAMES = 30;
+function whenMapSized(run: () => void, frames = MAP_SIZE_FRAMES) {
+  if (!sky) return;
+  if (sky.map.getView().width > 0 || frames <= 0) run();
+  else requestAnimationFrame(() => whenMapSized(run, frames - 1));
+}
 onIonViewDidEnter(() => {
   // "Voir sur la carte" of a photo's screen: the map frames that photo.
   const photoId = skyPhotoFocus.value;
   if (photoId) {
     skyPhotoFocus.value = null;
-    void photosRead.then(() => sky?.showPhoto(photoId));
+    void photosRead.then(() => whenMapSized(() => sky?.showPhoto(photoId)));
   }
   const focus = skyFocus.value;
   if (!focus) return;
   skyFocus.value = null;
   // A photo being placed goes along to the searched object, at the same size on screen.
-  if (placement.value) placement.value.follow(() => sky?.focus(focus));
-  else sky?.focus(focus);
+  whenMapSized(() => {
+    if (placement.value) placement.value.follow(() => sky?.focus(focus));
+    else sky?.focus(focus);
+  });
 });
 
 // The selected object has its sheet; the back button closes it before anything else.
@@ -117,6 +129,28 @@ function photoPlaced(photo: Photo) {
   void reloadPhotos().then(() => sky?.showPhoto(photo.id));
 }
 useBackClose(() => placing.value !== null, cancelPlacement);
+
+// Choosing a star on the map for a point of the identification (board "Identifier les étoiles, choisir sur la carte"):
+// the map takes the screen with the chosen star under it. Valider, Annuler and the back button open the photo again.
+const picking = computed(() => skyStarPick.value);
+const inMode = computed(() => placing.value !== null || picking.value !== null);
+watch(picking, (now) => {
+  if (now) clearSkySelection();
+});
+watch(skySelection, (selection) => {
+  if (selection && picking.value) clearSkySelection();
+});
+function endPick(star: Star | null) {
+  const pick = skyStarPick.value;
+  skyStarPick.value = null;
+  if (!pick) return;
+  pick.done(star);
+  void router.push(pick.returnTo);
+}
+useBackClose(
+  () => picking.value !== null,
+  () => endPick(null),
+);
 const onSkyView = (listener: () => void) => sky?.onView(listener) ?? (() => undefined);
 
 const time = useSkyTimeStore();
@@ -152,23 +186,26 @@ onBeforeUnmount(() => {
 <template>
   <IonPage>
     <IonContent :scroll-y="false">
-      <div class="mob-page-fill mob-sky-frame" :class="{ 'mob-map-mode': placing }">
-        <header v-if="placing" class="mob-topbar">
-          <h1 class="mob-topbar-title m-title">{{ t('manual.modeLabel') }}</h1>
+      <div class="mob-page-fill mob-sky-frame" :class="{ 'mob-map-mode': inMode }">
+        <header v-if="inMode" class="mob-topbar">
+          <PhoneBackButton :action="placing ? cancelPlacement : () => endPick(null)" />
+          <h1 class="mob-topbar-title mob-topbar-title--grow m-title">
+            {{ placing ? t('manual.modeLabel') : t('modal.mapPickTooltip') }}
+          </h1>
         </header>
         <main ref="mapEl" class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
           <div ref="photoBox" class="mob-photo-layer" />
-          <SkyTopBar v-if="!placing" @search="openSearch" @display="displayOpen = true" />
+          <SkyTopBar v-if="!inMode" @search="openSearch" @display="displayOpen = true" />
           <!-- First start: no observing location yet, the time and place of the sky cannot be shown. -->
-          <div v-if="!located && !placing" class="mob-map-prompt">
+          <div v-if="!located && !inMode" class="mob-map-prompt">
             <p class="m-body">{{ t('targets.location.notSet') }}</p>
             <PhoneButton variant="action" size="lg" @click="openLocation">
               <AppIcon :svg="mapPinIcon" />{{ t('targets.location.label') }}
             </PhoneButton>
           </div>
           <!-- The time bar and the toggles of the map belong to the date mode: the live sky has neither. -->
-          <template v-if="time.mode === 'date' && !placing">
+          <template v-if="time.mode === 'date' && !inMode">
             <SkyTimeBar />
             <SkyLayerButtons />
           </template>
@@ -202,6 +239,13 @@ onBeforeUnmount(() => {
           @cancel="cancelPlacement"
           @placed="photoPlaced"
           @search="openSearch"
+        />
+        <SkyStarPick
+          v-else-if="picking && skyMap"
+          :map="skyMap"
+          :point="picking.point"
+          @cancel="endPick(null)"
+          @picked="endPick"
         />
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />

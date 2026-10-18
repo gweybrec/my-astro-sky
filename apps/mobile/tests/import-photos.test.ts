@@ -153,6 +153,24 @@ describe('the import page', () => {
     skyPlacement.value = null;
   });
 
+  it('keeps a photo whose stars are identified as a waiting photo, and opens its identification', async () => {
+    push.mockReset();
+    addImportFiles([new File(['x'], 'M101.jpg')]);
+    const wrapper = mountPage();
+    await flushPromises();
+    await fileRows(wrapper)[0].trigger('click');
+    await flushPromises();
+    await wrapper
+      .findAll('.mob-sheet .mob-row')
+      .find((r) => r.text().includes('Identifier 2–3 étoiles'))!
+      .trigger('click');
+    await flushPromises();
+    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M101.jpg', 'toPlace']]);
+    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
+    expect(push).toHaveBeenCalledWith(`/gallery/identify/${pendingPhotos.value[0].id}`);
+    await removePendingPhoto(pendingPhotos.value[0].id);
+  });
+
   it('asks how to place a photo, sends it to the online solver and shows "Résolution"', async () => {
     addImportFiles([new File(['x'], 'M45.jpg')]);
     const wrapper = mountPage();

@@ -2934,3 +2934,44 @@ svg.mob-icon--sm,
 .mob-row-sub--busy {
   color: var(--accent-color);
 }
+
+/* Revision 16. A point given as coordinates (ThreePointRaDec), the desktop's RA/Déc entry: the point's number in the lead column, then the
+   label, three number fields each followed by its unit (outside the field), the second label and its fields, and the Étoile / OK buttons.
+   The labels, fields and buttons start on the body column of the rows above (gutter + 40px lead + 16px). */
+.mob-coord {
+  display: grid;
+  grid-template-columns: var(--space-13) minmax(0, 1fr);
+  column-gap: var(--space-7);
+  row-gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.mob-coord > * {
+  grid-column: 2;
+}
+.mob-coord > .mob-row-lead {
+  grid-column: 1;
+  grid-row: 1;
+}
+.mob-coord-label {
+  color: var(--text-secondary);
+}
+.mob-coord-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr) var(--space-7));
+  column-gap: var(--space-4);
+  align-items: center;
+}
+.mob-coord-fields .mob-field {
+  text-align: center;
+  padding: 0 var(--space-4);
+}
+.mob-coord-unit {
+  color: var(--text-secondary);
+}
+.mob-coord-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}

@@ -22,7 +22,7 @@ const en: Translations['mobile'] = {
     solveComputerSub: 'Connect the app to the computer to use ASTAP',
     identifyStars: 'Identify 2–3 stars',
     identifyStarsSub:
-      'Tap 2 or 3 recognisable stars in the photo, then identify each one by its name.',
+      'Tap 2 or 3 recognisable stars in the photo, then identify each one by name or RA/Dec coordinates.',
     placeByHand: 'Place by hand',
     placeByHandSub: 'Move, resize and rotate the photo on the map',
     placeHint: 'One finger: move · Two fingers: resize and rotate',
@@ -30,6 +30,14 @@ const en: Translations['mobile'] = {
     placeShowSettings: 'Show the settings',
     import: 'Import',
     perLine: 'Photos per line',
+  },
+  identify: {
+    starPlaceholder: 'Star name…',
+    point: 'Point {n}',
+    points: 'Reference stars',
+    suggestions: 'Suggested stars',
+    starName: 'Name of star {n}',
+    tapPhoto: 'Tap the photo…',
   },
   plans: {
     searchPlaceholder: 'Search for a plan…',

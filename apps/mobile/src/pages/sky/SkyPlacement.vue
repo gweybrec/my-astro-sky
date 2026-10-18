@@ -297,7 +297,8 @@ async function validate() {
 
 <template>
   <Teleport :to="mapEl">
-    <div class="mob-map-hint m-secondary">{{ t('mobile.gallery.placeHint') }}</div>
+    <!-- In the caption size: the desktop's hint holds on one line over the map of a phone. -->
+    <div class="mob-map-hint m-caption">{{ t('mobile.gallery.placeHint') }}</div>
     <img
       v-if="url"
       class="mob-placing-photo"
