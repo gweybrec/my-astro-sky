@@ -5,6 +5,7 @@ import { IonPage, IonContent, IonList, onIonViewDidLeave } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { useErrorToast } from '../composables/useErrorToast';
 import { skyPlacement } from '../sky-modes';
+import { endIdentify } from '../star-identify-session';
 import {
   clearImport,
   importAll,
@@ -53,6 +54,21 @@ async function placeByHand() {
   try {
     skyPlacement.value = { pendingId: await keepImportPending(placing.value) };
     await router.push('/tabs/sky');
+  } catch (error) {
+    void showError(error);
+  }
+}
+
+// Identifying stars is done on its own page: the photo is kept as a waiting photo first, as for a solve, and its page is
+// opened from the gallery, as a tap on the waiting photo does (this page empties its list when it is left anyway). Opened
+// over this page, two levels above the tabs, its way to the map showed the Galerie tab under the Ciel tab's address.
+async function identify() {
+  if (!placing.value) return;
+  try {
+    const id = await keepImportPending(placing.value);
+    endIdentify(id);
+    await router.replace('/tabs/gallery');
+    await router.push(`/gallery/identify/${id}`);
   } catch (error) {
     void showError(error);
   }
@@ -141,6 +157,11 @@ onIonViewDidLeave(clearImport);
         >{{ t('mobile.gallery.import') }}</PhoneButton
       >
     </PhoneFooter>
-    <PlacementMethodSheet v-model:open="methodOpen" @online="solveOnline" @hand="placeByHand" />
+    <PlacementMethodSheet
+      v-model:open="methodOpen"
+      @online="solveOnline"
+      @identify="identify"
+      @hand="placeByHand"
+    />
   </IonPage>
 </template>

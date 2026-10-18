@@ -23,6 +23,7 @@ import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pe
 import { loadGalleryDisplay, photosPerLine, type Orientation } from '../gallery-display';
 import { poiTypeIcon } from '../poi-icons';
 import { skyPlacement } from '../sky-modes';
+import { endIdentify } from '../star-identify-session';
 import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import GalleryDisplaySheet from './gallery/GalleryDisplaySheet.vue';
 import PhotoTile, { type PhotoTag } from './gallery/PhotoTile.vue';
@@ -121,6 +122,13 @@ function placeByHand() {
   if (!placingId.value) return;
   skyPlacement.value = { pendingId: placingId.value };
   void router.push('/tabs/sky');
+}
+
+// Identifying stars starts with no point, even when an earlier identification of this photo was left.
+function identify() {
+  if (!placingId.value) return;
+  endIdentify(placingId.value);
+  void router.push(`/gallery/identify/${placingId.value}`);
 }
 
 function solveOnline() {
@@ -226,7 +234,12 @@ async function addPicked(pick: () => Promise<File[]>) {
         @click="adding = true"
       />
     </IonContent>
-    <PlacementMethodSheet v-model:open="methodOpen" @online="solveOnline" @hand="placeByHand" />
+    <PlacementMethodSheet
+      v-model:open="methodOpen"
+      @online="solveOnline"
+      @identify="identify"
+      @hand="placeByHand"
+    />
     <GalleryDisplaySheet v-model:open="displayOpen" :orientation="orientation" />
     <PhoneSheet v-model:open="adding" :title="t('batch.modalTitle')">
       <PhoneRow

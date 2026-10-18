@@ -56,8 +56,13 @@ export function zoomToward(zoom: PhotoZoom, point: { x: number; y: number }, fac
 /**
  * Zoom of the photo viewer (boards "Photo, détail" and "Photo, zoom"): two fingers zoom around their middle, one finger
  * moves a zoomed photo, a double tap zooms in on the spot and, on a zoomed photo, shows it whole again.
+ * With `onTap` (board "Identifier les étoiles"), a tap is given to it at once instead, and a double tap does not zoom.
  */
-export function usePhotoZoom(viewer: Ref<HTMLElement | null>, photo: () => Size) {
+export function usePhotoZoom(
+  viewer: Ref<HTMLElement | null>,
+  photo: () => Size,
+  options: { onTap?: (x: number, y: number) => void } = {},
+) {
   const zoom = ref<PhotoZoom>(WHOLE);
   const zoomed = computed(() => zoom.value.scale > 1);
   const transform = computed(
@@ -126,6 +131,10 @@ export function usePhotoZoom(viewer: Ref<HTMLElement | null>, photo: () => Size)
       lastTap = null;
       return;
     }
+    if (options.onTap) {
+      options.onTap(event.clientX, event.clientY);
+      return;
+    }
     const tap = { at: event.timeStamp, x: event.clientX, y: event.clientY };
     const double =
       lastTap !== null &&
@@ -152,6 +161,7 @@ export function usePhotoZoom(viewer: Ref<HTMLElement | null>, photo: () => Size)
   onBeforeUnmount(() => window.removeEventListener('resize', onResize));
 
   return {
+    zoom,
     zoomed,
     transform,
     reset,

@@ -215,6 +215,16 @@ describe('the gallery page', () => {
     skyPlacement.value = null;
   });
 
+  it('opens the star identification of a waiting photo', async () => {
+    getPhotos.mockResolvedValue([]);
+    const photo = await addPendingPhoto(new Blob(['y']), 'M101.jpg');
+    const wrapper = mountPage();
+    await flushPromises();
+    await openMethods(wrapper);
+    await rowWith(wrapper, 'Identifier 2–3 étoiles').trigger('click');
+    expect(push).toHaveBeenCalledWith(`/gallery/identify/${photo.id}`);
+  });
+
   it('greys out the online solve without a connection, and without the astrometry.net key', async () => {
     getPhotos.mockResolvedValue([]);
     await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');

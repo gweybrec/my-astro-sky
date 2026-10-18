@@ -20,7 +20,7 @@ const fr = {
     solveComputerSub: "Connectez l'application à l'ordinateur pour utiliser ASTAP",
     identifyStars: 'Identifier 2–3 étoiles',
     identifyStarsSub:
-      'Touchez 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom.',
+      'Touchez 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
     placeByHand: 'Placer à la main',
     placeByHandSub: 'Déplacer, agrandir et tourner la photo sur la carte',
     placeHint: 'Un doigt : déplacer · Deux doigts : agrandir et tourner',
@@ -28,6 +28,14 @@ const fr = {
     placeShowSettings: 'Afficher les réglages',
     import: 'Importer',
     perLine: 'Photos par ligne',
+  },
+  identify: {
+    starPlaceholder: "Nom de l'étoile…",
+    point: 'Point {n}',
+    points: 'Étoiles de repère',
+    suggestions: 'Étoiles proposées',
+    starName: "Nom de l'étoile {n}",
+    tapPhoto: 'Touchez la photo…',
   },
   plans: {
     searchPlaceholder: 'Rechercher un plan…',
