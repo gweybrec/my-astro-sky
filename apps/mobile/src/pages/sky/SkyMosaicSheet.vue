@@ -113,10 +113,15 @@ watch(
   },
   { immediate: true },
 );
+// While objects are listed, they take the place of the other fields and of the buttons, so that they show above the
+// keyboard. The rest is hidden, not removed: moving the search field would take its focus (and the keyboard) away.
+const listing = computed(() => results.value.length > 0);
 const resultTitle = (d: DSO) => (d.displayName ? `${d.id} — ${d.displayName}` : d.id);
 function addTarget(d: DSO) {
   if (!form.targets.some((s) => s.id === d.id)) form.targets.push(d);
   query.value = '';
+  results.value = [];
+  (document.activeElement as HTMLElement | null)?.blur();
   gridFromTargets();
 }
 function removeTarget(index: number) {
@@ -213,8 +218,10 @@ async function save() {
     v-model:open="open"
     :title="mosaicId ? t('fovOverlay.editMosaicTitle') : t('fovOverlay.mosaicTitle')"
     tall
+    :footer-hidden="listing"
   >
     <PhoneField
+      v-show="!listing"
       v-model="form.name"
       :label="t('fovOverlay.mosaicName')"
       :placeholder="t('fovOverlay.mosaicNamePlaceholder')"
@@ -233,14 +240,17 @@ async function save() {
         :key="d.id"
         :title="resultTitle(d)"
         button
+        @pointerdown.prevent
         @click="addTarget(d)"
       />
     </IonList>
     <PhoneRemoveChips
+      v-show="!listing"
       :items="form.targets.map((d) => ({ label: d.displayName || d.id }))"
       @remove="removeTarget"
     />
     <PhoneStepperRow
+      v-show="!listing"
       v-model="overlap"
       :label="t('fovOverlay.mosaicOverlap')"
       :less-label="t('mobile.sky.overlapLess')"
@@ -250,6 +260,7 @@ async function save() {
       :step="5"
     />
     <PhoneStepperRow
+      v-show="!listing"
       v-model="form.cols"
       :label="t('fovOverlay.mosaicColumns')"
       :less-label="t('mobile.sky.colsLess')"
@@ -257,13 +268,14 @@ async function save() {
       :min="1"
     />
     <PhoneStepperRow
+      v-show="!listing"
       v-model="form.rows"
       :label="t('fovOverlay.mosaicRows')"
       :less-label="t('mobile.sky.rowsLess')"
       :more-label="t('mobile.sky.rowsMore')"
       :min="1"
     />
-    <PhoneHelper v-if="summary">{{ summary }}</PhoneHelper>
+    <PhoneHelper v-if="summary" v-show="!listing">{{ summary }}</PhoneHelper>
     <template #footer>
       <PhoneButton size="lg" @click="open = false">{{ t('targets.gear.cancel') }}</PhoneButton>
       <PhoneButton variant="confirm" size="lg" :disabled="!canSave" @click="save">{{

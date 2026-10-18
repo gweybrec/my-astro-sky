@@ -14,6 +14,8 @@ defineProps<{
   /** A line under the title (`.mob-meta`): what the sheet is about. */
   subtitle?: string;
   tall?: boolean;
+  /** The footer is hidden, not removed (a search's results take its place above the keyboard). */
+  footerHidden?: boolean;
 }>();
 const emit = defineEmits<{ 'update:open': [open: boolean] }>();
 const titleId = useId();
@@ -50,7 +52,9 @@ const titleId = useId();
         <slot name="header-extra" />
       </div>
       <div class="mob-sheet-body mob-scroll ion-content-scroll-host"><slot /></div>
-      <div v-if="$slots.footer" class="mob-sheet-footer"><slot name="footer" /></div>
+      <div v-if="$slots.footer" v-show="!footerHidden" class="mob-sheet-footer">
+        <slot name="footer" />
+      </div>
     </section>
   </IonModal>
 </template>
