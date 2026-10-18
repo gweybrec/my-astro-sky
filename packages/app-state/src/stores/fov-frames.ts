@@ -1063,6 +1063,40 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     persistMosaicTiles(planId, mosaic.id, newTiles);
   }
 
+  /**
+   * Re-tile a mosaic (plan or free) to `cols × rows` about its centre and angle, at its overlap: the phone's Lignes /
+   * Colonnes. Like a resize, it regrids to a full rectangle (resets any per-tile trimming).
+   */
+  function setMosaicGrid(mosaicId: string, cols: number, rows: number): void {
+    const c = Math.max(1, Math.round(cols)),
+      r = Math.max(1, Math.round(rows));
+    const free = adhocMosaics.value.find((m) => m.id === mosaicId);
+    const plan = free
+      ? undefined
+      : plansStore.plans.find((p) => p.mosaics?.some((m) => m.id === mosaicId));
+    const mosaic = free ?? plan?.mosaics.find((m) => m.id === mosaicId);
+    const setupId = free ? free.setupId : plan?.setupId;
+    const spec = setupId ? specs.value.get(setupId) : undefined;
+    if (!mosaic || !spec) return;
+    mosaic.cols = c;
+    mosaic.rows = r;
+    const tiles = tileCenters(
+      { ra: mosaic.centerRa, dec: mosaic.centerDec },
+      mosaic.paDeg,
+      c,
+      r,
+      spec.wDeg,
+      spec.hDeg,
+      mosaic.overlapPct,
+    ).map((t) => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg }));
+    if (free) {
+      free.tiles = tiles;
+      persistAdhocMosaics();
+    } else if (plan) {
+      persistMosaicTiles(plan.id, mosaicId, tiles);
+    }
+  }
+
   // ── Free (ad-hoc) mosaics ──────────────────────────────────────────────────
   // The free-mode mirror of the plan-mosaic ops above. They reuse the same
   // geometry helpers (tileCenters, recenterMosaicTiles, …) but read/write the
@@ -1814,6 +1848,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
     setAdhocMosaicVisible,
     transformAdhocMosaic,
     resizeAdhocMosaic,
+    setMosaicGrid,
     removeAdhocMosaic,
     migrateFreeFrameToPlan,
     migrateFreeMosaicToPlan,

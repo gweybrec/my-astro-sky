@@ -14,17 +14,20 @@ import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneRow from '../../components/PhoneRow.vue';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
+import PhoneStepperRow from '../../components/PhoneStepperRow.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import listPlusIcon from '@icons/list-plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
+import penIcon from '@icons/pen.svg?raw';
 
 // The board "Ciel, cadre sélectionné": the selected frame in a sheet over the bottom of the map. Its rotation (slider,
 // ±1° and ±5°), pinning, the anchor (a pinned frame snaps to the nearest object), moving a free frame into a plan,
 // deleting it. While a finger drags the frame the sheet shrinks to its title (board "Ciel, déplacer le cadre"). It
 // closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button, and the frame
-// is let go of. The rows and columns of a mosaic come with the mosaics.
+// is let go of. A mosaic (board "Ciel, mosaïque sélectionnée") adds its Lignes / Colonnes, which re-tile it about its
+// centre, and for a plan's mosaic "Modifier la mosaïque" (the desktop's edit button), which the page opens.
 const props = defineProps<{ frame: RenderableFrame; map: SkyMap }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; editMosaic: [planId: string, mosaicId: string] }>();
 const titleId = useId();
 const fov = useFovFramesStore();
 const plans = usePlansStore();
@@ -106,6 +109,28 @@ async function moveTo(planId: string) {
 }
 
 const isMosaic = computed(() => kind.value === 'freeMosaic' || kind.value === 'planMosaic');
+const mosaicIds = computed(() => {
+  const [, owner, id] = props.frame.id.split(':');
+  return { owner, id };
+});
+const mosaic = computed(() => {
+  if (!isMosaic.value) return undefined;
+  const { owner, id } = mosaicIds.value;
+  if (owner === 'free') return fov.adhocMosaics.find((m) => m.id === id);
+  return plans.plans.find((p) => p.id === owner)?.mosaics.find((m) => m.id === id);
+});
+const rows = computed({
+  get: () => mosaic.value?.rows ?? 1,
+  set: (n: number) => mosaic.value && fov.setMosaicGrid(mosaic.value.id, mosaic.value.cols, n),
+});
+const cols = computed({
+  get: () => mosaic.value?.cols ?? 1,
+  set: (n: number) => mosaic.value && fov.setMosaicGrid(mosaic.value.id, n, mosaic.value.rows),
+});
+function editMosaic() {
+  const { owner, id } = mosaicIds.value;
+  emit('editMosaic', owner, id);
+}
 async function remove() {
   const name = frameName(props.frame);
   const ok = await confirm({
@@ -174,6 +199,29 @@ async function remove() {
         :title="t('mobile.sky.frameAnchor')"
         :sub="t('mobile.sky.frameAnchorSub')"
       />
+      <template v-if="mosaic">
+        <PhoneStepperRow
+          v-model="rows"
+          :label="t('fovOverlay.mosaicRows')"
+          :less-label="t('mobile.sky.rowsLess')"
+          :more-label="t('mobile.sky.rowsMore')"
+          :min="1"
+        />
+        <PhoneStepperRow
+          v-model="cols"
+          :label="t('fovOverlay.mosaicColumns')"
+          :less-label="t('mobile.sky.colsLess')"
+          :more-label="t('mobile.sky.colsMore')"
+          :min="1"
+        />
+        <PhoneRow
+          v-if="kind === 'planMosaic'"
+          :title="t('fovOverlay.editMosaicTitle')"
+          :lead="penIcon"
+          button
+          @click="editMosaic"
+        />
+      </template>
       <PhoneRow
         v-if="canMove"
         :title="t('fovOverlay.moveToPlan')"

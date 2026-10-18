@@ -771,11 +771,17 @@ export function drawPinGlyph(
 }
 
 /** Draw a delete (trash) button centred at `at`, used per-tile on the selected mosaic. */
-export function drawTileTrash(ctx: CanvasRenderingContext2D, at: Point, color: string): void {
-  const size = 16;
+export function drawTileTrash(
+  ctx: CanvasRenderingContext2D,
+  at: Point,
+  color: string,
+  radius: number = TILE_TRASH_R,
+): void {
+  // The icon keeps the desktop's proportion to its disc (16 px in 11).
+  const size = Math.round((radius * 16) / TILE_TRASH_R);
   ctx.save();
   ctx.beginPath();
-  ctx.arc(at.x, at.y, TILE_TRASH_R, 0, Math.PI * 2);
+  ctx.arc(at.x, at.y, radius, 0, Math.PI * 2);
   ctx.fillStyle = TILE_BUTTON.bg;
   ctx.fill();
   ctx.translate(at.x - size / 2, at.y - size / 2);
@@ -789,20 +795,26 @@ export function drawTileTrash(ctx: CanvasRenderingContext2D, at: Point, color: s
 }
 
 /** Draw an add (plus) button centred at `at`, used at the "+" spots around a mosaic. */
-export function drawTileAdd(ctx: CanvasRenderingContext2D, at: Point, color: string): void {
+export function drawTileAdd(
+  ctx: CanvasRenderingContext2D,
+  at: Point,
+  color: string,
+  radius: number = TILE_TRASH_R,
+): void {
+  const arm = (radius * 5) / TILE_TRASH_R;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(at.x, at.y, TILE_TRASH_R, 0, Math.PI * 2);
+  ctx.arc(at.x, at.y, radius, 0, Math.PI * 2);
   ctx.fillStyle = TILE_BUTTON.bg;
   ctx.fill();
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(at.x - 5, at.y);
-  ctx.lineTo(at.x + 5, at.y);
-  ctx.moveTo(at.x, at.y - 5);
-  ctx.lineTo(at.x, at.y + 5);
+  ctx.moveTo(at.x - arm, at.y);
+  ctx.lineTo(at.x + arm, at.y);
+  ctx.moveTo(at.x, at.y - arm);
+  ctx.lineTo(at.x, at.y + arm);
   ctx.stroke();
   ctx.restore();
 }

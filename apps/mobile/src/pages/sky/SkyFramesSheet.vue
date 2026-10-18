@@ -18,6 +18,14 @@ import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import SkySetupRows from './SkySetupRows.vue';
+import SkyMosaicSheet, { type MosaicDest } from './SkyMosaicSheet.vue';
+import SkySetupSwitchSheet from './SkySetupSwitchSheet.vue';
+import {
+  setupSwitchItems,
+  switchSetupDirectly,
+  type SwitchItem,
+} from '@myastrosky/app-state/setup-switch';
+import { useSetupLines } from '../../composables/useSetupLines';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import addFrameIcon from '@icons/add-frame.svg?raw';
@@ -27,8 +35,9 @@ import planListIcon from '@icons/plan-list.svg?raw';
 // The board "Ciel, contours de champ" (the desktop's frame manager, opened by the telescope button): all frames shown
 // or hidden, the free frames or one plan's, and the list. A free frame's tick box shows it on the map; tapping a frame
 // centres the map on it and selects it (its sheet opens). Then the desktop's actions: add a frame (a free one floats
-// in the middle of the map with the setup chosen; a plan's is placed in the middle of the map), add a mosaic (with the
-// mosaics), and in a plan its details. The plan's setup is chosen with the mosaics, which a change of setup reworks.
+// in the middle of the map with the setup chosen; a plan's is placed in the middle of the map), add a mosaic (the
+// mosaic form; a free one asks for a setup that is not a smart telescope first), and in a plan its details. A plan has
+// its "Setup" field: a change that does not fit its mosaics asks per mosaic (board "Ciel, changer d'équipement").
 const props = defineProps<{ map: SkyMap | null }>();
 const open = defineModel<boolean>('open', { required: true });
 // A frame tapped in the list: the page centres it above the frame's sheet.
@@ -128,9 +137,79 @@ function addFreeFrame(setupId: string) {
 }
 function newSetup() {
   pickSetupOpen.value = false;
+  pickMosaicSetupOpen.value = false;
+  setupPickOpen.value = false;
   open.value = false;
   void router.push('/settings/setups/new');
 }
+// "Setup": the plan's gear setup (the desktop's dropdown, with "Choisir un setup" while it has none).
+const { lines: setupLines, load: loadSetups } = useSetupLines();
+const setupPickOpen = ref(false);
+const setupLabel = (id: string, name: string) => fov.specs.get(id)?.label ?? name;
+const setupOptions = computed(() =>
+  setupLines.value.map((l) => ({ value: l.setup.id, label: setupLabel(l.setup.id, l.setup.name) })),
+);
+const planSetupName = computed(() => {
+  const id = plan.value?.setupId;
+  if (!id) return t('fovOverlay.pickSetup');
+  return setupOptions.value.find((o) => o.value === id)?.label ?? fov.specs.get(id)?.label ?? '';
+});
+function openSetupPick() {
+  setupPickOpen.value = true;
+  loadSetups().catch((error) => void showError(error));
+}
+const switchOpen = ref(false);
+const switchTo = ref<{ setupId: string; items: SwitchItem[] } | null>(null);
+const planSetup = computed({
+  get: () => plan.value?.setupId ?? undefined,
+  set: (id: string | undefined) => {
+    setupPickOpen.value = false;
+    const p = plan.value;
+    if (!p || !id || id === p.setupId) return;
+    void (async () => {
+      try {
+        const items = await setupSwitchItems(p, id);
+        if (items.length === 0) await switchSetupDirectly(p, id);
+        else {
+          switchTo.value = { setupId: id, items };
+          switchOpen.value = true;
+        }
+      } catch (error) {
+        await showError(error);
+      }
+    })();
+  },
+});
+
+// "Ajouter une mosaïque": in a plan with a setup that tiles; free, once a setup that tiles is picked.
+const isSmart = (setupId: string) => !!fov.specs.get(setupId)?.smart;
+const canAddMosaic = computed(
+  () => !isPlan.value || (!!plan.value?.setupId && !isSmart(plan.value.setupId)),
+);
+const mosaicOpen = ref(false);
+const mosaicDest = ref<MosaicDest | null>(null);
+const pickMosaicSetupOpen = ref(false);
+function addMosaic() {
+  if (!isPlan.value) {
+    pickMosaicSetupOpen.value = true;
+    return;
+  }
+  if (!plan.value) return;
+  mosaicDest.value = { kind: 'plan', planId: plan.value.id };
+  mosaicOpen.value = true;
+}
+function addFreeMosaic(setupId: string) {
+  pickMosaicSetupOpen.value = false;
+  mosaicDest.value = { kind: 'free', setupId };
+  mosaicOpen.value = true;
+}
+// The new mosaic is selected: the map shows it beside its sheet.
+function mosaicDone() {
+  open.value = false;
+  const added = fov.renderables.find((f) => f.active);
+  if (added) emit('show', added.id);
+}
+
 function openPlan() {
   if (!plan.value) return;
   open.value = false;
@@ -151,6 +230,20 @@ function openPlan() {
       >
         <span class="mob-btn-key">{{ t('mobile.sky.frameSet') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{ setName }}</span>
+        <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+      </PhoneButton>
+    </div>
+
+    <div v-if="isPlan && plan" class="mob-form-row mob-form-row--field">
+      <PhoneButton
+        variant="field"
+        block
+        text-style="body"
+        :aria-label="`${t('mobile.sky.planSetup')} : ${planSetupName}`"
+        @click="openSetupPick"
+      >
+        <span class="mob-btn-key">{{ t('mobile.sky.planSetup') }}</span>
+        <span class="mob-btn-value mob-btn-value--swatch">{{ planSetupName }}</span>
         <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
       </PhoneButton>
     </div>
@@ -201,7 +294,13 @@ function openPlan() {
           button
           @click="addFrame"
         />
-        <PhoneRow :title="t('fovOverlay.addMosaic')" :lead="addMosaicIcon" inert />
+        <PhoneRow
+          v-if="canAddMosaic"
+          :title="t('fovOverlay.addMosaic')"
+          :lead="addMosaicIcon"
+          button
+          @click="addMosaic"
+        />
         <PhoneRow
           v-if="isPlan"
           :title="t('fovOverlay.openPlanDetails')"
@@ -216,10 +315,36 @@ function openPlan() {
       <PhoneRadioGroup v-model="selected" :options="setOptions" :label="t('mobile.sky.frameSet')" />
       <PhoneRow :title="t('targets.plan.newPlan')" :lead="plusIcon" button @click="newPlan" />
     </PhoneSheet>
+    <PhoneSheet v-model:open="setupPickOpen" :title="t('mobile.sky.planSetup')">
+      <PhoneRadioGroup
+        v-model="planSetup"
+        :options="setupOptions"
+        :label="t('mobile.sky.planSetup')"
+      />
+      <PhoneRow :title="t('fovOverlay.newSetup')" :lead="plusIcon" button @click="newSetup" />
+    </PhoneSheet>
+    <SkySetupSwitchSheet
+      v-if="plan && switchTo"
+      v-model:open="switchOpen"
+      :plan="plan"
+      :setup-id="switchTo.setupId"
+      :items="switchTo.items"
+    />
     <PhoneSheet v-model:open="pickSetupOpen" :title="t('fovOverlay.pickSetup')">
       <IonList class="mob-list" lines="none">
         <SkySetupRows @pick="addFreeFrame" @add="newSetup" />
       </IonList>
     </PhoneSheet>
+    <PhoneSheet v-model:open="pickMosaicSetupOpen" :title="t('fovOverlay.pickSetup')">
+      <IonList class="mob-list" lines="none">
+        <SkySetupRows :exclude="isSmart" @pick="addFreeMosaic" @add="newSetup" />
+      </IonList>
+    </PhoneSheet>
+    <SkyMosaicSheet
+      v-if="mosaicDest"
+      v-model:open="mosaicOpen"
+      :dest="mosaicDest"
+      @done="mosaicDone"
+    />
   </PhoneSheet>
 </template>

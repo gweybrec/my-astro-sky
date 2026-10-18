@@ -77,11 +77,19 @@ export interface FrameHost {
   navigateTo(ra: number, dec: number, targetScale: number, animate: boolean): void;
 }
 
-/** An in-progress drag on the active frame. */
+/** What a mosaic tile button does: add a tile at a "+" spot, or remove a tile. */
+export type TileAction =
+  { kind: 'add'; ra: number; dec: number } | { kind: 'remove'; tileId: string };
+
+/** An in-progress drag on the active frame; `tap` is a finger on a tile button, which acts when it lifts. */
 export interface FrameDrag {
   id: string;
-  mode: 'move' | 'rotate' | 'resize';
+  mode: 'move' | 'rotate' | 'resize' | 'tap';
   corner?: number;
+  tile?: TileAction;
+  /** Where the finger landed (a `tap` lets go once it moves away). */
+  x?: number;
+  y?: number;
 }
 
 /** The DSO a move-drag will snap to on release; drives the elastic overlay. */
@@ -96,6 +104,12 @@ export interface SnapCandidate {
 export const TOUCH_HANDLE_RADIUS_PX = 22;
 /** How far from the selected frame's border a finger may land and move it, in CSS px. */
 export const TOUCH_BORDER_PX = 16;
+/** A mosaic tile button under a finger: its disc's radius, and the smallest tile half-size that holds one (so two
+ * buttons' finger-sized press areas never overlap), in CSS px. */
+export const TOUCH_TILE_BUTTON_R = 16;
+export const TOUCH_TILE_MIN_HALF_PX = 28;
+/** A finger that strays further than this from a tile button lets the tap go, in CSS px. */
+const TOUCH_TAP_SLOP_PX = 10;
 
 export class FrameController {
   private host: FrameHost;
@@ -223,9 +237,15 @@ export class FrameController {
     return framePinGlyphPos(corner, rotDeg);
   }
 
+  /** Radius of a mosaic tile's delete/add button disc (finger-sized on a touch screen). */
+  get tileButtonRadius(): number {
+    return this.touch ? TOUCH_TILE_BUTTON_R : TILE_TRASH_R;
+  }
+
   /** Whether a tile is large enough to host its delete/add button. */
   tileTrashVisible(halfW: number, halfH: number): boolean {
-    return Math.min(halfW, halfH) >= 16; // only on tiles big enough that the icon fits
+    // Only on tiles big enough that the icon fits (for a finger, that two buttons' press areas stay apart).
+    return Math.min(halfW, halfH) >= (this.touch ? TOUCH_TILE_MIN_HALF_PX : 16);
   }
 
   /** Whether the selected mosaic's tiles are large enough to host their edit
@@ -258,14 +278,13 @@ export class FrameController {
   ): Point {
     const p = project(c.ra, c.dec);
     let pt = toCanvas(p.x, p.y, this.host.view);
-    if (avoid && Math.hypot(pt.x - avoid.handle.x, pt.y - avoid.handle.y) < TILE_TRASH_R * 2 + 4) {
+    const r = this.tileButtonRadius;
+    if (avoid && Math.hypot(pt.x - avoid.handle.x, pt.y - avoid.handle.y) < r * 2 + 4) {
       const dx = pt.x - avoid.center.x,
         dy = pt.y - avoid.center.y;
       const len = Math.hypot(dx, dy) || 1;
       const newDist =
-        Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) +
-        TILE_TRASH_R +
-        14;
+        Math.hypot(avoid.handle.x - avoid.center.x, avoid.handle.y - avoid.center.y) + r + 14;
       pt = { x: avoid.center.x + (dx / len) * newDist, y: avoid.center.y + (dy / len) * newDist };
     }
     return pt;
@@ -276,7 +295,7 @@ export class FrameController {
   /** Hit-test the active/instance frames on mousedown. Returns true if the event was consumed (no pan). */
   handleMouseDown(mx: number, my: number): boolean {
     const consumed = this.press(mx, my);
-    if (this.drag) this.onDragChange?.(true);
+    if (this.drag && this.drag.mode !== 'tap') this.onDragChange?.(true);
     return consumed;
   }
 
@@ -313,6 +332,8 @@ export class FrameController {
             }
           }
         }
+        // A finger: the tile buttons come before the move dot (the frame moves from anywhere inside it anyway).
+        if (touch && this.pressTileButton(active, mx, my)) return true;
         if (active.movable && isNearHandle(mx, my, { x: geo.cx, y: geo.cy }, handleR)) {
           this.drag = { id: active.id, mode: 'move' };
           return true;
@@ -323,28 +344,9 @@ export class FrameController {
         this.drag = { id: active.id, mode: 'move' };
         return true;
       }
-      // Per-tile editing: the selected mosaic shows a delete button on each tile
+      // Per-tile editing (a mouse, after the handles): the selected mosaic shows a delete button on each tile
       // and an add ("+") button at each empty neighbour cell.
-      if (active.isMosaicOutline) {
-        const mosaicId = active.id.split(':')[2];
-        if (this.mosaicEditButtonsVisible(mosaicId)) {
-          const avoid = this.activeOutlineRotateAvoid();
-          for (const c of this.addCandidates) {
-            if (isNearHandle(mx, my, this.candidateCanvasPoint(c, avoid), TILE_TRASH_R)) {
-              this.onTileAdd?.(c.ra, c.dec);
-              return true;
-            }
-          }
-          for (const t of this.instances) {
-            if (t.mosaicId !== mosaicId || !t.mosaicIsBorderTile) continue;
-            const tg = this.frameGeometry(t);
-            if (isNearHandle(mx, my, { x: tg.cx, y: tg.cy }, TILE_TRASH_R)) {
-              this.onTileRemove?.(t.id);
-              return true;
-            }
-          }
-        }
-      }
+      if (!touch && this.pressTileButton(active, mx, my)) return true;
     }
 
     // A finger drags the selected frame from anywhere inside it (a mouse pans there).
@@ -377,9 +379,52 @@ export class FrameController {
     return false;
   }
 
+  /**
+   * A press on one of the selected mosaic's tile buttons. A mouse acts at once; a finger only marks the button, which
+   * acts when the finger lifts without straying (so a pan that starts on a button changes nothing).
+   */
+  private pressTileButton(active: RenderableFrame, mx: number, my: number): boolean {
+    if (!active.isMosaicOutline) return false;
+    const mosaicId = active.id.split(':')[2];
+    if (!this.mosaicEditButtonsVisible(mosaicId)) return false;
+    const hitR = this.touch ? TOUCH_HANDLE_RADIUS_PX : TILE_TRASH_R;
+    let tile: TileAction | null = null;
+    const avoid = this.activeOutlineRotateAvoid();
+    for (const c of this.addCandidates) {
+      if (isNearHandle(mx, my, this.candidateCanvasPoint(c, avoid), hitR)) {
+        tile = { kind: 'add', ra: c.ra, dec: c.dec };
+        break;
+      }
+    }
+    for (const t of tile ? [] : this.instances) {
+      if (t.mosaicId !== mosaicId || !t.mosaicIsBorderTile) continue;
+      const tg = this.frameGeometry(t);
+      if (isNearHandle(mx, my, { x: tg.cx, y: tg.cy }, hitR)) {
+        tile = { kind: 'remove', tileId: t.id };
+        break;
+      }
+    }
+    if (!tile) return false;
+    if (this.touch) this.drag = { id: active.id, mode: 'tap', tile, x: mx, y: my };
+    else this.runTileAction(tile);
+    return true;
+  }
+
+  private runTileAction(tile: TileAction): void {
+    if (tile.kind === 'add') this.onTileAdd?.(tile.ra, tile.dec);
+    else this.onTileRemove?.(tile.tileId);
+  }
+
   /** Apply a frame move/rotate/resize drag for the current cursor position. */
   handleDragMove(mx: number, my: number): void {
     if (!this.drag) return;
+    if (this.drag.mode === 'tap') {
+      // The finger strayed from the tile button: no tap (and no pan, the gesture stays the frame's).
+      if (Math.hypot(mx - (this.drag.x ?? mx), my - (this.drag.y ?? my)) > TOUCH_TAP_SLOP_PX) {
+        this.drag.tile = undefined;
+      }
+      return;
+    }
     const f = this.instances.find((x) => x.id === this.drag!.id);
     if (!f) {
       this.drag = null;
@@ -492,7 +537,9 @@ export class FrameController {
     this.onDragChange?.(false);
     const snap = this.snap;
     this.snap = null;
-    if (drag.mode === 'resize') this.finalizeResize(drag.id);
+    if (drag.mode === 'tap') {
+      if (drag.tile) this.runTileAction(drag.tile);
+    } else if (drag.mode === 'resize') this.finalizeResize(drag.id);
     else if (drag.mode === 'move') {
       // Release within snap range: spring the frame to the DSO centre.
       if (snap) this.animateSnapToDso(drag.id, snap);

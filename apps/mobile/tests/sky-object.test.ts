@@ -82,7 +82,7 @@ describe('the object sheet', () => {
     expect(date[0][1]).toMatch(/^-?\d+°$/);
   });
 
-  it('has the five actions of the board; all but the frame wait for their screens', () => {
+  it('has the five actions of the board; all but the frame and the mosaic wait for their screens', () => {
     const labels = mountSheet()
       .findAll('.mob-icon-row button')
       .map((b) => b.attributes('aria-label'));
@@ -93,13 +93,15 @@ describe('the object sheet', () => {
       'Modifier',
       'Voir les détails',
     ]);
-    expect(mountSheet().findAll('.mob-icon-row button[aria-disabled="true"]')).toHaveLength(4);
+    expect(mountSheet().findAll('.mob-icon-row button[aria-disabled="true"]')).toHaveLength(3);
   });
 
-  it('asks the page for "Créer un cadre"', async () => {
+  it('asks the page for "Créer un cadre" and "Créer une mosaïque"', async () => {
     const w = mountSheet();
     await w.find('.mob-icon-row button[aria-label="Ajouter un cadre"]').trigger('click');
     expect(w.emitted('addFrame')).toHaveLength(1);
+    await w.find('.mob-icon-row button[aria-label="Ajouter une mosaïque"]').trigger('click');
+    expect(w.emitted('addMosaic')).toHaveLength(1);
   });
 
   it('closes from the handle and by dragging down, not by a small movement', async () => {
