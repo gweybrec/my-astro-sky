@@ -26,10 +26,11 @@ import {
   resolveSetupCamera,
 } from '@myastrosky/core/gear-catalog';
 import { fovDeg, formatSetupCanvasLabel } from '@myastrosky/core/gear-presets';
-import { getDSOById } from '../dso-catalog';
-import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
+import { usePlansStore } from './plans';
 import { orderPlanEntryIds } from '@myastrosky/core/plan-order';
-import { reportUnknownRendererError } from '../error-reporter';
+import { reportError } from '@myastrosky/core/platform/error-hook';
+import { storage } from '@myastrosky/core/platform/storage';
 
 /** Resolved angular size + labels for a gear setup. `wDeg`/`hDeg` are the native
  * (single-frame) FOV. For a smart telescope, `mosaic` holds the single-frame
@@ -48,7 +49,7 @@ type FrameAnchor =
   | { kind: 'screen'; nx: number; ny: number }
   | { kind: 'sky'; ra: number; dec: number; dsoId: string | null };
 
-/** An ad-hoc (not plan-derived) frame instance, persisted to localStorage. */
+/** An ad-hoc (not plan-derived) frame instance, kept on the device. */
 export interface AdhocFrame {
   id: string;
   setupId: string;
@@ -61,7 +62,7 @@ export interface AdhocFrame {
 }
 
 /**
- * An ad-hoc (free, not plan-derived) mosaic, persisted to localStorage. Mirrors a
+ * An ad-hoc (free, not plan-derived) mosaic, kept on the device. Mirrors a
  * plan mosaic: a sky-anchored tile grid, edited on-canvas (move/rotate/resize,
  * add/remove tile). Tiles are stored explicitly so a trimmed/non-rectangular set
  * survives a move or rotation.
@@ -156,7 +157,7 @@ function computeBorderTileIds(
 
 function loadAdhoc(): AdhocFrame[] {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
+    const raw = storage().get(STORE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -167,7 +168,7 @@ function loadAdhoc(): AdhocFrame[] {
 
 function loadAdhocMosaics(): AdhocMosaic[] {
   try {
-    const raw = localStorage.getItem(MOSAIC_STORE_KEY);
+    const raw = storage().get(MOSAIC_STORE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -178,7 +179,7 @@ function loadAdhocMosaics(): AdhocMosaic[] {
 
 function loadSelection(): FovSelection {
   try {
-    const raw = localStorage.getItem(SELECTION_KEY);
+    const raw = storage().get(SELECTION_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed?.kind === 'plan' && typeof parsed.planId === 'string') return parsed;
@@ -191,7 +192,7 @@ function loadSelection(): FovSelection {
 
 function loadAnchorSnap(): Record<string, boolean> {
   try {
-    const raw = localStorage.getItem(ANCHOR_SNAP_KEY);
+    const raw = storage().get(ANCHOR_SNAP_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') return parsed as Record<string, boolean>;
@@ -204,7 +205,7 @@ function loadAnchorSnap(): Record<string, boolean> {
 
 function loadPlanFloating(): Record<string, PlanFloating> {
   try {
-    const raw = localStorage.getItem(PLAN_FLOATING_KEY);
+    const raw = storage().get(PLAN_FLOATING_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') return parsed as Record<string, PlanFloating>;
@@ -217,7 +218,7 @@ function loadPlanFloating(): Record<string, PlanFloating> {
 
 function loadHidden(): Record<string, boolean> {
   try {
-    const raw = localStorage.getItem(HIDDEN_KEY);
+    const raw = storage().get(HIDDEN_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') return parsed as Record<string, boolean>;
@@ -231,7 +232,7 @@ function loadHidden(): Record<string, boolean> {
 /** Global master toggle for drawing frames on the map (defaults to visible). */
 function loadFramesVisible(): boolean {
   try {
-    return localStorage.getItem(FRAMES_VISIBLE_KEY) !== 'false';
+    return storage().get(FRAMES_VISIBLE_KEY) !== 'false';
   } catch {
     return true;
   }
@@ -283,57 +284,57 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
 
   function persist(): void {
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(adhoc.value));
+      storage().set(STORE_KEY, JSON.stringify(adhoc.value));
     } catch (err) {
-      reportUnknownRendererError('fov_frames_persist', err);
+      reportError('fov_frames_persist', err);
     }
   }
 
   function persistAdhocMosaics(): void {
     try {
-      localStorage.setItem(MOSAIC_STORE_KEY, JSON.stringify(adhocMosaics.value));
+      storage().set(MOSAIC_STORE_KEY, JSON.stringify(adhocMosaics.value));
     } catch (err) {
-      reportUnknownRendererError('fov_adhoc_mosaics_persist', err);
+      reportError('fov_adhoc_mosaics_persist', err);
     }
   }
 
   function persistSelection(): void {
     try {
-      localStorage.setItem(SELECTION_KEY, JSON.stringify(selection.value));
+      storage().set(SELECTION_KEY, JSON.stringify(selection.value));
     } catch (err) {
-      reportUnknownRendererError('fov_frames_persist_selection', err);
+      reportError('fov_frames_persist_selection', err);
     }
   }
 
   function persistAnchorSnap(): void {
     try {
-      localStorage.setItem(ANCHOR_SNAP_KEY, JSON.stringify(anchorSnap.value));
+      storage().set(ANCHOR_SNAP_KEY, JSON.stringify(anchorSnap.value));
     } catch (err) {
-      reportUnknownRendererError('fov_frames_persist_anchor', err);
+      reportError('fov_frames_persist_anchor', err);
     }
   }
 
   function persistPlanFloating(): void {
     try {
-      localStorage.setItem(PLAN_FLOATING_KEY, JSON.stringify(planFloating.value));
+      storage().set(PLAN_FLOATING_KEY, JSON.stringify(planFloating.value));
     } catch (err) {
-      reportUnknownRendererError('fov_frames_persist_plan_floating', err);
+      reportError('fov_frames_persist_plan_floating', err);
     }
   }
 
   function persistHidden(): void {
     try {
-      localStorage.setItem(HIDDEN_KEY, JSON.stringify(adhocHidden.value));
+      storage().set(HIDDEN_KEY, JSON.stringify(adhocHidden.value));
     } catch (err) {
-      reportUnknownRendererError('fov_frames_persist_hidden', err);
+      reportError('fov_frames_persist_hidden', err);
     }
   }
 
   function persistFramesVisible(): void {
     try {
-      localStorage.setItem(FRAMES_VISIBLE_KEY, JSON.stringify(framesVisible.value));
+      storage().set(FRAMES_VISIBLE_KEY, JSON.stringify(framesVisible.value));
     } catch (err) {
-      reportUnknownRendererError('fov_frames_persist_visible', err);
+      reportError('fov_frames_persist_visible', err);
     }
   }
 
@@ -437,7 +438,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       }
       specs.value = m;
     } catch (err) {
-      reportUnknownRendererError('fov_frames_load_specs', err);
+      reportError('fov_frames_load_specs', err);
     }
   }
 
@@ -823,9 +824,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
           cols: mosaic.cols,
           rows: mosaic.rows,
           tiles: tiles.map((t) => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg })),
-        }).catch((err) =>
-          reportUnknownRendererError('plan_transform_mosaic_failed', err, { mosaicId }),
-        );
+        }).catch((err) => reportError('plan_transform_mosaic_failed', err, { mosaicId }));
       }, 250),
     );
   }
@@ -1067,7 +1066,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
   // ── Free (ad-hoc) mosaics ──────────────────────────────────────────────────
   // The free-mode mirror of the plan-mosaic ops above. They reuse the same
   // geometry helpers (tileCenters, recenterMosaicTiles, …) but read/write the
-  // local adhocMosaics list instead of a plan, and persist to localStorage.
+  // local adhocMosaics list instead of a plan, and persist them on the device.
 
   function findAdhocMosaic(id: string): AdhocMosaic | undefined {
     return adhocMosaics.value.find((m) => m.id === id);

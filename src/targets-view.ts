@@ -88,7 +88,7 @@ import trajectorySvg from './icons/trajectory.svg?raw';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
-import { useFovFramesStore } from './stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { useUiStore } from './stores/ui';
 import { useHorizonStore } from './stores/horizon';
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';

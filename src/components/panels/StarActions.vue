@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { t } from '../../i18n';
 import { useUiStore } from '../../stores/ui';
-import { useFovFramesStore } from '../../stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { useCanvasStore } from '../../stores/canvas';
 import { openFramePicker } from '../../fov-overlay';
 import addFrameSvg from '../../icons/add-frame.svg?raw';

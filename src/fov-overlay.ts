@@ -15,7 +15,7 @@ import { formatSetupCanvasLabel, formatFov, fovDeg } from '@myastrosky/core/gear
 import { reconcileSetupGear } from '@myastrosky/core/setup-gear';
 import { formatPaDeg } from '@myastrosky/core/frame-orientation';
 import { reportUnknownRendererError } from './error-reporter';
-import { useFovFramesStore } from './stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { useCanvasStore } from './stores/canvas';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useUiStore } from './stores/ui';

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
-vi.mock('../../src/api', () => ({
+vi.mock('@myastrosky/app-state/api', () => ({
   getGearSetups: vi.fn().mockResolvedValue([
     {
       id: 's1',
@@ -87,7 +87,7 @@ vi.mock('@myastrosky/core/gear-presets', () => ({
   formatSetupCanvasLabel: vi.fn().mockReturnValue('Setup 1 · 2.5° × 1.7°'),
 }));
 
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   // M42 carries an angular size so the auto-sized free mosaic has a real footprint
   // to cover (300'×240' → ~5°×4° + margin); other lookups stay size-less.
   getDSOById: vi.fn((id: string) =>
@@ -95,9 +95,9 @@ vi.mock('../../src/dso-catalog', () => ({
   ),
 }));
 
-vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
+vi.mock('@myastrosky/core/platform/error-hook', () => ({ reportError: vi.fn() }));
 
-import { useFovFramesStore } from '../../src/stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { framePointToSky, tileCenters } from '@myastrosky/core/mosaic';
 

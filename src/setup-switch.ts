@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { formatFov } from '@myastrosky/core/gear-presets';
 import { reportUnknownRendererError } from './error-reporter';
-import { useFovFramesStore } from './stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { getDSOById } from './dso-catalog';
 import { customLocationLabel } from './star-catalog';

@@ -17,7 +17,7 @@ import { pinia } from './pinia-instance';
 import { useCanvasStore } from './stores/canvas';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
-import { useFovFramesStore } from './stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { showToast } from './toast';
 import { getLang, t } from './i18n';

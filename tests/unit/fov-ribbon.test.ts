@@ -22,7 +22,7 @@ vi.mock('../../src/i18n', () => ({
 import FOVRibbon from '../../src/components/overlay/FOVRibbon.vue';
 import { buildFovPopup } from '../../src/fov-overlay';
 import { useCanvasStore } from '../../src/stores/canvas';
-import { useFovFramesStore } from '../../src/stores/fov-frames';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 
 function makeSkyMap() {
