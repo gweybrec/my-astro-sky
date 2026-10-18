@@ -1,6 +1,5 @@
 import { watch } from 'vue';
 import { t } from './i18n';
-import { angularSeparationDeg } from '@myastrosky/core/sky-geometry';
 import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { DSO } from '@myastrosky/core/types';
 import { buildGearSectionContent, type GearSectionPrefs } from './targets-view';
@@ -21,7 +20,14 @@ import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useUiStore } from './stores/ui';
 import { getDSOById } from './dso-catalog';
 import { customLocationLabel } from './star-catalog';
-import { autoRegionForDsos, planGrid, tileCenters } from '@myastrosky/core/mosaic';
+import {
+  MOSAIC_DEFAULT_OVERLAP,
+  clampOverlap,
+  entriesCoveredByMosaic,
+  mosaicPlacement,
+  mosaicSummary,
+  mosaicTiles,
+} from '@myastrosky/core/mosaic-form';
 import { requestSetupSwitch } from './setup-switch';
 import { searchDSOs } from '@myastrosky/core/search';
 import type { MosaicParams } from './api';
@@ -1535,23 +1541,13 @@ export function buildFovPopup(
     const tileW = spec.wDeg;
     const tileH = spec.hDeg;
 
-    const DEFAULT_OVERLAP = 20;
-    const initialOverlap = edit?.overlapPct ?? DEFAULT_OVERLAP;
+    const initialOverlap = edit?.overlapPct ?? MOSAIC_DEFAULT_OVERLAP;
 
     // Chosen targets (mutable). The covering centre/PA/region are derived from
     // these: one DSO stays anchored to it; several un-anchor to the bounding box
     // between them. Editing with no chips keeps the mosaic's stored centre/PA.
     const selected: DSO[] = [...seedDsos];
-    let center = edit ? { ra: edit.centerRa, dec: edit.centerDec } : { ra: 0, dec: 0 };
-    let paDeg = edit ? edit.paDeg : 0;
-    let region = { wDeg: 0, hDeg: 0, paDeg };
-    if (selected.length > 0) {
-      const res = autoRegionForDsos(selected, 20);
-      center = res.center;
-      region = res.region;
-      paDeg = region.paDeg;
-    }
-    let auto = planGrid(tileW, tileH, region.wDeg, region.hDeg, initialOverlap);
+    let { center, paDeg, auto } = mosaicPlacement(selected, tileW, tileH, initialOverlap, edit);
 
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
@@ -1684,36 +1680,28 @@ export function buildFovPopup(
       const n = parseInt(el.value, 10);
       return Number.isFinite(n) && n >= 1 ? n : fallback;
     };
-    const readOverlap = (): number => {
-      const n = parseFloat(overlap.input.value);
-      return Number.isFinite(n) ? Math.min(90, Math.max(0, n)) : DEFAULT_OVERLAP;
-    };
+    const readOverlap = (): number => clampOverlap(parseFloat(overlap.input.value));
 
     function recompute(): void {
       const ov = readOverlap();
       const c = readInt(cols.input, auto.cols);
       const r = readInt(rows.input, auto.rows);
-      const f = 1 - ov / 100;
-      const wDeg = (c - 1) * tileW * f + tileW;
-      const hDeg = (r - 1) * tileH * f + tileH;
-      summary.textContent = `${c}×${r} · ${c * r} ${t('fovOverlay.mosaicPanels')} · ${formatFov(wDeg, hDeg)}`;
+      summary.textContent = mosaicSummary(
+        c,
+        r,
+        tileW,
+        tileH,
+        ov,
+        t('fovOverlay.mosaicPanels'),
+        formatFov,
+      );
     }
 
     // Re-derive centre/PA/region from the chosen targets (falling back to the
     // mosaic's stored centre when editing with no targets), refresh the auto grid
     // and the summary.
     function recomputePlacement(): void {
-      if (selected.length > 0) {
-        const res = autoRegionForDsos(selected, 20);
-        center = res.center;
-        region = res.region;
-        paDeg = region.paDeg;
-      } else if (edit) {
-        center = { ra: edit.centerRa, dec: edit.centerDec };
-        paDeg = edit.paDeg;
-        region = { wDeg: 0, hDeg: 0, paDeg };
-      }
-      auto = planGrid(tileW, tileH, region.wDeg, region.hDeg, readOverlap());
+      ({ center, paDeg, auto } = mosaicPlacement(selected, tileW, tileH, readOverlap(), edit));
     }
     // Targets (or overlap) drive the grid: overwrite cols/rows from the auto
     // layout. With no targets (editing a free mosaic) keep the user's values.
@@ -1857,11 +1845,7 @@ export function buildFovPopup(
       const r = readInt(rows.input, auto.rows);
       // One DSO stays anchored to it; several (or none) un-anchor to the centre.
       const dsoId = selected.length === 1 ? selected[0].id : null;
-      const tiles = tileCenters(center, paDeg, c, r, tileW, tileH, overlapPct).map((tl) => ({
-        ra: tl.ra,
-        dec: tl.dec,
-        paDeg: tl.paDeg,
-      }));
+      const tiles = mosaicTiles(center, paDeg, c, r, tileW, tileH, overlapPct);
       create.disabled = true;
 
       // Free destination: create an ad-hoc mosaic (local, no plan) and select it.
@@ -1903,19 +1887,16 @@ export function buildFovPopup(
         // Standalone frames this mosaic stands in for: the same target, or any
         // custom-location frame sitting within the mosaic footprint. They're
         // deleted with the mosaic creation so only the mosaic remains.
-        const f2 = 1 - overlapPct / 100;
-        const reach = Math.max((c - 1) * tileW * f2 + tileW, (r - 1) * tileH * f2 + tileH) / 2;
-        const replaceEntryIds = plan!.entries
-          .filter((e) => {
-            if (e.mosaicId) return false;
-            if (dsoId && e.dsoId === dsoId) return true;
-            const ed = e.dsoId ? getDSOById(e.dsoId) : null;
-            const era = e.ra ?? ed?.ra;
-            const edec = e.dec ?? ed?.dec;
-            if (era == null || edec == null) return false;
-            return angularSeparationDeg(center.ra, center.dec, era, edec) <= reach;
-          })
-          .map((e) => e.id);
+        const replaceEntryIds = entriesCoveredByMosaic(
+          plan!.entries,
+          dsoId,
+          center,
+          c,
+          r,
+          tileW,
+          tileH,
+          overlapPct,
+        );
         const params: MosaicParams = {
           dsoId,
           name,
