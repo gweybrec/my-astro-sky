@@ -2,7 +2,7 @@
 //   node .claude/skills/check-alignment/scripts/run.mjs <app> [--view <name>] [--verbose] [--crop <view>:<n>] [--inject "<css>"]
 // It starts what the app's rules file asks for (on free ports, in a new temporary folder), seeds the test data, opens
 // the views, measures, stops everything it started, and prints the result. Exit code: 0 aligned, 1 misaligned,
-// 2 set-up problem. BROWSER_CHANNEL (default msedge) names the installed browser; nothing is downloaded.
+// 2 set-up problem. BROWSER_CHANNEL (default chrome) names the installed browser; nothing is downloaded.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -116,12 +116,12 @@ async function main() {
   let browser;
   try {
     browser = await chromium.launch({
-      channel: process.env.BROWSER_CHANNEL || 'msedge',
+      channel: process.env.BROWSER_CHANNEL || 'chrome',
       headless: true,
     });
   } catch {
     throw new SetupError(
-      `No browser found for the channel "${process.env.BROWSER_CHANNEL || 'msedge'}": install Microsoft Edge or Chrome, or set BROWSER_CHANNEL (msedge, chrome).`,
+      `No browser found for the channel "${process.env.BROWSER_CHANNEL || 'chrome'}": install Chrome or Microsoft Edge, or set BROWSER_CHANNEL (chrome, msedge).`,
     );
   }
 

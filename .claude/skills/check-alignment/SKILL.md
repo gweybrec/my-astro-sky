@@ -12,7 +12,7 @@ description: >
 
 ## When
 
-After any change to a row, a component or a theme file of the phone app, and when the user reports a misalignment. Needs an installed Edge or Chrome (`BROWSER_CHANNEL`, default `msedge`); nothing is downloaded.
+After any change to a row, a component or a theme file of the phone app, and when the user reports a misalignment. Needs an installed Chrome or Edge (`BROWSER_CHANNEL`, default `chrome`); nothing is downloaded.
 
 ## The command
 
