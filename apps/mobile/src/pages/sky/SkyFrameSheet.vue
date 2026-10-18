@@ -66,6 +66,9 @@ function resize(side: 'w' | 'h', deg: number) {
   if (area != null && w * h > area) {
     if (side === 'w') h = Math.max(s.nativeHDeg, area / w);
     else w = Math.max(s.nativeWDeg, area / h);
+    // The other side at its native floor: the side moved stops where the cap binds.
+    if (side === 'w') w = Math.min(w, area / h);
+    else h = Math.min(h, area / w);
   }
   const { ra, dec, paDeg } = props.frame;
   void fov.applyResize(props.frame.id, {
@@ -216,7 +219,8 @@ async function remove() {
       </button>
       <div class="mob-sheet-header">
         <h2 :id="titleId" class="mob-sheet-title m-title">{{ title }}</h2>
-        <div v-show="!frameDragging" class="mob-meta m-secondary">
+        <!-- A floating free frame is titled by its setup already: the line would only repeat it. -->
+        <div v-if="frame.label !== title" v-show="!frameDragging" class="mob-meta m-secondary">
           <span>{{ frame.label }}</span>
         </div>
       </div>

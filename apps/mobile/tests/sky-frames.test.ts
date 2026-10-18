@@ -285,6 +285,33 @@ describe('the size of a smart telescope frame', () => {
     expect(region.wDeg).toBeCloseTo(10.56 / 4.2, 6);
   });
 
+  it('stops the side moved where the area cap binds once the other is at its native size', () => {
+    const apply = vi.spyOn(useFovFramesStore(), 'applyResize').mockResolvedValue();
+    const w = mountSheet(
+      seestar({
+        wDeg: 2.6,
+        hDeg: 1.4,
+        smartMosaic: {
+          env: { maxWDeg: 4.33, maxHDeg: 4.33, maxAreaDeg2: 10.56 },
+          nativeWDeg: 2.6,
+          nativeHDeg: 1.4,
+        },
+      }),
+    );
+    w.findAllComponents(PhoneSliderRow)[1].vm.$emit('update:modelValue', 4.33);
+    const region = apply.mock.calls[0][1];
+    expect(region.wDeg).toBe(2.6);
+    expect(region.hDeg).toBeCloseTo(10.56 / 2.6, 6);
+  });
+
+  it('does not repeat the title under it for a floating free frame', () => {
+    const w = mountSheet(
+      seestar({ anchorKind: 'screen', anchorLabel: null, label: "S50 · 1.3° × 44'" }),
+    );
+    expect(w.find('.mob-sheet-title').text()).toBe("S50 · 1.3° × 44'");
+    expect(w.find('.mob-map-sheet > .mob-sheet-drag .mob-meta').exists()).toBe(false);
+  });
+
   it('has no size rows for a frame of a classical telescope', () => {
     const w = mountSheet(frame({ id: 'adhoc-1' }));
     expect(w.findAllComponents(PhoneSliderRow)).toHaveLength(1);
