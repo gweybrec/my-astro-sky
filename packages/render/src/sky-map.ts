@@ -708,7 +708,14 @@ export class SkyMap {
   }
   /** Bring the given frame to the centre of the view. */
   centerFrameInView(id: string): void {
-    this.frames.centerFrameInView(id);
+    // A floating frame goes to the middle of the part of the map a sheet leaves free (see setCover).
+    const { width, height } = this.view;
+    const left = Math.min(width, Math.max(0, this.cover.left));
+    const bottom = Math.min(height, Math.max(0, this.cover.bottom));
+    this.frames.centerFrameInView(id, {
+      nx: width > 0 ? (left + width) / 2 / width : 0.5,
+      ny: height > 0 ? (height - bottom) / 2 / height : 0.5,
+    });
   }
 
   /** Sky coordinates (degrees) at the centre of the current viewport — used to

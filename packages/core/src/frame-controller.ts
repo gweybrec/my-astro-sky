@@ -742,7 +742,7 @@ export class FrameController {
    * Idempotent: a pinned frame pans the view to its sky anchor; a floating frame
    * snaps its own screen anchor back to the viewport centre.
    */
-  centerFrameInView(id: string): void {
+  centerFrameInView(id: string, floatAt: { nx: number; ny: number } = { nx: 0.5, ny: 0.5 }): void {
     const f = this.instances.find((x) => x.id === id);
     if (!f) return;
     if (f.anchorKind === 'sky') {
@@ -751,7 +751,7 @@ export class FrameController {
       const scale = computeFovTargetScale(f.wDeg, f.hDeg, f.dec ?? 0, getHemisphere(), minDim);
       this.host.navigateTo(f.ra ?? 0, f.dec ?? 0, scale, true);
     } else {
-      this.onChange?.(f.id, { anchor: { kind: 'screen', nx: 0.5, ny: 0.5 } });
+      this.onChange?.(f.id, { anchor: { kind: 'screen', nx: floatAt.nx, ny: floatAt.ny } });
     }
   }
 
