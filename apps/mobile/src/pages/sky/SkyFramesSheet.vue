@@ -126,7 +126,11 @@ function addFrame() {
   map.pinActiveIfFloating();
   const { ra, dec } = map.viewCenterSky();
   open.value = false;
-  fov.addPlanFrame(plan.value.id, ra, dec).catch((error) => void showError(error));
+  // The new frame is selected: the map shows it beside its sheet (else the sheet covers the middle of the map).
+  fov
+    .addPlanFrame(plan.value.id, ra, dec)
+    .then(() => fov.activeId && emit('show', fov.activeId))
+    .catch((error) => void showError(error));
 }
 function addFreeFrame(setupId: string) {
   pickSetupOpen.value = false;
@@ -134,6 +138,7 @@ function addFreeFrame(setupId: string) {
   props.map?.pinActiveIfFloating();
   if (!fov.framesVisible) fov.setFramesVisible(true);
   fov.addAdhocFrame(setupId);
+  if (fov.activeId) emit('show', fov.activeId);
 }
 function newSetup() {
   pickSetupOpen.value = false;

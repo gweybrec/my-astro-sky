@@ -691,6 +691,13 @@ describe('FrameController', () => {
       expect(h.changes[0].change.anchor).toEqual({ kind: 'screen', nx: 0.5, ny: 0.5 });
     });
 
+    it('puts a floating frame where it is asked (the part of the map a sheet leaves free)', () => {
+      const h = harness();
+      h.fc.setFrames([bigActiveFrame({ anchorKind: 'screen', nx: 0.1, ny: 0.9 })]);
+      h.fc.centerFrameInView('f1', { nx: 0.5, ny: 0.25 });
+      expect(h.changes[0].change.anchor).toEqual({ kind: 'screen', nx: 0.5, ny: 0.25 });
+    });
+
     it('is a no-op for an unknown id', () => {
       const h = harness();
       h.fc.setFrames([bigActiveFrame()]);
