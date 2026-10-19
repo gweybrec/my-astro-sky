@@ -448,12 +448,13 @@ export const rules = [
     gap: 'var(--space-4)',
     minimum: true,
   },
-  // The first column's titles, headers and helper lines start on one line (not the second field of a pair).
+  // The first column's titles, headers and helper lines start on one line (not the second field of a pair); a row that
+  // starts with a picture placeholder starts with it.
   {
     id: 'left-edge',
     type: 'leadingEdge',
     items:
-      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead)):not(.mob-entry .mob-row) .mob-row-title, ion-toggle.mob-row .mob-row-title',
+      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row .mob-row-title',
   },
   // The chevron (else the switch) of each row ends on one line.
   {
@@ -713,6 +714,28 @@ export const views = [
     path: '/sky/search',
     ready: '.mob-search-wrap',
     open: [{ fill: '.mob-search-wrap input', text: 'andro' }, { wait: '.mob-row--roomy' }],
+  },
+  // The Photos tab of the search: the seed's photos are named after constellations, and all hold the same objects.
+  {
+    name: 'sky-search-photos',
+    path: '/sky/search',
+    ready: '.mob-search-wrap',
+    open: [
+      { click: '.mob-search-tabs .mob-seg-btn:nth-child(2)' },
+      { fill: '.mob-search-wrap input', text: 'Cygnus' },
+      { wait: '.mob-row-thumb' },
+      { pause: 400 },
+    ],
+  },
+  {
+    name: 'sky-search-photos-none',
+    path: '/sky/search',
+    ready: '.mob-search-wrap',
+    open: [
+      { click: '.mob-search-tabs .mob-seg-btn:nth-child(2)' },
+      { fill: '.mob-search-wrap input', text: 'zzz' },
+      { wait: '.mob-empty-text' },
+    ],
   },
   {
     name: 'sky-star',

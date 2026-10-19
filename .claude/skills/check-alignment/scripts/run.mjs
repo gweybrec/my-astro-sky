@@ -151,16 +151,22 @@ async function main() {
           if (route.request().method() !== 'GET') return route.continue();
           const key = route.request().url();
           let hit = answers.get(key);
-          if (!hit) {
-            const response = await route.fetch();
-            hit = {
-              status: response.status(),
-              headers: response.headers(),
-              body: await response.body(),
-            };
-            if (hit.status === 200) answers.set(key, hit);
+          try {
+            if (!hit) {
+              const response = await route.fetch();
+              hit = {
+                status: response.status(),
+                headers: response.headers(),
+                body: await response.body(),
+              };
+              if (hit.status === 200) answers.set(key, hit);
+            }
+            return await route.fulfill(hit);
+          } catch {
+            // The view's page was closed while its request was still running (a page that reads as it opens): nothing
+            // waits for the answer any more.
+            return undefined;
           }
-          return route.fulfill(hit);
         },
       );
     }
