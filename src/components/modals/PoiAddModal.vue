@@ -65,9 +65,7 @@ import PoiTypesModal from './PoiTypesModal.vue';
 import { t } from '../../i18n';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { resolveCategory } from '@myastrosky/core/poi';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
-import { withCanonicalProjection } from '@myastrosky/core/projection';
-import { photoPixelToRaDec } from '@myastrosky/core/asteroid-identify';
+import { poiAtPixel } from '@myastrosky/core/photo-identify';
 import penSvg from '../../icons/pen.svg?raw';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
@@ -107,14 +105,7 @@ function onAdd() {
   const pos = posPx.value;
   const name = nameInput.value.trim();
   if (!canAdd.value || !pos) return;
-  // Unprojected in the canonical pole projection: the zenith-centred display mode
-  // clips and rotates with the sky clock (see withCanonicalProjection).
-  const raDec = withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(props.photo);
-    return matrix ? photoPixelToRaDec(matrix, pos.x, pos.y) : null;
-  });
-  if (!raDec) return;
-  const ra = ((raDec.ra % 360) + 360) % 360;
-  emit('identified', props.photo, [{ name, categoryId: categoryInput.value, ra, dec: raDec.dec }]);
+  const poi = poiAtPixel(props.photo, pos, name, categoryInput.value);
+  if (poi) emit('identified', props.photo, [poi]);
 }
 </script>

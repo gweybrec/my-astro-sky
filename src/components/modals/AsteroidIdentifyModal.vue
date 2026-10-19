@@ -171,19 +171,14 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
-import { withCanonicalProjection } from '@myastrosky/core/projection';
+import { asteroidSearchPlan, rankAsteroids } from '@myastrosky/core/photo-identify';
 import { skybotConesearchAPI } from '../../api';
 import { buildPageList } from '../../targets-view';
 import {
-  photoPixelToRaDec,
-  buildSearch,
-  rankCandidates,
   formatCandidateName,
   formatAsteroidClass,
   candidateToPoi,
   defaultTimeWindow,
-  isoToJd,
   isoToUtcParts,
   utcPartsToIso,
   type RankedCandidate,
@@ -280,42 +275,16 @@ async function onSearch() {
   resultPage.value = 0;
   selected.value = new Set();
   try {
-    // Fitted and unprojected in the canonical pole projection: the zenith-centred
-    // display mode clips a field that is currently below the horizon (collapsing the
-    // fit) and rotates with the sky clock (see withCanonicalProjection).
-    const start = startPx.value;
-    const end = endPx.value;
-    const marks = withCanonicalProjection(() => {
-      const matrix = computePhotoToProjMatrix(props.photo);
-      return matrix
-        ? {
-            startRaDec: photoPixelToRaDec(matrix, start.x, start.y),
-            endRaDec: photoPixelToRaDec(matrix, end.x, end.y),
-          }
-        : null;
-    });
-    if (!marks) return;
-    const { startRaDec, endRaDec } = marks;
-    const startJd = isoToJd(startIso.value);
-    const endJd = isoToJd(endIso.value);
-    const search = buildSearch(startRaDec, endRaDec, startJd, endJd);
-    const effectiveRadius = Math.max(radiusArcmin.value, search.suggestedRadiusArcmin);
-
-    const candidates = await skybotConesearchAPI({
-      raDeg: search.raDeg,
-      decDeg: search.decDeg,
-      radiusArcmin: effectiveRadius,
-      epochJd: search.epochJd,
-    });
-
-    ranked.value = rankCandidates(
-      candidates,
-      {
-        start: { ...startRaDec, jd: startJd },
-        end: { ...endRaDec, jd: endJd },
-      },
-      search.epochJd,
+    const plan = asteroidSearchPlan(
+      props.photo,
+      startPx.value,
+      endPx.value,
+      startIso.value,
+      endIso.value,
+      radiusArcmin.value,
     );
+    if (!plan) return;
+    ranked.value = rankAsteroids(await skybotConesearchAPI(plan.params), plan);
     // The best match is pre-selected; the others are opt-in.
     if (ranked.value.length) selected.value = new Set([candidateKey(ranked.value[0])]);
   } catch (err) {

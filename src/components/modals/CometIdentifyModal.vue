@@ -135,17 +135,10 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
-import { withCanonicalProjection } from '@myastrosky/core/projection';
+import { cometPois, cometsInPhoto, isPhotoSolved } from '@myastrosky/core/photo-identify';
 import { cometElementsAPI } from '../../api';
+import { isoToUtcParts, utcPartsToIso } from '@myastrosky/core/asteroid-identify';
 import {
-  isoToUtcParts,
-  utcPartsToIso,
-  photoPixelToRaDec,
-} from '@myastrosky/core/asteroid-identify';
-import {
-  findComets,
-  candidateToPoi,
   jplLookupUrl,
   COMET_CATEGORY_ID,
   type CometSearchResult,
@@ -206,13 +199,7 @@ async function onSearch() {
   searching.value = true;
   searchErrorMessage.value = '';
   try {
-    const comets = await cometElementsAPI();
-    results.value = withCanonicalProjection(() => {
-      const matrix = computePhotoToProjMatrix(props.photo);
-      return matrix
-        ? findComets(comets, matrix, props.photo.width, props.photo.height, obs)
-        : { inFrame: [], nearby: [] };
-    });
+    results.value = cometsInPhoto(props.photo, await cometElementsAPI(), obs);
     // Comets in the frame are pre-selected; the brightest one is the click target.
     const names = results.value.inFrame.map((c) => c.name);
     selected.value = new Set(names);
@@ -227,7 +214,7 @@ async function onSearch() {
 }
 
 // One search on open when the date is already known, like the supernova modal.
-if (computePhotoToProjMatrix(props.photo) && obsIso.value) void onSearch();
+if (isPhotoSolved(props.photo) && obsIso.value) void onSearch();
 
 function toggle(name: string, on: boolean) {
   const next = new Set(selected.value);
@@ -257,18 +244,7 @@ function pinPixel(c: PlacedComet): { x: number; y: number } {
 
 function onAdd() {
   if (!results.value) return;
-  const inFrame = results.value.inFrame;
-  const pois = withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(props.photo);
-    return inFrame
-      .filter((c) => selected.value.has(c.name))
-      .map((c) => {
-        const px = overrides.value.get(c.name);
-        const position =
-          px && matrix ? photoPixelToRaDec(matrix, px.x, px.y) : { ra: c.raDeg, dec: c.decDeg };
-        return candidateToPoi(c, position);
-      });
-  });
-  emit('identified', props.photo, pois);
+  const chosen = results.value.inFrame.filter((c) => selected.value.has(c.name));
+  emit('identified', props.photo, cometPois(props.photo, chosen, overrides.value));
 }
 </script>

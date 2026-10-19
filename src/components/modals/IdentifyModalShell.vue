@@ -95,7 +95,7 @@ import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { t } from '../../i18n';
 import { photoFileUrl } from '../../api';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { isPhotoSolved } from '@myastrosky/core/photo-identify';
 import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
 import type { Photo } from '@myastrosky/core/types';
 
@@ -121,7 +121,7 @@ const emit = defineEmits<{
   'photo-click': [{ x: number; y: number }];
 }>();
 
-const solved = computed(() => computePhotoToProjMatrix(props.photo) !== null);
+const solved = computed(() => isPhotoSolved(props.photo));
 
 // ─── Zoom / pan ─────────────────────────────────────────────────────────────
 const imgEl = ref<HTMLImageElement | null>(null);

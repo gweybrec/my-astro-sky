@@ -103,15 +103,14 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
-import { withCanonicalProjection } from '@myastrosky/core/projection';
+import {
+  isPhotoSolved,
+  placeSupernovae,
+  supernovaSearchPlan,
+} from '@myastrosky/core/photo-identify';
 import { tnsConesearchAPI } from '../../api';
 import { isoToUtcParts, utcPartsToIso } from '@myastrosky/core/asteroid-identify';
 import {
-  photoFieldCircle,
-  searchWindow,
-  placeInImage,
-  rankTransients,
   formatDaysFromDiscovery,
   candidateToPoi,
   SUPERNOVA_CATEGORY_ID,
@@ -158,33 +157,15 @@ const selected = ref(new Set<string>());
 const hovered = ref<string | null>(null);
 
 async function onSearch() {
-  // Sky geometry runs in the canonical pole projection: the zenith-centred display
-  // mode clips a field that is currently below the horizon (see
-  // withCanonicalProjection), which would collapse the photo's fit.
-  const fieldCircle = withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(props.photo);
-    return matrix ? photoFieldCircle(matrix, props.photo.width, props.photo.height) : null;
-  });
-  const dateWindow = obsIso.value ? searchWindow(obsIso.value) : null;
-  if (!fieldCircle || !dateWindow) return;
+  const plan = supernovaSearchPlan(props.photo, obsIso.value);
+  if (!plan) return;
   searching.value = true;
   searchErrorMessage.value = '';
   results.value = null;
   try {
-    field.value = fieldCircle;
-    const candidates = await tnsConesearchAPI({
-      raDeg: field.value.raDeg,
-      decDeg: field.value.decDeg,
-      radiusArcmin: field.value.radiusArcmin,
-      ...dateWindow,
-    });
-    const placed = withCanonicalProjection(() => {
-      const matrix = computePhotoToProjMatrix(props.photo);
-      return matrix
-        ? placeInImage(candidates, matrix, props.photo.width, props.photo.height, obsIso.value)
-        : [];
-    });
-    results.value = rankTransients(placed);
+    field.value = plan.field;
+    const candidates = await tnsConesearchAPI(plan.params);
+    results.value = placeSupernovae(props.photo, candidates, obsIso.value);
     // Confirmed supernovae are pre-selected; unclassified transients are opt-in.
     selected.value = new Set(results.value.filter((c) => c.classified).map((c) => c.name));
   } catch (err) {
@@ -196,7 +177,7 @@ async function onSearch() {
 
 // One search on open when the date is already known — cached server-side, so
 // re-opening the modal on the same photo doesn't hit TNS's rate limit again.
-if (computePhotoToProjMatrix(props.photo) && obsIso.value) void onSearch();
+if (isPhotoSolved(props.photo) && obsIso.value) void onSearch();
 
 function toggle(name: string, on: boolean) {
   const next = new Set(selected.value);
