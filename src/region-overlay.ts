@@ -4,9 +4,8 @@ import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { confirmSkyRegionDelete } from './photo-delete-confirm';
 import { showToast } from './toast';
 import { reportUnknownRendererError } from './error-reporter';
+import { DEFAULT_REGION_COLOR } from '@myastrosky/core/domain/regions';
 import trashSvg from './icons/trash.svg?raw';
-
-const DEFAULT_REGION_COLOR = '#4ea1ff';
 
 /** Name/color modal shown once a freehand region has been drawn, before saving it. */
 function buildSaveRegionModal(

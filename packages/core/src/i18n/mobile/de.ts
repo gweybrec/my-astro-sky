@@ -115,6 +115,10 @@ const de: Translations['mobile'] = {
     regionView: 'Region „{name}“ ansehen',
     regionDelete: 'Region „{name}“ löschen',
     regionDraw: 'Neue Region zeichnen',
+    regionDrawTitle: 'Region zeichnen',
+    regionDrawHint: 'Ein Finger: zeichnen · Zwei Finger: Karte verschieben',
+    regionClear: 'Umriss löschen',
+    regionFinish: 'Fertig',
   },
   settings: {
     observation: 'Beobachtung',

@@ -16,7 +16,7 @@ import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
-import { skyPlacement, skyStarPick } from '../sky-modes';
+import { skyPlacement, skyRegionDraw, skyRegionView, skyStarPick } from '../sky-modes';
 import { skyDrawOrder } from '../sky-draw-order';
 import { framesSheetOpen } from '../sky-frames';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
@@ -35,6 +35,8 @@ import SkyFramePicker, { type FrameTarget } from './sky/SkyFramePicker.vue';
 import SkyMosaicSheet from './sky/SkyMosaicSheet.vue';
 import SkyPlacement from './sky/SkyPlacement.vue';
 import SkyStarPick from './sky/SkyStarPick.vue';
+import SkyRegionDraw from './sky/SkyRegionDraw.vue';
+import SkyRegionView from './sky/SkyRegionView.vue';
 import SkyTimeBar from './sky/SkyTimeBar.vue';
 import SkyTopBar from './sky/SkyTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
@@ -150,7 +152,6 @@ useBackClose(() => placing.value !== null, cancelPlacement);
 // Choosing a star on the map for a point of the identification (board "Identifier les étoiles, choisir sur la carte"):
 // the map takes the screen with the chosen star under it. Valider, Annuler and the back button open the photo again.
 const picking = computed(() => skyStarPick.value);
-const inMode = computed(() => placing.value !== null || picking.value !== null);
 watch(picking, (now) => {
   if (now) clearSkySelection();
 });
@@ -168,6 +169,39 @@ useBackClose(
   () => picking.value !== null,
   () => endPick(null),
 );
+
+// Drawing a sky region (board "Dessiner une région") and showing a saved one (board "Voir une région"), asked by the
+// regions page of Cibles: the map takes the screen in local sky. Terminer, Annuler and the back button open that page
+// again.
+const regionDrawing = computed(() => skyRegionDraw.value);
+const regionShown = computed(() => skyRegionView.value);
+watch([regionDrawing, regionShown], ([drawing, shown]) => {
+  if (drawing || shown) clearSkySelection();
+});
+watch(skySelection, (selection) => {
+  if (selection && (regionDrawing.value || regionShown.value)) clearSkySelection();
+});
+// The regions page opens again above the Cibles tab, where its back arrow leads (pushed above the Ciel tab, it led there).
+async function endRegionMode() {
+  const returnTo = skyRegionDraw.value?.returnTo ?? skyRegionView.value?.returnTo;
+  skyRegionDraw.value = null;
+  skyRegionView.value = null;
+  if (!returnTo) return;
+  await router.replace('/tabs/targets');
+  await router.push(returnTo);
+}
+useBackClose(() => regionDrawing.value !== null || regionShown.value !== null, endRegionMode);
+
+// The bar of the mode on: its title and what its back arrow does.
+const modeBar = computed(() => {
+  if (placing.value) return { title: t('manual.modeLabel'), back: cancelPlacement };
+  if (picking.value) return { title: t('modal.mapPickTooltip'), back: () => endPick(null) };
+  if (regionDrawing.value)
+    return { title: t('mobile.targets.regionDrawTitle'), back: endRegionMode };
+  if (regionShown.value) return { title: regionShown.value.region.name, back: endRegionMode };
+  return null;
+});
+const inMode = computed(() => modeBar.value !== null);
 const onSkyView = (listener: () => void) => sky?.onView(listener) ?? (() => undefined);
 
 const time = useSkyTimeStore();
@@ -304,12 +338,13 @@ onBeforeUnmount(() => {
 <template>
   <IonPage>
     <IonContent :scroll-y="false">
-      <div class="mob-page-fill mob-sky-frame" :class="{ 'mob-map-mode': inMode }">
-        <header v-if="inMode" class="mob-topbar">
-          <PhoneBackButton :action="placing ? cancelPlacement : () => endPick(null)" />
-          <h1 class="mob-topbar-title mob-topbar-title--grow m-title">
-            {{ placing ? t('manual.modeLabel') : t('modal.mapPickTooltip') }}
-          </h1>
+      <div
+        class="mob-page-fill mob-sky-frame"
+        :class="{ 'mob-map-mode': inMode, 'mob-map-mode--bare': regionShown }"
+      >
+        <header v-if="modeBar" class="mob-topbar">
+          <PhoneBackButton :action="modeBar.back" />
+          <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ modeBar.title }}</h1>
         </header>
         <main ref="mapEl" class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
@@ -381,6 +416,19 @@ onBeforeUnmount(() => {
           :point="picking.point"
           @cancel="endPick(null)"
           @picked="endPick"
+        />
+        <SkyRegionDraw
+          v-else-if="regionDrawing && skyMap && mapEl"
+          :map="skyMap"
+          :map-el="mapEl"
+          @cancel="endRegionMode"
+          @saved="endRegionMode"
+        />
+        <SkyRegionView
+          v-else-if="regionShown && skyMap"
+          :key="regionShown.region.id"
+          :map="skyMap"
+          :region="regionShown.region"
         />
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" />
