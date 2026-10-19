@@ -1538,7 +1538,9 @@ export class SkyMap {
       ctx: this.ctx,
       view,
       theme: this.skyTheme,
-      horizon: this.skyTimeMode === 'date' ? this.computeHorizonParams() : null,
+      // Local sky needs it in the live sky too: a region drawn or shown is traced in altitude and azimuth.
+      horizon:
+        this.skyTimeMode === 'date' || this.localSkyMode ? this.computeHorizonParams() : null,
       trajectory: this.computeTrajectoryForSelection(),
       offscreen: this._renderingOffscreen,
 
@@ -1621,8 +1623,8 @@ export class SkyMap {
     // Invalidate the per-frame DSO selection cache; rebuilt lazily by the first consumer.
     this.dsoSelection.invalidate();
 
-    // Horizon params (LST + latitude), computed once per frame — null outside date mode
-    // or before an observer location is set, in which case no dimming/line is drawn.
+    // Horizon params (LST + latitude), computed once per frame — null outside date mode and
+    // local sky, or before an observer location is set, in which case no dimming/line is drawn.
     const horizon = scene.horizon;
 
     ctx.save();
