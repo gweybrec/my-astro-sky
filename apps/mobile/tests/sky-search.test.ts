@@ -7,13 +7,25 @@ import type { DSO } from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
 
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
+const getPhotos = vi.fn();
+vi.mock('@myastrosky/app-state/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/app-state/api')>()),
+  getPhotos: (...a: unknown[]) => getPhotos(...a),
+  getPoiCategories: () => Promise.resolve([]),
+}));
 const searchUnified = vi.fn();
 vi.mock('@myastrosky/core/search', () => ({
   searchUnified: (...a: unknown[]) => searchUnified(...a),
 }));
 
 import SkySearchPage from '../src/pages/SkySearchPage.vue';
-import { clearSkySelection, skyFocus, skySelection } from '../src/composables/useSkySelection';
+import {
+  clearSkySelection,
+  skyFocus,
+  skyPhotoFocus,
+  skySelection,
+} from '../src/composables/useSkySelection';
+import type { Photo } from '@myastrosky/core/types';
 
 /** "Ciel, recherche": the search page and the selection it hands to the map. */
 
@@ -79,8 +91,10 @@ describe('the search page', () => {
     localStorage.setItem('lang', 'fr');
     vi.useFakeTimers();
     searchUnified.mockReset().mockResolvedValue(results);
+    getPhotos.mockReset().mockResolvedValue(photos);
     clearSkySelection();
     skyFocus.value = null;
+    skyPhotoFocus.value = null;
   });
   afterEach(() => vi.useRealTimers());
 
@@ -148,5 +162,95 @@ describe('the search page', () => {
     await wrapper.find('input[type=search]').setValue('');
     await flushPromises();
     expect(wrapper.findAll('.mob-row--roomy')).toHaveLength(0);
+  });
+
+  it('opens on the Ciel tab, with the Photos tab beside it', async () => {
+    const { wrapper } = mountPage();
+    await type(wrapper, 'andro');
+    const tabs = wrapper.findAll('.mob-seg-btn');
+    expect(tabs.map((b) => b.text())).toEqual(['Ciel', 'Photos']);
+    expect(tabs[0].attributes('aria-checked')).toBe('true');
+    expect(wrapper.findAll('.mob-row--roomy')).toHaveLength(3);
+  });
+});
+
+/** Placed photos (two star correspondences or a manual placement) and one waiting to be placed. */
+const placedAt = { correspondences: [{}, {}] as Photo['correspondences'] };
+const photo = (id: string, over: Partial<Photo>): Photo =>
+  ({
+    id,
+    originalName: `${id}.jpg`,
+    notes: '',
+    labels: [],
+    dsoIds: [],
+    pointsOfInterest: [],
+    correspondences: [],
+    ...over,
+  }) as Photo;
+const photos: Photo[] = [
+  photo('Orion_wide', { ...placedAt, dsoIds: ['NGC1977', 'M42', 'M43'] }),
+  photo('M42_stack', { ...placedAt, dsoIds: ['M42'], labels: ['M42 HaRGB'] }),
+  photo('M31_mosaic', { ...placedAt, dsoIds: ['M31'] }),
+  photo('M42_waiting', { dsoIds: ['M42'] }),
+];
+
+describe('the search page, Photos tab', () => {
+  beforeEach(() => {
+    localStorage.setItem('lang', 'fr');
+    vi.useFakeTimers();
+    searchUnified.mockReset().mockResolvedValue(results);
+    getPhotos.mockReset().mockResolvedValue(photos);
+    clearSkySelection();
+    skyPhotoFocus.value = null;
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const photosTab = async (wrapper: ReturnType<typeof mount>, text: string) => {
+    await flushPromises();
+    await wrapper.findAll('.mob-seg-btn')[1].trigger('click');
+    await type(wrapper, text);
+  };
+  const names = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.findAll('.mob-row-title').map((t) => t.text());
+
+  it('lists the placed photos that match, in the desktop order, without the waiting ones', async () => {
+    const { wrapper } = mountPage();
+    await photosTab(wrapper, 'm42');
+    expect(names(wrapper)).toEqual(['M42_stack.jpg', 'Orion_wide.jpg']);
+  });
+
+  it('shows the chips of what matched only', async () => {
+    const { wrapper } = mountPage();
+    await photosTab(wrapper, 'm42');
+    const chips = (n: number) =>
+      wrapper
+        .findAll('.mob-row--roomy')
+        [n].findAll('.mob-tag-text')
+        .map((c) => c.text());
+    expect(chips(0)).toEqual(['M42 HaRGB', 'M42']);
+    expect(chips(1)).toEqual(['M42']);
+  });
+
+  it('says so when no photo matches', async () => {
+    const { wrapper } = mountPage();
+    await photosTab(wrapper, 'xyz');
+    expect(wrapper.find('.mob-empty-text').text()).toBe('Aucune photo correspondante');
+  });
+
+  it('keeps the Photos tab while the query changes', async () => {
+    const { wrapper } = mountPage();
+    await photosTab(wrapper, 'm42');
+    await type(wrapper, 'm31');
+    expect(names(wrapper)).toEqual(['M31_mosaic.jpg']);
+    expect(wrapper.findAll('.mob-seg-btn')[1].attributes('aria-checked')).toBe('true');
+  });
+
+  it('selects the tapped photo, asks the map to frame it and goes back', async () => {
+    const { wrapper, back } = mountPage();
+    await photosTab(wrapper, 'm31');
+    await wrapper.findAll('.mob-row--roomy')[0].trigger('click');
+    expect(skySelection.value).toEqual({ kind: 'photo', photo: photos[2] });
+    expect(skyPhotoFocus.value).toBe('M31_mosaic');
+    expect(back).toHaveBeenCalled();
   });
 });

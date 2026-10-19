@@ -102,11 +102,16 @@ function whenMapSized(run: () => void, frames = MAP_SIZE_FRAMES) {
   else requestAnimationFrame(() => whenMapSized(run, frames - 1));
 }
 onIonViewDidEnter(() => {
-  // "Voir sur la carte" of a photo's screen: the map frames that photo.
+  // "Voir sur la carte" of a photo's screen, or a photo chosen in the search: the map frames that photo, beside its
+  // sheet when the search selected it.
   const photoId = skyPhotoFocus.value;
   if (photoId) {
     skyPhotoFocus.value = null;
-    void photosRead.then(() => whenMapSized(() => sky?.showPhoto(photoId)));
+    void photosRead.then(() =>
+      whenMapSized(() =>
+        besideSheet(({ width, height }) => sky?.showPhoto(photoId, width, height)),
+      ),
+    );
   }
   const focus = skyFocus.value;
   if (!focus) return;
@@ -239,18 +244,25 @@ function mosaicEdited() {
   const edited = fov.renderables.find((f) => f.active);
   if (edited) showFrame(edited.id);
 }
-// Brings a selected frame to the middle of the part of the map its sheet leaves free (above it in portrait, right of
-// it in landscape): once the map has the frame (Vue's next update) and the sheet has its size (the next drawn frame).
-function showFrame(id: string) {
+// Runs a move of the map within the part its sheet leaves free (above it in portrait, right of it in landscape), with
+// that part's size: once the map has what it moves to (Vue's next update) and the sheet has its size (the next drawn
+// frame). Without a sheet the whole map is free.
+function besideSheet(move: (free: { width: number; height: number }) => void) {
   void nextTick(() =>
     requestAnimationFrame(() => {
       const map = sky?.map;
       if (!map) return;
-      map.setCover(sheetCover());
-      map.centerFrameInView(id);
+      const cover = sheetCover();
+      const view = map.getView();
+      map.setCover(cover);
+      move({ width: view.width - cover.left, height: view.height - cover.bottom });
       map.setCover({ left: 0, bottom: 0 });
     }),
   );
+}
+// Brings a selected frame to the middle of the part of the map its sheet leaves free.
+function showFrame(id: string) {
+  besideSheet(() => sky?.map.centerFrameInView(id));
 }
 // The sheet's place in the map from its layout box, not its box on screen: it is still sliding in.
 function sheetCover() {

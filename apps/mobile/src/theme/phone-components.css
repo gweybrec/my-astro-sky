@@ -1478,3 +1478,14 @@ ion-tab-bar.mob-tabbar-hidden {
   overflow: hidden;
   visibility: hidden;
 }
+
+/* The Ciel | Photos switch of the search page (boards "Ciel, recherche" and "Ciel, recherche, photos"): the first row of
+   the results, kept at the top while they scroll. Above the rows (Ionic's items stack their own content), on the list's
+   colour made opaque, and holding the page's top gap itself so that no row shows above it once it is stuck. */
+.mob-search-tabs {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-panel);
+  padding-top: var(--space-4);
+  background: linear-gradient(var(--bg-panel), var(--bg-panel)), var(--bg-app);
+}
