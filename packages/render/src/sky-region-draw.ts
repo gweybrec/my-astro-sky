@@ -27,6 +27,8 @@ export const REGION_DEDUPE_DEG = 0.3;
 export interface RegionDrawCallbacks {
   onComplete: (points: AltAzPoint[]) => void;
   onCancel: () => void;
+  /** A new stroke starts (the phone hides the stroke it shows until then). */
+  onPress?: () => void;
 }
 
 export class RegionDrawGesture {
@@ -67,6 +69,16 @@ export class RegionDrawGesture {
   /** Mouse pressed: start capturing, discarding anything from a previous stroke. */
   press(): void {
     this.drawing = true;
+    this.points = [];
+    this.callbacks?.onPress?.();
+  }
+
+  /**
+   * Drops the stroke being drawn without ending the gesture: a second finger turns the touch into a move of the map,
+   * and the next press draws again.
+   */
+  abortStroke(): void {
+    this.drawing = false;
     this.points = [];
   }
 

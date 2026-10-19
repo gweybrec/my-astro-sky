@@ -51,6 +51,7 @@ function makeHost(over: Partial<SkyTouchHost> = {}) {
     regionDrawPress: vi.fn(),
     regionDrawMove: vi.fn(),
     regionDrawFinish: vi.fn(),
+    regionDrawAbortStroke: vi.fn(),
     frameMouseDown: vi.fn(() => false),
     frameDragMove: vi.fn(),
     frameMouseUp: vi.fn(),
@@ -398,15 +399,38 @@ describe('region drawing with a finger', () => {
     expect(calls.emitDSOClick).not.toHaveBeenCalled();
   });
 
-  it('ignores a second finger and does not long-press', () => {
+  it('does not long-press while drawing', () => {
+    const { canvas, calls, state } = setup();
+    state.region = true;
+    fire(canvas, 'pointerdown', 1, 500, 400);
+    vi.advanceTimersByTime(LONG_PRESS_MS + 1);
+    expect(calls.emitLongPress).not.toHaveBeenCalled();
+  });
+
+  it('lets two fingers move and zoom the map, dropping the stroke without ending the drawing', () => {
     const { canvas, view, calls, state } = setup();
     state.region = true;
     fire(canvas, 'pointerdown', 1, 500, 400);
-    fire(canvas, 'pointerdown', 2, 600, 400);
-    fire(canvas, 'pointermove', 2, 700, 400);
-    vi.advanceTimersByTime(LONG_PRESS_MS + 1);
-    expect(view.scale).toBe(600);
-    expect(calls.emitLongPress).not.toHaveBeenCalled();
+    state.capturing = true;
+    fire(canvas, 'pointermove', 1, 520, 400);
+    fire(canvas, 'pointerdown', 2, 620, 400);
+    expect(calls.regionDrawAbortStroke).toHaveBeenCalledTimes(1);
+    state.capturing = false;
+    const moves = calls.regionDrawMove.mock.calls.length;
+    fire(canvas, 'pointermove', 2, 720, 400);
+    expect(view.scale).toBeGreaterThan(600);
+    fire(canvas, 'pointermove', 1, 520, 460);
+    fire(canvas, 'pointermove', 2, 720, 460);
+    expect(view.centerY).not.toBe(0);
+    expect(calls.regionDrawMove).toHaveBeenCalledTimes(moves);
+    fire(canvas, 'pointerup', 1, 520, 460);
+    fire(canvas, 'pointerup', 2, 720, 460);
+    expect(calls.regionDrawFinish).not.toHaveBeenCalled();
+    expect(calls.emitClearSelection).not.toHaveBeenCalled();
+    // The next finger draws again.
+    calls.regionDrawPress.mockClear();
+    fire(canvas, 'pointerdown', 3, 500, 400);
+    expect(calls.regionDrawPress).toHaveBeenCalledTimes(1);
   });
 });
 

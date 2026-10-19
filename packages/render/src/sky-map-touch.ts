@@ -9,7 +9,8 @@
  * (`pickDSOAt`) instead of relying on a previous hover.
  *
  * Region drawing and frames take a finger first, as they take the mouse first: while one is
- * active, the other gestures (pan, pinch, tap, long press) are off so they cannot conflict.
+ * active, the other gestures (pan, pinch, tap, long press) are off so they cannot conflict. A second
+ * finger while a region is drawn moves the map instead: the stroke begun is dropped.
  */
 import type { Star, ViewState } from '@myastrosky/core/types';
 import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
@@ -40,6 +41,8 @@ export interface SkyTouchHost {
   regionDrawPress(): void;
   regionDrawMove(pt: AltAzPoint | null): void;
   regionDrawFinish(cancelled: boolean): void;
+  /** Drops the stroke being drawn and keeps the drawing on (a second finger moves the map). */
+  regionDrawAbortStroke(): void;
   canvasToAltAz(mx: number, my: number): AltAzPoint | null;
   frameMouseDown(mx: number, my: number): boolean;
   frameDragActive(): boolean;
@@ -132,7 +135,13 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
     host.cancelAnimation();
     host.dismissTooltip();
     host.canvas.setPointerCapture?.(e.pointerId);
-    // A region or frame gesture owns the touch: a second finger does nothing.
+    // A second finger while a region is drawn: the two fingers move the map, the stroke begun is dropped.
+    if (mode === 'region' && fingers.size === 1) {
+      host.regionDrawAbortStroke();
+      host.requestRenderInteractive();
+      mode = 'view';
+    }
+    // A frame gesture owns the touch: a second finger does nothing.
     if (mode !== 'view') return;
     fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -173,7 +182,11 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
 
   add('pointermove', ((e: PointerEvent) => {
     if (mode !== 'view') {
-      if (!fingers.has(e.pointerId)) return;
+      const held = fingers.get(e.pointerId);
+      if (!held) return;
+      // Kept up to date: a second finger may turn the touch into a pinch from where this one is.
+      held.x = e.clientX;
+      held.y = e.clientY;
       const { mx, my } = local(e.clientX, e.clientY);
       if (mode === 'region') {
         if (host.regionDrawCapturing()) {
