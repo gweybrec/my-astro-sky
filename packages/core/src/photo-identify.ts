@@ -32,7 +32,7 @@ import {
 import type { Photo, PointOfInterest } from './types';
 
 /**
- * After this long, a search still running says so: SkyBoT, TNS and the MPC can take up to a minute, and a spinner alone
+ * After this long, a search still running says so: the app waits up to a minute for SkyBoT (less for TNS and the MPC), and a spinner alone
  * for that long would look like a frozen app.
  */
 export const SLOW_SEARCH_MS = 20_000;

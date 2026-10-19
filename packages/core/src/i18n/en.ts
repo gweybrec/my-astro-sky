@@ -874,7 +874,7 @@ const en: Translations = {
   identify: {
     search: 'Search',
     searching: 'Searching…',
-    stillSearching: 'Still searching: the online service sometimes takes up to a minute to answer.',
+    stillSearching: 'Still searching: the online service sometimes takes a while to answer.',
     addSelected: 'Add selected ({n})',
     obsDateLabel: 'Observation date (UTC)',
     dateRequired: 'This photo has no observation date — enter it to search.',

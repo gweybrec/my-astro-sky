@@ -187,15 +187,15 @@ describe('IdentifyModalShell', () => {
       const status = () => document.body.querySelector('[role="status"]');
       expect(status()?.querySelector('.auto-solve-spinner')).not.toBeNull();
       expect(status()?.textContent).toContain('Searching');
-      expect(status()?.textContent).not.toContain('up to a minute');
+      expect(status()?.textContent).not.toContain('takes a while to answer');
       vi.advanceTimersByTime(20_000);
       await flushPromises();
-      expect(status()?.textContent).toContain('up to a minute');
+      expect(status()?.textContent).toContain('takes a while to answer');
       await wrapper.setProps({ searching: false });
       expect(status()).toBeNull();
       // A new search starts without the line again.
       await wrapper.setProps({ searching: true });
-      expect(status()?.textContent).not.toContain('up to a minute');
+      expect(status()?.textContent).not.toContain('takes a while to answer');
       wrapper.unmount();
     } finally {
       vi.useRealTimers();

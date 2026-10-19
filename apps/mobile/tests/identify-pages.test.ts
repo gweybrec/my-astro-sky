@@ -236,7 +236,7 @@ describe('identify an asteroid', () => {
       await byLabel(w, 'button', 'Rechercher').trigger('click');
       await nextTick();
       expect(w.find('.mob-busy').text()).toBe('Recherche…');
-      expect(w.text()).not.toContain('jusqu’à une minute');
+      expect(w.text()).not.toContain('répond parfois lentement');
       vi.advanceTimersByTime(20_000);
       await nextTick();
       expect(w.text()).toContain(
