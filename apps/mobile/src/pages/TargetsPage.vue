@@ -18,6 +18,7 @@ import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-pro
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { catalogsReady } from '../catalogs';
 import { useErrorToast } from '../composables/useErrorToast';
+import { useGrowingList } from '../composables/useGrowingList';
 import { reloadTargetsPrefs, targetsPrefs, updateTargetsPrefs } from '../composables/useTargets';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
@@ -56,7 +57,6 @@ const gear = shallowRef<GearLists | null>(null);
 let found: TargetSuggestion[] = [];
 const sorted = shallowRef<TargetSuggestion[]>([]);
 const emptyKind = ref<'no-setup' | 'no-match'>('no-match');
-const visible = ref(CHUNK);
 const typesOpen = ref(false);
 const filtersOpen = ref(false);
 const settingsOpen = ref(false);
@@ -87,8 +87,14 @@ const shown = computed(() => {
   const all = query ? sorted.value.filter((s) => matchesTargetQuery(s.dso, query)) : sorted.value;
   return all;
 });
+// The list is drawn a part at a time: thousands of rows at once froze the page.
+const {
+  shown: visibleTargets,
+  onScroll,
+  reset: resetVisible,
+} = useGrowingList(() => shown.value, CHUNK);
 const rows = computed(() =>
-  shown.value.slice(0, visible.value).map((s) => {
+  visibleTargets.value.map((s) => {
     const { dso } = s;
     const mag = dso.mag !== null ? `${t('stars.magnitude')} ${dso.mag.toFixed(1)}` : undefined;
     return {
@@ -107,16 +113,6 @@ const rows = computed(() =>
     };
   }),
 );
-
-function onScroll(event: Event) {
-  const el = event.target as HTMLElement;
-  if (
-    el.scrollTop + el.clientHeight > el.scrollHeight - 400 &&
-    visible.value < shown.value.length
-  ) {
-    visible.value += CHUNK;
-  }
-}
 
 /** Lets the browser paint the spinner before the long computation blocks the page. */
 const nextPaint = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -195,7 +191,7 @@ async function runSearch() {
       sorted.value = [];
       emptyKind.value = result.reason === 'no-setup' ? 'no-setup' : 'no-match';
     }
-    visible.value = CHUNK;
+    resetVisible();
   } catch (error) {
     lastKey = '';
     found = [];

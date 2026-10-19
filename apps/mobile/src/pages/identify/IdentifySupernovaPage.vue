@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { placeSupernovae, supernovaSearchPlan } from '@myastrosky/core/photo-identify';
@@ -20,6 +20,7 @@ import PhoneUtcDateTime from '../../components/PhoneUtcDateTime.vue';
 import IdentifyFrame from './IdentifyFrame.vue';
 import IdentifySearching from './IdentifySearching.vue';
 import { toggled, useIdentifyPage } from './identify-page';
+import { useGrowingList } from '../../composables/useGrowingList';
 import searchIcon from '../../icons/search.svg?raw';
 import pinIcon from '@icons/supernova-pin.svg?raw';
 
@@ -42,7 +43,13 @@ const { photo, adding, close, add } = useIdentifyPage((p) => {
 const searching = ref(false);
 const error = ref('');
 const field = ref<FieldCircle | null>(null);
-const results = ref<PlacedTransient[] | null>(null);
+const results = shallowRef<PlacedTransient[] | null>(null);
+// Up to a hundred transients: their rows are drawn a part at a time.
+const {
+  shown: shownResults,
+  onScroll,
+  reset: resetShown,
+} = useGrowingList(() => results.value ?? [], 20);
 const selected = ref(new Set<string>());
 
 async function search() {
@@ -57,6 +64,7 @@ async function search() {
     results.value = placeSupernovae(photo.value, await tnsConesearchAPI(plan.params), obsIso.value);
     // Confirmed supernovae are ticked; unclassified transients are opt-in.
     selected.value = new Set(results.value.filter((c) => c.classified).map((c) => c.name));
+    resetShown();
   } catch (err) {
     error.value = t('supernova.searchError', { message: (err as Error).message });
   } finally {
@@ -127,9 +135,9 @@ function addSelected() {
     <PhoneHelper v-if="field?.truncated && results">{{
       t('supernova.fieldTruncated')
     }}</PhoneHelper>
-    <div v-if="results?.length" class="mob-scroll mob-results-list">
+    <div v-if="results?.length" class="mob-scroll mob-results-list" @scroll.passive="onScroll">
       <PhoneCheckRow
-        v-for="c in results"
+        v-for="c in shownResults"
         :key="c.name"
         :model-value="selected.has(c.name)"
         :title="c.name"
