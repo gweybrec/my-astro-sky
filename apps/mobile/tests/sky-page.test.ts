@@ -61,7 +61,13 @@ describe('the Ciel page', () => {
   it('gives a sky region being drawn or shown its own title bar, whose back arrow opens the regions page again', async () => {
     const w = mountPage();
     await flushPromises();
-    const region = { id: 'r1', name: 'Vue depuis le jardin', color: '#4a9eff', points: [], position: 0 };
+    const region = {
+      id: 'r1',
+      name: 'Vue depuis le jardin',
+      color: '#4a9eff',
+      points: [],
+      position: 0,
+    };
     skyRegionView.value = { region, returnTo: '/targets/regions' };
     await flushPromises();
     expect(w.find('.mob-topbar-title').text()).toBe('Vue depuis le jardin');
