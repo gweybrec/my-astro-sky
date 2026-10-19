@@ -576,8 +576,10 @@ ion-item.mob-entry::part(native) {
   gap: var(--space-7);
 }
 /* The handle is the board's 48 px touch box with its 24 px icon centred in it by layout (board "Détail du plan"); the
-   title follows after the row's gap. `ion-reorder` is not a button, so the box and the icon size are set here. */
-ion-reorder.mob-drag {
+   title follows after the row's gap. `ion-reorder` is not a button, so the box and the icon size are set here. Ionic's
+   `.reorder-enabled ion-reorder { display: block }` weighs as much as `ion-reorder.mob-drag` and comes later in the built
+   app: the list's class makes ours outweigh it (with `block` the icon sat in the box's top-left corner). */
+.mob-entry-list ion-reorder.mob-drag {
   display: flex;
   flex: none;
   align-self: center;
@@ -590,7 +592,7 @@ ion-reorder.mob-drag {
   padding: 0;
   --color: var(--text-primary);
 }
-ion-reorder.mob-drag svg {
+.mob-entry-list ion-reorder.mob-drag svg {
   flex: none;
   width: var(--space-9);
   height: var(--space-9);
