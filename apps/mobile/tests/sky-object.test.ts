@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 import { mount } from '@vue/test-utils';
+import { createMemoryHistory, createRouter } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
@@ -235,5 +236,31 @@ describe('the back button with the sheet open', () => {
     const w = mountHost(() => true, vi.fn());
     w.unmount();
     expect(press().registered).toBe(false);
+  });
+
+  it('leaves the press to a page pushed above it, as the back arrow of that page does', async () => {
+    // The map's tab keeps its sheet open under a page pushed above the tabs, and is not told it was left.
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/:p(.*)*', component: { template: '<div />' } }],
+    });
+    await router.push('/tabs/sky');
+    const close = vi.fn();
+    const w = mount(
+      defineComponent({
+        setup() {
+          useBackClose(() => true, close);
+          return () => h('div');
+        },
+      }),
+      { global: { plugins: [router] } },
+    );
+    expect(press().next).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledTimes(1);
+    await router.push('/sky/draw-order');
+    const { next } = press();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
+    w.unmount();
   });
 });
