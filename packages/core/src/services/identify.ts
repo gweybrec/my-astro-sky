@@ -20,7 +20,9 @@ import type {
 import type { HttpClient, HttpRequest, HttpResponse } from '../ports/http-client';
 
 const SKYBOT_URL = 'https://ssp.imcce.fr/webservices/skybot/api/conesearch.php';
-const SKYBOT_TIMEOUT_MS = 20_000;
+// A field on the ecliptic is crowded with asteroids: SkyBoT takes 12–15 s for one even with a few arcminutes of radius,
+// and more on a slow connection or a busy server.
+const SKYBOT_TIMEOUT_MS = 60_000;
 
 const TNS_SEARCH_URL = 'https://www.wis-tns.org/search';
 const TNS_OBJECT_URL = 'https://www.wis-tns.org/object/';
