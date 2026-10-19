@@ -170,6 +170,20 @@ async function main() {
         },
       );
     }
+    // Fixed answers for the routes that would reach services outside (registered last: they win over the cache).
+    for (const fixture of app.fixtures ?? []) {
+      await context.route(
+        (url) => url.pathname === fixture.path,
+        (route) =>
+          route.request().method() === fixture.method
+            ? route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(fixture.body),
+              })
+            : route.continue(),
+      );
+    }
     const page = await context.newPage();
     const problems = [];
     page.on('pageerror', (e) => problems.push(e.message));
