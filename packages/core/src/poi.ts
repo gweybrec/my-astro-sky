@@ -193,3 +193,23 @@ export function isPoiVisible(
 ): boolean {
   return visiblePois[poiKey(resolveCategory(poi.categoryId, categories).id, poi.name)] !== false;
 }
+
+/** A type of point of interest being edited (the types editor's list): `isNew` until it is saved. */
+export interface PoiTypeDraft {
+  id: string;
+  name: string;
+  color: string;
+  isNew?: boolean;
+}
+
+/** The editable copy of the saved types. */
+export function poiTypesDraft(categories: PoiCategory[]): PoiTypeDraft[] {
+  return categories.map((c) => ({ id: c.id, name: c.name, color: c.color }));
+}
+
+/** Compares two drafts of the types: equal keys mean nothing to save. */
+export function poiTypesDraftKey(list: PoiTypeDraft[]): string {
+  return JSON.stringify(
+    list.map((c) => ({ id: c.isNew ? 'new' : c.id, name: c.name.trim(), color: c.color })),
+  );
+}

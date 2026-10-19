@@ -7,6 +7,7 @@ import {
   deletePoiCategoryAPI,
 } from '../api';
 import type { PoiCategory } from '@myastrosky/core/types';
+import type { PoiTypeDraft } from '@myastrosky/core/poi';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 
 /**
@@ -56,5 +57,30 @@ export const usePoiCategoriesStore = defineStore('poiCategories', () => {
     await load();
   }
 
-  return { categories, loaded, byId, load, ensureLoaded, create, update, remove };
+  /**
+   * Saves an edited list of the types (the types editor's Enregistrer): the saved types missing from it are deleted,
+   * the new ones created and the changed ones updated; a type without a name is skipped.
+   */
+  async function saveDraft(draft: PoiTypeDraft[]): Promise<void> {
+    const existing = categories.value;
+    const kept = new Set(draft.filter((d) => !d.isNew).map((d) => d.id));
+    for (const c of existing) {
+      if (!kept.has(c.id)) await deletePoiCategoryAPI(c.id);
+    }
+    for (const d of draft) {
+      const name = d.name.trim();
+      if (!name) continue;
+      if (d.isNew) {
+        await createPoiCategory({ name, color: d.color });
+      } else {
+        const o = existing.find((c) => c.id === d.id);
+        if (o && (o.name !== name || o.color !== d.color)) {
+          await updatePoiCategory(d.id, { name, color: d.color });
+        }
+      }
+    }
+    await load();
+  }
+
+  return { categories, loaded, byId, load, ensureLoaded, create, update, remove, saveDraft };
 });

@@ -73,8 +73,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
-import { createPoiCategory, updatePoiCategory, deletePoiCategoryAPI } from '../../api';
 import { poiTypeIcon } from '../../poi-icons';
+import { poiTypesDraft, poiTypesDraftKey, type PoiTypeDraft } from '@myastrosky/core/poi';
 import { confirmUnsavedChanges } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
 import { isTopmostOverlay } from '../../popup-utils';
@@ -84,15 +84,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const store = usePoiCategoriesStore();
 
-interface DraftType {
-  id: string;
-  name: string;
-  color: string;
-  position: number;
-  isNew?: boolean;
-}
-
-const draft = ref<DraftType[]>([]);
+const draft = ref<PoiTypeDraft[]>([]);
 let original = '';
 let tmpCounter = 0;
 
@@ -100,24 +92,13 @@ const newName = ref('');
 const newColor = ref('#4ea1ff');
 const saving = ref(false);
 
-function snapshot(list: DraftType[]): string {
-  return JSON.stringify(
-    list.map((c) => ({ id: c.isNew ? 'new' : c.id, name: c.name.trim(), color: c.color })),
-  );
-}
-
 onMounted(async () => {
   await store.ensureLoaded();
-  draft.value = store.categories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    color: c.color,
-    position: c.position,
-  }));
-  original = snapshot(draft.value);
+  draft.value = poiTypesDraft(store.categories);
+  original = poiTypesDraftKey(draft.value);
 });
 
-const dirty = computed(() => snapshot(draft.value) !== original);
+const dirty = computed(() => poiTypesDraftKey(draft.value) !== original);
 
 function addType() {
   const name = newName.value.trim();
@@ -126,7 +107,6 @@ function addType() {
     id: `tmp-${++tmpCounter}`,
     name,
     color: newColor.value,
-    position: draft.value.length,
     isNew: true,
   });
   newName.value = '';
@@ -153,26 +133,7 @@ async function requestClose() {
 async function save() {
   saving.value = true;
   try {
-    const existing = store.categories;
-    const keptIds = new Set(draft.value.filter((d) => !d.isNew).map((d) => d.id));
-    // Deletions: original types no longer present in the draft.
-    for (const c of existing) {
-      if (!keptIds.has(c.id)) await deletePoiCategoryAPI(c.id);
-    }
-    // Creates + updates.
-    for (const d of draft.value) {
-      const name = d.name.trim();
-      if (!name) continue;
-      if (d.isNew) {
-        await createPoiCategory({ name, color: d.color });
-      } else {
-        const o = existing.find((c) => c.id === d.id);
-        if (o && (o.name !== name || o.color !== d.color)) {
-          await updatePoiCategory(d.id, { name, color: d.color });
-        }
-      }
-    }
-    await store.load();
+    await store.saveDraft(draft.value);
     emit('close');
   } catch (err: any) {
     showToast({ message: err.message, type: 'error', duration: 4000 });
