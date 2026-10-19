@@ -4,6 +4,7 @@ import { getLang, t } from '@myastrosky/core/i18n/index';
 import { getDSOById, sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
 import { formatPlanDate } from '@myastrosky/core/targets/plan';
+import { isPhotoSolved } from '@myastrosky/core/photo-identify';
 import type { Photo } from '@myastrosky/core/types';
 import { deletePhotoAPI } from '@myastrosky/app-state/api';
 import { useConfirm } from '../../composables/useConfirm';
@@ -19,15 +20,21 @@ import targetIcon from '@icons/target.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Photo, informations": the first object of the photo with its type and constellation, what is known of the
-// photo (only the facts it has), and its actions. Showing it on the map, editing its information and deleting it are done
-// here; identifying objects waits for its screen.
+// photo (only the facts it has), and its actions: showing it on the map, editing its information, identifying objects
+// in it (a photo with a solve only, as the desktop's identifications) and deleting it.
 const props = defineProps<{
   open: boolean;
   photo: Photo;
   /** The name of the photo's equipment, when it has one. */
   setupName?: string;
 }>();
-const emit = defineEmits<{ 'update:open': [open: boolean]; map: []; edit: []; removed: [] }>();
+const emit = defineEmits<{
+  'update:open': [open: boolean];
+  map: [];
+  edit: [];
+  identify: [];
+  removed: [];
+}>();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
@@ -110,7 +117,10 @@ async function remove() {
       <PhoneIconButton :label="t('gallery.editMetadata')" @click="emit('edit')"
         ><AppIcon :svg="penIcon"
       /></PhoneIconButton>
-      <PhoneIconButton waiting :label="t('mobile.photo.identify')"
+      <PhoneIconButton
+        :disabled="!isPhotoSolved(photo)"
+        :label="t('mobile.photo.identify')"
+        @click="emit('identify')"
         ><AppIcon :svg="targetIcon"
       /></PhoneIconButton>
       <PhoneIconButton danger :label="t('photos.delete')" @click="remove">

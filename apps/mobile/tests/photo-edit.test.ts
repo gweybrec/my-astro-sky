@@ -20,8 +20,9 @@ vi.mock('@myastrosky/app-state/stores/poi-categories', () => ({
 
 const replace = vi.fn();
 const back = vi.fn();
+const push = vi.fn();
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ replace, back, push: vi.fn() }),
+  useRouter: () => ({ replace, back, push }),
   useRoute: () => ({ params: { id: 'p1' } }),
 }));
 
@@ -50,6 +51,7 @@ vi.mock('@myastrosky/core/search', () => ({
 }));
 
 import PhotoEditPage from '../src/pages/PhotoEditPage.vue';
+import { deliverPois } from '../src/identify-session';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 
 /** "Photo, modifier les infos": the form of a photo's metadata. */
@@ -85,7 +87,14 @@ const byText = (w: Page, tag: string, text: string) =>
 const chips = (w: Page) => w.findAll('.mob-chip--remove').map((c) => c.text());
 const rowTitles = (w: Page) => w.findAll('.mob-row-title').map((r) => r.text());
 /** The rows of the points of interest: they wait for their screens. */
-const poiRows = (w: Page) => w.findAll('.mob-row--inert .mob-row-title').map((r) => r.text());
+/** The rows under the points of interest: adding one, and the identifications. */
+const poiRows = (w: Page) =>
+  w
+    .findAll('.mob-row .mob-row-title')
+    .map((r) => r.text())
+    .filter((text) => /point d'intérêt$|^Identifier /.test(text));
+const row = (w: Page, title: string) =>
+  w.findAll('.mob-row').find((r) => r.find('.mob-row-title').text() === title)!;
 const saved = () => updatePhotoMetadata.mock.calls[0][1];
 const save = async (w: Page) => {
   await byText(w, 'button', 'Enregistrer').trigger('click');
@@ -198,6 +207,28 @@ describe("a photo's edit page", () => {
     solved.value = false;
     const unplaced = await mountPage();
     expect(poiRows(unplaced)).toEqual(["Ajouter un point d'intérêt"]);
+    expect(row(unplaced, "Ajouter un point d'intérêt").classes()).toContain('mob-row--disabled');
+  });
+
+  it("opens the identifications and Ajouter un point d'intérêt, whose points join the form", async () => {
+    const w = await mountPage();
+    await row(w, 'Identifier des supernovae').trigger('click');
+    expect(push).toHaveBeenLastCalledWith('/gallery/photo/p1/identify/supernova');
+    await row(w, "Ajouter un point d'intérêt").trigger('click');
+    expect(push).toHaveBeenLastCalledWith('/gallery/photo/p1/poi');
+
+    // What a page found joins the form, not the saved photo; one already listed is not added twice.
+    const fresh = await deliverPois(photo(), [
+      { name: 'C/2023 A3', categoryId: 'cat-comet' },
+      { name: 'SN 2025rbs', categoryId: 'cat-supernova', ra: 339.26, dec: 34.42 },
+    ]);
+    expect(fresh.map((p) => p.name)).toEqual(['SN 2025rbs']);
+    expect(updatePhotoMetadata).not.toHaveBeenCalled();
+    await save(w);
+    expect(saved().pointsOfInterest.map((p: { name: string }) => p.name)).toEqual([
+      'C/2023 A3',
+      'SN 2025rbs',
+    ]);
   });
 
   it('edits the integration rows: a new row, its total, a refused number, a removed row', async () => {

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { CAPTURE_FIELDS } from '@myastrosky/core/capture-fields';
 import { datetimeLocalToIso, isoToDatetimeLocal } from '@myastrosky/core/datetime-local';
 import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { isPhotoSolved, mergeIdentifiedPois } from '@myastrosky/core/photo-identify';
 import {
   draftFromPhoto,
   draftToMetadata,
@@ -29,6 +29,7 @@ import { catalogsReady } from '../catalogs';
 import { useBackClose } from '../composables/useBackClose';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
+import { receivePois } from '../identify-session';
 import { poiTypeIcon } from '../poi-icons';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneAddRow from '../components/PhoneAddRow.vue';
@@ -52,8 +53,9 @@ import cometIcon from '@icons/poi-comet.svg?raw';
 import supernovaIcon from '@icons/poi-supernova.svg?raw';
 
 // The board "Photo, modifier les infos": the form of a photo's metadata, with what the desktop's editor does
-// (`MetadataEditorPanel.vue`): nothing is saved before Enregistrer, and leaving with changes asks first. Adding a
-// point of interest, the three identifications and reading a WCS file wait for their screens.
+// (`MetadataEditorPanel.vue`): nothing is saved before Enregistrer, and leaving with changes asks first. The points of
+// interest added by hand or found by an identification join the form (`receivePois`), as the desktop's PoiEditor.
+// Reading a WCS file waits for its screen.
 const route = useRoute();
 const router = useRouter();
 const { confirm } = useConfirm();
@@ -154,7 +156,16 @@ function addLabel(text: string) {
 
 // ── Points of interest ────────────────────────────────────────────────────────────────────────────
 
-const isSolved = computed(() => !!photo.value && computePhotoToProjMatrix(photo.value) !== null);
+const isSolved = computed(() => !!photo.value && isPhotoSolved(photo.value));
+const stopReceiving = receivePois(String(route.params.id), (pois) => {
+  const { merged, fresh } = mergeIdentifiedPois(draft.pointsOfInterest, pois);
+  draft.pointsOfInterest = merged;
+  return fresh;
+});
+onBeforeUnmount(stopReceiving);
+const openPoiPage = (path: string) => {
+  if (photo.value) void router.push(`/gallery/photo/${photo.value.id}/${path}`);
+};
 const poiChips = computed(() =>
   draft.pointsOfInterest.map((poi) => ({
     label: poi.name,
@@ -353,13 +364,34 @@ async function save() {
 
         <PhoneSectionHeader>{{ t('modal.metadataPoi') }}</PhoneSectionHeader>
         <PhoneRemoveChips :items="poiChips" @remove="draft.pointsOfInterest.splice($event, 1)" />
-        <!-- Adding a point of interest and the identifications have their own screens, built next: the rows show and do nothing. -->
+        <!-- As the desktop: adding a point needs a solved photo; the identifications show only for one. -->
         <IonList class="mob-list" lines="none">
-          <PhoneRow :title="withoutPlus(t('poi.addPoi'))" :lead="plusIcon" inert />
+          <PhoneRow
+            :title="withoutPlus(t('poi.addPoi'))"
+            :lead="plusIcon"
+            button
+            :disabled="!isSolved"
+            @click="openPoiPage('poi')"
+          />
           <template v-if="isSolved">
-            <PhoneRow :title="t('asteroid.menuLabel')" :lead="asteroidIcon" inert />
-            <PhoneRow :title="t('supernova.menuLabel')" :lead="supernovaIcon" inert />
-            <PhoneRow :title="t('comet.menuLabel')" :lead="cometIcon" inert />
+            <PhoneRow
+              :title="t('asteroid.menuLabel')"
+              :lead="asteroidIcon"
+              button
+              @click="openPoiPage('identify/asteroid')"
+            />
+            <PhoneRow
+              :title="t('supernova.menuLabel')"
+              :lead="supernovaIcon"
+              button
+              @click="openPoiPage('identify/supernova')"
+            />
+            <PhoneRow
+              :title="t('comet.menuLabel')"
+              :lead="cometIcon"
+              button
+              @click="openPoiPage('identify/comet')"
+            />
           </template>
         </IonList>
 

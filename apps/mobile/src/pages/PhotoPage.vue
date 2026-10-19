@@ -12,6 +12,7 @@ import { skyPhotoFocus } from '../composables/useSkySelection';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
+import IdentifyChooseSheet, { type IdentifyKind } from './gallery/IdentifyChooseSheet.vue';
 import PhotoInfoSheet from './gallery/PhotoInfoSheet.vue';
 import infoIcon from '../icons/info.svg?raw';
 import resetIcon from '../icons/rotate-ccw.svg?raw';
@@ -26,6 +27,7 @@ const router = useRouter();
 const photo = ref<Photo | null>(null);
 const setupName = ref<string>();
 const infoOpen = ref(false);
+const chooseOpen = ref(false);
 // A picture that cannot be read leaves the stage with the photo's name.
 const broken = ref(false);
 
@@ -75,6 +77,22 @@ function showOnMap() {
 }
 
 const backToGallery = () => void router.replace('/tabs/gallery');
+
+// "Identifier les objets" replaces the photo's sheet by the choice of an identification; its back arrow brings the
+// photo's sheet back.
+function identify() {
+  infoOpen.value = false;
+  chooseOpen.value = true;
+}
+function backToInfo() {
+  chooseOpen.value = false;
+  infoOpen.value = true;
+}
+function openIdentification(kind: IdentifyKind) {
+  if (!photo.value) return;
+  chooseOpen.value = false;
+  void router.push(`/gallery/photo/${photo.value.id}/identify/${kind}`);
+}
 
 function edit() {
   if (!photo.value) return;
@@ -135,7 +153,13 @@ function edit() {
         :setup-name="setupName"
         @map="showOnMap"
         @edit="edit"
+        @identify="identify"
         @removed="backToGallery"
+      />
+      <IdentifyChooseSheet
+        v-model:open="chooseOpen"
+        @back="backToInfo"
+        @choose="openIdentification"
       />
     </IonContent>
   </IonPage>
