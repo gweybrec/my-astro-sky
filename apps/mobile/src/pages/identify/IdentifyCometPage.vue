@@ -20,6 +20,7 @@ import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import PhoneUtcDateTime from '../../components/PhoneUtcDateTime.vue';
 import type { PhotoPoint } from '../../components/PhonePhotoStage.vue';
 import IdentifyFrame from './IdentifyFrame.vue';
+import IdentifySearching from './IdentifySearching.vue';
 import { toggled, useIdentifyPage } from './identify-page';
 import searchIcon from '../../icons/search.svg?raw';
 import pinIcon from '@icons/supernova-pin.svg?raw';
@@ -135,7 +136,7 @@ function addSelected() {
       t('identify.dateRequired')
     }}</PhoneHelper>
     <PhoneHelper v-else-if="error" class="mob-status--danger">{{ error }}</PhoneHelper>
-    <PhoneHelper v-else-if="searching">{{ t('identify.searching') }}</PhoneHelper>
+    <IdentifySearching v-else-if="searching" />
     <PhoneHelper v-else-if="results && results.inFrame.length === 0">{{
       t('comet.noCandidates')
     }}</PhoneHelper>
@@ -201,15 +202,17 @@ function addSelected() {
       </template>
     </div>
 
-    <div class="mob-sheet-footer mob-sheet-footer--primary-wide">
-      <PhoneButton size="lg" @click="close">{{ t('modal.cancel') }}</PhoneButton>
-      <PhoneButton
-        variant="confirm"
-        size="lg"
-        :disabled="selected.size === 0 || !results || adding"
-        @click="addSelected"
-        >{{ t('identify.addSelected', { n: results ? selected.size : 0 }) }}</PhoneButton
-      >
-    </div>
+    <template #footer>
+      <div class="mob-sheet-footer mob-sheet-footer--primary-wide">
+        <PhoneButton size="lg" @click="close">{{ t('modal.cancel') }}</PhoneButton>
+        <PhoneButton
+          variant="confirm"
+          size="lg"
+          :disabled="selected.size === 0 || !results || adding"
+          @click="addSelected"
+          >{{ t('identify.addSelected', { n: results ? selected.size : 0 }) }}</PhoneButton
+        >
+      </div>
+    </template>
   </IdentifyFrame>
 </template>

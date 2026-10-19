@@ -115,12 +115,14 @@ function addPoi() {
       </PhoneButton>
     </div>
 
-    <div class="mob-sheet-footer mob-sheet-footer--primary-wide">
-      <PhoneButton size="lg" @click="close">{{ t('modal.cancel') }}</PhoneButton>
-      <PhoneButton variant="confirm" size="lg" :disabled="!canAdd || adding" @click="addPoi">{{
-        t('poi.addConfirm')
-      }}</PhoneButton>
-    </div>
+    <template #footer>
+      <div class="mob-sheet-footer mob-sheet-footer--primary-wide">
+        <PhoneButton size="lg" @click="close">{{ t('modal.cancel') }}</PhoneButton>
+        <PhoneButton variant="confirm" size="lg" :disabled="!canAdd || adding" @click="addPoi">{{
+          t('poi.addConfirm')
+        }}</PhoneButton>
+      </div>
+    </template>
 
     <PhoneRadioSheet
       v-model:open="typeOpen"

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Photo, PoiCategory } from '@myastrosky/core/types';
@@ -223,6 +224,27 @@ describe('identify an asteroid', () => {
     await byText(w, 'button', 'Modifier la recherche').trigger('click');
     expect(w.findAll('.mob-when-row')).toHaveLength(3);
     expect(w.findAll('.mob-marker')).toHaveLength(2);
+  });
+
+  it('shows a spinner while SkyBoT answers, and after 20 s says the search still runs', async () => {
+    const w = await mountPage(IdentifyAsteroidPage);
+    await tapPhoto(w, { x: 200, y: 235 });
+    await tapPhoto(w, { x: 460, y: 235 });
+    skybotConesearchAPI.mockReturnValue(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await byLabel(w, 'button', 'Rechercher').trigger('click');
+      await nextTick();
+      expect(w.find('.mob-busy').text()).toBe('Recherche…');
+      expect(w.text()).not.toContain('jusqu’à une minute');
+      vi.advanceTimersByTime(20_000);
+      await nextTick();
+      expect(w.text()).toContain(
+        'Toujours en cours : le service en ligne répond parfois lentement',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('opens the photo instead when it has no solve', async () => {
