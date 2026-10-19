@@ -21,11 +21,18 @@ import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Ciel, photo sélectionnée": a placed photo picked on the map, in a sheet over the bottom of the map. Its name,
 // the objects it shows (a chip each, nine to a page, pages swiped), its opacity on the map and its actions. Hiding the
-// photo, opening it in the gallery, editing its information and deleting it are done here; repositioning and the
-// display order wait for their screens.
+// photo, opening it in the gallery, editing its information and deleting it are done here; the display order opens its
+// page (`order`); repositioning waits for its screen.
 // It closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button.
 const props = defineProps<{ photo: Photo; layer: PhotoLayer }>();
-const emit = defineEmits<{ close: []; removed: []; dso: [id: string]; gallery: []; edit: [] }>();
+const emit = defineEmits<{
+  close: [];
+  removed: [];
+  dso: [id: string];
+  gallery: [];
+  edit: [];
+  order: [];
+}>();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
@@ -115,7 +122,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       :step="0.05"
       :display="opacity.toFixed(2)"
     />
-    <!-- The screens behind repositioning and the display order are not built yet. -->
+    <!-- The screen behind repositioning is not built yet. -->
     <div class="mob-icon-row" role="group" :aria-label="t('mobile.sky.photoActions')">
       <PhoneIconButton
         :label="visible ? t('photos.hide') : t('photos.show')"
@@ -129,7 +136,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       <PhoneIconButton waiting :label="t('photos.reposition')"
         ><AppIcon :svg="moveIcon"
       /></PhoneIconButton>
-      <PhoneIconButton waiting :label="t('photos.zOrder')"
+      <PhoneIconButton :label="t('photos.zOrder')" @click="emit('order')"
         ><AppIcon :svg="stackIcon"
       /></PhoneIconButton>
       <PhoneIconButton :label="t('gallery.editMetadata')" @click="emit('edit')"

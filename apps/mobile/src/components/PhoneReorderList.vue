@@ -6,8 +6,13 @@ import gripIcon from '../icons/grip.svg?raw';
 
 // A reorderable list (board "Ciel, ordre d'affichage"): each entry is a drag handle and a row. `items` are the
 // entries' ids in order; releasing a drag emits the new order. With `openable` a tap on a row (not on its handle)
-// emits `open` with the entry's id.
-const props = defineProps<{ items: { id: string; handleLabel: string }[]; openable?: boolean }>();
+// emits `open` with the entry's id. The entry whose id is `current` is highlighted (the photo the display order was
+// opened for).
+const props = defineProps<{
+  items: { id: string; handleLabel: string }[];
+  openable?: boolean;
+  current?: string;
+}>();
 const emit = defineEmits<{ reorder: [ids: string[]]; open: [id: string] }>();
 
 function onReorder(event: CustomEvent<ItemReorderEventDetail>) {
@@ -18,7 +23,13 @@ function onReorder(event: CustomEvent<ItemReorderEventDetail>) {
 
 <template>
   <IonReorderGroup class="mob-entry-list" :disabled="false" @ion-reorder-end="onReorder">
-    <IonItem v-for="item in items" :key="item.id" class="mob-entry" lines="none">
+    <IonItem
+      v-for="item in items"
+      :key="item.id"
+      class="mob-entry"
+      :class="{ 'mob-entry--current': item.id === current }"
+      lines="none"
+    >
       <div class="mob-entry-line">
         <IonReorder class="mob-drag" :aria-label="item.handleLabel"
           ><AppIcon :svg="gripIcon"

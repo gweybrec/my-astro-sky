@@ -17,6 +17,7 @@ import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
 import { skyPlacement, skyStarPick } from '../sky-modes';
+import { skyDrawOrder } from '../sky-draw-order';
 import { framesSheetOpen } from '../sky-frames';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import type { SkyMap } from '@myastrosky/render/sky-map';
@@ -270,6 +271,16 @@ function sheetCover() {
 const openSearch = () => void router.push('/sky/search');
 const openInGallery = (photoId: string) => void router.push(`/gallery/photo/${photoId}`);
 const editPhoto = (photoId: string) => void router.push(`/gallery/photo/${photoId}/edit`);
+// The display order page measures nothing itself: the photos' outlines are taken here, while the map is on screen.
+function openDrawOrder(photoId: string) {
+  if (!sky) return;
+  skyDrawOrder.value = {
+    photoId,
+    layer: sky.photos,
+    quads: sky.photos.getPhotoCanvasQuads(sky.map.getView()),
+  };
+  void router.push('/sky/draw-order');
+}
 
 onBeforeUnmount(() => {
   sky?.destroy();
@@ -321,6 +332,7 @@ onBeforeUnmount(() => {
               @dso="goToDso"
               @gallery="openInGallery(skySelection.photo.id)"
               @edit="editPhoto(skySelection.photo.id)"
+              @order="openDrawOrder(skySelection.photo.id)"
             />
             <SkyObjectSheet
               v-else-if="skySelection && skySelection.kind !== 'photo'"
