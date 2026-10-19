@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import {
   candidateToPoi,
@@ -20,6 +20,7 @@ import type { PhotoPoint } from '../../components/PhonePhotoStage.vue';
 import IdentifyFrame from './IdentifyFrame.vue';
 import IdentifySearching from './IdentifySearching.vue';
 import { toggled, useIdentifyPage } from './identify-page';
+import { useGrowingList } from '../../composables/useGrowingList';
 import searchIcon from '../../icons/search.svg?raw';
 
 // The boards "Identifier un astéroïde" and "Astéroïdes trouvés", as the desktop's AsteroidIdentifyModal: the start and
@@ -27,6 +28,8 @@ import searchIcon from '../../icons/search.svg?raw';
 // with their times (UTC, from the photo's date and integration) and a search radius; IMCCE SkyBoT is asked for the
 // asteroids that passed there, the best match ticked. "Modifier la recherche" goes back to the marks and the times.
 const ASTEROID_CATEGORY_ID = 'cat-asteroid';
+/** Rows drawn at a time in the list of asteroids found. */
+const RESULTS_CHUNK = 20;
 
 const { photo, adding, close, add } = useIdentifyPage((p) => {
   const window = defaultTimeWindow(p);
@@ -66,7 +69,14 @@ const letter = (key: string) =>
 const radius = computed(() => Number(radiusText.value.replace(',', '.')));
 const searching = ref(false);
 const error = ref('');
-const ranked = ref<RankedCandidate[] | null>(null);
+// SkyBoT can answer with thousands of asteroids on a field near the ecliptic (12,976 on a test photo): they are kept
+// out of Vue's reactivity, and their rows are drawn a part at a time.
+const ranked = shallowRef<RankedCandidate[] | null>(null);
+const {
+  shown: shownAsteroids,
+  onScroll,
+  reset: resetShown,
+} = useGrowingList(() => ranked.value ?? [], RESULTS_CHUNK);
 const selected = ref(new Set<string>());
 const showResults = ref(false);
 
@@ -96,6 +106,7 @@ async function search() {
     );
     if (!plan) return;
     ranked.value = rankAsteroids(await skybotConesearchAPI(plan.params), plan);
+    resetShown();
     // The best match is ticked; the others are opt-in.
     selected.value = new Set(ranked.value.length ? [key(ranked.value[0])] : []);
     showResults.value = true;
@@ -206,9 +217,9 @@ function addSelected() {
       <PhoneHelper
         ><span :class="{ 'mob-status--success': ranked?.length }">{{ found }}</span></PhoneHelper
       >
-      <div v-if="ranked?.length" class="mob-scroll mob-results-list">
+      <div v-if="ranked?.length" class="mob-scroll mob-results-list" @scroll.passive="onScroll">
         <PhoneCheckRow
-          v-for="c in ranked"
+          v-for="c in shownAsteroids"
           :key="key(c)"
           :model-value="selected.has(key(c))"
           :title="formatCandidateName(c)"

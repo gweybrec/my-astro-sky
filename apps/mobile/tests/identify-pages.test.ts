@@ -247,6 +247,38 @@ describe('identify an asteroid', () => {
     }
   });
 
+  it('draws a long list of asteroids a part at a time, more as it is scrolled to its end', async () => {
+    const w = await mountPage(IdentifyAsteroidPage);
+    await tapPhoto(w, { x: 200, y: 235 });
+    await tapPhoto(w, { x: 460, y: 235 });
+    skybotConesearchAPI.mockResolvedValue(
+      Array.from({ length: 50 }, (_, i) => ({
+        number: String(1000 + i),
+        name: `A${i}`,
+        raDeg: 339.2 + i * 0.001,
+        decDeg: 34.4,
+        className: 'MB>Middle',
+        vMag: 18,
+        ephemErrArcsec: 1,
+        distArcsec: 0,
+        dRaArcsecPerHour: 0,
+        dDecArcsecPerHour: 0,
+      })),
+    );
+    await byLabel(w, 'button', 'Rechercher').trigger('click');
+    await flushPromises();
+    expect(w.find('.mob-helper').text()).toBe('50 astéroïdes trouvés');
+    expect(w.findAll('.mob-check-row')).toHaveLength(20);
+    const list = w.find('.mob-results-list').element as HTMLElement;
+    Object.defineProperties(list, {
+      scrollTop: { value: 1000, configurable: true },
+      clientHeight: { value: 300, configurable: true },
+      scrollHeight: { value: 1400, configurable: true },
+    });
+    await w.find('.mob-results-list').trigger('scroll');
+    expect(w.findAll('.mob-check-row')).toHaveLength(40);
+  });
+
   it('opens the photo instead when it has no solve', async () => {
     getPhotos.mockResolvedValue([{ ...NGC7331, correspondences: [] }]);
     await mountPage(IdentifyAsteroidPage);
