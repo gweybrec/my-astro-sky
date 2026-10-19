@@ -4,6 +4,8 @@ import type { Photo } from '@myastrosky/core/types';
 import {
   filterDrawOrderPhotos,
   findOverlappingPhotoIds,
+  fullPhotoOrder,
+  mergeFilteredOrder,
   polygonsOverlap,
   type PhotoCanvasQuad,
 } from '@myastrosky/core/photo-draw-order';
@@ -82,5 +84,37 @@ describe('photo draw order helpers', () => {
     const filtered = filterDrawOrderPhotos(photos, 'm42', true, 'current', quads);
 
     expect(filtered.map((photo) => photo.id)).toEqual(['mid', 'current']);
+  });
+});
+
+describe('mergeFilteredOrder', () => {
+  it('reorders the filtered ids in their own slots and keeps the others', () => {
+    const full = ['a', 'b', 'c', 'd', 'e'];
+    expect(mergeFilteredOrder(full, ['d', 'b'], new Set(['b', 'd']))).toEqual([
+      'a',
+      'd',
+      'c',
+      'b',
+      'e',
+    ]);
+  });
+
+  it('leaves the order unchanged when the filtered order is unchanged', () => {
+    const full = ['a', 'b', 'c'];
+    expect(mergeFilteredOrder(full, ['a', 'c'], new Set(['a', 'c']))).toEqual(full);
+  });
+});
+
+describe('fullPhotoOrder', () => {
+  it('keeps the photos without a placement where they were', () => {
+    // u1 and u2 have no placement: they are not on the map and keep their slots.
+    const all = ['p1', 'u1', 'p2', 'p3', 'u2'];
+    expect(fullPhotoOrder(all, ['p3', 'p1', 'p2'])).toEqual(['p3', 'u1', 'p1', 'p2', 'u2']);
+  });
+
+  it('holds every photo once', () => {
+    const all = ['p1', 'u1', 'p2'];
+    const out = fullPhotoOrder(all, ['p2', 'p1']);
+    expect([...out].sort()).toEqual([...all].sort());
   });
 });
