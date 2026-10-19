@@ -105,3 +105,27 @@ export function filterDrawOrderPhotos(
     return true;
   });
 }
+
+/**
+ * The whole order after a drag in a filtered list: the filtered ids take their new order across the slots they held,
+ * the others stay where they were. Both lists run in the same direction (the draw order list's, top photo first).
+ */
+export function mergeFilteredOrder(
+  fullIds: readonly string[],
+  newVisibleIds: readonly string[],
+  filteredIds: ReadonlySet<string>,
+): string[] {
+  let next = 0;
+  return fullIds.map((id) => (filteredIds.has(id) ? (newVisibleIds[next++] ?? id) : id));
+}
+
+/**
+ * The order of every photo for saving, when only the placed ones were reordered: they take their new order across the
+ * slots placed photos held, and the photos without a placement keep theirs (the save wants every photo).
+ */
+export function fullPhotoOrder(
+  allIds: readonly string[],
+  placedIdsInNewOrder: readonly string[],
+): string[] {
+  return mergeFilteredOrder(allIds, placedIdsInNewOrder, new Set(placedIdsInNewOrder));
+}
