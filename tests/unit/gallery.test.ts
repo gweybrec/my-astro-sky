@@ -673,6 +673,22 @@ describe('Gallery', () => {
     expect(chips.querySelector('.label-chip')?.textContent).toBe('nebula');
   });
 
+  it('lists the objects of a card the most important catalogue first', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({
+        id: 'a',
+        originalName: 'Orion',
+        filename: 'a.jpg',
+        dsoIds: ['IC434', 'Barnard 33', 'NGC2023', 'M42'],
+      }),
+    ]);
+    const chips = [...document.querySelectorAll('.gallery-item-chips .tag-chip')].map(
+      (c) => c.textContent,
+    );
+    expect(chips).toEqual(['M42', 'NGC2023', 'IC434', 'Barnard 33']);
+  });
+
   it('setGearSetups is a no-op when the setup list is unchanged (no hero carousel rebuild)', () => {
     const gallery = new Gallery();
     const setup = (id: string, name: string) => ({

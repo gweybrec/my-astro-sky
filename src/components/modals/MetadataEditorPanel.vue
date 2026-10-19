@@ -14,7 +14,7 @@
   <div class="metadata-field">
     <label class="metadata-label">{{ t('modal.metadataDsos') }}</label>
     <div class="tag-chips">
-      <span v-for="dsoId in dsoIds" :key="dsoId" class="tag-chip">
+      <span v-for="dsoId in sortedDsoIds" :key="dsoId" class="tag-chip">
         {{ dsoId }}
         <button type="button" class="tag-chip-remove" @click="removeDso(dsoId)">×</button>
       </span>
@@ -266,6 +266,7 @@ import type { GearSetupData } from '../../api';
 import { CAPTURE_FIELDS } from '@myastrosky/core/capture-fields';
 import { t } from '../../i18n';
 import { searchDSOs } from '@myastrosky/core/search';
+import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { showToast } from '../../toast';
 import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
 import { normalizeIntegrationFilterKey } from '../../batch-utils';
@@ -295,6 +296,8 @@ const props = defineProps<{
   photo?: Photo | null;
 }>();
 
+// The objects' chips, the most important catalogue first (Messier, NGC, IC, …); the list itself keeps its order.
+const sortedDsoIds = computed(() => sortDsoIdsByImportance(props.dsoIds));
 const emit = defineEmits<{
   'update:dsoIds': [string[]];
   'update:labels': [string[]];

@@ -10,6 +10,7 @@ import { createLazyObserver } from './lazy-image';
 import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
 import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
 import { withCanonicalProjection } from '@myastrosky/core/projection';
+import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import {
   computePhotoDsoOverlayLayout,
   renderPhotoDsoOverlay,
@@ -422,7 +423,8 @@ export class Gallery {
       chip.textContent = label;
       wrap.appendChild(chip);
     }
-    for (const id of dsoIds) {
+    // The most important catalogue first (Messier, NGC, IC, …).
+    for (const id of sortDsoIdsByImportance(dsoIds)) {
       const chip = document.createElement('span');
       chip.className = 'tag-chip';
       chip.textContent = id;
