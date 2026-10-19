@@ -57,7 +57,7 @@ import { t } from '../../i18n';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { poiTypeIcon } from '../../poi-icons';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { isPhotoSolved, mergeIdentifiedPois } from '@myastrosky/core/photo-identify';
 import {
   triggerAsteroidModal,
   triggerSupernovaModal,
@@ -75,7 +75,7 @@ import { showToast } from '../../toast';
 const props = defineProps<{ pois: PointOfInterest[]; photo?: Photo | null }>();
 const emit = defineEmits<{ 'update:pois': [PointOfInterest[]] }>();
 
-const isSolved = computed(() => !!props.photo && computePhotoToProjMatrix(props.photo) !== null);
+const isSolved = computed(() => !!props.photo && isPhotoSolved(props.photo));
 
 function onIdentifyAsteroid() {
   if (!props.photo) return;
@@ -85,14 +85,12 @@ function onIdentifyAsteroid() {
 // Several asteroids / supernovae / comets can be added at once; one already on
 // the photo (same name and type) is skipped rather than duplicated.
 function addIdentifiedPois(pois: PointOfInterest[], toastKey: string) {
-  const fresh = pois.filter(
-    (poi) => !props.pois.some((p) => p.name === poi.name && p.categoryId === poi.categoryId),
-  );
+  const { merged, fresh } = mergeIdentifiedPois(props.pois, pois);
   if (!fresh.length) {
     if (pois.length) showToast({ message: t('poi.alreadyListed'), type: 'info', duration: 3000 });
     return;
   }
-  emit('update:pois', [...props.pois, ...fresh]);
+  emit('update:pois', merged);
   showToast({
     message: t(toastKey, { names: fresh.map((p) => p.name).join(', ') }),
     type: 'info',
