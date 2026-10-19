@@ -1034,9 +1034,13 @@ export class SkyMap {
    * Returns false (no-op) if no observer location is set — same guard as
    * setLocalSkyMode, since computeHorizonParams() can't resolve without one.
    */
-  enterRegionDrawMode(onComplete: (points: AltAzPoint[]) => void, onCancel: () => void): boolean {
+  enterRegionDrawMode(
+    onComplete: (points: AltAzPoint[]) => void,
+    onCancel: () => void,
+    onPress?: () => void,
+  ): boolean {
     if (!this.computeHorizonParams()) return false;
-    this.regionDraw.enter({ onComplete, onCancel }, this.localSkyMode);
+    this.regionDraw.enter({ onComplete, onCancel, onPress }, this.localSkyMode);
     if (!this.localSkyMode) this.setLocalSkyMode(true);
     this.canvas.style.cursor = 'crosshair';
     this.dismissTooltip();
@@ -1265,6 +1269,7 @@ export class SkyMap {
       regionDrawPress: () => this.regionDraw.press(),
       regionDrawMove: (pt) => this.regionDraw.move(pt),
       regionDrawFinish: (cancelled) => this.finishRegionDraw(cancelled),
+      regionDrawAbortStroke: () => this.regionDraw.abortStroke(),
       canvasToAltAz: (mx, my) => this.canvasToAltAz(mx, my),
       frameMouseDown: (mx, my) => this.frames.handleMouseDown(mx, my),
       frameDragActive: () => this.frames.activeDrag !== null,
