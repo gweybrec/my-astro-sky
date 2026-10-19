@@ -218,7 +218,7 @@ function addSelected() {
         />
       </div>
       <div class="mob-form-row mob-identify-edit">
-        <PhoneButton variant="text" @click="showResults = false">{{
+        <PhoneButton @click="showResults = false">{{
           t('mobile.identify.editSearch')
         }}</PhoneButton>
       </div>

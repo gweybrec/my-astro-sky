@@ -1469,8 +1469,8 @@ ion-tab-bar.mob-tabbar-hidden {
    comètes", "Ajouter un point d'intérêt"): the star identification's frame. The panel's first row of fields has the
    board's 8px above it; with a list of results the panel is the design system's `.mob-panel--results` (only the list
    scrolls, at most 60 % of the screen in portrait; in landscape the column's height). A pin or a marker is centred on
-   its point by the zero-size anchor of the star identification; "Modifier la recherche" is a text button whose text
-   starts on the gutter (its own inset taken out of the row's). */
+   its point by the zero-size anchor of the star identification; "Modifier la recherche" is a button on the gutter,
+   with the board's 8px above it. */
 .mob-identify-body > .mob-when-row:first-child,
 .mob-identify-body > .mob-form-row--search:first-child {
   padding-top: var(--space-4);
@@ -1481,7 +1481,6 @@ ion-tab-bar.mob-tabbar-hidden {
 }
 .mob-identify-edit {
   padding-top: var(--space-4);
-  padding-left: calc(var(--mobile-gutter) - var(--space-4));
 }
 @media (orientation: landscape) {
   .mob-identify-panel.mob-panel--results {
