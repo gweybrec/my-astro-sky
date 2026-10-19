@@ -143,7 +143,7 @@ function addSelected() {
           }}</span>
         </template>
         <template #actions>
-          <PhoneButton variant="text" :href="c.tnsUrl" target="_blank" rel="noopener noreferrer">{{
+          <PhoneButton :href="c.tnsUrl" target="_blank" rel="noopener noreferrer">{{
             t('supernova.viewOnTns')
           }}</PhoneButton>
         </template>

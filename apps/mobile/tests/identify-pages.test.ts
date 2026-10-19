@@ -334,16 +334,18 @@ describe('identify comets', () => {
 
   it('"Revenir à la position prédite" puts the pin back', async () => {
     const w = await mountPage(IdentifyCometPage);
-    // The badge and the button keep their room while hidden: the first tap does not grow the panel.
-    const hidden = () =>
-      [w.find('.mob-badge'), byText(w, 'button', 'Revenir à la position prédite')].map((e) =>
-        e.classes().includes('mob-invisible'),
-      );
-    expect(hidden()).toEqual([true, true]);
+    // The first tap does not grow the panel: the badge keeps its room while hidden, and the button is there from
+    // the start, disabled until the pin is moved.
+    const reset = () => byText(w, 'button', 'Revenir à la position prédite');
+    const state = () => [
+      w.find('.mob-badge').classes().includes('mob-invisible'),
+      reset().attributes('disabled') !== undefined,
+    ];
+    expect(state()).toEqual([true, true]);
     await tapPhoto(w, { x: 10, y: 10 });
-    expect(hidden()).toEqual([false, false]);
-    await byText(w, 'button', 'Revenir à la position prédite').trigger('click');
-    expect(hidden()).toEqual([true, true]);
+    expect(state()).toEqual([false, false]);
+    await reset().trigger('click');
+    expect(state()).toEqual([true, true]);
   });
 
   it('lists the comets near the field on a wrong date', async () => {

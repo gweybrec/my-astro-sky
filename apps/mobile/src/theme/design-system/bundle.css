@@ -3070,3 +3070,25 @@ svg.mob-icon--sm,
   width: var(--space-11);
   height: var(--space-11);
 }
+
+/* Revision 19. The actions under a result's lines ("Voir sur TNS", "Voir sur JPL", "Revenir à la position prédite") are
+   outlined buttons (`.mob-btn`), not text buttons: they start on the row's text edge, 8px apart, with 4px above them. */
+.mob-row-actions {
+  gap: var(--space-4);
+  margin-left: 0;
+  padding-top: var(--space-2);
+}
+/* The text of a row that is a tap target of its own (`.mob-row-text`): its badges ("Ajusté") end the title's line, its
+   lines follow under them. */
+.mob-row-text {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+}
+.mob-row-text > .mob-row-badges {
+  padding-top: 0;
+}
+.mob-row-text > .mob-row-sub {
+  flex-basis: 100%;
+}
