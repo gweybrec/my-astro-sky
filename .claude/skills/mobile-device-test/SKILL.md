@@ -27,7 +27,7 @@ Run `node .claude/skills/mobile-device-test/scripts/device-info.mjs`. If no devi
 
 ## Step 3 — Build and install
 
-1. `npm run mobile:sync`
+1. `npm run mobile:android:sync`
 2. `cd apps/mobile/android` and run `./gradlew assembleDebug` with `ANDROID_HOME` set for that command. If Gradle names a missing SDK package, stop and tell the user; do not fetch it.
 3. `adb -s <serial> install -r app/build/outputs/apk/debug/app-debug.apk`. Installing keeps the app's data and does not need the phone unlocked. Never clear the app's data without the user's yes.
 4. Under Git Bash, set `MSYS_NO_PATHCONV=1` for any adb command that has a device path.
