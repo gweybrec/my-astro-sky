@@ -1385,6 +1385,10 @@ ion-tab-bar.mob-tabbar-hidden {
   .mob-map-mode > .mob-panel > .mob-sheet-footer {
     margin-top: auto;
   }
+  /* The map runs under the status bar at the left of the column: its hint starts below it, as landscape.css draws it. */
+  .mob-map-mode > .mob-map .mob-map-hint {
+    top: calc(var(--mobile-gutter) + var(--safe-top, 0px));
+  }
   /* A mode without a panel (board "Voir une région"): the title bar stays across the top, the map has the rest. */
   .mob-sky-frame.mob-map-mode.mob-map-mode--bare {
     display: flex;
