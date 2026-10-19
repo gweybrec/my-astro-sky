@@ -327,6 +327,19 @@ function catalogSortKey(id: string): number {
   return 10;
 }
 
+/**
+ * Orders object ids by catalogue importance (Messier, NGC, IC, SH2, LBN, LDN, vdB, Abell, LPN, Barnard, then the
+ * others), then by their number within a catalogue (M1 before M42), for the chips that list a photo's objects.
+ */
+export function compareDsoIdsByImportance(a: string, b: string): number {
+  return catalogSortKey(a) - catalogSortKey(b) || a.localeCompare(b, 'en', { numeric: true });
+}
+
+/** A copy of the ids, most important catalogue first (see {@link compareDsoIdsByImportance}). */
+export function sortDsoIdsByImportance(ids: readonly string[]): string[] {
+  return [...ids].sort(compareDsoIdsByImportance);
+}
+
 export type DSOCatalog =
   'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard';
 

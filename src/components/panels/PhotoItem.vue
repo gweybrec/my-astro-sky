@@ -50,7 +50,7 @@
         {{ poi.name }}
       </span>
       <PhotoChip
-        v-for="id in dsoChips"
+        v-for="id in sortedDsoChips"
         :key="id"
         :text="id"
         :is-label="false"
@@ -78,6 +78,7 @@ import type { PointOfInterest } from '@myastrosky/core/types';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { poiTypeIcon } from '../../poi-icons';
+import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 
 const props = withDefaults(
   defineProps<{
@@ -88,6 +89,8 @@ const props = withDefaults(
   }>(),
   { dsoChips: () => [], labelChips: () => [], poiChips: () => [] },
 );
+// The objects' chips, the most important catalogue first (Messier, NGC, IC, …).
+const sortedDsoChips = computed(() => sortDsoIdsByImportance(props.dsoChips));
 
 const poiCategoriesStore = usePoiCategoriesStore();
 poiCategoriesStore.ensureLoaded();
