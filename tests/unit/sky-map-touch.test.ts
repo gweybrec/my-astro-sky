@@ -333,11 +333,11 @@ describe('a tap on a photo', () => {
     expect(calls.emitClearSelection).not.toHaveBeenCalled();
   });
 
-  it('prefers a deep-sky object, then a star, to the photo they lie on', () => {
+  it('always selects the photo over a deep-sky object under it, but not over a star', () => {
     const dso = withPhoto({ pickDSOAt: vi.fn(() => true) });
     tap(dso.canvas);
-    expect(dso.calls.emitDSOClick).toHaveBeenCalled();
-    expect(dso.calls.emitPhotoClick).not.toHaveBeenCalled();
+    expect(dso.calls.emitPhotoClick).toHaveBeenCalledWith('m31.jpg');
+    expect(dso.calls.emitDSOClick).not.toHaveBeenCalled();
     const star = withPhoto({ pickStarAt: vi.fn(() => ({ hip: 1 })) as never });
     tap(star.canvas);
     expect(star.calls.emitStarTap).toHaveBeenCalled();

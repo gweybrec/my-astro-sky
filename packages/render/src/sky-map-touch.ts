@@ -257,15 +257,17 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
       }
       return;
     }
-    // What is tapped, most specific first: a deep-sky object, a star, a photo; a tap on nothing clears the selection.
-    // (A touch has no hover: a tap on a star is how its information is asked for.)
-    if (host.interactionEnabled && host.pickDSOAt(mx, my)) {
+    // What is tapped: a deep-sky object, then a star; over a photo, a star, then the photo (an object is never picked
+    // there: a photo usually lies on a large object whose outline would take the tap, and the photo's sheet lists its
+    // objects). A tap on nothing clears the selection. A touch has no hover: a tap on a star asks for its information.
+    const photoName = host.hasPhotoClickHandler()
+      ? findTopPhotoOutlineAtPoint(mx, my, host.photoOutlines)
+      : null;
+    const dso = host.interactionEnabled && !photoName && host.pickDSOAt(mx, my);
+    if (dso) {
       host.emitDSOClick();
     } else {
       const star = host.interactionEnabled ? host.pickStarAt(mx, my) : null;
-      const photoName = host.hasPhotoClickHandler()
-        ? findTopPhotoOutlineAtPoint(mx, my, host.photoOutlines)
-        : null;
       if (star) host.emitStarTap(star);
       else if (photoName) host.emitPhotoClick(photoName);
       else host.emitClearSelection();
