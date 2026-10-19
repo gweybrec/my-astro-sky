@@ -20,6 +20,7 @@ import PhoneHelper from '../components/PhoneHelper.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneChip from '../components/PhoneChip.vue';
+import PhoneColorButton from '../components/PhoneColorButton.vue';
 import PhoneEmptyState from '../components/PhoneEmptyState.vue';
 import PhoneField from '../components/PhoneField.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
@@ -47,6 +48,7 @@ import eyeIcon from '@icons/eye.svg?raw';
 import telescopeIcon from '@icons/telescope.svg?raw';
 
 const search = ref('');
+const color = ref('#4ea1ff');
 const lat = ref('48.58');
 const empty = ref('');
 const notes = ref('Seeing moyen');
@@ -126,6 +128,9 @@ function raiseError() {
             <span class="mob-btn-value">2 types</span>
             <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
           </PhoneButton>
+        </div>
+        <div class="mob-form-row">
+          <PhoneColorButton v-model="color" label="Couleur" field="Couleur" />
         </div>
 
         <PhoneSectionHeader>Boutons icône (appui long : le nom)</PhoneSectionHeader>
