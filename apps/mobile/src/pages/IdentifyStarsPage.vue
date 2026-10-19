@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -11,7 +11,7 @@ import type { StarSearchResult } from '@myastrosky/core/domain/stars';
 import type { PhotoCorrespondence } from '@myastrosky/core/types';
 import { searchStarsAPI, uploadPhoto } from '@myastrosky/app-state/api';
 import { catalogsReady } from '../catalogs';
-import { fittedSize, usePhotoZoom, type Size } from '../composables/usePhotoZoom';
+import type { Size } from '../composables/usePhotoZoom';
 import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { skyPhotoFocus } from '../composables/useSkySelection';
@@ -29,6 +29,7 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneField from '../components/PhoneField.vue';
 import PhoneHelper from '../components/PhoneHelper.vue';
+import PhonePhotoStage from '../components/PhonePhotoStage.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import checkIcon from '@icons/check.svg?raw';
 import mapIcon from '../icons/map.svg?raw';
@@ -66,11 +67,6 @@ onBeforeUnmount(() => {
   if (url.value) URL.revokeObjectURL(url.value);
 });
 
-function onLoad(event: Event) {
-  const img = event.target as HTMLImageElement;
-  size.value = { width: img.naturalWidth, height: img.naturalHeight };
-}
-
 // ── The points ───────────────────────────────────────────────────────────────────────────────────
 // As on the desktop, the point a tap places is the first one not named yet: a placed point that is not named moves
 // to the new tap, the next one waits.
@@ -79,61 +75,14 @@ const named = (p: IdentifyPoint) => p.star !== null;
 const active = computed(() => points.findIndex((p) => !named(p)));
 const namedCount = computed(() => points.filter(named).length);
 
-// ── The photo on its stage: zoom, and where a point of the picture is on the screen ────────────────────────────
+// ── The photo on its stage: a tap places the active point ──────────────────────────────────────────
 
-const area = ref<HTMLElement | null>(null);
-const box = reactive({ width: 0, height: 0 });
-let observer: ResizeObserver | null = null;
-onMounted(() => {
-  if (!area.value || typeof ResizeObserver === 'undefined') return;
-  observer = new ResizeObserver(([entry]) => {
-    box.width = entry.contentRect.width;
-    box.height = entry.contentRect.height;
-  });
-  observer.observe(area.value);
-});
-onBeforeUnmount(() => observer?.disconnect());
+const stage = ref<InstanceType<typeof PhonePhotoStage> | null>(null);
+const onScreen = (p: PhotoPoint): PhotoPoint => stage.value?.onScreen(p) ?? { x: 0, y: 0 };
+const pixelScale = () => stage.value?.pixelScale() ?? 0;
 
-const { zoom, transform, handlers } = usePhotoZoom(
-  area,
-  () => size.value ?? { width: 0, height: 0 },
-  { onTap: placeAt },
-);
-
-/** Screen pixels per picture pixel. */
-function pixelScale(): number {
-  if (!size.value) return 0;
-  return (fittedSize(size.value, box).width / size.value.width) * zoom.value.scale;
-}
-
-/** Where a point of the picture is in the photo's area (px from its top left). */
-function onScreen(p: PhotoPoint): PhotoPoint {
-  const k = pixelScale();
-  const { width, height } = size.value ?? { width: 0, height: 0 };
-  return {
-    x: box.width / 2 + zoom.value.tx + (p.x - width / 2) * k,
-    y: box.height / 2 + zoom.value.ty + (p.y - height / 2) * k,
-  };
-}
-
-/** The point of the picture under a screen position, kept on the picture. */
-function onPicture(clientX: number, clientY: number): PhotoPoint | null {
-  const rect = area.value?.getBoundingClientRect();
-  const k = pixelScale();
-  if (!rect || !size.value || k <= 0) return null;
-  const { width, height } = size.value;
-  return {
-    x: (clientX - rect.left - box.width / 2 - zoom.value.tx) / k + width / 2,
-    y: (clientY - rect.top - box.height / 2 - zoom.value.ty) / k + height / 2,
-  };
-}
-const onThePicture = (p: PhotoPoint) =>
-  !!size.value && p.x >= 0 && p.y >= 0 && p.x <= size.value.width && p.y <= size.value.height;
-
-function placeAt(clientX: number, clientY: number) {
-  if (active.value < 0) return;
-  const p = onPicture(clientX, clientY);
-  if (p && onThePicture(p)) points[active.value].at = p;
+function placeAt(p: PhotoPoint) {
+  if (active.value >= 0) points[active.value].at = p;
 }
 
 const markers = computed(() =>
@@ -149,7 +98,7 @@ const drag = shallowRef<{ index: number; pointer: number; dx: number; dy: number
 
 function grab(index: number, event: PointerEvent) {
   const at = points[index].at;
-  const rect = area.value?.getBoundingClientRect();
+  const rect = stage.value?.area?.getBoundingClientRect();
   if (!at || !rect) return;
   (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
   const s = onScreen(at);
@@ -163,7 +112,7 @@ function grab(index: number, event: PointerEvent) {
 function dragMove(event: PointerEvent) {
   const d = drag.value;
   if (!d || d.pointer !== event.pointerId || !size.value) return;
-  const p = onPicture(event.clientX - d.dx, event.clientY - d.dy);
+  const p = stage.value?.onPicture(event.clientX - d.dx, event.clientY - d.dy);
   if (!p) return;
   points[d.index].at = {
     x: Math.min(size.value.width, Math.max(0, p.x)),
@@ -185,7 +134,7 @@ const magnifier = computed(() => {
   return {
     index: d!.index,
     // Above the finger, or under it when the point is near the top of the photo.
-    below: onScreen(at).y < box.height / 3,
+    below: onScreen(at).y < (stage.value?.box.height ?? 0) / 3,
     background: [
       `${cross} center / 1px 100% no-repeat`,
       `${cross} center / 100% 1px no-repeat`,
@@ -336,45 +285,40 @@ async function validate() {
           <PhoneBackButton :action="cancel" />
           <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ title }}</h1>
         </header>
-        <main class="mob-stage mob-photo-stage" v-on="handlers">
-          <div ref="area" class="mob-photo-area">
-            <img
-              v-if="url"
-              class="mob-photo-view"
-              :src="url"
-              :alt="file?.name"
-              :style="{ transform }"
-              draggable="false"
-              @load="onLoad"
-            />
-            <!-- A point of the photo: its marker, and the magnifier while it is dragged, are centred on it by layout. -->
-            <div
-              v-for="m in markers"
-              :key="m.index"
-              class="mob-identify-anchor"
-              :style="{ left: `${m.x}px`, top: `${m.y}px` }"
+        <PhonePhotoStage
+          ref="stage"
+          :src="url"
+          :alt="file?.name"
+          @load="size = $event"
+          @tap="placeAt"
+        >
+          <!-- A point of the photo: its marker, and the magnifier while it is dragged, are centred on it by layout. -->
+          <div
+            v-for="m in markers"
+            :key="m.index"
+            class="mob-identify-anchor"
+            :style="{ left: `${m.x}px`, top: `${m.y}px` }"
+          >
+            <button
+              type="button"
+              class="mob-marker"
+              :class="{ 'mob-marker--active': m.index === active }"
+              :aria-label="t('mobile.identify.point', { n: m.index + 1 })"
+              @pointerdown.stop="grab(m.index, $event)"
+              @pointermove="dragMove"
+              @pointerup="release"
+              @pointercancel="release"
             >
-              <button
-                type="button"
-                class="mob-marker"
-                :class="{ 'mob-marker--active': m.index === active }"
-                :aria-label="t('mobile.identify.point', { n: m.index + 1 })"
-                @pointerdown.stop="grab(m.index, $event)"
-                @pointermove="dragMove"
-                @pointerup="release"
-                @pointercancel="release"
-              >
-                <span class="mob-marker-dot m-secondary">{{ m.index + 1 }}</span>
-              </button>
-              <div
-                v-if="magnifier?.index === m.index"
-                class="mob-magnifier"
-                :class="magnifier.below ? 'mob-identify-below' : 'mob-identify-above'"
-                :style="{ background: magnifier.background }"
-              />
-            </div>
+              <span class="mob-marker-dot m-secondary">{{ m.index + 1 }}</span>
+            </button>
+            <div
+              v-if="magnifier?.index === m.index"
+              class="mob-magnifier"
+              :class="magnifier.below ? 'mob-identify-below' : 'mob-identify-above'"
+              :style="{ background: magnifier.background }"
+            />
           </div>
-        </main>
+        </PhonePhotoStage>
         <section class="mob-panel mob-identify-panel" :aria-label="t('mobile.identify.points')">
           <!-- The points scroll when the panel is short (landscape, keyboard); Annuler and Valider stay under them. -->
           <div class="mob-identify-points mob-scroll">
