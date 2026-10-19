@@ -9,8 +9,9 @@ import PhonePhotoStage, { type PhotoPoint } from '../../components/PhonePhotoSta
 // The frame of the pages that identify objects on a solved photo (boards "Identifier un astéroïde", "Identifier des
 // supernovae", "Identifier des comètes", "Ajouter un point d'intérêt"), the star identification's layout: the title bar
 // of a mode with its "i", the photo on its stage with what the page marks on it (`markers` slot, given `onScreen`),
-// and the panel under it, at the right in landscape (default slot). A tap on the photo is given as its pixel (`tap`).
-// With `results`, only the panel's list scrolls (`.mob-results-list`); its fields and footer stay.
+// and the panel under it, at the right in landscape: its content (default slot) scrolls when it is taller than the
+// panel, its footer (`footer` slot) stays under it. A tap on the photo is given as its pixel (`tap`). With `results`,
+// the content's list of results is what shrinks and scrolls (`.mob-results-list`).
 const props = defineProps<{
   title: string;
   /** The explanation behind the "i": the desktop's introduction of the modal. */
@@ -51,7 +52,8 @@ const size = computed(() =>
           :class="{ 'mob-panel--results': results }"
           :aria-label="panelLabel"
         >
-          <slot />
+          <div class="mob-identify-body"><slot /></div>
+          <slot name="footer" />
         </section>
       </div>
     </IonContent>

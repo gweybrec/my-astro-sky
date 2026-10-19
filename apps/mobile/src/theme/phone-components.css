@@ -1471,8 +1471,8 @@ ion-tab-bar.mob-tabbar-hidden {
    scrolls, at most 60 % of the screen in portrait; in landscape the column's height). A pin or a marker is centred on
    its point by the zero-size anchor of the star identification; "Modifier la recherche" is a text button whose text
    starts on the gutter (its own inset taken out of the row's). */
-.mob-identify-panel > .mob-when-row:first-child,
-.mob-identify-panel > .mob-form-row--search:first-child {
+.mob-identify-body > .mob-when-row:first-child,
+.mob-identify-body > .mob-form-row--search:first-child {
   padding-top: var(--space-4);
 }
 /* The explanation under "Près de ce champ" sits right under its title, as the board draws it. */
@@ -1487,6 +1487,25 @@ ion-tab-bar.mob-tabbar-hidden {
   .mob-identify-panel.mob-panel--results {
     max-height: none;
   }
+}
+/* The panel's content scrolls by itself when it is taller than the panel (landscape, a search that runs long); its
+   list of results shrinks first. Two lines in a row are one paragraph apart, not two. */
+.mob-identify-panel > .mob-identify-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.mob-identify-body > * {
+  flex: none;
+}
+.mob-identify-body > .mob-results-list {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.mob-identify-body > .mob-helper + .mob-helper {
+  padding-top: 0;
 }
 .mob-identify-anchor > .mob-marker,
 .mob-identify-anchor > .mob-pin {
