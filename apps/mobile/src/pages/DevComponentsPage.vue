@@ -25,6 +25,7 @@ import PhoneField from '../components/PhoneField.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhoneInfoButton from '../components/PhoneInfoButton.vue';
 import PhoneReorderList from '../components/PhoneReorderList.vue';
+import PhoneTags from '../components/PhoneTags.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
@@ -40,6 +41,7 @@ import { useErrorToast } from '../composables/useErrorToast';
 import filterIcon from '../icons/filter.svg?raw';
 import caretIcon from '../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
+import imageIcon from '@icons/image.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 import eyeIcon from '@icons/eye.svg?raw';
 import telescopeIcon from '@icons/telescope.svg?raw';
@@ -341,6 +343,24 @@ function raiseError() {
             >
           </template>
         </PhoneReorderList>
+
+        <PhoneSectionHeader>Étiquettes</PhoneSectionHeader>
+        <PhoneRow title="M42_2025-01-12_stack.jpg" :thumb="imageIcon" roomy button>
+          <template #below
+            ><PhoneTags
+              :tags="[
+                { kind: 'setup', text: 'Newton 200 + ASI 183' },
+                { kind: 'label', text: 'HaRGB' },
+                { kind: 'dso', text: 'M42' },
+                { kind: 'dso', text: 'M43' },
+                { kind: 'dso', text: 'NGC1977' },
+                { kind: 'dso', text: 'NGC1973' },
+                { kind: 'dso', text: 'NGC1975' },
+                { kind: 'dso', text: 'IC434' },
+                { kind: 'dso', text: 'Barnard 33' },
+              ]"
+          /></template>
+        </PhoneRow>
 
         <PhoneSectionHeader>Fenêtres</PhoneSectionHeader>
         <div class="mob-form-row" style="display: flex; gap: var(--space-4); flex-wrap: wrap">

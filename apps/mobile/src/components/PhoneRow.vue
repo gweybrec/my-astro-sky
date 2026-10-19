@@ -5,7 +5,8 @@ import PhoneBusy from './PhoneBusy.vue';
 import chevronIcon from '../icons/chevron-right.svg?raw';
 
 // A list row (`.mob-row`) on Ionic's item: title, up to a few lines under it, a leading icon, a trailing value,
-// a chevron, or anything in the `trail` slot (a switch, a button). A row with `button` is a tap target.
+// a chevron, or anything in the `trail` slot (a switch, a button); the `below` slot goes under the lines. A row with
+// `button` is a tap target.
 withDefaults(
   defineProps<{
     title: string;
@@ -81,6 +82,8 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
             >{{ line }}</span
           ><template v-else>{{ line }}</template></span
         >
+        <!-- Anything else under the title (a photo's chips in a search result). -->
+        <slot name="below" />
       </span>
       <span v-if="value || chevron || $slots.trail" class="mob-row-trail m-secondary">
         <span v-if="value" :class="{ 'm-mono': mono }">{{ value }}</span>
