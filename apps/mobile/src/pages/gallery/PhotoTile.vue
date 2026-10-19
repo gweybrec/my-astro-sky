@@ -1,18 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { useTagRows } from '../../composables/useTagRows';
+import type { PhotoTag } from '../../photo-tags';
 import AppIcon from '../../components/AppIcon.vue';
 import PhoneBusy from '../../components/PhoneBusy.vue';
+import PhoneTags from '../../components/PhoneTags.vue';
 import imageIcon from '@icons/image.svg?raw';
-
-/** A chip of a tile: the photo's equipment, a point of interest, a label or an object. */
-export interface PhotoTag {
-  kind: 'setup' | 'poi' | 'label' | 'dso';
-  text: string;
-  /** A point of interest's colour, and the icon of its kind when it has one (a coloured dot otherwise). */
-  color?: string;
-  icon?: string | null;
-}
 
 // A photo of the gallery (boards "Galerie" and "Galerie, résolutions en cours"): one card holding the picture and, in the
 // same border, the photo's file name and its chips in the desktop's order, on two rows at most; the chips that do not
@@ -34,9 +26,6 @@ watch(
   () => props.picture,
   () => (broken.value = false),
 );
-
-const box = ref<HTMLElement | null>(null);
-const { shown } = useTagRows(box, () => props.tags?.length ?? 0);
 </script>
 
 <template>
@@ -65,21 +54,7 @@ const { shown } = useTagRows(box, () => props.tags?.length ?? 0);
     </span>
     <span class="mob-photo-card-caption">
       <span class="mob-photo-card-name m-secondary">{{ name }}</span>
-      <span v-if="tags?.length" ref="box" class="mob-tags">
-        <span
-          v-for="(tag, n) in tags.slice(0, shown)"
-          :key="n"
-          class="mob-tag m-caption"
-          :class="[`mob-tag--${tag.kind}`, { 'mob-tag--dot': tag.kind === 'poi' && !tag.icon }]"
-          :style="tag.color ? { '--poi-color': tag.color } : undefined"
-          ><AppIcon v-if="tag.icon" :svg="tag.icon" /><span class="mob-tag-text">{{
-            tag.text
-          }}</span></span
-        >
-        <span v-if="shown < tags.length" class="mob-tag mob-tag--more m-caption"
-          ><span class="mob-tag-text">+{{ tags.length - shown }}</span></span
-        >
-      </span>
+      <PhoneTags v-if="tags?.length" :tags="tags" />
     </span>
   </button>
 </template>

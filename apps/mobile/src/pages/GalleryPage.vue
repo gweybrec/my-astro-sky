@@ -5,8 +5,6 @@ import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
-import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
-import { resolveCategory } from '@myastrosky/core/poi';
 import { getGearSetups, getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import AppIcon from '../components/AppIcon.vue';
@@ -22,12 +20,12 @@ import { useErrorToast } from '../composables/useErrorToast';
 import { loadPendingPhotos, pendingPhotos, type PendingState } from '../pending-photos';
 import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pending-solve';
 import { loadGalleryDisplay, photosPerLine, type Orientation } from '../gallery-display';
-import { poiTypeIcon } from '../poi-icons';
 import { skyPlacement } from '../sky-modes';
 import { endIdentify } from '../star-identify-session';
 import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import GalleryDisplaySheet from './gallery/GalleryDisplaySheet.vue';
-import PhotoTile, { type PhotoTag } from './gallery/PhotoTile.vue';
+import PhotoTile from './gallery/PhotoTile.vue';
+import { photoTags, type PhotoTag } from '../photo-tags';
 import { PHOTO_FILE_TYPES, pickFiles, pickGalleryPhotos } from '../platform-device';
 import filterIcon from '../icons/filter.svg?raw';
 import slidersIcon from '../icons/sliders.svg?raw';
@@ -59,20 +57,15 @@ const poiCategories = usePoiCategoriesStore();
 
 /** The chips of a photo, in the order of the desktop's gallery card. */
 function tagsOf(photo: Photo): PhotoTag[] {
-  const tags: PhotoTag[] = [];
-  const setup = photo.gearSetupId ? setupNames.value.get(photo.gearSetupId) : undefined;
-  if (setup) tags.push({ kind: 'setup', text: setup });
-  for (const poi of photo.pointsOfInterest ?? []) {
-    tags.push({
-      kind: 'poi',
-      text: poi.name,
-      color: resolveCategory(poi.categoryId, poiCategories.categories).color,
-      icon: poiTypeIcon(poi.categoryId),
-    });
-  }
-  for (const label of photo.labels ?? []) tags.push({ kind: 'label', text: label });
-  for (const id of sortDsoIdsByImportance(photo.dsoIds ?? [])) tags.push({ kind: 'dso', text: id });
-  return tags;
+  return photoTags(
+    {
+      setupName: photo.gearSetupId ? setupNames.value.get(photo.gearSetupId) : undefined,
+      pois: photo.pointsOfInterest,
+      labels: photo.labels,
+      dsoIds: photo.dsoIds,
+    },
+    poiCategories.categories,
+  );
 }
 
 const tiles = computed(() =>
