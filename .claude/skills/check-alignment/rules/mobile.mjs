@@ -15,6 +15,7 @@
 //               { click: selector } | { fill: selector, text } | { wait: selector } | { pause: ms }; `scope` limits the measure to one element
 //               (an open sheet); `clearStorage` is a list of storage keys removed before the page loads (a first start);
 //               `variants: true` repeats the view in every language and at 130 % text.
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,7 +24,26 @@ const node = (...parts) => path.join(repo, ...parts);
 
 export const name = 'mobile';
 
-export const prepare = [{ args: [node('apps/mobile/scripts/copy-bundled.mjs')], cwd: repo }];
+// The check measures the built app, the files the phone runs: the development server loads the style sheets in another
+// order, so a rule that loses to Ionic's only in the build (the reorder handle's `display`) passed there.
+// Built in mode "check" (the components page is kept) into a folder of its own, never the app's `dist`.
+const BUILT = path.join(os.tmpdir(), 'myastrosky-check-alignment-build');
+export const prepare = [
+  { args: [node('apps/mobile/scripts/copy-bundled.mjs')], cwd: repo },
+  {
+    args: [
+      node('node_modules/vite/bin/vite.js'),
+      'build',
+      'apps/mobile',
+      '--mode',
+      'check',
+      '--outDir',
+      BUILT,
+      '--emptyOutDir',
+    ],
+    cwd: repo,
+  },
+];
 
 export const servers = ({ ports, tmp }) => [
   {
@@ -41,7 +61,10 @@ export const servers = ({ ports, tmp }) => [
     name: 'the phone app',
     args: [
       node('node_modules/vite/bin/vite.js'),
+      'preview',
       'apps/mobile',
+      '--outDir',
+      BUILT,
       '--port',
       String(ports[1]),
       '--strictPort',
