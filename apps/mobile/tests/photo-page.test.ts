@@ -32,6 +32,8 @@ vi.mock('../src/composables/useConfirm', () => ({
   showInfo: vi.fn(),
 }));
 vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+const solved = { value: true };
+vi.mock('@myastrosky/core/photo-identify', () => ({ isPhotoSolved: () => solved.value }));
 
 vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@myastrosky/core/catalog/dso-registry')>()),
@@ -49,6 +51,7 @@ vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
 
 import PhotoPage from '../src/pages/PhotoPage.vue';
 import PhotoInfoSheet from '../src/pages/gallery/PhotoInfoSheet.vue';
+import IdentifyChooseSheet from '../src/pages/gallery/IdentifyChooseSheet.vue';
 import { skyPhotoFocus } from '../src/composables/useSkySelection';
 
 /** "Photo, détail", "Photo, zoom" and "Photo, informations": a photo's own screen. */
@@ -88,6 +91,8 @@ describe("a photo's own screen", () => {
     confirm.mockReset().mockResolvedValue(true);
     showError.mockReset();
     replace.mockReset();
+    push.mockReset();
+    solved.value = true;
     skyPhotoFocus.value = null;
   });
 
@@ -233,9 +238,33 @@ describe("a photo's own screen", () => {
     expect(push).toHaveBeenCalledWith('/gallery/photo/p1/edit');
   });
 
-  it('draws the screen that waits as the board does', async () => {
+  it('"Identifier les objets" puts the choice of an identification in place of the sheet, which its arrow brings back', async () => {
     const w = mountPage();
     await flushPromises();
-    expect(button(w, 'Identifier les objets').attributes('aria-disabled')).toBe('true');
+    const info = () => w.findComponent(PhotoInfoSheet).props('open');
+    const choose = () => w.findComponent(IdentifyChooseSheet).props('open');
+    await button(w, 'Informations sur la photo').trigger('click');
+    await button(w, 'Identifier les objets').trigger('click');
+    expect([info(), choose()]).toEqual([false, true]);
+    const sheet = w.findComponent(IdentifyChooseSheet);
+    expect(sheet.findAll('.mob-row-title').map((r) => r.text())).toEqual([
+      'Identifier un astéroïde',
+      'Identifier des supernovae',
+      'Identifier des comètes',
+    ]);
+    await sheet.find('button[aria-label="Retour"]').trigger('click');
+    expect([info(), choose()]).toEqual([true, false]);
+
+    await button(w, 'Identifier les objets').trigger('click');
+    await w.findComponent(IdentifyChooseSheet).findAll('.mob-row')[2].trigger('click');
+    expect(choose()).toBe(false);
+    expect(push).toHaveBeenCalledWith('/gallery/photo/p1/identify/comet');
+  });
+
+  it('cannot identify objects on a photo without a solve', async () => {
+    solved.value = false;
+    const w = mountPage();
+    await flushPromises();
+    expect(button(w, 'Identifier les objets').attributes('disabled')).toBeDefined();
   });
 });

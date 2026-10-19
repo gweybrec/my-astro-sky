@@ -76,6 +76,11 @@ ion-button.mob-btn--field .mob-btn-content {
   gap: var(--space-2);
   padding: 0 var(--space-4);
 }
+/* A text button's inset is inside it, on its content: the design system's own inset on the button (`.mob-btn.mob-btn--text`,
+   heavier than the reset of `ion-button.mob-btn`) would double it. */
+ion-button.mob-btn.mob-btn--text {
+  padding: 0;
+}
 ion-button.mob-btn--text .mob-btn-content {
   padding: 0 var(--space-4);
 }
@@ -795,11 +800,12 @@ ion-alert.mob-dialog-alert ion-ripple-effect {
   display: none;
 }
 
-/* ── Error toast: `ion-toast.mob-toast-error` is the desktop's `.toast.toast-error` (board "Lieu, horizon indisponible"). */
-ion-toast.mob-toast-error {
+/* ── Toasts: `ion-toast.mob-toast` is the desktop's `.toast` (a message, such as the points of interest added), and with
+   `.mob-toast-error` its `.toast.toast-error` (board "Lieu, horizon indisponible"). */
+ion-toast.mob-toast {
   --background: var(--bg-deep);
-  --color: var(--btn-danger-hover-text);
-  --border-color: var(--card-status-failed);
+  --color: var(--text-secondary);
+  --border-color: var(--border-panel);
   --border-width: 1px;
   --border-style: solid;
   --border-radius: var(--radius-lg);
@@ -811,13 +817,17 @@ ion-toast.mob-toast-error {
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
 }
-ion-toast.mob-toast-error::part(message) {
+ion-toast.mob-toast.mob-toast-error {
+  --color: var(--btn-danger-hover-text);
+  --border-color: var(--card-status-failed);
+}
+ion-toast.mob-toast::part(message) {
   text-align: left;
   padding: var(--space-5) var(--space-7);
   font-size: var(--font-size-body);
   line-height: normal;
 }
-ion-toast.mob-toast-error::part(wrapper) {
+ion-toast.mob-toast::part(wrapper) {
   /* where the board puts the desktop's toast (`.mob-toast-host`): centred, 16 px from the sides, 16 px above the bottom bar */
   --start: var(--mobile-gutter);
   --end: var(--mobile-gutter);
@@ -834,14 +844,14 @@ ion-toast.mob-toast-error::part(wrapper) {
   justify-content: center;
   pointer-events: none;
 }
-ion-toast.mob-toast-error::part(container) {
+ion-toast.mob-toast::part(container) {
   width: auto;
   max-width: 100%;
   min-width: 0;
   padding: 0;
   pointer-events: auto;
 }
-ion-toast.mob-toast-error::part(content) {
+ion-toast.mob-toast::part(content) {
   padding: 0;
   min-height: 0;
 }
@@ -1453,6 +1463,48 @@ ion-tab-bar.mob-tabbar-hidden {
   .mob-identify-panel > .mob-sheet-footer {
     margin-top: auto;
   }
+}
+
+/* ── Identifying objects on a solved photo (boards "Identifier un astéroïde", "Identifier des supernovae", "Identifier des
+   comètes", "Ajouter un point d'intérêt"): the star identification's frame. The panel's first row of fields has the
+   board's 8px above it; with a list of results the panel is the design system's `.mob-panel--results` (only the list
+   scrolls, at most 60 % of the screen in portrait; in landscape the column's height). A pin or a marker is centred on
+   its point by the zero-size anchor of the star identification; "Modifier la recherche" is a text button whose text
+   starts on the gutter (its own inset taken out of the row's). */
+.mob-identify-panel > .mob-when-row:first-child,
+.mob-identify-panel > .mob-form-row--search:first-child {
+  padding-top: var(--space-4);
+}
+/* The explanation under "Près de ce champ" sits right under its title, as the board draws it. */
+.mob-results-list > .mob-section-header + .mob-helper {
+  padding-top: 0;
+}
+.mob-identify-edit {
+  padding-top: var(--space-4);
+  padding-left: calc(var(--mobile-gutter) - var(--space-4));
+}
+@media (orientation: landscape) {
+  .mob-identify-panel.mob-panel--results {
+    max-height: none;
+  }
+}
+.mob-identify-anchor > .mob-marker,
+.mob-identify-anchor > .mob-pin {
+  pointer-events: none;
+}
+/* "Ajouter un point d'intérêt": the Type row has the board's 8px above it. "Types de points d'intérêt": so has the
+   first type. */
+.mob-identify-type,
+.mob-poi-types > .mob-type-row:first-child {
+  padding-top: var(--space-4);
+}
+/* Kept in the layout but not shown (and not focusable): what appears later without moving the rest. */
+.mob-invisible {
+  visibility: hidden;
+}
+/* A unit or a short label printed beside a field ("UTC", "Rayon", "arcmin"). */
+.mob-unit {
+  color: var(--text-secondary);
 }
 
 /* A page with controls above a list that can be empty (board "Ciel, ordre d'affichage"): the empty text fills only the

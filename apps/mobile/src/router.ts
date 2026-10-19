@@ -29,6 +29,22 @@ const routes: RouteRecordRaw[] = [
   { path: '/gallery/import', component: () => import('./pages/ImportPhotosPage.vue') },
   { path: '/gallery/photo/:id', component: () => import('./pages/PhotoPage.vue') },
   { path: '/gallery/photo/:id/edit', component: () => import('./pages/PhotoEditPage.vue') },
+  // The identifications of a solved photo and "Ajouter un point d'intérêt" (boards "Identifier un astéroïde",
+  // "Identifier des supernovae", "Identifier des comètes", "Ajouter un point d'intérêt", "Types de points d'intérêt").
+  {
+    path: '/gallery/photo/:id/identify/asteroid',
+    component: () => import('./pages/identify/IdentifyAsteroidPage.vue'),
+  },
+  {
+    path: '/gallery/photo/:id/identify/supernova',
+    component: () => import('./pages/identify/IdentifySupernovaPage.vue'),
+  },
+  {
+    path: '/gallery/photo/:id/identify/comet',
+    component: () => import('./pages/identify/IdentifyCometPage.vue'),
+  },
+  { path: '/gallery/photo/:id/poi', component: () => import('./pages/identify/PoiAddPage.vue') },
+  { path: '/gallery/poi-types', component: () => import('./pages/PoiTypesPage.vue') },
   // A waiting photo placed by naming 2 or 3 of its stars (board "Identifier les étoiles").
   { path: '/gallery/identify/:id', component: () => import('./pages/IdentifyStarsPage.vue') },
   // The page pushed from the Cibles tab: full screen, without the tab bar (board "Cibles, régions du ciel").

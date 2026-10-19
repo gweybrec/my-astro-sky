@@ -68,8 +68,17 @@ describe('the error toast', () => {
     const arg = toastCreate.mock.calls[0][0];
     expect(arg.message).toBe('Impossible de calculer');
     expect(arg.position).toBe('bottom');
-    expect(arg.cssClass).toBe('mob-toast-error');
+    expect(arg.cssClass).toEqual(['mob-toast', 'mob-toast-error']);
+    expect(arg.htmlAttributes.role).toBe('alert');
     expect(present).toHaveBeenCalledOnce();
+  });
+
+  it('shows a notice in the plain toast', async () => {
+    await useErrorToast().showNotice('M42 ajouté(s) aux points d’intérêt');
+    const arg = toastCreate.mock.calls[0][0];
+    expect(arg.message).toBe('M42 ajouté(s) aux points d’intérêt');
+    expect(arg.cssClass).toBe('mob-toast');
+    expect(arg.htmlAttributes.role).toBe('status');
   });
 
   it('shows the text of something that is not an Error', async () => {

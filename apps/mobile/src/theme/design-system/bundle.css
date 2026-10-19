@@ -2976,3 +2976,97 @@ svg.mob-icon--sm,
   justify-content: space-between;
   gap: var(--space-4);
 }
+
+/* ── Revision 18 ─────────────────────────────────────────────────────────────────────────────────
+   Identification pages (IdentifySupernova, IdentifyComet, PoiAdd) and the types of points of interest (PoiTypes).
+   `.mob-pin`: what a search found on the photo (a supernova, a comet), the desktop's 28px starburst in the type's colour
+   (`--poi-color`), centred on its point; `.mob-pin--off` is one not ticked. `.mob-marker--tint`: a marker whose ring takes
+   the type's colour (the point of interest placed by hand). `.mob-badge--warn`: a badge in the warning colour
+   ("Non confirmée"). `.mob-row-actions`: text buttons under a result's lines ("Voir sur TNS"), as tall as a touch target.
+   `.mob-row--current`: the result a tap on the photo acts on (the comet whose pin moves), as `.mob-entry--current`; `.mob-row-text`
+   is its text, a tap target of its own beside the tick box.
+   `.mob-type-row`: a type of point of interest, "colour | name | remove", and the row that adds one, "colour | name | add". */
+.mob-pin {
+  position: absolute;
+  width: var(--space-14);
+  height: var(--space-14);
+  color: var(--poi-color, var(--accent-color));
+  pointer-events: none;
+}
+.mob-pin svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mob-pin--off {
+  opacity: 0.4;
+}
+.mob-marker--tint .mob-marker-dot {
+  background: transparent;
+  border-color: var(--poi-color, var(--text-bright));
+}
+.mob-badge--warn {
+  flex: none;
+  color: var(--status-warn-text);
+  background: var(--status-warn-bg);
+  border-color: var(--status-warn-border);
+}
+.mob-row-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-2);
+}
+.mob-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-7);
+  margin-left: calc(-1 * var(--space-4));
+}
+.mob-row--current {
+  background: var(--accent-fill-sm);
+  box-shadow: inset 0 0 0 1px var(--border-accent);
+}
+/* The text of a row as a tap target of its own, beside its tick box (the comet a tap on the photo moves). */
+.mob-row-text {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.mob-type-row {
+  display: grid;
+  grid-template-columns: var(--mobile-touch-min) minmax(0, 1fr) var(--mobile-touch-min);
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: var(--space-18);
+  padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+/* A field button beside an icon button in an add row ("Type" and the pen that manages the types) takes the row's width. */
+.mob-add-row > .mob-btn--block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* The actions under a result's lines are text buttons, a link out of the app included: never underlined. */
+.mob-row-actions .mob-btn {
+  text-decoration: none;
+}
+.mob-swatch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.mob-swatch-btn .mob-swatch {
+  width: var(--space-11);
+  height: var(--space-11);
+}
