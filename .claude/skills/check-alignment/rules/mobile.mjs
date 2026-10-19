@@ -8,11 +8,14 @@
 //   seed        async ({ ports }) => { ids, storage }: fills the app's data through its API; `storage` are the
 //               localStorage entries to set before a page loads; `ids` are passed to the views' paths
 //   cachedPrefixes  address prefixes whose GET answers are kept after the first time (a server with a rate limit)
+//   fixtures    [{ method, path, body }]: fixed JSON answers for the routes that would reach services outside (the
+//               identifications' SkyBoT, TNS and MPC), so that a check never depends on them
 //   language    { key, all }: the storage key of the language, and the languages to try (the first is the default)
 //   sizes       the viewport sizes [width, height]
 //   rules       the measurements: { id, type, ...selectors } (types are in the engine; `minimum: true` for a gap)
 //   views       the pages: { name, path (string or ids => string), ready?, open?, scope?, variants? }; `open` is a list of
-//               { click: selector } | { fill: selector, text } | { wait: selector } | { pause: ms }; `scope` limits the measure to one element
+//               { click: selector } | { fill: selector, text } | { wait: selector } | { pause: ms } |
+//               { tapAt: selector, x, y } (fractions of its box); `scope` limits the measure to one element
 //               (an open sheet); `clearStorage` is a list of storage keys removed before the page loads (a first start);
 //               `variants: true` repeats the view in every language and at 130 % text.
 import os from 'node:os';
@@ -79,33 +82,48 @@ export const baseUrl = ({ ports }) => `http://localhost:${ports[1]}`;
 
 // A photo placed over the north celestial pole (three stars 20° from it, 120° apart), so that a tap at the middle of the map
 // lands on it.
-async function uploadPhoto(base, fileName = 'Cygnus_wide_2025-08-23.jpg') {
+const POLE_FRAME = {
+  width: 400,
+  height: 300,
+  stars: [
+    [200, 40, 0, 70],
+    [80, 230, 120, 70],
+    [320, 230, 240, 70],
+  ],
+};
+// The frame of the comet C/2025 R2 (SWAN) on 2025-11-07 at 18:42 UTC (the core comet tests' photo): 1341 × 790 px at
+// 2.36″ per pixel, north up, centred on RA 341.441°, Dec 2.273°.
+const COMET_FRAME = {
+  width: 1341,
+  height: 790,
+  stars: [
+    [134.1, 79, 341.7929169, 2.4801556],
+    [1206.9, 118.5, 341.0890831, 2.4542611],
+    [670.5, 711, 341.441, 2.0658444],
+  ],
+};
+
+async function uploadPhoto(base, fileName = 'Cygnus_wide_2025-08-23.jpg', frame = POLE_FRAME) {
   const sharp = (await import('sharp')).default;
-  const width = 400;
-  const height = 300;
+  const { width, height } = frame;
   const bytes = await sharp({
     create: { width, height, channels: 3, background: { r: 40, g: 70, b: 120 } },
   })
     .jpeg()
     .toBuffer();
-  const stars = [
-    [200, 40, 0],
-    [80, 230, 120],
-    [320, 230, 240],
-  ];
   const form = new FormData();
   form.append('photo', new Blob([bytes], { type: 'image/jpeg' }), fileName);
   form.append(
     'correspondences',
     JSON.stringify(
-      stars.map(([x, y, ra], i) => ({
+      frame.stars.map(([x, y, ra, dec], i) => ({
         pointIndex: i,
         photoX: x,
         photoY: y,
         starHip: 0,
         starName: `Étoile ${i + 1}`,
         starRa: ra,
-        starDec: 70,
+        starDec: dec,
       })),
     ),
   );
@@ -252,10 +270,16 @@ export async function seed({ ports }) {
     'Pegasus_2025-08-31.jpg',
     'Perseus_2025-09-01.jpg',
     'Auriga_2025-09-02.jpg',
-    'Taurus_2025-09-03.jpg',
   ]) {
     await uploadPhoto(base, fileName);
   }
+  // The twelfth: the photo of a comet, for the comet identification (its date puts C/2025 R2 in it).
+  const comet = await uploadPhoto(base, 'Comet_C2025R2_2025-11-07.jpg', COMET_FRAME);
+  const cometPhotoId = (comet.photo ?? comet).id;
+  await api(base, 'PATCH', `/api/photos/${cometPhotoId}/metadata`, {
+    dsoIds: [],
+    observationDate: '2025-11-07T18:42:00.000Z',
+  });
 
   await api(base, 'POST', '/api/sky-regions', {
     name: 'Zone dégagée',
@@ -273,6 +297,7 @@ export async function seed({ ports }) {
     ids: {
       setup: setup1.id,
       photo: photoId,
+      cometPhoto: cometPhotoId,
       plan: summer.id,
       entry: summer.entries.NGC7000,
       longEntry: summer.entries['SH2-308'],
@@ -330,6 +355,85 @@ export async function seed({ ports }) {
 // Read-only calls answered from memory after the first time: the server refuses more than 300 requests a minute.
 export const cachedPrefixes = ['/api/'];
 
+// What SkyBoT, TNS and the MPC answer in the checks. The asteroids and the supernovae lie in the seed's first photo (over
+// the pole: its centre is near RA 70°, Dec 82.3°), the comet's elements put it in the comet photo.
+export const fixtures = [
+  {
+    method: 'POST',
+    path: '/api/skybot/conesearch',
+    body: {
+      candidates: [
+        ['1685', 'Toro', 'NEA>Apollo', 16.2, 1],
+        ['2204', 'Lyyli', 'MB>Middle', 17.4, 2],
+        ['7968', 'Elst-Pizarro', 'MB>Outer', 18.9, 120],
+      ].map(([number, name, className, vMag, ephemErrArcsec], i) => ({
+        number,
+        name,
+        raDeg: 69.97 + i * 0.4,
+        decDeg: 82.25 - i * 0.05,
+        className,
+        vMag,
+        ephemErrArcsec,
+        distArcsec: 10 * (i + 1),
+        dRaArcsecPerHour: 30,
+        dDecArcsecPerHour: -5,
+      })),
+    },
+  },
+  {
+    method: 'POST',
+    path: '/api/tns/conesearch',
+    body: {
+      candidates: [
+        {
+          name: 'SN 2025rkx',
+          raDeg: 69.966,
+          decDeg: 82.251,
+          type: 'SN Ia',
+          classified: true,
+          discoveryDate: '2025-08-20T03:12:00.000Z',
+          discoveryMag: 17.3,
+          hostName: 'NGC 2655',
+          redshift: 0.0047,
+          tnsUrl: 'https://www.wis-tns.org/object/2025rkx',
+        },
+        {
+          name: 'AT 2025sab',
+          raDeg: 315.934,
+          decDeg: 77.47,
+          type: null,
+          classified: false,
+          discoveryDate: '2025-08-24T22:40:00.000Z',
+          discoveryMag: 18.2,
+          hostName: null,
+          redshift: null,
+          tnsUrl: 'https://www.wis-tns.org/object/2025sab',
+        },
+      ],
+    },
+  },
+  {
+    method: 'GET',
+    path: '/api/comets/elements',
+    body: {
+      comets: [
+        {
+          designation: 'C/2025 R2',
+          name: 'C/2025 R2 (SWAN)',
+          tpJd: 2460931.3087,
+          q: 0.50428,
+          e: 0.994162,
+          peri: 308.3762,
+          node: 335.3135,
+          incl: 4.4729,
+          h: 12.4,
+          k: 4,
+        },
+      ],
+    },
+  },
+];
+
 export const language = { key: 'lang', all: ['fr', 'en', 'es', 'de'] };
 
 export const sizes = [
@@ -381,7 +485,7 @@ export const rules = [
   {
     id: 'centre-line',
     type: 'centreLine',
-    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar',
+    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar, .mob-when-row, .mob-form-row--search, .mob-type-row, .mob-add-row',
   },
   // The clear button of a search field is centred on the field.
   { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },
@@ -818,6 +922,67 @@ export const views = [
     path: (ids) => `/gallery/photo/${ids.photo}/edit`,
     ready: '.mob-integration',
   },
+  // Identifying objects on the seed's photo: the choice from the photo's sheet, then each page (SkyBoT, TNS and the MPC
+  // answer from `fixtures`).
+  {
+    name: 'photo-identify-choose',
+    path: (ids) => `/gallery/photo/${ids.photo}`,
+    ready: '.mob-photo-view',
+    open: [
+      { click: '.mob-topbar--overlay ion-button.mob-icon-btn:last-of-type' },
+      { wait: OPEN_SHEET },
+      { pause: 600 },
+      { click: `${OPEN_SHEET} .mob-icon-row ion-button:nth-of-type(3)` },
+      { wait: 'ion-modal.show-modal .mob-sheet-header--bar' },
+      { pause: 600 },
+    ],
+    scope: OPEN_SHEET,
+  },
+  {
+    name: 'identify-asteroid',
+    path: (ids) => `/gallery/photo/${ids.photo}/identify/asteroid`,
+    ready: '.mob-when-row',
+    open: [{ tapAt: '.mob-photo-area', x: 0.4, y: 0.45 }, { wait: '.mob-marker' }],
+  },
+  {
+    name: 'identify-asteroid-results',
+    path: (ids) => `/gallery/photo/${ids.photo}/identify/asteroid`,
+    ready: '.mob-when-row',
+    open: [
+      { tapAt: '.mob-photo-area', x: 0.4, y: 0.45 },
+      { tapAt: '.mob-photo-area', x: 0.6, y: 0.55 },
+      { click: '.mob-when-row--radius ion-button' },
+      { wait: '.mob-results-list' },
+    ],
+  },
+  {
+    name: 'identify-supernova',
+    path: (ids) => `/gallery/photo/${ids.photo}/identify/supernova`,
+    ready: '.mob-check-row',
+  },
+  {
+    name: 'identify-comet',
+    path: (ids) => `/gallery/photo/${ids.cometPhoto}/identify/comet`,
+    ready: '.mob-check-lead-row',
+  },
+  {
+    name: 'poi-add',
+    path: (ids) => `/gallery/photo/${ids.photo}/poi`,
+    ready: '.mob-identify-type',
+    open: [{ tapAt: '.mob-photo-area', x: 0.5, y: 0.5 }, { wait: '.mob-marker--tint' }],
+  },
+  {
+    name: 'poi-add-type',
+    path: (ids) => `/gallery/photo/${ids.photo}/poi`,
+    ready: '.mob-identify-type',
+    open: [
+      { click: '.mob-identify-type ion-button.mob-btn--field' },
+      { wait: OPEN_SHEET },
+      { pause: 600 },
+    ],
+    scope: OPEN_SHEET,
+  },
+  { name: 'poi-types', path: '/gallery/poi-types', ready: '.mob-type-row' },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
   { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-entry' },
   { name: 'plan-target', path: (ids) => `/plans/${ids.plan}/${ids.entry}`, ready: '.mob-meta' },

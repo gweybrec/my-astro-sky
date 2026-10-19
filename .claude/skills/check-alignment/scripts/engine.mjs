@@ -319,6 +319,11 @@ export async function runActions(page, actions = []) {
       const box = await page.locator(action.tapCentre).first().boundingBox();
       if (!box) throw new Error(`"${action.tapCentre}" has no box to click`);
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    } else if (action.tapAt) {
+      // A tap at a point of an element given as fractions of its box (x, y from its top left).
+      const box = await page.locator(action.tapAt).first().boundingBox();
+      if (!box) throw new Error(`"${action.tapAt}" has no box to tap`);
+      await page.mouse.click(box.x + box.width * action.x, box.y + box.height * action.y);
     } else if (action.fill)
       await page
         .locator(action.fill)
