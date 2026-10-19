@@ -448,6 +448,17 @@ export const rules = [
 const SHEET = { scope: '.mob-sheet' };
 // The sheet of the modal that is open, when the map's own sheet or other (closed) modals are also on the page.
 const OPEN_SHEET = 'ion-modal.show-modal .mob-sheet';
+// A tap at the middle of the map picks the seed's photo; its sheet's button opens the display order page.
+const DRAW_ORDER_OPEN = [
+  { wait: '.photo-overlay-img' },
+  { pause: 800 },
+  { tapCentre: '.mob-sky-canvas' },
+  { wait: '.mob-map-sheet' },
+  { pause: 600 },
+  { click: `.mob-map-sheet [aria-label="Ordre d'affichage"]` },
+  { wait: '.mob-entry' },
+  { pause: 400 },
+];
 // The setup picker opened over "Contours de champ".
 const PICK_SETUP = 'ion-modal.show-modal:has(.mob-sheet-title:text-is("Choisir un setup"))';
 
@@ -516,6 +527,23 @@ export const views = [
       { tapCentre: '.mob-sky-canvas' },
       { wait: '.mob-map-sheet' },
       { pause: 600 },
+    ],
+  },
+  // The display order page, opened from the photo's sheet (the seed's photos all lie over the pole: they overlap).
+  {
+    name: 'sky-draw-order',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    open: DRAW_ORDER_OPEN,
+  },
+  {
+    name: 'sky-draw-order-search',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    open: [
+      ...DRAW_ORDER_OPEN,
+      { fill: '.mob-form-row input[type="search"]', text: 'Cygnus' },
+      { pause: 300 },
     ],
   },
   {
