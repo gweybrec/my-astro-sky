@@ -31,7 +31,7 @@ import { isIAUStyle } from '@myastrosky/core/types';
 import { SkyMap } from '@myastrosky/render/sky-map';
 import type { ViewChangeCallback } from '@myastrosky/core/sky-map-types';
 import { PhotoOverlay } from './photo-overlay';
-import { Gallery, smartSortPhotos } from './gallery';
+import { Gallery } from './gallery';
 import { getDSOTypeName, searchUnified, searchDSOs } from '@myastrosky/core/search';
 import {
   uploadPhoto,
@@ -53,7 +53,7 @@ import { t, getLang, setLang } from './i18n';
 import { showMetadataEditor } from './metadata-editor';
 import { stripExtension } from './file-utils';
 import { openDSOEditModal } from './dso-editor';
-import { buildPhotoQueryMatches } from '@myastrosky/core/photo-search';
+import { buildPhotoQueryMatches, smartSortPhotos } from '@myastrosky/core/photo-search';
 import { filterDrawOrderPhotos } from '@myastrosky/core/photo-draw-order';
 import { computeDSOHighlightShape } from '@myastrosky/core/dso-highlight';
 import { confirmPhotoDelete } from './photo-delete-confirm';

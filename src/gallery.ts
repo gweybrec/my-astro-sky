@@ -1,6 +1,7 @@
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
 import type { Photo, PoiCategory, PointOfInterest } from '@myastrosky/core/types';
+import { smartSortPhotos } from '@myastrosky/core/photo-search';
 import type { GearSetupData } from './api';
 import { photoFileUrl } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
@@ -55,58 +56,6 @@ function iconButton(svg: string, label: string): HTMLButtonElement {
  * it), never the class list, so pressing can't change the button's size. */
 function setToggleState(btn: HTMLButtonElement, on: boolean): void {
   btn.setAttribute('aria-pressed', String(on));
-}
-
-/**
- * Smart sorting for astronomical catalog names
- * e.g., M31, M100, NGC224, NGC1976, IC1805, SH2-106
- * Ensures M100 comes after M99, not before M2
- */
-export function smartSortPhotos(photos: Photo[]): Photo[] {
-  return [...photos].sort((a, b) => {
-    const nameA = a.originalName;
-    const nameB = b.originalName;
-
-    // Extract catalog prefix and number if present
-    const parseFilename = (
-      name: string,
-    ): { catalog: string; number: number | null; rest: string } => {
-      // Match patterns like M31, NGC224, IC1805, SH2-106, Sh2-106, etc.
-      const match = name.match(/^([A-Za-z]+)[\s-]?(\d+)/);
-      if (match) {
-        const catalog = match[1].toUpperCase();
-        const number = parseInt(match[2], 10);
-        const rest = name.substring(match[0].length);
-        return { catalog, number, rest };
-      }
-      return { catalog: '', number: null, rest: name };
-    };
-
-    const parsedA = parseFilename(nameA);
-    const parsedB = parseFilename(nameB);
-
-    // If both have catalog prefixes
-    if (parsedA.number !== null && parsedB.number !== null) {
-      // First sort by catalog name (M before NGC before IC, etc.)
-      const catalogCompare = parsedA.catalog.localeCompare(parsedB.catalog);
-      if (catalogCompare !== 0) return catalogCompare;
-
-      // Then by catalog number
-      if (parsedA.number !== parsedB.number) {
-        return parsedA.number - parsedB.number;
-      }
-
-      // Finally by the rest of the filename
-      return parsedA.rest.localeCompare(parsedB.rest);
-    }
-
-    // If only one has a catalog prefix, it comes first
-    if (parsedA.number !== null) return -1;
-    if (parsedB.number !== null) return 1;
-
-    // Neither has catalog prefix, use simple alphabetical
-    return nameA.localeCompare(nameB);
-  });
 }
 
 export class Gallery {
