@@ -304,7 +304,7 @@ export function scaleText(factor) {
   });
 }
 
-/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { tapCentre } (a click at the middle of an element), { chooseFiles, files } (a click that opens the file picker, answered with the files), { wait } (a selector) or { pause } (milliseconds). */
+/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { tapCentre } (a click at the middle of an element), { drag, path } (a mouse drag through points of an element), { chooseFiles, files } (a click that opens the file picker, answered with the files), { wait } (a selector) or { pause } (milliseconds). */
 export async function runActions(page, actions = []) {
   for (const action of actions) {
     if (action.click) await page.locator(action.click).first().click({ timeout: 10000 });
@@ -324,6 +324,16 @@ export async function runActions(page, actions = []) {
       const box = await page.locator(action.tapAt).first().boundingBox();
       if (!box) throw new Error(`"${action.tapAt}" has no box to tap`);
       await page.mouse.click(box.x + box.width * action.x, box.y + box.height * action.y);
+    } else if (action.drag) {
+      // A drag with the mouse held through points of an element given as fractions of its box ([x, y] from its top left).
+      const box = await page.locator(action.drag).first().boundingBox();
+      if (!box) throw new Error(`"${action.drag}" has no box to drag on`);
+      const at = ([x, y]) => [box.x + box.width * x, box.y + box.height * y];
+      const [first, ...rest] = action.path.map(at);
+      await page.mouse.move(...first);
+      await page.mouse.down();
+      for (const point of rest) await page.mouse.move(...point, { steps: 8 });
+      await page.mouse.up();
     } else if (action.fill)
       await page
         .locator(action.fill)
