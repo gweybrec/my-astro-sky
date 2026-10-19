@@ -587,6 +587,12 @@ const DRAW_ORDER_OPEN = [
   { wait: '.mob-entry' },
   { pause: 400 },
 ];
+// The plus of the regions page opens the map to draw a region.
+const REGION_DRAW_OPEN = [
+  { click: '.mob-fab' },
+  { wait: '.mob-map-mode .mob-panel' },
+  { pause: 800 },
+];
 // The setup picker opened over "Contours de champ".
 const PICK_SETUP = 'ion-modal.show-modal:has(.mob-sheet-title:text-is("Choisir un setup"))';
 
@@ -618,6 +624,45 @@ export const views = [
     ready: '.mob-row--roomy',
     open: [{ click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' }, { wait: '.mob-sheet' }],
     ...SHEET,
+  },
+  { name: 'targets-regions', path: '/targets/regions', ready: '.mob-row--region' },
+  // The plus of the regions page: the map in local sky with the panel of the region under it.
+  {
+    name: 'region-draw',
+    path: '/targets/regions',
+    ready: '.mob-row--region',
+    open: REGION_DRAW_OPEN,
+  },
+  {
+    name: 'region-draw-drawn',
+    path: '/targets/regions',
+    ready: '.mob-row--region',
+    open: [
+      ...REGION_DRAW_OPEN,
+      {
+        drag: '.mob-sky-canvas',
+        path: [
+          [0.35, 0.35],
+          [0.65, 0.35],
+          [0.65, 0.6],
+          [0.35, 0.6],
+          [0.35, 0.36],
+        ],
+      },
+      { fill: '.mob-map-mode .mob-panel input', text: 'Vue depuis le jardin' },
+      { pause: 300 },
+    ],
+  },
+  // The pin of a region: the map in local sky with the region drawn, under a title bar of its name.
+  {
+    name: 'region-view',
+    path: '/targets/regions',
+    ready: '.mob-row--region',
+    open: [
+      { click: '[aria-label^="Voir la région"]' },
+      { wait: '.mob-map-mode--bare' },
+      { pause: 800 },
+    ],
   },
   { name: 'sky', path: '/tabs/sky', ready: '.mob-map-top' },
   {
