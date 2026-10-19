@@ -160,8 +160,9 @@ function addSelected() {
           @update:model-value="selected = toggled(selected, c.name, $event)"
           @open="activeName = c.name"
         >
-          <!-- The badge and "Revenir à la position prédite" keep their room while hidden: the first tap on the photo
-               must not grow the panel, which would shrink the photo under the finger. -->
+          <!-- The first tap on the photo must not grow the panel, which would shrink the photo under the finger: the
+               badge keeps its room (at the end of the title's line) while hidden, and "Revenir à la position prédite"
+               is there from the start, disabled until the pin is moved. -->
           <template #badges>
             <span
               class="mob-badge mob-badge--type m-caption"
@@ -171,19 +172,14 @@ function addSelected() {
           </template>
           <template #actions>
             <PhoneButton
-              variant="text"
               :href="jplLookupUrl(c.designation)"
               target="_blank"
               rel="noopener noreferrer"
               >{{ t('comet.viewOnJpl') }}</PhoneButton
             >
-            <PhoneButton
-              variant="text"
-              :class="{ 'mob-invisible': !moved.has(c.name) }"
-              :aria-hidden="moved.has(c.name) ? undefined : 'true'"
-              @click="reset(c.name)"
-              >{{ t('comet.resetPosition') }}</PhoneButton
-            >
+            <PhoneButton :disabled="!moved.has(c.name)" @click="reset(c.name)">{{
+              t('comet.resetPosition')
+            }}</PhoneButton>
           </template>
         </PhoneCheckLeadRow>
       </div>
