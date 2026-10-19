@@ -13,7 +13,8 @@ vi.mock('@myastrosky/app-state/api', () => ({
   getPhotos: (...a: unknown[]) => getPhotos(...a),
   updatePhotoOrder: (...a: unknown[]) => updatePhotoOrder(...a),
 }));
-vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/catalog/dso-registry')>()),
   getDSOById: (id: string) => (id === 'NGC7000' ? { id, catalogs: ['NGC7000'] } : undefined),
 }));
 const showError = vi.fn();

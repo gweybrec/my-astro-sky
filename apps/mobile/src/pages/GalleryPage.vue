@@ -5,6 +5,7 @@ import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
+import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { getGearSetups, getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
@@ -70,7 +71,7 @@ function tagsOf(photo: Photo): PhotoTag[] {
     });
   }
   for (const label of photo.labels ?? []) tags.push({ kind: 'label', text: label });
-  for (const id of photo.dsoIds ?? []) tags.push({ kind: 'dso', text: id });
+  for (const id of sortDsoIdsByImportance(photo.dsoIds ?? [])) tags.push({ kind: 'dso', text: id });
   return tags;
 }
 
