@@ -29,6 +29,8 @@ export interface RegionDrawCallbacks {
   onCancel: () => void;
   /** A new stroke starts (the phone hides the stroke it shows until then). */
   onPress?: () => void;
+  /** The stroke begun was dropped by {@link RegionDrawGesture.abortStroke} (the phone shows its previous one again). */
+  onAbort?: () => void;
 }
 
 export class RegionDrawGesture {
@@ -80,6 +82,7 @@ export class RegionDrawGesture {
   abortStroke(): void {
     this.drawing = false;
     this.points = [];
+    this.callbacks?.onAbort?.();
   }
 
   /**

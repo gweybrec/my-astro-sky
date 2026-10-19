@@ -72,10 +72,15 @@ describe('RegionDrawGesture', () => {
       expect(onPress).toHaveBeenCalledTimes(1);
     });
 
-    it('drops the stroke on abortStroke() and stays active for the next one', () => {
-      const { g, onComplete, onCancel } = setup();
+    it('drops the stroke on abortStroke(), tells onAbort, and stays active for the next one', () => {
+      const onComplete = vi.fn();
+      const onCancel = vi.fn();
+      const onAbort = vi.fn();
+      const g = new RegionDrawGesture();
+      g.enter({ onComplete, onCancel, onAbort }, false);
       drawSquare(g);
       g.abortStroke();
+      expect(onAbort).toHaveBeenCalledTimes(1);
       expect(g.capturedPoints).toHaveLength(0);
       expect(g.capturing).toBe(false);
       expect(g.active).toBe(true);

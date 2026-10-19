@@ -1037,10 +1037,10 @@ export class SkyMap {
   enterRegionDrawMode(
     onComplete: (points: AltAzPoint[]) => void,
     onCancel: () => void,
-    onPress?: () => void,
+    strokes: { onPress?: () => void; onAbort?: () => void } = {},
   ): boolean {
     if (!this.computeHorizonParams()) return false;
-    this.regionDraw.enter({ onComplete, onCancel, onPress }, this.localSkyMode);
+    this.regionDraw.enter({ onComplete, onCancel, ...strokes }, this.localSkyMode);
     if (!this.localSkyMode) this.setLocalSkyMode(true);
     this.canvas.style.cursor = 'crosshair';
     this.dismissTooltip();
