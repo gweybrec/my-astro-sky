@@ -46,9 +46,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/settings/backup', component: () => import('./pages/BackupPage.vue') },
 ];
 
-// The gallery of the shared components, for the checks: development builds only (the condition is replaced at build
-// time, so the page and its route are not in the production bundle).
-if (import.meta.env.DEV) {
+// The gallery of the shared components, for the checks: development builds and the alignment check's build (mode
+// "check") only. Both conditions are replaced at build time, so the page and its route are not in the app's bundle.
+if (import.meta.env.DEV || import.meta.env.MODE === 'check') {
   routes.push({
     path: '/dev/components',
     component: () => import('./pages/DevComponentsPage.vue'),
