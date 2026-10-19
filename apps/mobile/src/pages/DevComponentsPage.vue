@@ -332,6 +332,7 @@ function raiseError() {
         <PhoneSectionHeader>Liste réordonnable</PhoneSectionHeader>
         <PhoneReorderList
           :items="order.map((id) => ({ id, handleLabel: `Déplacer ${id}` }))"
+          current="b"
           @reorder="order = $event"
         >
           <template #default="{ id }">

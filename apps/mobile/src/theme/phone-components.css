@@ -1452,3 +1452,17 @@ ion-tab-bar.mob-tabbar-hidden {
     margin-top: auto;
   }
 }
+
+/* A page with controls above a list that can be empty (board "Ciel, ordre d'affichage"): the empty text fills only the
+   space under the controls, centred there, instead of the whole page's height. */
+.mob-page-stack {
+  display: flex;
+  flex-direction: column;
+}
+.mob-page-stack > * {
+  flex: none;
+}
+.mob-page-stack > .mob-empty {
+  flex: 1;
+  height: auto;
+}
