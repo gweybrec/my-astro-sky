@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonButton, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
+import type { SkyRegionData } from '@myastrosky/core/domain/regions';
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
+import { readObserverLocation } from '@myastrosky/core/observer-location';
+import { skyRegionDraw, skyRegionView } from '../sky-modes';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { reloadTargetsPrefs, targetsPrefs, updateTargetsPrefs } from '../composables/useTargets';
@@ -14,9 +18,10 @@ import pinIcon from '@icons/map-pin.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Cibles, régions du ciel": "Tout le ciel" and the saved regions, one of which filters the targets. A tap on
-// a name chooses it at once; the pin shows the region on the sky map and the plus draws a new one, both of which need
-// the map (a later card), so they are drawn as the board draws them and do nothing.
+// a name chooses it at once; the pin shows the region on the sky map (board "Voir une région") and the plus draws a new
+// one there (board "Dessiner une région"). Both need the observing location, as on the desktop: the map is in local sky.
 const store = useSkyRegionsStore();
+const router = useRouter();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
@@ -28,6 +33,20 @@ load();
 onIonViewWillEnter(load);
 
 const choose = (id: string | null) => updateTargetsPrefs({ skyRegionId: id ?? undefined });
+
+// The map replaces this page and opens it again when the mode ends.
+function toMap(start: () => void) {
+  const { lat, lon } = readObserverLocation();
+  if (lat === null || lon === null) {
+    void showError(new Error(t('horizon.error.noLocation')));
+    return;
+  }
+  start();
+  void router.replace('/tabs/sky');
+}
+const draw = () => toMap(() => (skyRegionDraw.value = { returnTo: '/targets/regions' }));
+const view = (region: SkyRegionData) =>
+  toMap(() => (skyRegionView.value = { region, returnTo: '/targets/regions' }));
 
 async function remove(region: { id: string; name: string }) {
   const sure = await confirm({
@@ -91,7 +110,10 @@ async function remove(region: { id: string; name: string }) {
                 <span>{{ region.name }}</span></span
               >
             </IonButton>
-            <PhoneIconButton :label="t('mobile.targets.regionView', { name: region.name })" waiting>
+            <PhoneIconButton
+              :label="t('mobile.targets.regionView', { name: region.name })"
+              @click="view(region)"
+            >
               <AppIcon :svg="pinIcon" />
             </PhoneIconButton>
             <PhoneIconButton
@@ -104,7 +126,7 @@ async function remove(region: { id: string; name: string }) {
           </div>
         </div>
       </div>
-      <PhoneFab :label="t('mobile.targets.regionDraw')" waiting />
+      <PhoneFab :label="t('mobile.targets.regionDraw')" @click="draw" />
     </IonContent>
   </IonPage>
 </template>

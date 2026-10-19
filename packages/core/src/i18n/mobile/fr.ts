@@ -113,6 +113,10 @@ const fr = {
     regionView: 'Voir la région « {name} »',
     regionDelete: 'Supprimer la région « {name} »',
     regionDraw: 'Dessiner une nouvelle région',
+    regionDrawTitle: 'Dessiner une région',
+    regionDrawHint: 'Un doigt : dessiner · Deux doigts : déplacer la carte',
+    regionClear: 'Effacer le tracé',
+    regionFinish: 'Terminer',
   },
   settings: {
     observation: 'Observation',

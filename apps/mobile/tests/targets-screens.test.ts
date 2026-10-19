@@ -29,6 +29,8 @@ import TypesSheet from '../src/pages/targets/TypesSheet.vue';
 import FiltersSheet from '../src/pages/targets/FiltersSheet.vue';
 import SearchSettingsSheet from '../src/pages/targets/SearchSettingsSheet.vue';
 import RegionsPage from '../src/pages/RegionsPage.vue';
+import { skyRegionDraw, skyRegionView } from '../src/sky-modes';
+import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import { reloadTargetsPrefs, updateTargetsPrefs } from '../src/composables/useTargets';
@@ -691,14 +693,35 @@ describe('the regions page', () => {
     expect(prefsOf()).not.toHaveProperty('skyRegionId');
   });
 
-  it('shows the pin and the plus waiting, as the board draws them: they need the sky map', async () => {
-    const w = show(RegionsPage, { global: app().global });
+  it('opens the map to draw a region, or to show one, and comes back here when it ends', async () => {
+    writeObserverLocation(48.58, 7.75);
+    const { router, global } = app();
+    const replace = vi.spyOn(router, 'replace');
+    const w = show(RegionsPage, { global });
     await settle();
-    const pin = w.find('button[aria-label="Voir la région « Vue depuis le jardin »"]');
-    expect(pin.attributes('aria-disabled')).toBeDefined();
-    expect(
-      w.find('button[aria-label="Dessiner une nouvelle région"]').attributes('aria-disabled'),
-    ).toBeDefined();
+    await w.find('button[aria-label="Dessiner une nouvelle région"]').trigger('click');
+    expect(skyRegionDraw.value).toEqual({ returnTo: '/targets/regions' });
+    expect(replace).toHaveBeenCalledWith('/tabs/sky');
+    skyRegionDraw.value = null;
+    await w.find('button[aria-label="Voir la région « Vue depuis le jardin »"]').trigger('click');
+    expect(skyRegionView.value).toEqual({ region: regions[0], returnTo: '/targets/regions' });
+    skyRegionView.value = null;
+  });
+
+  it('says the location is missing instead of opening the map without one', async () => {
+    writeObserverLocation(null, null);
+    const { router, global } = app();
+    const replace = vi.spyOn(router, 'replace');
+    const w = show(RegionsPage, { global });
+    await settle();
+    await w.find('button[aria-label="Dessiner une nouvelle région"]').trigger('click');
+    await w.find('button[aria-label="Voir la région « Vue depuis le jardin »"]').trigger('click');
+    expect(skyRegionDraw.value).toBeNull();
+    expect(skyRegionView.value).toBeNull();
+    expect(replace).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Définissez d'abord une position d'observation" }),
+    );
   });
 
   it('asks before deleting, deletes after the yes, and keeps the region after the no', async () => {

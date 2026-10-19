@@ -1385,6 +1385,13 @@ ion-tab-bar.mob-tabbar-hidden {
   .mob-map-mode > .mob-panel > .mob-sheet-footer {
     margin-top: auto;
   }
+  /* A mode without a panel (board "Voir une région"): the title bar stays across the top, the map has the rest. */
+  .mob-sky-frame.mob-map-mode.mob-map-mode--bare {
+    display: flex;
+  }
+  .mob-map-mode--bare > .mob-topbar {
+    box-shadow: none;
+  }
   /* A column beside the map does not fold: no handle, the search row starts the column. */
   .mob-placing-grab {
     display: none;

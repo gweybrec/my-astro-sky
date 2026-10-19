@@ -114,6 +114,10 @@ const en: Translations['mobile'] = {
     regionView: 'View region "{name}"',
     regionDelete: 'Delete region "{name}"',
     regionDraw: 'Draw a new region',
+    regionDrawTitle: 'Draw a region',
+    regionDrawHint: 'One finger: draw · Two fingers: move the map',
+    regionClear: 'Clear the outline',
+    regionFinish: 'Finish',
   },
   settings: {
     observation: 'Observation',

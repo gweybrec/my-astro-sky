@@ -114,6 +114,10 @@ const es: Translations['mobile'] = {
     regionView: 'Ver la región «{name}»',
     regionDelete: 'Eliminar la región «{name}»',
     regionDraw: 'Dibujar una nueva región',
+    regionDrawTitle: 'Dibujar una región',
+    regionDrawHint: 'Un dedo: dibujar · Dos dedos: mover el mapa',
+    regionClear: 'Borrar el trazo',
+    regionFinish: 'Terminar',
   },
   settings: {
     observation: 'Observación',
