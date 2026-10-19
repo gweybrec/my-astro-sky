@@ -172,7 +172,7 @@ import { getGearSetups, updatePhotoMetadata } from '../../api';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
 import { useI18n } from '../../composables/useI18n';
-import { smartSortPhotos } from '../../gallery';
+import { smartSortPhotos } from '@myastrosky/core/photo-search';
 import {
   SETUP_NO_CHANGE,
   applyBatchEdit,
