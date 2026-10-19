@@ -885,8 +885,7 @@ const de: Translations = {
   identify: {
     search: 'Suchen',
     searching: 'Suche…',
-    stillSearching:
-      'Suche läuft noch: Der Online-Dienst braucht manchmal bis zu einer Minute für die Antwort.',
+    stillSearching: 'Suche läuft noch: Der Online-Dienst antwortet manchmal langsam.',
     addSelected: 'Auswahl hinzufügen ({n})',
     obsDateLabel: 'Beobachtungsdatum (UTC)',
     dateRequired: 'Dieses Foto hat kein Beobachtungsdatum – geben Sie es für die Suche ein.',

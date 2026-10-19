@@ -6,7 +6,7 @@ import PhoneBusy from '../../components/PhoneBusy.vue';
 import PhoneHelper from '../../components/PhoneHelper.vue';
 
 // A search of an identification page that runs (shown while it does): a spinner with "Recherche…", and after
-// SLOW_SEARCH_MS a line saying it still runs. SkyBoT, TNS and the MPC can take up to a minute, and a spinner alone for
+// SLOW_SEARCH_MS a line saying it still runs. The app waits up to a minute for SkyBoT, and a spinner alone for
 // that long would look like a frozen app. As the desktop's identification modals. The line is scrolled into the panel's
 // view when it appears (in landscape the panel may be full).
 const slow = ref(false);

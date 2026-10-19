@@ -882,8 +882,7 @@ const fr = {
   identify: {
     search: 'Rechercher',
     searching: 'Recherche…',
-    stillSearching:
-      'Toujours en cours : le service en ligne répond parfois lentement, jusqu’à une minute.',
+    stillSearching: 'Toujours en cours : le service en ligne répond parfois lentement.',
     addSelected: 'Ajouter la sélection ({n})',
     obsDateLabel: 'Date d’observation (UTC)',
     dateRequired:
