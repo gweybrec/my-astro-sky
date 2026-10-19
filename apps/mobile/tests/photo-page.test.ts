@@ -33,7 +33,8 @@ vi.mock('../src/composables/useConfirm', () => ({
 }));
 vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
 
-vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/catalog/dso-registry')>()),
   getDSOById: (id: string) =>
     id === 'M31'
       ? {

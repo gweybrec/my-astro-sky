@@ -64,24 +64,69 @@ describe('the photo sheet', () => {
     showError.mockReset();
   });
 
-  it('names the photo and lists its objects as chips', () => {
+  it('names the photo and lists its objects as chips, the most important catalogue first', () => {
     const { w } = mountSheet();
     expect(w.find('.mob-sheet-title').text()).toBe('Cygnus_wide_2025-08-23.jpg');
-    expect(w.findAll('.mob-chip').map((c) => c.text())).toEqual(['NGC7000', 'IC5070', 'NGC6888']);
+    expect(w.findAll('.mob-pager .mob-chip').map((c) => c.text())).toEqual([
+      'NGC6888',
+      'NGC7000',
+      'IC5070',
+    ]);
     expect(w.find('.mob-pager-dots').exists()).toBe(false);
   });
 
-  it('puts the objects nine to a page, with a dot for each page', () => {
-    const ids = Array.from({ length: 10 }, (_, i) => `NGC${i + 1}`);
-    const { w } = mountSheet(photo({ dsoIds: ids }));
-    expect(w.findAll('.mob-pager-page').map((p) => p.findAll('.mob-chip').length)).toEqual([9, 1]);
+  // Laid out three chips to a line, 56 px apart, with the phone held as `orientation` says.
+  const layOut = (orientation: 'portrait' | 'landscape') => {
+    const offsetTop = vi
+      .spyOn(HTMLElement.prototype, 'offsetTop', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        const i = Array.prototype.indexOf.call(this.parentElement?.children ?? [], this);
+        return Math.floor(i / 3) * 56;
+      });
+    const matchMedia = vi
+      .spyOn(window, 'matchMedia')
+      .mockImplementation(
+        (query: string) =>
+          ({ matches: query === `(orientation: ${orientation})` }) as MediaQueryList,
+      );
+    return () => {
+      offsetTop.mockRestore();
+      matchMedia.mockRestore();
+    };
+  };
+  const ten = () => photo({ dsoIds: Array.from({ length: 10 }, (_, i) => `NGC${i + 1}`) });
+
+  it('puts at most two lines of chips on a page in portrait, with a dot for each page', async () => {
+    const restore = layOut('portrait');
+    const { w } = mountSheet(ten());
+    await flushPromises();
+    expect(w.findAll('.mob-pager-page').map((p) => p.findAll('.mob-chip').length)).toEqual([6, 4]);
+    expect(w.findAll('.mob-pager-page')[0].text()).toBe('NGC1NGC2NGC3NGC4NGC5NGC6');
     expect(w.findAll('.mob-pager-dot')).toHaveLength(2);
     expect(w.find('.mob-pager-dots').attributes('aria-label')).toBe('Page 1 sur 2');
+    restore();
+  });
+
+  it('puts one line of chips on a page in landscape, where the sheet has less height', async () => {
+    const restore = layOut('landscape');
+    const { w } = mountSheet(ten());
+    await flushPromises();
+    expect(w.findAll('.mob-pager-page').map((p) => p.findAll('.mob-chip').length)).toEqual([
+      3, 3, 3, 1,
+    ]);
+    restore();
+  });
+
+  it('keeps the chips laid out for measuring out of reach', () => {
+    const { w } = mountSheet();
+    const measure = w.find('.mob-pager-measure');
+    expect(measure.attributes('aria-hidden')).toBe('true');
+    expect(measure.attributes('inert')).toBeDefined();
   });
 
   it('goes to an object when its chip is tapped', async () => {
     const { w } = mountSheet();
-    await w.findAll('.mob-chip')[1].trigger('click');
+    await w.findAll('.mob-pager .mob-chip')[2].trigger('click');
     expect(w.emitted('dso')).toEqual([['IC5070']]);
   });
 

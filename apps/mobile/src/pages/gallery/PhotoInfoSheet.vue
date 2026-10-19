@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { getLang, t } from '@myastrosky/core/i18n/index';
-import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
+import { getDSOById, sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
 import { formatPlanDate } from '@myastrosky/core/targets/plan';
 import type { Photo } from '@myastrosky/core/types';
@@ -32,7 +32,8 @@ const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
 const object = computed(() => {
-  const id = props.photo.dsoIds?.[0];
+  // The photo's main object: its most important one (Messier, NGC, IC, …).
+  const id = sortDsoIdsByImportance(props.photo.dsoIds ?? [])[0];
   const dso = id ? getDSOById(id) : undefined;
   if (!dso) return null;
   return {

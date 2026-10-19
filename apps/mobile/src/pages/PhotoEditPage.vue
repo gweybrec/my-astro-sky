@@ -16,6 +16,7 @@ import {
 } from '@myastrosky/core/photo-metadata-draft';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { searchDSOs } from '@myastrosky/core/search';
+import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import type { Photo } from '@myastrosky/core/types';
 import {
   getGearSetups,
@@ -72,6 +73,8 @@ const draft = reactive<PhotoMetadataDraft>({
   gearSetupId: null,
   notes: '',
 });
+// The objects' chips, the most important catalogue first (Messier, NGC, IC, …); the list itself keeps its order.
+const sortedDsoIds = computed(() => sortDsoIdsByImportance(draft.dsoIds));
 const knownLabels = ref<string[]>([]);
 const setups = ref<GearSetupData[]>([]);
 const saving = ref(false);
@@ -308,8 +311,8 @@ async function save() {
 
         <PhoneSectionHeader>{{ t('modal.metadataDsos') }}</PhoneSectionHeader>
         <PhoneRemoveChips
-          :items="draft.dsoIds.map((id) => ({ label: id }))"
-          @remove="draft.dsoIds.splice($event, 1)"
+          :items="sortedDsoIds.map((id) => ({ label: id }))"
+          @remove="draft.dsoIds.splice(draft.dsoIds.indexOf(sortedDsoIds[$event]), 1)"
         />
         <PhoneAddRow
           v-model="dsoQuery"

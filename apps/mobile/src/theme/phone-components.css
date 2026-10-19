@@ -1468,3 +1468,13 @@ ion-tab-bar.mob-tabbar-hidden {
   flex: 1;
   height: auto;
 }
+
+/* The photo sheet's chips laid out once as on a page, to find where they wrap (pages hold at most two lines): as wide as
+   a page, taking no height and never shown. */
+.mob-pager-measure {
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  visibility: hidden;
+}

@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
-import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
+import { getDSOById, sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import {
   filterDrawOrderPhotos,
   fullPhotoOrder,
@@ -51,9 +51,9 @@ const listed = computed<Photo[]>(() => {
   );
 });
 
-/** The row's title is the photo's first object, its file name under it; without an object, the file name alone. */
+/** The row's title is the photo's most important object, its file name under it; without an object, the file name alone. */
 function rowText(photo: Photo): { title: string; sub?: string } {
-  const id = photo.dsoIds?.[0];
+  const id = sortDsoIdsByImportance(photo.dsoIds ?? [])[0];
   if (!id) return { title: photo.originalName };
   const dso = getDSOById(id);
   return { title: dso ? dso.catalogs[0] || dso.id : id, sub: photo.originalName };

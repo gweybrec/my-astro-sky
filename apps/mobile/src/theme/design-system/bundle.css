@@ -2519,10 +2519,11 @@ svg.mob-icon--sm,
 .mob-pager-track::-webkit-scrollbar {
   display: none;
 }
+/* Revision 17. A page holds at most two lines of chips (one in landscape), cut where the chips wrap, the most important objects first
+   (Messier, NGC, IC, …); it has no height of its own, so a single line leaves no empty space under it. */
 .mob-pager-page {
   flex: 0 0 100%;
   min-width: 0;
-  min-height: calc(3 * var(--mobile-touch-min) + 3 * var(--space-4));
   align-content: flex-start;
   scroll-snap-align: start;
   scroll-snap-stop: always;
