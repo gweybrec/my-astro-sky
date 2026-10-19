@@ -31,6 +31,12 @@ import {
 } from './supernova-identify';
 import type { Photo, PointOfInterest } from './types';
 
+/**
+ * After this long, a search still running says so: SkyBoT, TNS and the MPC can take up to a minute, and a spinner alone
+ * for that long would look like a frozen app.
+ */
+export const SLOW_SEARCH_MS = 20_000;
+
 /** A point of the photo, in its pixels (origin at the top left). */
 export interface PhotoPixel {
   x: number;
