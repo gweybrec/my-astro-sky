@@ -105,6 +105,13 @@ ion-button.mob-icon-btn--held {
 .mob-sheet-footer ion-button.mob-btn {
   flex: 1 1 0;
 }
+/* The back arrow (design system revision 20, `.mob-back-btn`): round, with no outline when held either. */
+ion-button.mob-icon-btn.mob-back-btn {
+  --border-radius: var(--radius-pill);
+}
+ion-button.mob-icon-btn.mob-back-btn.mob-icon-btn--held {
+  border-color: transparent;
+}
 
 /* ── Fields: `ion-input.mob-field` / `ion-input.mob-search` take the design system's box; the native input fills it. */
 ion-input.mob-field,

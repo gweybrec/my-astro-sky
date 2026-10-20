@@ -15,6 +15,7 @@ import PhoneSearch from '../src/components/PhoneSearch.vue';
 import PhoneField from '../src/components/PhoneField.vue';
 import PhoneBusy from '../src/components/PhoneBusy.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
+import PhoneBackButton from '../src/components/PhoneBackButton.vue';
 
 const global = { stubs: ionicStubs };
 
@@ -201,6 +202,16 @@ describe('the shared phone components', () => {
     stub.vm.$emit('ionChange', { detail: { value: '' } });
     expect(w.emitted('pick')).toEqual([['22:15']]);
     expect(w.emitted('clear')).toHaveLength(1);
+  });
+});
+
+describe('the back arrow', () => {
+  it("is drawn as Android's (design system revision 20), not as an outlined icon button", () => {
+    const w = mount(PhoneBackButton, {
+      global: { stubs: ionicStubs, provide: { router: {} } },
+    });
+    const button = w.find('[aria-label="Retour"]');
+    expect(button.classes()).toEqual(expect.arrayContaining(['mob-icon-btn', 'mob-back-btn']));
   });
 });
 
