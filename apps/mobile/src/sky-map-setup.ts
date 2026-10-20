@@ -32,6 +32,35 @@ export const PHOTOS_FROZEN_MS = 100;
 export const isPlaced = (photo: Photo) =>
   Boolean(photo.manualPlacement) || photo.correspondences.length >= 2;
 
+/** What places a photo on the map: a change of one of these draws it again from its file. */
+const placementOf = (p: Photo) =>
+  JSON.stringify([p.filename, p.width, p.height, p.manualPlacement, p.correspondences]);
+
+/**
+ * What changed between the photos on the map and those just read: the ones gone, the ones new, the ones placed
+ * differently (drawn again), the ones whose other information changed (kept as they are, with their new data), and
+ * whether the order changed. Reading the photos again then loads only what changed, not every picture each time the
+ * tab is shown.
+ */
+export function photoChanges(current: readonly Photo[], next: readonly Photo[]) {
+  const before = new Map(current.map((p) => [p.id, p]));
+  const nextIds = new Set(next.map((p) => p.id));
+  const removed = current.filter((p) => !nextIds.has(p.id)).map((p) => p.id);
+  const added: Photo[] = [];
+  const moved: Photo[] = [];
+  const updated: Photo[] = [];
+  for (const photo of next) {
+    const old = before.get(photo.id);
+    if (!old) added.push(photo);
+    else if (placementOf(old) !== placementOf(photo)) moved.push(photo);
+    else if (JSON.stringify(old) !== JSON.stringify(photo)) updated.push(photo);
+  }
+  const kept = current.filter((p) => nextIds.has(p.id)).map((p) => p.id);
+  const keptNext = next.filter((p) => before.has(p.id)).map((p) => p.id);
+  const reordered = kept.some((id, i) => id !== keptNext[i]);
+  return { removed, added, moved, updated, reordered };
+}
+
 /** The most pixels per CSS pixel the map draws: a phone screen's 2.6 to 3.5 costs more than it shows. */
 export const MAX_PIXEL_RATIO = 2;
 
@@ -48,8 +77,13 @@ export interface PhoneSkyMap {
   readonly map: SkyMap;
   /** The photos drawn over the sky. */
   readonly photos: PhotoLayer;
-  /** Reads the placed photos again (they changed in the gallery, an import or a deletion). */
+  /** Reads the placed photos again (they changed in the gallery, an import or a deletion); only the changes load. */
   reloadPhotos(): Promise<void>;
+  /**
+   * The tab is shown (true) or left (false). Left, the pictures still loading stop and a reading of the photos that
+   * ends then is dropped (the next showing reads them again).
+   */
+  setActive(active: boolean): void;
   /** Re-reads the observing location after it changed in Réglages. */
   refreshLocation(): void;
   /** Highlights the selected object on the map (nothing when null). */
@@ -204,10 +238,25 @@ export function createPhoneSkyMap(
     { immediate: true },
   );
 
+  let active = true;
+  let reading = 0;
   async function reloadPhotos() {
+    const run = ++reading;
     const photos = (await getPhotos()).filter(isPlaced);
-    layer.clearAllPhotos();
-    layer.loadPhotos(photos);
+    if (run !== reading || !active) return;
+    const changes = photoChanges(
+      layer.getPlacedPhotos().map((p) => p.photo),
+      photos,
+    );
+    const gone = [...changes.removed, ...changes.moved.map((p) => p.id)];
+    if (gone.length) layer.removePhotosFromMap(gone);
+    if (changes.updated.length) layer.updatePhotosData(changes.updated);
+    if (changes.added.length || changes.moved.length) {
+      layer.loadPhotos([...changes.added, ...changes.moved]);
+    }
+    if (changes.reordered || changes.moved.length || changes.added.length) {
+      layer.setPhotoOrder(photos.map((p) => p.id));
+    }
     map.setPhotoOutlines(layer.getPhotoCanvasOutlines(map.getView()));
     map.requestRender();
   }
@@ -216,6 +265,10 @@ export function createPhoneSkyMap(
     map,
     photos: layer,
     reloadPhotos,
+    setActive(value) {
+      active = value;
+      layer.setLoadingPaused(!value);
+    },
     refreshLocation,
     select(selection) {
       map.setHighlightedDSO(selection?.kind === 'dso' ? selection.dso.id : null);

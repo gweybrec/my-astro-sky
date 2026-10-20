@@ -51,6 +51,19 @@ describe('PhotoLayer', () => {
     return { container, layer };
   };
 
+  it('stops the downloads of the pictures not loaded yet while paused, and starts them again', () => {
+    const { container, layer } = make();
+    layer.loadPhotos([placedPhoto('1'), placedPhoto('2')]);
+    const [first, second] = [...container.querySelectorAll('img')];
+    Object.defineProperty(first, 'complete', { value: true });
+    Object.defineProperty(second, 'complete', { value: false });
+    layer.setLoadingPaused(true);
+    expect(first.getAttribute('src')).toBe('/files/1.jpg');
+    expect(second.hasAttribute('src')).toBe(false);
+    layer.setLoadingPaused(false);
+    expect(second.getAttribute('src')).toBe('/files/2.jpg');
+  });
+
   it('takes the address of a photo file from the app', () => {
     const { container, layer } = make();
     layer.loadPhotos([placedPhoto('1')]);

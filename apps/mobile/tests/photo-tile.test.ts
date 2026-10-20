@@ -12,6 +12,20 @@ import {
   setPhotosPerLine,
 } from '../src/gallery-display';
 
+describe('a gallery card left with its tab', () => {
+  it('drops the address of a picture still loading, and keeps one already loaded', async () => {
+    const w = mount(PhotoTile, {
+      props: { name: 'M31.jpg', picture: '/uploads/a.jpg', paused: true },
+    });
+    expect(w.find('img').attributes('src')).toBeUndefined();
+    await w.setProps({ paused: false });
+    expect(w.find('img').attributes('src')).toBe('/uploads/a.jpg');
+    await w.find('img').trigger('load');
+    await w.setProps({ paused: true });
+    expect(w.find('img').attributes('src')).toBe('/uploads/a.jpg');
+  });
+});
+
 /** A gallery card's chips ("+N" for the ones that do not fit in two rows) and the photos-per-line choice. */
 
 const tags = (n: number): PhotoTag[] =>

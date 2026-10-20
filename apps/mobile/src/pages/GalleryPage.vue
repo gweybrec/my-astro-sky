@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
@@ -17,6 +17,7 @@ import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import { addImportFiles } from '../composables/usePhotoImport';
 import { useErrorToast } from '../composables/useErrorToast';
+import { useGrowingList } from '../composables/useGrowingList';
 import { loadPendingPhotos, pendingPhotos, type PendingState } from '../pending-photos';
 import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pending-solve';
 import { loadGalleryDisplay, photosPerLine, type Orientation } from '../gallery-display';
@@ -68,8 +69,11 @@ function tagsOf(photo: Photo): PhotoTag[] {
   );
 }
 
+// The cards are drawn a part at a time as the grid is scrolled (a gallery can hold hundreds of photos).
+const TILES_CHUNK = 24;
+const growing = useGrowingList(() => photos.value ?? [], TILES_CHUNK);
 const tiles = computed(() =>
-  (photos.value ?? []).map((photo) => ({
+  growing.shown.value.map((photo) => ({
     id: photo.id,
     name: photo.originalName,
     picture: photoFileUrl(photo.thumbFilename ?? photo.filename),
@@ -132,18 +136,28 @@ const isEmpty = computed(
   () => photos.value !== null && photos.value.length === 0 && waiting.value.length === 0,
 );
 
-async function load() {
-  try {
-    await loadPendingPhotos();
-    await resumePendingSolves();
-  } catch (error) {
-    reportError('GalleryPage.loadPendingPhotos', error);
-  }
-  await loadPhotos();
+// Whether the tab is shown. Left (another tab chosen), the pictures still loading stop and a reading that ends then is
+// dropped: the next showing reads the photos again.
+const active = ref(true);
+let running: Promise<void> | null = null;
+/** Reads the waiting and placed photos; a reading already running (the page's first showing) is shared. */
+function load() {
+  running ??= (async () => {
+    try {
+      await loadPendingPhotos();
+      await resumePendingSolves();
+    } catch (error) {
+      reportError('GalleryPage.loadPendingPhotos', error);
+    }
+    await loadPhotos();
+  })().finally(() => (running = null));
+  return running;
 }
 async function loadPhotos() {
   try {
-    photos.value = await getPhotos();
+    const read = await getPhotos();
+    // Unchanged photos keep their cards as they are, already drawn.
+    if (active.value && JSON.stringify(read) !== JSON.stringify(photos.value)) photos.value = read;
   } catch (error) {
     reportError('GalleryPage.getPhotos', error);
   }
@@ -156,7 +170,11 @@ async function loadPhotos() {
   }
 }
 onMounted(load);
-onIonViewWillEnter(load);
+onIonViewWillEnter(() => {
+  active.value = true;
+  void load();
+});
+onIonViewWillLeave(() => (active.value = false));
 // A photo solved while the gallery is shown joins the placed ones.
 watch(solvedPhotoCount, loadPhotos);
 
@@ -194,7 +212,7 @@ async function addPicked(pick: () => Promise<File[]>) {
       /></PhoneIconButton>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div class="mob-scroll mob-page-fill">
+      <div class="mob-scroll mob-page-fill" @scroll.passive="growing.onScroll">
         <PhoneEmptyState
           v-if="isEmpty"
           :text="t('mobile.gallery.empty')"
@@ -216,6 +234,7 @@ async function addPicked(pick: () => Promise<File[]>) {
             :key="tile.id"
             :name="tile.name"
             :picture="tile.picture"
+            :paused="!active"
             :tags="tile.tags"
             @click="router.push(`/gallery/photo/${tile.id}`)"
           />

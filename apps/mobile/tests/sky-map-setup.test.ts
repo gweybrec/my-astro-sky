@@ -28,6 +28,14 @@ vi.mock('@myastrosky/app-state/stores/poi-categories', () => ({
   }),
 }));
 
+const getPhotos = vi.fn();
+vi.mock('@myastrosky/app-state/api', async (original) => ({
+  ...(await original<object>()),
+  getPhotos: () => getPhotos(),
+  // No address: the test's DOM would try to download the pictures.
+  photoFileUrl: () => '',
+}));
+
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import { DEFAULT_SETTINGS } from '@myastrosky/core/sky-time-settings';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
@@ -47,6 +55,49 @@ describe('the Ciel tab sky map', () => {
       photoContainer: document.createElement('div'),
       onPhotoPlacementError: () => {},
     });
+
+  it('reads the photos again loading only what changed, and drops a reading that ends after the tab was left', async () => {
+    const photo = (id: string, extra: object = {}) => ({
+      id,
+      filename: `${id}.jpg`,
+      originalName: id,
+      width: 100,
+      height: 80,
+      manualPlacement: { centerRa: 10, centerDec: 20, rotationDeg: 0, projPerPx: 1 },
+      correspondences: [],
+      labels: [],
+      ...extra,
+    });
+    const sky = make();
+    const load = vi.spyOn(sky.photos, 'loadPhotos');
+    const remove = vi.spyOn(sky.photos, 'removePhotosFromMap');
+    const update = vi.spyOn(sky.photos, 'updatePhotosData');
+    const clear = vi.spyOn(sky.photos, 'clearAllPhotos');
+
+    getPhotos.mockResolvedValue([photo('a'), photo('b')]);
+    await sky.reloadPhotos();
+    await sky.reloadPhotos();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(clear).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+
+    // A label changed on one, the other placed again: only the second is drawn again.
+    getPhotos.mockResolvedValue([
+      photo('a', { labels: ['x'] }),
+      photo('b', {
+        manualPlacement: { centerRa: 11, centerDec: 20, rotationDeg: 0, projPerPx: 1 },
+      }),
+    ]);
+    await sky.reloadPhotos();
+    expect(update.mock.calls[0][0].map((p) => p.id)).toEqual(['a']);
+    expect(remove).toHaveBeenLastCalledWith(['b']);
+    expect(load.mock.lastCall![0].map((p) => p.id)).toEqual(['b']);
+
+    getPhotos.mockResolvedValue([photo('a', { labels: ['x'] })]);
+    sky.setActive(false);
+    await sky.reloadPhotos();
+    expect(sky.photos.getPlacedPhotos()).toHaveLength(2);
+  });
 
   it('is built for a phone: touch, density capped, follows rotation, no side panel', () => {
     make();
