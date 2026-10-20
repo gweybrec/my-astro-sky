@@ -118,6 +118,17 @@ describe('the Ciel tab sky map', () => {
     expect(calls.navigateTo).toEqual([[10, 41, 900]]);
   });
 
+  it("zooms on a setup's field so it fills a third of the map, as the desktop's show on map", () => {
+    const sky = make();
+    const { calls } = created[0];
+    Object.assign(sky.map, { getView: () => ({ width: 400, height: 800, scale: 100 }) });
+    sky.focus({ ra: 10, dec: 41, scale: 0, fov: { wDeg: 2, hDeg: 1.5 } });
+    sky.focus({ ra: 10, dec: 41, scale: 0, fov: { wDeg: 0.5, hDeg: 0.4 } });
+    const [wide, narrow] = calls.navigateTo.map((c) => c[2] as number);
+    expect(wide).toBeGreaterThan(300);
+    expect(narrow).toBeCloseTo(wide * 4, 0);
+  });
+
   it('hands the map to the shared stores through the port, and takes it back on destroy', () => {
     const sky = make();
     expect(useMapPortStore().skyMap).not.toBeNull();

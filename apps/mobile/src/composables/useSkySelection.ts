@@ -11,6 +11,8 @@ export interface SkyFocus {
   ra: number;
   dec: number;
   scale: number;
+  /** A setup's field: the map is zoomed so it fills a third of the map, as the desktop's "Afficher sur la carte". */
+  fov?: { wDeg: number; hDeg: number };
 }
 
 /** The zoom a searched object is shown at, at least: a deep-sky object is smaller than a star's surroundings. */

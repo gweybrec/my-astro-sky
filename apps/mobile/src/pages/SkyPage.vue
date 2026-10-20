@@ -130,6 +130,8 @@ onIonViewDidEnter(() => {
   // A photo being placed goes along to the searched object, at the same size on screen.
   whenMapSized(() => {
     if (placement.value) placement.value.follow(() => sky?.focus(focus));
+    // A setup's field ("Afficher sur la carte" of a plan) comes with its frame's sheet: framed in the part left free.
+    else if (focus.fov) besideSheet(({ width, height }) => sky?.focus(focus, width, height));
     else sky?.focus(focus);
   });
 });
