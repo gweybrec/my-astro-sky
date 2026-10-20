@@ -163,6 +163,7 @@ const fr = {
   },
   sky: {
     layers: 'Calques de la carte',
+    searchShort: 'Rechercher…',
     sectionStars: 'Étoiles et constellations',
     searchClear: 'Effacer la recherche',
     closeSheet: 'Fermer la fiche',

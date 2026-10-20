@@ -23,7 +23,7 @@ const { mode } = storeToRefs(time);
     <!-- Typing happens on the search page: this field only opens it. -->
     <PhoneSearch
       readonly
-      :placeholder="t('search.placeholder')"
+      :placeholder="t('mobile.sky.searchShort')"
       :label="t('search.placeholder')"
       @click="emit('search')"
     />

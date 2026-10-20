@@ -164,6 +164,7 @@ const es: Translations['mobile'] = {
   },
   sky: {
     layers: 'Capas del mapa',
+    searchShort: 'Buscar…',
     sectionStars: 'Estrellas y constelaciones',
     searchClear: 'Borrar la búsqueda',
     closeSheet: 'Cerrar la ficha',

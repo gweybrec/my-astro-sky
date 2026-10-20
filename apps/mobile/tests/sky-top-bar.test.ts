@@ -30,6 +30,12 @@ describe('the top row of the map', () => {
     ]);
   });
 
+  it('shows a short hint in the search field; the search page shows the full one', () => {
+    const input = mountBar().find('input[type=search]');
+    expect(input.attributes('placeholder')).toBe('Rechercher…');
+    expect(input.attributes('aria-label')).toBe('Rechercher étoile ou DSO…');
+  });
+
   it('asks for the search, the display sheet and the frames sheet', async () => {
     const w = mountBar();
     await w.find('input[type=search]').trigger('click');
