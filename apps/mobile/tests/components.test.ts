@@ -240,6 +240,24 @@ describe('the map sheets', () => {
     expect(w.find('.mob-map-sheet').exists()).toBe(false);
   });
 
+  it('puts its content in a body that scrolls under the handle and the title, hidden when collapsed', async () => {
+    const collapsed = ref(false);
+    const Page = defineComponent({
+      setup: () => () =>
+        h(PhoneMapSheetHost, null, {
+          default: () =>
+            h(PhoneMapSheet, { title: 'M31', collapsed: collapsed.value }, () => h('p', 'Contenu')),
+        }),
+    });
+    const w = mount(Page, { global: { stubs: ionicStubs } });
+    const body = w.find('.mob-map-sheet > .mob-sheet-body.mob-scroll');
+    expect(body.text()).toBe('Contenu');
+    collapsed.value = true;
+    await nextTick();
+    expect(body.attributes('style')).toContain('display: none');
+    expect(w.find('.mob-sheet-title').isVisible()).toBe(true);
+  });
+
   it('closes from its handle', async () => {
     const w = mount(PhoneMapSheetHost, {
       slots: { default: () => h(PhoneMapSheet, { title: 'M31' }) },

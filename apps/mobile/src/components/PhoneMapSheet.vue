@@ -8,8 +8,13 @@ import { MAP_SHEET_HOST } from './map-sheet';
 // map, not in an overlay, so the map stays in view and can be touched. Its slide up and down comes from the
 // PhoneMapSheetHost it must sit in (outside one it is not drawn: an error in development and in the tests). It closes by
 // dragging it down from its handle or header and with its handle (`close`); the page closes it for a tap on an empty
-// spot of the map and for the back button. Its rows have no dividers (the boards of the map's sheets).
-defineProps<{ title: string }>();
+// spot of the map and for the back button. Its rows have no dividers (the boards of the map's sheets). Its content scrolls
+// under the handle and the title when the sheet reaches its height (a third of the map in portrait).
+defineProps<{
+  title: string;
+  /** Only the handle and the title are shown (a frame being dragged: board "Ciel, déplacer le cadre"). */
+  collapsed?: boolean;
+}>();
 const emit = defineEmits<{ close: [] }>();
 if (!inject(MAP_SHEET_HOST, false)) {
   throw new Error(
@@ -37,6 +42,8 @@ const drag = useSheetDrag(() => emit('close'));
         <slot name="meta" />
       </div>
     </div>
-    <slot />
+    <div v-show="!collapsed" class="mob-sheet-body mob-scroll">
+      <slot />
+    </div>
   </section>
 </template>
