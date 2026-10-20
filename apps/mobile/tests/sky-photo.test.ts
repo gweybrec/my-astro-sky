@@ -75,6 +75,14 @@ describe('the photo sheet', () => {
     expect(w.find('.mob-pager-dots').exists()).toBe(false);
   });
 
+  it('draws the chips compact (32 px, smaller text), laid out and measured the same way', () => {
+    const { w } = mountSheet();
+    const chips = w.findAll('.mob-chip');
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips)
+      expect(chip.classes()).toEqual(expect.arrayContaining(['mob-chip--compact', 'm-secondary']));
+  });
+
   // Laid out three chips to a line, 56 px apart, with the phone held as `orientation` says.
   const layOut = (orientation: 'portrait' | 'landscape') => {
     const offsetTop = vi

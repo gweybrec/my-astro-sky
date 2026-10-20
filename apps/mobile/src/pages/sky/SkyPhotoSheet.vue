@@ -110,7 +110,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       aria-hidden="true"
       inert
     >
-      <PhoneChip v-for="id in ids" :key="id">{{ id }}</PhoneChip>
+      <PhoneChip v-for="id in ids" :key="id" compact>{{ id }}</PhoneChip>
     </div>
     <div
       v-if="pages.length"
@@ -127,7 +127,9 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
           role="group"
           :aria-label="pageLabel(n + 1)"
         >
-          <PhoneChip v-for="id in ids" :key="id" @click="emit('dso', id)">{{ id }}</PhoneChip>
+          <PhoneChip v-for="id in ids" :key="id" compact @click="emit('dso', id)">{{
+            id
+          }}</PhoneChip>
         </div>
       </div>
       <div
