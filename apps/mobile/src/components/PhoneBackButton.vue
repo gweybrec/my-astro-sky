@@ -5,7 +5,7 @@ import PhoneIconButton from './PhoneIconButton.vue';
 import AppIcon from './AppIcon.vue';
 import backIcon from '../icons/arrow-left.svg?raw';
 
-// The back arrow at the left of a pushed page's top bar (an icon button of the design system). It goes back one
+// The back arrow at the left of a pushed page's top bar (`.mob-back-btn`: drawn as Android's, no outline). It goes back one
 // page in the history, as the Android back button does; `fallback` is where it goes when there is nothing to go back
 // to (the page was opened directly). In a mode of a screen (placing a photo, choosing a star), `action` is done instead:
 // the mode's own way out, as its Annuler button and the Android back button.
@@ -26,7 +26,7 @@ async function goBack() {
 </script>
 
 <template>
-  <PhoneIconButton :label="t('mobile.nav.back')" @click="goBack">
+  <PhoneIconButton class="mob-back-btn" :label="t('mobile.nav.back')" @click="goBack">
     <AppIcon :svg="backIcon" />
   </PhoneIconButton>
 </template>

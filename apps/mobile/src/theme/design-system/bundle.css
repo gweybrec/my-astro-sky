@@ -3092,3 +3092,13 @@ svg.mob-icon--sm,
 .mob-row-text > .mob-row-sub {
   flex-basis: 100%;
 }
+
+/* Revision 20. The back arrow at the start of a top bar or of a mode bar (`.mob-icon-btn.mob-back-btn`), as Android draws it: no
+   outline, a round fill while it is pressed; still 48 x 48 to touch. */
+.mob-icon-btn.mob-back-btn {
+  border-color: transparent;
+  border-radius: var(--radius-pill);
+}
+.mob-icon-btn.mob-back-btn:active {
+  border-color: transparent;
+}
