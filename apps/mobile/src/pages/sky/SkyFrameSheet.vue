@@ -205,90 +205,88 @@ async function remove() {
 </script>
 
 <template>
-  <PhoneMapSheet :title="title" @close="emit('close')">
+  <PhoneMapSheet :title="title" :collapsed="frameDragging" @close="emit('close')">
     <template #meta>
       <!-- A floating free frame is titled by its setup already: the line would only repeat it. -->
       <div v-if="frame.label !== title" v-show="!frameDragging" class="mob-meta m-secondary">
         <span>{{ frame.label }}</span>
       </div>
     </template>
-    <div v-show="!frameDragging" class="mob-sheet-body mob-scroll">
-      <template v-if="smart">
-        <PhoneSliderRow
-          v-model="width"
-          :label="t('mobile.sky.frameWidth')"
-          :min="smart.nativeWDeg"
-          :max="smart.env.maxWDeg"
-          :step="SIZE_STEP_DEG"
-          :display="formatFrameSide(width)"
-        />
-        <PhoneSliderRow
-          v-model="height"
-          :label="t('mobile.sky.frameHeight')"
-          :min="smart.nativeHDeg"
-          :max="smart.env.maxHDeg"
-          :step="SIZE_STEP_DEG"
-          :display="formatFrameSide(height)"
-        />
-        <PhoneRow
-          :title="t('mobile.sky.frameNativeSize')"
-          :lead="resetIcon"
-          :disabled="isNative"
-          button
-          @click="nativeSize"
-        />
-      </template>
+    <template v-if="smart">
       <PhoneSliderRow
-        v-model="rotation"
-        :label="t('manual.rotation')"
-        :min="0"
-        :max="359"
-        :display="`${rotation}°`"
+        v-model="width"
+        :label="t('mobile.sky.frameWidth')"
+        :min="smart.nativeWDeg"
+        :max="smart.env.maxWDeg"
+        :step="SIZE_STEP_DEG"
+        :display="formatFrameSide(width)"
       />
-      <PhoneToggleRow v-if="frame.pinnable" v-model="pinned" :title="t('mobile.sky.framePin')" />
-      <PhoneToggleRow
-        v-model="anchored"
-        :title="t('mobile.sky.frameAnchor')"
-        :sub="t('mobile.sky.frameAnchorSub')"
-      />
-      <template v-if="mosaic">
-        <PhoneStepperRow
-          v-model="rows"
-          :label="t('fovOverlay.mosaicRows')"
-          :less-label="t('mobile.sky.rowsLess')"
-          :more-label="t('mobile.sky.rowsMore')"
-          :min="1"
-        />
-        <PhoneStepperRow
-          v-model="cols"
-          :label="t('fovOverlay.mosaicColumns')"
-          :less-label="t('mobile.sky.colsLess')"
-          :more-label="t('mobile.sky.colsMore')"
-          :min="1"
-        />
-        <PhoneRow
-          v-if="kind === 'planMosaic'"
-          :title="t('fovOverlay.editMosaicTitle')"
-          :lead="penIcon"
-          button
-          @click="editMosaic"
-        />
-      </template>
-      <PhoneRow
-        v-if="canMove"
-        :title="t('fovOverlay.moveToPlan')"
-        :lead="listPlusIcon"
-        button
-        @click="moveOpen = true"
+      <PhoneSliderRow
+        v-model="height"
+        :label="t('mobile.sky.frameHeight')"
+        :min="smart.nativeHDeg"
+        :max="smart.env.maxHDeg"
+        :step="SIZE_STEP_DEG"
+        :display="formatFrameSide(height)"
       />
       <PhoneRow
-        :title="isMosaic ? t('fovOverlay.deleteMosaic') : t('fovOverlay.deleteFrame')"
-        :lead="trashIcon"
-        danger
+        :title="t('mobile.sky.frameNativeSize')"
+        :lead="resetIcon"
+        :disabled="isNative"
         button
-        @click="remove"
+        @click="nativeSize"
       />
-    </div>
+    </template>
+    <PhoneSliderRow
+      v-model="rotation"
+      :label="t('manual.rotation')"
+      :min="0"
+      :max="359"
+      :display="`${rotation}°`"
+    />
+    <PhoneToggleRow v-if="frame.pinnable" v-model="pinned" :title="t('mobile.sky.framePin')" />
+    <PhoneToggleRow
+      v-model="anchored"
+      :title="t('mobile.sky.frameAnchor')"
+      :sub="t('mobile.sky.frameAnchorSub')"
+    />
+    <template v-if="mosaic">
+      <PhoneStepperRow
+        v-model="rows"
+        :label="t('fovOverlay.mosaicRows')"
+        :less-label="t('mobile.sky.rowsLess')"
+        :more-label="t('mobile.sky.rowsMore')"
+        :min="1"
+      />
+      <PhoneStepperRow
+        v-model="cols"
+        :label="t('fovOverlay.mosaicColumns')"
+        :less-label="t('mobile.sky.colsLess')"
+        :more-label="t('mobile.sky.colsMore')"
+        :min="1"
+      />
+      <PhoneRow
+        v-if="kind === 'planMosaic'"
+        :title="t('fovOverlay.editMosaicTitle')"
+        :lead="penIcon"
+        button
+        @click="editMosaic"
+      />
+    </template>
+    <PhoneRow
+      v-if="canMove"
+      :title="t('fovOverlay.moveToPlan')"
+      :lead="listPlusIcon"
+      button
+      @click="moveOpen = true"
+    />
+    <PhoneRow
+      :title="isMosaic ? t('fovOverlay.deleteMosaic') : t('fovOverlay.deleteFrame')"
+      :lead="trashIcon"
+      danger
+      button
+      @click="remove"
+    />
     <PhoneSheet v-model:open="moveOpen" :title="t('fovOverlay.moveToPlan')" :subtitle="title">
       <PhoneRow
         v-for="p in planChoices"

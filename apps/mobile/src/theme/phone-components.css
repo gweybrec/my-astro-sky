@@ -1049,10 +1049,16 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   bottom: 0;
   z-index: var(--z-base);
 }
-/* Portrait: the sheet of the map sits on the tab bar, which already keeps clear of the system's navigation bar. */
+/* Portrait: the sheet of the map sits on the tab bar, which already keeps clear of the system's navigation bar. It is at
+   most a third of the map under its search row (user's rule 2026-10-20): its handle and title stay, its content scrolls. */
 @media (orientation: portrait) {
   .mob-map-sheet {
     padding-bottom: 0;
+    max-height: calc((100% - 2 * var(--mobile-gutter) - var(--mobile-touch-min)) / 3);
+  }
+  /* The hand placement's panel under the map: at most a third of the frame under its mode bar; its settings scroll. */
+  .mob-sky-frame.mob-map-mode > .mob-placing-panel {
+    max-height: calc((100% - var(--mobile-topbar-height) - var(--safe-top, 0px)) / 3);
   }
 }
 /* Landscape (boards "Ciel, objet sélectionné" and "Ciel, cadre sélectionné", landscape): the sheet of the map is as
