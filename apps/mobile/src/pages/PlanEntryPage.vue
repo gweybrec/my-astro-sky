@@ -43,6 +43,7 @@ import PhoneBadge from '../components/PhoneBadge.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
+import PhoneSheet from '../components/PhoneSheet.vue';
 import ObsWindowSheet from './plans/ObsWindowSheet.vue';
 import diamondIcon from '../icons/diamond.svg?raw';
 import filterIcon from '../icons/filter.svg?raw';
@@ -51,8 +52,8 @@ import plusIcon from '@icons/plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 
 // The boards "Plan, détail d'une cible" and "Plan, fenêtre d'observation": the target's figures for the plan's night
-// and setup, its observation windows (a tap opens one; the plus adds one) and the removal of the target from the
-// plan. The suggested filters and showing the target on the map have no board / need the sky map (a later card).
+// and setup, its suggested filters (board "Plan, cible, filtres suggérés": the desktop's recipe, a sheet), its
+// observation windows (a tap opens one; the plus adds one) and the removal of the target from the plan.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -172,11 +173,21 @@ const facts = computed(() => {
 
 const readVar = (cssVar: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(cssVar);
-/** The window's colour dot: the one chosen, else the catalogue filter's, else the filter band's text colour token (board). */
-const colorOf = (w: ObservationWindow) =>
-  w.color ||
-  (w.filter && catalogFilterColor(w.filter)) ||
-  readVar(`--filter-${filterCssKey(w.filter)}-text`).trim();
+/** A filter's colour dot: the catalogue filter's, else the filter band's text colour token (board). */
+const filterColor = (filter: string | null | undefined) =>
+  (filter && catalogFilterColor(filter)) || readVar(`--filter-${filterCssKey(filter)}-text`).trim();
+/** The window's colour dot: the one chosen, else its filter's. */
+const colorOf = (w: ObservationWindow) => w.color || filterColor(w.filter);
+
+// The desktop's "Filtres suggérés" of the plan's row: each filter of the recipe with its exposures and hours.
+const filtersOpen = ref(false);
+const suggestedFilters = computed(() =>
+  (scores.value?.recipe.filters ?? []).map((f) => ({
+    name: f.name,
+    value: `${f.count} × ${f.subSeconds} s = ${formatHours(f.hours)}`,
+    color: filterColor(f.name),
+  })),
+);
 
 const windows = computed(() =>
   [...(entry.value?.observationWindows ?? [])]
@@ -306,8 +317,14 @@ async function removeFromPlan() {
         </div>
         <PhoneFacts :facts="facts" />
         <IonList class="mob-list" lines="none">
-          <!-- The list of the suggested filters has no board: drawn as the board draws it, no tap. -->
-          <PhoneRow :title="t('targets.results.filtersTitle')" :lead="filterIcon" chevron inert />
+          <PhoneRow
+            :title="t('targets.results.filtersTitle')"
+            :lead="filterIcon"
+            chevron
+            button
+            :disabled="suggestedFilters.length === 0"
+            @click="filtersOpen = true"
+          />
         </IonList>
         <PhoneSectionHeader>{{ t('mobile.plans.windowsHeader') }}</PhoneSectionHeader>
         <IonList class="mob-list" lines="none">
@@ -342,6 +359,22 @@ async function removeFromPlan() {
         </IonList>
       </div>
     </IonContent>
+    <PhoneSheet
+      v-model:open="filtersOpen"
+      :title="t('targets.results.filtersTitle')"
+      :subtitle="setup ? `${name} · ${setup.name}` : name"
+    >
+      <IonList class="mob-list" lines="none">
+        <PhoneRow
+          v-for="f in suggestedFilters"
+          :key="f.name"
+          :title="f.name"
+          :value="f.value"
+          :swatch="f.color"
+          mono
+        />
+      </IonList>
+    </PhoneSheet>
     <ObsWindowSheet
       v-model:open="editorOpen"
       :window="editing"

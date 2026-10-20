@@ -463,6 +463,17 @@ describe('the plan entry page', () => {
     expect(text).toContain('Filtres suggérés');
   });
 
+  it("opens the suggested filters, the desktop's recipe, in a sheet", async () => {
+    const { w } = await show(PlanEntryPage, '/plans/p1/e1');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().trim() === 'Filtres suggérés')!
+      .trigger('click');
+    await settle();
+    const rows = w.findAll('.mob-row').filter((r) => /\d+ × \d+ s = /.test(r.text()));
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
   it('lists the observation windows with their filter, times and exposures', async () => {
     const { w } = await show(PlanEntryPage, '/plans/p1/e1');
     expect(w.text()).toContain("Fenêtres d'observation");
