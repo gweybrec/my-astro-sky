@@ -340,7 +340,7 @@ async function validate() {
           <!-- Typing happens on the search page: this field only opens it, as the Ciel map's own. -->
           <PhoneSearch
             readonly
-            :placeholder="t('search.placeholder')"
+            :placeholder="t('mobile.sky.searchShort')"
             :label="t('search.placeholder')"
             @click="emit('search')"
           />
