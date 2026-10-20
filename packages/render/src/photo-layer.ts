@@ -456,6 +456,22 @@ export class PhotoLayer {
     if (removed.length > 0) this.fireOnPhotosChanged();
   }
 
+  /**
+   * Stops the downloads of the pictures that have not loaded yet (`paused`), and starts them again. The phone pauses
+   * them while its map's tab is not shown, so the tab shown gets the connection and the decoding to itself.
+   */
+  setLoadingPaused(paused: boolean) {
+    for (const { imgEl } of this.placedPhotos) {
+      if (paused && imgEl.getAttribute('src') && !imgEl.complete) {
+        imgEl.dataset.pausedSrc = imgEl.getAttribute('src')!;
+        imgEl.removeAttribute('src');
+      } else if (!paused && imgEl.dataset.pausedSrc) {
+        imgEl.src = imgEl.dataset.pausedSrc;
+        delete imgEl.dataset.pausedSrc;
+      }
+    }
+  }
+
   /** Remove all photos from the in-memory overlay without calling the API. */
   clearAllPhotos() {
     this.placedPhotos.forEach((p) => p.imgEl.remove());

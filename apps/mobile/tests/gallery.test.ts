@@ -71,6 +71,20 @@ describe('the gallery page', () => {
     configurePendingStore(createMemoryPendingStore());
   });
 
+  it('draws the cards a part at a time, the next part as the grid is scrolled', async () => {
+    getPhotos.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({ id: `p${i}`, originalName: `${i}.jpg` })),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.findAll('.mob-photo-card')).toHaveLength(24);
+    const grid = wrapper.find('.mob-scroll').element as HTMLElement;
+    Object.defineProperty(grid, 'scrollHeight', { value: 1000 });
+    Object.defineProperty(grid, 'clientHeight', { value: 800 });
+    await wrapper.find('.mob-scroll').trigger('scroll');
+    expect(wrapper.findAll('.mob-photo-card')).toHaveLength(30);
+  });
+
   it('shows the empty state when the backend returns no photo', async () => {
     getPhotos.mockResolvedValue([]);
     const wrapper = mountPage();

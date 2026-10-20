@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { PhotoTag } from '../../photo-tags';
 import AppIcon from '../../components/AppIcon.vue';
 import PhoneBusy from '../../components/PhoneBusy.vue';
@@ -17,15 +17,23 @@ const props = defineProps<{
   /** Where a waiting photo stands ("À placer", "Résolution"), and whether that is a running operation. */
   state?: string;
   busy?: boolean;
+  /** The tab is not shown: a picture still loading stops (it starts again once the tab is back). */
+  paused?: boolean;
 }>();
 const emit = defineEmits<{ click: [] }>();
 
 // A picture that cannot be read leaves the picture area with its placeholder.
 const broken = ref(false);
+const loaded = ref(false);
 watch(
   () => props.picture,
-  () => (broken.value = false),
+  () => {
+    broken.value = false;
+    loaded.value = false;
+  },
 );
+// Without its address the picture's download stops; one already loaded keeps it.
+const src = computed(() => (props.paused && !loaded.value ? undefined : props.picture));
 </script>
 
 <template>
@@ -39,9 +47,10 @@ watch(
       <img
         v-if="picture && !broken"
         class="mob-photo-picture"
-        :src="picture"
+        :src="src"
         alt=""
         loading="lazy"
+        @load="loaded = true"
         @error="broken = true"
       />
       <AppIcon v-else :svg="imageIcon" />

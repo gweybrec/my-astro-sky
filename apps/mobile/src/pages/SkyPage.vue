@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonPage, IonContent, onIonViewDidEnter, onIonViewWillEnter } from '@ionic/vue';
+import {
+  IonPage,
+  IonContent,
+  onIonViewDidEnter,
+  onIonViewWillEnter,
+  onIonViewWillLeave,
+} from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
@@ -89,12 +95,15 @@ watch(skySelection, (selection) => sky?.select(selection));
 // The observing location may have changed in Réglages while this tab stayed mounted; a search may have chosen an
 // object to go to.
 onIonViewWillEnter(() => {
+  sky?.setActive(true);
   sky?.refreshLocation();
   // A setup may have been added or changed in Réglages: the frames take its size again.
   void fov.loadSpecs();
   // Photos may have been added, changed or deleted in the gallery or by an import while another tab was showing.
   void reloadPhotos();
 });
+// Another tab chosen: the pictures still loading stop, so that tab is not slowed down.
+onIonViewWillLeave(() => sky?.setActive(false));
 // While a page above the tabs covered it, the map measured nothing; back, it may not have measured itself again yet. A
 // move of the map waits for its size (a few frames at most), else it would frame nothing.
 const MAP_SIZE_FRAMES = 30;
