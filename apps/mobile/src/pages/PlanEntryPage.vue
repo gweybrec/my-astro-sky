@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -66,6 +66,11 @@ const entry = computed(() => plan.value?.entries.find((e) => e.id === entryId.va
 const gear = shallowRef<GearLists | null>(null);
 const editingId = ref<string | null>(null);
 const editorOpen = ref(false);
+/** A window being added: stored only when its sheet's "Enregistrer" is tapped. */
+const draft = ref<ObservationWindow | null>(null);
+watch(editorOpen, (isOpen) => {
+  if (!isOpen) draft.value = null;
+});
 
 const night = computed(() =>
   plan.value ? resolvePlanNight(plan.value, targetsPrefs, planLookups) : null,
@@ -189,8 +194,10 @@ const windows = computed(() =>
       };
     }),
 );
-const editing = computed(
-  () => entry.value?.observationWindows.find((w) => w.id === editingId.value) ?? null,
+const editing = computed(() =>
+  draft.value && draft.value.id === editingId.value
+    ? draft.value
+    : (entry.value?.observationWindows.find((w) => w.id === editingId.value) ?? null),
 );
 
 async function load() {
@@ -217,14 +224,9 @@ function openWindow(id: string) {
   editorOpen.value = true;
 }
 
-async function addWindow() {
-  const created = newObservationWindow();
-  try {
-    await saveWindows([...(entry.value?.observationWindows ?? []), created]);
-    openWindow(created.id);
-  } catch (error) {
-    void showError(error);
-  }
+function addWindow() {
+  draft.value = newObservationWindow();
+  openWindow(draft.value.id);
 }
 
 async function saveWindow(changes: {
@@ -234,11 +236,15 @@ async function saveWindow(changes: {
   snap: boolean;
 }) {
   const id = editingId.value;
+  const added = draft.value;
   editorOpen.value = false;
   if (!id) return;
+  const stored = entry.value?.observationWindows ?? [];
   try {
     await saveWindows(
-      (entry.value?.observationWindows ?? []).map((w) => (w.id === id ? { ...w, ...changes } : w)),
+      added?.id === id
+        ? [...stored, { ...added, ...changes }]
+        : stored.map((w) => (w.id === id ? { ...w, ...changes } : w)),
     );
   } catch (error) {
     void showError(error);
@@ -342,6 +348,7 @@ async function removeFromPlan() {
       :subtitle="setup ? `${name} · ${setup.name}` : name"
       :night="night?.win ?? null"
       :swatch="editing ? colorOf(editing) : ''"
+      :is-new="draft !== null"
       @save="saveWindow"
       @delete="deleteWindow"
     />

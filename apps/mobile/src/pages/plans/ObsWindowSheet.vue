@@ -23,7 +23,8 @@ import caretIcon from '../../icons/chevron-down.svg?raw';
 // The board "Plan, fenêtre d'observation": the window's start and end, its duration and number of exposures, its
 // filter and colour, the single exposure and the switch that aligns the window on it. A tap on the start or the end
 // opens the phone's time picker; as on the desktop, a window keeps a minimum length. "Enregistrer" stores the times,
-// the exposure and the switch; "Supprimer" removes the window (the page asks first). The filter and the colour open
+// the exposure and the switch; "Supprimer" removes the window (the page asks first). A new window (board "Plan, nouvelle
+// fenêtre d'observation", `isNew`) is not stored yet: it has "Annuler" instead, which leaves it unsaved. The filter and the colour open
 // pickers that are not built yet: they show their value and do nothing.
 const props = defineProps<{
   window: ObservationWindow | null;
@@ -33,6 +34,8 @@ const props = defineProps<{
   night: { start: Date; end: Date } | null;
   /** The colour dot of the window (the filter's, or the one chosen). */
   swatch: string;
+  /** A window being added, stored only by "Enregistrer". */
+  isNew?: boolean;
 }>();
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{
@@ -181,7 +184,10 @@ function save() {
       :info="t('targets.plan.obsWindowSnap')"
     />
     <template #footer>
-      <PhoneButton variant="danger" size="lg" @click="emit('delete')">{{
+      <PhoneButton v-if="isNew" size="lg" @click="open = false">{{
+        t('modal.cancel')
+      }}</PhoneButton>
+      <PhoneButton v-else variant="danger" size="lg" @click="emit('delete')">{{
         t('mobile.plans.delete')
       }}</PhoneButton>
       <PhoneButton variant="confirm" size="lg" @click="save">{{

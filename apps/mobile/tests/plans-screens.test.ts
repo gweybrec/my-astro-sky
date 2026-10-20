@@ -472,16 +472,36 @@ describe('the plan entry page', () => {
     expect(rows[0].text()).toMatch(/\d+ × 180 s/);
   });
 
-  it('adds a window with one request that keeps the others', async () => {
+  it('adds a window only on Enregistrer, with one request that keeps the others', async () => {
     const { w } = await show(PlanEntryPage, '/plans/p1/e1');
     const add = w.findAll('.mob-row').find((r) => r.text().trim() === "Fenêtre d'observation")!;
     await add.trigger('click');
+    await settle();
+    expect(backend.plans.updateEntry).not.toHaveBeenCalled();
+    expect(w.findAll('button').some((b) => b.text() === 'Supprimer')).toBe(false);
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'Enregistrer')!
+      .trigger('click');
     await settle();
     expect(backend.plans.updateEntry).toHaveBeenCalledTimes(1);
     const [entryId, changes] = backend.plans.updateEntry.mock.calls[0];
     expect(entryId).toBe('e1');
     expect(changes.observationWindows).toHaveLength(2);
     expect(changes.observationWindows[0].id).toBe('w1');
+  });
+
+  it('leaves a new window unsaved with Annuler', async () => {
+    const { w } = await show(PlanEntryPage, '/plans/p1/e1');
+    const add = w.findAll('.mob-row').find((r) => r.text().trim() === "Fenêtre d'observation")!;
+    await add.trigger('click');
+    await settle();
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'Annuler')!
+      .trigger('click');
+    await settle();
+    expect(backend.plans.updateEntry).not.toHaveBeenCalled();
   });
 
   it('opens the window sheet with the stored values and saves the exposure and the switch', async () => {
@@ -603,6 +623,11 @@ describe('the plan entry page', () => {
     const { w } = await show(PlanEntryPage, '/plans/p1/e1');
     const add = w.findAll('.mob-row').find((r) => r.text().trim() === "Fenêtre d'observation")!;
     await add.trigger('click');
+    await settle();
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'Enregistrer')!
+      .trigger('click');
     await settle();
     expect(showError).toHaveBeenCalled();
   });
