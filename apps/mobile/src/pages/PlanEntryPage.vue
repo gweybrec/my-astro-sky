@@ -32,6 +32,9 @@ import {
   type Plan,
 } from '@myastrosky/app-state/api';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { skyFocus } from '../composables/useSkySelection';
+import { openTab } from '../tab-navigation';
 import { catalogsReady } from '../catalogs';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -53,7 +56,8 @@ import trashIcon from '@icons/trash.svg?raw';
 
 // The boards "Plan, détail d'une cible" and "Plan, fenêtre d'observation": the target's figures for the plan's night
 // and setup, its suggested filters (board "Plan, cible, filtres suggérés": the desktop's recipe, a sheet), its
-// observation windows (a tap opens one; the plus adds one) and the removal of the target from the plan.
+// observation windows (a tap opens one; the plus adds one), showing it on the map (as the desktop: a free frame of the
+// setup on the target, the map zoomed on that frame) and the removal of the target from the plan.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -281,6 +285,25 @@ async function deleteWindow() {
   }
 }
 
+// The desktop's "Afficher sur la carte" (`onNavigate` in its main.ts): with a setup, a free frame of that setup pinned
+// on the target, frames shown and the map zoomed on the frame (its sheet opens there); without one, the map at the target.
+const fov = useFovFramesStore();
+async function showOnMap() {
+  const d = dso.value;
+  if (!d) return;
+  const id = setupId.value;
+  if (id && !fov.specs.has(id)) await fov.loadSpecs();
+  const spec = id ? fov.specs.get(id) : undefined;
+  if (id && spec) {
+    fov.addAdhocFrameAtSky(id, d.ra, d.dec);
+    fov.setFramesVisible(true);
+    skyFocus.value = { ra: d.ra, dec: d.dec, scale: 0, fov: { wDeg: spec.wDeg, hDeg: spec.hDeg } };
+  } else {
+    skyFocus.value = { ra: d.ra, dec: d.dec, scale: 800 };
+  }
+  await openTab(router, 'plans', 'sky');
+}
+
 async function removeFromPlan() {
   const sure = await confirm({
     title: t('targets.plan.remove'),
@@ -348,7 +371,12 @@ async function removeFromPlan() {
           />
         </IonList>
         <IonList class="mob-list" lines="none" style="padding-top: var(--space-7)">
-          <PhoneRow :title="t('targets.plan.showOnMap')" :lead="mapPinIcon" inert />
+          <PhoneRow
+            :title="t('targets.plan.showOnMap')"
+            :lead="mapPinIcon"
+            button
+            @click="showOnMap"
+          />
           <PhoneRow
             :title="t('targets.plan.remove')"
             :lead="trashIcon"

@@ -32,6 +32,8 @@ import PhoneReorderList from '../src/components/PhoneReorderList.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import { reloadTargetsPrefs } from '../src/composables/useTargets';
+import { skyFocus } from '../src/composables/useSkySelection';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 
 const GEAR = {
   telescope: [
@@ -461,6 +463,22 @@ describe('the plan entry page', () => {
     expect(text).toContain('24°');
     expect(text).toContain('Équipement 1 · Askar FRA400 + ZWO ASI533MC');
     expect(text).toContain('Filtres suggérés');
+  });
+
+  it('shows the target on the map as the desktop does: a free frame of the setup, the map zoomed on it', async () => {
+    const { w, router } = await show(PlanEntryPage, '/plans/p1/e1');
+    const replace = vi.spyOn(router, 'replace').mockResolvedValue(undefined);
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().trim() === 'Afficher sur la carte')!
+      .trigger('click');
+    await settle();
+    expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/plans', '/tabs/sky']);
+    const frames = useFovFramesStore();
+    expect(frames.selection).toEqual({ kind: 'free' });
+    expect(frames.framesVisible).toBe(true);
+    expect(skyFocus.value).toMatchObject({ ra: DSOS.NGC7000.ra, dec: DSOS.NGC7000.dec });
+    expect(skyFocus.value?.fov?.wDeg).toBeGreaterThan(0);
   });
 
   it("opens the suggested filters, the desktop's recipe, in a sheet", async () => {

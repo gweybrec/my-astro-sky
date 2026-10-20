@@ -5,6 +5,8 @@
  */
 import { loadSettings } from '@myastrosky/core/display-settings';
 import { isIAUStyle } from '@myastrosky/core/types';
+import { computeFovTargetScale } from '@myastrosky/core/gear-presets';
+import { getHemisphere } from '@myastrosky/core/projection';
 import { readObserverLocation } from '@myastrosky/core/observer-location';
 import { watch } from 'vue';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
@@ -89,7 +91,8 @@ export interface PhoneSkyMap {
   /** Highlights the selected object on the map (nothing when null). */
   select(selection: SkySelection | null): void;
   /** Moves the map to a position, zooming in to at least the given scale. */
-  focus(focus: SkyFocus): void;
+  /** Moves there; a setup's field (`focus.fov`) fills a third of `width` × `height` (the part a sheet leaves free). */
+  focus(focus: SkyFocus, width?: number, height?: number): void;
   /**
    * Frames a placed photo in the map, as the desktop's "Voir sur la carte" does: fitted to `width` × `height` (the part
    * a sheet leaves free; the whole map by default) and centred in the map's free part (`SkyMap.setCover`).
@@ -276,7 +279,22 @@ export function createPhoneSkyMap(
       // A searched deep-sky object is shown even when the deep-sky layer is off, as on the desktop.
       if (selection?.kind === 'dso') map.setShowDSOs(true);
     },
-    focus: ({ ra, dec, scale }) => map.navigateTo(ra, dec, Math.max(map.getView().scale, scale)),
+    focus: ({ ra, dec, scale, fov }, width, height) => {
+      const view = map.getView();
+      map.navigateTo(
+        ra,
+        dec,
+        fov
+          ? computeFovTargetScale(
+              fov.wDeg,
+              fov.hDeg,
+              dec,
+              getHemisphere(),
+              Math.min(width ?? view.width, height ?? view.height),
+            )
+          : Math.max(view.scale, scale),
+      );
+    },
     showPhoto(photoId, width, height) {
       const view = map.getView();
       const fit = layer.getPhotoCenterAndScale(photoId, width ?? view.width, height ?? view.height);
