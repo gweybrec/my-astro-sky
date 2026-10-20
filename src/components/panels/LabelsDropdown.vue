@@ -39,6 +39,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
+import { buildLabelFilterItems } from '@myastrosky/core/photo-placement';
 import { useCanvasStore } from '../../stores/canvas';
 import { useI18n } from '../../composables/useI18n';
 import DropdownPanel from '../base/DropdownPanel.vue';
@@ -60,15 +61,7 @@ const labelItems = ref<LabelItem[]>([]);
 function refreshLabels() {
   const overlay = canvasStore.overlay;
   if (!overlay) return;
-  const placed = overlay.getPlacedPhotos();
-  const counts = new Map<string, number>();
-  for (const p of placed) {
-    const labs = p.photo.labels?.length ? p.photo.labels : ['(no label)'];
-    for (const l of labs) counts.set(l, (counts.get(l) || 0) + 1);
-  }
-  labelItems.value = Array.from(counts.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  labelItems.value = buildLabelFilterItems(overlay.getPlacedPhotos().map((p) => p.photo));
 }
 
 function isLabelVisible(label: string): boolean {

@@ -264,12 +264,29 @@ export function computePhotoCenter(photo: Photo): { ra: number; dec: number } | 
   return { ra: avg.ra, dec: avg.dec };
 }
 
+/** The label filter's entry for the photos that have no label. */
+export const NO_LABEL = '(no label)';
+
+/** The labels of the given photos with how many photos carry each (photos without one under {@link NO_LABEL}), by name. */
+export function buildLabelFilterItems(
+  photos: ReadonlyArray<Pick<Photo, 'labels'>>,
+): Array<{ label: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const photo of photos) {
+    const labels = photo.labels?.length ? photo.labels : [NO_LABEL];
+    for (const label of labels) counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
 /** True when the photo passes the current label filter (no filter ⇒ allowed). */
 export function isLabelAllowed(photo: Photo, visibleLabels: { [label: string]: boolean }): boolean {
   const filterKeys = Object.keys(visibleLabels || {});
   if (filterKeys.length === 0) return true;
   if (!photo.labels || photo.labels.length === 0) {
-    return visibleLabels['(no label)'] !== false;
+    return visibleLabels[NO_LABEL] !== false;
   }
   return photo.labels.some((l) => visibleLabels[l] !== false);
 }
