@@ -3102,3 +3102,11 @@ svg.mob-icon--sm,
 .mob-icon-btn.mob-back-btn:active {
   border-color: transparent;
 }
+
+/* Revision 21. A compact chip (`.mob-chip.mob-chip--compact`, text `.m-secondary`): the objects of a photo in its sheet on the map,
+   32px tall with 12px sides, so the sheet leaves more of the map in view. The chips of a row stay 8px apart. */
+.mob-chip.mob-chip--compact {
+  height: var(--space-11);
+  min-width: var(--space-11);
+  padding: 0 var(--space-6);
+}

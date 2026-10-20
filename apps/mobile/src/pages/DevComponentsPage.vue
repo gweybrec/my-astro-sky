@@ -305,6 +305,7 @@ function raiseError() {
         >
           <PhoneChip>Normale</PhoneChip>
           <PhoneChip :pressed="true">Choisie</PhoneChip>
+          <PhoneChip compact>Compacte</PhoneChip>
           <PhoneBadge kind="type">Galaxie</PhoneBadge>
           <PhoneBadge kind="const">Andromède</PhoneBadge>
         </div>
@@ -329,6 +330,13 @@ function raiseError() {
             <span>Texte</span>
             <PhoneChip>Normale</PhoneChip>
             <PhoneChip :pressed="true">Choisie</PhoneChip>
+          </div>
+        </div>
+        <div class="mob-form-row">
+          <div class="mob-meta m-secondary" data-baseline-row>
+            <span>Texte</span>
+            <PhoneChip compact>NGC6888</PhoneChip>
+            <PhoneChip compact>IC5070</PhoneChip>
           </div>
         </div>
 
