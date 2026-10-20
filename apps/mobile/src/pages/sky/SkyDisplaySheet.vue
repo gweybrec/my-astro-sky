@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@myastrosky/core/i18n/index';
 import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
 import type { ConstellationStyle } from '@myastrosky/core/types';
 import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
+import { buildPoiFilterGroups, poiKey } from '@myastrosky/core/poi';
+import { buildLabelFilterItems } from '@myastrosky/core/photo-placement';
+import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import {
   budgetToSliderPos,
   DSO_DENSITY_MAX,
@@ -14,6 +17,7 @@ import {
 } from '@myastrosky/core/density-slider';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useFisheyeStore } from '@myastrosky/app-state/stores/fisheye';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
@@ -26,8 +30,9 @@ import caretIcon from '../../icons/chevron-down.svg?raw';
 
 // The board "Ciel, affichage": the map's display settings of the desktop's side panel. Every change applies at once.
 // The field buttons open a choice sheet: tick boxes when several values can be kept (types, catalogues), a radio
-// choice when there is one (drawing style, hemisphere, projection). The points of interest and the photo labels come
-// from the photos placed on the map and have no picker yet.
+// choice when there is one (drawing style, hemisphere, projection). The points of interest and the photo labels are
+// those of the photos placed on the map (`layer`), counted each time the sheet opens, as the desktop's dropdowns do.
+const props = defineProps<{ layer?: PhotoLayer | null }>();
 const open = defineModel<boolean>('open', { required: true });
 
 const display = useDisplayStore();
@@ -100,12 +105,25 @@ const projection = computed({
 const countAria = (label: string, n: number, total: number) =>
   t('mobile.targets.countAria', { label, n, total });
 const countOf = (n: number, total: number) => t('mobile.targets.countOf', { n, total });
-const count = (flags: Record<string, boolean>) => {
-  const keys = Object.keys(flags);
-  return { n: keys.filter((k) => flags[k] !== false).length, total: keys.length };
-};
-const poi = computed(() => count(visiblePois.value));
-const labels = computed(() => count(visibleLabels.value));
+/** How many of the keys are shown: a key is shown unless its flag is off. */
+const count = (keys: string[], flags: Record<string, boolean>) => ({
+  n: keys.filter((k) => flags[k] !== false).length,
+  total: keys.length,
+});
+const categories = usePoiCategoriesStore();
+const poiKeys = shallowRef<string[]>([]);
+const labelKeys = shallowRef<string[]>([]);
+function readPhotos() {
+  const photos = props.layer?.getPlacedPhotos().map((p) => p.photo) ?? [];
+  poiKeys.value = buildPoiFilterGroups(
+    photos.map((p) => p.pointsOfInterest ?? []),
+    categories.categories,
+  ).flatMap((g) => g.names.map((n) => poiKey(g.category.id, n.name)));
+  labelKeys.value = buildLabelFilterItems(photos).map((i) => i.label);
+}
+watch(open, (isOpen) => isOpen && readPhotos(), { immediate: true });
+const poi = computed(() => count(poiKeys.value, visiblePois.value));
+const labels = computed(() => count(labelKeys.value, visibleLabels.value));
 const styleName = computed(() => styleLabel(constellationStyle.value));
 const hemisphereName = computed(() =>
   t(hemisphere.value === 'north' ? 'display.hemisphereNorth' : 'display.hemisphereSouth'),

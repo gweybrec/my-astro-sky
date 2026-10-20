@@ -121,6 +121,25 @@ describe('the display sheet ("Ciel, affichage")', () => {
   const slider = (w: ReturnType<typeof mount>, label: string) =>
     w.findAllComponents(PhoneSliderRow).find((r) => r.props('label') === label)!;
 
+  it('counts the points of interest and labels of the photos placed on the map', () => {
+    const photo = (labels: string[], pois: { categoryId: string; name: string }[]) => ({
+      photo: { labels, pointsOfInterest: pois },
+    });
+    const layer = {
+      getPlacedPhotos: () => [
+        photo(['Seestar'], [{ categoryId: 'cat-comet', name: 'C/2023 A3' }]),
+        photo([], [{ categoryId: 'cat-asteroid', name: 'Vesta' }]),
+      ],
+    };
+    useDisplayStore().setVisibleLabel('Seestar', false);
+    const w = mount(SkyDisplaySheet, {
+      props: { open: true, layer: layer as never },
+      global: { stubs: ionicStubs },
+    });
+    expect(buttonNamed(w, "Points d'intérêt : 2 sur 2").exists()).toBe(true);
+    expect(buttonNamed(w, 'Étiquettes : 1 sur 2').exists()).toBe(true);
+  });
+
   it('lists the sections of the board in order', () => {
     const headers = mountSheet()
       .findAll('.mob-section-header')

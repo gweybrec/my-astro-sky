@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  buildLabelFilterItems,
   getCorrRaDec,
   fitPhotoAffine,
   buildPhotoProjPoints,
@@ -532,5 +533,17 @@ describe('formatZoomPercent', () => {
     expect(formatZoomPercent(0.002, 0.004)).toBe(`50${NBSP}%`);
     // three wheel notches of 1.1
     expect(formatZoomPercent(0.004 * 1.1 ** 3, 0.004)).toBe(`133${NBSP}%`);
+  });
+});
+
+describe('buildLabelFilterItems', () => {
+  it('counts the photos of each label, the photos without one under "(no label)", by name', () => {
+    expect(
+      buildLabelFilterItems([{ labels: ['b', 'a'] }, { labels: ['a'] }, { labels: [] }, {}]),
+    ).toEqual([
+      { label: '(no label)', count: 2 },
+      { label: 'a', count: 2 },
+      { label: 'b', count: 1 },
+    ]);
   });
 });

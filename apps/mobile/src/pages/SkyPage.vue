@@ -431,7 +431,7 @@ onBeforeUnmount(() => {
           :region="regionShown.region"
         />
       </div>
-      <SkyDisplaySheet v-model:open="displayOpen" />
+      <SkyDisplaySheet v-model:open="displayOpen" :layer="photoLayer" />
       <SkyFramesSheet v-model:open="framesSheetOpen" :map="skyMap" @show="showFrame" />
       <SkyFramePicker
         v-if="pickerTarget"
