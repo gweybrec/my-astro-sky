@@ -6,13 +6,14 @@ import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
 import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { usePhotoZoom } from '../composables/usePhotoZoom';
+import { usePhotoOverlay } from '../composables/usePhotoOverlay';
 import { setStatusBarHidden } from '../platform-device';
 import { skyPhotoFocus } from '../composables/useSkySelection';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
-import IdentifyChooseSheet, { type IdentifyKind } from './gallery/IdentifyChooseSheet.vue';
 import PhotoInfoSheet from './gallery/PhotoInfoSheet.vue';
 import infoIcon from '../icons/info.svg?raw';
 import resetIcon from '../icons/rotate-ccw.svg?raw';
@@ -20,22 +21,38 @@ import resetIcon from '../icons/rotate-ccw.svg?raw';
 // A photo's own screen, from the boards "Photo, détail", "Photo, zoom" and "Photo, informations": the photo on a dark
 // stage, the top bar with the photo's name, and the sheet of its information. The whole photo is fitted under the bar,
 // so that nothing of it stays hidden behind the bar; zoomed, it runs behind the bar, which stays readable over it. Two
-// fingers and a double tap zoom; the button that shows the photo whole again is there only while it is zoomed.
+// fingers and a double tap zoom; the button that shows the photo whole again is there only while it is zoomed. The
+// sheet's toggles draw the photo's objects and points of interest over it (board "Photo, objets affichés").
 const route = useRoute();
 const router = useRouter();
 
 const photo = ref<Photo | null>(null);
 const infoOpen = ref(false);
-const chooseOpen = ref(false);
 // A picture that cannot be read leaves the stage with the photo's name.
 const broken = ref(false);
 
 // The part of the stage under the top bar: the whole photo is fitted in it.
 const area = ref<HTMLElement | null>(null);
-const { zoomed, transform, reset, handlers } = usePhotoZoom(area, () => ({
+const { zoom, zoomed, transform, reset, handlers } = usePhotoZoom(area, () => ({
   width: photo.value?.width ?? 0,
   height: photo.value?.height ?? 0,
 }));
+
+// What is drawn over the photo: off at first, as on the desktop; the catalogues start from the map's and are this
+// photo's own choice afterwards.
+const showObjects = ref(false);
+const showPois = ref(false);
+const catalogs = ref([...useDisplayStore().dsoCatalogs]);
+const overlay = ref<HTMLCanvasElement | null>(null);
+const { canShowObjects, canShowPois } = usePhotoOverlay({
+  canvas: overlay,
+  area,
+  photo,
+  zoom,
+  objects: showObjects,
+  pois: showPois,
+  catalogs,
+});
 
 const title = computed(() => photo.value?.originalName ?? '');
 
@@ -73,22 +90,6 @@ function showOnMap() {
 }
 
 const backToGallery = () => void router.replace('/tabs/gallery');
-
-// "Identifier les objets" replaces the photo's sheet by the choice of an identification; its back arrow brings the
-// photo's sheet back.
-function identify() {
-  infoOpen.value = false;
-  chooseOpen.value = true;
-}
-function backToInfo() {
-  chooseOpen.value = false;
-  infoOpen.value = true;
-}
-function openIdentification(kind: IdentifyKind) {
-  if (!photo.value) return;
-  chooseOpen.value = false;
-  void router.push(`/gallery/photo/${photo.value.id}/identify/${kind}`);
-}
 
 function edit() {
   if (!photo.value) return;
@@ -128,6 +129,7 @@ function edit() {
                 @error="broken = true"
               />
             </template>
+            <canvas ref="overlay" class="mob-photo-overlay" aria-hidden="true" />
           </div>
           <PhoneIconButton
             v-if="zoomed"
@@ -147,14 +149,13 @@ function edit() {
         v-model:open="infoOpen"
         :photo="photo"
         @map="showOnMap"
+        v-model:objects="showObjects"
+        v-model:pois="showPois"
+        v-model:catalogs="catalogs"
+        :can-show-objects="canShowObjects"
+        :can-show-pois="canShowPois"
         @edit="edit"
-        @identify="identify"
         @removed="backToGallery"
-      />
-      <IdentifyChooseSheet
-        v-model:open="chooseOpen"
-        @back="backToInfo"
-        @choose="openIdentification"
       />
     </IonContent>
   </IonPage>

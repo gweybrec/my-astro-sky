@@ -23,6 +23,7 @@ import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
+import { dsoCatalogOptions } from '../../catalog-options';
 import SkyCheckSheet, { type CheckGroup, type CheckOption } from './SkyCheckSheet.vue';
 import PhoneRadioSheet from '../../components/PhoneRadioSheet.vue';
 import AppIcon from '../../components/AppIcon.vue';
@@ -96,10 +97,7 @@ const projectionOptions = [
   { value: 'fisheye' as const, label: t('display.projFisheye') },
 ];
 const typeOptions = DSO_TYPES_ALL.map((value) => ({ value, label: t(`dso.typeLabels.${value}`) }));
-const catalogOptions = DSO_CATALOGS_ALL.map((value) => ({
-  value,
-  label: t(`dso.catalogLabels.${value}`),
-}));
+const catalogOptions = dsoCatalogOptions();
 const projection = computed({
   get: () => (fisheye.active ? ('fisheye' as const) : ('stereo' as const)),
   set: (v?: 'stereo' | 'fisheye') => fisheye.setActive(v === 'fisheye'),

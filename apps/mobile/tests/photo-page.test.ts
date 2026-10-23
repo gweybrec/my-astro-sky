@@ -32,11 +32,26 @@ vi.mock('../src/composables/useConfirm', () => ({
   showInfo: vi.fn(),
 }));
 vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+// A solved photo has a sky matrix; the drawing and the sky lookups are stand-ins that record what they are asked.
 const solved = { value: true };
-vi.mock('@myastrosky/core/photo-identify', () => ({ isPhotoSolved: () => solved.value }));
+vi.mock('@myastrosky/core/photo-placement', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/photo-placement')>()),
+  computePhotoToProjMatrix: () => (solved.value ? { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 } : null),
+}));
+const findDsoPlacementsInImage = vi.fn();
+const drawPhotoOverlay = vi.fn();
+vi.mock('@myastrosky/render/photo-dso-overlay-render', () => ({
+  drawPhotoOverlay: (...a: unknown[]) => drawPhotoOverlay(...a),
+}));
+vi.mock('@myastrosky/render/poi-pins', () => ({
+  poiPinsInImage: (pois: { name: string; ra?: number }[]) =>
+    pois.filter((p) => p.ra !== undefined).map((poi) => ({ poi, x: 10, y: 10 })),
+}));
+vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
 
 vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@myastrosky/core/catalog/dso-registry')>()),
+  findDsoPlacementsInImage: (...a: unknown[]) => findDsoPlacementsInImage(...a),
   getDSOById: (id: string) =>
     id === 'M31'
       ? {
@@ -51,7 +66,10 @@ vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
 
 import PhotoPage from '../src/pages/PhotoPage.vue';
 import PhotoInfoSheet from '../src/pages/gallery/PhotoInfoSheet.vue';
-import IdentifyChooseSheet from '../src/pages/gallery/IdentifyChooseSheet.vue';
+import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
+import { createPinia, setActivePinia } from 'pinia';
+import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import { skyPhotoFocus } from '../src/composables/useSkySelection';
 
 /** "Photo, détail", "Photo, zoom" and "Photo, informations": a photo's own screen. */
@@ -94,6 +112,10 @@ describe("a photo's own screen", () => {
     push.mockReset();
     solved.value = true;
     skyPhotoFocus.value = null;
+    configureStorage(createMemoryStore());
+    setActivePinia(createPinia());
+    findDsoPlacementsInImage.mockReset().mockReturnValue([{ dso: { id: 'M31' }, x: 5, y: 5 }]);
+    drawPhotoOverlay.mockReset();
   });
 
   it("shows the photo whole under a top bar with the photo's name, and no reset button", async () => {
@@ -202,7 +224,8 @@ describe("a photo's own screen", () => {
     expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([
       'Voir sur la carte',
       'Modifier les métadonnées',
-      'Identifier les objets',
+      'Afficher les objets',
+      "Afficher les points d'intérêt",
       'Supprimer',
     ]);
   });
@@ -259,33 +282,82 @@ describe("a photo's own screen", () => {
     expect(push).toHaveBeenCalledWith('/gallery/photo/p1/edit');
   });
 
-  it('"Identifier les objets" puts the choice of an identification in place of the sheet, which its arrow brings back', async () => {
-    const w = mountPage();
-    await flushPromises();
-    const info = () => w.findComponent(PhotoInfoSheet).props('open');
-    const choose = () => w.findComponent(IdentifyChooseSheet).props('open');
-    await button(w, 'Informations sur la photo').trigger('click');
-    await button(w, 'Identifier les objets').trigger('click');
-    expect([info(), choose()]).toEqual([false, true]);
-    const sheet = w.findComponent(IdentifyChooseSheet);
-    expect(sheet.findAll('.mob-row-title').map((r) => r.text())).toEqual([
-      'Identifier un astéroïde',
-      'Identifier des supernovae',
-      'Identifier des comètes',
-    ]);
-    await sheet.find('button[aria-label="Retour"]').trigger('click');
-    expect([info(), choose()]).toEqual([true, false]);
+  describe('the objects and points of interest drawn over the photo ("Photo, objets affichés")', () => {
+    beforeEach(() => {
+      // The photo's area has a size, and its canvas a context, as in a browser.
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        top: 0,
+        width: 400,
+        height: 800,
+      } as DOMRect);
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+        new Proxy({}, { get: () => vi.fn() }) as unknown as CanvasRenderingContext2D,
+      );
+    });
+    const pressed = (w: ReturnType<typeof mountPage>, name: string) =>
+      button(w, name).attributes('aria-pressed');
 
-    await button(w, 'Identifier les objets').trigger('click');
-    await w.findComponent(IdentifyChooseSheet).findAll('.mob-row')[2].trigger('click');
-    expect(choose()).toBe(false);
-    expect(push).toHaveBeenCalledWith('/gallery/photo/p1/identify/comet');
-  });
+    it("draws the objects of the map's catalogues once their toggle is on, and offers the catalogues meanwhile", async () => {
+      useDisplayStore().setDsoCatalogs(['M']);
+      const w = mountPage();
+      await flushPromises();
+      await button(w, 'Informations sur la photo').trigger('click');
+      expect(pressed(w, 'Afficher les objets')).toBe('false');
+      expect(drawPhotoOverlay).not.toHaveBeenCalled();
+      expect(w.find('button[aria-label^="Catalogues"]').exists()).toBe(false);
 
-  it('cannot identify objects on a photo without a solve', async () => {
-    solved.value = false;
-    const w = mountPage();
-    await flushPromises();
-    expect(button(w, 'Identifier les objets').attributes('disabled')).toBeDefined();
+      await button(w, 'Afficher les objets').trigger('click');
+      await flushPromises();
+      expect(pressed(w, 'Afficher les objets')).toBe('true');
+      expect(findDsoPlacementsInImage.mock.lastCall![3]).toEqual(new Set(['M']));
+      const drawn = drawPhotoOverlay.mock.lastCall![1];
+      expect(drawn.placements).toHaveLength(1);
+      expect(drawn.pins).toEqual([]);
+      // 4000 px wide photo fitted in a 400 px wide area
+      expect(drawn.dispScale).toBeCloseTo(0.1);
+
+      const field = w.find('button[aria-label^="Catalogues"]');
+      await field.trigger('click');
+      const sheet = w
+        .findAllComponents(SkyCheckSheet)
+        .find((c) => c.props('title') === 'Catalogues')!;
+      expect(sheet.props('open')).toBe(true);
+      sheet.vm.$emit('update:selected', ['M', 'NGC']);
+      await flushPromises();
+      expect(findDsoPlacementsInImage.mock.lastCall![3]).toEqual(new Set(['M', 'NGC']));
+      // the map's own choice is not changed
+      expect(useDisplayStore().dsoCatalogs).toEqual(['M']);
+
+      await button(w, 'Afficher les objets').trigger('click');
+      await flushPromises();
+      expect(w.find('button[aria-label^="Catalogues"]').exists()).toBe(false);
+    });
+
+    it('pins the points of interest that have a sky position', async () => {
+      getPhotos.mockResolvedValue([
+        photo({
+          pointsOfInterest: [
+            { name: 'C/2023 A3', categoryId: 'cat-comet', ra: 10, dec: 20 },
+            { name: 'Sans position', categoryId: 'cat-comet' },
+          ] as Photo['pointsOfInterest'],
+        }),
+      ]);
+      const w = mountPage();
+      await flushPromises();
+      await button(w, "Afficher les points d'intérêt").trigger('click');
+      await flushPromises();
+      const drawn = drawPhotoOverlay.mock.lastCall![1];
+      expect(drawn.placements).toEqual([]);
+      expect(drawn.pins.map((p: { poi: { name: string } }) => p.poi.name)).toEqual(['C/2023 A3']);
+    });
+
+    it('cannot draw objects on a photo not placed on the sky, nor points of interest without a position', async () => {
+      solved.value = false;
+      const w = mountPage();
+      await flushPromises();
+      expect(button(w, 'Afficher les objets').attributes('disabled')).toBeDefined();
+      expect(button(w, "Afficher les points d'intérêt").attributes('disabled')).toBeDefined();
+    });
   });
 });
