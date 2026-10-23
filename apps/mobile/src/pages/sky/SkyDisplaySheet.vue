@@ -6,7 +6,7 @@ import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
 import type { ConstellationStyle } from '@myastrosky/core/types';
 import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
 import { buildPoiFilterGroups, poiKey } from '@myastrosky/core/poi';
-import { buildLabelFilterItems } from '@myastrosky/core/photo-placement';
+import { buildLabelFilterItems, NO_LABEL } from '@myastrosky/core/photo-placement';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import {
   budgetToSliderPos,
@@ -23,7 +23,7 @@ import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
-import SkyCheckSheet from './SkyCheckSheet.vue';
+import SkyCheckSheet, { type CheckGroup, type CheckOption } from './SkyCheckSheet.vue';
 import PhoneRadioSheet from '../../components/PhoneRadioSheet.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import caretIcon from '../../icons/chevron-down.svg?raw';
@@ -31,7 +31,8 @@ import caretIcon from '../../icons/chevron-down.svg?raw';
 // The board "Ciel, affichage": the map's display settings of the desktop's side panel. Every change applies at once.
 // The field buttons open a choice sheet: tick boxes when several values can be kept (types, catalogues), a radio
 // choice when there is one (drawing style, hemisphere, projection). The points of interest and the photo labels are
-// those of the photos placed on the map (`layer`), counted each time the sheet opens, as the desktop's dropdowns do.
+// those of the photos placed on the map (`layer`), counted each time the sheet opens, as the desktop's dropdowns do;
+// their sheets list them with the number of photos ("Ciel, affichage, points d'intérêt" / "étiquettes").
 const props = defineProps<{ layer?: PhotoLayer | null }>();
 const open = defineModel<boolean>('open', { required: true });
 
@@ -64,7 +65,7 @@ const {
   reduceDetailWhileMoving,
 } = storeToRefs(display);
 
-type Picker = 'types' | 'catalogs' | 'style' | 'hemisphere' | 'projection';
+type Picker = 'pois' | 'labels' | 'types' | 'catalogs' | 'style' | 'hemisphere' | 'projection';
 const pickerOpen = ref<Picker | null>(null);
 const pickerIs = (name: Picker) =>
   computed({
@@ -74,6 +75,8 @@ const pickerIs = (name: Picker) =>
       else if (pickerOpen.value === name) pickerOpen.value = null;
     },
   });
+const poisOpen = pickerIs('pois');
+const labelsOpen = pickerIs('labels');
 const typesOpen = pickerIs('types');
 const catalogsOpen = pickerIs('catalogs');
 const styleOpen = pickerIs('style');
@@ -111,19 +114,63 @@ const count = (keys: string[], flags: Record<string, boolean>) => ({
   total: keys.length,
 });
 const categories = usePoiCategoriesStore();
-const poiKeys = shallowRef<string[]>([]);
-const labelKeys = shallowRef<string[]>([]);
+const photoCount = (n: number) =>
+  n === 1 ? t('mobile.sky.photoCountOne') : t('mobile.sky.photoCountMany', { n });
+const poiGroups = shallowRef<CheckGroup[]>([]);
+const poiOptions = computed(() => poiGroups.value.flatMap((g) => g.options));
+const labelOptions = shallowRef<CheckOption[]>([]);
 function readPhotos() {
   const photos = props.layer?.getPlacedPhotos().map((p) => p.photo) ?? [];
-  poiKeys.value = buildPoiFilterGroups(
+  poiGroups.value = buildPoiFilterGroups(
     photos.map((p) => p.pointsOfInterest ?? []),
     categories.categories,
-  ).flatMap((g) => g.names.map((n) => poiKey(g.category.id, n.name)));
-  labelKeys.value = buildLabelFilterItems(photos).map((i) => i.label);
+  ).map((g) => ({
+    id: g.category.id,
+    label: g.category.name,
+    color: g.category.color,
+    options: g.names.map((n) => ({
+      value: poiKey(g.category.id, n.name),
+      label: n.name,
+      sub: photoCount(n.count),
+    })),
+  }));
+  labelOptions.value = buildLabelFilterItems(photos).map((i) => ({
+    value: i.label,
+    label: i.label === NO_LABEL ? t('display.noLabel') : i.label,
+    sub: photoCount(i.count),
+  }));
 }
 watch(open, (isOpen) => isOpen && readPhotos(), { immediate: true });
-const poi = computed(() => count(poiKeys.value, visiblePois.value));
-const labels = computed(() => count(labelKeys.value, visibleLabels.value));
+const keysOf = (options: CheckOption[]) => options.map((o) => o.value);
+const poi = computed(() => count(keysOf(poiOptions.value), visiblePois.value));
+const labels = computed(() => count(keysOf(labelOptions.value), visibleLabels.value));
+/** The keys shown (every key is shown unless its flag is off). */
+const shownOf = (options: CheckOption[], flags: Record<string, boolean>) =>
+  keysOf(options).filter((k) => flags[k] !== false);
+const poisShown = computed({
+  get: () => shownOf(poiOptions.value, visiblePois.value),
+  set: (shown: string[]) => {
+    const on = new Set(shown);
+    const keys = keysOf(poiOptions.value);
+    display.setAllPois(
+      keys.filter((k) => on.has(k)),
+      true,
+    );
+    display.setAllPois(
+      keys.filter((k) => !on.has(k)),
+      false,
+    );
+  },
+});
+const labelsShown = computed({
+  get: () => shownOf(labelOptions.value, visibleLabels.value),
+  // the store's `setAllLabels` forgets the labels it is not given: each changed label is set on its own
+  set: (shown: string[]) => {
+    const on = new Set(shown);
+    for (const k of keysOf(labelOptions.value))
+      if ((visibleLabels.value[k] !== false) !== on.has(k)) display.setVisibleLabel(k, on.has(k));
+  },
+});
 const styleName = computed(() => styleLabel(constellationStyle.value));
 const hemisphereName = computed(() =>
   t(hemisphere.value === 'north' ? 'display.hemisphereNorth' : 'display.hemisphereSouth'),
@@ -174,6 +221,7 @@ const dsoDensity = computed({
         block
         text-style="body"
         :aria-label="countAria(t('gallery.filterPoi'), poi.n, poi.total)"
+        @click="poisOpen = true"
       >
         <span class="mob-btn-key">{{ t('gallery.filterPoi') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{ countOf(poi.n, poi.total) }}</span>
@@ -186,6 +234,7 @@ const dsoDensity = computed({
         block
         text-style="body"
         :aria-label="countAria(t('gallery.filterLabels'), labels.n, labels.total)"
+        @click="labelsOpen = true"
       >
         <span class="mob-btn-key">{{ t('gallery.filterLabels') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{
@@ -366,6 +415,19 @@ const dsoDensity = computed({
       @update:model-value="display.setReduceDetailWhileMoving"
     />
 
+    <SkyCheckSheet
+      v-model:open="poisOpen"
+      :title="t('gallery.filterPoi')"
+      :options="poiOptions"
+      :groups="poiGroups"
+      v-model:selected="poisShown"
+    />
+    <SkyCheckSheet
+      v-model:open="labelsOpen"
+      :title="t('gallery.filterLabels')"
+      :options="labelOptions"
+      v-model:selected="labelsShown"
+    />
     <SkyCheckSheet
       v-model:open="typesOpen"
       :title="t('gallery.filterTypes')"

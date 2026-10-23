@@ -164,6 +164,8 @@ const fr = {
   sky: {
     layers: 'Calques de la carte',
     searchShort: 'Rechercher…',
+    photoCountOne: '1 photo',
+    photoCountMany: '{n} photos',
     sectionStars: 'Étoiles et constellations',
     searchClear: 'Effacer la recherche',
     closeSheet: 'Fermer la fiche',

@@ -326,6 +326,10 @@ ion-checkbox.mob-check-row::part(mark) {
   transform: scale(0.75);
 }
 ion-checkbox.mob-check-row::part(label) {
+  /* a row: the colour dot of a group's row (`.mob-row-lead`), then the title and its lines */
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
   margin: 0 var(--space-7) 0 0;
   white-space: normal;
   flex: 1;
