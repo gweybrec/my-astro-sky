@@ -105,6 +105,39 @@ describe('PhotoLayer', () => {
     expect(container.querySelector('img')!.style.transform).toMatch(/^matrix\(/);
   });
 
+  it('starts a photo placed by its stars with its thumbnail, and loads the full picture once it shows large', () => {
+    const starPlaced = (id: string, spread: number, size = 100) =>
+      placedPhoto(id, {
+        width: size,
+        height: size,
+        manualPlacement: undefined,
+        correspondences: [
+          [0, 0, 10, 50],
+          [100, 0, 10 + spread, 50],
+          [0, 100, 10, 50 + spread],
+        ].map(([photoX, photoY, starRa, starDec], i) => ({
+          pointIndex: i,
+          photoX,
+          photoY,
+          starHip: 0,
+          starName: `s${i}`,
+          starRa,
+          starDec,
+        })) as never,
+      });
+    const { container, layer } = make();
+    // its first 100 px spanning 0.01° it shows tiny; a 1000 px photo whose first 100 px span 40° shows over 300 px
+    layer.loadPhotos([
+      starPlaced('small', 0.01),
+      starPlaced('large', 40, 1000),
+      placedPhoto('hand'),
+    ]);
+    const src = () => [...container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
+    expect(src()).toEqual(['/files/small-thumb.jpg', '/files/large-thumb.jpg', '/files/hand.jpg']);
+    layer.updateTransforms();
+    expect(src()).toEqual(['/files/small-thumb.jpg', '/files/large.jpg', '/files/hand.jpg']);
+  });
+
   it('tells the app once when a photo cannot be placed', () => {
     const onPlacementError = vi.fn();
     const { layer } = make({ onPlacementError });
