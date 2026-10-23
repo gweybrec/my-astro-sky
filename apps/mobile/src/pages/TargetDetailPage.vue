@@ -2,7 +2,7 @@
 import { computed, ref, shallowRef } from 'vue';
 import { useRoute } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
-import { t } from '@myastrosky/core/i18n/index';
+import { getLang, t } from '@myastrosky/core/i18n/index';
 import { defaultPlanName, resolvePlanNight, scorePlanEntry } from '@myastrosky/core/targets/plan';
 import { todayISO } from '@myastrosky/core/targets/format';
 import {
@@ -125,7 +125,9 @@ async function addStar(planId: string) {
 
 async function addToNewPlan() {
   // Named after the night searched, as the desktop.
-  const id = await plans.createPlan(defaultPlanName(targetsPrefs.lastDateISO ?? todayISO(), t));
+  const id = await plans.createPlan(
+    defaultPlanName(targetsPrefs.lastDateISO ?? todayISO(), t, getLang()),
+  );
   if (!id) return;
   if (isStar.value) {
     await addStar(id);

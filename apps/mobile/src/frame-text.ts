@@ -7,7 +7,7 @@
 import type { RenderableFrame } from '@myastrosky/core/sky-map-types';
 import { customLocationLabelOr, defaultPlanName } from '@myastrosky/core/targets/plan';
 import { formatPaDeg } from '@myastrosky/core/frame-orientation';
-import { t } from '@myastrosky/core/i18n/index';
+import { getLang, t } from '@myastrosky/core/i18n/index';
 
 export type FrameKind = 'free' | 'plan' | 'freeMosaic' | 'planMosaic';
 
@@ -54,7 +54,7 @@ export function frameRotation(f: RenderableFrame): number {
 export function newPlanName(now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  return defaultPlanName(today, t);
+  return defaultPlanName(today, t, getLang());
 }
 
 /** One side of a smart telescope frame in degrees, as its Largeur / Hauteur show it: "2.1°", "0.73°" under a degree. */
