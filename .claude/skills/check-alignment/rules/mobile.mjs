@@ -967,10 +967,11 @@ export const views = [
     path: (ids) => `/gallery/photo/${ids.photo}/edit`,
     ready: '.mob-integration',
   },
-  // Identifying objects on the seed's photo: the choice from the photo's sheet, then each page (SkyBoT, TNS and the MPC
-  // answer from `fixtures`).
+  // The objects drawn over the seed's photo: its sheet with the objects toggle on and the catalogues field under the
+  // facts (board "Photo, objets affichés"). Then each identification page (SkyBoT, TNS and the MPC answer from
+  // `fixtures`).
   {
-    name: 'photo-identify-choose',
+    name: 'photo-objects',
     path: (ids) => `/gallery/photo/${ids.photo}`,
     ready: '.mob-photo-view',
     open: [
@@ -978,7 +979,7 @@ export const views = [
       { wait: OPEN_SHEET },
       { pause: 600 },
       { click: `${OPEN_SHEET} .mob-icon-row ion-button:nth-of-type(3)` },
-      { wait: 'ion-modal.show-modal .mob-sheet-header--bar' },
+      { wait: `${OPEN_SHEET} .mob-form-row--field` },
       { pause: 600 },
     ],
     scope: OPEN_SHEET,
