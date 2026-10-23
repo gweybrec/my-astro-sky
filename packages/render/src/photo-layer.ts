@@ -514,7 +514,12 @@ export class PhotoLayer {
     before: HTMLImageElement | null,
   ): PlacedPhoto {
     const img = document.createElement('img');
-    img.src = this.hooks.photoUrl(photo.filename);
+    // A photo placed by its stars starts with its thumbnail: the size switch in applyTransform loads the full picture
+    // once the photo shows large. Starting with the full picture downloaded and decoded every one at start, only to
+    // swap most of them for their thumbnails (44 full pictures on the phone for 42 shown as thumbnails). A hand-placed
+    // photo has no size switch and starts with its full picture.
+    const startSmall = !!photo.thumbFilename && !photo.manualPlacement;
+    img.src = this.hooks.photoUrl(startSmall ? photo.thumbFilename! : photo.filename);
     img.className = 'photo-overlay-img';
     img.draggable = false;
     img.style.visibility = 'hidden'; // Hide until loaded
