@@ -147,6 +147,7 @@ import {
   type MoonOverlay,
   type PlanTargetInfo,
 } from '@myastrosky/core/targets/plan';
+import { altChartScale } from '@myastrosky/core/targets/alt-chart';
 import {
   presetForSetupId,
   resolveSetupById,
@@ -5170,25 +5171,14 @@ export class TargetsView {
       };
 
     const span = win.end.getTime() - win.start.getTime() || 1;
-    // Fixed 0–90° Y scale so all objects are comparable.
-    const lo = 0,
-      hi = 90,
-      range = 90;
-    const usableH = H - 2 * padY;
-
-    // The plot is inset by padX so the left axis (and a transit line at the
-    // window start) sits fully inside the viewBox instead of being clipped.
-    const xAt = (d: Date) => padX + ((d.getTime() - win.start.getTime()) / span) * (W - padX);
-    const yAt = (alt: number) => {
-      const a = Math.max(lo, Math.min(hi, alt));
-      return padY + (1 - (a - lo) / range) * usableH;
-    };
+    // Fixed 0–90° Y scale so all objects are comparable (the phone's chart shares it). The plot is inset by padX so
+    // the left axis (and a transit line at the window start) sits fully inside the viewBox instead of being clipped.
+    const scale = altChartScale(win, { left: padX, right: W, top: padY, bottom: H - padY });
+    const { xAt, yAt } = scale;
 
     // Left-axis graduations: faint gridlines at 0/20/40/60/80° (labels drawn in HTML).
-    const TICK_DEGS = [0, 20, 40, 60, 80];
-    for (const deg of TICK_DEGS) {
+    for (const { y } of scale.ticks) {
       const g = document.createElementNS(NS, 'line');
-      const y = yAt(deg);
       g.setAttribute('x1', String(padX));
       g.setAttribute('x2', String(W));
       g.setAttribute('y1', String(y));
@@ -5198,7 +5188,7 @@ export class TargetsView {
       g.setAttribute('vector-effect', 'non-scaling-stroke');
       svg.appendChild(g);
     }
-    const ticks = TICK_DEGS.map((deg) => ({ label: formatAlt(deg), frac: yAt(deg) / H }));
+    const ticks = scale.ticks.map(({ deg, y }) => ({ label: formatAlt(deg), frac: y / H }));
 
     // Left vertical axis — always present, so every chart has a consistent frame.
     const axis = document.createElementNS(NS, 'line');
