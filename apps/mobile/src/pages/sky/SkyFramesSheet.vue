@@ -19,13 +19,7 @@ import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import SkySetupRows from './SkySetupRows.vue';
 import SkyMosaicSheet, { type MosaicDest } from './SkyMosaicSheet.vue';
-import SkySetupSwitchSheet from './SkySetupSwitchSheet.vue';
-import {
-  setupSwitchItems,
-  switchSetupDirectly,
-  type SwitchItem,
-} from '@myastrosky/app-state/setup-switch';
-import { useSetupLines } from '../../composables/useSetupLines';
+import PlanSetupField from '../plans/PlanSetupField.vue';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import addFrameIcon from '@icons/add-frame.svg?raw';
@@ -143,49 +137,9 @@ function addFreeFrame(setupId: string) {
 function newSetup() {
   pickSetupOpen.value = false;
   pickMosaicSetupOpen.value = false;
-  setupPickOpen.value = false;
   open.value = false;
   void router.push('/settings/setups/new');
 }
-// "Setup": the plan's gear setup (the desktop's dropdown, with "Choisir un setup" while it has none).
-const { lines: setupLines, load: loadSetups } = useSetupLines();
-const setupPickOpen = ref(false);
-const setupLabel = (id: string, name: string) => fov.specs.get(id)?.label ?? name;
-const setupOptions = computed(() =>
-  setupLines.value.map((l) => ({ value: l.setup.id, label: setupLabel(l.setup.id, l.setup.name) })),
-);
-const planSetupName = computed(() => {
-  const id = plan.value?.setupId;
-  if (!id) return t('fovOverlay.pickSetup');
-  return setupOptions.value.find((o) => o.value === id)?.label ?? fov.specs.get(id)?.label ?? '';
-});
-function openSetupPick() {
-  setupPickOpen.value = true;
-  loadSetups().catch((error) => void showError(error));
-}
-const switchOpen = ref(false);
-const switchTo = ref<{ setupId: string; items: SwitchItem[] } | null>(null);
-const planSetup = computed({
-  get: () => plan.value?.setupId ?? undefined,
-  set: (id: string | undefined) => {
-    setupPickOpen.value = false;
-    const p = plan.value;
-    if (!p || !id || id === p.setupId) return;
-    void (async () => {
-      try {
-        const items = await setupSwitchItems(p, id);
-        if (items.length === 0) await switchSetupDirectly(p, id);
-        else {
-          switchTo.value = { setupId: id, items };
-          switchOpen.value = true;
-        }
-      } catch (error) {
-        await showError(error);
-      }
-    })();
-  },
-});
-
 // "Ajouter une mosaïque": in a plan with a setup that tiles; free, once a setup that tiles is picked.
 const isSmart = (setupId: string) => !!fov.specs.get(setupId)?.smart;
 const canAddMosaic = computed(
@@ -239,19 +193,7 @@ function openPlan() {
       </PhoneButton>
     </div>
 
-    <div v-if="isPlan && plan" class="mob-form-row mob-form-row--field">
-      <PhoneButton
-        variant="field"
-        block
-        text-style="body"
-        :aria-label="`${t('mobile.sky.planSetup')} : ${planSetupName}`"
-        @click="openSetupPick"
-      >
-        <span class="mob-btn-key">{{ t('mobile.sky.planSetup') }}</span>
-        <span class="mob-btn-value mob-btn-value--swatch">{{ planSetupName }}</span>
-        <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-      </PhoneButton>
-    </div>
+    <PlanSetupField v-if="isPlan && plan" :plan="plan" @new-setup="newSetup" />
 
     <PhoneHelper v-if="isPlan && plan && !plan.setupId">{{
       t('fovOverlay.planNoSetup')
@@ -320,21 +262,6 @@ function openPlan() {
       <PhoneRadioGroup v-model="selected" :options="setOptions" :label="t('mobile.sky.frameSet')" />
       <PhoneRow :title="t('targets.plan.newPlan')" :lead="plusIcon" button @click="newPlan" />
     </PhoneSheet>
-    <PhoneSheet v-model:open="setupPickOpen" :title="t('mobile.sky.planSetup')">
-      <PhoneRadioGroup
-        v-model="planSetup"
-        :options="setupOptions"
-        :label="t('mobile.sky.planSetup')"
-      />
-      <PhoneRow :title="t('fovOverlay.newSetup')" :lead="plusIcon" button @click="newSetup" />
-    </PhoneSheet>
-    <SkySetupSwitchSheet
-      v-if="plan && switchTo"
-      v-model:open="switchOpen"
-      :plan="plan"
-      :setup-id="switchTo.setupId"
-      :items="switchTo.items"
-    />
     <PhoneSheet v-model:open="pickSetupOpen" :title="t('fovOverlay.pickSetup')">
       <IonList class="mob-list" lines="none">
         <SkySetupRows @pick="addFreeFrame" @add="newSetup" />

@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { fracToClock } from '@myastrosky/core/observation-windows';
 import { PLAN_SORT_KEYS, type PlanSortKey } from '@myastrosky/core/domain/plans';
 import { formatClock24 } from '@myastrosky/core/targets/format';
-import type { GearLists } from '@myastrosky/core/targets/plan-setup';
 import { planItemCount, resolvePlanNight } from '@myastrosky/core/targets/plan';
 import {
   deletePlanAPI,
@@ -18,13 +17,14 @@ import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { catalogsReady } from '../catalogs';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
-import { loadGearLists, planLookups } from '../composables/usePlans';
+import { planLookups } from '../composables/usePlans';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
+import PlanSetupField from './plans/PlanSetupField.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
 import PhoneReorderList from '../components/PhoneReorderList.vue';
 import PhoneFab from '../components/PhoneFab.vue';
@@ -35,7 +35,8 @@ import moreIcon from '../icons/more-vertical.svg?raw';
 import chevronIcon from '../icons/chevron-right.svg?raw';
 
 // The boards "Détail du plan", "Plan, actions" and "Plan, confirmer la suppression": the night of the plan, then its
-// targets in the plan's order, each with its first observation window and its setup. A tap opens the target; a drag
+// plan's equipment (a field: choosing another may ask about its mosaics, board "Ciel, changer d'équipement"), then its
+// targets in the plan's order, each with its first observation window. A tap opens the target; a drag
 // by its handle puts it elsewhere (one request). The actions rename the plan, choose how its targets are sorted (the
 // desktop's sorts) and delete it. Adding a target needs the targets list to pick from, which cannot add to a plan yet.
 const route = useRoute();
@@ -46,7 +47,6 @@ const { showError } = useErrorToast();
 
 const planId = computed(() => String(route.params.id));
 const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === planId.value));
-const gear = shallowRef<GearLists | null>(null);
 const actionsOpen = ref(false);
 const renameOpen = ref(false);
 const sortOpen = ref(false);
@@ -56,11 +56,6 @@ const handOrder = ref<string[] | null>(null);
 const night = computed(() =>
   plan.value ? resolvePlanNight(plan.value, targetsPrefs, planLookups) : null,
 );
-
-const setupName = computed(() => {
-  const id = plan.value?.setupId ?? targetsPrefs.setupId;
-  return gear.value?.setups.find((s) => s.id === id)?.name;
-});
 
 const summary = computed(() => {
   const n = night.value;
@@ -109,7 +104,7 @@ const rows = computed(() => {
       first && win
         ? `${fracToClock(first.startFrac, win)} – ${fracToClock(first.endFrac, win)}`
         : '';
-    return { id, name: names.get(id) ?? id, range, setup: setupName.value ?? '' };
+    return { id, name: names.get(id) ?? id, range };
   });
 });
 
@@ -118,7 +113,6 @@ async function load() {
     reloadTargetsPrefs();
     await catalogsReady();
     await store.load();
-    gear.value = await loadGearLists();
     handOrder.value = null;
   } catch (error) {
     void showError(error);
@@ -218,6 +212,7 @@ async function remove() {
           <PhoneSectionHeader>{{ t('targets.plan.pdf.summary') }}</PhoneSectionHeader>
           <PhoneFacts :facts="summary" />
         </template>
+        <PlanSetupField :plan="plan" bare @new-setup="router.push('/settings/setups/new')" />
         <PhoneSectionHeader>{{
           t('targets.plan.itemCount', { n: planItemCount(plan) })
         }}</PhoneSectionHeader>
@@ -234,9 +229,8 @@ async function remove() {
               <template v-for="row in rows.filter((r) => r.id === id)" :key="row.id">
                 <span class="mob-row-body">
                   <span class="mob-row-title m-body">{{ row.name }}</span>
-                  <span v-if="row.range || row.setup" class="mob-row-sub m-secondary">
-                    <span v-if="row.range" class="m-mono">{{ row.range }}</span>
-                    <template v-if="row.range && row.setup"> · </template>{{ row.setup }}
+                  <span v-if="row.range" class="mob-row-sub m-secondary">
+                    <span class="m-mono">{{ row.range }}</span>
                   </span>
                 </span>
                 <span class="mob-row-trail">

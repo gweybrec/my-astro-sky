@@ -269,7 +269,7 @@ describe('the Plans page', () => {
 });
 
 describe('the plan detail page', () => {
-  it('shows the night, the Moon and the targets with their window and setup', async () => {
+  it("shows the night, the Moon, the plan's equipment and the targets with their window", async () => {
     const { w } = await show(PlanDetailPage, '/plans/p1');
     const text = w.text();
     expect(text).toContain('Nuit du 2026-10-03');
@@ -285,7 +285,18 @@ describe('the plan detail page', () => {
     expect(names.some((n) => n.includes("Galaxie d'Andromède"))).toBe(true);
     const withWindow = rows.find((r) => r.text().includes("Nébuleuse de l'Amérique"))!;
     expect(withWindow.text()).toMatch(/\d\d:\d\d – \d\d:\d\d/);
-    expect(withWindow.text()).toContain('Équipement 1');
+    // the equipment is the plan's: a field, no longer repeated on each target
+    expect(withWindow.text()).not.toContain('Équipement 1');
+    const field = w.find('button[aria-label^="Équipement : "]');
+    expect(field.attributes('aria-label')).toContain('Équipement 1');
+    expect(field.find('.mob-btn-label').text()).toContain('Équipement 1');
+    await field.trigger('click');
+    await settle();
+    const pick = w
+      .findAllComponents({ name: 'PhoneSheet' })
+      .find((c) => c.props('title') === 'Équipement')!;
+    expect(pick.props('open')).toBe(true);
+    expect(pick.text()).toContain('Nouveau setup');
   });
 
   it('opens a target on a tap', async () => {
