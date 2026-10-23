@@ -83,6 +83,8 @@ describe('the photo sheet', () => {
       photo({
         observationDate: '2025-08-23T21:00:00.000Z',
         integrations: [{ frames: 40, seconds: 300, filter: 'Ha' }],
+        // the temperatures and the binning are the gallery's details, not the map's
+        captureDetails: { gain: 100, offset: 50, ccdTemp: -10, setTemp: -10, binning: '1x1' },
         gearSetupId: 's1',
         labels: ['Seestar'],
         notes: 'Nuit claire',
@@ -96,6 +98,8 @@ describe('the photo sheet', () => {
     ).toEqual([
       ["Date d'observation", '23 août 2025'],
       ['Exposition totale', '3h20'],
+      ['Gain', '100'],
+      ['Offset', '50'],
       ['Équipement', 'Newton 200 + ASI 183'],
       ['Intégration', 'Ha 40 × 300 s'],
       ['Étiquettes', 'Seestar'],

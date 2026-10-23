@@ -147,7 +147,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
         />
       </div>
     </div>
-    <PhotoFacts :photo="photo" />
+    <PhotoFacts :photo="photo" brief />
     <PhoneSliderRow
       v-model="opacity"
       :label="t('photos.opacity')"

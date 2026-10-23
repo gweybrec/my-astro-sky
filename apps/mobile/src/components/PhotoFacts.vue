@@ -8,7 +8,12 @@ import PhoneFacts from './PhoneFacts.vue';
 
 // What is known of a photo, read only, in compact facts (the boards "Ciel, photo sélectionnée" and "Photo,
 // informations"): the facts of `photoFacts`, with the name of the photo's equipment looked up here.
-const props = defineProps<{ photo: Photo; fileName?: boolean; objects?: boolean }>();
+const props = defineProps<{
+  photo: Photo;
+  fileName?: boolean;
+  objects?: boolean;
+  brief?: boolean;
+}>();
 
 const setupName = ref<string>();
 watch(
@@ -29,6 +34,7 @@ const facts = computed(() =>
     setupName: setupName.value,
     fileName: props.fileName,
     objects: props.objects,
+    brief: props.brief,
   }),
 );
 </script>
