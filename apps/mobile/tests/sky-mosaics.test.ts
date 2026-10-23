@@ -320,6 +320,9 @@ describe('the mosaic form', () => {
 });
 
 describe('the Setup of a plan in Contours de champ', () => {
+  /** The choice of the plan's setup, among the sheet's radio choices. */
+  const setupChoice = (w: ReturnType<typeof mount>) =>
+    w.findAllComponents({ name: 'PhoneRadioGroup' }).find((r) => r.props('label') === 'Setup')!;
   const mountSheet = () =>
     mount(SkyFramesSheet, { props: { open: true, map: fakeMap() }, global: { stubs: ionicStubs } });
 
@@ -332,8 +335,7 @@ describe('the Setup of a plan in Contours de champ', () => {
     const w = mountSheet();
     await flushPromises();
     expect(byText(w, 'Setup')!.text()).toContain('Équipement 1 · 2.5° × 1.7°');
-    const radios = w.findAllComponents({ name: 'PhoneRadioGroup' });
-    radios.at(-1)!.vm.$emit('update:modelValue', 's2');
+    setupChoice(w).vm.$emit('update:modelValue', 's2');
     await flushPromises();
     expect(settings).toHaveBeenCalledWith('p1', undefined, 's2', undefined, undefined);
   });
@@ -350,7 +352,7 @@ describe('the Setup of a plan in Contours de champ', () => {
     vi.spyOn(plans, 'load').mockResolvedValue();
     const w = mountSheet();
     await flushPromises();
-    w.findAllComponents({ name: 'PhoneRadioGroup' }).at(-1)!.vm.$emit('update:modelValue', 's2');
+    setupChoice(w).vm.$emit('update:modelValue', 's2');
     await flushPromises();
     expect(settings).not.toHaveBeenCalled();
     const sheet = w.findComponent({ name: 'SkySetupSwitchSheet' });

@@ -357,6 +357,17 @@ describe('Contours de champ', () => {
     return fov;
   }
 
+  it('offers the free frames and each plan in the frame set field', async () => {
+    withFreeFrames();
+    const { w } = mountSheet();
+    await w.find('button[aria-label^="Cadres"]').trigger('click');
+    const group = w.findComponent({ name: 'PhoneRadioGroup' });
+    expect(group.exists()).toBe(true);
+    expect(group.props('options').map((o: { label: string }) => o.label)).toContain(
+      'Cadres libres',
+    );
+  });
+
   it('lists the free frames with their tick boxes under "Tout sélectionner"', () => {
     withFreeFrames();
     const { w } = mountSheet();
