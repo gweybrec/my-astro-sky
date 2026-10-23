@@ -12,7 +12,10 @@ import { ionicStubs } from './helpers';
 const showError = vi.fn();
 const confirm = vi.fn();
 const showInfo = vi.fn();
-vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+const showNotice = vi.fn();
+vi.mock('../src/composables/useErrorToast', () => ({
+  useErrorToast: () => ({ showError, showNotice }),
+}));
 vi.mock('../src/composables/useConfirm', () => ({
   useConfirm: () => ({ confirm }),
   showInfo: (...a: unknown[]) => showInfo(...a),
@@ -20,6 +23,12 @@ vi.mock('../src/composables/useConfirm', () => ({
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
 
 const DSOS: Record<string, DSO> = {};
+// The search's multiple stars, made for the setup (the star catalogue is not loaded here).
+const STARS: DSO[] = [];
+vi.mock('@myastrosky/core/targets/multiple-stars', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/targets/multiple-stars')>()),
+  buildMultipleStarTargets: () => STARS,
+}));
 vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@myastrosky/core/catalog/dso-registry')>()),
   getDSOById: (id: string) => DSOS[id],
@@ -28,6 +37,7 @@ vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
 import PlansPage from '../src/pages/PlansPage.vue';
 import PlanDetailPage from '../src/pages/PlanDetailPage.vue';
 import PlanEntryPage from '../src/pages/PlanEntryPage.vue';
+import TargetDetailPage from '../src/pages/TargetDetailPage.vue';
 import PhoneReorderList from '../src/components/PhoneReorderList.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
@@ -139,6 +149,7 @@ const backend = {
     reorderEntries: vi.fn(),
     removeEntry: vi.fn(),
     updateEntry: vi.fn(),
+    addEntry: vi.fn(),
   },
 };
 
@@ -148,6 +159,7 @@ function app(path: string) {
     routes: [
       { path: '/plans/:id/:entryId', component: { template: '<div />' } },
       { path: '/plans/:id', component: { template: '<div />' } },
+      { path: '/targets/:dsoId', component: { template: '<div />' } },
       { path: '/:p(.*)*', component: { template: '<div />' } },
     ],
   });
@@ -212,6 +224,7 @@ beforeEach(() => {
   backend.plans.reorderEntries.mockResolvedValue(undefined);
   backend.plans.removeEntry.mockResolvedValue(undefined);
   backend.plans.updateEntry.mockResolvedValue(undefined);
+  backend.plans.addEntry.mockResolvedValue({ id: 'e9' });
   confirm.mockResolvedValue(true);
   setBackend(backend as never);
 });
@@ -470,6 +483,7 @@ describe('the plan entry page', () => {
     // the equipment is the plan's, chosen on the plan's page
     expect(w.findAll('.mob-fact-label').map((l) => l.text())).not.toContain('Équipement');
     expect(w.find('.mob-facts').classes()).toContain('mob-facts--compact');
+    expect(w.find('.mob-facts').classes()).not.toContain('mob-photo-facts');
     expect(text).toContain('4.0');
     expect(text).toContain('2.0°');
     expect(text).toContain('★★★★★');
@@ -697,5 +711,99 @@ describe('the plan entry page', () => {
       .trigger('click');
     await settle();
     expect(showError).toHaveBeenCalled();
+  });
+});
+
+describe('the target page ("Cibles, détail d\'une cible")', () => {
+  const row = (w: ReturnType<typeof mount>, title: string) =>
+    w.findAll('.mob-row').find((r) => r.text().trim() === title)!;
+
+  it("shows the target's figures, altitude and suggested filters for the search's night and setup", async () => {
+    const { w } = await show(TargetDetailPage, '/targets/NGC7000');
+    const labels = w.findAll('.mob-fact-label').map((l) => l.text());
+    expect(labels).toEqual(expect.arrayContaining(['Alt. max', 'Transit', 'Score', 'Champ']));
+    // no frame on a target of the list, and the setup is the search's
+    expect(labels).not.toContain('Angle');
+    expect(w.find('.mob-alt-chart svg').attributes('aria-label')).toMatch(
+      /^Trajectoire de la nuit/,
+    );
+    expect(w.findAll('.mob-alt-chart-window')).toHaveLength(0);
+    expect(row(w, 'Filtres suggérés').exists()).toBe(true);
+    expect(row(w, 'Afficher sur la carte').exists()).toBe(true);
+    expect(row(w, 'Ajouter à un plan').exists()).toBe(true);
+    expect(w.text()).not.toContain('Modifier');
+  });
+
+  it("shows the target on the map with the search's setup, leaving the Cibles tab", async () => {
+    const { w, router } = await show(TargetDetailPage, '/targets/NGC7000');
+    const replace = vi.spyOn(router, 'replace').mockResolvedValue(undefined);
+    await row(w, 'Afficher sur la carte').trigger('click');
+    await settle();
+    expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/targets', '/tabs/sky']);
+    expect(skyFocus.value).toMatchObject({ ra: DSOS.NGC7000.ra, dec: DSOS.NGC7000.dec });
+    expect(useFovFramesStore().framesVisible).toBe(true);
+  });
+
+  it('adds the target to a plan or takes it out, the plans ticked where it is, and says so', async () => {
+    const { w } = await show(TargetDetailPage, '/targets/M31');
+    await row(w, 'Ajouter à un plan').trigger('click');
+    await settle();
+    const picker = w
+      .findAllComponents({ name: 'PhoneSheet' })
+      .find((c) => c.props('title') === 'Ajouter au plan')!;
+    expect(picker.props('open')).toBe(true);
+    const ticks = picker.findAllComponents({ name: 'PhoneCheckRow' });
+    expect(ticks.map((c) => [c.props('title'), c.props('modelValue')])).toEqual(
+      PLANS.map((p) => [p.name, p.entries.some((e) => e.dsoId === 'M31')]),
+    );
+    const out = ticks.find((c) => c.props('modelValue') === false)!;
+    out.vm.$emit('update:modelValue', true);
+    await settle();
+    const planId = PLANS.find((p) => p.name === out.props('title'))!.id;
+    expect(backend.plans.addEntry).toHaveBeenCalledWith(planId, { dsoId: 'M31' });
+    expect(showNotice).toHaveBeenCalledWith(`Ajouté à « ${out.props('title')} »`);
+
+    const inside = ticks.find((c) => c.props('modelValue') === true)!;
+    inside.vm.$emit('update:modelValue', false);
+    await settle();
+    expect(backend.plans.removeEntry).toHaveBeenCalled();
+    expect(showNotice).toHaveBeenLastCalledWith(`Retiré de « ${inside.props('title')} »`);
+  });
+
+  it('shows a multiple star of the list and adds it to a plan as a frame on its position', async () => {
+    STARS.splice(0, STARS.length, {
+      ...DSOS.NGC7000,
+      id: 'star:95947',
+      type: 'MS',
+      displayName: 'Albireo',
+      catalogs: ['β Cyg'],
+      majAxis: null,
+      multiplicity: { components: 2, sep: '34.7"' },
+    } as DSO);
+    const { w } = await show(TargetDetailPage, '/targets/star%3A95947');
+    expect(w.find('.mob-topbar-title').text()).toBe('Albireo');
+    expect(w.find('.mob-alt-chart svg').exists()).toBe(true);
+    expect(w.findAll('.mob-fact-label').map((l) => l.text())).toContain('Alt. max');
+    await row(w, 'Ajouter à un plan').trigger('click');
+    await settle();
+    // added only, as the desktop: plain rows, no tick
+    expect(w.findAllComponents({ name: 'PhoneCheckRow' })).toHaveLength(0);
+    await row(w, PLANS[1].name).trigger('click');
+    await settle();
+    expect(backend.plans.addEntry).toHaveBeenCalledWith(PLANS[1].id, {
+      ra: DSOS.NGC7000.ra,
+      dec: DSOS.NGC7000.dec,
+    });
+    expect(showNotice).toHaveBeenCalledWith(`Ajouté à « ${PLANS[1].name} »`);
+  });
+
+  it('makes a new plan holding the target, named after the night searched', async () => {
+    const { w } = await show(TargetDetailPage, '/targets/M31');
+    await row(w, 'Ajouter à un plan').trigger('click');
+    await settle();
+    await row(w, 'Nouveau plan').trigger('click');
+    await settle();
+    expect(backend.plans.create).toHaveBeenCalledWith({ name: expect.stringMatching(/^Nuit du /) });
+    expect(backend.plans.addEntry).toHaveBeenCalledWith('p3', { dsoId: 'M31' });
   });
 });
