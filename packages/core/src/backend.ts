@@ -89,6 +89,7 @@ export interface Backend {
     | 'updateMetadata'
     | 'setManualPlacement'
     | 'setOrder'
+    | 'rotateRight'
   > & {
     upload(file: FileSource, fields: UploadFields, options?: TransferOptions): Promise<Photo>;
   };

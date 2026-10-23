@@ -11,7 +11,7 @@ import {
   reverseMap,
   saveBindings,
   defaultBindings,
-} from '../keyboard-shortcuts';
+} from '@myastrosky/core/keyboard-shortcuts';
 
 export const useShortcutsStore = defineStore('shortcuts', () => {
   const bindings = ref<Bindings>(loadBindings());

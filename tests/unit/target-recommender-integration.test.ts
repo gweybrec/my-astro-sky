@@ -17,15 +17,15 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { recommendTargets } from '../../src/target-recommender';
+import { recommendTargets } from '@myastrosky/core/target-recommender';
 import {
   filterTargetDSOs,
   snapToObservationTime,
   NIGHT_TIME_OPTIONS,
 } from '../../src/targets-view';
 import type { DSOFilterOptions } from '../../src/targets-view';
-import type { DSO } from '../../src/types';
-import type { GearPreset } from '../../src/gear-presets';
+import type { DSO } from '@myastrosky/core/types';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
 
 // ─── Mocks required by targets-view.ts imports ───────────────────────────────
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
@@ -34,7 +34,7 @@ vi.mock('../../src/api', () => ({
   createCustomGear: vi.fn(),
   deleteCustomGear: vi.fn(),
 }));
-vi.mock('../../src/gear-catalog', () => ({
+vi.mock('@myastrosky/core/gear-catalog', () => ({
   getTelescopes: vi.fn(),
   getCameras: vi.fn(),
   getAccessories: vi.fn(),
@@ -45,7 +45,7 @@ vi.mock('../../src/gear-catalog', () => ({
   accessoryLabel: vi.fn(),
 }));
 vi.mock('../../src/star-catalog', () => ({ getConstellationInfos: vi.fn() }));
-vi.mock('../../src/imaging-recipe', () => ({ recommendRecipe: vi.fn() }));
+vi.mock('@myastrosky/core/imaging-recipe', () => ({ recommendRecipe: vi.fn() }));
 vi.mock('../../src/tooltip-utils', () => ({
   showKeyValueTooltip: vi.fn(),
   showTextTooltip: vi.fn(),

@@ -1,3 +1,4 @@
+import frMobile from './mobile/fr';
 const fr = {
   app: {
     title: 'MyAstroSky',
@@ -772,7 +773,7 @@ const fr = {
     INVALID_PHOTO_Y: 'photoY invalide (nombre positif attendu)',
     INVALID_STAR_HIP: 'starHip invalide (entier positif attendu)',
     PHOTO_NOT_FOUND: 'Photo introuvable',
-    UNSUPPORTED_FORMAT: 'Format non supporté. Utilisez TIFF ou FITS.',
+    UNSUPPORTED_FORMAT: 'Format non supporté. Utilisez TIFF, FITS ou XISF.',
     NO_WCS_DATA: 'Aucune donnée WCS trouvée dans le fichier',
     NO_IMAGE_DIMENSIONS: "Dimensions de l'image introuvables",
     NOT_ENOUGH_CATALOG_STARS: "Pas assez d'étoiles du catalogue dans le champ",
@@ -881,6 +882,7 @@ const fr = {
   identify: {
     search: 'Rechercher',
     searching: 'Recherche…',
+    stillSearching: 'Toujours en cours : le service en ligne répond parfois lentement.',
     addSelected: 'Ajouter la sélection ({n})',
     obsDateLabel: 'Date d’observation (UTC)',
     dateRequired:
@@ -959,6 +961,7 @@ const fr = {
     loadFromWcsError: 'Impossible de lire les métadonnées de ce fichier',
     metadataTitle: 'Modifier les infos',
     showOnMap: 'Voir sur la carte',
+    rotatePhotoRight: 'Faire pivoter à droite',
     showDsos: 'Afficher les objets',
     showDsosUnavailable: "Cette photo n'est pas encore placée sur la carte du ciel",
     showPois: "Afficher les points d'intérêt",
@@ -1483,6 +1486,7 @@ const fr = {
     labelsForAll: 'Étiquettes pour toutes les photos',
     setupForAll: 'Équipement pour toutes les photos',
   },
+  mobile: frMobile,
 };
 
 // Recursive type: same structure with string leaves

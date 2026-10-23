@@ -1,4 +1,5 @@
 import type { Translations } from './fr';
+import esMobile from './mobile/es';
 
 const es: Translations = {
   app: {
@@ -774,7 +775,7 @@ const es: Translations = {
     INVALID_PHOTO_Y: 'photoY no válido (se esperaba número positivo)',
     INVALID_STAR_HIP: 'starHip no válido (se esperaba entero positivo)',
     PHOTO_NOT_FOUND: 'Foto no encontrada',
-    UNSUPPORTED_FORMAT: 'Formato no compatible. Usa TIFF o FITS.',
+    UNSUPPORTED_FORMAT: 'Formato no compatible. Usa TIFF, FITS o XISF.',
     NO_WCS_DATA: 'No se encontraron datos WCS en el archivo',
     NO_IMAGE_DIMENSIONS: 'Dimensiones de imagen no encontradas',
     NOT_ENOUGH_CATALOG_STARS: 'No hay suficientes estrellas del catálogo en el campo',
@@ -883,6 +884,7 @@ const es: Translations = {
   identify: {
     search: 'Buscar',
     searching: 'Buscando…',
+    stillSearching: 'Búsqueda en curso: el servicio en línea a veces tarda en responder.',
     addSelected: 'Añadir selección ({n})',
     obsDateLabel: 'Fecha de observación (UTC)',
     dateRequired: 'Esta foto no tiene fecha de observación: introdúzcala para buscar.',
@@ -960,6 +962,7 @@ const es: Translations = {
     loadFromWcsError: 'No se pudieron leer los metadatos de este archivo',
     metadataTitle: 'Editar información',
     showOnMap: 'Ver en el mapa',
+    rotatePhotoRight: 'Girar a la derecha',
     showDsos: 'Mostrar objetos',
     showDsosUnavailable: 'Esta foto aún no está colocada en el mapa del cielo',
     showPois: 'Mostrar puntos de interés',
@@ -1482,6 +1485,7 @@ const es: Translations = {
     labelsForAll: 'Etiquetas para todas las fotos',
     setupForAll: 'Equipo para todas las fotos',
   },
+  mobile: esMobile,
 };
 
 export default es;

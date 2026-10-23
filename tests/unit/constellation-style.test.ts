@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { isIAUStyle, IAU_CONSTELLATION_STYLES, type ConstellationStyle } from '../../src/types';
+import {
+  isIAUStyle,
+  IAU_CONSTELLATION_STYLES,
+  type ConstellationStyle,
+} from '@myastrosky/core/types';
 import { parseConstellationLines, normalizeRA } from '../../src/star-catalog';
 
 // ─── isIAUStyle ───────────────────────────────────────────────────────────────

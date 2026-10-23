@@ -6,7 +6,7 @@ import {
   PHOTO_PICKER_ACCEPT,
   RAW_COMPANION_ACCEPT,
   isRawAstroFile,
-} from '../../src/photo-formats';
+} from '@myastrosky/core/photo-formats';
 
 describe('RASTER_PHOTO_EXT_RE', () => {
   it('accepts jpg/jpeg/png/webp, case-insensitively', () => {
@@ -24,7 +24,7 @@ describe('RASTER_PHOTO_EXT_RE', () => {
 
 describe('RAW_ASTRO_EXT_RE / isRawAstroFile', () => {
   it('accepts tif/tiff/fit/fits, case-insensitively', () => {
-    for (const name of ['M101.fit', 'M101.FITS', 'M101.tif', 'M101.TIFF']) {
+    for (const name of ['M101.fit', 'M101.FITS', 'M101.tif', 'M101.TIFF', 'M101.xisf']) {
       expect(RAW_ASTRO_EXT_RE.test(name)).toBe(true);
       expect(isRawAstroFile(name)).toBe(true);
     }
@@ -68,6 +68,6 @@ describe('accept strings', () => {
   });
 
   it('the companion accept string only offers raw extensions', () => {
-    expect(RAW_COMPANION_ACCEPT).toBe('.fit,.fits,.tif,.tiff');
+    expect(RAW_COMPANION_ACCEPT).toBe('.fit,.fits,.tif,.tiff,.xisf');
   });
 });

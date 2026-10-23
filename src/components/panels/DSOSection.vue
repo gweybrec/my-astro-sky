@@ -84,8 +84,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
-import { useDisplayStore } from '../../stores/display';
-import { DSO_TYPES_ALL } from '../../display-settings';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
+import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import { useI18n } from '../../composables/useI18n';
 import CollapsibleSection from '../base/CollapsibleSection.vue';

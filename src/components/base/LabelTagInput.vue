@@ -45,7 +45,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import { useI18n } from '../../composables/useI18n';
-import { filterLabelCandidates } from '../../autocomplete-utils';
+import { filterLabelCandidates } from '@myastrosky/core/photo-metadata-draft';
 import { attachAnchoredPanel } from '../../popup-utils';
 
 const props = defineProps<{

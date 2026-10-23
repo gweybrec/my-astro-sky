@@ -13,8 +13,8 @@ import {
   thinCrossingsByX,
   isCardinalAz,
   type AltSample,
-} from '../../src/sky-geometry';
-import { lstHours, dateToJD, moonRaDecDeg } from '../../src/astro-time';
+} from '@myastrosky/core/sky-geometry';
+import { lstHours, dateToJD, moonRaDecDeg } from '@myastrosky/core/astro-time';
 
 describe('altAzFromRaDec', () => {
   it('object on meridian (LST = RA) has azimuth ≈ 180° (due south, north hemisphere)', () => {

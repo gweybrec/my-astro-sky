@@ -1,34 +1,34 @@
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
-import type { Photo, PoiCategory, PointOfInterest } from './types';
+import type { Photo, PoiCategory, PointOfInterest } from '@myastrosky/core/types';
+import { smartSortPhotos } from '@myastrosky/core/photo-search';
 import type { GearSetupData } from './api';
-import { photoFileUrl } from './api';
+import { photoFileUrl, rotatePhotoAPI } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
 import { createLazyObserver } from './lazy-image';
 import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
-import { computePhotoToProjMatrix } from './photo-placement';
-import { withCanonicalProjection } from './projection';
-import {
-  computePhotoDsoOverlayLayout,
-  renderPhotoDsoOverlay,
-  LABEL_FONT,
-} from './photo-dso-overlay-render';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { withCanonicalProjection } from '@myastrosky/core/projection';
+import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
+import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
-import { buildPoiFilterGroups, poisMatchFilter, resolveCategory, type PoiFilterGroup } from './poi';
+import { showToast } from './toast';
 import {
-  poiPinsInImage,
-  computePoiPinLayout,
-  renderPoiPinOverlay,
-  type PhotoPoiPin,
-} from './poi-pins';
+  buildPoiFilterGroups,
+  poisMatchFilter,
+  resolveCategory,
+  type PoiFilterGroup,
+} from '@myastrosky/core/poi';
+import { poiPinsInImage, type PhotoPoiPin } from '@myastrosky/render/poi-pins';
 import { poiTypeIcon } from './poi-icons';
 import { pinia } from './pinia-instance';
-import { useDisplayStore } from './stores/display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import PhotoDsoCatalogFilter from './components/panels/PhotoDsoCatalogFilter.vue';
 import { hasOpenOverlay } from './popup-utils';
 import mapPinSvg from './icons/map-pin.svg?raw';
+import rotateCwSvg from './icons/rotate-cw.svg?raw';
 import dsoGalaxySvg from './icons/dso-galaxy.svg?raw';
 import poiCometSvg from './icons/poi-comet.svg?raw';
 
@@ -49,58 +49,6 @@ function iconButton(svg: string, label: string): HTMLButtonElement {
  * it), never the class list, so pressing can't change the button's size. */
 function setToggleState(btn: HTMLButtonElement, on: boolean): void {
   btn.setAttribute('aria-pressed', String(on));
-}
-
-/**
- * Smart sorting for astronomical catalog names
- * e.g., M31, M100, NGC224, NGC1976, IC1805, SH2-106
- * Ensures M100 comes after M99, not before M2
- */
-export function smartSortPhotos(photos: Photo[]): Photo[] {
-  return [...photos].sort((a, b) => {
-    const nameA = a.originalName;
-    const nameB = b.originalName;
-
-    // Extract catalog prefix and number if present
-    const parseFilename = (
-      name: string,
-    ): { catalog: string; number: number | null; rest: string } => {
-      // Match patterns like M31, NGC224, IC1805, SH2-106, Sh2-106, etc.
-      const match = name.match(/^([A-Za-z]+)[\s-]?(\d+)/);
-      if (match) {
-        const catalog = match[1].toUpperCase();
-        const number = parseInt(match[2], 10);
-        const rest = name.substring(match[0].length);
-        return { catalog, number, rest };
-      }
-      return { catalog: '', number: null, rest: name };
-    };
-
-    const parsedA = parseFilename(nameA);
-    const parsedB = parseFilename(nameB);
-
-    // If both have catalog prefixes
-    if (parsedA.number !== null && parsedB.number !== null) {
-      // First sort by catalog name (M before NGC before IC, etc.)
-      const catalogCompare = parsedA.catalog.localeCompare(parsedB.catalog);
-      if (catalogCompare !== 0) return catalogCompare;
-
-      // Then by catalog number
-      if (parsedA.number !== parsedB.number) {
-        return parsedA.number - parsedB.number;
-      }
-
-      // Finally by the rest of the filename
-      return parsedA.rest.localeCompare(parsedB.rest);
-    }
-
-    // If only one has a catalog prefix, it comes first
-    if (parsedA.number !== null) return -1;
-    if (parsedB.number !== null) return 1;
-
-    // Neither has catalog prefix, use simple alphabetical
-    return nameA.localeCompare(nameB);
-  });
 }
 
 export class Gallery {
@@ -136,6 +84,8 @@ export class Gallery {
   onNavigateToMap: ((photo: Photo) => void) | null = null;
   onPhotoMetadataUpdated: ((photo: Photo) => void) | null = null;
   onDeletePhoto: ((photo: Photo) => void) | null = null;
+  /** A photo was turned a quarter: its picture and the pixel-measured data changed. */
+  onPhotoTurned: ((photo: Photo) => void) | null = null;
 
   constructor() {
     this.container = document.getElementById('gallery-container')!;
@@ -383,7 +333,7 @@ export class Gallery {
   private buildChips(
     dsoIds: string[],
     labels: string[],
-    pois: import('./types').PointOfInterest[] = [],
+    pois: import('@myastrosky/core/types').PointOfInterest[] = [],
     setupName?: string,
   ): HTMLElement {
     const wrap = document.createElement('div');
@@ -417,7 +367,8 @@ export class Gallery {
       chip.textContent = label;
       wrap.appendChild(chip);
     }
-    for (const id of dsoIds) {
+    // The most important catalogue first (Messier, NGC, IC, …).
+    for (const id of sortDsoIdsByImportance(dsoIds)) {
       const chip = document.createElement('span');
       chip.className = 'tag-chip';
       chip.textContent = id;
@@ -820,6 +771,27 @@ export class Gallery {
       if (await close()) this.onNavigateToMap?.(photo);
     });
 
+    // "Faire pivoter à droite": the picture is saved again turned a quarter; the photo keeps its place on the sky.
+    // Unsaved edits would be lost with the view reopened on the turned photo, so they are asked about first.
+    const rotateBtn = iconButton(rotateCwSvg, t('gallery.rotatePhotoRight'));
+    rotateBtn.addEventListener('click', async () => {
+      if (metaPanelIsDirty?.() && !(await confirmUnsavedChanges())) return;
+      rotateBtn.disabled = true;
+      try {
+        const turned = await rotatePhotoAPI(photo.id);
+        const idx = this.photos.findIndex((p) => p.id === turned.id);
+        if (idx !== -1) this.photos[idx] = turned;
+        this.renderCarousel();
+        this.applyFilters();
+        this.onPhotoTurned?.(turned);
+        rawClose();
+        void this.openDetailModal(turned);
+      } catch (err) {
+        rotateBtn.disabled = false;
+        showToast({ message: err instanceof Error ? err.message : String(err), type: 'error' });
+      }
+    });
+
     // ── "Show DSOs" toggle + catalog filter ────────────────────────────────────
     // photo→projection affine, independent of the sky map's view — null when the
     // photo has no manual placement and fewer than 2 resolvable correspondences.
@@ -906,36 +878,18 @@ export class Gallery {
       ctx.setTransform(dpr, 0, 0, dpr, -offsetX * dpr, -offsetY * dpr);
       ctx.clearRect(offsetX, offsetY, visWidth, visHeight);
 
-      const dispScale = imgRect.width / photo.width;
-      const items = computePhotoDsoOverlayLayout(
-        dsoPlacements,
-        dispScale,
-        // Measure against the same font renderPhotoDsoOverlay actually draws with —
-        // this runs first, before that font is ever set on this context, so relying
-        // on it already being set (the canvas default is narrower) under-measures
-        // every label and starves ellipseLabelClearance's footprint calculation.
-        (text) => {
-          ctx.font = LABEL_FONT;
-          return ctx.measureText(text).width;
+      drawPhotoOverlay(ctx, {
+        placements: dsoPlacements,
+        pins: drawPins ? poiPins : [],
+        dispScale: imgRect.width / photo.width,
+        viewport: {
+          left: offsetX,
+          top: offsetY,
+          right: offsetX + visWidth,
+          bottom: offsetY + visHeight,
         },
-        { left: offsetX, top: offsetY, right: offsetX + visWidth, bottom: offsetY + visHeight },
-      );
-      renderPhotoDsoOverlay(ctx, items);
-
-      if (drawPins) {
-        const pinItems = computePoiPinLayout(
-          poiPins,
-          dispScale,
-          (poi) => resolveCategory(poi.categoryId, getPoiCategories()).color,
-          (text) => {
-            ctx.font = LABEL_FONT;
-            return ctx.measureText(text).width;
-          },
-          { left: offsetX, top: offsetY, right: offsetX + visWidth, bottom: offsetY + visHeight },
-          items.map((item) => item.labelBox),
-        );
-        renderPoiPinOverlay(ctx, pinItems, LABEL_FONT);
-      }
+        pinColor: (poi) => resolveCategory(poi.categoryId, getPoiCategories()).color,
+      });
     }
 
     const showDsosBtn = iconButton(dsoGalaxySvg, t('gallery.showDsos'));
@@ -982,6 +936,7 @@ export class Gallery {
     btnRow.appendChild(showDsosBtn);
     btnRow.appendChild(showPoisBtn);
     btnRow.appendChild(showOnMapBtn);
+    btnRow.appendChild(rotateBtn);
 
     const dsoFilterEl = document.createElement('div');
     dsoFilterApp = createApp({

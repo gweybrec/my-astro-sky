@@ -10,11 +10,58 @@ import tseslint from 'typescript-eslint';
 import vue from 'eslint-plugin-vue';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import { existsSync, readFileSync } from 'node:fs';
+
+// The folders the repository's .gitignore anchors at the root (`/name/`) are local files, not source: ESLint does not read
+// .gitignore (Prettier does), so they are ignored here from the same lines.
+const rootIgnored = existsSync('.gitignore')
+  ? readFileSync('.gitignore', 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => /^\/[\w.-]+(\/[\w.-]+)*\/$/.test(line))
+      .map((line) => `${line.slice(1)}**`)
+  : [];
+
+const noReexport = {
+  selector: 'Program > ExportAllDeclaration[source.value=/^@myastrosky[/]/]',
+  message:
+    "Do not add a shim that re-exports an @myastrosky/* module: import '@myastrosky/<package>/<path>' directly.",
+};
+
+const REEXPORT_EXEMPT = [
+  'src/density-slider.ts',
+  'src/dso-catalog.ts',
+  'src/frame-controller.ts',
+  'src/star-catalog.ts',
+  'src/i18n/index.ts',
+  'server/wcs-reader.ts',
+];
+
+const fetchRules = [
+  {
+    selector:
+      "CallExpression[callee.name='fetch'] > Literal.arguments:first-child[value=/^\\/(api|uploads)\\//]",
+    message: 'Do not fetch the server directly: add a function to src/api.ts.',
+  },
+  {
+    selector:
+      "CallExpression[callee.name='fetch'] > TemplateLiteral.arguments:first-child > TemplateElement:first-child[value.raw=/^\\/(api|uploads)\\//]",
+    message: 'Do not fetch the server directly: add a function to src/api.ts.',
+  },
+  {
+    selector: 'Literal[value=/^\\/uploads\\//]',
+    message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+  },
+  {
+    selector: 'TemplateLiteral > TemplateElement:first-child[value.raw=/^\\/uploads\\//]',
+    message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
+  },
+];
 
 export default tseslint.config(
   {
     // Anything generated, vendored, or non-source. Mirrors .prettierignore.
     ignores: [
+      ...rootIgnored,
       'node_modules/**',
       'dist/**',
       'out/**',
@@ -23,6 +70,9 @@ export default tseslint.config(
       'coverage/**',
       'uploads/**',
       'public/data/**',
+      'apps/mobile/dist/**',
+      'apps/mobile/public/data/**',
+      'apps/mobile/public/gear/**',
       'public/swagger.json',
       'resources/**',
       'other-resources/**',
@@ -62,7 +112,14 @@ export default tseslint.config(
   // (tsconfig.json → src incl. .vue, tsconfig.server.json → server, tsconfig.test.json
   // → src/server/tests). This is what makes `no-floating-promises` possible.
   {
-    files: ['src/**/*.{ts,vue}', 'server/**/*.ts', 'tests/**/*.ts', 'packages/**/*.ts'],
+    files: [
+      'src/**/*.{ts,vue}',
+      'server/**/*.ts',
+      'tests/**/*.ts',
+      'packages/**/*.ts',
+      'apps/mobile/src/**/*.{ts,vue}',
+      'apps/mobile/tests/**/*.ts',
+    ],
     languageOptions: {
       parserOptions: {
         // Explicit list rather than `projectService` — the repo has one root
@@ -75,6 +132,9 @@ export default tseslint.config(
           './packages/core/tsconfig.json',
           './packages/backend-local/tsconfig.json',
           './packages/backend-http/tsconfig.json',
+          './packages/render/tsconfig.json',
+          './packages/app-state/tsconfig.json',
+          './apps/mobile/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],
@@ -117,38 +177,33 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
-    files: ['server/**/*.ts', 'electron/**/*.ts', 'tests/**/*.ts', '*.config.{ts,js,mjs}'],
+    files: [
+      'server/**/*.ts',
+      'electron/**/*.ts',
+      'tests/**/*.ts',
+      '*.config.{ts,js,mjs}',
+      'apps/mobile/*.config.ts',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
 
   // Screens reach their data through src/api.ts (which calls the backend), never the server directly:
   // no fetch of an /api/ or /uploads/ address, and no hand-built /uploads/ address (use photoFileUrl).
+  // Also: no one-line `export * from '@myastrosky/...'` shim files — import the package path directly. The files of
+  // REEXPORT_EXEMPT re-export a package module AND add something of their own (a wrapper, a platform-init import).
   {
     files: ['src/**/*.{ts,vue}'],
-    ignores: ['src/api.ts', 'src/backend.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            "CallExpression[callee.name='fetch'] > Literal.arguments:first-child[value=/^\\/(api|uploads)\\//]",
-          message: 'Do not fetch the server directly: add a function to src/api.ts.',
-        },
-        {
-          selector:
-            "CallExpression[callee.name='fetch'] > TemplateLiteral.arguments:first-child > TemplateElement:first-child[value.raw=/^\\/(api|uploads)\\//]",
-          message: 'Do not fetch the server directly: add a function to src/api.ts.',
-        },
-        {
-          selector: 'Literal[value=/^\\/uploads\\//]',
-          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
-        },
-        {
-          selector: 'TemplateLiteral > TemplateElement:first-child[value.raw=/^\\/uploads\\//]',
-          message: 'Do not build /uploads/ addresses: use photoFileUrl() from src/api.ts.',
-        },
-      ],
-    },
+    ignores: ['src/api.ts', 'src/backend.ts', ...REEXPORT_EXEMPT],
+    rules: { 'no-restricted-syntax': ['error', ...fetchRules, noReexport] },
+  },
+  {
+    files: REEXPORT_EXEMPT.filter((f) => f.startsWith('src/')),
+    rules: { 'no-restricted-syntax': ['error', ...fetchRules] },
+  },
+  {
+    files: ['server/**/*.ts', 'tests/**/*.ts'],
+    ignores: REEXPORT_EXEMPT,
+    rules: { 'no-restricted-syntax': ['error', noReexport] },
   },
 
   // @myastrosky/core must stay platform-neutral (browser, worker, Node, Electron, Capacitor):
@@ -200,6 +255,47 @@ export default tseslint.config(
     },
   },
 
+  // @myastrosky/render is the sky map's canvas drawing: browser globals, and it may import only core and its own
+  // files (what it needs from the app arrives through the platform hooks of core).
+  {
+    files: ['packages/render/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|\./)',
+              message: 'render may import only @myastrosky/core/* and its own files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // @myastrosky/app-state is shared by the desktop and the phone: browser globals, and it may import only core,
+  // vue, pinia and its own files (relative paths).
+  {
+    files: ['packages/app-state/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@myastrosky/core/|vue$|pinia$|\.{1,2}/)',
+              message:
+                'app-state may import only @myastrosky/core/*, vue, pinia and relative paths.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // @myastrosky/backend-local runs in the phone's WebView: browser globals, and it may import only core, fflate
   // and its own files. The Capacitor plugin is imported by `capacitor-sqlite-db.ts` alone; everything else of
   // the platform arrives through the options of createLocalBackend.
@@ -223,10 +319,31 @@ export default tseslint.config(
     },
   },
 
+  // The phone app (apps/mobile): browser globals. It may import the shared packages by their @myastrosky/* names,
+  // never the desktop's src/ or server/ (what both need goes to a shared package first).
+  {
+    files: ['apps/mobile/**/*.{ts,vue}'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(../){3,}(src|server)(/|$)',
+              message:
+                'The phone app may not import src/ or server/ of the desktop: move what it needs to a shared package.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Build/CLI scripts: plain ES modules, no type information, and console output is
   // their whole job — so silence `no-console` here.
   {
-    files: ['scripts/**/*.mjs', 'tests/helpers/*.mjs'],
+    files: ['scripts/**/*.mjs', 'tests/helpers/*.mjs', 'apps/mobile/scripts/**/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: { ...globals.node },

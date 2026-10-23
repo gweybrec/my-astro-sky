@@ -6,7 +6,7 @@ import {
   affineToCSS,
   applyAffine as applyAffineReal,
   invertAffine,
-} from '../../src/affine';
+} from '@myastrosky/core/affine';
 
 // Mock i18n so affine.ts can be imported in Node/happy-dom without localStorage issues
 vi.mock('@myastrosky/core/i18n/index', () => ({ t: (key: string) => key }));

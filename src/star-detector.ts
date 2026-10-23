@@ -1,4 +1,4 @@
-import type { DetectedSpot, StarDetectionResult } from './types';
+import type { DetectedSpot, StarDetectionResult } from '@myastrosky/core/types';
 import { t } from './i18n';
 
 const TARGET_WIDTH = 1000;

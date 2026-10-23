@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SpatialIndex } from '../../src/spatial-index';
+import { SpatialIndex } from '@myastrosky/core/spatial-index';
 
 describe('SpatialIndex', () => {
   describe('findNearest', () => {

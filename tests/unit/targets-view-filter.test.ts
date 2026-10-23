@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { filterTargetDSOs, sortCustomFirst } from '../../src/targets-view';
 import type { DSOFilterOptions } from '../../src/targets-view';
-import type { DSO } from '../../src/types';
+import type { DSO } from '@myastrosky/core/types';
 
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
 
@@ -13,7 +13,7 @@ vi.mock('../../src/api', () => ({
 }));
 
 // gear-catalog and star-catalog are used in TargetsView but not in filterTargetDSOs
-vi.mock('../../src/gear-catalog', () => ({
+vi.mock('@myastrosky/core/gear-catalog', () => ({
   getTelescopes: vi.fn(),
   getCameras: vi.fn(),
   getAccessories: vi.fn(),
@@ -24,8 +24,8 @@ vi.mock('../../src/gear-catalog', () => ({
   accessoryLabel: vi.fn(),
 }));
 vi.mock('../../src/star-catalog', () => ({ getConstellationInfos: vi.fn() }));
-vi.mock('../../src/target-recommender', () => ({ recommendTargets: vi.fn() }));
-vi.mock('../../src/imaging-recipe', () => ({ recommendRecipe: vi.fn() }));
+vi.mock('@myastrosky/core/target-recommender', () => ({ recommendTargets: vi.fn() }));
+vi.mock('@myastrosky/core/imaging-recipe', () => ({ recommendRecipe: vi.fn() }));
 vi.mock('../../src/tooltip-utils', () => ({
   showKeyValueTooltip: vi.fn(),
   showTextTooltip: vi.fn(),

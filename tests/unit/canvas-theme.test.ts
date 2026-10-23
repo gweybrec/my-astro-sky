@@ -4,9 +4,9 @@ import {
   DSO_LABEL_COLORS,
   DEFAULT_DSO_LABEL_COLOR,
   FONTS,
-} from '../../src/canvas-theme';
-import { DSO_TYPES_ALL } from '../../src/display-settings';
-import type { DSOType } from '../../src/types';
+} from '@myastrosky/core/canvas-theme';
+import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
+import type { DSOType } from '@myastrosky/core/types';
 
 describe('canvas-theme DSO tables', () => {
   it('has a marker style for every DSO type (no gaps)', () => {

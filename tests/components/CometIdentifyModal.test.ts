@@ -11,13 +11,13 @@ import { createTestingPinia } from '@pinia/testing';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import CometIdentifyModal from '../../src/components/modals/CometIdentifyModal.vue';
-import { computePhotoToProjMatrix } from '../../src/photo-placement';
-import { photoPixelToRaDec } from '../../src/asteroid-identify';
-import { cometRaDec } from '../../src/comet-ephemeris';
-import { dateToJD } from '../../src/astro-time';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { photoPixelToRaDec } from '@myastrosky/core/asteroid-identify';
+import { cometRaDec } from '@myastrosky/core/comet-ephemeris';
+import { dateToJD } from '@myastrosky/core/astro-time';
 import { parseCometEls } from '@myastrosky/core/services/identify';
-import { setCenterMode, setProjectionObserver } from '../../src/projection';
-import type { Photo, ManualPlacement } from '../../src/types';
+import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
+import type { Photo, ManualPlacement } from '@myastrosky/core/types';
 
 vi.mock('../../src/api', () => ({
   cometElementsAPI: vi.fn(),

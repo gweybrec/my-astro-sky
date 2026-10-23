@@ -54,7 +54,7 @@ describe('searchAsteroids()', () => {
       true,
     );
     expect(req.headers).toBeUndefined();
-    expect(req.timeoutMs).toBe(20_000);
+    expect(req.timeoutMs).toBe(60_000);
   });
 
   it('uses the given observatory code', async () => {

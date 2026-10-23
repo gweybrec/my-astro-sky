@@ -4,7 +4,7 @@
  */
 
 import { t } from './i18n';
-import { getDSOs, getDSOCatalog, DSO_CATALOGS_ALL } from './dso-catalog';
+import { DSO_CATALOGS_ALL } from './dso-catalog';
 import { getConstellationInfos, customLocationLabel, formatMultiplicity } from './star-catalog';
 import {
   getTelescopes,
@@ -23,18 +23,28 @@ import {
   setHiddenFilterIds,
   filterLabel,
   catalogFilterColor,
-} from './gear-catalog';
-import type { TelescopeData, CameraData, AccessoryData, CustomGearType } from './gear-catalog';
-import { formatGearFovLabel, fovDeg, formatFov, computeFovTargetScale } from './gear-presets';
-import { getHemisphere } from './projection';
-import { buildSetupInfoRows } from './setup-info';
-import { recommendTargets, scoreDso, type ObserverLocation } from './target-recommender';
-import { buildMultipleStarTargets } from './multiple-stars';
-import { formatPaDeg } from './frame-orientation';
-import { formatRA, formatDec, formatAlt, cardinalLetter } from './format-utils';
+} from '@myastrosky/core/gear-catalog';
+import { sortCustomFirst } from '@myastrosky/core/gear-sort';
+import type {
+  TelescopeData,
+  CameraData,
+  AccessoryData,
+  CustomGearType,
+} from '@myastrosky/core/gear-catalog';
+import {
+  formatGearFovLabel,
+  fovDeg,
+  formatFov,
+  computeFovTargetScale,
+} from '@myastrosky/core/gear-presets';
+import { getHemisphere } from '@myastrosky/core/projection';
+import { buildSetupInfoRows } from '@myastrosky/core/setup-info';
+import type { ObserverLocation } from '@myastrosky/core/target-recommender';
+import { formatPaDeg } from '@myastrosky/core/frame-orientation';
+import { formatRA, formatDec, formatAlt, cardinalLetter } from '@myastrosky/core/format-utils';
 import { attachAnchoredPanel } from './popup-utils';
-import type { GearPreset } from './gear-presets';
-import { recommendRecipe } from './imaging-recipe';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
+import { recommendRecipe } from '@myastrosky/core/imaging-recipe';
 import {
   createCustomGear,
   deleteCustomGear,
@@ -48,15 +58,17 @@ import {
 import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
 import { showToast } from './toast';
-import type { SkyMap } from './sky-map';
-import type { TargetSuggestion } from './target-recommender';
-import type { DSO } from './types';
+import type { SkyMap } from '@myastrosky/render/sky-map';
+import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
+import type { DSO } from '@myastrosky/core/types';
 import { createTargetsChip, createFilterBadge, buildIntegrationFilterField } from './chip-utils';
 import {
   newObservationWindow,
   windowDurationMs,
   framesInWindow,
   windowTimeOptions,
+  parseFrameSeconds,
+  snapStepFrac,
   formatWindowDuration,
   fracToClock,
   clockToFrac,
@@ -64,7 +76,7 @@ import {
   toBandFill,
   cssColorToHex,
   MIN_WINDOW_FRAC,
-} from './observation-windows';
+} from '@myastrosky/core/observation-windows';
 import type { ObservationWindow } from './api';
 import exportSvg from './icons/export.svg?raw';
 import trashSvg from './icons/trash.svg?raw';
@@ -75,114 +87,77 @@ import targetSvg from './icons/target.svg?raw';
 import trajectorySvg from './icons/trajectory.svg?raw';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
-import { usePlansStore } from './stores/plans';
-import { useFovFramesStore } from './stores/fov-frames';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { useUiStore } from './stores/ui';
 import { useHorizonStore } from './stores/horizon';
-import { useSkyRegionsStore } from './stores/sky-regions';
-import { isAltAzInRegion } from './region-geometry';
+import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { openManageRegionsModal } from './region-overlay';
 import { deleteFrameWithUndo } from './frame-delete';
 import { getDSOById } from './dso-catalog';
-import { twilightWindow, dateToJD, lstHours, moonRaDecDeg, moonPhase } from './astro-time';
 import {
   maxAltDuringWindow,
   sampleAltCurve,
-  sampleMoonAltCurve,
-  angularSeparationDeg,
-  moonDangerLevel,
-  altAzFromRaDec,
   azimuthCrossings,
   thinCrossingsByX,
   isCardinalAz,
   type AltSample,
-} from './sky-geometry';
-import { outlineFromGrid } from './mosaic';
-import { sortPlanTargets, firstWindowFracByEntry } from './plan-sort';
+} from '@myastrosky/core/sky-geometry';
+import { outlineFromGrid } from '@myastrosky/core/mosaic';
+import { sortPlanTargets, firstWindowFracByEntry } from '@myastrosky/core/plan-sort';
 import type { PlanPdfTarget } from './export-render';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
 import { confirmPlanDelete, confirmPlanEntryDelete } from './photo-delete-confirm';
+import {
+  loadTargetsPrefs as loadPrefs,
+  saveTargetsPrefs as savePrefs,
+  type SortKey,
+  type TargetsPrefs,
+} from '@myastrosky/core/targets/prefs';
+import {
+  ALL_DSO_TYPES,
+  filterTargetDSOs,
+  type DSOFilterOptions,
+} from '@myastrosky/core/targets/filters';
+import {
+  formatArcmin,
+  formatTime,
+  formatHours,
+  todayISO,
+  snapToObservationTime,
+  NIGHT_TIME_OPTIONS,
+} from '@myastrosky/core/targets/format';
+import { buildPageList, sortSuggestions, shuffleArray } from '@myastrosky/core/targets/sorting';
+import {
+  nightWindow,
+  moonSeparationAt,
+  moonEventsInWindow,
+  getPlanObserverFor,
+} from '@myastrosky/core/targets/night';
+import {
+  buildMoonOverlay,
+  computePlanTargets,
+  customLocationDso,
+  defaultPlanName,
+  moonPhaseForWindow,
+  moonSeparationRating,
+  planItemCount,
+  scorePlanEntry,
+  type MoonOverlay,
+  type PlanTargetInfo,
+} from '@myastrosky/core/targets/plan';
+import { altChartScale } from '@myastrosky/core/targets/alt-chart';
+import {
+  presetForSetupId,
+  resolveSetupById,
+  type GearLists,
+} from '@myastrosky/core/targets/plan-setup';
+import { runTargetRecommendation } from '@myastrosky/core/targets/recommend';
 
-// ─── Persistence key ─────────────────────────────────────────────────────────
-
-const PREFS_KEY = 'targets-prefs-v3';
-
-type SortKey =
-  | 'score'
-  | 'altitude'
-  | 'transit'
-  | 'magnitude'
-  | 'size'
-  | 'fov-fit'
-  | 'name'
-  | 'rating'
-  | 'difficulty';
-
-interface TargetsPrefs {
-  setupId: string | null;
-  lat: number | null;
-  lon: number | null;
-  lastDateISO: string | null;
-  coordFormat?: 'decimal' | 'dms';
-  enabledTypes?: string[];
-  resultLimit?: number;
-  sortBy?: SortKey;
-  horizonDirs?: string[];
-  /** Selected saved sky-region id, or null/undefined for "no region filter". */
-  skyRegionId?: string | null;
-  enabledRatings?: number[];
-  enabledDifficulties?: number[];
-  enabledCatalogs?: string[];
-  includeOversized?: boolean;
-  excludePhotographed?: boolean;
-  pageSize?: number;
-  enabledConstellations?: string[];
-  minAltDeg?: number;
-  maxAltDeg?: number;
-  respectHorizon?: boolean;
-  showMoon?: boolean;
-  showCardinal?: boolean;
-  obsStartTime?: string | null;
-  obsEndTime?: string | null;
-}
-
-function loadPrefs(): TargetsPrefs {
-  try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as TargetsPrefs;
-      if ('setupId' in parsed) return parsed;
-    }
-    // Migrate from v2 (had telescopeId/cameraId/accessoryId) — copy non-gear fields
-    const legacy = localStorage.getItem('targets-prefs-v2');
-    if (legacy) {
-      const old = JSON.parse(legacy) as any;
-      return {
-        setupId: null,
-        lat: old.lat ?? null,
-        lon: old.lon ?? null,
-        lastDateISO: old.lastDateISO ?? null,
-        coordFormat: old.coordFormat,
-        enabledTypes: old.enabledTypes,
-        sortBy: old.sortBy,
-        horizonDirs: old.horizonDirs,
-        enabledRatings: old.enabledRatings,
-        enabledDifficulties: old.enabledDifficulties,
-        enabledCatalogs: old.enabledCatalogs,
-        includeOversized: old.includeOversized,
-        pageSize: old.pageSize,
-      };
-    }
-  } catch {
-    // ignore
-  }
-  return { setupId: null, lat: null, lon: null, lastDateISO: null };
-}
-
-function savePrefs(p: TargetsPrefs): void {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(p));
-}
+// These stay importable from here: the unit tests and other desktop modules take them from this module.
+export { filterTargetDSOs, snapToObservationTime, NIGHT_TIME_OPTIONS, buildPageList };
+export type { DSOFilterOptions };
 
 /**
  * Tiny SVG of the Moon for one of the 8 standard phases (index 0 = new …
@@ -215,176 +190,12 @@ function moonPhaseIconSvg(phaseIndex: number): string {
   );
 }
 
-export function sortCustomFirst<T extends { id: string }>(arr: T[]): T[] {
-  return [...arr].sort((a, b) => {
-    const ac = a.id.startsWith('custom-');
-    const bc = b.id.startsWith('custom-');
-    return ac && !bc ? -1 : !ac && bc ? 1 : 0;
-  });
-}
+export { sortCustomFirst };
 
 // ─── DSO type labels ──────────────────────────────────────────────────────────
 
-const ALL_DSO_TYPES = [
-  'GxS',
-  'GxE',
-  'GxI',
-  'Gx',
-  'OC',
-  'GC',
-  'EN',
-  'RN',
-  'PN',
-  'SNR',
-  'DN',
-  'PS',
-  'MS',
-] as const;
-
-export interface DSOFilterOptions {
-  enabledTypes: Set<string>;
-  enabledRatings: Set<number>;
-  enabledDifficulties: Set<number>;
-  enabledCatalogs: Set<string>;
-  photographedIds: Set<string> | null;
-  enabledConstellations: Set<string> | null;
-}
-
-export function filterTargetDSOs(dsos: DSO[], opts: DSOFilterOptions): DSO[] {
-  return dsos.filter((d) => {
-    if (!opts.enabledTypes.has(d.type as string)) return false;
-    if (d.rating !== null && !opts.enabledRatings.has(d.rating)) return false;
-    if (d.difficulty !== null && !opts.enabledDifficulties.has(d.difficulty)) return false;
-    const cat = getDSOCatalog(d.id);
-    if (cat !== null && !opts.enabledCatalogs.has(cat)) return false;
-    if (opts.photographedIds !== null && opts.photographedIds.has(d.id)) return false;
-    if (
-      opts.enabledConstellations !== null &&
-      d.constellation !== null &&
-      !opts.enabledConstellations.has(d.constellation)
-    )
-      return false;
-    return true;
-  });
-}
-
 function dsoTypeLabel(type: string): string {
   return t(`dso.types.${type}`) || type;
-}
-
-// ─── Format helpers ───────────────────────────────────────────────────────────
-
-function formatArcmin(arcmin: number | null): string {
-  if (arcmin === null) return '—';
-  if (arcmin >= 60) return `${(arcmin / 60).toFixed(1)}°`;
-  return `${arcmin.toFixed(1)}'`;
-}
-
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatHours(h: number): string {
-  if (h < 1) return `${Math.round(h * 60)} min`;
-  return `${h.toFixed(1)} h`;
-}
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-const DAY_START_MIN = 8 * 60; // 08:00 — start of excluded daytime range
-const DAY_END_MIN = 18 * 60; // 18:00 — end of excluded daytime range
-
-function minutesToHHMM(total: number): string {
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-/**
- * Snap a `HH:MM` time to the nearest 30-minute step, then push it out of
- * daytime hours (08:00–18:00, exclusive) to the nearer night boundary.
- *
- * Used only to self-heal a pre-existing persisted value (e.g. from an older
- * app version) on load — new selections always come from {@link NIGHT_TIME_OPTIONS}
- * via a custom dropdown, not a native `<input type="time">`, whose own
- * picker/step/min-max handling turned out to be unreliable across
- * interaction paths (its scroll-wheel popup ignores `step` entirely, and
- * opening it on an empty field can commit the literal current wall-clock
- * time unaligned to any step).
- */
-export function snapToObservationTime(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number);
-  let total = (((h * 60 + m) % 1440) + 1440) % 1440;
-  total = (Math.round(total / 30) * 30) % 1440;
-  if (total > DAY_START_MIN && total < DAY_END_MIN) {
-    total = total - DAY_START_MIN <= DAY_END_MIN - total ? DAY_START_MIN : DAY_END_MIN;
-  }
-  return minutesToHHMM(total);
-}
-
-/** All valid observation-window times: 18:00–23:30, then 00:00–08:00, every 30 min. */
-export const NIGHT_TIME_OPTIONS: string[] = [
-  ...Array.from({ length: (1440 - DAY_END_MIN) / 30 }, (_, i) =>
-    minutesToHHMM(DAY_END_MIN + i * 30),
-  ),
-  ...Array.from({ length: DAY_START_MIN / 30 + 1 }, (_, i) => minutesToHHMM(i * 30)),
-];
-
-// ─── Sort/pagination helpers ──────────────────────────────────────────────────
-
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-/** Exported so other paginated lists (e.g. AsteroidIdentifyModal.vue's SkyBoT
- *  results) can reuse the exact same page-button layout/algorithm. */
-export function buildPageList(current: number, total: number): (number | null)[] {
-  if (total <= 1) return [0];
-  const pages = new Set<number>([0, total - 1]);
-  for (let i = Math.max(0, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.add(i);
-  const sorted = [...pages].sort((a, b) => a - b);
-  const result: (number | null)[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push(null);
-    result.push(sorted[i]);
-  }
-  return result;
-}
-
-function sortSuggestions(suggestions: TargetSuggestion[], sortBy: SortKey): TargetSuggestion[] {
-  const arr = [...suggestions];
-  switch (sortBy) {
-    case 'altitude':
-      return arr.sort((a, b) => b.maxAltDeg - a.maxAltDeg);
-    case 'transit':
-      return arr.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
-    case 'magnitude':
-      return arr.sort((a, b) => (a.dso.mag ?? 99) - (b.dso.mag ?? 99));
-    case 'size':
-      return arr.sort((a, b) => (b.dso.majAxis ?? 0) - (a.dso.majAxis ?? 0));
-    case 'fov-fit':
-      return arr.sort((a, b) => b.fovFitScore - a.fovFitScore);
-    case 'name':
-      return arr.sort((a, b) =>
-        (a.dso.catalogs[0] ?? a.dso.id).localeCompare(b.dso.catalogs[0] ?? b.dso.id, undefined, {
-          numeric: true,
-        }),
-      );
-    case 'rating':
-      return arr.sort((a, b) => (b.dso.rating ?? 0) - (a.dso.rating ?? 0));
-    case 'difficulty':
-      return arr.sort((a, b) => (b.dso.difficulty ?? 0) - (a.dso.difficulty ?? 0));
-    default:
-      return arr.sort((a, b) => b.score - a.score);
-  }
 }
 
 // ─── Custom gear modal ────────────────────────────────────────────────────────
@@ -1415,28 +1226,6 @@ export function buildGearSectionContent(
 }
 
 // ─── TargetsView class ────────────────────────────────────────────────────────
-
-/** A plan target resolved + scored for the current observer/night. */
-interface PlanTargetInfo {
-  entryId: string;
-  dso: DSO;
-  maxAltDeg: number;
-  bestTimeUtc: Date;
-  curve: AltSample[];
-  /** Moon–target angular separation (°) at the imaging time, or null when the moon overlay is off / moon never rises. */
-  moonSepDeg: number | null;
-}
-
-/**
- * Moon overlay for a plan render — identical for every row of a plan (same
- * night + location), so it is computed once and threaded into each chart.
- * Null when the toggle is off or the Moon never clears the horizon.
- */
-interface MoonOverlay {
-  curve: AltSample[];
-  phaseIndex: number;
-  illum: number;
-}
 
 export class TargetsView {
   private container: HTMLElement;
@@ -2556,140 +2345,34 @@ export class TargetsView {
     await new Promise((r) => setTimeout(r, 10));
 
     try {
-      const [setups, telescopes, cameras, accessories] = await Promise.all([
-        getGearSetups(),
-        getTelescopes(),
-        getCameras(),
-        getAccessories(),
-      ]);
-
-      const setup = setups.find((s) => s.id === this.prefs.setupId);
-      if (!setup) {
-        resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
-        allGenBtns.forEach((b) => {
-          b.disabled = false;
-        });
-        btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
-        return;
-      }
-
-      const telescope = telescopes.find((t) => t.id === setup.telescopeId);
-      if (!telescope) {
-        resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
-        allGenBtns.forEach((b) => {
-          b.disabled = false;
-        });
-        btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
-        return;
-      }
-
-      const camera = resolveSetupCamera(telescope, cameras, setup.cameraId);
-      if (!camera) {
-        resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
-        allGenBtns.forEach((b) => {
-          b.disabled = false;
-        });
-        btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
-        return;
-      }
-
-      const accessory =
-        telescope.is_smart_telescope || !setup.accessoryId
-          ? null
-          : (accessories.find((a) => a.id === setup.accessoryId) ?? null);
-
-      const preset = buildGearPreset(telescope, camera, accessory);
-
       const dateStr = dateInput.value || todayISO();
-      const dateNight = new Date(dateStr + 'T12:00:00Z');
-      const dsos = getDSOs();
-      const enabledTypes = new Set(this.prefs.enabledTypes ?? [...ALL_DSO_TYPES]);
-      const enabledRatings = new Set(this.prefs.enabledRatings ?? [1, 2, 3, 4, 5]);
-      const enabledDifficulties = new Set(this.prefs.enabledDifficulties ?? [1, 2, 3, 4, 5]);
-      const enabledCatalogs = new Set(this.prefs.enabledCatalogs ?? [...DSO_CATALOGS_ALL]);
-      const allConsts = getConstellationInfos();
-      const enabledConstellations =
-        this.prefs.enabledConstellations &&
-        this.prefs.enabledConstellations.length < allConsts.length
-          ? new Set(this.prefs.enabledConstellations)
-          : null;
-
-      let photographedIds: Set<string> | null = null;
-      if (this.prefs.excludePhotographed) {
-        const photos = await getPhotos();
-        photographedIds = new Set(photos.flatMap((p) => p.dsoIds));
-      }
-
-      const filteredDSOs = filterTargetDSOs(dsos, {
-        enabledTypes,
-        enabledRatings,
-        enabledDifficulties,
-        enabledCatalogs,
-        photographedIds,
-        enabledConstellations,
-      });
-      const location: ObserverLocation = { latDeg: lat, lonDeg: lon };
-      const enabledDirs = new Set(this.prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
-      const dirFilterActive = enabledDirs.size < 4;
-
-      const timeWindow = this.timeWindowFor(dateStr);
-      if (timeWindow) {
-        const dark = this.nightWindow(location, dateNight);
-        const overlapStart = Math.max(dark.start.getTime(), timeWindow.start.getTime());
-        const overlapEnd = Math.min(dark.end.getTime(), timeWindow.end.getTime());
-        if (overlapEnd <= overlapStart) {
-          resultsEl.innerHTML = `<div class="targets-empty">${t('targets.results.noWindowOverlap')}</div>`;
-          allGenBtns.forEach((b) => {
-            b.disabled = false;
-          });
-          btn.textContent = t(
-            mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest',
-          );
-          return;
-        }
-      }
-
-      // Multiple/double stars are synthetic point-like targets (not in the DSO catalog);
-      // inject them into the pool when their type chip is enabled.
-      const msTargets = enabledTypes.has('MS') ? buildMultipleStarTargets(preset) : [];
-      const pool = msTargets.length ? [...filteredDSOs, ...msTargets] : filteredDSOs;
-
-      const rawSuggestions = recommendTargets(pool, preset, location, dateNight, 5000, {
-        ignoreFovFit: this.prefs.includeOversized ?? false,
-        minAltDeg: this.prefs.minAltDeg ?? 20,
-        maxAltDeg: this.prefs.maxAltDeg ?? 80,
-        timeWindow: timeWindow ?? undefined,
-        horizonProfile: this.prefs.respectHorizon ? useHorizonStore(pinia).profile : null,
-      });
-
-      let suggestions: TargetSuggestion[];
-      if (!dirFilterActive) {
-        suggestions = rawSuggestions;
-      } else {
-        const midnightUTC = dateNight.getTime() + (12 - lon / 15) * 3600 * 1000;
-        suggestions = rawSuggestions.filter((s) => {
-          const isNorth = s.dso.dec > lat;
-          if (!enabledDirs.has('N') && isNorth) return false;
-          if (!enabledDirs.has('S') && !isNorth) return false;
-          const isEast = s.bestTimeUtc.getTime() > midnightUTC;
-          if (!enabledDirs.has('E') && isEast) return false;
-          if (!enabledDirs.has('W') && !isEast) return false;
-          return true;
-        });
-      }
-
-      // Sky region filter: composes as AND with the N/S/E/W chips above — a precise
-      // "what I can actually see from my garden" cut on top of the coarse quadrant one.
-      const activeRegion = this.prefs.skyRegionId
-        ? this.skyRegionsStore.regions.find((r) => r.id === this.prefs.skyRegionId)
+      const photographedIds = this.prefs.excludePhotographed
+        ? new Set((await getPhotos()).flatMap((p) => p.dsoIds))
         : null;
-      if (activeRegion) {
-        suggestions = suggestions.filter((s) => {
-          const lstH = lstHours(dateToJD(s.bestTimeUtc), lon);
-          const { altDeg, azDeg } = altAzFromRaDec(s.dso.ra, s.dso.dec, lstH, lat);
-          return isAltAzInRegion(azDeg, altDeg, activeRegion);
+      const result = runTargetRecommendation({
+        prefs: this.prefs,
+        dateStr,
+        gear: await this.loadGearLists(),
+        photographedIds,
+        horizonProfile: useHorizonStore(pinia).profile,
+        regions: this.skyRegionsStore.regions,
+      });
+
+      if (result.kind === 'empty') {
+        resultsEl.innerHTML = `<div class="targets-empty">${t(
+          result.reason === 'no-window-overlap'
+            ? 'targets.results.noWindowOverlap'
+            : result.reason === 'no-location'
+              ? 'targets.location.notSet'
+              : 'targets.results.empty',
+        )}</div>`;
+        allGenBtns.forEach((b) => {
+          b.disabled = false;
         });
+        btn.textContent = t(mode === 'random' ? 'targets.generateRandom' : 'targets.generateBest');
+        return;
       }
+      const { suggestions, preset, location, dateNight } = result;
 
       allGenBtns.forEach((b) => {
         b.disabled = false;
@@ -3201,7 +2884,7 @@ export class TargetsView {
       );
     if (moon) {
       const moonSep = this.moonSepMetaItem(
-        this.moonSeparationAt(dso.ra, dso.dec, s.bestTimeUtc),
+        moonSeparationAt(dso.ra, dso.dec, s.bestTimeUtc),
         moon.illum,
       );
       if (moonSep) statsGroup.appendChild(moonSep);
@@ -3367,9 +3050,9 @@ export class TargetsView {
       }
 
       const loc = this.lastLocation!;
-      const win = this.nightWindow(loc, this.lastDateNight!);
+      const win = nightWindow(loc, this.lastDateNight!);
       const curve = sampleAltCurve(dso.ra, dso.dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
-      const moon = this.buildMoonOverlay(loc, win);
+      const moon = buildMoonOverlay(loc, win, this.prefs.showMoon !== false);
 
       // Same three actions as the results card, on the right of the stats
       // row. Nav/edit both navigate away from this view, so — unlike the
@@ -3520,30 +3203,18 @@ export class TargetsView {
    */
   private moonSepMetaItem(sepDeg: number | null, illum: number): HTMLElement | null {
     if (sepDeg == null) return null;
-    const level = moonDangerLevel(sepDeg, illum);
+    const rating = moonSeparationRating(sepDeg, illum);
     // Lead with an adjective so the number reads as a distance from the target,
     // e.g. "Close (34°)" / "Far (109°)".
-    const adj = t(
-      {
-        danger: 'targets.plan.moonClose',
-        warn: 'targets.plan.moonModerate',
-        ok: 'targets.plan.moonFar',
-      }[level],
-    );
     const item = this.metaItem(
       t('targets.plan.moonSeparation'),
-      `${adj} (${formatAlt(sepDeg)})`,
+      `${t(rating.labelKey)} (${formatAlt(sepDeg)})`,
       t('targets.plan.moonSeparationHelp'),
     );
-    const token = {
-      danger: '--color-danger',
-      warn: '--status-warn-text',
-      ok: '--status-success-text',
-    }[level];
     const value = item.querySelector('.target-meta-value') as HTMLElement;
     // Inline style (not a utility class): `.target-meta-value` sets its own colour
     // and would win the cascade tie by source order, so set it directly here.
-    value.style.color = `var(${token})`;
+    value.style.color = `var(${rating.colorToken})`;
     // The "Moon distance" value ("Medium (67°)") is longer than most — keep it
     // on one line too (labels are already nowrap via metaItem).
     value.classList.add('whitespace-nowrap');
@@ -3553,17 +3224,6 @@ export class TargetsView {
   // ─── My Plans (night plans) ─────────────────────────────────────────────────
 
   /** Observer for a given observation night ISO date (falls back to the global date / today). */
-  private getPlanObserverFor(plan: Plan): { loc: ObserverLocation; dateNight: Date } | null {
-    // Per-plan location, falling back to the global location when unset (mirrors
-    // nightOf falling back to the global date).
-    const lat = plan.lat ?? this.prefs.lat;
-    const lon = plan.lon ?? this.prefs.lon;
-    if (lat == null || lon == null) return null;
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-    const dateStr = plan.nightOf ?? this.prefs.lastDateISO ?? todayISO();
-    return { loc: { latDeg: lat, lonDeg: lon }, dateNight: new Date(dateStr + 'T12:00:00Z') };
-  }
-
   /**
    * Open the sky map zoomed to fit a whole mosaic: selects the mosaic's plan,
    * shows the frames, and zooms using the mosaic's overall envelope (cols × rows
@@ -3597,27 +3257,22 @@ export class TargetsView {
     this.fovFramesStore.requestPopupOpen();
   }
 
+  /** The gear lists a setup id is resolved against (the resolution itself is `presetForSetupId` / `resolveSetupById` in core). */
+  private async loadGearLists(): Promise<GearLists> {
+    const [setups, telescopes, cameras, accessories] = await Promise.all([
+      getGearSetups(),
+      getTelescopes(),
+      getCameras(),
+      getAccessories(),
+    ]);
+    return { setups, telescopes, cameras, accessories };
+  }
+
   /** Resolve a gear setup id to a {@link GearPreset} (telescope+camera+accessory). */
   private async planPreset(setupId: string | null): Promise<GearPreset | null> {
     if (!setupId) return null;
     try {
-      const [setups, telescopes, cameras, accessories] = await Promise.all([
-        getGearSetups(),
-        getTelescopes(),
-        getCameras(),
-        getAccessories(),
-      ]);
-      const setup = setups.find((s) => s.id === setupId);
-      if (!setup) return null;
-      const telescope = telescopes.find((tel) => tel.id === setup.telescopeId);
-      if (!telescope) return null;
-      const camera = resolveSetupCamera(telescope, cameras, setup.cameraId);
-      if (!camera) return null;
-      const accessory =
-        telescope.is_smart_telescope || !setup.accessoryId
-          ? null
-          : (accessories.find((a) => a.id === setup.accessoryId) ?? null);
-      return buildGearPreset(telescope, camera, accessory);
+      return presetForSetupId(setupId, await this.loadGearLists());
     } catch (err) {
       reportUnknownRendererError('plan_preset_failed', err, { setupId });
       return null;
@@ -3633,179 +3288,15 @@ export class TargetsView {
   } | null> {
     if (!setupId) return null;
     try {
-      const [setups, telescopes, cameras, accessories] = await Promise.all([
-        getGearSetups(),
-        getTelescopes(),
-        getCameras(),
-        getAccessories(),
-      ]);
-      const setup = setups.find((s) => s.id === setupId);
-      if (!setup) return null;
-      const tel = telescopes.find((t) => t.id === setup.telescopeId);
-      if (!tel) return null;
-      const cam = resolveSetupCamera(tel, cameras, setup.cameraId);
-      if (!cam) return null;
-      const acc =
-        tel.is_smart_telescope || !setup.accessoryId
-          ? null
-          : (accessories.find((a) => a.id === setup.accessoryId) ?? null);
-      return { name: setup.name, tel, cam, acc };
+      return resolveSetupById(setupId, await this.loadGearLists());
     } catch (err) {
       reportUnknownRendererError('plan_setup_resolve_failed', err, { setupId });
       return null;
     }
   }
 
-  /** Dark-sky window for the night (mirrors recommendTargets fallback). */
-  private nightWindow(loc: ObserverLocation, dateNight: Date): { start: Date; end: Date } {
-    const tw = twilightWindow(dateNight, loc.latDeg, loc.lonDeg);
-    if (tw) return { start: tw.start, end: tw.end };
-    return {
-      start: new Date(
-        Date.UTC(
-          dateNight.getUTCFullYear(),
-          dateNight.getUTCMonth(),
-          dateNight.getUTCDate(),
-          20,
-          0,
-          0,
-        ),
-      ),
-      end: new Date(
-        Date.UTC(
-          dateNight.getUTCFullYear(),
-          dateNight.getUTCMonth(),
-          dateNight.getUTCDate() + 1,
-          6,
-          0,
-          0,
-        ),
-      ),
-    };
-  }
-
-  /**
-   * User-configured observation window (`obsStartTime`/`obsEndTime`, HH:MM in the
-   * browser's local time) for the given night, or null if not set — both fields
-   * must be filled in for the window to be active.
-   *
-   * "Night of `dateStr`" spans that evening through the following morning, so a
-   * pre-noon clock time (e.g. "01:00") is anchored to the calendar day *after*
-   * `dateStr`, while a PM/noon time is anchored to `dateStr` itself — matching
-   * dusk (evening of `dateStr`) / dawn (morning of `dateStr`+1) from
-   * `twilightWindow`. Without this, "01:00" would resolve to the night before
-   * the one actually being searched.
-   */
-  private timeWindowFor(dateStr: string): { start: Date; end: Date } | null {
-    const startStr = this.prefs.obsStartTime;
-    const endStr = this.prefs.obsEndTime;
-    if (!startStr || !endStr) return null;
-    const anchor = (hhmm: string): Date => {
-      const d = new Date(`${dateStr}T${hhmm}:00`);
-      if (parseInt(hhmm.slice(0, 2), 10) < 12) d.setDate(d.getDate() + 1);
-      return d;
-    };
-    const start = anchor(startStr);
-    let end = anchor(endStr);
-    if (end.getTime() <= start.getTime()) end = new Date(end.getTime() + 24 * 3600 * 1000);
-    return { start, end };
-  }
-
-  /** Moon–target angular separation (°) at a given UTC instant. */
-  private moonSeparationAt(raDeg: number, decDeg: number, at: Date): number {
-    const { raDeg: moonRa, decDeg: moonDec } = moonRaDecDeg(dateToJD(at));
-    return angularSeparationDeg(raDeg, decDeg, moonRa, moonDec);
-  }
-
-  /**
-   * Moon overlay for a plan night, computed once and shared by every row.
-   * Returns null when the toggle is off or the Moon stays below the horizon for
-   * the whole window (no curve, no separation badge).
-   */
-  private buildMoonOverlay(
-    loc: ObserverLocation,
-    win: { start: Date; end: Date },
-  ): MoonOverlay | null {
-    if (this.prefs.showMoon === false) return null;
-    const curve = sampleMoonAltCurve(loc.latDeg, loc.lonDeg, win.start, win.end);
-    if (!curve.some((s) => s.altDeg > 0)) return null; // moon never rises this night
-    const midJd = dateToJD(new Date((win.start.getTime() + win.end.getTime()) / 2));
-    const { phaseIndex, illum } = moonPhase(midJd);
-    return { curve, phaseIndex, illum };
-  }
-
-  private computePlanTargets(
-    plan: {
-      entries: Array<{
-        id: string;
-        dsoId: string | null;
-        ra: number | null;
-        dec: number | null;
-        mosaicId?: string | null;
-      }>;
-    },
-    loc: ObserverLocation,
-    win: { start: Date; end: Date },
-    moonEnabled: boolean,
-  ): PlanTargetInfo[] {
-    const out: PlanTargetInfo[] = [];
-    for (const e of plan.entries) {
-      if (e.mosaicId) continue; // mosaic tiles are summarised as one mosaic, not per-tile rows
-      const realDso = e.dsoId ? getDSOById(e.dsoId) : null;
-      // Effective position: explicit frame-centre override, else the DSO centre.
-      const ra = e.ra ?? realDso?.ra;
-      const dec = e.dec ?? realDso?.dec;
-      if (ra == null || dec == null) continue; // nothing to place
-      // A frame on empty sky keeps a trajectory but has no catalogue metadata.
-      const dso = realDso ?? this.customLocationDso(e.id, ra, dec);
-      const { maxAltDeg, atDate } = maxAltDuringWindow(
-        ra,
-        dec,
-        loc.latDeg,
-        loc.lonDeg,
-        win.start,
-        win.end,
-        10,
-      );
-      const curve = sampleAltCurve(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
-      const moonSepDeg = moonEnabled ? this.moonSeparationAt(ra, dec, atDate) : null;
-      out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve, moonSepDeg });
-    }
-    // Transit-ordered: earliest culmination first.
-    out.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
-    return out;
-  }
-
-  /** Synthetic DSO for a custom-location plan entry (no catalogued object). */
-  private customLocationDso(entryId: string, ra: number, dec: number): DSO {
-    return {
-      id: `custom:${entryId}`,
-      ra,
-      dec,
-      type: '?',
-      majAxis: null,
-      minAxis: null,
-      pa: 0,
-      mag: null,
-      displayName: customLocationLabel(ra, dec),
-      catalogs: [`${ra.toFixed(1)}°, ${dec.toFixed(1)}°`],
-      emissionLines: null,
-      constellation: null,
-      rating: null,
-      difficulty: null,
-      containerId: null,
-      priority: Number.MAX_SAFE_INTEGER,
-    };
-  }
-
   private defaultPlanName(): string {
-    const dateStr = this.prefs.lastDateISO ?? todayISO();
-    const nice = new Date(dateStr + 'T12:00:00Z').toLocaleDateString([], {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-    return t('targets.plan.defaultName', { date: nice });
+    return defaultPlanName(this.prefs.lastDateISO ?? todayISO(), t);
   }
 
   /**
@@ -3988,8 +3479,7 @@ export class TargetsView {
       count.textContent = `(${t('targets.plan.itemCount', { n })})`;
     };
     // A mosaic counts as one item (its tiles aren't listed individually).
-    const itemCount = () =>
-      plan.entries.filter((e) => !e.mosaicId).length + (plan.mosaics?.length ?? 0);
+    const itemCount = () => planItemCount(plan);
     setCount(itemCount());
 
     nameWrap.appendChild(nameEl);
@@ -4136,7 +3626,7 @@ export class TargetsView {
       trajWrap.innerHTML = '';
       currentInfos = [];
       currentWin = null;
-      const observer = this.getPlanObserverFor(plan);
+      const observer = getPlanObserverFor(plan, this.prefs);
       if (!observer) {
         trajWrap.innerHTML = `<div class="targets-empty">${t('targets.location.notSet')}</div>`;
         return;
@@ -4146,14 +3636,17 @@ export class TargetsView {
         trajWrap.appendChild(this.buildPlanEmptyState(plan));
         return;
       }
-      const win = this.nightWindow(observer.loc, observer.dateNight);
-      const moon = this.buildMoonOverlay(observer.loc, win);
+      const win = nightWindow(observer.loc, observer.dateNight);
+      const moon = buildMoonOverlay(observer.loc, win, this.prefs.showMoon !== false);
       // computePlanTargets returns a transit-ordered baseline; re-order by the
       // plan's chosen sort key (the exported PDF reads currentInfos, so both the
       // list and the PDF inherit this order).
       const sortKey = (plan.sortBy ?? 'transit') as PlanSortKey;
       const infos = sortPlanTargets(
-        this.computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false),
+        computePlanTargets(plan, observer.loc, win, this.prefs.showMoon !== false, {
+          getDsoById: getDSOById,
+          customLabel: customLocationLabel,
+        }),
         sortKey,
         firstWindowFracByEntry(plan.entries),
       );
@@ -4282,7 +3775,7 @@ export class TargetsView {
         );
         const mosaicSep = moon
           ? this.moonSepMetaItem(
-              this.moonSeparationAt(mosaic.centerRa, mosaic.centerDec, atDate),
+              moonSeparationAt(mosaic.centerRa, mosaic.centerDec, atDate),
               moon.illum,
             )
           : null;
@@ -4447,7 +3940,7 @@ export class TargetsView {
       }
       const win = currentWin;
       const infos = currentInfos;
-      const observer = this.getPlanObserverFor(plan);
+      const observer = getPlanObserverFor(plan, this.prefs);
       showToast({ message: t('settings.exportView.rendering'), type: 'info', duration: 2000 });
       try {
         const setupId = effectiveSetupId();
@@ -4458,7 +3951,9 @@ export class TargetsView {
         ]);
 
         // Moon overlay for the PDF charts (same night/location for every page).
-        const moon = observer ? this.buildMoonOverlay(observer.loc, win) : null;
+        const moon = observer
+          ? buildMoonOverlay(observer.loc, win, this.prefs.showMoon !== false)
+          : null;
         const moonShared = moon
           ? { moonCurve: moon.curve, moonPhaseIndex: moon.phaseIndex, moonIllum: moon.illum }
           : {};
@@ -4503,7 +3998,13 @@ export class TargetsView {
             );
             const realDso = m.dsoId ? getDSOById(m.dsoId) : null;
             const dso =
-              realDso ?? this.customLocationDso(`mosaic:${m.id}`, m.centerRa, m.centerDec);
+              realDso ??
+              customLocationDso(
+                `mosaic:${m.id}`,
+                m.centerRa,
+                m.centerDec,
+                customLocationLabel(m.centerRa, m.centerDec),
+              );
             if (!realDso && m.name) dso.displayName = m.name;
             const env = outlineFromGrid(m.cols, m.rows, tileW, tileH, m.overlapPct);
             targets.push({
@@ -4514,7 +4015,7 @@ export class TargetsView {
               nightWin: win,
               mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles },
               ...moonShared,
-              moonSepDeg: moon ? this.moonSeparationAt(m.centerRa, m.centerDec, atDate) : null,
+              moonSepDeg: moon ? moonSeparationAt(m.centerRa, m.centerDec, atDate) : null,
             });
           }
         }
@@ -4653,23 +4154,6 @@ export class TargetsView {
   }
 
   /** Moonrise/moonset crossings (alt = 0) within the night window, interpolated. */
-  private moonEventsInWindow(
-    loc: ObserverLocation,
-    win: { start: Date; end: Date },
-  ): { type: 'rise' | 'set'; time: Date }[] {
-    const curve = sampleMoonAltCurve(loc.latDeg, loc.lonDeg, win.start, win.end, 5);
-    const events: { type: 'rise' | 'set'; time: Date }[] = [];
-    for (let i = 1; i < curve.length; i++) {
-      const a = curve[i - 1],
-        b = curve[i];
-      if (a.altDeg < 0 === b.altDeg < 0) continue; // no horizon crossing
-      const frac = a.altDeg / (a.altDeg - b.altDeg); // linear interp to alt = 0
-      const tMs = a.time.getTime() + frac * (b.time.getTime() - a.time.getTime());
-      events.push({ type: b.altDeg >= a.altDeg ? 'rise' : 'set', time: new Date(tMs) });
-    }
-    return events;
-  }
-
   /**
    * Toolbar strip showing the night window (start/end) and, when the Moon rises
    * during that window, its rise time next to a phase icon matching the sky map's
@@ -4677,19 +4161,16 @@ export class TargetsView {
    */
   private buildNightInfoBar(): HTMLElement | null {
     if (!this.lastLocation || !this.lastDateNight) return null;
-    const win = this.nightWindow(this.lastLocation, this.lastDateNight);
+    const win = nightWindow(this.lastLocation, this.lastDateNight);
 
     const bar = document.createElement('div');
     bar.className = 'flex items-center gap-8 ml-8';
     bar.appendChild(this.inlineTimeStat(t('targets.plan.nightStart'), win.start));
     bar.appendChild(this.inlineTimeStat(t('targets.plan.nightEnd'), win.end));
 
-    const riseEvent = this.moonEventsInWindow(this.lastLocation, win).find(
-      (e) => e.type === 'rise',
-    );
+    const riseEvent = moonEventsInWindow(this.lastLocation, win).find((e) => e.type === 'rise');
     if (riseEvent) {
-      const midJd = dateToJD(new Date((win.start.getTime() + win.end.getTime()) / 2));
-      const { phaseIndex } = moonPhase(midJd);
+      const { phaseIndex } = moonPhaseForWindow(win);
       const moonriseGroup = document.createElement('div');
       moonriseGroup.className = 'flex items-center gap-2';
       const icon = document.createElement('span');
@@ -4808,7 +4289,7 @@ export class TargetsView {
 
     // Moon marker(s) — only when the overlay is on (and the moon clears the horizon).
     if (moon) {
-      const events = this.moonEventsInWindow(loc, win);
+      const events = moonEventsInWindow(loc, win);
       // Same x-mapping as the chart (viewBox W=120 with a padX=2 left inset), so
       // a marker sits exactly above where the moon line meets the horizon.
       const W = 120,
@@ -5046,14 +4527,14 @@ export class TargetsView {
 
     const applyPreset = (preset: GearPreset | null): void => {
       if (!preset) return;
-      const { score, fovFitScore } = scoreDso(dso, preset, info.maxAltDeg, {
-        ignoreFovFit: this.prefs.includeOversized ?? false,
-        minAltDeg: this.prefs.minAltDeg ?? 20,
-      });
-      scoreItem.querySelector('.target-meta-value')!.textContent = `${Math.round(score * 100)}%`;
-      fovItem.querySelector('.target-meta-value')!.textContent =
-        `${Math.round(fovFitScore * 100)}%`;
-      const recipe = recommendRecipe(dso, preset);
+      const { scorePct, fovFitPct, recipe } = scorePlanEntry(
+        dso,
+        preset,
+        info.maxAltDeg,
+        this.prefs,
+      );
+      scoreItem.querySelector('.target-meta-value')!.textContent = `${scorePct}%`;
+      fovItem.querySelector('.target-meta-value')!.textContent = `${fovFitPct}%`;
       totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours)}`;
       filterList.innerHTML = '';
       for (const f of recipe.filters) {
@@ -5223,8 +4704,7 @@ export class TargetsView {
 
     // Snap step as a fraction of the night, or 0 when the window has no frame
     // duration / snap is off (→ free drag).
-    const stepFrac = (w: ObservationWindow): number =>
-      w.snap && w.frameSeconds ? (w.frameSeconds * 1000) / nightSpanMs : 0;
+    const stepFrac = (w: ObservationWindow): number => snapStepFrac(w, nightSpanMs);
 
     const layer = document.createElement('div');
     layer.className = 'obs-window-layer';
@@ -5449,8 +4929,7 @@ export class TargetsView {
           oper.textContent = has ? '×' : '';
         };
         subInput.addEventListener('change', () => {
-          const n = Number(subInput.value);
-          w.frameSeconds = Number.isFinite(n) && n > 0 ? n : null;
+          w.frameSeconds = parseFrameSeconds(subInput.value);
           if (!w.frameSeconds) subInput.value = '';
           refreshFrames();
           persist();
@@ -5692,25 +5171,14 @@ export class TargetsView {
       };
 
     const span = win.end.getTime() - win.start.getTime() || 1;
-    // Fixed 0–90° Y scale so all objects are comparable.
-    const lo = 0,
-      hi = 90,
-      range = 90;
-    const usableH = H - 2 * padY;
-
-    // The plot is inset by padX so the left axis (and a transit line at the
-    // window start) sits fully inside the viewBox instead of being clipped.
-    const xAt = (d: Date) => padX + ((d.getTime() - win.start.getTime()) / span) * (W - padX);
-    const yAt = (alt: number) => {
-      const a = Math.max(lo, Math.min(hi, alt));
-      return padY + (1 - (a - lo) / range) * usableH;
-    };
+    // Fixed 0–90° Y scale so all objects are comparable (the phone's chart shares it). The plot is inset by padX so
+    // the left axis (and a transit line at the window start) sits fully inside the viewBox instead of being clipped.
+    const scale = altChartScale(win, { left: padX, right: W, top: padY, bottom: H - padY });
+    const { xAt, yAt } = scale;
 
     // Left-axis graduations: faint gridlines at 0/20/40/60/80° (labels drawn in HTML).
-    const TICK_DEGS = [0, 20, 40, 60, 80];
-    for (const deg of TICK_DEGS) {
+    for (const { y } of scale.ticks) {
       const g = document.createElementNS(NS, 'line');
-      const y = yAt(deg);
       g.setAttribute('x1', String(padX));
       g.setAttribute('x2', String(W));
       g.setAttribute('y1', String(y));
@@ -5720,7 +5188,7 @@ export class TargetsView {
       g.setAttribute('vector-effect', 'non-scaling-stroke');
       svg.appendChild(g);
     }
-    const ticks = TICK_DEGS.map((deg) => ({ label: formatAlt(deg), frac: yAt(deg) / H }));
+    const ticks = scale.ticks.map(({ deg, y }) => ({ label: formatAlt(deg), frac: y / H }));
 
     // Left vertical axis — always present, so every chart has a consistent frame.
     const axis = document.createElementNS(NS, 'line');

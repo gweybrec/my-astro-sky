@@ -16,9 +16,9 @@ import {
   cometRateArcminPerHour,
   cometHeliocentricXYZ,
   type CometElements,
-} from '../../src/comet-ephemeris';
-import { dateToJD } from '../../src/astro-time';
-import { angularSeparationDeg } from '../../src/sky-geometry';
+} from '@myastrosky/core/comet-ephemeris';
+import { dateToJD } from '@myastrosky/core/astro-time';
+import { angularSeparationDeg } from '@myastrosky/core/sky-geometry';
 
 const COMETS = parseCometEls(
   readFileSync(join(__dirname, '../fixtures/comets/CometEls-sample.txt'), 'utf-8'),

@@ -8,7 +8,7 @@ import {
   canvasRotationDegFromCursor,
   resizeFromCorner,
   convexPolygonsOverlap,
-} from '../../src/fov-frame-geometry';
+} from '@myastrosky/core/fov-frame-geometry';
 
 // Axis-aligned square centred at (100,100), half-size 50 → corners.
 const square = [

@@ -26,6 +26,7 @@ export interface FakeImageCodec extends ImageCodec {
   info: ImageInfo | null;
   failBake: boolean;
   failThumbnail: boolean;
+  failRotate: boolean;
 }
 
 /** A codec that does no image work: bytes pass through, a thumbnail is the byte `0x7a`. */
@@ -34,6 +35,7 @@ export function fakeImageCodec(): FakeImageCodec {
     info: { width: 100, height: 50 },
     failBake: false,
     failThumbnail: false,
+    failRotate: false,
     async probe() {
       if (!codec.info) throw new Error('not an image');
       return codec.info;
@@ -41,6 +43,10 @@ export function fakeImageCodec(): FakeImageCodec {
     async bakeOrientation(bytes) {
       if (codec.failBake) throw new Error('bake failed');
       return bytes;
+    },
+    async rotateRight(bytes) {
+      if (codec.failRotate) throw new Error('rotate failed');
+      return new Uint8Array([...bytes].reverse());
     },
     async thumbnail() {
       if (codec.failThumbnail) throw new Error('thumbnail failed');

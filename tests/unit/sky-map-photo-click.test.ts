@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { findTopPhotoOutlineAtPoint, pointInConvexPolygon } from '../../src/photo-outline';
-import type { Point } from '../../src/types';
+import { findTopPhotoOutlineAtPoint, pointInConvexPolygon } from '@myastrosky/core/photo-outline';
+import type { Point } from '@myastrosky/core/types';
 
 function rect(x0: number, y0: number, x1: number, y1: number): Point[] {
   return [

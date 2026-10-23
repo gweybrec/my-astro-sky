@@ -24,6 +24,7 @@ import type { ImageCodec, ImageInfo } from '../ports/image-codec';
 import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
 import type { CaptureDetails, Photo, PhotoIntegration, PointOfInterest } from '../types';
 import { sanitizeCaptureDetails } from '../wcs';
+import { rotatePhotoRight } from '../photo-rotation';
 
 /** Extensions an uploaded photo may have (lower case, with the dot). */
 export const ALLOWED_PHOTO_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -94,7 +95,7 @@ export interface PhotoService {
    * Makes the thumbnail `thumbFilename` from the image `filename` when the image exists and the thumbnail does not.
    * Rejects when the picture cannot be read or written; used after a backup import.
    */
-  ensureThumbnail(filename: string, thumbFilename: string): Promise<void>;
+  ensureThumbnail(filename: string, thumbFilename: string, replace?: boolean): Promise<void>;
   /** Replaces the metadata of a photo. Returns the cleaned `originalName` when one was given. Throws `notFound` (`PHOTO_NOT_FOUND`). */
   updateMetadata(id: string, changes: PhotoMetadataChanges): Promise<{ originalName?: string }>;
   /** Stores the placement as JSON, or clears it when `placement` is falsy. Throws `notFound` (`PHOTO_NOT_FOUND`). */
@@ -108,6 +109,13 @@ export interface PhotoService {
   removeRow(id: string): Promise<boolean>;
   /** Deletes the rows with these ids (not their files). Returns how many existed. Ids that are not strings are ignored. */
   removeRows(ids: readonly string[]): Promise<number>;
+  /**
+   * Turns a photo a quarter to the right: its picture is saved again turned, in the same format under a new file name
+   * (the old picture and thumbnail are deleted), its thumbnail made again, and what is measured in its pixels turned with it (size, matched stars, hand placement), so it keeps
+   * its place on the sky. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no such photo, `invalid`
+   * (`INVALID_IMAGE`) when its picture cannot be read or written. Returns the photo as stored.
+   */
+  rotateRight(id: string): Promise<Photo>;
   /** Deletes every photo row (not the files). Returns how many there were. */
   removeAllRows(): Promise<number>;
   /** Deletes every photo: the rows, the images and the thumbnails. Returns how many there were. */
@@ -169,6 +177,9 @@ const SELECT_NAMES = 'SELECT id, original_name FROM photos ORDER BY rowid ASC';
 const DELETE_PHOTO = 'DELETE FROM photos WHERE id = ?';
 const DELETE_ALL_PHOTOS = 'DELETE FROM photos';
 const UPDATE_PLACEMENT = 'UPDATE photos SET manual_placement = ? WHERE id = ?';
+const UPDATE_TURNED =
+  'UPDATE photos SET filename = ?, thumb_filename = ?, width = ?, height = ?, manual_placement = ? WHERE id = ?';
+const DELETE_CORRESPONDENCES_FOR = 'DELETE FROM star_correspondences WHERE photo_id = ?';
 const UPDATE_METADATA =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ? WHERE id = ?';
 const UPDATE_METADATA_WITH_NAME =
@@ -462,9 +473,13 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       return service.removeRows(doomed.map((r) => r.id));
     },
 
-    async ensureThumbnail(filename, thumbFilename) {
-      if ((await blobs.size(filename)) === null || (await blobs.size(thumbFilename)) !== null) {
-        return;
+    async ensureThumbnail(filename, thumbFilename, replace = false) {
+      // `replace`: the image has just been written and the thumbnail is made again without looking for the old one
+      // (looking for a missing file is an error the phone's file plugin writes to the console).
+      if (!replace) {
+        if ((await blobs.size(filename)) === null || (await blobs.size(thumbFilename)) !== null) {
+          return;
+        }
       }
       const bytes = await blobs.get(filename);
       if (!bytes) return;
@@ -678,6 +693,52 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     async setManualPlacement(id, placement) {
       const json = placement ? JSON.stringify(placement) : null;
       if ((await db.run(UPDATE_PLACEMENT, [json, id])).changes === 0) throw photoNotFound();
+    },
+
+    async rotateRight(id) {
+      const photo = await readOne(id);
+      if (!photo) throw photoNotFound();
+      const ext = extensionOf(photo.filename) || '.jpg';
+      // The turned picture is made first: nothing is changed when it cannot be.
+      let turnedBytes: Uint8Array;
+      try {
+        const bytes = await blobs.get(photo.filename);
+        if (!bytes) throw new Error('missing picture');
+        turnedBytes = await images.rotateRight(bytes, ext);
+      } catch {
+        throw invalidUpload("Impossible de faire pivoter l'image", 'INVALID_IMAGE');
+      }
+      // Saved under a new name, so that no browser shows the old picture or thumbnail from its cache.
+      const filename = `${id}-${newId()}${ext}`;
+      const thumbFilename = thumbnailNameOf(filename);
+      await blobs.put(filename, turnedBytes);
+      // A thumbnail that cannot be made is left out: a missing one is made when it is asked for.
+      await service.ensureThumbnail(filename, thumbFilename, true).catch(() => undefined);
+      const turned = rotatePhotoRight(photo);
+      try {
+        await db.batch([
+          {
+            sql: UPDATE_TURNED,
+            params: [
+              filename,
+              thumbFilename,
+              turned.width,
+              turned.height,
+              turned.manualPlacement ? JSON.stringify(turned.manualPlacement) : null,
+              id,
+            ],
+          },
+          { sql: DELETE_CORRESPONDENCES_FOR, params: [id] },
+          ...correspondenceStatements(id, turned.correspondences),
+        ]);
+      } catch (error) {
+        await blobs.remove(filename).catch(() => undefined);
+        await blobs.remove(thumbFilename).catch(() => undefined);
+        throw error;
+      }
+      await blobs.remove(photo.filename).catch(() => undefined);
+      await blobs.remove(thumbnailNameOf(photo.filename)).catch(() => undefined);
+      return (await readOne(id))!;
     },
 
     async setOrder(photoIds) {

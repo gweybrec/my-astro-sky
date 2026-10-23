@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveHover, type HoverAnchor, type HoverResolveInput } from '../../src/hover-resolve';
+import {
+  resolveHover,
+  type HoverAnchor,
+  type HoverResolveInput,
+} from '@myastrosky/core/hover-resolve';
 
 /**
  * Hover target resolution: which tooltip (if any) the cursor should show, and when a

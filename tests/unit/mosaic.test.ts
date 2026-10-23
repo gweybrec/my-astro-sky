@@ -13,7 +13,7 @@ import {
   clampSmartMosaicSize,
   outlineFromGrid,
   transformMosaicToSetup,
-} from '../../src/mosaic';
+} from '@myastrosky/core/mosaic';
 
 /** True if a list of offsets contains one ≈(gx, gy). */
 function hasOffset(list: Array<{ gx: number; gy: number }>, gx: number, gy: number): boolean {

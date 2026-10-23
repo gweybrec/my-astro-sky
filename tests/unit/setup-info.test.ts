@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildSetupInfoRows } from '../../src/setup-info';
-import type { TelescopeData, CameraData, AccessoryData } from '../../src/gear-catalog';
+import { buildSetupInfoRows } from '@myastrosky/core/setup-info';
+import type { TelescopeData, CameraData, AccessoryData } from '@myastrosky/core/gear-catalog';
 
 const TELESCOPE: TelescopeData = {
   id: 'celestron-c8-sct',

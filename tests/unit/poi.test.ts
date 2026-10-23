@@ -9,8 +9,8 @@ import {
   poiKey,
   isPoiVisible,
   UNCATEGORIZED_ID,
-} from '../../src/poi';
-import type { PoiCategory, PointOfInterest } from '../../src/types';
+} from '@myastrosky/core/poi';
+import type { PoiCategory, PointOfInterest } from '@myastrosky/core/types';
 
 const cats: PoiCategory[] = [
   { id: 'cat-comet', name: 'Comet', color: '#111', position: 0 },

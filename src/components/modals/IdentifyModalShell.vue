@@ -40,6 +40,15 @@
           </button>
         </div>
         <slot name="fields-hint" />
+        <!-- A search can take up to a minute: a spinner says it runs, and after SLOW_SEARCH_MS a line says it still
+             does, so that a long wait does not look like a frozen modal. -->
+        <div v-if="searching" class="flex flex-col gap-1" role="status">
+          <div class="flex items-center gap-2">
+            <span class="auto-solve-spinner"></span>
+            <span class="text-hint">{{ t('identify.searching') }}</span>
+          </div>
+          <div v-if="slow" class="text-hint">{{ t('identify.stillSearching') }}</div>
+        </div>
       </div>
 
       <slot name="photo-hint" />
@@ -95,9 +104,9 @@ import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { t } from '../../i18n';
 import { photoFileUrl } from '../../api';
-import { computePhotoToProjMatrix } from '../../photo-placement';
+import { isPhotoSolved, SLOW_SEARCH_MS } from '@myastrosky/core/photo-identify';
 import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
-import type { Photo } from '../../types';
+import type { Photo } from '@myastrosky/core/types';
 
 const props = defineProps<{
   photo: Photo;
@@ -121,7 +130,21 @@ const emit = defineEmits<{
   'photo-click': [{ x: number; y: number }];
 }>();
 
-const solved = computed(() => computePhotoToProjMatrix(props.photo) !== null);
+const solved = computed(() => isPhotoSolved(props.photo));
+
+// ─── A search that takes long ───────────────────────────────────────────────
+const slow = ref(false);
+let slowTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  () => props.searching,
+  (on) => {
+    clearTimeout(slowTimer);
+    slow.value = false;
+    if (on) slowTimer = setTimeout(() => (slow.value = true), SLOW_SEARCH_MS);
+  },
+  { immediate: true },
+);
+onUnmounted(() => clearTimeout(slowTimer));
 
 // ─── Zoom / pan ─────────────────────────────────────────────────────────────
 const imgEl = ref<HTMLImageElement | null>(null);

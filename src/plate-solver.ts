@@ -1,6 +1,11 @@
-import type { DetectedSpot, PlateSolveResult, PhotoCorrespondence, Star } from './types';
+import type {
+  DetectedSpot,
+  PlateSolveResult,
+  PhotoCorrespondence,
+  Star,
+} from '@myastrosky/core/types';
 import { getStars } from './star-catalog';
-import { project } from './projection';
+import { project } from '@myastrosky/core/projection';
 import { t } from './i18n';
 
 const DEG2RAD = Math.PI / 180;

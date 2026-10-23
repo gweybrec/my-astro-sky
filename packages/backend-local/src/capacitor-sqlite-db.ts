@@ -167,7 +167,7 @@ interface OpenTx {
 
 interface Waiter {
   cancelled: boolean;
-  timer: number | undefined;
+  timer: ReturnType<typeof setTimeout> | undefined;
   grant: (release: () => void) => void;
 }
 

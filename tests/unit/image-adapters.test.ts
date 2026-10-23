@@ -55,6 +55,25 @@ describe('createSharpImageCodec', () => {
     expect(await codec.probe(await png())).toEqual({ width: 24, height: 12 });
   });
 
+  it('turns a photo without visibly lowering it: a fine JPEG keeps nearly its size', async () => {
+    // Noise, so the file's size follows the quality closely; saved at 98 as the users' photos are.
+    const w = 300;
+    const h = 200;
+    const raw = Buffer.alloc(w * h * 3);
+    let seed = 7;
+    for (let i = 0; i < raw.length; i++)
+      raw[i] = (seed = (seed * 1103515245 + 12345) % 2 ** 31) % 256;
+    const fine = new Uint8Array(
+      await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+        .jpeg({ quality: 98 })
+        .toBuffer(),
+    );
+    const turned = await codec.rotateRight(fine, '.jpg');
+    expect(await codec.probe(turned)).toEqual({ width: h, height: w });
+    // At quality 90 or 92 it shrinks to about two thirds; at 98 it stays above 90 %.
+    expect(turned.length / fine.length).toBeGreaterThan(0.9);
+  });
+
   it('rejects bytes that are not an image', async () => {
     await expect(codec.probe(new Uint8Array([1, 2, 3, 4]))).rejects.toThrow();
     await expect(codec.probe(new Uint8Array())).rejects.toThrow();

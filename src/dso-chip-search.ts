@@ -1,5 +1,5 @@
-import type { DSO } from './types';
-import type { UnifiedSearchResult } from './search';
+import type { DSO } from '@myastrosky/core/types';
+import type { UnifiedSearchResult } from '@myastrosky/core/search';
 
 export function normalizeChipKey(input: string): string {
   return input.trim().toUpperCase();

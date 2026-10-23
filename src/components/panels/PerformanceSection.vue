@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import CollapsibleSection from '../base/CollapsibleSection.vue';
 import CheckRow from '../base/CheckRow.vue';
-import { useDisplayStore } from '../../stores/display';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useI18n } from '../../composables/useI18n';
 import {
   sliderPosToBudget,

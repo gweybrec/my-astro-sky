@@ -6,7 +6,7 @@ import {
   RATE_LADDER,
   DEFAULT_SETTINGS,
   type SkyTimeSettings,
-} from '../../src/sky-time-settings';
+} from '@myastrosky/core/sky-time-settings';
 
 describe('sky-time-settings', () => {
   beforeEach(() => {

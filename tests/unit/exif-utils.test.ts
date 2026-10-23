@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rawToBrowserCoords } from '../../server/exif-utils';
+import { rawToBrowserCoords } from '@myastrosky/core/exif-utils';
 
 describe('rawToBrowserCoords', () => {
   // Use a non-square image so W and H errors are distinguishable

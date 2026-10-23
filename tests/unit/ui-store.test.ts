@@ -6,7 +6,7 @@ import {
   SKY_TOOLTIP_SAFE_MARGIN,
   tooltipSafeZoneContains,
 } from '../../src/stores/ui';
-import type { DSO } from '../../src/types';
+import type { DSO } from '@myastrosky/core/types';
 
 const fakeDSO = (id: string) => ({ id, catalogs: [id] }) as unknown as DSO;
 

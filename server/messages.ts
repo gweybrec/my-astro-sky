@@ -194,8 +194,8 @@ export const msg = {
     unsupportedWcsFormat: (lang: ServerLang) =>
       m(
         lang,
-        'Format non supporté. Utilisez TIFF ou FITS.',
-        'Unsupported format. Use TIFF or FITS.',
+        'Format non supporté. Utilisez TIFF, FITS ou XISF.',
+        'Unsupported format. Use TIFF, FITS or XISF.',
       ),
 
     noWcsData: (lang: ServerLang) =>
@@ -241,8 +241,8 @@ export const msg = {
     unsupportedRawFormat: (lang: ServerLang, ext: string) =>
       m(
         lang,
-        `Format brut non pris en charge : ${ext}. Utilisez TIFF ou FITS.`,
-        `Unsupported raw format: ${ext}. Use TIFF or FITS.`,
+        `Format brut non pris en charge : ${ext}. Utilisez TIFF, FITS ou XISF.`,
+        `Unsupported raw format: ${ext}. Use TIFF, FITS or XISF.`,
       ),
 
     rawDecodeFailed: (lang: ServerLang, detail: string) =>

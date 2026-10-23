@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import PoiEditor from '../../src/components/modals/PoiEditor.vue';
-import type { ManualPlacement, Photo, PointOfInterest } from '../../src/types';
+import type { ManualPlacement, Photo, PointOfInterest } from '@myastrosky/core/types';
 
 vi.mock('../../src/ui', () => ({
   triggerAsteroidModal: vi.fn(),

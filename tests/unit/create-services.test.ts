@@ -3,7 +3,7 @@
 import Database from 'better-sqlite3';
 import { describe, it, expect, vi } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
-import { createServices } from '../../server/create-services';
+import { createServices } from '@myastrosky/core/services/create-services';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';

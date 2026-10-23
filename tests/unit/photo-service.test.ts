@@ -978,6 +978,67 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await calls(() => svc.importPhoto(backup({ id: 'x3' }), 'skip'))).toBe(3);
     });
   });
+  describe('rotateRight', () => {
+    const placement = {
+      centerRa: 10,
+      centerDec: 41,
+      rotationDeg: 30,
+      projPerPx: 0.001,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const stored = async () => {
+      await svc.insert(newPhoto('p1', { manualPlacement: JSON.stringify(placement) as never }));
+      await blobs.put('p1.jpg', new Uint8Array([1, 2, 3]));
+      await blobs.put('p1_thumb.jpg', new Uint8Array([7]));
+    };
+
+    it('saves the picture turned, makes its thumbnail again and turns what is measured in its pixels', async () => {
+      await stored();
+      const turned = await svc.rotateRight('p1');
+      expect([turned.width, turned.height]).toEqual([600, 800]);
+      // (x, y) of the 800 x 600 picture becomes (600 - y, x)
+      expect(turned.correspondences.map((c) => [c.photoX, c.photoY])).toEqual([
+        [600, 0],
+        [580, 10],
+      ]);
+      expect(turned.manualPlacement?.rotationDeg).toBe(-60);
+      expect(await svc.get('p1')).toEqual(turned);
+      // a new file name, so no browser shows the old picture from its cache; the old files are gone
+      expect(turned.filename).toMatch(/^p1-.+.jpg$/);
+      expect(turned.thumbFilename).toBe(turned.filename.replace('.jpg', '_thumb.jpg'));
+      expect([...(await blobs.get(turned.filename))!]).toEqual([3, 2, 1]);
+      expect([...(await blobs.get(turned.thumbFilename!))!]).toEqual([0x7a]);
+      expect([...blobs.store.keys()].sort()).toEqual(
+        [turned.filename, turned.thumbFilename].sort(),
+      );
+    });
+
+    it('changes nothing when the picture cannot be turned', async () => {
+      await stored();
+      const before = await svc.get('p1');
+      codec.failRotate = true;
+      expect((await rejection(svc.rotateRight('p1'))).body).toMatchObject({
+        code: 'INVALID_IMAGE',
+      });
+      expect(await svc.get('p1')).toEqual(before);
+      expect([...(await blobs.get('p1.jpg'))!]).toEqual([1, 2, 3]);
+      expect([...blobs.store.keys()].sort()).toEqual(['p1.jpg', 'p1_thumb.jpg']);
+    });
+
+    it('keeps the turn when the thumbnail cannot be made again, and drops the old one', async () => {
+      await stored();
+      codec.failThumbnail = true;
+      const turned = await svc.rotateRight('p1');
+      expect(turned.width).toBe(600);
+      expect([...blobs.store.keys()]).toEqual([turned.filename]);
+    });
+
+    it('is PHOTO_NOT_FOUND for an unknown photo', async () => {
+      expect((await rejection(svc.rotateRight('nope'))).kind).toBe('notFound');
+    });
+  });
+
   describe('upload, list with sizes and delete (WP2.3h)', () => {
     const file = (name = 'm31.png') => ({
       name,
@@ -1234,6 +1295,13 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       codec.failThumbnail = true;
       await blobs.put('y.png', new Uint8Array([9]));
       await expect(svc.ensureThumbnail('y.png', 'y_thumb.jpg')).rejects.toThrow();
+    });
+
+    it('ensureThumbnail with replace makes the thumbnail again without looking for the old one', async () => {
+      await blobs.put('z.png', new Uint8Array([9]));
+      blobs.store.set('z_thumb.jpg', new Uint8Array([5, 5]));
+      await svc.ensureThumbnail('z.png', 'z_thumb.jpg', true);
+      expect(blobs.store.get('z_thumb.jpg')).not.toEqual(new Uint8Array([5, 5]));
     });
   });
 });

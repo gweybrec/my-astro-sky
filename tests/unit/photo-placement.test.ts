@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  buildLabelFilterItems,
   getCorrRaDec,
   fitPhotoAffine,
   buildPhotoProjPoints,
@@ -22,7 +23,7 @@ import {
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
   formatZoomPercent,
-} from '../../src/photo-placement';
+} from '@myastrosky/core/photo-placement';
 import {
   project,
   toCanvas,
@@ -30,8 +31,13 @@ import {
   setHemisphere,
   setProjectionMode,
   setCenterMode,
-} from '../../src/projection';
-import type { Photo, PhotoCorrespondence, ManualPlacement, ViewState } from '../../src/types';
+} from '@myastrosky/core/projection';
+import type {
+  Photo,
+  PhotoCorrespondence,
+  ManualPlacement,
+  ViewState,
+} from '@myastrosky/core/types';
 
 const VIEW: ViewState = {
   centerX: 0,
@@ -250,6 +256,29 @@ describe('geometry getters', () => {
     expect(corners).toHaveLength(4);
   });
 
+  it('computePhotoQuadCorners follows the manual placement, not the correspondences', () => {
+    const placement: ManualPlacement = {
+      centerRa: 0,
+      centerDec: 90,
+      rotationDeg: 0,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    // Two correspondences far apart would give a huge outline; the manual placement gives the small one.
+    const photo = makePhoto([corr(0, 0, 0, 0, 80), corr(1, 100, 80, 5, 78)], {
+      manualPlacement: placement,
+      width: 100,
+      height: 80,
+    });
+    const corners = computePhotoQuadCorners(photo, VIEW)!;
+    const expected = mapPhotoCorners(computeManualMatrix(placement, VIEW, 100, 80), 100, 80);
+    expect(corners).toEqual(expected);
+    // A manually placed photo has an outline without any correspondence.
+    const bare = makePhoto([], { manualPlacement: placement, width: 100, height: 80 });
+    expect(computePhotoQuadCorners(bare, VIEW)).toHaveLength(4);
+  });
+
   it('computePhotoMatrixForView returns null when centroid is outside the border', () => {
     // borderRadiusPU = 0 → nothing can be inside.
     const m = computePhotoMatrixForView(
@@ -387,6 +416,34 @@ describe('manual placement math', () => {
     expect(back.mirrorY).toBe(false);
   });
 
+  it('places a photo on the sky whatever the rotation of the map', () => {
+    const p: ManualPlacement = {
+      centerRa: 0,
+      centerDec: 80,
+      rotationDeg: 25,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const turned = { ...VIEW, rotationDeg: 40 };
+    const straight = buildSyntheticCorrespondences(p, 100, 80, VIEW);
+    const onTurned = buildSyntheticCorrespondences(p, 100, 80, turned);
+    for (let i = 0; i < 3; i++) {
+      expect(onTurned[i].starRa).toBeCloseTo(straight[i].starRa!, 6);
+      expect(onTurned[i].starDec).toBeCloseTo(straight[i].starDec!, 6);
+    }
+    // And reading it back from the turned map's matrix gives the same placement.
+    const back = derivePlacementFromMatrix(
+      computeManualMatrix(p, turned, 100, 80),
+      turned,
+      100,
+      80,
+    );
+    expect(back.rotationDeg).toBeCloseTo(25, 6);
+    expect(back.centerRa).toBeCloseTo(0, 3);
+    expect(back.centerDec).toBeCloseTo(80, 3);
+  });
+
   it('manual → synthetic correspondences → derive round-trips the placement', () => {
     const p: ManualPlacement = {
       centerRa: 40,
@@ -405,6 +462,30 @@ describe('manual placement math', () => {
     expect(derived.centerRa).toBeCloseTo(p.centerRa, 2);
     expect(derived.centerDec).toBeCloseTo(p.centerDec, 2);
     expect(derived.projPerPx).toBeCloseTo(p.projPerPx, 4);
+    expect(derived.rotationDeg).toBeCloseTo(p.rotationDeg, 2);
+    expect(derived.mirrorX).toBe(false);
+  });
+
+  it('derive gives back the angle and the mirror of a mirrored placement', () => {
+    const p: ManualPlacement = {
+      centerRa: 210.85,
+      centerDec: 54.34,
+      rotationDeg: -66,
+      projPerPx: 0.0015,
+      mirrorX: true,
+      mirrorY: false,
+    };
+    const synth = buildSyntheticCorrespondences(p, 100, 80, VIEW);
+    const derived = derivePlacementFromCorrespondences(makePhoto(synth), 100, 80);
+    expect(derived.rotationDeg).toBeCloseTo(p.rotationDeg, 2);
+    expect(derived.mirrorX).toBe(true);
+    // The derived placement puts every photo point where the correspondences say.
+    const m = computeManualProjMatrix(derived, 100, 80);
+    for (const c of synth) {
+      const sky = project(c.starRa!, c.starDec!);
+      expect(m.a * c.photoX + m.c * c.photoY + m.e).toBeCloseTo(sky.x, 6);
+      expect(m.b * c.photoX + m.d * c.photoY + m.f).toBeCloseTo(sky.y, 6);
+    }
   });
 
   it('derivePlacementFromCorrespondences falls back to the default with <3 points', () => {
@@ -452,5 +533,17 @@ describe('formatZoomPercent', () => {
     expect(formatZoomPercent(0.002, 0.004)).toBe(`50${NBSP}%`);
     // three wheel notches of 1.1
     expect(formatZoomPercent(0.004 * 1.1 ** 3, 0.004)).toBe(`133${NBSP}%`);
+  });
+});
+
+describe('buildLabelFilterItems', () => {
+  it('counts the photos of each label, the photos without one under "(no label)", by name', () => {
+    expect(
+      buildLabelFilterItems([{ labels: ['b', 'a'] }, { labels: ['a'] }, { labels: [] }, {}]),
+    ).toEqual([
+      { label: '(no label)', count: 2 },
+      { label: 'a', count: 2 },
+      { label: 'b', count: 1 },
+    ]);
   });
 });

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { recommendTargets, scoreDso } from '../../src/target-recommender';
-import { mightBeVisible, maxAltDuringWindow } from '../../src/sky-geometry';
-import { twilightWindow } from '../../src/astro-time';
-import { densifyPoints } from '../../src/horizon-io';
-import type { DSO } from '../../src/types';
-import type { GearPreset } from '../../src/gear-presets';
+import { recommendTargets, scoreDso } from '@myastrosky/core/target-recommender';
+import { mightBeVisible, maxAltDuringWindow } from '@myastrosky/core/sky-geometry';
+import { twilightWindow } from '@myastrosky/core/astro-time';
+import { densifyPoints } from '@myastrosky/core/horizon-io';
+import type { DSO } from '@myastrosky/core/types';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
 
 // Mock i18n
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));

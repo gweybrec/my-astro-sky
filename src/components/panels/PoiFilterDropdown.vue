@@ -81,7 +81,7 @@
 import { ref, computed } from 'vue';
 import { t } from '../../i18n';
 import DropdownPanel from '../base/DropdownPanel.vue';
-import type { PoiFilterGroup } from '../../poi';
+import type { PoiFilterGroup } from '@myastrosky/core/poi';
 import { poiTypeIcon } from '../../poi-icons';
 
 const props = defineProps<{

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import PoiAddModal from '../../src/components/modals/PoiAddModal.vue';
-import type { ManualPlacement, Photo, PointOfInterest } from '../../src/types';
+import type { ManualPlacement, Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const W = 800;
 const H = 600;

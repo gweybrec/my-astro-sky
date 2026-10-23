@@ -1,4 +1,5 @@
 import type { Translations } from './fr';
+import enMobile from './mobile/en';
 
 const en: Translations = {
   app: {
@@ -765,7 +766,7 @@ const en: Translations = {
     INVALID_PHOTO_Y: 'Invalid photoY (positive number expected)',
     INVALID_STAR_HIP: 'Invalid starHip (positive integer expected)',
     PHOTO_NOT_FOUND: 'Photo not found',
-    UNSUPPORTED_FORMAT: 'Unsupported format. Use TIFF or FITS.',
+    UNSUPPORTED_FORMAT: 'Unsupported format. Use TIFF, FITS or XISF.',
     NO_WCS_DATA: 'No WCS data found in file',
     NO_IMAGE_DIMENSIONS: 'Image dimensions not found',
     NOT_ENOUGH_CATALOG_STARS: 'Not enough catalog stars in the field',
@@ -873,6 +874,7 @@ const en: Translations = {
   identify: {
     search: 'Search',
     searching: 'Searching…',
+    stillSearching: 'Still searching: the online service sometimes takes a while to answer.',
     addSelected: 'Add selected ({n})',
     obsDateLabel: 'Observation date (UTC)',
     dateRequired: 'This photo has no observation date — enter it to search.',
@@ -949,6 +951,7 @@ const en: Translations = {
     loadFromWcsError: 'Could not read metadata from this file',
     metadataTitle: 'Edit info',
     showOnMap: 'Show on map',
+    rotatePhotoRight: 'Rotate right',
     showDsos: 'Show DSOs',
     showDsosUnavailable: 'This photo is not placed on the sky map yet',
     showPois: 'Show points of interest',
@@ -1463,6 +1466,7 @@ const en: Translations = {
     labelsForAll: 'Labels for all photos',
     setupForAll: 'Setup for all photos',
   },
+  mobile: enMobile,
 };
 
 export default en;

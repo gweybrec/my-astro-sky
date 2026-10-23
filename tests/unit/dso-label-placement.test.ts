@@ -6,7 +6,7 @@ import {
   type Rect,
   type Size,
   type Clearance,
-} from '../../src/dso-label-placement';
+} from '@myastrosky/core/dso-label-placement';
 
 // Ported from the sibling Android app's `ui/LabelPlacementTest.kt`
 // (`C:\Workspace\TiffViewer`) — same cases, same reasoning.

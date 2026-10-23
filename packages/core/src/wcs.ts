@@ -654,8 +654,11 @@ export function extractWCS(buffer: Uint8Array, ext: string): WCSData | null {
 
   if (!headerStr) return null;
 
-  const parsed = parseFITSHeader(headerStr);
+  return wcsFromHeader(parseFITSHeader(headerStr));
+}
 
+/** The plate solution and capture fields of a parsed FITS header; null when it holds no usable solution. */
+export function wcsFromHeader(parsed: Record<string, number | string | boolean>): WCSData | null {
   // Check CRPIX/CRVAL as always required
   const baseRequired = ['CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2'];
   for (const key of baseRequired) {

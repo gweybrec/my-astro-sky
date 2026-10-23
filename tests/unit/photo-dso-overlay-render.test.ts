@@ -1,13 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   computePhotoDsoOverlayLayout,
+  drawPhotoOverlay,
   withAlpha,
   ellipseBoundExtent,
   ellipseLabelClearance,
-} from '../../src/photo-dso-overlay-render';
-import { overlaps } from '../../src/dso-label-placement';
-import type { DSO } from '../../src/types';
-import type { PhotoDsoPlacement } from '../../src/dso-catalog';
+} from '@myastrosky/render/photo-dso-overlay-render';
+import { overlaps } from '@myastrosky/core/dso-label-placement';
+import type { DSO } from '@myastrosky/core/types';
+import type { PhotoDsoPlacement } from '@myastrosky/core/catalog/dso-registry';
+import type { PhotoPoiPin } from '@myastrosky/render/poi-pins';
 
 function makeDso(id: string, extra?: Partial<DSO>): DSO {
   return {
@@ -236,5 +238,58 @@ describe('ellipseLabelClearance', () => {
     // A wider label's footprint reaches further round the tilted ellipse, so it
     // needs at least as much vertical clearance as a narrower one.
     expect(wide.y).toBeGreaterThanOrEqual(narrow.y);
+  });
+});
+
+describe('drawPhotoOverlay', () => {
+  /** A canvas context that records the texts drawn; every other call does nothing. */
+  function recordingCtx() {
+    const texts: { text: string; x: number; y: number }[] = [];
+    const ctx = new Proxy(
+      {
+        font: '',
+        measureText: (text: string) => ({ width: text.length * 6 }),
+        fillText: (text: string, x: number, y: number) => texts.push({ text, x, y }),
+      } as Record<string, unknown>,
+      { get: (target, key: string) => (key in target ? target[key] : vi.fn()) },
+    );
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, texts };
+  }
+  const pin = (name: string, x: number, y: number) =>
+    ({ poi: { name, categoryId: 'c', ra: 0, dec: 0 }, x, y }) as PhotoPoiPin;
+
+  it("draws the objects' names, then the pins' names clear of them", () => {
+    const { ctx, texts } = recordingCtx();
+    drawPhotoOverlay(ctx, {
+      placements: [placement(makeDso('M31'), 100, 100)],
+      pins: [pin('C/2023 A3', 100, 100)],
+      dispScale: 1,
+      viewport: BIG_VIEWPORT,
+      pinColor: () => '#fff',
+    });
+    expect(texts.map((t) => t.text)).toEqual(['M31', 'C/2023 A3']);
+    const [object, comet] = texts;
+    expect(object.x !== comet.x || object.y !== comet.y).toBe(true);
+  });
+
+  it('draws only the objects without pins, only the pins without objects', () => {
+    const a = recordingCtx();
+    drawPhotoOverlay(a.ctx, {
+      placements: [placement(makeDso('M31'), 100, 100)],
+      pins: [],
+      dispScale: 1,
+      viewport: BIG_VIEWPORT,
+      pinColor: () => '#fff',
+    });
+    expect(a.texts.map((t) => t.text)).toEqual(['M31']);
+    const b = recordingCtx();
+    drawPhotoOverlay(b.ctx, {
+      placements: [],
+      pins: [pin('SN 2026aaiv', 50, 50)],
+      dispScale: 1,
+      viewport: BIG_VIEWPORT,
+      pinColor: () => '#fff',
+    });
+    expect(b.texts.map((t) => t.text)).toEqual(['SN 2026aaiv']);
   });
 });

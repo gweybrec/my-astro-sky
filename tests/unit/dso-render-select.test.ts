@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DSO, DSOType, ViewState } from '../../src/types';
+import type { DSO, DSOType, ViewState } from '@myastrosky/core/types';
 
 /**
  * DSO render selection: the single source of truth for which DSOs are drawn in a
@@ -14,7 +14,7 @@ import type { DSO, DSOType, ViewState } from '../../src/types';
 /** Catalog contents for the current test — swapped per test via `setCatalog`. */
 let catalog: DSO[] = [];
 
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   getDSOs: () => catalog,
   getDSOById: (id: string) => catalog.find((d) => d.id === id) ?? null,
   // Rank by array order: index 0 is the "best" object. Keeps the effective-priority
@@ -22,8 +22,8 @@ vi.mock('../../src/dso-catalog', () => ({
   getDSOImportanceRank: () => new Map(catalog.map((d, i) => [d.id, i])),
 }));
 
-import { DsoRenderSelection } from '../../src/dso-render-select';
-import { setCenterMode, setHemisphere, setProjectionMode } from '../../src/projection';
+import { DsoRenderSelection } from '@myastrosky/render/dso-render-select';
+import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';
 
 function makeDSO(over: Partial<DSO> & { id: string }): DSO {
   return {
@@ -119,6 +119,18 @@ describe('DsoRenderSelection', () => {
       setCatalog([makeDSO({ id: 'A', catalog: null })]);
       const sel = fresh().select(options({ visibleCatalogs: new Set(['M']) }));
       expect(ids(sel)).toEqual(['A']);
+    });
+  });
+
+  describe('a catalogue that loads after the first frame', () => {
+    it('is drawn once the index is invalidated, and not before', () => {
+      const sel = fresh();
+      expect(ids(sel.select(options()))).toEqual([]);
+      setCatalog([makeDSO({ id: 'A' })]);
+      sel.invalidate();
+      expect(ids(sel.select(options()))).toEqual([]);
+      sel.invalidateIndex();
+      expect(ids(sel.select(options()))).toEqual(['A']);
     });
   });
 

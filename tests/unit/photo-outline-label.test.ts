@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { photoLabelEdgeIndex, photoLabelTransform } from '../../src/photo-outline';
-import type { Point } from '../../src/types';
+import { photoLabelEdgeIndex, photoLabelTransform } from '@myastrosky/core/photo-outline';
+import type { Point } from '@myastrosky/core/types';
 
 const DEG = Math.PI / 180;
 

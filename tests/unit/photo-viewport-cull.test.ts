@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PhotoOverlay } from '../../src/photo-overlay';
-import { getProjectionGeneration } from '../../src/projection';
+import { getProjectionGeneration } from '@myastrosky/core/projection';
 
 // The viewport cull only trusts a cached projCentroid when its projGen matches the
 // current projection generation (a hemisphere/mode/center switch remaps every point,

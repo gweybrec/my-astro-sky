@@ -1,4 +1,4 @@
-import type { DSO, DSOType, DSOUserOverride } from './types';
+import type { DSO, DSOType, DSOUserOverride } from '@myastrosky/core/types';
 import { upsertDsoOverride, deleteDsoOverride } from './api';
 import {
   applyAndStoreSingleOverride,

@@ -11,12 +11,12 @@ import {
   computePoiPinLayout,
   renderPoiPinOverlay,
   PHOTO_PIN_RADIUS_PX,
-} from '../../src/poi-pins';
-import { renderPoiPins } from '../../src/sky-frame-render';
-import { fitPhotoAffine } from '../../src/photo-placement';
-import { project, toCanvas } from '../../src/projection';
-import type { PointOfInterest } from '../../src/types';
-import type { SkyScene } from '../../src/sky-scene';
+} from '@myastrosky/render/poi-pins';
+import { renderPoiPins } from '@myastrosky/render/sky-frame-render';
+import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
+import { project, toCanvas } from '@myastrosky/core/projection';
+import type { PointOfInterest } from '@myastrosky/core/types';
+import type { SkyScene } from '@myastrosky/render/sky-scene';
 
 function mockCtx() {
   return {

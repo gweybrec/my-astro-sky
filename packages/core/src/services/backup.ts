@@ -195,8 +195,11 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       if (!p.id || typeof p.id !== 'string') continue;
       const filename: string = p.filename ?? `${p.id}.jpg`;
       const thumbFilename: string = p.thumbFilename ?? thumbnailNameOf(filename);
+      // The archive's own thumbnail was written with the image; otherwise the image was just written, so any thumbnail
+      // already there belongs to the old file and is made again.
+      if (writtenFiles?.has(thumbFilename)) continue;
       try {
-        await photos.ensureThumbnail(filename, thumbFilename);
+        await photos.ensureThumbnail(filename, thumbFilename, writtenFiles !== null);
       } catch (thumbErr) {
         console.warn(`[Import] Thumbnail regeneration failed for ${filename}:`, thumbErr);
       }
@@ -601,6 +604,16 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       // Copy the selected image files into the blob store (always overwrite).
       const imageNames = names.filter((n) => n.startsWith('images/') && !n.endsWith('/'));
       const writtenFiles = new Set<string>();
+      // The picture list of the preview has no thumbnails: the thumbnail of a selected image comes with it.
+      const selectedThumbs = new Set<string>();
+      for (const p of list) {
+        if (typeof p.filename !== 'string' || !selectedImages?.has(p.filename)) continue;
+        selectedThumbs.add(
+          typeof p.thumbFilename === 'string' && p.thumbFilename
+            ? p.thumbFilename
+            : thumbnailNameOf(p.filename),
+        );
+      }
       // Without a selection, files are written only for the photo records this same
       // request imports (all photos of the manifest); otherwise they would belong to no photo.
       const importsPhotoRecords = importMetadata && list.length > 0;
@@ -608,7 +621,12 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         if (selectedImages === null && !importsPhotoRecords) continue;
         const baseName = baseNameOf(entryName);
         if (!ALLOWED_PHOTO_EXTENSIONS.has(extNameOf(baseName).toLowerCase())) continue;
-        if (selectedImages !== null && !selectedImages.has(baseName)) continue;
+        if (
+          selectedImages !== null &&
+          !selectedImages.has(baseName) &&
+          !selectedThumbs.has(baseName)
+        )
+          continue;
         try {
           const bytes = await reader.read(entryName);
           if (!bytes) continue;

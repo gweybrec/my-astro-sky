@@ -14,6 +14,7 @@ import {
 import { createSharpImageCodec } from '../../server/image-codec';
 import { buildFits } from '../fixtures/fits-builders';
 import { buildTiff } from '../fixtures/tiff-builders';
+import { buildXisf } from '../fixtures/xisf-builders';
 import { fakeImageCodec } from '../helpers/fake-image-io';
 
 const STARS: CatalogStar[] = [
@@ -65,6 +66,20 @@ function tiffWithHeader(header: string): Uint8Array {
   out.set(text, 26);
   return out;
 }
+
+/** A 40 × 30 XISF of 8-bit samples carrying the same solution as `fits()`, or none. */
+const xisf = (solved = true) =>
+  buildXisf({
+    geometry: '40:30:1',
+    sampleFormat: 'UInt8',
+    pixels: Uint8Array.from({ length: 40 * 30 }, (_, i) => i % 256),
+    keywords: solved
+      ? WCS_CARDS.map((card) => ({
+          name: card.slice(0, 8).trim(),
+          value: card.slice(card.indexOf('=') + 1).trim(),
+        }))
+      : [],
+  });
 
 const plainTiff = () =>
   new Uint8Array(
@@ -224,6 +239,39 @@ describe('solveWcs()', () => {
     });
     await expect(service.solveWcs({ fileName: 'a.fits', bytes: fits() })).rejects.toThrow(
       'Star catalog not found',
+    );
+  });
+});
+
+describe('an XISF file', () => {
+  it('gives the same solution and capture metadata as the FITS with the same header', async () => {
+    const { service } = setup();
+    const fromFits = await service.solveWcs({ fileName: 'a.fits', bytes: fits() });
+    const fromXisf = await service.solveWcs({ fileName: 'a.XISF', bytes: xisf() });
+    expect(fromXisf).toEqual(fromFits);
+    expect(fromXisf.success).toBe(true);
+  });
+
+  it('is converted to a picture of its own size, with its solution', async () => {
+    const { service, encode } = setup();
+    const result = await service.convert({ fileName: 'a.xisf', bytes: xisf() });
+    expect([result.success, result.width, result.height]).toEqual([true, 40, 30]);
+    expect(result.correspondences!.length).toBeGreaterThanOrEqual(3);
+    expect(result.dateObs).toBe('2025-09-04T21:30:00Z');
+    expect(encode).toHaveBeenCalledTimes(1);
+    expect(encode.mock.calls[0][0]).toMatchObject({ width: 40, height: 30, channels: 1 });
+  });
+
+  it('without a solution is a picture to place, and an unreadable one has no solution', async () => {
+    const { service } = setup();
+    const result = await service.convert({ fileName: 'a.xisf', bytes: xisf(false) });
+    expect([result.success, result.code]).toEqual([false, 'NO_WCS_DATA']);
+    expect(await service.solveWcs({ fileName: 'a.xisf', bytes: new Uint8Array(40) })).toEqual({
+      success: false,
+      code: 'NO_WCS_DATA',
+    });
+    expect(await codeOf(service.convert({ fileName: 'a.xisf', bytes: new Uint8Array(40) }))).toBe(
+      'invalid:UNSUPPORTED_RAW_FORMAT',
     );
   });
 });

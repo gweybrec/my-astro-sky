@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toByte } from '../../server/raw-decode/linear-map';
+import { toByte } from '@myastrosky/core/raw-decode/linear-map';
 
 describe('toByte — faithful linear [0,1] -> [0,255] mapping (no stretch)', () => {
   it('maps the endpoints exactly', () => {

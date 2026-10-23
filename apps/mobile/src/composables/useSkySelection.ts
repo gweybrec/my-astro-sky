@@ -1,0 +1,48 @@
+import { shallowRef } from 'vue';
+import type { UnifiedSearchResult } from '@myastrosky/core/search';
+import type { DSO, Photo, Star } from '@myastrosky/core/types';
+
+/** What is selected on the sky map: a deep-sky object, a star (a search result's star is one) or a placed photo. */
+export type SkySelection =
+  { kind: 'dso'; dso: DSO } | { kind: 'star'; star: Star } | { kind: 'photo'; photo: Photo };
+
+/** Where the map should go: the sky position and the zoom to keep at least. */
+export interface SkyFocus {
+  ra: number;
+  dec: number;
+  scale: number;
+  /** A setup's field: the map is zoomed so it fills a third of the map, as the desktop's "Afficher sur la carte". */
+  fov?: { wDeg: number; hDeg: number };
+}
+
+/** The zoom a searched object is shown at, at least: a deep-sky object is smaller than a star's surroundings. */
+const DSO_SCALE = 1200;
+const STAR_SCALE = 800;
+
+/** What is selected on the map; the Ciel page highlights it and the search page sets it. */
+export const skySelection = shallowRef<SkySelection | null>(null);
+/** A request to move the map to a position, set once by the search page and taken by the Ciel page. */
+export const skyFocus = shallowRef<SkyFocus | null>(null);
+
+/** A request to frame a placed photo on the map (its id), set by the photo's screen and taken by the Ciel page. */
+export const skyPhotoFocus = shallowRef<string | null>(null);
+
+/** Selects a search result and asks the map to go to it. */
+export function selectSearchResult(result: UnifiedSearchResult) {
+  if (result.type === 'dso' && result.dso) {
+    skySelection.value = { kind: 'dso', dso: result.dso };
+  } else if (result.type === 'star' && result.star) {
+    skySelection.value = { kind: 'star', star: result.star };
+  } else {
+    return;
+  }
+  skyFocus.value = {
+    ra: result.ra,
+    dec: result.dec,
+    scale: result.type === 'dso' ? DSO_SCALE : STAR_SCALE,
+  };
+}
+
+export function clearSkySelection() {
+  skySelection.value = null;
+}

@@ -1,12 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   plugins: [vue()],
+  // The phone app imports the desktop's SVG icon files through this alias (see apps/mobile/vite.config.ts).
+  resolve: { alias: { '@icons': fileURLToPath(new URL('./src/icons', import.meta.url)) } },
   test: {
     environment: 'happy-dom',
     setupFiles: ['tests/setup/platform.ts'],
-    include: ['tests/**/*.test.ts', 'tests/components/**/*.test.ts'],
+    include: [
+      'tests/**/*.test.ts',
+      'tests/components/**/*.test.ts',
+      'apps/mobile/tests/**/*.test.ts',
+    ],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'src/**/*.vue', 'server/**/*.ts', 'packages/**/*.ts'],
@@ -17,7 +24,6 @@ export default defineConfig({
         'src/style.css',
         // Type-only files
         'src/app-meta.d.ts',
-        'src/types.ts',
         // Canvas painting — untestable in a unit env. Everything that *decides* what to
         // paint has been pulled out into covered modules (star-budget, dso-render-select,
         // hover-resolve, sky-hit-test, frame-controller, sky-map-events, star-sprite-atlas,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DSO, DSOType, Star, ViewState } from '../../src/types';
-import type { HorizonProfile } from '../../src/horizon-io';
+import type { DSO, DSOType, Star, ViewState } from '@myastrosky/core/types';
+import type { HorizonProfile } from '@myastrosky/core/horizon-io';
 
 /**
  * Cursor hit-testing against the star/DSO spatial indexes and the terrain summits.
@@ -17,30 +17,30 @@ let dsos: DSO[] = [];
 let starScans = 0;
 let dsoScans = 0;
 
-vi.mock('../../src/star-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/star-registry', () => ({
   getStars: () => {
     starScans++;
     return stars;
   },
 }));
 
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   getDSOs: () => {
     dsoScans++;
     return dsos;
   },
 }));
 
-import { SkyHitTest, isStarRendered, type DsoIndexFilters } from '../../src/sky-hit-test';
+import { SkyHitTest, isStarRendered, type DsoIndexFilters } from '@myastrosky/render/sky-hit-test';
 import {
   setCenterMode,
   setHemisphere,
   setProjectionMode,
   project,
   toCanvas,
-} from '../../src/projection';
-import { raDecFromAltAz } from '../../src/sky-geometry';
-import { starAreaBudget } from '../../src/star-budget';
+} from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import { starAreaBudget } from '@myastrosky/core/star-budget';
 
 function makeStar(over: Partial<Star> & { hip: number }): Star {
   return { ra: 0, dec: 85, mag: 4, bv: 0.5, ...over };
@@ -154,6 +154,14 @@ describe('SkyHitTest', () => {
       const c = canvasOf(0, 85, v);
       expect(new SkyHitTest().findClosestStar(c.x, c.y, v, 6)?.hip).toBe(1);
       expect(new SkyHitTest().findClosestStar(c.x + 200, c.y, v, 6)).toBeNull();
+    });
+
+    it('reaches a star further away when given a wider radius, as a finger needs', () => {
+      const v = view();
+      stars = [makeStar({ hip: 1, ra: 0, dec: 85 })];
+      const c = canvasOf(0, 85, v);
+      expect(new SkyHitTest().findClosestStar(c.x + 15, c.y, v, 6)).toBeNull();
+      expect(new SkyHitTest().findClosestStar(c.x + 15, c.y, v, 6, 20)?.hip).toBe(1);
     });
 
     it('excludes stars fainter than the magnitude limit from the index', () => {

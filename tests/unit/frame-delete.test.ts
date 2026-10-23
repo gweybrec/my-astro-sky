@@ -30,8 +30,8 @@ const fakePlans = {
   setEntryPosition: vi.fn(),
 };
 
-vi.mock('../../src/stores/fov-frames', () => ({ useFovFramesStore: () => fakeFov }));
-vi.mock('../../src/stores/plans', () => ({ usePlansStore: () => fakePlans }));
+vi.mock('@myastrosky/app-state/stores/fov-frames', () => ({ useFovFramesStore: () => fakeFov }));
+vi.mock('@myastrosky/app-state/stores/plans', () => ({ usePlansStore: () => fakePlans }));
 
 import { deleteFrameWithUndo } from '../../src/frame-delete';
 

@@ -3,13 +3,13 @@ import { setActivePinia, createPinia } from 'pinia';
 
 // The store only imports these for its async CRUD; the pure getters under test
 // never call them, but they must resolve as mocks so the module loads.
-vi.mock('../../src/api', () => ({
+vi.mock('@myastrosky/app-state/api', () => ({
   getPlans: vi.fn().mockResolvedValue([]),
   updatePlanSortAPI: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
-import { usePlansStore } from '../../src/stores/plans';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { getPlans, updatePlanSortAPI, type Plan } from '../../src/api';
 
 function makePlan(id: string, setupId: string | null): Plan {

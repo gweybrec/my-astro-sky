@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DSO } from '../../src/types';
-import type { UnifiedSearchResult } from '../../src/search';
+import type { DSO } from '@myastrosky/core/types';
+import type { UnifiedSearchResult } from '@myastrosky/core/search';
 import {
   buildFallbackDSOResult,
   findChipDSOResult,

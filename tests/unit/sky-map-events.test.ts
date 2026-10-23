@@ -5,10 +5,10 @@ import {
   CLICK_SLOP_PX,
   type EventBinding,
   type SkyEventHost,
-} from '../../src/sky-map-events';
-import type { PhotoOutline } from '../../src/photo-outline';
-import type { Star, ViewState } from '../../src/types';
-import { setCenterMode, setHemisphere, setProjectionMode } from '../../src/projection';
+} from '@myastrosky/render/sky-map-events';
+import type { PhotoOutline } from '@myastrosky/core/photo-outline';
+import type { Star, ViewState } from '@myastrosky/core/types';
+import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';
 
 /**
  * Pointer/keyboard routing for the sky map. These handlers decide *which subsystem
@@ -274,6 +274,22 @@ describe('attachSkyMapEvents', () => {
       const { calls } = setup();
       window.dispatchEvent(mouse('mousemove', 500, 400));
       expect(calls.requestHover).toHaveBeenCalledWith(500, 400, 500, 400);
+    });
+
+    it("uses the host's panel test instead of the desktop side panel", () => {
+      const panel = document.createElement('div');
+      panel.id = 'side-panel';
+      document.body.appendChild(panel);
+      window.innerWidth = 1000;
+      // Desktop default: the 280 px side panel covers the right edge.
+      const desktop = setup();
+      window.dispatchEvent(mouse('mousemove', 900, 400));
+      expect(desktop.calls.requestHover).not.toHaveBeenCalled();
+      // A host that has no panel (the phone) hovers there.
+      const phone = setup({ isOverPanel: () => false });
+      window.dispatchEvent(mouse('mousemove', 900, 400));
+      expect(phone.calls.requestHover).toHaveBeenCalledWith(900, 400, 900, 400);
+      panel.remove();
     });
 
     it('does nothing at all when interaction is disabled', () => {

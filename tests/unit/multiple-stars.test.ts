@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key, getLang: () => 'en' }));
 
-import { multipleStarRating } from '../../src/multiple-stars';
+import { multipleStarRating } from '@myastrosky/core/targets/multiple-stars';
 
 // A setup that resolves everything down to 1″ (so the resolution gate never fires unless
 // we pass a coarse limit explicitly).

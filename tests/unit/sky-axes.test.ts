@@ -6,9 +6,9 @@ import {
   setHemisphere,
   setCenterMode,
   setProjectionObserver,
-} from '../../src/projection';
-import { altAzFromRaDec, raDecFromAltAz } from '../../src/sky-geometry';
-import { angularSizeToCanvasPx } from '../../src/dso-render-math';
+} from '@myastrosky/core/projection';
+import { altAzFromRaDec, raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import { angularSizeToCanvasPx } from '@myastrosky/core/dso-render-math';
 import {
   projUnitsPerDeg,
   canvasPxPerDeg,
@@ -17,8 +17,8 @@ import {
   paToCanvasAngle,
   canvasAngleToPa,
   isSkyPointVisible,
-} from '../../src/sky-axes';
-import type { ViewState } from '../../src/types';
+} from '@myastrosky/core/sky-axes';
+import type { ViewState } from '@myastrosky/core/types';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;

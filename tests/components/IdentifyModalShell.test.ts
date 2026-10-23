@@ -10,7 +10,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import { h } from 'vue';
 import IdentifyModalShell from '../../src/components/modals/IdentifyModalShell.vue';
-import type { Photo, ManualPlacement } from '../../src/types';
+import type { Photo, ManualPlacement } from '@myastrosky/core/types';
 
 const W = 800;
 const H = 600;
@@ -177,5 +177,28 @@ describe('IdentifyModalShell', () => {
     expect(document.body.querySelector('.modal-photo-container')).toBeNull();
     expect(byText('Search')).toBeUndefined();
     wrapper.unmount();
+  });
+
+  it('shows a spinner while searching, and after 20 s says the search still runs', async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = mountShell({ searching: true });
+      await flushPromises();
+      const status = () => document.body.querySelector('[role="status"]');
+      expect(status()?.querySelector('.auto-solve-spinner')).not.toBeNull();
+      expect(status()?.textContent).toContain('Searching');
+      expect(status()?.textContent).not.toContain('takes a while to answer');
+      vi.advanceTimersByTime(20_000);
+      await flushPromises();
+      expect(status()?.textContent).toContain('takes a while to answer');
+      await wrapper.setProps({ searching: false });
+      expect(status()).toBeNull();
+      // A new search starts without the line again.
+      await wrapper.setProps({ searching: true });
+      expect(status()?.textContent).not.toContain('takes a while to answer');
+      wrapper.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

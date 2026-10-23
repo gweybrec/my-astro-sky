@@ -8,6 +8,10 @@ const FORMAT_OF_EXT: Record<string, 'jpeg' | 'png' | 'webp'> = {
   '.webp': 'webp',
 };
 
+/** The quality of a JPEG or WebP picture saved again turned: the user's photos are stored near 98–100, and a turn
+ * must not visibly lower them (at 90 a turned photo came out 5 to 6 times smaller than the original). */
+const TURN_QUALITY = 98;
+
 const toBytes = (b: Buffer): Uint8Array => new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
 
 /** The image codec of the server: the `sharp` calls the upload route made before the port existed. */
@@ -27,6 +31,17 @@ export function createSharpImageCodec(): ImageCodec {
       const format = FORMAT_OF_EXT[ext];
       if (!format) throw new Error(`Unsupported image format: ${ext}`);
       return toBytes(await sharp(bytes).rotate().toFormat(format).toBuffer());
+    },
+
+    async rotateRight(bytes, ext) {
+      const format = FORMAT_OF_EXT[ext];
+      if (!format) throw new Error(`Unsupported image format: ${ext}`);
+      const img = sharp(bytes).rotate(90);
+      return toBytes(
+        await (
+          format === 'png' ? img.png() : img.toFormat(format, { quality: TURN_QUALITY })
+        ).toBuffer(),
+      );
     },
 
     async thumbnail(bytes, maxSize, quality) {

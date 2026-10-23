@@ -140,7 +140,7 @@ import SupernovaIdentifyModal from './components/modals/SupernovaIdentifyModal.v
 import CometIdentifyModal from './components/modals/CometIdentifyModal.vue';
 import PoiAddModal from './components/modals/PoiAddModal.vue';
 import { useUiStore } from './stores/ui';
-import type { Photo, PointOfInterest } from './types';
+import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 type ModalName =
   | 'settings'

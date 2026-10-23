@@ -1,5 +1,8 @@
 // Sky-region (Alt/Az polygon) API shapes.
 
+/** The colour a new region starts with. */
+export const DEFAULT_REGION_COLOR = '#4ea1ff';
+
 /** A freehand Alt/Az polygon drawn on the Local Sky (zenith) view, saved by name. */
 export interface SkyRegionData {
   id: string;

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { DetectedSpot, Star } from '../../src/types';
+import type { DetectedSpot, Star } from '@myastrosky/core/types';
 
 vi.mock('../../src/star-catalog', () => ({
   getStars: vi.fn(),
 }));
 
-vi.mock('../../src/projection', () => ({
+vi.mock('@myastrosky/core/projection', () => ({
   project: vi.fn(),
 }));
 
@@ -14,7 +14,7 @@ vi.mock('../../src/i18n', () => ({
 }));
 
 import { getStars } from '../../src/star-catalog';
-import { project } from '../../src/projection';
+import { project } from '@myastrosky/core/projection';
 import { solvePlate } from '../../src/plate-solver';
 
 const mockGetStars = vi.mocked(getStars);

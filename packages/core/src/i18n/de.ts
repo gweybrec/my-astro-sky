@@ -1,4 +1,5 @@
 import type { Translations } from './fr';
+import deMobile from './mobile/de';
 
 const de: Translations = {
   app: {
@@ -772,7 +773,7 @@ const de: Translations = {
     INVALID_PHOTO_Y: 'Ungültiges photoY (positive Zahl erwartet)',
     INVALID_STAR_HIP: 'Ungültiges starHip (positive Ganzzahl erwartet)',
     PHOTO_NOT_FOUND: 'Foto nicht gefunden',
-    UNSUPPORTED_FORMAT: 'Nicht unterstütztes Format. Bitte TIFF oder FITS verwenden.',
+    UNSUPPORTED_FORMAT: 'Nicht unterstütztes Format. Bitte TIFF, FITS oder XISF verwenden.',
     NO_WCS_DATA: 'Keine WCS-Daten in der Datei gefunden',
     NO_IMAGE_DIMENSIONS: 'Bildabmessungen nicht gefunden',
     NOT_ENOUGH_CATALOG_STARS: 'Nicht genügend Katalogsterne im Feld',
@@ -884,6 +885,7 @@ const de: Translations = {
   identify: {
     search: 'Suchen',
     searching: 'Suche…',
+    stillSearching: 'Suche läuft noch: Der Online-Dienst antwortet manchmal langsam.',
     addSelected: 'Auswahl hinzufügen ({n})',
     obsDateLabel: 'Beobachtungsdatum (UTC)',
     dateRequired: 'Dieses Foto hat kein Beobachtungsdatum – geben Sie es für die Suche ein.',
@@ -962,6 +964,7 @@ const de: Translations = {
     loadFromWcsError: 'Metadaten dieser Datei konnten nicht gelesen werden',
     metadataTitle: 'Informationen bearbeiten',
     showOnMap: 'Auf Karte anzeigen',
+    rotatePhotoRight: 'Nach rechts drehen',
     showDsos: 'Objekte anzeigen',
     showDsosUnavailable: 'Dieses Foto ist noch nicht auf der Himmelskarte platziert',
     showPois: 'Points of Interest anzeigen',
@@ -1483,6 +1486,7 @@ const de: Translations = {
     labelsForAll: 'Etiketten für alle Fotos',
     setupForAll: 'Ausrüstung für alle Fotos',
   },
+  mobile: deMobile,
 };
 
 export default de;

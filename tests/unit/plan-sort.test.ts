@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { sortPlanTargets, firstWindowFracByEntry, type PlanSortItem } from '../../src/plan-sort';
-import type { DSO } from '../../src/types';
+import {
+  sortPlanTargets,
+  firstWindowFracByEntry,
+  type PlanSortItem,
+} from '@myastrosky/core/plan-sort';
+import type { DSO } from '@myastrosky/core/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import fr from '../../src/i18n/fr';
-import en from '../../src/i18n/en';
-import es from '../../src/i18n/es';
-import de from '../../src/i18n/de';
+import fr from '@myastrosky/core/i18n/fr';
+import en from '@myastrosky/core/i18n/en';
+import es from '@myastrosky/core/i18n/es';
+import de from '@myastrosky/core/i18n/de';
 
 // Flatten a nested translation object to the sorted set of its dotted leaf-key paths
 // (e.g. `app.title`, `batch.placeButton`). Only string leaves count as keys.

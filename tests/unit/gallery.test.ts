@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Photo } from '../../src/types';
+import type { Photo } from '@myastrosky/core/types';
 
 const mockBuildMetadataEditorPanel = vi.fn();
 
+const rotatePhotoAPI = vi.fn();
+vi.mock('../../src/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/api')>()),
+  rotatePhotoAPI: (...a: unknown[]) => rotatePhotoAPI(...a),
+}));
 vi.mock('../../src/metadata-editor', () => ({
   buildMetadataEditorPanel: (...args: any[]) => mockBuildMetadataEditorPanel(...args),
 }));
@@ -13,14 +18,14 @@ vi.mock('../../src/i18n', () => ({
   setLang: vi.fn(),
 }));
 
-vi.mock('../../src/poi-pins', async (importOriginal) => {
-  const real = await importOriginal<typeof import('../../src/poi-pins')>();
+vi.mock('@myastrosky/render/poi-pins', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@myastrosky/render/poi-pins')>();
   return { ...real, poiPinsInImage: vi.fn(real.poiPinsInImage) };
 });
 
 import { Gallery } from '../../src/gallery';
-import { poiPinsInImage } from '../../src/poi-pins';
-import { setCenterMode, setProjectionObserver } from '../../src/projection';
+import { poiPinsInImage } from '@myastrosky/render/poi-pins';
+import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
 function makePhoto(overrides: Partial<Photo> = {}): Photo {
   return {
@@ -294,18 +299,39 @@ describe('Gallery', () => {
         dsos: btn('gallery.showDsos'),
         pois: btn('gallery.showPois'),
         map: btn('gallery.showOnMap'),
+        rotate: btn('gallery.rotatePhotoRight'),
+        gallery,
         canvas: document.querySelector('.gallery-detail-dso-overlay') as HTMLCanvasElement,
       };
     }
 
-    it('renders DSO, POI and map icon buttons in that order', () => {
-      const { dsos, pois, map } = openDetail({ manualPlacement: placement });
+    it('renders DSO, POI, map and rotate icon buttons in that order', () => {
+      const { dsos, pois, map, rotate } = openDetail({ manualPlacement: placement });
       const row = [...document.querySelectorAll('.gallery-detail-btn-row button')];
-      expect(row).toEqual([dsos, pois, map]);
+      expect(row).toEqual([dsos, pois, map, rotate]);
       for (const b of row) {
         expect(b.querySelector('svg')).toBeTruthy();
         expect(b.textContent?.trim()).toBe('');
       }
+    });
+
+    it('turns the photo right, tells the app and opens the detail again on the turned photo', async () => {
+      const turned = makePhoto({ id: 'd', filename: 'd-2.jpg', width: 300, height: 400 });
+      rotatePhotoAPI.mockResolvedValue(turned);
+      const { rotate, gallery } = openDetail({ manualPlacement: placement });
+      const told = vi.fn();
+      gallery.onPhotoTurned = told;
+      rotate.click();
+      await vi.waitFor(() => expect(told).toHaveBeenCalledWith(turned));
+      expect(rotatePhotoAPI).toHaveBeenCalledWith('d');
+      await vi.waitFor(() =>
+        expect(
+          (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).getAttribute(
+            'src',
+          ),
+        ).toContain('d-2.jpg'),
+      );
+      expect(document.querySelectorAll('.gallery-cinematic-overlay')).toHaveLength(1);
     });
 
     it('disables the POI button with a reason when no POI has a position', () => {
@@ -671,6 +697,22 @@ describe('Gallery', () => {
     expect(first?.textContent).toBe('Vespera');
     // The label chip is still rendered (now styled separately)
     expect(chips.querySelector('.label-chip')?.textContent).toBe('nebula');
+  });
+
+  it('lists the objects of a card the most important catalogue first', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({
+        id: 'a',
+        originalName: 'Orion',
+        filename: 'a.jpg',
+        dsoIds: ['IC434', 'Barnard 33', 'NGC2023', 'M42'],
+      }),
+    ]);
+    const chips = [...document.querySelectorAll('.gallery-item-chips .tag-chip')].map(
+      (c) => c.textContent,
+    );
+    expect(chips).toEqual(['M42', 'NGC2023', 'IC434', 'Barnard 33']);
   });
 
   it('setGearSetups is a no-op when the setup list is unchanged (no hero carousel rebuild)', () => {

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { starAreaBudget, starFaintLimitAt, starMagThreshold } from '../../src/star-budget';
+import { starAreaBudget, starFaintLimitAt, starMagThreshold } from '@myastrosky/core/star-budget';
 import {
   borderRadiusPU,
   setCenterMode,
   setHemisphere,
   setProjectionMode,
-} from '../../src/projection';
-import { STAR_BRIGHT_FLOOR_MAG } from '../../src/render-budget';
-import type { ViewState } from '../../src/types';
+} from '@myastrosky/core/projection';
+import { STAR_BRIGHT_FLOOR_MAG } from '@myastrosky/core/render-budget';
+import type { ViewState } from '@myastrosky/core/types';
 
 /**
  * The area-weighted star gate. The stereographic projection is not equal-area, so a

@@ -9,11 +9,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import SupernovaIdentifyModal from '../../src/components/modals/SupernovaIdentifyModal.vue';
-import { computePhotoToProjMatrix } from '../../src/photo-placement';
-import { photoPixelToRaDec } from '../../src/asteroid-identify';
-import type { TnsCandidate } from '../../src/supernova-identify';
-import type { Photo, ManualPlacement } from '../../src/types';
-import { setCenterMode, setProjectionObserver } from '../../src/projection';
+import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { photoPixelToRaDec } from '@myastrosky/core/asteroid-identify';
+import type { TnsCandidate } from '@myastrosky/core/supernova-identify';
+import type { Photo, ManualPlacement } from '@myastrosky/core/types';
+import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
 vi.mock('../../src/api', () => ({
   tnsConesearchAPI: vi.fn(),

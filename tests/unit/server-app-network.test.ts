@@ -705,7 +705,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(r.status).toBe(400);
       expect(r.body).toEqual({
         success: false,
-        error: 'Unsupported format. Use TIFF or FITS.',
+        error: 'Unsupported format. Use TIFF, FITS or XISF.',
         code: 'UNSUPPORTED_FORMAT',
       });
     });
@@ -831,7 +831,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(jpg.status).toBe(400);
       expect(jpg.body).toEqual({
         success: false,
-        error: 'Unsupported raw format: .jpg. Use TIFF or FITS.',
+        error: 'Unsupported raw format: .jpg. Use TIFF, FITS or XISF.',
         code: 'UNSUPPORTED_FORMAT',
       });
     });

@@ -11,7 +11,7 @@ import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBackupService, type BackupFile } from '@myastrosky/core/services/backup';
-import { createServices } from '../../server/create-services';
+import { createServices } from '@myastrosky/core/services/create-services';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 import { SQL_ADAPTERS } from '../helpers/sql-adapters';
@@ -307,8 +307,8 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(await b.poiCategories.list()).toEqual(await a.poiCategories.list());
       expect(await b.dsoOverrides.getAll()).toEqual(await a.dsoOverrides.getAll());
       expect(new TextDecoder().decode(b.blobs.store.get('p1.jpg'))).toBe('image-1');
-      // The thumbnail was in the bundle but is not a selectable image: it is regenerated.
-      expect(b.blobs.store.has('thumb_p1.jpg')).toBe(true);
+      // The thumbnail is not a selectable image, but comes with its image: the archive's own file is written.
+      expect(new TextDecoder().decode(b.blobs.store.get('thumb_p1.jpg'))).toBe('thumb-1');
       expect(b.blobs.store.has('p2.jpg')).toBe(true);
     });
 
