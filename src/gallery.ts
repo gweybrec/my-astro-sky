@@ -12,11 +12,7 @@ import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './
 import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
 import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
-import {
-  computePhotoDsoOverlayLayout,
-  renderPhotoDsoOverlay,
-  LABEL_FONT,
-} from './photo-dso-overlay-render';
+import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
 import {
   buildPoiFilterGroups,
@@ -24,12 +20,7 @@ import {
   resolveCategory,
   type PoiFilterGroup,
 } from '@myastrosky/core/poi';
-import {
-  poiPinsInImage,
-  computePoiPinLayout,
-  renderPoiPinOverlay,
-  type PhotoPoiPin,
-} from '@myastrosky/render/poi-pins';
+import { poiPinsInImage, type PhotoPoiPin } from '@myastrosky/render/poi-pins';
 import { poiTypeIcon } from './poi-icons';
 import { pinia } from './pinia-instance';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
@@ -862,36 +853,18 @@ export class Gallery {
       ctx.setTransform(dpr, 0, 0, dpr, -offsetX * dpr, -offsetY * dpr);
       ctx.clearRect(offsetX, offsetY, visWidth, visHeight);
 
-      const dispScale = imgRect.width / photo.width;
-      const items = computePhotoDsoOverlayLayout(
-        dsoPlacements,
-        dispScale,
-        // Measure against the same font renderPhotoDsoOverlay actually draws with —
-        // this runs first, before that font is ever set on this context, so relying
-        // on it already being set (the canvas default is narrower) under-measures
-        // every label and starves ellipseLabelClearance's footprint calculation.
-        (text) => {
-          ctx.font = LABEL_FONT;
-          return ctx.measureText(text).width;
+      drawPhotoOverlay(ctx, {
+        placements: dsoPlacements,
+        pins: drawPins ? poiPins : [],
+        dispScale: imgRect.width / photo.width,
+        viewport: {
+          left: offsetX,
+          top: offsetY,
+          right: offsetX + visWidth,
+          bottom: offsetY + visHeight,
         },
-        { left: offsetX, top: offsetY, right: offsetX + visWidth, bottom: offsetY + visHeight },
-      );
-      renderPhotoDsoOverlay(ctx, items);
-
-      if (drawPins) {
-        const pinItems = computePoiPinLayout(
-          poiPins,
-          dispScale,
-          (poi) => resolveCategory(poi.categoryId, getPoiCategories()).color,
-          (text) => {
-            ctx.font = LABEL_FONT;
-            return ctx.measureText(text).width;
-          },
-          { left: offsetX, top: offsetY, right: offsetX + visWidth, bottom: offsetY + visHeight },
-          items.map((item) => item.labelBox),
-        );
-        renderPoiPinOverlay(ctx, pinItems, LABEL_FONT);
-      }
+        pinColor: (poi) => resolveCategory(poi.categoryId, getPoiCategories()).color,
+      });
     }
 
     const showDsosBtn = iconButton(dsoGalaxySvg, t('gallery.showDsos'));
