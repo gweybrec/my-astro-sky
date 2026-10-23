@@ -4,7 +4,7 @@
  * boosted stroke opacity/width so an outline stays legible over a bright photo
  * instead of the sky map's own fill+thin-stroke look, which reads as barely visible
  * on a photo's raster background. Labels are laid out by {@link placeLabel}
- * (`src/dso-label-placement.ts`, ported from the sibling Android app's
+ * (`packages/core/src/dso-label-placement.ts`, ported from the sibling Android app's
  * label-placement algorithm) and then clamped to stay inside the photo's own
  * visible area, since the canvas silently clips anything drawn past its own bounds —
  * without the clamp, a DSO near the bottom/side edge (visible as a half-circle) would
@@ -22,7 +22,7 @@
  * labels do not."
  */
 import type { DSO, DSOType } from '@myastrosky/core/types';
-import type { PhotoDsoPlacement } from './dso-catalog';
+import type { PhotoDsoPlacement } from '@myastrosky/core/catalog/dso-registry';
 import {
   placeLabel,
   type Rect,
@@ -30,6 +30,12 @@ import {
   type Size,
 } from '@myastrosky/core/dso-label-placement';
 import { formatCatalogId } from '@myastrosky/core/dso-label';
+import {
+  computePoiPinLayout,
+  renderPoiPinOverlay,
+  type PhotoPoiPin,
+  type PositionedPoi,
+} from './poi-pins';
 import {
   DSO_MARKER_STYLES,
   DSO_LABEL_COLORS,
@@ -291,4 +297,45 @@ export function renderPhotoDsoOverlay(
     ctx.fillText(item.label, item.labelBox.left, item.labelBox.top);
   }
   ctx.textBaseline = 'alphabetic';
+}
+
+/**
+ * Draws a photo's whole overlay on a canvas already set to image-relative CSS px:
+ * the objects' outlines and names, then the pins of its positioned points of
+ * interest, whose names keep clear of the objects' names. Shared by the desktop's
+ * photo detail and the phone's photo page.
+ */
+export function drawPhotoOverlay(
+  ctx: CanvasRenderingContext2D,
+  overlay: {
+    placements: PhotoDsoPlacement[];
+    pins: PhotoPoiPin[];
+    dispScale: number;
+    viewport: Rect;
+    pinColor: (poi: PositionedPoi) => string;
+  },
+): void {
+  // Measure against the font the labels are drawn with: nothing has set it on this
+  // context yet, and the canvas default is narrower (see LABEL_FONT).
+  const measure = (text: string) => {
+    ctx.font = LABEL_FONT;
+    return ctx.measureText(text).width;
+  };
+  const items = computePhotoDsoOverlayLayout(
+    overlay.placements,
+    overlay.dispScale,
+    measure,
+    overlay.viewport,
+  );
+  renderPhotoDsoOverlay(ctx, items);
+  if (!overlay.pins.length) return;
+  const pinItems = computePoiPinLayout(
+    overlay.pins,
+    overlay.dispScale,
+    overlay.pinColor,
+    measure,
+    overlay.viewport,
+    items.map((item) => item.labelBox),
+  );
+  renderPoiPinOverlay(ctx, pinItems, LABEL_FONT);
 }
