@@ -13,6 +13,9 @@ export interface PhotoFact {
   mono?: boolean;
 }
 
+/** The capture details left out of the map's photo sheet (`brief`): the gallery's information shows them. */
+const DETAILS_ONLY = new Set(['ccdTemp', 'setTemp', 'binning']);
+
 /** Joins a list as the boards write it: "Seestar · Mosaïque". */
 const joined = (items: readonly string[]) => items.join(' · ');
 
@@ -20,11 +23,11 @@ const joined = (items: readonly string[]) => items.join(' · ');
  * What is known of a photo, as the edit page lists it, read only (the boards "Ciel, photo sélectionnée" and "Photo,
  * informations"): its file name (`fileName`), the observation date, the total exposure, the capture details, the
  * equipment, the integration rows, the labels, the points of interest, the notes and its objects (`objects`). Only the
- * facts the photo has are listed.
+ * facts the photo has are listed. `brief` (the map's photo sheet) leaves out the sensor temperatures and the binning.
  */
 export function photoFacts(
   photo: Photo,
-  options: { setupName?: string; fileName?: boolean; objects?: boolean } = {},
+  options: { setupName?: string; fileName?: boolean; objects?: boolean; brief?: boolean } = {},
 ): PhotoFact[] {
   const out: PhotoFact[] = [];
   if (options.fileName) {
@@ -43,6 +46,7 @@ export function photoFacts(
     out.push({ label: t('mobile.photo.totalExposure'), value: formatIntegrationTotal(seconds) });
   }
   for (const field of CAPTURE_FIELDS) {
+    if (options.brief && DETAILS_ONLY.has(field.id)) continue;
     const value = photo.captureDetails?.[field.id];
     if (value === undefined || value === '') continue;
     out.push({
