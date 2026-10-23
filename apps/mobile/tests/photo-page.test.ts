@@ -6,7 +6,9 @@ import { ionicStubs } from './helpers';
 const getPhotos = vi.fn();
 const getGearSetups = vi.fn();
 const deletePhotoAPI = vi.fn();
+const rotatePhotoAPI = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
+  rotatePhotoAPI: (...a: unknown[]) => rotatePhotoAPI(...a),
   getPhotos: () => getPhotos(),
   getGearSetups: () => getGearSetups(),
   deletePhotoAPI: (...a: unknown[]) => deletePhotoAPI(...a),
@@ -128,7 +130,7 @@ describe("a photo's own screen", () => {
     expect(picture.attributes('src')).toBe('/uploads/m31.jpg');
     expect(picture.attributes('alt')).toBe('M31_2025-09-14_stack.jpg');
     expect(w.findAll('.mob-topbar--overlay button').map((b) => b.attributes('aria-label'))).toEqual(
-      ['Retour', 'Informations sur la photo'],
+      ['Retour', 'Faire pivoter à droite', 'Informations sur la photo'],
     );
     expect(button(w, 'Réinitialiser le zoom')).toBeUndefined();
   });
@@ -274,6 +276,33 @@ describe("a photo's own screen", () => {
     await flushPromises();
     expect(showError).toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('turns the photo right from the top bar and shows it turned, whole again', async () => {
+    rotatePhotoAPI.mockResolvedValue(photo({ filename: 'm31-b.jpg', width: 2000, height: 4000 }));
+    const w = mountPage();
+    await flushPromises();
+    const turn = button(w, 'Faire pivoter à droite');
+    // before the information button, as the board
+    const bar = w.findAll('.mob-photo-bar button').map((b) => b.attributes('aria-label'));
+    expect(bar.indexOf('Faire pivoter à droite')).toBe(
+      bar.indexOf('Informations sur la photo') - 1,
+    );
+    await turn.trigger('click');
+    await flushPromises();
+    expect(rotatePhotoAPI).toHaveBeenCalledWith('p1');
+    expect(w.find('.mob-photo-view').attributes('src')).toBe('/uploads/m31-b.jpg');
+  });
+
+  it('keeps the photo and says so when it cannot be turned', async () => {
+    rotatePhotoAPI.mockRejectedValue(new Error('disk'));
+    const w = mountPage();
+    await flushPromises();
+    await button(w, 'Faire pivoter à droite').trigger('click');
+    await flushPromises();
+    expect(showError).toHaveBeenCalled();
+    expect(w.find('.mob-photo-view').attributes('src')).toBe('/uploads/m31.jpg');
+    expect(button(w, 'Faire pivoter à droite').attributes('disabled')).toBeUndefined();
   });
 
   it('opens the edit page of the photo from the pen', async () => {
