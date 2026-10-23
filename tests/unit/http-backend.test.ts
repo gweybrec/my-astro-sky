@@ -156,6 +156,12 @@ describe('requests', () => {
     await backend.photos.setManualPlacement('p', null);
     expect(JSON.parse(sent[0].body as string)).toEqual({ manualPlacement: null });
   });
+
+  it('turns a photo with one POST and answers the photo the server sends back', async () => {
+    const { backend, sent } = makeBackend(() => json({ id: 'p 1', width: 3, height: 4 }));
+    expect(await backend.photos.rotateRight('p 1')).toEqual({ id: 'p 1', width: 3, height: 4 });
+    expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/photos/p%201/rotate']);
+  });
 });
 
 describe('files', () => {

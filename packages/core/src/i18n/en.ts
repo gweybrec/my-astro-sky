@@ -951,6 +951,7 @@ const en: Translations = {
     loadFromWcsError: 'Could not read metadata from this file',
     metadataTitle: 'Edit info',
     showOnMap: 'Show on map',
+    rotatePhotoRight: 'Rotate right',
     showDsos: 'Show DSOs',
     showDsosUnavailable: 'This photo is not placed on the sky map yet',
     showPois: 'Show points of interest',

@@ -3,7 +3,7 @@ import type { App } from 'vue';
 import type { Photo, PoiCategory, PointOfInterest } from '@myastrosky/core/types';
 import { smartSortPhotos } from '@myastrosky/core/photo-search';
 import type { GearSetupData } from './api';
-import { photoFileUrl } from './api';
+import { photoFileUrl, rotatePhotoAPI } from './api';
 import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
@@ -14,6 +14,7 @@ import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
+import { showToast } from './toast';
 import {
   buildPoiFilterGroups,
   poisMatchFilter,
@@ -27,6 +28,7 @@ import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import PhotoDsoCatalogFilter from './components/panels/PhotoDsoCatalogFilter.vue';
 import { hasOpenOverlay } from './popup-utils';
 import mapPinSvg from './icons/map-pin.svg?raw';
+import rotateCwSvg from './icons/rotate-cw.svg?raw';
 import dsoGalaxySvg from './icons/dso-galaxy.svg?raw';
 import poiCometSvg from './icons/poi-comet.svg?raw';
 
@@ -82,6 +84,8 @@ export class Gallery {
   onNavigateToMap: ((photo: Photo) => void) | null = null;
   onPhotoMetadataUpdated: ((photo: Photo) => void) | null = null;
   onDeletePhoto: ((photo: Photo) => void) | null = null;
+  /** A photo was turned a quarter: its picture and the pixel-measured data changed. */
+  onPhotoTurned: ((photo: Photo) => void) | null = null;
 
   constructor() {
     this.container = document.getElementById('gallery-container')!;
@@ -767,6 +771,27 @@ export class Gallery {
       if (await close()) this.onNavigateToMap?.(photo);
     });
 
+    // "Faire pivoter à droite": the picture is saved again turned a quarter; the photo keeps its place on the sky.
+    // Unsaved edits would be lost with the view reopened on the turned photo, so they are asked about first.
+    const rotateBtn = iconButton(rotateCwSvg, t('gallery.rotatePhotoRight'));
+    rotateBtn.addEventListener('click', async () => {
+      if (metaPanelIsDirty?.() && !(await confirmUnsavedChanges())) return;
+      rotateBtn.disabled = true;
+      try {
+        const turned = await rotatePhotoAPI(photo.id);
+        const idx = this.photos.findIndex((p) => p.id === turned.id);
+        if (idx !== -1) this.photos[idx] = turned;
+        this.renderCarousel();
+        this.applyFilters();
+        this.onPhotoTurned?.(turned);
+        rawClose();
+        void this.openDetailModal(turned);
+      } catch (err) {
+        rotateBtn.disabled = false;
+        showToast({ message: err instanceof Error ? err.message : String(err), type: 'error' });
+      }
+    });
+
     // ── "Show DSOs" toggle + catalog filter ────────────────────────────────────
     // photo→projection affine, independent of the sky map's view — null when the
     // photo has no manual placement and fewer than 2 resolvable correspondences.
@@ -911,6 +936,7 @@ export class Gallery {
     btnRow.appendChild(showDsosBtn);
     btnRow.appendChild(showPoisBtn);
     btnRow.appendChild(showOnMapBtn);
+    btnRow.appendChild(rotateBtn);
 
     const dsoFilterEl = document.createElement('div');
     dsoFilterApp = createApp({

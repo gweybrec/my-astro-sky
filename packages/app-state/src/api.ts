@@ -249,6 +249,11 @@ export async function deletePhotoAPI(id: string): Promise<void> {
   return guard('errors.deletePhoto', () => getBackend().photos.remove(id));
 }
 
+/** Turns a photo a quarter to the right: its picture is saved turned, and it keeps its place on the sky. */
+export async function rotatePhotoAPI(id: string): Promise<Photo> {
+  return guard('errors.updatePhoto', () => getBackend().photos.rotateRight(id));
+}
+
 export async function updatePhotoManualPlacement(
   photoId: string,
   manualPlacement: ManualPlacement | null,
