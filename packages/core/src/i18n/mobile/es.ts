@@ -65,6 +65,7 @@ const es: Translations['mobile'] = {
     newTypeName: 'Nombre del nuevo tipo',
   },
   plans: {
+    chartAria: 'Trayectoria de la noche: {alt} a las {time}',
     searchPlaceholder: 'Buscar un plan…',
     searchLabel: 'Buscar un plan',
     moon: 'Luna',

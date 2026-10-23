@@ -3,23 +3,13 @@ import { computed, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
-import { catalogFilterColor } from '@myastrosky/core/gear-catalog';
-import { formatAlt } from '@myastrosky/core/format-utils';
 import { formatPaDeg } from '@myastrosky/core/frame-orientation';
 import {
   fracToClock,
   framesInWindow,
   newObservationWindow,
 } from '@myastrosky/core/observation-windows';
-import { filterCssKey } from '@myastrosky/core/filter-keys';
-import { buildSetupSummary } from '@myastrosky/core/setup-info';
-import { formatArcmin, formatClock24, formatHours } from '@myastrosky/core/targets/format';
-import { formatMultiplicity } from '@myastrosky/core/targets/multiplicity';
-import {
-  moonSeparationRating,
-  resolvePlanNight,
-  scorePlanEntry,
-} from '@myastrosky/core/targets/plan';
+import { resolvePlanNight, scorePlanEntry } from '@myastrosky/core/targets/plan';
 import {
   presetForSetupId,
   resolveSetupById,
@@ -42,14 +32,11 @@ import { loadGearLists, planLookups } from '../composables/usePlans';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
-import PhoneBadge from '../components/PhoneBadge.vue';
-import PhoneFacts from '../components/PhoneFacts.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
-import PhoneSheet from '../components/PhoneSheet.vue';
 import ObsWindowSheet from './plans/ObsWindowSheet.vue';
-import diamondIcon from '../icons/diamond.svg?raw';
-import filterIcon from '../icons/filter.svg?raw';
+import TargetSummary from './targets/TargetSummary.vue';
+import { filterColor } from '../filter-color';
 import mapPinIcon from '@icons/map-pin.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
@@ -99,99 +86,8 @@ const scores = computed(() =>
     : null,
 );
 
-const typeLabel = computed(() => {
-  const d = dso.value;
-  if (!d) return '';
-  return d.type === 'MS' && d.multiplicity
-    ? formatMultiplicity(d.multiplicity, t)
-    : t(`dso.types.${d.type}`);
-});
-
-const facts = computed(() => {
-  const d = dso.value;
-  const i = info.value;
-  if (!d) return [];
-  const out: {
-    label: string;
-    value: string;
-    wide?: boolean;
-    tone?: 'success' | 'warn' | 'danger';
-    rating?: boolean;
-    icon?: string;
-  }[] = [];
-  if (i) {
-    out.push({ label: t('targets.results.maxAlt'), value: formatAlt(i.maxAltDeg) });
-    out.push({ label: t('targets.results.bestTime'), value: formatClock24(i.bestTimeUtc) });
-  }
-  if (d.mag !== null) out.push({ label: t('stars.magnitude'), value: d.mag.toFixed(1) });
-  if (d.majAxis) out.push({ label: t('targets.results.size'), value: formatArcmin(d.majAxis) });
-  // Shown whenever the Moon is on (as the plan page's "Lune" fact); the phase is the night's, so a Moon that stays
-  // below the horizon all night (no overlay) still gives its distance.
-  if (i && night.value && i.moonSepDeg !== null) {
-    const rating = moonSeparationRating(i.moonSepDeg, night.value.phase.illum);
-    out.push({
-      label: t('targets.plan.moonSeparation'),
-      value: `${t(rating.labelKey)} (${formatAlt(i.moonSepDeg)})`,
-      tone: rating.level === 'ok' ? 'success' : rating.level,
-    });
-  }
-  if (d.rating !== null) {
-    out.push({
-      label: t('targets.ratingFilter'),
-      value: '★'.repeat(d.rating) + '☆'.repeat(5 - d.rating),
-      rating: true,
-    });
-  }
-  if (d.difficulty !== null) {
-    out.push({
-      label: t('targets.sort.difficulty'),
-      value: String(d.difficulty),
-      icon: diamondIcon,
-    });
-  }
-  out.push({
-    label: t('fovOverlay.angleLabel'),
-    value: entry.value?.paDeg != null ? formatPaDeg(entry.value.paDeg) : '—',
-  });
-  if (scores.value) {
-    out.push({ label: t('targets.results.score'), value: `${scores.value.scorePct} %` });
-    out.push({ label: t('targets.results.fov'), value: `${scores.value.fovFitPct} %` });
-  }
-  if (setup.value) {
-    const gearLine = buildSetupSummary(setup.value.tel, setup.value.cam, setup.value.acc).gearLine;
-    out.push({
-      label: t('targets.gear.section'),
-      value: `${setup.value.name} · ${gearLine}`,
-      wide: true,
-    });
-  }
-  if (scores.value) {
-    out.push({
-      label: t('targets.results.integrationTotal'),
-      value: formatHours(scores.value.recipe.totalHours),
-      wide: true,
-    });
-  }
-  return out;
-});
-
-const readVar = (cssVar: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(cssVar);
-/** A filter's colour dot: the catalogue filter's, else the filter band's text colour token (board). */
-const filterColor = (filter: string | null | undefined) =>
-  (filter && catalogFilterColor(filter)) || readVar(`--filter-${filterCssKey(filter)}-text`).trim();
 /** The window's colour dot: the one chosen, else its filter's. */
 const colorOf = (w: ObservationWindow) => w.color || filterColor(w.filter);
-
-// The desktop's "Filtres suggérés" of the plan's row: each filter of the recipe with its exposures and hours.
-const filtersOpen = ref(false);
-const suggestedFilters = computed(() =>
-  (scores.value?.recipe.filters ?? []).map((f) => ({
-    name: f.name,
-    value: `${f.count} × ${f.subSeconds} s = ${formatHours(f.hours)}`,
-    color: filterColor(f.name),
-  })),
-);
 
 const windows = computed(() =>
   [...(entry.value?.observationWindows ?? [])]
@@ -209,6 +105,15 @@ const windows = computed(() =>
       };
     }),
 );
+// The windows as bands of the altitude chart, in their colours.
+const chartWindows = computed(() =>
+  windows.value.map((row) => ({
+    startFrac: row.w.startFrac,
+    endFrac: row.w.endFrac,
+    color: row.color,
+  })),
+);
+const angle = computed(() => (entry.value?.paDeg != null ? formatPaDeg(entry.value.paDeg) : '—'));
 const editing = computed(() =>
   draft.value && draft.value.id === editingId.value
     ? draft.value
@@ -329,26 +234,15 @@ async function removeFromPlan() {
     </PhoneTopBar>
     <IonContent :scroll-y="false">
       <div v-if="dso" class="mob-scroll mob-page-fill mob-page-column mob-page-safe">
-        <div class="mob-sheet-header" style="padding-top: var(--space-7)">
-          <div class="mob-meta m-secondary">
-            <span v-if="dso.displayName">{{ dso.catalogs[0] || dso.id }}</span>
-            <PhoneBadge kind="type">{{ typeLabel }}</PhoneBadge>
-            <PhoneBadge v-if="dso.constellation" kind="const">{{
-              dso.constellation.toUpperCase()
-            }}</PhoneBadge>
-          </div>
-        </div>
-        <PhoneFacts :facts="facts" />
-        <IonList class="mob-list" lines="none">
-          <PhoneRow
-            :title="t('targets.results.filtersTitle')"
-            :lead="filterIcon"
-            chevron
-            button
-            :disabled="suggestedFilters.length === 0"
-            @click="filtersOpen = true"
-          />
-        </IonList>
+        <TargetSummary
+          :dso="dso"
+          :info="info ?? null"
+          :night="night"
+          :scores="scores"
+          :angle="angle"
+          :windows="chartWindows"
+          :filters-subtitle="setup ? `${name} · ${setup.name}` : name"
+        />
         <PhoneSectionHeader>{{ t('mobile.plans.windowsHeader') }}</PhoneSectionHeader>
         <IonList class="mob-list" lines="none">
           <PhoneRow
@@ -387,22 +281,6 @@ async function removeFromPlan() {
         </IonList>
       </div>
     </IonContent>
-    <PhoneSheet
-      v-model:open="filtersOpen"
-      :title="t('targets.results.filtersTitle')"
-      :subtitle="setup ? `${name} · ${setup.name}` : name"
-    >
-      <IonList class="mob-list" lines="none">
-        <PhoneRow
-          v-for="f in suggestedFilters"
-          :key="f.name"
-          :title="f.name"
-          :value="f.value"
-          :swatch="f.color"
-          mono
-        />
-      </IonList>
-    </PhoneSheet>
     <ObsWindowSheet
       v-model:open="editorOpen"
       :window="editing"

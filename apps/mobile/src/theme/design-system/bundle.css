@@ -3128,3 +3128,42 @@ svg.mob-icon--sm,
 .mob-facts--compact .mob-fact--wide {
   flex-basis: 100%;
 }
+/* Revision 23. The altitude chart of a target for the night (`.mob-alt-chart`, the desktop's trajectory chart): the night from its start
+   to its end across, 0 to 90° up with lines at 20, 40, 60 and 80°, the target's curve, the Moon's dashed, the best time as a dotted line,
+   and the observation windows as shaded bands in their colours (the desktop's). It runs from gutter to gutter and keeps its proportions. */
+.mob-alt-chart {
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+}
+.mob-alt-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.mob-alt-chart-grid {
+  stroke: var(--border-white-md);
+  stroke-width: 1;
+}
+.mob-alt-chart-curve {
+  fill: none;
+  stroke: var(--accent-color);
+  stroke-width: 2;
+}
+.mob-alt-chart-moon {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.mob-alt-chart-best {
+  stroke: var(--text-label);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.mob-alt-chart-window {
+  fill-opacity: 0.3;
+  stroke: var(--border-white-md);
+  stroke-width: 1;
+}
+.mob-alt-chart-tick {
+  fill: var(--text-label);
+}
