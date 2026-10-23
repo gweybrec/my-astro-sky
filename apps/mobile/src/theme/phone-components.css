@@ -1601,3 +1601,13 @@ ion-tab-bar.mob-tabbar-hidden {
 .mob-facts.mob-facts--compact {
   padding-top: var(--space-4);
 }
+
+/* The objects and points of interest drawn over a photo (board "Photo, objets affichés"): a canvas over the photo's
+   area; it never takes a touch, the photo under it zooms and moves. */
+.mob-photo-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
