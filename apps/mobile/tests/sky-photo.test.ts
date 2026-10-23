@@ -7,8 +7,10 @@ import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import { ionicStubs, mapSheetHost } from './helpers';
 
 const deletePhotoAPI = vi.fn();
+const getGearSetups = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   deletePhotoAPI: (...a: unknown[]) => deletePhotoAPI(...a),
+  getGearSetups: () => getGearSetups(),
 }));
 const confirm = vi.fn();
 const showError = vi.fn();
@@ -60,6 +62,7 @@ describe('the photo sheet', () => {
     configureStorage(createMemoryStore());
     setActivePinia(createPinia());
     deletePhotoAPI.mockReset().mockResolvedValue(undefined);
+    getGearSetups.mockReset().mockResolvedValue([{ id: 's1', name: 'Newton 200 + ASI 183' }]);
     confirm.mockReset().mockResolvedValue(true);
     showError.mockReset();
   });
@@ -73,6 +76,39 @@ describe('the photo sheet', () => {
       'IC5070',
     ]);
     expect(w.find('.mob-pager-dots').exists()).toBe(false);
+  });
+
+  it('shows what is known of the photo, read only, between the chips and the opacity', async () => {
+    const { w } = mountSheet(
+      photo({
+        observationDate: '2025-08-23T21:00:00.000Z',
+        integrations: [{ frames: 40, seconds: 300, filter: 'Ha' }],
+        gearSetupId: 's1',
+        labels: ['Seestar'],
+        notes: 'Nuit claire',
+      }),
+    );
+    await flushPromises();
+    expect(
+      w
+        .findAll('.mob-facts--compact .mob-fact')
+        .map((f) => [f.find('.mob-fact-label').text(), f.find('.mob-fact-value').text()]),
+    ).toEqual([
+      ["Date d'observation", '23 août 2025'],
+      ['Exposition totale', '3h20'],
+      ['Équipement', 'Newton 200 + ASI 183'],
+      ['Intégration', 'Ha 40 × 300 s'],
+      ['Étiquettes', 'Seestar'],
+      ['Notes', 'Nuit claire'],
+    ]);
+    // the objects are the chips above, the name is the title: neither is repeated
+    const order = [...w.find('.mob-sheet-body').element.children].map((e) => e.className);
+    expect(order.findIndex((c) => c.includes('mob-facts'))).toBeGreaterThan(
+      order.findIndex((c) => c.includes('mob-pager ') || c === 'mob-pager'),
+    );
+    expect(order.findIndex((c) => c.includes('mob-facts'))).toBeLessThan(
+      order.findIndex((c) => c.includes('mob-slider-row')),
+    );
   });
 
   it('draws the chips compact (32 px, smaller text), laid out and measured the same way', () => {

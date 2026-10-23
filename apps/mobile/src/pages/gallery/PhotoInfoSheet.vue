@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { getLang, t } from '@myastrosky/core/i18n/index';
+import { t } from '@myastrosky/core/i18n/index';
 import { getDSOById, sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
-import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
-import { formatPlanDate } from '@myastrosky/core/targets/plan';
 import { isPhotoSolved } from '@myastrosky/core/photo-identify';
 import type { Photo } from '@myastrosky/core/types';
 import { deletePhotoAPI } from '@myastrosky/app-state/api';
@@ -11,7 +9,7 @@ import { useConfirm } from '../../composables/useConfirm';
 import { useErrorToast } from '../../composables/useErrorToast';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneBadge from '../../components/PhoneBadge.vue';
-import PhoneFacts from '../../components/PhoneFacts.vue';
+import PhotoFacts from '../../components/PhotoFacts.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import mapPinIcon from '@icons/map-pin.svg?raw';
@@ -20,13 +18,12 @@ import targetIcon from '@icons/target.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Photo, informations": the first object of the photo with its type and constellation, what is known of the
-// photo (only the facts it has), and its actions: showing it on the map, editing its information, identifying objects
+// photo, read only (only the facts it has; the sheet is at most a third of the screen in portrait and its body scrolls),
+// and its actions: showing it on the map, editing its information, identifying objects
 // in it (a photo with a solve only, as the desktop's identifications) and deleting it.
 const props = defineProps<{
   open: boolean;
   photo: Photo;
-  /** The name of the photo's equipment, when it has one. */
-  setupName?: string;
 }>();
 const emit = defineEmits<{
   'update:open': [open: boolean];
@@ -52,28 +49,6 @@ const object = computed(() => {
   };
 });
 
-const facts = computed(() => {
-  const out: { label: string; value: string }[] = [];
-  const { observationDate, integrations = [] } = props.photo;
-  if (observationDate) {
-    out.push({
-      label: t('modal.metadataObsDate'),
-      value: formatPlanDate(observationDate.slice(0, 10), getLang()),
-    });
-  }
-  const seconds = integrations.reduce(
-    (sum, row) => (row.frames >= 1 && row.seconds >= 1 ? sum + row.frames * row.seconds : sum),
-    0,
-  );
-  if (seconds > 0) {
-    out.push({ label: t('mobile.photo.totalExposure'), value: formatIntegrationTotal(seconds) });
-  }
-  if (props.setupName) out.push({ label: t('modal.metadataGearSetup'), value: props.setupName });
-  const filters = [...new Set(integrations.map((row) => row.filter).filter(Boolean))];
-  if (filters.length) out.push({ label: t('mobile.photo.filters'), value: filters.join(', ') });
-  return out;
-});
-
 async function remove() {
   const ok = await confirm({
     title: t('photos.deleteConfirmTitle'),
@@ -97,6 +72,7 @@ async function remove() {
   <PhoneSheet
     :open="open"
     tall
+    third
     :title="object?.title ?? photo.originalName"
     @update:open="emit('update:open', $event)"
   >
@@ -109,7 +85,7 @@ async function remove() {
         }}</PhoneBadge>
       </div>
     </template>
-    <PhoneFacts v-if="facts.length" :facts="facts" />
+    <PhotoFacts :photo="photo" file-name objects />
     <div class="mob-icon-row" role="group" :aria-label="t('mobile.photo.actions')">
       <PhoneIconButton :label="t('gallery.showOnMap')" @click="emit('map')">
         <AppIcon :svg="mapPinIcon" />

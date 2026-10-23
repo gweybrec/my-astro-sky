@@ -141,7 +141,6 @@ const de: Translations['mobile'] = {
     info: 'Informationen zum Foto',
     resetZoom: 'Zoom zurücksetzen',
     totalExposure: 'Gesamtbelichtung',
-    filters: 'Filter',
     identify: 'Objekte identifizieren',
     actions: 'Aktionen für das Foto',
     removeChip: '{name} entfernen',

@@ -5,7 +5,7 @@ import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@io
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
-import { getGearSetups, getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
+import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { usePhotoZoom } from '../composables/usePhotoZoom';
 import { setStatusBarHidden } from '../platform-device';
 import { skyPhotoFocus } from '../composables/useSkySelection';
@@ -25,7 +25,6 @@ const route = useRoute();
 const router = useRouter();
 
 const photo = ref<Photo | null>(null);
-const setupName = ref<string>();
 const infoOpen = ref(false);
 const chooseOpen = ref(false);
 // A picture that cannot be read leaves the stage with the photo's name.
@@ -53,9 +52,6 @@ async function load() {
       reset();
     }
     photo.value = found;
-    setupName.value = found.gearSetupId
-      ? (await getGearSetups()).find((s) => s.id === found.gearSetupId)?.name
-      : undefined;
   } catch (error) {
     reportError('PhotoPage.load', error);
   }
@@ -150,7 +146,6 @@ function edit() {
         v-if="photo"
         v-model:open="infoOpen"
         :photo="photo"
-        :setup-name="setupName"
         @map="showOnMap"
         @edit="edit"
         @identify="identify"

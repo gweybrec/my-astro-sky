@@ -12,6 +12,7 @@ import PhoneMapSheet from '../../components/PhoneMapSheet.vue';
 import PhoneChip from '../../components/PhoneChip.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
+import PhotoFacts from '../../components/PhotoFacts.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import eyeIcon from '@icons/eye.svg?raw';
 import eyeOffIcon from '@icons/eye-off.svg?raw';
@@ -23,9 +24,9 @@ import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Ciel, photo sélectionnée": a placed photo picked on the map, in a sheet over the bottom of the map. Its name,
 // the objects it shows (a chip each, the most important catalogue first, two lines to a page in portrait and one in
-// landscape, pages swiped), its opacity on the map and its actions. Hiding the
-// photo, opening it in the gallery, editing its information and deleting it are done here; the display order opens its
-// page (`order`); repositioning waits for its screen.
+// landscape, pages swiped), what is known of it, read only, its opacity on the map and its actions; the body scrolls.
+// Hiding the photo, opening it in the gallery, editing its information and deleting it are done here; the display order
+// opens its page (`order`); repositioning waits for its screen.
 // It closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button.
 const props = defineProps<{ photo: Photo; layer: PhotoLayer }>();
 const emit = defineEmits<{
@@ -146,6 +147,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
         />
       </div>
     </div>
+    <PhotoFacts :photo="photo" />
     <PhoneSliderRow
       v-model="opacity"
       :label="t('photos.opacity')"
