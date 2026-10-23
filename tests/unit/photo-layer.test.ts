@@ -64,6 +64,31 @@ describe('PhotoLayer', () => {
     expect(second.getAttribute('src')).toBe('/files/2.jpg');
   });
 
+  it('replaces a turned photo by its new picture, keeping its draw order, opacity and hiding', () => {
+    const { container, layer } = make();
+    layer.loadPhotos([placedPhoto('1'), placedPhoto('2'), placedPhoto('3')]);
+    layer.setPhotoOpacity('2', 0.4);
+    layer.toggleVisibility('2');
+    const changed = vi.fn();
+    layer.addOnPhotosChanged(changed);
+    layer.replacePhoto(placedPhoto('2', { filename: '2-b.jpg', width: 60, height: 100 }));
+    const imgs = [...container.querySelectorAll('img')];
+    expect(imgs.map((i) => i.getAttribute('src'))).toEqual([
+      '/files/1.jpg',
+      '/files/2-b.jpg',
+      '/files/3.jpg',
+    ]);
+    expect([imgs[1].style.width, imgs[1].style.opacity, imgs[1].style.display]).toEqual([
+      '60px',
+      '0.4',
+      'none',
+    ]);
+    const placed = layer.getPlacedPhotos();
+    expect(placed.map((p) => p.photo.id)).toEqual(['1', '2', '3']);
+    expect(placed[1]).toMatchObject({ visible: false, opacity: 0.4 });
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+
   it('takes the address of a photo file from the app', () => {
     const { container, layer } = make();
     layer.loadPhotos([placedPhoto('1')]);

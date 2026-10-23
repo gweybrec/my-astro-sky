@@ -964,6 +964,7 @@ const de: Translations = {
     loadFromWcsError: 'Metadaten dieser Datei konnten nicht gelesen werden',
     metadataTitle: 'Informationen bearbeiten',
     showOnMap: 'Auf Karte anzeigen',
+    rotatePhotoRight: 'Nach rechts drehen',
     showDsos: 'Objekte anzeigen',
     showDsosUnavailable: 'Dieses Foto ist noch nicht auf der Himmelskarte platziert',
     showPois: 'Points of Interest anzeigen',

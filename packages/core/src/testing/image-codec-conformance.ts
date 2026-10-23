@@ -136,6 +136,27 @@ export function imageCodecConformanceCases(
       },
     },
     {
+      name: 'rotateRight: a quarter clockwise, size swapped, same format, the corner moved',
+      async run(codec) {
+        // Upright first, as a stored picture (no EXIF orientation): 30 x 60, red at the top right.
+        const upright = await codec.bakeOrientation(fx.orientedJpeg, '.jpg');
+        const out = await codec.rotateRight(upright, '.jpg');
+        toBe(formatOf(out), 'jpeg', 'format');
+        const info = await codec.probe(out);
+        toBe(info.width, 60, 'width');
+        toBe(info.height, 30, 'height');
+        // Turned right, the top-right corner goes to the bottom right.
+        const img = await codec.decode(out);
+        ok(isRed(pixel(img, 57, 27)), 'the bottom-right corner must be red');
+        ok(isBlue(pixel(img, 57, 2)), 'the top-right corner must be blue');
+        ok(isBlue(pixel(img, 2, 27)), 'the bottom-left corner must be blue');
+        const png = await codec.rotateRight(fx.png, '.png');
+        toBe(formatOf(png), 'png', 'png format');
+        toBe((await codec.probe(png)).width, 12, 'png width');
+        await rejects(() => codec.rotateRight(fx.jpeg, '.gif'), '.gif');
+      },
+    },
+    {
       name: 'thumbnail: longer side at most maxSize, ratio kept, JPEG',
       async run(codec) {
         const out = await codec.thumbnail(fx.large, 100, 75);

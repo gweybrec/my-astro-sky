@@ -961,6 +961,7 @@ const fr = {
     loadFromWcsError: 'Impossible de lire les métadonnées de ce fichier',
     metadataTitle: 'Modifier les infos',
     showOnMap: 'Voir sur la carte',
+    rotatePhotoRight: 'Faire pivoter à droite',
     showDsos: 'Afficher les objets',
     showDsosUnavailable: "Cette photo n'est pas encore placée sur la carte du ciel",
     showPois: "Afficher les points d'intérêt",

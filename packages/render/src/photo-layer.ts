@@ -487,6 +487,32 @@ export class PhotoLayer {
       return;
     }
 
+    this.placedPhotos.push(this.placePhotoImage(photo, this.defaultOpacity, null));
+  }
+
+  /**
+   * A photo whose picture changed (turned a quarter): its new picture takes the old one's place, and the photo keeps
+   * its place in the draw order, its opacity and whether it is shown.
+   */
+  replacePhoto(updated: Photo): void {
+    const idx = this.placedPhotos.findIndex((p) => p.photo.id === updated.id);
+    if (idx < 0) return;
+    const old = this.placedPhotos[idx];
+    const placed = this.placePhotoImage(updated, old.opacity, old.imgEl);
+    placed.visible = old.visible;
+    placed.borderHidden = old.borderHidden;
+    if (!old.visible) placed.imgEl.style.display = 'none';
+    old.imgEl.remove();
+    this.placedPhotos[idx] = placed;
+    this.fireOnPhotosChanged();
+  }
+
+  /** The picture of a photo on the map, before `before` in the draw order (last without it). */
+  private placePhotoImage(
+    photo: Photo,
+    opacity: number,
+    before: HTMLImageElement | null,
+  ): PlacedPhoto {
     const img = document.createElement('img');
     img.src = this.hooks.photoUrl(photo.filename);
     img.className = 'photo-overlay-img';
@@ -495,21 +521,20 @@ export class PhotoLayer {
     // Pin to full-image dims: affine matrix is in full-image pixel space; thumbnail LOD src swaps must not change the coordinate space.
     img.style.width = `${photo.width}px`;
     img.style.height = `${photo.height}px`;
-    this.container.appendChild(img);
+    this.container.insertBefore(img, before);
 
-    img.style.opacity = String(this.defaultOpacity);
+    img.style.opacity = String(opacity);
     const placed: PlacedPhoto = {
       photo,
       imgEl: img,
       visible: true,
-      opacity: this.defaultOpacity,
+      opacity,
       borderHidden: false,
       viewportCulled: false,
       projCentroid: null,
       projHalfDiag: 0,
       projGen: -1,
     };
-    this.placedPhotos.push(placed);
 
     img.onload = () => {
       // Only validate dimensions for the full-resolution image. The LOD swap loads a 400px
@@ -527,6 +552,7 @@ export class PhotoLayer {
       img.style.visibility = 'visible';
       this.applyTransform(placed, this.getView());
     };
+    return placed;
   }
 
   protected applyTransform(placed: PlacedPhoto, view: ViewState) {

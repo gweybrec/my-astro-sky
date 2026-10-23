@@ -3,6 +3,11 @@ import type { Photo } from '@myastrosky/core/types';
 
 const mockBuildMetadataEditorPanel = vi.fn();
 
+const rotatePhotoAPI = vi.fn();
+vi.mock('../../src/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/api')>()),
+  rotatePhotoAPI: (...a: unknown[]) => rotatePhotoAPI(...a),
+}));
 vi.mock('../../src/metadata-editor', () => ({
   buildMetadataEditorPanel: (...args: any[]) => mockBuildMetadataEditorPanel(...args),
 }));
@@ -294,18 +299,39 @@ describe('Gallery', () => {
         dsos: btn('gallery.showDsos'),
         pois: btn('gallery.showPois'),
         map: btn('gallery.showOnMap'),
+        rotate: btn('gallery.rotatePhotoRight'),
+        gallery,
         canvas: document.querySelector('.gallery-detail-dso-overlay') as HTMLCanvasElement,
       };
     }
 
-    it('renders DSO, POI and map icon buttons in that order', () => {
-      const { dsos, pois, map } = openDetail({ manualPlacement: placement });
+    it('renders DSO, POI, map and rotate icon buttons in that order', () => {
+      const { dsos, pois, map, rotate } = openDetail({ manualPlacement: placement });
       const row = [...document.querySelectorAll('.gallery-detail-btn-row button')];
-      expect(row).toEqual([dsos, pois, map]);
+      expect(row).toEqual([dsos, pois, map, rotate]);
       for (const b of row) {
         expect(b.querySelector('svg')).toBeTruthy();
         expect(b.textContent?.trim()).toBe('');
       }
+    });
+
+    it('turns the photo right, tells the app and opens the detail again on the turned photo', async () => {
+      const turned = makePhoto({ id: 'd', filename: 'd-2.jpg', width: 300, height: 400 });
+      rotatePhotoAPI.mockResolvedValue(turned);
+      const { rotate, gallery } = openDetail({ manualPlacement: placement });
+      const told = vi.fn();
+      gallery.onPhotoTurned = told;
+      rotate.click();
+      await vi.waitFor(() => expect(told).toHaveBeenCalledWith(turned));
+      expect(rotatePhotoAPI).toHaveBeenCalledWith('d');
+      await vi.waitFor(() =>
+        expect(
+          (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).getAttribute(
+            'src',
+          ),
+        ).toContain('d-2.jpg'),
+      );
+      expect(document.querySelectorAll('.gallery-cinematic-overlay')).toHaveLength(1);
     });
 
     it('disables the POI button with a reason when no POI has a position', () => {

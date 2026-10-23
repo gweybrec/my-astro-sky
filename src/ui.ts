@@ -236,6 +236,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     });
   };
 
+  // A photo turned in the gallery: the map shows its new picture where the old one was
+  gallery.onPhotoTurned = (turned) => {
+    overlay.replacePhoto(turned);
+    usePhotosStore(pinia).syncFromOverlay();
+  };
+
   // Sync metadata edits from gallery back to overlay and photos panel
   gallery.onPhotoMetadataUpdated = (updated) => {
     overlay.updatePhotoData(updated);

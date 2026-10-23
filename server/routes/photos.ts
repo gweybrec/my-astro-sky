@@ -293,6 +293,65 @@ photosRouter.patch('/api/photos/:id/manual-placement', async (req, res) => {
 
 /**
  * @swagger
+ * /api/photos/{id}/rotate:
+ *   post:
+ *     summary: Turn a photo a quarter to the right
+ *     description: >
+ *       Saves the photo's picture again turned 90° clockwise (same file and format), makes its thumbnail again,
+ *       and turns what is measured in its pixels (size, star correspondences, manual placement) so that it keeps
+ *       its place on the sky.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Photo ID
+ *     responses:
+ *       200:
+ *         description: The photo as stored after the turn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       400:
+ *         description: The picture cannot be read or written
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *                   enum: [INVALID_IMAGE]
+ *       404:
+ *         description: Photo not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Photo introuvable"
+ *                 code:
+ *                   type: string
+ *                   enum: [PHOTO_NOT_FOUND]
+ *       500:
+ *         description: Server error
+ */
+photosRouter.post('/api/photos/:id/rotate', async (req, res) => {
+  try {
+    res.json(await photos.rotateRight(req.params.id));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/**
+ * @swagger
  * /api/photos/{id}/metadata:
  *   patch:
  *     summary: Update photo metadata including DSO ids, labels, notes, and integrations
