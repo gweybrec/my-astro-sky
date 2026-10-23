@@ -165,6 +165,8 @@ const en: Translations['mobile'] = {
   sky: {
     layers: 'Map layers',
     searchShort: 'Search…',
+    photoCountOne: '1 photo',
+    photoCountMany: '{n} photos',
     sectionStars: 'Stars and constellations',
     searchClear: 'Clear the search',
     closeSheet: 'Close the card',

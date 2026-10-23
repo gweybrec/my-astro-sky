@@ -140,6 +140,49 @@ describe('the display sheet ("Ciel, affichage")', () => {
     expect(buttonNamed(w, 'Étiquettes : 1 sur 2').exists()).toBe(true);
   });
 
+  it('opens the points of interest and labels sheets with their photos, and applies each tick at once', async () => {
+    const photo = (labels: string[], pois: { categoryId: string; name: string }[]) => ({
+      photo: { labels, pointsOfInterest: pois },
+    });
+    const layer = {
+      getPlacedPhotos: () => [
+        photo(['Seestar'], [{ categoryId: 'cat-comet', name: 'C/2023 A3' }]),
+        photo(['Seestar'], [{ categoryId: 'cat-comet', name: 'C/2023 A3' }]),
+        photo([], [{ categoryId: 'cat-comet', name: '12P' }]),
+      ],
+    };
+    const display = useDisplayStore();
+    const w = mount(SkyDisplaySheet, {
+      props: { open: true, layer: layer as never },
+      global: { stubs: ionicStubs },
+    });
+    const sheet = (title: string) =>
+      w.findAllComponents(SkyCheckSheet).find((c) => c.props('title') === title)!;
+
+    await buttonNamed(w, "Points d'intérêt : 2 sur 2").trigger('click');
+    const pois = sheet("Points d'intérêt");
+    expect(pois.props('open')).toBe(true);
+    const group = pois.props('groups')![0];
+    expect(group.options.map((o) => [o.label, o.sub])).toEqual([
+      ['12P', '1 photo'],
+      ['C/2023 A3', '2 photos'],
+    ]);
+    pois.vm.$emit('update:selected', [group.options[1].value]);
+    expect(display.visiblePois[group.options[0].value]).toBe(false);
+    expect(display.visiblePois[group.options[1].value]).toBe(true);
+
+    await buttonNamed(w, 'Étiquettes : 2 sur 2').trigger('click');
+    const labels = sheet('Étiquettes');
+    expect(labels.props('open')).toBe(true);
+    expect(labels.props('options').map((o) => [o.label, o.sub])).toEqual([
+      ['(sans étiquette)', '1 photo'],
+      ['Seestar', '2 photos'],
+    ]);
+    labels.vm.$emit('update:selected', ['Seestar']);
+    expect(display.visibleLabels['(no label)']).toBe(false);
+    expect(display.visibleLabels['Seestar']).not.toBe(false);
+  });
+
   it('lists the sections of the board in order', () => {
     const headers = mountSheet()
       .findAll('.mob-section-header')

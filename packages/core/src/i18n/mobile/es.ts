@@ -165,6 +165,8 @@ const es: Translations['mobile'] = {
   sky: {
     layers: 'Capas del mapa',
     searchShort: 'Buscar…',
+    photoCountOne: '1 foto',
+    photoCountMany: '{n} fotos',
     sectionStars: 'Estrellas y constelaciones',
     searchClear: 'Borrar la búsqueda',
     closeSheet: 'Cerrar la ficha',

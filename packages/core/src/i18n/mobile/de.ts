@@ -166,6 +166,8 @@ const de: Translations['mobile'] = {
   sky: {
     layers: 'Kartenebenen',
     searchShort: 'Suchen…',
+    photoCountOne: '1 Foto',
+    photoCountMany: '{n} Fotos',
     sectionStars: 'Sterne und Sternbilder',
     searchClear: 'Suche löschen',
     closeSheet: 'Karte schließen',
