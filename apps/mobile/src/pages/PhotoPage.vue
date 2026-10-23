@@ -5,7 +5,8 @@ import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@io
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
-import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
+import { getPhotos, photoFileUrl, rotatePhotoAPI } from '@myastrosky/app-state/api';
+import { useErrorToast } from '../composables/useErrorToast';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { usePhotoZoom } from '../composables/usePhotoZoom';
 import { usePhotoOverlay } from '../composables/usePhotoOverlay';
@@ -16,18 +17,23 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhotoInfoSheet from './gallery/PhotoInfoSheet.vue';
 import infoIcon from '../icons/info.svg?raw';
+import rotateIcon from '@icons/rotate-cw.svg?raw';
 import resetIcon from '../icons/rotate-ccw.svg?raw';
 
 // A photo's own screen, from the boards "Photo, détail", "Photo, zoom" and "Photo, informations": the photo on a dark
 // stage, the top bar with the photo's name, and the sheet of its information. The whole photo is fitted under the bar,
 // so that nothing of it stays hidden behind the bar; zoomed, it runs behind the bar, which stays readable over it. Two
 // fingers and a double tap zoom; the button that shows the photo whole again is there only while it is zoomed. The
-// sheet's toggles draw the photo's objects and points of interest over it (board "Photo, objets affichés").
+// sheet's toggles draw the photo's objects and points of interest over it (board "Photo, objets affichés"). "Faire
+// pivoter à droite" saves the picture again turned a quarter (as the desktop's photo detail); the photo keeps its place
+// on the sky.
 const route = useRoute();
 const router = useRouter();
 
 const photo = ref<Photo | null>(null);
 const infoOpen = ref(false);
+const turning = ref(false);
+const { showError } = useErrorToast();
 // A picture that cannot be read leaves the stage with the photo's name.
 const broken = ref(false);
 
@@ -91,6 +97,20 @@ function showOnMap() {
 
 const backToGallery = () => void router.replace('/tabs/gallery');
 
+async function rotate() {
+  if (!photo.value || turning.value) return;
+  turning.value = true;
+  try {
+    photo.value = await rotatePhotoAPI(photo.value.id);
+    broken.value = false;
+    reset();
+  } catch (error) {
+    await showError(error);
+  } finally {
+    turning.value = false;
+  }
+}
+
 function edit() {
   if (!photo.value) return;
   infoOpen.value = false;
@@ -110,6 +130,14 @@ function edit() {
           >
             <PhoneBackButton float fallback="/tabs/gallery" />
             <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ title }}</h1>
+            <PhoneIconButton
+              float
+              :disabled="!photo || turning"
+              :label="t('gallery.rotatePhotoRight')"
+              @click="rotate"
+            >
+              <AppIcon :svg="rotateIcon" />
+            </PhoneIconButton>
             <PhoneIconButton float :label="t('mobile.photo.info')" @click="infoOpen = true">
               <AppIcon :svg="infoIcon" />
             </PhoneIconButton>
@@ -147,13 +175,13 @@ function edit() {
       <PhotoInfoSheet
         v-if="photo"
         v-model:open="infoOpen"
-        :photo="photo"
-        @map="showOnMap"
         v-model:objects="showObjects"
         v-model:pois="showPois"
         v-model:catalogs="catalogs"
+        :photo="photo"
         :can-show-objects="canShowObjects"
         :can-show-pois="canShowPois"
+        @map="showOnMap"
         @edit="edit"
         @removed="backToGallery"
       />
