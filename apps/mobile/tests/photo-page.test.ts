@@ -219,6 +219,8 @@ describe("a photo's own screen", () => {
     ]);
     // compact facts, the integration rows in the mono face; the sheet is a third of the screen at most in portrait
     expect(w.find('.mob-facts').classes()).toContain('mob-facts--compact');
+    // 8 px under the title: the photo sheets' own spacing (the target pages put their facts right under the badges)
+    expect(w.find('.mob-facts').classes()).toContain('mob-photo-facts');
     expect(w.find('.mob-fact-value .m-mono').text()).toBe('L 60 × 180 s · R 20 × 240 s');
     expect(w.find('.mob-sheet-modal').classes()).toContain('mob-sheet-modal--third');
     expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([

@@ -22,9 +22,7 @@ import {
   type Plan,
 } from '@myastrosky/app-state/api';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
-import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
-import { skyFocus } from '../composables/useSkySelection';
-import { openTab } from '../tab-navigation';
+import { useShowTargetOnMap } from '../composables/useShowTargetOnMap';
 import { catalogsReady } from '../catalogs';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -190,23 +188,10 @@ async function deleteWindow() {
   }
 }
 
-// The desktop's "Afficher sur la carte" (`onNavigate` in its main.ts): with a setup, a free frame of that setup pinned
-// on the target, frames shown and the map zoomed on the frame (its sheet opens there); without one, the map at the target.
-const fov = useFovFramesStore();
+// The desktop's "Afficher sur la carte", with the plan's setup.
+const showTargetOnMap = useShowTargetOnMap('plans');
 async function showOnMap() {
-  const d = dso.value;
-  if (!d) return;
-  const id = setupId.value;
-  if (id && !fov.specs.has(id)) await fov.loadSpecs();
-  const spec = id ? fov.specs.get(id) : undefined;
-  if (id && spec) {
-    fov.addAdhocFrameAtSky(id, d.ra, d.dec);
-    fov.setFramesVisible(true);
-    skyFocus.value = { ra: d.ra, dec: d.dec, scale: 0, fov: { wDeg: spec.wDeg, hDeg: spec.hDeg } };
-  } else {
-    skyFocus.value = { ra: d.ra, dec: d.dec, scale: 800 };
-  }
-  await openTab(router, 'plans', 'sky');
+  if (dso.value) await showTargetOnMap(dso.value, setupId.value);
 }
 
 async function removeFromPlan() {

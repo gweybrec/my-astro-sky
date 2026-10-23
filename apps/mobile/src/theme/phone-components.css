@@ -1598,7 +1598,7 @@ ion-tab-bar.mob-tabbar-hidden {
 
 /* A photo's information in compact facts (boards "Ciel, photo sélectionnée" and "Photo, informations"): 8 px under the
    title or the object chips above them. */
-.mob-facts.mob-facts--compact {
+.mob-facts.mob-photo-facts {
   padding-top: var(--space-4);
 }
 

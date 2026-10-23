@@ -331,6 +331,16 @@ describe('the Cibles page', () => {
     expect(w.findAll('.mob-row--roomy')[0].text()).toContain('M27');
   });
 
+  it("opens a target's page on a tap", async () => {
+    const { global, router } = app();
+    const w = show(TargetsPage, { global });
+    await settle();
+    await w.find('input[type="search"]').setValue('m27');
+    await w.find('.mob-row--roomy').trigger('click');
+    await settle();
+    expect(router.currentRoute.value.path).toBe('/targets/M27');
+  });
+
   it('shows the no-setup board with its button leading to the setups', async () => {
     backend.gear.listSetups.mockResolvedValue([]);
     search.mockResolvedValue({ kind: 'empty', reason: 'no-setup' });

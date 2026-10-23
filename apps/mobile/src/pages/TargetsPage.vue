@@ -268,7 +268,6 @@ function closed(open: boolean) {
           <p class="mob-empty-text m-body">{{ t('targets.results.empty') }}</p>
         </div>
         <div v-else class="mob-cols2">
-          <!-- A tap on a target opens its sheet on the sky map, which is a later card: the row does nothing yet. -->
           <PhoneTargetRow
             v-for="row in rows"
             :key="row.id"
@@ -280,6 +279,7 @@ function closed(open: boolean) {
             :rating="row.rating"
             :altitude="row.altitude"
             :time="row.time"
+            @click="router.push(`/targets/${encodeURIComponent(row.id)}`)"
           />
         </div>
       </div>

@@ -49,6 +49,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/gallery/identify/:id', component: () => import('./pages/IdentifyStarsPage.vue') },
   // The page pushed from the Cibles tab: full screen, without the tab bar (board "Cibles, régions du ciel").
   { path: '/targets/regions', component: () => import('./pages/RegionsPage.vue') },
+  { path: '/targets/:dsoId', component: () => import('./pages/TargetDetailPage.vue') },
   // The pages pushed from the Plans tab: full screen, without the tab bar (boards "Détail du plan" and "Plan, détail d'une cible").
   { path: '/plans/:id', component: () => import('./pages/PlanDetailPage.vue') },
   { path: '/plans/:id/:entryId', component: () => import('./pages/PlanEntryPage.vue') },
