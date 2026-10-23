@@ -434,7 +434,7 @@ describe('the plan detail page', () => {
 });
 
 describe('the plan entry page', () => {
-  it('shows the figures of the target for the night and the setup', async () => {
+  it('shows the figures of the target for the night and the setup, compact, without the equipment', async () => {
     const { w } = await show(PlanEntryPage, '/plans/p1/e1');
     const text = w.text();
     expect(text).toContain("Nébuleuse de l'Amérique du Nord");
@@ -452,17 +452,44 @@ describe('the plan entry page', () => {
       'Angle',
       'Score',
       'Champ',
-      'Équipement',
       'Temps total indicatif',
     ]) {
       expect(text).toContain(label);
     }
+    // the equipment is the plan's, chosen on the plan's page
+    expect(w.findAll('.mob-fact-label').map((l) => l.text())).not.toContain('Équipement');
+    expect(w.find('.mob-facts').classes()).toContain('mob-facts--compact');
     expect(text).toContain('4.0');
     expect(text).toContain('2.0°');
     expect(text).toContain('★★★★★');
     expect(text).toContain('24°');
-    expect(text).toContain('Équipement 1 · Askar FRA400 + ZWO ASI533MC');
+    expect(text).not.toContain('Askar FRA400');
     expect(text).toContain('Filtres suggérés');
+  });
+
+  it("draws the target's altitude over the night with its observation windows as bands", async () => {
+    const { w } = await show(PlanEntryPage, '/plans/p1/e1');
+    const chart = w.find('.mob-alt-chart svg');
+    expect(chart.attributes('aria-label')).toMatch(/^Trajectoire de la nuit : \d+° à \d\d:\d\d$/);
+    expect(
+      chart.find('.mob-alt-chart-curve').attributes('points')!.split(' ').length,
+    ).toBeGreaterThan(10);
+    expect(chart.findAll('.mob-alt-chart-grid')).toHaveLength(5);
+    expect(chart.findAll('.mob-alt-chart-tick').map((t) => t.text())).toEqual(
+      expect.arrayContaining(['20°', '40°', '60°', '80°']),
+    );
+    // the seed's one window, Ha, as a band inside the plot
+    const bands = chart.findAll('.mob-alt-chart-window');
+    expect(bands).toHaveLength(1);
+    expect(Number(bands[0].attributes('x'))).toBeGreaterThanOrEqual(36);
+    expect(
+      Number(bands[0].attributes('x')) + Number(bands[0].attributes('width')),
+    ).toBeLessThanOrEqual(372);
+    // the chart's facts come first, the suggested filters after it
+    const order = [...w.find('.mob-scroll').element.children].map((e) => e.className);
+    expect(order.findIndex((c) => c.includes('mob-alt-chart'))).toBeGreaterThan(
+      order.findIndex((c) => c.includes('mob-facts')),
+    );
   });
 
   it('shows the target on the map as the desktop does: a free frame of the setup, the map zoomed on it', async () => {
