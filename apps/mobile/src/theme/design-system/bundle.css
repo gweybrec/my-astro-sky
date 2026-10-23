@@ -3110,3 +3110,21 @@ svg.mob-icon--sm,
   min-width: var(--space-11);
   padding: 0 var(--space-6);
 }
+/* Revision 22. Compact facts (`.mob-facts.mob-facts--compact`): the label over its value with no card around them, as many to a line
+   as fit, 24px apart, 8px between lines, as the desktop lists a target's or a photo's figures. A wide fact (`.mob-fact--wide`) takes a
+   line of its own (equipment, integration, labels, notes). */
+.mob-facts.mob-facts--compact {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-9);
+  row-gap: var(--space-4);
+}
+.mob-facts--compact .mob-fact {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+.mob-facts--compact .mob-fact--wide {
+  flex-basis: 100%;
+}

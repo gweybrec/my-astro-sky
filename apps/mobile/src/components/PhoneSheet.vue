@@ -11,7 +11,8 @@ import backIcon from '../icons/arrow-left.svg?raw';
 // overlay handling), and so does dragging it down from its header or handle (Ionic's sheet gesture: breakpoints 0 and 1,
 // the content's height as the 1; the body is a scroll host, so it scrolls first). A sheet has no close button: a sheet
 // without a footer applies its changes at once. With `back`, the header starts with a back arrow (`back` event): the
-// sheet replaced another, which the arrow opens again (board "Photo, choisir une identification").
+// sheet replaced another, which the arrow opens again (board "Photo, choisir une identification"). With `third`, in
+// portrait, it is at most a third of the screen under the top bar (board "Photo, informations"): its body scrolls.
 defineProps<{
   open: boolean;
   title: string;
@@ -21,6 +22,7 @@ defineProps<{
   /** The footer is hidden, not removed (a search's results take its place above the keyboard). */
   footerHidden?: boolean;
   back?: boolean;
+  third?: boolean;
 }>();
 const emit = defineEmits<{ 'update:open': [open: boolean]; back: [] }>();
 const titleId = useId();
@@ -29,6 +31,7 @@ const titleId = useId();
 <template>
   <IonModal
     class="mob-sheet-modal"
+    :class="{ 'mob-sheet-modal--third': third }"
     :is-open="open"
     :breakpoints="[0, 1]"
     :initial-breakpoint="1"

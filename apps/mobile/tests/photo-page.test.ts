@@ -160,7 +160,17 @@ describe("a photo's own screen", () => {
     expect(button(w, 'Réinitialiser le zoom')).toBeUndefined();
   });
 
-  it('lists what is known of the photo, values written as the desktop writes them', async () => {
+  it('lists what is known of the photo, read only, values written as the desktop writes them', async () => {
+    getPhotos.mockResolvedValue([
+      photo({
+        captureDetails: { gain: 100, ccdTemp: -10 },
+        labels: ['Seestar', 'Mosaïque'],
+        pointsOfInterest: [
+          { name: 'C/2023 A3', categoryId: 'cat-comet' },
+        ] as Photo['pointsOfInterest'],
+        notes: ' Nuit claire. ',
+      }),
+    ]);
     const w = mountPage();
     await flushPromises();
     await button(w, 'Informations sur la photo').trigger('click');
@@ -173,11 +183,22 @@ describe("a photo's own screen", () => {
     ]);
     // 60 x 180 s + 20 x 240 s = 4 h 20; the row without frames does not count.
     expect(facts(w)).toEqual([
+      ['Nom du fichier', 'M31_2025-09-14_stack.jpg'],
       ["Date d'observation", '14 sept. 2025'],
       ['Exposition totale', '4h20'],
+      ['Gain', '100'],
+      ['Temp. capteur', '-10 °C'],
       ['Équipement', 'Équipement 1'],
-      ['Filtres', 'L, R'],
+      ['Intégration', 'L 60 × 180 s · R 20 × 240 s'],
+      ['Étiquettes', 'Seestar · Mosaïque'],
+      ["Points d'intérêt", 'C/2023 A3'],
+      ['Notes', 'Nuit claire.'],
+      ['Objets dans cette image', 'M31 · M32'],
     ]);
+    // compact facts, the integration rows in the mono face; the sheet is a third of the screen at most in portrait
+    expect(w.find('.mob-facts').classes()).toContain('mob-facts--compact');
+    expect(w.find('.mob-fact-value .m-mono').text()).toBe('L 60 × 180 s · R 20 × 240 s');
+    expect(w.find('.mob-sheet-modal').classes()).toContain('mob-sheet-modal--third');
     expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([
       'Voir sur la carte',
       'Modifier les métadonnées',
@@ -194,7 +215,7 @@ describe("a photo's own screen", () => {
     await flushPromises();
     expect(w.find('.mob-sheet-title').text()).toBe('M31_2025-09-14_stack.jpg');
     expect(w.find('.mob-sheet .mob-meta').exists()).toBe(false);
-    expect(w.find('.mob-facts').exists()).toBe(false);
+    expect(facts(w)).toEqual([['Nom du fichier', 'M31_2025-09-14_stack.jpg']]);
     expect(getGearSetups).not.toHaveBeenCalled();
   });
 

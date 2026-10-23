@@ -667,6 +667,14 @@ ion-modal.mob-sheet-modal .mob-sheet {
 ion-modal.mob-sheet-modal .mob-sheet--auto-lg {
   max-height: var(--sheet-max-height-tall);
 }
+/* A photo's information over the photo (`third`): at most a third of the screen under the top bar in portrait. */
+@media (orientation: portrait) {
+  ion-modal.mob-sheet-modal.mob-sheet-modal--third .mob-sheet {
+    max-height: calc(
+      (100dvh - var(--safe-top, 0px) - var(--mobile-topbar-height) - var(--space-9)) / 3
+    );
+  }
+}
 @media (orientation: landscape) {
   /* A sheet over a scrim is a centred card of limited width. */
   ion-modal.mob-sheet-modal {
@@ -1586,4 +1594,10 @@ ion-tab-bar.mob-tabbar-hidden {
   z-index: var(--z-panel);
   padding-top: var(--space-4);
   background: linear-gradient(var(--bg-panel), var(--bg-panel)), var(--bg-app);
+}
+
+/* A photo's information in compact facts (boards "Ciel, photo sélectionnée" and "Photo, informations"): 8 px under the
+   title or the object chips above them. */
+.mob-facts.mob-facts--compact {
+  padding-top: var(--space-4);
 }
