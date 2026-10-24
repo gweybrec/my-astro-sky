@@ -497,14 +497,15 @@ export const rules = [
     children: '.mob-fact-label, .mob-fact-value',
   },
   { id: 'ribbon-edge', type: 'sameStart', bars: '.mob-map-ribbon', children: 'ion-button' },
-  // The object sheet's cards and buttons span the same width, between the same two edges as its title.
+  // The object sheet's facts and buttons start at the same edge as its title; its buttons end at the same edge too
+  // (facts are as wide as their text since design system revision 24).
   {
     id: 'sheet-edges',
     type: 'edges',
     within: '.mob-map-sheet, .mob-sheet',
     lefts:
       '.mob-fact:first-child, .mob-icon-row > :first-child, .mob-pager-page:first-child > :first-child, .mob-slider-label',
-    rights: '.mob-fact:last-child, .mob-icon-row:not(.mob-icon-row--start) > :last-child',
+    rights: '.mob-icon-row:not(.mob-icon-row--start) > :last-child',
   },
   // The gallery's tiles make columns between the same two edges: two in portrait, six in landscape. The first tile of
   // every sixth is in the first column in both, and the sixth of every six in the last.
