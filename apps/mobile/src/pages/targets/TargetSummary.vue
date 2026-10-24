@@ -23,7 +23,7 @@ import diamondIcon from '../../icons/diamond.svg?raw';
 import filterIcon from '../../icons/filter.svg?raw';
 
 // What a target is for the night and the setup, the head of the boards "Plan, détail d'une cible" and "Cibles, détail
-// d'une cible": its designation, type and constellation, its figures as compact facts (design system revision 22), its
+// d'une cible": its designation, type and constellation, its figures as facts (design system revisions 22 and 24), its
 // altitude over the night (revision 23, with the plan's observation windows as bands) and its suggested filters (board
 // "Plan, cible, filtres suggérés": the desktop's recipe, in a sheet). The equipment is the plan's or the search's,
 // shown where it is chosen, not here.
@@ -121,7 +121,7 @@ const suggestedFilters = computed(() =>
       }}</PhoneBadge>
     </div>
   </div>
-  <PhoneFacts compact :facts="facts" />
+  <PhoneFacts :facts="facts" />
   <PhoneAltChart
     v-if="info && night"
     :curve="info.curve"

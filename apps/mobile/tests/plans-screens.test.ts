@@ -482,8 +482,7 @@ describe('the plan entry page', () => {
     }
     // the equipment is the plan's, chosen on the plan's page
     expect(w.findAll('.mob-fact-label').map((l) => l.text())).not.toContain('Équipement');
-    expect(w.find('.mob-facts').classes()).toContain('mob-facts--compact');
-    expect(w.find('.mob-facts').classes()).not.toContain('mob-photo-facts');
+    expect(w.find('.mob-facts').classes()).toEqual(['mob-facts']);
     expect(text).toContain('4.0');
     expect(text).toContain('2.0°');
     expect(text).toContain('★★★★★');

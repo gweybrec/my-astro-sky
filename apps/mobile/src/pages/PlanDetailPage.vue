@@ -60,7 +60,7 @@ const night = computed(() =>
 const summary = computed(() => {
   const n = night.value;
   if (!n) return [];
-  const facts: { label: string; value: string; wide?: boolean }[] = [
+  const facts: { label: string; value: string }[] = [
     { label: t('targets.plan.nightStart'), value: formatClock24(n.win.start) },
     { label: t('targets.plan.nightEnd'), value: formatClock24(n.win.end) },
   ];
@@ -68,7 +68,6 @@ const summary = computed(() => {
     facts.push({
       label: t('mobile.plans.moon'),
       value: `${t(`mobile.plans.phase${n.phase.phaseIndex}`)} · ${Math.round(n.phase.illum * 100)} %`,
-      wide: true,
     });
   }
   return facts;

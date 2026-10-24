@@ -3167,3 +3167,25 @@ svg.mob-icon--sm,
 .mob-alt-chart-tick {
   fill: var(--text-label);
 }
+/* Revision 24. Facts are always compact (user's rule 2026-10-24): `.mob-facts` lists label over value with no card, each as wide as
+   its text, as many to a line as fit, 24px apart, 8px between lines, as the desktop lists figures. `.mob-facts--2` and
+   `.mob-facts--compact` are kept as names of the same thing; `.mob-fact--wide` no longer takes a line of its own (a long value wraps
+   inside the line). Values are body text, not bold. */
+.mob-facts,
+.mob-facts.mob-facts--2,
+.mob-facts.mob-facts--compact {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-9);
+  row-gap: var(--space-4);
+}
+.mob-facts .mob-fact {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+.mob-facts .mob-fact--wide,
+.mob-facts--compact .mob-fact--wide {
+  flex-basis: auto;
+}

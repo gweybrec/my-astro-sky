@@ -93,7 +93,7 @@ describe('the photo sheet', () => {
     await flushPromises();
     expect(
       w
-        .findAll('.mob-facts--compact .mob-fact')
+        .findAll('.mob-facts .mob-fact')
         .map((f) => [f.find('.mob-fact-label').text(), f.find('.mob-fact-value').text()]),
     ).toEqual([
       ["Date d'observation", '23 août 2025'],

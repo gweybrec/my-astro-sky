@@ -5,11 +5,10 @@ import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
 import { formatPlanDate } from '@myastrosky/core/targets/plan';
 import type { Photo } from '@myastrosky/core/types';
 
-/** One read-only figure of a photo: a `wide` one takes a line of its own, a `mono` one is drawn in the mono face. */
+/** One read-only figure of a photo: a `mono` one is drawn in the mono face. */
 export interface PhotoFact {
   label: string;
   value: string;
-  wide?: boolean;
   mono?: boolean;
 }
 
@@ -31,7 +30,7 @@ export function photoFacts(
 ): PhotoFact[] {
   const out: PhotoFact[] = [];
   if (options.fileName) {
-    out.push({ label: t('modal.metadataFilename'), value: photo.originalName, wide: true });
+    out.push({ label: t('modal.metadataFilename'), value: photo.originalName });
   }
   if (photo.observationDate) {
     out.push({
@@ -55,7 +54,7 @@ export function photoFacts(
     });
   }
   if (options.setupName) {
-    out.push({ label: t('modal.metadataGearSetup'), value: options.setupName, wide: true });
+    out.push({ label: t('modal.metadataGearSetup'), value: options.setupName });
   }
   if (rows.length) {
     out.push({
@@ -70,28 +69,25 @@ export function photoFacts(
             .join(' '),
         ),
       ),
-      wide: true,
       mono: true,
     });
   }
   if (photo.labels?.length) {
-    out.push({ label: t('modal.metadataLabels'), value: joined(photo.labels), wide: true });
+    out.push({ label: t('modal.metadataLabels'), value: joined(photo.labels) });
   }
   if (photo.pointsOfInterest?.length) {
     out.push({
       label: t('modal.metadataPoi'),
       value: joined([...new Set(photo.pointsOfInterest.map((poi) => poi.name))]),
-      wide: true,
     });
   }
   if (photo.notes?.trim()) {
-    out.push({ label: t('modal.metadataNotes'), value: photo.notes.trim(), wide: true });
+    out.push({ label: t('modal.metadataNotes'), value: photo.notes.trim() });
   }
   if (options.objects && photo.dsoIds?.length) {
     out.push({
       label: t('modal.metadataDsos'),
       value: joined(sortDsoIdsByImportance(photo.dsoIds)),
-      wide: true,
     });
   }
   return out;

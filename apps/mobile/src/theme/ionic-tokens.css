@@ -207,10 +207,6 @@ ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page) {
   ion-footer.mob-footer > ion-button.mob-btn {
     flex: 0 0 200px;
   }
-  /* Fact cards: as many per row as fit. */
-  .mob-page-column .mob-facts--2 {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
   /* The context row of the targets: the fields share one row equally. */
   .mob-context > * {
     flex: 1 1 0;

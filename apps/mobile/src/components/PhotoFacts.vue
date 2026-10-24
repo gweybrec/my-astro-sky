@@ -40,5 +40,5 @@ const facts = computed(() =>
 </script>
 
 <template>
-  <PhoneFacts v-if="facts.length" class="mob-photo-facts" compact :facts="facts" />
+  <PhoneFacts v-if="facts.length" class="mob-photo-facts" :facts="facts" />
 </template>

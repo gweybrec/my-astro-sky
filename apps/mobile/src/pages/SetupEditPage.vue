@@ -115,7 +115,7 @@ const facts = computed(() =>
     ? [
         { label: t('targets.gear.effectiveFocalLength'), value: `${summary.value.focalMm} mm` },
         { label: t('targets.gear.info.resolution'), value: summary.value.resolution },
-        { label: 'FOV', value: `${summary.value.fov} · ${summary.value.scale}`, wide: true },
+        { label: 'FOV', value: `${summary.value.fov} · ${summary.value.scale}` },
       ]
     : [],
 );

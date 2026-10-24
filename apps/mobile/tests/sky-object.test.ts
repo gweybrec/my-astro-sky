@@ -74,6 +74,13 @@ describe('the object sheet', () => {
     expect(factsOf(mountSheet())).toEqual([['Magnitude', '3.4']]);
   });
 
+  it('lists its facts without cards, each as wide as its text, values in body text (design system revision 24)', () => {
+    const w = mountSheet();
+    expect(w.find('.mob-facts').classes()).toEqual(['mob-facts']);
+    expect(w.find('.mob-fact-value').classes()).toContain('m-body');
+    expect(w.find('.mob-fact-value').classes()).not.toContain('m-body-strong');
+  });
+
   it('adds the transit tonight once there is a location, and the altitude too in date mode', () => {
     writeObserverLocation(48.58, 7.75);
     setActivePinia(createPinia());

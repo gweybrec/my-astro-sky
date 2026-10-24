@@ -1318,6 +1318,11 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
 .mob-sheet-body > .mob-facts:first-child {
   padding-top: var(--space-4);
 }
+/* Facts right under a list (the setup's page, under "Gérer les filtres") stand off its last row as they do off a
+   sheet's header: without cards, nothing else parts them. */
+.mob-list + .mob-facts {
+  padding-top: var(--space-4);
+}
 .mob-sheet-body > .mob-icon-row {
   padding-right: var(--mobile-gutter-end);
 }

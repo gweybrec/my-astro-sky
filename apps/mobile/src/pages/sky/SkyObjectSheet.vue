@@ -99,7 +99,7 @@ const facts = computed(() => {
         }}</PhoneBadge>
       </div>
     </template>
-    <PhoneFacts :facts="facts" :columns="facts.length === 3 ? 3 : 2" />
+    <PhoneFacts :facts="facts" />
     <!-- "Ajouter un cadre" and "Ajouter une mosaïque" open "Créer un cadre" / "Créer une mosaïque"; the screens behind
          the others (plan picker, edit, details) are not built yet. -->
     <div

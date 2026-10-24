@@ -427,8 +427,8 @@ function raiseError() {
           :facts="[
             { label: 'Focale', value: '1422 mm' },
             { label: 'Résolution', value: '6248 × 4176 px' },
-            { label: 'FOV', value: '57′ × 38′', wide: true },
-            { label: 'Lune', value: 'Dernier quartier · 50 %', wide: true, icon: caretIcon },
+            { label: 'FOV', value: '57′ × 38′' },
+            { label: 'Lune', value: 'Dernier quartier · 50 %', icon: caretIcon },
           ]"
         />
         <PhoneHelper>Ligne d'état</PhoneHelper>
