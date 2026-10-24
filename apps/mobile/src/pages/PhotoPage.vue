@@ -17,7 +17,7 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhotoInfoSheet from './gallery/PhotoInfoSheet.vue';
 import infoIcon from '../icons/info.svg?raw';
-import rotateIcon from '@icons/rotate-cw.svg?raw';
+import rotateIcon from '@icons/rotate-right-90.svg?raw';
 import resetIcon from '../icons/rotate-ccw.svg?raw';
 
 // A photo's own screen, from the boards "Photo, détail", "Photo, zoom" and "Photo, informations": the photo on a dark

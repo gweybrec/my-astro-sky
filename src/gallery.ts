@@ -28,7 +28,7 @@ import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import PhotoDsoCatalogFilter from './components/panels/PhotoDsoCatalogFilter.vue';
 import { hasOpenOverlay } from './popup-utils';
 import mapPinSvg from './icons/map-pin.svg?raw';
-import rotateCwSvg from './icons/rotate-cw.svg?raw';
+import rotateRightSvg from './icons/rotate-right-90.svg?raw';
 import dsoGalaxySvg from './icons/dso-galaxy.svg?raw';
 import poiCometSvg from './icons/poi-comet.svg?raw';
 
@@ -773,7 +773,7 @@ export class Gallery {
 
     // "Faire pivoter à droite": the picture is saved again turned a quarter; the photo keeps its place on the sky.
     // Unsaved edits would be lost with the view reopened on the turned photo, so they are asked about first.
-    const rotateBtn = iconButton(rotateCwSvg, t('gallery.rotatePhotoRight'));
+    const rotateBtn = iconButton(rotateRightSvg, t('gallery.rotatePhotoRight'));
     rotateBtn.addEventListener('click', async () => {
       if (metaPanelIsDirty?.() && !(await confirmUnsavedChanges())) return;
       rotateBtn.disabled = true;

@@ -283,6 +283,8 @@ describe("a photo's own screen", () => {
     const w = mountPage();
     await flushPromises();
     const turn = button(w, 'Faire pivoter à droite');
+    // a quarter arc with its arrow (docs/dev/curved-arrow-svg.md), not the reload circle
+    expect(turn.html()).toContain('A 13 13 0 0 1 18 19');
     // before the information button, as the board
     const bar = w.findAll('.mob-photo-bar button').map((b) => b.attributes('aria-label'));
     expect(bar.indexOf('Faire pivoter à droite')).toBe(
