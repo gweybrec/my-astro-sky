@@ -1,4 +1,5 @@
-import type { DSO, DSOType, DSOUserOverride } from '@myastrosky/core/types';
+import type { DSO } from '@myastrosky/core/types';
+import { buildDsoOverride, DSO_EDIT_TYPES } from '@myastrosky/core/catalog/dso-override-form';
 import { upsertDsoOverride, deleteDsoOverride } from './api';
 import {
   applyAndStoreSingleOverride,
@@ -12,22 +13,6 @@ import { showToast } from './toast';
 interface ConstellationOption {
   id: string;
   name: string;
-}
-
-/**
- * Returns true when a dropdown selection should be persisted as an override.
- * Empty selection or a value matching the catalog base is treated as "no change",
- * which causes any previous override for that field to be removed on save.
- */
-export function shouldOverrideConstellation(
-  selected: string,
-  baseConstellation: string | null | undefined,
-): boolean {
-  return !!selected && selected !== (baseConstellation ?? '');
-}
-
-export function shouldOverrideType(selected: string, baseType: string | null | undefined): boolean {
-  return !!selected && selected !== (baseType ?? '');
 }
 
 // Pre-load constellation list at module init so the data is ready before the user opens the modal.
@@ -175,22 +160,7 @@ export async function openDSOEditModal(dso: DSO, onSaved?: () => void): Promise<
   typeSelect.className = 'tag-input';
 
   const baseType = base?.type ?? null;
-  const DSO_TYPE_OPTIONS: DSOType[] = [
-    'Gx',
-    'GxS',
-    'GxE',
-    'GxI',
-    'OC',
-    'GC',
-    'EN',
-    'RN',
-    'PN',
-    'SNR',
-    'DN',
-    'PS',
-    '?',
-  ];
-  for (const code of DSO_TYPE_OPTIONS) {
+  for (const code of DSO_EDIT_TYPES) {
     const opt = document.createElement('option');
     opt.value = code;
     const isDefault = code === baseType;
@@ -298,36 +268,24 @@ export async function openDSOEditModal(dso: DSO, onSaved?: () => void): Promise<
         onSaved?.();
         return;
       }
-      const override: DSOUserOverride = {};
-      const names: DSOUserOverride['names'] = {};
-      if (frInput.value.trim()) names.fr = frInput.value.trim();
-      if (enInput.value.trim()) names.en = enInput.value.trim();
-      if (esInput.value.trim()) names.es = esInput.value.trim();
-      if (deInput.value.trim()) names.de = deInput.value.trim();
-      if (Object.keys(names).length > 0) override.names = names;
-
-      const ra = parseFloat(raInput.value);
-      const dec = parseFloat(decInput.value);
-      if (!isNaN(ra)) {
-        if (ra < 0 || ra >= 360) throw new Error(t('dso.editErrorRa'));
-        if (ra !== dso.ra) override.ra = ra;
-      }
-      if (!isNaN(dec)) {
-        if (dec < -90 || dec > 90) throw new Error(t('dso.editErrorDec'));
-        if (dec !== dso.dec) override.dec = dec;
-      }
-      if (shouldOverrideConstellation(constSelect.value, baseConstellation)) {
-        override.constellation = constSelect.value;
-      }
-
-      const rating = parseInt(ratingInput.value, 10);
-      if (!isNaN(rating) && rating >= 1 && rating <= 5) override.rating = rating;
-      const difficulty = parseInt(diffInput.value, 10);
-      if (!isNaN(difficulty) && difficulty >= 1 && difficulty <= 5)
-        override.difficulty = difficulty;
-      if (shouldOverrideType(typeSelect.value, baseType)) {
-        override.type = typeSelect.value as DSOType;
-      }
+      const override = buildDsoOverride(
+        {
+          names: {
+            fr: frInput.value,
+            en: enInput.value,
+            es: esInput.value,
+            de: deInput.value,
+          },
+          ra: raInput.value,
+          dec: decInput.value,
+          constellation: constSelect.value,
+          rating: ratingInput.value,
+          difficulty: diffInput.value,
+          type: typeSelect.value,
+        },
+        dso,
+        { constellation: baseConstellation, type: baseType },
+      );
 
       await upsertDsoOverride(dso.id, override);
       applyAndStoreSingleOverride(dso.id, override);
