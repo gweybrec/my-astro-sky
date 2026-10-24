@@ -272,6 +272,19 @@ describe('placing a photo by hand', () => {
     await handle.trigger('pointerdown', { clientY: 170 });
     await handle.trigger('pointermove', { clientY: 100 });
     expect(shown()).toBe(true);
+    // Open, a drag up takes it to two thirds; a drag down takes it back to a third, still open, then folds it.
+    const expanded = () => w.find('.mob-placing-panel').classes().includes('mob-sheet--expanded');
+    expect(expanded()).toBe(false);
+    await handle.trigger('pointerdown', { clientY: 170 });
+    await handle.trigger('pointermove', { clientY: 100 });
+    expect(expanded()).toBe(true);
+    await handle.trigger('pointerdown', { clientY: 100 });
+    await handle.trigger('pointermove', { clientY: 170 });
+    expect(expanded()).toBe(false);
+    expect(shown()).toBe(true);
+    await handle.trigger('pointerdown', { clientY: 100 });
+    await handle.trigger('pointermove', { clientY: 170 });
+    expect(shown()).toBe(false);
     window.matchMedia = media;
   });
 

@@ -164,6 +164,34 @@ describe('the shared phone components', () => {
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
   });
 
+  it('PhoneSheet third goes to two thirds when dragged up; a drag down from there takes it back to a third, open', async () => {
+    const restore = portrait();
+    const w = mount(PhoneSheet, { props: { open: true, title: 'x', third: true }, global });
+    const section = () => w.find('section.mob-sheet');
+    await dragBy(w.find('.mob-sheet-header'), -70);
+    expect(section().classes()).toContain('mob-sheet--expanded');
+    await w.find('.mob-sheet-grab').trigger('click');
+    expect(w.emitted('update:open')).toBeUndefined();
+    // Ionic asks before its drag down closes the sheet
+    const canDismiss = w.findComponent(ionicStubs.IonModal).vm.$attrs['can-dismiss'] as (
+      d: unknown,
+      role: string,
+    ) => Promise<boolean>;
+    expect(await canDismiss(undefined, 'gesture')).toBe(false);
+    await nextTick();
+    expect(section().classes()).not.toContain('mob-sheet--expanded');
+    expect(await canDismiss(undefined, 'gesture')).toBe(true);
+    restore();
+  });
+
+  it('PhoneSheet without third does not grow when dragged up', async () => {
+    const restore = portrait();
+    const w = mount(PhoneSheet, { props: { open: true, title: 'x' }, global });
+    await dragBy(w.find('.mob-sheet-header'), -70);
+    expect(w.find('section.mob-sheet').classes()).not.toContain('mob-sheet--expanded');
+    restore();
+  });
+
   it('PhoneSheet has no close button, with or without a footer', () => {
     const w = mount(PhoneSheet, { props: { open: true, title: 'x' }, global });
     expect(w.find('.mob-sheet-footer').exists()).toBe(false);
@@ -266,4 +294,54 @@ describe('the map sheets', () => {
     await w.find('.mob-sheet-grab').trigger('click');
     expect(w.findComponent(PhoneMapSheet).emitted('close')).toHaveLength(1);
   });
+
+  it('goes up to two thirds when dragged up in portrait, back to a third, then closes', async () => {
+    const restore = portrait();
+    const w = mount(PhoneMapSheetHost, {
+      slots: { default: () => h(PhoneMapSheet, { title: 'M31' }) },
+      global: { stubs: ionicStubs },
+    });
+    const sheet = () => w.find('.mob-map-sheet');
+    const drag = w.find('.mob-sheet-drag');
+    await dragBy(drag, -70);
+    expect(sheet().classes()).toContain('mob-sheet--expanded');
+    // the click that ends a drag on the handle does not close the sheet
+    await w.find('.mob-sheet-grab').trigger('click');
+    expect(w.findComponent(PhoneMapSheet).emitted('close')).toBeUndefined();
+    await dragBy(drag, 70);
+    expect(sheet().classes()).not.toContain('mob-sheet--expanded');
+    expect(w.findComponent(PhoneMapSheet).emitted('close')).toBeUndefined();
+    await dragBy(drag, 70);
+    expect(w.findComponent(PhoneMapSheet).emitted('close')).toHaveLength(1);
+    restore();
+  });
+
+  it('stays as it is when dragged up in landscape, where it already has the full height', async () => {
+    const restore = portrait(false);
+    const w = mount(PhoneMapSheetHost, {
+      slots: { default: () => h(PhoneMapSheet, { title: 'M31' }) },
+      global: { stubs: ionicStubs },
+    });
+    await dragBy(w.find('.mob-sheet-drag'), -70);
+    expect(w.find('.mob-map-sheet').classes()).not.toContain('mob-sheet--expanded');
+    restore();
+  });
 });
+
+/** Makes the window portrait (or landscape) for `(orientation: landscape)`; returns the undo. */
+function portrait(isPortrait = true) {
+  const media = window.matchMedia;
+  window.matchMedia = ((q: string) => ({
+    matches: q.includes('landscape') ? !isPortrait : false,
+    addEventListener() {},
+    removeEventListener() {},
+  })) as unknown as typeof window.matchMedia;
+  return () => (window.matchMedia = media);
+}
+
+/** A finger dragging from an element by `dy` pixels (down when positive). */
+async function dragBy(el: { trigger: (e: string, o?: object) => Promise<void> }, dy: number) {
+  await el.trigger('pointerdown', { clientY: 300 });
+  await el.trigger('pointermove', { clientY: 300 + dy });
+  await el.trigger('pointerup', { clientY: 300 + dy });
+}

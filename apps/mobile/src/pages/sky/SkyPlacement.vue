@@ -16,6 +16,7 @@ import { uploadPhoto } from '@myastrosky/app-state/api';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import { catalogsReady } from '../../catalogs';
 import { useErrorToast } from '../../composables/useErrorToast';
+import { useSheetDrag, useSheetExpand } from '../../composables/useSheetDrag';
 import { pendingPhotoFile, removePendingPhoto } from '../../pending-photos';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneSearch from '../../components/PhoneSearch.vue';
@@ -59,38 +60,32 @@ const opacity = ref(0.85);
 
 // ── The panel folded down (portrait) ─────────────────────────────────────────────────────────────
 // As a bottom sheet, the panel folds down to its handle and its buttons, by a tap on the handle or a drag down from it,
-// and opens again the same way: the map then has the room to place the photo by hand. In landscape the panel is a
-// column beside the map and does not fold.
-const FOLD_DRAG_PX = 48;
+// and opens again the same way: the map then has the room to place the photo by hand. Open, a drag up takes it from a
+// third of the frame to two thirds, and a drag down back to a third. In landscape the panel is a column beside the map
+// and does not fold.
 const folded = ref(false);
+const { expanded, grow } = useSheetExpand();
 const landscapeQuery =
   typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
 const landscape = ref(landscapeQuery?.matches ?? false);
 const onTurn = () => (landscape.value = landscapeQuery?.matches ?? false);
 landscapeQuery?.addEventListener('change', onTurn);
 const settingsShown = computed(() => landscape.value || !folded.value);
-let grabFrom: number | null = null;
+const grab = useSheetDrag(
+  () => {
+    if (expanded.value) expanded.value = false;
+    else folded.value = true;
+  },
+  () => {
+    if (folded.value) folded.value = false;
+    else grow();
+  },
+);
 /** A drag on the handle ends with a click on it, which must not fold it back. */
-let dragged = false;
-const grab = {
-  pointerdown(e: PointerEvent) {
-    grabFrom = e.clientY;
-    dragged = false;
-  },
-  pointermove(e: PointerEvent) {
-    if (grabFrom === null) return;
-    const dy = e.clientY - grabFrom;
-    if (Math.abs(dy) < FOLD_DRAG_PX) return;
-    folded.value = dy > 0;
-    grabFrom = null;
-    dragged = true;
-  },
-  pointerup: () => (grabFrom = null),
-  pointercancel: () => (grabFrom = null),
-};
 function toggleFold() {
-  if (dragged) dragged = false;
-  else folded.value = !folded.value;
+  if (grab.wasDragged()) return;
+  folded.value = !folded.value;
+  expanded.value = false;
 }
 const view = shallowRef<ViewState>(props.map.getView());
 const saving = ref(false);
@@ -314,8 +309,12 @@ async function validate() {
       @pointercancel="onUp"
     />
   </Teleport>
-  <section class="mob-panel mob-placing-panel" :aria-label="t('manual.modeLabel')">
-    <div class="mob-placing-grab" v-on="grab">
+  <section
+    class="mob-panel mob-placing-panel"
+    :class="{ 'mob-sheet--expanded': expanded }"
+    :aria-label="t('manual.modeLabel')"
+  >
+    <div class="mob-placing-grab" v-on="grab.handlers">
       <button
         type="button"
         class="mob-sheet-grab"

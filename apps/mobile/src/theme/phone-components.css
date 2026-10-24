@@ -667,12 +667,19 @@ ion-modal.mob-sheet-modal .mob-sheet {
 ion-modal.mob-sheet-modal .mob-sheet--auto-lg {
   max-height: var(--sheet-max-height-tall);
 }
-/* A photo's information over the photo (`third`): at most a third of the screen under the top bar in portrait. */
+/* A photo's information over the photo (`third`): at most a third of the screen under the top bar in portrait (two
+   thirds once dragged up). Its handle and header take the drag up without scrolling the page. */
 @media (orientation: portrait) {
   ion-modal.mob-sheet-modal.mob-sheet-modal--third .mob-sheet {
     max-height: calc(
-      (100dvh - var(--safe-top, 0px) - var(--mobile-topbar-height) - var(--space-9)) / 3
+      (100dvh - var(--safe-top, 0px) - var(--mobile-topbar-height) - var(--space-9)) *
+        var(--sheet-share)
     );
+    transition: max-height var(--sheet-slide-duration) ease;
+  }
+  ion-modal.mob-sheet-modal--third .mob-sheet-grab,
+  ion-modal.mob-sheet-modal--third .mob-sheet-header {
+    touch-action: none;
   }
 }
 @media (orientation: landscape) {
@@ -1062,15 +1069,23 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   z-index: var(--z-base);
 }
 /* Portrait: the sheet of the map sits on the tab bar, which already keeps clear of the system's navigation bar. It is at
-   most a third of the map under its search row (user's rule 2026-10-20): its handle and title stay, its content scrolls. */
+   most a third of the map under its search row (user's rule 2026-10-20), two thirds once dragged up (2026-10-24): its
+   handle and title stay, its content scrolls. */
 @media (orientation: portrait) {
   .mob-map-sheet {
     padding-bottom: 0;
-    max-height: calc((100% - 2 * var(--mobile-gutter) - var(--mobile-touch-min)) / 3);
+    max-height: calc(
+      (100% - 2 * var(--mobile-gutter) - var(--mobile-touch-min)) * var(--sheet-share)
+    );
+    transition: max-height var(--sheet-slide-duration) ease;
   }
-  /* The hand placement's panel under the map: at most a third of the frame under its mode bar; its settings scroll. */
+  /* The hand placement's panel under the map: at most a third of the frame under its mode bar (two thirds once dragged
+     up); its settings scroll. */
   .mob-sky-frame.mob-map-mode > .mob-placing-panel {
-    max-height: calc((100% - var(--mobile-topbar-height) - var(--safe-top, 0px)) / 3);
+    max-height: calc(
+      (100% - var(--mobile-topbar-height) - var(--safe-top, 0px)) * var(--sheet-share)
+    );
+    transition: max-height var(--sheet-slide-duration) ease;
   }
 }
 /* Landscape (boards "Ciel, objet sélectionné" and "Ciel, cadre sélectionné", landscape): the sheet of the map is as
@@ -1105,6 +1120,20 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
    panel folds at it. */
 :root {
   --sheet-slide-duration: 0.3s;
+}
+/* The share of its room a sheet held to a third takes: a third, two thirds once dragged up (`useSheetExpand`). */
+:root {
+  --sheet-share: calc(1 / 3);
+}
+.mob-sheet--expanded {
+  --sheet-share: calc(2 / 3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mob-map-sheet,
+  .mob-sky-frame.mob-map-mode > .mob-placing-panel,
+  ion-modal.mob-sheet-modal.mob-sheet-modal--third .mob-sheet {
+    transition: none;
+  }
 }
 /* A row of fewer actions than the board's five sits at the start of the row, not spread from edge to edge. */
 .mob-icon-row--start {

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { useId } from 'vue';
+import { computed, useId } from 'vue';
 import { IonModal } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import AppIcon from './AppIcon.vue';
 import PhoneIconButton from './PhoneIconButton.vue';
+import { useSheetDrag, useSheetExpand } from '../composables/useSheetDrag';
 import backIcon from '../icons/arrow-left.svg?raw';
 
 // A bottom sheet (`.mob-sheet`) on Ionic's modal. It takes the height of its content (60 % of the screen at most, 70 %
@@ -12,8 +13,10 @@ import backIcon from '../icons/arrow-left.svg?raw';
 // the content's height as the 1; the body is a scroll host, so it scrolls first). A sheet has no close button: a sheet
 // without a footer applies its changes at once. With `back`, the header starts with a back arrow (`back` event): the
 // sheet replaced another, which the arrow opens again (board "Photo, choisir une identification"). With `third`, in
-// portrait, it is at most a third of the screen under the top bar (board "Photo, informations"): its body scrolls.
-defineProps<{
+// portrait, it is at most a third of the screen under the top bar (board "Photo, informations"): its body scrolls, and a
+// drag up from its handle or header takes it to two thirds; dragging it down from there takes it back to a third instead
+// of closing it.
+const props = defineProps<{
   open: boolean;
   title: string;
   /** A line under the title (`.mob-meta`): what the sheet is about. */
@@ -26,6 +29,26 @@ defineProps<{
 }>();
 const emit = defineEmits<{ 'update:open': [open: boolean]; back: [] }>();
 const titleId = useId();
+
+const { expanded, grow } = useSheetExpand();
+// Ionic's own gesture moves the sheet down; this only takes the drag up.
+const drag = useSheetDrag(() => {}, grow);
+const dragHandlers = computed(() => (props.third ? drag.handlers : {}));
+/** Ionic asks before a drag down closes the sheet: from two thirds, it goes back to a third and stays open. */
+async function canDismiss(_data: unknown, role?: string) {
+  if (role === 'gesture' && expanded.value) {
+    expanded.value = false;
+    return false;
+  }
+  return true;
+}
+function tapHandle() {
+  if (!drag.wasDragged()) emit('update:open', false);
+}
+function dismissed() {
+  expanded.value = false;
+  emit('update:open', false);
+}
 </script>
 
 <template>
@@ -36,22 +59,27 @@ const titleId = useId();
     :breakpoints="[0, 1]"
     :initial-breakpoint="1"
     :handle="false"
-    @did-dismiss="emit('update:open', false)"
+    :can-dismiss="canDismiss"
+    @did-dismiss="dismissed"
   >
     <section
       class="mob-sheet"
-      :class="tall ? 'mob-sheet--auto-lg' : 'mob-sheet--auto'"
+      :class="[
+        tall ? 'mob-sheet--auto-lg' : 'mob-sheet--auto',
+        { 'mob-sheet--expanded': expanded },
+      ]"
       :aria-labelledby="titleId"
     >
       <button
         type="button"
         class="mob-sheet-grab"
         :aria-label="t('modal.close')"
-        @click="emit('update:open', false)"
+        v-on="dragHandlers"
+        @click="tapHandle"
       >
         <span class="mob-sheet-handle" />
       </button>
-      <div class="mob-sheet-header" :class="{ 'mob-sheet-header--bar': back }">
+      <div class="mob-sheet-header" :class="{ 'mob-sheet-header--bar': back }" v-on="dragHandlers">
         <PhoneIconButton v-if="back" :label="t('mobile.nav.back')" @click="emit('back')">
           <AppIcon :svg="backIcon" />
         </PhoneIconButton>
