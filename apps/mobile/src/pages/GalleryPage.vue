@@ -16,9 +16,15 @@ import PhoneFab from '../components/PhoneFab.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import { addImportFiles } from '../composables/usePhotoImport';
+import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useGrowingList } from '../composables/useGrowingList';
-import { loadPendingPhotos, pendingPhotos, type PendingState } from '../pending-photos';
+import {
+  loadPendingPhotos,
+  pendingPhotos,
+  removePendingPhoto,
+  type PendingState,
+} from '../pending-photos';
 import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pending-solve';
 import { loadGalleryDisplay, photosPerLine, type Orientation } from '../gallery-display';
 import { skyPlacement } from '../sky-modes';
@@ -44,6 +50,7 @@ import plusIcon from '@icons/plus.svg?raw';
 // placed photo opens its own screen.
 const router = useRouter();
 const { showError } = useErrorToast();
+const { confirm } = useConfirm();
 
 // null until the photos are read; the empty state shows only once the backend has answered with none.
 const photos = ref<Photo[] | null>(null);
@@ -127,6 +134,24 @@ function identify() {
   if (!placingId.value) return;
   endIdentify(placingId.value);
   void router.push(`/gallery/identify/${placingId.value}`);
+}
+
+// A waiting photo is deleted after the same question as a placed one; it was only kept on the phone.
+async function deleteWaiting() {
+  const photo = pendingPhotos.value.find((p) => p.id === placingId.value);
+  if (!photo) return;
+  const ok = await confirm({
+    title: t('photos.deleteConfirmTitle'),
+    message: t('photos.deleteConfirmMessage', { name: photo.name }),
+    confirmLabel: t('photos.deleteConfirmAction'),
+    destructive: true,
+  });
+  if (!ok) return;
+  try {
+    await removePendingPhoto(photo.id);
+  } catch (error) {
+    await showError(error);
+  }
 }
 
 function solveOnline() {
@@ -249,6 +274,8 @@ async function addPicked(pick: () => Promise<File[]>) {
     </IonContent>
     <PlacementMethodSheet
       v-model:open="methodOpen"
+      deletable
+      @delete="deleteWaiting"
       @online="solveOnline"
       @identify="identify"
       @hand="placeByHand"

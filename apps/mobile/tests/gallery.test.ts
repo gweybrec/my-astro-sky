@@ -39,6 +39,9 @@ vi.mock('../src/platform-device', () => ({
   pickGalleryPhotos: () => pickGalleryPhotos(),
 }));
 
+const confirm = vi.fn();
+vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({ confirm }) }));
+
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import GalleryPage from '../src/pages/GalleryPage.vue';
 import { loadGalleryDisplay } from '../src/gallery-display';
@@ -47,6 +50,8 @@ import { clearImport, importItems } from '../src/composables/usePhotoImport';
 import {
   addPendingPhoto,
   configurePendingStore,
+  loadPendingPhotos,
+  pendingPhotos,
   createMemoryPendingStore,
   setPendingState,
 } from '../src/pending-photos';
@@ -215,6 +220,29 @@ describe('the gallery page', () => {
     expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
       'NGC7000.tif : Échec de la résolution',
     );
+  });
+
+  it('deletes a waiting photo from the red last row, after asking', async () => {
+    getPhotos.mockResolvedValue([]);
+    await addPendingPhoto(new Blob(['y']), 'M101.jpg');
+    const wrapper = mountPage();
+    await flushPromises();
+    await openMethods(wrapper);
+    const row = rowWith(wrapper, 'Supprimer cette photo');
+    expect(row.classes()).toContain('mob-row--danger');
+    confirm.mockReset().mockResolvedValueOnce(false);
+    await row.trigger('click');
+    await flushPromises();
+    expect(confirm.mock.calls[0][0].message).toContain('M101.jpg');
+    expect(wrapper.findAll('.mob-photo-card')).toHaveLength(1);
+    await openMethods(wrapper);
+    confirm.mockResolvedValueOnce(true);
+    await rowWith(wrapper, 'Supprimer cette photo').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('.mob-photo-card')).toHaveLength(0);
+    // gone from the phone's store too, not only from the list
+    await loadPendingPhotos();
+    expect(pendingPhotos.value).toEqual([]);
   });
 
   it('places a waiting photo by hand on the sky map', async () => {

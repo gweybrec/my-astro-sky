@@ -5,13 +5,16 @@ import { reportError } from '@myastrosky/core/platform/error-hook';
 import { loadServerSettings } from '@myastrosky/app-state/api';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneRow from '../../components/PhoneRow.vue';
+import trashIcon from '@icons/trash.svg?raw';
 
 // The boards "Importer, méthode de placement" and "Résolution en ligne, hors connexion": the four ways to place a
 // photo. Solving online needs a connection and the astrometry.net key; without one of them the row is greyed out with
 // the reason under it. Identifying stars has its own page, and placing by hand is done on the sky map. Solving on the
-// computer needs the connection to the computer: that row is drawn and does nothing yet.
+// computer needs the connection to the computer: that row is drawn and does nothing yet. A photo already kept as waiting
+// (`deletable`, the gallery's) can also be deleted from the red last row (`delete`; the page asks first).
 const open = defineModel<boolean>('open', { required: true });
-const emit = defineEmits<{ online: []; identify: []; hand: [] }>();
+defineProps<{ deletable?: boolean }>();
+const emit = defineEmits<{ online: []; identify: []; hand: []; delete: [] }>();
 
 const online = ref(true);
 const keySet = ref(true);
@@ -46,6 +49,11 @@ function chooseIdentify() {
 function chooseHand() {
   open.value = false;
   emit('hand');
+}
+
+function chooseDelete() {
+  open.value = false;
+  emit('delete');
 }
 
 function chooseOnline() {
@@ -85,6 +93,14 @@ function chooseOnline() {
       :title="t('mobile.gallery.placeByHand')"
       :subs="[t('mobile.gallery.placeByHandSub')]"
       @click="chooseHand"
+    />
+    <PhoneRow
+      v-if="deletable"
+      button
+      danger
+      :lead="trashIcon"
+      :title="t('photos.deleteThisPhoto')"
+      @click="chooseDelete"
     />
   </PhoneSheet>
 </template>
