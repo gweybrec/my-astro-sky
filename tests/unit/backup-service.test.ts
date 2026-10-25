@@ -391,6 +391,44 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(result).toMatchObject({ imported: 0, skipped: 1 });
       expect(await notesById(a)).toEqual({ L: 'local', X: 'kept' });
     });
+
+    it('writes no picture for a photo that is skipped, so the one here keeps its own', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('X', 'other.jpg', 'kept'), 'skip');
+      a.blobs.store.set('X.jpg', text('local-image'));
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importFrom(
+        memoryReader([
+          ['manifest.json', JSON.stringify([named('X', 'result.jpg', 'bundle')])],
+          ['images/X.jpg', 'bundle-image'],
+        ]),
+        everything,
+      );
+      expect(result).toMatchObject({ imported: 0, skipped: 1 });
+      expect(new TextDecoder().decode(a.blobs.store.get('X.jpg'))).toBe('local-image');
+    });
+
+    it('removes the files of the photo it replaces, and keeps those another photo names', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('L', 'result.jpg'), 'skip');
+      await a.photos.importPhoto({ ...named('P', 'm42.jpg'), filename: 'old-P.jpg' }, 'skip');
+      await a.photos.importPhoto({ ...named('K', 'kept.jpg'), filename: 'shared.jpg' }, 'skip');
+      await a.photos.importPhoto({ ...named('S', 's.jpg'), filename: 'shared.jpg' }, 'skip');
+      for (const f of ['L.jpg', 'L_thumb.jpg', 'old-P.jpg', 'old-P_thumb.jpg', 'shared.jpg']) {
+        a.blobs.store.set(f, text(f));
+      }
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importPhotoList(
+        [
+          named('A', 'result.jpg'), // replaces L by its name
+          named('P', 'm42.jpg'), // replaces P by its id, under a new file name
+          { ...named('T', 's.jpg'), filename: 'other.jpg' }, // replaces S, whose file K still names
+        ],
+        everything,
+      );
+      expect(result).toMatchObject({ imported: 3, skipped: 0 });
+      expect([...a.blobs.store.keys()].sort()).toEqual(['shared.jpg']);
+    });
   });
 
   describe('partial import', () => {
@@ -869,9 +907,10 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       const perPlan = (await calls(2, 1)) - base;
       const perPhoto = (await calls(1, 2)) - base;
       // The formula: calls = 2 reads (local setups, local gear) + 1 read when plans are ticked (plan names)
-      // + 1 read when photos are imported (names already here) + 1 per plan (one batch) + 4 per new photo
-      // (its transaction: begin, existence check, one batch, commit). 9 for one plan and one photo.
-      expect(base).toBe(9);
+      // + 3 reads when photos are imported (names already here; the photos already here and their correspondences)
+      // + 1 per plan (one batch) + 4 per new photo (its transaction: begin, existence check, one batch, commit).
+      // 11 for one plan and one photo.
+      expect(base).toBe(11);
       expect(perPlan).toBe(1);
       expect(perPhoto).toBe(4);
       expect(await calls(5, 1)).toBe(base + 4 * perPlan);

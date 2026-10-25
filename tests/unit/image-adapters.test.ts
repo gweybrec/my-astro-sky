@@ -7,7 +7,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import sharp from 'sharp';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createFsBlobStore } from '../../server/blob-store';
 import { createSharpImageCodec } from '../../server/image-codec';
 
@@ -172,6 +172,24 @@ describe('createFsBlobStore', () => {
     await store.remove('blob.bin');
     expect(await store.get('blob.bin')).toBeNull();
     expect(fs.existsSync(path.join(dir, 'blob.bin'))).toBe(false);
+  });
+
+  it('keeps the old file whole and leaves no partial file when a write fails', async () => {
+    const store = createFsBlobStore(dir);
+    await store.put('kept.bin', new Uint8Array([1, 2, 3]));
+    const write = vi.spyOn(fs.promises, 'writeFile').mockImplementationOnce(async (file) => {
+      // A full disk: part of the bytes land, then the write fails.
+      fs.writeFileSync(file as string, new Uint8Array([9]));
+      throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' });
+    });
+    try {
+      await expect(store.put('kept.bin', new Uint8Array(1000))).rejects.toThrow('no space');
+    } finally {
+      write.mockRestore();
+    }
+    expect([...fs.readFileSync(path.join(dir, 'kept.bin'))]).toEqual([1, 2, 3]);
+    expect(fs.readdirSync(dir).filter((f) => f.includes('kept'))).toEqual(['kept.bin']);
+    await store.remove('kept.bin');
   });
 
   it('rejects a put into a folder that does not exist', async () => {

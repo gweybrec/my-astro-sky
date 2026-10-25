@@ -11,6 +11,8 @@ export interface CapacitorFilesystem {
   appendFile(options: { path: string; data: string; directory: string }): Promise<unknown>;
   stat(options: { path: string; directory: string }): Promise<{ size: number }>;
   deleteFile(options: { path: string; directory: string }): Promise<unknown>;
+  /** Moves a file; an existing file at `to` is replaced. */
+  rename(options: { from: string; to: string; directory: string }): Promise<unknown>;
   mkdir(options: { path: string; directory: string; recursive?: boolean }): Promise<unknown>;
   getUri(options: { path: string; directory: string }): Promise<{ uri: string }>;
 }
@@ -155,11 +157,15 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
 
     async put(name, bytes) {
       const path = pathOf(name);
+      // The pieces go to a hidden file (no blob name starts with a dot), renamed over the blob once all are written,
+      // so a failed write (a full phone) leaves the old file whole.
+      const part = `${folder}/.${name}.part`;
       await ensureFolder();
       try {
-        await writeFileInPieces(filesystem, directory, path, bytes, pieceBytes);
+        await writeFileInPieces(filesystem, directory, part, bytes, pieceBytes);
+        await filesystem.rename({ from: part, to: path, directory });
       } catch (err) {
-        await filesystem.deleteFile({ path, directory }).catch(() => undefined);
+        await filesystem.deleteFile({ path: part, directory }).catch(() => undefined);
         throw err;
       }
     },

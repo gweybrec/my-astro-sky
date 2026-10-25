@@ -2,11 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import type { BlobStore } from '@myastrosky/core/ports/blob-store';
 
-/** A blob store over one directory (the uploads folder): a blob is the file of that name. */
+/**
+ * A blob store over one directory (the uploads folder): a blob is the file of that name. A put writes a hidden
+ * `.<name>.part` first and renames it over the file, so a failed write leaves the old file whole.
+ */
 export function createFsBlobStore(dir: string): BlobStore {
   return {
     async put(name, bytes) {
-      await fs.promises.writeFile(path.join(dir, name), bytes);
+      const target = path.join(dir, name);
+      const part = path.join(dir, `.${name}.part`);
+      try {
+        await fs.promises.writeFile(part, bytes);
+        await fs.promises.rename(part, target);
+      } catch (err) {
+        await fs.promises.unlink(part).catch(() => undefined);
+        throw err;
+      }
     },
     async get(name) {
       try {

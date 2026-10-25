@@ -57,6 +57,12 @@ export function createFakeFilesystem(): FakeFilesystem {
     async deleteFile({ path }) {
       if (!files.delete(path)) throw new Error('File does not exist');
     },
+    async rename({ from, to }) {
+      const f = files.get(from);
+      if (!f) throw new Error('File does not exist');
+      files.delete(from);
+      files.set(to, f);
+    },
     async mkdir() {},
     async getUri({ path }) {
       return { uri: `${ROOT}/${path}` };

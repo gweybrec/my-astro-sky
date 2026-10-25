@@ -112,6 +112,24 @@ const encode = (value: unknown): Uint8Array =>
 /** A photo record of a manifest: whatever the file holds. */
 type ManifestPhoto = Record<string, any>;
 
+/** A photo already here: its name and its two files (image, thumbnail). */
+interface LocalPhoto {
+  originalName: string;
+  files: string[];
+}
+
+const photoThumbOf = (p: { filename: string; thumbFilename?: string | null }): string =>
+  p.thumbFilename || thumbnailNameOf(p.filename);
+
+/** The name a manifest photo is matched by. */
+const nameOfManifestPhoto = (p: ManifestPhoto): string => p.originalName ?? p.filename ?? p.id;
+
+/** The image and thumbnail names of a manifest photo; none when it names no image. */
+const manifestFilesOf = (p: ManifestPhoto): string[] =>
+  typeof p.filename === 'string' && p.filename
+    ? [p.filename, photoThumbOf({ filename: p.filename, thumbFilename: p.thumbFilename })]
+    : [];
+
 export function createBackupService(deps: BackupServiceDeps): BackupService {
   const { photos, plans, gear, dsoOverrides, poiCategories, skyRegions, blobs, newId } = deps;
 
@@ -146,12 +164,33 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
     return entries;
   }
 
+  /** The photos already here, by id, read once before an import writes anything. */
+  async function localPhotos(): Promise<Map<string, LocalPhoto>> {
+    return new Map(
+      (await photos.list()).map((p) => [
+        p.id,
+        { originalName: p.originalName, files: [p.filename, photoThumbOf(p)] },
+      ]),
+    );
+  }
+
+  /**
+   * Whether the record of a manifest photo will be skipped: it has no id, or a photo here has its id under another
+   * name (`importPhoto` with `skip` leaves that one alone).
+   */
+  function recordIsSkipped(p: ManifestPhoto, local: Map<string, LocalPhoto>): boolean {
+    if (!p.id || typeof p.id !== 'string') return true;
+    const here = local.get(p.id);
+    return here !== undefined && here.originalName !== nameOfManifestPhoto(p);
+  }
+
   /** Writes the photo records the selection asks for, then the missing thumbnails. */
   async function importPhotoRecords(
     list: ManifestPhoto[],
     importMetadata: boolean,
     writtenFiles: Set<string> | null,
     recordFailure: (kind: ImportFailure['kind'], name: string, err: unknown) => void,
+    local: Map<string, LocalPhoto>,
   ): Promise<{ imported: number; skipped: number }> {
     let imported = 0;
     let skipped = 0;
@@ -175,7 +214,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
           skipped++;
           continue;
         }
-        const origName: string = p.originalName ?? p.filename ?? p.id;
+        const origName: string = nameOfManifestPhoto(p);
 
         // Skip photos whose image file was not written (not selected, or write failed)
         if (writtenFiles !== null && !writtenFiles.has(p.filename)) {
@@ -197,10 +236,26 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
           );
           if (result === 'imported') {
             imported++;
-            if (other) replaced.add(other);
+            replaced.add(other ?? p.id);
           } else skipped++;
         } catch (photoErr) {
           recordFailure('photo', origName, photoErr);
+        }
+      }
+
+      // The files of a replaced photo belong to no photo any more, unless a photo here or of the list names them.
+      const inUse = new Set(list.flatMap(manifestFilesOf));
+      for (const [id, here] of local) {
+        if (!replaced.has(id)) here.files.forEach((f) => inUse.add(f));
+      }
+      for (const id of replaced) {
+        for (const f of local.get(id)?.files ?? []) {
+          if (inUse.has(f)) continue;
+          await blobs
+            .remove(f)
+            .catch((err) =>
+              console.warn(`[Import] Could not remove ${f} of a replaced photo:`, err),
+            );
         }
       }
     }
@@ -619,26 +674,34 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         }
       }
 
-      // Copy the selected image files into the blob store (always overwrite).
+      // Copy the selected image files into the blob store; a file replaces the one of its name only once fully written.
       const imageNames = names.filter((n) => n.startsWith('images/') && !n.endsWith('/'));
       const writtenFiles = new Set<string>();
       // The picture list of the preview has no thumbnails: the thumbnail of a selected image comes with it.
       const selectedThumbs = new Set<string>();
       for (const p of list) {
         if (typeof p.filename !== 'string' || !selectedImages?.has(p.filename)) continue;
-        selectedThumbs.add(
-          typeof p.thumbFilename === 'string' && p.thumbFilename
-            ? p.thumbFilename
-            : thumbnailNameOf(p.filename),
-        );
+        selectedThumbs.add(manifestFilesOf(p)[1]);
       }
       // Without a selection, files are written only for the photo records this same
       // request imports (all photos of the manifest); otherwise they would belong to no photo.
       const importsPhotoRecords = importMetadata && list.length > 0;
+      const local = importsPhotoRecords ? await localPhotos() : new Map<string, LocalPhoto>();
+      // The files of a record that will be skipped are not written: they would overwrite those of the photo here.
+      const skippedFiles = new Set<string>();
+      if (importsPhotoRecords) {
+        const keptFiles = new Set<string>();
+        for (const p of list) {
+          const files = recordIsSkipped(p, local) ? skippedFiles : keptFiles;
+          manifestFilesOf(p).forEach((f) => files.add(f));
+        }
+        keptFiles.forEach((f) => skippedFiles.delete(f));
+      }
       for (const entryName of imageNames) {
         if (selectedImages === null && !importsPhotoRecords) continue;
         const baseName = baseNameOf(entryName);
         if (!ALLOWED_PHOTO_EXTENSIONS.has(extNameOf(baseName).toLowerCase())) continue;
+        if (skippedFiles.has(baseName)) continue;
         if (
           selectedImages !== null &&
           !selectedImages.has(baseName) &&
@@ -660,6 +723,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         importMetadata,
         writtenFiles,
         recordFailure,
+        local,
       );
       return { imported, skipped, dsoOverridesImported, failed };
     },
@@ -684,11 +748,13 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
     async importPhotoList(list, selection) {
       if (!Array.isArray(list)) throw invalidManifest();
       const failed: ImportFailure[] = [];
+      const importMetadata = selection.importMetadata === true;
       const { imported, skipped } = await importPhotoRecords(
         list as ManifestPhoto[],
-        selection.importMetadata === true,
+        importMetadata,
         null,
         makeFailureRecorder(failed),
+        importMetadata && list.length > 0 ? await localPhotos() : new Map(),
       );
       return { imported, skipped, dsoOverridesImported: 0, failed };
     },

@@ -65,14 +65,16 @@ describe('createCapacitorBlobStore', () => {
     expect(toBase64(new Uint8Array(0))).toBe('');
   });
 
-  it('removes the partial file and rejects when a write fails', async () => {
+  it('rejects when a write fails, leaving no partial file and the old file whole', async () => {
     const fake = createFakeFilesystem();
     const store = await openPhoneStore(fake);
-    fake.failOnWrite = 2;
+    await store.put('x.jpg', new Uint8Array([1, 2, 3]));
+    fake.failOnWrite = 3; // the append after the first piece of the second put
     await expect(store.put('x.jpg', new Uint8Array(2 * BLOB_PIECE_BYTES))).rejects.toThrow(
       'disk full',
     );
-    expect(fake.files.has('uploads/x.jpg')).toBe(false);
+    expect([...fake.files.keys()]).toEqual(['uploads/x.jpg']);
+    expect([...(await store.get('x.jpg'))!]).toEqual([1, 2, 3]);
   });
 
   it('returns null for a missing file although the local server answers 200', async () => {
