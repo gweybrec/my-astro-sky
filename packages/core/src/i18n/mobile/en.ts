@@ -201,6 +201,7 @@ const en: Translations['mobile'] = {
     overlapMore: 'More overlap',
   },
   backup: { exportSection: 'Export', importSection: 'Import' },
+  startup: { failed: 'The app could not start.' },
 };
 
 export default en;

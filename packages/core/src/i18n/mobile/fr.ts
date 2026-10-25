@@ -200,6 +200,7 @@ const fr = {
     overlapMore: 'Plus de chevauchement',
   },
   backup: { exportSection: 'Exporter', importSection: 'Importer' },
+  startup: { failed: "L'application n'a pas pu démarrer." },
 };
 
 export default fr;

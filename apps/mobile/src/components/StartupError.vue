@@ -9,7 +9,10 @@ const retry = () => location.reload();
 
 <template>
   <div class="mob-startup-error">
-    <p class="m-body">{{ message }}</p>
+    <div class="mob-startup-error-text">
+      <p class="m-body-strong">{{ t('mobile.startup.failed') }}</p>
+      <p class="m-body">{{ message }}</p>
+    </div>
     <button type="button" class="mob-btn mob-btn--action mob-btn--lg m-body-strong" @click="retry">
       {{ t('batch.retryButton') }}
     </button>
@@ -29,5 +32,11 @@ const retry = () => location.reload();
   background: var(--bg-app);
   color: var(--text-primary);
   text-align: center;
+}
+
+.mob-startup-error-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 </style>

@@ -10,9 +10,10 @@ describe('the start-up error screen', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows the error text and a Réessayer button that starts again', async () => {
+  it('says the app could not start, shows the error text and a Réessayer button that starts again', async () => {
     const wrapper = mount(StartupError, { props: { message: 'database is locked' } });
-    expect(wrapper.text()).toContain('database is locked');
+    const lines = wrapper.findAll('p').map((p) => p.text());
+    expect(lines).toEqual(["L'application n'a pas pu démarrer.", 'database is locked']);
     const button = wrapper.find('button');
     expect(button.text()).toBe('Réessayer');
     await button.trigger('click');
