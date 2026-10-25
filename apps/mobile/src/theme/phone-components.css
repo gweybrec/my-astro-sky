@@ -1040,6 +1040,34 @@ ion-fab.mob-fab--flush {
 ion-button.mob-icon-btn--unavailable {
   opacity: 0.35;
 }
+/* ── The long-press label's anchor: a fixed band as tall as the held button, from the gap beside it to the screen's gutter
+   on that side. The label is centred on the button by the band's flex row, also when its reason makes it taller than the
+   button. `useLongPressLabel` sets only the button's measured edges (`--longpress-top`, `--longpress-height`,
+   `--longpress-edge`: from the screen edge on the label's side to the button). */
+.mob-longpress-anchor {
+  position: fixed;
+  top: var(--longpress-top);
+  height: var(--longpress-height);
+  z-index: var(--z-base);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+.mob-longpress-anchor--end {
+  left: calc(var(--longpress-edge) + var(--space-4));
+  right: var(--mobile-gutter);
+  justify-content: flex-start;
+}
+.mob-longpress-anchor--start {
+  right: calc(var(--longpress-edge) + var(--space-4));
+  left: var(--mobile-gutter);
+  justify-content: flex-end;
+}
+.mob-longpress-anchor .mob-longpress-label {
+  position: static;
+  flex: none;
+  max-width: 100%;
+}
 .mob-longpress-reason {
   display: block;
   color: var(--text-secondary);

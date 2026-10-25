@@ -1,28 +1,32 @@
 import { onBeforeUnmount, ref, type CSSProperties } from 'vue';
 
 const HOLD_MS = 500;
-const GAP_PX = 8;
 
 /**
  * The name of an icon-only button, shown beside it while it is held (decision of 2026-10-05). The label sits at the
  * left of the button, or at its right when the button is in the left half of the screen. A press that showed the
  * label does not count as a tap: `consumeTap()` tells the button to ignore the click that follows.
+ *
+ * Only the button's measured edges are set here, as CSS variables of the label's anchor (`.mob-longpress-anchor`):
+ * the gap to the button and the vertical centring on it are the stylesheet's (phone-components.css).
  */
 export function useLongPressLabel() {
   const style = ref<CSSProperties | null>(null);
+  /** The label is at the right of the button (`end`) or at its left (`start`). */
+  const side = ref<'start' | 'end'>('start');
   let timer: ReturnType<typeof setTimeout> | undefined;
   let shown = false;
 
   function show(button: HTMLElement) {
     const rect = button.getBoundingClientRect();
     const onLeftHalf = rect.left + rect.width / 2 < window.innerWidth / 2;
-    style.value = onLeftHalf
-      ? { position: 'fixed', top: `${rect.top}px`, left: `${rect.right + GAP_PX}px`, right: 'auto' }
-      : {
-          position: 'fixed',
-          top: `${rect.top}px`,
-          right: `${window.innerWidth - rect.left + GAP_PX}px`,
-        };
+    side.value = onLeftHalf ? 'end' : 'start';
+    style.value = {
+      '--longpress-top': `${rect.top}px`,
+      '--longpress-height': `${rect.height}px`,
+      // From the screen edge on the label's side to the button's edge facing the label.
+      '--longpress-edge': `${onLeftHalf ? rect.right : window.innerWidth - rect.left}px`,
+    } as CSSProperties;
     shown = true;
   }
 
@@ -46,5 +50,5 @@ export function useLongPressLabel() {
   }
 
   onBeforeUnmount(() => clearTimeout(timer));
-  return { style, start, end, consumeTap };
+  return { style, side, start, end, consumeTap };
 }

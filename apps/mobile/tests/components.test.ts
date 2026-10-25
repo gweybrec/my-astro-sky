@@ -102,6 +102,34 @@ describe('the shared phone components', () => {
       w.unmount();
     });
 
+    it('sets only the measured edges of the button: the gap and the centring are the stylesheet’s', async () => {
+      const w = mount(PhoneIconButton, {
+        props: { label: 'Supprimer' },
+        global,
+        attachTo: document.body,
+      });
+      const button = w.find('button');
+      // A button in the right half of a 400 px wide screen: the label goes at its left.
+      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(400);
+      vi.spyOn(button.element, 'getBoundingClientRect').mockReturnValue(
+        new DOMRect(300, 100, 48, 48),
+      );
+      await button.trigger('pointerdown');
+      vi.advanceTimersByTime(600);
+      await w.vm.$nextTick();
+      const anchor = document.body.querySelector<HTMLElement>('.mob-longpress-anchor');
+      expect(anchor?.classList).toContain('mob-longpress-anchor--start');
+      const props = Array.from(anchor?.style ?? []).sort();
+      expect(props).toEqual(['--longpress-edge', '--longpress-height', '--longpress-top']);
+      expect(anchor?.style.getPropertyValue('--longpress-edge')).toBe('100px');
+      expect(anchor?.style.getPropertyValue('--longpress-top')).toBe('100px');
+      expect(anchor?.style.getPropertyValue('--longpress-height')).toBe('48px');
+      expect(anchor?.querySelector('.mob-longpress-label')?.getAttribute('style')).toBeNull();
+      await button.trigger('pointerup');
+      w.unmount();
+      vi.restoreAllMocks();
+    });
+
     it('shows nothing on a short tap', async () => {
       const w = mount(PhoneIconButton, {
         props: { label: 'Supprimer' },

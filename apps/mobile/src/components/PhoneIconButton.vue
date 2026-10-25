@@ -23,7 +23,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
 
-const { style, start, end, consumeTap } = useLongPressLabel();
+const { style, side, start, end, consumeTap } = useLongPressLabel();
 
 function onClick(event: MouseEvent) {
   if (consumeTap() || props.unavailable) return;
@@ -59,9 +59,16 @@ function onClick(event: MouseEvent) {
     <slot />
   </IonButton>
   <Teleport to="body">
-    <div v-if="style" class="mob-longpress-label m-body" role="tooltip" :style="style">
-      {{ label }}
-      <span v-if="unavailable" class="mob-longpress-reason m-secondary">{{ unavailable }}</span>
+    <div
+      v-if="style"
+      class="mob-longpress-anchor"
+      :class="`mob-longpress-anchor--${side}`"
+      :style="style"
+    >
+      <div class="mob-longpress-label m-body" role="tooltip">
+        {{ label }}
+        <span v-if="unavailable" class="mob-longpress-reason m-secondary">{{ unavailable }}</span>
+      </div>
     </div>
   </Teleport>
 </template>
