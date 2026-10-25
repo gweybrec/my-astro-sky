@@ -109,7 +109,7 @@ Where the phone's adapters differ from the server's on purpose:
 
 - **A picture with no rotation is stored byte for byte.** `bakeOrientation` re-encodes only to apply a real EXIF rotation; the server always re-encodes.
 - **`decode` always returns 4 channels**, since a canvas has no other form.
-- **The astrometry.net key** is encrypted with a key the WebView creates as non-extractable. A backup never contains the key.
+- **The astrometry.net key** is encrypted with a key the WebView creates as non-extractable. A backup never contains the key. Android's own backup and phone-to-phone transfer are off (`allowBackup="false"` and `res/xml/data_extraction_rules.xml`), since they would copy that key with the database; changing phones goes through the app's backup.
 - **A backup archive is read in memory**, so `openZipBundle` rejects an archive above `maxArchiveBytes` (`BACKUP_TOO_LARGE`). Pictures are stored uncompressed in the archive.
 - **A network timeout is a race with a timer**, because the natively routed `fetch` may ignore an abort.
 
