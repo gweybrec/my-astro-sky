@@ -122,7 +122,7 @@ function addSelected() {
 
     <div class="mob-form-row mob-form-row--search">
       <PhoneUtcDateTime v-model="obsIso" :label="t('identify.obsDateLabel')" />
-      <span class="mob-unit m-body">UTC</span>
+      <span class="mob-unit m-body">{{ t('mobile.format.utc') }}</span>
       <PhoneButton
         variant="action"
         icon

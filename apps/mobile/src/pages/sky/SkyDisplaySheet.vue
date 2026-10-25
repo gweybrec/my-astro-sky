@@ -268,7 +268,12 @@ const dsoDensity = computed({
         variant="field"
         block
         text-style="body"
-        :aria-label="`${t('display.constellationStyle')} : ${styleName}`"
+        :aria-label="
+          t('mobile.format.labelValue', {
+            label: t('display.constellationStyle'),
+            value: styleName,
+          })
+        "
         @click="styleOpen = true"
       >
         <span class="mob-btn-key">{{ t('display.constellationStyle') }}</span>
@@ -332,7 +337,9 @@ const dsoDensity = computed({
         variant="field"
         block
         text-style="body"
-        :aria-label="`${t('display.hemisphere')} : ${hemisphereName}`"
+        :aria-label="
+          t('mobile.format.labelValue', { label: t('display.hemisphere'), value: hemisphereName })
+        "
         @click="hemisphereOpen = true"
       >
         <span class="mob-btn-key">{{ t('display.hemisphere') }}</span>
@@ -345,7 +352,9 @@ const dsoDensity = computed({
         variant="field"
         block
         text-style="body"
-        :aria-label="`${t('display.fisheye')} : ${projectionName}`"
+        :aria-label="
+          t('mobile.format.labelValue', { label: t('display.fisheye'), value: projectionName })
+        "
         @click="projectionOpen = true"
       >
         <span class="mob-btn-key">{{ t('display.fisheye') }}</span>

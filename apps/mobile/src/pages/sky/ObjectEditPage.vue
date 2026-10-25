@@ -171,7 +171,9 @@ async function save() {
             text-style="body"
             block
             class="mob-btn--wrap"
-            :aria-label="`${t('dso.editType')} : ${typeLabel}`"
+            :aria-label="
+              t('mobile.format.labelValue', { label: t('dso.editType'), value: typeLabel })
+            "
             @click="typePicker = true"
           >
             <span class="mob-btn-label">{{ typeLabel }}</span>
@@ -185,7 +187,12 @@ async function save() {
             text-style="body"
             block
             class="mob-btn--wrap"
-            :aria-label="`${t('dso.editConstellation')} : ${constellationLabel}`"
+            :aria-label="
+              t('mobile.format.labelValue', {
+                label: t('dso.editConstellation'),
+                value: constellationLabel,
+              })
+            "
             @click="constellationPicker = true"
           >
             <span class="mob-btn-label">{{ constellationLabel }}</span>

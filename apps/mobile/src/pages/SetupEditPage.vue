@@ -267,7 +267,12 @@ async function remove() {
             text-style="body"
             block
             class="mob-btn--wrap"
-            :aria-label="`${t('targets.gear.telescope')} : ${telescope ? telescopeLabel(telescope) : ''}`"
+            :aria-label="
+              t('mobile.format.labelValue', {
+                label: t('targets.gear.telescope'),
+                value: telescope ? telescopeLabel(telescope) : '',
+              })
+            "
             @click="openPicker('telescope')"
           >
             <span class="mob-btn-label">{{ telescope ? telescopeLabel(telescope) : '' }}</span>
@@ -287,7 +292,12 @@ async function remove() {
             block
             class="mob-btn--wrap"
             :disabled="isSmart"
-            :aria-label="`${t('targets.gear.camera')} : ${camera ? cameraLabel(camera) : ''}`"
+            :aria-label="
+              t('mobile.format.labelValue', {
+                label: t('targets.gear.camera'),
+                value: camera ? cameraLabel(camera) : '',
+              })
+            "
             @click="openPicker('camera')"
           >
             <span class="mob-btn-label">{{ camera ? cameraLabel(camera) : '' }}</span>
@@ -306,7 +316,12 @@ async function remove() {
             block
             class="mob-btn--wrap"
             :disabled="isSmart"
-            :aria-label="`${t('targets.gear.accessory')} : ${accessory ? accessoryLabel(accessory) : ''}`"
+            :aria-label="
+              t('mobile.format.labelValue', {
+                label: t('targets.gear.accessory'),
+                value: accessory ? accessoryLabel(accessory) : '',
+              })
+            "
             @click="openPicker('accessory')"
           >
             <span class="mob-btn-label">{{ accessory ? accessoryLabel(accessory) : '' }}</span>

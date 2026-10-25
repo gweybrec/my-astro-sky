@@ -137,7 +137,12 @@ const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { na
         variant="field"
         block
         text-style="body"
-        :aria-label="`${t('targets.skyRegion.label')} : ${region ? region.name : t('targets.skyRegion.none')}`"
+        :aria-label="
+          t('mobile.format.labelValue', {
+            label: t('targets.skyRegion.label'),
+            value: region ? region.name : t('targets.skyRegion.none'),
+          })
+        "
         @click="leaveTo('/targets/regions')"
       >
         <span class="mob-btn-key">{{ t('targets.skyRegion.label') }}</span>

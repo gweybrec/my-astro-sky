@@ -2,6 +2,13 @@ import type { Translations } from '../fr';
 
 const de: Translations['mobile'] = {
   info: { label: 'Information: {title}' },
+  format: {
+    labelValue: '{label}: {value}',
+    percent: '{n} %',
+    mag: 'mag {n}',
+    utc: 'UTC',
+    arcmin: 'Bogenmin.',
+  },
   tabs: { sky: 'Himmel', targets: 'Ziele', navLabel: 'Navigation' },
   gallery: {
     searchLabel: 'Foto suchen',
@@ -41,6 +48,7 @@ const de: Translations['mobile'] = {
     dateOf: '{label}, Datum',
     timeOf: '{label}, Uhrzeit',
     radius: 'Radius',
+    setCoordinates: 'OK',
     radiusAria: 'Suchradius, Bogenminuten',
     markStartAria: 'Anfang der Spur markieren',
     markEndAria: 'Ende der Spur markieren',

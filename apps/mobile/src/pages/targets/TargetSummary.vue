@@ -90,8 +90,14 @@ const facts = computed(() => {
   if (props.angle !== undefined)
     out.push({ label: t('fovOverlay.angleLabel'), value: props.angle });
   if (props.scores) {
-    out.push({ label: t('targets.results.score'), value: `${props.scores.scorePct} %` });
-    out.push({ label: t('targets.results.fov'), value: `${props.scores.fovFitPct} %` });
+    out.push({
+      label: t('targets.results.score'),
+      value: t('mobile.format.percent', { n: props.scores.scorePct }),
+    });
+    out.push({
+      label: t('targets.results.fov'),
+      value: t('mobile.format.percent', { n: props.scores.fovFitPct }),
+    });
     out.push({
       label: t('targets.results.integrationTotal'),
       value: formatHours(props.scores.recipe.totalHours),

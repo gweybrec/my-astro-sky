@@ -67,7 +67,7 @@ const summary = computed(() => {
   if (targetsPrefs.showMoon !== false) {
     facts.push({
       label: t('mobile.plans.moon'),
-      value: `${t(`mobile.plans.phase${n.phase.phaseIndex}`)} · ${Math.round(n.phase.illum * 100)} %`,
+      value: `${t(`mobile.plans.phase${n.phase.phaseIndex}`)} · ${t('mobile.format.percent', { n: Math.round(n.phase.illum * 100) })}`,
     });
   }
   return facts;

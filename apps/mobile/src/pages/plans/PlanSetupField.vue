@@ -83,7 +83,7 @@ const chosen = computed({
       variant="field"
       block
       text-style="body"
-      :aria-label="`${fieldName} : ${name}`"
+      :aria-label="t('mobile.format.labelValue', { label: fieldName, value: name })"
       @click="openPick"
     >
       <span v-if="bare" class="mob-btn-label">{{ name }}</span>

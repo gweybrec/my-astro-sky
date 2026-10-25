@@ -339,7 +339,12 @@ async function restore() {
             text-style="body"
             block
             waiting
-            :aria-label="`${t('photos.section')} : ${photos.length} / ${photos.length}`"
+            :aria-label="
+              t('mobile.format.labelValue', {
+                label: t('photos.section'),
+                value: `${photos.length} / ${photos.length}`,
+              })
+            "
           >
             <span class="mob-btn-key">{{ t('photos.section') }}</span>
             <span class="mob-btn-value mob-btn-value--swatch"

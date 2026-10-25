@@ -184,7 +184,9 @@ function openPlan() {
         variant="field"
         block
         text-style="body"
-        :aria-label="`${t('mobile.sky.frameSet')} : ${setName}`"
+        :aria-label="
+          t('mobile.format.labelValue', { label: t('mobile.sky.frameSet'), value: setName })
+        "
         @click="setOpen = true"
       >
         <span class="mob-btn-key">{{ t('mobile.sky.frameSet') }}</span>
@@ -213,7 +215,9 @@ function openPlan() {
           :model-value="f.visible !== false"
           :title="frameName(f)"
           :subs="[frameStatus(f, grid(f))]"
-          :check-label="`${t('fovOverlay.showOnMap')} : ${frameName(f)}`"
+          :check-label="
+            t('mobile.format.labelValue', { label: t('fovOverlay.showOnMap'), value: frameName(f) })
+          "
           button
           @update:model-value="setShown(f, $event)"
           @open="openFrame(f)"

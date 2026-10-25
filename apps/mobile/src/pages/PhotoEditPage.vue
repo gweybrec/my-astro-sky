@@ -461,7 +461,12 @@ async function save() {
             variant="field"
             text-style="body"
             block
-            :aria-label="`${t('modal.metadataGearSetup')} : ${setupName}`"
+            :aria-label="
+              t('mobile.format.labelValue', {
+                label: t('modal.metadataGearSetup'),
+                value: setupName,
+              })
+            "
             @click="setupOpen = true"
           >
             <span class="mob-btn-label">{{ setupName }}</span>

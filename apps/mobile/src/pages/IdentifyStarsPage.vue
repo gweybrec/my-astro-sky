@@ -341,7 +341,9 @@ async function validate() {
                 <span class="mob-row-body">
                   <span class="mob-row-title m-body">{{ r.label }}</span>
                 </span>
-                <span class="mob-row-trail m-secondary">mag {{ r.mag.toFixed(1) }}</span>
+                <span class="mob-row-trail m-secondary">{{
+                  t('mobile.format.mag', { n: r.mag.toFixed(1) })
+                }}</span>
               </button>
             </div>
             <!-- The list, the other points, the instructions and the buttons are hidden, not removed, while stars are listed:
@@ -442,7 +444,9 @@ async function validate() {
                   <PhoneButton :title="t('modal.starModeTooltip')" @click="p.entry = 'star'">
                     {{ t('modal.starMode') }}
                   </PhoneButton>
-                  <PhoneButton @click="setCoordinates(i)">OK</PhoneButton>
+                  <PhoneButton @click="setCoordinates(i)">{{
+                    t('mobile.identify.setCoordinates')
+                  }}</PhoneButton>
                 </div>
               </div>
               <div v-else class="mob-row">

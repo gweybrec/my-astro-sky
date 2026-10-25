@@ -37,7 +37,9 @@ function validate() {
       <span class="mob-row-body">
         <span class="mob-row-title m-body">{{ starDisplayLabel(star) }}</span>
       </span>
-      <span class="mob-row-trail m-secondary">mag {{ star.mag.toFixed(1) }}</span>
+      <span class="mob-row-trail m-secondary">{{
+        t('mobile.format.mag', { n: star.mag.toFixed(1) })
+      }}</span>
     </div>
     <div class="mob-sheet-footer">
       <PhoneButton size="lg" @click="emit('cancel')">{{ t('modal.cancel') }}</PhoneButton>

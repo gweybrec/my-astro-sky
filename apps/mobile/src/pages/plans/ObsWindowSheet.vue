@@ -102,7 +102,10 @@ const filterName = computed(() => props.window?.filter ?? '');
 const colorAria = computed(() =>
   props.window?.color
     ? t('targets.plan.obsWindowColor')
-    : `${t('targets.plan.obsWindowColor')} : ${t('mobile.plans.colorFromFilter')}`,
+    : t('mobile.format.labelValue', {
+        label: t('targets.plan.obsWindowColor'),
+        value: t('mobile.plans.colorFromFilter'),
+      }),
 );
 
 function save() {
@@ -147,7 +150,12 @@ function save() {
         text-style="body"
         block
         waiting
-        :aria-label="`${t('targets.plan.obsWindowFilter')} : ${filterName}`"
+        :aria-label="
+          t('mobile.format.labelValue', {
+            label: t('targets.plan.obsWindowFilter'),
+            value: filterName,
+          })
+        "
       >
         <span class="mob-btn-key">{{ t('targets.plan.obsWindowFilter') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{ filterName }}</span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { t } from '@myastrosky/core/i18n/index';
 import type { QuarterTurns } from '@myastrosky/core/types';
 import type { PhotoTag } from '../../photo-tags';
 import AppIcon from '../../components/AppIcon.vue';
@@ -43,7 +44,7 @@ const src = computed(() => (props.paused && !loaded.value ? undefined : props.pi
   <button
     type="button"
     class="mob-photo mob-photo-card"
-    :aria-label="state ? `${name} : ${state}` : name"
+    :aria-label="state ? t('mobile.format.labelValue', { label: name, value: state }) : name"
     @click="emit('click')"
   >
     <span class="mob-photo-card-picture">

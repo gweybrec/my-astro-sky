@@ -99,7 +99,9 @@ function addPoi() {
         variant="field"
         text-style="body"
         block
-        :aria-label="`${t('poi.typeLabel')} : ${type?.name ?? ''}`"
+        :aria-label="
+          t('mobile.format.labelValue', { label: t('poi.typeLabel'), value: type?.name ?? '' })
+        "
         @click="typeOpen = true"
       >
         <span class="mob-btn-key">{{ t('poi.typeLabel') }}</span>

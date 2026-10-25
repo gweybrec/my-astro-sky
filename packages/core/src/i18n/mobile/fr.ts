@@ -1,5 +1,12 @@
 const fr = {
   info: { label: 'Informations : {title}' },
+  format: {
+    labelValue: '{label} : {value}',
+    percent: '{n} %',
+    mag: 'mag {n}',
+    utc: 'UTC',
+    arcmin: 'arcmin',
+  },
   tabs: { sky: 'Ciel', targets: 'Cibles', navLabel: 'Navigation' },
   gallery: {
     searchLabel: 'Rechercher une photo',
@@ -39,6 +46,7 @@ const fr = {
     dateOf: '{label}, date',
     timeOf: '{label}, heure',
     radius: 'Rayon',
+    setCoordinates: 'OK',
     radiusAria: 'Rayon de recherche, arcminutes',
     markStartAria: 'Marquer le départ de la traînée',
     markEndAria: "Marquer l'arrivée de la traînée",

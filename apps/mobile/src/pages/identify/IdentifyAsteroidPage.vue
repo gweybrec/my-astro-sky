@@ -179,7 +179,7 @@ function addSelected() {
           >{{ t('asteroid.markStart') }}</PhoneButton
         >
         <PhoneUtcDateTime v-model="startIso" :label="t('asteroid.markStart')" />
-        <span class="mob-unit m-body">UTC</span>
+        <span class="mob-unit m-body">{{ t('mobile.format.utc') }}</span>
       </div>
       <div class="mob-when-row">
         <PhoneButton
@@ -189,7 +189,7 @@ function addSelected() {
           >{{ t('asteroid.markEnd') }}</PhoneButton
         >
         <PhoneUtcDateTime v-model="endIso" :label="t('asteroid.markEnd')" />
-        <span class="mob-unit m-body">UTC</span>
+        <span class="mob-unit m-body">{{ t('mobile.format.utc') }}</span>
       </div>
       <div class="mob-when-row mob-when-row--radius">
         <span class="mob-unit m-body">{{ t('mobile.identify.radius') }}</span>
@@ -199,7 +199,7 @@ function addSelected() {
           inputmode="numeric"
           :aria-label="t('mobile.identify.radiusAria')"
         />
-        <span class="mob-unit m-body">arcmin</span>
+        <span class="mob-unit m-body">{{ t('mobile.format.arcmin') }}</span>
         <PhoneButton
           variant="action"
           icon
