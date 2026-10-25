@@ -109,6 +109,8 @@ function raiseError() {
           <PhoneButton disabled>Désactivé</PhoneButton>
           <PhoneButton variant="action" disabled>Action off</PhoneButton>
           <PhoneButton variant="confirm" disabled>Valider off</PhoneButton>
+          <PhoneButton busy>En cours</PhoneButton>
+          <PhoneButton variant="confirm" busy>Valider en cours</PhoneButton>
         </div>
         <div class="mob-form-row" style="display: flex; gap: var(--space-4)">
           <PhoneButton size="lg">Grand</PhoneButton>

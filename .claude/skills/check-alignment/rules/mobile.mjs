@@ -481,6 +481,13 @@ export const rules = [
   },
   // An icon after a text is centred on the text's line.
   { id: 'icon-text', type: 'iconOnLine', lines: '.mob-fact-value', icon: 'svg' },
+  // The spinner of a busy button is centred on its label's line.
+  {
+    id: 'busy-spinner',
+    type: 'iconOnLine',
+    lines: 'ion-button.mob-btn--busy .mob-btn-content',
+    icon: 'ion-spinner',
+  },
   // Items side by side in a bar, a footer, a field row share their centre line.
   {
     id: 'centre-line',

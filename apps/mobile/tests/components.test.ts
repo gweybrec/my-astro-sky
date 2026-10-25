@@ -36,6 +36,25 @@ describe('the shared phone components', () => {
     expect(w.text()).toBe('Valider');
   });
 
+  it('PhoneButton busy keeps its label after a spinner, is not disabled, and says it is busy', () => {
+    const w = mount(PhoneButton, {
+      props: { variant: 'confirm', busy: true },
+      slots: { default: 'Valider' },
+      global,
+    });
+    const button = w.find('button');
+    expect(button.classes()).toContain('mob-btn--busy');
+    expect(button.attributes('disabled')).toBeUndefined();
+    expect(button.attributes('aria-busy')).toBe('true');
+    expect(button.attributes('aria-disabled')).toBe('true');
+    const content = button.find('.mob-btn-content');
+    expect(content.element.firstElementChild?.classList.contains('mob-spinner')).toBe(true);
+    expect(w.text()).toBe('Valider');
+    const idle = mount(PhoneButton, { slots: { default: 'Valider' }, global });
+    expect(idle.find('.mob-spinner').exists()).toBe(false);
+    expect(idle.find('button').attributes('aria-busy')).toBeUndefined();
+  });
+
   it('PhoneButton uses the plain weight by default and the secondary size for a field', () => {
     const plain = mount(PhoneButton, { slots: { default: 'x' }, global });
     expect(plain.find('button').classes()).toContain('m-body');

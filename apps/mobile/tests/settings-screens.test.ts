@@ -563,6 +563,66 @@ describe('the backup page', () => {
     expect(backend.backup.restore).not.toHaveBeenCalled();
   });
 
+  /** A promise and the function that settles it, to hold an action running. */
+  function held<T>() {
+    let settle!: (v: T) => void;
+    const promise = new Promise<T>((resolve) => (settle = resolve));
+    return { promise, settle };
+  }
+  const button = (w: ReturnType<typeof mount>, label: string) =>
+    w.findAll('button').find((b) => b.text() === label)!;
+  const isBusy = (b: ReturnType<ReturnType<typeof mount>['find']>) =>
+    b.classes().includes('mob-btn--busy') && b.find('.mob-spinner').exists();
+
+  it('shows the spinner on "Créer une sauvegarde" while the backup is built, and only once', async () => {
+    backend.photos.listWithSizes.mockResolvedValue([{ id: 'p1', fileSize: 1000 }]);
+    const run = held<void>();
+    backend.backup.exportToUser.mockReturnValue(run.promise);
+    const { global } = app();
+    const w = mount(BackupPage, { global });
+    await flushPromises();
+    await button(w, 'Créer une sauvegarde').trigger('click');
+    await flushPromises();
+    expect(isBusy(button(w, 'Créer une sauvegarde'))).toBe(true);
+    await button(w, 'Créer une sauvegarde').trigger('click');
+    expect(backend.backup.exportToUser).toHaveBeenCalledTimes(1);
+    run.settle();
+    await flushPromises();
+    expect(isBusy(button(w, 'Créer une sauvegarde'))).toBe(false);
+  });
+
+  it('shows the spinner on "Choisir un fichier" while the chosen file is read', async () => {
+    const run = held<ReturnType<typeof previewWithDifferentSetup>>();
+    backend.backup.preview.mockReturnValue(run.promise);
+    pickFile.mockResolvedValue(new File(['x'], 'sauvegarde.zip'));
+    const { global } = app();
+    const w = mount(BackupPage, { global });
+    await flushPromises();
+    await button(w, 'Choisir un fichier').trigger('click');
+    await flushPromises();
+    expect(isBusy(button(w, 'Choisir un fichier'))).toBe(true);
+    run.settle(previewWithDifferentSetup());
+    await flushPromises();
+    expect(w.find('.mob-btn--busy').exists()).toBe(false);
+    expect(w.text()).toContain('sauvegarde.zip');
+  });
+
+  it('shows the spinner on "Restaurer une sauvegarde" while restoring', async () => {
+    const w = await openPreview();
+    const run = held<{ imported: number; skipped: number }>();
+    backend.backup.restore.mockReturnValue(run.promise);
+    await radios(w)
+      .find((r) => r.text() === 'Remplacer')!
+      .trigger('click');
+    await restoreButton(w).trigger('click');
+    await flushPromises();
+    expect(isBusy(restoreButton(w))).toBe(true);
+    expect(button(w, 'Changer de fichier').attributes('disabled')).toBeDefined();
+    run.settle({ imported: 1, skipped: 0 });
+    await flushPromises();
+    expect(w.find('.mob-btn--busy').exists()).toBe(false);
+  });
+
   it('shows the toast when the file cannot be read', async () => {
     backend.backup.preview.mockRejectedValue(new Error('bad'));
     pickFile.mockResolvedValue(new File(['x'], 'x.zip'));

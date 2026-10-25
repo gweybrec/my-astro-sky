@@ -88,6 +88,7 @@ const sizeLabel = computed(() =>
 );
 
 async function createBackup() {
+  if (exporting.value) return;
   exporting.value = true;
   try {
     const ids = [...photoIds.value];
@@ -103,6 +104,8 @@ async function createBackup() {
 
 const file = ref<File | null>(null);
 const preview = ref<ImportPreviewResult | null>(null);
+/** The chosen file is being read (picked, then previewed). */
+const reading = ref(false);
 const importing = ref(false);
 const setupChoices = reactive<Record<string, SetupImportChoice>>({});
 const sel = reactive({
@@ -127,6 +130,7 @@ const canRestore = computed(
   () =>
     !!preview.value &&
     !importing.value &&
+    !reading.value &&
     canImport(preview.value, selection()) &&
     !setupChoiceMissing(preview.value, selection()),
 );
@@ -155,6 +159,8 @@ function chooseSetup(id: string, choice: SetupImportChoice | undefined) {
 }
 
 async function chooseFile() {
+  if (reading.value || importing.value) return;
+  reading.value = true;
   try {
     const picked = await pickFile(BACKUP_FILE_TYPES);
     if (!picked) return;
@@ -170,6 +176,8 @@ async function chooseFile() {
     sel.gear = new Set(result.gear.map((g) => g.id));
   } catch (error) {
     void showError(error);
+  } finally {
+    reading.value = false;
   }
 }
 
@@ -270,7 +278,7 @@ function selectableIds(section: Section): string[] {
 
 async function restore() {
   const p = preview.value;
-  if (!p || !file.value) return;
+  if (!p || !file.value || !canRestore.value) return;
   importing.value = true;
   try {
     const result = await importData(file.value, buildImportOptions(p, selection()));
@@ -346,7 +354,8 @@ async function restore() {
             variant="confirm"
             size="lg"
             block
-            :disabled="exporting || !canExport(flags, photos.length)"
+            :busy="exporting"
+            :disabled="!exporting && !canExport(flags, photos.length)"
             @click="createBackup"
           >
             {{ t('settings.exportBtn') }}
@@ -360,7 +369,7 @@ async function restore() {
             <PhoneRow :title="file.name" />
           </IonList>
           <div class="mob-form-row">
-            <PhoneButton block @click="chooseFile">{{
+            <PhoneButton block :busy="reading" :disabled="importing" @click="chooseFile">{{
               t('settings.importChangeFile')
             }}</PhoneButton>
           </div>
@@ -412,14 +421,23 @@ async function restore() {
             </IonList>
           </template>
           <div class="mob-form-row mob-form-row--restore">
-            <PhoneButton variant="confirm" size="lg" block :disabled="!canRestore" @click="restore">
+            <PhoneButton
+              variant="confirm"
+              size="lg"
+              block
+              :busy="importing"
+              :disabled="!importing && !canRestore"
+              @click="restore"
+            >
               {{ t('settings.importData') }}
             </PhoneButton>
           </div>
         </template>
         <!-- Before a file is chosen the board shows nothing but the warning; this button is the desktop's own. -->
         <div v-else class="mob-form-row">
-          <PhoneButton block @click="chooseFile">{{ t('settings.importChooseFile') }}</PhoneButton>
+          <PhoneButton block :busy="reading" @click="chooseFile">{{
+            t('settings.importChooseFile')
+          }}</PhoneButton>
         </div>
       </div>
     </IonContent>

@@ -91,6 +91,17 @@ ion-button.mob-btn.button-disabled,
 ion-button.mob-icon-btn.button-disabled {
   opacity: 0.4;
 }
+/* A running action (the board "Réglages, sauvegarde en cours"): not dimmed, no tap, the small spinner in the label's
+   colour so it shows on any fill. */
+ion-button.mob-btn--busy {
+  pointer-events: none;
+}
+.mob-btn--busy ion-spinner.mob-spinner {
+  --spinner-size: var(--space-6);
+  color: currentcolor;
+  --color: currentcolor;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, currentcolor 30%, transparent);
+}
 ion-button.mob-btn.ion-focused,
 ion-button.mob-icon-btn.ion-focused {
   outline: 2px solid var(--text-bright);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonButton } from '@ionic/vue';
+import { IonButton, IonSpinner } from '@ionic/vue';
 
 // The design system's text button (`.mob-btn`) on Ionic's button. Roles follow the desktop: the default is the
 // ghost/cancel button, `action` the accent fill, `confirm` the green save/validate button, `danger` the outlined
@@ -17,6 +17,8 @@ const props = withDefaults(
     pressed?: boolean;
     /** Waits for a screen that is not built yet: drawn as the board draws it, without a tap. */
     waiting?: boolean;
+    /** Its action is running: the spinner before the label, not dimmed, no tap until it ends. */
+    busy?: boolean;
     /** Type style of the label: the filled roles are in the strong weight, a field is in the secondary size. */
     textStyle?: 'body' | 'strong' | 'secondary';
   }>(),
@@ -49,7 +51,8 @@ const typeClass = computed(() => {
   <IonButton
     fill="clear"
     :disabled="disabled"
-    :aria-disabled="waiting ? 'true' : undefined"
+    :aria-disabled="waiting || busy ? 'true' : undefined"
+    :aria-busy="busy ? 'true' : undefined"
     :aria-pressed="pressed === undefined ? undefined : String(pressed)"
     class="mob-btn"
     :class="[
@@ -60,9 +63,12 @@ const typeClass = computed(() => {
         'mob-btn--lg': size === 'lg',
         'mob-btn--block': block,
         'mob-btn--icon': icon,
+        'mob-btn--busy': busy,
       },
     ]"
   >
-    <span class="mob-btn-content" :class="typeClass"><slot /></span>
+    <span class="mob-btn-content" :class="typeClass"
+      ><IonSpinner v-if="busy" name="crescent" class="mob-spinner" aria-hidden="true" /><slot
+    /></span>
   </IonButton>
 </template>
