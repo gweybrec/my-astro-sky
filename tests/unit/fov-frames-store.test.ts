@@ -100,6 +100,7 @@ vi.mock('@myastrosky/core/platform/error-hook', () => ({ reportError: vi.fn() })
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { framePointToSky, tileCenters } from '@myastrosky/core/mosaic';
+import { reportError } from '@myastrosky/core/platform/error-hook';
 
 describe('fov-frames store', () => {
   beforeEach(() => {
@@ -495,6 +496,21 @@ describe('fov-frames store', () => {
     setActivePinia(createPinia());
     const reloaded = useFovFramesStore();
     expect(reloaded.framesVisible).toBe(false);
+  });
+
+  it('a write the browser storage refuses (full) is reported, not swallowed', async () => {
+    const store = await withSpecs();
+    vi.mocked(reportError).mockClear();
+    const quota = new DOMException('full', 'QuotaExceededError');
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw quota;
+    });
+    try {
+      store.setFramesVisible(false);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(reportError).toHaveBeenCalledWith('fov_frames_persist_visible', quota);
   });
 
   it('framesVisible does not alter the frames themselves (map push is gated elsewhere)', async () => {

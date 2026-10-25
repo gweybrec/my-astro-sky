@@ -47,16 +47,16 @@ describe('storage port', () => {
     expect(localStorage.getItem('port-test')).toBeNull();
   });
 
-  it('browser store swallows a throwing localStorage', () => {
+  it('browser store swallows a throwing localStorage on read and remove, not on write', () => {
     const boom = () => {
       throw new Error('denied');
     };
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(boom);
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(boom);
-    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(boom);
+    vi.spyOn(localStorage, 'getItem').mockImplementation(boom);
+    vi.spyOn(localStorage, 'setItem').mockImplementation(boom);
+    vi.spyOn(localStorage, 'removeItem').mockImplementation(boom);
     const s = createLocalStorageStore();
     expect(s.get('k')).toBeNull();
-    expect(() => s.set('k', 'v')).not.toThrow();
+    expect(() => s.set('k', 'v')).toThrow('denied');
     expect(() => s.remove('k')).not.toThrow();
   });
 });

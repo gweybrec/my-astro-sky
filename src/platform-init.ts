@@ -12,7 +12,10 @@ import { getLang } from '@myastrosky/core/i18n/index';
 import { reportUnknownRendererError } from './error-reporter';
 import { downloadBlob } from './file-utils';
 
-/** The browser's localStorage, which can throw (private window, blocked site data). */
+/**
+ * The browser's localStorage, which can throw (private window, blocked site data). Reads and removals swallow it;
+ * a write lets it through, so that a full storage reaches the caller's error report.
+ */
 export function createLocalStorageStore(): KeyValueStore {
   return {
     get(key) {
@@ -23,11 +26,7 @@ export function createLocalStorageStore(): KeyValueStore {
       }
     },
     set(key, value) {
-      try {
-        localStorage.setItem(key, value);
-      } catch {
-        /* ignore */
-      }
+      localStorage.setItem(key, value);
     },
     remove(key) {
       try {
