@@ -114,8 +114,6 @@ const en: Translations['mobile'] = {
     apply: 'Apply',
     filtersTitle: 'Filters',
     sectionSky: 'Sky',
-    sectionObjects: 'Objects',
-    sectionOptions: 'Options',
     ratingN: 'Interest {n} of 5',
     difficultyN: 'Difficulty {n} of 5',
     countOf: '{n} / {total}',

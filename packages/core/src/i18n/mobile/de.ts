@@ -115,8 +115,6 @@ const de: Translations['mobile'] = {
     apply: 'Anwenden',
     filtersTitle: 'Filter',
     sectionSky: 'Himmel',
-    sectionObjects: 'Objekte',
-    sectionOptions: 'Optionen',
     ratingN: 'Interesse {n} von 5',
     difficultyN: 'Schwierigkeit {n} von 5',
     countOf: '{n} / {total}',

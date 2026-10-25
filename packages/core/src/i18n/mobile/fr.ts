@@ -113,8 +113,6 @@ const fr = {
     apply: 'Appliquer',
     filtersTitle: 'Filtres',
     sectionSky: 'Ciel',
-    sectionObjects: 'Objets',
-    sectionOptions: 'Options',
     ratingN: 'Intérêt {n} sur 5',
     difficultyN: 'Difficulté {n} sur 5',
     countOf: '{n} / {total}',
