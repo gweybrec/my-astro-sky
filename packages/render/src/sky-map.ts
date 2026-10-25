@@ -1690,7 +1690,9 @@ export class SkyMap {
         drawGrid(ctx, view, scene.theme, scene.borderLatDeg);
       }
     }
-    if (horizon) {
+    // The azimuth grid, horizon line and terrain are date-mode layers (their buttons live there),
+    // so the live sky's local-sky horizon (kept for a sky region) never draws them.
+    if (horizon && scene.skyTimeMode === 'date') {
       if (scene.showAzimuthGrid) {
         drawAzimuthGrid(ctx, view, horizon.lstH, horizon.latDeg, scene.theme);
       }
