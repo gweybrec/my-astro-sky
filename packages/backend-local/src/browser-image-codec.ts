@@ -20,9 +20,6 @@ const MIME_OF_EXT: Record<string, string> = {
 
 /** The JPEG quality of a re-encoded picture. */
 const BAKE_QUALITY = 0.9;
-/** The quality of a picture saved again turned: the user's photos are stored near 0.98–1, and a turn must not
- * visibly lower them (at 0.9 a turned photo came out 5 to 6 times smaller than the original). */
-const TURN_QUALITY = 0.98;
 
 const asBlob = (bytes: Uint8Array): Blob => new Blob([bytes as BlobPart]);
 
@@ -85,23 +82,6 @@ export function createBrowserImageCodec(options: BrowserImageCodecOptions = {}):
         const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
         context2d(canvas).drawImage(bitmap, 0, 0);
         return await canvasToBytes(canvas, mime, mime === 'image/png' ? undefined : BAKE_QUALITY);
-      } finally {
-        bitmap.close();
-      }
-    },
-
-    async rotateRight(bytes, ext) {
-      const mime = MIME_OF_EXT[ext];
-      if (!mime) throw new Error(`Unsupported image format: ${ext}`);
-      const bitmap = await createImageBitmap(asBlob(bytes), { imageOrientation: 'none' });
-      try {
-        // A quarter clockwise: the canvas is as wide as the picture is tall, the picture drawn turned about the corner.
-        const canvas = new OffscreenCanvas(bitmap.height, bitmap.width);
-        const ctx = context2d(canvas);
-        ctx.translate(bitmap.height, 0);
-        ctx.rotate(Math.PI / 2);
-        ctx.drawImage(bitmap, 0, 0);
-        return await canvasToBytes(canvas, mime, mime === 'image/png' ? undefined : TURN_QUALITY);
       } finally {
         bitmap.close();
       }

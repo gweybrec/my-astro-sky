@@ -13,7 +13,7 @@
 import type { SqlDb, SqlTx } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 /**
  * The schema at `SCHEMA_VERSION`, one statement per entry (tables first, then indexes).
@@ -59,7 +59,8 @@ export const BASELINE_SCHEMA: readonly string[] = [
     observation_date TEXT,
     points_of_interest TEXT NOT NULL DEFAULT '[]',
     capture_details TEXT NOT NULL DEFAULT '{}',
-    gear_setup_id TEXT
+    gear_setup_id TEXT,
+    quarter_turns INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE plan_entries (
     id        TEXT PRIMARY KEY,
@@ -138,7 +139,13 @@ export interface DataMigration {
 }
 
 // Migrations from version 15 on go here, as SQL statements only, in ascending order.
-export const MIGRATIONS: readonly DataMigration[] = [];
+export const MIGRATIONS: readonly DataMigration[] = [
+  // How many quarters to the right a photo is shown turned; its picture file is never changed.
+  {
+    version: 15,
+    statements: ['ALTER TABLE photos ADD COLUMN quarter_turns INTEGER NOT NULL DEFAULT 0'],
+  },
+];
 
 /**
  * Runs every migration of `migrations` above the stored version, in order; each migration's

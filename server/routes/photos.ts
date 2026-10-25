@@ -297,10 +297,9 @@ photosRouter.patch('/api/photos/:id/manual-placement', async (req, res) => {
  *   post:
  *     summary: Turn a photo a quarter to the right
  *     description: >
- *       Saves the photo's picture turned 90° clockwise in the same format, under a new file name so that no
- *       cache shows the old picture, makes its thumbnail again, deletes the old picture and thumbnail, and turns
- *       what is measured in its pixels (size, star correspondences, manual placement) so that it keeps its place
- *       on the sky.
+ *       Adds a quarter turn to the right to how the photo is shown (`quarterTurns`, 0 to 3, back to 0 after four).
+ *       The picture file, its thumbnail and what is measured in their pixels (size, star correspondences, manual
+ *       placement) are not changed, so nothing is lost and the photo keeps its place on the sky.
  *     parameters:
  *       - in: path
  *         name: id
@@ -315,18 +314,11 @@ photosRouter.patch('/api/photos/:id/manual-placement', async (req, res) => {
  *           application/json:
  *             schema:
  *               type: object
- *       400:
- *         description: The picture cannot be read or written
- *         content:
- *           application/json:
- *             schema:
- *               type: object
  *               properties:
- *                 error:
- *                   type: string
- *                 code:
- *                   type: string
- *                   enum: [INVALID_IMAGE]
+ *                 quarterTurns:
+ *                   type: integer
+ *                   enum: [1, 2, 3]
+ *                   description: Quarters to the right the photo is shown turned; absent when 0
  *       404:
  *         description: Photo not found
  *         content:

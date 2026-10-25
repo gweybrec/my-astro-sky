@@ -2910,7 +2910,7 @@ input:focus-visible {
   transition: transform 0.15s ease;
 }
 
-.gallery-item img {
+.gallery-item > img {
   width: 100%;
   aspect-ratio: 3/2;
   object-fit: cover;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rotatePhotoRight } from '@myastrosky/core/photo-rotation';
+import { photoAsShown, quarterTurnsOf, rotatePhotoRight } from '@myastrosky/core/photo-rotation';
 import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
 import { applyAffine } from '@myastrosky/core/affine';
 import type { ManualPlacement, Photo, PhotoCorrespondence } from '@myastrosky/core/types';
@@ -134,5 +134,54 @@ describe('rotatePhotoRight', () => {
     ).toBe(true);
     expect(p.dsoIds).toEqual(['M31']);
     expect(p.pointsOfInterest).toEqual(before.pointsOfInterest);
+  });
+});
+
+describe('photoAsShown', () => {
+  const correspondences: PhotoCorrespondence[] = [
+    { pointIndex: 0, photoX: 100, photoY: 200, starHip: 0, starName: 'a', starRa: 10, starDec: 41 },
+    {
+      pointIndex: 1,
+      photoX: 3500,
+      photoY: 400,
+      starHip: 0,
+      starName: 'b',
+      starRa: 11.5,
+      starDec: 41.2,
+    },
+  ];
+
+  it('is the photo itself, without quarterTurns, when it is not turned', () => {
+    const p = photo({ correspondences });
+    expect(photoAsShown(p)).toEqual(p);
+    expect(photoAsShown({ ...p, quarterTurns: 0 })).toEqual(p);
+  });
+
+  it('is the photo turned right as many times as quarterTurns says, and is not turned again', () => {
+    const p = photo({ correspondences });
+    let expected = p;
+    for (const turns of [1, 2, 3] as const) {
+      expected = rotatePhotoRight(expected);
+      const shown = photoAsShown({ ...p, quarterTurns: turns });
+      expect(shown).toEqual(expected);
+      expect(shown).not.toHaveProperty('quarterTurns');
+      expect(photoAsShown(shown)).toEqual(shown);
+    }
+  });
+
+  it('keeps every pixel of the shown photo on the same place of the sky', () => {
+    const p = photo({ correspondences });
+    const shown = photoAsShown({ ...p, quarterTurns: 3 });
+    // three turns right are one turn left: (x, y) of the W x H picture becomes (y, W - x)
+    const a = sky(p, 1234, 567);
+    const b = sky(shown, 567, W - 1234);
+    expect(b.x).toBeCloseTo(a.x, 9);
+    expect(b.y).toBeCloseTo(a.y, 9);
+  });
+
+  it('reads 1, 2 and 3 as turns and anything else as none', () => {
+    expect(
+      [1, 2, 3, 0, 4, -1, 1.5, undefined, null].map((q) => quarterTurnsOf({ quarterTurns: q })),
+    ).toEqual([1, 2, 3, 0, 0, 0, 0, 0, 0]);
   });
 });

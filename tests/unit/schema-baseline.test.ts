@@ -83,9 +83,9 @@ describe('baseline schema equals the server upgrade path', () => {
   });
 
   it('both report the baseline version', () => {
-    expect(SCHEMA_VERSION).toBe(14);
-    expect(version(a)).toBe(14);
-    expect(version(b)).toBe(14);
+    expect(SCHEMA_VERSION).toBe(15);
+    expect(version(a)).toBe(15);
+    expect(version(b)).toBe(15);
   });
 
   it('enforces foreign keys on the new database', async () => {
@@ -104,11 +104,11 @@ describe('baseline schema equals the server upgrade path', () => {
 
   it('initSchema is a no-op when run again, on either database', async () => {
     const before = sqlText(b);
-    expect(await initSchema(dbB)).toBe(14);
+    expect(await initSchema(dbB)).toBe(15);
     expect(sqlText(b)).toEqual(before);
 
     const beforeA = sqlText(a);
-    expect(await initSchema(createBetterSqliteDb(a))).toBe(14);
+    expect(await initSchema(createBetterSqliteDb(a))).toBe(15);
     expect(sqlText(a)).toEqual(beforeA);
   });
 
@@ -123,17 +123,17 @@ describe('baseline schema equals the server upgrade path', () => {
 describe('data migrations', () => {
   const fake: DataMigration[] = [
     {
-      version: 15,
+      version: 16,
       statements: [
         'CREATE TABLE fake_a (id TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)',
         'CREATE INDEX idx_fake_a_n ON fake_a(n)',
       ],
     },
-    { version: 16, statements: ['ALTER TABLE fake_a ADD COLUMN extra TEXT'] },
+    { version: 17, statements: ['ALTER TABLE fake_a ADD COLUMN extra TEXT'] },
   ];
   const failing: DataMigration[] = [
     {
-      version: 15,
+      version: 16,
       statements: ['CREATE TABLE fake_b (id TEXT)', 'ALTER TABLE no_such_table ADD COLUMN x TEXT'],
     },
   ];
@@ -147,46 +147,46 @@ describe('data migrations', () => {
 
   it('runs future migrations through initSchema machinery and moves the version', async () => {
     const { conn, db } = await freshDb();
-    expect(await runDataMigrations(db, fake, 14)).toBe(16);
-    expect(version(conn)).toBe(16);
+    expect(await runDataMigrations(db, fake, 15)).toBe(17);
+    expect(version(conn)).toBe(17);
     expect(names(conn, 'table')).toContain('fake_a');
     expect(names(conn, 'index')).toContain('idx_fake_a_n');
     const cols = (conn.pragma('table_info(fake_a)') as { name: string }[]).map((c) => c.name);
     expect(cols).toEqual(['id', 'n', 'extra']);
     // migrations at or below the stored version are skipped
-    expect(await runDataMigrations(db, fake, 16)).toBe(16);
+    expect(await runDataMigrations(db, fake, 17)).toBe(17);
     conn.close();
   });
 
   it('a failing statement leaves the version and the schema unchanged', async () => {
     const { conn, db } = await freshDb();
     const before = sqlText(conn);
-    await expect(runDataMigrations(db, failing, 14)).rejects.toThrow();
-    expect(version(conn)).toBe(14);
+    await expect(runDataMigrations(db, failing, 15)).rejects.toThrow();
+    expect(version(conn)).toBe(15);
     expect(sqlText(conn)).toEqual(before);
     conn.close();
   });
 
   it('the server loop gives the same schema as the initSchema loop', async () => {
     const viaCore = await freshDb();
-    await runDataMigrations(viaCore.db, fake, 14);
+    await runDataMigrations(viaCore.db, fake, 15);
 
     const serverConn = new Database(':memory:');
     await initSchema(createBetterSqliteDb(serverConn));
-    expect(applyDataMigrations(serverConn, fake, 14)).toBe(16);
+    expect(applyDataMigrations(serverConn, fake, 15)).toBe(17);
 
-    expect(version(serverConn)).toBe(16);
+    expect(version(serverConn)).toBe(17);
     expect(sqlText(serverConn)).toEqual(sqlText(viaCore.conn));
 
     const before = sqlText(serverConn);
     expect(() =>
       applyDataMigrations(
         serverConn,
-        failing.map((m) => ({ ...m, version: 17 })),
-        16,
+        failing.map((m) => ({ ...m, version: 18 })),
+        17,
       ),
     ).toThrow();
-    expect(version(serverConn)).toBe(16);
+    expect(version(serverConn)).toBe(17);
     expect(sqlText(serverConn)).toEqual(before);
 
     viaCore.conn.close();

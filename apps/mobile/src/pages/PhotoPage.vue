@@ -5,6 +5,7 @@ import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@io
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
+import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { getPhotos, photoFileUrl, rotatePhotoAPI } from '@myastrosky/app-state/api';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
@@ -25,8 +26,8 @@ import resetIcon from '../icons/rotate-ccw.svg?raw';
 // so that nothing of it stays hidden behind the bar; zoomed, it runs behind the bar, which stays readable over it. Two
 // fingers and a double tap zoom; the button that shows the photo whole again is there only while it is zoomed. The
 // sheet's toggles draw the photo's objects and points of interest over it (board "Photo, objets affichés"). "Faire
-// pivoter à droite" saves the picture again turned a quarter (as the desktop's photo detail); the photo keeps its place
-// on the sky.
+// pivoter à droite" shows the photo turned a quarter more (as the desktop's photo detail): its file is not changed, and
+// the photo keeps its place on the sky.
 const route = useRoute();
 const router = useRouter();
 
@@ -34,14 +35,18 @@ const photo = ref<Photo | null>(null);
 const infoOpen = ref(false);
 const turning = ref(false);
 const { showError } = useErrorToast();
+// The photo as it is shown, turned: the zoom and what is drawn over it work in its pixels.
+const shown = computed(() => (photo.value ? photoAsShown(photo.value) : null));
+const turns = computed(() => (photo.value ? quarterTurnsOf(photo.value) : 0));
+const turnTransform = computed(() => (turns.value ? ` rotate(${turns.value * 90}deg)` : ''));
 // A picture that cannot be read leaves the stage with the photo's name.
 const broken = ref(false);
 
 // The part of the stage under the top bar: the whole photo is fitted in it.
 const area = ref<HTMLElement | null>(null);
 const { zoom, zoomed, transform, reset, handlers } = usePhotoZoom(area, () => ({
-  width: photo.value?.width ?? 0,
-  height: photo.value?.height ?? 0,
+  width: shown.value?.width ?? 0,
+  height: shown.value?.height ?? 0,
 }));
 
 // What is drawn over the photo: off at first, as on the desktop; the catalogues start from the map's and are this
@@ -53,7 +58,7 @@ const overlay = ref<HTMLCanvasElement | null>(null);
 const { canShowObjects, canShowPois } = usePhotoOverlay({
   canvas: overlay,
   area,
-  photo,
+  photo: shown,
   zoom,
   objects: showObjects,
   pois: showPois,
@@ -150,9 +155,10 @@ function edit() {
               <img
                 v-else
                 class="mob-photo-view"
+                :class="{ 'mob-photo-view--sideways': turns % 2 === 1 }"
                 :src="photoFileUrl(photo.filename)"
                 :alt="photo.originalName"
-                :style="{ transform }"
+                :style="{ transform: transform + turnTransform }"
                 draggable="false"
                 @error="broken = true"
               />

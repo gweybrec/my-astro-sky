@@ -35,7 +35,7 @@ void categories.ensureLoaded();
 const pinColor = computed(() => resolveCategory(COMET_CATEGORY_ID, categories.categories).color);
 
 const obsIso = ref('');
-const { photo, adding, close, add } = useIdentifyPage((p) => {
+const { photo, shown, adding, close, add } = useIdentifyPage((p) => {
   obsIso.value = p.observationDate ?? '';
   if (obsIso.value) void search();
 });
@@ -50,12 +50,12 @@ const activeName = ref<string | null>(null);
 const moved = ref(new Map<string, PhotoPoint>());
 
 async function search() {
-  if (!photo.value || !obsIso.value || searching.value) return;
+  if (!shown.value || !obsIso.value || searching.value) return;
   const obs = obsIso.value;
   searching.value = true;
   error.value = '';
   try {
-    results.value = cometsInPhoto(photo.value, await cometElementsAPI(), obs);
+    results.value = cometsInPhoto(shown.value, await cometElementsAPI(), obs);
     // The comets in the photo are ticked; the brightest one is the one a tap moves.
     const names = results.value.inFrame.map((c) => c.name);
     selected.value = new Set(names);
@@ -88,9 +88,9 @@ const nearLine = (c: CometSearchResult['nearby'][number]) =>
   `${t('comet.awayDeg', { n: c.separationDeg.toFixed(1) })} · ${t('comet.colMag')} ${c.mag?.toFixed(1) ?? '—'}`;
 
 function addSelected() {
-  if (!results.value || !photo.value) return;
+  if (!results.value || !shown.value) return;
   const chosen = results.value.inFrame.filter((c) => selected.value.has(c.name));
-  void add(cometPois(photo.value, chosen, moved.value), 'comet.added');
+  void add(cometPois(shown.value, chosen, moved.value), 'comet.added');
 }
 </script>
 

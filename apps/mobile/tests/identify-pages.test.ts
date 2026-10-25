@@ -413,6 +413,22 @@ describe('add a point of interest', () => {
     expect(savedPois()[0].ra).toBeCloseTo(339.267614, 3);
   });
 
+  it('on a photo shown turned, takes the tap in the pixels of the photo as shown', async () => {
+    // Turned a quarter right, the 664 x 470 photo is shown 470 x 664: its pixel (332, 235) is shown at (470 - 235, 332).
+    getPhotos.mockReset().mockResolvedValue([{ ...NGC7331, quarterTurns: 1 }]);
+    const w = await mountPage(PoiAddPage);
+    const stage = w.findComponent(PhonePhotoStage);
+    expect(stage.props('size')).toEqual({ width: 470, height: 664 });
+    expect(stage.props('turns')).toBe(1);
+    await w.find('input[aria-label="Nom"]').setValue('Météore');
+    await byText(w, '[role="radio"]', 'Satellite').trigger('click');
+    await tapPhoto(w, { x: 235, y: 332 });
+    await byText(w, '.mob-sheet-footer button', 'Ajouter').trigger('click');
+    await flushPromises();
+    expect(savedPois()[0].ra).toBeCloseTo(339.267614, 3);
+    expect(savedPois()[0].dec).toBeCloseTo(34.419887, 3);
+  });
+
   it('opens the types of points of interest from the pen', async () => {
     const w = await mountPage(PoiAddPage);
     await byLabel(w, 'button', 'Gérer les types').trigger('click');

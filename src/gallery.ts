@@ -10,10 +10,12 @@ import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confir
 import { createLazyObserver } from './lazy-image';
 import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
 import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
+import { setPictureTurn, turnedPictureFrame } from './photo-turn';
 import { showToast } from './toast';
 import {
   buildPoiFilterGroups,
@@ -461,7 +463,16 @@ export class Gallery {
         );
       }
 
-      item.appendChild(img);
+      // A photo shown turned is cropped in a frame of the card's shape (the CSS of `.gallery-item > img` on it).
+      const turns = quarterTurnsOf(photo);
+      if (turns) {
+        img.classList.add('object-cover');
+        item.appendChild(
+          turnedPictureFrame(img, turns, 'block w-full aspect-[3/2] cursor-pointer'),
+        );
+      } else {
+        item.appendChild(img);
+      }
       item.appendChild(placeholder);
       item.appendChild(caption);
 
@@ -514,9 +525,11 @@ export class Gallery {
     const imgWrapper = document.createElement('div');
     imgWrapper.className = 'gallery-carousel-img-wrap';
 
+    // The picture fills a frame of the hero's shape, so that a photo shown turned fits it too.
     const imgEl = document.createElement('img');
-    imgEl.className = 'gallery-carousel-img';
+    imgEl.className = 'object-contain';
     imgEl.draggable = false;
+    const imgFrame = turnedPictureFrame(imgEl, 0, 'gallery-carousel-img');
 
     const captionEl = document.createElement('div');
     captionEl.className = 'gallery-hero-caption';
@@ -559,16 +572,18 @@ export class Gallery {
       index = ((i % total) + total) % total;
       const photo = photos[index];
       if (animate) {
-        imgEl.style.opacity = '0';
+        imgFrame.style.opacity = '0';
         setTimeout(() => {
           imgEl.src = photoFileUrl(photo.filename);
           imgEl.alt = photo.originalName;
+          setPictureTurn(imgEl, quarterTurnsOf(photo));
           updateCaption(photo);
-          imgEl.style.opacity = '';
+          imgFrame.style.opacity = '';
         }, 250);
       } else {
         imgEl.src = photoFileUrl(photo.filename);
         imgEl.alt = photo.originalName;
+        setPictureTurn(imgEl, quarterTurnsOf(photo));
         updateCaption(photo);
       }
       if (counterEl) counterEl.textContent = `${index + 1} / ${total}`;
@@ -623,7 +638,7 @@ export class Gallery {
     goTo(0, false);
 
     imgWrapper.addEventListener('click', () => void this.openDetailModal(photos[index]));
-    imgWrapper.appendChild(imgEl);
+    imgWrapper.appendChild(imgFrame);
     wrap.appendChild(imgWrapper);
     wrap.appendChild(captionEl);
 
@@ -771,7 +786,8 @@ export class Gallery {
       if (await close()) this.onNavigateToMap?.(photo);
     });
 
-    // "Faire pivoter à droite": the picture is saved again turned a quarter; the photo keeps its place on the sky.
+    // "Faire pivoter à droite": the photo is shown turned a quarter more (its file is not changed); it keeps its place on
+    // the sky.
     // Unsaved edits would be lost with the view reopened on the turned photo, so they are asked about first.
     const rotateBtn = iconButton(rotateRightSvg, t('gallery.rotatePhotoRight'));
     rotateBtn.addEventListener('click', async () => {
@@ -798,6 +814,8 @@ export class Gallery {
     // Only used to know whether the photo is solved: every sky→pixel conversion
     // below re-fits it and projects in the same withCanonicalProjection scope.
     const photoToProj = computePhotoToProjMatrix(photo);
+    // The photo as it is shown, turned: objects and points of interest are placed in its pixels.
+    const shown = photoAsShown(photo);
     let dsoPlacements: PhotoDsoPlacement[] = [];
     const dsoState = reactive({
       show: false,
@@ -816,17 +834,17 @@ export class Gallery {
     // whose field is currently below the horizon (see withCanonicalProjection).
     const recomputePoiPins = (pois: PointOfInterest[]) => {
       poiPins = withCanonicalProjection(() => {
-        const matrix = computePhotoToProjMatrix(photo);
-        return matrix ? poiPinsInImage(pois, matrix, photo.width, photo.height) : [];
+        const matrix = computePhotoToProjMatrix(shown);
+        return matrix ? poiPinsInImage(pois, matrix, shown.width, shown.height) : [];
       });
     };
     recomputePoiPins(photo.pointsOfInterest ?? []);
 
     function recomputeDsoPlacements() {
       dsoPlacements = withCanonicalProjection(() => {
-        const matrix = dsoState.show ? computePhotoToProjMatrix(photo) : null;
+        const matrix = dsoState.show ? computePhotoToProjMatrix(shown) : null;
         return dsoState.show && matrix
-          ? findDsoPlacementsInImage(matrix, photo.width, photo.height, new Set(dsoState.catalogs))
+          ? findDsoPlacementsInImage(matrix, shown.width, shown.height, new Set(dsoState.catalogs))
           : [];
       });
     }
@@ -881,7 +899,7 @@ export class Gallery {
       drawPhotoOverlay(ctx, {
         placements: dsoPlacements,
         pins: drawPins ? poiPins : [],
-        dispScale: imgRect.width / photo.width,
+        dispScale: imgRect.width / shown.width,
         viewport: {
           left: offsetX,
           top: offsetY,
@@ -1032,6 +1050,7 @@ export class Gallery {
       maxScale: 16,
       fitButtons: true,
       fitOnLoad: true,
+      quarterTurns: quarterTurnsOf(photo),
     });
     const zoomControls = zoom.controls;
     zoom.onTransformChange(redrawDsoOverlay);

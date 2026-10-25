@@ -543,6 +543,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
         captureDetails: {},
         gearSetupId: null,
         thumbFilename: `${first.id}_thumb.jpg`,
+        quarterTurns: 0,
         correspondences: CORRESPONDENCES,
       },
       'the photo an upload returns',
@@ -659,37 +660,29 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     };
     await b.photos.setManualPlacement(id, placement);
 
+    const [before] = await b.photos.listWithSizes();
+
+    // Only how the photo is shown changes: its picture, its thumbnail and what is measured in their pixels stay.
     const turned = await b.photos.rotateRight(id);
-    expectEqual([turned.width, turned.height], [48, 64], 'the size swapped');
-    // (x, y) of the 64 x 48 picture becomes (48 - y, x)
+    expectEqual(turned.quarterTurns, 1, 'shown turned a quarter');
+    const { fileSize, ...rest } = before;
     expectEqual(
-      turned.correspondences,
-      [
-        { ...CORRESPONDENCES[0], photoX: 46, photoY: 1 },
-        { ...CORRESPONDENCES[1], photoX: 33, photoY: 20 },
-      ],
-      'the correspondences turned with the picture',
-    );
-    expectEqual(
-      turned.manualPlacement,
-      { ...placement, rotationDeg: -57 },
-      'the manual placement turned back, so the photo keeps its place on the sky',
-    );
-    expectTrue(
-      turned.filename !== `${id}.jpg` &&
-        turned.filename.startsWith(id) &&
-        turned.filename.endsWith('.jpg'),
-      'the turned picture is saved under a new name of the same format',
-    );
-    expectEqual(
-      turned.thumbFilename,
-      turned.filename.replace(/\.jpg$/, '_thumb.jpg'),
-      'the thumbnail follows the new name',
+      stable(turned),
+      stable({ ...(rest as Photo), quarterTurns: 1 }),
+      'the picture, its thumbnail, its size, its correspondences and its placement unchanged',
     );
     const [listed] = await b.photos.listWithSizes();
-    const { fileSize, ...rest } = listed;
-    expectTrue(typeof fileSize === 'number' && fileSize > 0, 'the turned picture is stored');
-    expectEqual(stable(rest as Photo), stable(turned), 'the listed photo is the turned one');
+    expectEqual(listed.fileSize, fileSize, 'the picture file is not saved again');
+    expectEqual(stable(listed), stable({ ...before, quarterTurns: 1 }), 'the listed photo turned');
+
+    const turns = [];
+    for (let i = 0; i < 4; i++) turns.push((await b.photos.rotateRight(id)).quarterTurns);
+    expectEqual(turns, [2, 3, 0, 1], 'four turns come back to the start');
+    expectEqual(
+      [listed.manualPlacement, listed.correspondences],
+      [placement, CORRESPONDENCES],
+      'the placement and the correspondences as they were set',
+    );
 
     expectEqual(await b.photos.removeAll(), 1, 'the turned photo removed');
   });
@@ -890,10 +883,11 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     const { backend: b, fixtures } = await makeBackend();
     const planId = (await b.plans.create({ name: 'Backed up' })).id;
     await b.plans.addEntry(planId, { dsoId: 'M31' });
-    await b.photos.upload(fixtures.jpeg(), {
+    const kept = await b.photos.upload(fixtures.jpeg(), {
       correspondences: JSON.stringify(CORRESPONDENCES),
       notes: 'kept',
     });
+    await b.photos.rotateRight(kept.id);
     await b.gear.addCustom('telescope', { brand: 'Contract', model: 'Scope' });
     await b.dsoOverrides.upsert('M31', { rating: 4 });
     const regionPoints = [
@@ -981,8 +975,8 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       );
       const restoredPhotos = await o.photos.listWithSizes();
       expectEqual(
-        restoredPhotos.map((p) => [p.originalName, p.notes, p.width, p.height]),
-        [['contract.jpg', 'kept', 64, 48]],
+        restoredPhotos.map((p) => [p.originalName, p.notes, p.width, p.height, p.quarterTurns]),
+        [['contract.jpg', 'kept', 64, 48, 1]],
         'the photo restored',
       );
       expectEqual(

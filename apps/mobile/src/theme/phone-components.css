@@ -1303,6 +1303,8 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   position: relative;
   flex: 1;
   min-height: 0;
+  /* Its size is known to the photo inside (cqw, cqh): a photo shown turned is laid out in the area turned. */
+  container-type: size;
 }
 .mob-photo-view {
   position: absolute;
@@ -1312,6 +1314,14 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   object-fit: contain;
   transform-origin: center;
   pointer-events: none;
+}
+/* A photo shown turned a quarter or three: its box is the area turned about its centre, so that, rotated, the picture
+   fills the area as an upright one does. */
+.mob-photo-view--sideways {
+  left: calc((100cqw - 100cqh) / 2);
+  top: calc((100cqh - 100cqw) / 2);
+  width: 100cqh;
+  height: 100cqw;
 }
 /* The facts that open a sheet's body stand off its header (board "Photo, informations"). The row of actions under them
    ends where they end: a sheet's body keeps room for its scrollbar, which the end gutter already counts. */

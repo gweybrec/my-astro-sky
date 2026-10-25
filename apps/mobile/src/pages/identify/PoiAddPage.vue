@@ -23,7 +23,7 @@ const router = useRouter();
 const categories = usePoiCategoriesStore();
 void categories.ensureLoaded();
 
-const { photo, adding, close, add } = useIdentifyPage();
+const { photo, shown, adding, close, add } = useIdentifyPage();
 
 const name = ref('');
 const categoryId = ref<string | undefined>(undefined);
@@ -58,8 +58,8 @@ const typeChoice = computed({
 const canAdd = computed(() => !!name.value.trim() && !!categoryId.value && !!at.value);
 
 function addPoi() {
-  if (!photo.value || !at.value || !categoryId.value || !canAdd.value) return;
-  const poi = poiAtPixel(photo.value, at.value, name.value.trim(), categoryId.value);
+  if (!shown.value || !at.value || !categoryId.value || !canAdd.value) return;
+  const poi = poiAtPixel(shown.value, at.value, name.value.trim(), categoryId.value);
   if (poi) void add([poi], 'poi.added');
 }
 </script>

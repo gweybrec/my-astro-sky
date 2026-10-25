@@ -24,6 +24,13 @@ describe('a gallery card left with its tab', () => {
     await w.setProps({ paused: true });
     expect(w.find('img').attributes('src')).toBe('/uploads/a.jpg');
   });
+
+  it('shows a turned photo turned in its square', async () => {
+    const w = mount(PhotoTile, { props: { name: 'M31.jpg', picture: '/uploads/a.jpg', turns: 3 } });
+    expect(w.find('img').attributes('style')).toContain('rotate(270deg)');
+    await w.setProps({ turns: 0 });
+    expect(w.find('img').attributes('style')).toBeUndefined();
+  });
 });
 
 /** A gallery card's chips ("+N" for the ones that do not fit in two rows) and the photos-per-line choice. */

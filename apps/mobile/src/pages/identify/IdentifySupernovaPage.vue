@@ -35,7 +35,7 @@ const pinColor = computed(
 );
 
 const obsIso = ref('');
-const { photo, adding, close, add } = useIdentifyPage((p) => {
+const { photo, shown, adding, close, add } = useIdentifyPage((p) => {
   obsIso.value = p.observationDate ?? '';
   if (obsIso.value) void search();
 });
@@ -53,15 +53,15 @@ const {
 const selected = ref(new Set<string>());
 
 async function search() {
-  if (!photo.value || searching.value) return;
-  const plan = supernovaSearchPlan(photo.value, obsIso.value);
+  if (!shown.value || searching.value) return;
+  const plan = supernovaSearchPlan(shown.value, obsIso.value);
   if (!plan) return;
   searching.value = true;
   error.value = '';
   results.value = null;
   try {
     field.value = plan.field;
-    results.value = placeSupernovae(photo.value, await tnsConesearchAPI(plan.params), obsIso.value);
+    results.value = placeSupernovae(shown.value, await tnsConesearchAPI(plan.params), obsIso.value);
     // Confirmed supernovae are ticked; unclassified transients are opt-in.
     selected.value = new Set(results.value.filter((c) => c.classified).map((c) => c.name));
     resetShown();

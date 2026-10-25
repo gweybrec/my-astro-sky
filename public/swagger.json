@@ -1880,7 +1880,7 @@
     "/api/photos/{id}/rotate": {
       "post": {
         "summary": "Turn a photo a quarter to the right",
-        "description": "Saves the photo's picture turned 90° clockwise in the same format, under a new file name so that no cache shows the old picture, makes its thumbnail again, deletes the old picture and thumbnail, and turns what is measured in its pixels (size, star correspondences, manual placement) so that it keeps its place on the sky.\n",
+        "description": "Adds a quarter turn to the right to how the photo is shown (`quarterTurns`, 0 to 3, back to 0 after four). The picture file, its thumbnail and what is measured in their pixels (size, star correspondences, manual placement) are not changed, so nothing is lost and the photo keeps its place on the sky.\n",
         "parameters": [
           {
             "in": "path",
@@ -1898,26 +1898,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The picture cannot be read or written",
-            "content": {
-              "application/json": {
-                "schema": {
                   "type": "object",
                   "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
+                    "quarterTurns": {
+                      "type": "integer",
                       "enum": [
-                        "INVALID_IMAGE"
-                      ]
+                        1,
+                        2,
+                        3
+                      ],
+                      "description": "Quarters to the right the photo is shown turned; absent when 0"
                     }
                   }
                 }

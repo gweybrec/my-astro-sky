@@ -915,11 +915,26 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         thumbFilename: null,
         observationDate: null,
         gearSetupId: null,
+        quarterTurns: 0,
         correspondences: [],
       });
       expect((await svc.get('min'))!.createdAt).toEqual(expect.any(String));
       await svc.importPhoto({ id: 'named', filename: 'f.png' }, 'skip');
       expect((await svc.get('named'))!.originalName).toBe('f.png');
+    });
+
+    it('keeps how the photo is shown turned, and reads anything but 1, 2 or 3 as 0', async () => {
+      await svc.importPhoto({ id: 't3', quarterTurns: 3 }, 'skip');
+      expect((await svc.get('t3'))!.quarterTurns).toBe(3);
+      for (const [id, turns] of [
+        ['t4', 4],
+        ['tneg', -1],
+        ['thalf', 1.5],
+        ['tstr', '2'],
+      ] as const) {
+        await svc.importPhoto({ id, quarterTurns: turns }, 'skip');
+        expect((await svc.get(id))!.quarterTurns).toBe(0);
+      }
     });
 
     it('skip leaves an existing photo unchanged and says so', async () => {
@@ -993,45 +1008,22 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       await blobs.put('p1_thumb.jpg', new Uint8Array([7]));
     };
 
-    it('saves the picture turned, makes its thumbnail again and turns what is measured in its pixels', async () => {
-      await stored();
-      const turned = await svc.rotateRight('p1');
-      expect([turned.width, turned.height]).toEqual([600, 800]);
-      // (x, y) of the 800 x 600 picture becomes (600 - y, x)
-      expect(turned.correspondences.map((c) => [c.photoX, c.photoY])).toEqual([
-        [600, 0],
-        [580, 10],
-      ]);
-      expect(turned.manualPlacement?.rotationDeg).toBe(-60);
-      expect(await svc.get('p1')).toEqual(turned);
-      // a new file name, so no browser shows the old picture from its cache; the old files are gone
-      expect(turned.filename).toMatch(/^p1-.+.jpg$/);
-      expect(turned.thumbFilename).toBe(turned.filename.replace('.jpg', '_thumb.jpg'));
-      expect([...(await blobs.get(turned.filename))!]).toEqual([3, 2, 1]);
-      expect([...(await blobs.get(turned.thumbFilename!))!]).toEqual([0x7a]);
-      expect([...blobs.store.keys()].sort()).toEqual(
-        [turned.filename, turned.thumbFilename].sort(),
-      );
-    });
-
-    it('changes nothing when the picture cannot be turned', async () => {
+    it('shows the photo turned a quarter more, and leaves its picture and its pixels alone', async () => {
       await stored();
       const before = await svc.get('p1');
-      codec.failRotate = true;
-      expect((await rejection(svc.rotateRight('p1'))).body).toMatchObject({
-        code: 'INVALID_IMAGE',
-      });
-      expect(await svc.get('p1')).toEqual(before);
-      expect([...(await blobs.get('p1.jpg'))!]).toEqual([1, 2, 3]);
+      const turned = await svc.rotateRight('p1');
+      expect(turned).toEqual({ ...before, quarterTurns: 1 });
+      expect(await svc.get('p1')).toEqual(turned);
+      // the picture and its thumbnail are not touched: nothing is lost
       expect([...blobs.store.keys()].sort()).toEqual(['p1.jpg', 'p1_thumb.jpg']);
+      expect([...(await blobs.get('p1.jpg'))!]).toEqual([1, 2, 3]);
     });
 
-    it('keeps the turn when the thumbnail cannot be made again, and drops the old one', async () => {
+    it('counts the turns 1, 2, 3 and back to 0', async () => {
       await stored();
-      codec.failThumbnail = true;
-      const turned = await svc.rotateRight('p1');
-      expect(turned.width).toBe(600);
-      expect([...blobs.store.keys()]).toEqual([turned.filename]);
+      const turns = [];
+      for (let i = 0; i < 4; i++) turns.push((await svc.rotateRight('p1')).quarterTurns);
+      expect(turns).toEqual([1, 2, 3, 0]);
     });
 
     it('is PHOTO_NOT_FOUND for an unknown photo', async () => {
@@ -1046,9 +1038,9 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         await svc.insert(newPhoto(id, { correspondences: corr(n) }));
         await blobs.put(`${id}.jpg`, new Uint8Array([1, 2, 3]));
       }
-      // the photo and its correspondences read, the one batch, the turned photo read back
-      expect(await calls(() => svc.rotateRight('few'))).toBe(5);
-      expect(await calls(() => svc.rotateRight('many'))).toBe(5);
+      // the one update, the photo and its correspondences read back
+      expect(await calls(() => svc.rotateRight('few'))).toBe(3);
+      expect(await calls(() => svc.rotateRight('many'))).toBe(3);
     });
   });
 

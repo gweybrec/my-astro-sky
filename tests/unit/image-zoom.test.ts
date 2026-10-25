@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { applyZoomToward, createImageZoomPan } from '../../src/image-zoom';
+import { applyZoomToward, createImageZoomPan, quarterTurnTransform } from '../../src/image-zoom';
 
 describe('applyZoomToward', () => {
   const MIN = 0.2;
@@ -443,5 +443,90 @@ describe('createImageZoomPan Fit / 1:1', () => {
     zoom.actualSize();
     expect(zoom.getState().scale).toBeCloseTo(3, 6);
     zoom.destroy();
+  });
+});
+
+describe('a turned image', () => {
+  /** Where the point (x, y) of the element goes under the turn's transform (translate, then rotate, about 0 0). */
+  function moved(transform: string, x: number, y: number) {
+    const tr = /translate\(([-\d.]+)px,([-\d.]+)px\)/.exec(transform)!;
+    const deg = Number(/rotate\(([-\d.]+)deg\)/.exec(transform)![1]);
+    const a = (deg * Math.PI) / 180;
+    const rx = x * Math.cos(a) - y * Math.sin(a);
+    const ry = x * Math.sin(a) + y * Math.cos(a);
+    // "+ 0": -0 is 0 here.
+    return [Math.round(rx + Number(tr[1])) + 0, Math.round(ry + Number(tr[2])) + 0];
+  }
+
+  it('is turned right about its corner and moved back over its own box', () => {
+    const w = 300;
+    const h = 200;
+    expect(quarterTurnTransform(0, w, h)).toBe('');
+    // a quarter right: the top-left corner goes to the top right of the turned box (h wide, w tall)
+    expect(moved(quarterTurnTransform(1, w, h), 0, 0)).toEqual([h, 0]);
+    expect(moved(quarterTurnTransform(1, w, h), w, h)).toEqual([0, w]);
+    expect(moved(quarterTurnTransform(2, w, h), 0, 0)).toEqual([w, h]);
+    expect(moved(quarterTurnTransform(2, w, h), w, h)).toEqual([0, 0]);
+    expect(moved(quarterTurnTransform(3, w, h), 0, 0)).toEqual([0, w]);
+    expect(moved(quarterTurnTransform(3, w, h), w, h)).toEqual([h, 0]);
+  });
+
+  it('keeps its turn after the zoom and the move, from its layout size', () => {
+    const container = document.createElement('div');
+    const img = document.createElement('img');
+    container.appendChild(img);
+    document.body.appendChild(container);
+    Object.defineProperty(img, 'offsetWidth', { value: 300, configurable: true });
+    Object.defineProperty(img, 'offsetHeight', { value: 200, configurable: true });
+    const zoom = createImageZoomPan(img, container, { quarterTurns: 1 });
+    expect(img.style.transform).toBe(
+      'translate(0px,0px) scale(1)' + quarterTurnTransform(1, 300, 200),
+    );
+    zoom.destroy();
+    container.remove();
+  });
+
+  it('1:1 shows a picture turned a quarter at the native size of its file turned', () => {
+    // layout 300 x 200, file 900 x 600: turned, the box is 200 wide for a file 600 tall → scale 3
+    const container = document.createElement('div');
+    const img = document.createElement('img');
+    container.appendChild(img);
+    document.body.appendChild(container);
+    Object.defineProperty(img, 'naturalWidth', { value: 900, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 600, configurable: true });
+    container.getBoundingClientRect = vi.fn(() => ({
+      left: 0,
+      top: 0,
+      width: 1000,
+      height: 800,
+      right: 1000,
+      bottom: 800,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    })) as never;
+    img.getBoundingClientRect = vi.fn(() => {
+      const scale = Number(/scale\(([-\d.]+)\)/.exec(img.style.transform)?.[1] ?? 1);
+      return {
+        left: 0,
+        top: 0,
+        width: 200 * scale,
+        height: 300 * scale,
+        right: 200 * scale,
+        bottom: 300 * scale,
+        x: 0,
+        y: 0,
+        toJSON() {},
+      };
+    }) as never;
+    const zoom = createImageZoomPan(img, container, {
+      fitButtons: true,
+      maxScale: 16,
+      quarterTurns: 1,
+    });
+    zoom.actualSize();
+    expect(zoom.getState().scale).toBeCloseTo(3, 6);
+    zoom.destroy();
+    container.remove();
   });
 });

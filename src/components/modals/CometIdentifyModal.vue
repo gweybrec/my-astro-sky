@@ -136,6 +136,7 @@ import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
 import { cometPois, cometsInPhoto, isPhotoSolved } from '@myastrosky/core/photo-identify';
+import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import { cometElementsAPI } from '../../api';
 import { isoToUtcParts, utcPartsToIso } from '@myastrosky/core/asteroid-identify';
 import {
@@ -151,6 +152,8 @@ import pinSvg from '../../icons/supernova-pin.svg?raw';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const props = defineProps<{ photo: Photo }>();
+// The photo as it is shown, turned: the clicks and the markers of the shell are in its pixels.
+const shown = computed(() => photoAsShown(props.photo));
 // The modal never persists: the caller (PoiEditor.vue) pushes the POIs into its own
 // v-model, like the asteroid and supernova modals.
 const emit = defineEmits<{ close: []; identified: [Photo, PointOfInterest[]] }>();
@@ -199,7 +202,7 @@ async function onSearch() {
   searching.value = true;
   searchErrorMessage.value = '';
   try {
-    results.value = cometsInPhoto(props.photo, await cometElementsAPI(), obs);
+    results.value = cometsInPhoto(shown.value, await cometElementsAPI(), obs);
     // Comets in the frame are pre-selected; the brightest one is the click target.
     const names = results.value.inFrame.map((c) => c.name);
     selected.value = new Set(names);
@@ -245,6 +248,6 @@ function pinPixel(c: PlacedComet): { x: number; y: number } {
 function onAdd() {
   if (!results.value) return;
   const chosen = results.value.inFrame.filter((c) => selected.value.has(c.name));
-  emit('identified', props.photo, cometPois(props.photo, chosen, overrides.value));
+  emit('identified', props.photo, cometPois(shown.value, chosen, overrides.value));
 }
 </script>

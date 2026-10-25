@@ -140,6 +140,34 @@ describe('IdentifyModalShell', () => {
     wrapper.unmount();
   });
 
+  it('shows a turned photo turned, and reports clicks and places markers in its pixels as shown', async () => {
+    // Turned a quarter, the 800 x 600 photo is shown 600 x 800; here at half size, 300 x 400.
+    const wrapper = mountShell({ photo: makePhoto({ quarterTurns: 1 }) }, { x: 300, y: 200 });
+    await flushPromises();
+    const img = document.body.querySelector('img') as HTMLImageElement;
+    expect(img.style.transform).toContain('rotate(90deg)');
+    img.getBoundingClientRect = vi.fn(() => ({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 400,
+      right: 300,
+      bottom: 400,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    })) as never;
+    img.dispatchEvent(new Event('load'));
+    await flushPromises();
+    const container = document.body.querySelector('.modal-photo-container')!;
+    container.dispatchEvent(new MouseEvent('click', { clientX: 100, clientY: 100, bubbles: true }));
+    expect(wrapper.emitted('photo-click')).toEqual([[{ x: 200, y: 200 }]]);
+    const marker = document.body.querySelector<HTMLElement>('.test-marker')!;
+    expect(parseFloat(marker.style.left)).toBeCloseTo(150, 0);
+    expect(parseFloat(marker.style.top)).toBeCloseTo(100, 0);
+    wrapper.unmount();
+  });
+
   it('places markers through toDisplay at the image scale', async () => {
     const wrapper = mountShell({}, { x: 300, y: 200 });
     stubImageRect();

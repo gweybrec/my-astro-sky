@@ -172,6 +172,7 @@ import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
 import { asteroidSearchPlan, rankAsteroids } from '@myastrosky/core/photo-identify';
+import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import { skybotConesearchAPI } from '../../api';
 import { buildPageList } from '../../targets-view';
 import {
@@ -189,6 +190,8 @@ const ASTEROID_CATEGORY_ID = 'cat-asteroid';
 const RESULTS_PAGE_SIZE = 6;
 
 const props = defineProps<{ photo: Photo }>();
+// The photo as it is shown, turned: the clicks and the markers of the shell are in its pixels.
+const shown = computed(() => photoAsShown(props.photo));
 // `identified` hands the target photo and the chosen POIs to the caller — the modal
 // never persists itself. PoiEditor.vue pushes them into its own (possibly not yet
 // saved) `pois` v-model, so it works the same for a placed photo (gallery) and a
@@ -276,7 +279,7 @@ async function onSearch() {
   selected.value = new Set();
   try {
     const plan = asteroidSearchPlan(
-      props.photo,
+      shown.value,
       startPx.value,
       endPx.value,
       startIso.value,

@@ -1,4 +1,4 @@
-import type { ManualPlacement, PhotoCorrespondence } from './types';
+import type { ManualPlacement, PhotoCorrespondence, QuarterTurns } from './types';
 
 /** What of a photo is measured in its pixels, and so changes when the picture is turned. */
 export interface PhotoPixelFrame {
@@ -8,8 +8,28 @@ export interface PhotoPixelFrame {
   manualPlacement?: ManualPlacement | null;
 }
 
+/** How many quarters to the right a photo is shown turned (0 when it is not). */
+export function quarterTurnsOf(photo: { quarterTurns?: number | null }): QuarterTurns {
+  const turns = photo.quarterTurns;
+  return turns === 1 || turns === 2 || turns === 3 ? turns : 0;
+}
+
 /**
- * A photo turned a quarter to the right (clockwise), as the picture is re-saved turned: the pixel (x, y) of a
+ * The photo as it is shown: its picture file is never turned, only shown turned `quarterTurns` times, so a screen that
+ * shows it flat works with this frame (size, matched stars, hand placement turned with the picture) and turns the
+ * picture by `quarterTurns × 90°`. The result has no `quarterTurns`: it is not turned twice.
+ */
+export function photoAsShown<P extends PhotoPixelFrame & { quarterTurns?: QuarterTurns }>(
+  photo: P,
+): P {
+  let shown = photo;
+  for (let i = 0; i < quarterTurnsOf(photo); i++) shown = rotatePhotoRight(shown);
+  const { quarterTurns: _turns, ...rest } = shown;
+  return rest as P;
+}
+
+/**
+ * A photo turned a quarter to the right (clockwise): the pixel (x, y) of a
  * W × H picture becomes (H − y, x) of an H × W one. The matched stars move with their pixels, so a solved photo
  * keeps its place on the sky; a hand placement keeps it by turning its angle back a quarter (forward with one
  * mirror, which reverses the turn). Points of interest and objects are on the sky and do not change.

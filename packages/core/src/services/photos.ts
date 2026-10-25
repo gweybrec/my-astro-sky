@@ -22,9 +22,14 @@ import type {
 import type { BlobStore } from '../ports/blob-store';
 import type { ImageCodec, ImageInfo } from '../ports/image-codec';
 import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
-import type { CaptureDetails, Photo, PhotoIntegration, PointOfInterest } from '../types';
+import type {
+  CaptureDetails,
+  Photo,
+  PhotoIntegration,
+  PointOfInterest,
+  QuarterTurns,
+} from '../types';
 import { sanitizeCaptureDetails } from '../wcs';
-import { rotatePhotoRight } from '../photo-rotation';
 
 /** Extensions an uploaded photo may have (lower case, with the dot). */
 export const ALLOWED_PHOTO_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -110,10 +115,9 @@ export interface PhotoService {
   /** Deletes the rows with these ids (not their files). Returns how many existed. Ids that are not strings are ignored. */
   removeRows(ids: readonly string[]): Promise<number>;
   /**
-   * Turns a photo a quarter to the right: its picture is saved again turned, in the same format under a new file name
-   * (the old picture and thumbnail are deleted), its thumbnail made again, and what is measured in its pixels turned with it (size, matched stars, hand placement), so it keeps
-   * its place on the sky. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no such photo, `invalid`
-   * (`INVALID_IMAGE`) when its picture cannot be read or written. Returns the photo as stored.
+   * Turns a photo a quarter to the right as it is shown (`quarterTurns`, 0 to 3). Its picture, its thumbnail and
+   * what is measured in their pixels are left as they are, so nothing is lost and the photo keeps its place on the
+   * sky. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no such photo. Returns the photo as stored.
    */
   rotateRight(id: string): Promise<Photo>;
   /** Deletes every photo row (not the files). Returns how many there were. */
@@ -146,6 +150,7 @@ interface PhotoRow {
   observation_date: string | null;
   capture_details: string | null;
   gear_setup_id: string | null;
+  quarter_turns: number | null;
 }
 
 interface CorrespondenceRow {
@@ -161,8 +166,8 @@ interface CorrespondenceRow {
 
 const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`;
-const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`;
+const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
 const INSERT_CORRESPONDENCE =
   'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
 const SELECT_PHOTOS = 'SELECT * FROM photos ORDER BY display_order ASC, created_at ASC, id ASC';
@@ -177,9 +182,7 @@ const SELECT_NAMES = 'SELECT id, original_name FROM photos ORDER BY rowid ASC';
 const DELETE_PHOTO = 'DELETE FROM photos WHERE id = ?';
 const DELETE_ALL_PHOTOS = 'DELETE FROM photos';
 const UPDATE_PLACEMENT = 'UPDATE photos SET manual_placement = ? WHERE id = ?';
-const UPDATE_TURNED =
-  'UPDATE photos SET filename = ?, thumb_filename = ?, width = ?, height = ?, manual_placement = ? WHERE id = ?';
-const DELETE_CORRESPONDENCES_FOR = 'DELETE FROM star_correspondences WHERE photo_id = ?';
+const UPDATE_TURN_RIGHT = 'UPDATE photos SET quarter_turns = (quarter_turns + 1) % 4 WHERE id = ?';
 const UPDATE_METADATA =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ? WHERE id = ?';
 const UPDATE_METADATA_WITH_NAME =
@@ -266,6 +269,11 @@ function cleanSetupId(val: unknown): string | null {
   return typeof val === 'string' && val.trim().length > 0 ? val.trim().slice(0, 64) : null;
 }
 
+/** A number of quarter turns, 0 to 3; anything else is 0. */
+function cleanQuarterTurns(val: unknown): QuarterTurns {
+  return val === 1 || val === 2 || val === 3 ? val : 0;
+}
+
 function parseJsonArray(val: string | null): string[] {
   if (!val) return [];
   try {
@@ -308,6 +316,7 @@ function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Photo {
     captureDetails: parseSanitized(p.capture_details, sanitizeCaptureDetails, {}),
     gearSetupId: p.gear_setup_id ?? null,
     thumbFilename: p.thumb_filename ?? null,
+    quarterTurns: cleanQuarterTurns(p.quarter_turns),
     correspondences: corr.map((c) => ({
       pointIndex: c.point_index,
       photoX: c.photo_x,
@@ -696,48 +705,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     },
 
     async rotateRight(id) {
-      const photo = await readOne(id);
-      if (!photo) throw photoNotFound();
-      const ext = extensionOf(photo.filename) || '.jpg';
-      // The turned picture is made first: nothing is changed when it cannot be.
-      let turnedBytes: Uint8Array;
-      try {
-        const bytes = await blobs.get(photo.filename);
-        if (!bytes) throw new Error('missing picture');
-        turnedBytes = await images.rotateRight(bytes, ext);
-      } catch {
-        throw invalidUpload("Impossible de faire pivoter l'image", 'INVALID_IMAGE');
-      }
-      // Saved under a new name, so that no browser shows the old picture or thumbnail from its cache.
-      const filename = `${id}-${newId()}${ext}`;
-      const thumbFilename = thumbnailNameOf(filename);
-      await blobs.put(filename, turnedBytes);
-      // A thumbnail that cannot be made is left out: a missing one is made when it is asked for.
-      await service.ensureThumbnail(filename, thumbFilename, true).catch(() => undefined);
-      const turned = rotatePhotoRight(photo);
-      try {
-        await db.batch([
-          {
-            sql: UPDATE_TURNED,
-            params: [
-              filename,
-              thumbFilename,
-              turned.width,
-              turned.height,
-              turned.manualPlacement ? JSON.stringify(turned.manualPlacement) : null,
-              id,
-            ],
-          },
-          { sql: DELETE_CORRESPONDENCES_FOR, params: [id] },
-          ...correspondenceStatements(id, turned.correspondences),
-        ]);
-      } catch (error) {
-        await blobs.remove(filename).catch(() => undefined);
-        await blobs.remove(thumbFilename).catch(() => undefined);
-        throw error;
-      }
-      await blobs.remove(photo.filename).catch(() => undefined);
-      await blobs.remove(thumbnailNameOf(photo.filename)).catch(() => undefined);
+      if ((await db.run(UPDATE_TURN_RIGHT, [id])).changes === 0) throw photoNotFound();
       return (await readOne(id))!;
     },
 
@@ -832,6 +800,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           typeof p.observationDate === 'string' ? p.observationDate : null,
           JSON.stringify(sanitizeCaptureDetails(p.captureDetails)),
           cleanSetupId(p.gearSetupId),
+          cleanQuarterTurns(p.quarterTurns),
         ]);
         if (result.changes === 0) return 'skipped' as const;
         if (correspondences.length > 0) {

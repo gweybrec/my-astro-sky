@@ -8,8 +8,6 @@ export interface ImageCodec {
   probe(bytes: Uint8Array): Promise<ImageInfo>;
   /** Re-encodes in the same format with the EXIF orientation applied to the pixels. `ext` is the lower-case file extension, with its dot. */
   bakeOrientation(bytes: Uint8Array, ext: string): Promise<Uint8Array>;
-  /** The picture turned a quarter clockwise (to the right), re-encoded in the same format: `ext` as for `bakeOrientation`. A stored picture has no EXIF orientation left, so its pixels are turned as they are. */
-  rotateRight(bytes: Uint8Array, ext: string): Promise<Uint8Array>;
   /** A JPEG no larger than `maxSize` on its longer side (never enlarged), at the given quality. */
   thumbnail(bytes: Uint8Array, maxSize: number, quality: number): Promise<Uint8Array>;
   /** Encodes raw pixels (8-bit, `channels` 1, 3 or 4, row by row) as an image. Used to turn a decoded FITS, TIFF or XISF into a picture; the server implements it with `sharp`. */

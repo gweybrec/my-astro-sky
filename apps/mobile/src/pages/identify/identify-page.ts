@@ -1,7 +1,8 @@
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { t } from '@myastrosky/core/i18n/index';
 import { isPhotoSolved } from '@myastrosky/core/photo-identify';
+import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 import { getPhotos } from '@myastrosky/app-state/api';
 import { useErrorToast } from '../../composables/useErrorToast';
@@ -11,7 +12,8 @@ import { deliverPois } from '../../identify-session';
  * What the identification pages share: the photo of the address (a photo without a solve has nothing to identify: its
  * page opens instead), leaving the page (Annuler), and adding the points found (Ajouter): they go where
  * `deliverPois` sends them, a toast says which were added (`addedKey`, the desktop's) or that they were already
- * listed, and the page closes.
+ * listed, and the page closes. `shown` is the photo as it is shown, turned: what is measured on the picture (a tap, a
+ * marker) is in its pixels.
  */
 export function useIdentifyPage(onLoaded?: (photo: Photo) => void) {
   const route = useRoute();
@@ -56,7 +58,9 @@ export function useIdentifyPage(onLoaded?: (photo: Photo) => void) {
     }
   }
 
-  return { photo, adding, close, add, showError };
+  const shown = computed(() => (photo.value ? photoAsShown(photo.value) : null));
+
+  return { photo, shown, adding, close, add, showError };
 }
 
 /** Toggles one key of a set held in a ref, as a new set (the ticks of a list of results). */

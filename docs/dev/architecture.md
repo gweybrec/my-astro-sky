@@ -123,7 +123,7 @@ Express in-memory rate limits protect all API routes (global) and the `POST /api
 - **Electron**: when the Express server is loaded inside the Electron main process (`process.versions.electron` is set), rate limiting is disabled entirely. The app is single-user/local so limits would only hurt the user.
 
 - **`db.ts`**: SQLite (better-sqlite3, WAL mode) with tables:
-  - `photos`: id, filename, originalName, width, height, displayOrder, createdAt, thumb_filename
+  - `photos`: id, filename, originalName, width, height, displayOrder, createdAt, thumb_filename, quarter_turns (how many quarters to the right the photo is shown turned: "Faire pivoter à droite" changes only this, never the file, its thumbnail or what is measured in their pixels; screens that show the photo flat work with `photoAsShown`)
   - `star_correspondences`: id, photoId, pointIndex, photoX, photoY, starHip, starName, starRa, starDec
   - `dso_overrides`: id (TEXT PRIMARY KEY), data (TEXT — JSON-serialised `DSOUserOverride`)
   - `schema_version`: single-row table tracking the migration version (see `db-migrations.ts`)

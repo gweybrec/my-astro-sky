@@ -91,6 +91,7 @@ const photo = (over: Partial<Photo> = {}): Photo =>
       { frames: 0, seconds: 120, filter: 'L' },
     ],
     gearSetupId: 's1',
+    correspondences: [],
     ...over,
   }) as Photo;
 
@@ -281,7 +282,7 @@ describe("a photo's own screen", () => {
   });
 
   it('turns the photo right from the top bar and shows it turned, whole again', async () => {
-    rotatePhotoAPI.mockResolvedValue(photo({ filename: 'm31-b.jpg', width: 2000, height: 4000 }));
+    rotatePhotoAPI.mockResolvedValue(photo({ quarterTurns: 1 }));
     const w = mountPage();
     await flushPromises();
     const turn = button(w, 'Faire pivoter à droite');
@@ -295,7 +296,11 @@ describe("a photo's own screen", () => {
     await turn.trigger('click');
     await flushPromises();
     expect(rotatePhotoAPI).toHaveBeenCalledWith('p1');
-    expect(w.find('.mob-photo-view').attributes('src')).toBe('/uploads/m31-b.jpg');
+    // the same picture, laid out on its side and turned a quarter
+    const view = w.find('.mob-photo-view');
+    expect(view.attributes('src')).toBe('/uploads/m31.jpg');
+    expect(view.classes()).toContain('mob-photo-view--sideways');
+    expect(view.attributes('style')).toContain('rotate(90deg)');
   });
 
   it('keeps the photo and says so when it cannot be turned', async () => {

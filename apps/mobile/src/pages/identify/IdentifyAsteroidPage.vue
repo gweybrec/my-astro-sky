@@ -31,7 +31,7 @@ const ASTEROID_CATEGORY_ID = 'cat-asteroid';
 /** Rows drawn at a time in the list of asteroids found. */
 const RESULTS_CHUNK = 20;
 
-const { photo, adding, close, add } = useIdentifyPage((p) => {
+const { photo, shown, adding, close, add } = useIdentifyPage((p) => {
   const window = defaultTimeWindow(p);
   startIso.value = window?.startIso ?? '';
   endIso.value = window?.endIso ?? '';
@@ -92,12 +92,12 @@ const canSearch = computed(
 const key = (c: Pick<RankedCandidate, 'number' | 'name'>) => `${c.number ?? ''}|${c.name}`;
 
 async function search() {
-  if (!photo.value || !startPx.value || !endPx.value || searching.value) return;
+  if (!shown.value || !startPx.value || !endPx.value || searching.value) return;
   searching.value = true;
   error.value = '';
   try {
     const plan = asteroidSearchPlan(
-      photo.value,
+      shown.value,
       startPx.value,
       endPx.value,
       startIso.value,

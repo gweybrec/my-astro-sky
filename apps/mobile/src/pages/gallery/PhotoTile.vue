@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import type { QuarterTurns } from '@myastrosky/core/types';
 import type { PhotoTag } from '../../photo-tags';
 import AppIcon from '../../components/AppIcon.vue';
 import PhoneBusy from '../../components/PhoneBusy.vue';
@@ -13,6 +14,8 @@ const props = defineProps<{
   name: string;
   /** The picture's address; a waiting photo has none. */
   picture?: string;
+  /** Quarters to the right the picture is shown turned (the square card stays square). */
+  turns?: QuarterTurns;
   tags?: PhotoTag[];
   /** Where a waiting photo stands ("À placer", "Résolution"), and whether that is a running operation. */
   state?: string;
@@ -48,6 +51,7 @@ const src = computed(() => (props.paused && !loaded.value ? undefined : props.pi
         v-if="picture && !broken"
         class="mob-photo-picture"
         :src="src"
+        :style="turns ? { transform: `rotate(${turns * 90}deg)` } : undefined"
         alt=""
         loading="lazy"
         @load="loaded = true"

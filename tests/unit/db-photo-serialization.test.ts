@@ -44,6 +44,7 @@ const METADATA_KEYS = [
   'captureDetails',
   'gearSetupId',
   'thumbFilename',
+  'quarterTurns',
 ] as const;
 
 /** A photo service on its own in-memory database, with the raw connection for schema checks. */

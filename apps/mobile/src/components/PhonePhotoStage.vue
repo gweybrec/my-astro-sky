@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import type { QuarterTurns } from '@myastrosky/core/types';
 import { fittedSize, usePhotoZoom, type Size } from '../composables/usePhotoZoom';
 
 /** A point of the photo, in its pixels from its top left. */
@@ -12,11 +13,15 @@ export interface PhotoPoint {
 // "Ajouter un point d'intérêt"…): two fingers zoom, one finger moves a zoomed photo, and a tap on the photo is given
 // as the photo's pixel under it (`tap`). The `default` slot draws the markers: `onScreen` gives where a pixel of the
 // photo is in the stage, following the zoom. Without `size`, the photo's own size is read when it loads (`load`).
+// With `turns`, the picture is shown turned that many quarters to the right; `size` and every point are then those
+// of the picture as shown.
 const props = defineProps<{
   src: string;
   alt?: string;
   /** The photo's size in pixels, when known before it loads. */
   size?: Size | null;
+  /** Quarters to the right the picture is shown turned. */
+  turns?: QuarterTurns;
 }>();
 const emit = defineEmits<{ tap: [point: PhotoPoint]; load: [size: Size] }>();
 
@@ -99,9 +104,10 @@ defineExpose({ onScreen, onPicture, pixelScale, area, box, zoom });
       <img
         v-if="src"
         class="mob-photo-view"
+        :class="{ 'mob-photo-view--sideways': (turns ?? 0) % 2 === 1 }"
         :src="src"
         :alt="alt"
-        :style="{ transform }"
+        :style="{ transform: turns ? `${transform} rotate(${turns * 90}deg)` : transform }"
         draggable="false"
         @load="onLoad"
       />

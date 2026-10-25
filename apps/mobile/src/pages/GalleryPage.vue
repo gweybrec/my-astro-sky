@@ -5,6 +5,7 @@ import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@io
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
+import { quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { getGearSetups, getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import AppIcon from '../components/AppIcon.vue';
@@ -84,6 +85,7 @@ const tiles = computed(() =>
     id: photo.id,
     name: photo.originalName,
     picture: photoFileUrl(photo.thumbFilename ?? photo.filename),
+    turns: quarterTurnsOf(photo),
     tags: tagsOf(photo),
   })),
 );
@@ -259,6 +261,7 @@ async function addPicked(pick: () => Promise<File[]>) {
             :key="tile.id"
             :name="tile.name"
             :picture="tile.picture"
+            :turns="tile.turns"
             :paused="!active"
             :tags="tile.tags"
             @click="router.push(`/gallery/photo/${tile.id}`)"

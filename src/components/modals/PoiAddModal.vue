@@ -66,10 +66,13 @@ import { t } from '../../i18n';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { poiAtPixel } from '@myastrosky/core/photo-identify';
+import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import penSvg from '../../icons/pen.svg?raw';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const props = defineProps<{ photo: Photo }>();
+// The photo as it is shown, turned: the clicks and the markers of the shell are in its pixels.
+const shown = computed(() => photoAsShown(props.photo));
 // The modal never persists: `identified` hands the photo and the new POI to the caller
 // (PoiEditor.vue), exactly like the identification modals.
 const emit = defineEmits<{ close: []; identified: [Photo, PointOfInterest[]] }>();
@@ -105,7 +108,7 @@ function onAdd() {
   const pos = posPx.value;
   const name = nameInput.value.trim();
   if (!canAdd.value || !pos) return;
-  const poi = poiAtPixel(props.photo, pos, name, categoryInput.value);
+  const poi = poiAtPixel(shown.value, pos, name, categoryInput.value);
   if (poi) emit('identified', props.photo, [poi]);
 }
 </script>

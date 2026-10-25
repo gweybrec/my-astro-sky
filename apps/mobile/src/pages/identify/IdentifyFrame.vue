@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
 import type { Photo } from '@myastrosky/core/types';
+import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { photoFileUrl } from '@myastrosky/app-state/api';
 import PhoneInfoButton from '../../components/PhoneInfoButton.vue';
 import PhonePhotoStage, { type PhotoPoint } from '../../components/PhonePhotoStage.vue';
@@ -11,7 +12,8 @@ import PhonePhotoStage, { type PhotoPoint } from '../../components/PhonePhotoSta
 // of a mode with its "i", the photo on its stage with what the page marks on it (`markers` slot, given `onScreen`),
 // and the panel under it, at the right in landscape: its content (default slot) scrolls when it is taller than the
 // panel, its footer (`footer` slot) stays under it. A tap on the photo is given as its pixel (`tap`). With `results`,
-// the content's list of results is what shrinks and scrolls (`.mob-results-list`).
+// the content's list of results is what shrinks and scrolls (`.mob-results-list`). The photo is shown turned as its
+// `quarterTurns` say: taps and markers are in the pixels of the photo as shown (`photoAsShown`).
 const props = defineProps<{
   title: string;
   /** The explanation behind the "i": the desktop's introduction of the modal. */
@@ -24,9 +26,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ tap: [point: PhotoPoint] }>();
 
-const size = computed(() =>
-  props.photo ? { width: props.photo.width, height: props.photo.height } : null,
-);
+const size = computed(() => {
+  if (!props.photo) return null;
+  const { width, height } = photoAsShown(props.photo);
+  return { width, height };
+});
 </script>
 
 <template>
@@ -41,6 +45,7 @@ const size = computed(() =>
           :src="photo ? photoFileUrl(photo.filename) : ''"
           :alt="photo?.originalName"
           :size="size"
+          :turns="photo ? quarterTurnsOf(photo) : 0"
           @tap="emit('tap', $event)"
         >
           <template #default="{ onScreen }">

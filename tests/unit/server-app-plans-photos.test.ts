@@ -1666,23 +1666,17 @@ describe('PATCH /api/photos/:id/metadata', () => {
 });
 
 describe('POST /api/photos/:id/rotate', () => {
-  it('saves the picture turned right, makes its thumbnail again and answers the turned photo', async () => {
+  it('answers the photo shown a quarter more turned, its picture file untouched', async () => {
     const photo = await upload();
+    const files = uploadsList();
+    const bytes = fs.readFileSync(path.join(uploadsDir, photo.filename));
     const r = await call('POST', `/api/photos/${photo.id}/rotate`);
     expect(r.status).toBe(200);
-    expect([r.body.width, r.body.height]).toEqual([photo.height, photo.width]);
-    // (x, y) of a W x H picture becomes (H - y, x)
-    expect(r.body.correspondences.map((c: any) => [c.photoX, c.photoY])).toEqual(
-      photo.correspondences.map((c: any) => [photo.height - c.photoY, c.photoX]),
-    );
-    expect(await readPhoto(photo.id)).toMatchObject({ width: photo.height, height: photo.width });
-    // saved under new names (no cached picture shows), the old files deleted
-    expect(r.body.filename).not.toBe(photo.filename);
-    expect(uploadsList()).toEqual([r.body.filename, r.body.thumbFilename].sort());
-    const file = await sharp(path.join(uploadsDir, r.body.filename)).metadata();
-    expect([file.width, file.height, file.format]).toEqual([photo.height, photo.width, 'png']);
-    const thumb = await sharp(path.join(uploadsDir, r.body.thumbFilename)).metadata();
-    expect(Math.sign(thumb.height! - thumb.width!)).toBe(Math.sign(photo.width - photo.height));
+    expect(r.body).toEqual({ ...photo, quarterTurns: 1 });
+    expect(await readPhoto(photo.id)).toMatchObject({ quarterTurns: 1, width: photo.width });
+    // the picture is not saved again: same files, same bytes
+    expect(uploadsList()).toEqual(files);
+    expect(fs.readFileSync(path.join(uploadsDir, photo.filename)).equals(bytes)).toBe(true);
   });
 
   it('is 404 PHOTO_NOT_FOUND for an unknown photo', async () => {

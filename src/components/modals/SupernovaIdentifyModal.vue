@@ -108,6 +108,7 @@ import {
   placeSupernovae,
   supernovaSearchPlan,
 } from '@myastrosky/core/photo-identify';
+import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import { tnsConesearchAPI } from '../../api';
 import { isoToUtcParts, utcPartsToIso } from '@myastrosky/core/asteroid-identify';
 import {
@@ -123,6 +124,8 @@ import pinSvg from '../../icons/supernova-pin.svg?raw';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const props = defineProps<{ photo: Photo }>();
+// The photo as it is shown, turned: the clicks and the markers of the shell are in its pixels.
+const shown = computed(() => photoAsShown(props.photo));
 // The modal never persists: the caller (PoiEditor.vue) pushes the POIs into its own
 // v-model, like the asteroid and comet modals.
 const emit = defineEmits<{ close: []; identified: [Photo, PointOfInterest[]] }>();
@@ -157,7 +160,7 @@ const selected = ref(new Set<string>());
 const hovered = ref<string | null>(null);
 
 async function onSearch() {
-  const plan = supernovaSearchPlan(props.photo, obsIso.value);
+  const plan = supernovaSearchPlan(shown.value, obsIso.value);
   if (!plan) return;
   searching.value = true;
   searchErrorMessage.value = '';
@@ -165,7 +168,7 @@ async function onSearch() {
   try {
     field.value = plan.field;
     const candidates = await tnsConesearchAPI(plan.params);
-    results.value = placeSupernovae(props.photo, candidates, obsIso.value);
+    results.value = placeSupernovae(shown.value, candidates, obsIso.value);
     // Confirmed supernovae are pre-selected; unclassified transients are opt-in.
     selected.value = new Set(results.value.filter((c) => c.classified).map((c) => c.name));
   } catch (err) {

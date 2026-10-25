@@ -53,8 +53,9 @@
 
       <slot name="photo-hint" />
 
-      <!-- Zoom/pan photo. A click (not a drag) is reported in photo pixels; the
-           modal's markers are drawn through the `markers` slot's toDisplay(). -->
+      <!-- Zoom/pan photo, shown turned as its quarterTurns say. A click (not a drag) is
+           reported in the pixels of the photo as shown (photoAsShown); the modal's
+           markers are drawn through the `markers` slot's toDisplay(). -->
       <div class="flex items-center justify-center w-full overflow-hidden">
         <div ref="photoContainerEl" class="modal-photo-container select-none" @click="onImageClick">
           <img
@@ -106,6 +107,7 @@ import { t } from '../../i18n';
 import { photoFileUrl } from '../../api';
 import { isPhotoSolved, SLOW_SEARCH_MS } from '@myastrosky/core/photo-identify';
 import { createImageZoomPan, type ZoomPanController } from '../../image-zoom';
+import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import type { Photo } from '@myastrosky/core/types';
 
 const props = defineProps<{
@@ -131,6 +133,9 @@ const emit = defineEmits<{
 }>();
 
 const solved = computed(() => isPhotoSolved(props.photo));
+// The photo as it is shown, turned: clicks and markers are in its pixels.
+const shown = computed(() => photoAsShown(props.photo));
+const turns = computed(() => quarterTurnsOf(props.photo));
 
 // ─── A search that takes long ───────────────────────────────────────────────
 const slow = ref(false);
@@ -175,7 +180,13 @@ function setupZoom() {
     maxScale: 5,
     fitButtons: true,
     dblClick: 'none',
+    quarterTurns: turns.value,
   });
+  if (turns.value % 2 === 1) {
+    const img = imgEl.value;
+    if (img.complete) sizeSideways();
+    else img.addEventListener('load', sizeSideways, { once: true });
+  }
   zoomControlsHost.value?.appendChild(zoom.controls);
   unsubTransform = zoom.onTransformChange(() => {
     layoutVersion.value++;
@@ -185,6 +196,30 @@ function setupZoom() {
     resizeObserver = new ResizeObserver(() => layoutVersion.value++);
     resizeObserver.observe(imgEl.value);
   }
+}
+
+/**
+ * A photo turned a quarter or three is wider than tall where its file is taller than wide: the container takes the size
+ * of the turned picture within the same limits as an upright one (the modal's width, `.modal-photo`'s 60vh, never
+ * enlarged), and the image the size of its file at that scale, which the zoom then shows turned in the container.
+ */
+function sizeSideways() {
+  const img = imgEl.value;
+  const container = photoContainerEl.value;
+  const room = container?.parentElement?.clientWidth ?? 0;
+  if (!img || !container || !img.naturalWidth || !img.naturalHeight || room <= 0) return;
+  const scale = Math.min(
+    1,
+    room / img.naturalHeight,
+    (window.innerHeight * 0.6) / img.naturalWidth,
+  );
+  img.style.maxWidth = 'none';
+  img.style.maxHeight = 'none';
+  img.style.width = `${img.naturalWidth * scale}px`;
+  img.style.height = `${img.naturalHeight * scale}px`;
+  container.style.width = `${img.naturalHeight * scale}px`;
+  container.style.height = `${img.naturalWidth * scale}px`;
+  zoom?.reset();
 }
 
 // The photo block only exists while the photo is solved (v-if), so wire zoom up
@@ -203,7 +238,7 @@ function onImageClick(e: MouseEvent) {
   const relX = (e.clientX - rect.left) / rect.width;
   const relY = (e.clientY - rect.top) / rect.height;
   if (!(relX >= 0 && relX <= 1 && relY >= 0 && relY <= 1)) return;
-  emit('photo-click', { x: relX * props.photo.width, y: relY * props.photo.height });
+  emit('photo-click', { x: relX * shown.value.width, y: relY * shown.value.height });
 }
 
 /**
@@ -218,8 +253,8 @@ function toDisplay(px: { x: number; y: number }): { left: number; top: number } 
   if (imgRect.width <= 0) return null;
   const containerRect = photoContainerEl.value.getBoundingClientRect();
   return {
-    left: imgRect.left - containerRect.left + (px.x / props.photo.width) * imgRect.width,
-    top: imgRect.top - containerRect.top + (px.y / props.photo.height) * imgRect.height,
+    left: imgRect.left - containerRect.left + (px.x / shown.value.width) * imgRect.width,
+    top: imgRect.top - containerRect.top + (px.y / shown.value.height) * imgRect.height,
   };
 }
 </script>

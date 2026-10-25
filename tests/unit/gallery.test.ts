@@ -316,7 +316,7 @@ describe('Gallery', () => {
     });
 
     it('turns the photo right, tells the app and opens the detail again on the turned photo', async () => {
-      const turned = makePhoto({ id: 'd', filename: 'd-2.jpg', width: 300, height: 400 });
+      const turned = makePhoto({ id: 'd', filename: 'd.jpg', quarterTurns: 1 });
       rotatePhotoAPI.mockResolvedValue(turned);
       const { rotate, gallery } = openDetail({ manualPlacement: placement });
       const told = vi.fn();
@@ -324,13 +324,15 @@ describe('Gallery', () => {
       rotate.click();
       await vi.waitFor(() => expect(told).toHaveBeenCalledWith(turned));
       expect(rotatePhotoAPI).toHaveBeenCalledWith('d');
+      // the same picture, shown turned
       await vi.waitFor(() =>
         expect(
-          (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).getAttribute(
-            'src',
-          ),
-        ).toContain('d-2.jpg'),
+          (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).style.transform,
+        ).toContain('rotate(90deg)'),
       );
+      expect(
+        (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).getAttribute('src'),
+      ).toContain('d.jpg');
       expect(document.querySelectorAll('.gallery-cinematic-overlay')).toHaveLength(1);
     });
 
@@ -863,6 +865,21 @@ describe('Gallery', () => {
     expect(img).toBeTruthy();
     expect(img.getAttribute('src')).toBeNull();
     expect(img.dataset.src).toBe('/uploads/a.jpg');
+  });
+
+  it('crops a turned photo in a frame of the card, turned', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', filename: 'a.jpg', originalName: 'M42', quarterTurns: 3 }),
+      makePhoto({ id: 'b', filename: 'b.jpg', originalName: 'M31' }),
+    ]);
+    const imgs = [...document.querySelectorAll<HTMLImageElement>('.gallery-item img')];
+    const turned = imgs.find((i) => i.dataset.src === '/uploads/a.jpg')!;
+    const upright = imgs.find((i) => i.dataset.src === '/uploads/b.jpg')!;
+    expect(turned.parentElement!.classList.contains('photo-turn-frame')).toBe(true);
+    expect(turned.classList.contains('rotate-270')).toBe(true);
+    expect(turned.classList.contains('photo-turn-picture--sideways')).toBe(true);
+    expect(upright.parentElement!.classList.contains('gallery-item')).toBe(true);
   });
 
   it('images start with visibility hidden until loaded', () => {
