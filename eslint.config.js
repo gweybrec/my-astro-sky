@@ -27,10 +27,9 @@ const noReexport = {
     "Do not add a shim that re-exports an @myastrosky/* module: import '@myastrosky/<package>/<path>' directly.",
 };
 
-const REEXPORT_EXEMPT = [
+export const REEXPORT_EXEMPT = [
   'src/density-slider.ts',
   'src/dso-catalog.ts',
-  'src/frame-controller.ts',
   'src/star-catalog.ts',
   'src/i18n/index.ts',
   'server/wcs-reader.ts',

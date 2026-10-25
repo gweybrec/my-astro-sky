@@ -1,36 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
-import { filterTargetDSOs, sortCustomFirst } from '../../src/targets-view';
-import type { DSOFilterOptions } from '../../src/targets-view';
+import { describe, it, expect } from 'vitest';
+import { filterTargetDSOs, type DSOFilterOptions } from '@myastrosky/core/targets/filters';
+import { sortCustomFirst } from '@myastrosky/core/gear-sort';
 import type { DSO } from '@myastrosky/core/types';
-
-vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
-
-// targets-view imports api.ts (getPhotos/createCustomGear/deleteCustomGear) — stub it out
-vi.mock('../../src/api', () => ({
-  getPhotos: vi.fn(),
-  createCustomGear: vi.fn(),
-  deleteCustomGear: vi.fn(),
-}));
-
-// gear-catalog and star-catalog are used in TargetsView but not in filterTargetDSOs
-vi.mock('@myastrosky/core/gear-catalog', () => ({
-  getTelescopes: vi.fn(),
-  getCameras: vi.fn(),
-  getAccessories: vi.fn(),
-  buildGearPreset: vi.fn(),
-  invalidateGearCache: vi.fn(),
-  telescopeLabel: vi.fn(),
-  cameraLabel: vi.fn(),
-  accessoryLabel: vi.fn(),
-}));
-vi.mock('../../src/star-catalog', () => ({ getConstellationInfos: vi.fn() }));
-vi.mock('@myastrosky/core/target-recommender', () => ({ recommendTargets: vi.fn() }));
-vi.mock('@myastrosky/core/imaging-recipe', () => ({ recommendRecipe: vi.fn() }));
-vi.mock('../../src/tooltip-utils', () => ({
-  showKeyValueTooltip: vi.fn(),
-  showTextTooltip: vi.fn(),
-}));
-vi.mock('../../src/chip-utils', () => ({ createTargetsChip: vi.fn(), createFilterBadge: vi.fn() }));
 
 function makeDSO(overrides: Partial<DSO> & { id: string }): DSO {
   return {

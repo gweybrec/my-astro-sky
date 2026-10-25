@@ -257,5 +257,3 @@ export function createTargetsChip(
   chip.appendChild(text);
   return chip;
 }
-
-export { filterCssKey };

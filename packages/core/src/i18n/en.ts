@@ -723,7 +723,6 @@ const en: Translations = {
     loadGearSetups: 'Failed to load gear setups',
     createGearSetup: 'Failed to create gear setup',
     updateGearSetup: 'Failed to update gear setup',
-    updateGearSetupEnabled: 'Failed to update gear setup enabled state',
     deleteGearSetup: 'Failed to delete gear setup',
     deleteAllGearSetups: 'Failed to delete all gear setups',
     loadPoiCategories: 'Failed to load POI categories',

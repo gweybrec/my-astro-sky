@@ -730,7 +730,6 @@ const fr = {
     loadGearSetups: 'Impossible de charger les setups.',
     createGearSetup: 'Impossible de créer le setup.',
     updateGearSetup: 'Impossible de modifier le setup.',
-    updateGearSetupEnabled: "Impossible d'activer ou de désactiver le setup.",
     deleteGearSetup: 'Impossible de supprimer le setup.',
     deleteAllGearSetups: 'Impossible de supprimer tous les setups.',
     loadPoiCategories: "Impossible de charger les types de points d'intérêt.",

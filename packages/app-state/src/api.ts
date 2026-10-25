@@ -565,12 +565,6 @@ export async function updateGearSetup(id: string, data: Omit<GearSetupData, 'id'
   return guard('errors.updateGearSetup', () => getBackend().gear.replaceSetup(id, data));
 }
 
-export async function patchGearSetupEnabled(id: string, enabled: boolean): Promise<void> {
-  return guard('errors.updateGearSetupEnabled', () =>
-    getBackend().gear.setSetupEnabled(id, enabled),
-  );
-}
-
 export async function deleteGearSetupAPI(id: string): Promise<void> {
   return guard('errors.deleteGearSetup', () => getBackend().gear.removeSetup(id));
 }

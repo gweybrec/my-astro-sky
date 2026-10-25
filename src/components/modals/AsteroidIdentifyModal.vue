@@ -174,7 +174,7 @@ import { t } from '../../i18n';
 import { asteroidSearchPlan, rankAsteroids } from '@myastrosky/core/photo-identify';
 import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import { skybotConesearchAPI } from '../../api';
-import { buildPageList } from '../../targets-view';
+import { buildPageList } from '@myastrosky/core/targets/sorting';
 import {
   formatCandidateName,
   formatAsteroidClass,

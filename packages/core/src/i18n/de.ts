@@ -730,7 +730,6 @@ const de: Translations = {
     loadGearSetups: 'Die Setups konnten nicht geladen werden.',
     createGearSetup: 'Das Setup konnte nicht erstellt werden.',
     updateGearSetup: 'Das Setup konnte nicht geändert werden.',
-    updateGearSetupEnabled: 'Das Setup konnte nicht aktiviert oder deaktiviert werden.',
     deleteGearSetup: 'Das Setup konnte nicht gelöscht werden.',
     deleteAllGearSetups: 'Die Setups konnten nicht alle gelöscht werden.',
     loadPoiCategories: 'Die Typen interessanter Objekte konnten nicht geladen werden.',

@@ -115,11 +115,7 @@ import {
   type SortKey,
   type TargetsPrefs,
 } from '@myastrosky/core/targets/prefs';
-import {
-  ALL_DSO_TYPES,
-  filterTargetDSOs,
-  type DSOFilterOptions,
-} from '@myastrosky/core/targets/filters';
+import { ALL_DSO_TYPES } from '@myastrosky/core/targets/filters';
 import {
   formatArcmin,
   formatTime,
@@ -155,10 +151,6 @@ import {
 } from '@myastrosky/core/targets/plan-setup';
 import { runTargetRecommendation } from '@myastrosky/core/targets/recommend';
 
-// These stay importable from here: the unit tests and other desktop modules take them from this module.
-export { filterTargetDSOs, snapToObservationTime, NIGHT_TIME_OPTIONS, buildPageList };
-export type { DSOFilterOptions };
-
 /**
  * Tiny SVG of the Moon for one of the 8 standard phases (index 0 = new …
  * 4 = full … 7 = waning crescent). The illuminated portion is built from a
@@ -189,8 +181,6 @@ function moonPhaseIconSvg(phaseIndex: number): string {
     `<g${flip}>${lit}</g></svg>`
   );
 }
-
-export { sortCustomFirst };
 
 // ─── DSO type labels ──────────────────────────────────────────────────────────
 

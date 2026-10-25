@@ -732,7 +732,6 @@ const es: Translations = {
     loadGearSetups: 'No se pudieron cargar los setups.',
     createGearSetup: 'No se pudo crear el setup.',
     updateGearSetup: 'No se pudo modificar el setup.',
-    updateGearSetupEnabled: 'No se pudo activar o desactivar el setup.',
     deleteGearSetup: 'No se pudo eliminar el setup.',
     deleteAllGearSetups: 'No se pudieron eliminar todos los setups.',
     loadPoiCategories: 'No se pudieron cargar los tipos de puntos de interés.',
