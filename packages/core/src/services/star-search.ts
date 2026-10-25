@@ -91,11 +91,20 @@ function clampLimit(limit: number | undefined, fallback: number, max: number): n
 export function createStarSearchService(deps: StarSearchServiceDeps): StarSearchService {
   let loaded: Promise<{ stars: readonly DeepStar[]; byHip: Map<number, DeepStar> }> | null = null;
 
-  /** Loads and indexes the catalogue once, even when several calls arrive together. */
+  /**
+   * Loads and indexes the catalogue once, even when several calls arrive together.
+   * A failed load is forgotten, so the next call tries again.
+   */
   function catalog() {
-    loaded ??= Promise.resolve(typeof deps.stars === 'function' ? deps.stars() : deps.stars).then(
-      (stars) => ({ stars, byHip: new Map(stars.map((s) => [s.hip, s])) }),
-    );
+    if (!loaded) {
+      const attempt = Promise.resolve()
+        .then(() => (typeof deps.stars === 'function' ? deps.stars() : deps.stars))
+        .then((stars) => ({ stars, byHip: new Map(stars.map((s) => [s.hip, s])) }));
+      loaded = attempt;
+      attempt.catch(() => {
+        if (loaded === attempt) loaded = null;
+      });
+    }
     return loaded;
   }
 

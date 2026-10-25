@@ -177,4 +177,27 @@ describe('catalogue source', () => {
     const sync = createStarSearchService({ stars: () => STARS });
     expect((await sync.getByHip(FAR)).hip).toBe(FAR);
   });
+
+  it('loads the catalogue again on the next call after a failed load', async () => {
+    const loader = vi
+      .fn<() => Promise<DeepStar[]>>()
+      .mockRejectedValueOnce(new Error('disk read failed'))
+      .mockResolvedValue(STARS);
+    const s = createStarSearchService({ stars: loader });
+    await expect(s.search('vega')).rejects.toThrow('disk read failed');
+    expect((await s.getByHip(VEGA)).hip).toBe(VEGA);
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads again after a loader that throws instead of rejecting', async () => {
+    let calls = 0;
+    const s = createStarSearchService({
+      stars: () => {
+        if (calls++ === 0) throw new Error('file missing');
+        return STARS;
+      },
+    });
+    await expect(s.nearby({ ra: 0, dec: 0, radius: 1 })).rejects.toThrow('file missing');
+    expect((await s.getByHip(VEGA)).hip).toBe(VEGA);
+  });
 });
