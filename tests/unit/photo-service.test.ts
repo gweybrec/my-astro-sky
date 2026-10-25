@@ -1037,6 +1037,19 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
     it('is PHOTO_NOT_FOUND for an unknown photo', async () => {
       expect((await rejection(svc.rotateRight('nope'))).kind).toBe('notFound');
     });
+
+    it('makes a fixed number of round trips whatever the number of correspondences', async () => {
+      for (const [id, n] of [
+        ['few', 2],
+        ['many', 80],
+      ] as const) {
+        await svc.insert(newPhoto(id, { correspondences: corr(n) }));
+        await blobs.put(`${id}.jpg`, new Uint8Array([1, 2, 3]));
+      }
+      // the photo and its correspondences read, the one batch, the turned photo read back
+      expect(await calls(() => svc.rotateRight('few'))).toBe(5);
+      expect(await calls(() => svc.rotateRight('many'))).toBe(5);
+    });
   });
 
   describe('upload, list with sizes and delete (WP2.3h)', () => {

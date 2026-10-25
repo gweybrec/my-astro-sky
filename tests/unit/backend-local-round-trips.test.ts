@@ -75,6 +75,20 @@ describe('database round trips of the local backend', () => {
     expect(counts['photos.upload']).toBeLessThanOrEqual(LIMIT);
   });
 
+  it('turning one photo', async () => {
+    const { backend, fixtures, counter } = await setup();
+    const photo = await backend.photos.upload(fixtures.jpeg(), {
+      correspondences: JSON.stringify([
+        { pointIndex: 0, photoX: 1, photoY: 2, starHip: 32349, starName: 'Sirius' },
+        { pointIndex: 1, photoX: 20, photoY: 15, starHip: 27989, starName: '' },
+      ]),
+    });
+    counter.reset();
+    await backend.photos.rotateRight(photo.id);
+    counts['photos.rotateRight'] = counter.calls();
+    expect(counts['photos.rotateRight']).toBeLessThanOrEqual(LIMIT);
+  });
+
   it('restoring a backup of 3 plans and 2 photos', async () => {
     const source = await setup();
     for (const name of ['A', 'B', 'C']) await source.backend.plans.create({ name });

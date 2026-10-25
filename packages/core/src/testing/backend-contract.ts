@@ -637,6 +637,56 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     expectEqual(await b.photos.listWithSizes(), [], 'every photo removed');
   });
 
+  add('photos: turning a photo a quarter to the right', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    const { id } = await b.photos.upload(fixtures.jpeg(), {
+      correspondences: JSON.stringify(CORRESPONDENCES),
+    });
+    const placement = {
+      centerRa: 10.5,
+      centerDec: -20.25,
+      rotationDeg: 33,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    await b.photos.setManualPlacement(id, placement);
+
+    const turned = await b.photos.rotateRight(id);
+    expectEqual([turned.width, turned.height], [48, 64], 'the size swapped');
+    // (x, y) of the 64 x 48 picture becomes (48 - y, x)
+    expectEqual(
+      turned.correspondences,
+      [
+        { ...CORRESPONDENCES[0], photoX: 46, photoY: 1 },
+        { ...CORRESPONDENCES[1], photoX: 33, photoY: 20 },
+      ],
+      'the correspondences turned with the picture',
+    );
+    expectEqual(
+      turned.manualPlacement,
+      { ...placement, rotationDeg: -57 },
+      'the manual placement turned back, so the photo keeps its place on the sky',
+    );
+    expectTrue(
+      turned.filename !== `${id}.jpg` &&
+        turned.filename.startsWith(id) &&
+        turned.filename.endsWith('.jpg'),
+      'the turned picture is saved under a new name of the same format',
+    );
+    expectEqual(
+      turned.thumbFilename,
+      turned.filename.replace(/\.jpg$/, '_thumb.jpg'),
+      'the thumbnail follows the new name',
+    );
+    const [listed] = await b.photos.listWithSizes();
+    const { fileSize, ...rest } = listed;
+    expectTrue(typeof fileSize === 'number' && fileSize > 0, 'the turned picture is stored');
+    expectEqual(stable(rest as Photo), stable(turned), 'the listed photo is the turned one');
+
+    expectEqual(await b.photos.removeAll(), 1, 'the turned photo removed');
+  });
+
   add('files: an address for a stored file and for the star catalogue', async () => {
     const { backend: b } = await makeBackend();
     const url = b.files.url('abc_thumb.jpg');
@@ -991,6 +1041,12 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       'notFound',
       'PHOTO_NOT_FOUND',
       'an unknown photo',
+    );
+    await expectDomainError(
+      b.photos.rotateRight('no-such-photo'),
+      'notFound',
+      'PHOTO_NOT_FOUND',
+      'turning an unknown photo',
     );
     await expectDomainError(
       b.stars.getByHip(99999999),

@@ -297,9 +297,10 @@ photosRouter.patch('/api/photos/:id/manual-placement', async (req, res) => {
  *   post:
  *     summary: Turn a photo a quarter to the right
  *     description: >
- *       Saves the photo's picture again turned 90° clockwise (same file and format), makes its thumbnail again,
- *       and turns what is measured in its pixels (size, star correspondences, manual placement) so that it keeps
- *       its place on the sky.
+ *       Saves the photo's picture turned 90° clockwise in the same format, under a new file name so that no
+ *       cache shows the old picture, makes its thumbnail again, deletes the old picture and thumbnail, and turns
+ *       what is measured in its pixels (size, star correspondences, manual placement) so that it keeps its place
+ *       on the sky.
  *     parameters:
  *       - in: path
  *         name: id
