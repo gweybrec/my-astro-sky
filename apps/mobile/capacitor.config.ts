@@ -7,10 +7,6 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
-  android: {
-    // Lets chrome://inspect attach to the WebView; the Gradle debug build only (release builds ignore it).
-    webContentsDebuggingEnabled: true,
-  },
   plugins: {
     // The frame reads the system bars through env(safe-area-inset-*), never through the --safe-area-inset-* variables
     // that Capacitor's default 'css' mode injects (it logged "Error injecting safe area CSS" at every start, before the
