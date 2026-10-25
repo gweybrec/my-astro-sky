@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
 vi.mock('@myastrosky/app-state/api', () => ({
@@ -101,6 +101,17 @@ import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { framePointToSky, tileCenters } from '@myastrosky/core/mosaic';
 import { reportError } from '@myastrosky/core/platform/error-hook';
+import { updatePlanMosaicAPI } from '@myastrosky/app-state/api';
+
+// A mosaic's tiles are written 250 ms after the last change. Fake the timer and send any
+// write still waiting at the end of each test, so none fires after the file is done.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+});
+afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
+});
 
 describe('fov-frames store', () => {
   beforeEach(() => {
@@ -716,6 +727,24 @@ describe('fov-frames store', () => {
     expect(
       tiles.some((t: any) => Math.abs(t.ra - 83.8) < 1e-9 && Math.abs(t.dec + 5.4) < 1e-9),
     ).toBe(true);
+  });
+
+  it('writes a re-tiled plan mosaic once, 250 ms after the last change', async () => {
+    const store = await withSpecs();
+    withMosaicPlan(store);
+    vi.mocked(updatePlanMosaicAPI).mockClear();
+    store.setMosaicGrid('mo1', 3, 1);
+    store.setMosaicGrid('mo1', 2, 2);
+    vi.advanceTimersByTime(249);
+    expect(updatePlanMosaicAPI).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(updatePlanMosaicAPI).toHaveBeenCalledTimes(1);
+    expect(updatePlanMosaicAPI).toHaveBeenCalledWith(
+      'p1',
+      'mo1',
+      expect.objectContaining({ cols: 2, rows: 2, tiles: expect.any(Array) }),
+    );
+    expect(vi.mocked(updatePlanMosaicAPI).mock.calls[0][2].tiles).toHaveLength(4);
   });
 
   it('setMosaicGrid re-tiles a free mosaic and keeps at least one row and column', async () => {
