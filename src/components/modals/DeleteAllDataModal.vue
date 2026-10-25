@@ -10,10 +10,13 @@
           <div class="import-backup-warning">⚠ {{ t('settings.deleteBackupWarning') }}</div>
           <button
             class="display-controls-btn self-start text-small"
+            :class="{ 'btn-busy': backingUp }"
+            :aria-busy="backingUp || undefined"
             :disabled="!hasPhotos || backingUp"
             @click="doBackup"
           >
-            {{ t('settings.importBackupBtn') }}
+            <span v-if="backingUp" class="auto-solve-spinner" aria-hidden="true"></span
+            >{{ t('settings.importBackupBtn') }}
           </button>
         </div>
 

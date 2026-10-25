@@ -234,3 +234,41 @@ describe('ImportModal failed items', () => {
     expect(toasts().map((o) => o.message)).toEqual(['settings.importSuccess']);
   });
 });
+
+describe('ImportModal busy buttons', () => {
+  it('shows a spinner beside the label while the chosen file is read', async () => {
+    let answer!: (v: unknown) => void;
+    api.importPreview.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    api.getPhotos.mockResolvedValue([]);
+    const w = mount(ImportModal);
+    const input = w.find('input[type="file"]');
+    Object.defineProperty(input.element, 'files', {
+      value: [new File(['zip'], 'backup.zip')],
+      configurable: true,
+    });
+    await input.trigger('change');
+    const label = w.find('label.display-controls-btn');
+    expect(label.classes()).toContain('btn-busy');
+    expect(label.find('.auto-solve-spinner').exists()).toBe(true);
+    expect(label.text()).toBe('settings.importChooseFile');
+    answer(PREVIEW);
+    await flushPromises();
+    expect(w.find('.auto-solve-spinner').exists()).toBe(false);
+  });
+
+  it('shows a spinner on the restore button while the backup is restored, then removes it', async () => {
+    const w = await openDialog();
+    let answer!: (v: unknown) => void;
+    api.importData.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    await radioFor(w, 'Diff rig', 'replace').setValue(true);
+    await confirmButton(w).trigger('click');
+    const button = confirmButton(w);
+    expect(button.classes()).toContain('btn-busy');
+    expect(button.attributes('aria-busy')).toBe('true');
+    expect(button.find('.auto-solve-spinner').exists()).toBe(true);
+    expect(button.text()).toBe('settings.importData');
+    answer({ imported: 1, skipped: 0 });
+    await flushPromises();
+    expect(w.find('.auto-solve-spinner').exists()).toBe(false);
+  });
+});

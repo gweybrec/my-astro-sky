@@ -12,8 +12,13 @@
 
       <!-- Phase 1: pick a file -->
       <div v-if="phase === 'pick'" class="modal-body modal-form-body--loose">
-        <label class="display-controls-btn self-start">
-          {{ previewBusy ? '…' : t('settings.importChooseFile') }}
+        <label
+          class="display-controls-btn self-start"
+          :class="{ 'btn-busy': previewBusy }"
+          :aria-busy="previewBusy || undefined"
+        >
+          <span v-if="previewBusy" class="auto-solve-spinner" aria-hidden="true"></span
+          >{{ t('settings.importChooseFile') }}
           <input
             type="file"
             accept=".zip,.json"
@@ -26,10 +31,13 @@
           <div class="import-backup-warning">⚠ {{ t('settings.importBackupWarning') }}</div>
           <button
             class="display-controls-btn self-start text-small"
+            :class="{ 'btn-busy': backingUp }"
+            :aria-busy="backingUp || undefined"
             :disabled="!hasPhotos || backingUp"
             @click="doBackup"
           >
-            {{ t('settings.importBackupBtn') }}
+            <span v-if="backingUp" class="auto-solve-spinner" aria-hidden="true"></span
+            >{{ t('settings.importBackupBtn') }}
           </button>
         </div>
       </div>
@@ -279,10 +287,13 @@
         <button
           v-if="phase === 'options'"
           class="btn-confirm"
+          :class="{ 'btn-busy': importBusy }"
+          :aria-busy="importBusy || undefined"
           :disabled="!canImport || setupChoiceMissing || importBusy"
           @click="onImport"
         >
-          {{ importBusy ? '…' : t('settings.importData') }}
+          <span v-if="importBusy" class="auto-solve-spinner" aria-hidden="true"></span
+          >{{ t('settings.importData') }}
         </button>
       </div>
     </div>

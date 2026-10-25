@@ -70,8 +70,15 @@
         <button class="btn-cancel" :disabled="busy" @click="onClose">
           {{ t('modal.cancel') }}
         </button>
-        <button class="btn-confirm" :disabled="!canExport || busy" @click="onExport">
-          {{ busy ? '…' : t('settings.exportConfirm') }}
+        <button
+          class="btn-confirm"
+          :class="{ 'btn-busy': busy }"
+          :aria-busy="busy || undefined"
+          :disabled="!canExport || busy"
+          @click="onExport"
+        >
+          <span v-if="busy" class="auto-solve-spinner" aria-hidden="true"></span
+          >{{ t('settings.exportConfirm') }}
         </button>
       </div>
     </div>
