@@ -5,9 +5,11 @@
  */
 import type { Backend, CancelSignal, FileSource } from '@myastrosky/core/backend';
 import { backupFileName } from '@myastrosky/core/domain/backup';
+import { DomainError } from '@myastrosky/core/domain/errors';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { BackupFile } from '@myastrosky/core/services/backup';
 import type { Services } from '@myastrosky/core/services/create-services';
+import type { RangeSource } from './bundle-fflate';
 
 export interface LocalBackendDeps {
   /** What `createServices` returns, built on the phone's database, blob store and image codec. */
@@ -16,8 +18,11 @@ export interface LocalBackendDeps {
   files: { url(fileName: string): string };
   /** The address of the star catalogue file. */
   starCatalogUrl: string;
-  /** Opens a ZIP archive held in memory. */
-  openZip(bytes: Uint8Array): Promise<BundleReader>;
+  /** Opens a ZIP archive read by pieces. */
+  openZip(source: RangeSource): Promise<BundleReader>;
+  /** The largest file read whole (a `.json` backup, or a file that cannot be read by pieces); larger is
+   *  refused with `BACKUP_TOO_LARGE` before it is read. No limit when absent. */
+  maxWholeFileBytes?: number;
   /** Builds a ZIP archive in memory. */
   newZip(): { writer: BundleWriter; finish(): Promise<Uint8Array> };
   /** Hands a file to the user (the share sheet on the phone). */
@@ -33,12 +38,27 @@ function throwIfCancelled(cancel: CancelSignal | undefined): void {
 }
 
 export function createLocalBackend(deps: LocalBackendDeps): Backend {
-  const { services, files, starCatalogUrl, openZip, newZip, saveFile, now } = deps;
+  const { services, files, starCatalogUrl, openZip, newZip, saveFile, now, maxWholeFileBytes } =
+    deps;
 
-  const backupFileOf = async (file: FileSource): Promise<BackupFile> => {
-    const bytes = await file.read();
-    return { name: file.name, bytes, openZip: () => openZip(bytes) };
+  const readWhole = async (file: FileSource) => {
+    if (maxWholeFileBytes !== undefined && file.size > maxWholeFileBytes) {
+      throw new DomainError('invalid', 'Backup too large', { code: 'BACKUP_TOO_LARGE' });
+    }
+    return file.read();
   };
+  // A ZIP is read by pieces when the file can be; otherwise it is read whole, once.
+  const rangesOf = async (file: FileSource): Promise<RangeSource> => {
+    const { readRange } = file;
+    if (readRange) return { size: file.size, read: (start, end) => readRange(start, end) };
+    const bytes = await readWhole(file);
+    return { size: bytes.byteLength, read: async (start, end) => bytes.subarray(start, end) };
+  };
+  const backupFileOf = (file: FileSource): BackupFile => ({
+    name: file.name,
+    read: () => readWhole(file),
+    openZip: async () => openZip(await rangesOf(file)),
+  });
   const solvedFileOf = async (file: FileSource) => ({
     fileName: file.name,
     bytes: await file.read(),
@@ -101,10 +121,10 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
         await saveFile(backupFileName(now()), await zip.finish());
       },
       async preview(file) {
-        return services.backup.previewFile(await backupFileOf(file));
+        return services.backup.previewFile(backupFileOf(file));
       },
       async restore(file, options) {
-        return services.backup.importFile(await backupFileOf(file), options);
+        return services.backup.importFile(backupFileOf(file), options);
       },
     },
   };

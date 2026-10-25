@@ -53,7 +53,8 @@ export interface BackupServiceDeps {
 export interface BackupFile {
   /** The file's name; its extension (`.zip` or `.json`) says what it is. */
   name: string;
-  bytes: Uint8Array;
+  /** The whole file; read only for a `.json` file. */
+  read(): Promise<Uint8Array>;
   /** Opens the file as a ZIP archive. Called at most once, and only for a `.zip` file. */
   openZip(): Promise<BundleReader>;
 }
@@ -650,7 +651,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const extension = extensionOf(file.name);
       if (extension === '.zip') return service.preview(await file.openZip());
       if (extension === '.json')
-        return service.previewPhotoList(JSON.parse(decodeUtf8(file.bytes)));
+        return service.previewPhotoList(JSON.parse(decodeUtf8(await file.read())));
       throw unsupportedFormat();
     },
 
@@ -658,7 +659,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const extension = extensionOf(file.name);
       if (extension === '.zip') return service.importFrom(await file.openZip(), selection);
       if (extension === '.json') {
-        return service.importPhotoList(JSON.parse(decodeUtf8(file.bytes)), selection);
+        return service.importPhotoList(JSON.parse(decodeUtf8(await file.read())), selection);
       }
       throw unsupportedFormat();
     },

@@ -7,7 +7,7 @@ import type { Backend } from '@myastrosky/core/backend';
 import { initSchema } from '@myastrosky/core/db/schema';
 import type { ImageCodec } from '@myastrosky/core/ports/image-codec';
 import { createServices } from '@myastrosky/core/services/create-services';
-import { newZipBundle, openZipBundle } from './bundle-fflate';
+import { newZipBundle, openZipRanges } from './bundle-fflate';
 import { createBrowserImageCodec } from './browser-image-codec';
 import { createBundledCatalogs } from './bundled-catalogs';
 import {
@@ -25,8 +25,8 @@ import {
   type WebCryptoLike,
 } from './webcrypto-secret-codec';
 
-/** The largest backup the phone opens: an archive is held in memory. */
-export const MAX_ARCHIVE_BYTES = 300 * 1024 * 1024;
+/** The largest file the phone reads whole (a `.json` backup); a ZIP backup is read by pieces, with no limit. */
+export const MAX_WHOLE_FILE_BYTES = 300 * 1024 * 1024;
 
 /** The method of `@capacitor/share` that `saveFile` uses. */
 export interface CapacitorShare {
@@ -109,7 +109,8 @@ export async function createPhoneBackend(platform: PhonePlatform): Promise<Backe
     services,
     files: { url: (fileName) => blobs.url(fileName) },
     starCatalogUrl: `${baseUrl}/data/stars.14.json`,
-    openZip: (bytes) => openZipBundle(bytes, { maxArchiveBytes: MAX_ARCHIVE_BYTES }),
+    openZip: openZipRanges,
+    maxWholeFileBytes: MAX_WHOLE_FILE_BYTES,
     newZip: newZipBundle,
     // The share sheet takes a file address: write the file in the cache directory, then share it.
     saveFile: async (name, bytes) => {

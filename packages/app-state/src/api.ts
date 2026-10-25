@@ -135,6 +135,7 @@ function fileSource(file: File): FileSource {
     name: file.name,
     size: file.size,
     read: async () => new Uint8Array(await file.arrayBuffer()),
+    readRange: async (start, end) => new Uint8Array(await file.slice(start, end).arrayBuffer()),
     native: file,
   };
 }

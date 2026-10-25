@@ -34,6 +34,8 @@ export interface FileSource {
   name: string;
   size: number;
   read(): Promise<Uint8Array>;
+  /** Bytes `start` to `end` (excluded), without reading the rest: a large backup is read by pieces. */
+  readRange?(start: number, end: number): Promise<Uint8Array>;
   /** The platform's own handle on the same file (a browser `File`), when there is one.
    *  A backend that can send it as it is does so, and never calls `read()`. */
   native?: unknown;

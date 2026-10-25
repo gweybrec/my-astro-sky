@@ -639,7 +639,7 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       const file = {
         opened: 0,
         name,
-        bytes,
+        read: async () => bytes,
         async openZip() {
           file.opened++;
           if (!reader) throw new Error('not a zip');

@@ -24,7 +24,7 @@ function fail(res: express.Response, err: unknown): void {
 function backupFileOf(file: Express.Multer.File): BackupFile {
   return {
     name: file.originalname,
-    bytes: file.buffer,
+    read: async () => file.buffer,
     openZip: () => openZipBundle(file.buffer),
   };
 }
