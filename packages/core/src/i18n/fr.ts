@@ -811,6 +811,7 @@ const fr = {
     HTTP_ERROR: 'Le serveur a répondu par une erreur.',
     NETWORK_ERROR: 'Erreur réseau, vérifiez la connexion.',
     IDS_NOT_ARRAY: 'La liste des photos est invalide.',
+    INTERNAL_ERROR: "L'application a rencontré une erreur.",
     INVALID_DSO_DATA: "Les données de l'objet sont invalides.",
     INVALID_DSO_DEC: 'La déclinaison doit être comprise entre -90° et 90°.',
     INVALID_DSO_ID: "Identifiant d'objet invalide.",

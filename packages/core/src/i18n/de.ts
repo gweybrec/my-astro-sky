@@ -812,6 +812,7 @@ const de: Translations = {
     HTTP_ERROR: 'Der Server hat mit einem Fehler geantwortet.',
     NETWORK_ERROR: 'Netzwerkfehler, bitte die Verbindung prüfen.',
     IDS_NOT_ARRAY: 'Die Fotoliste ist ungültig.',
+    INTERNAL_ERROR: 'In der App ist ein Fehler aufgetreten.',
     INVALID_DSO_DATA: 'Die Objektdaten sind ungültig.',
     INVALID_DSO_DEC: 'Die Deklination muss zwischen -90° und 90° liegen.',
     INVALID_DSO_ID: 'Ungültige Objektkennung.',

@@ -804,6 +804,7 @@ const en: Translations = {
     HTTP_ERROR: 'The server answered with an error.',
     NETWORK_ERROR: 'Network error, check the connection.',
     IDS_NOT_ARRAY: 'The list of photos is invalid.',
+    INTERNAL_ERROR: 'Something went wrong in the app.',
     INVALID_DSO_DATA: 'The object data is invalid.',
     INVALID_DSO_DEC: 'The declination must be between -90° and 90°.',
     INVALID_DSO_ID: 'Invalid object identifier.',

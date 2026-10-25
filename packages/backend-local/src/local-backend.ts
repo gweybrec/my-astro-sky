@@ -6,6 +6,7 @@
 import type { Backend, CancelSignal, FileSource } from '@myastrosky/core/backend';
 import { backupFileName } from '@myastrosky/core/domain/backup';
 import { DomainError } from '@myastrosky/core/domain/errors';
+import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { BackupFile } from '@myastrosky/core/services/backup';
 import type { Services } from '@myastrosky/core/services/create-services';
@@ -37,6 +38,49 @@ function throwIfCancelled(cancel: CancelSignal | undefined): void {
   if (cancel?.aborted) throw aborted();
 }
 
+/**
+ * A failure that is neither a `DomainError` nor a cancel (a file that cannot be read, a decoder or network error) is
+ * what the server answers with a 500: on the HTTP backend it arrives as `upstream` with its message and a code the
+ * screen translates. Here it becomes the same, with `INTERNAL_ERROR`, so its English message never reaches a screen.
+ */
+function toDomainError(err: unknown): unknown {
+  if (err instanceof DomainError || (err as { name?: string } | null)?.name === 'AbortError') {
+    return err;
+  }
+  reportError('Local backend call failed', err);
+  return new DomainError('upstream', err instanceof Error ? err.message : String(err), {
+    code: 'INTERNAL_ERROR',
+  });
+}
+
+/** Every method of every member, with its failures passed through `toDomainError`; a synchronous one stays so. */
+function withDomainErrors(backend: Backend): Backend {
+  const wrapMember = (member: object): object =>
+    Object.fromEntries(
+      Object.entries(member).map(([name, value]) => [
+        name,
+        typeof value !== 'function'
+          ? value
+          : (...args: unknown[]) => {
+              let result: unknown;
+              try {
+                result = (value as (...a: unknown[]) => unknown).apply(member, args);
+              } catch (err) {
+                throw toDomainError(err);
+              }
+              return result instanceof Promise
+                ? result.catch((err: unknown) => {
+                    throw toDomainError(err);
+                  })
+                : result;
+            },
+      ]),
+    );
+  return Object.fromEntries(
+    Object.entries(backend).map(([name, member]) => [name, wrapMember(member as object)]),
+  ) as unknown as Backend;
+}
+
 export function createLocalBackend(deps: LocalBackendDeps): Backend {
   const { services, files, starCatalogUrl, openZip, newZip, saveFile, now, maxWholeFileBytes } =
     deps;
@@ -64,7 +108,7 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
     bytes: await file.read(),
   });
 
-  return {
+  return withDomainErrors({
     capabilities: { localSolvers: false },
     files,
     catalog: { starCatalogUrl: async () => starCatalogUrl },
@@ -127,5 +171,5 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
         return services.backup.importFile(backupFileOf(file), options);
       },
     },
-  };
+  });
 }

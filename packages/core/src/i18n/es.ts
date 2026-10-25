@@ -814,6 +814,7 @@ const es: Translations = {
     HTTP_ERROR: 'El servidor respondió con un error.',
     NETWORK_ERROR: 'Error de red, comprueba la conexión.',
     IDS_NOT_ARRAY: 'La lista de fotos no es válida.',
+    INTERNAL_ERROR: 'La aplicación encontró un error.',
     INVALID_DSO_DATA: 'Los datos del objeto no son válidos.',
     INVALID_DSO_DEC: 'La declinación debe estar entre -90° y 90°.',
     INVALID_DSO_ID: 'Identificador de objeto no válido.',
