@@ -37,8 +37,8 @@ This workflow does **not** build or run Electron — it only validates that the 
 **Steps:**
 
 1. `npm ci` — install dependencies
-2. `npm test` — runs the full Vitest suite (`tests/unit/` + `tests/components/`)
-3. Coverage artifacts uploaded to GitHub (`coverage/`, retained 7 days)
+2. `npm run test:coverage` — runs the full Vitest suite (`tests/unit/`, `tests/components/`, `apps/mobile/tests/`) and measures coverage (what is counted is set in `vitest.config.ts`)
+3. Coverage report uploaded to GitHub (`coverage/`, retained 7 days), also when a test fails
 
 ---
 

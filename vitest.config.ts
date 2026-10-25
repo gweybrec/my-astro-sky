@@ -16,6 +16,8 @@ export default defineConfig({
     ],
     coverage: {
       provider: 'v8',
+      // CI uploads the report even when a test fails.
+      reportOnFailure: true,
       include: [
         'src/**/*.ts',
         'src/**/*.vue',
