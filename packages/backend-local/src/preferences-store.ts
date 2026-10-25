@@ -19,10 +19,12 @@ export async function createPreferencesStore(
 ): Promise<KeyValueStore> {
   const memory = new Map<string, string>();
   const { keys } = await preferences.keys();
-  for (const key of keys) {
-    const { value } = await preferences.get({ key });
+  // The plugin has no call that reads every value: the reads are made together, so start-up waits for one of them.
+  const values = await Promise.all(keys.map((key) => preferences.get({ key })));
+  keys.forEach((key, i) => {
+    const { value } = values[i];
     if (value !== null) memory.set(key, value);
-  }
+  });
 
   // Writes run one after the other; a failed write is reported and does not stop the ones behind it.
   let queue: Promise<void> = Promise.resolve();

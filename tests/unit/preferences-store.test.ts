@@ -44,6 +44,22 @@ describe('createPreferencesStore', () => {
     expect(get.mock.calls.map(([{ key }]) => key).sort()).toEqual(['lang', 'other']);
   });
 
+  it('reads the stored values together, not one after the other', async () => {
+    const { plugin } = fakePlugin({ a: '1', b: '2', c: '3' });
+    let inFlight = 0;
+    let most = 0;
+    const get = plugin.get.bind(plugin);
+    plugin.get = async (options) => {
+      most = Math.max(most, ++inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return get(options);
+    };
+    const store = await createPreferencesStore(plugin);
+    expect(most).toBe(3);
+    expect(['a', 'b', 'c'].map((k) => store.get(k))).toEqual(['1', '2', '3']);
+  });
+
   it('set and remove show in memory at once and reach the plugin afterwards', async () => {
     const { plugin, data } = fakePlugin({ a: '1' });
     const store = await createPreferencesStore(plugin);

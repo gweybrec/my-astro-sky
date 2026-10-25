@@ -58,8 +58,19 @@ export interface GearService {
     item: { id: string; type: CustomGearType; data: object },
     replaceIds: readonly string[],
   ): Promise<void>;
+  /** Writes several custom items as `importCustom` does, in order, in one atomic batch. */
+  importCustomItems(
+    items: readonly {
+      item: { id: string; type: CustomGearType; data: object };
+      replaceIds: readonly string[];
+    }[],
+  ): Promise<void>;
   /** Writes a setup from a backup file, replacing the one with the same id. The setups in `replaceIds` are deleted first, in the same transaction. */
   importSetup(setup: GearSetupData, replaceIds: readonly string[]): Promise<void>;
+  /** Writes several setups as `importSetup` does, in order, in one atomic batch. */
+  importSetups(
+    items: readonly { setup: GearSetupData; replaceIds: readonly string[] }[],
+  ): Promise<void>;
 }
 
 interface CustomGearRow {
@@ -132,6 +143,41 @@ export function createGearService(deps: GearServiceDeps): GearService {
   const { db, newId, catalog } = deps;
 
   const allCustom = (): Promise<CustomGearRow[]> => db.all<CustomGearRow>(SELECT_CUSTOM);
+
+  const importCustomItems: GearService['importCustomItems'] = async (items) => {
+    if (items.length === 0) return;
+    // One atomic batch: for each item, the items it replaces are deleted, then it is written.
+    await db.batch(
+      items.flatMap(({ item, replaceIds }) => [
+        ...replaceIds.map((id) => ({ sql: DELETE_CUSTOM, params: [id] })),
+        {
+          sql: UPSERT_CUSTOM,
+          params: [item.id, item.type, JSON.stringify({ ...item.data, id: item.id })],
+        },
+      ]),
+    );
+  };
+
+  const importSetups: GearService['importSetups'] = async (items) => {
+    if (items.length === 0) return;
+    // One atomic batch: for each setup, the setups it replaces are deleted, then it is written.
+    await db.batch(
+      items.flatMap(({ setup, replaceIds }) => [
+        ...replaceIds.map((id) => ({ sql: DELETE_SETUP, params: [id] })),
+        {
+          sql: UPSERT_SETUP,
+          params: setupParams(
+            setup.id,
+            setup.name,
+            setup.telescopeId,
+            setup.cameraId,
+            setup.accessoryId,
+            setup.enabled,
+          ),
+        },
+      ]),
+    );
+  };
 
   return {
     async listCatalog(type) {
@@ -277,33 +323,9 @@ export function createGearService(deps: GearServiceDeps): GearService {
       });
     },
 
-    async importCustom(item, replaceIds) {
-      // One atomic batch: the replaced items are deleted, then the item is written.
-      await db.batch([
-        ...replaceIds.map((id) => ({ sql: DELETE_CUSTOM, params: [id] })),
-        {
-          sql: UPSERT_CUSTOM,
-          params: [item.id, item.type, JSON.stringify({ ...item.data, id: item.id })],
-        },
-      ]);
-    },
-
-    async importSetup(setup, replaceIds) {
-      // One atomic batch: the replaced setups are deleted, then the setup is written.
-      await db.batch([
-        ...replaceIds.map((id) => ({ sql: DELETE_SETUP, params: [id] })),
-        {
-          sql: UPSERT_SETUP,
-          params: setupParams(
-            setup.id,
-            setup.name,
-            setup.telescopeId,
-            setup.cameraId,
-            setup.accessoryId,
-            setup.enabled,
-          ),
-        },
-      ]);
-    },
+    importCustom: (item, replaceIds) => importCustomItems([{ item, replaceIds }]),
+    importCustomItems,
+    importSetup: (setup, replaceIds) => importSetups([{ setup, replaceIds }]),
+    importSetups,
   };
 }

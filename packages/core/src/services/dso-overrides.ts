@@ -22,6 +22,8 @@ export interface DsoOverrideService {
   removeAll(): Promise<number>;
   /** Writes an override without the checks of `upsert` (backup import has already filtered its entries). */
   importOne(id: string, data: object): Promise<void>;
+  /** Writes several overrides as `importOne` does, in one atomic batch. */
+  importMany(entries: readonly (readonly [id: string, data: object])[]): Promise<void>;
 }
 
 /**
@@ -45,11 +47,9 @@ export function validateDsoOverrideCoords(
 export function createDsoOverrideService(deps: DsoOverrideServiceDeps): DsoOverrideService {
   const { db } = deps;
 
+  const UPSERT = 'INSERT OR REPLACE INTO dso_overrides (id, data) VALUES (?, ?)';
   const write = async (id: string, data: object): Promise<void> => {
-    await db.run('INSERT OR REPLACE INTO dso_overrides (id, data) VALUES (?, ?)', [
-      id,
-      JSON.stringify(data),
-    ]);
+    await db.run(UPSERT, [id, JSON.stringify(data)]);
   };
 
   return {
@@ -93,5 +93,12 @@ export function createDsoOverrideService(deps: DsoOverrideServiceDeps): DsoOverr
     },
 
     importOne: write,
+
+    async importMany(entries) {
+      if (entries.length === 0) return;
+      await db.batch(
+        entries.map(([id, data]) => ({ sql: UPSERT, params: [id, JSON.stringify(data)] })),
+      );
+    },
   };
 }

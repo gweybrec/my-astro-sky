@@ -987,6 +987,56 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await ids()).toEqual(['a', 'imp']);
     });
 
+    it('importPhotos writes a list in order: an id taken here or earlier in the list is skipped under skip', async () => {
+      await svc.insert(newPhoto('a'));
+      const r = await svc.importPhotos([
+        { photo: backup({ id: 'a' }), strategy: 'skip', replaceIds: [] },
+        { photo: backup({ id: 'b' }), strategy: 'skip' },
+        { photo: backup({ id: 'b', notes: 'second' }), strategy: 'skip' },
+        { photo: backup({ id: 'b', notes: 'third' }), strategy: 'replace' },
+      ]);
+      expect(r).toEqual(['skipped', 'imported', 'skipped', 'imported']);
+      expect(await ids()).toEqual(['a', 'b']);
+      expect((await svc.get('b'))!.notes).toBe('third');
+      expect(await svc.importPhotos([])).toEqual([]);
+    });
+
+    it('importPhotos deletes the photos a written one replaces, and keeps those of a skipped one', async () => {
+      await svc.insert(newPhoto('a'));
+      await svc.insert(newPhoto('old1'));
+      await svc.insert(newPhoto('old2'));
+      const r = await svc.importPhotos([
+        { photo: backup({ id: 'a' }), strategy: 'skip', replaceIds: ['old1'] },
+        { photo: backup({ id: 'n' }), strategy: 'skip', replaceIds: ['old2'] },
+      ]);
+      expect(r).toEqual(['skipped', 'imported']);
+      expect(await ids()).toEqual(['a', 'old1', 'n']);
+    });
+
+    it('importPhotos writes nothing when one photo of the list is refused', async () => {
+      await expect(
+        svc.importPhotos([
+          { photo: backup({ id: 'ok' }), strategy: 'skip' },
+          {
+            photo: backup({ id: 'bad', correspondences: [corr(1)[0], corr(1)[0]] }),
+            strategy: 'skip',
+          },
+        ]),
+      ).rejects.toThrow();
+      expect(await ids()).toEqual([]);
+    });
+
+    it('importPhotos makes the same round trips for one photo or many', async () => {
+      const list = (n: number) =>
+        Array.from({ length: n }, (_, i) => ({
+          photo: backup({ id: `m${n}-${i}`, correspondences: corr(5) }),
+          strategy: 'skip' as const,
+        }));
+      // begin, the read of the ids, one batch, commit
+      expect(await calls(() => svc.importPhotos(list(1)))).toBe(4);
+      expect(await calls(() => svc.importPhotos(list(12)))).toBe(4);
+    });
+
     it('makes a fixed number of round trips whatever the number of correspondences', async () => {
       expect(
         await calls(() => svc.importPhoto(backup({ id: 'x1', correspondences: corr(2) }), 'skip')),
@@ -998,8 +1048,8 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         await calls(() =>
           svc.importPhoto(backup({ id: 'x3', correspondences: corr(80) }), 'replace'),
         ),
-      ).toBe(5);
-      // skipped: begin, the ignored insert, commit
+      ).toBe(4);
+      // skipped: begin, the read of the ids, commit
       expect(await calls(() => svc.importPhoto(backup({ id: 'x3' }), 'skip'))).toBe(3);
       // the photos it replaces go in the batch of the correspondences
       expect(

@@ -15,6 +15,7 @@ import {
 } from '@myastrosky/core/db/schema';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { applyDataMigrations } from '../../server/db-migrations';
+import { countingSqlDb } from '../helpers/counting-sql-db';
 
 type Conn = Database.Database;
 
@@ -164,7 +165,25 @@ describe('data migrations', () => {
     await expect(runDataMigrations(db, failing, 15)).rejects.toThrow();
     expect(version(conn)).toBe(15);
     expect(sqlText(conn)).toEqual(before);
+    // A later migration that fails undoes the earlier ones of the same run too.
+    const laterFails = [fake[0], ...failing.map((m) => ({ ...m, version: 17 }))];
+    await expect(runDataMigrations(db, laterFails, 15)).rejects.toThrow();
+    expect(version(conn)).toBe(15);
+    expect(sqlText(conn)).toEqual(before);
     conn.close();
+  });
+
+  it('creates a database and runs the pending migrations in a fixed number of round trips', async () => {
+    const counted = countingSqlDb(createBetterSqliteDb(new Database(':memory:')));
+    // pragma, schema_version table, version read, empty-database check, one batch
+    expect(await initSchema(counted)).toBe(SCHEMA_VERSION);
+    expect(counted.calls()).toBe(5);
+    counted.reset();
+    expect(await runDataMigrations(counted, fake, 15)).toBe(17);
+    expect(counted.calls()).toBe(1);
+    counted.reset();
+    expect(await runDataMigrations(counted, fake, 17)).toBe(17);
+    expect(counted.calls()).toBe(0);
   });
 
   it('the server loop gives the same schema as the initSchema loop', async () => {

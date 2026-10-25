@@ -521,6 +521,52 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(result.failed).toEqual([{ kind: 'photo', name: 'bad.jpg' }]);
       expect((await b.photos.list()).map((p) => p.id)).toEqual(['ok']);
     });
+
+    it('lists only the plan that fails when the plans are written together, and imports the others', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      const plan = (id: string, entryIds: string[]) => ({
+        id,
+        name: `Plan ${id}`,
+        entries: entryIds.map((e, i) => ({ id: e, dsoId: 'M31', position: i })),
+      });
+      const reader = memoryReader([
+        [
+          'plans.json',
+          JSON.stringify([plan('a', ['a1']), plan('bad', ['dup', 'dup']), plan('c', ['c1'])]),
+        ],
+      ]);
+      const result = await svc.importFrom(reader, {
+        ...everything,
+        selectedPlans: ['a', 'bad', 'c'],
+      });
+      expect(result.failed).toEqual([{ kind: 'plan', name: 'Plan bad' }]);
+      expect((await b.plans.list()).map((p) => p.id).sort()).toEqual(['a', 'c']);
+    });
+
+    it('imports the other categories when one is refused', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      // No category the import passes on can be refused by the database, so the refusal is forced: on the
+      // grouped write, then on the bad category alone.
+      const importOne = b.poiCategories.importMany.bind(b.poiCategories);
+      vi.spyOn(b.poiCategories, 'importMany').mockImplementation(async (group) => {
+        if (group.some((c) => c.id === 'cat-bad')) throw new Error('refused');
+        await importOne(group);
+      });
+      const reader = memoryReader([
+        [
+          'poi-categories.json',
+          JSON.stringify([
+            { id: 'cat-a', name: 'A' },
+            { id: 'cat-bad', name: 'Bad' },
+            { id: 'cat-c', name: 'C' },
+          ]),
+        ],
+      ]);
+      await svc.importFrom(reader, everything);
+      expect((await b.poiCategories.list()).map((c) => c.id).sort()).toEqual(['cat-a', 'cat-c']);
+    });
   });
 
   describe('a bundle that is not what it should be', () => {
@@ -890,7 +936,7 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(big).toBe(small);
     });
 
-    it('an import grows with the number of items: fixed reads + one transaction per plan and per photo', async () => {
+    it('an import costs the same however many items it has: fixed reads + one write per kind', async () => {
       const calls = async (plans: number, photos: number) => {
         const ids = Array.from({ length: plans }, (_, i) => `pl${i}`);
         const files: [string, string][] = [
@@ -903,19 +949,51 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
         ];
         return importCalls(files, { selectedPlans: ids });
       };
-      const base = await calls(1, 1);
-      const perPlan = (await calls(2, 1)) - base;
-      const perPhoto = (await calls(1, 2)) - base;
       // The formula: calls = 2 reads (local setups, local gear) + 1 read when plans are ticked (plan names)
       // + 3 reads when photos are imported (names already here; the photos already here and their correspondences)
-      // + 1 per plan (one batch) + 4 per new photo (its transaction: begin, existence check, one batch, commit).
-      // 11 for one plan and one photo.
-      expect(base).toBe(11);
-      expect(perPlan).toBe(1);
-      expect(perPhoto).toBe(4);
-      expect(await calls(5, 1)).toBe(base + 4 * perPlan);
-      expect(await calls(1, 6)).toBe(base + 5 * perPhoto);
-      expect(await calls(4, 3)).toBe(base + 3 * perPlan + 2 * perPhoto);
+      // + 1 for the plans (one batch) + 4 for the photos (one transaction: begin, the ids here, one batch, commit).
+      expect(await calls(1, 1)).toBe(11);
+      expect(await calls(5, 1)).toBe(11);
+      expect(await calls(1, 6)).toBe(11);
+      expect(await calls(4, 3)).toBe(11);
+    });
+
+    it('gear, setups, categories, regions and overrides cost one write per kind however many there are', async () => {
+      const calls = async (n: number) => {
+        const ids = (prefix: string) => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
+        const gearList = ids('custom-t').map((id) => ({ id, type: 'telescope', name: id }));
+        const setupList = ids('setup-').map((id) => ({
+          id,
+          name: id,
+          telescopeId: 'custom-t0',
+          cameraId: 'cam-builtin',
+          accessoryId: null,
+          enabled: true,
+        }));
+        const files: [string, string][] = [
+          ['custom-gear.json', JSON.stringify(gearList)],
+          ['gear-setups.json', JSON.stringify(setupList)],
+          [
+            'poi-categories.json',
+            JSON.stringify(ids('cat-').map((id) => ({ id, name: id, color: '#fff' }))),
+          ],
+          [
+            'sky-regions.json',
+            JSON.stringify(ids('r-').map((id) => ({ id, name: id, points: [[0, 0]] }))),
+          ],
+          [
+            'dso-overrides.json',
+            JSON.stringify(Object.fromEntries(ids('NGC ').map((id) => [id, { name: id }]))),
+          ],
+        ];
+        return importCalls(files, {
+          selectedGear: gearList.map((g) => g.id),
+          selectedSetups: setupList.map((s) => s.id),
+        });
+      };
+      // 2 reads (local setups, local gear) + one batch each for gear, setups, categories, regions, overrides.
+      expect(await calls(1)).toBe(7);
+      expect(await calls(8)).toBe(7);
     });
   });
 });

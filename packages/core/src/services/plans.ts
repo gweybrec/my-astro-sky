@@ -68,6 +68,8 @@ export interface PlanService {
    * mosaics are inserted. Returns false, writing nothing, when the plan has no string id or name.
    */
   importPlan(plan: BackupPlan, options: PlanImportOptions): Promise<boolean>;
+  /** Writes several plans as `importPlan` does, in order, in one atomic batch; a plan with no string id or name is left out. */
+  importPlans(items: readonly { plan: BackupPlan; options: PlanImportOptions }[]): Promise<void>;
 }
 
 interface PlanRow {
@@ -350,6 +352,85 @@ function tileStatements(
     pos++;
     return { sql: INSERT_ENTRY, params };
   });
+}
+
+/** The statements that write one plan of a backup file; null when it has no string id or name. */
+function planImportStatements(plan: BackupPlan, options: PlanImportOptions): SqlStatement[] | null {
+  const p = plan as Record<string, any>;
+  if (typeof p?.id !== 'string' || typeof p.name !== 'string') return null;
+  const planId: string = p.id;
+  const writes: SqlStatement[] = [];
+  for (const id of [...options.replaceIds, planId]) {
+    writes.push(
+      { sql: DELETE_PLAN_ENTRIES, params: [id] },
+      { sql: DELETE_PLAN_MOSAICS, params: [id] },
+      { sql: DELETE_PLAN, params: [id] },
+    );
+  }
+  writes.push({
+    sql: INSERT_PLAN,
+    params: [
+      planId,
+      p.name,
+      typeof p.position === 'number' ? p.position : options.index,
+      new Date().toISOString(),
+      typeof p.nightOf === 'string' ? p.nightOf : null,
+      options.setupId,
+      typeof p.lat === 'number' ? p.lat : null,
+      typeof p.lon === 'number' ? p.lon : null,
+      (PLAN_SORT_KEYS as readonly string[]).includes(p.sortBy) ? p.sortBy : 'transit',
+    ],
+  });
+  if (Array.isArray(p.entries)) {
+    p.entries.forEach((e: any, ei: number) => {
+      if (typeof e.id !== 'string') return;
+      const hasDso = typeof e.dsoId === 'string';
+      const hasCoords = typeof e.ra === 'number' && typeof e.dec === 'number';
+      // An entry needs either a DSO target or explicit frame coords.
+      if (!hasDso && !hasCoords) return;
+      writes.push({
+        sql: INSERT_ENTRY,
+        params: [
+          e.id,
+          planId,
+          hasDso ? e.dsoId : null,
+          typeof e.position === 'number' ? e.position : ei,
+          typeof e.paDeg === 'number' ? e.paDeg : null,
+          hasCoords ? e.ra : null,
+          hasCoords ? e.dec : null,
+          typeof e.notes === 'string' ? e.notes : null,
+          // Keep the tile→mosaic grouping (the mosaic row is recreated below).
+          typeof e.mosaicId === 'string' ? e.mosaicId : null,
+          typeof e.mosaicWDeg === 'number' ? e.mosaicWDeg : null,
+          typeof e.mosaicHDeg === 'number' ? e.mosaicHDeg : null,
+          sanitizeObservationWindows(e.observationWindows),
+        ],
+      });
+    });
+  }
+  if (Array.isArray(p.mosaics)) {
+    p.mosaics.forEach((m: any, mi: number) => {
+      if (typeof m.id !== 'string') return;
+      if (typeof m.centerRa !== 'number' || typeof m.centerDec !== 'number') return;
+      writes.push({
+        sql: INSERT_MOSAIC,
+        params: [
+          m.id,
+          planId,
+          typeof m.dsoId === 'string' ? m.dsoId : null,
+          typeof m.name === 'string' ? m.name : null,
+          m.centerRa,
+          m.centerDec,
+          typeof m.paDeg === 'number' ? m.paDeg : 0,
+          typeof m.overlapPct === 'number' ? m.overlapPct : 20,
+          Number.isInteger(m.cols) ? m.cols : 1,
+          Number.isInteger(m.rows) ? m.rows : 1,
+          typeof m.position === 'number' ? m.position : mi,
+        ],
+      });
+    });
+  }
+  return writes;
 }
 
 export function createPlanService(deps: PlanServiceDeps): PlanService {
@@ -668,82 +749,17 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
     },
 
     async importPlan(plan, options) {
-      const p = plan as Record<string, any>;
-      if (typeof p?.id !== 'string' || typeof p.name !== 'string') return false;
-      const planId: string = p.id;
-      const writes: SqlStatement[] = [];
-      for (const id of [...options.replaceIds, planId]) {
-        writes.push(
-          { sql: DELETE_PLAN_ENTRIES, params: [id] },
-          { sql: DELETE_PLAN_MOSAICS, params: [id] },
-          { sql: DELETE_PLAN, params: [id] },
-        );
-      }
-      writes.push({
-        sql: INSERT_PLAN,
-        params: [
-          planId,
-          p.name,
-          typeof p.position === 'number' ? p.position : options.index,
-          new Date().toISOString(),
-          typeof p.nightOf === 'string' ? p.nightOf : null,
-          options.setupId,
-          typeof p.lat === 'number' ? p.lat : null,
-          typeof p.lon === 'number' ? p.lon : null,
-          (PLAN_SORT_KEYS as readonly string[]).includes(p.sortBy) ? p.sortBy : 'transit',
-        ],
-      });
-      if (Array.isArray(p.entries)) {
-        p.entries.forEach((e: any, ei: number) => {
-          if (typeof e.id !== 'string') return;
-          const hasDso = typeof e.dsoId === 'string';
-          const hasCoords = typeof e.ra === 'number' && typeof e.dec === 'number';
-          // An entry needs either a DSO target or explicit frame coords.
-          if (!hasDso && !hasCoords) return;
-          writes.push({
-            sql: INSERT_ENTRY,
-            params: [
-              e.id,
-              planId,
-              hasDso ? e.dsoId : null,
-              typeof e.position === 'number' ? e.position : ei,
-              typeof e.paDeg === 'number' ? e.paDeg : null,
-              hasCoords ? e.ra : null,
-              hasCoords ? e.dec : null,
-              typeof e.notes === 'string' ? e.notes : null,
-              // Keep the tile→mosaic grouping (the mosaic row is recreated below).
-              typeof e.mosaicId === 'string' ? e.mosaicId : null,
-              typeof e.mosaicWDeg === 'number' ? e.mosaicWDeg : null,
-              typeof e.mosaicHDeg === 'number' ? e.mosaicHDeg : null,
-              sanitizeObservationWindows(e.observationWindows),
-            ],
-          });
-        });
-      }
-      if (Array.isArray(p.mosaics)) {
-        p.mosaics.forEach((m: any, mi: number) => {
-          if (typeof m.id !== 'string') return;
-          if (typeof m.centerRa !== 'number' || typeof m.centerDec !== 'number') return;
-          writes.push({
-            sql: INSERT_MOSAIC,
-            params: [
-              m.id,
-              planId,
-              typeof m.dsoId === 'string' ? m.dsoId : null,
-              typeof m.name === 'string' ? m.name : null,
-              m.centerRa,
-              m.centerDec,
-              typeof m.paDeg === 'number' ? m.paDeg : 0,
-              typeof m.overlapPct === 'number' ? m.overlapPct : 20,
-              Number.isInteger(m.cols) ? m.cols : 1,
-              Number.isInteger(m.rows) ? m.rows : 1,
-              typeof m.position === 'number' ? m.position : mi,
-            ],
-          });
-        });
-      }
+      const writes = planImportStatements(plan, options);
+      if (!writes) return false;
       await db.batch(writes);
       return true;
+    },
+
+    async importPlans(items) {
+      const writes = items.flatMap(
+        ({ plan, options }) => planImportStatements(plan, options) ?? [],
+      );
+      if (writes.length > 0) await db.batch(writes);
     },
   };
 }

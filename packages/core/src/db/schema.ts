@@ -10,7 +10,7 @@
  * `SCHEMA_VERSION` are updated in the same commit; `tests/unit/schema-baseline.test.ts` compares
  * the baseline with what the server produces and fails otherwise.
  */
-import type { SqlDb, SqlTx } from '../ports/sql-db';
+import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
 export const SCHEMA_VERSION = 15;
@@ -148,24 +148,24 @@ export const MIGRATIONS: readonly DataMigration[] = [
 ];
 
 /**
- * Runs every migration of `migrations` above the stored version, in order; each migration's
- * statements and its `UPDATE schema_version` share one transaction. Returns the final version.
+ * Runs every migration of `migrations` above the stored version, in order, each followed by its
+ * `UPDATE schema_version`, all in one atomic batch: a failure leaves the database at `fromVersion`.
+ * Returns the final version.
  */
 export async function runDataMigrations(
   db: SqlDb,
   migrations: readonly DataMigration[],
   fromVersion: number,
 ): Promise<number> {
-  let current = fromVersion;
-  for (const migration of migrations) {
-    if (migration.version <= current) continue;
-    await db.transaction(async (tx: SqlTx) => {
-      for (const sql of migration.statements) await tx.run(sql);
-      await tx.run('UPDATE schema_version SET version = ?', [migration.version]);
-    });
-    current = migration.version;
-  }
-  return current;
+  const pending = migrations.filter((m) => m.version > fromVersion);
+  if (pending.length === 0) return fromVersion;
+  await db.batch(
+    pending.flatMap((m) => [
+      ...m.statements.map((sql) => ({ sql })),
+      { sql: 'UPDATE schema_version SET version = ?', params: [m.version] },
+    ]),
+  );
+  return pending[pending.length - 1].version;
 }
 
 /**
@@ -187,10 +187,10 @@ export async function initSchema(db: SqlDb): Promise<number> {
         'This database predates versioning (it has a photos table but no schema version); open it with the desktop server first.',
       );
     }
-    await db.transaction(async (tx) => {
-      for (const sql of BASELINE_SCHEMA) await tx.run(sql);
-      await tx.run('INSERT INTO schema_version (version) VALUES (?)', [SCHEMA_VERSION]);
-    });
+    await db.batch([
+      ...BASELINE_SCHEMA.map((sql) => ({ sql })),
+      { sql: 'INSERT INTO schema_version (version) VALUES (?)', params: [SCHEMA_VERSION] },
+    ]);
     current = SCHEMA_VERSION;
   } else {
     current = row.version;

@@ -139,6 +139,17 @@ export interface PhotoService {
     strategy: PhotoImportStrategy,
     replaceIds?: readonly string[],
   ): Promise<'imported' | 'skipped'>;
+  /**
+   * Writes several photos as `importPhoto` does, in order, in one transaction: an id taken by a photo here or by
+   * an earlier one of the list is skipped under `skip`. Returns the outcome of each, in the order of `items`.
+   */
+  importPhotos(
+    items: readonly {
+      photo: BackupPhoto;
+      strategy: PhotoImportStrategy;
+      replaceIds?: readonly string[];
+    }[],
+  ): Promise<('imported' | 'skipped')[]>;
 }
 
 interface PhotoRow {
@@ -785,43 +796,65 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     },
 
     async importPhoto(photo, strategy, replaceIds = []) {
-      const p = photo as unknown as Record<string, any>;
-      const id: string = p.id;
-      const correspondences: PhotoCorrespondenceInput[] = Array.isArray(p.correspondences)
-        ? p.correspondences
-        : [];
+      return (await service.importPhotos([{ photo, strategy, replaceIds }]))[0];
+    },
+
+    async importPhotos(items) {
+      if (items.length === 0) return [];
       return db.transaction(async (tx) => {
-        if (strategy === 'replace') await tx.run(DELETE_PHOTO, [id]);
-        const result = await tx.run(INSERT_PHOTO_WITH_ID, [
-          id,
-          p.filename ?? `${id}.jpg`,
-          p.originalName ?? p.filename ?? id,
-          p.width ?? 0,
-          p.height ?? 0,
-          p.createdAt ?? new Date().toISOString(),
-          p.manualPlacement ? JSON.stringify(p.manualPlacement) : null,
-          JSON.stringify(Array.isArray(p.dsoIds) ? p.dsoIds : []),
-          JSON.stringify(Array.isArray(p.labels) ? p.labels : []),
-          JSON.stringify(sanitizePois(p.pointsOfInterest)),
-          typeof p.notes === 'string' ? p.notes : '',
-          JSON.stringify(sanitizeIntegrationRows(p.integrations)),
-          typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null,
-          typeof p.observationDate === 'string' ? p.observationDate : null,
-          JSON.stringify(sanitizeCaptureDetails(p.captureDetails)),
-          cleanSetupId(p.gearSetupId),
-          cleanQuarterTurns(p.quarterTurns),
-        ]);
-        if (result.changes === 0) return 'skipped' as const;
-        const statements = [
-          ...replaceIds
-            .filter((other) => other !== id)
-            .map((other) => ({ sql: DELETE_PHOTO, params: [other] })),
-          ...correspondenceStatements(id, correspondences),
-        ];
+        // The ids taken: those here, then as the list writes and deletes them.
+        const taken = new Set((await tx.all<{ id: string }>(SELECT_IDS)).map((r) => r.id));
+        const results: ('imported' | 'skipped')[] = [];
+        const statements: SqlStatement[] = [];
+        for (const { photo, strategy, replaceIds = [] } of items) {
+          const p = photo as unknown as Record<string, any>;
+          const id: string = p.id;
+          if (strategy !== 'replace' && taken.has(id)) {
+            results.push('skipped');
+            continue;
+          }
+          const correspondences: PhotoCorrespondenceInput[] = Array.isArray(p.correspondences)
+            ? p.correspondences
+            : [];
+          const others = replaceIds.filter((other) => other !== id);
+          if (strategy === 'replace') statements.push({ sql: DELETE_PHOTO, params: [id] });
+          statements.push(
+            { sql: INSERT_PHOTO_WITH_ID, params: importParams(p) },
+            ...others.map((other) => ({ sql: DELETE_PHOTO, params: [other] })),
+            ...correspondenceStatements(id, correspondences),
+          );
+          taken.add(id);
+          others.forEach((other) => taken.delete(other));
+          results.push('imported');
+        }
         if (statements.length > 0) await tx.batch(statements);
-        return 'imported' as const;
+        return results;
       });
     },
   };
   return service;
+}
+
+/** The parameters of `INSERT_PHOTO_WITH_ID` for a photo of a backup manifest. */
+function importParams(p: Record<string, any>): SqlValue[] {
+  const id: string = p.id;
+  return [
+    id,
+    p.filename ?? `${id}.jpg`,
+    p.originalName ?? p.filename ?? id,
+    p.width ?? 0,
+    p.height ?? 0,
+    p.createdAt ?? new Date().toISOString(),
+    p.manualPlacement ? JSON.stringify(p.manualPlacement) : null,
+    JSON.stringify(Array.isArray(p.dsoIds) ? p.dsoIds : []),
+    JSON.stringify(Array.isArray(p.labels) ? p.labels : []),
+    JSON.stringify(sanitizePois(p.pointsOfInterest)),
+    typeof p.notes === 'string' ? p.notes : '',
+    JSON.stringify(sanitizeIntegrationRows(p.integrations)),
+    typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null,
+    typeof p.observationDate === 'string' ? p.observationDate : null,
+    JSON.stringify(sanitizeCaptureDetails(p.captureDetails)),
+    cleanSetupId(p.gearSetupId),
+    cleanQuarterTurns(p.quarterTurns),
+  ];
 }
