@@ -2,7 +2,7 @@
 import { IonChip } from '@ionic/vue';
 
 // A filter chip (`.mob-chip`, 48 px tall) on Ionic's chip; `pressed` is the selected state. Chips wrap, they never
-// scroll sideways. `compact` is the 32 px chip with smaller text (design system revision 21: a photo's objects on the map).
+// scroll sideways. `compact` is the 32 px chip with smaller text (a photo's objects on the map).
 defineProps<{ pressed?: boolean; compact?: boolean }>();
 const emit = defineEmits<{ click: [event: Event] }>();
 </script>

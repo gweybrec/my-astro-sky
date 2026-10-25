@@ -54,7 +54,7 @@ export function useSheetDrag(down: () => void, up?: () => void) {
 }
 
 /**
- * A sheet held to a third of its room in portrait that a drag up takes to two thirds (user's rule 2026-10-24):
+ * A sheet held to a third of its room in portrait that a drag up takes to two thirds:
  * `expanded` puts `.mob-sheet--expanded` on it. In landscape the sheets already have the full height: `grow` does nothing.
  */
 export function useSheetExpand() {

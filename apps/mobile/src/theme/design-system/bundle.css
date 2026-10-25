@@ -1,7 +1,7 @@
 /* MyAstroSky component classes.
    Desktop section: the UnoCSS shortcuts of uno.config.ts and the matching rules of src/style.css / src/styles/canvas.css,
    expanded into plain CSS. Where the two disagree, the cascade of the app wins (style.css loads after the shortcuts).
-   Mobile section (.mob-*): proposed, not in the code.
+   Mobile section (.mob-*): the phone app's classes.
    Every colour, length and radius is a token from tokens.json; tokens.css is loaded before this file. */
 
 /* ── Font sizes ─────────────────────────────────────────────────────────────────────────────
@@ -798,7 +798,7 @@ select.input-base {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════
-   MOBILE LAYER — proposed, not in the code. Built only from tokens.
+   MOBILE LAYER — the phone app's classes. Built only from tokens.
    Type comes from the Mobile type styles (class m-body, m-caption, …); focus ring is text-bright.
    ════════════════════════════════════════════════════════════════════════════════════════════ */
 :root {
@@ -964,7 +964,7 @@ select.input-base {
   display: block;
 }
 .mob-select-wrap::after {
-  /* a drawn chevron-down (revision 5, was the "▾" glyph): a 14px box in the glyph's place, painted in text-secondary through a mask */
+  /* a drawn chevron-down: a 14px box in the glyph's place, painted in text-secondary through a mask */
   content: '';
   position: absolute;
   right: calc(var(--space-7) - 1px);
@@ -1153,7 +1153,7 @@ select.input-base {
   border-color: var(--border-focus);
   color: var(--text-bright);
 }
-/* ── Mobile layer, round D1 batch 1 (structure and navigation) ───────────────────────────────── */
+/* ── Mobile layer: structure and navigation ─────────────────────────────────────────────────────── */
 .mob-chip {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -1581,7 +1581,7 @@ select.input-base {
   box-shadow: inset 0 1px 0 var(--border-panel);
 }
 
-/* ── Mobile layer, round D1 revision 2 ───────────────────────────────────────────────────────── */
+/* ── Mobile layer: sheets, dialogs and footers ──────────────────────────────────────────────────── */
 /* BottomSheet that takes the height of its content: --auto stops at 60 % of the parent, --auto-lg at 70 %; past that
    the body scrolls. The last row of a sheet body has no separator, so it does not double the line above the tab bar. */
 .mob-sheet--auto,
@@ -1742,7 +1742,7 @@ select.input-base {
   margin-top: var(--space-2);
 }
 
-/* ── Mobile layer, round D1 batch 2a (photo flows) ───────────────────────────────────────────── */
+/* ── Mobile layer: photo flows ──────────────────────────────────────────────────────────────────── */
 /* Helper text under a control or a list: the visible home of every explanation and every reason a control is disabled. */
 .mob-helper {
   margin: 0;
@@ -1974,7 +1974,7 @@ select.input-base {
   border-bottom: 0;
 }
 
-/* ── Mobile layer, round D1 batch 2b (map modes, plan and filter sheets, computer connection) ─── */
+/* ── Mobile layer: map modes, plan and filter sheets, computer connection ───────────────────────── */
 /* Label over a control (a field, a pair of fields, a group of buttons) in a panel or sheet. */
 .mob-form-row {
   padding: 0 var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
@@ -2192,7 +2192,7 @@ select.input-base {
   color: var(--text-bright);
 }
 
-/* ── Mobile layer, round D1 batch 2c ─────────────────────────────────────────────────────────── */
+/* ── Mobile layer: search fields, sheet headers and form rows ───────────────────────────────────── */
 /* A 16px icon next to a number or a word (the difficulty diamond in a button or a fact), where the 24px icon is too big. */
 svg.mob-icon--sm,
 .mob-btn svg.mob-icon--sm {
@@ -2285,7 +2285,7 @@ svg.mob-icon--sm,
 .mob-sheet-header--bar {
   padding-top: var(--space-4);
 }
-/* ── Photo metadata form (batch 2c) ──────────────────────────────────────────────────────────── */
+/* ── Photo metadata form ────────────────────────────────────────────────────────────────────────── */
 /* Chips that wrap onto several lines (labels, objects of a photo); a removable chip holds its text and a small remove icon, the
    whole chip is the 48px target. */
 .mob-chip-row--wrap {
@@ -2376,7 +2376,7 @@ svg.mob-icon--sm,
   color: var(--status-warn-text);
 }
 
-/* ── Mobile layer, round D1 revision 5: drawn icons instead of the text glyphs ▶ ▾ ⠿ ↑ ↓ → ← ───────────────────────── */
+/* ── Mobile layer: drawn icons in the place of the text glyphs ▶ ▾ ⠿ ↑ ↓ → ← ────────────────────── */
 /* The boxes keep the layout footprint of the glyph they replace (width and height of its line box), so no neighbour moves. */
 .mob-row-chevron {
   /* the span is the glyph's footprint: 10.34px wide, 16px high in a plain trail (the icon is 20px high, pulled back by -2px each side) */
@@ -2410,7 +2410,7 @@ svg.mob-icon--sm,
   stroke-width: 2.5;
 }
 
-/* ── Mobile layer, round D1 batch 2d (identification flows) ──────────────────────────────────────── */
+/* ── Mobile layer: identification flows ─────────────────────────────────────────────────────────── */
 /* A 48px square button that holds only an icon (the magnifier beside a field); the icon is 24px. */
 .mob-btn.mob-btn--icon {
   width: var(--mobile-touch-min);
@@ -2458,7 +2458,7 @@ svg.mob-icon--sm,
   min-width: 96px;
 }
 
-/* ── Mobile layer, revision 8b ─────────────────────────────────────────────────────────────── */
+/* ── Mobile layer: map controls, pagers and drawings on the map ─────────────────────────────────── */
 /* Display ribbon of the sky map: the seven toggles of the desktop's map toolbar (SkyTimeControl.vue) and the display settings, as a column of
    48px `.mob-icon-btn--float` buttons, 8px apart, along the right gutter, dropping 8px under the layers button of `.mob-map-top`. The last
    button (display settings) is set apart by 16px. */
@@ -2519,7 +2519,7 @@ svg.mob-icon--sm,
 .mob-pager-track::-webkit-scrollbar {
   display: none;
 }
-/* Revision 17. A page holds at most two lines of chips (one in landscape), cut where the chips wrap, the most important objects first
+/* A page holds at most two lines of chips (one in landscape), cut where the chips wrap, the most important objects first
    (Messier, NGC, IC, …); it has no height of its own, so a single line leaves no empty space under it. */
 .mob-pager-page {
   flex: 0 0 100%;
@@ -2563,17 +2563,17 @@ svg.mob-icon--sm,
   background: var(--accent-fill-sm);
   box-shadow: inset 0 0 0 1px var(--border-accent);
 }
-/* Revision 9. A floating plus on a screen without a tab bar (PlanDetail): it sits one gutter above the bottom edge instead of above the tab bar. */
+/* A floating plus on a screen without a tab bar (PlanDetail): it sits one gutter above the bottom edge instead of above the tab bar. */
 .mob-fab--flush {
   bottom: var(--mobile-gutter);
 }
-/* Revision 9. A trailing icon of a row (the check of a named star) in a 48px cell centred on the same axis as a 48px button in the row being filled
+/* A trailing icon of a row (the check of a named star) in a 48px cell centred on the same axis as a 48px button in the row being filled
    (ThreePoint): the body column then has the same width in every row. */
 .mob-row-trail--cell {
   width: var(--mobile-touch-min);
   justify-content: center;
 }
-/* Revision 9. Stars on the sky map in "pick a star" mode (ThreePointMap), in a `.mob-map-drawing` SVG: `.mob-sky-star` a dot (radius by magnitude),
+/* Stars on the sky map in "pick a star" mode (ThreePointMap), in a `.mob-map-drawing` SVG: `.mob-sky-star` a dot (radius by magnitude),
    `.mob-sky-star--picked` the tapped star (bright), `.mob-sky-ring` the ring around it (accent colour, the selection colour of the map), `.mob-sky-label`
    its label as the desktop writes it (`starDisplayLabel`: "Deneb (α Cyg)"). The desktop's picking mode draws no mark (it picks on the click and closes). */
 .mob-sky-star {
@@ -2590,7 +2590,7 @@ svg.mob-icon--sm,
 .mob-sky-label {
   fill: var(--text-bright);
 }
-/* Revision 11. The "i" button (48 x 48 `.mob-icon-btn`, the explanation itself is not drawn) beside a label that has a desktop tooltip.
+/* The "i" button (48 x 48 `.mob-icon-btn`, the explanation itself is not drawn) beside a label that has a desktop tooltip.
    `.mob-form-row--bar`: a group label row (label left, "i" on the right gutter, same centre line, 8px above the next control).
    `.mob-row--info`: a switch row whose title has an "i": title, "i", switch (the switch keeps the gutter); 8px above and below the 48px button, so it keeps the 8px gap to the row under it (64px row).
    `.mob-slider-row--info`: a stacked slider row whose label has an "i" at the right end of the label line (column 2, the value column), 8px above the slider. */
@@ -2621,7 +2621,7 @@ svg.mob-icon--sm,
   justify-self: end;
 }
 
-/* ── Revision 12 ─────────────────────────────────────────────────────────────────────────────────
+/* ── Dialog buttons, top-bar titles, radio buttons, long-press labels ─────────────────────────────
    Dialog buttons never wrap their label: side by side when both labels fit on one line each, else stacked full width, confirm above cancel
    (wrap-reverse stacks the second button above the first). A lone button takes the whole row.
    Top-bar title: up to two lines before the ellipsis; the bar grows if it needs to.
@@ -2706,7 +2706,7 @@ svg.mob-icon--sm,
   white-space: nowrap;
 }
 
-/* ── Revision 13 ─────────────────────────────────────────────────────────────────────────────────
+/* ── Asteroid results panel ───────────────────────────────────────────────────────────────────────
    Asteroid results panel: the status line, "Modifier la recherche" and the footer buttons are fixed; only the list of asteroids scrolls
    (a `.mob-scroll`, always-visible 8px bar), in the height the panel has left (at most 60 % of the screen in portrait). */
 .mob-panel--results {
@@ -2723,7 +2723,7 @@ svg.mob-icon--sm,
   min-height: 0;
 }
 
-/* ── Revision 14 ─────────────────────────────────────────────────────────────────────────────────
+/* ── Empty states, prompts on the map, photo states, region rows ──────────────────────────────────
    `.mob-empty`: an empty list or area: one line and at most one button, centred.
    `.mob-map-prompt`: the same on the map (first start, no position), above the time bar.
    `.mob-status--danger`: a state line in the danger colour. `.mob-toast-host`: where the desktop `.toast` sits on a phone screen.
@@ -2832,7 +2832,7 @@ svg.mob-icon--sm,
   background: radial-gradient(circle, var(--accent-color) 0 4px, transparent 5px);
 }
 
-/* ── Revision 14: Android system bars ────────────────────────────────────────────────────────────
+/* ── Android system bars ──────────────────────────────────────────────────────────────────────────
    The frame reserves 24 px at the top (status bar) and 24 px at the bottom (gesture bar). The two bars are drawn over the app; the app lays out
    with `--safe-top` / `--safe-bottom` (on a device these are `env(safe-area-inset-*)`, which the rules above fall back to).
    Top bars and tab bars keep their background under the bars; the map runs under both. */
@@ -2908,7 +2908,7 @@ svg.mob-icon--sm,
   bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
 }
 
-/* Revision 14: what the system bars moved. A page whose scrolling area is the last thing of the frame ends above the gesture bar when scrolled to the
+/* A page whose scrolling area is the last thing of the frame ends above the gesture bar when scrolled to the
    end; the footers of a page keep their 16 px below the buttons above the gesture bar. */
 #root > .mob-scroll:last-child {
   padding-bottom: var(--safe-bottom, 0px);
@@ -2917,7 +2917,7 @@ svg.mob-icon--sm,
   padding-bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
 }
 
-/* Revision 15: the spinner of the desktop (.auto-solve-spinner, 12 px) left of "Résolution", centred on it, one line. */
+/* The spinner of the desktop (.auto-solve-spinner, 12 px) left of "Résolution", centred on it, one line. */
 .mob-photo-state--busy,
 .mob-row-sub--busy {
   display: flex;
@@ -2936,7 +2936,7 @@ svg.mob-icon--sm,
   color: var(--accent-color);
 }
 
-/* Revision 16. A point given as coordinates (ThreePointRaDec), the desktop's RA/Déc entry: the point's number in the lead column, then the
+/* A point given as coordinates (ThreePointRaDec), the desktop's RA/Déc entry: the point's number in the lead column, then the
    label, three number fields each followed by its unit (outside the field), the second label and its fields, and the Étoile / OK buttons.
    The labels, fields and buttons start on the body column of the rows above (gutter + 40px lead + 16px). */
 .mob-coord {
@@ -2977,7 +2977,7 @@ svg.mob-icon--sm,
   gap: var(--space-4);
 }
 
-/* ── Revision 18 ─────────────────────────────────────────────────────────────────────────────────
+/* ── Identification pages and types of points of interest ─────────────────────────────────────────
    Identification pages (IdentifySupernova, IdentifyComet, PoiAdd) and the types of points of interest (PoiTypes).
    `.mob-pin`: what a search found on the photo (a supernova, a comet), the desktop's 28px starburst in the type's colour
    (`--poi-color`), centred on its point; `.mob-pin--off` is one not ticked. `.mob-marker--tint`: a marker whose ring takes
@@ -3071,7 +3071,7 @@ svg.mob-icon--sm,
   height: var(--space-11);
 }
 
-/* Revision 19. The actions under a result's lines ("Voir sur TNS", "Voir sur JPL", "Revenir à la position prédite") are
+/* The actions under a result's lines ("Voir sur TNS", "Voir sur JPL", "Revenir à la position prédite") are
    outlined buttons (`.mob-btn`), not text buttons: they start on the row's text edge, 8px apart, with 4px above them. */
 .mob-row-actions {
   gap: var(--space-4);
@@ -3093,7 +3093,7 @@ svg.mob-icon--sm,
   flex-basis: 100%;
 }
 
-/* Revision 20. The back arrow at the start of a top bar or of a mode bar (`.mob-icon-btn.mob-back-btn`), as Android draws it: no
+/* The back arrow at the start of a top bar or of a mode bar (`.mob-icon-btn.mob-back-btn`), as Android draws it: no
    outline, a round fill while it is pressed; still 48 x 48 to touch. */
 .mob-icon-btn.mob-back-btn {
   border-color: transparent;
@@ -3103,14 +3103,14 @@ svg.mob-icon--sm,
   border-color: transparent;
 }
 
-/* Revision 21. A compact chip (`.mob-chip.mob-chip--compact`, text `.m-secondary`): the objects of a photo in its sheet on the map,
+/* A compact chip (`.mob-chip.mob-chip--compact`, text `.m-secondary`): the objects of a photo in its sheet on the map,
    32px tall with 12px sides, so the sheet leaves more of the map in view. The chips of a row stay 8px apart. */
 .mob-chip.mob-chip--compact {
   height: var(--space-11);
   min-width: var(--space-11);
   padding: 0 var(--space-6);
 }
-/* Revision 22. Compact facts (`.mob-facts.mob-facts--compact`): the label over its value with no card around them, as many to a line
+/* Compact facts (`.mob-facts.mob-facts--compact`): the label over its value with no card around them, as many to a line
    as fit, 24px apart, 8px between lines, as the desktop lists a target's or a photo's figures. A wide fact (`.mob-fact--wide`) takes a
    line of its own (equipment, integration, labels, notes). */
 .mob-facts.mob-facts--compact {
@@ -3128,7 +3128,7 @@ svg.mob-icon--sm,
 .mob-facts--compact .mob-fact--wide {
   flex-basis: 100%;
 }
-/* Revision 23. The altitude chart of a target for the night (`.mob-alt-chart`, the desktop's trajectory chart): the night from its start
+/* The altitude chart of a target for the night (`.mob-alt-chart`, the desktop's trajectory chart): the night from its start
    to its end across, 0 to 90° up with lines at 20, 40, 60 and 80°, the target's curve, the Moon's dashed, the best time as a dotted line,
    and the observation windows as shaded bands in their colours (the desktop's). It runs from gutter to gutter and keeps its proportions. */
 .mob-alt-chart {
@@ -3167,9 +3167,9 @@ svg.mob-icon--sm,
 .mob-alt-chart-tick {
   fill: var(--text-label);
 }
-/* Revision 24. Facts are always compact (user's rule 2026-10-24): `.mob-facts` lists label over value with no card, each as wide as
+/* Facts are always compact: `.mob-facts` lists label over value with no card, each as wide as
    its text, as many to a line as fit, 24px apart, 8px between lines, as the desktop lists figures. `.mob-facts--2` and
-   `.mob-facts--compact` are kept as names of the same thing; `.mob-fact--wide` no longer takes a line of its own (a long value wraps
+   `.mob-facts--compact` are kept as names of the same thing; `.mob-fact--wide` does not take a line of its own (a long value wraps
    inside the line). Values are body text, not bold. */
 .mob-facts,
 .mob-facts.mob-facts--2,

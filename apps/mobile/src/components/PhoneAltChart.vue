@@ -6,7 +6,7 @@ import { formatClock24 } from '@myastrosky/core/targets/format';
 import type { AltSample } from '@myastrosky/core/sky-geometry';
 import { altChartLayout, type AltChartWindow } from '@myastrosky/core/targets/alt-chart';
 
-// A target's altitude over the night (design system revision 23, `.mob-alt-chart`; the desktop's trajectory chart,
+// A target's altitude over the night (`.mob-alt-chart`; the desktop's trajectory chart,
 // sharing its scale): 0 to 90° up with lines at 20, 40, 60 and 80°, the night across with every second hour under it,
 // the target's curve, the Moon's dashed, the best time dotted, and the observation windows as bands in their colours.
 // Drawn in a fixed box that scales with the width, as the board.

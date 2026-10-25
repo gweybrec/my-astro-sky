@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppIcon from './AppIcon.vue';
 
-// Read-only figures (`.mob-facts`, design system revision 24): label over value with no card, each as wide as its
+// Read-only figures (`.mob-facts`): label over value with no card, each as wide as its
 // text, as many to a line as fit, as the desktop lists a target's or a photo's figures; a long value wraps inside the
 // line. `tone` draws the value in a status colour, `rating` in the stars' colour, `mono` in the mono face, and
 // `icon` (an SVG file's markup) follows the value.
