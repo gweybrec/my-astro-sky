@@ -374,6 +374,19 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect([...b.blobs.store.keys()].sort()).toEqual(['p2.jpg', 'p2_thumb.jpg']);
     });
 
+    it('makes the thumbnail again when it restores an image whose archive has none, over an old thumbnail', async () => {
+      const a = await seed();
+      const reader = memoryReader((await exportAll(a)).files);
+      const b = await makeSet();
+      b.blobs.store.set('p2.jpg', text('old-image'));
+      b.blobs.store.set('p2_thumb.jpg', text('old-thumb'));
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      await svc.importFrom(reader, { ...everything, selectedImages: ['p2.jpg'] });
+      expect(new TextDecoder().decode(b.blobs.store.get('p2.jpg'))).toBe('image-2');
+      expect(b.blobs.store.has('p2_thumb.jpg')).toBe(true);
+      expect(new TextDecoder().decode(b.blobs.store.get('p2_thumb.jpg'))).not.toBe('old-thumb');
+    });
+
     it('writes no image file for a metadata-less import without a selection', async () => {
       const a = await seed();
       const reader = memoryReader((await exportAll(a)).files);

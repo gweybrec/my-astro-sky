@@ -31,6 +31,7 @@ describe('the shared horizon store', () => {
     expect(getProfile).toHaveBeenCalledWith(
       expect.objectContaining({ lat: 48.58, lon: 7.75, obsHeightM: 1.7 }),
     );
+    expect(store.profile).toEqual(profile);
     expect(store.enabled).toBe(true);
     expect(JSON.parse(storage().get(HORIZON_SETTINGS_KEY)!)).toMatchObject({
       enabled: true,

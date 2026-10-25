@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   createPreferencesStore,
   type CapacitorPreferences,
@@ -33,10 +33,15 @@ const settle = () => new Promise((r) => setTimeout(r, 60));
 describe('createPreferencesStore', () => {
   it('reads every stored key once, then answers synchronously', async () => {
     const { plugin } = fakePlugin({ lang: 'de', other: 'x' });
+    const keys = vi.spyOn(plugin, 'keys');
+    const get = vi.spyOn(plugin, 'get');
     const store = await createPreferencesStore(plugin);
     expect(store.get('lang')).toBe('de');
     expect(store.get('other')).toBe('x');
     expect(store.get('missing')).toBeNull();
+    expect(store.get('lang')).toBe('de');
+    expect(keys).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls.map(([{ key }]) => key).sort()).toEqual(['lang', 'other']);
   });
 
   it('set and remove show in memory at once and reach the plugin afterwards', async () => {

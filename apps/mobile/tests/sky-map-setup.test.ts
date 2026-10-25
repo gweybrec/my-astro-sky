@@ -38,6 +38,7 @@ vi.mock('@myastrosky/app-state/api', async (original) => ({
 
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import { DEFAULT_SETTINGS } from '@myastrosky/core/sky-time-settings';
+import { DEFAULT_SETTINGS as DISPLAY_DEFAULTS } from '@myastrosky/core/display-settings';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import { createPhoneSkyMap, MAX_PIXEL_RATIO } from '../src/sky-map-setup';
 
@@ -160,9 +161,43 @@ describe('the Ciel tab sky map', () => {
     expect(calls.setSimDate.length).toBeGreaterThan(before);
   });
 
-  it('applies the saved photo display settings (outlines are off by default)', () => {
+  it('draws photo outlines off by default', () => {
     make();
     expect(created[0].calls.setShowPhotoOutlines).toEqual([[false]]);
+  });
+
+  it('applies the saved display settings to the map', () => {
+    localStorage.setItem(
+      'display-settings',
+      JSON.stringify({
+        ...DISPLAY_DEFAULTS,
+        hemisphere: 'south',
+        borderLatDeg: 30,
+        mapRotationDeg: 90,
+        showStars: false,
+        showConstellationLines: false,
+        showDSOLabels: false,
+        showGrid: true,
+        showPhotoOutlines: true,
+        skyOpacity: 0.3,
+        showDSOs: false,
+        autoStarDensity: false,
+        maxStarCount: 1234,
+      }),
+    );
+    make();
+    const { calls } = created[0];
+    expect(calls.setHemisphere).toEqual([['south', 30]]);
+    expect(calls.setRotationDeg).toEqual([[90]]);
+    expect(calls.setShowStars).toEqual([[false]]);
+    expect(calls.setShowConstellationLines).toEqual([[false]]);
+    expect(calls.setShowDSOLabels).toEqual([[false]]);
+    expect(calls.setShowGrid).toEqual([[true]]);
+    expect(calls.setShowPhotoOutlines).toEqual([[true]]);
+    expect(calls.setSkyOpacity).toEqual([[0.3]]);
+    expect(calls.setShowDSOs).toEqual([[false]]);
+    expect(calls.setAutoStarDensity).toEqual([[false]]);
+    expect(calls.setMaxStarCount).toEqual([[1234]]);
   });
 
   it('reads the location again after Réglages changed it', () => {

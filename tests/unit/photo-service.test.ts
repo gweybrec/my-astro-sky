@@ -3,7 +3,7 @@
  * The photo service, data part (WP2.3g), on a private in-memory database, on both SQL adapters.
  */
 import Database from 'better-sqlite3';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
 import { DomainError, isDomainError } from '@myastrosky/core/domain/errors';
 import type { NewPhotoInput, UploadFields } from '@myastrosky/core/domain/photos';
@@ -1305,7 +1305,9 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
     it('ensureThumbnail with replace makes the thumbnail again without looking for the old one', async () => {
       await blobs.put('z.png', new Uint8Array([9]));
       blobs.store.set('z_thumb.jpg', new Uint8Array([5, 5]));
+      const size = vi.spyOn(blobs, 'size');
       await svc.ensureThumbnail('z.png', 'z_thumb.jpg', true);
+      expect(size).not.toHaveBeenCalled();
       expect(blobs.store.get('z_thumb.jpg')).not.toEqual(new Uint8Array([5, 5]));
     });
   });
