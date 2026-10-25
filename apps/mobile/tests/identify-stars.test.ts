@@ -87,8 +87,9 @@ async function tap(w: VueWrapper, x: number, y: number) {
 }
 
 /** A row's text, its parts (number, name, value) apart. */
+// A PhoneRow holds its parts in one line.
 const partsOf = (el: Element) =>
-  [...el.children]
+  [...([...el.children].find((c) => c.classList.contains('mob-row-line')) ?? el).children]
     .map((c) => c.textContent!.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
     .join(' ');

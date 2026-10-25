@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { configureStorage, createMemoryStore, storage } from '@myastrosky/core/platform/storage';
 import { ionicStubs } from './helpers';
-import PhotoTile from '../src/pages/gallery/PhotoTile.vue';
+import PhotoTile from '../src/components/PhotoTile.vue';
 import type { PhotoTag } from '../src/photo-tags';
 import { rowCount } from '../src/composables/useTagRows';
 import {

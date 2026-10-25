@@ -160,6 +160,11 @@ describe('the shared phone components', () => {
     expect(w.emitted('click')).toHaveLength(1);
   });
 
+  it('PhoneRow puts a number in the lead (a point of a star identification)', () => {
+    const w = mount(PhoneRow, { props: { title: 'Deneb', number: 2 }, global });
+    expect(w.find('.mob-row-lead').text()).toBe('2');
+  });
+
   it('PhoneRow marks the delete and disabled rows', () => {
     const w = mount(PhoneRow, { props: { title: 'x', danger: true, disabled: true }, global });
     expect(w.find('.mob-row').classes()).toEqual(

@@ -46,6 +46,7 @@ import imageIcon from '@icons/image.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 import eyeIcon from '@icons/eye.svg?raw';
 import telescopeIcon from '@icons/telescope.svg?raw';
+import checkIcon from '@icons/check.svg?raw';
 
 const search = ref('');
 const color = ref('#4ea1ff');
@@ -188,6 +189,12 @@ function raiseError() {
           />
           <PhoneRow title="Icône" :lead="telescopeIcon" chevron button />
           <PhoneRow title="Supprimer" :lead="trashIcon" danger button />
+          <PhoneRow title="Deneb (α Cyg)" :number="1" button>
+            <template #trail
+              ><span class="mob-row-trail--cell mob-status--success"
+                ><AppIcon :svg="checkIcon" /></span
+            ></template>
+          </PhoneRow>
           <PhoneRow title="Désactivée" :subs="['La raison reste lisible']" disabled chevron />
           <PhoneToggleRow v-model="switchOn" title="Interrupteur activé" />
           <PhoneToggleRow v-model="switchOff" title="Interrupteur désactivé" />

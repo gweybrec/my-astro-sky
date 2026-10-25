@@ -20,6 +20,7 @@ import { useSheetDrag, useSheetExpand } from '../../composables/useSheetDrag';
 import { pendingPhotoFile, removePendingPhoto } from '../../pending-photos';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneSearch from '../../components/PhoneSearch.vue';
+import PhoneSheetGrab from '../../components/PhoneSheetGrab.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 
@@ -316,17 +317,13 @@ async function validate() {
     :aria-label="t('manual.modeLabel')"
   >
     <div class="mob-placing-grab" v-on="grab.handlers">
-      <button
-        type="button"
-        class="mob-sheet-grab"
-        :aria-label="
+      <PhoneSheetGrab
+        :label="
           folded ? t('mobile.gallery.placeShowSettings') : t('mobile.gallery.placeHideSettings')
         "
         :aria-expanded="!folded"
         @click="toggleFold"
-      >
-        <span class="mob-sheet-handle" />
-      </button>
+      />
     </div>
     <!-- The settings scroll when the panel is short (landscape); Annuler and Valider stay under them. -->
     <!-- Folding slides the settings away under the handle (their height goes to the map). -->

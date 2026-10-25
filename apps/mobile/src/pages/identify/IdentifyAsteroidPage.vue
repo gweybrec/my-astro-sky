@@ -15,6 +15,7 @@ import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneCheckRow from '../../components/PhoneCheckRow.vue';
 import PhoneField from '../../components/PhoneField.vue';
 import PhoneHelper from '../../components/PhoneHelper.vue';
+import PhoneMarker from '../../components/PhoneMarker.vue';
 import PhoneUtcDateTime from '../../components/PhoneUtcDateTime.vue';
 import type { PhotoPoint } from '../../components/PhonePhotoStage.vue';
 import IdentifyFrame from './IdentifyFrame.vue';
@@ -160,13 +161,11 @@ function addSelected() {
         class="mob-identify-anchor"
         :style="{ left: `${onScreen(m.at).x}px`, top: `${onScreen(m.at).y}px` }"
       >
-        <span
-          class="mob-marker"
-          :class="{ 'mob-marker--active': !showResults && active === m.key }"
-          role="img"
-          :aria-label="m.label"
-          ><span class="mob-marker-dot m-secondary">{{ letter(m.key) }}</span></span
-        >
+        <PhoneMarker
+          :label="m.label"
+          :text="letter(m.key)"
+          :active="!showResults && active === m.key"
+        />
       </div>
     </template>
 

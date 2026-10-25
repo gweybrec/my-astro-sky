@@ -23,6 +23,8 @@ withDefaults(
     lead?: string;
     /** SVG markup of a picture placeholder in a square holder (a file in a list). */
     thumb?: string;
+    /** A number in the lead's round holder (a point of a star identification). */
+    number?: number;
     /** How the line under the title reads: a finished state (green), a running operation (spinner and accent), or a failure (red). */
     status?: 'success' | 'busy' | 'danger';
     /** The delete row: lead and title in the danger colour. */
@@ -63,6 +65,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
       /></span>
       <span v-else-if="lead" class="mob-row-lead"><AppIcon :svg="lead" /></span>
       <span v-else-if="thumb" class="mob-row-thumb"><AppIcon :svg="thumb" /></span>
+      <span v-else-if="number !== undefined" class="mob-row-lead m-body-strong">{{ number }}</span>
       <span class="mob-row-body">
         <span class="mob-row-title m-body" :class="{ 'mob-row-title--wrap': wrap }">{{
           title

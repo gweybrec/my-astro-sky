@@ -14,8 +14,8 @@ const src = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src')
 const SHEETS = ['components/PhoneSheet.vue', 'components/PhoneMapSheet.vue'];
 /** Files that use one of the classes for something that is not a sheet, with the reason. */
 const ALLOWED = {
-  // The placement mode's settings panel: a handle that folds the panel, not a sheet that opens and closes.
-  'pages/sky/SkyPlacement.vue': ['mob-sheet-grab'],
+  // The handle alone, shared by the two sheets and the placement mode's settings panel (which it folds).
+  'components/PhoneSheetGrab.vue': ['mob-sheet-grab'],
 };
 // A class attribute (static or bound) naming the sheet itself, its place over the map, or its handle.
 const MARKUP = /class="[^"]*\b(mob-sheet|mob-map-sheet|mob-sheet-grab)\b(?![-\w])/g;

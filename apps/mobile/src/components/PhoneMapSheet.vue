@@ -3,6 +3,7 @@ import { inject, useId } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { useSheetDrag, useSheetExpand } from '../composables/useSheetDrag';
 import { MAP_SHEET_HOST } from './map-sheet';
+import PhoneSheetGrab from './PhoneSheetGrab.vue';
 
 // A sheet of the map (`.mob-map-sheet`: the object, photo and frame sheets): drawn in the page over the bottom of the
 // map, not in an overlay, so the map stays in view and can be touched. Its slide up and down comes from the
@@ -40,14 +41,7 @@ function tapHandle() {
     :aria-labelledby="titleId"
   >
     <div class="mob-sheet-drag" v-on="drag.handlers">
-      <button
-        type="button"
-        class="mob-sheet-grab"
-        :aria-label="t('mobile.sky.closeSheet')"
-        @click="tapHandle"
-      >
-        <span class="mob-sheet-handle" />
-      </button>
+      <PhoneSheetGrab :label="t('mobile.sky.closeSheet')" @click="tapHandle" />
       <div class="mob-sheet-header">
         <h2 :id="titleId" class="mob-sheet-title m-title">{{ title }}</h2>
         <!-- The line under the title (`.mob-meta`). -->

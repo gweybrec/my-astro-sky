@@ -29,7 +29,9 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneField from '../components/PhoneField.vue';
 import PhoneHelper from '../components/PhoneHelper.vue';
+import PhoneMarker from '../components/PhoneMarker.vue';
 import PhonePhotoStage from '../components/PhonePhotoStage.vue';
+import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import checkIcon from '@icons/check.svg?raw';
 import mapIcon from '../icons/map.svg?raw';
@@ -299,18 +301,16 @@ async function validate() {
             class="mob-identify-anchor"
             :style="{ left: `${m.x}px`, top: `${m.y}px` }"
           >
-            <button
-              type="button"
-              class="mob-marker"
-              :class="{ 'mob-marker--active': m.index === active }"
-              :aria-label="t('mobile.identify.point', { n: m.index + 1 })"
+            <PhoneMarker
+              button
+              :label="t('mobile.identify.point', { n: m.index + 1 })"
+              :text="String(m.index + 1)"
+              :active="m.index === active"
               @pointerdown.stop="grab(m.index, $event)"
               @pointermove="dragMove"
               @pointerup="release"
               @pointercancel="release"
-            >
-              <span class="mob-marker-dot m-secondary">{{ m.index + 1 }}</span>
-            </button>
+            />
             <div
               v-if="magnifier?.index === m.index"
               class="mob-magnifier"
@@ -328,23 +328,17 @@ async function validate() {
               role="listbox"
               :aria-label="t('mobile.identify.suggestions')"
             >
-              <button
+              <PhoneRow
                 v-for="r in results"
                 :key="r.hip"
-                type="button"
-                class="mob-row"
+                :title="r.label"
+                :value="t('mobile.format.mag', { n: r.mag.toFixed(1) })"
+                button
                 role="option"
                 :aria-selected="false"
                 @pointerdown.prevent
                 @click="suggesting !== null && chooseStar(suggesting, r)"
-              >
-                <span class="mob-row-body">
-                  <span class="mob-row-title m-body">{{ r.label }}</span>
-                </span>
-                <span class="mob-row-trail m-secondary">{{
-                  t('mobile.format.mag', { n: r.mag.toFixed(1) })
-                }}</span>
-              </button>
+              />
             </div>
             <!-- The list, the other points, the instructions and the buttons are hidden, not removed, while stars are listed:
                  a row moved by Vue would lose the focus of its field, and the list would close. -->
@@ -355,15 +349,18 @@ async function validate() {
               class="mob-identify-point"
             >
               <!-- Named: a tap names it again (the desktop's tap on a named point). -->
-              <button v-if="p.star" type="button" class="mob-row" @click="clearPointStar(p)">
-                <span class="mob-row-lead m-body-strong">{{ i + 1 }}</span>
-                <span class="mob-row-body">
-                  <span class="mob-row-title m-body">{{ p.star.starName }}</span>
-                </span>
-                <span class="mob-row-trail mob-row-trail--cell mob-status--success">
-                  <AppIcon :svg="checkIcon" />
-                </span>
-              </button>
+              <PhoneRow
+                v-if="p.star"
+                :number="i + 1"
+                :title="p.star.starName"
+                button
+                @click="clearPointStar(p)"
+              >
+                <template #trail
+                  ><span class="mob-row-trail--cell mob-status--success"
+                    ><AppIcon :svg="checkIcon" /></span
+                ></template>
+              </PhoneRow>
               <div v-else-if="p.at && p.entry === 'star'" class="mob-row">
                 <span class="mob-row-lead m-body-strong">{{ i + 1 }}</span>
                 <span class="mob-row-body">

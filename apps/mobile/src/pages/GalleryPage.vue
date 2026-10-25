@@ -32,7 +32,7 @@ import { skyPlacement } from '../sky-modes';
 import { endIdentify } from '../star-identify-session';
 import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import GalleryDisplaySheet from './gallery/GalleryDisplaySheet.vue';
-import PhotoTile from './gallery/PhotoTile.vue';
+import PhotoTile from '../components/PhotoTile.vue';
 import { photoTags, type PhotoTag } from '../photo-tags';
 import { PHOTO_FILE_TYPES, pickFiles, pickGalleryPhotos } from '../platform-device';
 import filterIcon from '../icons/filter.svg?raw';

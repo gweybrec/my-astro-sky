@@ -2,10 +2,10 @@
 import { computed, ref, watch } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import type { QuarterTurns } from '@myastrosky/core/types';
-import type { PhotoTag } from '../../photo-tags';
-import AppIcon from '../../components/AppIcon.vue';
-import PhoneBusy from '../../components/PhoneBusy.vue';
-import PhoneTags from '../../components/PhoneTags.vue';
+import type { PhotoTag } from '../photo-tags';
+import AppIcon from './AppIcon.vue';
+import PhoneBusy from './PhoneBusy.vue';
+import PhoneTags from './PhoneTags.vue';
 import imageIcon from '@icons/image.svg?raw';
 
 // A photo of the gallery (boards "Galerie" and "Galerie, résolutions en cours"): one card holding the picture and, in the

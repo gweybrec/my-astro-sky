@@ -8,6 +8,7 @@ import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categori
 import AppIcon from '../../components/AppIcon.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneField from '../../components/PhoneField.vue';
+import PhoneMarker from '../../components/PhoneMarker.vue';
 import PhoneRadioSheet from '../../components/PhoneRadioSheet.vue';
 import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import type { PhotoPoint } from '../../components/PhonePhotoStage.vue';
@@ -78,13 +79,12 @@ function addPoi() {
         class="mob-identify-anchor"
         :style="{ left: `${onScreen(at).x}px`, top: `${onScreen(at).y}px` }"
       >
-        <span
-          class="mob-marker mob-marker--active mob-marker--tint"
+        <PhoneMarker
+          :label="t('mobile.identify.poiMarker')"
+          active
+          tint
           :style="{ '--poi-color': type?.color }"
-          role="img"
-          :aria-label="t('mobile.identify.poiMarker')"
-          ><span class="mob-marker-dot m-secondary"
-        /></span>
+        />
       </div>
     </template>
 

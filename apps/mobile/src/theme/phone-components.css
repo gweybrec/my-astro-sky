@@ -236,6 +236,10 @@ ion-item.mob-row::part(native) {
 ion-item.mob-row.item-disabled {
   opacity: 1;
 }
+/* A cell in a row's trail (a named point's tick): as wide as a touch target, its icon in the middle. */
+.mob-row-trail > .mob-row-trail--cell {
+  display: flex;
+}
 .mob-row-line {
   display: flex;
   align-items: center;

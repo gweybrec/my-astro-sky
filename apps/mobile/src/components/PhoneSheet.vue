@@ -4,6 +4,7 @@ import { IonModal } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import AppIcon from './AppIcon.vue';
 import PhoneIconButton from './PhoneIconButton.vue';
+import PhoneSheetGrab from './PhoneSheetGrab.vue';
 import { useSheetDrag, useSheetExpand } from '../composables/useSheetDrag';
 import backIcon from '../icons/arrow-left.svg?raw';
 
@@ -70,15 +71,7 @@ function dismissed() {
       ]"
       :aria-labelledby="titleId"
     >
-      <button
-        type="button"
-        class="mob-sheet-grab"
-        :aria-label="t('modal.close')"
-        v-on="dragHandlers"
-        @click="tapHandle"
-      >
-        <span class="mob-sheet-handle" />
-      </button>
+      <PhoneSheetGrab :label="t('modal.close')" v-on="dragHandlers" @click="tapHandle" />
       <div class="mob-sheet-header" :class="{ 'mob-sheet-header--bar': back }" v-on="dragHandlers">
         <PhoneIconButton v-if="back" :label="t('mobile.nav.back')" @click="emit('back')">
           <AppIcon :svg="backIcon" />
