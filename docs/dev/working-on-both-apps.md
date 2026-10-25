@@ -99,7 +99,7 @@ Keep it that way: if a difference between the orientations is only layout, it is
 
 ### Mockups
 
-Every screen has a portrait mockup and a landscape mockup (its title ends with ", paysage"). A new screen or a visible layout change is drawn in both before it is coded; see [ui/mobile.md](ui/mobile.md).
+Every screen has a portrait mockup and a landscape mockup (its title ends with ", paysage"). A new screen or a visible layout change is drawn in both before it is coded. The mockups are on the Claude Design page, not in the repository; the rules every screen follows are in [ui/mobile.md](ui/mobile.md).
 
 ## Developing a change
 
