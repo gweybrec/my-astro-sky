@@ -22,6 +22,8 @@ const routes: RouteRecordRaw[] = [
   // d'affichage").
   { path: '/sky/search', component: () => import('./pages/SkySearchPage.vue') },
   { path: '/sky/draw-order', component: () => import('./pages/SkyDrawOrderPage.vue') },
+  // A deep-sky object's corrections, from its sheet on the map (board "Objet, modifier").
+  { path: '/sky/object/:id/edit', component: () => import('./pages/sky/ObjectEditPage.vue') },
   // The pages pushed from the Réglages tab: full screen, without the tab bar (boards "Réglages, setups", "Équipement,
   // modifier le setup", "Réglages, lieu d'observation", "Réglages, exporter et importer").
   // The pages pushed from the Galerie tab: full screen, without the tab bar (boards "Importer des photos" and

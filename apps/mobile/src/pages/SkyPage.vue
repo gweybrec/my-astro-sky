@@ -255,6 +255,10 @@ useBackClose(() => activeFrame.value !== null, releaseFrame);
 const pickerOpen = ref(false);
 const pickerTarget = ref<FrameTarget | null>(null);
 const pickerKind = ref<'frame' | 'mosaic'>('frame');
+function editObject() {
+  const s = skySelection.value;
+  if (s?.kind === 'dso') void router.push(`/sky/object/${encodeURIComponent(s.dso.id)}/edit`);
+}
 function openFramePicker(kind: 'frame' | 'mosaic') {
   pickerKind.value = kind;
   const s = skySelection.value;
@@ -398,6 +402,7 @@ onBeforeUnmount(() => {
               @close="clearSkySelection"
               @add-frame="openFramePicker('frame')"
               @add-mosaic="openFramePicker('mosaic')"
+              @edit="editObject"
             />
             <SkyFrameSheet
               v-else-if="activeFrame && skyMap"

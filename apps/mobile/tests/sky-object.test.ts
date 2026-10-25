@@ -94,7 +94,7 @@ describe('the object sheet', () => {
     expect(date[0][1]).toMatch(/^-?\d+°$/);
   });
 
-  it('has the five actions of the board; all but the frame and the mosaic wait for their screens', () => {
+  it('has the four actions of the board, all usable; no details button, the facts are in the sheet', () => {
     const labels = mountSheet()
       .findAll('.mob-icon-row button')
       .map((b) => b.attributes('aria-label'));
@@ -103,9 +103,18 @@ describe('the object sheet', () => {
       'Ajouter une mosaïque',
       'Ajouter au plan',
       'Modifier',
-      'Voir les détails',
     ]);
-    expect(mountSheet().findAll('.mob-icon-row button[aria-disabled="true"]')).toHaveLength(3);
+    expect(mountSheet().findAll('.mob-icon-row button[aria-disabled="true"]')).toHaveLength(0);
+  });
+
+  it("asks the page for the object's corrections page, and opens the plan picker for the object", async () => {
+    const w = mountSheet();
+    await w.find('.mob-icon-row button[aria-label="Modifier"]').trigger('click');
+    expect(w.emitted('edit')).toHaveLength(1);
+    expect(w.find('.mob-sheet-modal').attributes('is-open')).toBe('false');
+    await w.find('.mob-icon-row button[aria-label="Ajouter au plan"]').trigger('click');
+    expect(w.find('.mob-sheet-modal').attributes('is-open')).toBe('true');
+    expect(w.find('.mob-sheet-modal').text()).toContain("Galaxie d'Andromède");
   });
 
   it('asks the page for "Créer un cadre" and "Créer une mosaïque"', async () => {
@@ -175,14 +184,15 @@ describe('the sheet of a star', () => {
     expect(w.find('.mob-badge--type').text()).toContain('3.2');
   });
 
-  it('has the desktop actions of a star: a frame, a mosaic and the details', () => {
+  it('has the desktop actions of a star: a frame and a mosaic (the desktop has no star editor)', () => {
     const labels = mountSheet(star())
       .findAll('.mob-icon-row button')
       .map((b) => b.attributes('aria-label'));
-    expect(labels).toEqual(['Ajouter un cadre', 'Ajouter une mosaïque', 'Voir les détails']);
+    expect(labels).toEqual(['Ajouter un cadre', 'Ajouter une mosaïque']);
+    expect(mountSheet(star()).find('.mob-sheet-modal').exists()).toBe(false);
   });
 
-  it('keeps its few actions at the start of the row, where the five of an object are spread', () => {
+  it('keeps its few actions at the start of the row, where the four of an object are spread', () => {
     expect(mountSheet(star()).find('.mob-icon-row').classes()).toContain('mob-icon-row--start');
     expect(mountSheet().find('.mob-icon-row').classes()).not.toContain('mob-icon-row--start');
   });

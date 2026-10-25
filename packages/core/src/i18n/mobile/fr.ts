@@ -169,7 +169,6 @@ const fr = {
     searchClear: 'Effacer la recherche',
     closeSheet: 'Fermer la fiche',
     objectActions: "Actions sur l'objet",
-    details: 'Voir les détails',
     tonight: 'Ce soir',
     dateField: 'Date et heure, ouvrir les sélecteurs : {value}',
     photoObjects: 'Objets de la photo',

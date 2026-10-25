@@ -171,7 +171,6 @@ const de: Translations['mobile'] = {
     searchClear: 'Suche löschen',
     closeSheet: 'Karte schließen',
     objectActions: 'Aktionen für das Objekt',
-    details: 'Details ansehen',
     tonight: 'Heute Abend',
     dateField: 'Datum und Uhrzeit, Auswahl öffnen: {value}',
     photoObjects: 'Objekte des Fotos',

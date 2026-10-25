@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { twilightWindow } from '@myastrosky/core/astro-time';
 import { altitudeAtDeg, maxAltDuringWindow } from '@myastrosky/core/sky-geometry';
@@ -13,20 +13,22 @@ import PhoneBadge from '../../components/PhoneBadge.vue';
 import PhoneFacts from '../../components/PhoneFacts.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
 import AppIcon from '../../components/AppIcon.vue';
+import PlanPickerSheet from '../targets/PlanPickerSheet.vue';
 import addFrameIcon from '@icons/add-frame.svg?raw';
 import addMosaicIcon from '@icons/add-mosaic.svg?raw';
 import addToPlanIcon from '@icons/list-plus.svg?raw';
 import editIcon from '@icons/pen.svg?raw';
-import infoIcon from '../../icons/info.svg?raw';
 
 // The board "Ciel, objet sélectionné": the object picked on the map or in the search, in a sheet over the bottom of the
-// map. A deep-sky object has the board's five actions; a star, which the board does not draw, has the desktop's: a
-// frame, a mosaic, and its details. "Ajouter un cadre" and "Ajouter une mosaïque" are handed to the page. The sheet
+// map. A deep-sky object has the board's four actions: a frame, a mosaic, "Ajouter au plan" (the plan picker) and
+// "Modifier" (its corrections' page, `edit`); a star has the desktop's two, a frame and a mosaic (the desktop has no
+// star editor). The facts are already in the sheet, so there is no details button. "Ajouter un cadre", "Ajouter une
+// mosaïque" and "Modifier" are handed to the page. The sheet
 // closes by dragging it down from its handle or header, with the handle, with a tap on an empty spot of the map and with the back button. The altitude is the object's now in the map's time
 // (as the desktop shows it, in date mode with a location only); the transit is when it is highest during the night at
 // the location.
 const props = defineProps<{ selection: Exclude<SkySelection, { kind: 'photo' }> }>();
-const emit = defineEmits<{ close: []; addFrame: []; addMosaic: [] }>();
+const emit = defineEmits<{ close: []; addFrame: []; addMosaic: []; edit: [] }>();
 const time = useSkyTimeStore();
 
 const shown = computed(() => {
@@ -69,6 +71,14 @@ const shown = computed(() => {
 });
 
 const located = computed(() => time.lat !== null && time.lon !== null);
+
+const planPicker = ref(false);
+const planTarget = computed(() => {
+  const s = props.selection;
+  return s.kind === 'dso'
+    ? { id: s.dso.id, name: shown.value.title, ra: s.dso.ra, dec: s.dso.dec }
+    : null;
+});
 const facts = computed(() => {
   const { ra, dec, magnitude } = shown.value;
   const out: { label: string; value: string }[] = [];
@@ -100,8 +110,6 @@ const facts = computed(() => {
       </div>
     </template>
     <PhoneFacts :facts="facts" />
-    <!-- "Ajouter un cadre" and "Ajouter une mosaïque" open "Créer un cadre" / "Créer une mosaïque"; the screens behind
-         the others (plan picker, edit, details) are not built yet. -->
     <div
       class="mob-icon-row"
       :class="{ 'mob-icon-row--start': selection.kind !== 'dso' }"
@@ -115,16 +123,14 @@ const facts = computed(() => {
         ><AppIcon :svg="addMosaicIcon"
       /></PhoneIconButton>
       <template v-if="selection.kind === 'dso'">
-        <PhoneIconButton waiting :label="t('targets.plan.pickerTitle')"
+        <PhoneIconButton :label="t('targets.plan.pickerTitle')" @click="planPicker = true"
           ><AppIcon :svg="addToPlanIcon"
         /></PhoneIconButton>
-        <PhoneIconButton waiting :label="t('dso.edit')"
+        <PhoneIconButton :label="t('dso.edit')" @click="emit('edit')"
           ><AppIcon :svg="editIcon"
         /></PhoneIconButton>
       </template>
-      <PhoneIconButton waiting :label="t('mobile.sky.details')"
-        ><AppIcon :svg="infoIcon"
-      /></PhoneIconButton>
     </div>
+    <PlanPickerSheet v-if="planTarget" v-model:open="planPicker" :target="planTarget" />
   </PhoneMapSheet>
 </template>

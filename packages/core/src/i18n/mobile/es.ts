@@ -170,7 +170,6 @@ const es: Translations['mobile'] = {
     searchClear: 'Borrar la búsqueda',
     closeSheet: 'Cerrar la ficha',
     objectActions: 'Acciones sobre el objeto',
-    details: 'Ver los detalles',
     tonight: 'Esta noche',
     dateField: 'Fecha y hora, abrir los selectores: {value}',
     photoObjects: 'Objetos de la foto',
