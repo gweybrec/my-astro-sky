@@ -26,6 +26,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 | `docs/dev/render-performance.md`    | Developers               | Transferable canvas-perf techniques from the sky-map render loop: profiling, hoisting per-frame invariants, sprite atlas, input coalescing, cache-key bucketing/drift             |
 | `docs/dev/ci.md`                    | Developers               | GitHub Actions workflows: CI, tests, Docker image build/smoke-test, Electron release builds; also documents the (workflow-free) GitHub Pages docs deployment                      |
 | `docs/dev/mobile-architecture.md`   | Developers               | How the desktop and phone apps share code: packages and dependency rules, the backend seam, services, ports and platform adapters, the phone app, constraints measured on a phone |
+| `docs/dev/working-on-both-apps.md`  | Developers               | How the desktop and phone UIs are kept apart, how the phone app adapts to portrait and landscape, where to start a change and what to test for each kind of change                |
 
 **Rules:**
 
