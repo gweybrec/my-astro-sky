@@ -74,7 +74,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { t } from '../../i18n';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { poiTypeIcon } from '../../poi-icons';
-import { poiTypesDraft, poiTypesDraftKey, type PoiTypeDraft } from '@myastrosky/core/poi';
+import {
+  NEW_POI_TYPE_COLOR,
+  poiTypesDraft,
+  poiTypesDraftKey,
+  type PoiTypeDraft,
+} from '@myastrosky/core/poi';
 import { confirmUnsavedChanges } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
 import { isTopmostOverlay } from '../../popup-utils';
@@ -89,7 +94,7 @@ let original = '';
 let tmpCounter = 0;
 
 const newName = ref('');
-const newColor = ref('#4ea1ff');
+const newColor = ref(NEW_POI_TYPE_COLOR);
 const saving = ref(false);
 
 onMounted(async () => {

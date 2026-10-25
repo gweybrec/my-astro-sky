@@ -51,6 +51,12 @@
   --mobile-column-max: 680px;
   /* The settings column beside the map of a map mode in landscape (boards "…Landscape" of the map modes). */
   --mobile-side-panel: 400px;
+  /* A sheet's width in landscape, over a scrim or over the map; a dialog's; a pushed form's footer button's. */
+  --mobile-sheet-width: 440px;
+  --mobile-dialog-width: 400px;
+  --mobile-footer-button-width: 200px;
+  /* The stroke of a tick box's mark: about 2 px once Ionic's mark is scaled to three quarters of the box. */
+  --checkmark-stroke: 2.6px;
   --mobile-hairline: 1px;
   --spinner-size-page: 36px;
   --sheet-max-height: 60dvh;
@@ -205,7 +211,7 @@ ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page) {
     padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px));
   }
   ion-footer.mob-footer > ion-button.mob-btn {
-    flex: 0 0 200px;
+    flex: 0 0 var(--mobile-footer-button-width);
   }
   /* The context row of the targets: the fields share one row equally. */
   .mob-context > * {

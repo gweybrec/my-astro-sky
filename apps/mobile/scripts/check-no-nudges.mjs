@@ -1,12 +1,16 @@
-// Static check, no browser: the phone app aligns by layout (flex, grid, baselines, tokens), never by pixel offsets.
-// Scans the CSS files and the style blocks / inline styles of the .vue files of apps/mobile/src for a literal length in
-// the properties that are used to nudge an item, and fails on any hit that is not in ALLOWED below.
-// Usage: node apps/mobile/scripts/check-no-nudges.mjs
+// Static check, no browser: the phone app aligns by layout (flex, grid, baselines, tokens), never by pixel offsets, and
+// sizes by tokens or named variables, never by raw lengths. Scans the CSS files and the style blocks / inline styles of
+// the .vue files of apps/mobile/src for a literal length in the properties that are used to nudge an item or to size
+// one, and fails on any hit that is not in ALLOWED below. The named variables themselves (`--mobile-sheet-width: 440px`
+// in ionic-tokens.css) are not sizing properties, so they may hold a length.
+// Usage: node apps/mobile/scripts/check-no-nudges.mjs [src folder, apps/mobile/src by default]
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const src = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src');
+const src = path.resolve(
+  process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '../src'),
+);
 
 // A length written as a number: 4px, -0.5rem, 50%, 2em. `0` alone is not a length. A length inside `var(--x, 4px)`
 // fallback counts too.
@@ -16,6 +20,9 @@ const NEUTRAL = /(?<![\w.-])(0(px|rem|em|%)?|100(%|dvh|vh|vw))(?![\w.%-])/g;
 const PROPS = new RegExp(
   '^(top|bottom|left|right|inset|inset-[a-z-]+|margin|margin-[a-z-]+|padding|padding-[a-z-]+|height|min-height|max-height|line-height|vertical-align|translate|transform|transform-origin|gap|row-gap|column-gap)$',
 );
+// Sizes, and the size variables of Ionic's components. Border widths are not here: every border is a 1px hairline.
+const SIZE_PROPS =
+  /^(font-size|width|min-width|max-width|flex|flex-basis|--width|--min-width|--max-width|--height|--min-height|--max-height|--size|--checkmark-width)$/;
 
 /**
  * Each entry: file (relative to apps/mobile/src), a text the offending declaration's rule/selector must contain, the
@@ -85,7 +92,7 @@ for (const file of files(src)) {
   }
   for (const b of blocks) {
     for (const d of declarations(b.css, b.line)) {
-      if (!PROPS.test(d.prop)) continue;
+      if (!PROPS.test(d.prop) && !SIZE_PROPS.test(d.prop)) continue;
       const bad =
         d.prop === 'transform' || d.prop === 'translate'
           ? /translate/.test(d.value) && LITERAL.test(d.value.replace(NEUTRAL, ''))
@@ -100,9 +107,9 @@ for (const file of files(src)) {
 }
 if (hits.length) {
   console.error(
-    'Pixel offsets in the phone app (align by layout instead, or allow-list with a reason):',
+    'Pixel offsets or raw sizes in the phone app (align by layout, size by a token or a named variable, or allow-list with a reason):',
   );
   for (const h of hits) console.error('  ' + h);
   process.exit(1);
 }
-console.log('No pixel nudges in apps/mobile/src.');
+console.log(`No pixel nudges or raw sizes in ${path.relative(process.cwd(), src) || '.'}.`);

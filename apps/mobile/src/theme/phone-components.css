@@ -327,7 +327,7 @@ ion-checkbox.mob-check-row {
   --checkmark-color: var(--bg-app);
   /* The board's tick is the browser's own: thin (about 2 px) and about three quarters of the box. Ionic's mark fills
      the box, so it is scaled down; the stroke is set so that it stays about 2 px after the scale. */
-  --checkmark-width: 2.6px;
+  --checkmark-width: var(--checkmark-stroke);
   --transition: none;
 }
 ion-checkbox.mob-check-row::part(mark) {
@@ -373,7 +373,7 @@ ion-checkbox.mob-lead-check {
   --checkbox-background: var(--border-white-md);
   --checkbox-background-checked: var(--accent-color);
   --checkmark-color: var(--bg-app);
-  --checkmark-width: 2.6px;
+  --checkmark-width: var(--checkmark-stroke);
   --transition: none;
 }
 ion-checkbox.mob-lead-check::part(mark) {
@@ -696,7 +696,7 @@ ion-modal.mob-sheet-modal .mob-sheet--auto-lg {
 @media (orientation: landscape) {
   /* A sheet over a scrim is a centred card of limited width. */
   ion-modal.mob-sheet-modal {
-    --width: 440px;
+    --width: var(--mobile-sheet-width);
     --max-width: calc(100% - 2 * var(--mobile-gutter));
   }
   ion-modal.mob-sheet-modal .mob-sheet,
@@ -725,7 +725,7 @@ ion-alert.mob-dialog-alert {
 /* Landscape: a card of fixed width, centred (the landscape mockup's dialog). */
 @media (orientation: landscape) {
   ion-alert.mob-dialog-alert {
-    --width: 400px;
+    --width: var(--mobile-dialog-width);
     --max-width: calc(100% - 2 * var(--mobile-gutter));
   }
 }
@@ -746,7 +746,7 @@ ion-alert.mob-dialog-alert .alert-head {
 ion-alert.mob-dialog-alert .alert-title {
   margin: 0;
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-section);
   line-height: var(--alert-title-line);
   font-weight: 600;
 }
@@ -756,7 +756,7 @@ ion-alert.mob-dialog-alert .alert-message {
   padding: 0;
   max-height: none;
   color: var(--text-secondary);
-  font-size: 16px;
+  font-size: var(--font-size-head);
   line-height: var(--alert-text-line);
   font-weight: 400;
 }
@@ -793,7 +793,7 @@ ion-alert.mob-dialog-alert .alert-button {
   white-space: normal;
   text-align: center;
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: var(--font-size-head);
   line-height: var(--alert-text-line);
   font-weight: 400;
 }
@@ -995,7 +995,7 @@ ion-button.mob-row-main--checked .mob-radio-mark {
 /* The saved-region list is a centred 680 px column in landscape (board "Cibles, régions du ciel", landscape), which keeps it clear of the plus. */
 @media (orientation: landscape) {
   .mob-region-list {
-    max-width: 680px;
+    max-width: var(--mobile-column-max);
     margin: 0 auto;
   }
 }
@@ -1105,7 +1105,7 @@ ion-button.mob-icon-btn--float.mob-icon-btn--pressed {
   .mob-map-sheet {
     left: var(--mobile-gutter);
     right: auto;
-    width: 440px;
+    width: var(--mobile-sheet-width);
     max-width: calc(100% - 2 * var(--mobile-gutter));
     max-height: calc(100% - var(--mobile-touch-min) - 2 * var(--mobile-gutter));
     box-sizing: border-box;

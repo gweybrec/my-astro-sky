@@ -194,6 +194,9 @@ export function isPoiVisible(
   return visiblePois[poiKey(resolveCategory(poi.categoryId, categories).id, poi.name)] !== false;
 }
 
+/** The colour a new type of point of interest starts with in the types editor. */
+export const NEW_POI_TYPE_COLOR = '#4ea1ff';
+
 /** A type of point of interest being edited (the types editor's list): `isNew` until it is saved. */
 export interface PoiTypeDraft {
   id: string;

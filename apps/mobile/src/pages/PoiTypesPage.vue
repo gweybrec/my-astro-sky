@@ -3,7 +3,12 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
-import { poiTypesDraft, poiTypesDraftKey, type PoiTypeDraft } from '@myastrosky/core/poi';
+import {
+  NEW_POI_TYPE_COLOR,
+  poiTypesDraft,
+  poiTypesDraftKey,
+  type PoiTypeDraft,
+} from '@myastrosky/core/poi';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { useBackClose } from '../composables/useBackClose';
 import { useConfirm } from '../composables/useConfirm';
@@ -34,7 +39,7 @@ const { showError } = useErrorToast();
 const draft = ref<PoiTypeDraft[]>([]);
 const original = ref('');
 const newName = ref('');
-const newColor = ref('#4ea1ff');
+const newColor = ref(NEW_POI_TYPE_COLOR);
 const saving = ref(false);
 let tmp = 0;
 /** The desktop's "+ Ajouter un type" starts with a "+" that the board draws as an icon. */

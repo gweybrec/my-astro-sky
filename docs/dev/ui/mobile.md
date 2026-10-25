@@ -14,7 +14,7 @@ The rules every screen of the phone app (`apps/mobile/`) follows. The desktop's 
 - A phone is 360 to 430 CSS pixels wide. Fixed sizes and margins are constants; flexible elements take the remaining width; nothing is scaled or clipped. Landscape has its own layout: a navigation rail on the left, sheets of limited width.
 - The frame applies the system bars' insets once. A screen never reads `env(safe-area-inset-*)`.
 - **Alignment comes from layout.** Items line up because of how their row arranges them (`align-items`, `gap`, grid tracks). Text beside a chip shares the baseline of the text inside the chip. An icon is aligned by its row and sized by a token or in `em`.
-- **No pixel offsets.** No literal length in a position, margin, transform or fixed height may be used to bring something into line: it would break when the text wraps, grows or is translated. `apps/mobile/scripts/check-no-nudges.mjs` runs in `npm run verify` and fails on them.
+- **No pixel offsets.** No literal length in a position, margin, transform or fixed height may be used to bring something into line: it would break when the text wraps, grows or is translated. `apps/mobile/scripts/check-no-nudges.mjs` runs in `npm run verify` and fails on them, and on a raw length in a size (`font-size`, `width`, `flex`, Ionic's `--width`…): sizes come from a token or a named variable in `ionic-tokens.css`.
 - Trailing items of a row (information button, switch, chevron, handle) are separated by the spacing token; they never touch.
 - Every touch area is at least 48 by 48 CSS pixels.
 
