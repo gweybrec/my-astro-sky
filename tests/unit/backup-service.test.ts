@@ -330,6 +330,69 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
     });
   });
 
+  describe('photos that share a name', () => {
+    const named = (id: string, name: string, notes = '') => ({
+      id,
+      filename: `${id}.jpg`,
+      originalName: name,
+      width: 1,
+      height: 1,
+      notes,
+    });
+    const notesById = async (set: Awaited<ReturnType<typeof makeSet>>) =>
+      Object.fromEntries((await set.photos.list()).map((p) => [p.id, p.notes]));
+
+    it('keeps both when a machine imports its own backup again', async () => {
+      const a = await makeSet();
+      for (const id of ['P', 'Q']) {
+        await a.photos.importPhoto(named(id, 'result.jpg'), 'skip');
+        a.blobs.store.set(`${id}.jpg`, text(`image-${id}`));
+      }
+      const writer = memoryWriter();
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      await svc.exportTo(writer, { options: {} });
+      const result = await svc.importFrom(memoryReader(writer.files), {
+        ...everything,
+        selectedImages: ['P.jpg', 'Q.jpg'],
+      });
+      expect(result).toMatchObject({ imported: 2, skipped: 0, failed: [] });
+      expect((await a.photos.list()).map((p) => p.id)).toEqual(['P', 'Q']);
+    });
+
+    it('replaces only the photo the backup carries, not the other one of the same name', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('P', 'result.jpg', 'old'), 'skip');
+      await a.photos.importPhoto(named('Q', 'result.jpg', 'mine'), 'skip');
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importPhotoList([named('P', 'result.jpg', 'new')], everything);
+      expect(result).toMatchObject({ imported: 1, skipped: 0 });
+      expect(await notesById(a)).toEqual({ P: 'new', Q: 'mine' });
+    });
+
+    it('replaces a photo of the same name under another id, once', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('L', 'result.jpg', 'local'), 'skip');
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importPhotoList(
+        [named('A', 'result.jpg', 'a'), named('B', 'result.jpg', 'b')],
+        everything,
+      );
+      expect(result).toMatchObject({ imported: 2, skipped: 0 });
+      expect(await notesById(a)).toEqual({ A: 'a', B: 'b' });
+    });
+
+    it('deletes nothing for a photo that is skipped', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('L', 'result.jpg', 'local'), 'skip');
+      await a.photos.importPhoto(named('X', 'other.jpg', 'kept'), 'skip');
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      // Its id exists here under another name, so it is skipped: the local result.jpg must stay.
+      const result = await svc.importPhotoList([named('X', 'result.jpg', 'bundle')], everything);
+      expect(result).toMatchObject({ imported: 0, skipped: 1 });
+      expect(await notesById(a)).toEqual({ L: 'local', X: 'kept' });
+    });
+  });
+
   describe('partial import', () => {
     it('imports only the ticked plan, with its setup and the gear that setup uses', async () => {
       const a = await seed();

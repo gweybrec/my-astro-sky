@@ -124,13 +124,21 @@ export interface PhotoService {
   removeAllRows(): Promise<number>;
   /** Deletes every photo: the rows, the images and the thumbnails. Returns how many there were. */
   removeAll(): Promise<number>;
-  /** For each of `names` that is the display name of a stored photo, the id of that photo (the first one), in the order of `names`. */
+  /**
+   * For each of `names`, every stored photo with that display name, in the order of `names`, then in the order the
+   * photos are stored.
+   */
   findByOriginalNames(names: readonly string[]): Promise<{ originalName: string; id: string }[]>;
   /**
    * Writes one photo of a backup manifest in one transaction, with the id it has there. With `skip` an existing
-   * id is left alone ('skipped'); with `replace` it is deleted first.
+   * id is left alone ('skipped'); with `replace` it is deleted first. The photos `replaceIds` are deleted in the same
+   * transaction once the photo is written, and kept when it is skipped.
    */
-  importPhoto(photo: BackupPhoto, strategy: PhotoImportStrategy): Promise<'imported' | 'skipped'>;
+  importPhoto(
+    photo: BackupPhoto,
+    strategy: PhotoImportStrategy,
+    replaceIds?: readonly string[],
+  ): Promise<'imported' | 'skipped'>;
 }
 
 interface PhotoRow {
@@ -763,19 +771,20 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
 
     async findByOriginalNames(names) {
       if (names.length === 0) return [];
-      const idByName = new Map<string, string>();
+      const idsByName = new Map<string, string[]>();
       for (const r of await db.all<{ id: string; original_name: string }>(SELECT_NAMES)) {
-        if (!idByName.has(r.original_name)) idByName.set(r.original_name, r.id);
+        const ids = idsByName.get(r.original_name);
+        if (ids) ids.push(r.id);
+        else idsByName.set(r.original_name, [r.id]);
       }
       const found: { originalName: string; id: string }[] = [];
       for (const name of names) {
-        const id = idByName.get(name);
-        if (id !== undefined) found.push({ originalName: name, id });
+        for (const id of idsByName.get(name) ?? []) found.push({ originalName: name, id });
       }
       return found;
     },
 
-    async importPhoto(photo, strategy) {
+    async importPhoto(photo, strategy, replaceIds = []) {
       const p = photo as unknown as Record<string, any>;
       const id: string = p.id;
       const correspondences: PhotoCorrespondenceInput[] = Array.isArray(p.correspondences)
@@ -803,9 +812,13 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           cleanQuarterTurns(p.quarterTurns),
         ]);
         if (result.changes === 0) return 'skipped' as const;
-        if (correspondences.length > 0) {
-          await tx.batch(correspondenceStatements(id, correspondences));
-        }
+        const statements = [
+          ...replaceIds
+            .filter((other) => other !== id)
+            .map((other) => ({ sql: DELETE_PHOTO, params: [other] })),
+          ...correspondenceStatements(id, correspondences),
+        ];
+        if (statements.length > 0) await tx.batch(statements);
         return 'imported' as const;
       });
     },

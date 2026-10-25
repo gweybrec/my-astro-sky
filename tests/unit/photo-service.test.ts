@@ -833,12 +833,13 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await svc.findByOriginalNames([])).toEqual([]);
     });
 
-    it('matches only the display name and answers the first photo when two share a name', async () => {
+    it('matches only the display name and answers every photo when two share a name', async () => {
       await svc.insert(newPhoto('first', { originalName: 'same.jpg', filename: 'f1.jpg' }));
       await svc.insert(newPhoto('second', { originalName: 'same.jpg', filename: 'f2.jpg' }));
       expect(await svc.findByOriginalNames(['first', 'f1.jpg'])).toEqual([]);
       expect(await svc.findByOriginalNames(['same.jpg'])).toEqual([
         { originalName: 'same.jpg', id: 'first' },
+        { originalName: 'same.jpg', id: 'second' },
       ]);
     });
 
@@ -958,6 +959,15 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await ids()).toEqual(['imp']);
     });
 
+    it('deletes the photos of replaceIds once it is written, and keeps them when it is skipped', async () => {
+      await svc.insert(newPhoto('old', { correspondences: corr(2) }));
+      await svc.insert(newPhoto('other'));
+      expect(await svc.importPhoto(backup(), 'skip', ['old'])).toBe('imported');
+      expect(await ids()).toEqual(['other', 'imp']);
+      expect(await svc.importPhoto(backup({ notes: 'again' }), 'skip', ['other'])).toBe('skipped');
+      expect(await ids()).toEqual(['other', 'imp']);
+    });
+
     it('is all or nothing: repeated pointIndex rolls the photo back', async () => {
       await expect(
         svc.importPhoto(backup({ correspondences: [corr(1)[0], corr(1)[0]] }), 'skip'),
@@ -991,6 +1001,12 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       ).toBe(5);
       // skipped: begin, the ignored insert, commit
       expect(await calls(() => svc.importPhoto(backup({ id: 'x3' }), 'skip'))).toBe(3);
+      // the photos it replaces go in the batch of the correspondences
+      expect(
+        await calls(() =>
+          svc.importPhoto(backup({ id: 'x4', correspondences: corr(2) }), 'skip', ['x1', 'x2']),
+        ),
+      ).toBe(4);
     });
   });
   describe('rotateRight', () => {

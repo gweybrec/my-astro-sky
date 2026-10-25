@@ -158,9 +158,17 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
 
     if (importMetadata && list.length > 0) {
       const allNames = list.map((p) => p.originalName ?? p.filename ?? p.id).filter(Boolean);
-      const existingByName = new Map(
-        (await photos.findByOriginalNames(allNames)).map((r) => [r.originalName, r.id]),
-      );
+      // One snapshot of the photos already here, taken before anything is imported: a photo of the list replaces
+      // the local one with its id and name, else the first local one of its name that the list does not carry and
+      // no earlier photo of the list replaced, so two photos of the same name never delete each other.
+      const localIdsByName = new Map<string, string[]>();
+      for (const r of await photos.findByOriginalNames([...new Set(allNames)])) {
+        const ids = localIdsByName.get(r.originalName);
+        if (ids) ids.push(r.id);
+        else localIdsByName.set(r.originalName, [r.id]);
+      }
+      const listIds = new Set(list.map((p) => p.id));
+      const replaced = new Set<string>();
 
       for (const p of list) {
         if (!p.id || typeof p.id !== 'string') {
@@ -176,12 +184,21 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         }
 
         try {
-          const existingId = existingByName.get(origName);
-          if (existingId) await photos.removeRow(existingId);
+          const localIds = localIdsByName.get(origName) ?? [];
+          const sameId = localIds.includes(p.id);
+          const other = sameId
+            ? undefined
+            : localIds.find((id) => !listIds.has(id) && !replaced.has(id));
 
-          const result = await photos.importPhoto(p as any, 'skip');
-          if (result === 'imported') imported++;
-          else skipped++;
+          const result = await photos.importPhoto(
+            p as any,
+            sameId ? 'replace' : 'skip',
+            other ? [other] : [],
+          );
+          if (result === 'imported') {
+            imported++;
+            if (other) replaced.add(other);
+          } else skipped++;
         } catch (photoErr) {
           recordFailure('photo', origName, photoErr);
         }
