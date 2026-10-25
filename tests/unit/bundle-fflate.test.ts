@@ -127,7 +127,8 @@ describe('bundle-fflate', () => {
       expect(await reader.read('manifest.json')).toEqual(text('{"photos":[]}'));
       // The picture's bytes are never asked for unless it is read.
       expect(total()).toBeLessThan(EOCD_SEARCH_BOUND);
-      expect(await reader.read('images/big.jpg')).toEqual(big);
+      // Compared as bytes: toEqual walks a 1 MB array element by element and takes seconds.
+      expect(Buffer.from(await reader.read('images/big.jpg')).equals(big)).toBe(true);
     });
 
     it('opens an archive larger than the phone could hold, reading only a few pieces', async () => {

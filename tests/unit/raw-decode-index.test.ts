@@ -84,24 +84,26 @@ const TEST_PHOTOS_DIR = path.join(__dirname, '../../test-photos');
 describe.skipIf(!fs.existsSync(TEST_PHOTOS_DIR))(
   'decodeRawAstroImage — real sample files (local only, test-photos/ is gitignored)',
   () => {
-    it('decodes all real TIFF/FITS samples to plausible dimensions', async () => {
-      const cases: Array<[string, string, number, number, 1 | 3]> = [
-        ['M26.tiff', '.tiff', 3331, 1791, 3],
-        ['M97+M108.tiff', '.tiff', 3263, 1931, 3],
-        ['M1-CCD.fit', '.fit', 1049, 754, 1],
-        ['M2_1320s.fit', '.fit', 674, 507, 1],
-        ['M101.fit', '.fit', 3204, 2136, 3],
-        ['LDN1235.fit', '.fit', 5760, 3239, 3],
-      ];
-      for (const [file, ext, width, height, channels] of cases) {
+    // One test per file, so each large sample gets its own time limit (they take seconds each
+    // under coverage) and a failure names the file.
+    it.each<[string, string, number, number, 1 | 3]>([
+      ['M26.tiff', '.tiff', 3331, 1791, 3],
+      ['M97+M108.tiff', '.tiff', 3263, 1931, 3],
+      ['M1-CCD.fit', '.fit', 1049, 754, 1],
+      ['M2_1320s.fit', '.fit', 674, 507, 1],
+      ['M101.fit', '.fit', 3204, 2136, 3],
+      ['LDN1235.fit', '.fit', 5760, 3239, 3],
+    ])(
+      'decodes %s to plausible dimensions',
+      async (file, ext, width, height, channels) => {
         const full = path.join(TEST_PHOTOS_DIR, file);
-        if (!fs.existsSync(full)) continue;
-        const buf = fs.readFileSync(full);
-        const r = await decodeRawAstroImage(buf, ext);
+        if (!fs.existsSync(full)) return;
+        const r = await decodeRawAstroImage(fs.readFileSync(full), ext);
         expect(r.width).toBe(width);
         expect(r.height).toBe(height);
         expect(r.channels).toBe(channels);
-      }
-    }, 30000);
+      },
+      30000,
+    );
   },
 );
