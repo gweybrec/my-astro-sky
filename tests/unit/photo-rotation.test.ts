@@ -128,6 +128,10 @@ describe('rotatePhotoRight', () => {
     for (let i = 0; i < 4; i++) p = rotatePhotoRight(p);
     expect(p.width).toBe(W);
     expect(p.manualPlacement!.rotationDeg).toBeCloseTo(-170);
+    expect(
+      rotatePhotoRight(photo({ manualPlacement: { ...before.manualPlacement!, angleOnSky: true } }))
+        .manualPlacement!.angleOnSky,
+    ).toBe(true);
     expect(p.dsoIds).toEqual(['M31']);
     expect(p.pointsOfInterest).toEqual(before.pointsOfInterest);
   });

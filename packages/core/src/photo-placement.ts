@@ -20,6 +20,7 @@ import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform } from './affine';
 import { getStarByHip } from './catalog/star-registry';
 import { reportError } from './platform/error-hook';
+import { normalizeRotationDeg } from './sky-map-types';
 
 /**
  * Get RA/Dec for a correspondence: use the stored starRa/starDec when present
@@ -323,9 +324,11 @@ export function computeManualMatrix(
   const pxPerPx = placement.projPerPx * view.scale;
   const mx = placement.mirrorX ? -1 : 1;
   const my = placement.mirrorY ? -1 : 1;
-  // The placement's angle is on the sky: a map turned by the view's rotation (toCanvas turns the sky by −rotationDeg)
-  // turns the photo with it.
-  const rotRad = ((placement.rotationDeg - view.rotationDeg) * Math.PI) / 180;
+  // An angle on the sky turns with the map (toCanvas turns the sky by −rotationDeg); one saved before is on screen.
+  const screenDeg = placement.angleOnSky
+    ? placement.rotationDeg - view.rotationDeg
+    : placement.rotationDeg;
+  const rotRad = (screenDeg * Math.PI) / 180;
 
   // The photo pixel (cx, cy) maps to the placed centre.
   const cx = natW / 2;
@@ -343,6 +346,16 @@ export function computeManualMatrix(
   const f = centerCanvas.y - b * cx - d * cy;
 
   return { a, b, c, d, e, f };
+}
+
+/** The placement with its angle on the sky, drawn as it is at `view`: one saved with an angle on screen gets the map's turn added. */
+export function withAngleOnSky(placement: ManualPlacement, view: ViewState): ManualPlacement {
+  if (placement.angleOnSky) return placement;
+  return {
+    ...placement,
+    rotationDeg: normalizeRotationDeg(placement.rotationDeg + view.rotationDeg),
+    angleOnSky: true,
+  };
 }
 
 /** Neutral view under which `toCanvas` reduces to the pure flip `(x, y) → (x, -y)` —
@@ -455,6 +468,7 @@ const DEFAULT_MANUAL_PLACEMENT: ManualPlacement = {
   projPerPx: 0.002,
   mirrorX: false,
   mirrorY: false,
+  angleOnSky: true,
 };
 
 /**
@@ -509,6 +523,7 @@ export function derivePlacementFromCorrespondences(
       projPerPx,
       mirrorX: mx < 0,
       mirrorY: false,
+      angleOnSky: true,
     };
   } catch (err) {
     reportError('derive_placement_error', err);
@@ -548,6 +563,7 @@ export function derivePlacementFromMatrix(
     projPerPx,
     mirrorX: false,
     mirrorY: det < 0,
+    angleOnSky: true,
   };
 }
 

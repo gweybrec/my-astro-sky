@@ -22,6 +22,7 @@ import {
   extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
+  withAngleOnSky,
   formatZoomPercent,
 } from '@myastrosky/core/photo-placement';
 import {
@@ -424,6 +425,7 @@ describe('manual placement math', () => {
       projPerPx: 0.002,
       mirrorX: false,
       mirrorY: false,
+      angleOnSky: true,
     };
     const turned = { ...VIEW, rotationDeg: 40 };
     const straight = buildSyntheticCorrespondences(p, 100, 80, VIEW);
@@ -440,8 +442,48 @@ describe('manual placement math', () => {
       80,
     );
     expect(back.rotationDeg).toBeCloseTo(25, 6);
+    expect(back.angleOnSky).toBe(true);
     expect(back.centerRa).toBeCloseTo(0, 3);
     expect(back.centerDec).toBeCloseTo(80, 3);
+  });
+
+  it('draws a placement saved before the angle was on the sky at its angle on screen, as it was saved', () => {
+    // Saved by v0.12.0 at 20° on screen with the map turned by 30°: still drawn at 20° on that map.
+    const old: ManualPlacement = {
+      centerRa: 83.8,
+      centerDec: 22,
+      rotationDeg: 20,
+      projPerPx: 0.0005,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const turned = { ...VIEW, rotationDeg: 30 };
+    const m = computeManualMatrix(old, turned, 100, 80);
+    expect((Math.atan2(m.b, m.a) * 180) / Math.PI).toBeCloseTo(20, 6);
+    expect(Math.hypot(m.a, m.b)).toBeCloseTo(0.0005 * VIEW.scale, 9);
+    const c = toCanvas(project(83.8, 22).x, project(83.8, 22).y, turned);
+    expect(m.a * 50 + m.c * 40 + m.e).toBeCloseTo(c.x, 6);
+    expect(m.b * 50 + m.d * 40 + m.f).toBeCloseTo(c.y, 6);
+  });
+
+  it('withAngleOnSky turns a placement saved on screen into one on the sky drawn the same at that view', () => {
+    const old: ManualPlacement = {
+      centerRa: 83.8,
+      centerDec: 22,
+      rotationDeg: 170,
+      projPerPx: 0.0005,
+      mirrorX: true,
+      mirrorY: false,
+    };
+    const turned = { ...VIEW, rotationDeg: 30 };
+    const onSky = withAngleOnSky(old, turned);
+    expect(onSky).toMatchObject({ rotationDeg: -160, angleOnSky: true });
+    const before = computeManualMatrix(old, turned, 100, 80);
+    const after = computeManualMatrix(onSky, turned, 100, 80);
+    for (const k of ['a', 'b', 'c', 'd', 'e', 'f'] as const)
+      expect(after[k]).toBeCloseTo(before[k], 9);
+    // One already on the sky is left as it is.
+    expect(withAngleOnSky(onSky, { ...VIEW, rotationDeg: -75 })).toBe(onSky);
   });
 
   it('manual → synthetic correspondences → derive round-trips the placement', () => {
@@ -497,6 +539,7 @@ describe('manual placement math', () => {
       projPerPx: 0.002,
       mirrorX: false,
       mirrorY: false,
+      angleOnSky: true,
     });
   });
 });

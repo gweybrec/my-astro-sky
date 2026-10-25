@@ -6,7 +6,7 @@ import type {
   PhotoIntegration,
   PointOfInterest,
 } from '@myastrosky/core/types';
-import { project, toCanvas, unproject } from '@myastrosky/core/projection';
+import { project, unproject } from '@myastrosky/core/projection';
 import { reportUnknownRendererError } from './error-reporter';
 
 import {
@@ -14,6 +14,8 @@ import {
   extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
+  computeManualMatrix,
+  withAngleOnSky,
   formatZoomPercent,
 } from '@myastrosky/core/photo-placement';
 import {
@@ -1621,6 +1623,7 @@ export class PhotoOverlay extends PhotoLayer {
       projPerPx: 0.002,
       mirrorX: false,
       mirrorY: false,
+      angleOnSky: true,
     };
 
     // Initialize to current map center
@@ -1838,24 +1841,7 @@ export class PhotoOverlay extends PhotoLayer {
 
         // Compute the manual CSS matrix for comparison
         const view = this.getView();
-        const centerProj = project(placement.centerRa, placement.centerDec);
-        const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
-        const pxPerPx = placement.projPerPx * view.scale;
-        const rotRad = (placement.rotationDeg * Math.PI) / 180;
-        const mx = placement.mirrorX ? -1 : 1;
-        const my = placement.mirrorY ? -1 : 1;
-        const cx = naturalWidth / 2;
-        const cy = naturalHeight / 2;
-        const cosR = Math.cos(rotRad) * pxPerPx;
-        const sinR = Math.sin(rotRad) * pxPerPx;
-        const manualMatrix = {
-          a: cosR * mx,
-          b: sinR * mx,
-          c: -sinR * my,
-          d: cosR * my,
-          e: centerCanvas.x - cosR * mx * cx - -sinR * my * cy,
-          f: centerCanvas.y - sinR * mx * cx - cosR * my * cy,
-        };
+        const manualMatrix = computeManualMatrix(placement, view, naturalWidth, naturalHeight);
         console.log('[Manual Validation] Manual CSS matrix:', manualMatrix, 'at view:', view);
         (window as any).__manualMatrix = manualMatrix; // Store for comparison
 
@@ -1907,8 +1893,8 @@ export class PhotoOverlay extends PhotoLayer {
     let placement: ManualPlacement;
 
     if (photo.manualPlacement) {
-      // Use existing manual placement
-      placement = { ...photo.manualPlacement };
+      // Use existing manual placement, its angle on the sky (one saved before had it on screen)
+      placement = withAngleOnSky({ ...photo.manualPlacement }, view);
     } else {
       // Extract placement from the current CSS transform matrix
       // This ensures the repositioned photo starts exactly where it currently is

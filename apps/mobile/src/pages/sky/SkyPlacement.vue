@@ -54,6 +54,7 @@ const placement = reactive<ManualPlacement>({
   projPerPx: 1,
   mirrorX: false,
   mirrorY: false,
+  angleOnSky: true,
 });
 let firstProjPerPx = 1;
 const opacity = ref(0.85);

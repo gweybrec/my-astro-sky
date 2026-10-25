@@ -251,7 +251,7 @@ photosRouter.delete('/api/photo-metadata', async (_req, res) => {
  *             properties:
  *               manualPlacement:
  *                 type: object
- *                 description: Manual placement object with projPerPx and transformation matrix
+ *                 description: Manual placement (centre, angle, projPerPx, mirrors). angleOnSky true means rotationDeg is on the sky; without it (saved before) it is on screen.
  *     responses:
  *       200:
  *         description: Manual placement updated successfully

@@ -605,6 +605,13 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       placement,
       'a manual placement saved',
     );
+    const onSky = { ...placement, angleOnSky: true };
+    await b.photos.setManualPlacement(first.id, onSky);
+    expectEqual(
+      (await b.photos.listWithSizes())[0].manualPlacement,
+      onSky,
+      'a manual placement with its angle on the sky saved',
+    );
     await b.photos.setManualPlacement(first.id, null);
     expectEqual(
       (await b.photos.listWithSizes())[0].manualPlacement ?? null,

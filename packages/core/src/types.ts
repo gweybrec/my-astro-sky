@@ -256,6 +256,8 @@ export interface ManualPlacement {
   projPerPx: number; // unités de projection par pixel photo
   mirrorX: boolean;
   mirrorY: boolean;
+  /** The angle is on the sky. Without it (a placement saved before) the angle is on screen, whatever the map's turn. */
+  angleOnSky?: boolean;
 }
 
 export interface DSOUserOverride {
