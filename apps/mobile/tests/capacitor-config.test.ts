@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import config from '../capacitor.config';
 
 describe('Capacitor config', () => {
-  it('turns off the bridge logs, in debug builds too', () => {
+  it('keeps the bridge logs out of release builds', () => {
     expect(config.plugins?.CapacitorHttp?.enabled).toBe(true);
-    expect(config.loggingBehavior).toBe('none');
-    expect(config.android?.loggingBehavior).toBeUndefined();
+    // Unset means 'debug': logs in debug builds only.
+    for (const behavior of [config.loggingBehavior, config.android?.loggingBehavior])
+      expect(behavior ?? 'debug').toBe('debug');
   });
 });
