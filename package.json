@@ -90,6 +90,7 @@
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.9.2",
+    "fake-indexeddb": "^6.2.5",
     "git-cliff": "^2.10.1",
     "globals": "^17.7.0",
     "happy-dom": "^18.0.1",
