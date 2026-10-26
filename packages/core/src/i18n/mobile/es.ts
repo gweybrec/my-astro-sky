@@ -128,7 +128,7 @@ const es: Translations['mobile'] = {
   },
   settings: {
     observation: 'Observación',
-    setups: 'Setups',
+    setups: 'Configuraciones',
     astrometryKey: 'Clave de astrometry.net',
     computerSection: 'Ordenador y datos',
     computerConnection: 'Conexión al ordenador',
