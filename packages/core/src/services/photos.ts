@@ -134,7 +134,8 @@ export interface PhotoService {
   /**
    * Writes one photo of a backup manifest in one transaction, with the id it has there. With `skip` an existing
    * id is left alone ('skipped'); with `replace` it is deleted first. The photos `replaceIds` are deleted in the same
-   * transaction once the photo is written, and kept when it is skipped.
+   * transaction once the photo is written, and kept when it is skipped. A photo the manifest gives no size takes the
+   * size of its stored picture; throws `invalid` (`CANNOT_DETERMINE_DIMENSIONS`) when that picture cannot be read.
    */
   importPhoto(
     photo: BackupPhoto,
@@ -152,6 +153,11 @@ export interface PhotoService {
       replaceIds?: readonly string[];
     }[],
   ): Promise<('imported' | 'skipped')[]>;
+  /**
+   * Gives each photo stored with a width or height of 0 or less the size of its stored picture, in one grouped
+   * write. A photo whose picture is missing or not an image is left as it is. Returns the number of photos repaired.
+   */
+  repairSizes(): Promise<number>;
 }
 
 interface PhotoRow {
@@ -209,6 +215,8 @@ const UPDATE_METADATA =
 const UPDATE_METADATA_WITH_NAME =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ?, original_name = ? WHERE id = ?';
 const UPDATE_DRAW_ORDER = 'UPDATE photos SET display_order = ? WHERE id = ?';
+const SELECT_UNSIZED = 'SELECT id, filename FROM photos WHERE width <= 0 OR height <= 0';
+const UPDATE_SIZE = 'UPDATE photos SET width = ?, height = ? WHERE id = ?';
 
 const photoNotFoundBody = { error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' } as const;
 
@@ -378,6 +386,14 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     return rowToPhoto(row, await db.all<CorrespondenceRow>(SELECT_CORRESPONDENCES_FOR, [id]));
   }
 
+  /** The size a stored picture is shown at; null when it is missing or not an image. */
+  async function measureStored(
+    filename: string,
+  ): Promise<{ width: number; height: number } | null> {
+    const bytes = await blobs.get(filename).catch(() => null);
+    return bytes ? images.probe(bytes).then(shownSize, () => null) : null;
+  }
+
   const service: PhotoService = {
     async list() {
       const photos = await db.all<PhotoRow>(SELECT_PHOTOS);
@@ -408,10 +424,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       } catch {
         throw invalidUpload('Fichier image invalide ou corrompu', 'INVALID_IMAGE');
       }
-      // The browser shows the picture with its EXIF rotation applied: orientations 5 to 8 swap width and height.
-      const swap = !!source.orientation && source.orientation >= 5 && source.orientation <= 8;
-      const width = swap ? source.height : source.width;
-      const height = swap ? source.width : source.height;
+      const { width, height } = shownSize(source);
 
       // The orientation is baked into the stored file, which keeps the coordinate space consistent.
       const id = newId();
@@ -804,17 +817,32 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
 
     async importPhotos(items) {
       if (items.length === 0) return [];
+      // The size of the stored picture of a photo the manifest gives none, read before the transaction (whose body
+      // may await only its own calls); null when the picture is missing or not an image.
+      const measured = new Map<number, { width: number; height: number } | null>();
+      for (const [i, { photo }] of items.entries()) {
+        const p = photo as unknown as Record<string, any>;
+        if (isPixelCount(p.width) && isPixelCount(p.height)) continue;
+        measured.set(i, await measureStored(p.filename ?? `${p.id}.jpg`));
+      }
       return db.transaction(async (tx) => {
         // The ids taken: those here, then as the list writes and deletes them.
         const taken = new Set((await tx.all<{ id: string }>(SELECT_IDS)).map((r) => r.id));
         const results: ('imported' | 'skipped')[] = [];
         const statements: SqlStatement[] = [];
-        for (const { photo, strategy, replaceIds = [] } of items) {
+        for (const [i, { photo, strategy, replaceIds = [] }] of items.entries()) {
           const p = photo as unknown as Record<string, any>;
           const id: string = p.id;
           if (strategy !== 'replace' && taken.has(id)) {
             results.push('skipped');
             continue;
+          }
+          const size = measured.has(i) ? measured.get(i) : { width: p.width, height: p.height };
+          if (!size) {
+            throw invalidUpload(
+              "Impossible de déterminer les dimensions de l'image",
+              'CANNOT_DETERMINE_DIMENSIONS',
+            );
           }
           const correspondences: PhotoCorrespondenceInput[] = Array.isArray(p.correspondences)
             ? p.correspondences
@@ -822,7 +850,10 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           const others = replaceIds.filter((other) => other !== id);
           if (strategy === 'replace') statements.push({ sql: DELETE_PHOTO, params: [id] });
           statements.push(
-            { sql: INSERT_PHOTO_WITH_ID, params: importParams(p, new Date(now()).toISOString()) },
+            {
+              sql: INSERT_PHOTO_WITH_ID,
+              params: importParams({ ...p, ...size }, new Date(now()).toISOString()),
+            },
             ...others.map((other) => ({ sql: DELETE_PHOTO, params: [other] })),
             ...correspondenceStatements(id, correspondences),
           );
@@ -834,9 +865,31 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
         return results;
       });
     },
+
+    async repairSizes() {
+      const statements: SqlStatement[] = [];
+      for (const r of await db.all<{ id: string; filename: string }>(SELECT_UNSIZED)) {
+        const size = await measureStored(r.filename);
+        if (size) statements.push({ sql: UPDATE_SIZE, params: [size.width, size.height, r.id] });
+        else console.warn(`[Photos] The size of ${r.filename} cannot be read from its picture`);
+      }
+      if (statements.length > 0) await db.batch(statements);
+      return statements.length;
+    },
   };
   return service;
 }
+
+/** The size the picture is shown at: the browser applies its EXIF rotation, and orientations 5 to 8 swap width and height. */
+function shownSize(info: ImageInfo): { width: number; height: number } {
+  const swap = !!info.orientation && info.orientation >= 5 && info.orientation <= 8;
+  return swap
+    ? { width: info.height, height: info.width }
+    : { width: info.width, height: info.height };
+}
+
+/** A width or height a picture can have: a whole number of pixels, at least one. */
+const isPixelCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0;
 
 /** A date in the form the database wrote before schema version 16 (`YYYY-MM-DD HH:MM:SS`, UTC). */
 const SQLITE_DATETIME = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/;
@@ -848,8 +901,8 @@ function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
     id,
     p.filename ?? `${id}.jpg`,
     p.originalName ?? p.filename ?? id,
-    p.width ?? 0,
-    p.height ?? 0,
+    p.width,
+    p.height,
     typeof p.createdAt === 'string'
       ? p.createdAt.replace(SQLITE_DATETIME, '$1T$2.000Z')
       : (p.createdAt ?? nowIso),

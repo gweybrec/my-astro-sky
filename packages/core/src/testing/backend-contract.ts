@@ -687,6 +687,17 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     expectEqual(await b.photos.removeAll(), 1, 'the turned photo removed');
   });
 
+  add('photos: repairing sizes leaves a photo whose size is known as it is', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    expectEqual(await b.photos.repairSizes(), 0, 'nothing to repair without photos');
+    await b.photos.upload(fixtures.jpeg(), { correspondences: JSON.stringify(CORRESPONDENCES) });
+    const [before] = await b.photos.listWithSizes();
+    expectEqual(await b.photos.repairSizes(), 0, 'an uploaded photo has its size');
+    const [after] = await b.photos.listWithSizes();
+    expectEqual(stable(after), stable(before), 'the photo unchanged');
+    expectEqual(await b.photos.removeAll(), 1, 'the photo removed');
+  });
+
   add('photos: a cancelled upload stores nothing', async () => {
     const { backend: b, fixtures } = await makeBackend();
     await expectAborted(

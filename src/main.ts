@@ -5,7 +5,7 @@ import { SkyMap } from '@myastrosky/render/sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery } from './gallery';
 import { TargetsView } from './targets-view';
-import { getPhotos, getGearSetups, getLatestVersion } from './api';
+import { getPhotos, getGearSetups, getLatestVersion, repairPhotoSizes } from './api';
 import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from '@myastrosky/core/version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
 import { getHemisphere } from '@myastrosky/core/projection';
@@ -259,10 +259,30 @@ async function checkForUpdate() {
   }
 }
 
+/**
+ * Last at start-up: the photos stored without a size take the size of their picture, and when any did, the sky map
+ * and the gallery are given the photos again. A failure is only reported.
+ */
+async function repairStoredPhotoSizes() {
+  try {
+    if ((await repairPhotoSizes()) === 0) return;
+    const photos = await getPhotos();
+    const { overlay, gallery, skyMap } = useCanvasStore(pinia);
+    overlay?.loadPhotos(photos);
+    gallery?.loadPhotos(photos);
+    if (overlay && skyMap) {
+      skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
+      skyMap.render();
+    }
+    usePhotosStore(pinia).syncFromOverlay();
+  } catch (err) {
+    reportUnknownRendererError('photo_size_repair_failure', err);
+  }
+}
+
 init()
-  .then(() => {
-    void checkForUpdate();
-  })
+  .then(() => checkForUpdate())
+  .then(() => repairStoredPhotoSizes())
   .catch((err) => {
     reportUnknownRendererError('app_init_failure', err);
   });

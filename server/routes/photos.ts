@@ -346,6 +346,36 @@ photosRouter.post('/api/photos/:id/rotate', async (req, res) => {
 
 /**
  * @swagger
+ * /api/photos/repair-sizes:
+ *   post:
+ *     summary: Give the photos stored without a size the size of their picture
+ *     description: >
+ *       Each photo stored with a width or height of 0 or less takes the size its stored picture is shown at. A photo
+ *       whose picture is missing or not an image is left as it is. The apps call it last at start-up.
+ *     responses:
+ *       200:
+ *         description: The number of photos repaired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 repaired:
+ *                   type: integer
+ *                   example: 0
+ *       500:
+ *         description: Server error
+ */
+photosRouter.post('/api/photos/repair-sizes', async (_req, res) => {
+  try {
+    res.json({ repaired: await photos.repairSizes() });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/**
+ * @swagger
  * /api/photos/{id}/metadata:
  *   patch:
  *     summary: Update photo metadata including DSO ids, labels, notes, and integrations

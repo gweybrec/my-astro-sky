@@ -10,6 +10,7 @@ import router from './router';
 import { initPlatform, installBackButton } from './platform-init';
 import { catalogsReady } from './catalogs';
 import { checkAstrometryKey } from './key-check';
+import { repairStoredPhotoSizes } from './photo-sizes';
 
 async function start(): Promise<void> {
   try {
@@ -26,8 +27,11 @@ async function start(): Promise<void> {
   void router
     .isReady()
     .then(() => checkAstrometryKey(() => router.push('/settings/astrometry-key')));
-  // After the first screen is up: the gear lists and the star and deep-sky registries (screens wait on the same promise).
-  void catalogsReady().catch(() => undefined);
+  // After the first screen is up: the gear lists and the star and deep-sky registries (screens wait on the same promise),
+  // then, last, the sizes of the photos stored without one.
+  void catalogsReady()
+    .catch(() => undefined)
+    .then(() => repairStoredPhotoSizes());
 }
 
 void start();

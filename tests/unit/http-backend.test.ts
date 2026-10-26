@@ -162,6 +162,12 @@ describe('requests', () => {
     expect(await backend.photos.rotateRight('p 1')).toEqual({ id: 'p 1', width: 3, height: 4 });
     expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/photos/p%201/rotate']);
   });
+
+  it('repairs the photo sizes with one POST and answers the number the server sends back', async () => {
+    const { backend, sent } = makeBackend(() => json({ repaired: 2 }));
+    expect(await backend.photos.repairSizes()).toBe(2);
+    expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/photos/repair-sizes']);
+  });
 });
 
 describe('files', () => {

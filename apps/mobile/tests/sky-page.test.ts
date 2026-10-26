@@ -9,11 +9,16 @@ const push = vi.hoisted(() => vi.fn());
 const replace = vi.hoisted(() => vi.fn());
 vi.mock('vue-router', () => ({ useRouter: () => ({ push, replace }) }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => new Promise(() => {}) }));
+const reloadPhotos = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const sizesRepaired = vi.hoisted(() => ({ settle: (_n: number) => {} }));
+vi.mock('../src/photo-sizes', () => ({
+  photoSizesRepaired: () => new Promise<number>((resolve) => (sizesRepaired.settle = resolve)),
+}));
 vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({}), showInfo: vi.fn() }));
 vi.mock('../src/sky-map-setup', () => ({
   createPhoneSkyMap: () => ({
     photos: {},
-    reloadPhotos: () => Promise.resolve(),
+    reloadPhotos,
     select: () => {},
     focus: () => {},
     showPhoto: () => {},
@@ -34,6 +39,22 @@ describe('the Ciel page', () => {
     setActivePinia(createPinia());
   });
   const mountPage = () => mount(SkyPage, { global: { stubs: ionicStubs } });
+
+  it('reads its photos again when the start-up repair gave some a size, and not when it gave none', async () => {
+    mountPage();
+    await flushPromises();
+    reloadPhotos.mockClear();
+    sizesRepaired.settle(0);
+    await flushPromises();
+    expect(reloadPhotos).not.toHaveBeenCalled();
+
+    mountPage();
+    await flushPromises();
+    reloadPhotos.mockClear();
+    sizesRepaired.settle(2);
+    await flushPromises();
+    expect(reloadPhotos).toHaveBeenCalledOnce();
+  });
 
   it('shows neither the time bar nor the toggles of the map with the live sky', async () => {
     const w = mountPage();

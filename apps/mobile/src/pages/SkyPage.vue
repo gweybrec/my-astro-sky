@@ -12,6 +12,7 @@ import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { catalogsReady } from '../catalogs';
+import { photoSizesRepaired } from '../photo-sizes';
 import {
   clearSkySelection,
   skyFocus,
@@ -88,6 +89,10 @@ onMounted(() => {
   catalogsReady()
     .then(() => sky?.catalogsLoaded())
     .catch((error) => reportError('SkyPage.catalogsReady', error));
+  // A photo the start-up repair gave a size to is shown again with it.
+  void photoSizesRepaired().then((repaired) => {
+    if (repaired > 0) void reloadPhotos();
+  });
 });
 
 watch(skySelection, (selection) => sky?.select(selection));

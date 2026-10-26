@@ -92,6 +92,7 @@ export interface Backend {
     | 'setManualPlacement'
     | 'setOrder'
     | 'rotateRight'
+    | 'repairSizes'
   > & {
     upload(file: FileSource, fields: UploadFields, options?: TransferOptions): Promise<Photo>;
   };

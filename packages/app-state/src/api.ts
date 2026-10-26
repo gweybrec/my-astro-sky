@@ -255,6 +255,11 @@ export async function rotatePhotoAPI(id: string): Promise<Photo> {
   return guard('errors.updatePhoto', () => getBackend().photos.rotateRight(id));
 }
 
+/** Gives the photos stored without a size the size of their picture; returns how many were repaired. */
+export async function repairPhotoSizes(): Promise<number> {
+  return guard('errors.updatePhoto', () => getBackend().photos.repairSizes());
+}
+
 export async function updatePhotoManualPlacement(
   photoId: string,
   manualPlacement: ManualPlacement | null,

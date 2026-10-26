@@ -337,6 +337,9 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       async rotateRight(photoId) {
         return call<Photo>('POST', `/api/photos/${id(photoId)}/rotate`);
       },
+      async repairSizes() {
+        return (await call<{ repaired: number }>('POST', '/api/photos/repair-sizes')).repaired;
+      },
       async upload(file, fields, opts) {
         const form = await formOf('photo', file, { ...fields });
         const reply = await sendUpload({

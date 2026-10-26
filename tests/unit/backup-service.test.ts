@@ -522,6 +522,31 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect((await b.photos.list()).map((p) => p.id)).toEqual(['ok']);
     });
 
+    it('measures the picture of a photo the backup gives no size, and lists one whose picture cannot be read', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      const sized = { id: 's', filename: 's.jpg', originalName: 's.jpg', width: 7, height: 9 };
+      const unsized = { id: 'u', filename: 'u.jpg', originalName: 'u.jpg' };
+      const reader = memoryReader([
+        ['manifest.json', JSON.stringify({ manifestVersion: 1, photos: [sized, unsized] })],
+        ['images/s.jpg', 'x'],
+        ['images/u.jpg', 'y'],
+      ]);
+      expect(await svc.importFrom(reader, everything)).toMatchObject({ imported: 2, failed: [] });
+      // the backup's own size is kept; the other is the picture's (the fake codec reads 100 × 50)
+      expect((await b.photos.get('s'))!).toMatchObject({ width: 7, height: 9 });
+      expect((await b.photos.get('u'))!).toMatchObject({ width: 100, height: 50 });
+
+      // a metadata-only list whose picture is not here (or not an image) has no size to give
+      b.images.info = null;
+      const list = [{ id: 'v', filename: 'v.jpg', originalName: 'v.jpg', width: 0, height: 0 }];
+      expect(await svc.importPhotoList(list, everything)).toMatchObject({
+        imported: 0,
+        failed: [{ kind: 'photo', name: 'v.jpg' }],
+      });
+      expect(await b.photos.get('v')).toBeUndefined();
+    });
+
     it('lists only the plan that fails when the plans are written together, and imports the others', async () => {
       const b = await makeSet();
       const svc = createBackupService({ ...b, newId: () => 'y' });
