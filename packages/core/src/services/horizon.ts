@@ -11,6 +11,7 @@ import {
   DEFAULT_EYE_HEIGHT_M,
   DEG,
   EARTH_R,
+  MAX_TILE_LAT,
   MAX_TILES,
   PEAK_QUERY_RADIUS_M,
   SHELL_KM,
@@ -62,7 +63,8 @@ export interface HorizonService {
   /**
    * The horizon profile of a location, from the cache when one exists (1 database round trip), else
    * computed and cached (2 round trips). Throws `invalid` (INVALID_LAT_LON) for a latitude or
-   * longitude that is not a number or a latitude outside -90..90, and `upstream`
+   * longitude that is not a number or a latitude outside -90..90, `invalid` (HORIZON_OUT_OF_COVERAGE)
+   * for a latitude beyond the elevation tiles' ±85.0511°, and `upstream`
    * (HORIZON_COMPUTE_FAILED, with the original error as `cause`) when the tiles cannot be fetched,
    * decoded or traced. A failure to get the named summits or to cache the profile never fails it.
    */
@@ -106,25 +108,30 @@ export function createHorizonService(deps: HorizonServiceDeps): HorizonService {
   ): Promise<HorizonProfileResult> {
     const radiusKm = Math.max(1, Math.min(100, opts.radiusKm));
     const radiusM = radiusKm * 1000;
-    const z = TILE_ZOOM;
 
-    // Bounding box in degrees, padded so rays never leave the fetched grid.
+    // Bounding box in degrees, padded so rays never leave the fetched grid, and cut at the
+    // tiles' coverage (beyond it the terrain reads as sea level).
     const dLat = radiusM / EARTH_R / DEG;
     const dLon = radiusM / (EARTH_R * Math.cos(lat * DEG)) / DEG;
-    const north = lat + dLat;
-    const south = lat - dLat;
+    const north = Math.min(lat + dLat, MAX_TILE_LAT);
+    const south = Math.max(lat - dLat, -MAX_TILE_LAT);
     const west = lon - dLon;
     const east = lon + dLon;
 
-    const tx0 = Math.floor(lon2tileX(west, z));
-    const tx1 = Math.floor(lon2tileX(east, z));
-    const ty0 = Math.floor(lat2tileY(north, z)); // north = smaller tile-y
-    const ty1 = Math.floor(lat2tileY(south, z));
+    // The finest zoom that covers the box in at most MAX_TILES tiles. A large radius or a high
+    // latitude (where tiles shrink on the ground) steps down to coarser tiles, whose ground
+    // resolution at that latitude stays close to zoom 12's at mid-latitudes.
+    let z = TILE_ZOOM + 1;
+    let tx0: number, tx1: number, ty0: number, ty1: number;
+    do {
+      z--;
+      tx0 = Math.floor(lon2tileX(west, z));
+      tx1 = Math.floor(lon2tileX(east, z));
+      ty0 = Math.floor(lat2tileY(north, z)); // north = smaller tile-y
+      ty1 = Math.floor(lat2tileY(south, z));
+    } while (z > 0 && (tx1 - tx0 + 1) * (ty1 - ty0 + 1) > MAX_TILES);
     const tilesX = tx1 - tx0 + 1;
     const tilesY = ty1 - ty0 + 1;
-    if (tilesX * tilesY > MAX_TILES) {
-      throw new Error(`Horizon radius too large: ${tilesX * tilesY} tiles exceeds ${MAX_TILES}`);
-    }
 
     // Assemble one combined elevation grid covering the tile range.
     const gw = tilesX * TILE_SIZE;
@@ -227,6 +234,11 @@ export function createHorizonService(deps: HorizonServiceDeps): HorizonService {
       ) {
         throw new DomainError('invalid', 'Invalid or missing lat/lon', {
           code: 'INVALID_LAT_LON',
+        });
+      }
+      if (Math.abs(lat) > MAX_TILE_LAT) {
+        throw new DomainError('invalid', 'No terrain data beyond 85° of latitude', {
+          code: 'HORIZON_OUT_OF_COVERAGE',
         });
       }
       const radiusKm =

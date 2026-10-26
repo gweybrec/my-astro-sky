@@ -802,6 +802,8 @@ const es: Translations = {
     GEAR_NOT_CUSTOM: 'Solo se puede eliminar el equipo que añadiste tú.',
     GEAR_NOT_FOUND: 'Este equipo ya no existe.',
     HORIZON_COMPUTE_FAILED: 'No se pudo calcular el horizonte.',
+    HORIZON_OUT_OF_COVERAGE:
+      'No hay datos de relieve tan cerca de un polo: el horizonte solo se puede calcular entre 85° S y 85° N.',
     HTTP_400: 'No se aceptó la solicitud.',
     HTTP_404: 'No se encontró nada en esta dirección.',
     HTTP_409: 'Esto entra en conflicto con el estado actual.',

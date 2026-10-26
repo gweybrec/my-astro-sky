@@ -792,6 +792,8 @@ const en: Translations = {
     GEAR_NOT_CUSTOM: 'Only gear you added yourself can be deleted.',
     GEAR_NOT_FOUND: 'This gear no longer exists.',
     HORIZON_COMPUTE_FAILED: 'The horizon could not be computed.',
+    HORIZON_OUT_OF_COVERAGE:
+      'No terrain data this close to a pole: the horizon can only be computed between 85° S and 85° N.',
     HTTP_400: 'The request was not accepted.',
     HTTP_404: 'Nothing was found at this address.',
     HTTP_409: 'This conflicts with the current state.',

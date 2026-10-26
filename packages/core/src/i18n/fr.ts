@@ -799,6 +799,8 @@ const fr = {
     GEAR_NOT_CUSTOM: 'Seul le matériel que vous avez ajouté peut être supprimé.',
     GEAR_NOT_FOUND: "Ce matériel n'existe plus.",
     HORIZON_COMPUTE_FAILED: "Le calcul de l'horizon a échoué.",
+    HORIZON_OUT_OF_COVERAGE:
+      "Pas de données de relief si près d'un pôle : l'horizon ne peut être calculé qu'entre 85° S et 85° N.",
     HTTP_400: "La requête n'a pas été acceptée.",
     HTTP_404: "Rien n'a été trouvé à cette adresse.",
     HTTP_409: "Cela entre en conflit avec l'état actuel.",

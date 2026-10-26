@@ -46,9 +46,11 @@ const R_EFF = EARTH_R / (1 - REFRACTION_K);
 export const DEG = Math.PI / 180;
 export const DEFAULT_EYE_HEIGHT_M = 1.7;
 const ALT_FLOOR_DEG = -5; // clamp valley-floor / below-observer horizons
-export const TILE_ZOOM = 12; // ~38 m/px at the equator
+export const TILE_ZOOM = 12; // finest zoom, ~38 m/px at the equator
 export const TILE_SIZE = 256;
-export const MAX_TILES = 400; // guardrail against an over-large radius
+export const MAX_TILES = 400; // above this, the area is fetched from coarser tiles
+/** The tiles (Web Mercator) cover latitudes -85.0511..85.0511 only. */
+export const MAX_TILE_LAT = 85.0511;
 const STEP_M = 30; // ray-march step distance
 export const PEAK_QUERY_RADIUS_M = 30000; // cap the Overpass peak bbox (lighter query)
 // Fine distance shells (km) so the near→far tone reads as continuous atmospheric

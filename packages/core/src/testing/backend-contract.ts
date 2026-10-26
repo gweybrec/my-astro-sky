@@ -1099,6 +1099,16 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     );
   });
 
+  add('horizon: a latitude beyond the elevation tiles is refused', async () => {
+    const { backend: b } = await makeBackend();
+    await expectDomainError(
+      b.horizon.getProfile({ lat: 86, lon: 0 }),
+      'invalid',
+      'HORIZON_OUT_OF_COVERAGE',
+      'latitude 86',
+    );
+  });
+
   add('identification: a cone out of range is refused', async () => {
     const { backend: b } = await makeBackend();
     await expectDomainError(

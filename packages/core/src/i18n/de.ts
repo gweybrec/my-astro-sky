@@ -800,6 +800,8 @@ const de: Translations = {
     GEAR_NOT_CUSTOM: 'Nur selbst hinzugefügte Ausrüstung kann gelöscht werden.',
     GEAR_NOT_FOUND: 'Diese Ausrüstung gibt es nicht mehr.',
     HORIZON_COMPUTE_FAILED: 'Der Horizont konnte nicht berechnet werden.',
+    HORIZON_OUT_OF_COVERAGE:
+      'Keine Geländedaten so nah am Pol: Der Horizont kann nur zwischen 85° S und 85° N berechnet werden.',
     HTTP_400: 'Die Anfrage wurde nicht akzeptiert.',
     HTTP_404: 'Unter dieser Adresse wurde nichts gefunden.',
     HTTP_409: 'Das steht im Konflikt mit dem aktuellen Zustand.',
