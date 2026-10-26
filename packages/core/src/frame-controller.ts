@@ -90,6 +90,11 @@ export interface FrameDrag {
   /** Where the finger landed (a `tap` lets go once it moves away). */
   x?: number;
   y?: number;
+  /** A finger's `move`: the frame's anchor minus where the finger landed, so the grabbed point stays under it. */
+  grabDx?: number;
+  grabDy?: number;
+  /** The drag has moved at least once (reported to `onDragChange`). */
+  moved?: boolean;
 }
 
 /** The DSO a move-drag will snap to on release; drives the elastic overlay. */
@@ -294,9 +299,7 @@ export class FrameController {
 
   /** Hit-test the active/instance frames on mousedown. Returns true if the event was consumed (no pan). */
   handleMouseDown(mx: number, my: number): boolean {
-    const consumed = this.press(mx, my);
-    if (this.drag && this.drag.mode !== 'tap') this.onDragChange?.(true);
-    return consumed;
+    return this.press(mx, my);
   }
 
   private press(mx: number, my: number): boolean {
@@ -335,13 +338,13 @@ export class FrameController {
         // A finger: the tile buttons come before the move dot (the frame moves from anywhere inside it anyway).
         if (touch && this.pressTileButton(active, mx, my)) return true;
         if (active.movable && isNearHandle(mx, my, { x: geo.cx, y: geo.cy }, handleR)) {
-          this.drag = { id: active.id, mode: 'move' };
+          this.startMove(active, mx, my);
           return true;
         }
       }
       // Dragging the border moves the active frame at any size.
       if (active.movable && isNearPolygonBorder(mx, my, geo.corners, touch ? TOUCH_BORDER_PX : 6)) {
-        this.drag = { id: active.id, mode: 'move' };
+        this.startMove(active, mx, my);
         return true;
       }
       // Per-tile editing (a mouse, after the handles): the selected mosaic shows a delete button on each tile
@@ -357,7 +360,7 @@ export class FrameController {
       active.movable &&
       pointInConvexPolygon(mx, my, this.frameGeometry(active).corners)
     ) {
-      this.drag = { id: active.id, mode: 'move' };
+      this.startMove(active, mx, my);
       return true;
     }
 
@@ -369,6 +372,8 @@ export class FrameController {
       const geo = this.frameGeometry(f);
       if (pointInConvexPolygon(mx, my, geo.corners)) {
         this.selectFrame(f.id);
+        // A finger can move the frame it has just selected without lifting first.
+        if (touch && f.movable) this.startMove(f, mx, my);
         return true;
       }
     }
@@ -377,6 +382,15 @@ export class FrameController {
     // stays selected (deselect explicitly via the popup or the Escape key) so
     // panning the sky under a floating frame never loses the selection.
     return false;
+  }
+
+  /** Starts moving a frame. A finger keeps the point it grabbed under it; a mouse carries the frame's centre. */
+  private startMove(f: RenderableFrame, mx: number, my: number): void {
+    this.drag = { id: f.id, mode: 'move' };
+    if (!this.touch) return;
+    const { cx, cy } = this.frameAnchorCanvas(f);
+    this.drag.grabDx = cx - mx;
+    this.drag.grabDy = cy - my;
   }
 
   /**
@@ -430,6 +444,11 @@ export class FrameController {
       this.drag = null;
       return;
     }
+    // Reported on the first move, not the press: a tap that selects a frame does not shrink its sheet.
+    if (!this.drag.moved) {
+      this.drag.moved = true;
+      this.onDragChange?.(true);
+    }
 
     if (this.drag.mode === 'resize') {
       // Recompute the rubber-band rectangle from the (unchanged) frame geometry's
@@ -468,6 +487,9 @@ export class FrameController {
         this.onChange?.(f.id, { screenRotationDeg: normalizeRotationDeg(rotDeg) });
       }
     } else {
+      // From here on (mx, my) is where the frame's anchor goes.
+      mx += this.drag.grabDx ?? 0;
+      my += this.drag.grabDy ?? 0;
       if (f.anchorKind === 'sky') {
         // Hold the frame's on-screen orientation fixed while moving: a pinned
         // frame's rotation is a position angle relative to celestial north,
@@ -540,7 +562,8 @@ export class FrameController {
     if (drag.mode === 'tap') {
       if (drag.tile) this.runTileAction(drag.tile);
     } else if (drag.mode === 'resize') this.finalizeResize(drag.id);
-    else if (drag.mode === 'move') {
+    // A finger lifted without moving (a tap that selects a frame) drops nothing.
+    else if (drag.mode === 'move' && (drag.moved || !this.touch)) {
       // Release within snap range: spring the frame to the DSO centre.
       if (snap) this.animateSnapToDso(drag.id, snap);
       // A standalone frame dropped onto another frame/mosaic of the same plan merges.

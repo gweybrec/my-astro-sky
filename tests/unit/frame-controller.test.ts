@@ -189,7 +189,23 @@ describe('FrameController', () => {
       const x = (geo.cx + geo.corners[0].x) / 2;
       const y = (geo.cy + geo.corners[0].y) / 2;
       expect(h.fc.handleMouseDown(x, y)).toBe(true);
-      expect(h.fc.activeDrag).toEqual({ id: 'f1', mode: 'move' });
+      expect(h.fc.activeDrag).toMatchObject({ id: 'f1', mode: 'move' });
+    });
+
+    it('a finger keeps the point it grabbed under it, not the centre', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame({ anchorKind: 'screen', nx: 0.5, ny: 0.5 });
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      const x = (geo.cx + geo.corners[0].x) / 2;
+      const y = (geo.cy + geo.corners[0].y) / 2;
+      h.fc.handleMouseDown(x, y);
+      h.fc.handleDragMove(x + 40, y + 20);
+      const anchor = h.changes[0].change.anchor;
+      expect(anchor?.kind).toBe('screen');
+      if (anchor?.kind !== 'screen') return;
+      expect(anchor.nx * h.state.v.width).toBeCloseTo(geo.cx + 40, 6);
+      expect(anchor.ny * h.state.v.height).toBeCloseTo(geo.cy + 20, 6);
     });
 
     it('a mouse pans from the same spot', () => {
@@ -220,8 +236,35 @@ describe('FrameController', () => {
       h.fc.setOnDragChange((d) => states.push(d));
       const geo = frameGeometry(f, h.state.v);
       h.fc.handleMouseDown(geo.cx, geo.cy);
+      expect(states).toEqual([]); // not on the press: a tap does not shrink the sheet
+      h.fc.handleDragMove(geo.cx + 20, geo.cy);
       h.fc.handleMouseUp();
       expect(states).toEqual([true, false]);
+    });
+
+    it('a finger that selects a frame can move it without lifting', () => {
+      const h = harness({ touch: true });
+      const f = makeFrame({ id: 'f2', wDeg: 3, hDeg: 3 });
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      expect(h.fc.handleMouseDown(geo.cx, geo.cy)).toBe(true);
+      expect(h.selects).toEqual(['f2']);
+      expect(h.fc.activeDrag?.mode).toBe('move');
+      h.fc.handleDragMove(geo.cx + 30, geo.cy);
+      expect(h.changes).toHaveLength(1);
+    });
+
+    it('a finger that only taps a frame drops nothing when it lifts', () => {
+      const h = harness({ touch: true });
+      // Lying on another frame of the same plan: a drop there would merge them.
+      const f = makeFrame({ id: 'plan:1:a', wDeg: 3, hDeg: 3 });
+      h.fc.setFrames([makeFrame({ id: 'plan:1:b', wDeg: 3, hDeg: 3 }), f]);
+      const geo = frameGeometry(f, h.state.v);
+      h.fc.handleMouseDown(geo.cx, geo.cy);
+      expect(h.selects).toEqual(['plan:1:a']);
+      h.fc.handleMouseUp();
+      expect(h.changes).toEqual([]);
+      expect(h.merges).toEqual([]);
     });
 
     it('neither pins from the glyph nor resizes from a corner', () => {
