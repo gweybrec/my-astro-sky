@@ -4,9 +4,13 @@ import {
   type CapacitorPreferences,
 } from '@myastrosky/backend-local/preferences-store';
 
-/** A fake plugin: a map, a log of the writes, and a switch to make one write slow or failing. */
+/**
+ * A fake plugin: a map, the writes it was asked for (`calls`) and the ones it finished (`log`), and a switch to make
+ * one write slow or failing.
+ */
 function fakePlugin(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
+  const calls: string[] = [];
   const log: string[] = [];
   const plugin: CapacitorPreferences & { delayKey?: string; failKey?: string } = {
     async keys() {
@@ -16,17 +20,19 @@ function fakePlugin(initial: Record<string, string> = {}) {
       return { value: data.get(key) ?? null };
     },
     async set({ key, value }) {
+      calls.push(`set ${key}=${value}`);
       if (plugin.delayKey === key) await new Promise((r) => setTimeout(r, 20));
       if (plugin.failKey === key) throw new Error('disk full');
       log.push(`set ${key}=${value}`);
       data.set(key, value);
     },
     async remove({ key }) {
+      calls.push(`remove ${key}`);
       log.push(`remove ${key}`);
       data.delete(key);
     },
   };
-  return { plugin, data, log };
+  return { plugin, data, calls, log };
 }
 const settle = () => new Promise((r) => setTimeout(r, 60));
 
@@ -67,20 +73,20 @@ describe('createPreferencesStore', () => {
     store.remove('a');
     expect(store.get('b')).toBe('2');
     expect(store.get('a')).toBeNull();
-    expect(data.has('b')).toBe(false);
     await settle();
     expect([...data.entries()]).toEqual([['b', '2']]);
   });
 
-  it('writes in the order the calls were made, even when an earlier write is slower', async () => {
-    const { plugin, log } = fakePlugin();
+  it('hands every write to the plugin at once, in call order, without waiting for a slower earlier one', async () => {
+    const { plugin, calls } = fakePlugin();
     plugin.delayKey = 'slow';
     const store = await createPreferencesStore(plugin);
     store.set('slow', '1');
     store.set('fast', '2');
     store.remove('slow');
+    // Nothing waits in the store: were the app killed now, the plugin would already have every write.
+    expect(calls).toEqual(['set slow=1', 'set fast=2', 'remove slow']);
     await settle();
-    expect(log).toEqual(['set slow=1', 'set fast=2', 'remove slow']);
   });
 
   it('reports a failed write and carries on with the next ones', async () => {
