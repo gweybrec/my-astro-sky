@@ -285,6 +285,28 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
       expect(sleeps).toEqual([800]);
     });
 
+    it('returns the computed profile and logs when the cache write fails', async () => {
+      const failingWrites: SqlDb = {
+        ...db,
+        run: async () => {
+          throw new Error('SQLITE_FULL');
+        },
+      };
+      const s = createHorizonService({
+        db: failingWrites,
+        http,
+        images: createSharpImageCodec(),
+        now: () => 0,
+        log: (event, error, context) => logged.push({ event, context: { ...context, error } }),
+      });
+      const r = await s.getProfile({ lat: 45.123, lon: 6.456, radiusKm: 3 });
+      expect(r.alts).toHaveLength(360);
+      expect(cacheRows()).toEqual([]);
+      expect(logged).toHaveLength(1);
+      expect(logged[0].event).toBe('horizon_cache_write_failed');
+      expect((logged[0].context?.error as Error).message).toBe('SQLITE_FULL');
+    });
+
     it('fails with HORIZON_COMPUTE_FAILED when a tile request fails, keeps the cause and caches nothing', async () => {
       tileReply = { reject: 'ECONNRESET' };
       const err = await rejection(svc.getProfile({ lat: -20.5, lon: 140.5, radiusKm: 3 }));

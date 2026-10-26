@@ -52,7 +52,7 @@ export interface HorizonServiceDeps {
   images: ImageCodec;
   /** The clock, in milliseconds since the epoch. The profile cache has no expiry (terrain does not move), so nothing reads it today. */
   now: () => number;
-  /** Where a non-fatal problem (the peaks could not be fetched) is reported. */
+  /** Where a non-fatal problem (the peaks could not be fetched, the profile could not be cached) is reported. */
   log?: (event: string, error: unknown, context?: Record<string, unknown>) => void;
   /** Waits between two Overpass attempts; the default is a timer. */
   sleep?: (ms: number) => Promise<void>;
@@ -64,7 +64,7 @@ export interface HorizonService {
    * computed and cached (2 round trips). Throws `invalid` (INVALID_LAT_LON) for a latitude or
    * longitude that is not a number or a latitude outside -90..90, and `upstream`
    * (HORIZON_COMPUTE_FAILED, with the original error as `cause`) when the tiles cannot be fetched,
-   * decoded or traced. A failure to get the named summits never fails the profile.
+   * decoded or traced. A failure to get the named summits or to cache the profile never fails it.
    */
   getProfile(query: HorizonQuery): Promise<HorizonProfileResult>;
 }
@@ -240,13 +240,9 @@ export function createHorizonService(deps: HorizonServiceDeps): HorizonService {
       const cached = await readCached(db, key);
       if (cached) return cached;
 
+      let profile: HorizonProfileResult;
       try {
-        const profile = await compute(lat, lon, { radiusKm, obsHeightM });
-        await db.run('INSERT OR REPLACE INTO horizon_profiles (key, json) VALUES (?, ?)', [
-          key,
-          JSON.stringify(profile),
-        ]);
-        return profile;
+        profile = await compute(lat, lon, { radiusKm, obsHeightM });
       } catch (err) {
         const message = 'Failed to compute horizon from elevation data';
         const failure = new DomainError('upstream', message, {
@@ -256,6 +252,16 @@ export function createHorizonService(deps: HorizonServiceDeps): HorizonService {
         failure.cause = err;
         throw failure;
       }
+      // A profile that cannot be cached is still a good answer; it is computed again next time.
+      try {
+        await db.run('INSERT OR REPLACE INTO horizon_profiles (key, json) VALUES (?, ?)', [
+          key,
+          JSON.stringify(profile),
+        ]);
+      } catch (err) {
+        log?.('horizon_cache_write_failed', err, { key });
+      }
+      return profile;
     },
   };
 }
