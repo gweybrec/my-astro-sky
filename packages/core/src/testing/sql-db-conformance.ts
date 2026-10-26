@@ -6,7 +6,7 @@
  * belong here.
  */
 import { initSchema, SCHEMA_VERSION } from '../db/schema';
-import { SQL_TX_NESTED, SQL_TX_OUTER_CALL } from '../ports/sql-db';
+import { SQL_TX_AWAITED_NON_DB, SQL_TX_NESTED, SQL_TX_OUTER_CALL } from '../ports/sql-db';
 import type { SqlDb, SqlTx } from '../ports/sql-db';
 
 export interface OpenedSqlDb {
@@ -256,6 +256,29 @@ export const sqlDbConformanceCases: SqlDbConformanceCase[] = [
       });
       toBe(codeOf(nested), SQL_TX_NESTED, 'nested transaction code');
       toBe(await count(db), 1, 'rows');
+    },
+  ),
+
+  withDb(
+    'a body that awaits something other than tx is rolled back with SQL_TX_AWAITED_NON_DB',
+    async (db) => {
+      await db.exec(T_DDL);
+      let late: unknown;
+      let resumed!: () => void;
+      const bodyResumed = new Promise<void>((resolve) => (resumed = resolve));
+      const err = await rejection(
+        db.transaction(async (tx) => {
+          await tx.run('INSERT INTO t (name) VALUES (?)', ['before']);
+          await new Promise<void>((resolve) => setTimeout(resolve, 20));
+          await tx.run('INSERT INTO t (name) VALUES (?)', ['after']).catch((e) => (late = e));
+          resumed();
+        }),
+        'transaction whose body awaited a timer',
+      );
+      toBe(codeOf(err), SQL_TX_AWAITED_NON_DB, 'transaction code');
+      await bodyResumed;
+      toBe(codeOf(late), SQL_TX_AWAITED_NON_DB, 'tx call after the timer');
+      toBe(await count(db), 0, 'rows');
     },
   ),
 

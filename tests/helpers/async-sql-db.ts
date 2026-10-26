@@ -4,7 +4,9 @@
  * those gaps with a real lock, so other callers wait for it.
  *
  * It wraps another `SqlDb` (the better-sqlite3 adapter) but never uses the wrapped `transaction`
- * (its watchdog forbids awaiting a timer): it sends BEGIN / COMMIT / ROLLBACK itself.
+ * (its watchdog forbids awaiting a timer): it sends BEGIN / COMMIT / ROLLBACK itself. Like the
+ * phone's adapter, it rolls back a body that awaits something other than its `tx` calls: once the
+ * body's last `tx` call settles, a 0 ms timer checks that it started another one or settled.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import {
@@ -17,6 +19,10 @@ import {
 
 interface TxContext {
   open: boolean;
+  bodyDone: boolean;
+  inFlight: number;
+  settled: number;
+  abandon: (err: Error) => void;
 }
 
 function codedError(code: string, message: string): Error & { code: string } {
@@ -88,14 +94,36 @@ export function createAsyncSqlDb(inner: SqlDb): SqlDb {
       const refused = refuseFromTx(true);
       if (refused) throw refused;
       const release = await acquire();
-      const ctx: TxContext = { open: true };
+      const ctx: TxContext = {
+        open: true,
+        bodyDone: false,
+        inFlight: 0,
+        settled: 0,
+        abandon: () => {},
+      };
+      const watch = (): void => {
+        const at = ctx.settled;
+        setTimeout(() => {
+          if (!ctx.open || ctx.bodyDone || ctx.inFlight > 0 || ctx.settled !== at) return;
+          ctx.abandon(
+            codedError(SQL_TX_AWAITED_NON_DB, 'The body awaited something other than tx.'),
+          );
+        }, 0);
+      };
       try {
         await tick();
         await inner.exec('BEGIN IMMEDIATE');
         const step = async <R>(fn: () => Promise<R>): Promise<R> => {
           if (!ctx.open) throw codedError(SQL_TX_AWAITED_NON_DB, 'This tx is no longer open.');
-          await tick();
-          return fn();
+          ctx.inFlight++;
+          try {
+            await tick();
+            return await fn();
+          } finally {
+            ctx.inFlight--;
+            ctx.settled++;
+            if (ctx.inFlight === 0) watch();
+          }
         };
         const tx: SqlTx = {
           all: (sql, params) => step(() => inner.all(sql, params)),
@@ -105,7 +133,25 @@ export function createAsyncSqlDb(inner: SqlDb): SqlDb {
         };
         let value: T;
         try {
-          value = await als.run(ctx, () => body(tx));
+          value = await new Promise<T>((resolve, reject) => {
+            ctx.abandon = (err) => {
+              ctx.open = false;
+              reject(err);
+            };
+            als
+              .run(ctx, () => body(tx))
+              .then(
+                (v) => {
+                  ctx.bodyDone = true;
+                  resolve(v);
+                },
+                (err: unknown) => {
+                  ctx.bodyDone = true;
+                  reject(err);
+                },
+              );
+            watch();
+          });
         } catch (err) {
           ctx.open = false;
           await tick();

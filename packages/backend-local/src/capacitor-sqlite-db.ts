@@ -9,13 +9,16 @@
  *   except for a `batch` made outside a transaction, which lets the plugin wrap its single
  *   `executeSet` call (one hop, atomic) because the lock guarantees no transaction is open.
  *
- * Calls on the outer `SqlDb` from inside a transaction body (and `transaction()` inside a body)
- * cannot be recognised without `AsyncLocalStorage`: they simply wait for the lock, which the body
- * holds while it awaits them. A waiter therefore gives up after `lockTimeoutMs` of the lock
- * holder (an open transaction) making no progress, and rejects with `SQL_TX_OUTER_CALL` (or
- * `SQL_TX_NESTED` for `transaction()`). The body then decides what to do with the rejection; if
- * it lets it propagate, the transaction rolls back. A legitimate waiter behind a busy
- * transaction does not time out, because the holder keeps making `tx` calls.
+ * The rule that a transaction body may only await `tx` calls is enforced like the server's
+ * adapter does, without `AsyncLocalStorage`: when the body starts and whenever its last `tx` call
+ * settles, a timer of 0 ms is set. A body that keeps the rule has, by the time it fires (after
+ * every pending microtask), either started another `tx` call or settled. If it has done neither,
+ * it is awaiting something else:
+ * - when calls joined the lock queue since then, they came from the body (calls on the outer
+ *   `SqlDb`, or `transaction()` inside the body): they are rejected with `SQL_TX_OUTER_CALL` or
+ *   `SQL_TX_NESTED` without running, and the body decides what to do with the rejection;
+ * - otherwise the transaction is rolled back at once and rejects with `SQL_TX_AWAITED_NON_DB`;
+ *   its `tx` calls are refused from then on.
  *
  * BLOBs: the plugin returns a BLOB column as an array of byte values and accepts a bound BLOB as
  * `{ type: 'Buffer', data: number[] }` in `run` and `query`, but not in `executeSet`, which binds
@@ -62,14 +65,6 @@ export interface CapacitorSqliteConnection {
   beginTransaction(): Promise<unknown>;
   commitTransaction(): Promise<unknown>;
   rollbackTransaction(): Promise<unknown>;
-}
-
-export interface CapacitorSqliteDbOptions {
-  /**
-   * How long a call waiting for the lock tolerates a transaction that makes no progress before
-   * it concludes it was made from inside that transaction's body. Default 10 000 ms.
-   */
-  lockTimeoutMs?: number;
 }
 
 function codedError(code: string, message: string): Error & { code: string } {
@@ -161,22 +156,25 @@ function readRow<T>(row: unknown): T {
 
 interface OpenTx {
   open: boolean;
+  /** The body has settled: COMMIT or ROLLBACK follows, nothing more to watch. */
+  bodyDone: boolean;
   inFlight: number;
-  lastActivity: number;
+  /** Counts the `tx` calls that settled, so a watchdog set before the latest one does nothing. */
+  settled: number;
+  /** Rolls the transaction back and rejects it (set when the body starts). */
+  abandon: (err: Error) => void;
 }
 
 interface Waiter {
   cancelled: boolean;
-  timer: ReturnType<typeof setTimeout> | undefined;
   grant: (release: () => void) => void;
+  refuse: () => void;
+  /** The transaction that held the lock, idle, when this call joined the queue. */
+  idleOf: OpenTx | null;
+  idleAt: number;
 }
 
-export function createCapacitorSqliteDb(
-  conn: CapacitorSqliteConnection,
-  options: CapacitorSqliteDbOptions = {},
-): SqlDb {
-  const lockTimeoutMs = options.lockTimeoutMs ?? 10_000;
-
+export function createCapacitorSqliteDb(conn: CapacitorSqliteConnection): SqlDb {
   // The lock.
   let locked = false;
   const queue: Waiter[] = [];
@@ -188,7 +186,6 @@ export function createCapacitorSqliteDb(
       const waiter = queue.shift();
       if (!waiter) return;
       if (waiter.cancelled) continue;
-      if (waiter.timer !== undefined) clearTimeout(waiter.timer);
       locked = true;
       waiter.grant(release);
     }
@@ -199,40 +196,56 @@ export function createCapacitorSqliteDb(
     next();
   };
 
-  const idleMs = (tx: OpenTx): number => (tx.inFlight > 0 ? 0 : Date.now() - tx.lastActivity);
-
-  const acquire = (rejectCode: string, what: string): Promise<() => void> =>
+  const acquire = (rejectCode: string, message: string): Promise<() => void> =>
     new Promise((resolve, reject) => {
-      const waiter: Waiter = { cancelled: false, timer: undefined, grant: resolve };
       if (!locked && queue.length === 0) {
         locked = true;
         resolve(release);
         return;
       }
-      const check = (): void => {
-        if (waiter.cancelled) return;
-        const h = holder;
-        if (h && idleMs(h) >= lockTimeoutMs) {
-          waiter.cancelled = true;
-          reject(
-            codedError(
-              rejectCode,
-              `${what} waited ${lockTimeoutMs} ms for a transaction that made no progress: it was most likely made from inside a transaction body (use tx; transactions do not nest).`,
-            ),
-          );
-          return;
-        }
-        const wait = h ? Math.max(10, lockTimeoutMs - idleMs(h)) : lockTimeoutMs;
-        waiter.timer = setTimeout(check, wait);
-      };
-      waiter.timer = setTimeout(check, lockTimeoutMs);
-      queue.push(waiter);
+      const h = holder;
+      const idle = h !== null && h.open && !h.bodyDone && h.inFlight === 0;
+      queue.push({
+        cancelled: false,
+        grant: resolve,
+        refuse: () => reject(codedError(rejectCode, message)),
+        idleOf: idle ? h : null,
+        idleAt: idle ? h.settled : -1,
+      });
     });
+
+  /** Checks, after every pending microtask, that the body started a `tx` call or settled. */
+  const watch = (state: OpenTx): void => {
+    const at = state.settled;
+    setTimeout(() => {
+      if (!state.open || state.bodyDone || state.inFlight > 0 || state.settled !== at) return;
+      const fromBody = queue.filter((w) => !w.cancelled && w.idleOf === state && w.idleAt === at);
+      if (fromBody.length > 0) {
+        for (const w of fromBody) {
+          w.cancelled = true;
+          w.refuse();
+        }
+        // The body now reacts to the rejections; watch it again.
+        state.settled++;
+        watch(state);
+        return;
+      }
+      state.abandon(
+        codedError(
+          SQL_TX_AWAITED_NON_DB,
+          'A SqlDb transaction body may only await tx calls; it awaited something else, so the transaction was rolled back.',
+        ),
+      );
+    }, 0);
+  };
 
   /** Runs `fn` with the lock held. */
   const withLock = async <T>(fn: () => Promise<T>): Promise<T> => {
     await ready;
-    const done = await acquire(SQL_TX_OUTER_CALL, 'A SqlDb call');
+    const done = await acquire(
+      SQL_TX_OUTER_CALL,
+      'A call on the outer SqlDb was made from inside a transaction body; use tx.',
+    );
     try {
       return await fn();
     } finally {
@@ -275,6 +288,12 @@ export function createCapacitorSqliteDb(
     if (INSERT_RE.test(sql) && changes > 0 && lastId !== undefined) out.lastInsertRowid = lastId;
     return out;
   };
+  /**
+   * The plugin joins the lines of each statement with a space and cuts each line at "--", quotes
+   * or not, so a string literal in an `exec` script must not hold a newline or "--" (schema
+   * scripts hold neither). Joining the lines here as well keeps a ";" + newline inside a literal
+   * from being taken for the end of a statement.
+   */
   const doExec = async (sql: string): Promise<void> => {
     try {
       const statements = splitStatements(sql).map((st) => st.replace(/\s*\n\s*/g, ' '));
@@ -366,7 +385,8 @@ export function createCapacitorSqliteDb(
         return await fn();
       } finally {
         state.inFlight--;
-        state.lastActivity = Date.now();
+        state.settled++;
+        if (state.inFlight === 0) watch(state);
       }
     };
     return {
@@ -400,17 +420,48 @@ export function createCapacitorSqliteDb(
       }),
     transaction: async <T>(body: (tx: SqlTx) => Promise<T>): Promise<T> => {
       await ready;
-      const done = await acquire(SQL_TX_NESTED, 'transaction()');
-      const state: OpenTx = { open: false, inFlight: 0, lastActivity: Date.now() };
+      const done = await acquire(
+        SQL_TX_NESTED,
+        'transaction() was called from inside a transaction body; transactions do not nest.',
+      );
+      const state: OpenTx = {
+        open: false,
+        bodyDone: false,
+        inFlight: 0,
+        settled: 0,
+        abandon: () => {},
+      };
       try {
         checkReady();
         await begin();
         state.open = true;
-        state.lastActivity = Date.now();
         holder = state;
         let value: T;
         try {
-          value = await body(makeTx(state));
+          // The first of the body settling and the watchdog abandoning the transaction wins.
+          value = await new Promise<T>((resolve, reject) => {
+            state.abandon = (err) => {
+              state.open = false;
+              reject(err);
+            };
+            let result: Promise<T>;
+            try {
+              result = Promise.resolve(body(makeTx(state)));
+            } catch (err) {
+              result = Promise.reject(err);
+            }
+            result.then(
+              (v) => {
+                state.bodyDone = true;
+                resolve(v);
+              },
+              (err) => {
+                state.bodyDone = true;
+                reject(err);
+              },
+            );
+            watch(state);
+          });
           await commit();
         } catch (err) {
           state.open = false;

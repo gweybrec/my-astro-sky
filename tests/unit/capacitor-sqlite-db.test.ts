@@ -5,7 +5,11 @@
  * encodings and quirks (an `executeSet` binds raw JSON, so a BLOB there fails).
  */
 import { describe, it, expect } from 'vitest';
-import { SQL_TX_NESTED, SQL_TX_OUTER_CALL } from '@myastrosky/core/ports/sql-db';
+import {
+  SQL_TX_AWAITED_NON_DB,
+  SQL_TX_NESTED,
+  SQL_TX_OUTER_CALL,
+} from '@myastrosky/core/ports/sql-db';
 import {
   createCapacitorSqliteDb,
   splitStatements,
@@ -13,15 +17,22 @@ import {
 import { createFakeConnection, type FakeConnection } from '../helpers/fake-sqlite-connection';
 import { describeSqlDbConformance } from '../helpers/sql-db-conformance';
 
-const tick = (): Promise<void> => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const sleep = (ms: number): Promise<void> =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-// The lock timeout is short so the two "called from inside a body" cases are quick.
+/** Makes every `run` of the fake plugin take `ms` longer, like a slow bridge hop. */
+function slowRuns(conn: FakeConnection, ms: number): void {
+  const run = conn.run.bind(conn);
+  conn.run = async (...args) => {
+    await sleep(ms);
+    return run(...args);
+  };
+}
+
 describeSqlDbConformance('Capacitor SQLite adapter over a fake plugin', async () => {
   const conn = createFakeConnection();
   return {
-    db: createCapacitorSqliteDb(conn, { lockTimeoutMs: 40 }),
+    db: createCapacitorSqliteDb(conn),
     close: async () => {
       conn.raw.close();
     },
@@ -29,9 +40,9 @@ describeSqlDbConformance('Capacitor SQLite adapter over a fake plugin', async ()
 });
 
 describe('createCapacitorSqliteDb (specific to the Capacitor adapter)', () => {
-  const setup = async (lockTimeoutMs = 40) => {
+  const setup = async () => {
     const conn = createFakeConnection();
-    const db = createCapacitorSqliteDb(conn, { lockTimeoutMs });
+    const db = createCapacitorSqliteDb(conn);
     await db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, data BLOB)');
     conn.calls.length = 0;
     return { conn, db };
@@ -147,9 +158,9 @@ describe('createCapacitorSqliteDb (specific to the Capacitor adapter)', () => {
   it('the lock: a plain call waits for a running transaction and runs after it', async () => {
     const { conn, db } = await setup();
     const order: string[] = [];
+    slowRuns(conn, 5);
     const tx = db.transaction(async (t) => {
       await t.run('INSERT INTO t (name) VALUES (?)', ['a']);
-      await sleep(5);
       await t.run('INSERT INTO t (name) VALUES (?)', ['b']);
       order.push('tx');
     });
@@ -165,22 +176,64 @@ describe('createCapacitorSqliteDb (specific to the Capacitor adapter)', () => {
     expect(ms.indexOf('commitTransaction')).toBeLessThan(ms.lastIndexOf('query'));
   });
 
-  it('a waiter behind a busy transaction does not time out', async () => {
-    const { db } = await setup(60);
+  it('a call that joins the queue behind a busy transaction is not taken for one from its body', async () => {
+    const { conn, db } = await setup();
+    slowRuns(conn, 15);
+    let started!: () => void;
+    const bodyStarted = new Promise<void>((resolve) => (started = resolve));
     const tx = db.transaction(async (t) => {
-      for (let i = 0; i < 12; i++) {
-        await t.run('INSERT INTO t (name) VALUES (?)', [`n${i}`]);
-        await sleep(15);
-      }
+      started();
+      for (let i = 0; i < 6; i++) await t.run('INSERT INTO t (name) VALUES (?)', [`n${i}`]);
     });
-    // Waits about 180 ms, three times the timeout, but the transaction keeps working.
+    await bodyStarted;
+    // Joins while the first run is in flight, then waits through the five others.
     const waiter = db.get<{ c: number }>('SELECT COUNT(*) AS c FROM t');
-    expect(await waiter).toEqual({ c: 12 });
+    expect(await waiter).toEqual({ c: 6 });
     await tx;
   });
 
-  it('times out a call made on the outer db from inside a body', async () => {
-    const { db } = await setup(30);
+  it('a body that awaits a timer is rolled back at once, and its later tx calls are refused', async () => {
+    const { conn, db } = await setup();
+    let late: unknown;
+    let resumed!: () => void;
+    const bodyResumed = new Promise<void>((resolve) => (resumed = resolve));
+    const started = Date.now();
+    const result = db.transaction(async (tx) => {
+      await tx.run('INSERT INTO t (name) VALUES (?)', ['before']);
+      await sleep(200);
+      await tx.run('INSERT INTO t (name) VALUES (?)', ['after']).catch((e) => (late = e));
+      resumed();
+    });
+    await expect(result).rejects.toMatchObject({ code: SQL_TX_AWAITED_NON_DB });
+    // Rolled back without waiting for the timer, and the lock is free again.
+    expect(Date.now() - started).toBeLessThan(150);
+    expect(methods(conn)).toContain('rollbackTransaction');
+    expect(methods(conn)).not.toContain('commitTransaction');
+    expect(await db.all('SELECT name FROM t')).toEqual([]);
+    await bodyResumed;
+    expect((late as { code?: string }).code).toBe(SQL_TX_AWAITED_NON_DB);
+    expect(await db.all('SELECT name FROM t')).toEqual([]);
+  });
+
+  it('a body that awaits only tx calls, in parallel and through helpers, commits', async () => {
+    const { db } = await setup();
+    const insert = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], n: string) => {
+      await Promise.resolve();
+      await tx.run('INSERT INTO t (name) VALUES (?)', [n]);
+    };
+    await db.transaction(async (tx) => {
+      await Promise.all([insert(tx, 'a'), insert(tx, 'b'), tx.get('SELECT 1')]);
+      await insert(tx, 'c');
+    });
+    expect(await db.all('SELECT name FROM t ORDER BY id')).toEqual([
+      { name: 'a' },
+      { name: 'b' },
+      { name: 'c' },
+    ]);
+  });
+
+  it('rejects a call made on the outer db from inside a body at once, without running it', async () => {
+    const { db } = await setup();
     const started = Date.now();
     let outer: unknown;
     await db.transaction(async (tx) => {
@@ -188,13 +241,13 @@ describe('createCapacitorSqliteDb (specific to the Capacitor adapter)', () => {
       await db.run('INSERT INTO t (name) VALUES (?)', ['out']).catch((e) => (outer = e));
     });
     expect((outer as { code?: string }).code).toBe(SQL_TX_OUTER_CALL);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(25);
-    // The cancelled waiter does not block the lock afterwards.
+    expect(Date.now() - started).toBeLessThan(150);
+    // The refused call never ran and does not block the lock afterwards.
     expect(await db.all('SELECT name FROM t')).toEqual([{ name: 'in' }]);
   });
 
-  it('times out a nested transaction() with SQL_TX_NESTED and rolls back when the body propagates it', async () => {
-    const { db } = await setup(30);
+  it('rejects a nested transaction() with SQL_TX_NESTED and rolls back when the body propagates it', async () => {
+    const { db } = await setup();
     await expect(
       db.transaction(async (tx) => {
         await tx.run('INSERT INTO t (name) VALUES (?)', ['in']);
