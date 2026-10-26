@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InteractionLod } from '../../src/interaction-lod';
+import { InteractionLod } from '@myastrosky/core/interaction-lod';
 import { DSO_DENSITY_MAX } from '../../src/density-slider';
 
 /**

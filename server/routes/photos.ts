@@ -4,6 +4,7 @@ import type { PhotoMetadataChanges } from '@myastrosky/core/domain/photos';
 import { isElectron, UPLOAD_LIMIT, checkRateLimit, upload } from './shared.js';
 import { photos } from '../services.js';
 import { sendError } from './http-errors.js';
+import { logDebug } from '@myastrosky/core/platform/log';
 
 export const photosRouter = express.Router();
 
@@ -41,9 +42,9 @@ photosRouter.post('/api/photos', upload.single('photo'), async (req, res) => {
       { name: file.originalname, bytes: file.buffer },
       req.body ?? {},
     );
-    console.log('[Upload] File pixel dimensions:', source.width, 'x', source.height);
-    console.log('[Upload] EXIF orientation:', source.orientation);
-    console.log('[Upload] Browser showed dimensions:', photo.width, 'x', photo.height);
+    logDebug('Upload', `File pixel dimensions: ${source.width} x ${source.height}`);
+    logDebug('Upload', `EXIF orientation: ${source.orientation}`);
+    logDebug('Upload', `Browser showed dimensions: ${photo.width} x ${photo.height}`);
     for (const w of warnings) console.warn('[Upload] Thumbnail generation failed:', w.error);
 
     // Answer with the row as GET /api/photos returns it, so the client's in-memory photo matches what a
@@ -251,7 +252,7 @@ photosRouter.delete('/api/photo-metadata', async (_req, res) => {
  *             properties:
  *               manualPlacement:
  *                 type: object
- *                 description: Manual placement object with projPerPx and transformation matrix
+ *                 description: Manual placement (centre, angle, projPerPx, mirrors). angleOnSky true means rotationDeg is on the sky; without it (saved before) it is on screen.
  *     responses:
  *       200:
  *         description: Manual placement updated successfully
@@ -286,6 +287,88 @@ photosRouter.patch('/api/photos/:id/manual-placement', async (req, res) => {
     const { manualPlacement } = req.body;
     await photos.setManualPlacement(id, manualPlacement);
     res.json({ ok: true });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/**
+ * @swagger
+ * /api/photos/{id}/rotate:
+ *   post:
+ *     summary: Turn a photo a quarter to the right
+ *     description: >
+ *       Adds a quarter turn to the right to how the photo is shown (`quarterTurns`, 0 to 3, back to 0 after four).
+ *       The picture file, its thumbnail and what is measured in their pixels (size, star correspondences, manual
+ *       placement) are not changed, so nothing is lost and the photo keeps its place on the sky.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Photo ID
+ *     responses:
+ *       200:
+ *         description: The photo as stored after the turn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 quarterTurns:
+ *                   type: integer
+ *                   enum: [1, 2, 3]
+ *                   description: Quarters to the right the photo is shown turned; absent when 0
+ *       404:
+ *         description: Photo not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Photo introuvable"
+ *                 code:
+ *                   type: string
+ *                   enum: [PHOTO_NOT_FOUND]
+ *       500:
+ *         description: Server error
+ */
+photosRouter.post('/api/photos/:id/rotate', async (req, res) => {
+  try {
+    res.json(await photos.rotateRight(req.params.id));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/**
+ * @swagger
+ * /api/photos/repair-sizes:
+ *   post:
+ *     summary: Give the photos stored without a size the size of their picture
+ *     description: >
+ *       Each photo stored with a width or height of 0 or less takes the size its stored picture is shown at. A photo
+ *       whose picture is missing or not an image is left as it is. The apps call it last at start-up.
+ *     responses:
+ *       200:
+ *         description: The number of photos repaired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 repaired:
+ *                   type: integer
+ *                   example: 0
+ *       500:
+ *         description: Server error
+ */
+photosRouter.post('/api/photos/repair-sizes', async (_req, res) => {
+  try {
+    res.json({ repaired: await photos.repairSizes() });
   } catch (err) {
     sendError(res, err);
   }

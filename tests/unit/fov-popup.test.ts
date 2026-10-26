@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
 // Keep the heavy gear/catalog/targets modules out of the popup under test.
-vi.mock('../../src/api', () => ({
+vi.mock('@myastrosky/app-state/api', () => ({
   getGearSetups: vi.fn().mockResolvedValue([
     {
       id: 's1',
@@ -16,7 +16,7 @@ vi.mock('../../src/api', () => ({
   createGearSetup: vi.fn(),
   updateGearSetup: vi.fn(),
 }));
-vi.mock('../../src/gear-catalog', () => ({
+vi.mock('@myastrosky/core/gear-catalog', () => ({
   getTelescopes: vi.fn().mockResolvedValue([{ id: 't1', focal_length_mm: 500, aperture_mm: 80 }]),
   getCameras: vi.fn().mockResolvedValue([
     {
@@ -43,7 +43,7 @@ vi.mock('../../src/gear-catalog', () => ({
     },
   ),
 }));
-vi.mock('../../src/gear-presets', () => ({
+vi.mock('@myastrosky/core/gear-presets', () => ({
   fovDeg: vi.fn().mockReturnValue({ wDeg: 2.5, hDeg: 1.7 }),
   formatSetupCanvasLabel: vi.fn().mockReturnValue('Setup 1 · 2.5° × 1.7°'),
   formatFov: vi.fn().mockReturnValue('5.0° × 3.0°'),
@@ -53,12 +53,17 @@ vi.mock('../../src/dso-catalog', () => ({
     id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, displayName: 'Orion Nebula' } : undefined,
   ),
 }));
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
+  getDSOById: vi.fn((id: string) =>
+    id === 'M42' ? { id: 'M42', ra: 83.8, dec: -5.4, displayName: 'Orion Nebula' } : undefined,
+  ),
+}));
 vi.mock('../../src/targets-view', () => ({ buildGearSectionContent: vi.fn() }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { buildFovPopup } from '../../src/fov-overlay';
-import { useFovFramesStore } from '../../src/stores/fov-frames';
-import { usePlansStore } from '../../src/stores/plans';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useUiStore } from '../../src/stores/ui';
 import { useCanvasStore } from '../../src/stores/canvas';
 

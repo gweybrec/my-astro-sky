@@ -44,6 +44,7 @@ const METADATA_KEYS = [
   'captureDetails',
   'gearSetupId',
   'thumbFilename',
+  'quarterTurns',
 ] as const;
 
 /** A photo service on its own in-memory database, with the raw connection for schema checks. */
@@ -55,6 +56,7 @@ async function makeService(): Promise<{ photos: PhotoService; conn: Database.Dat
     photos: createPhotoService({
       db,
       newId: () => 'unused',
+      now: () => 0,
       images: fakeImageCodec(),
       blobs: memoryBlobStore(),
     }),

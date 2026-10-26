@@ -3,10 +3,11 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BLOB_PIECE_BYTES,
   createCapacitorBlobStore,
+  ensureDirectory,
   toBase64,
   toBase64Js,
 } from '@myastrosky/backend-local/capacitor-blob-store';
@@ -64,14 +65,16 @@ describe('createCapacitorBlobStore', () => {
     expect(toBase64(new Uint8Array(0))).toBe('');
   });
 
-  it('removes the partial file and rejects when a write fails', async () => {
+  it('rejects when a write fails, leaving no partial file and the old file whole', async () => {
     const fake = createFakeFilesystem();
     const store = await openPhoneStore(fake);
-    fake.failOnWrite = 2;
+    await store.put('x.jpg', new Uint8Array([1, 2, 3]));
+    fake.failOnWrite = 3; // the append after the first piece of the second put
     await expect(store.put('x.jpg', new Uint8Array(2 * BLOB_PIECE_BYTES))).rejects.toThrow(
       'disk full',
     );
-    expect(fake.files.has('uploads/x.jpg')).toBe(false);
+    expect([...fake.files.keys()]).toEqual(['uploads/x.jpg']);
+    expect([...(await store.get('x.jpg'))!]).toEqual([1, 2, 3]);
   });
 
   it('returns null for a missing file although the local server answers 200', async () => {
@@ -89,5 +92,21 @@ describe('createCapacitorBlobStore', () => {
   it('refuses names that leave the folder', async () => {
     const store = await openPhoneStore();
     await expect(store.put('../x.jpg', new Uint8Array(1))).rejects.toThrow();
+  });
+});
+
+describe('ensureDirectory', () => {
+  it('does not ask the plugin to create a folder that exists (it would log the refusal)', async () => {
+    const stat = vi.fn().mockResolvedValue({ size: 0 });
+    const mkdir = vi.fn();
+    await ensureDirectory({ stat, mkdir }, 'DATA', 'uploads');
+    expect(mkdir).not.toHaveBeenCalled();
+  });
+
+  it('creates a missing folder and tolerates a refusal', async () => {
+    const stat = vi.fn().mockRejectedValue(new Error('missing'));
+    const mkdir = vi.fn().mockRejectedValue(new Error('exists'));
+    await expect(ensureDirectory({ stat, mkdir }, 'DATA', 'uploads')).resolves.toBeUndefined();
+    expect(mkdir).toHaveBeenCalledWith({ path: 'uploads', directory: 'DATA', recursive: true });
   });
 });

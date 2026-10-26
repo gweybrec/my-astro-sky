@@ -108,6 +108,7 @@ const photosOn = (db: typeof import('../../server/db.js')): PhotoService =>
   createPhotoService({
     db: createBetterSqliteDb(db.getConnection()),
     newId: () => 'unused',
+    now: () => 0,
     images: fakeImageCodec(),
     blobs: memoryBlobStore(),
   });
@@ -722,7 +723,11 @@ describe('DB import/export round-trip', () => {
 
 // The plan service on the same in-memory database as the legacy `db` module.
 const plansOn = (db: typeof import('../../server/db.js')) =>
-  createPlanService({ db: createBetterSqliteDb(db.getConnection()), newId: () => 'unused' });
+  createPlanService({
+    db: createBetterSqliteDb(db.getConnection()),
+    newId: () => 'unused',
+    now: () => 0,
+  });
 
 describe('Plan + mosaic export/import round-trip', () => {
   beforeEach(() => {

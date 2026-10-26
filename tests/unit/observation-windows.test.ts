@@ -5,6 +5,8 @@ import {
   windowDurationMs,
   framesInWindow,
   windowTimeOptions,
+  parseFrameSeconds,
+  snapStepFrac,
   formatWindowDuration,
   fracToClock,
   clockToFrac,
@@ -13,7 +15,7 @@ import {
   hexToRgba,
   toBandFill,
   MIN_WINDOW_FRAC,
-} from '../../src/observation-windows';
+} from '@myastrosky/core/observation-windows';
 
 describe('sanitizeObservationWindows', () => {
   it('drops non-array and malformed entries', () => {
@@ -302,5 +304,23 @@ describe('hexToRgba / toBandFill', () => {
     expect(toBandFill('#00ff00', 0.3)).toBe('rgba(0, 255, 0, 0.3)');
     // A filter token already carries its own alpha — pass it through.
     expect(toBandFill('rgba(180,40,40,0.4)')).toBe('rgba(180,40,40,0.4)');
+  });
+});
+
+describe('parseFrameSeconds / snapStepFrac', () => {
+  it('reads a positive number of seconds and nothing else', () => {
+    expect(parseFrameSeconds('180')).toBe(180);
+    expect(parseFrameSeconds(30)).toBe(30);
+    expect(parseFrameSeconds('')).toBeNull();
+    expect(parseFrameSeconds('0')).toBeNull();
+    expect(parseFrameSeconds('-5')).toBeNull();
+    expect(parseFrameSeconds('abc')).toBeNull();
+  });
+
+  it('snaps to one frame of the night, or not at all without a frame or with snapping off', () => {
+    const w = { ...newObservationWindow(), frameSeconds: 600, snap: true };
+    expect(snapStepFrac(w, 3600_000)).toBeCloseTo(1 / 6);
+    expect(snapStepFrac({ ...w, snap: false }, 3600_000)).toBe(0);
+    expect(snapStepFrac({ ...w, frameSeconds: null }, 3600_000)).toBe(0);
   });
 });

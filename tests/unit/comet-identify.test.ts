@@ -17,10 +17,10 @@ import {
   jplLookupUrl,
   COMET_CATEGORY_ID,
   NEARBY_RADIUS_DEG,
-} from '../../src/comet-identify';
-import type { CometElements } from '../../src/comet-ephemeris';
-import { fitPhotoAffine } from '../../src/photo-placement';
-import { project } from '../../src/projection';
+} from '@myastrosky/core/comet-identify';
+import type { CometElements } from '@myastrosky/core/comet-ephemeris';
+import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
+import { project } from '@myastrosky/core/projection';
 
 const COMETS = parseCometEls(
   readFileSync(join(__dirname, '../fixtures/comets/CometEls-sample.txt'), 'utf-8'),

@@ -3,10 +3,10 @@ import {
   findMergeTarget,
   resizeRegionFromDraft,
   type ResizeDraft,
-} from '../../src/frame-interaction';
-import { fromCanvas, unproject, setHemisphere } from '../../src/projection';
-import type { RenderableFrame } from '../../src/sky-map-types';
-import type { ViewState } from '../../src/types';
+} from '@myastrosky/core/frame-interaction';
+import { fromCanvas, unproject, setHemisphere } from '@myastrosky/core/projection';
+import type { RenderableFrame } from '@myastrosky/core/sky-map-types';
+import type { ViewState } from '@myastrosky/core/types';
 
 const view: ViewState = {
   centerX: 0,

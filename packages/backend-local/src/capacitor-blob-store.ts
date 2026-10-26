@@ -11,6 +11,8 @@ export interface CapacitorFilesystem {
   appendFile(options: { path: string; data: string; directory: string }): Promise<unknown>;
   stat(options: { path: string; directory: string }): Promise<{ size: number }>;
   deleteFile(options: { path: string; directory: string }): Promise<unknown>;
+  /** Moves a file; an existing file at `to` is replaced. */
+  rename(options: { from: string; to: string; directory: string }): Promise<unknown>;
   mkdir(options: { path: string; directory: string; recursive?: boolean }): Promise<unknown>;
   getUri(options: { path: string; directory: string }): Promise<{ uri: string }>;
 }
@@ -35,6 +37,24 @@ export interface CapacitorBlobStore extends BlobStore {
   init(): Promise<void>;
   /** The address of a stored file, for an image's `src`. Synchronous; `init` must have resolved. */
   url(name: string): string;
+}
+
+/**
+ * Creates a folder unless it exists. The plugin logs every rejected call in the console, and `mkdir` rejects on an
+ * existing folder, so the folder is looked at first. A real problem shows on the write that follows.
+ */
+export async function ensureDirectory(
+  filesystem: Pick<CapacitorFilesystem, 'stat' | 'mkdir'>,
+  directory: string,
+  path: string,
+): Promise<void> {
+  try {
+    await filesystem.stat({ path, directory });
+    return;
+  } catch {
+    // Not there yet.
+  }
+  await filesystem.mkdir({ path, directory, recursive: true }).catch(() => undefined);
 }
 
 /** Bytes per piece written; each piece is encoded on its own, so no base64 text of a whole file exists. */
@@ -114,11 +134,7 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
 
   let folderReady: Promise<void> | null = null;
   const ensureFolder = (): Promise<void> => {
-    folderReady ??= filesystem.mkdir({ path: folder, directory, recursive: true }).then(
-      () => undefined,
-      // The folder may already exist; a real problem shows on the write that follows.
-      () => undefined,
-    );
+    folderReady ??= ensureDirectory(filesystem, directory, folder);
     return folderReady;
   };
 
@@ -141,11 +157,15 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
 
     async put(name, bytes) {
       const path = pathOf(name);
+      // The pieces go to a hidden file (no blob name starts with a dot), renamed over the blob once all are written,
+      // so a failed write (a full phone) leaves the old file whole.
+      const part = `${folder}/.${name}.part`;
       await ensureFolder();
       try {
-        await writeFileInPieces(filesystem, directory, path, bytes, pieceBytes);
+        await writeFileInPieces(filesystem, directory, part, bytes, pieceBytes);
+        await filesystem.rename({ from: part, to: path, directory });
       } catch (err) {
-        await filesystem.deleteFile({ path, directory }).catch(() => undefined);
+        await filesystem.deleteFile({ path: part, directory }).catch(() => undefined);
         throw err;
       }
     },

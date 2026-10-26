@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isMessier, formatDsoLabel, formatCatalogId, dsoLabelVisible } from '../../src/dso-label';
-import type { DSO } from '../../src/types';
+import {
+  isMessier,
+  formatDsoLabel,
+  formatCatalogId,
+  dsoLabelVisible,
+} from '@myastrosky/core/dso-label';
+import type { DSO } from '@myastrosky/core/types';
 
 function dso(id: string, over: Partial<DSO> = {}): DSO {
   return {

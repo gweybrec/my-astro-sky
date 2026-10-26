@@ -312,7 +312,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { t } from '../../i18n';
-import { useSkyTimeStore } from '../../stores/sky-time';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonStore } from '../../stores/horizon';
 import { useUiStore } from '../../stores/ui';
 import DropdownPanel from '../base/DropdownPanel.vue';

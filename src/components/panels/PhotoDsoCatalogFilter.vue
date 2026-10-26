@@ -46,7 +46,7 @@ import { useI18n } from '../../composables/useI18n';
 import DropdownPanel from '../base/DropdownPanel.vue';
 
 // Catalog dropdown for the gallery detail view's "show DSOs" photo overlay. Same
-// markup/logic as DSOSection.vue's own catalog dropdown, but the selection here is
+// markup/logic as DisplayControlsSection.vue's own catalog dropdown, but the selection here is
 // local to this photo view — seeded once by the caller from the sky map's current
 // selection (`displayStore.dsoCatalogs`), not two-way bound to it.
 const props = defineProps<{

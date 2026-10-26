@@ -4,7 +4,7 @@
  */
 import { DomainError } from '../domain/errors';
 import type { SkyRegionChanges, SkyRegionData, SkyRegionInput } from '../domain/regions';
-import type { SqlDb, SqlTx } from '../ports/sql-db';
+import type { SqlDb, SqlStatement, SqlTx } from '../ports/sql-db';
 
 export interface SkyRegionServiceDeps {
   db: SqlDb;
@@ -33,6 +33,8 @@ export interface SkyRegionService {
   remove(id: string): Promise<void>;
   /** Writes a region from a backup file, replacing the one with the same id, without the checks of `create`. */
   importOne(region: ImportedSkyRegion): Promise<void>;
+  /** Writes several regions as `importOne` does, in one atomic batch. */
+  importMany(regions: readonly ImportedSkyRegion[]): Promise<void>;
 }
 
 interface SkyRegionRow {
@@ -72,12 +74,23 @@ function rowToApi(r: SkyRegionRow): SkyRegionData {
 
 const SELECT_ALL = 'SELECT * FROM sky_regions ORDER BY position ASC, rowid ASC';
 
+const rowStatement = (row: SkyRegionRow): SqlStatement => ({
+  sql: 'INSERT OR REPLACE INTO sky_regions (id, name, color, points, position) VALUES (?, ?, ?, ?, ?)',
+  params: [row.id, row.name.slice(0, 60), row.color.slice(0, 32), row.points, row.position],
+});
+
 async function writeRow(tx: SqlTx, row: SkyRegionRow): Promise<void> {
-  await tx.run(
-    'INSERT OR REPLACE INTO sky_regions (id, name, color, points, position) VALUES (?, ?, ?, ?, ?)',
-    [row.id, row.name.slice(0, 60), row.color.slice(0, 32), row.points, row.position],
-  );
+  const { sql, params } = rowStatement(row);
+  await tx.run(sql, params);
 }
+
+const importedRow = (region: ImportedSkyRegion): SkyRegionRow => ({
+  id: region.id,
+  name: region.name,
+  color: region.color,
+  points: JSON.stringify(region.points),
+  position: region.position,
+});
 
 export function createSkyRegionService(deps: SkyRegionServiceDeps): SkyRegionService {
   const { db, newId } = deps;
@@ -101,10 +114,10 @@ export function createSkyRegionService(deps: SkyRegionServiceDeps): SkyRegionSer
         });
       }
       const id = `region-${newId()}`;
-      // One statement: the new region goes after the existing ones (its position is the row count).
+      // One statement: the new region goes after the existing ones (its position follows the last one).
       await db.run(
         `INSERT OR REPLACE INTO sky_regions (id, name, color, points, position)
-         SELECT ?, ?, ?, ?, COUNT(*) FROM sky_regions`,
+         SELECT ?, ?, ?, ?, COALESCE(MAX(position) + 1, 0) FROM sky_regions`,
         [
           id,
           name.trim().slice(0, 60),
@@ -140,13 +153,11 @@ export function createSkyRegionService(deps: SkyRegionServiceDeps): SkyRegionSer
     },
 
     async importOne(region) {
-      await writeRow(db, {
-        id: region.id,
-        name: region.name,
-        color: region.color,
-        points: JSON.stringify(region.points),
-        position: region.position,
-      });
+      await writeRow(db, importedRow(region));
+    },
+
+    async importMany(regions) {
+      if (regions.length > 0) await db.batch(regions.map((r) => rowStatement(importedRow(r))));
     },
   };
 }

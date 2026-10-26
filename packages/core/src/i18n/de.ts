@@ -1,4 +1,5 @@
 import type { Translations } from './fr';
+import deMobile from './mobile/de';
 
 const de: Translations = {
   app: {
@@ -729,7 +730,6 @@ const de: Translations = {
     loadGearSetups: 'Die Setups konnten nicht geladen werden.',
     createGearSetup: 'Das Setup konnte nicht erstellt werden.',
     updateGearSetup: 'Das Setup konnte nicht geändert werden.',
-    updateGearSetupEnabled: 'Das Setup konnte nicht aktiviert oder deaktiviert werden.',
     deleteGearSetup: 'Das Setup konnte nicht gelöscht werden.',
     deleteAllGearSetups: 'Die Setups konnten nicht alle gelöscht werden.',
     loadPoiCategories: 'Die Typen interessanter Objekte konnten nicht geladen werden.',
@@ -772,7 +772,7 @@ const de: Translations = {
     INVALID_PHOTO_Y: 'Ungültiges photoY (positive Zahl erwartet)',
     INVALID_STAR_HIP: 'Ungültiges starHip (positive Ganzzahl erwartet)',
     PHOTO_NOT_FOUND: 'Foto nicht gefunden',
-    UNSUPPORTED_FORMAT: 'Nicht unterstütztes Format. Bitte TIFF oder FITS verwenden.',
+    UNSUPPORTED_FORMAT: 'Nicht unterstütztes Format. Bitte TIFF, FITS oder XISF verwenden.',
     NO_WCS_DATA: 'Keine WCS-Daten in der Datei gefunden',
     NO_IMAGE_DIMENSIONS: 'Bildabmessungen nicht gefunden',
     NOT_ENOUGH_CATALOG_STARS: 'Nicht genügend Katalogsterne im Feld',
@@ -800,6 +800,8 @@ const de: Translations = {
     GEAR_NOT_CUSTOM: 'Nur selbst hinzugefügte Ausrüstung kann gelöscht werden.',
     GEAR_NOT_FOUND: 'Diese Ausrüstung gibt es nicht mehr.',
     HORIZON_COMPUTE_FAILED: 'Der Horizont konnte nicht berechnet werden.',
+    HORIZON_OUT_OF_COVERAGE:
+      'Keine Geländedaten so nah am Pol: Der Horizont kann nur zwischen 85° S und 85° N berechnet werden.',
     HTTP_400: 'Die Anfrage wurde nicht akzeptiert.',
     HTTP_404: 'Unter dieser Adresse wurde nichts gefunden.',
     HTTP_409: 'Das steht im Konflikt mit dem aktuellen Zustand.',
@@ -812,6 +814,7 @@ const de: Translations = {
     HTTP_ERROR: 'Der Server hat mit einem Fehler geantwortet.',
     NETWORK_ERROR: 'Netzwerkfehler, bitte die Verbindung prüfen.',
     IDS_NOT_ARRAY: 'Die Fotoliste ist ungültig.',
+    INTERNAL_ERROR: 'In der App ist ein Fehler aufgetreten.',
     INVALID_DSO_DATA: 'Die Objektdaten sind ungültig.',
     INVALID_DSO_DEC: 'Die Deklination muss zwischen -90° und 90° liegen.',
     INVALID_DSO_ID: 'Ungültige Objektkennung.',
@@ -884,6 +887,7 @@ const de: Translations = {
   identify: {
     search: 'Suchen',
     searching: 'Suche…',
+    stillSearching: 'Suche läuft noch: Der Online-Dienst antwortet manchmal langsam.',
     addSelected: 'Auswahl hinzufügen ({n})',
     obsDateLabel: 'Beobachtungsdatum (UTC)',
     dateRequired: 'Dieses Foto hat kein Beobachtungsdatum – geben Sie es für die Suche ein.',
@@ -962,6 +966,7 @@ const de: Translations = {
     loadFromWcsError: 'Metadaten dieser Datei konnten nicht gelesen werden',
     metadataTitle: 'Informationen bearbeiten',
     showOnMap: 'Auf Karte anzeigen',
+    rotatePhotoRight: 'Nach rechts drehen',
     showDsos: 'Objekte anzeigen',
     showDsosUnavailable: 'Dieses Foto ist noch nicht auf der Himmelskarte platziert',
     showPois: 'Points of Interest anzeigen',
@@ -1483,6 +1488,7 @@ const de: Translations = {
     labelsForAll: 'Etiketten für alle Fotos',
     setupForAll: 'Ausrüstung für alle Fotos',
   },
+  mobile: deMobile,
 };
 
 export default de;

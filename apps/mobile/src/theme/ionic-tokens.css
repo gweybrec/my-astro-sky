@@ -1,0 +1,221 @@
+/* Ionic's own variables, mapped to the design system's tokens (design-system/tokens.css), in this one
+   file, so that Ionic's components take the look without per-screen overrides. Dark only. */
+
+:root {
+  color-scheme: dark;
+  --rail-width: 80px;
+  /* The system bars as insets. The design system only defines these on its board frame (`#root`), and its top bar's
+     `min-height` reads `--safe-top` without a fallback; a browser run overrides them on `<html>`. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Landscape: a display cut-out or the 3-button navigation bar sits at the left or the right edge (rotation 1 or 3). */
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  --ion-font-family: var(--font-sans);
+  --ion-background-color: var(--bg-app);
+  --ion-text-color: var(--text-primary);
+  --ion-border-color: var(--border-panel);
+
+  /* Ionic wants the colour as a triplet as well; the one place a value is written twice (accent-color, 0.9). */
+  --ion-color-primary: var(--accent-color);
+  --ion-color-primary-rgb: 100, 150, 220;
+  --ion-color-primary-contrast: var(--text-bright);
+  --ion-color-primary-contrast-rgb: 232, 240, 255;
+  --ion-color-primary-shade: var(--accent-color);
+  --ion-color-primary-tint: var(--accent-color);
+
+  --ion-toolbar-background: var(--bg-panel);
+  --ion-toolbar-color: var(--text-bright);
+  --ion-toolbar-border-color: var(--border-panel);
+
+  --ion-tab-bar-background: var(--bg-panel);
+  --ion-tab-bar-color: var(--text-secondary);
+  --ion-tab-bar-color-selected: var(--text-bright);
+  --ion-tab-bar-border-color: transparent;
+
+  --ion-item-background: var(--bg-panel);
+  --ion-item-color: var(--text-primary);
+  --ion-item-border-color: var(--border-subtle);
+
+  --ion-overlay-background-color: var(--bg-modal);
+  --ion-backdrop-color: var(--bg-overlay);
+
+  /* The system bars: Android hands them over as safe-area insets; the design system reads `--safe-top` and
+     `--safe-bottom` and falls back to the same `env()` values. */
+  --ion-safe-area-top: var(--safe-top, env(safe-area-inset-top, 0px));
+  --ion-safe-area-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px));
+
+  /* Sizes the boards fix and the design system has no token for (board "…Landscape"). */
+  --rail-button-height: 64px;
+  --mobile-column-max: 680px;
+  /* The settings column beside the map of a map mode in landscape (boards "…Landscape" of the map modes). */
+  --mobile-side-panel: 400px;
+  /* A sheet's width in landscape, over a scrim or over the map; a dialog's; a pushed form's footer button's. */
+  --mobile-sheet-width: 440px;
+  --mobile-dialog-width: 400px;
+  --mobile-footer-button-width: 200px;
+  /* The stroke of a tick box's mark: about 2 px once Ionic's mark is scaled to three quarters of the box. */
+  --checkmark-stroke: 2.6px;
+  --mobile-hairline: 1px;
+  --spinner-size-page: 36px;
+  --sheet-max-height: 60dvh;
+  --sheet-max-height-tall: 70dvh;
+  --alert-title-line: 26px;
+  --alert-text-line: 24px;
+}
+
+html,
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+ion-content {
+  --background: var(--bg-app);
+  --color: var(--text-primary);
+}
+
+/* A page's top bar is the design system's `.mob-topbar` (the header element carries the class). */
+ion-header.mob-topbar {
+  flex: none;
+}
+ion-header.header-md::after {
+  display: none;
+}
+
+/* ── Tab bar: `.mob-tabbar` / `.mob-tab` of the design system, on Ionic's tabs.
+   Portrait: 56 px bar at the bottom, above the gesture bar area. */
+ion-tab-bar {
+  --background: var(--bg-panel);
+  --border: none;
+  --color: var(--text-secondary);
+  --color-selected: var(--text-bright);
+  box-sizing: border-box;
+  height: var(--mobile-tabbar-height);
+  padding: 0 0 var(--ion-safe-area-bottom);
+  /* hairline drawn inside the box so the bar is exactly the tab bar height */
+  box-shadow: inset 0 1px 0 var(--border-panel);
+}
+ion-tab-button {
+  --background: transparent;
+  --background-focused: transparent;
+  --ripple-color: transparent;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  min-width: var(--mobile-touch-min);
+  max-width: none;
+  gap: var(--space-1);
+  -webkit-tap-highlight-color: transparent;
+}
+ion-tab-button .mob-tab-pill {
+  transition: none;
+}
+ion-tab-button.tab-selected .mob-tab-pill {
+  background: var(--accent-bg);
+}
+ion-tab-button:active .mob-tab-pill {
+  background: var(--accent-fill-lg);
+}
+
+/* ── Landscape: the bar becomes a navigation rail at the left edge (board "…Landscape": 80 px wide, the five tabs
+   centred in a column, 8 px apart, labels kept, system bars above and below, a display cut-out at the left). */
+@media (orientation: landscape) {
+  ion-tabs {
+    box-sizing: border-box;
+    padding-left: calc(var(--rail-width) + var(--safe-left, 0px));
+    /* the navigation bar of a 3-button device sits at the right edge in landscape */
+    padding-right: var(--safe-right, 0px);
+  }
+  ion-tab-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    /* Ionic forces `box-sizing: content-box` on the tab bar: the width is the buttons' column, the padding the cut-out. */
+    width: var(--rail-width);
+    height: auto;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--ion-safe-area-top) 0 var(--ion-safe-area-bottom) var(--safe-left, 0px);
+    box-shadow: inset -1px 0 0 var(--border-panel);
+  }
+  ion-tab-button {
+    flex: none;
+    height: var(--rail-button-height);
+    width: 100%;
+  }
+}
+
+/* ── A page pushed above the tabs (the top-level outlet's pages other than the tabs page, whose `ion-tabs` already
+   keeps the side insets): the top bar, the content, the floating plus and the footer stay clear of the system bars at
+   the left and right edges. */
+ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page) {
+  box-sizing: border-box;
+  padding-left: var(--safe-left, 0px);
+  padding-right: var(--safe-right, 0px);
+}
+
+/* ── Pages: the design system's scrolling area fills the page's content. */
+.mob-page-fill {
+  height: 100%;
+  box-sizing: border-box;
+}
+/* A page pushed above the tabs has no tab bar under it: its scrolling area ends above the navigation bar (the frame's
+   `--safe-bottom`, as the design system's `#root > .mob-scroll:last-child`). */
+.mob-page-safe {
+  padding-bottom: var(--safe-bottom, 0px);
+}
+/* Layout values the boards fix without a token of their own. */
+/* A pushed page's list starts one small gap under the top bar (boards "Réglages, setups", "Équipement, modifier le setup"). */
+.mob-page-pad {
+  padding-top: var(--space-4);
+}
+/* The delete row of a form stands apart from the rows above it (board "Équipement, modifier le setup"). */
+.mob-section-gap {
+  padding-top: var(--space-7);
+}
+/* Spacing the board "Réglages, exporter et importer" sets between its blocks (no token names these gaps). */
+.mob-section-gap-sm {
+  padding-top: var(--space-4);
+}
+.mob-form-row.mob-form-row--spaced {
+  padding-bottom: var(--space-4);
+}
+.mob-form-row.mob-form-row--restore {
+  padding-top: var(--space-7);
+}
+/* A field in a sheet header has the header's own inset, not the form row's. */
+.mob-form-row.mob-form-row--flush {
+  padding-left: 0;
+  padding-right: 0;
+}
+/* The red asterisk of a required field's label. */
+.mob-required {
+  color: var(--color-danger);
+}
+
+/* Landscape, a page of rows or cards: a centred column of at most 680 px (board land--page). */
+@media (orientation: landscape) {
+  .mob-page-column {
+    width: min(100%, var(--mobile-column-max));
+    margin: 0 auto;
+  }
+  /* A pushed form's footer: the buttons line up with the column, at the right, 200 px each (the mockup of the landscape page). */
+  ion-footer.mob-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--space-4) max(var(--mobile-gutter), calc((100% - var(--mobile-column-max)) / 2));
+    padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px));
+  }
+  ion-footer.mob-footer > ion-button.mob-btn {
+    flex: 0 0 var(--mobile-footer-button-width);
+  }
+  /* The context row of the targets: the fields share one row equally. */
+  .mob-context > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}

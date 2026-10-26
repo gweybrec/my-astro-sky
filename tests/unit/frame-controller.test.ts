@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DSO, DSOType, ViewState } from '../../src/types';
-import type { RenderableFrame, FovFrameChange } from '../../src/sky-map-types';
-import { FrameController, type FrameHost } from '../../src/frame-controller';
-import { frameGeometry, framePinGlyphPos } from '../../src/frame-geometry';
-import { rotateHandlePos } from '../../src/fov-frame-geometry';
-import { setCenterMode, setHemisphere, setProjectionMode } from '../../src/projection';
+import type { DSO, DSOType, ViewState } from '@myastrosky/core/types';
+import type { RenderableFrame, FovFrameChange } from '@myastrosky/core/sky-map-types';
+import { FrameController, type FrameHost } from '@myastrosky/render/frame-controller';
+import { frameGeometry, framePinGlyphPos } from '@myastrosky/core/frame-geometry';
+import { rotateHandlePos } from '@myastrosky/core/fov-frame-geometry';
+import { setCenterMode, setHemisphere, setProjectionMode } from '@myastrosky/core/projection';
 
 /**
  * The interactive FOV-frame state machine, driven against a stub host — no canvas.
@@ -81,7 +81,12 @@ interface Harness {
 }
 
 function harness(
-  over: { v?: ViewState; interactionEnabled?: boolean; pickingMode?: boolean } = {},
+  over: {
+    v?: ViewState;
+    interactionEnabled?: boolean;
+    pickingMode?: boolean;
+    touch?: boolean;
+  } = {},
 ) {
   const state = {
     nearDso: null as DSO | null,
@@ -103,6 +108,7 @@ function harness(
     },
     interactionEnabled: over.interactionEnabled ?? true,
     pickingMode: over.pickingMode ?? false,
+    touch: over.touch,
     findClosestDSO: () => state.nearDso,
     dsosInFrame: () => state.framedDsos,
     requestRenderInteractive: vi.fn(),
@@ -170,6 +176,63 @@ describe('FrameController', () => {
       h.fc.setFrames([bigActiveFrame()]);
       expect(h.fc.handleMouseDown(5, 5)).toBe(false);
       expect(h.fc.activeDrag).toBeNull();
+    });
+  });
+
+  describe('handleMouseDown — touch', () => {
+    it('a finger moves the selected frame from anywhere inside it', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      // Halfway between the centre and a corner: neither a handle nor the border.
+      const x = (geo.cx + geo.corners[0].x) / 2;
+      const y = (geo.cy + geo.corners[0].y) / 2;
+      expect(h.fc.handleMouseDown(x, y)).toBe(true);
+      expect(h.fc.activeDrag).toEqual({ id: 'f1', mode: 'move' });
+    });
+
+    it('a mouse pans from the same spot', () => {
+      const h = harness();
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      const x = (geo.cx + geo.corners[0].x) / 2;
+      const y = (geo.cy + geo.corners[0].y) / 2;
+      expect(h.fc.handleMouseDown(x, y)).toBe(false);
+    });
+
+    it('takes the rotation dot from a finger-sized distance', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      const rh = rotateHandlePos(geo.cx, geo.cy, geo.halfH, geo.rotDeg, 24);
+      expect(h.fc.handleMouseDown(rh.x + 18, rh.y)).toBe(true);
+      expect(h.fc.activeDrag).toEqual({ id: 'f1', mode: 'rotate' });
+    });
+
+    it('reports when a drag starts and ends', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame();
+      h.fc.setFrames([f]);
+      const states: boolean[] = [];
+      h.fc.setOnDragChange((d) => states.push(d));
+      const geo = frameGeometry(f, h.state.v);
+      h.fc.handleMouseDown(geo.cx, geo.cy);
+      h.fc.handleMouseUp();
+      expect(states).toEqual([true, false]);
+    });
+
+    it('neither pins from the glyph nor resizes from a corner', () => {
+      const h = harness({ touch: true });
+      const f = bigActiveFrame({ pinnable: true, resizable: true });
+      h.fc.setFrames([f]);
+      const geo = frameGeometry(f, h.state.v);
+      h.fc.handleMouseDown(geo.corners[2].x, geo.corners[2].y);
+      expect(h.fc.activeDrag?.mode).toBe('move');
+      expect(h.changes).toHaveLength(0);
+      expect(h.fc.touch).toBe(true);
     });
   });
 
@@ -628,6 +691,13 @@ describe('FrameController', () => {
       expect(h.changes[0].change.anchor).toEqual({ kind: 'screen', nx: 0.5, ny: 0.5 });
     });
 
+    it('puts a floating frame where it is asked (the part of the map a sheet leaves free)', () => {
+      const h = harness();
+      h.fc.setFrames([bigActiveFrame({ anchorKind: 'screen', nx: 0.1, ny: 0.9 })]);
+      h.fc.centerFrameInView('f1', { nx: 0.5, ny: 0.25 });
+      expect(h.changes[0].change.anchor).toEqual({ kind: 'screen', nx: 0.5, ny: 0.25 });
+    });
+
     it('is a no-op for an unknown id', () => {
       const h = harness();
       h.fc.setFrames([bigActiveFrame()]);
@@ -701,6 +771,57 @@ describe('FrameController', () => {
         makeFrame({ id: 't1', mosaicId: 'm1', mosaicIsBorderTile: true, wDeg: 0.02, hDeg: 0.02 }),
       ]);
       expect(h.fc.mosaicEditButtonsVisible('m1')).toBe(false);
+    });
+
+    it('a finger on a tile button acts when it lifts, not when it lands', () => {
+      const h = harness({ touch: true });
+      const frames = mosaic();
+      h.fc.setFrames(frames);
+      const drags: boolean[] = [];
+      h.fc.setOnDragChange((d) => drags.push(d));
+      const tileGeo = frameGeometry(frames[1], h.state.v);
+      expect(h.fc.handleMouseDown(tileGeo.cx + 15, tileGeo.cy)).toBe(true); // within the finger's reach
+      expect(h.tileRemoves).toEqual([]);
+      h.fc.handleDragMove(tileGeo.cx + 18, tileGeo.cy + 2);
+      h.fc.handleMouseUp();
+      expect(h.tileRemoves).toEqual(['t1']);
+      // A tap neither moves the mosaic nor shrinks the sheet.
+      expect(h.changes).toEqual([]);
+      expect(drags).toEqual([false]);
+    });
+
+    it('a finger that strays from a tile button lets the tap go', () => {
+      const h = harness({ touch: true });
+      const frames = mosaic();
+      h.fc.setFrames(frames);
+      h.fc.setMosaicAddCandidates([{ ra: 3, dec: 84 }]);
+      const pt = h.fc.candidateCanvasPoint({ ra: 3, dec: 84 }, h.fc.activeOutlineRotateAvoid());
+      expect(h.fc.handleMouseDown(pt.x, pt.y)).toBe(true);
+      h.fc.handleDragMove(pt.x + 30, pt.y);
+      h.fc.handleMouseUp();
+      expect(h.tileAdds).toEqual([]);
+      expect(h.changes).toEqual([]);
+    });
+
+    it('a finger takes a tile button before the move dot at the mosaic centre', () => {
+      const h = harness({ touch: true });
+      h.fc.setFrames([
+        makeFrame({ id: 'mosaic:p1:m1', active: true, isMosaicOutline: true, wDeg: 9, hDeg: 3 }),
+        makeFrame({ id: 't1', mosaicId: 'm1', mosaicIsBorderTile: true, wDeg: 3, hDeg: 3 }),
+      ]);
+      const geo = frameGeometry(h.fc.frames[1], h.state.v);
+      h.fc.handleMouseDown(geo.cx, geo.cy);
+      h.fc.handleMouseUp();
+      expect(h.tileRemoves).toEqual(['t1']);
+    });
+
+    it('draws finger-sized buttons and needs bigger tiles for them on a touch screen', () => {
+      const mouse = harness();
+      const finger = harness({ touch: true });
+      expect(finger.fc.tileButtonRadius).toBeGreaterThan(mouse.fc.tileButtonRadius);
+      expect(mouse.fc.tileTrashVisible(20, 20)).toBe(true);
+      expect(finger.fc.tileTrashVisible(20, 20)).toBe(false);
+      expect(finger.fc.tileTrashVisible(28, 30)).toBe(true);
     });
 
     it('reports no edit buttons for a mosaic with no tiles', () => {

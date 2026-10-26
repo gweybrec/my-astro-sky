@@ -1,5 +1,5 @@
 /**
- * Import of already-solved files: a FITS or a TIFF whose header holds the plate solution. The
+ * Import of already-solved files: a FITS, a TIFF or an XISF whose header holds the plate solution. The
  * service reads the coordinates, turns them into star correspondences against the catalogue the
  * host passes in, and (for `convert`) turns the decoded pixels into a PNG through the
  * `ImageCodec` port. It has no database and no file access.
@@ -19,9 +19,12 @@ import {
   UnsupportedFitsError,
   UnsupportedRawFormatError,
   UnsupportedTiffError,
+  UnsupportedXisfError,
 } from '../raw-decode/index';
+import { parseXisfHeader } from '../raw-decode/xisf';
 import {
   extractWCS,
+  wcsFromHeader,
   wcsToCorrespondencesWithCatalog,
   type CatalogStar,
   type WCSData,
@@ -38,22 +41,43 @@ export interface SolvedImportServiceDeps {
 
 export interface SolvedImportService {
   /**
-   * Reads the solution of a FITS or TIFF file and returns the star correspondences, rescaled to
+   * Reads the solution of a FITS, TIFF or XISF file and returns the star correspondences, rescaled to
    * the target picture size when one is given. A file without a usable solution is a result
    * (`success: false` and a code), not an error. Throws `invalid` (`NO_FILE`) when no file is
-   * given and `invalid` (`UNSUPPORTED_FORMAT`) for an extension other than .tif, .tiff, .fits
-   * or .fit.
+   * given and `invalid` (`UNSUPPORTED_FORMAT`) for an extension other than .tif, .tiff, .fits,
+   * .fit or .xisf.
    */
   solveWcs(request: SolveWcsRequest): Promise<SolveWcsResult>;
   /**
-   * Decodes a FITS or TIFF file to a PNG and returns it with the solution its header holds, if
+   * Decodes a FITS, TIFF or XISF file to a PNG and returns it with the solution its header holds, if
    * any. Throws `invalid` (`NO_FILE`, `UNSUPPORTED_FORMAT`) like `solveWcs`, and `invalid`
    * (`UNSUPPORTED_RAW_FORMAT`, with the decoder's message) for a layout that cannot be decoded.
    */
   convert(file: SolvedFile): Promise<ConvertSolvedResult>;
 }
 
-const ALLOWED_EXTENSIONS = new Set(['.tif', '.tiff', '.fits', '.fit']);
+const ALLOWED_EXTENSIONS = new Set(['.tif', '.tiff', '.fits', '.fit', '.xisf']);
+
+/**
+ * The solution a file's header holds. An XISF carries it as FITS keywords in its XML header, and
+ * its size in the image element; an XISF that cannot be read has no solution.
+ */
+function readWcs(bytes: Uint8Array, ext: string): WCSData | null {
+  if (ext !== '.xisf') return extractWCS(bytes, ext);
+  let header: ReturnType<typeof parseXisfHeader>;
+  try {
+    header = parseXisfHeader(bytes);
+  } catch (err) {
+    if (err instanceof UnsupportedXisfError) return null;
+    throw err;
+  }
+  const wcs = wcsFromHeader(header.fitsKeywords);
+  if (wcs && header.image) {
+    wcs.NAXIS1 = wcs.NAXIS1 || header.image.width;
+    wcs.NAXIS2 = wcs.NAXIS2 || header.image.height;
+  }
+  return wcs;
+}
 
 /** Lower-case extension with its dot ('' when there is none), as `path.extname` gives it. */
 function extensionOf(fileName: string): string {
@@ -95,13 +119,14 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
 
   // Standard FITS files from PixInsight/Siril use the FITS Y convention (Y=1 is the bottom row,
   // Y increases upward), opposite to the display convention (Y=0 is the top row), hence `true`.
+  // The FITS keywords of a TIFF or an XISF are read the same way.
   const correspondencesOf = async (wcs: WCSData, width: number, height: number) =>
     wcsToCorrespondencesWithCatalog(wcs, await catalog(), width, height, true);
 
   return {
     async solveWcs(request) {
       const ext = requireFile(request);
-      const wcs = extractWCS(request.bytes, ext);
+      const wcs = readWcs(request.bytes, ext);
       if (!wcs) return { success: false, code: 'NO_WCS_DATA' };
 
       // The size comes from the NAXIS header keywords; for a TIFF without them, from the codec.
@@ -169,7 +194,8 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
         if (
           err instanceof UnsupportedRawFormatError ||
           err instanceof UnsupportedTiffError ||
-          err instanceof UnsupportedFitsError
+          err instanceof UnsupportedFitsError ||
+          err instanceof UnsupportedXisfError
         ) {
           throw new DomainError('invalid', err.message, { code: 'UNSUPPORTED_RAW_FORMAT' });
         }
@@ -177,7 +203,7 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
       }
 
       // WCS and capture metadata; no rescale is needed since the PNG has the file's own size.
-      const wcs = extractWCS(file.bytes, ext);
+      const wcs = readWcs(file.bytes, ext);
       let correspondences: ConvertSolvedResult['correspondences'];
       if (wcs) correspondences = await correspondencesOf(wcs, decoded.width, decoded.height);
       const success = !!correspondences && correspondences.length >= 3;

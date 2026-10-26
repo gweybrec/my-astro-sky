@@ -75,8 +75,8 @@ export function createServices(deps: ServiceDeps) {
   const skyRegions = createSkyRegionService({ db, newId });
   const poiCategories = createPoiCategoryService({ db, newId });
   const gear = createGearService({ db, newId, catalog: gearCatalog });
-  const plans = createPlanService({ db, newId });
-  const photos = createPhotoService({ db, newId, images, blobs });
+  const plans = createPlanService({ db, newId, now });
+  const photos = createPhotoService({ db, newId, now, images, blobs });
   const novaSolve = createNovaSolveService({
     http,
     settings,

@@ -21,8 +21,11 @@ vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
 vi.mock('../../src/toast', () => ({ showToast: vi.fn() }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 vi.mock('../../src/batch-place', () => ({ placeBatchItem: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('../../src/autocomplete-utils', () => ({ filterLabelCandidates: () => [] }));
+vi.mock('@myastrosky/core/photo-metadata-draft', () => ({ filterLabelCandidates: () => [] }));
 vi.mock('../../src/dso-catalog', () => ({ findDSOIdsFromCorrespondences: () => [] }));
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
+  findDSOIdsFromCorrespondences: () => [],
+}));
 vi.mock('../../src/file-utils', () => ({
   stripExtension: (s: string) => s.replace(/\.[^.]+$/, ''),
 }));
@@ -36,7 +39,7 @@ vi.mock('../../src/batch-utils', () => ({
 vi.mock('../../src/stores/canvas', () => ({
   useCanvasStore: () => ({ overlay: null, gallery: null }),
 }));
-vi.mock('../../src/stores/settings', () => ({
+vi.mock('@myastrosky/app-state/stores/settings', () => ({
   useSettingsStore: () => ({
     serverSettings: { MAX_PARALLEL_SOLVES: state.maxParallel },
     load: vi.fn(),

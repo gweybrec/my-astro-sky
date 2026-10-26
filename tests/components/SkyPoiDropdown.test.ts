@@ -9,8 +9,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import SkyPoiDropdown from '../../src/components/panels/SkyPoiDropdown.vue';
-import { useDisplayStore } from '../../src/stores/display';
-import { poiKey } from '../../src/poi';
+import { useDisplayStore } from '@myastrosky/app-state/stores/display';
+import { poiKey } from '@myastrosky/core/poi';
 
 const setVisiblePois = vi.fn();
 const photos = [
@@ -34,6 +34,11 @@ vi.mock('../../src/stores/canvas', () => ({
       setVisiblePois,
     },
   }),
+}));
+
+// The shared display store sets the visible POIs through the map port.
+vi.mock('@myastrosky/app-state/stores/map-port', () => ({
+  useMapPortStore: () => ({ skyMap: null, overlay: { setVisiblePois } }),
 }));
 
 const categories = [

@@ -100,7 +100,7 @@ import {
   normalizeKey,
   type ShortcutActionId,
   type ShortcutCategory,
-} from '../../keyboard-shortcuts';
+} from '@myastrosky/core/keyboard-shortcuts';
 
 const emit = defineEmits<{ close: [] }>();
 

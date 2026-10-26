@@ -171,29 +171,27 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { computePhotoToProjMatrix } from '../../photo-placement';
-import { withCanonicalProjection } from '../../projection';
+import { asteroidSearchPlan, rankAsteroids } from '@myastrosky/core/photo-identify';
+import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import { skybotConesearchAPI } from '../../api';
-import { buildPageList } from '../../targets-view';
+import { buildPageList } from '@myastrosky/core/targets/sorting';
 import {
-  photoPixelToRaDec,
-  buildSearch,
-  rankCandidates,
   formatCandidateName,
   formatAsteroidClass,
   candidateToPoi,
   defaultTimeWindow,
-  isoToJd,
   isoToUtcParts,
   utcPartsToIso,
   type RankedCandidate,
-} from '../../asteroid-identify';
-import type { Photo, PointOfInterest } from '../../types';
+} from '@myastrosky/core/asteroid-identify';
+import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const ASTEROID_CATEGORY_ID = 'cat-asteroid';
 const RESULTS_PAGE_SIZE = 6;
 
 const props = defineProps<{ photo: Photo }>();
+// The photo as it is shown, turned: the clicks and the markers of the shell are in its pixels.
+const shown = computed(() => photoAsShown(props.photo));
 // `identified` hands the target photo and the chosen POIs to the caller — the modal
 // never persists itself. PoiEditor.vue pushes them into its own (possibly not yet
 // saved) `pois` v-model, so it works the same for a placed photo (gallery) and a
@@ -280,42 +278,16 @@ async function onSearch() {
   resultPage.value = 0;
   selected.value = new Set();
   try {
-    // Fitted and unprojected in the canonical pole projection: the zenith-centred
-    // display mode clips a field that is currently below the horizon (collapsing the
-    // fit) and rotates with the sky clock (see withCanonicalProjection).
-    const start = startPx.value;
-    const end = endPx.value;
-    const marks = withCanonicalProjection(() => {
-      const matrix = computePhotoToProjMatrix(props.photo);
-      return matrix
-        ? {
-            startRaDec: photoPixelToRaDec(matrix, start.x, start.y),
-            endRaDec: photoPixelToRaDec(matrix, end.x, end.y),
-          }
-        : null;
-    });
-    if (!marks) return;
-    const { startRaDec, endRaDec } = marks;
-    const startJd = isoToJd(startIso.value);
-    const endJd = isoToJd(endIso.value);
-    const search = buildSearch(startRaDec, endRaDec, startJd, endJd);
-    const effectiveRadius = Math.max(radiusArcmin.value, search.suggestedRadiusArcmin);
-
-    const candidates = await skybotConesearchAPI({
-      raDeg: search.raDeg,
-      decDeg: search.decDeg,
-      radiusArcmin: effectiveRadius,
-      epochJd: search.epochJd,
-    });
-
-    ranked.value = rankCandidates(
-      candidates,
-      {
-        start: { ...startRaDec, jd: startJd },
-        end: { ...endRaDec, jd: endJd },
-      },
-      search.epochJd,
+    const plan = asteroidSearchPlan(
+      shown.value,
+      startPx.value,
+      endPx.value,
+      startIso.value,
+      endIso.value,
+      radiusArcmin.value,
     );
+    if (!plan) return;
+    ranked.value = rankAsteroids(await skybotConesearchAPI(plan.params), plan);
     // The best match is pre-selected; the others are opt-in.
     if (ranked.value.length) selected.value = new Set([candidateKey(ranked.value[0])]);
   } catch (err) {

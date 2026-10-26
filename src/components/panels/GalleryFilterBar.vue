@@ -291,19 +291,19 @@ import { ref, computed, watch } from 'vue';
 import { useUiStore } from '../../stores/ui';
 import { useCanvasStore } from '../../stores/canvas';
 import { useI18n } from '../../composables/useI18n';
-import { DSO_TYPES_ALL } from '../../display-settings';
+import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import PoiFilterDropdown from './PoiFilterDropdown.vue';
 import BatchPhotoEditModal from '../modals/BatchPhotoEditModal.vue';
-import type { BatchEditMode } from '../../batch-photo-edit';
-import { usePoiCategoriesStore } from '../../stores/poi-categories';
+import type { BatchEditMode } from '@myastrosky/core/batch-photo-edit';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import {
   buildPoiFilterGroups,
   prunePoiSelection,
   poiSelectionsEqual,
   type PoiFilterGroup,
-} from '../../poi';
+} from '@myastrosky/core/poi';
 import { showToast } from '../../toast';
 import { getGearSetups } from '../../api';
 import { downloadBlob } from '../../file-utils';

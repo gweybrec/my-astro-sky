@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PhotoOverlay } from '../../src/photo-overlay';
-import { setHemisphere, setProjectionMode, setCenterMode } from '../../src/projection';
+import { setHemisphere, setProjectionMode, setCenterMode } from '@myastrosky/core/projection';
 
 // Minimal Photo shape for the tests
 function makePhoto(id: string, labels: string[] | undefined) {

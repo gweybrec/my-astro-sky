@@ -6,8 +6,8 @@ import {
   collectBatchEdits,
   draftFromPhoto,
   type PhotoEditDraft,
-} from '../../src/batch-photo-edit';
-import type { Photo } from '../../src/types';
+} from '@myastrosky/core/batch-photo-edit';
+import type { Photo } from '@myastrosky/core/types';
 
 function makePhoto(overrides: Partial<Photo> = {}): Photo {
   return {

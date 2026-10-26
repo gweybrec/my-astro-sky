@@ -576,7 +576,7 @@ describe('observation windows through PATCH', () => {
     expect(out.map((w) => w.snap)).toEqual([false, false, false, false, true, false]);
   });
 
-  it('gives a window with no id one of the form ow-<time>-<random>, and cuts a long id', async () => {
+  it('gives a window with no id one of the form ow-<uuid> from the id maker, and cuts a long id', async () => {
     const out = await patchWindows([
       { startFrac: 0.1, endFrac: 0.3 },
       { id: '', startFrac: 0.1, endFrac: 0.3 },
@@ -584,7 +584,8 @@ describe('observation windows through PATCH', () => {
       { id: 7, startFrac: 0.1, endFrac: 0.3 },
       { id: ' x '.padEnd(80, 'y'), startFrac: 0.1, endFrac: 0.3 },
     ]);
-    for (const w of out.slice(0, 4)) expect(w.id).toMatch(/^ow-[0-9a-z]+-[0-9a-z]{1,6}$/);
+    for (const w of out.slice(0, 4))
+      expect(w.id).toMatch(/^ow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(new Set(out.slice(0, 4).map((w) => w.id)).size).toBe(4);
     expect(out[4].id).toHaveLength(64);
     expect(out[4].id.startsWith('x')).toBe(true);
@@ -1096,12 +1097,11 @@ describe('plan positions', () => {
     expect(await call('DELETE', `/api/plans/${p1}`)).toEqual(OK);
     const p4 = await mkPlan('P4');
     const list = (await call('GET', '/api/plans')).body;
-    // KNOWN GAP: a new plan takes position = number of plans, so after a delete it can share a position
-    // with an existing plan (P3 and P4 are both at 2); the order then falls back on insertion order.
+    // A new plan follows the last position, not the number of plans, so it never shares one after a delete.
     expect(list.map((p: any) => [p.id, p.position])).toEqual([
       [p2, 1],
       [p3, 2],
-      [p4, 2],
+      [p4, 3],
     ]);
   });
 
@@ -1662,6 +1662,27 @@ describe('PATCH /api/photos/:id/metadata', () => {
     expect((await readPhoto(id)).gearSetupId).toBe('g'.repeat(64));
     expect(await patch(id, { gearSetupId: '   ' })).toEqual(OK);
     expect((await readPhoto(id)).gearSetupId).toBeNull();
+  });
+});
+
+describe('POST /api/photos/:id/rotate', () => {
+  it('answers the photo shown a quarter more turned, its picture file untouched', async () => {
+    const photo = await upload();
+    const files = uploadsList();
+    const bytes = fs.readFileSync(path.join(uploadsDir, photo.filename));
+    const r = await call('POST', `/api/photos/${photo.id}/rotate`);
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ...photo, quarterTurns: 1 });
+    expect(await readPhoto(photo.id)).toMatchObject({ quarterTurns: 1, width: photo.width });
+    // the picture is not saved again: same files, same bytes
+    expect(uploadsList()).toEqual(files);
+    expect(fs.readFileSync(path.join(uploadsDir, photo.filename)).equals(bytes)).toBe(true);
+  });
+
+  it('is 404 PHOTO_NOT_FOUND for an unknown photo', async () => {
+    const r = await call('POST', '/api/photos/nope/rotate');
+    expect(r.status).toBe(404);
+    expect(r.body.code).toBe('PHOTO_NOT_FOUND');
   });
 });
 

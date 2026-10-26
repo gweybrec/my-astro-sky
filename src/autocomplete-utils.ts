@@ -1,3 +1,7 @@
+import type { FilterCatalogEntry } from '@myastrosky/core/filter-catalog-entry';
+
+export type { FilterCatalogEntry };
+
 /**
  * Returns display labels from knownFilterMap whose name contains `query` (case-insensitive).
  * An empty query returns all entries. Results are capped at `maxResults`.
@@ -25,17 +29,6 @@ export interface FilterCandidate {
   color: string | null;
   /** Short spec line shown under the badge, e.g. "Ha · 656.3nm / 3nm". */
   detail: string | null;
-}
-
-/** The subset of a catalog filter this module needs — keeps it free of gear-catalog imports. */
-export interface FilterCatalogEntry {
-  label: string;
-  color: string;
-  detail: string | null;
-  brand: string;
-  model: string;
-  series: string | null;
-  subtype: string;
 }
 
 /**
@@ -92,23 +85,4 @@ export function filterCandidatesWithCatalog(
   }
 
   return results;
-}
-
-/**
- * Returns labels from `knownLabels` that:
- *   - are not already in `currentLabels` (excluded from suggestions)
- *   - contain `query` as a substring (case-insensitive); all pass when query is empty
- * Results are capped at `maxResults`.
- */
-export function filterLabelCandidates(
-  knownLabels: string[],
-  currentLabels: string[],
-  query: string,
-  maxResults = 8,
-): string[] {
-  const excluded = new Set(currentLabels);
-  const q = query.trim().toLowerCase();
-  return knownLabels
-    .filter((l) => !excluded.has(l) && (!q || l.toLowerCase().includes(q)))
-    .slice(0, maxResults);
 }

@@ -111,6 +111,7 @@ export interface BackupPhoto {
   pointsOfInterest?: unknown;
   captureDetails?: unknown;
   gearSetupId?: unknown;
+  quarterTurns?: unknown;
 }
 
 /** The image of an upload: the name it had on the sender's side and its bytes. */

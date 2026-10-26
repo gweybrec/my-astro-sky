@@ -1,24 +1,24 @@
 import './platform-init';
 import { loadCatalog } from './star-catalog';
 import { loadDSOCatalog } from './dso-catalog';
-import { SkyMap } from './sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery } from './gallery';
 import { TargetsView } from './targets-view';
-import { getPhotos, getGearSetups, getLatestVersion } from './api';
-import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from './version-check';
+import { getPhotos, getGearSetups, getLatestVersion, repairPhotoSizes } from './api';
+import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from '@myastrosky/core/version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
-import { getHemisphere } from './projection';
-import { computeFovTargetScale } from './gear-presets';
-import { getFilters } from './gear-catalog';
+import { getHemisphere } from '@myastrosky/core/projection';
+import { computeFovTargetScale } from '@myastrosky/core/gear-presets';
+import { getFilters } from '@myastrosky/core/gear-catalog';
 import { setupUI } from './ui';
 import { mountVueApp, openVueModal } from './modal-host';
 import { pinia } from './pinia-instance';
 import { useCanvasStore } from './stores/canvas';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
-import { useFovFramesStore } from './stores/fov-frames';
-import { usePoiCategoriesStore } from './stores/poi-categories';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { showToast } from './toast';
 import { getLang, t } from './i18n';
 import { reportRendererError, reportUnknownRendererError } from './error-reporter';
@@ -259,10 +259,30 @@ async function checkForUpdate() {
   }
 }
 
+/**
+ * Last at start-up: the photos stored without a size take the size of their picture, and when any did, the sky map
+ * and the gallery are given the photos again. A failure is only reported.
+ */
+async function repairStoredPhotoSizes() {
+  try {
+    if ((await repairPhotoSizes()) === 0) return;
+    const photos = await getPhotos();
+    const { overlay, gallery, skyMap } = useCanvasStore(pinia);
+    overlay?.loadPhotos(photos);
+    gallery?.loadPhotos(photos);
+    if (overlay && skyMap) {
+      skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
+      skyMap.render();
+    }
+    usePhotosStore(pinia).syncFromOverlay();
+  } catch (err) {
+    reportUnknownRendererError('photo_size_repair_failure', err);
+  }
+}
+
 init()
-  .then(() => {
-    void checkForUpdate();
-  })
+  .then(() => checkForUpdate())
+  .then(() => repairStoredPhotoSizes())
   .catch((err) => {
     reportUnknownRendererError('app_init_failure', err);
   });

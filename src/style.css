@@ -1197,6 +1197,26 @@ body {
   vertical-align: middle;
 }
 
+/* A button whose action is running (a backup being built or restored): not faded like a disabled one, and its
+   spinner in the button's own text colour so it shows on any fill. */
+button.btn-busy:disabled,
+label.btn-busy {
+  opacity: 1;
+  cursor: progress;
+}
+.btn-busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+.btn-busy .auto-solve-spinner {
+  flex: none;
+  margin-right: 0;
+  border-color: color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+}
+
 .solve-cancel-btn {
   margin-left: auto;
   padding: var(--space-1) var(--space-2);
@@ -2910,7 +2930,7 @@ input:focus-visible {
   transition: transform 0.15s ease;
 }
 
-.gallery-item img {
+.gallery-item > img {
   width: 100%;
   aspect-ratio: 3/2;
   object-fit: cover;

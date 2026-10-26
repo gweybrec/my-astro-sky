@@ -104,7 +104,10 @@ export interface Photo {
   notes: string;
   fileSize?: number | null; // Server-computed file size in bytes (present when loaded from API)
   thumbFilename?: string | null; // Low-res thumbnail filename (generated on upload)
+  quarterTurns?: QuarterTurns; // Quarters to the right the picture is shown turned (absent = 0); the file and everything measured in its pixels stay as stored
 }
+
+export type QuarterTurns = 0 | 1 | 2 | 3;
 
 /** Optional per-photo capture fields keyed by field id (see CAPTURE_FIELDS in capture-fields.ts). */
 export type CaptureDetails = Record<string, number | string>;
@@ -256,6 +259,8 @@ export interface ManualPlacement {
   projPerPx: number; // unités de projection par pixel photo
   mirrorX: boolean;
   mirrorY: boolean;
+  /** The angle is on the sky. Without it (a placement saved before) the angle is on screen, whatever the map's turn. */
+  angleOnSky?: boolean;
 }
 
 export interface DSOUserOverride {

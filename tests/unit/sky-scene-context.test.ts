@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 /** Long enough that the catalog length never becomes the binding budget constraint. */
 const MAGS = Array.from({ length: 50000 }, (_, i) => 15 * Math.cbrt(i / 50000));
 
-vi.mock('../../src/star-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/star-registry', () => ({
   getStars: () => [],
   getStarMagsSorted: () => MAGS,
   getConstellationLines: () => [],
@@ -11,15 +11,22 @@ vi.mock('../../src/star-catalog', () => ({
   loadConstellationStyle: vi.fn(),
 }));
 
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   getDSOs: () => [],
   getDSOById: () => null,
   getDSOImportanceRank: () => new Map(),
   getDSOCatalog: () => null,
 }));
 
-import { SkyMap } from '../../src/sky-map';
-import type { ViewState } from '../../src/types';
+// Pass-through, so a test can check which grid passes a frame draws.
+vi.mock('@myastrosky/render/sky-draw', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@myastrosky/render/sky-draw')>();
+  return { ...actual, drawAzimuthGrid: vi.fn(actual.drawAzimuthGrid) };
+});
+
+import { SkyMap } from '@myastrosky/render/sky-map';
+import { drawAzimuthGrid } from '@myastrosky/render/sky-draw';
+import type { ViewState } from '@myastrosky/core/types';
 
 /**
  * The per-frame render context.
@@ -147,6 +154,22 @@ describe('SkyMap render scene', () => {
     const liveCount = (live.starBudget as { count: number }).count;
     const zoomedCount = (zoomed.starBudget as { count: number }).count;
     expect(zoomedCount).toBeGreaterThan(liveCount);
+  });
+
+  // Its button is in the date-mode toolbar only, so the live sky never draws it, even with local
+  // sky forced on by a sky region being drawn or shown.
+  it('draws the azimuth grid in the date mode only', () => {
+    const { map: m } = makeMap();
+    m.setObserverLocation(48.58, 7.75);
+    m.setShowAzimuthGrid(true);
+    m.setLocalSkyMode(true);
+    vi.mocked(drawAzimuthGrid).mockClear();
+    m.render();
+    expect(drawAzimuthGrid).not.toHaveBeenCalled();
+    m.setSkyTimeMode('date');
+    m.setLocalSkyMode(true);
+    m.render();
+    expect(drawAzimuthGrid).toHaveBeenCalled();
   });
 
   describe('renderToCanvas', () => {

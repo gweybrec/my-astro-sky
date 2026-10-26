@@ -1825,7 +1825,7 @@
                 "properties": {
                   "manualPlacement": {
                     "type": "object",
-                    "description": "Manual placement object with projPerPx and transformation matrix"
+                    "description": "Manual placement (centre, angle, projPerPx, mirrors). angleOnSky true means rotationDeg is on the sky; without it (saved before) it is on screen."
                   }
                 }
               }
@@ -1865,6 +1865,98 @@
                       "enum": [
                         "PHOTO_NOT_FOUND"
                       ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/rotate": {
+      "post": {
+        "summary": "Turn a photo a quarter to the right",
+        "description": "Adds a quarter turn to the right to how the photo is shown (`quarterTurns`, 0 to 3, back to 0 after four). The picture file, its thumbnail and what is measured in their pixels (size, star correspondences, manual placement) are not changed, so nothing is lost and the photo keeps its place on the sky.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Photo ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo as stored after the turn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "quarterTurns": {
+                      "type": "integer",
+                      "enum": [
+                        1,
+                        2,
+                        3
+                      ],
+                      "description": "Quarters to the right the photo is shown turned; absent when 0"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Photo introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHOTO_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/photos/repair-sizes": {
+      "post": {
+        "summary": "Give the photos stored without a size the size of their picture",
+        "description": "Each photo stored with a width or height of 0 or less takes the size its stored picture is shown at. A photo whose picture is missing or not an image is left as it is. The apps call it last at start-up.\n",
+        "responses": {
+          "200": {
+            "description": "The number of photos repaired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "repaired": {
+                      "type": "integer",
+                      "example": 0
                     }
                   }
                 }
@@ -2719,7 +2811,7 @@
             "description": "Horizon profile returned"
           },
           "400": {
-            "description": "Invalid or missing lat/lon"
+            "description": "Invalid or missing lat/lon, or a latitude beyond ±85.05° (no elevation tiles)"
           },
           "502": {
             "description": "Failed to fetch or process elevation data"
@@ -3661,7 +3753,10 @@
                               "plan",
                               "setup",
                               "gear",
-                              "photo"
+                              "photo",
+                              "dsoOverride",
+                              "poiCategory",
+                              "skyRegion"
                             ]
                           },
                           "name": {

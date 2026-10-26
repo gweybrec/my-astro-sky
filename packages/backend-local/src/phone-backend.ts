@@ -7,12 +7,13 @@ import type { Backend } from '@myastrosky/core/backend';
 import { initSchema } from '@myastrosky/core/db/schema';
 import type { ImageCodec } from '@myastrosky/core/ports/image-codec';
 import { createServices } from '@myastrosky/core/services/create-services';
-import { newZipBundle, openZipBundle } from './bundle-fflate';
+import { newZipBundle, openZipRanges } from './bundle-fflate';
 import { createBrowserImageCodec } from './browser-image-codec';
 import { createBundledCatalogs } from './bundled-catalogs';
 import {
   createCapacitorBlobStore,
   writeFileInPieces,
+  ensureDirectory,
   type CapacitorFilesystem,
 } from './capacitor-blob-store';
 import { createCapacitorSqliteDb, type CapacitorSqliteConnection } from './capacitor-sqlite-db';
@@ -24,13 +25,16 @@ import {
   type WebCryptoLike,
 } from './webcrypto-secret-codec';
 
-/** The largest backup the phone opens: an archive is held in memory. */
-export const MAX_ARCHIVE_BYTES = 300 * 1024 * 1024;
+/** The largest file the phone reads whole (a `.json` backup); a ZIP backup is read by pieces, with no limit. */
+export const MAX_WHOLE_FILE_BYTES = 300 * 1024 * 1024;
 
 /** The method of `@capacitor/share` that `saveFile` uses. */
 export interface CapacitorShare {
   share(options: { title?: string; url?: string; dialogTitle?: string }): Promise<unknown>;
 }
+
+/** What the Share plugin rejects with when the share sheet is closed without a choice: the user's choice, not a failure. */
+export const SHARE_CANCELED = 'Share canceled';
 
 /** The WebView's `fetch` (the one Capacitor patches), as far as the adapters use it. */
 export type PlatformFetch = (
@@ -66,11 +70,22 @@ export interface PhonePlatform {
 /** The folder of picture files inside the data directory. */
 const BLOB_FOLDER = 'uploads';
 
-export async function createPhoneBackend(platform: PhonePlatform): Promise<Backend> {
+export interface PhoneBackendOptions {
+  /**
+   * Opens the database as it is, without its updates and without writing anything at start-up: for the full backup
+   * the start-up error screen offers after a database update failed. Only that export is meant to run on it.
+   */
+  withoutUpdates?: boolean;
+}
+
+export async function createPhoneBackend(
+  platform: PhonePlatform,
+  options: PhoneBackendOptions = {},
+): Promise<Backend> {
   const { filesystem, now, baseUrl, directories } = platform;
 
   const db = createCapacitorSqliteDb(platform.sqliteConnection);
-  await initSchema(db);
+  if (!options.withoutUpdates) await initSchema(db);
 
   const blobs = createCapacitorBlobStore({
     filesystem,
@@ -102,23 +117,26 @@ export async function createPhoneBackend(platform: PhonePlatform): Promise<Backe
     now,
   });
   // First run: the default POI categories, before anything can list them.
-  await services.poiCategories.ensureDefaults();
+  if (!options.withoutUpdates) await services.poiCategories.ensureDefaults();
 
   return createLocalBackend({
     services,
     files: { url: (fileName) => blobs.url(fileName) },
     starCatalogUrl: `${baseUrl}/data/stars.14.json`,
-    openZip: (bytes) => openZipBundle(bytes, { maxArchiveBytes: MAX_ARCHIVE_BYTES }),
+    openZip: openZipRanges,
+    maxWholeFileBytes: MAX_WHOLE_FILE_BYTES,
     newZip: newZipBundle,
     // The share sheet takes a file address: write the file in the cache directory, then share it.
     saveFile: async (name, bytes) => {
-      await filesystem
-        .mkdir({ path: 'exports', directory: directories.cache, recursive: true })
-        .catch(() => undefined);
+      await ensureDirectory(filesystem, directories.cache, 'exports');
       const path = `exports/${name}`;
       await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
       const { uri } = await filesystem.getUri({ path, directory: directories.cache });
-      await platform.share.share({ title: name, url: uri, dialogTitle: name });
+      try {
+        await platform.share.share({ title: name, url: uri, dialogTitle: name });
+      } catch (error) {
+        if (!(error instanceof Error && error.message === SHARE_CANCELED)) throw error;
+      }
     },
     now: () => new Date(now()),
   });

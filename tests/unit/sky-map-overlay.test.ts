@@ -11,7 +11,7 @@ vi.mock('../../src/dso-catalog', () => ({
   getDSOCatalog: () => null,
 }));
 
-import { SkyMap } from '../../src/sky-map';
+import { SkyMap } from '@myastrosky/render/sky-map';
 
 describe('SkyMap overlay canvas', () => {
   let originalGetContext: typeof HTMLCanvasElement.prototype.getContext;
@@ -99,5 +99,15 @@ describe('SkyMap overlay canvas', () => {
 
     expect(overlayCanvas.width).toBe(canvas.width);
     expect(overlayCanvas.height).toBe(canvas.height);
+  });
+
+  it('gives local sky the horizon in the live sky too, so a sky region drawn or shown is traced', () => {
+    const { map } = makeMap();
+    const scene = () => (map as unknown as { buildScene(): { horizon: unknown } }).buildScene();
+    map.setObserverLocation(48.58, 7.75);
+    map.setSkyTimeMode('live');
+    expect(scene().horizon).toBeNull();
+    map.setLocalSkyMode(true);
+    expect(scene().horizon).not.toBeNull();
   });
 });

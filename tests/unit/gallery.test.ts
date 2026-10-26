@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Photo } from '../../src/types';
+import type { Photo } from '@myastrosky/core/types';
 
 const mockBuildMetadataEditorPanel = vi.fn();
 
+const rotatePhotoAPI = vi.fn();
+vi.mock('../../src/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/api')>()),
+  rotatePhotoAPI: (...a: unknown[]) => rotatePhotoAPI(...a),
+}));
 vi.mock('../../src/metadata-editor', () => ({
   buildMetadataEditorPanel: (...args: any[]) => mockBuildMetadataEditorPanel(...args),
 }));
@@ -13,14 +18,14 @@ vi.mock('../../src/i18n', () => ({
   setLang: vi.fn(),
 }));
 
-vi.mock('../../src/poi-pins', async (importOriginal) => {
-  const real = await importOriginal<typeof import('../../src/poi-pins')>();
+vi.mock('@myastrosky/render/poi-pins', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@myastrosky/render/poi-pins')>();
   return { ...real, poiPinsInImage: vi.fn(real.poiPinsInImage) };
 });
 
 import { Gallery } from '../../src/gallery';
-import { poiPinsInImage } from '../../src/poi-pins';
-import { setCenterMode, setProjectionObserver } from '../../src/projection';
+import { poiPinsInImage } from '@myastrosky/render/poi-pins';
+import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
 function makePhoto(overrides: Partial<Photo> = {}): Photo {
   return {
@@ -294,18 +299,41 @@ describe('Gallery', () => {
         dsos: btn('gallery.showDsos'),
         pois: btn('gallery.showPois'),
         map: btn('gallery.showOnMap'),
+        rotate: btn('gallery.rotatePhotoRight'),
+        gallery,
         canvas: document.querySelector('.gallery-detail-dso-overlay') as HTMLCanvasElement,
       };
     }
 
-    it('renders DSO, POI and map icon buttons in that order', () => {
-      const { dsos, pois, map } = openDetail({ manualPlacement: placement });
+    it('renders DSO, POI, map and rotate icon buttons in that order', () => {
+      const { dsos, pois, map, rotate } = openDetail({ manualPlacement: placement });
       const row = [...document.querySelectorAll('.gallery-detail-btn-row button')];
-      expect(row).toEqual([dsos, pois, map]);
+      expect(row).toEqual([dsos, pois, map, rotate]);
       for (const b of row) {
         expect(b.querySelector('svg')).toBeTruthy();
         expect(b.textContent?.trim()).toBe('');
       }
+    });
+
+    it('turns the photo right, tells the app and opens the detail again on the turned photo', async () => {
+      const turned = makePhoto({ id: 'd', filename: 'd.jpg', quarterTurns: 1 });
+      rotatePhotoAPI.mockResolvedValue(turned);
+      const { rotate, gallery } = openDetail({ manualPlacement: placement });
+      const told = vi.fn();
+      gallery.onPhotoTurned = told;
+      rotate.click();
+      await vi.waitFor(() => expect(told).toHaveBeenCalledWith(turned));
+      expect(rotatePhotoAPI).toHaveBeenCalledWith('d');
+      // the same picture, shown turned
+      await vi.waitFor(() =>
+        expect(
+          (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).style.transform,
+        ).toContain('rotate(90deg)'),
+      );
+      expect(
+        (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).getAttribute('src'),
+      ).toContain('d.jpg');
+      expect(document.querySelectorAll('.gallery-cinematic-overlay')).toHaveLength(1);
     });
 
     it('disables the POI button with a reason when no POI has a position', () => {
@@ -673,6 +701,22 @@ describe('Gallery', () => {
     expect(chips.querySelector('.label-chip')?.textContent).toBe('nebula');
   });
 
+  it('lists the objects of a card the most important catalogue first', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({
+        id: 'a',
+        originalName: 'Orion',
+        filename: 'a.jpg',
+        dsoIds: ['IC434', 'Barnard 33', 'NGC2023', 'M42'],
+      }),
+    ]);
+    const chips = [...document.querySelectorAll('.gallery-item-chips .tag-chip')].map(
+      (c) => c.textContent,
+    );
+    expect(chips).toEqual(['M42', 'NGC2023', 'IC434', 'Barnard 33']);
+  });
+
   it('setGearSetups is a no-op when the setup list is unchanged (no hero carousel rebuild)', () => {
     const gallery = new Gallery();
     const setup = (id: string, name: string) => ({
@@ -821,6 +865,21 @@ describe('Gallery', () => {
     expect(img).toBeTruthy();
     expect(img.getAttribute('src')).toBeNull();
     expect(img.dataset.src).toBe('/uploads/a.jpg');
+  });
+
+  it('crops a turned photo in a frame of the card, turned', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', filename: 'a.jpg', originalName: 'M42', quarterTurns: 3 }),
+      makePhoto({ id: 'b', filename: 'b.jpg', originalName: 'M31' }),
+    ]);
+    const imgs = [...document.querySelectorAll<HTMLImageElement>('.gallery-item img')];
+    const turned = imgs.find((i) => i.dataset.src === '/uploads/a.jpg')!;
+    const upright = imgs.find((i) => i.dataset.src === '/uploads/b.jpg')!;
+    expect(turned.parentElement!.classList.contains('photo-turn-frame')).toBe(true);
+    expect(turned.classList.contains('rotate-270')).toBe(true);
+    expect(turned.classList.contains('photo-turn-picture--sideways')).toBe(true);
+    expect(upright.parentElement!.classList.contains('gallery-item')).toBe(true);
   });
 
   it('images start with visibility hidden until loaded', () => {

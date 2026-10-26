@@ -8,9 +8,8 @@ import { parseFITSHeader } from '../wcs';
  *
  * Known limit: XISF files whose astrometric solution is stored only as XISF Properties
  * (`PCL:AstrometricSolution:*`), not as FITS keywords, are not handled — their `fitsKeywords`
- * carry no CRVAL/CD cards. That needs a real sample to implement. Pixel decoding (attachment
- * blocks, compression, byte shuffling) is also out of scope here; this module only locates the
- * data.
+ * carry no CRVAL/CD cards. That needs a real sample to implement. The pixels are decoded by
+ * `xisf-decoder.ts`; this module only locates them.
  */
 
 export class UnsupportedXisfError extends Error {}
@@ -34,6 +33,10 @@ export interface XisfImageInfo {
   pixelStorage?: string;
   /** Raw `compression` attribute (e.g. `zlib:1234`), absent for uncompressed data. */
   compression?: string;
+  /** Raw `bounds` attribute (`lower:upper`), the value range of floating-point samples. */
+  bounds?: string;
+  /** Raw `byteOrder` attribute (`little` or `big`); little-endian when absent. */
+  byteOrder?: string;
   location: XisfImageLocation;
 }
 
@@ -160,6 +163,8 @@ export function parseXisfHeader(buf: Uint8Array): XisfHeader {
       colorSpace: attrs.colorSpace,
       pixelStorage: attrs.pixelStorage,
       compression: attrs.compression,
+      bounds: attrs.bounds,
+      byteOrder: attrs.byteOrder,
       location: parseLocation(attrs.location),
     };
     if (imageStart[2] === '/') {

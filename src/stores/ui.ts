@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, shallowRef } from 'vue';
-import type { ViewMode, DSO, Star, Photo, PointOfInterest } from '../types';
+import type { ViewMode, DSO, Star, Photo, PointOfInterest } from '@myastrosky/core/types';
 import { useCanvasStore } from './canvas';
 
 // Screen offset (px) of the tooltip from the cursor anchor; the tooltip is drawn

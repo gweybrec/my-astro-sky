@@ -6,7 +6,7 @@
 import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { createLocalBackend } from '@myastrosky/backend-local/local-backend';
-import { newZipBundle, openZipBundle } from '@myastrosky/backend-local/bundle-fflate';
+import { newZipBundle, openZipRanges } from '@myastrosky/backend-local/bundle-fflate';
 import { initSchema } from '@myastrosky/core/db/schema';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createServices } from '@myastrosky/core/services/create-services';
@@ -59,7 +59,7 @@ export async function makeLocalContractSetup(
     services,
     files: { url: (fileName) => `/uploads/${fileName}` },
     starCatalogUrl: '/data/stars-deep.json',
-    openZip: openZipBundle,
+    openZip: openZipRanges,
     newZip: newZipBundle,
     saveFile: async (name, bytes) => {
       saved.push({ name, bytes });

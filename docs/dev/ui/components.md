@@ -742,7 +742,7 @@ During pan/zoom interactions, photo overlay images are hidden by toggling `.phot
 
 **All buttons reuse `.sky-rotation-btn` as their base class** — no new button variant.
 
-**Show/hide toggle:** hiding locks floating frames to the sky first and closes the popup; showing opens the popup. The visibility state persists in `localStorage` key `fov-frames-visible-v1` (`src/stores/fov-frames.ts`).
+**Show/hide toggle:** hiding locks floating frames to the sky first and closes the popup; showing opens the popup. The visibility state persists in the device storage key `fov-frames-visible-v1` (`packages/app-state/src/stores/fov-frames.ts`).
 
 **Popup tooltip suppression:** hovering or focusing either button suppresses the sky tooltip via `uiStore.setForceSuppressTooltip`.
 

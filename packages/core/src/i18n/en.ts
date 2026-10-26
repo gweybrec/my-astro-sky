@@ -1,4 +1,5 @@
 import type { Translations } from './fr';
+import enMobile from './mobile/en';
 
 const en: Translations = {
   app: {
@@ -722,7 +723,6 @@ const en: Translations = {
     loadGearSetups: 'Failed to load gear setups',
     createGearSetup: 'Failed to create gear setup',
     updateGearSetup: 'Failed to update gear setup',
-    updateGearSetupEnabled: 'Failed to update gear setup enabled state',
     deleteGearSetup: 'Failed to delete gear setup',
     deleteAllGearSetups: 'Failed to delete all gear setups',
     loadPoiCategories: 'Failed to load POI categories',
@@ -765,7 +765,7 @@ const en: Translations = {
     INVALID_PHOTO_Y: 'Invalid photoY (positive number expected)',
     INVALID_STAR_HIP: 'Invalid starHip (positive integer expected)',
     PHOTO_NOT_FOUND: 'Photo not found',
-    UNSUPPORTED_FORMAT: 'Unsupported format. Use TIFF or FITS.',
+    UNSUPPORTED_FORMAT: 'Unsupported format. Use TIFF, FITS or XISF.',
     NO_WCS_DATA: 'No WCS data found in file',
     NO_IMAGE_DIMENSIONS: 'Image dimensions not found',
     NOT_ENOUGH_CATALOG_STARS: 'Not enough catalog stars in the field',
@@ -792,6 +792,8 @@ const en: Translations = {
     GEAR_NOT_CUSTOM: 'Only gear you added yourself can be deleted.',
     GEAR_NOT_FOUND: 'This gear no longer exists.',
     HORIZON_COMPUTE_FAILED: 'The horizon could not be computed.',
+    HORIZON_OUT_OF_COVERAGE:
+      'No terrain data this close to a pole: the horizon can only be computed between 85° S and 85° N.',
     HTTP_400: 'The request was not accepted.',
     HTTP_404: 'Nothing was found at this address.',
     HTTP_409: 'This conflicts with the current state.',
@@ -804,6 +806,7 @@ const en: Translations = {
     HTTP_ERROR: 'The server answered with an error.',
     NETWORK_ERROR: 'Network error, check the connection.',
     IDS_NOT_ARRAY: 'The list of photos is invalid.',
+    INTERNAL_ERROR: 'Something went wrong in the app.',
     INVALID_DSO_DATA: 'The object data is invalid.',
     INVALID_DSO_DEC: 'The declination must be between -90° and 90°.',
     INVALID_DSO_ID: 'Invalid object identifier.',
@@ -873,6 +876,7 @@ const en: Translations = {
   identify: {
     search: 'Search',
     searching: 'Searching…',
+    stillSearching: 'Still searching: the online service sometimes takes a while to answer.',
     addSelected: 'Add selected ({n})',
     obsDateLabel: 'Observation date (UTC)',
     dateRequired: 'This photo has no observation date — enter it to search.',
@@ -949,6 +953,7 @@ const en: Translations = {
     loadFromWcsError: 'Could not read metadata from this file',
     metadataTitle: 'Edit info',
     showOnMap: 'Show on map',
+    rotatePhotoRight: 'Rotate right',
     showDsos: 'Show DSOs',
     showDsosUnavailable: 'This photo is not placed on the sky map yet',
     showPois: 'Show points of interest',
@@ -1463,6 +1468,7 @@ const en: Translations = {
     labelsForAll: 'Labels for all photos',
     setupForAll: 'Setup for all photos',
   },
+  mobile: enMobile,
 };
 
 export default en;

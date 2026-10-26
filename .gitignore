@@ -7,7 +7,7 @@ data.db
 *.log
 *.db-shm
 .vite/
-.playwright-mcp/
+/.playwright-mcp/
 server/data/
 .env
 
@@ -30,3 +30,7 @@ build/
 # Release-notes scratch file (generated at release time, never committed)
 /RELEASE_BODY.md
 
+# Local working material: never committed (see docs/CLAUDE.md)
+/design/
+/.claude/work-packages/
+/.claude/tracking/

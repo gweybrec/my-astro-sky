@@ -102,6 +102,14 @@ export default defineConfig({
   },
 
   shortcuts: {
+    // ── A photo shown turned (src/photo-turn.ts) ─────────────────────────────
+    // The frame has the place and size of the picture; the picture inside fills it, on its side when turned a quarter
+    // or three (cqw/cqh: the frame's own width and height), and is rotated about its centre.
+    'photo-turn-frame': 'relative overflow-hidden [container-type:size]',
+    'photo-turn-picture': 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 block',
+    'photo-turn-picture--upright': 'w-[100cqw] h-[100cqh]',
+    'photo-turn-picture--sideways': 'w-[100cqh] h-[100cqw]',
+
     // ── Buttons ──────────────────────────────────────────────────────────────
     // See docs/dev/ui/components.md §2.1 for the canonical button hierarchy.
     'btn-action': [

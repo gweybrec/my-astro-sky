@@ -1,3 +1,4 @@
+import frMobile from './mobile/fr';
 const fr = {
   app: {
     title: 'MyAstroSky',
@@ -729,7 +730,6 @@ const fr = {
     loadGearSetups: 'Impossible de charger les setups.',
     createGearSetup: 'Impossible de créer le setup.',
     updateGearSetup: 'Impossible de modifier le setup.',
-    updateGearSetupEnabled: "Impossible d'activer ou de désactiver le setup.",
     deleteGearSetup: 'Impossible de supprimer le setup.',
     deleteAllGearSetups: 'Impossible de supprimer tous les setups.',
     loadPoiCategories: "Impossible de charger les types de points d'intérêt.",
@@ -772,7 +772,7 @@ const fr = {
     INVALID_PHOTO_Y: 'photoY invalide (nombre positif attendu)',
     INVALID_STAR_HIP: 'starHip invalide (entier positif attendu)',
     PHOTO_NOT_FOUND: 'Photo introuvable',
-    UNSUPPORTED_FORMAT: 'Format non supporté. Utilisez TIFF ou FITS.',
+    UNSUPPORTED_FORMAT: 'Format non supporté. Utilisez TIFF, FITS ou XISF.',
     NO_WCS_DATA: 'Aucune donnée WCS trouvée dans le fichier',
     NO_IMAGE_DIMENSIONS: "Dimensions de l'image introuvables",
     NOT_ENOUGH_CATALOG_STARS: "Pas assez d'étoiles du catalogue dans le champ",
@@ -799,6 +799,8 @@ const fr = {
     GEAR_NOT_CUSTOM: 'Seul le matériel que vous avez ajouté peut être supprimé.',
     GEAR_NOT_FOUND: "Ce matériel n'existe plus.",
     HORIZON_COMPUTE_FAILED: "Le calcul de l'horizon a échoué.",
+    HORIZON_OUT_OF_COVERAGE:
+      "Pas de données de relief si près d'un pôle : l'horizon ne peut être calculé qu'entre 85° S et 85° N.",
     HTTP_400: "La requête n'a pas été acceptée.",
     HTTP_404: "Rien n'a été trouvé à cette adresse.",
     HTTP_409: "Cela entre en conflit avec l'état actuel.",
@@ -811,6 +813,7 @@ const fr = {
     HTTP_ERROR: 'Le serveur a répondu par une erreur.',
     NETWORK_ERROR: 'Erreur réseau, vérifiez la connexion.',
     IDS_NOT_ARRAY: 'La liste des photos est invalide.',
+    INTERNAL_ERROR: "L'application a rencontré une erreur.",
     INVALID_DSO_DATA: "Les données de l'objet sont invalides.",
     INVALID_DSO_DEC: 'La déclinaison doit être comprise entre -90° et 90°.',
     INVALID_DSO_ID: "Identifiant d'objet invalide.",
@@ -881,6 +884,7 @@ const fr = {
   identify: {
     search: 'Rechercher',
     searching: 'Recherche…',
+    stillSearching: 'Toujours en cours : le service en ligne répond parfois lentement.',
     addSelected: 'Ajouter la sélection ({n})',
     obsDateLabel: 'Date d’observation (UTC)',
     dateRequired:
@@ -959,6 +963,7 @@ const fr = {
     loadFromWcsError: 'Impossible de lire les métadonnées de ce fichier',
     metadataTitle: 'Modifier les infos',
     showOnMap: 'Voir sur la carte',
+    rotatePhotoRight: 'Faire pivoter à droite',
     showDsos: 'Afficher les objets',
     showDsosUnavailable: "Cette photo n'est pas encore placée sur la carte du ciel",
     showPois: "Afficher les points d'intérêt",
@@ -1483,6 +1488,7 @@ const fr = {
     labelsForAll: 'Étiquettes pour toutes les photos',
     setupForAll: 'Équipement pour toutes les photos',
   },
+  mobile: frMobile,
 };
 
 // Recursive type: same structure with string leaves

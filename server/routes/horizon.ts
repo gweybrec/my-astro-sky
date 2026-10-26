@@ -37,7 +37,7 @@ export const horizonRouter = express.Router();
  *       200:
  *         description: Horizon profile returned
  *       400:
- *         description: Invalid or missing lat/lon
+ *         description: Invalid or missing lat/lon, or a latitude beyond ±85.05° (no elevation tiles)
  *       502:
  *         description: Failed to fetch or process elevation data
  */

@@ -425,7 +425,7 @@ describe('GET /api/comets/elements', () => {
 
 describe('GET /api/horizon', () => {
   const TILE_URL =
-    /^https:\/\/s3\.amazonaws\.com\/elevation-tiles-prod\/terrarium\/12\/\d+\/\d+\.png$/;
+    /^https:\/\/s3\.amazonaws\.com\/elevation-tiles-prod\/terrarium\/\d+\/\d+\/\d+\.png$/;
   const OVERPASS_URLS = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass-api.de/api/interpreter',
@@ -595,18 +595,21 @@ describe('GET /api/horizon', () => {
     });
   });
 
-  it('answers 502 before any request when the radius needs more than 400 tiles (clamped to 100 km)', async () => {
-    upstream = answer({ status: 200, body: PEAKS });
-    for (const radius of ['100', '1000']) {
-      const r = await call('GET', `/api/horizon?lat=45.5&lon=7.5&radiusKm=${radius}`);
-      expect(r).toEqual({
-        status: 502,
-        body: {
-          error: 'Failed to compute horizon from elevation data',
-          code: 'HORIZON_COMPUTE_FAILED',
-        },
-      });
-    }
+  it('answers a 100 km radius from zoom 11 tiles, at most 400 of them', async () => {
+    upstream = answer({ status: 200, body: '{"elements":[]}' }, { status: 404, body: '' });
+    const r = await call('GET', '/api/horizon?lat=45.5&lon=7.5&radiusKm=1000');
+    expect(r.status).toBe(200);
+    expect(r.body.alts).toHaveLength(360);
+    expect(tileRequests().length).toBeLessThanOrEqual(400);
+    expect(new Set(tileRequests().map((q) => q.url.split('/')[5]))).toEqual(new Set(['11']));
+  }, 30_000);
+
+  it('rejects a latitude beyond the elevation tiles with 400 and calls nobody', async () => {
+    const r = await call('GET', '/api/horizon?lat=86&lon=7.5');
+    expect(r).toEqual({
+      status: 400,
+      body: { error: 'No terrain data beyond 85° of latitude', code: 'HORIZON_OUT_OF_COVERAGE' },
+    });
     expect(recorded).toHaveLength(0);
   });
 
@@ -705,7 +708,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(r.status).toBe(400);
       expect(r.body).toEqual({
         success: false,
-        error: 'Unsupported format. Use TIFF or FITS.',
+        error: 'Unsupported format. Use TIFF, FITS or XISF.',
         code: 'UNSUPPORTED_FORMAT',
       });
     });
@@ -831,7 +834,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(jpg.status).toBe(400);
       expect(jpg.body).toEqual({
         success: false,
-        error: 'Unsupported raw format: .jpg. Use TIFF or FITS.',
+        error: 'Unsupported raw format: .jpg. Use TIFF, FITS or XISF.',
         code: 'UNSUPPORTED_FORMAT',
       });
     });

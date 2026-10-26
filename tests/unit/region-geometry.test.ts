@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAltAzInRegion, pointInPolygon, projectAzAlt } from '../../src/region-geometry';
+import { isAltAzInRegion, pointInPolygon, projectAzAlt } from '@myastrosky/core/region-geometry';
 
 /** A square-ish region centered on the north point at moderate altitude. */
 function squareRegion(centerAzDeg: number, centerAltDeg: number, halfSizeDeg: number) {

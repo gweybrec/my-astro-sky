@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { smartSortPhotos } from '../../src/gallery';
+import { smartSortPhotos } from '@myastrosky/core/photo-search';
 
 // Mock i18n and DOM to avoid browser dependency
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));

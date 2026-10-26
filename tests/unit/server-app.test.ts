@@ -96,6 +96,8 @@ const EXPECTED_API_ROUTES = [
   'DELETE /api/photo-metadata',
   'PATCH /api/photos/:id/manual-placement',
   'PATCH /api/photos/:id/metadata',
+  'POST /api/photos/:id/rotate',
+  'POST /api/photos/repair-sizes',
   'POST /api/solve-wcs',
   'POST /api/photos/convert',
   'POST /api/solve-astap',
@@ -194,10 +196,10 @@ describe('route table', () => {
     ]);
   });
 
-  it('registers exactly the 76 documented /api routes', () => {
+  it('registers exactly the 78 documented /api routes', () => {
     const all = listRoutes(app);
     const api = all.filter((r) => r.split(' ')[1].startsWith('/api/'));
-    expect(EXPECTED_API_ROUTES).toHaveLength(76);
+    expect(EXPECTED_API_ROUTES).toHaveLength(78);
     expect([...api].sort()).toEqual([...EXPECTED_API_ROUTES].sort());
   });
 
@@ -249,6 +251,7 @@ describe('lists on an empty database', () => {
     expect(typeof r.body.isWindows).toBe('boolean');
     expect({ ...r.body, isWindows: undefined }).toEqual({
       apiKeySet: false,
+      apiKeyUnreadable: false,
       isWindows: undefined,
       ASTAP_PATH: '',
       SOLVE_FIELD_PATH: '',

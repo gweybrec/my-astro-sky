@@ -19,7 +19,12 @@ const read = (file: string) => fs.readFileSync(path.join(FIXTURES, file), 'utf8'
 
 /** A file as the contract wants it: bytes in memory, no browser `File`. */
 export function fileSource(name: string, bytes: Uint8Array): FileSource {
-  return { name, size: bytes.length, read: async () => bytes };
+  return {
+    name,
+    size: bytes.length,
+    read: async () => bytes,
+    readRange: async (start, end) => bytes.slice(start, end),
+  };
 }
 
 // A 40x30 mono FITS whose solution (0.1 degree per pixel) covers a field of the real star catalogue.

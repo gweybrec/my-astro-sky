@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
-vi.mock('../../src/api', () => ({
+vi.mock('@myastrosky/app-state/api', () => ({
   getGearSetups: vi.fn().mockResolvedValue([
     {
       id: 's1',
@@ -32,7 +32,7 @@ vi.mock('../../src/api', () => ({
   updatePlanMosaicAPI: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../src/gear-catalog', () => ({
+vi.mock('@myastrosky/core/gear-catalog', () => ({
   getTelescopes: vi.fn().mockResolvedValue([
     { id: 't1', focal_length_mm: 500, aperture_mm: 80, is_smart_telescope: false },
     {
@@ -82,12 +82,12 @@ vi.mock('../../src/gear-catalog', () => ({
   ),
 }));
 
-vi.mock('../../src/gear-presets', () => ({
+vi.mock('@myastrosky/core/gear-presets', () => ({
   fovDeg: vi.fn().mockReturnValue({ wDeg: 2.5, hDeg: 1.7 }),
   formatSetupCanvasLabel: vi.fn().mockReturnValue('Setup 1 · 2.5° × 1.7°'),
 }));
 
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   // M42 carries an angular size so the auto-sized free mosaic has a real footprint
   // to cover (300'×240' → ~5°×4° + margin); other lookups stay size-less.
   getDSOById: vi.fn((id: string) =>
@@ -95,11 +95,23 @@ vi.mock('../../src/dso-catalog', () => ({
   ),
 }));
 
-vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
+vi.mock('@myastrosky/core/platform/error-hook', () => ({ reportError: vi.fn() }));
 
-import { useFovFramesStore } from '../../src/stores/fov-frames';
-import { usePlansStore } from '../../src/stores/plans';
-import { framePointToSky, tileCenters } from '../../src/mosaic';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { framePointToSky, tileCenters } from '@myastrosky/core/mosaic';
+import { reportError } from '@myastrosky/core/platform/error-hook';
+import { updatePlanMosaicAPI } from '@myastrosky/app-state/api';
+
+// A mosaic's tiles are written 250 ms after the last change. Fake the timer and send any
+// write still waiting at the end of each test, so none fires after the file is done.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+});
+afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
+});
 
 describe('fov-frames store', () => {
   beforeEach(() => {
@@ -497,6 +509,21 @@ describe('fov-frames store', () => {
     expect(reloaded.framesVisible).toBe(false);
   });
 
+  it('a write the browser storage refuses (full) is reported, not swallowed', async () => {
+    const store = await withSpecs();
+    vi.mocked(reportError).mockClear();
+    const quota = new DOMException('full', 'QuotaExceededError');
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw quota;
+    });
+    try {
+      store.setFramesVisible(false);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(reportError).toHaveBeenCalledWith('fov_frames_persist_visible', quota);
+  });
+
   it('framesVisible does not alter the frames themselves (map push is gated elsewhere)', async () => {
     const store = await withSpecs();
     store.addAdhocFrame('s1');
@@ -685,6 +712,63 @@ describe('fov-frames store', () => {
     expect(mosaic.cols).toBe(5);
     expect(mosaic.rows).toBe(5);
     expect(plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1')).toHaveLength(25);
+  });
+
+  it('setMosaicGrid re-tiles a plan mosaic to the new rows and columns about its centre', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.setMosaicGrid('mo1', 3, 1);
+    const mosaic = plans.plans[0].mosaics[0];
+    expect([mosaic.cols, mosaic.rows]).toEqual([3, 1]);
+    expect(mosaic.centerRa).toBe(83.8);
+    const tiles = plans.plans[0].entries.filter((e: any) => e.mosaicId === 'mo1');
+    expect(tiles).toHaveLength(3);
+    // The middle tile of a 3 × 1 row sits on the centre.
+    expect(
+      tiles.some((t: any) => Math.abs(t.ra - 83.8) < 1e-9 && Math.abs(t.dec + 5.4) < 1e-9),
+    ).toBe(true);
+  });
+
+  it('writes a re-tiled plan mosaic once, 250 ms after the last change', async () => {
+    const store = await withSpecs();
+    withMosaicPlan(store);
+    vi.mocked(updatePlanMosaicAPI).mockClear();
+    store.setMosaicGrid('mo1', 3, 1);
+    store.setMosaicGrid('mo1', 2, 2);
+    vi.advanceTimersByTime(249);
+    expect(updatePlanMosaicAPI).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(updatePlanMosaicAPI).toHaveBeenCalledTimes(1);
+    expect(updatePlanMosaicAPI).toHaveBeenCalledWith(
+      'p1',
+      'mo1',
+      expect.objectContaining({ cols: 2, rows: 2, tiles: expect.any(Array) }),
+    );
+    expect(vi.mocked(updatePlanMosaicAPI).mock.calls[0][2].tiles).toHaveLength(4);
+  });
+
+  it('setMosaicGrid re-tiles a free mosaic and keeps at least one row and column', async () => {
+    const store = await withSpecs();
+    store.addAdhocMosaic('s1', 84, -5, 'M42');
+    const id = store.adhocMosaics[0].id;
+    store.setMosaicGrid(id, 2, 0);
+    const m = store.adhocMosaics[0];
+    expect([m.cols, m.rows]).toEqual([2, 1]);
+    expect(m.tiles).toHaveLength(2);
+    expect(JSON.parse(localStorage.getItem('fov-adhoc-mosaics-v1')!)[0].tiles).toHaveLength(2);
+  });
+
+  it('a frame added while a mosaic is selected takes the selection from it', async () => {
+    const store = await withSpecs();
+    const plans = withMosaicPlan(store);
+    store.setActive('mosaic:p1:mo1');
+    vi.spyOn(plans, 'addCustomEntry').mockResolvedValue('e-new');
+    await store.addPlanFrame('p1', 84, -5);
+    expect(store.activeId).toBe('plan:p1:e-new');
+    expect(store.activeMosaicId).toBeNull();
+    store.setActive('mosaic:p1:mo1');
+    store.addAdhocFrame('s1');
+    expect(store.activeMosaicId).toBeNull();
   });
 
   // ── mosaicIsBorderTile: only outer tiles show the delete button ─────────────
@@ -1640,7 +1724,7 @@ describe('fov-frames store — smart-scope single-frame mosaics', () => {
     // Regression: setups saved for a smart scope carried an arbitrary cameraId (the
     // camera picker is disabled, so it never got updated), and loadSpecs used it
     // verbatim — every smart scope of the same focal length rendered the same wrong FOV.
-    const { buildGearPreset } = await import('../../src/gear-catalog');
+    const { buildGearPreset } = await import('@myastrosky/core/gear-catalog');
     (buildGearPreset as ReturnType<typeof vi.fn>).mockClear();
     await useFovFramesStore().loadSpecs();
 

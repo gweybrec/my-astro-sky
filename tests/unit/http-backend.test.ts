@@ -156,6 +156,18 @@ describe('requests', () => {
     await backend.photos.setManualPlacement('p', null);
     expect(JSON.parse(sent[0].body as string)).toEqual({ manualPlacement: null });
   });
+
+  it('turns a photo with one POST and answers the photo the server sends back', async () => {
+    const { backend, sent } = makeBackend(() => json({ id: 'p 1', width: 3, height: 4 }));
+    expect(await backend.photos.rotateRight('p 1')).toEqual({ id: 'p 1', width: 3, height: 4 });
+    expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/photos/p%201/rotate']);
+  });
+
+  it('repairs the photo sizes with one POST and answers the number the server sends back', async () => {
+    const { backend, sent } = makeBackend(() => json({ repaired: 2 }));
+    expect(await backend.photos.repairSizes()).toBe(2);
+    expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/photos/repair-sizes']);
+  });
 });
 
 describe('files', () => {
@@ -181,6 +193,7 @@ describe('files', () => {
     expect((form.get('photo') as File).type).toBe('image/png');
     expect(form.get('ra')).toBe('1.5');
     expect(form.has('dec')).toBe(false);
+    expect(form.get('lang')).toBe('fr');
   });
 
   it('builds the file from its bytes, with the type its extension says', async () => {

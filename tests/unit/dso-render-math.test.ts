@@ -1,13 +1,17 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { angularSizeToCanvasPx, dsoSizeCos2, dsoCanvasAngle } from '../../src/dso-render-math';
+import {
+  angularSizeToCanvasPx,
+  dsoSizeCos2,
+  dsoCanvasAngle,
+} from '@myastrosky/core/dso-render-math';
 import {
   setHemisphere,
   getProjectionGeneration,
   setCenterMode,
   setProjectionObserver,
-} from '../../src/projection';
-import { raDecFromAltAz } from '../../src/sky-geometry';
-import type { DSO } from '../../src/types';
+} from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
+import type { DSO } from '@myastrosky/core/types';
 
 const DEG2RAD = Math.PI / 180;
 

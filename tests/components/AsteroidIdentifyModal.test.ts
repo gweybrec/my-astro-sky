@@ -10,9 +10,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import AsteroidIdentifyModal from '../../src/components/modals/AsteroidIdentifyModal.vue';
-import { isoToUtcParts, isoToJd } from '../../src/asteroid-identify';
-import type { Photo, ManualPlacement } from '../../src/types';
-import { setCenterMode, setProjectionObserver } from '../../src/projection';
+import { isoToUtcParts, isoToJd } from '@myastrosky/core/asteroid-identify';
+import type { Photo, ManualPlacement } from '@myastrosky/core/types';
+import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
 vi.mock('../../src/api', () => ({
   skybotConesearchAPI: vi.fn(),

@@ -22,7 +22,13 @@ import type {
 import type { BlobStore } from '../ports/blob-store';
 import type { ImageCodec, ImageInfo } from '../ports/image-codec';
 import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
-import type { CaptureDetails, Photo, PhotoIntegration, PointOfInterest } from '../types';
+import type {
+  CaptureDetails,
+  Photo,
+  PhotoIntegration,
+  PointOfInterest,
+  QuarterTurns,
+} from '../types';
 import { sanitizeCaptureDetails } from '../wcs';
 
 /** Extensions an uploaded photo may have (lower case, with the dot). */
@@ -48,6 +54,8 @@ export const thumbnailNameOf = (filename: string): string =>
 export interface PhotoServiceDeps {
   db: SqlDb;
   newId: () => string;
+  /** The clock, in milliseconds since the epoch; it dates a new photo, and a restored one that has no date. */
+  now: () => number;
   images: ImageCodec;
   blobs: BlobStore;
 }
@@ -94,7 +102,7 @@ export interface PhotoService {
    * Makes the thumbnail `thumbFilename` from the image `filename` when the image exists and the thumbnail does not.
    * Rejects when the picture cannot be read or written; used after a backup import.
    */
-  ensureThumbnail(filename: string, thumbFilename: string): Promise<void>;
+  ensureThumbnail(filename: string, thumbFilename: string, replace?: boolean): Promise<void>;
   /** Replaces the metadata of a photo. Returns the cleaned `originalName` when one was given. Throws `notFound` (`PHOTO_NOT_FOUND`). */
   updateMetadata(id: string, changes: PhotoMetadataChanges): Promise<{ originalName?: string }>;
   /** Stores the placement as JSON, or clears it when `placement` is falsy. Throws `notFound` (`PHOTO_NOT_FOUND`). */
@@ -108,17 +116,48 @@ export interface PhotoService {
   removeRow(id: string): Promise<boolean>;
   /** Deletes the rows with these ids (not their files). Returns how many existed. Ids that are not strings are ignored. */
   removeRows(ids: readonly string[]): Promise<number>;
+  /**
+   * Turns a photo a quarter to the right as it is shown (`quarterTurns`, 0 to 3). Its picture, its thumbnail and
+   * what is measured in their pixels are left as they are, so nothing is lost and the photo keeps its place on the
+   * sky. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no such photo. Returns the photo as stored.
+   */
+  rotateRight(id: string): Promise<Photo>;
   /** Deletes every photo row (not the files). Returns how many there were. */
   removeAllRows(): Promise<number>;
   /** Deletes every photo: the rows, the images and the thumbnails. Returns how many there were. */
   removeAll(): Promise<number>;
-  /** For each of `names` that is the display name of a stored photo, the id of that photo (the first one), in the order of `names`. */
+  /**
+   * For each of `names`, every stored photo with that display name, in the order of `names`, then in the order the
+   * photos are stored.
+   */
   findByOriginalNames(names: readonly string[]): Promise<{ originalName: string; id: string }[]>;
   /**
    * Writes one photo of a backup manifest in one transaction, with the id it has there. With `skip` an existing
-   * id is left alone ('skipped'); with `replace` it is deleted first.
+   * id is left alone ('skipped'); with `replace` it is deleted first. The photos `replaceIds` are deleted in the same
+   * transaction once the photo is written, and kept when it is skipped. A photo the manifest gives no size takes the
+   * size of its stored picture; throws `invalid` (`CANNOT_DETERMINE_DIMENSIONS`) when that picture cannot be read.
    */
-  importPhoto(photo: BackupPhoto, strategy: PhotoImportStrategy): Promise<'imported' | 'skipped'>;
+  importPhoto(
+    photo: BackupPhoto,
+    strategy: PhotoImportStrategy,
+    replaceIds?: readonly string[],
+  ): Promise<'imported' | 'skipped'>;
+  /**
+   * Writes several photos as `importPhoto` does, in order, in one transaction: an id taken by a photo here or by
+   * an earlier one of the list is skipped under `skip`. Returns the outcome of each, in the order of `items`.
+   */
+  importPhotos(
+    items: readonly {
+      photo: BackupPhoto;
+      strategy: PhotoImportStrategy;
+      replaceIds?: readonly string[];
+    }[],
+  ): Promise<('imported' | 'skipped')[]>;
+  /**
+   * Gives each photo stored with a width or height of 0 or less the size of its stored picture, in one grouped
+   * write. A photo whose picture is missing or not an image is left as it is. Returns the number of photos repaired.
+   */
+  repairSizes(): Promise<number>;
 }
 
 interface PhotoRow {
@@ -138,6 +177,7 @@ interface PhotoRow {
   observation_date: string | null;
   capture_details: string | null;
   gear_setup_id: string | null;
+  quarter_turns: number | null;
 }
 
 interface CorrespondenceRow {
@@ -151,10 +191,10 @@ interface CorrespondenceRow {
   star_dec: number | null;
 }
 
-const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`;
-const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
+const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`;
+const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
 const INSERT_CORRESPONDENCE =
   'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
 const SELECT_PHOTOS = 'SELECT * FROM photos ORDER BY display_order ASC, created_at ASC, id ASC';
@@ -169,11 +209,14 @@ const SELECT_NAMES = 'SELECT id, original_name FROM photos ORDER BY rowid ASC';
 const DELETE_PHOTO = 'DELETE FROM photos WHERE id = ?';
 const DELETE_ALL_PHOTOS = 'DELETE FROM photos';
 const UPDATE_PLACEMENT = 'UPDATE photos SET manual_placement = ? WHERE id = ?';
+const UPDATE_TURN_RIGHT = 'UPDATE photos SET quarter_turns = (quarter_turns + 1) % 4 WHERE id = ?';
 const UPDATE_METADATA =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ? WHERE id = ?';
 const UPDATE_METADATA_WITH_NAME =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ?, original_name = ? WHERE id = ?';
 const UPDATE_DRAW_ORDER = 'UPDATE photos SET display_order = ? WHERE id = ?';
+const SELECT_UNSIZED = 'SELECT id, filename FROM photos WHERE width <= 0 OR height <= 0';
+const UPDATE_SIZE = 'UPDATE photos SET width = ?, height = ? WHERE id = ?';
 
 const photoNotFoundBody = { error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' } as const;
 
@@ -255,6 +298,11 @@ function cleanSetupId(val: unknown): string | null {
   return typeof val === 'string' && val.trim().length > 0 ? val.trim().slice(0, 64) : null;
 }
 
+/** A number of quarter turns, 0 to 3; anything else is 0. */
+function cleanQuarterTurns(val: unknown): QuarterTurns {
+  return val === 1 || val === 2 || val === 3 ? val : 0;
+}
+
 function parseJsonArray(val: string | null): string[] {
   if (!val) return [];
   try {
@@ -297,6 +345,7 @@ function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Photo {
     captureDetails: parseSanitized(p.capture_details, sanitizeCaptureDetails, {}),
     gearSetupId: p.gear_setup_id ?? null,
     thumbFilename: p.thumb_filename ?? null,
+    quarterTurns: cleanQuarterTurns(p.quarter_turns),
     correspondences: corr.map((c) => ({
       pointIndex: c.point_index,
       photoX: c.photo_x,
@@ -329,12 +378,20 @@ function correspondenceStatements(
 }
 
 export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
-  const { db, newId, images, blobs } = deps;
+  const { db, newId, now, images, blobs } = deps;
 
   async function readOne(id: string): Promise<Photo | undefined> {
     const row = await db.get<PhotoRow>(SELECT_PHOTO, [id]);
     if (!row) return undefined;
     return rowToPhoto(row, await db.all<CorrespondenceRow>(SELECT_CORRESPONDENCES_FOR, [id]));
+  }
+
+  /** The size a stored picture is shown at; null when it is missing or not an image. */
+  async function measureStored(
+    filename: string,
+  ): Promise<{ width: number; height: number } | null> {
+    const bytes = await blobs.get(filename).catch(() => null);
+    return bytes ? images.probe(bytes).then(shownSize, () => null) : null;
   }
 
   const service: PhotoService = {
@@ -367,10 +424,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       } catch {
         throw invalidUpload('Fichier image invalide ou corrompu', 'INVALID_IMAGE');
       }
-      // The browser shows the picture with its EXIF rotation applied: orientations 5 to 8 swap width and height.
-      const swap = !!source.orientation && source.orientation >= 5 && source.orientation <= 8;
-      const width = swap ? source.height : source.width;
-      const height = swap ? source.width : source.height;
+      const { width, height } = shownSize(source);
 
       // The orientation is baked into the stored file, which keeps the coordinate space consistent.
       const id = newId();
@@ -462,9 +516,13 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       return service.removeRows(doomed.map((r) => r.id));
     },
 
-    async ensureThumbnail(filename, thumbFilename) {
-      if ((await blobs.size(filename)) === null || (await blobs.size(thumbFilename)) !== null) {
-        return;
+    async ensureThumbnail(filename, thumbFilename, replace = false) {
+      // `replace`: the image has just been written and the thumbnail is made again without looking for the old one
+      // (looking for a missing file is an error the phone's file plugin writes to the console).
+      if (!replace) {
+        if ((await blobs.size(filename)) === null || (await blobs.size(thumbFilename)) !== null) {
+          return;
+        }
       }
       const bytes = await blobs.get(filename);
       if (!bytes) return;
@@ -481,6 +539,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
             input.originalName,
             input.width,
             input.height,
+            new Date(now()).toISOString(),
             input.manualPlacement ?? null,
             JSON.stringify(input.dsoIds ?? []),
             JSON.stringify(input.labels ?? []),
@@ -680,6 +739,11 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       if ((await db.run(UPDATE_PLACEMENT, [json, id])).changes === 0) throw photoNotFound();
     },
 
+    async rotateRight(id) {
+      if ((await db.run(UPDATE_TURN_RIGHT, [id])).changes === 0) throw photoNotFound();
+      return (await readOne(id))!;
+    },
+
     async setOrder(photoIds) {
       if (
         !Array.isArray(photoIds) ||
@@ -734,51 +798,124 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
 
     async findByOriginalNames(names) {
       if (names.length === 0) return [];
-      const idByName = new Map<string, string>();
+      const idsByName = new Map<string, string[]>();
       for (const r of await db.all<{ id: string; original_name: string }>(SELECT_NAMES)) {
-        if (!idByName.has(r.original_name)) idByName.set(r.original_name, r.id);
+        const ids = idsByName.get(r.original_name);
+        if (ids) ids.push(r.id);
+        else idsByName.set(r.original_name, [r.id]);
       }
       const found: { originalName: string; id: string }[] = [];
       for (const name of names) {
-        const id = idByName.get(name);
-        if (id !== undefined) found.push({ originalName: name, id });
+        for (const id of idsByName.get(name) ?? []) found.push({ originalName: name, id });
       }
       return found;
     },
 
-    async importPhoto(photo, strategy) {
-      const p = photo as unknown as Record<string, any>;
-      const id: string = p.id;
-      const correspondences: PhotoCorrespondenceInput[] = Array.isArray(p.correspondences)
-        ? p.correspondences
-        : [];
+    async importPhoto(photo, strategy, replaceIds = []) {
+      return (await service.importPhotos([{ photo, strategy, replaceIds }]))[0];
+    },
+
+    async importPhotos(items) {
+      if (items.length === 0) return [];
+      // The size of the stored picture of a photo the manifest gives none, read before the transaction (whose body
+      // may await only its own calls); null when the picture is missing or not an image.
+      const measured = new Map<number, { width: number; height: number } | null>();
+      for (const [i, { photo }] of items.entries()) {
+        const p = photo as unknown as Record<string, any>;
+        if (isPixelCount(p.width) && isPixelCount(p.height)) continue;
+        measured.set(i, await measureStored(p.filename ?? `${p.id}.jpg`));
+      }
       return db.transaction(async (tx) => {
-        if (strategy === 'replace') await tx.run(DELETE_PHOTO, [id]);
-        const result = await tx.run(INSERT_PHOTO_WITH_ID, [
-          id,
-          p.filename ?? `${id}.jpg`,
-          p.originalName ?? p.filename ?? id,
-          p.width ?? 0,
-          p.height ?? 0,
-          p.createdAt ?? new Date().toISOString(),
-          p.manualPlacement ? JSON.stringify(p.manualPlacement) : null,
-          JSON.stringify(Array.isArray(p.dsoIds) ? p.dsoIds : []),
-          JSON.stringify(Array.isArray(p.labels) ? p.labels : []),
-          JSON.stringify(sanitizePois(p.pointsOfInterest)),
-          typeof p.notes === 'string' ? p.notes : '',
-          JSON.stringify(sanitizeIntegrationRows(p.integrations)),
-          typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null,
-          typeof p.observationDate === 'string' ? p.observationDate : null,
-          JSON.stringify(sanitizeCaptureDetails(p.captureDetails)),
-          cleanSetupId(p.gearSetupId),
-        ]);
-        if (result.changes === 0) return 'skipped' as const;
-        if (correspondences.length > 0) {
-          await tx.batch(correspondenceStatements(id, correspondences));
+        // The ids taken: those here, then as the list writes and deletes them.
+        const taken = new Set((await tx.all<{ id: string }>(SELECT_IDS)).map((r) => r.id));
+        const results: ('imported' | 'skipped')[] = [];
+        const statements: SqlStatement[] = [];
+        for (const [i, { photo, strategy, replaceIds = [] }] of items.entries()) {
+          const p = photo as unknown as Record<string, any>;
+          const id: string = p.id;
+          if (strategy !== 'replace' && taken.has(id)) {
+            results.push('skipped');
+            continue;
+          }
+          const size = measured.has(i) ? measured.get(i) : { width: p.width, height: p.height };
+          if (!size) {
+            throw invalidUpload(
+              "Impossible de déterminer les dimensions de l'image",
+              'CANNOT_DETERMINE_DIMENSIONS',
+            );
+          }
+          const correspondences: PhotoCorrespondenceInput[] = Array.isArray(p.correspondences)
+            ? p.correspondences
+            : [];
+          const others = replaceIds.filter((other) => other !== id);
+          if (strategy === 'replace') statements.push({ sql: DELETE_PHOTO, params: [id] });
+          statements.push(
+            {
+              sql: INSERT_PHOTO_WITH_ID,
+              params: importParams({ ...p, ...size }, new Date(now()).toISOString()),
+            },
+            ...others.map((other) => ({ sql: DELETE_PHOTO, params: [other] })),
+            ...correspondenceStatements(id, correspondences),
+          );
+          taken.add(id);
+          others.forEach((other) => taken.delete(other));
+          results.push('imported');
         }
-        return 'imported' as const;
+        if (statements.length > 0) await tx.batch(statements);
+        return results;
       });
+    },
+
+    async repairSizes() {
+      const statements: SqlStatement[] = [];
+      for (const r of await db.all<{ id: string; filename: string }>(SELECT_UNSIZED)) {
+        const size = await measureStored(r.filename);
+        if (size) statements.push({ sql: UPDATE_SIZE, params: [size.width, size.height, r.id] });
+        else console.warn(`[Photos] The size of ${r.filename} cannot be read from its picture`);
+      }
+      if (statements.length > 0) await db.batch(statements);
+      return statements.length;
     },
   };
   return service;
+}
+
+/** The size the picture is shown at: the browser applies its EXIF rotation, and orientations 5 to 8 swap width and height. */
+function shownSize(info: ImageInfo): { width: number; height: number } {
+  const swap = !!info.orientation && info.orientation >= 5 && info.orientation <= 8;
+  return swap
+    ? { width: info.height, height: info.width }
+    : { width: info.width, height: info.height };
+}
+
+/** A width or height a picture can have: a whole number of pixels, at least one. */
+const isPixelCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0;
+
+/** A date in the form the database wrote before schema version 16 (`YYYY-MM-DD HH:MM:SS`, UTC). */
+const SQLITE_DATETIME = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/;
+
+/** The parameters of `INSERT_PHOTO_WITH_ID` for a photo of a backup manifest. */
+function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
+  const id: string = p.id;
+  return [
+    id,
+    p.filename ?? `${id}.jpg`,
+    p.originalName ?? p.filename ?? id,
+    p.width,
+    p.height,
+    typeof p.createdAt === 'string'
+      ? p.createdAt.replace(SQLITE_DATETIME, '$1T$2.000Z')
+      : (p.createdAt ?? nowIso),
+    p.manualPlacement ? JSON.stringify(p.manualPlacement) : null,
+    JSON.stringify(Array.isArray(p.dsoIds) ? p.dsoIds : []),
+    JSON.stringify(Array.isArray(p.labels) ? p.labels : []),
+    JSON.stringify(sanitizePois(p.pointsOfInterest)),
+    typeof p.notes === 'string' ? p.notes : '',
+    JSON.stringify(sanitizeIntegrationRows(p.integrations)),
+    typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null,
+    typeof p.observationDate === 'string' ? p.observationDate : null,
+    JSON.stringify(sanitizeCaptureDetails(p.captureDetails)),
+    cleanSetupId(p.gearSetupId),
+    cleanQuarterTurns(p.quarterTurns),
+  ];
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatSetupCanvasLabel } from '../../src/gear-presets';
+import { formatSetupCanvasLabel } from '@myastrosky/core/gear-presets';
 
 describe('formatSetupCanvasLabel', () => {
   it('uses degree FOV when both dims >= 1°', () => {

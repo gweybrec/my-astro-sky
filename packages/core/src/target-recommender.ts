@@ -32,22 +32,31 @@ export interface TargetSuggestion {
 
 const MAX_RESULTS = 8;
 
-export function recommendTargets(
-  dsos: DSO[],
+/** Options of the recommendation (see {@link recommendTargets}). */
+export interface RecommendOptions {
+  ignoreFovFit?: boolean;
+  minAltDeg?: number;
+  maxAltDeg?: number;
+  timeWindow?: { start: Date; end: Date };
+  /** Terrain skyline: reject targets whose peak sits below the horizon in that
+   *  direction ("how low not to go" made azimuth-dependent). */
+  horizonProfile?: HorizonProfile | null;
+}
+
+/**
+ * The recommendation in two steps so that a caller can score the objects a slice at a time and let the page breathe
+ * between slices: `collect` scores objects (call it on consecutive slices of the pool, in order), `finish` ranks the
+ * concatenated result. {@link recommendTargets} is both steps on the whole pool.
+ */
+export function createRecommender(
   preset: GearPreset,
   location: ObserverLocation,
   dateNight: Date,
-  limit = MAX_RESULTS,
-  options: {
-    ignoreFovFit?: boolean;
-    minAltDeg?: number;
-    maxAltDeg?: number;
-    timeWindow?: { start: Date; end: Date };
-    /** Terrain skyline: reject targets whose peak sits below the horizon in that
-     *  direction ("how low not to go" made azimuth-dependent). */
-    horizonProfile?: HorizonProfile | null;
-  } = {},
-): TargetSuggestion[] {
+  options: RecommendOptions = {},
+): {
+  collect: (dsos: DSO[]) => TargetSuggestion[];
+  finish: (candidates: TargetSuggestion[], limit: number) => TargetSuggestion[];
+} {
   const { latDeg, lonDeg } = location;
   const fov = fovDeg(preset);
   const magLimit = limitingMag(preset);
@@ -88,101 +97,122 @@ export function recommendTargets(
     starEnd = new Date(Math.min(starEnd.getTime(), options.timeWindow.end.getTime()));
   }
 
-  const candidates: TargetSuggestion[] = [];
+  const collect = (dsos: DSO[]): TargetSuggestion[] => {
+    const candidates: TargetSuggestion[] = [];
 
-  for (const dso of dsos) {
-    // Multiple/double stars are point-like synthetic targets: they have no angular size
-    // and no FOV-fit, and are scored by altitude + their own (setup-aware) quality rating.
-    const isMultipleStar = dso.type === 'MS';
+    for (const dso of dsos) {
+      // Multiple/double stars are point-like synthetic targets: they have no angular size
+      // and no FOV-fit, and are scored by altitude + their own (setup-aware) quality rating.
+      const isMultipleStar = dso.type === 'MS';
 
-    // Skip objects without angular size (can't compute FOV fit) — except point-like stars
-    const majAxisArcmin = dso.majAxis;
-    if (!isMultipleStar && !majAxisArcmin) continue;
+      // Skip objects without angular size (can't compute FOV fit) — except point-like stars
+      const majAxisArcmin = dso.majAxis;
+      if (!isMultipleStar && !majAxisArcmin) continue;
 
-    // Skip objects that are too faint
-    if (dso.mag !== null && dso.mag > magLimit) continue;
+      // Skip objects that are too faint
+      if (dso.mag !== null && dso.mag > magLimit) continue;
 
-    // Quick declination pre-filter (avoids expensive sampling)
-    if (!mightBeVisible(dso.dec, latDeg, minAlt)) continue;
+      // Quick declination pre-filter (avoids expensive sampling)
+      if (!mightBeVisible(dso.dec, latDeg, minAlt)) continue;
 
-    // Compute max altitude during the observing window. Stars use the wider visual
-    // window and ignore the upper altitude cap (overhead is ideal for splitting doubles;
-    // the cap only exists to avoid meridian-flip trouble on tracked imaging).
-    const { maxAltDeg, atDate } = maxAltDuringWindow(
-      dso.ra,
-      dso.dec,
-      latDeg,
-      lonDeg,
-      isMultipleStar ? starStart : windowStart,
-      isMultipleStar ? starEnd : windowEnd,
-      10,
-    );
+      // Compute max altitude during the observing window. Stars use the wider visual
+      // window and ignore the upper altitude cap (overhead is ideal for splitting doubles;
+      // the cap only exists to avoid meridian-flip trouble on tracked imaging).
+      const { maxAltDeg, atDate } = maxAltDuringWindow(
+        dso.ra,
+        dso.dec,
+        latDeg,
+        lonDeg,
+        isMultipleStar ? starStart : windowStart,
+        isMultipleStar ? starEnd : windowEnd,
+        10,
+      );
 
-    const effectiveMaxAlt = isMultipleStar ? 90 : maxAlt;
-    if (maxAltDeg < minAlt || maxAltDeg > effectiveMaxAlt) continue;
+      const effectiveMaxAlt = isMultipleStar ? 90 : maxAlt;
+      if (maxAltDeg < minAlt || maxAltDeg > effectiveMaxAlt) continue;
 
-    // Terrain horizon gate: reject targets that never clear the real skyline in
-    // their direction. The peak-time azimuth is used as an MVP approximation — an
-    // object hidden behind terrain even at culmination is definitely blocked.
-    if (options.horizonProfile) {
-      const lst = lstHours(dateToJD(atDate), lonDeg);
-      const azDeg = altAzFromRaDec(dso.ra, dso.dec, lst, latDeg).azDeg;
-      if (maxAltDeg < horizonAltAt(options.horizonProfile, azDeg)) continue;
+      // Terrain horizon gate: reject targets that never clear the real skyline in
+      // their direction. The peak-time azimuth is used as an MVP approximation — an
+      // object hidden behind terrain even at culmination is definitely blocked.
+      if (options.horizonProfile) {
+        const lst = lstHours(dateToJD(atDate), lonDeg);
+        const azDeg = altAzFromRaDec(dso.ra, dso.dec, lst, latDeg).azDeg;
+        if (maxAltDeg < horizonAltAt(options.horizonProfile, azDeg)) continue;
+      }
+
+      // ─ Altitude score (0-1): best at 70°, good above 50°, ok at minAlt ─
+      const altScore = altitudeScore(maxAltDeg, minAlt);
+
+      // ─ FOV fit score (0-1) ─ (point-like stars are FOV-neutral)
+      const objDeg = (majAxisArcmin ?? 0) / 60; // convert arcmin to deg
+      const fovFitScore = isMultipleStar || options.ignoreFovFit ? 1.0 : fovFit(objDeg, minFovDeg);
+
+      // ─ Brightness score (0-1) ─
+      const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
+
+      // Multiple stars: rank by altitude + their own quality rating (0★ = unresolvable by
+      // the setup, which sinks them). Everything else: altitude + FOV fit + brightness.
+      const score = isMultipleStar
+        ? 0.5 * altScore + 0.5 * ((dso.rating ?? 0) / 5)
+        : 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
+
+      candidates.push({
+        dso,
+        maxAltDeg,
+        bestTimeUtc: atDate,
+        score,
+        fovFitScore,
+        altScore,
+        brightnessScore,
+      });
     }
+    return candidates;
+  };
 
-    // ─ Altitude score (0-1): best at 70°, good above 50°, ok at minAlt ─
-    const altScore = altitudeScore(maxAltDeg, minAlt);
+  const finish = (candidates: TargetSuggestion[], limit: number): TargetSuggestion[] => {
+    // Sort by score descending
+    candidates.sort((a, b) => b.score - a.score);
 
-    // ─ FOV fit score (0-1) ─ (point-like stars are FOV-neutral)
-    const objDeg = (majAxisArcmin ?? 0) / 60; // convert arcmin to deg
-    const fovFitScore = isMultipleStar || options.ignoreFovFit ? 1.0 : fovFit(objDeg, minFovDeg);
-
-    // ─ Brightness score (0-1) ─
-    const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
-
-    // Multiple stars: rank by altitude + their own quality rating (0★ = unresolvable by
-    // the setup, which sinks them). Everything else: altitude + FOV fit + brightness.
-    const score = isMultipleStar
-      ? 0.5 * altScore + 0.5 * ((dso.rating ?? 0) / 5)
-      : 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
-
-    candidates.push({
-      dso,
-      maxAltDeg,
-      bestTimeUtc: atDate,
-      score,
-      fovFitScore,
-      altScore,
-      brightnessScore,
-    });
-  }
-
-  // Sort by score descending
-  candidates.sort((a, b) => b.score - a.score);
-
-  // Diversity cap: max 2 of each DSO type in top results
-  const typeCounts: Record<string, number> = {};
-  const diverse: TargetSuggestion[] = [];
-  for (const c of candidates) {
-    const t = c.dso.type;
-    typeCounts[t] = (typeCounts[t] ?? 0) + 1;
-    if (typeCounts[t] <= 2) {
-      diverse.push(c);
-    }
-    if (diverse.length >= limit) break;
-  }
-
-  // If diversity filter left us with fewer than limit, top up
-  if (diverse.length < limit) {
+    // Diversity cap: max 2 of each DSO type in top results
+    const typeCounts: Record<string, number> = {};
+    const diverse: TargetSuggestion[] = [];
     for (const c of candidates) {
-      if (!diverse.includes(c)) {
+      const t = c.dso.type;
+      typeCounts[t] = (typeCounts[t] ?? 0) + 1;
+      if (typeCounts[t] <= 2) {
         diverse.push(c);
-        if (diverse.length >= limit) break;
+      }
+      if (diverse.length >= limit) break;
+    }
+
+    // If diversity filter left us with fewer than limit, top up
+    if (diverse.length < limit) {
+      const picked = new Set(diverse);
+      for (const c of candidates) {
+        if (!picked.has(c)) {
+          diverse.push(c);
+          picked.add(c);
+          if (diverse.length >= limit) break;
+        }
       }
     }
-  }
 
-  return diverse.slice(0, limit);
+    return diverse.slice(0, limit);
+  };
+
+  return { collect, finish };
+}
+
+export function recommendTargets(
+  dsos: DSO[],
+  preset: GearPreset,
+  location: ObserverLocation,
+  dateNight: Date,
+  limit = MAX_RESULTS,
+  options: RecommendOptions = {},
+): TargetSuggestion[] {
+  const recommender = createRecommender(preset, location, dateNight, options);
+  return recommender.finish(recommender.collect(dsos), limit);
 }
 
 /**

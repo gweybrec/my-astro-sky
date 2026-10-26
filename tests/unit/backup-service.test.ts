@@ -11,7 +11,7 @@ import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
 import { createBackupService, type BackupFile } from '@myastrosky/core/services/backup';
-import { createServices } from '../../server/create-services';
+import { createServices } from '@myastrosky/core/services/create-services';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { fakeImageCodec, memoryBlobStore } from '../helpers/fake-image-io';
 import { SQL_ADAPTERS } from '../helpers/sql-adapters';
@@ -307,8 +307,8 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(await b.poiCategories.list()).toEqual(await a.poiCategories.list());
       expect(await b.dsoOverrides.getAll()).toEqual(await a.dsoOverrides.getAll());
       expect(new TextDecoder().decode(b.blobs.store.get('p1.jpg'))).toBe('image-1');
-      // The thumbnail was in the bundle but is not a selectable image: it is regenerated.
-      expect(b.blobs.store.has('thumb_p1.jpg')).toBe(true);
+      // The thumbnail is not a selectable image, but comes with its image: the archive's own file is written.
+      expect(new TextDecoder().decode(b.blobs.store.get('thumb_p1.jpg'))).toBe('thumb-1');
       expect(b.blobs.store.has('p2.jpg')).toBe(true);
     });
 
@@ -327,6 +327,107 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(await a.photos.list()).toHaveLength(2);
       expect(await a.plans.list()).toHaveLength(1);
       expect(await a.gear.listSetups()).toHaveLength(1);
+    });
+  });
+
+  describe('photos that share a name', () => {
+    const named = (id: string, name: string, notes = '') => ({
+      id,
+      filename: `${id}.jpg`,
+      originalName: name,
+      width: 1,
+      height: 1,
+      notes,
+    });
+    const notesById = async (set: Awaited<ReturnType<typeof makeSet>>) =>
+      Object.fromEntries((await set.photos.list()).map((p) => [p.id, p.notes]));
+
+    it('keeps both when a machine imports its own backup again', async () => {
+      const a = await makeSet();
+      for (const id of ['P', 'Q']) {
+        await a.photos.importPhoto(named(id, 'result.jpg'), 'skip');
+        a.blobs.store.set(`${id}.jpg`, text(`image-${id}`));
+      }
+      const writer = memoryWriter();
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      await svc.exportTo(writer, { options: {} });
+      const result = await svc.importFrom(memoryReader(writer.files), {
+        ...everything,
+        selectedImages: ['P.jpg', 'Q.jpg'],
+      });
+      expect(result).toMatchObject({ imported: 2, skipped: 0, failed: [] });
+      expect((await a.photos.list()).map((p) => p.id)).toEqual(['P', 'Q']);
+    });
+
+    it('replaces only the photo the backup carries, not the other one of the same name', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('P', 'result.jpg', 'old'), 'skip');
+      await a.photos.importPhoto(named('Q', 'result.jpg', 'mine'), 'skip');
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importPhotoList([named('P', 'result.jpg', 'new')], everything);
+      expect(result).toMatchObject({ imported: 1, skipped: 0 });
+      expect(await notesById(a)).toEqual({ P: 'new', Q: 'mine' });
+    });
+
+    it('replaces a photo of the same name under another id, once', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('L', 'result.jpg', 'local'), 'skip');
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importPhotoList(
+        [named('A', 'result.jpg', 'a'), named('B', 'result.jpg', 'b')],
+        everything,
+      );
+      expect(result).toMatchObject({ imported: 2, skipped: 0 });
+      expect(await notesById(a)).toEqual({ A: 'a', B: 'b' });
+    });
+
+    it('deletes nothing for a photo that is skipped', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('L', 'result.jpg', 'local'), 'skip');
+      await a.photos.importPhoto(named('X', 'other.jpg', 'kept'), 'skip');
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      // Its id exists here under another name, so it is skipped: the local result.jpg must stay.
+      const result = await svc.importPhotoList([named('X', 'result.jpg', 'bundle')], everything);
+      expect(result).toMatchObject({ imported: 0, skipped: 1 });
+      expect(await notesById(a)).toEqual({ L: 'local', X: 'kept' });
+    });
+
+    it('writes no picture for a photo that is skipped, so the one here keeps its own', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('X', 'other.jpg', 'kept'), 'skip');
+      a.blobs.store.set('X.jpg', text('local-image'));
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importFrom(
+        memoryReader([
+          ['manifest.json', JSON.stringify([named('X', 'result.jpg', 'bundle')])],
+          ['images/X.jpg', 'bundle-image'],
+        ]),
+        everything,
+      );
+      expect(result).toMatchObject({ imported: 0, skipped: 1 });
+      expect(new TextDecoder().decode(a.blobs.store.get('X.jpg'))).toBe('local-image');
+    });
+
+    it('removes the files of the photo it replaces, and keeps those another photo names', async () => {
+      const a = await makeSet();
+      await a.photos.importPhoto(named('L', 'result.jpg'), 'skip');
+      await a.photos.importPhoto({ ...named('P', 'm42.jpg'), filename: 'old-P.jpg' }, 'skip');
+      await a.photos.importPhoto({ ...named('K', 'kept.jpg'), filename: 'shared.jpg' }, 'skip');
+      await a.photos.importPhoto({ ...named('S', 's.jpg'), filename: 'shared.jpg' }, 'skip');
+      for (const f of ['L.jpg', 'L_thumb.jpg', 'old-P.jpg', 'old-P_thumb.jpg', 'shared.jpg']) {
+        a.blobs.store.set(f, text(f));
+      }
+      const svc = createBackupService({ ...a, newId: () => 'y' });
+      const result = await svc.importPhotoList(
+        [
+          named('A', 'result.jpg'), // replaces L by its name
+          named('P', 'm42.jpg'), // replaces P by its id, under a new file name
+          { ...named('T', 's.jpg'), filename: 'other.jpg' }, // replaces S, whose file K still names
+        ],
+        everything,
+      );
+      expect(result).toMatchObject({ imported: 3, skipped: 0 });
+      expect([...a.blobs.store.keys()].sort()).toEqual(['shared.jpg']);
     });
   });
 
@@ -374,6 +475,19 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect([...b.blobs.store.keys()].sort()).toEqual(['p2.jpg', 'p2_thumb.jpg']);
     });
 
+    it('makes the thumbnail again when it restores an image whose archive has none, over an old thumbnail', async () => {
+      const a = await seed();
+      const reader = memoryReader((await exportAll(a)).files);
+      const b = await makeSet();
+      b.blobs.store.set('p2.jpg', text('old-image'));
+      b.blobs.store.set('p2_thumb.jpg', text('old-thumb'));
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      await svc.importFrom(reader, { ...everything, selectedImages: ['p2.jpg'] });
+      expect(new TextDecoder().decode(b.blobs.store.get('p2.jpg'))).toBe('image-2');
+      expect(b.blobs.store.has('p2_thumb.jpg')).toBe(true);
+      expect(new TextDecoder().decode(b.blobs.store.get('p2_thumb.jpg'))).not.toBe('old-thumb');
+    });
+
     it('writes no image file for a metadata-less import without a selection', async () => {
       const a = await seed();
       const reader = memoryReader((await exportAll(a)).files);
@@ -406,6 +520,103 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(result.imported).toBe(1);
       expect(result.failed).toEqual([{ kind: 'photo', name: 'bad.jpg' }]);
       expect((await b.photos.list()).map((p) => p.id)).toEqual(['ok']);
+    });
+
+    it('measures the picture of a photo the backup gives no size, and lists one whose picture cannot be read', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      const sized = { id: 's', filename: 's.jpg', originalName: 's.jpg', width: 7, height: 9 };
+      const unsized = { id: 'u', filename: 'u.jpg', originalName: 'u.jpg' };
+      const reader = memoryReader([
+        ['manifest.json', JSON.stringify({ manifestVersion: 1, photos: [sized, unsized] })],
+        ['images/s.jpg', 'x'],
+        ['images/u.jpg', 'y'],
+      ]);
+      expect(await svc.importFrom(reader, everything)).toMatchObject({ imported: 2, failed: [] });
+      // the backup's own size is kept; the other is the picture's (the fake codec reads 100 × 50)
+      expect((await b.photos.get('s'))!).toMatchObject({ width: 7, height: 9 });
+      expect((await b.photos.get('u'))!).toMatchObject({ width: 100, height: 50 });
+
+      // a metadata-only list whose picture is not here (or not an image) has no size to give
+      b.images.info = null;
+      const list = [{ id: 'v', filename: 'v.jpg', originalName: 'v.jpg', width: 0, height: 0 }];
+      expect(await svc.importPhotoList(list, everything)).toMatchObject({
+        imported: 0,
+        failed: [{ kind: 'photo', name: 'v.jpg' }],
+      });
+      expect(await b.photos.get('v')).toBeUndefined();
+    });
+
+    it('lists only the plan that fails when the plans are written together, and imports the others', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      const plan = (id: string, entryIds: string[]) => ({
+        id,
+        name: `Plan ${id}`,
+        entries: entryIds.map((e, i) => ({ id: e, dsoId: 'M31', position: i })),
+      });
+      const reader = memoryReader([
+        [
+          'plans.json',
+          JSON.stringify([plan('a', ['a1']), plan('bad', ['dup', 'dup']), plan('c', ['c1'])]),
+        ],
+      ]);
+      const result = await svc.importFrom(reader, {
+        ...everything,
+        selectedPlans: ['a', 'bad', 'c'],
+      });
+      expect(result.failed).toEqual([{ kind: 'plan', name: 'Plan bad' }]);
+      expect((await b.plans.list()).map((p) => p.id).sort()).toEqual(['a', 'c']);
+    });
+
+    it('lists a refused override, category and region in `failed`, and imports the others', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      // None of these the import passes on can be refused by the database, so the refusal is forced: on the
+      // grouped write, then on the bad item alone.
+      const importOverrides = b.dsoOverrides.importMany.bind(b.dsoOverrides);
+      vi.spyOn(b.dsoOverrides, 'importMany').mockImplementation(async (group) => {
+        if (group.some(([id]) => id === 'M2')) throw new Error('refused');
+        await importOverrides(group);
+      });
+      const importCategories = b.poiCategories.importMany.bind(b.poiCategories);
+      vi.spyOn(b.poiCategories, 'importMany').mockImplementation(async (group) => {
+        if (group.some((c) => c.id === 'cat-bad')) throw new Error('refused');
+        await importCategories(group);
+      });
+      const importRegions = b.skyRegions.importMany.bind(b.skyRegions);
+      vi.spyOn(b.skyRegions, 'importMany').mockImplementation(async (group) => {
+        if (group.some((r) => r.id === 'reg-bad')) throw new Error('refused');
+        await importRegions(group);
+      });
+      const reader = memoryReader([
+        ['dso-overrides.json', JSON.stringify({ M1: { name: 'Crab' }, M2: { name: 'Bad' } })],
+        [
+          'poi-categories.json',
+          JSON.stringify([
+            { id: 'cat-a', name: 'A' },
+            { id: 'cat-bad', name: 'Bad' },
+            { id: 'cat-c', name: 'C' },
+          ]),
+        ],
+        [
+          'sky-regions.json',
+          JSON.stringify([
+            { id: 'reg-a', name: 'Region A', points: [] },
+            { id: 'reg-bad', name: 'Region bad', points: [] },
+          ]),
+        ],
+      ]);
+      const result = await svc.importFrom(reader, everything);
+      expect(result.failed).toEqual([
+        { kind: 'dsoOverride', name: 'M2' },
+        { kind: 'poiCategory', name: 'Bad' },
+        { kind: 'skyRegion', name: 'Region bad' },
+      ]);
+      expect(result.dsoOverridesImported).toBe(1);
+      expect(Object.keys(await b.dsoOverrides.getAll())).toEqual(['M1']);
+      expect((await b.poiCategories.list()).map((c) => c.id).sort()).toEqual(['cat-a', 'cat-c']);
+      expect((await b.skyRegions.list()).map((r) => r.id)).toEqual(['reg-a']);
     });
   });
 
@@ -639,7 +850,7 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       const file = {
         opened: 0,
         name,
-        bytes,
+        read: async () => bytes,
         async openZip() {
           file.opened++;
           if (!reader) throw new Error('not a zip');
@@ -776,7 +987,7 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(big).toBe(small);
     });
 
-    it('an import grows with the number of items: fixed reads + one transaction per plan and per photo', async () => {
+    it('an import costs the same however many items it has: fixed reads + one write per kind', async () => {
       const calls = async (plans: number, photos: number) => {
         const ids = Array.from({ length: plans }, (_, i) => `pl${i}`);
         const files: [string, string][] = [
@@ -789,18 +1000,51 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
         ];
         return importCalls(files, { selectedPlans: ids });
       };
-      const base = await calls(1, 1);
-      const perPlan = (await calls(2, 1)) - base;
-      const perPhoto = (await calls(1, 2)) - base;
       // The formula: calls = 2 reads (local setups, local gear) + 1 read when plans are ticked (plan names)
-      // + 1 read when photos are imported (names already here) + 1 per plan (one batch) + 4 per new photo
-      // (its transaction: begin, existence check, one batch, commit). 9 for one plan and one photo.
-      expect(base).toBe(9);
-      expect(perPlan).toBe(1);
-      expect(perPhoto).toBe(4);
-      expect(await calls(5, 1)).toBe(base + 4 * perPlan);
-      expect(await calls(1, 6)).toBe(base + 5 * perPhoto);
-      expect(await calls(4, 3)).toBe(base + 3 * perPlan + 2 * perPhoto);
+      // + 3 reads when photos are imported (names already here; the photos already here and their correspondences)
+      // + 1 for the plans (one batch) + 4 for the photos (one transaction: begin, the ids here, one batch, commit).
+      expect(await calls(1, 1)).toBe(11);
+      expect(await calls(5, 1)).toBe(11);
+      expect(await calls(1, 6)).toBe(11);
+      expect(await calls(4, 3)).toBe(11);
+    });
+
+    it('gear, setups, categories, regions and overrides cost one write per kind however many there are', async () => {
+      const calls = async (n: number) => {
+        const ids = (prefix: string) => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
+        const gearList = ids('custom-t').map((id) => ({ id, type: 'telescope', name: id }));
+        const setupList = ids('setup-').map((id) => ({
+          id,
+          name: id,
+          telescopeId: 'custom-t0',
+          cameraId: 'cam-builtin',
+          accessoryId: null,
+          enabled: true,
+        }));
+        const files: [string, string][] = [
+          ['custom-gear.json', JSON.stringify(gearList)],
+          ['gear-setups.json', JSON.stringify(setupList)],
+          [
+            'poi-categories.json',
+            JSON.stringify(ids('cat-').map((id) => ({ id, name: id, color: '#fff' }))),
+          ],
+          [
+            'sky-regions.json',
+            JSON.stringify(ids('r-').map((id) => ({ id, name: id, points: [[0, 0]] }))),
+          ],
+          [
+            'dso-overrides.json',
+            JSON.stringify(Object.fromEntries(ids('NGC ').map((id) => [id, { name: id }]))),
+          ],
+        ];
+        return importCalls(files, {
+          selectedGear: gearList.map((g) => g.id),
+          selectedSetups: setupList.map((s) => s.id),
+        });
+      };
+      // 2 reads (local setups, local gear) + one batch each for gear, setups, categories, regions, overrides.
+      expect(await calls(1)).toBe(7);
+      expect(await calls(8)).toBe(7);
     });
   });
 });

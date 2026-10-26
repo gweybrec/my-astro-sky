@@ -194,8 +194,8 @@ export const msg = {
     unsupportedWcsFormat: (lang: ServerLang) =>
       m(
         lang,
-        'Format non supporté. Utilisez TIFF ou FITS.',
-        'Unsupported format. Use TIFF or FITS.',
+        'Format non supporté. Utilisez TIFF, FITS ou XISF.',
+        'Unsupported format. Use TIFF, FITS or XISF.',
       ),
 
     noWcsData: (lang: ServerLang) =>
@@ -241,8 +241,8 @@ export const msg = {
     unsupportedRawFormat: (lang: ServerLang, ext: string) =>
       m(
         lang,
-        `Format brut non pris en charge : ${ext}. Utilisez TIFF ou FITS.`,
-        `Unsupported raw format: ${ext}. Use TIFF or FITS.`,
+        `Format brut non pris en charge : ${ext}. Utilisez TIFF, FITS ou XISF.`,
+        `Unsupported raw format: ${ext}. Use TIFF, FITS or XISF.`,
       ),
 
     rawDecodeFailed: (lang: ServerLang, detail: string) =>
@@ -286,5 +286,36 @@ export const msg = {
         `Impossible de charger les orbites des comètes (MPC) : ${err}`,
         `Could not load comet orbits (MPC): ${err}`,
       ),
+  },
+
+  // ── Start-up: a database update that failed (the desktop app's dialog) ────────
+  databaseUpdate: {
+    message: (lang: ServerLang) =>
+      m(
+        lang,
+        "MyAstroSky n'a pas pu mettre à jour sa base de données. Vos données sont intactes.",
+        'MyAstroSky could not update its database. Your data is intact.',
+      ),
+
+    detail: (lang: ServerLang, err: string) =>
+      m(
+        lang,
+        `Installez une version plus récente de l'application, ou réinstallez la précédente. En attendant, vous pouvez enregistrer une sauvegarde complète.
+
+${err}`,
+        `Install a newer version of the app, or reinstall the previous one. Meanwhile, you can save a full backup.
+
+${err}`,
+      ),
+
+    saveBackup: (lang: ServerLang) => m(lang, 'Enregistrer une sauvegarde…', 'Save a backup…'),
+
+    quit: (lang: ServerLang) => m(lang, 'Quitter', 'Quit'),
+
+    saved: (lang: ServerLang, file: string) =>
+      m(lang, `Sauvegarde enregistrée : ${file}`, `Backup saved: ${file}`),
+
+    saveFailed: (lang: ServerLang, err: string) =>
+      m(lang, `La sauvegarde a échoué : ${err}`, `The backup failed: ${err}`),
   },
 };

@@ -1,0 +1,104 @@
+import { describe, it, expect, vi } from 'vitest';
+import {
+  createPreferencesStore,
+  type CapacitorPreferences,
+} from '@myastrosky/backend-local/preferences-store';
+
+/**
+ * A fake plugin: a map, the writes it was asked for (`calls`) and the ones it finished (`log`), and a switch to make
+ * one write slow or failing.
+ */
+function fakePlugin(initial: Record<string, string> = {}) {
+  const data = new Map(Object.entries(initial));
+  const calls: string[] = [];
+  const log: string[] = [];
+  const plugin: CapacitorPreferences & { delayKey?: string; failKey?: string } = {
+    async keys() {
+      return { keys: [...data.keys()] };
+    },
+    async get({ key }) {
+      return { value: data.get(key) ?? null };
+    },
+    async set({ key, value }) {
+      calls.push(`set ${key}=${value}`);
+      if (plugin.delayKey === key) await new Promise((r) => setTimeout(r, 20));
+      if (plugin.failKey === key) throw new Error('disk full');
+      log.push(`set ${key}=${value}`);
+      data.set(key, value);
+    },
+    async remove({ key }) {
+      calls.push(`remove ${key}`);
+      log.push(`remove ${key}`);
+      data.delete(key);
+    },
+  };
+  return { plugin, data, calls, log };
+}
+const settle = () => new Promise((r) => setTimeout(r, 60));
+
+describe('createPreferencesStore', () => {
+  it('reads every stored key once, then answers synchronously', async () => {
+    const { plugin } = fakePlugin({ lang: 'de', other: 'x' });
+    const keys = vi.spyOn(plugin, 'keys');
+    const get = vi.spyOn(plugin, 'get');
+    const store = await createPreferencesStore(plugin);
+    expect(store.get('lang')).toBe('de');
+    expect(store.get('other')).toBe('x');
+    expect(store.get('missing')).toBeNull();
+    expect(store.get('lang')).toBe('de');
+    expect(keys).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls.map(([{ key }]) => key).sort()).toEqual(['lang', 'other']);
+  });
+
+  it('reads the stored values together, not one after the other', async () => {
+    const { plugin } = fakePlugin({ a: '1', b: '2', c: '3' });
+    let inFlight = 0;
+    let most = 0;
+    const get = plugin.get.bind(plugin);
+    plugin.get = async (options) => {
+      most = Math.max(most, ++inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return get(options);
+    };
+    const store = await createPreferencesStore(plugin);
+    expect(most).toBe(3);
+    expect(['a', 'b', 'c'].map((k) => store.get(k))).toEqual(['1', '2', '3']);
+  });
+
+  it('set and remove show in memory at once and reach the plugin afterwards', async () => {
+    const { plugin, data } = fakePlugin({ a: '1' });
+    const store = await createPreferencesStore(plugin);
+    store.set('b', '2');
+    store.remove('a');
+    expect(store.get('b')).toBe('2');
+    expect(store.get('a')).toBeNull();
+    await settle();
+    expect([...data.entries()]).toEqual([['b', '2']]);
+  });
+
+  it('hands every write to the plugin at once, in call order, without waiting for a slower earlier one', async () => {
+    const { plugin, calls } = fakePlugin();
+    plugin.delayKey = 'slow';
+    const store = await createPreferencesStore(plugin);
+    store.set('slow', '1');
+    store.set('fast', '2');
+    store.remove('slow');
+    // Nothing waits in the store: were the app killed now, the plugin would already have every write.
+    expect(calls).toEqual(['set slow=1', 'set fast=2', 'remove slow']);
+    await settle();
+  });
+
+  it('reports a failed write and carries on with the next ones', async () => {
+    const { plugin, log } = fakePlugin();
+    plugin.failKey = 'bad';
+    const errors: unknown[] = [];
+    const store = await createPreferencesStore(plugin, (e) => errors.push(e));
+    store.set('bad', '1');
+    store.set('good', '2');
+    await settle();
+    expect(errors).toHaveLength(1);
+    expect(log).toEqual(['set good=2']);
+    expect(store.get('bad')).toBe('1');
+  });
+});

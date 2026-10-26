@@ -58,3 +58,19 @@ export function formatDifficulty(difficulty: number | null): string {
   if (difficulty === null) return '';
   return '◆'.repeat(difficulty) + '◇'.repeat(5 - difficulty);
 }
+
+/**
+ * Clock-style total integration time for a `frames × seconds` product.
+ * `< 60 s` -> `"45s"`; `< 1 h` -> `"45min"`; `>= 1 h` -> `"6h07"` (minutes
+ * zero-padded, no trailing unit). Non-finite / non-positive -> `"0min"`.
+ * Used by the collapsed integration-row label in MetadataEditorPanel and by the phone's photo information.
+ */
+export function formatIntegrationTotal(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '0min';
+  if (totalSeconds < 60) return `${Math.round(totalSeconds)}s`;
+  const totalMin = Math.round(totalSeconds / 60);
+  if (totalMin < 60) return `${totalMin}min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${h}h${String(m).padStart(2, '0')}`;
+}

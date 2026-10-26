@@ -166,13 +166,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
-import type { Photo } from '../../types';
+import type { Photo } from '@myastrosky/core/types';
 import type { GearSetupData } from '../../api';
 import { getGearSetups, updatePhotoMetadata } from '../../api';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
 import { useI18n } from '../../composables/useI18n';
-import { smartSortPhotos } from '../../gallery';
+import { smartSortPhotos } from '@myastrosky/core/photo-search';
 import {
   SETUP_NO_CHANGE,
   applyBatchEdit,
@@ -181,7 +181,7 @@ import {
   draftFromPhoto,
   type BatchEditMode,
   type PhotoEditDraft,
-} from '../../batch-photo-edit';
+} from '@myastrosky/core/batch-photo-edit';
 import { confirmUnsavedChanges } from '../../photo-delete-confirm';
 import { showTextTooltip } from '../../tooltip-utils';
 import { showToast } from '../../toast';

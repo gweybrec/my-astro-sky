@@ -543,6 +543,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
         captureDetails: {},
         gearSetupId: null,
         thumbFilename: `${first.id}_thumb.jpg`,
+        quarterTurns: 0,
         correspondences: CORRESPONDENCES,
       },
       'the photo an upload returns',
@@ -605,6 +606,13 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       placement,
       'a manual placement saved',
     );
+    const onSky = { ...placement, angleOnSky: true };
+    await b.photos.setManualPlacement(first.id, onSky);
+    expectEqual(
+      (await b.photos.listWithSizes())[0].manualPlacement,
+      onSky,
+      'a manual placement with its angle on the sky saved',
+    );
     await b.photos.setManualPlacement(first.id, null);
     expectEqual(
       (await b.photos.listWithSizes())[0].manualPlacement ?? null,
@@ -637,6 +645,81 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     expectEqual(await b.photos.listWithSizes(), [], 'every photo removed');
   });
 
+  add('photos: turning a photo a quarter to the right', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    const { id } = await b.photos.upload(fixtures.jpeg(), {
+      correspondences: JSON.stringify(CORRESPONDENCES),
+    });
+    const placement = {
+      centerRa: 10.5,
+      centerDec: -20.25,
+      rotationDeg: 33,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    await b.photos.setManualPlacement(id, placement);
+
+    const [before] = await b.photos.listWithSizes();
+
+    // Only how the photo is shown changes: its picture, its thumbnail and what is measured in their pixels stay.
+    const turned = await b.photos.rotateRight(id);
+    expectEqual(turned.quarterTurns, 1, 'shown turned a quarter');
+    const { fileSize, ...rest } = before;
+    expectEqual(
+      stable(turned),
+      stable({ ...(rest as Photo), quarterTurns: 1 }),
+      'the picture, its thumbnail, its size, its correspondences and its placement unchanged',
+    );
+    const [listed] = await b.photos.listWithSizes();
+    expectEqual(listed.fileSize, fileSize, 'the picture file is not saved again');
+    expectEqual(stable(listed), stable({ ...before, quarterTurns: 1 }), 'the listed photo turned');
+
+    const turns = [];
+    for (let i = 0; i < 4; i++) turns.push((await b.photos.rotateRight(id)).quarterTurns);
+    expectEqual(turns, [2, 3, 0, 1], 'four turns come back to the start');
+    expectEqual(
+      [listed.manualPlacement, listed.correspondences],
+      [placement, CORRESPONDENCES],
+      'the placement and the correspondences as they were set',
+    );
+
+    expectEqual(await b.photos.removeAll(), 1, 'the turned photo removed');
+  });
+
+  add('photos: repairing sizes leaves a photo whose size is known as it is', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    expectEqual(await b.photos.repairSizes(), 0, 'nothing to repair without photos');
+    await b.photos.upload(fixtures.jpeg(), { correspondences: JSON.stringify(CORRESPONDENCES) });
+    const [before] = await b.photos.listWithSizes();
+    expectEqual(await b.photos.repairSizes(), 0, 'an uploaded photo has its size');
+    const [after] = await b.photos.listWithSizes();
+    expectEqual(stable(after), stable(before), 'the photo unchanged');
+    expectEqual(await b.photos.removeAll(), 1, 'the photo removed');
+  });
+
+  add('photos: a cancelled upload stores nothing', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    await expectAborted(
+      b.photos.upload(
+        fixtures.jpeg(),
+        { correspondences: JSON.stringify(CORRESPONDENCES) },
+        { cancel: cancelledSignal },
+      ),
+      'upload with a cancelled signal',
+    );
+    expectEqual(await b.photos.listWithSizes(), [], 'no photo after a cancelled upload');
+  });
+
+  add('capabilities: local solvers are announced exactly when the backend has them', async () => {
+    const { backend: b } = await makeBackend();
+    expectEqual(
+      b.capabilities.localSolvers,
+      b.localSolvers !== undefined,
+      'capabilities.localSolvers matches the localSolvers member',
+    );
+  });
+
   add('files: an address for a stored file and for the star catalogue', async () => {
     const { backend: b } = await makeBackend();
     const url = b.files.url('abc_thumb.jpg');
@@ -659,6 +742,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     };
     const blank = {
       apiKeySet: false,
+      apiKeyUnreadable: false,
       ASTAP_PATH: '',
       SOLVE_FIELD_PATH: '',
       ASTROMETRY_DATA_DIR: '',
@@ -695,6 +779,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
         'a key was written',
       );
       expectEqual((await read()).apiKeySet, true, 'the key is set, and never returned');
+      expectEqual((await read()).apiKeyUnreadable, false, 'a key just written can be read');
     } finally {
       await b.settings.removeApiKey();
       await b.settings.update({
@@ -833,10 +918,11 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     const { backend: b, fixtures } = await makeBackend();
     const planId = (await b.plans.create({ name: 'Backed up' })).id;
     await b.plans.addEntry(planId, { dsoId: 'M31' });
-    await b.photos.upload(fixtures.jpeg(), {
+    const kept = await b.photos.upload(fixtures.jpeg(), {
       correspondences: JSON.stringify(CORRESPONDENCES),
       notes: 'kept',
     });
+    await b.photos.rotateRight(kept.id);
     await b.gear.addCustom('telescope', { brand: 'Contract', model: 'Scope' });
     await b.dsoOverrides.upsert('M31', { rating: 4 });
     const regionPoints = [
@@ -924,8 +1010,8 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       );
       const restoredPhotos = await o.photos.listWithSizes();
       expectEqual(
-        restoredPhotos.map((p) => [p.originalName, p.notes, p.width, p.height]),
-        [['contract.jpg', 'kept', 64, 48]],
+        restoredPhotos.map((p) => [p.originalName, p.notes, p.width, p.height, p.quarterTurns]),
+        [['contract.jpg', 'kept', 64, 48, 1]],
         'the photo restored',
       );
       expectEqual(
@@ -993,6 +1079,12 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       'an unknown photo',
     );
     await expectDomainError(
+      b.photos.rotateRight('no-such-photo'),
+      'notFound',
+      'PHOTO_NOT_FOUND',
+      'turning an unknown photo',
+    );
+    await expectDomainError(
       b.stars.getByHip(99999999),
       'notFound',
       'STAR_NOT_FOUND',
@@ -1015,6 +1107,16 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       'invalid',
       'INVALID_LAT_LON',
       'latitude 95',
+    );
+  });
+
+  add('horizon: a latitude beyond the elevation tiles is refused', async () => {
+    const { backend: b } = await makeBackend();
+    await expectDomainError(
+      b.horizon.getProfile({ lat: 86, lon: 0 }),
+      'invalid',
+      'HORIZON_OUT_OF_COVERAGE',
+      'latitude 86',
     );
   });
 

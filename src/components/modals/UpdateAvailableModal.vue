@@ -40,7 +40,7 @@ import { computed } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
 import { useI18n } from '../../composables/useI18n';
 import { useUiStore } from '../../stores/ui';
-import { DISMISSED_UPDATE_KEY } from '../../version-check';
+import { DISMISSED_UPDATE_KEY } from '@myastrosky/core/version-check';
 
 const emit = defineEmits<{ close: [] }>();
 

@@ -5,7 +5,7 @@ import { ALLOWED_PHOTO_EXTENSIONS, upload } from './shared.js';
 import { solveWithASTAP } from '../astap.js';
 import { solveWithSolveField } from '../solve-field.js';
 import { createJob, getJob, updateJob, cancelJob } from '../solve-queue.js';
-import { rawToBrowserCoords } from '../exif-utils.js';
+import { rawToBrowserCoords } from '@myastrosky/core/exif-utils';
 import { msg } from '../messages.js';
 import type { ServerLang } from '../messages.js';
 

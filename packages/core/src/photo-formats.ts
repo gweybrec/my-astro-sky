@@ -8,16 +8,16 @@
 export const RASTER_PHOTO_EXT_RE = /\.(jpe?g|png|webp)$/i;
 
 /** Raw astro formats that must be converted server-side before they can be previewed. */
-export const RAW_ASTRO_EXT_RE = /\.(tiff?|fits?)$/i;
+export const RAW_ASTRO_EXT_RE = /\.(tiff?|fits?|xisf)$/i;
 
 /** Either family — what the main photo picker accepts. */
-export const ANY_PHOTO_EXT_RE = /\.(jpe?g|png|webp|tiff?|fits?)$/i;
+export const ANY_PHOTO_EXT_RE = /\.(jpe?g|png|webp|tiff?|fits?|xisf)$/i;
 
 export const PHOTO_PICKER_ACCEPT =
-  'image/jpeg,image/png,image/webp,image/jpg,.tif,.tiff,.fit,.fits';
+  'image/jpeg,image/png,image/webp,image/jpg,.tif,.tiff,.fit,.fits,.xisf';
 
 /** Accept string for the WCS/metadata *companion* file picker (raw formats only). */
-export const RAW_COMPANION_ACCEPT = '.fit,.fits,.tif,.tiff';
+export const RAW_COMPANION_ACCEPT = '.fit,.fits,.tif,.tiff,.xisf';
 
 export function isRawAstroFile(name: string): boolean {
   return RAW_ASTRO_EXT_RE.test(name);

@@ -1,7 +1,9 @@
 /**
  * Backup: the export of the user's data to an archive, the preview of an archive, and its import.
  * The archive itself is a port (`BundleWriter`, `BundleReader`); every write goes through the service
- * that owns the data, one grouped write per item (a plan, a setup, a photo with its correspondences).
+ * that owns the data, one grouped write per kind (all the plans, all the setups, all the photos with their
+ * correspondences); when that write fails, the items of that kind are written one by one, so only those that fail
+ * are lost and listed.
  * The archive format (entry names, order, manifest) is the one the desktop app has always written.
  */
 import {
@@ -26,6 +28,7 @@ import {
 } from '../domain/backup';
 import { DomainError } from '../domain/errors';
 import { customGearName, type CustomGearType } from '../domain/gear';
+import type { BackupPhoto } from '../domain/photos';
 import type { BlobStore } from '../ports/blob-store';
 import type { BundleReader, BundleWriter } from '../ports/bundle';
 import type { Photo } from '../types';
@@ -53,7 +56,8 @@ export interface BackupServiceDeps {
 export interface BackupFile {
   /** The file's name; its extension (`.zip` or `.json`) says what it is. */
   name: string;
-  bytes: Uint8Array;
+  /** The whole file; read only for a `.json` file. */
+  read(): Promise<Uint8Array>;
   /** Opens the file as a ZIP archive. Called at most once, and only for a `.zip` file. */
   openZip(): Promise<BundleReader>;
 }
@@ -111,6 +115,55 @@ const encode = (value: unknown): Uint8Array =>
 /** A photo record of a manifest: whatever the file holds. */
 type ManifestPhoto = Record<string, any>;
 
+/** A photo already here: its name and its two files (image, thumbnail). */
+interface LocalPhoto {
+  originalName: string;
+  files: string[];
+}
+
+const photoThumbOf = (p: { filename: string; thumbFilename?: string | null }): string =>
+  p.thumbFilename || thumbnailNameOf(p.filename);
+
+/** The name a manifest photo is matched by. */
+const nameOfManifestPhoto = (p: ManifestPhoto): string => p.originalName ?? p.filename ?? p.id;
+
+/** The image and thumbnail names of a manifest photo; none when it names no image. */
+const manifestFilesOf = (p: ManifestPhoto): string[] =>
+  typeof p.filename === 'string' && p.filename
+    ? [p.filename, photoThumbOf({ filename: p.filename, thumbFilename: p.thumbFilename })]
+    : [];
+
+/**
+ * Writes `items` with one grouped call. When that call fails nothing of it is kept, so the items are written again one
+ * by one and only those that fail are passed to `onFail`. Returns the items that were written.
+ */
+async function writeGrouped<T>(
+  items: readonly T[],
+  write: (group: readonly T[]) => Promise<unknown>,
+  onFail: (item: T, err: unknown) => void,
+): Promise<T[]> {
+  if (items.length === 0) return [];
+  try {
+    await write(items);
+    return [...items];
+  } catch (err) {
+    if (items.length === 1) {
+      onFail(items[0], err);
+      return [];
+    }
+  }
+  const written: T[] = [];
+  for (const item of items) {
+    try {
+      await write([item]);
+      written.push(item);
+    } catch (err) {
+      onFail(item, err);
+    }
+  }
+  return written;
+}
+
 export function createBackupService(deps: BackupServiceDeps): BackupService {
   const { photos, plans, gear, dsoOverrides, poiCategories, skyRegions, blobs, newId } = deps;
 
@@ -145,28 +198,67 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
     return entries;
   }
 
+  /** The photos already here, by id, read once before an import writes anything. */
+  async function localPhotos(): Promise<Map<string, LocalPhoto>> {
+    return new Map(
+      (await photos.list()).map((p) => [
+        p.id,
+        { originalName: p.originalName, files: [p.filename, photoThumbOf(p)] },
+      ]),
+    );
+  }
+
+  /**
+   * Whether the record of a manifest photo will be skipped: it has no id, or a photo here has its id under another
+   * name (`importPhoto` with `skip` leaves that one alone).
+   */
+  function recordIsSkipped(p: ManifestPhoto, local: Map<string, LocalPhoto>): boolean {
+    if (!p.id || typeof p.id !== 'string') return true;
+    const here = local.get(p.id);
+    return here !== undefined && here.originalName !== nameOfManifestPhoto(p);
+  }
+
   /** Writes the photo records the selection asks for, then the missing thumbnails. */
   async function importPhotoRecords(
     list: ManifestPhoto[],
     importMetadata: boolean,
     writtenFiles: Set<string> | null,
     recordFailure: (kind: ImportFailure['kind'], name: string, err: unknown) => void,
+    local: Map<string, LocalPhoto>,
   ): Promise<{ imported: number; skipped: number }> {
     let imported = 0;
     let skipped = 0;
 
     if (importMetadata && list.length > 0) {
       const allNames = list.map((p) => p.originalName ?? p.filename ?? p.id).filter(Boolean);
-      const existingByName = new Map(
-        (await photos.findByOriginalNames(allNames)).map((r) => [r.originalName, r.id]),
-      );
+      // One snapshot of the photos already here, taken before anything is imported: a photo of the list replaces
+      // the local one with its id and name, else the first local one of its name that the list does not carry and
+      // no earlier photo of the list replaced, so two photos of the same name never delete each other.
+      const localIdsByName = new Map<string, string[]>();
+      for (const r of await photos.findByOriginalNames([...new Set(allNames)])) {
+        const ids = localIdsByName.get(r.originalName);
+        if (ids) ids.push(r.id);
+        else localIdsByName.set(r.originalName, [r.id]);
+      }
+      const listIds = new Set(list.map((p) => p.id));
+      // The ids taken as the list is written, to foresee which photos `skip` leaves alone; a skipped photo
+      // replaces nothing, so the local photo it would have replaced stays free for a later one.
+      const taken = new Set(local.keys());
+      const claimed = new Set<string>();
+      const items: {
+        photo: BackupPhoto;
+        strategy: 'replace' | 'skip';
+        replaceIds: string[];
+        id: string;
+        name: string;
+      }[] = [];
 
       for (const p of list) {
         if (!p.id || typeof p.id !== 'string') {
           skipped++;
           continue;
         }
-        const origName: string = p.originalName ?? p.filename ?? p.id;
+        const origName: string = nameOfManifestPhoto(p);
 
         // Skip photos whose image file was not written (not selected, or write failed)
         if (writtenFiles !== null && !writtenFiles.has(p.filename)) {
@@ -174,15 +266,56 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
           continue;
         }
 
-        try {
-          const existingId = existingByName.get(origName);
-          if (existingId) await photos.removeRow(existingId);
+        const localIds = localIdsByName.get(origName) ?? [];
+        const sameId = localIds.includes(p.id);
+        const other = sameId
+          ? undefined
+          : localIds.find((id) => !listIds.has(id) && !claimed.has(id));
+        items.push({
+          photo: p as BackupPhoto,
+          strategy: sameId ? 'replace' : 'skip',
+          replaceIds: other ? [other] : [],
+          id: p.id,
+          name: origName,
+        });
+        if (sameId || !taken.has(p.id)) {
+          taken.add(p.id);
+          claimed.add(other ?? p.id);
+        }
+      }
 
-          const result = await photos.importPhoto(p as any, 'skip');
-          if (result === 'imported') imported++;
-          else skipped++;
-        } catch (photoErr) {
-          recordFailure('photo', origName, photoErr);
+      // All the photos in one transaction; when it fails, one by one, so only the photos that fail are lost.
+      const outcomes = new Map<(typeof items)[number], 'imported' | 'skipped'>();
+      await writeGrouped(
+        items,
+        async (group) => {
+          const results = await photos.importPhotos(group);
+          group.forEach((item, i) => outcomes.set(item, results[i]));
+        },
+        (item, err) => recordFailure('photo', item.name, err),
+      );
+      const replaced = new Set<string>();
+      for (const item of items) {
+        const outcome = outcomes.get(item);
+        if (outcome === 'imported') {
+          imported++;
+          replaced.add(item.replaceIds[0] ?? item.id);
+        } else if (outcome === 'skipped') skipped++;
+      }
+
+      // The files of a replaced photo belong to no photo any more, unless a photo here or of the list names them.
+      const inUse = new Set(list.flatMap(manifestFilesOf));
+      for (const [id, here] of local) {
+        if (!replaced.has(id)) here.files.forEach((f) => inUse.add(f));
+      }
+      for (const id of replaced) {
+        for (const f of local.get(id)?.files ?? []) {
+          if (inUse.has(f)) continue;
+          await blobs
+            .remove(f)
+            .catch((err) =>
+              console.warn(`[Import] Could not remove ${f} of a replaced photo:`, err),
+            );
         }
       }
     }
@@ -195,8 +328,11 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       if (!p.id || typeof p.id !== 'string') continue;
       const filename: string = p.filename ?? `${p.id}.jpg`;
       const thumbFilename: string = p.thumbFilename ?? thumbnailNameOf(filename);
+      // The archive's own thumbnail was written with the image; otherwise the image was just written, so any thumbnail
+      // already there belongs to the old file and is made again.
+      if (writtenFiles?.has(thumbFilename)) continue;
       try {
-        await photos.ensureThumbnail(filename, thumbFilename);
+        await photos.ensureThumbnail(filename, thumbFilename, writtenFiles !== null);
       } catch (thumbErr) {
         console.warn(`[Import] Thumbnail regeneration failed for ${filename}:`, thumbErr);
       }
@@ -423,18 +559,21 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
             decodeUtf8((await reader.read('dso-overrides.json')) ?? new Uint8Array()),
           );
           if (typeof overrides === 'object' && !Array.isArray(overrides)) {
-            for (const [id, data] of Object.entries(overrides)) {
-              if (
-                typeof id === 'string' &&
-                id.length <= 100 &&
-                typeof data === 'object' &&
-                data !== null &&
-                !Array.isArray(data)
-              ) {
-                await dsoOverrides.importOne(id, data as object);
-                dsoOverridesImported++;
-              }
-            }
+            const entries = Object.entries(overrides).filter(
+              (entry): entry is [string, object] =>
+                typeof entry[0] === 'string' &&
+                entry[0].length <= 100 &&
+                typeof entry[1] === 'object' &&
+                entry[1] !== null &&
+                !Array.isArray(entry[1]),
+            );
+            dsoOverridesImported = (
+              await writeGrouped(
+                entries,
+                (group) => dsoOverrides.importMany(group),
+                ([id], overrideErr) => recordFailure('dsoOverride', id, overrideErr),
+              )
+            ).length;
           }
         } catch {
           /* ignore invalid dso-overrides.json */
@@ -474,25 +613,28 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       if (has('custom-gear.json') && gearToImport.size > 0) {
         try {
           if (Array.isArray(rawGearList)) {
-            for (const g of rawGearList) {
-              if (
-                typeof g.id === 'string' &&
-                gearToImport.has(g.id) &&
-                ['telescope', 'camera', 'accessory'].includes(g.type)
-              ) {
+            const items = rawGearList
+              .filter(
+                (g) =>
+                  typeof g.id === 'string' &&
+                  gearToImport.has(g.id) &&
+                  ['telescope', 'camera', 'accessory'].includes(g.type),
+              )
+              .map((g) => {
                 const { id, type, ...data } = g;
                 const name = customGearName(type, data, id);
                 const sameType = existingGear.filter((r) => r.type === type);
-                try {
-                  await gear.importCustom(
-                    { id, type: type as CustomGearType, data },
-                    idsToReplaceByName(sameType, name),
-                  );
-                } catch (itemErr) {
-                  recordFailure('gear', name, itemErr);
-                }
-              }
-            }
+                return {
+                  item: { id, type: type as CustomGearType, data },
+                  replaceIds: idsToReplaceByName(sameType, name),
+                  name,
+                };
+              });
+            await writeGrouped(
+              items,
+              (group) => gear.importCustomItems(group),
+              (it, itemErr) => recordFailure('gear', it.name, itemErr),
+            );
           }
         } catch {
           /* ignore invalid custom-gear.json */
@@ -502,14 +644,13 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       // Import gear setups: the ticked ones and the setups of ticked plans, as decided by
       // planSetupImportActions (replace by name only when the name is non-empty — an empty
       // name must not match, and delete, every existing unnamed setup).
-      for (const a of setupPlan.actions) {
-        if (!a.setup) continue;
-        try {
-          await gear.importSetup(a.setup, a.replaceIds);
-        } catch (setupErr) {
-          recordFailure('setup', a.setup.name || a.setup.id, setupErr);
-        }
-      }
+      await writeGrouped(
+        setupPlan.actions.flatMap((a) =>
+          a.setup ? [{ setup: a.setup, replaceIds: a.replaceIds }] : [],
+        ),
+        (group) => gear.importSetups(group),
+        ({ setup }, setupErr) => recordFailure('setup', setup.name || setup.id, setupErr),
+      );
 
       // Import POI categories (id-based upsert: a re-imported category with the same
       // id replaces the existing one, keeping any photos' POI references valid).
@@ -519,15 +660,23 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
             decodeUtf8((await reader.read('poi-categories.json')) ?? new Uint8Array()),
           );
           if (Array.isArray(rawCats)) {
-            for (const [ci, c] of rawCats.entries()) {
-              if (typeof c?.id !== 'string' || typeof c?.name !== 'string') continue;
-              await poiCategories.importOne({
-                id: c.id,
-                name: c.name,
-                color: typeof c.color === 'string' && c.color.trim() ? c.color : '#888888',
-                position: Number.isFinite(c.position) ? Number(c.position) : ci,
-              });
-            }
+            const categories = rawCats.flatMap((c, ci) =>
+              typeof c?.id !== 'string' || typeof c?.name !== 'string'
+                ? []
+                : [
+                    {
+                      id: c.id as string,
+                      name: c.name as string,
+                      color: typeof c.color === 'string' && c.color.trim() ? c.color : '#888888',
+                      position: Number.isFinite(c.position) ? Number(c.position) : ci,
+                    },
+                  ],
+            );
+            await writeGrouped(
+              categories,
+              (group) => poiCategories.importMany(group),
+              (c, catErr) => recordFailure('poiCategory', c.name, catErr),
+            );
           }
         } catch {
           /* ignore invalid poi-categories.json */
@@ -542,22 +691,24 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
             decodeUtf8((await reader.read('sky-regions.json')) ?? new Uint8Array()),
           );
           if (Array.isArray(rawRegions)) {
-            for (const [ri, r] of rawRegions.entries()) {
-              if (
-                typeof r?.id !== 'string' ||
-                typeof r?.name !== 'string' ||
-                !Array.isArray(r.points)
-              ) {
-                continue;
-              }
-              await skyRegions.importOne({
-                id: r.id,
-                name: r.name,
-                color: typeof r.color === 'string' && r.color.trim() ? r.color : '#4ea1ff',
-                points: r.points,
-                position: Number.isFinite(r.position) ? Number(r.position) : ri,
-              });
-            }
+            const regions = rawRegions.flatMap((r, ri) =>
+              typeof r?.id !== 'string' || typeof r?.name !== 'string' || !Array.isArray(r.points)
+                ? []
+                : [
+                    {
+                      id: r.id as string,
+                      name: r.name as string,
+                      color: typeof r.color === 'string' && r.color.trim() ? r.color : '#4ea1ff',
+                      points: r.points as unknown[],
+                      position: Number.isFinite(r.position) ? Number(r.position) : ri,
+                    },
+                  ],
+            );
+            await writeGrouped(
+              regions,
+              (group) => skyRegions.importMany(group),
+              (r, regionErr) => recordFailure('skyRegion', r.name, regionErr),
+            );
           }
         } catch {
           /* ignore invalid sky-regions.json */
@@ -575,40 +726,70 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
             // Snapshot once so two same-name plans in this bundle don't delete each
             // other; replace by name only when non-empty.
             const existingPlans = await plans.listNames();
-            for (const [pi, p] of rawPlanList.entries()) {
-              if (typeof p.id !== 'string' || typeof p.name !== 'string') continue;
-              if (!selectedPlans.has(p.id)) continue;
-              try {
-                await plans.importPlan(p, {
-                  replaceIds: p.name ? idsToReplaceByName(existingPlans, p.name) : [],
-                  // A setup this import skipped or kept under another id is pointed at its local twin.
-                  setupId:
-                    typeof p.setupId === 'string'
-                      ? (setupPlan.setupIdRemap[p.setupId] ?? p.setupId)
-                      : null,
-                  index: pi,
-                });
-              } catch (planErr) {
-                recordFailure('plan', p.name || p.id, planErr);
-              }
-            }
+            const items = rawPlanList.flatMap((p, pi) =>
+              typeof p.id !== 'string' || typeof p.name !== 'string' || !selectedPlans.has(p.id)
+                ? []
+                : [
+                    {
+                      plan: p,
+                      options: {
+                        replaceIds: p.name ? idsToReplaceByName(existingPlans, p.name) : [],
+                        // A setup this import skipped or kept under another id is pointed at its local twin.
+                        setupId:
+                          typeof p.setupId === 'string'
+                            ? (setupPlan.setupIdRemap[p.setupId] ?? p.setupId)
+                            : null,
+                        index: pi,
+                      },
+                      name: (p.name || p.id) as string,
+                    },
+                  ],
+            );
+            await writeGrouped(
+              items,
+              (group) => plans.importPlans(group),
+              (it, planErr) => recordFailure('plan', it.name, planErr),
+            );
           }
         } catch {
           /* ignore invalid plans.json */
         }
       }
 
-      // Copy the selected image files into the blob store (always overwrite).
+      // Copy the selected image files into the blob store; a file replaces the one of its name only once fully written.
       const imageNames = names.filter((n) => n.startsWith('images/') && !n.endsWith('/'));
       const writtenFiles = new Set<string>();
+      // The picture list of the preview has no thumbnails: the thumbnail of a selected image comes with it.
+      const selectedThumbs = new Set<string>();
+      for (const p of list) {
+        if (typeof p.filename !== 'string' || !selectedImages?.has(p.filename)) continue;
+        selectedThumbs.add(manifestFilesOf(p)[1]);
+      }
       // Without a selection, files are written only for the photo records this same
       // request imports (all photos of the manifest); otherwise they would belong to no photo.
       const importsPhotoRecords = importMetadata && list.length > 0;
+      const local = importsPhotoRecords ? await localPhotos() : new Map<string, LocalPhoto>();
+      // The files of a record that will be skipped are not written: they would overwrite those of the photo here.
+      const skippedFiles = new Set<string>();
+      if (importsPhotoRecords) {
+        const keptFiles = new Set<string>();
+        for (const p of list) {
+          const files = recordIsSkipped(p, local) ? skippedFiles : keptFiles;
+          manifestFilesOf(p).forEach((f) => files.add(f));
+        }
+        keptFiles.forEach((f) => skippedFiles.delete(f));
+      }
       for (const entryName of imageNames) {
         if (selectedImages === null && !importsPhotoRecords) continue;
         const baseName = baseNameOf(entryName);
         if (!ALLOWED_PHOTO_EXTENSIONS.has(extNameOf(baseName).toLowerCase())) continue;
-        if (selectedImages !== null && !selectedImages.has(baseName)) continue;
+        if (skippedFiles.has(baseName)) continue;
+        if (
+          selectedImages !== null &&
+          !selectedImages.has(baseName) &&
+          !selectedThumbs.has(baseName)
+        )
+          continue;
         try {
           const bytes = await reader.read(entryName);
           if (!bytes) continue;
@@ -624,6 +805,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         importMetadata,
         writtenFiles,
         recordFailure,
+        local,
       );
       return { imported, skipped, dsoOverridesImported, failed };
     },
@@ -632,7 +814,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const extension = extensionOf(file.name);
       if (extension === '.zip') return service.preview(await file.openZip());
       if (extension === '.json')
-        return service.previewPhotoList(JSON.parse(decodeUtf8(file.bytes)));
+        return service.previewPhotoList(JSON.parse(decodeUtf8(await file.read())));
       throw unsupportedFormat();
     },
 
@@ -640,7 +822,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const extension = extensionOf(file.name);
       if (extension === '.zip') return service.importFrom(await file.openZip(), selection);
       if (extension === '.json') {
-        return service.importPhotoList(JSON.parse(decodeUtf8(file.bytes)), selection);
+        return service.importPhotoList(JSON.parse(decodeUtf8(await file.read())), selection);
       }
       throw unsupportedFormat();
     },
@@ -648,11 +830,13 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
     async importPhotoList(list, selection) {
       if (!Array.isArray(list)) throw invalidManifest();
       const failed: ImportFailure[] = [];
+      const importMetadata = selection.importMetadata === true;
       const { imported, skipped } = await importPhotoRecords(
         list as ManifestPhoto[],
-        selection.importMetadata === true,
+        importMetadata,
         null,
         makeFailureRecorder(failed),
+        importMetadata && list.length > 0 ? await localPhotos() : new Map(),
       );
       return { imported, skipped, dsoOverridesImported: 0, failed };
     },

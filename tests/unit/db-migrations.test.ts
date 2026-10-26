@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
+import { DatabaseUpdateError, SCHEMA_VERSION } from '@myastrosky/core/db/schema';
 import { applyMigrations } from '../../server/db-migrations';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,13 +61,13 @@ describe('applyMigrations — fresh database', () => {
   it('returns the latest schema version after first run', () => {
     const db = freshBaseDb();
     const version = applyMigrations(db);
-    expect(version).toBe(14);
+    expect(version).toBe(SCHEMA_VERSION);
   });
 
   it('schema_version table contains the latest version', () => {
     const db = freshBaseDb();
     applyMigrations(db);
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('adds star_ra and star_dec columns to star_correspondences', () => {
@@ -103,8 +104,8 @@ describe('applyMigrations — idempotency', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     const v = applyMigrations(db);
-    expect(v).toBe(14);
-    expect(schemaVersion(db)).toBe(14);
+    expect(v).toBe(SCHEMA_VERSION);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 });
 
@@ -128,7 +129,7 @@ describe('applyMigrations — v2 per-plan night/setup', () => {
   it('is a no-op (no throw) when the plans table is absent', () => {
     const db = freshBaseDb();
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 });
 
@@ -172,7 +173,7 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     const row = db.prepare('SELECT * FROM plan_entries WHERE id = ?').get('e1') as any;
     expect(row.dso_id).toBe('M42');
     expect(row.pa_deg).toBe(142);
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('is idempotent on an already-migrated plan_entries table', () => {
@@ -182,6 +183,18 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     expect(() => applyMigrations(db)).not.toThrow();
     const cols = getColumns(db, 'plan_entries');
     expect(cols.filter((c) => c === 'ra').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — a migration that fails', () => {
+  it('throws a DatabaseUpdateError and keeps the version of the last migration that ran', () => {
+    const db = freshBaseDb();
+    // A pre-v3 plan_entries without pa_deg: the v3 rebuild cannot copy it.
+    db.exec(
+      'CREATE TABLE plan_entries (id TEXT PRIMARY KEY, plan_id TEXT, dso_id TEXT, position INTEGER)',
+    );
+    expect(() => applyMigrations(db)).toThrow(DatabaseUpdateError);
+    expect(schemaVersion(db)).toBe(2);
   });
 });
 
@@ -201,7 +214,7 @@ describe('applyMigrations — existing database (simulates upgrade)', () => {
     db.exec('ALTER TABLE photos ADD COLUMN observation_date TEXT');
 
     expect(() => applyMigrations(db)).not.toThrow();
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 });
 
@@ -226,7 +239,7 @@ describe('applyMigrations — v4 mosaics', () => {
     expect(mosaicCols).toContain('center_ra');
     expect(mosaicCols).toContain('overlap_pct');
     expect(mosaicCols).toContain('cols');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('is idempotent — a second run does not duplicate mosaic_id', () => {
@@ -248,7 +261,7 @@ describe('applyMigrations — v5 mosaic name', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     expect(getColumns(db, 'plan_mosaics')).toContain('name');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('round-trips a stored mosaic name', () => {
@@ -284,7 +297,7 @@ describe('applyMigrations — v6 smart-scope mosaic size', () => {
     const cols = getColumns(db, 'plan_entries');
     expect(cols).toContain('mosaic_w_deg');
     expect(cols).toContain('mosaic_h_deg');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('round-trips a stored smart mosaic size and preserves existing rows', () => {
@@ -341,7 +354,7 @@ describe('applyMigrations — v7 per-plan observing location', () => {
     const cols = getColumns(db, 'plans');
     expect(cols).toContain('lat');
     expect(cols).toContain('lon');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('round-trips a stored per-plan location', () => {
@@ -389,7 +402,7 @@ describe('applyMigrations — v8 points of interest', () => {
     expect(catCols).toContain('name');
     expect(catCols).toContain('color');
     expect(catCols).toContain('position');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('defaults points_of_interest to an empty JSON array', () => {
@@ -433,6 +446,8 @@ describe('applyMigrations — v9 supernova type + ISS recolor', () => {
     applyMigrations(db); // brings to latest, creates poi_categories
     db.exec('DELETE FROM poi_categories');
     db.prepare('UPDATE schema_version SET version = 8').run();
+    // Migration 15 on is plain SQL, run once: what it added goes too.
+    db.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
     const ins = db.prepare(
       'INSERT INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)',
     );
@@ -502,7 +517,7 @@ describe('applyMigrations — v10 observation windows', () => {
       observation_windows: string;
     };
     expect(row.observation_windows).toBe('[]');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('is idempotent — a second run keeps a single observation_windows column', () => {
@@ -542,7 +557,7 @@ describe('applyMigrations — v11 per-plan objects-list sort', () => {
       sort_by: string;
     };
     expect(row.sort_by).toBe('transit');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('round-trips a stored sort key', () => {
@@ -587,7 +602,7 @@ describe('applyMigrations — v12 photo capture details + gear setup link', () =
       .get('id1') as { capture_details: string; gear_setup_id: string | null };
     expect(row.capture_details).toBe('{}');
     expect(row.gear_setup_id).toBeNull();
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('round-trips capture details and a setup id', () => {
@@ -721,7 +736,7 @@ describe('applyMigrations — v14 sky regions', () => {
     expect(cols).toContain('color');
     expect(cols).toContain('points');
     expect(cols).toContain('position');
-    expect(schemaVersion(db)).toBe(14);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
   });
 
   it('round-trips a stored region', () => {
@@ -749,5 +764,114 @@ describe('applyMigrations — v14 sky regions', () => {
     ).run('region-1', 'Garden view', '#4ea1ff', '[]', 0);
     applyMigrations(db);
     expect(db.prepare('SELECT COUNT(*) AS n FROM sky_regions').get()).toEqual({ n: 1 });
+  });
+});
+
+describe('applyMigrations — v15 photo quarter turns', () => {
+  it('shows the photos of a v14 database unturned', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    // back to v14, with a photo
+    db.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
+    db.prepare('UPDATE schema_version SET version = 14').run();
+    db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
+    ).run('p1', 'p1.jpg', 'p1.jpg', 30, 20);
+    expect(applyMigrations(db)).toBe(SCHEMA_VERSION);
+    expect(db.prepare('SELECT quarter_turns FROM photos WHERE id = ?').get('p1')).toEqual({
+      quarter_turns: 0,
+    });
+  });
+});
+
+describe('applyMigrations — v16 photo dates in ISO form', () => {
+  it("rewrites the database's old date form as ISO and leaves every other value alone", () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    db.prepare('UPDATE schema_version SET version = 15').run();
+    const ins = db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    );
+    ins.run('old', 'a.jpg', 'a.jpg', 1, 1, '2026-03-04 05:06:07');
+    ins.run('iso', 'b.jpg', 'b.jpg', 1, 1, '2026-03-04T05:06:07.123Z');
+    ins.run('none', 'c.jpg', 'c.jpg', 1, 1, null);
+    ins.run('odd', 'd.jpg', 'd.jpg', 1, 1, '2026-03-04 05:06');
+    expect(applyMigrations(db)).toBe(SCHEMA_VERSION);
+    expect(db.prepare('SELECT id, created_at FROM photos ORDER BY id').all()).toEqual([
+      { id: 'iso', created_at: '2026-03-04T05:06:07.123Z' },
+      { id: 'none', created_at: null },
+      { id: 'odd', created_at: '2026-03-04 05:06' },
+      { id: 'old', created_at: '2026-03-04T05:06:07.000Z' },
+    ]);
+  });
+});
+
+describe('applyMigrations — v17 photos table rebuilt with an ISO date default', () => {
+  it('keeps every photo, every star match and the link between them', () => {
+    const db = freshBaseDb();
+    db.pragma('foreign_keys = ON');
+    const photo = db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    );
+    photo.run('p1', 'p1.jpg', 'P1.jpg', 30, 20, '2026-03-04 05:06:07');
+    photo.run('p2', 'p2.jpg', 'P2.jpg', 40, 10, '2026-03-05T01:02:03.456Z');
+    const match = db.prepare(
+      'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip) VALUES (?, ?, ?, ?, ?)',
+    );
+    match.run('p1', 0, 1, 2, 100);
+    match.run('p1', 1, 3, 4, 200);
+    match.run('p2', 0, 5, 6, 300);
+
+    expect(applyMigrations(db)).toBe(SCHEMA_VERSION);
+    expect(
+      db
+        .prepare(
+          'SELECT id, filename, original_name, width, height, created_at FROM photos ORDER BY id',
+        )
+        .all(),
+    ).toEqual([
+      {
+        id: 'p1',
+        filename: 'p1.jpg',
+        original_name: 'P1.jpg',
+        width: 30,
+        height: 20,
+        created_at: '2026-03-04T05:06:07.000Z',
+      },
+      {
+        id: 'p2',
+        filename: 'p2.jpg',
+        original_name: 'P2.jpg',
+        width: 40,
+        height: 10,
+        created_at: '2026-03-05T01:02:03.456Z',
+      },
+    ]);
+    const matches = () =>
+      db
+        .prepare('SELECT photo_id, point_index, star_hip FROM star_correspondences ORDER BY id')
+        .all();
+    expect(matches()).toEqual([
+      { photo_id: 'p1', point_index: 0, star_hip: 100 },
+      { photo_id: 'p1', point_index: 1, star_hip: 200 },
+      { photo_id: 'p2', point_index: 0, star_hip: 300 },
+    ]);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    db.prepare('DELETE FROM photos WHERE id = ?').run('p1');
+    expect(matches()).toEqual([{ photo_id: 'p2', point_index: 0, star_hip: 300 }]);
+    db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
+    ).run('p3', 'p3.jpg', 'p3.jpg', 1, 1);
+    expect(
+      (db.prepare('SELECT created_at FROM photos WHERE id = ?').get('p3') as { created_at: string })
+        .created_at,
+    ).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it('puts the foreign-key switch back as it found it', () => {
+    const db = freshBaseDb();
+    db.pragma('foreign_keys = OFF'); // better-sqlite3 opens with them on
+    applyMigrations(db);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(0);
   });
 });

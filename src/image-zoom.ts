@@ -1,3 +1,4 @@
+import type { QuarterTurns } from '@myastrosky/core/types';
 import { t } from './i18n';
 
 export interface ZoomPanState {
@@ -18,6 +19,21 @@ export interface ZoomPanOptions {
    * `'fit'` when it is on. `'none'` disables the double-click handler entirely.
    */
   dblClick?: 'fit' | 'reset' | 'none';
+  /**
+   * Quarters to the right the image is shown turned (a photo's `quarterTurns`). The image is turned about its top-left
+   * corner and moved back, so its box on screen (`getBoundingClientRect`) is the turned picture, with its top left
+   * where the upright one's would be: the zoom, the fit and what is drawn over it follow the turned picture.
+   */
+  quarterTurns?: QuarterTurns;
+}
+
+/** The end of the CSS transform that shows an element of layout size `w` × `h` turned `turns` quarters to the right,
+ * its turned box starting where its box starts. */
+export function quarterTurnTransform(turns: QuarterTurns, w: number, h: number): string {
+  if (turns === 1) return ` translate(${h}px,0px) rotate(90deg)`;
+  if (turns === 2) return ` translate(${w}px,${h}px) rotate(180deg)`;
+  if (turns === 3) return ` translate(0px,${w}px) rotate(270deg)`;
+  return '';
 }
 
 export interface ZoomPanController {
@@ -59,6 +75,7 @@ export function createImageZoomPan(
   const MAX_SCALE = opts?.maxScale ?? 6;
   const useFitButtons = opts?.fitButtons ?? false;
   const dblClickMode = opts?.dblClick ?? (useFitButtons ? 'fit' : 'reset');
+  const turns = opts?.quarterTurns ?? 0;
 
   let scale = 1,
     tx = 0,
@@ -112,7 +129,9 @@ export function createImageZoomPan(
 
   // ── Transform ───────────────────────────────────────────────────────────────
   function applyTransform() {
-    img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+    img.style.transform =
+      `translate(${tx}px,${ty}px) scale(${scale})` +
+      quarterTurnTransform(turns, img.offsetWidth, img.offsetHeight);
     for (const cb of listeners) cb();
   }
 
@@ -196,7 +215,11 @@ export function createImageZoomPan(
     const imgRect = img.getBoundingClientRect();
     const layoutW = imgRect.width / scale;
     if (!(layoutW > 0)) return;
-    const nat = (img as HTMLImageElement).naturalWidth || layoutW;
+    // The turned picture's width is the file's height when it is turned a quarter or three.
+    const nat =
+      (turns % 2 === 1
+        ? (img as HTMLImageElement).naturalHeight
+        : (img as HTMLImageElement).naturalWidth) || layoutW;
     applyAbsoluteScaleCentered(nat / layoutW);
   }
 
@@ -313,6 +336,12 @@ export function createImageZoomPan(
       runFitOnLoad();
     }
   }
+  // A turned image's transform depends on its size, known once it has loaded.
+  const turnOnLoad = () => applyTransform();
+  if (turns) {
+    applyTransform();
+    img.addEventListener('load', turnOnLoad);
+  }
 
   return {
     controls,
@@ -333,6 +362,7 @@ export function createImageZoomPan(
     destroy() {
       if (fitRaf) cancelAnimationFrame(fitRaf);
       img.removeEventListener('load', runFitOnLoad);
+      img.removeEventListener('load', turnOnLoad);
       container.removeEventListener('wheel', onWheel);
       container.removeEventListener('pointerdown', onPointerDown);
       container.removeEventListener('pointermove', onPointerMove);

@@ -1,8 +1,10 @@
 import type { ImageCodec } from '../ports/image-codec';
 import { decodeFitsToBytes, UnsupportedFitsError } from './fits-decoder';
 import { decodeTiffToBytes, UnsupportedTiffError } from './tiff-decoder';
+import { UnsupportedXisfError } from './xisf';
+import { decodeXisfToBytes } from './xisf-decoder';
 
-export { UnsupportedTiffError, UnsupportedFitsError };
+export { UnsupportedTiffError, UnsupportedFitsError, UnsupportedXisfError };
 
 export class UnsupportedRawFormatError extends Error {}
 
@@ -14,11 +16,11 @@ export interface DecodedRaw {
 }
 
 /**
- * Decode a raw astro image file (TIFF or FITS) into an 8-bit PNG, faithfully — a straight
+ * Decode a raw astro image file (TIFF, FITS or XISF) into an 8-bit PNG, faithfully — a straight
  * linear mapping of the source data to [0,255], never a histogram stretch. The image codec is
  * used only as the PNG *encoder*: `sharp` silently misdecodes 32-bit float TIFF/FITS pixel data
  * (verified — every sharp read path collapses linear-light float samples toward black), so
- * decoding is entirely our own code in `tiff-decoder.ts`/`fits-decoder.ts`.
+ * decoding is entirely our own code in `tiff-decoder.ts`/`fits-decoder.ts`/`xisf-decoder.ts`.
  */
 export async function decodeRawAstroImage(
   bytes: Uint8Array,
@@ -32,6 +34,8 @@ export async function decodeRawAstroImage(
     decoded = decodeTiffToBytes(bytes);
   } else if (normalizedExt === '.fit' || normalizedExt === '.fits') {
     decoded = decodeFitsToBytes(bytes);
+  } else if (normalizedExt === '.xisf') {
+    decoded = decodeXisfToBytes(bytes);
   } else {
     throw new UnsupportedRawFormatError(`Unsupported raw astro image extension: ${ext}`);
   }

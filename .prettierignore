@@ -33,3 +33,7 @@ smart_telescope_mosaic_capabilities.html
 spikes
 **/android
 **/ios
+
+# Phone app: bundled copies and native project
+apps/mobile/public/data
+apps/mobile/public/gear

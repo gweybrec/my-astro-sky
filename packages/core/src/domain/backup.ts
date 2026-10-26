@@ -75,9 +75,9 @@ export interface ImportPreviewResult {
   gear: ImportPreviewGear[];
 }
 
-/** An item of a backup that could not be restored. */
+/** An item of a backup that could not be restored; a DSO override is named by its object's id. */
 export interface ImportFailure {
-  kind: 'plan' | 'setup' | 'gear' | 'photo';
+  kind: 'plan' | 'setup' | 'gear' | 'photo' | 'dsoOverride' | 'poiCategory' | 'skyRegion';
   name: string;
 }
 

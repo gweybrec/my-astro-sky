@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dsoImportance } from '../../src/dso-catalog';
-import type { DSO } from '../../src/types';
+import type { DSO } from '@myastrosky/core/types';
 
 // dsoImportance only reads `rating` and `mag`; build minimal stand-ins.
 const dso = (rating: number | null, mag: number | null): DSO => ({ rating, mag }) as unknown as DSO;

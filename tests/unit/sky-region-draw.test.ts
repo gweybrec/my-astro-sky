@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { RegionDrawGesture, REGION_DEDUPE_DEG, REGION_MIN_POINTS } from '../../src/sky-region-draw';
-import type { AltAzPoint } from '../../src/sky-map-types';
+import {
+  RegionDrawGesture,
+  REGION_DEDUPE_DEG,
+  REGION_MIN_POINTS,
+} from '@myastrosky/render/sky-region-draw';
+import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
 
 /**
  * The freehand sky-region gesture. Points are captured in Alt/Az (time-invariant, so a
@@ -58,6 +62,34 @@ describe('RegionDrawGesture', () => {
       expect(g.capturedPoints.length).toBeGreaterThan(0);
       g.press();
       expect(g.capturedPoints).toHaveLength(0);
+    });
+
+    it('tells onPress when a stroke starts', () => {
+      const onPress = vi.fn();
+      const g = new RegionDrawGesture();
+      g.enter({ onComplete: vi.fn(), onCancel: vi.fn(), onPress }, false);
+      g.press();
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the stroke on abortStroke(), tells onAbort, and stays active for the next one', () => {
+      const onComplete = vi.fn();
+      const onCancel = vi.fn();
+      const onAbort = vi.fn();
+      const g = new RegionDrawGesture();
+      g.enter({ onComplete, onCancel, onAbort }, false);
+      drawSquare(g);
+      g.abortStroke();
+      expect(onAbort).toHaveBeenCalledTimes(1);
+      expect(g.capturedPoints).toHaveLength(0);
+      expect(g.capturing).toBe(false);
+      expect(g.active).toBe(true);
+      g.move(pt(50, 50));
+      expect(g.capturedPoints).toHaveLength(0);
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onCancel).not.toHaveBeenCalled();
+      drawSquare(g);
+      expect(g.capturedPoints).toHaveLength(4);
     });
 
     it('goes inactive after finish()', () => {

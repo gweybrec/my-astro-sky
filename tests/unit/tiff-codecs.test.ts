@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { packBitsDecode } from '../../server/raw-decode/codec/packbits';
-import { lzwDecode } from '../../server/raw-decode/codec/lzw';
-import { applyHorizontalPredictor } from '../../server/raw-decode/codec/predictor';
+import { packBitsDecode } from '@myastrosky/core/raw-decode/codec/packbits';
+import { lzwDecode } from '@myastrosky/core/raw-decode/codec/lzw';
+import { applyHorizontalPredictor } from '@myastrosky/core/raw-decode/codec/predictor';
 
 // ─── PackBits ───────────────────────────────────────────────────────────────────
 

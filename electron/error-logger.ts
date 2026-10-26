@@ -6,6 +6,7 @@ import { cleanupOldLogsSafely } from './log-retention.js';
 import { buildPathAnonymizer } from './path-anonymizer.js';
 import { sanitizeContext, type Json } from './sanitize-context.js';
 import { diffSeenDumps } from './crash-seen.js';
+import { logDebug } from '@myastrosky/core/platform/log';
 
 export interface RendererErrorPayload {
   category: string;
@@ -361,7 +362,7 @@ export function setupErrorLogging(): void {
   });
 
   ipcMain.handle('diagnostics:open-logs-dir', async () => {
-    console.info('[Diagnostics] IPC open logs dir request received');
+    logDebug('Diagnostics', 'IPC open logs dir request received');
     const result = await shell.openPath(getLogsDir());
     return { ok: !result, message: result || undefined };
   });

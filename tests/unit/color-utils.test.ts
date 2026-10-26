@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { lerpColor, filterBadgeColors, cssColorToHex, hexToRgba } from '../../src/color-utils';
+import {
+  lerpColor,
+  filterBadgeColors,
+  cssColorToHex,
+  hexToRgba,
+} from '@myastrosky/core/color-utils';
 
 describe('lerpColor', () => {
   it('returns the endpoints at t=0 and t=1', () => {

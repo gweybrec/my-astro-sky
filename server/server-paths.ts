@@ -2,6 +2,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 export const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
+export const DB_PATH = process.env.DB_PATH || path.join(SERVER_DIR, '..', 'data.db');
 export const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(SERVER_DIR, '..', 'uploads');
 export const RESOURCES_DIR = process.env.RESOURCES_DIR || path.join(SERVER_DIR, '..', 'resources');
 export const DIST_DIR = process.env.DIST_DIR || path.join(SERVER_DIR, '..', 'dist');

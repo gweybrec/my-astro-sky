@@ -1,7 +1,6 @@
 import multer from 'multer';
 
 export { ALLOWED_PHOTO_EXTENSIONS } from '@myastrosky/core/services/photos';
-export const ALLOWED_WCS_EXTENSIONS = new Set(['.tif', '.tiff', '.fits', '.fit']);
 
 // In Electron the server runs inside the Electron main process (process.versions.electron is set).
 // Rate limiting is meaningless there (single-user local app).

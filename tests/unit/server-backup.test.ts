@@ -885,8 +885,17 @@ describe('export and import round trip', () => {
     const inst = await startInstance();
     const svc = await import('../../server/services.js');
     const brokenSetup = setups[0];
-    vi.spyOn(svc.gear, 'importSetup').mockRejectedValueOnce(new Error('setup refused'));
-    vi.spyOn(svc.gear, 'importCustom').mockRejectedValueOnce(new Error('gear refused'));
+    // The broken setup and gear item are refused in any write that carries them, alone or with others.
+    const importSetups = svc.gear.importSetups.bind(svc.gear);
+    vi.spyOn(svc.gear, 'importSetups').mockImplementation(async (items) => {
+      if (items.some((i) => i.setup.id === brokenSetup.id)) throw new Error('setup refused');
+      await importSetups(items);
+    });
+    const importCustomItems = svc.gear.importCustomItems.bind(svc.gear);
+    vi.spyOn(svc.gear, 'importCustomItems').mockImplementation(async (items) => {
+      if (items.some((i) => i.item.id === gear[0].id)) throw new Error('gear refused');
+      await importCustomItems(items);
+    });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const bundle = await zipWith({

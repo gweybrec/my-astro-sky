@@ -1,0 +1,66 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import { IonPage, IonContent } from '@ionic/vue';
+import type { Photo } from '@myastrosky/core/types';
+import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
+import { photoFileUrl } from '@myastrosky/app-state/api';
+import PhoneInfoButton from '../../components/PhoneInfoButton.vue';
+import PhonePhotoStage, { type PhotoPoint } from '../../components/PhonePhotoStage.vue';
+
+// The frame of the pages that identify objects on a solved photo (boards "Identifier un astéroïde", "Identifier des
+// supernovae", "Identifier des comètes", "Ajouter un point d'intérêt"), the star identification's layout: the title bar
+// of a mode with its "i", the photo on its stage with what the page marks on it (`markers` slot, given `onScreen`),
+// and the panel under it, at the right in landscape: its content (default slot) scrolls when it is taller than the
+// panel, its footer (`footer` slot) stays under it. A tap on the photo is given as its pixel (`tap`). With `results`,
+// the content's list of results is what shrinks and scrolls (`.mob-results-list`). The photo is shown turned as its
+// `quarterTurns` say: taps and markers are in the pixels of the photo as shown (`photoAsShown`).
+const props = defineProps<{
+  title: string;
+  /** The explanation behind the "i": the desktop's introduction of the modal. */
+  info: string;
+  photo: Photo | null;
+  /** The panel's name for assistive technology. */
+  panelLabel: string;
+  /** The panel holds a list of results: only the list scrolls. */
+  results?: boolean;
+}>();
+const emit = defineEmits<{ tap: [point: PhotoPoint] }>();
+
+const size = computed(() => {
+  if (!props.photo) return null;
+  const { width, height } = photoAsShown(props.photo);
+  return { width, height };
+});
+</script>
+
+<template>
+  <IonPage>
+    <IonContent :scroll-y="false">
+      <div class="mob-page-fill mob-map-mode mob-identify-frame">
+        <header class="mob-topbar">
+          <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ title }}</h1>
+          <PhoneInfoButton :title="title" :message="info" />
+        </header>
+        <PhonePhotoStage
+          :src="photo ? photoFileUrl(photo.filename) : ''"
+          :alt="photo?.originalName"
+          :size="size"
+          :turns="photo ? quarterTurnsOf(photo) : 0"
+          @tap="emit('tap', $event)"
+        >
+          <template #default="{ onScreen }">
+            <slot name="markers" :on-screen="onScreen" />
+          </template>
+        </PhonePhotoStage>
+        <section
+          class="mob-panel mob-identify-panel"
+          :class="{ 'mob-panel--results': results }"
+          :aria-label="panelLabel"
+        >
+          <div class="mob-identify-body"><slot /></div>
+          <slot name="footer" />
+        </section>
+      </div>
+    </IonContent>
+  </IonPage>
+</template>

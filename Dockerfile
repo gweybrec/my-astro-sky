@@ -11,6 +11,8 @@ COPY package.json package-lock.json* ./
 # npm workspaces: packages/*/package.json must be present before `npm ci` so the
 # @myastrosky/core link is created (the sources are then used as-is by Vite and tsx).
 COPY packages/ packages/
+# The phone app's workspace: only its package.json, so that the lockfile matches and `npm ci` works.
+COPY apps/mobile/package.json apps/mobile/package.json
 RUN npm ci
 
 # Everything Vite needs to build the frontend bundle.
@@ -35,10 +37,15 @@ COPY package.json package-lock.json* ./
 # npm workspaces: packages/*/package.json must be present before `npm ci` so the
 # @myastrosky/core link is created (the sources are then used as-is by Vite and tsx).
 COPY packages/ packages/
+COPY apps/mobile/package.json apps/mobile/package.json
 
 # Install runtime deps only, skipping install scripts of dependencies; the
-# native modules are then built explicitly with `npm rebuild`.
-RUN npm ci --omit=dev --ignore-scripts \
+# native modules are then built explicitly with `npm rebuild`. The phone app's
+# workspace (apps/mobile: Ionic, Capacitor) is left out: only the root and the four
+# packages/* workspaces are installed.
+RUN npm ci --omit=dev --ignore-scripts --include-workspace-root \
+    --workspace=packages/core --workspace=packages/backend-local \
+    --workspace=packages/backend-http --workspace=packages/app-state \
   && npm rebuild better-sqlite3 sharp
 
 # The server runs as TypeScript via tsx (no transpile step). tsx is declared as a
@@ -50,6 +57,9 @@ COPY --from=build /app/dist dist/
 
 RUN mkdir -p /data uploads
 
+# A release build: the debug and info messages of the server's logger stay off, as in the
+# packaged desktop app (errors, warnings and the start-up line still print).
+ENV NODE_ENV=production
 ENV PORT=3001
 ENV DB_PATH=/data/data.db
 # Catalog assets live under dist/data (Vite copied public/data there at build time).

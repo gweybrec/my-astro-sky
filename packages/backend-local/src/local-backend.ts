@@ -5,9 +5,12 @@
  */
 import type { Backend, CancelSignal, FileSource } from '@myastrosky/core/backend';
 import { backupFileName } from '@myastrosky/core/domain/backup';
+import { DomainError } from '@myastrosky/core/domain/errors';
+import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { BackupFile } from '@myastrosky/core/services/backup';
 import type { Services } from '@myastrosky/core/services/create-services';
+import type { RangeSource } from './bundle-fflate';
 
 export interface LocalBackendDeps {
   /** What `createServices` returns, built on the phone's database, blob store and image codec. */
@@ -16,8 +19,11 @@ export interface LocalBackendDeps {
   files: { url(fileName: string): string };
   /** The address of the star catalogue file. */
   starCatalogUrl: string;
-  /** Opens a ZIP archive held in memory. */
-  openZip(bytes: Uint8Array): Promise<BundleReader>;
+  /** Opens a ZIP archive read by pieces. */
+  openZip(source: RangeSource): Promise<BundleReader>;
+  /** The largest file read whole (a `.json` backup, or a file that cannot be read by pieces); larger is
+   *  refused with `BACKUP_TOO_LARGE` before it is read. No limit when absent. */
+  maxWholeFileBytes?: number;
   /** Builds a ZIP archive in memory. */
   newZip(): { writer: BundleWriter; finish(): Promise<Uint8Array> };
   /** Hands a file to the user (the share sheet on the phone). */
@@ -32,19 +38,77 @@ function throwIfCancelled(cancel: CancelSignal | undefined): void {
   if (cancel?.aborted) throw aborted();
 }
 
-export function createLocalBackend(deps: LocalBackendDeps): Backend {
-  const { services, files, starCatalogUrl, openZip, newZip, saveFile, now } = deps;
+/**
+ * A failure that is neither a `DomainError` nor a cancel (a file that cannot be read, a decoder or network error) is
+ * what the server answers with a 500: on the HTTP backend it arrives as `upstream` with its message and a code the
+ * screen translates. Here it becomes the same, with `INTERNAL_ERROR`, so its English message never reaches a screen.
+ */
+function toDomainError(err: unknown): unknown {
+  if (err instanceof DomainError || (err as { name?: string } | null)?.name === 'AbortError') {
+    return err;
+  }
+  reportError('Local backend call failed', err);
+  return new DomainError('upstream', err instanceof Error ? err.message : String(err), {
+    code: 'INTERNAL_ERROR',
+  });
+}
 
-  const backupFileOf = async (file: FileSource): Promise<BackupFile> => {
-    const bytes = await file.read();
-    return { name: file.name, bytes, openZip: () => openZip(bytes) };
+/** Every method of every member, with its failures passed through `toDomainError`; a synchronous one stays so. */
+function withDomainErrors(backend: Backend): Backend {
+  const wrapMember = (member: object): object =>
+    Object.fromEntries(
+      Object.entries(member).map(([name, value]) => [
+        name,
+        typeof value !== 'function'
+          ? value
+          : (...args: unknown[]) => {
+              let result: unknown;
+              try {
+                result = (value as (...a: unknown[]) => unknown).apply(member, args);
+              } catch (err) {
+                throw toDomainError(err);
+              }
+              return result instanceof Promise
+                ? result.catch((err: unknown) => {
+                    throw toDomainError(err);
+                  })
+                : result;
+            },
+      ]),
+    );
+  return Object.fromEntries(
+    Object.entries(backend).map(([name, member]) => [name, wrapMember(member as object)]),
+  ) as unknown as Backend;
+}
+
+export function createLocalBackend(deps: LocalBackendDeps): Backend {
+  const { services, files, starCatalogUrl, openZip, newZip, saveFile, now, maxWholeFileBytes } =
+    deps;
+
+  const readWhole = async (file: FileSource) => {
+    if (maxWholeFileBytes !== undefined && file.size > maxWholeFileBytes) {
+      throw new DomainError('invalid', 'Backup too large', { code: 'BACKUP_TOO_LARGE' });
+    }
+    return file.read();
   };
+  // A ZIP is read by pieces when the file can be; otherwise it is read whole, once.
+  const rangesOf = async (file: FileSource): Promise<RangeSource> => {
+    const { readRange } = file;
+    if (readRange) return { size: file.size, read: (start, end) => readRange(start, end) };
+    const bytes = await readWhole(file);
+    return { size: bytes.byteLength, read: async (start, end) => bytes.subarray(start, end) };
+  };
+  const backupFileOf = (file: FileSource): BackupFile => ({
+    name: file.name,
+    read: () => readWhole(file),
+    openZip: async () => openZip(await rangesOf(file)),
+  });
   const solvedFileOf = async (file: FileSource) => ({
     fileName: file.name,
     bytes: await file.read(),
   });
 
-  return {
+  return withDomainErrors({
     capabilities: { localSolvers: false },
     files,
     catalog: { starCatalogUrl: async () => starCatalogUrl },
@@ -53,10 +117,10 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
       ...services.photos,
       async upload(file, fields, options) {
         throwIfCancelled(options?.cancel);
-        const { photo } = await services.photos.upload(
-          { name: file.name, bytes: await file.read() },
-          fields,
-        );
+        const bytes = await file.read();
+        // Reading the file is the transfer here: a cancel is honoured until it ends, like an HTTP upload's.
+        throwIfCancelled(options?.cancel);
+        const { photo } = await services.photos.upload({ name: file.name, bytes }, fields);
         options?.onProgress?.(1);
         return photo;
       },
@@ -89,7 +153,9 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
       },
       async convert(file, options) {
         throwIfCancelled(options?.cancel);
-        const result = await services.solvedImport.convert(await solvedFileOf(file));
+        const solved = await solvedFileOf(file);
+        throwIfCancelled(options?.cancel);
+        const result = await services.solvedImport.convert(solved);
         options?.onProgress?.(1);
         return result;
       },
@@ -101,11 +167,11 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
         await saveFile(backupFileName(now()), await zip.finish());
       },
       async preview(file) {
-        return services.backup.previewFile(await backupFileOf(file));
+        return services.backup.previewFile(backupFileOf(file));
       },
       async restore(file, options) {
-        return services.backup.importFile(await backupFileOf(file), options);
+        return services.backup.importFile(backupFileOf(file), options);
       },
     },
-  };
+  });
 }

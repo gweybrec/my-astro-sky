@@ -1,27 +1,28 @@
 import { jsPDF } from 'jspdf';
-import type { SkyMap } from './sky-map';
-import { computeFovFrameCorners } from './frame-geometry';
-import type { FovFrameSpec } from './sky-map-types';
+import type { SkyMap } from '@myastrosky/render/sky-map';
+import { computeFovFrameCorners } from '@myastrosky/core/frame-geometry';
+import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
-import type { Photo, DSO, ViewState } from './types';
-import { project, toCanvas } from './projection';
-import { angularSizeToCanvasPxForDSO } from './dso-highlight';
-import { paToCanvasRotationDeg } from './frame-orientation';
+import type { Photo, DSO, ViewState, QuarterTurns } from '@myastrosky/core/types';
+import { quarterTurnsOf } from '@myastrosky/core/photo-rotation';
+import { project, toCanvas } from '@myastrosky/core/projection';
+import { angularSizeToCanvasPxForDSO } from '@myastrosky/core/dso-highlight';
+import { paToCanvasRotationDeg } from '@myastrosky/core/frame-orientation';
 import { getConstellationInfos } from './star-catalog';
 import { t } from './i18n';
-import { formatAlt, cardinalLetter } from './format-utils';
-import { buildSetupInfoRows } from './setup-info';
-import type { TelescopeData, CameraData, AccessoryData } from './gear-catalog';
-import { catalogFilterColor } from './gear-catalog';
+import { formatAlt, cardinalLetter } from '@myastrosky/core/format-utils';
+import { buildSetupInfoRows } from '@myastrosky/core/setup-info';
+import type { TelescopeData, CameraData, AccessoryData } from '@myastrosky/core/gear-catalog';
+import { catalogFilterColor } from '@myastrosky/core/gear-catalog';
 import {
   moonDangerLevel,
   azimuthCrossings,
   thinCrossingsByX,
   isCardinalAz,
   type AltSample,
-} from './sky-geometry';
-import { drawMoonMarker } from './moon-draw';
-import { CARDINAL_POINTS } from './canvas-theme';
+} from '@myastrosky/core/sky-geometry';
+import { drawMoonMarker } from '@myastrosky/render/moon-draw';
+import { CARDINAL_POINTS } from '@myastrosky/core/canvas-theme';
 import {
   resolveWindowColor,
   toBandFill,
@@ -30,7 +31,7 @@ import {
   framesInWindow,
   formatWindowDuration,
   cssColorToHex,
-} from './observation-windows';
+} from '@myastrosky/core/observation-windows';
 import type { ObservationWindow } from './api';
 import { photoFileUrl } from './api';
 
@@ -267,16 +268,17 @@ export async function renderGalleryPdf(photos: Photo[]): Promise<Blob> {
     const x = margin + col * (layout.cellW + gap);
     const y = margin + row * (layout.cellH + gap);
 
-    // Thumbnail, contained within the image box preserving aspect ratio.
+    // Thumbnail, shown turned as the photo is, contained within the image box preserving aspect ratio.
     const src = photoFileUrl(photo.thumbFilename ?? photo.filename);
     try {
-      const img = await loadImage(src);
-      const scale = Math.min(layout.cellW / img.naturalWidth, layout.imgH / img.naturalHeight);
-      const drawW = img.naturalWidth * scale;
-      const drawH = img.naturalHeight * scale;
+      const picture = turnedPicture(await loadImage(src), quarterTurnsOf(photo));
+      const { width, height } = pictureSize(picture);
+      const scale = Math.min(layout.cellW / width, layout.imgH / height);
+      const drawW = width * scale;
+      const drawH = height * scale;
       const dx = x + (layout.cellW - drawW) / 2;
       const dy = y + (layout.imgH - drawH) / 2;
-      doc.addImage(img, 'JPEG', dx, dy, drawW, drawH);
+      doc.addImage(picture, 'JPEG', dx, dy, drawW, drawH);
     } catch {
       // Skip image on load failure; caption still printed below.
     }
@@ -290,6 +292,30 @@ export async function renderGalleryPdf(photos: Photo[]): Promise<Blob> {
 
   return doc.output('blob');
 }
+
+/** The picture turned `turns` quarters to the right, drawn on a canvas (the image itself when it is not turned). */
+function turnedPicture(
+  img: HTMLImageElement,
+  turns: QuarterTurns,
+): HTMLImageElement | HTMLCanvasElement {
+  if (!turns) return img;
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = turns % 2 ? h : w;
+  canvas.height = turns % 2 ? w : h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return img;
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((turns * Math.PI) / 2);
+  ctx.drawImage(img, -w / 2, -h / 2);
+  return canvas;
+}
+
+const pictureSize = (p: HTMLImageElement | HTMLCanvasElement) =>
+  p instanceof HTMLImageElement
+    ? { width: p.naturalWidth, height: p.naturalHeight }
+    : { width: p.width, height: p.height };
 
 // ─── Night-plan PDF ───────────────────────────────────────────────────────────
 

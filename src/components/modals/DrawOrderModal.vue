@@ -51,7 +51,7 @@ import { t } from '../../i18n';
 import BaseModal from '../base/BaseModal.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
-import { filterDrawOrderPhotos } from '../../photo-draw-order';
+import { filterDrawOrderPhotos, mergeFilteredOrder } from '@myastrosky/core/photo-draw-order';
 import { updatePhotoOrder } from '../../api';
 import { showToast } from '../../toast';
 
@@ -201,18 +201,15 @@ function onMouseUp() {
   nextVisibleIds.splice(fromIdx, 1);
   nextVisibleIds.splice(displayIdx, 0, movedId);
 
-  const displayById = new Map(displayOrder.value.map((p) => [p.photo.id, p]));
-  const filtered = filteredIds.value;
-  let visibleIdx = 0;
-  const mergedDisplay = displayOrder.value.map((p) => {
-    if (!filtered.has(p.photo.id)) return p;
-    const nextId = nextVisibleIds[visibleIdx++];
-    return displayById.get(nextId) ?? p;
-  });
+  const mergedDisplay = mergeFilteredOrder(
+    displayOrder.value.map((p) => p.photo.id),
+    nextVisibleIds,
+    filteredIds.value,
+  );
 
   const overlay = canvasStore.overlay;
   if (overlay) {
-    overlay.setPhotoOrder(mergedDisplay.reverse().map((p) => p.photo.id));
+    overlay.setPhotoOrder(mergedDisplay.reverse());
     photosStore.syncFromOverlay();
     const ids = overlay.getPlacedPhotos().map((p) => p.photo.id);
     void updatePhotoOrder(ids).catch(() => {

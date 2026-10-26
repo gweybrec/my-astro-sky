@@ -21,7 +21,7 @@ import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 
 const TILE_URL =
-  /^https:\/\/s3\.amazonaws\.com\/elevation-tiles-prod\/terrarium\/12\/\d+\/\d+\.png$/;
+  /^https:\/\/s3\.amazonaws\.com\/elevation-tiles-prod\/terrarium\/\d+\/\d+\/\d+\.png$/;
 const PEAKS = JSON.stringify({
   elements: [
     { type: 'node', lat: 45.123, lon: 6.48, tags: { name: 'Pic Test', ele: '2500' } },
@@ -285,6 +285,28 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
       expect(sleeps).toEqual([800]);
     });
 
+    it('returns the computed profile and logs when the cache write fails', async () => {
+      const failingWrites: SqlDb = {
+        ...db,
+        run: async () => {
+          throw new Error('SQLITE_FULL');
+        },
+      };
+      const s = createHorizonService({
+        db: failingWrites,
+        http,
+        images: createSharpImageCodec(),
+        now: () => 0,
+        log: (event, error, context) => logged.push({ event, context: { ...context, error } }),
+      });
+      const r = await s.getProfile({ lat: 45.123, lon: 6.456, radiusKm: 3 });
+      expect(r.alts).toHaveLength(360);
+      expect(cacheRows()).toEqual([]);
+      expect(logged).toHaveLength(1);
+      expect(logged[0].event).toBe('horizon_cache_write_failed');
+      expect((logged[0].context?.error as Error).message).toBe('SQLITE_FULL');
+    });
+
     it('fails with HORIZON_COMPUTE_FAILED when a tile request fails, keeps the cause and caches nothing', async () => {
       tileReply = { reject: 'ECONNRESET' };
       const err = await rejection(svc.getProfile({ lat: -20.5, lon: 140.5, radiusKm: 3 }));
@@ -302,11 +324,41 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
       expect(cacheRows()).toEqual([]);
     });
 
-    it('fails before any request when the radius needs more than 400 tiles', async () => {
-      const err = await rejection(svc.getProfile({ lat: 45.5, lon: 7.5, radiusKm: 1000 }));
-      expect(err.code).toBe('HORIZON_COMPUTE_FAILED');
-      expect((err.cause as Error).message).toBe('Horizon radius too large: 900 tiles exceeds 400');
+    const zooms = () => [...new Set(tiles().map((t) => Number(t.url.split('/')[5])))];
+
+    it('fetches zoom 12 tiles when the area fits in 400 of them', async () => {
+      tileReply = { status: 404, body: '' };
+      overpassReply = { status: 200, body: '{"elements":[]}' };
+      await svc.getProfile({ lat: 45.5, lon: 7.5 });
+      expect(zooms()).toEqual([12]);
+      expect(tiles().length).toBeLessThanOrEqual(400);
+    });
+
+    it.each([
+      ['the default radius far north', { lat: 70.5, lon: 20.5 }, 11],
+      ['the default radius at 84°', { lat: -84, lon: 20.5 }, 9],
+      ['a radius clamped to 100 km', { lat: 45.5, lon: 7.5, radiusKm: 1000 }, 11],
+      ['100 km at the edge of the tiles', { lat: 85.05, lon: 7.5, radiusKm: 100 }, 8],
+    ])('steps down to coarser tiles for %s', async (_label, query, zoom) => {
+      tileReply = { status: 404, body: '' };
+      overpassReply = { status: 200, body: '{"elements":[]}' };
+      const r = await svc.getProfile(query);
+      expect(r.alts).toHaveLength(360);
+      expect(r.alts.every(Number.isFinite)).toBe(true);
+      expect(zooms()).toEqual([zoom]);
+      expect(tiles().length).toBeLessThanOrEqual(400);
+    });
+
+    it.each([
+      ['north', 85.06],
+      ['south', -89.9],
+    ])('refuses a latitude beyond the tiles (%s) before any request or query', async (_l, lat) => {
+      db.reset();
+      const err = await rejection(svc.getProfile({ lat, lon: 7.5 }));
+      expect(err.kind).toBe('invalid');
+      expect(err.code).toBe('HORIZON_OUT_OF_COVERAGE');
       expect(requests).toHaveLength(0);
+      expect(db.calls()).toBe(0);
     });
   });
 });

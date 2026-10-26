@@ -10,7 +10,7 @@ import { generateThumbnail } from '../../src/lazy-image';
 
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
 vi.mock('../../src/toast', () => ({ showToast: vi.fn() }));
-vi.mock('../../src/search', () => ({ searchUnified: vi.fn().mockResolvedValue([]) }));
+vi.mock('@myastrosky/core/search', () => ({ searchUnified: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../src/lazy-image', () => ({ generateThumbnail: vi.fn().mockResolvedValue('') }));
 vi.mock('../../src/batch-utils', () => ({ sanitizeIntegrationRows: (rows: unknown) => rows }));
 vi.mock('../../src/stores/canvas', () => ({ useCanvasStore: vi.fn(() => ({ overlay: null })) }));
@@ -26,7 +26,7 @@ vi.mock('../../src/api', () => ({
 }));
 
 const mockFindDSOIds = vi.fn();
-vi.mock('../../src/dso-catalog', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: (...args: unknown[]) => mockFindDSOIds(...args),
 }));
 
@@ -87,7 +87,7 @@ function mountCard(item: BatchItem) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function triggerWcsChange(wrapper: ReturnType<typeof mountCard>, wcsFile: File) {
-  const input = wrapper.find<HTMLInputElement>('input[accept=".fit,.fits,.tif,.tiff"]');
+  const input = wrapper.find<HTMLInputElement>('input[accept=".fit,.fits,.tif,.tiff,.xisf"]');
   Object.defineProperty(input.element, 'files', {
     get: () => [wcsFile],
     configurable: true,

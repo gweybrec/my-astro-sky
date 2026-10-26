@@ -116,10 +116,14 @@ export function createWebCryptoSecretCodec(options: WebCryptoSecretCodecOptions)
     (options.indexedDB ? createIndexedDbKeyStore(options.indexedDB) : undefined);
   if (!store) throw new Error('createWebCryptoSecretCodec needs an indexedDB or a keyStore');
 
-  /** The key, created on first use; concurrent first calls share one creation. */
-  let creating: Promise<CryptoKey> | null = null;
+  /**
+   * The stored key, created when there is none; concurrent calls share one look-up. Read from the store each
+   * time, not kept in memory: if the WebView's storage is cleared while the app is open, the next key saved
+   * must be encrypted with a key that is stored again, or it could never be read back.
+   */
+  let pending: Promise<CryptoKey> | null = null;
   const keyForEncrypt = (): Promise<CryptoKey> => {
-    creating ??= (async () => {
+    pending ??= (async () => {
       const existing = await store.load();
       if (existing) return existing;
       const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
@@ -128,11 +132,10 @@ export function createWebCryptoSecretCodec(options: WebCryptoSecretCodecOptions)
       ]);
       await store.save(key);
       return key;
-    })().catch((err) => {
-      creating = null;
-      throw err;
+    })().finally(() => {
+      pending = null;
     });
-    return creating;
+    return pending;
   };
 
   return {

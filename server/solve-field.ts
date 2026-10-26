@@ -11,6 +11,7 @@ import { settings } from './services.js';
 import { shouldUseWSL, wrapExecForWSL, wslPath } from './wsl-utils.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
+import { logDebug, logInfo } from '@myastrosky/core/platform/log';
 
 const execFileAsync = promisify(execFile);
 
@@ -41,9 +42,9 @@ async function logSolverVersion(
   try {
     const exec = wrapExecForWSL(bin, versionArgs, useWSL);
     const { stdout } = await execFileAsync(exec.cmd, exec.args, { timeout: 5_000 });
-    console.log(`[solve-field] version: ${stdout.trim().split('\n')[0]}`);
+    logInfo('solve-field', `version: ${stdout.trim().split('\n')[0]}`);
   } catch {
-    console.log(`[solve-field] version check failed for: ${bin}`);
+    logInfo('solve-field', `version check failed for: ${bin}`);
   }
 }
 
@@ -96,7 +97,7 @@ export async function solveWithSolveField(
     // solve-field will solve it in its original orientation
     await fsp.writeFile(imgPath, buffer);
 
-    console.log(`[solve-field] Image dimensions: ${width}×${height}`);
+    logDebug('solve-field', `Image dimensions: ${width}×${height}`);
 
     // Build solve-field command
     const imgArg = wslPath(imgPath, useWSL);
@@ -127,8 +128,9 @@ export async function solveWithSolveField(
       args.push('--scale-high', String(scaleHigh));
       args.push('--scale-units', 'arcsecperpix');
 
-      console.log(
-        `[solve-field] Using FOV hint: ${fovDegrees}° → scale ${scaleLow.toFixed(2)}-${scaleHigh.toFixed(2)} arcsec/px`,
+      logDebug(
+        'solve-field',
+        `Using FOV hint: ${fovDegrees}° → scale ${scaleLow.toFixed(2)}-${scaleHigh.toFixed(2)} arcsec/px`,
       );
     } else {
       // Estimate scale from image dimensions (typical DSLR/CCD range)
@@ -136,7 +138,7 @@ export async function solveWithSolveField(
       args.push('--scale-low', String(estimatedScale * 0.2)); // 0.4 arcsec/px
       args.push('--scale-high', String(estimatedScale * 5.0)); // 10 arcsec/px
       args.push('--scale-units', 'arcsecperpix');
-      console.log('[solve-field] No FOV hint, using wide scale range: 0.4-10 arcsec/px');
+      logDebug('solve-field', 'No FOV hint, using wide scale range: 0.4-10 arcsec/px');
     }
 
     // Add position hints if provided
@@ -148,17 +150,18 @@ export async function solveWithSolveField(
       const radius = hints?.radius || (hints.fov ? hints.fov * 1.5 : 10);
       args.push('--radius', String(radius));
 
-      console.log(
-        `[solve-field] Using position hints: RA=${hints.ra}°, Dec=${hints.dec}°, radius=${radius}°`,
+      logDebug(
+        'solve-field',
+        `Using position hints: RA=${hints.ra}°, Dec=${hints.dec}°, radius=${radius}°`,
       );
     } else {
-      console.log('[solve-field] No position hints, searching entire sky');
+      logDebug('solve-field', 'No position hints, searching entire sky');
     }
 
     // Downsample large images for speed
     if (width > 2048 || height > 2048) {
       args.push('--downsample', '2');
-      console.log('[solve-field] Image is large, downsampling by 2x for speed');
+      logDebug('solve-field', 'Image is large, downsampling by 2x for speed');
     }
 
     // Add data directory if specified
@@ -168,7 +171,7 @@ export async function solveWithSolveField(
     }
 
     const exec = wrapExecForWSL(bin, args, useWSL);
-    console.log(`[solve-field] Running: ${exec.cmd} ${exec.args.join(' ')}`);
+    logDebug('solve-field', `Running: ${exec.cmd} ${exec.args.join(' ')}`);
 
     // Human-readable command for the error-details collapsible: substitute the
     // temp input path with the user's original filename so it's recognizable.
@@ -190,8 +193,17 @@ export async function solveWithSolveField(
       } as any);
       solveStdout = String(stdout ?? '');
       solveOutput = [solveStdout, String(stderr ?? '')].filter(Boolean).join('\n').trim();
-      console.log('[solve-field] stdout:', stdout);
-      if (stderr) console.log('[solve-field] stderr:', stderr);
+      logDebug(
+        'solve-field',
+        `stdout:
+${stdout}`,
+      );
+      if (stderr)
+        logDebug(
+          'solve-field',
+          `stderr:
+${stderr}`,
+        );
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.code === 'ABORT_ERR' || signal?.aborted) {
         const abortErr = new Error('SOLVE_CANCELED');
@@ -212,7 +224,11 @@ export async function solveWithSolveField(
         solveStdout = stdout;
         solveOutput = fullOutput;
 
-        console.log('[solve-field] Full output:', fullOutput);
+        logDebug(
+          'solve-field',
+          `Full output:
+${fullOutput}`,
+        );
 
         // Parse output for diagnostics
         let noSolution = false;
@@ -314,8 +330,9 @@ export async function solveWithSolveField(
       NAXIS2: height,
     };
 
-    console.log(
-      `[solve-field] Solution found: RA=${wcs.CRVAL1.toFixed(4)}°, Dec=${wcs.CRVAL2.toFixed(4)}°`,
+    logDebug(
+      'solve-field',
+      `Solution found: RA=${wcs.CRVAL1.toFixed(4)}°, Dec=${wcs.CRVAL2.toFixed(4)}°`,
     );
 
     // Generate correspondences from catalog stars.
@@ -331,7 +348,7 @@ export async function solveWithSolveField(
       };
     }
 
-    console.log(`[solve-field] Generated ${correspondences.length} correspondences`);
+    logDebug('solve-field', `Generated ${correspondences.length} correspondences`);
 
     // Parse "Your field contains:" DSO list from stdout
     const dsoIds = parseSolveFieldDSOs(solveStdout, normalizeDSOAliases);

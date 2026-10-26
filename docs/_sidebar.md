@@ -13,6 +13,8 @@
 **Developer Docs**
 
 - [Architecture](dev/architecture.md)
+- [Mobile Architecture](dev/mobile-architecture.md)
+- [Working on Both Apps](dev/working-on-both-apps.md)
 - [UI Guidelines](dev/ui-guidelines.md)
 - [DSO Catalog](dev/dso-catalog.md)
 - [Target Recommender](dev/target-recommender.md)

@@ -3,9 +3,9 @@ import {
   MIN_HIGHLIGHT_AXIS_PX,
   angularSizeToCanvasPxForDSO,
   computeDSOHighlightShape,
-} from '../../src/dso-highlight';
-import { setCenterMode, setProjectionObserver } from '../../src/projection';
-import { raDecFromAltAz } from '../../src/sky-geometry';
+} from '@myastrosky/core/dso-highlight';
+import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
+import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
 
 describe('dso highlight geometry', () => {
   afterEach(() => setCenterMode('pole'));

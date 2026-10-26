@@ -39,8 +39,11 @@ interface HorizonProfile {
 1. **DEM source:** AWS `elevation-tiles-prod` **Terrarium** PNG tiles (open data, no key)
    at zoom 12 (~38 m/px at the equator), decoded through the `ImageCodec` port (`sharp` on the server). Elevation is RGB-encoded:
    `h = R*256 + G + B/256 - 32768`. Tiles for the `radiusKm` bounding box are fetched
-   (capped at `MAX_TILES`) and assembled into one combined grid; a missing tile (out of
-   coverage) is treated as sea level.
+   and assembled into one combined grid; a missing tile (out of coverage) is treated as sea
+   level. When the box needs more than `MAX_TILES` (400) tiles — a large radius, or a high
+   latitude where tiles shrink on the ground — the next coarser zoom is used (down to 8 for
+   100 km at 85°). The tiles stop at ±85.0511° (`MAX_TILE_LAT`): the box is cut there, and an
+   observer beyond it gets `invalid` / `HORIZON_OUT_OF_COVERAGE`.
 2. **Sampling:** bilinear `elevationAt(lat, lon)` over the combined grid.
 3. **Ray-trace:** `traceHorizonAngles()` (pure, unit-tested in `tests/unit/horizon.test.ts`)
    marches each azimuth outward in `STEP_M` (30 m) steps to `radiusM`, tracking the max

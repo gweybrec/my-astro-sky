@@ -3,7 +3,7 @@
  * The photo service, data part (WP2.3g), on a private in-memory database, on both SQL adapters.
  */
 import Database from 'better-sqlite3';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
 import { DomainError, isDomainError } from '@myastrosky/core/domain/errors';
 import type { NewPhotoInput, UploadFields } from '@myastrosky/core/domain/photos';
@@ -195,6 +195,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
     svc = createPhotoService({
       db: counting,
       newId: () => `id-${++idCount}`,
+      now: () => Date.UTC(2026, 6, 1),
       images: codec,
       blobs,
     });
@@ -262,7 +263,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         captureDetails: { gain: 120 },
         gearSetupId: 'setup-1',
       });
-      expect(photo.createdAt).toEqual(expect.any(String));
+      expect(photo.createdAt).toBe('2026-07-01T00:00:00.000Z');
       expect(photo.correspondences).toEqual([
         {
           pointIndex: 0,
@@ -833,12 +834,13 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await svc.findByOriginalNames([])).toEqual([]);
     });
 
-    it('matches only the display name and answers the first photo when two share a name', async () => {
+    it('matches only the display name and answers every photo when two share a name', async () => {
       await svc.insert(newPhoto('first', { originalName: 'same.jpg', filename: 'f1.jpg' }));
       await svc.insert(newPhoto('second', { originalName: 'same.jpg', filename: 'f2.jpg' }));
       expect(await svc.findByOriginalNames(['first', 'f1.jpg'])).toEqual([]);
       expect(await svc.findByOriginalNames(['same.jpg'])).toEqual([
         { originalName: 'same.jpg', id: 'first' },
+        { originalName: 'same.jpg', id: 'second' },
       ]);
     });
 
@@ -847,6 +849,51 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await calls(() => svc.findByOriginalNames(['n1']))).toBe(1);
       const names = Array.from({ length: 10 }, (_, i) => `n${i}`);
       expect(await calls(() => svc.findByOriginalNames(names))).toBe(1);
+    });
+  });
+
+  describe('repairSizes', () => {
+    it('gives a photo stored without a size the size of its picture, shown as the browser turns it', async () => {
+      await svc.insert(newPhoto('ok'));
+      await svc.insert(newPhoto('flat', { width: 0, height: 0 }));
+      await svc.insert(newPhoto('thin', { width: 640, height: -1 }));
+      await svc.insert(newPhoto('lost', { width: 0, height: 0 }));
+      blobs.store.set('flat.jpg', new Uint8Array([1]));
+      blobs.store.set('thin.jpg', new Uint8Array([1]));
+      codec.info = { width: 100, height: 50, orientation: 8 };
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await svc.repairSizes()).toBe(2);
+      const sizes = (await svc.list()).map((p) => [p.id, p.width, p.height]);
+      expect(sizes).toEqual([
+        ['ok', 800, 600],
+        ['flat', 50, 100],
+        ['thin', 50, 100],
+        // its picture is not here: left as it is, and said in the log
+        ['lost', 0, 0],
+      ]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('lost.jpg'));
+      warn.mockRestore();
+    });
+
+    it('costs one read when nothing needs it, and one write for every photo it repairs', async () => {
+      await svc.insert(newPhoto('ok'));
+      expect(await calls(() => svc.repairSizes())).toBe(1);
+      for (const id of ['a', 'b', 'c']) {
+        await svc.insert(newPhoto(id, { width: 0 }));
+        blobs.store.set(`${id}.jpg`, new Uint8Array([1]));
+      }
+      expect(await calls(() => svc.repairSizes())).toBe(2);
+      expect(await calls(() => svc.repairSizes())).toBe(1);
+    });
+
+    it('leaves a photo alone when its picture is not an image', async () => {
+      await svc.insert(newPhoto('bad', { width: 0 }));
+      blobs.store.set('bad.jpg', new Uint8Array([1]));
+      codec.info = null;
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await svc.repairSizes()).toBe(0);
+      expect((await svc.get('bad'))!.width).toBe(0);
+      vi.restoreAllMocks();
     });
   });
 
@@ -903,23 +950,70 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect((await svc.get('imp'))!.correspondences).toHaveLength(2);
     });
 
-    it('fills what the backup lacks: file name, display name, size, date, empty lists', async () => {
+    it('fills what the backup lacks: file name, display name, size, the date of the clock, empty lists', async () => {
+      for (const name of ['min.jpg', 'f.png', 'old.jpg'])
+        blobs.store.set(name, new Uint8Array([1]));
       await svc.importPhoto({ id: 'min' }, 'skip');
       expect(await svc.get('min')).toMatchObject({
         filename: 'min.jpg',
         originalName: 'min',
-        width: 0,
-        height: 0,
+        // the size of the stored picture, as the fake codec reads it
+        width: 100,
+        height: 50,
         dsoIds: [],
         notes: '',
         thumbFilename: null,
         observationDate: null,
         gearSetupId: null,
+        quarterTurns: 0,
         correspondences: [],
       });
-      expect((await svc.get('min'))!.createdAt).toEqual(expect.any(String));
+      expect((await svc.get('min'))!.createdAt).toBe('2026-07-01T00:00:00.000Z');
       await svc.importPhoto({ id: 'named', filename: 'f.png' }, 'skip');
+      // a backup made before schema version 16 holds the date in the database's old form
+      await svc.importPhoto({ id: 'old', createdAt: '2026-03-04 05:06:07' }, 'skip');
+      expect((await svc.get('old'))!.createdAt).toBe('2026-03-04T05:06:07.000Z');
       expect((await svc.get('named'))!.originalName).toBe('f.png');
+    });
+
+    it('measures the stored picture when the size is missing or not a pixel count, shown as the browser turns it', async () => {
+      blobs.store.set('imp.jpg', new Uint8Array([1]));
+      codec.info = { width: 100, height: 50, orientation: 6 };
+      await svc.importPhoto(backup({ width: 0, height: '20' }), 'skip');
+      expect(await svc.get('imp')).toMatchObject({ width: 50, height: 100 });
+      // a backup's own size is kept as it is
+      await svc.importPhoto(backup({ id: 'kept', width: 7, height: 9 }), 'skip');
+      expect(await svc.get('kept')).toMatchObject({ width: 7, height: 9 });
+    });
+
+    it('refuses a photo without a size whose picture is missing or not an image, and writes nothing', async () => {
+      const e = await rejection(svc.importPhoto(backup({ width: undefined }), 'skip'));
+      expect(e.code).toBe('CANNOT_DETERMINE_DIMENSIONS');
+      blobs.store.set('imp.jpg', new Uint8Array([1]));
+      codec.info = null;
+      const list = [
+        { photo: backup({ id: 'ok' }), strategy: 'skip' as const },
+        { photo: backup({ height: null }), strategy: 'skip' as const },
+      ];
+      expect((await rejection(svc.importPhotos(list))).code).toBe('CANNOT_DETERMINE_DIMENSIONS');
+      expect(await ids()).toEqual([]);
+      // a photo that is skipped is not refused
+      await svc.insert(newPhoto('imp'));
+      expect(await svc.importPhoto(backup({ width: undefined }), 'skip')).toBe('skipped');
+    });
+
+    it('keeps how the photo is shown turned, and reads anything but 1, 2 or 3 as 0', async () => {
+      await svc.importPhoto({ id: 't3', width: 4, height: 3, quarterTurns: 3 }, 'skip');
+      expect((await svc.get('t3'))!.quarterTurns).toBe(3);
+      for (const [id, turns] of [
+        ['t4', 4],
+        ['tneg', -1],
+        ['thalf', 1.5],
+        ['tstr', '2'],
+      ] as const) {
+        await svc.importPhoto({ id, width: 4, height: 3, quarterTurns: turns }, 'skip');
+        expect((await svc.get(id))!.quarterTurns).toBe(0);
+      }
     });
 
     it('skip leaves an existing photo unchanged and says so', async () => {
@@ -943,6 +1037,15 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await ids()).toEqual(['imp']);
     });
 
+    it('deletes the photos of replaceIds once it is written, and keeps them when it is skipped', async () => {
+      await svc.insert(newPhoto('old', { correspondences: corr(2) }));
+      await svc.insert(newPhoto('other'));
+      expect(await svc.importPhoto(backup(), 'skip', ['old'])).toBe('imported');
+      expect(await ids()).toEqual(['other', 'imp']);
+      expect(await svc.importPhoto(backup({ notes: 'again' }), 'skip', ['other'])).toBe('skipped');
+      expect(await ids()).toEqual(['other', 'imp']);
+    });
+
     it('is all or nothing: repeated pointIndex rolls the photo back', async () => {
       await expect(
         svc.importPhoto(backup({ correspondences: [corr(1)[0], corr(1)[0]] }), 'skip'),
@@ -962,6 +1065,56 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await ids()).toEqual(['a', 'imp']);
     });
 
+    it('importPhotos writes a list in order: an id taken here or earlier in the list is skipped under skip', async () => {
+      await svc.insert(newPhoto('a'));
+      const r = await svc.importPhotos([
+        { photo: backup({ id: 'a' }), strategy: 'skip', replaceIds: [] },
+        { photo: backup({ id: 'b' }), strategy: 'skip' },
+        { photo: backup({ id: 'b', notes: 'second' }), strategy: 'skip' },
+        { photo: backup({ id: 'b', notes: 'third' }), strategy: 'replace' },
+      ]);
+      expect(r).toEqual(['skipped', 'imported', 'skipped', 'imported']);
+      expect(await ids()).toEqual(['a', 'b']);
+      expect((await svc.get('b'))!.notes).toBe('third');
+      expect(await svc.importPhotos([])).toEqual([]);
+    });
+
+    it('importPhotos deletes the photos a written one replaces, and keeps those of a skipped one', async () => {
+      await svc.insert(newPhoto('a'));
+      await svc.insert(newPhoto('old1'));
+      await svc.insert(newPhoto('old2'));
+      const r = await svc.importPhotos([
+        { photo: backup({ id: 'a' }), strategy: 'skip', replaceIds: ['old1'] },
+        { photo: backup({ id: 'n' }), strategy: 'skip', replaceIds: ['old2'] },
+      ]);
+      expect(r).toEqual(['skipped', 'imported']);
+      expect(await ids()).toEqual(['a', 'old1', 'n']);
+    });
+
+    it('importPhotos writes nothing when one photo of the list is refused', async () => {
+      await expect(
+        svc.importPhotos([
+          { photo: backup({ id: 'ok' }), strategy: 'skip' },
+          {
+            photo: backup({ id: 'bad', correspondences: [corr(1)[0], corr(1)[0]] }),
+            strategy: 'skip',
+          },
+        ]),
+      ).rejects.toThrow();
+      expect(await ids()).toEqual([]);
+    });
+
+    it('importPhotos makes the same round trips for one photo or many', async () => {
+      const list = (n: number) =>
+        Array.from({ length: n }, (_, i) => ({
+          photo: backup({ id: `m${n}-${i}`, correspondences: corr(5) }),
+          strategy: 'skip' as const,
+        }));
+      // begin, the read of the ids, one batch, commit
+      expect(await calls(() => svc.importPhotos(list(1)))).toBe(4);
+      expect(await calls(() => svc.importPhotos(list(12)))).toBe(4);
+    });
+
     it('makes a fixed number of round trips whatever the number of correspondences', async () => {
       expect(
         await calls(() => svc.importPhoto(backup({ id: 'x1', correspondences: corr(2) }), 'skip')),
@@ -973,11 +1126,68 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         await calls(() =>
           svc.importPhoto(backup({ id: 'x3', correspondences: corr(80) }), 'replace'),
         ),
-      ).toBe(5);
-      // skipped: begin, the ignored insert, commit
+      ).toBe(4);
+      // skipped: begin, the read of the ids, commit
       expect(await calls(() => svc.importPhoto(backup({ id: 'x3' }), 'skip'))).toBe(3);
+      // the photos it replaces go in the batch of the correspondences
+      expect(
+        await calls(() =>
+          svc.importPhoto(backup({ id: 'x4', correspondences: corr(2) }), 'skip', ['x1', 'x2']),
+        ),
+      ).toBe(4);
     });
   });
+  describe('rotateRight', () => {
+    const placement = {
+      centerRa: 10,
+      centerDec: 41,
+      rotationDeg: 30,
+      projPerPx: 0.001,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const stored = async () => {
+      await svc.insert(newPhoto('p1', { manualPlacement: JSON.stringify(placement) as never }));
+      await blobs.put('p1.jpg', new Uint8Array([1, 2, 3]));
+      await blobs.put('p1_thumb.jpg', new Uint8Array([7]));
+    };
+
+    it('shows the photo turned a quarter more, and leaves its picture and its pixels alone', async () => {
+      await stored();
+      const before = await svc.get('p1');
+      const turned = await svc.rotateRight('p1');
+      expect(turned).toEqual({ ...before, quarterTurns: 1 });
+      expect(await svc.get('p1')).toEqual(turned);
+      // the picture and its thumbnail are not touched: nothing is lost
+      expect([...blobs.store.keys()].sort()).toEqual(['p1.jpg', 'p1_thumb.jpg']);
+      expect([...(await blobs.get('p1.jpg'))!]).toEqual([1, 2, 3]);
+    });
+
+    it('counts the turns 1, 2, 3 and back to 0', async () => {
+      await stored();
+      const turns = [];
+      for (let i = 0; i < 4; i++) turns.push((await svc.rotateRight('p1')).quarterTurns);
+      expect(turns).toEqual([1, 2, 3, 0]);
+    });
+
+    it('is PHOTO_NOT_FOUND for an unknown photo', async () => {
+      expect((await rejection(svc.rotateRight('nope'))).kind).toBe('notFound');
+    });
+
+    it('makes a fixed number of round trips whatever the number of correspondences', async () => {
+      for (const [id, n] of [
+        ['few', 2],
+        ['many', 80],
+      ] as const) {
+        await svc.insert(newPhoto(id, { correspondences: corr(n) }));
+        await blobs.put(`${id}.jpg`, new Uint8Array([1, 2, 3]));
+      }
+      // the one update, the photo and its correspondences read back
+      expect(await calls(() => svc.rotateRight('few'))).toBe(3);
+      expect(await calls(() => svc.rotateRight('many'))).toBe(3);
+    });
+  });
+
   describe('upload, list with sizes and delete (WP2.3h)', () => {
     const file = (name = 'm31.png') => ({
       name,
@@ -1109,6 +1319,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
           },
         } as SqlDb,
         newId: () => 'id-9',
+        now: () => 0,
         images: codec,
         blobs,
       });
@@ -1234,6 +1445,15 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       codec.failThumbnail = true;
       await blobs.put('y.png', new Uint8Array([9]));
       await expect(svc.ensureThumbnail('y.png', 'y_thumb.jpg')).rejects.toThrow();
+    });
+
+    it('ensureThumbnail with replace makes the thumbnail again without looking for the old one', async () => {
+      await blobs.put('z.png', new Uint8Array([9]));
+      blobs.store.set('z_thumb.jpg', new Uint8Array([5, 5]));
+      const size = vi.spyOn(blobs, 'size');
+      await svc.ensureThumbnail('z.png', 'z_thumb.jpg', true);
+      expect(size).not.toHaveBeenCalled();
+      expect(blobs.store.get('z_thumb.jpg')).not.toEqual(new Uint8Array([5, 5]));
     });
   });
 });

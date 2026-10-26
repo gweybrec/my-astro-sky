@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildDeepStars } from '@myastrosky/core/catalog/star-lists';
 import type { DeepStar } from '@myastrosky/core/domain/stars';
+import { logInfo } from '@myastrosky/core/platform/log';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,7 +25,7 @@ export function loadDeepCatalog(): DeepStar[] {
   const namesPath = path.join(publicDataDir, 'starnames.json');
   const multiplesPath = path.join(publicDataDir, 'star-multiples.json');
 
-  console.log(`Chargement du catalogue profond (${path.basename(catalogPath)})…`);
+  logInfo('Stars', `Chargement du catalogue profond (${path.basename(catalogPath)})…`);
 
   const starsData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
   const namesData = JSON.parse(fs.readFileSync(namesPath, 'utf-8'));
@@ -34,7 +35,7 @@ export function loadDeepCatalog(): DeepStar[] {
     : {};
 
   const stars = buildDeepStars(starsData, namesData, multiplesData);
-  console.log(`Catalogue chargé : ${stars.length} étoiles (mag ≤ 11)`);
+  logInfo('Stars', `Catalogue chargé : ${stars.length} étoiles (mag ≤ 11)`);
   deepStars = stars;
   return stars;
 }

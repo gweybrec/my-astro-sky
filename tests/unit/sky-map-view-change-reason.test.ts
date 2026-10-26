@@ -11,8 +11,8 @@ vi.mock('../../src/dso-catalog', () => ({
   getDSOCatalog: () => null,
 }));
 
-import { SkyMap } from '../../src/sky-map';
-import type { ViewChangeReason } from '../../src/sky-map-types';
+import { SkyMap } from '@myastrosky/render/sky-map';
+import type { ViewChangeReason } from '@myastrosky/core/sky-map-types';
 
 /**
  * `onViewChange` fires for two very different things, and listeners must be able to tell

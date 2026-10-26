@@ -10,10 +10,13 @@
           <div class="import-backup-warning">⚠ {{ t('settings.deleteBackupWarning') }}</div>
           <button
             class="display-controls-btn self-start text-small"
+            :class="{ 'btn-busy': backingUp }"
+            :aria-busy="backingUp || undefined"
             :disabled="!hasPhotos || backingUp"
             @click="doBackup"
           >
-            {{ t('settings.importBackupBtn') }}
+            <span v-if="backingUp" class="auto-solve-spinner" aria-hidden="true"></span
+            >{{ t('settings.importBackupBtn') }}
           </button>
         </div>
 
@@ -99,9 +102,9 @@ import {
   deleteAllGearSetupsAPI,
 } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
-import { buildDeleteSummaryLines } from '../../delete-utils';
+import { buildDeleteSummaryLines } from '@myastrosky/core/delete-utils';
 import { showToast } from '../../toast';
-import { formatBytes } from '../../format-utils';
+import { formatBytes } from '@myastrosky/core/format-utils';
 import BulkDeleteConfirmDialog from './BulkDeleteConfirmDialog.vue';
 
 const emit = defineEmits<{ close: [] }>();

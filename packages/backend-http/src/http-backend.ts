@@ -17,6 +17,7 @@ import type {
 } from '@myastrosky/core/domain/solve';
 import type { ConvertSolvedResult, SolveWcsResult } from '@myastrosky/core/domain/solved-import';
 import type { ImportOptions } from '@myastrosky/core/domain/backup';
+import type { Photo } from '@myastrosky/core/types';
 
 /** One multipart upload to send, with progress and cancel. */
 export interface UploadRequest {
@@ -333,6 +334,12 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       async setOrder(photoIds) {
         await call('PATCH', '/api/photos/order', { photoIds });
       },
+      async rotateRight(photoId) {
+        return call<Photo>('POST', `/api/photos/${id(photoId)}/rotate`);
+      },
+      async repairSizes() {
+        return (await call<{ repaired: number }>('POST', '/api/photos/repair-sizes')).repaired;
+      },
       async upload(file, fields, opts) {
         const form = await formOf('photo', file, { ...fields });
         const reply = await sendUpload({
@@ -504,6 +511,7 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
           radius: hints?.radius,
           scale_lower: hints?.scale_lower,
           scale_upper: hints?.scale_upper,
+          lang: options.lang(),
         });
         return (await sendForm<{ jobId: string }>('/api/solve-plate', form)).jobId;
       },

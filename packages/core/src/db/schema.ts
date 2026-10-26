@@ -10,10 +10,38 @@
  * `SCHEMA_VERSION` are updated in the same commit; `tests/unit/schema-baseline.test.ts` compares
  * the baseline with what the server produces and fails otherwise.
  */
-import type { SqlDb, SqlTx } from '../ports/sql-db';
+import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 17;
+
+/** The columns of the photos table, in their order. */
+const PHOTO_COLUMNS =
+  'id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, notes, integrations, display_order, thumb_filename, observation_date, points_of_interest, capture_details, gear_setup_id, quarter_turns';
+
+/** The photos table, created under `name` (the baseline and the rebuild of migration 17 share it). */
+function photosTable(name: string): string {
+  return `CREATE TABLE ${name} (
+    id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    manual_placement TEXT,
+    dso_ids TEXT NOT NULL DEFAULT '[]',
+    labels TEXT NOT NULL DEFAULT '[]',
+    notes TEXT NOT NULL DEFAULT '',
+    integrations TEXT NOT NULL DEFAULT '[]',
+    display_order INTEGER,
+    thumb_filename TEXT,
+    observation_date TEXT,
+    points_of_interest TEXT NOT NULL DEFAULT '[]',
+    capture_details TEXT NOT NULL DEFAULT '{}',
+    gear_setup_id TEXT,
+    quarter_turns INTEGER NOT NULL DEFAULT 0
+  )`;
+}
 
 /**
  * The schema at `SCHEMA_VERSION`, one statement per entry (tables first, then indexes).
@@ -42,25 +70,7 @@ export const BASELINE_SCHEMA: readonly string[] = [
     key  TEXT PRIMARY KEY,
     json TEXT NOT NULL
   )`,
-  `CREATE TABLE photos (
-    id TEXT PRIMARY KEY,
-    filename TEXT NOT NULL,
-    original_name TEXT NOT NULL,
-    width INTEGER NOT NULL,
-    height INTEGER NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    manual_placement TEXT,
-    dso_ids TEXT NOT NULL DEFAULT '[]',
-    labels TEXT NOT NULL DEFAULT '[]',
-    notes TEXT NOT NULL DEFAULT '',
-    integrations TEXT NOT NULL DEFAULT '[]',
-    display_order INTEGER,
-    thumb_filename TEXT,
-    observation_date TEXT,
-    points_of_interest TEXT NOT NULL DEFAULT '[]',
-    capture_details TEXT NOT NULL DEFAULT '{}',
-    gear_setup_id TEXT
-  )`,
+  photosTable('photos'),
   `CREATE TABLE plan_entries (
     id        TEXT PRIMARY KEY,
     plan_id   TEXT NOT NULL,
@@ -135,30 +145,109 @@ export const BASELINE_SCHEMA: readonly string[] = [
 export interface DataMigration {
   version: number;
   statements: readonly string[];
+  /**
+   * The statements drop and recreate a table that other tables point at. Foreign keys are switched off
+   * around the run (SQLite ignores the switch inside a transaction, and dropping the table would delete
+   * the rows that point at it), and the run is undone if it leaves more rows pointing nowhere than before.
+   */
+  rebuildsTable?: boolean;
 }
 
 // Migrations from version 15 on go here, as SQL statements only, in ascending order.
-export const MIGRATIONS: readonly DataMigration[] = [];
+export const MIGRATIONS: readonly DataMigration[] = [
+  // How many quarters to the right a photo is shown turned; its picture file is never changed.
+  {
+    version: 15,
+    statements: ['ALTER TABLE photos ADD COLUMN quarter_turns INTEGER NOT NULL DEFAULT 0'],
+  },
+  // A photo's date in the ISO form of the services' clock: the column default wrote `YYYY-MM-DD HH:MM:SS`, in UTC.
+  {
+    version: 16,
+    statements: [
+      `UPDATE photos SET created_at = substr(created_at, 1, 10) || 'T' || substr(created_at, 12) || '.000Z'
+       WHERE created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]'`,
+    ],
+  },
+  // The photos table again, with a date default in that ISO form (SQLite cannot change a column's default in place).
+  {
+    version: 17,
+    rebuildsTable: true,
+    statements: [
+      photosTable('photos_new'),
+      `INSERT INTO photos_new (${PHOTO_COLUMNS}) SELECT ${PHOTO_COLUMNS} FROM photos`,
+      'DROP TABLE photos',
+      'ALTER TABLE photos_new RENAME TO photos',
+    ],
+  },
+];
 
 /**
- * Runs every migration of `migrations` above the stored version, in order; each migration's
- * statements and its `UPDATE schema_version` share one transaction. Returns the final version.
+ * A database update that failed at start-up. Everything it wrote was undone, so the data is as the previous version
+ * of the app left it; until a version that fixes the update is installed, the app can only export a backup.
+ */
+export class DatabaseUpdateError extends Error {
+  readonly cause: unknown;
+  constructor(cause: unknown) {
+    super(`The database update failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+    this.name = 'DatabaseUpdateError';
+    this.cause = cause;
+  }
+}
+
+/** True for a `DatabaseUpdateError`, also when it comes from another copy of this module (by its name). */
+export function isDatabaseUpdateError(error: unknown): error is DatabaseUpdateError {
+  return error instanceof Error && error.name === 'DatabaseUpdateError';
+}
+
+/** The error of a table rebuild that left rows pointing nowhere; the run is undone. */
+export const REBUILD_BROKE_REFERENCES =
+  'A table rebuild left rows pointing at missing rows; it was undone.';
+
+/**
+ * Runs every migration of `migrations` above the stored version, in order, each followed by its
+ * `UPDATE schema_version`, all in one atomic batch: a failure leaves the database at `fromVersion`
+ * and throws a `DatabaseUpdateError`.
+ * When one of them rebuilds a table, the batch runs in a transaction with foreign keys switched off
+ * (see `DataMigration.rebuildsTable`), then put back as they were. Returns the final version.
  */
 export async function runDataMigrations(
   db: SqlDb,
   migrations: readonly DataMigration[],
   fromVersion: number,
 ): Promise<number> {
-  let current = fromVersion;
-  for (const migration of migrations) {
-    if (migration.version <= current) continue;
-    await db.transaction(async (tx: SqlTx) => {
-      for (const sql of migration.statements) await tx.run(sql);
-      await tx.run('UPDATE schema_version SET version = ?', [migration.version]);
-    });
-    current = migration.version;
+  const pending = migrations.filter((m) => m.version > fromVersion);
+  if (pending.length === 0) return fromVersion;
+  try {
+    await runPending(db, pending);
+  } catch (error) {
+    throw new DatabaseUpdateError(error);
   }
-  return current;
+  return pending[pending.length - 1].version;
+}
+
+async function runPending(db: SqlDb, pending: readonly DataMigration[]): Promise<void> {
+  const statements = pending.flatMap((m) => [
+    ...m.statements.map((sql) => ({ sql })),
+    { sql: 'UPDATE schema_version SET version = ?', params: [m.version] },
+  ]);
+  if (!pending.some((m) => m.rebuildsTable)) {
+    await db.batch(statements);
+  } else {
+    const foreignKeys = (await db.get<{ foreign_keys: number }>('PRAGMA foreign_keys'))
+      ?.foreign_keys;
+    await db.exec('PRAGMA foreign_keys = OFF');
+    try {
+      await db.transaction(async (tx) => {
+        const before = (await tx.all('PRAGMA foreign_key_check')).length;
+        await tx.batch(statements);
+        if ((await tx.all('PRAGMA foreign_key_check')).length > before) {
+          throw new Error(REBUILD_BROKE_REFERENCES);
+        }
+      });
+    } finally {
+      await db.exec(`PRAGMA foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
+    }
+  }
 }
 
 /**
@@ -180,10 +269,10 @@ export async function initSchema(db: SqlDb): Promise<number> {
         'This database predates versioning (it has a photos table but no schema version); open it with the desktop server first.',
       );
     }
-    await db.transaction(async (tx) => {
-      for (const sql of BASELINE_SCHEMA) await tx.run(sql);
-      await tx.run('INSERT INTO schema_version (version) VALUES (?)', [SCHEMA_VERSION]);
-    });
+    await db.batch([
+      ...BASELINE_SCHEMA.map((sql) => ({ sql })),
+      { sql: 'INSERT INTO schema_version (version) VALUES (?)', params: [SCHEMA_VERSION] },
+    ]);
     current = SCHEMA_VERSION;
   } else {
     current = row.version;

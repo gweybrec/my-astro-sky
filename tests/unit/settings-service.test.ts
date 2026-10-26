@@ -222,6 +222,7 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
       const result = await svc.readPublic();
       expect(result).toEqual({
         apiKeySet: false,
+        apiKeyUnreadable: false,
         isWindows: false,
         ASTAP_PATH: '',
         SOLVE_FIELD_PATH: '',
@@ -232,6 +233,7 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
       });
       expect(Object.keys(result)).toEqual([
         'apiKeySet',
+        'apiKeyUnreadable',
         'isWindows',
         'ASTAP_PATH',
         'SOLVE_FIELD_PATH',
@@ -288,11 +290,39 @@ describe.each(SQL_ADAPTERS)('SettingsService (%s)', (_adapter, wrap) => {
       expect((await svc.readPublic()).apiKeySet).toBe(true);
     });
 
-    it('reports an undecryptable key as not set', async () => {
+    it('reports an undecryptable key as not set and unreadable', async () => {
       codec.enabled = true;
       await svc.set('ASTROMETRY_API_KEY', 'secret');
       codec.enabled = false;
-      expect((await svc.readPublic()).apiKeySet).toBe(false);
+      const result = await svc.readPublic();
+      expect(result.apiKeySet).toBe(false);
+      expect(result.apiKeyUnreadable).toBe(true);
+    });
+
+    it('reports a readable, a missing or an environment key as not unreadable', async () => {
+      expect((await svc.readPublic()).apiKeyUnreadable).toBe(false);
+      codec.enabled = true;
+      await svc.set('ASTROMETRY_API_KEY', 'secret');
+      expect((await svc.readPublic()).apiKeyUnreadable).toBe(false);
+      codec.enabled = false;
+      env.ASTROMETRY_API_KEY = 'env-key';
+      expect(await svc.readPublic()).toMatchObject({ apiKeySet: true, apiKeyUnreadable: false });
+    });
+
+    it('is no longer unreadable once the key is removed or entered again', async () => {
+      await db.run('INSERT INTO settings (key, value) VALUES (?, ?)', [
+        'ASTROMETRY_API_KEY',
+        'fake:lost',
+      ]);
+      expect((await svc.readPublic()).apiKeyUnreadable).toBe(true);
+      await svc.removeApiKey();
+      expect((await svc.readPublic()).apiKeyUnreadable).toBe(false);
+      await db.run('INSERT INTO settings (key, value) VALUES (?, ?)', [
+        'ASTROMETRY_API_KEY',
+        'fake:lost',
+      ]);
+      await svc.update({ apiKey: 'typed-again' });
+      expect(await svc.readPublic()).toMatchObject({ apiKeySet: true, apiKeyUnreadable: false });
     });
   });
 

@@ -5,7 +5,7 @@ import {
   computeFovTargetScale,
   resolvingLimitArcsec,
   type GearPreset,
-} from '../../src/gear-presets';
+} from '@myastrosky/core/gear-presets';
 
 const makePreset = (overrides: Partial<GearPreset> = {}): GearPreset => ({
   apertureMm: 102,

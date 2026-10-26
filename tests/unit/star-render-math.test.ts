@@ -6,8 +6,8 @@ import {
   atlasScaleBucket,
   ATLAS_SCALE_STEP,
   computeStarPaint,
-} from '../../src/star-render-math';
-import { SKY_THEME } from '../../src/sky-themes';
+} from '@myastrosky/core/star-render-math';
+import { SKY_THEME } from '@myastrosky/core/sky-themes';
 
 describe('bvToRgb', () => {
   it('is neutral white at the B-V≈0.4 white point', () => {

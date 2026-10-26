@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { DSO } from '../../src/types';
-import type { GearPreset } from '../../src/gear-presets';
-import { recommendRecipe } from '../../src/imaging-recipe';
+import type { DSO } from '@myastrosky/core/types';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
+import { recommendRecipe } from '@myastrosky/core/imaging-recipe';
 
 function dso(overrides: Partial<DSO> = {}): DSO {
   return {

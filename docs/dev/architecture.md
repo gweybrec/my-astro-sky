@@ -123,13 +123,13 @@ Express in-memory rate limits protect all API routes (global) and the `POST /api
 - **Electron**: when the Express server is loaded inside the Electron main process (`process.versions.electron` is set), rate limiting is disabled entirely. The app is single-user/local so limits would only hurt the user.
 
 - **`db.ts`**: SQLite (better-sqlite3, WAL mode) with tables:
-  - `photos`: id, filename, originalName, width, height, displayOrder, createdAt, thumb_filename
+  - `photos`: id, filename, originalName, width, height, displayOrder, createdAt, thumb_filename, quarter_turns (how many quarters to the right the photo is shown turned: "Faire pivoter à droite" changes only this, never the file, its thumbnail or what is measured in their pixels; screens that show the photo flat work with `photoAsShown`)
   - `star_correspondences`: id, photoId, pointIndex, photoX, photoY, starHip, starName, starRa, starDec
   - `dso_overrides`: id (TEXT PRIMARY KEY), data (TEXT — JSON-serialised `DSOUserOverride`)
   - `schema_version`: single-row table tracking the migration version (see `db-migrations.ts`)
   - Photo + correspondences inserted in transaction
   - DSO override CRUD: `getDsoOverride(id)`, `getAllDsoOverrides()`, `upsertDsoOverride(id, data)`, `deleteDsoOverride(id)`
-- **`db-migrations.ts`**: Exports `applyMigrations(db)`. Creates the `schema_version` table on first run, then executes each pending migration in version order and updates the row after each. All historical `ALTER TABLE` additions are consolidated in migration 1 (idempotent via try/catch). Future schema changes go in as migration 2, 3, etc. Accepts any `Database.Database` instance so it can be tested against an in-memory DB without side effects.
+- **`db-migrations.ts`**: Exports `applyMigrations(db)`. Creates the `schema_version` table on first run, then executes each pending migration in version order and updates the row after each. All historical `ALTER TABLE` additions are consolidated in migration 1 (idempotent via try/catch). Future schema changes go in as migration 2, 3, etc. Accepts any `Database.Database` instance so it can be tested against an in-memory DB without side effects. A failing migration throws a `DatabaseUpdateError` (from `@myastrosky/core/db/schema`); the Electron app then offers a full backup through `backup-without-updates.ts`, which builds the services (`create-server-services.ts`) on the database without updating it.
 - **`astap.ts`**: ASTAP CLI integration — spawns subprocess, writes temp file, parses .ini solution, generates correspondences from WCS. Sets `LC_ALL=C` and `LANG=C` in the subprocess environment to normalise the decimal separator (prevents comma-vs-dot locale issues in parsed coordinates). Logs the ASTAP binary version (`-v`) once per binary path on first use.
 - **`solve-field.ts`**: solve-field (Astrometry.net local) integration — same locale normalisation (`LC_ALL=C`, `LANG=C`) and one-shot version logging (`--version`) per binary path.
 - **`astrometry.ts`**: Astrometry.net online API wrapper — job submission with hints (position, FOV), polling with exponential backoff, calibration parsing

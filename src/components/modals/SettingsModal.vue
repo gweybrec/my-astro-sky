@@ -88,7 +88,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import BaseModal from '../base/BaseModal.vue';
-import { useSettingsStore } from '../../stores/settings';
+import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import { useI18n } from '../../composables/useI18n';
 import { openVueModal } from '../../modal-host';
 import { showToast } from '../../toast';

@@ -4,7 +4,7 @@
  */
 import { DomainError } from '../domain/errors';
 import type { PoiCategoryChanges, PoiCategoryInput } from '../domain/poi-categories';
-import type { SqlDb, SqlTx } from '../ports/sql-db';
+import type { SqlDb, SqlStatement, SqlTx } from '../ports/sql-db';
 import type { PoiCategory } from '../types';
 
 export interface PoiCategoryServiceDeps {
@@ -26,6 +26,8 @@ export interface PoiCategoryService {
   removeAll(): Promise<number>;
   /** Writes a category from a backup file, replacing the one with the same id, without the checks of `create`. */
   importOne(category: PoiCategory): Promise<void>;
+  /** Writes several categories as `importOne` does, in one atomic batch. */
+  importMany(categories: readonly PoiCategory[]): Promise<void>;
   /** Inserts the five default categories when the table is empty. Call it once at start-up. */
   ensureDefaults(): Promise<void>;
 }
@@ -54,11 +56,14 @@ function rowToApi(r: PoiCategoryRow): PoiCategory {
 
 const SELECT_ALL = 'SELECT * FROM poi_categories ORDER BY position ASC, rowid ASC';
 
+const rowStatement = (row: PoiCategoryRow): SqlStatement => ({
+  sql: 'INSERT OR REPLACE INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)',
+  params: [row.id, row.name.slice(0, 60), row.color.slice(0, 32), row.position],
+});
+
 async function writeRow(tx: SqlTx, row: PoiCategoryRow): Promise<void> {
-  await tx.run(
-    'INSERT OR REPLACE INTO poi_categories (id, name, color, position) VALUES (?, ?, ?, ?)',
-    [row.id, row.name.slice(0, 60), row.color.slice(0, 32), row.position],
-  );
+  const { sql, params } = rowStatement(row);
+  await tx.run(sql, params);
 }
 
 export function createPoiCategoryService(deps: PoiCategoryServiceDeps): PoiCategoryService {
@@ -78,10 +83,10 @@ export function createPoiCategoryService(deps: PoiCategoryServiceDeps): PoiCateg
         });
       }
       const id = `cat-${newId()}`;
-      // One statement: the new category goes after the existing ones (its position is the row count).
+      // One statement: the new category goes after the existing ones (its position follows the last one).
       await db.run(
         `INSERT OR REPLACE INTO poi_categories (id, name, color, position)
-         SELECT ?, ?, ?, COUNT(*) FROM poi_categories`,
+         SELECT ?, ?, ?, COALESCE(MAX(position) + 1, 0) FROM poi_categories`,
         [
           id,
           name.trim().slice(0, 60),
@@ -122,6 +127,10 @@ export function createPoiCategoryService(deps: PoiCategoryServiceDeps): PoiCateg
 
     async importOne(category) {
       await writeRow(db, category);
+    },
+
+    async importMany(categories) {
+      if (categories.length > 0) await db.batch(categories.map(rowStatement));
     },
 
     async ensureDefaults() {
