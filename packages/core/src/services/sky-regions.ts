@@ -114,10 +114,10 @@ export function createSkyRegionService(deps: SkyRegionServiceDeps): SkyRegionSer
         });
       }
       const id = `region-${newId()}`;
-      // One statement: the new region goes after the existing ones (its position is the row count).
+      // One statement: the new region goes after the existing ones (its position follows the last one).
       await db.run(
         `INSERT OR REPLACE INTO sky_regions (id, name, color, points, position)
-         SELECT ?, ?, ?, ?, COUNT(*) FROM sky_regions`,
+         SELECT ?, ?, ?, ?, COALESCE(MAX(position) + 1, 0) FROM sky_regions`,
         [
           id,
           name.trim().slice(0, 60),

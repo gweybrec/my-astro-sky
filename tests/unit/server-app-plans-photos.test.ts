@@ -1097,12 +1097,11 @@ describe('plan positions', () => {
     expect(await call('DELETE', `/api/plans/${p1}`)).toEqual(OK);
     const p4 = await mkPlan('P4');
     const list = (await call('GET', '/api/plans')).body;
-    // KNOWN GAP: a new plan takes position = number of plans, so after a delete it can share a position
-    // with an existing plan (P3 and P4 are both at 2); the order then falls back on insertion order.
+    // A new plan follows the last position, not the number of plans, so it never shares one after a delete.
     expect(list.map((p: any) => [p.id, p.position])).toEqual([
       [p2, 1],
       [p3, 2],
-      [p4, 2],
+      [p4, 3],
     ]);
   });
 

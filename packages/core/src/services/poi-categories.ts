@@ -83,10 +83,10 @@ export function createPoiCategoryService(deps: PoiCategoryServiceDeps): PoiCateg
         });
       }
       const id = `cat-${newId()}`;
-      // One statement: the new category goes after the existing ones (its position is the row count).
+      // One statement: the new category goes after the existing ones (its position follows the last one).
       await db.run(
         `INSERT OR REPLACE INTO poi_categories (id, name, color, position)
-         SELECT ?, ?, ?, COUNT(*) FROM poi_categories`,
+         SELECT ?, ?, ?, COALESCE(MAX(position) + 1, 0) FROM poi_categories`,
         [
           id,
           name.trim().slice(0, 60),

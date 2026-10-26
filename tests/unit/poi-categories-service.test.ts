@@ -102,6 +102,16 @@ describe.each(SQL_ADAPTERS)('PoiCategoryService (%s)', (_adapter, wrap) => {
       ]);
     });
 
+    it('puts a new category after the last one when deleted categories left a gap', async () => {
+      for (const name of ['A', 'B', 'C']) await svc.create({ name });
+      await svc.remove('cat-id1');
+      await svc.remove('cat-id2');
+      await svc.create({ name: 'D' });
+      const list = await svc.list();
+      expect(list.map((c) => c.name)).toEqual(['C', 'D']);
+      expect(list[1]!.position).toBe(3);
+    });
+
     it('appends after the defaults', async () => {
       await svc.ensureDefaults();
       const { id } = await svc.create({ name: 'Meteor' });

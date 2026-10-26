@@ -117,9 +117,9 @@ interface PlanMosaicRow {
 const SELECT_PLANS = 'SELECT * FROM plans ORDER BY position ASC, rowid ASC';
 const SELECT_PLAN = 'SELECT * FROM plans WHERE id = ?';
 const SELECT_PLAN_NAMES = 'SELECT id, name FROM plans ORDER BY position ASC, rowid ASC';
-// The new plan goes at the end: its position is the number of plans, counted by the same statement.
+// The new plan goes at the end: its position follows the last one, read by the same statement.
 const INSERT_PLAN_AT_END =
-  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by) VALUES (?, ?, (SELECT COUNT(*) FROM plans), ?, ?, ?, ?, ?, ?)';
+  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by) VALUES (?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM plans), ?, ?, ?, ?, ?, ?)';
 const INSERT_PLAN =
   'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
 const RENAME_PLAN = 'UPDATE plans SET name = ? WHERE id = ?';

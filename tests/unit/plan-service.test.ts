@@ -180,6 +180,16 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
       });
     });
 
+    it('puts a new plan after the last one when deleted plans left a gap', async () => {
+      for (const name of ['A', 'B', 'C']) await svc.create({ name });
+      await svc.remove('plan-id1');
+      await svc.remove('plan-id2');
+      await svc.create({ name: 'D' });
+      const list = await svc.list();
+      expect(list.map((p) => p.name)).toEqual(['C', 'D']);
+      expect(list[1]!.position).toBe(3);
+    });
+
     it('dates the plan with the clock it is given', async () => {
       await svc.create({ name: 'A' });
       expect(rows('plans')).toMatchObject([{ created_at: NOW_ISO }]);

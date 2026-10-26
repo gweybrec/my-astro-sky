@@ -80,6 +80,16 @@ describe.each(SQL_ADAPTERS)('SkyRegionService (%s)', (_adapter, wrap) => {
       ]);
     });
 
+    it('puts a new region after the last one when deleted regions left a gap', async () => {
+      for (const name of ['A', 'B', 'C']) await svc.create({ name, points });
+      await svc.remove('region-id1');
+      await svc.remove('region-id2');
+      await svc.create({ name: 'D', points });
+      const list = await svc.list();
+      expect(list.map((r) => r.name)).toEqual(['C', 'D']);
+      expect(list[1]!.position).toBe(3);
+    });
+
     it('falls back to the default color for a blank or non-string color', async () => {
       await svc.create({ name: 'A', color: '  ', points });
       await svc.create({ name: 'B', color: 7, points });
