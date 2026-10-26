@@ -187,6 +187,7 @@ describe('files', () => {
     expect((form.get('photo') as File).type).toBe('image/png');
     expect(form.get('ra')).toBe('1.5');
     expect(form.has('dec')).toBe(false);
+    expect(form.get('lang')).toBe('fr');
   });
 
   it('builds the file from its bytes, with the type its extension says', async () => {

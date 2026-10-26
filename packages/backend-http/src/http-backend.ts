@@ -508,6 +508,7 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
           radius: hints?.radius,
           scale_lower: hints?.scale_lower,
           scale_upper: hints?.scale_upper,
+          lang: options.lang(),
         });
         return (await sendForm<{ jobId: string }>('/api/solve-plate', form)).jobId;
       },

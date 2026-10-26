@@ -117,10 +117,10 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
       ...services.photos,
       async upload(file, fields, options) {
         throwIfCancelled(options?.cancel);
-        const { photo } = await services.photos.upload(
-          { name: file.name, bytes: await file.read() },
-          fields,
-        );
+        const bytes = await file.read();
+        // Reading the file is the transfer here: a cancel is honoured until it ends, like an HTTP upload's.
+        throwIfCancelled(options?.cancel);
+        const { photo } = await services.photos.upload({ name: file.name, bytes }, fields);
         options?.onProgress?.(1);
         return photo;
       },
@@ -153,7 +153,9 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
       },
       async convert(file, options) {
         throwIfCancelled(options?.cancel);
-        const result = await services.solvedImport.convert(await solvedFileOf(file));
+        const solved = await solvedFileOf(file);
+        throwIfCancelled(options?.cancel);
+        const result = await services.solvedImport.convert(solved);
         options?.onProgress?.(1);
         return result;
       },

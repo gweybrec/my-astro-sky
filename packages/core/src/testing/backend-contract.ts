@@ -687,6 +687,28 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     expectEqual(await b.photos.removeAll(), 1, 'the turned photo removed');
   });
 
+  add('photos: a cancelled upload stores nothing', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    await expectAborted(
+      b.photos.upload(
+        fixtures.jpeg(),
+        { correspondences: JSON.stringify(CORRESPONDENCES) },
+        { cancel: cancelledSignal },
+      ),
+      'upload with a cancelled signal',
+    );
+    expectEqual(await b.photos.listWithSizes(), [], 'no photo after a cancelled upload');
+  });
+
+  add('capabilities: local solvers are announced exactly when the backend has them', async () => {
+    const { backend: b } = await makeBackend();
+    expectEqual(
+      b.capabilities.localSolvers,
+      b.localSolvers !== undefined,
+      'capabilities.localSolvers matches the localSolvers member',
+    );
+  });
+
   add('files: an address for a stored file and for the star catalogue', async () => {
     const { backend: b } = await makeBackend();
     const url = b.files.url('abc_thumb.jpg');

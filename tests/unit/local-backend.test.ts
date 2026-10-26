@@ -13,16 +13,20 @@ import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
 import { setBackend } from '@myastrosky/app-state/backend';
 import { getPlans } from '@myastrosky/app-state/api';
 
-/** Services whose `plans` members are the given ones; every other member is empty. */
-function servicesWith(plans: Record<string, unknown>): Services {
-  return new Proxy({ plans } as Record<string, unknown>, {
+/** Services with the given members; every other member is empty. */
+function servicesWith(members: Record<string, unknown>): Services {
+  return new Proxy(members, {
     get: (target, key: string) => target[key] ?? {},
   }) as unknown as Services;
 }
 
 function backendWith(plans: Record<string, unknown>) {
+  return backendOf({ plans });
+}
+
+function backendOf(members: Record<string, unknown>) {
   return createLocalBackend({
-    services: servicesWith(plans),
+    services: servicesWith(members),
     files: { url: (fileName) => `/uploads/${fileName}` },
     starCatalogUrl: '/data/stars-deep.json',
     openZip: () => Promise.reject(new Error('unused')),
@@ -80,5 +84,41 @@ describe('failures of the local backend', () => {
     });
     setBackend(backendWith({ list: plainFailure }));
     await expect(getPlans()).rejects.toThrow("L'application a rencontré une erreur.");
+  });
+});
+
+describe('cancelling a transfer of the local backend', () => {
+  /** A signal that turns cancelled while the file is being read, and the file that does it. */
+  function cancelledWhileReading() {
+    const cancel = { aborted: false, addEventListener: () => {}, removeEventListener: () => {} };
+    const file = {
+      name: 'a.jpg',
+      size: 3,
+      read: async () => {
+        cancel.aborted = true;
+        return new Uint8Array([1, 2, 3]);
+      },
+    };
+    return { cancel, file };
+  }
+
+  it('an upload cancelled while its file is read stores nothing', async () => {
+    const upload = vi.fn();
+    const { cancel, file } = cancelledWhileReading();
+    const err = await backendOf({ photos: { upload } })
+      .photos.upload(file, { correspondences: '[]' }, { cancel })
+      .catch((e: unknown) => e);
+    expect(err).toMatchObject({ name: 'AbortError' });
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('a conversion cancelled while its file is read converts nothing', async () => {
+    const convert = vi.fn();
+    const { cancel, file } = cancelledWhileReading();
+    const err = await backendOf({ solvedImport: { convert } })
+      .solvedImport.convert(file, { cancel })
+      .catch((e: unknown) => e);
+    expect(err).toMatchObject({ name: 'AbortError' });
+    expect(convert).not.toHaveBeenCalled();
   });
 });
