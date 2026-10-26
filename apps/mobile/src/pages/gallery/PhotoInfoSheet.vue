@@ -122,7 +122,13 @@ async function remove() {
         <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
       </PhoneButton>
     </div>
-    <div class="mob-icon-row" role="group" :aria-label="t('mobile.photo.actions')">
+    <!-- The sheet stops above this row before it shows everything. -->
+    <div
+      class="mob-icon-row"
+      role="group"
+      :aria-label="t('mobile.photo.actions')"
+      data-sheet-stop="before"
+    >
       <PhoneIconButton :label="t('gallery.showOnMap')" @click="emit('map')">
         <AppIcon :svg="mapPinIcon" />
       </PhoneIconButton>

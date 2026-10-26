@@ -6,8 +6,9 @@ export const DRAG_CLOSE_PX = 48;
 const DRAG_START_PX = 4;
 
 /**
- * Dragging a sheet drawn in the page by its handle or header: `down` for a drag down (close it, fold it, or take it back
- * to a third), `up` for a drag up (open it, or take it to two thirds). The three pointer handlers are `handlers`;
+ * Dragging a panel drawn in the page by its handle (the hand placement's panel; the sheets are Ionic's modals, which
+ * Ionic's gesture drags): `down` for a drag down (fold it, or take it back to a third), `up` for a drag up (open it, or
+ * take it to two thirds). The three pointer handlers are `handlers`;
  * `wasDragged()` tells the click that ends a drag on the handle, which must not act as a tap, and forgets it.
  */
 export function useSheetDrag(down: () => void, up?: () => void) {
@@ -54,8 +55,8 @@ export function useSheetDrag(down: () => void, up?: () => void) {
 }
 
 /**
- * A sheet held to a third of its room in portrait that a drag up takes to two thirds:
- * `expanded` puts `.mob-sheet--expanded` on it. In landscape the sheets already have the full height: `grow` does nothing.
+ * A panel held to a third of its room in portrait that a drag up takes to two thirds:
+ * `expanded` puts `.mob-sheet--expanded` on it. In landscape the panel already has the full height: `grow` does nothing.
  */
 export function useSheetExpand() {
   const expanded = ref(false);

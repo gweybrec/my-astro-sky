@@ -7,7 +7,9 @@ import { ionicStubs } from './helpers';
 
 const push = vi.hoisted(() => vi.fn());
 const replace = vi.hoisted(() => vi.fn());
-vi.mock('vue-router', () => ({ useRouter: () => ({ push, replace }) }));
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push, replace, currentRoute: { value: { path: '/tabs/sky' } } }),
+}));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => new Promise(() => {}) }));
 const reloadPhotos = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const sizesRepaired = vi.hoisted(() => ({ settle: (_n: number) => {} }));

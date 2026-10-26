@@ -255,14 +255,10 @@ describe('the photo sheet', () => {
     ]);
   });
 
-  it('closes from the handle and by dragging down', async () => {
+  it("closes from the handle and by Ionic's drag down", async () => {
     const { w } = mountSheet();
     await w.find('.mob-sheet-grab').trigger('click');
-    const drag = w.find('.mob-sheet-drag').element;
-    const fire = (type: string, y: number) =>
-      drag.dispatchEvent(new MouseEvent(type, { clientY: y, bubbles: true }));
-    fire('pointerdown', 100);
-    fire('pointermove', 170);
+    w.findComponent(ionicStubs.IonModal).vm.$emit('didDismiss', { detail: { role: 'gesture' } });
     expect(w.emitted('close')).toHaveLength(2);
   });
 });

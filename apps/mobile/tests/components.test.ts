@@ -16,6 +16,14 @@ import PhoneField from '../src/components/PhoneField.vue';
 import PhoneBusy from '../src/components/PhoneBusy.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import PhoneBackButton from '../src/components/PhoneBackButton.vue';
+import {
+  contentStops,
+  sheetMarks,
+  sheetRows,
+  sheetStops,
+  underLastRow,
+} from '../src/composables/useSheetStops';
+import PhoneFacts from '../src/components/PhoneFacts.vue';
 
 const global = { stubs: ionicStubs };
 
@@ -203,44 +211,33 @@ describe('the shared phone components', () => {
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
   });
 
-  it('PhoneSheet is Ionic sheet with breakpoints 0 and 1, so a drag down closes it like the backdrop', async () => {
+  it('PhoneSheet is Ionic sheet with breakpoints 0 and 1, whose drag down nothing holds back', async () => {
     const w = mount(PhoneSheet, { props: { open: true, title: 'x' }, global });
     const modal = w.find('.mob-sheet-modal');
     // The content's height is breakpoint 1; dropping below it dismisses the modal (Ionic's own gesture).
     expect(modal.attributes('breakpoints')).toBe('0,1');
     expect(modal.attributes('initial-breakpoint')).toBe('1');
     expect(modal.attributes('handle')).toBe('false');
+    // A `canDismiss` makes Ionic's drag down a spring that lags behind the finger and bounces back before closing.
+    expect(modal.attributes('can-dismiss')).toBeUndefined();
     // The body is a scroll host: Ionic lets it scroll before it lets the sheet move.
     expect(w.find('.mob-sheet-body').classes()).toContain('ion-content-scroll-host');
     await modal.trigger('did-dismiss');
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
   });
 
-  it('PhoneSheet third goes to two thirds when dragged up; a drag down from there takes it back to a third, open', async () => {
+  it('PhoneSheet third keeps its content mounted and opens once it has measured its stops', async () => {
     const restore = portrait();
-    const w = mount(PhoneSheet, { props: { open: true, title: 'x', third: true }, global });
-    const section = () => w.find('section.mob-sheet');
-    await dragBy(w.find('.mob-sheet-header'), -70);
-    expect(section().classes()).toContain('mob-sheet--expanded');
-    await w.find('.mob-sheet-grab').trigger('click');
-    expect(w.emitted('update:open')).toBeUndefined();
-    // Ionic asks before its drag down closes the sheet
-    const canDismiss = w.findComponent(ionicStubs.IonModal).vm.$attrs['can-dismiss'] as (
-      d: unknown,
-      role: string,
-    ) => Promise<boolean>;
-    expect(await canDismiss(undefined, 'gesture')).toBe(false);
+    const w = mount(PhoneSheet, { props: { open: false, title: 'x', third: true }, global });
+    const modal = () => w.find('.mob-sheet-modal');
+    expect(modal().attributes('keep-contents-mounted')).toBe('true');
+    expect(modal().attributes('expand-to-scroll')).toBe('false');
+    expect(w.find('.mob-sheet-room').exists()).toBe(true);
+    await w.setProps({ open: true });
+    expect(modal().attributes('is-open')).toBe('false');
     await nextTick();
-    expect(section().classes()).not.toContain('mob-sheet--expanded');
-    expect(await canDismiss(undefined, 'gesture')).toBe(true);
-    restore();
-  });
-
-  it('PhoneSheet without third does not grow when dragged up', async () => {
-    const restore = portrait();
-    const w = mount(PhoneSheet, { props: { open: true, title: 'x' }, global });
-    await dragBy(w.find('.mob-sheet-header'), -70);
-    expect(w.find('section.mob-sheet').classes()).not.toContain('mob-sheet--expanded');
+    await nextTick();
+    expect(modal().attributes('is-open')).toBe('true');
     restore();
   });
 
@@ -304,79 +301,224 @@ describe('the map sheets', () => {
     errors.mockRestore();
   });
 
-  it('slides a sheet in and out through its host, and draws the handle and the title', async () => {
-    const shown = ref(true);
+  // Each page is attached to the document (the modal is found by its id there) and removed after its test.
+  const pages: { unmount: () => void }[] = [];
+  afterEach(() => pages.splice(0).forEach((w) => w.unmount()));
+
+  /** A page drawing one map sheet in its host; `shown` is whether the page is on screen. */
+  function page(shown = ref(true), drawn = ref(true), collapsed = ref(false)) {
     const Page = defineComponent({
       setup: () => () =>
-        h(PhoneMapSheetHost, null, {
-          default: () => (shown.value ? h(PhoneMapSheet, { title: 'M31' }) : null),
-        }),
+        h(
+          PhoneMapSheetHost,
+          { shown: shown.value },
+          {
+            default: () =>
+              drawn.value
+                ? h(PhoneMapSheet, { title: 'M31', collapsed: collapsed.value }, () =>
+                    h('p', 'Contenu'),
+                  )
+                : null,
+          },
+        ),
     });
-    const w = mount(Page, { global: { stubs: ionicStubs } });
-    expect(w.find('.mob-map-sheet .mob-sheet-grab').exists()).toBe(true);
-    expect(w.find('.mob-sheet-title').text()).toBe('M31');
+    const w = mount(Page, {
+      global: { stubs: { ...ionicStubs, transition: false } },
+      attachTo: document.body,
+    });
+    pages.push(w);
+    return w;
+  }
+
+  it("is Ionic's sheet modal with no scrim, so the map around it can still be touched", () => {
+    const modal = page().find('.mob-sheet-modal--map');
+    expect(modal.attributes('show-backdrop')).toBe('false');
+    expect(modal.attributes('backdrop-dismiss')).toBe('false');
+    expect(modal.attributes('focus-trap')).toBe('false');
+    expect(modal.attributes('handle')).toBe('false');
+    expect(modal.attributes('keep-contents-mounted')).toBeDefined();
+    expect(modal.attributes('can-dismiss')).toBeUndefined();
+  });
+
+  it('opens only while its page is on screen', async () => {
+    const shown = ref(false);
+    const w = page(shown);
+    const isOpen = () => w.find('.mob-sheet-modal--map').attributes('is-open');
+    await nextTick();
+    expect(isOpen()).toBe('false');
+    shown.value = true;
+    await new Promise((r) => setTimeout(r));
+    await nextTick();
+    expect(isOpen()).toBe('true');
     shown.value = false;
     await nextTick();
-    expect(w.find('.mob-map-sheet').exists()).toBe(false);
+    expect(isOpen()).toBe('false');
   });
 
   it('puts its content in a body that scrolls under the handle and the title, hidden when collapsed', async () => {
     const collapsed = ref(false);
-    const Page = defineComponent({
-      setup: () => () =>
-        h(PhoneMapSheetHost, null, {
-          default: () =>
-            h(PhoneMapSheet, { title: 'M31', collapsed: collapsed.value }, () => h('p', 'Contenu')),
-        }),
-    });
-    const w = mount(Page, { global: { stubs: ionicStubs } });
+    const w = page(ref(true), ref(true), collapsed);
+    expect(w.find('.mob-sheet-title').text()).toBe('M31');
     const body = w.find('.mob-map-sheet > .mob-sheet-body.mob-scroll');
     expect(body.text()).toBe('Contenu');
+    expect(body.classes()).toContain('ion-content-scroll-host');
     collapsed.value = true;
     await nextTick();
     expect(body.attributes('style')).toContain('display: none');
     expect(w.find('.mob-sheet-title').isVisible()).toBe(true);
   });
 
-  it('closes from its handle', async () => {
-    const w = mount(PhoneMapSheetHost, {
-      slots: { default: () => h(PhoneMapSheet, { title: 'M31' }) },
-      global: { stubs: ionicStubs },
-    });
+  it('closes from its handle and from a drag down, not when its page closes it', async () => {
+    const w = page();
+    const sheet = () => w.findComponent(PhoneMapSheet);
     await w.find('.mob-sheet-grab').trigger('click');
-    expect(w.findComponent(PhoneMapSheet).emitted('close')).toHaveLength(1);
+    expect(sheet().emitted('close')).toHaveLength(1);
+    const modal = w.findComponent(ionicStubs.IonModal);
+    modal.vm.$emit('didDismiss', { detail: {} });
+    expect(sheet().emitted('close')).toHaveLength(1);
+    modal.vm.$emit('didDismiss', { detail: { role: 'gesture' } });
+    expect(sheet().emitted('close')).toHaveLength(2);
   });
 
-  it('goes up to two thirds when dragged up in portrait, back to a third, then closes', async () => {
-    const restore = portrait();
-    const w = mount(PhoneMapSheetHost, {
-      slots: { default: () => h(PhoneMapSheet, { title: 'M31' }) },
-      global: { stubs: ionicStubs },
+  it('is slid out by Ionic when the page removes it', async () => {
+    const drawn = ref(true);
+    const w = page(ref(true), drawn);
+    // The modal, found by the id its room names, is open: Ionic slides it out.
+    const id = w.find('.mob-map-sheet-room').attributes('data-modal')!;
+    const modal = document.getElementById(id)!;
+    modal.classList.add('show-modal');
+    let finish = () => {};
+    const dismiss = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    Object.assign(modal, { dismiss });
+    drawn.value = false;
+    await nextTick();
+    expect(dismiss).toHaveBeenCalled();
+    // Vue keeps the sheet until Ionic has slid it out
+    expect(document.getElementById(id)).not.toBeNull();
+    finish();
+    await new Promise((r) => setTimeout(r));
+    await nextTick();
+    expect(document.getElementById(id)).toBeNull();
+  });
+});
+
+describe('the stops of a sheet', () => {
+  it('opens a sheet at its content height when it fits in a third, or when it is not held to a third', () => {
+    expect(sheetStops(200, 900, true)).toEqual({
+      breakpoints: [0, 1],
+      initial: 1,
+      height: null,
+      max: 300,
+      opens: 200,
     });
-    const sheet = () => w.find('.mob-map-sheet');
-    const drag = w.find('.mob-sheet-drag');
-    await dragBy(drag, -70);
-    expect(sheet().classes()).toContain('mob-sheet--expanded');
-    // the click that ends a drag on the handle does not close the sheet
-    await w.find('.mob-sheet-grab').trigger('click');
-    expect(w.findComponent(PhoneMapSheet).emitted('close')).toBeUndefined();
-    await dragBy(drag, 70);
-    expect(sheet().classes()).not.toContain('mob-sheet--expanded');
-    expect(w.findComponent(PhoneMapSheet).emitted('close')).toBeUndefined();
-    await dragBy(drag, 70);
-    expect(w.findComponent(PhoneMapSheet).emitted('close')).toHaveLength(1);
-    restore();
+    expect(sheetStops(800, 900, false)).toEqual({
+      breakpoints: [0, 1],
+      initial: 1,
+      height: null,
+      max: 900,
+      opens: 800,
+    });
   });
 
-  it('stays as it is when dragged up in landscape, where it already has the full height', async () => {
-    const restore = portrait(false);
-    const w = mount(PhoneMapSheetHost, {
-      slots: { default: () => h(PhoneMapSheet, { title: 'M31' }) },
-      global: { stubs: ionicStubs },
+  it('opens a taller sheet at a third, its top stop at two thirds or at its content height', () => {
+    expect(sheetStops(800, 900, true)).toEqual({
+      breakpoints: [0, 0.5, 1],
+      initial: 0.5,
+      height: 600,
+      max: 600,
+      opens: 300,
     });
-    await dragBy(w.find('.mob-sheet-drag'), -70);
-    expect(w.find('.mob-map-sheet').classes()).not.toContain('mob-sheet--expanded');
-    restore();
+    expect(sheetStops(400, 900, true)).toEqual({
+      breakpoints: [0, 0.75, 1],
+      initial: 0.75,
+      height: 400,
+      max: 400,
+      opens: 300,
+    });
+  });
+
+  it('counts the strip under a sheet that ends above the bottom of the screen', () => {
+    // 100 px under: at the third the 700 px modal shows 400 px, the sheet's 300 and the strip
+    const stops = sheetStops(800, 900, true, 100);
+    expect(stops.height).toBe(700);
+    expect(stops.max).toBe(600);
+    expect(stops.opens).toBe(300);
+    expect(stops.breakpoints[1]).toBeCloseTo(400 / 700);
+  });
+
+  it('stops where the content marks it, then shows the whole content, opening at the first mark', () => {
+    const stops = contentStops(500, 700, [380, 260], 100);
+    // the modal is the 500 px sheet and the 100 px strip; the marks sorted, each with the strip under it
+    expect(stops.height).toBe(600);
+    expect(stops.breakpoints).toEqual([0, 360 / 600, 480 / 600, 1]);
+    expect(stops.initial).toBe(360 / 600);
+    expect(stops.opens).toBe(260);
+  });
+
+  it('shows at most the room, and leaves out the marks past it', () => {
+    const stops = contentStops(900, 400, [260, 520]);
+    expect(stops.height).toBe(400);
+    expect(stops.max).toBe(400);
+    expect(stops.breakpoints).toEqual([0, 260 / 400, 1]);
+    // no mark left: the sheet opens whole
+    expect(contentStops(300, 700, [300, 520])).toMatchObject({ breakpoints: [0, 1], height: null });
+  });
+
+  it('reads the marks of a content: under the line of a fact, above a row', () => {
+    const sheet = document.createElement('section');
+    sheet.innerHTML = `<div class="facts"><div id="a"></div><div id="eq" data-sheet-stop></div><div id="c"></div></div>
+      <div id="row" data-sheet-stop="before"></div>`;
+    const boxes: Record<string, [number, number]> = {
+      a: [200, 240],
+      eq: [200, 230],
+      c: [250, 290],
+      row: [330, 378],
+    };
+    for (const el of sheet.querySelectorAll<HTMLElement>('[id]')) {
+      const [top, bottom] = boxes[el.id];
+      el.getBoundingClientRect = () => ({ top, bottom }) as DOMRect;
+    }
+    sheet.getBoundingClientRect = () => ({ top: 100, bottom: 400 }) as DOMRect;
+    // the equipment's line ends with its tallest neighbour (240), the row starts at 330
+    expect(sheetMarks(sheet)).toEqual([140, 230]);
+  });
+});
+
+describe('the stops of a sheet without marks', () => {
+  it('moves a third that would cut a row up to the end of the last row it holds whole', () => {
+    expect(underLastRow(300, [120, 250, 330])).toBe(250);
+    // a row ending exactly there is held whole
+    expect(underLastRow(250, [120, 250, 330])).toBe(250);
+    // no row ends before it: it stays
+    expect(underLastRow(100, [120, 250])).toBe(100);
+  });
+
+  it("reads where the body's rows end, and the lines of a list inside one", () => {
+    const sheet = document.createElement('section');
+    sheet.innerHTML = `<div class="mob-sheet-body"><div id="facts"><div id="f1"></div><div id="f2"></div></div><div id="row"></div></div>`;
+    const bottoms: Record<string, number> = { facts: 260, f1: 200, f2: 260, row: 320 };
+    for (const el of sheet.querySelectorAll<HTMLElement>('[id]')) {
+      el.getBoundingClientRect = () => ({ bottom: bottoms[el.id] }) as DOMRect;
+    }
+    sheet.getBoundingClientRect = () => ({ top: 100 }) as DOMRect;
+    expect(sheetRows(sheet)).toEqual([100, 160, 160, 220]);
+  });
+});
+
+describe('the photo facts', () => {
+  it('mark the equipment as where a map sheet first stops', () => {
+    const w = mount(PhoneFacts, {
+      props: {
+        facts: [
+          { label: 'Date', value: '1 mars' },
+          { label: 'Équipement', value: 'Vespera', stop: true },
+        ],
+      },
+      global,
+    });
+    const facts = w.findAll('.mob-fact');
+    expect(facts[0].attributes('data-sheet-stop')).toBeUndefined();
+    expect(facts[1].attributes('data-sheet-stop')).toBe('');
   });
 });
 
@@ -389,11 +531,4 @@ function portrait(isPortrait = true) {
     removeEventListener() {},
   })) as unknown as typeof window.matchMedia;
   return () => (window.matchMedia = media);
-}
-
-/** A finger dragging from an element by `dy` pixels (down when positive). */
-async function dragBy(el: { trigger: (e: string, o?: object) => Promise<void> }, dy: number) {
-  await el.trigger('pointerdown', { clientY: 300 });
-  await el.trigger('pointermove', { clientY: 300 + dy });
-  await el.trigger('pointerup', { clientY: 300 + dy });
 }

@@ -111,10 +111,16 @@ describe('the object sheet', () => {
     const w = mountSheet();
     await w.find('.mob-icon-row button[aria-label="Modifier"]').trigger('click');
     expect(w.emitted('edit')).toHaveLength(1);
-    expect(w.find('.mob-sheet-modal').attributes('is-open')).toBe('false');
+    expect(w.find('.mob-sheet-modal:not(.mob-sheet-modal--map)').attributes('is-open')).toBe(
+      'false',
+    );
     await w.find('.mob-icon-row button[aria-label="Ajouter au plan"]').trigger('click');
-    expect(w.find('.mob-sheet-modal').attributes('is-open')).toBe('true');
-    expect(w.find('.mob-sheet-modal').text()).toContain("Galaxie d'Andromède");
+    expect(w.find('.mob-sheet-modal:not(.mob-sheet-modal--map)').attributes('is-open')).toBe(
+      'true',
+    );
+    expect(w.find('.mob-sheet-modal:not(.mob-sheet-modal--map)').text()).toContain(
+      "Galaxie d'Andromède",
+    );
   });
 
   it('asks the page for "Créer un cadre" and "Créer une mosaïque"', async () => {
@@ -125,20 +131,11 @@ describe('the object sheet', () => {
     expect(w.emitted('addMosaic')).toHaveLength(1);
   });
 
-  it('closes from the handle and by dragging down, not by a small movement', async () => {
+  it("closes from the handle and by Ionic's drag down", async () => {
     const w = mountSheet();
     await w.find('.mob-sheet-grab').trigger('click');
     expect(w.emitted('close')).toHaveLength(1);
-
-    const drag = w.find('.mob-sheet-drag');
-    const fire = (type: string, y: number) => {
-      const e = new MouseEvent(type, { clientY: y, bubbles: true });
-      drag.element.dispatchEvent(e);
-    };
-    fire('pointerdown', 100);
-    fire('pointermove', 120);
-    expect(w.emitted('close')).toHaveLength(1);
-    fire('pointermove', 170);
+    w.findComponent(ionicStubs.IonModal).vm.$emit('didDismiss', { detail: { role: 'gesture' } });
     expect(w.emitted('close')).toHaveLength(2);
   });
 });
@@ -189,7 +186,9 @@ describe('the sheet of a star', () => {
       .findAll('.mob-icon-row button')
       .map((b) => b.attributes('aria-label'));
     expect(labels).toEqual(['Ajouter un cadre', 'Ajouter une mosaïque']);
-    expect(mountSheet(star()).find('.mob-sheet-modal').exists()).toBe(false);
+    expect(mountSheet(star()).find('.mob-sheet-modal:not(.mob-sheet-modal--map)').exists()).toBe(
+      false,
+    );
   });
 
   it('keeps its few actions at the start of the row, where the four of an object are spread', () => {

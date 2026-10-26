@@ -1,4 +1,4 @@
-import { defineComponent, h, inject, provide } from 'vue';
+import { defineComponent, h, inject, provide, ref } from 'vue';
 import { MAP_SHEET_HOST } from '../src/components/map-sheet';
 
 /** Ionic's web components are not defined in happy-dom: each is replaced by a plain element that renders its slot. */
@@ -112,5 +112,5 @@ export const ionicStubs = {
   IonReorder: plain('div'),
 };
 
-/** What PhoneMapSheetHost provides: a map sheet mounted alone in a test is drawn as it is in its host. */
-export const mapSheetHost = { [MAP_SHEET_HOST as symbol]: true };
+/** What PhoneMapSheetHost provides: a map sheet mounted alone in a test is drawn as it is in its host, page shown. */
+export const mapSheetHost = { [MAP_SHEET_HOST as symbol]: ref(true) };

@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { provide } from 'vue';
-import { MAP_SHEET_HOST, slideSheetIn, slideSheetOut } from './map-sheet';
+import { provide, toRef } from 'vue';
+import { MAP_SHEET_HOST, slideSheetOut } from './map-sheet';
 
-// Where a page draws its map sheets (PhoneMapSheet): one sheet at a time (a `v-if` / `v-else-if` chain). A sheet slides
-// up when it appears, down when it goes, and the two cross when one replaces another, at Ionic's sheet speed. Vue can
-// only animate a removal from the parent's side, so this is the one place holding that transition; a PhoneMapSheet
-// refuses to be drawn anywhere else. The slide is played in script, not by CSS classes: a sheet added while its page is
-// still hidden (an object picked on the search page, while the map page comes back) waits until it is on screen.
-provide(MAP_SHEET_HOST, true);
+// Where a page draws its map sheets (PhoneMapSheet): one sheet at a time (a `v-if` / `v-else-if` chain). A sheet is
+// Ionic's sheet modal, which slides in by itself; Vue removes a sheet at once, so this holds it until Ionic has slid it
+// out (the two cross when one replaces another). `shown` is whether the page is on screen: a sheet opens only then.
+// A PhoneMapSheet refuses to be drawn anywhere else.
+const props = defineProps<{ shown: boolean }>();
+provide(MAP_SHEET_HOST, toRef(props, 'shown'));
 </script>
 
 <template>
-  <Transition :css="false" @enter="slideSheetIn" @leave="slideSheetOut">
+  <Transition :css="false" @leave="slideSheetOut">
     <slot />
   </Transition>
 </template>

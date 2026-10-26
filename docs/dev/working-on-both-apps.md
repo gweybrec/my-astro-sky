@@ -89,7 +89,7 @@ The system bars are given as safe-area insets, and they move when the phone turn
 A few behaviours are not layout, and read the orientation with `window.matchMedia('(orientation: landscape)')`, listening to its changes:
 
 - the hand placement panel folds only in portrait (`pages/sky/SkyPlacement.vue`);
-- a sheet held to a third grows to two thirds only in portrait (`composables/useSheetDrag.ts`);
+- a sheet held to a third has its two-thirds stop only in portrait (`composables/useSheetStops.ts`);
 - the gallery uses the photos-per-line setting of the current orientation (`pages/GalleryPage.vue`);
 - the pages of a photo's object chips are cut again when the width changes (`pages/sky/SkyPhotoSheet.vue`).
 

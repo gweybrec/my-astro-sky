@@ -5,11 +5,15 @@ import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
 import { formatPlanDate } from '@myastrosky/core/targets/plan';
 import type { Photo } from '@myastrosky/core/types';
 
-/** One read-only figure of a photo: a `mono` one is drawn in the mono face. */
+/**
+ * One read-only figure of a photo: a `mono` one is drawn in the mono face; a map sheet first stops under the line of
+ * the `stop` one (the equipment).
+ */
 export interface PhotoFact {
   label: string;
   value: string;
   mono?: boolean;
+  stop?: boolean;
 }
 
 /** The capture details left out of the map's photo sheet (`brief`): the gallery's information shows them. */
@@ -54,7 +58,7 @@ export function photoFacts(
     });
   }
   if (options.setupName) {
-    out.push({ label: t('modal.metadataGearSetup'), value: options.setupName });
+    out.push({ label: t('modal.metadataGearSetup'), value: options.setupName, stop: true });
   }
   if (rows.length) {
     out.push({

@@ -109,6 +109,9 @@ onIonViewWillEnter(() => {
 });
 // Another tab chosen: the pictures still loading stop, so that tab is not slowed down.
 onIonViewWillLeave(() => sky?.setActive(false));
+// The map's sheets open only while the page shows (another tab or a page pushed over the tabs hides it, and Ionic
+// draws them at the app's root, over any page).
+const mapShown = computed(() => router.currentRoute.value.path === '/tabs/sky');
 // While a page above the tabs covered it, the map measured nothing; back, it may not have measured itself again yet. A
 // move of the map waits for its size (a few frames at most), else it would frame nothing.
 const MAP_SIZE_FRAMES = 30;
@@ -318,20 +321,21 @@ function besideSheet(move: (free: { width: number; height: number }) => void) {
 function showFrame(id: string) {
   besideSheet(() => sky?.map.centerFrameInView(id));
 }
-// The sheet's place in the map from its layout box, not its box on screen: it is still sliding in.
+// The sheet's place in the map from its room and the height it opens at, not its box on screen: it is still sliding in.
 function sheetCover() {
   const map = mapEl.value;
-  const sheet = map?.querySelector<HTMLElement>('.mob-map-sheet');
-  if (!map || !sheet) return { left: 0, bottom: 0 };
+  const room = map?.querySelector<HTMLElement>('.mob-map-sheet-room');
+  if (!map || !room) return { left: 0, bottom: 0 };
   const width = map.clientWidth;
   const height = map.clientHeight;
-  const sheetRight = sheet.offsetLeft + sheet.offsetWidth;
-  const above = Math.max(0, sheet.offsetTop);
+  const sheetRight = room.offsetLeft + room.offsetWidth;
+  const sheetTop = room.offsetTop + room.offsetHeight - Number(room.dataset.cover ?? 0);
+  const above = Math.max(0, sheetTop);
   const right = Math.max(0, width - sheetRight);
   // The larger free part: right of the sheet, or above it.
   return right * height > above * width
     ? { left: sheetRight, bottom: 0 }
-    : { left: 0, bottom: height - sheet.offsetTop };
+    : { left: 0, bottom: height - sheetTop };
 }
 
 const openSearch = () => void router.push('/sky/search');
@@ -388,7 +392,7 @@ onBeforeUnmount(() => {
             <SkyTimeBar />
             <SkyLayerButtons />
           </template>
-          <PhoneMapSheetHost>
+          <PhoneMapSheetHost :shown="mapShown">
             <SkyPhotoSheet
               v-if="skySelection?.kind === 'photo' && photoLayer"
               :key="skySelection.photo.id"

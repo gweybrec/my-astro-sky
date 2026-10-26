@@ -1,6 +1,6 @@
-// Static check, no browser: a sheet of the phone app is never drawn by hand. Every sheet is either PhoneSheet (Ionic's
-// modal, which slides by itself) or PhoneMapSheet (a sheet over the map, which slides through its PhoneMapSheetHost and
-// refuses to be drawn without one). A .vue file of apps/mobile/src that writes the sheet's own markup (the
+// Static check, no browser: a sheet of the phone app is never drawn by hand. Every sheet is either PhoneSheet or
+// PhoneMapSheet (a sheet over the map, which its PhoneMapSheetHost slides out and which refuses to be drawn without one),
+// both Ionic's sheet modal, which follows the finger and slides by itself. A .vue file of apps/mobile/src that writes the sheet's own markup (the
 // `.mob-sheet` section, its `.mob-map-sheet` place, or its `.mob-sheet-grab` handle) outside these two components would
 // have no slide, so it fails here; each exception in ALLOWED says why it is not a sheet.
 // Usage: node apps/mobile/scripts/check-sheets.mjs

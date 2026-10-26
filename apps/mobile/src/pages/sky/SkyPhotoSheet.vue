@@ -156,8 +156,13 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       :step="0.05"
       :display="opacity.toFixed(2)"
     />
-    <!-- The screen behind repositioning is not built yet. -->
-    <div class="mob-icon-row" role="group" :aria-label="t('mobile.sky.photoActions')">
+    <!-- The screen behind repositioning is not built yet. The sheet's second stop is above this row. -->
+    <div
+      class="mob-icon-row"
+      role="group"
+      :aria-label="t('mobile.sky.photoActions')"
+      data-sheet-stop="before"
+    >
       <PhoneIconButton
         :label="visible ? t('photos.hide') : t('photos.show')"
         @click="toggleVisible"
