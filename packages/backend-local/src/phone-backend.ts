@@ -33,6 +33,9 @@ export interface CapacitorShare {
   share(options: { title?: string; url?: string; dialogTitle?: string }): Promise<unknown>;
 }
 
+/** What the Share plugin rejects with when the share sheet is closed without a choice: the user's choice, not a failure. */
+export const SHARE_CANCELED = 'Share canceled';
+
 /** The WebView's `fetch` (the one Capacitor patches), as far as the adapters use it. */
 export type PlatformFetch = (
   url: string,
@@ -129,7 +132,11 @@ export async function createPhoneBackend(
       const path = `exports/${name}`;
       await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
       const { uri } = await filesystem.getUri({ path, directory: directories.cache });
-      await platform.share.share({ title: name, url: uri, dialogTitle: name });
+      try {
+        await platform.share.share({ title: name, url: uri, dialogTitle: name });
+      } catch (error) {
+        if (!(error instanceof Error && error.message === SHARE_CANCELED)) throw error;
+      }
     },
     now: () => new Date(now()),
   });

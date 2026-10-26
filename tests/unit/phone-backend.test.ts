@@ -11,7 +11,11 @@ import { FULL_BACKUP_OPTIONS } from '@myastrosky/core/backup-selection';
 import { initSchema } from '@myastrosky/core/db/schema';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { createFakeConnection } from '../helpers/fake-sqlite-connection';
-import { createPhoneBackend, MAX_WHOLE_FILE_BYTES } from '@myastrosky/backend-local/phone-backend';
+import {
+  createPhoneBackend,
+  MAX_WHOLE_FILE_BYTES,
+  SHARE_CANCELED,
+} from '@myastrosky/backend-local/phone-backend';
 import { describeBackendContract } from '../helpers/backend-contract';
 import { installFakeInternet, releaseFakeInternet } from '../helpers/contract-shared';
 import { makePhoneContractSetup, makePhonePlatform } from '../helpers/phone-contract-backend';
@@ -61,6 +65,20 @@ describe('createPhoneBackend', () => {
     const bytes = fake.files.get(`exports/${shared[0].name}`)!;
     expect(bytes.length).toBeGreaterThan(0);
     expect(fake.maxDataLength).toBeLessThanOrEqual(Math.ceil((1024 * 1024) / 3) * 4);
+  });
+
+  it('closing the share sheet without a choice is not a failure; another share error is', async () => {
+    const { platform } = await makePhonePlatform();
+    let rejection = new Error(SHARE_CANCELED);
+    platform.share = { share: async () => Promise.reject(rejection) };
+    const backend = await createPhoneBackend(platform);
+    await expect(
+      backend.backup.exportToUser({ options: { includeSetups: true } }),
+    ).resolves.toBeUndefined();
+    rejection = new Error('No app can open this file');
+    await expect(backend.backup.exportToUser({ options: { includeSetups: true } })).rejects.toThrow(
+      'No app can open this file',
+    );
   });
 
   it('restores a ZIP backup by pieces, never reading the whole file', async () => {
