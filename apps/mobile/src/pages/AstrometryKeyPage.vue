@@ -20,13 +20,15 @@ import PhoneInfoButton from '../components/PhoneInfoButton.vue';
 
 // The board "Réglages, clé astrometry.net": the key of the online solver, as the desktop's solver settings handle it.
 // A stored key is never shown: the field is empty with dots as its placeholder, and a line says a key is configured.
-// "Enregistrer" stores a typed key and goes back; "Supprimer la clé API" asks first.
+// "Enregistrer" stores a typed key and goes back; "Supprimer la clé API" asks first. A stored key that can no
+// longer be read gets a line asking to enter it again, and can be deleted.
 const router = useRouter();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
 const key = ref('');
 const keySet = ref(false);
+const keyUnreadable = ref(false);
 const busy = ref(false);
 
 const placeholder = computed(() =>
@@ -39,7 +41,9 @@ const explanation = computed(() =>
 
 async function load() {
   try {
-    keySet.value = (await loadServerSettings()).apiKeySet;
+    const settings = await loadServerSettings();
+    keySet.value = settings.apiKeySet;
+    keyUnreadable.value = settings.apiKeyUnreadable;
   } catch (error) {
     void showError(error);
   }
@@ -79,6 +83,7 @@ async function clear() {
     await clearAstrometryApiKey();
     key.value = '';
     keySet.value = false;
+    keyUnreadable.value = false;
   } catch (error) {
     void showError(error);
   }
@@ -106,10 +111,17 @@ async function clear() {
           :placeholder="placeholder"
         />
         <PhoneHelper v-if="keySet">{{ t('settings.astrometryApiKeySet') }}</PhoneHelper>
+        <PhoneHelper v-else-if="keyUnreadable">{{
+          t('mobile.settings.keyUnreadable')
+        }}</PhoneHelper>
         <div class="mob-form-row">
-          <PhoneButton variant="danger" block :disabled="!keySet" @click="clear">{{
-            t('settings.clearApiKey')
-          }}</PhoneButton>
+          <PhoneButton
+            variant="danger"
+            block
+            :disabled="!keySet && !keyUnreadable"
+            @click="clear"
+            >{{ t('settings.clearApiKey') }}</PhoneButton
+          >
         </div>
       </div>
     </IonContent>

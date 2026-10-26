@@ -48,6 +48,16 @@ export function createLocalStorageStore(): KeyValueStore {
   };
 }
 
+/**
+ * Asks the WebView to keep its own storage when the phone runs low on space: it holds the encryption key of the
+ * astrometry.net key and the photos waiting to be placed. Takes no space; the answer is not needed.
+ */
+export function requestPersistentStorage(
+  manager: Pick<StorageManager, 'persist'> | undefined,
+): void {
+  void manager?.persist?.().catch(() => undefined);
+}
+
 async function createDeviceStorage(): Promise<KeyValueStore> {
   if (!isNativePlatform()) return createLocalStorageStore();
   const { Preferences } = await import('@capacitor/preferences');
@@ -116,8 +126,9 @@ export function installBackButton(router: BackRouter): void {
 }
 
 export async function initPlatform(): Promise<void> {
-  // 1. The device storage.
+  // 1. The device storage, and the WebView's kept from being cleared.
   configureStorage(await createDeviceStorage());
+  if (isNativePlatform()) requestPersistentStorage(navigator.storage);
 
   // 2. The language: the stored one, else the phone's preferred languages; a change reloads the page.
   configureI18n({

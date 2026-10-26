@@ -140,6 +140,10 @@ const es: Translations['mobile'] = {
     langDe: 'Deutsch',
     themeValue: 'Frío moderno',
     keyConfigured: '✓ Configurada',
+    keyUnreadableTitle: 'Clave de astrometry.net ilegible',
+    keyUnreadable:
+      'La clave de astrometry.net guardada ya no se puede leer. Introdúcela de nuevo para resolver tus fotos en línea.',
+    keyEnterAgain: 'Introducir la clave',
     lan: 'LAN',
   },
   nav: { back: 'Atrás' },

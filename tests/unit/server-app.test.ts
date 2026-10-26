@@ -250,6 +250,7 @@ describe('lists on an empty database', () => {
     expect(typeof r.body.isWindows).toBe('boolean');
     expect({ ...r.body, isWindows: undefined }).toEqual({
       apiKeySet: false,
+      apiKeyUnreadable: false,
       isWindows: undefined,
       ASTAP_PATH: '',
       SOLVE_FIELD_PATH: '',

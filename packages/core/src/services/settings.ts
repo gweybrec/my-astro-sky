@@ -30,7 +30,7 @@ export interface SettingsService {
   set(key: string, value: string): Promise<void>;
   /** Removes the stored value (an environment value stays visible through `get`). */
   remove(key: string): Promise<void>;
-  /** What `GET /api/settings` returns, `isWindows` included. The secret's value is never returned, only `apiKeySet`. */
+  /** What `GET /api/settings` returns, `isWindows` included. The secret's value is never returned, only `apiKeySet` and `apiKeyUnreadable`. */
   readPublic(): Promise<ServerSettings>;
   /**
    * Applies a `PUT /api/settings` body in one transaction. Throws `conflict` (code `SETTING_LOCKED_BY_ENV`)
@@ -115,7 +115,11 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
         keys,
       );
       const stored = new Map(rows.map((r) => [r.key, r.value]));
-      const apiKeySet = !!(await resolve(API_KEY, stored.get(API_KEY)));
+      const storedKey = stored.get(API_KEY);
+      const apiKey = await resolve(API_KEY, storedKey);
+      // `resolve` gives undefined for a stored key it cannot decrypt (no environment value then).
+      const apiKeyUnreadable =
+        env(API_KEY) === undefined && storedKey !== undefined && apiKey === undefined;
       const strings: Record<string, string> = {};
       for (const key of EDITABLE_STRING_SETTINGS) {
         strings[key] = (await resolve(key, stored.get(key))) ?? '';
@@ -126,7 +130,8 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
         flags[key] = value === '1' || value === 'true' || value === 'yes' || value === 'on';
       }
       return {
-        apiKeySet,
+        apiKeySet: !!apiKey,
+        apiKeyUnreadable,
         isWindows: platform.isWindows,
         ...strings,
         ...flags,

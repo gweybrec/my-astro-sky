@@ -171,6 +171,21 @@ describe('the astrometry.net key page', () => {
     expect(button(w, 'Supprimer la clé API').attributes('disabled')).toBeDefined();
   });
 
+  it('with a key that can no longer be read asks to enter it again and lets it be deleted', async () => {
+    backend.settings.readPublic.mockResolvedValue({ apiKeySet: false, apiKeyUnreadable: true });
+    confirm.mockResolvedValue(true);
+    const w = mount(AstrometryKeyPage, { global: app().global });
+    await flushPromises();
+    expect(field(w).attributes('placeholder')).toBe('Saisir la clé API…');
+    expect(w.text()).toContain(
+      'La clé astrometry.net enregistrée ne peut plus être lue. Saisissez-la à nouveau pour résoudre vos photos en ligne.',
+    );
+    await button(w, 'Supprimer la clé API').trigger('click');
+    await flushPromises();
+    expect(backend.settings.removeApiKey).toHaveBeenCalled();
+    expect(w.text()).not.toContain('ne peut plus être lue');
+  });
+
   it('stores only the typed key, trimmed, then goes back to Réglages', async () => {
     const { global, router } = app();
     const w = mount(AstrometryKeyPage, { global });

@@ -140,6 +140,10 @@ const en: Translations['mobile'] = {
     langDe: 'Deutsch',
     themeValue: 'Cold modern',
     keyConfigured: '✓ Configured',
+    keyUnreadableTitle: 'Unreadable astrometry.net key',
+    keyUnreadable:
+      'The saved astrometry.net key can no longer be read. Enter it again to solve your photos online.',
+    keyEnterAgain: 'Enter the key',
     lan: 'LAN',
   },
   nav: { back: 'Back' },

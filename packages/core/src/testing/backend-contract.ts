@@ -709,6 +709,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     };
     const blank = {
       apiKeySet: false,
+      apiKeyUnreadable: false,
       ASTAP_PATH: '',
       SOLVE_FIELD_PATH: '',
       ASTROMETRY_DATA_DIR: '',
@@ -745,6 +746,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
         'a key was written',
       );
       expectEqual((await read()).apiKeySet, true, 'the key is set, and never returned');
+      expectEqual((await read()).apiKeyUnreadable, false, 'a key just written can be read');
     } finally {
       await b.settings.removeApiKey();
       await b.settings.update({

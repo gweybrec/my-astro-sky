@@ -139,6 +139,10 @@ const fr = {
     langDe: 'Deutsch',
     themeValue: 'Froid moderne',
     keyConfigured: '✓ Configurée',
+    keyUnreadableTitle: 'Clé astrometry.net illisible',
+    keyUnreadable:
+      'La clé astrometry.net enregistrée ne peut plus être lue. Saisissez-la à nouveau pour résoudre vos photos en ligne.',
+    keyEnterAgain: 'Saisir la clé',
     lan: 'LAN',
   },
   nav: { back: 'Retour' },

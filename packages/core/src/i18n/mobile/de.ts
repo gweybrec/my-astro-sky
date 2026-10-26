@@ -141,6 +141,10 @@ const de: Translations['mobile'] = {
     langDe: 'Deutsch',
     themeValue: 'Kühl modern',
     keyConfigured: '✓ Konfiguriert',
+    keyUnreadableTitle: 'astrometry.net-Schlüssel nicht lesbar',
+    keyUnreadable:
+      'Der gespeicherte astrometry.net-Schlüssel kann nicht mehr gelesen werden. Geben Sie ihn erneut ein, um Ihre Fotos online zu lösen.',
+    keyEnterAgain: 'Schlüssel eingeben',
     lan: 'LAN',
   },
   nav: { back: 'Zurück' },

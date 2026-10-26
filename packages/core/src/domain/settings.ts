@@ -9,6 +9,8 @@ export interface LatestRelease {
 
 export interface ServerSettings {
   apiKeySet: boolean;
+  /** A key is stored but can no longer be decrypted (its encryption key was lost or changed): it must be entered again. */
+  apiKeyUnreadable: boolean;
   isWindows: boolean;
   ASTAP_PATH: string;
   SOLVE_FIELD_PATH: string;
