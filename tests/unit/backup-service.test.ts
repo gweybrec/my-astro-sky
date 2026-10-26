@@ -544,17 +544,28 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect((await b.plans.list()).map((p) => p.id).sort()).toEqual(['a', 'c']);
     });
 
-    it('imports the other categories when one is refused', async () => {
+    it('lists a refused override, category and region in `failed`, and imports the others', async () => {
       const b = await makeSet();
       const svc = createBackupService({ ...b, newId: () => 'y' });
-      // No category the import passes on can be refused by the database, so the refusal is forced: on the
-      // grouped write, then on the bad category alone.
-      const importOne = b.poiCategories.importMany.bind(b.poiCategories);
+      // None of these the import passes on can be refused by the database, so the refusal is forced: on the
+      // grouped write, then on the bad item alone.
+      const importOverrides = b.dsoOverrides.importMany.bind(b.dsoOverrides);
+      vi.spyOn(b.dsoOverrides, 'importMany').mockImplementation(async (group) => {
+        if (group.some(([id]) => id === 'M2')) throw new Error('refused');
+        await importOverrides(group);
+      });
+      const importCategories = b.poiCategories.importMany.bind(b.poiCategories);
       vi.spyOn(b.poiCategories, 'importMany').mockImplementation(async (group) => {
         if (group.some((c) => c.id === 'cat-bad')) throw new Error('refused');
-        await importOne(group);
+        await importCategories(group);
+      });
+      const importRegions = b.skyRegions.importMany.bind(b.skyRegions);
+      vi.spyOn(b.skyRegions, 'importMany').mockImplementation(async (group) => {
+        if (group.some((r) => r.id === 'reg-bad')) throw new Error('refused');
+        await importRegions(group);
       });
       const reader = memoryReader([
+        ['dso-overrides.json', JSON.stringify({ M1: { name: 'Crab' }, M2: { name: 'Bad' } })],
         [
           'poi-categories.json',
           JSON.stringify([
@@ -563,9 +574,24 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
             { id: 'cat-c', name: 'C' },
           ]),
         ],
+        [
+          'sky-regions.json',
+          JSON.stringify([
+            { id: 'reg-a', name: 'Region A', points: [] },
+            { id: 'reg-bad', name: 'Region bad', points: [] },
+          ]),
+        ],
       ]);
-      await svc.importFrom(reader, everything);
+      const result = await svc.importFrom(reader, everything);
+      expect(result.failed).toEqual([
+        { kind: 'dsoOverride', name: 'M2' },
+        { kind: 'poiCategory', name: 'Bad' },
+        { kind: 'skyRegion', name: 'Region bad' },
+      ]);
+      expect(result.dsoOverridesImported).toBe(1);
+      expect(Object.keys(await b.dsoOverrides.getAll())).toEqual(['M1']);
       expect((await b.poiCategories.list()).map((c) => c.id).sort()).toEqual(['cat-a', 'cat-c']);
+      expect((await b.skyRegions.list()).map((r) => r.id)).toEqual(['reg-a']);
     });
   });
 

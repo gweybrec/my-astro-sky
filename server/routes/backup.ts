@@ -205,7 +205,7 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
  *                   items:
  *                     type: object
  *                     properties:
- *                       kind: { type: string, enum: [plan, setup, gear, photo] }
+ *                       kind: { type: string, enum: [plan, setup, gear, photo, dsoOverride, poiCategory, skyRegion] }
  *                       name: { type: string }
  *       400:
  *         description: No file, unsupported format, invalid ZIP entry path or invalid manifest

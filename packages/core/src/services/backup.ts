@@ -164,12 +164,6 @@ async function writeGrouped<T>(
   return written;
 }
 
-/** The handler of a failed write of an item the import result does not list. */
-const warnFailed =
-  <T>(kind: string, nameOf: (item: T) => string) =>
-  (item: T, err: unknown): void =>
-    console.warn(`[Import] Failed to import ${kind} "${nameOf(item)}":`, err);
-
 export function createBackupService(deps: BackupServiceDeps): BackupService {
   const { photos, plans, gear, dsoOverrides, poiCategories, skyRegions, blobs, newId } = deps;
 
@@ -577,7 +571,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
               await writeGrouped(
                 entries,
                 (group) => dsoOverrides.importMany(group),
-                warnFailed('DSO override', ([id]: [string, object]) => id),
+                ([id], overrideErr) => recordFailure('dsoOverride', id, overrideErr),
               )
             ).length;
           }
@@ -681,7 +675,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
             await writeGrouped(
               categories,
               (group) => poiCategories.importMany(group),
-              warnFailed('POI category', (c: { name: string }) => c.name),
+              (c, catErr) => recordFailure('poiCategory', c.name, catErr),
             );
           }
         } catch {
@@ -713,7 +707,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
             await writeGrouped(
               regions,
               (group) => skyRegions.importMany(group),
-              warnFailed('sky region', (r: { name: string }) => r.name),
+              (r, regionErr) => recordFailure('skyRegion', r.name, regionErr),
             );
           }
         } catch {

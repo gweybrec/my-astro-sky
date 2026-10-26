@@ -3726,7 +3726,10 @@
                               "plan",
                               "setup",
                               "gear",
-                              "photo"
+                              "photo",
+                              "dsoOverride",
+                              "poiCategory",
+                              "skyRegion"
                             ]
                           },
                           "name": {
