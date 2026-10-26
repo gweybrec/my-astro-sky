@@ -263,7 +263,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         captureDetails: { gain: 120 },
         gearSetupId: 'setup-1',
       });
-      expect(photo.createdAt).toEqual(expect.any(String));
+      expect(photo.createdAt).toBe('2026-07-01T00:00:00.000Z');
       expect(photo.correspondences).toEqual([
         {
           pointIndex: 0,

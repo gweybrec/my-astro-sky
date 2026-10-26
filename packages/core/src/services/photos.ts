@@ -54,7 +54,7 @@ export const thumbnailNameOf = (filename: string): string =>
 export interface PhotoServiceDeps {
   db: SqlDb;
   newId: () => string;
-  /** The clock, in milliseconds since the epoch; it dates a restored photo that has no date. */
+  /** The clock, in milliseconds since the epoch; it dates a new photo, and a restored one that has no date. */
   now: () => number;
   images: ImageCodec;
   blobs: BlobStore;
@@ -185,8 +185,8 @@ interface CorrespondenceRow {
   star_dec: number | null;
 }
 
-const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`;
+const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`;
 const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
 const INSERT_CORRESPONDENCE =
@@ -526,6 +526,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
             input.originalName,
             input.width,
             input.height,
+            new Date(now()).toISOString(),
             input.manualPlacement ?? null,
             JSON.stringify(input.dsoIds ?? []),
             JSON.stringify(input.labels ?? []),
