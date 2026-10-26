@@ -935,6 +935,17 @@ export const views = [
     ...SHEET,
   },
   {
+    name: 'gallery-sort',
+    path: '/tabs/gallery',
+    ready: '.mob-photo',
+    open: [
+      { click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+    ],
+    ...SHEET,
+  },
+  {
     name: 'gallery-add',
     path: '/tabs/gallery',
     ready: '.mob-photo',

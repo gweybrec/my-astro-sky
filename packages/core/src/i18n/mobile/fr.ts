@@ -10,6 +10,8 @@ const fr = {
   tabs: { sky: 'Ciel', targets: 'Cibles', navLabel: 'Navigation' },
   gallery: {
     searchLabel: 'Rechercher une photo',
+    clearFilters: 'Effacer les filtres',
+    noDate: 'aucune date',
     empty: "Aucune photo pour l'instant",
     chooseFiles: 'Choisir des fichiers',
     formats: 'JPEG, PNG, TIF, TIFF, FIT, FITS, XISF',

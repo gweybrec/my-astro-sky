@@ -6,6 +6,7 @@ import type { FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOverlay } from '../photo-overlay';
 import type { Photo } from '@myastrosky/core/types';
 import type { PoiFilterGroup } from '@myastrosky/core/poi';
+import type { GallerySort } from '@myastrosky/core/gallery-filter';
 import type { GearSetupData } from '../api';
 
 /** Minimal interface for objects that can show/hide themselves. */
@@ -30,6 +31,7 @@ export interface GalleryInterface extends ShowHide {
   setDSOCatalogFilter(catalogs: string[]): void;
   setPoiFilter(selected: Map<string, Set<string>> | null): void;
   setDateRangeFilter(from: string | null, to: string | null): void;
+  setSort(sort: GallerySort): void;
   setGearSetups(setups: GearSetupData[]): void;
   getAllPois(): PoiFilterGroup[];
   getAllLabels(): { label: string; count: number }[];

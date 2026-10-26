@@ -28,12 +28,88 @@ describe('smartSortPhotos', () => {
     expect(sorted.indexOf('M31')).toBeLessThan(sorted.indexOf('M100'));
   });
 
-  it('sorts catalog prefixes alphabetically (IC before M before NGC)', () => {
-    // smartSortPhotos uses localeCompare on catalog names: IC < M < NGC alphabetically
-    const photos = ['NGC224', 'M31', 'IC1805'].map(makePhoto);
-    const sorted = smartSortPhotos(photos).map((p) => p.originalName);
-    expect(sorted.indexOf('IC1805')).toBeLessThan(sorted.indexOf('M31'));
-    expect(sorted.indexOf('M31')).toBeLessThan(sorted.indexOf('NGC224'));
+  it('sorts catalogs by importance (M before NGC before IC), not alphabetically', () => {
+    const photos = ['IC1805', 'NGC224', 'M31'].map(makePhoto);
+    expect(smartSortPhotos(photos).map((p) => p.originalName)).toEqual(['M31', 'NGC224', 'IC1805']);
+  });
+
+  it('follows the full catalog importance order, unknown catalogs next, plain names last', () => {
+    const photos = [
+      'Andromeda Galaxy',
+      'Cr399',
+      'Barnard 33',
+      'LDN1235',
+      'SH2-101',
+      'IC434',
+      'vdB142',
+      'M4',
+      'LBN438',
+      'NGC7000',
+    ].map(makePhoto);
+    expect(smartSortPhotos(photos).map((p) => p.originalName)).toEqual([
+      'M4',
+      'NGC7000',
+      'IC434',
+      'SH2-101',
+      'LBN438',
+      'LDN1235',
+      'vdB142',
+      'Barnard 33',
+      'Cr399',
+      'Andromeda Galaxy',
+    ]);
+  });
+
+  it('reads the whole number of a Sharpless name (SH2-99 before SH2-101)', () => {
+    const photos = ['SH2-101', 'Sh2 99', 'sh2_240'].map(makePhoto);
+    expect(smartSortPhotos(photos).map((p) => p.originalName)).toEqual([
+      'Sh2 99',
+      'SH2-101',
+      'sh2_240',
+    ]);
+  });
+
+  it('keeps several photos of one object in natural order of the rest of their names', () => {
+    const photos = ['M42 pass 10', 'M42', 'M42 pass 2', 'M4'].map(makePhoto);
+    expect(smartSortPhotos(photos).map((p) => p.originalName)).toEqual([
+      'M4',
+      'M42',
+      'M42 pass 2',
+      'M42 pass 10',
+    ]);
+  });
+
+  it('places a photo with no catalogue in its name by its most important solved object', () => {
+    const photos = [
+      makePhoto('Veil East'),
+      { ...makePhoto('Andromeda_stack'), dsoIds: ['M110', 'NGC224', 'M31'] },
+      makePhoto('M42'),
+      makePhoto('M31_2024'),
+      { ...makePhoto('Heart'), dsoIds: ['IC1805'] },
+      makePhoto('NGC7000'),
+    ];
+    expect(smartSortPhotos(photos).map((p) => p.originalName)).toEqual([
+      'M31_2024',
+      'Andromeda_stack',
+      'M42',
+      'NGC7000',
+      'Heart',
+      'Veil East',
+    ]);
+  });
+
+  it('keeps the catalogue number of the name over the solved objects', () => {
+    const photos = [{ ...makePhoto('NGC7000 wide'), dsoIds: ['M1'] }, makePhoto('M42')];
+    expect(smartSortPhotos(photos).map((p) => p.originalName)).toEqual(['M42', 'NGC7000 wide']);
+  });
+
+  it('sorts plain names in natural order, ignoring case', () => {
+    const photos = ['moon 10', 'Moon 2', 'aurora'].map(makePhoto);
+    expect(smartSortPhotos(photos).map((p) => p.originalName)).toEqual([
+      'aurora',
+      'Moon 2',
+      'moon 10',
+    ]);
   });
 
   it('sorts NGC objects numerically (NGC224 before NGC1976 before NGC7089)', () => {

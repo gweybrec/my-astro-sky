@@ -8,8 +8,15 @@ import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
 import { createLazyObserver } from './lazy-image';
-import { getDSOById, findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
+import {
+  filterGalleryPhotos,
+  gallerySetupItems,
+  loadGallerySort,
+  sortGalleryPhotos,
+  type GallerySort,
+} from '@myastrosky/core/gallery-filter';
+import { buildLabelFilterItems, computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
 import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
@@ -17,12 +24,7 @@ import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
 import { setPictureTurn, turnedPictureFrame } from './photo-turn';
 import { showToast } from './toast';
-import {
-  buildPoiFilterGroups,
-  poisMatchFilter,
-  resolveCategory,
-  type PoiFilterGroup,
-} from '@myastrosky/core/poi';
+import { buildPoiFilterGroups, resolveCategory, type PoiFilterGroup } from '@myastrosky/core/poi';
 import { poiPinsInImage, type PhotoPoiPin } from '@myastrosky/render/poi-pins';
 import { poiTypeIcon } from './poi-icons';
 import { pinia } from './pinia-instance';
@@ -80,6 +82,7 @@ export class Gallery {
   private gearSetups: GearSetupData[] = [];
   private setupNameById = new Map<string, string>();
   private searchQuery: string = '';
+  private sort: GallerySort = loadGallerySort();
   private lazyObserver: IntersectionObserver;
   private carouselTimer: ReturnType<typeof setInterval> | null = null;
   private _carouselAdvance: (() => void) | null = null;
@@ -106,6 +109,12 @@ export class Gallery {
   loadPhotos(photos: Photo[]) {
     this.photos = smartSortPhotos(photos);
     this.renderCarousel();
+    this.applyFilters();
+  }
+
+  /** The order of the grid (the hero carousel stays shuffled). */
+  setSort(sort: GallerySort) {
+    this.sort = sort;
     this.applyFilters();
   }
 
@@ -156,24 +165,7 @@ export class Gallery {
    * '(no setup)' sentinel for unlinked photos. Setups no photo uses are omitted.
    */
   getAllSetups(): { setupId: string; name: string; count: number }[] {
-    const counts = new Map<string, number>();
-    for (const p of this.photos) {
-      const id =
-        p.gearSetupId && this.setupNameById.has(p.gearSetupId) ? p.gearSetupId : '(no setup)';
-      counts.set(id, (counts.get(id) || 0) + 1);
-    }
-    return Array.from(counts.entries())
-      .map(([setupId, count]) => ({
-        setupId,
-        name:
-          setupId === '(no setup)' ? '(no setup)' : (this.setupNameById.get(setupId) ?? setupId),
-        count,
-      }))
-      .sort((a, b) => {
-        if (a.setupId === '(no setup)') return 1; // sentinel last
-        if (b.setupId === '(no setup)') return -1;
-        return a.name.localeCompare(b.name);
-      });
+    return gallerySetupItems(this.photos, this.setupNameById);
   }
 
   setSearchQuery(query: string) {
@@ -219,116 +211,31 @@ export class Gallery {
     );
   }
 
-  /** The photos currently passing the active filters, in display (smart-sorted) order. */
+  /** The photos currently passing the active filters, in the chosen display order. */
   getFilteredPhotos(): Photo[] {
     return [...this.filteredPhotos];
   }
 
   getAllLabels(): { label: string; count: number }[] {
-    const counts = new Map<string, number>();
-    for (const p of this.photos) {
-      const labels = p.labels.length ? p.labels : ['(no label)'];
-      for (const l of labels) counts.set(l, (counts.get(l) || 0) + 1);
-    }
-    return Array.from(counts.entries())
-      .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return buildLabelFilterItems(this.photos);
   }
 
   private applyFilters() {
-    let filtered = [...this.photos];
-
-    // Filter by search query — filename, dsoIds, labels, notes
-    if (this.searchQuery) {
-      const q = this.searchQuery;
-      filtered = filtered.filter(
-        (photo) =>
-          photo.originalName.toLowerCase().includes(q) ||
-          photo.dsoIds.some((id) => id.toLowerCase().includes(q)) ||
-          photo.labels.some((l) => l.toLowerCase().includes(q)) ||
-          (photo.pointsOfInterest ?? []).some((p) => p.name.toLowerCase().includes(q)) ||
-          photo.notes.toLowerCase().includes(q),
-      );
-    }
-
-    // Filter by labels — null means no filter; (no label) sentinel controls unlabelled photos
-    if (this.filterByLabels !== null) {
-      const sel = this.filterByLabels;
-      filtered = filtered.filter((photo) =>
-        photo.labels.length === 0
-          ? sel.includes('(no label)')
-          : photo.labels.some((l) => sel.includes(l)),
-      );
-    }
-
-    // Filter by gear setup — null means no filter; (no setup) sentinel controls unlinked photos
-    if (this.filterBySetups !== null) {
-      const sel = this.filterBySetups;
-      filtered = filtered.filter((photo) => {
-        const id =
-          photo.gearSetupId && this.setupNameById.has(photo.gearSetupId)
-            ? photo.gearSetupId
-            : '(no setup)';
-        return sel.includes(id);
-      });
-    }
-
-    // Filter by DSO types — photos with no DSO always pass; others need at least one match
-    if (this.filterByDSOTypes && this.filterByDSOTypes.length > 0) {
-      const sel = this.filterByDSOTypes;
-      filtered = filtered.filter(
-        (photo) =>
-          photo.dsoIds.length === 0 ||
-          photo.dsoIds.some((id) => {
-            const dso = getDSOById(id);
-            return dso && sel.includes(dso.type);
-          }),
-      );
-    }
-
-    // Filter by DSO catalogs — check dsoIds if present, fall back to originalName
-    if (this.filterByDSOCatalogs && this.filterByDSOCatalogs.length > 0) {
-      const sel = this.filterByDSOCatalogs;
-      const matchesCatalog = (name: string): boolean => {
-        const upper = name.toUpperCase();
-        return sel.some((cat) => {
-          const p = cat.toUpperCase();
-          return (
-            upper.startsWith(p + ' ') ||
-            upper.startsWith(p + '-') ||
-            upper === p ||
-            (upper.startsWith(p) && upper.length > p.length && /[\d\s\-]/.test(upper[p.length]))
-          );
-        });
-      };
-      filtered = filtered.filter((photo) =>
-        photo.dsoIds.length > 0
-          ? photo.dsoIds.some((id) => matchesCatalog(id))
-          : matchesCatalog(photo.originalName),
-      );
-    }
-
-    // Two-level POI filter — only photos with ≥1 selected POI pass (positive selection).
-    if (this.filterByPois) {
-      filtered = filtered.filter((photo) =>
-        poisMatchFilter(photo.pointsOfInterest ?? [], this.poiCategories, this.filterByPois),
-      );
-    }
-
-    // Observation-date range — strict: a photo with no observationDate can't satisfy
-    // an explicit date constraint, so it drops out while the filter is active.
-    // ISO 8601 date strings compare lexicographically, so slice off the UTC day.
-    if (this.filterByDateFrom) {
-      const from = this.filterByDateFrom;
-      const to = this.filterByDateTo ?? from;
-      filtered = filtered.filter((photo) => {
-        if (!photo.observationDate) return false;
-        const day = photo.observationDate.slice(0, 10);
-        return day >= from && day <= to;
-      });
-    }
-
-    this.filteredPhotos = filtered;
+    const filtered = filterGalleryPhotos(
+      this.photos,
+      {
+        query: this.searchQuery,
+        labels: this.filterByLabels,
+        setups: this.filterBySetups,
+        pois: this.filterByPois,
+        dsoTypes: this.filterByDSOTypes,
+        dsoCatalogs: this.filterByDSOCatalogs,
+        dateFrom: this.filterByDateFrom,
+        dateTo: this.filterByDateTo,
+      },
+      { knownSetupIds: new Set(this.setupNameById.keys()), poiCategories: this.poiCategories },
+    );
+    this.filteredPhotos = sortGalleryPhotos(filtered, this.sort);
     this.renderMosaic();
   }
 

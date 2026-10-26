@@ -27,15 +27,31 @@ import {
   type PendingState,
 } from '../pending-photos';
 import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pending-solve';
-import { loadGalleryDisplay, photosPerLine, type Orientation } from '../gallery-display';
+import {
+  clearGalleryFilters,
+  galleryFilters,
+  gallerySort,
+  loadGalleryDisplay,
+  photosPerLine,
+  setGallerySort,
+  type Orientation,
+} from '../gallery-display';
+import {
+  filterGalleryPhotos,
+  GALLERY_SORT_LABEL_KEYS,
+  GALLERY_SORTS,
+  sortGalleryPhotos,
+  type GallerySort,
+} from '@myastrosky/core/gallery-filter';
 import { skyPlacement } from '../sky-modes';
 import { endIdentify } from '../star-identify-session';
 import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import GalleryDisplaySheet from './gallery/GalleryDisplaySheet.vue';
 import PhotoTile from '../components/PhotoTile.vue';
+import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import { photoTags, type PhotoTag } from '../photo-tags';
 import { PHOTO_FILE_TYPES, pickFiles, pickGalleryPhotos } from '../platform-device';
-import filterIcon from '../icons/filter.svg?raw';
+import sortIcon from '../icons/arrow-up-down.svg?raw';
 import slidersIcon from '../icons/sliders.svg?raw';
 import folderIcon from '../icons/folder.svg?raw';
 import imageIcon from '@icons/image.svg?raw';
@@ -77,9 +93,33 @@ function tagsOf(photo: Photo): PhotoTag[] {
   );
 }
 
+// The photos the search and the filters of the "Affichage" sheet keep, in the order of the "Trier par" sheet (the
+// desktop gallery's).
+const shownPhotos = computed(() =>
+  sortGalleryPhotos(
+    filterGalleryPhotos(photos.value ?? [], galleryFilters, {
+      knownSetupIds: new Set(setupNames.value.keys()),
+      poiCategories: poiCategories.categories,
+    }),
+    gallerySort.value,
+  ),
+);
+const sortOpen = ref(false);
+const sortOptions = GALLERY_SORTS.map((value) => ({
+  value,
+  label: t(GALLERY_SORT_LABEL_KEYS[value]),
+}));
+const sort = computed({
+  get: () => gallerySort.value,
+  set: (value: GallerySort | undefined) => {
+    if (value) setGallerySort(value);
+    sortOpen.value = false;
+  },
+});
+
 // The cards are drawn a part at a time as the grid is scrolled (a gallery can hold hundreds of photos).
 const TILES_CHUNK = 24;
-const growing = useGrowingList(() => photos.value ?? [], TILES_CHUNK);
+const growing = useGrowingList(() => shownPhotos.value, TILES_CHUNK);
 const tiles = computed(() =>
   growing.shown.value.map((photo) => ({
     id: photo.id,
@@ -162,6 +202,14 @@ function solveOnline() {
 const isEmpty = computed(
   () => photos.value !== null && photos.value.length === 0 && waiting.value.length === 0,
 );
+/** Photos there are, but the search or the filters keep none of them. */
+const noMatch = computed(
+  () =>
+    !isEmpty.value &&
+    !!photos.value?.length &&
+    shownPhotos.value.length === 0 &&
+    !waiting.value.length,
+);
 
 // Whether the tab is shown. Left (another tab chosen), the pictures still loading stop and a reading that ends then is
 // dropped: the next showing reads the photos again.
@@ -228,14 +276,15 @@ async function addPicked(pick: () => Promise<File[]>) {
   <IonPage>
     <PhoneTopBar>
       <PhoneSearch
+        v-model="galleryFilters.query"
         :placeholder="t('photos.searchPlaceholder')"
         :label="t('mobile.gallery.searchLabel')"
       />
       <PhoneIconButton :label="t('display.section')" @click="displayOpen = true"
         ><AppIcon :svg="slidersIcon"
       /></PhoneIconButton>
-      <PhoneIconButton :label="t('targets.moreFilters')"
-        ><AppIcon :svg="filterIcon"
+      <PhoneIconButton :label="t('targets.sort.label')" @click="sortOpen = true"
+        ><AppIcon :svg="sortIcon"
       /></PhoneIconButton>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
@@ -246,6 +295,12 @@ async function addPicked(pick: () => Promise<File[]>) {
           :button-label="t('batch.modalTitle')"
           :button-icon="plusIcon"
           @action="adding = true"
+        />
+        <PhoneEmptyState
+          v-else-if="noMatch"
+          :text="t('gallery.noMatches')"
+          :button-label="t('mobile.gallery.clearFilters')"
+          @action="(clearGalleryFilters(), (galleryFilters.query = ''))"
         />
         <div v-else class="mob-photo-grid" :style="gridStyle">
           <PhotoTile
@@ -283,7 +338,18 @@ async function addPicked(pick: () => Promise<File[]>) {
       @identify="identify"
       @hand="placeByHand"
     />
-    <GalleryDisplaySheet v-model:open="displayOpen" :orientation="orientation" />
+    <GalleryDisplaySheet
+      v-model:open="displayOpen"
+      :orientation="orientation"
+      :photos="photos ?? []"
+      :setup-names="setupNames"
+    />
+    <PhoneRadioSheet
+      v-model:open="sortOpen"
+      v-model:value="sort"
+      :title="t('targets.sort.label')"
+      :options="sortOptions"
+    />
     <PhoneSheet v-model:open="adding" :title="t('batch.modalTitle')">
       <PhoneRow
         button

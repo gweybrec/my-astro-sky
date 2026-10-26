@@ -265,6 +265,33 @@
       </DropdownPanel>
     </div>
 
+    <!-- Sort order (kept between sessions, unlike the filters) -->
+    <div class="display-controls-mag-row">
+      <button
+        ref="sortBtnRef"
+        type="button"
+        class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
+        @click.stop="sortOpen = !sortOpen"
+      >
+        {{ t('gallery.sortValue', { value: t(`gallery.sortShort.${sort}`) }) }}
+      </button>
+      <DropdownPanel v-model="sortOpen" :anchor-el="sortBtnRef" min-width="240px">
+        <label
+          v-for="option in GALLERY_SORTS"
+          :key="option"
+          class="dso-toggle-label labels-select-all-row"
+        >
+          <input
+            type="radio"
+            name="gallery-sort"
+            :checked="sort === option"
+            @change="chooseSort(option)"
+          />
+          <span class="ml-4">{{ t(GALLERY_SORT_LABEL_KEYS[option]) }}</span>
+        </label>
+      </DropdownPanel>
+    </div>
+
     <!-- Export -->
     <button
       type="button"
@@ -309,6 +336,13 @@ import { getGearSetups } from '../../api';
 import { downloadBlob } from '../../file-utils';
 import { reportUnknownRendererError } from '../../error-reporter';
 import exportSvg from '../../icons/export.svg?raw';
+import {
+  GALLERY_SORTS,
+  GALLERY_SORT_LABEL_KEYS,
+  loadGallerySort,
+  saveGallerySort,
+  type GallerySort,
+} from '@myastrosky/core/gallery-filter';
 
 const { t } = useI18n();
 const uiStore = useUiStore();
@@ -503,6 +537,18 @@ function clearDateRange() {
   canvasStore.gallery?.setDateRangeFilter(null, null);
 }
 
+// ── Sort order ────────────────────────────────────────────────────────────────
+const sortBtnRef = ref<HTMLButtonElement>();
+const sortOpen = ref(false);
+const sort = ref<GallerySort>(loadGallerySort());
+
+function chooseSort(next: GallerySort) {
+  sort.value = next;
+  sortOpen.value = false;
+  saveGallerySort(next);
+  canvasStore.gallery?.setSort(next);
+}
+
 // ── Init / reset filters on gallery entry/exit ────────────────────────────────
 watch(viewMode, (mode) => {
   if (mode === 'gallery') {
@@ -519,6 +565,7 @@ watch(viewMode, (mode) => {
     canvasStore.gallery?.setDSOCatalogFilter([]);
     canvasStore.gallery?.setPoiFilter(null);
     canvasStore.gallery?.setDateRangeFilter(null, null);
+    canvasStore.gallery?.setSort(sort.value);
     refreshLabels();
     void refreshSetups();
     poiCategoriesStore.ensureLoaded();
@@ -538,6 +585,7 @@ watch(viewMode, (mode) => {
   typeOpen.value = false;
   catalogOpen.value = false;
   dateOpen.value = false;
+  sortOpen.value = false;
   batchEditMode.value = null;
   canvasStore.gallery?.setSearchQuery('');
   canvasStore.gallery?.setSetupFilter(null);

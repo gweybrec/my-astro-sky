@@ -12,6 +12,8 @@ const en: Translations['mobile'] = {
   tabs: { sky: 'Sky', targets: 'Targets', navLabel: 'Navigation' },
   gallery: {
     searchLabel: 'Search for a photo',
+    clearFilters: 'Clear filters',
+    noDate: 'no date',
     empty: 'No photos yet',
     chooseFiles: 'Choose files',
     formats: 'JPEG, PNG, TIF, TIFF, FIT, FITS, XISF',

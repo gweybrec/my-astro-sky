@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { ionicStubs } from './helpers';
 
 const getPhotos = vi.fn();
@@ -44,7 +44,7 @@ vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({ confirm }
 
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import GalleryPage from '../src/pages/GalleryPage.vue';
-import { loadGalleryDisplay } from '../src/gallery-display';
+import { clearGalleryFilters, galleryFilters, loadGalleryDisplay } from '../src/gallery-display';
 import { skyPlacement } from '../src/sky-modes';
 import { clearImport, importItems } from '../src/composables/usePhotoImport';
 import {
@@ -56,6 +56,8 @@ import {
   setPendingState,
 } from '../src/pending-photos';
 
+// Each page is unmounted after its test: a page left mounted would keep reacting to the shared search and filters.
+enableAutoUnmount(afterEach);
 const mountPage = () => mount(GalleryPage, { global: { stubs: ionicStubs } });
 const rowWith = (wrapper: ReturnType<typeof mountPage>, text: string) =>
   wrapper.findAll('.mob-row').find((r) => r.text().includes(text))!;
@@ -67,6 +69,8 @@ describe('the gallery page', () => {
     getGearSetups.mockReset().mockResolvedValue([{ id: 's1', name: 'Newton 200 + ASI 183' }]);
     configureStorage(createMemoryStore());
     loadGalleryDisplay();
+    clearGalleryFilters();
+    galleryFilters.query = '';
     push.mockReset();
     pickFiles.mockReset();
     pickGalleryPhotos.mockReset();
@@ -393,7 +397,7 @@ describe('the gallery page', () => {
     expect(grid()).toContain('--photos-per-line-landscape: 6');
     expect(wrapper.findAll('header button').map((b) => b.attributes('aria-label'))).toEqual([
       'Affichage',
-      'Plus de filtres',
+      'Trier par',
     ]);
     await wrapper.find('button[aria-label="Affichage"]').trigger('click');
     const group = wrapper.findComponent({ name: 'PhoneSegmented' });
@@ -409,6 +413,161 @@ describe('the gallery page', () => {
     const again = mountPage();
     await flushPromises();
     expect(again.find('.mob-photo-grid').attributes('style')).toContain('--photos-per-line: 3');
+  });
+
+  describe('sorting, search and filters', () => {
+    const PHOTOS = [
+      {
+        id: 'a',
+        originalName: 'M100',
+        filename: 'a.jpg',
+        observationDate: '2024-03-14T21:05:00.000Z',
+        dsoIds: [],
+        labels: ['nebula'],
+        notes: '',
+      },
+      {
+        id: 'b',
+        originalName: 'M2',
+        filename: 'b.jpg',
+        observationDate: '2025-01-02T03:30:00.000Z',
+        dsoIds: [],
+        labels: [],
+        notes: '',
+      },
+      {
+        id: 'c',
+        originalName: 'Andromeda',
+        filename: 'c.jpg',
+        observationDate: null,
+        dsoIds: ['M31'],
+        labels: ['galaxy'],
+        notes: '',
+      },
+    ];
+    const names = (wrapper: ReturnType<typeof mountPage>) =>
+      wrapper.findAll('.mob-photo-card').map((c) => c.attributes('aria-label'));
+    const checkSheet = (wrapper: ReturnType<typeof mountPage>, title: string) =>
+      wrapper.findAllComponents({ name: 'SkyCheckSheet' }).find((c) => c.props('title') === title)!;
+
+    it('shows the photos in natural name order, a photo named after no catalogue by its object', async () => {
+      getPhotos.mockResolvedValue(PHOTOS);
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(names(wrapper)).toEqual(['M2', 'Andromeda', 'M100']);
+    });
+
+    it('reorders the photos from "Trier par" and keeps the choice', async () => {
+      getPhotos.mockResolvedValue(PHOTOS);
+      const wrapper = mountPage();
+      await flushPromises();
+      await wrapper.find('button[aria-label="Trier par"]').trigger('click');
+      const sheet = wrapper.findComponent({ name: 'PhoneRadioSheet' });
+      expect(sheet.props('open')).toBe(true);
+      expect(sheet.props('options').map((o: { label: string }) => o.label)).toEqual([
+        'Nom (A–Z)',
+        'Nom (Z–A)',
+        "Date d'observation (récentes d'abord)",
+        "Date d'observation (anciennes d'abord)",
+      ]);
+      sheet.vm.$emit('update:value', 'date-desc');
+      await flushPromises();
+      expect(names(wrapper)).toEqual(['M2', 'M100', 'Andromeda']);
+      expect(sheet.props('open')).toBe(false);
+      loadGalleryDisplay();
+      const again = mountPage();
+      await flushPromises();
+      expect(names(again)).toEqual(['M2', 'M100', 'Andromeda']);
+    });
+
+    it('keeps the photos the search finds', async () => {
+      getPhotos.mockResolvedValue(PHOTOS);
+      const wrapper = mountPage();
+      await flushPromises();
+      wrapper.findComponent({ name: 'PhoneSearch' }).vm.$emit('update:modelValue', 'm31');
+      await flushPromises();
+      expect(names(wrapper)).toEqual(['Andromeda']);
+    });
+
+    it('hides the photos of an unticked label, and says when no photo is left', async () => {
+      getPhotos.mockResolvedValue(PHOTOS);
+      const wrapper = mountPage();
+      await flushPromises();
+      await wrapper.find('button[aria-label="Affichage"]').trigger('click');
+      expect(wrapper.text()).toContain('Filtres');
+      expect(wrapper.find('button[aria-label="Étiquettes : 3 sur 3"]').exists()).toBe(true);
+      const labels = checkSheet(wrapper, 'Étiquettes');
+      expect(labels.props('options').map((o: { label: string }) => o.label)).toEqual([
+        '(sans étiquette)',
+        'galaxy',
+        'nebula',
+      ]);
+      labels.vm.$emit('update:selected', ['nebula']);
+      await flushPromises();
+      expect(names(wrapper)).toEqual(['M100']);
+      expect(wrapper.find('button[aria-label="Étiquettes : 1 sur 3"]').exists()).toBe(true);
+
+      labels.vm.$emit('update:selected', []);
+      await flushPromises();
+      expect(wrapper.find('.mob-empty-text').text()).toBe('Aucune photo correspondante');
+      await wrapper.find('.mob-empty button').trigger('click');
+      await flushPromises();
+      expect(names(wrapper)).toEqual(['M2', 'Andromeda', 'M100']);
+    });
+
+    it('ticking every value again turns the filter off', async () => {
+      getPhotos.mockResolvedValue(PHOTOS);
+      const wrapper = mountPage();
+      await flushPromises();
+      await wrapper.find('button[aria-label="Affichage"]').trigger('click');
+      const types = checkSheet(wrapper, 'Types');
+      const all = types.props('options').map((o: { value: string }) => o.value);
+      types.vm.$emit('update:selected', all.slice(1));
+      await flushPromises();
+      expect(galleryFilters.dsoTypes).toHaveLength(all.length - 1);
+      types.vm.$emit('update:selected', all);
+      await flushPromises();
+      expect(galleryFilters.dsoTypes).toBeNull();
+    });
+
+    it('keeps the photos of the chosen days, "Au" waiting for "Du"', async () => {
+      getPhotos.mockResolvedValue(PHOTOS);
+      const wrapper = mountPage();
+      await flushPromises();
+      await wrapper.find('button[aria-label="Affichage"]').trigger('click');
+      const to = () => wrapper.find('button[aria-label="Au : aucune date"]');
+      expect(to().attributes('disabled')).toBeDefined();
+      const [fromPicker, toPicker] = wrapper.findAllComponents({ name: 'PhoneNativePicker' });
+      fromPicker.vm.$emit('pick', '2024-03-14');
+      await flushPromises();
+      expect(names(wrapper)).toEqual(['M100']);
+      expect(to().attributes('disabled')).toBeUndefined();
+      toPicker.vm.$emit('pick', '2025-01-02');
+      await flushPromises();
+      expect(names(wrapper)).toEqual(['M2', 'M100']);
+      // Emptying "Du" empties "Au" too.
+      fromPicker.vm.$emit('clear');
+      await flushPromises();
+      expect(galleryFilters.dateTo).toBeNull();
+      expect(names(wrapper)).toEqual(['M2', 'Andromeda', 'M100']);
+    });
+
+    it('"Effacer les filtres" shows every photo again and keeps the search', async () => {
+      getPhotos.mockResolvedValue(PHOTOS);
+      const wrapper = mountPage();
+      await flushPromises();
+      await wrapper.find('button[aria-label="Affichage"]').trigger('click');
+      const clear = () =>
+        wrapper.findAll('button').find((b) => b.text() === 'Effacer les filtres')!;
+      expect(clear().attributes('disabled')).toBeDefined();
+      galleryFilters.query = 'm';
+      checkSheet(wrapper, 'Étiquettes').vm.$emit('update:selected', ['nebula']);
+      await flushPromises();
+      await clear().trigger('click');
+      await flushPromises();
+      expect(galleryFilters.labels).toBeNull();
+      expect(galleryFilters.query).toBe('m');
+    });
   });
 
   it("opens the import with the pictures chosen in the phone's gallery", async () => {

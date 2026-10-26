@@ -1083,6 +1083,41 @@ describe('Gallery', () => {
 
   // ── Observation-date range filter ─────────────────────────────────────────
 
+  describe('setSort', () => {
+    const shownNames = () =>
+      Array.from(document.querySelectorAll('.gallery-item-name')).map((n) => n.textContent);
+    const load = () => {
+      const gallery = new Gallery();
+      gallery.loadPhotos([
+        makePhoto({ id: 'a', originalName: 'M100', observationDate: '2024-03-14T21:05:00.000Z' }),
+        makePhoto({ id: 'b', originalName: 'M2', observationDate: '2025-01-02T03:30:00.000Z' }),
+        makePhoto({ id: 'c', originalName: 'M31', observationDate: null }),
+      ]);
+      return gallery;
+    };
+
+    it('shows the cards by name (catalogue-aware) until another order is chosen', () => {
+      load();
+      expect(shownNames()).toEqual(['M2', 'M31', 'M100']);
+    });
+
+    it('reorders the cards by name descending and by date, undated photos last', () => {
+      const gallery = load();
+      gallery.setSort('name-desc');
+      expect(shownNames()).toEqual(['M100', 'M31', 'M2']);
+      gallery.setSort('date-desc');
+      expect(shownNames()).toEqual(['M2', 'M100', 'M31']);
+      gallery.setSort('date-asc');
+      expect(shownNames()).toEqual(['M100', 'M2', 'M31']);
+    });
+
+    it('keeps the chosen order in the filtered photos the export uses', () => {
+      const gallery = load();
+      gallery.setSort('date-asc');
+      expect(gallery.getFilteredPhotos().map((p) => p.id)).toEqual(['a', 'b', 'c']);
+    });
+  });
+
   describe('setDateRangeFilter', () => {
     const dated = () => {
       const gallery = new Gallery();
