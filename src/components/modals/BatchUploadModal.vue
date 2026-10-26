@@ -381,9 +381,11 @@ function addMorePhotos() {
       showToast({ message: t('errors.someFilesSkipped'), type: 'error', duration: 3500 });
     }
     // New items join as 'pending' (or 'converting'), bumping the total/unsolved count.
-    const newItems = valid.map(createBatchItem);
-    items.push(...newItems);
-    enqueueForConversion(newItems);
+    // Enqueue the reactive items read back from the array, not the plain objects pushed:
+    // conversion progress and status written to a plain object never reach the window.
+    const start = items.length;
+    items.push(...valid.map(createBatchItem));
+    enqueueForConversion(items.slice(start));
   };
   input.click();
 }

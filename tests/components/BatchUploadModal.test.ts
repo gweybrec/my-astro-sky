@@ -264,6 +264,39 @@ describe('BatchUploadModal — raw file conversion', () => {
     wrapper.unmount();
   });
 
+  it('updates the window when a raw file added with "Add more" finishes converting', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    let resolveConvert: (v: unknown) => void = () => {};
+    convertRawPhoto.mockReturnValue(new Promise((resolve) => (resolveConvert = resolve)));
+    // The file picker is never shown: clicking it hands back the chosen file straight away.
+    const pick = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      Object.defineProperty(this, 'files', { value: [fit('M101.fit')] });
+      (this.onchange as () => void)();
+    });
+
+    const wrapper = mountModal();
+    await flushPromises();
+    const startBtn = () => wrapper.find('.batch-footer-buttons .btn-action');
+
+    await wrapper.find('.batch-add-more-btn').trigger('click');
+    await flushPromises();
+    expect(startBtn().attributes('disabled')).toBeDefined(); // converting
+
+    resolveConvert({
+      png: new File(['png'], 'M101.png', { type: 'image/png' }),
+      meta: { success: false },
+    });
+    await flushPromises();
+
+    // Read from what is drawn: the item object itself changes even when the window does not.
+    expect(startBtn().attributes('disabled')).toBeUndefined();
+
+    pick.mockRestore();
+    wrapper.unmount();
+  });
+
   it('does not enqueue plain jpg/png files for conversion', async () => {
     state.pendingFiles = [jpeg('a.jpg')];
     const wrapper = mountModal();
