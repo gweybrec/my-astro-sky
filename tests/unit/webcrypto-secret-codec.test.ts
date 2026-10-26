@@ -58,6 +58,19 @@ describe('createWebCryptoSecretCodec', () => {
     expect(await createWebCryptoSecretCodec({ crypto, keyStore: keys }).decrypt(stored)).toBe('k');
   });
 
+  it('a key saved after the key store was emptied can be read back', async () => {
+    const keys = memoryKeyStore();
+    const codec = createWebCryptoSecretCodec({ crypto, keyStore: keys });
+    await codec.encrypt('old');
+    keys.key = null; // the WebView's storage was cleared while the app was open
+    const stored = await codec.encrypt('new');
+    expect(keys.key).not.toBeNull();
+    expect(await codec.decrypt(stored)).toBe('new');
+    expect(await createWebCryptoSecretCodec({ crypto, keyStore: keys }).decrypt(stored)).toBe(
+      'new',
+    );
+  });
+
   it('returns a value without the prefix unchanged', async () => {
     const codec = createWebCryptoSecretCodec({ crypto, keyStore: memoryKeyStore() });
     expect(await codec.decrypt('plain-key')).toBe('plain-key');
