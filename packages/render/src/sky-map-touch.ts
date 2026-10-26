@@ -9,8 +9,9 @@
  * (`pickDSOAt`) instead of relying on a previous hover.
  *
  * Region drawing and frames take a finger first, as they take the mouse first: while one is
- * active, the other gestures (pan, pinch, tap, long press) are off so they cannot conflict. A second
- * finger while a region is drawn moves the map instead: the stroke begun is dropped.
+ * active, the other gestures (pan, tap, long press) are off so they cannot conflict. A frame follows
+ * the finger only once it has moved past the tap slop. A second finger always moves and zooms the map
+ * instead: the stroke begun is dropped, and the frame is let go where it is.
  */
 import type { Star, ViewState } from '@myastrosky/core/types';
 import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
@@ -48,6 +49,8 @@ export interface SkyTouchHost {
   frameDragActive(): boolean;
   frameDragMove(mx: number, my: number): void;
   frameMouseUp(): void;
+  /** Lets go of the frame being dragged where it is, without a snap or a merge (a second finger zooms the map). */
+  frameDragCancel(): void;
 
   cancelAnimation(): void;
   dismissTooltip(): void;
@@ -96,6 +99,8 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
   let prevAngle = 0;
   /** What the first finger is doing: the map, a region being drawn or a frame being dragged. */
   let mode: 'view' | 'region' | 'frame' = 'view';
+  /** The finger on a frame has moved past the tap slop: the frame follows it. */
+  let frameFollows = false;
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 
   const local = (x: number, y: number) => {
@@ -141,7 +146,12 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
       host.requestRenderInteractive();
       mode = 'view';
     }
-    // A frame gesture owns the touch: a second finger does nothing.
+    // A second finger on a frame gesture: the frame is let go where it is, the two fingers move and zoom the map.
+    if (mode === 'frame' && fingers.size === 1) {
+      host.frameDragCancel();
+      host.requestRenderInteractive();
+      mode = 'view';
+    }
     if (mode !== 'view') return;
     fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -154,12 +164,13 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
         host.requestRenderInteractive();
         return;
       }
-      if (host.frameMouseDown(mx, my)) {
-        mode = 'frame';
-        return;
-      }
       startX = e.clientX;
       startY = e.clientY;
+      if (host.frameMouseDown(mx, my)) {
+        mode = 'frame';
+        frameFollows = false;
+        return;
+      }
       notATap = false;
       anchorAt(e.clientX, e.clientY);
       clearTimer();
@@ -194,6 +205,10 @@ export function attachSkyMapTouch(host: SkyTouchHost): EventBinding[] {
           host.requestRenderInteractive();
         }
       } else if (host.frameDragActive()) {
+        // A finger held still on a frame leaves it in place, so a second finger can still turn the touch into a pinch.
+        if (!frameFollows && Math.hypot(e.clientX - startX, e.clientY - startY) <= TAP_SLOP_PX)
+          return;
+        frameFollows = true;
         host.frameDragMove(mx, my);
       }
       return;

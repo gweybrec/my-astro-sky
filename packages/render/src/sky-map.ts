@@ -1275,6 +1275,7 @@ export class SkyMap {
       frameDragActive: () => this.frames.activeDrag !== null,
       frameDragMove: (mx, my) => this.frames.handleDragMove(mx, my),
       frameMouseUp: () => this.frames.handleMouseUp(),
+      frameDragCancel: () => this.frames.clearInteraction(),
       cancelAnimation: () => this.cancelAnimation(),
       dismissTooltip: () => this.dismissTooltip(),
       requestRenderInteractive: () => this.requestRenderInteractive(),

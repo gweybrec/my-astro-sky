@@ -55,6 +55,7 @@ function makeHost(over: Partial<SkyTouchHost> = {}) {
     frameMouseDown: vi.fn(() => false),
     frameDragMove: vi.fn(),
     frameMouseUp: vi.fn(),
+    frameDragCancel: vi.fn(),
   };
   const state = { region: false, capturing: false, frameDrag: false };
   const host = {
@@ -444,6 +445,46 @@ describe('frames with a finger', () => {
     expect(view.centerX).toBe(0);
     fire(canvas, 'pointerup', 1, 560, 430);
     expect(calls.frameMouseUp).toHaveBeenCalled();
+  });
+
+  it('leaves a grabbed frame in place while the finger stays inside the tap slop', () => {
+    const { canvas, calls, state } = setup({ frameMouseDown: vi.fn(() => true) });
+    state.frameDrag = true;
+    fire(canvas, 'pointerdown', 1, 500, 400);
+    fire(canvas, 'pointermove', 1, 504, 403);
+    expect(calls.frameDragMove).not.toHaveBeenCalled();
+    fire(canvas, 'pointermove', 1, 530, 400);
+    expect(calls.frameDragMove).toHaveBeenCalledWith(530, 400);
+  });
+
+  it('lets go of the frame and zooms the map when a second finger lands', () => {
+    const { canvas, view, calls, state } = setup({ frameMouseDown: vi.fn(() => true) });
+    state.frameDrag = true;
+    fire(canvas, 'pointerdown', 1, 500, 400);
+    fire(canvas, 'pointerdown', 2, 600, 400);
+    expect(calls.frameDragCancel).toHaveBeenCalledTimes(1);
+    state.frameDrag = false;
+    fire(canvas, 'pointermove', 2, 700, 400);
+    expect(view.scale).toBeGreaterThan(600);
+    expect(calls.frameDragMove).not.toHaveBeenCalled();
+    fire(canvas, 'pointerup', 1, 500, 400);
+    fire(canvas, 'pointerup', 2, 700, 400);
+    expect(calls.frameMouseUp).not.toHaveBeenCalled();
+    expect(calls.emitClearSelection).not.toHaveBeenCalled();
+  });
+
+  it('lets go of a frame already being moved when a second finger lands', () => {
+    const { canvas, view, calls, state } = setup({ frameMouseDown: vi.fn(() => true) });
+    state.frameDrag = true;
+    fire(canvas, 'pointerdown', 1, 500, 400);
+    fire(canvas, 'pointermove', 1, 540, 400);
+    expect(calls.frameDragMove).toHaveBeenCalledTimes(1);
+    fire(canvas, 'pointerdown', 2, 640, 400);
+    expect(calls.frameDragCancel).toHaveBeenCalledTimes(1);
+    state.frameDrag = false;
+    fire(canvas, 'pointermove', 2, 740, 400);
+    expect(view.scale).toBeGreaterThan(600);
+    expect(calls.frameDragMove).toHaveBeenCalledTimes(1);
   });
 
   it('lets a touch that misses every frame pan the map', () => {
