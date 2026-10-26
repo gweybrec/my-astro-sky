@@ -1,5 +1,9 @@
 import type DatabaseConstructor from 'better-sqlite3';
-import { MIGRATIONS, type DataMigration } from '@myastrosky/core/db/schema';
+import {
+  MIGRATIONS,
+  REBUILD_BROKE_REFERENCES,
+  type DataMigration,
+} from '@myastrosky/core/db/schema';
 
 type Database = DatabaseConstructor.Database;
 
@@ -368,8 +372,9 @@ export function applyMigrations(database: Database): number {
 
 /**
  * Run the SQL-only migrations (version 15 and above, defined in core's `schema.ts`) above
- * `fromVersion`. Each migration's statements and the version update share one transaction.
- * Returns the final version.
+ * `fromVersion`. Each migration's statements and the version update share one transaction; a
+ * migration that rebuilds a table runs with foreign keys switched off, as in core's
+ * `runDataMigrations`. Returns the final version.
  */
 export function applyDataMigrations(
   database: Database,
@@ -379,10 +384,26 @@ export function applyDataMigrations(
   let current = fromVersion;
   for (const migration of migrations) {
     if (migration.version <= current) continue;
-    database.transaction(() => {
+    const danglingRows = () => (database.pragma('foreign_key_check') as unknown[]).length;
+    const run = database.transaction(() => {
+      const before = migration.rebuildsTable ? danglingRows() : 0;
       for (const sql of migration.statements) database.exec(sql);
       database.prepare('UPDATE schema_version SET version = ?').run(migration.version);
-    })();
+      if (migration.rebuildsTable && danglingRows() > before) {
+        throw new Error(REBUILD_BROKE_REFERENCES);
+      }
+    });
+    if (migration.rebuildsTable) {
+      const foreignKeys = database.pragma('foreign_keys', { simple: true }) as number;
+      database.pragma('foreign_keys = OFF');
+      try {
+        run();
+      } finally {
+        database.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
+      }
+    } else {
+      run();
+    }
     current = migration.version;
   }
   return current;

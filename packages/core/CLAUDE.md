@@ -17,3 +17,4 @@ everywhere (`src/`, `server/`, `tests/`); no one-line re-export files remain (ES
 - Type-check with `npm run typecheck:core`.
 - **Schema changes:** new migrations (version 15 and above) are SQL statements added to `MIGRATIONS` in `src/db/schema.ts`.
   Update `BASELINE_SCHEMA` and `SCHEMA_VERSION` in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise.
+  A migration that drops and recreates a table other tables point at sets `rebuildsTable` (SQLite cannot change a column in place).

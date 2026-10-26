@@ -784,12 +784,82 @@ describe('applyMigrations — v16 photo dates in ISO form', () => {
     ins.run('iso', 'b.jpg', 'b.jpg', 1, 1, '2026-03-04T05:06:07.123Z');
     ins.run('none', 'c.jpg', 'c.jpg', 1, 1, null);
     ins.run('odd', 'd.jpg', 'd.jpg', 1, 1, '2026-03-04 05:06');
-    expect(applyMigrations(db)).toBe(16);
+    expect(applyMigrations(db)).toBe(SCHEMA_VERSION);
     expect(db.prepare('SELECT id, created_at FROM photos ORDER BY id').all()).toEqual([
       { id: 'iso', created_at: '2026-03-04T05:06:07.123Z' },
       { id: 'none', created_at: null },
       { id: 'odd', created_at: '2026-03-04 05:06' },
       { id: 'old', created_at: '2026-03-04T05:06:07.000Z' },
     ]);
+  });
+});
+
+describe('applyMigrations — v17 photos table rebuilt with an ISO date default', () => {
+  it('keeps every photo, every star match and the link between them', () => {
+    const db = freshBaseDb();
+    db.pragma('foreign_keys = ON');
+    const photo = db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    );
+    photo.run('p1', 'p1.jpg', 'P1.jpg', 30, 20, '2026-03-04 05:06:07');
+    photo.run('p2', 'p2.jpg', 'P2.jpg', 40, 10, '2026-03-05T01:02:03.456Z');
+    const match = db.prepare(
+      'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip) VALUES (?, ?, ?, ?, ?)',
+    );
+    match.run('p1', 0, 1, 2, 100);
+    match.run('p1', 1, 3, 4, 200);
+    match.run('p2', 0, 5, 6, 300);
+
+    expect(applyMigrations(db)).toBe(SCHEMA_VERSION);
+    expect(
+      db
+        .prepare(
+          'SELECT id, filename, original_name, width, height, created_at FROM photos ORDER BY id',
+        )
+        .all(),
+    ).toEqual([
+      {
+        id: 'p1',
+        filename: 'p1.jpg',
+        original_name: 'P1.jpg',
+        width: 30,
+        height: 20,
+        created_at: '2026-03-04T05:06:07.000Z',
+      },
+      {
+        id: 'p2',
+        filename: 'p2.jpg',
+        original_name: 'P2.jpg',
+        width: 40,
+        height: 10,
+        created_at: '2026-03-05T01:02:03.456Z',
+      },
+    ]);
+    const matches = () =>
+      db
+        .prepare('SELECT photo_id, point_index, star_hip FROM star_correspondences ORDER BY id')
+        .all();
+    expect(matches()).toEqual([
+      { photo_id: 'p1', point_index: 0, star_hip: 100 },
+      { photo_id: 'p1', point_index: 1, star_hip: 200 },
+      { photo_id: 'p2', point_index: 0, star_hip: 300 },
+    ]);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    db.prepare('DELETE FROM photos WHERE id = ?').run('p1');
+    expect(matches()).toEqual([{ photo_id: 'p2', point_index: 0, star_hip: 300 }]);
+    db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
+    ).run('p3', 'p3.jpg', 'p3.jpg', 1, 1);
+    expect(
+      (db.prepare('SELECT created_at FROM photos WHERE id = ?').get('p3') as { created_at: string })
+        .created_at,
+    ).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it('puts the foreign-key switch back as it found it', () => {
+    const db = freshBaseDb();
+    db.pragma('foreign_keys = OFF'); // better-sqlite3 opens with them on
+    applyMigrations(db);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(0);
   });
 });

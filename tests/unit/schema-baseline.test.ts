@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   BASELINE_SCHEMA,
+  REBUILD_BROKE_REFERENCES,
   SCHEMA_VERSION,
   initSchema,
   runDataMigrations,
@@ -16,6 +17,7 @@ import {
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { applyDataMigrations } from '../../server/db-migrations';
 import { countingSqlDb } from '../helpers/counting-sql-db';
+import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 
 type Conn = Database.Database;
 
@@ -84,9 +86,9 @@ describe('baseline schema equals the server upgrade path', () => {
   });
 
   it('both report the baseline version', () => {
-    expect(SCHEMA_VERSION).toBe(16);
-    expect(version(a)).toBe(16);
-    expect(version(b)).toBe(16);
+    expect(SCHEMA_VERSION).toBe(17);
+    expect(version(a)).toBe(SCHEMA_VERSION);
+    expect(version(b)).toBe(SCHEMA_VERSION);
   });
 
   it('enforces foreign keys on the new database', async () => {
@@ -105,11 +107,11 @@ describe('baseline schema equals the server upgrade path', () => {
 
   it('initSchema is a no-op when run again, on either database', async () => {
     const before = sqlText(b);
-    expect(await initSchema(dbB)).toBe(16);
+    expect(await initSchema(dbB)).toBe(SCHEMA_VERSION);
     expect(sqlText(b)).toEqual(before);
 
     const beforeA = sqlText(a);
-    expect(await initSchema(createBetterSqliteDb(a))).toBe(16);
+    expect(await initSchema(createBetterSqliteDb(a))).toBe(SCHEMA_VERSION);
     expect(sqlText(a)).toEqual(beforeA);
   });
 
@@ -122,19 +124,21 @@ describe('baseline schema equals the server upgrade path', () => {
 });
 
 describe('data migrations', () => {
+  /** The current version; the fake migrations come after it. */
+  const V = SCHEMA_VERSION;
   const fake: DataMigration[] = [
     {
-      version: 17,
+      version: V + 1,
       statements: [
         'CREATE TABLE fake_a (id TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)',
         'CREATE INDEX idx_fake_a_n ON fake_a(n)',
       ],
     },
-    { version: 18, statements: ['ALTER TABLE fake_a ADD COLUMN extra TEXT'] },
+    { version: V + 2, statements: ['ALTER TABLE fake_a ADD COLUMN extra TEXT'] },
   ];
   const failing: DataMigration[] = [
     {
-      version: 17,
+      version: V + 1,
       statements: ['CREATE TABLE fake_b (id TEXT)', 'ALTER TABLE no_such_table ADD COLUMN x TEXT'],
     },
   ];
@@ -148,27 +152,27 @@ describe('data migrations', () => {
 
   it('runs future migrations through initSchema machinery and moves the version', async () => {
     const { conn, db } = await freshDb();
-    expect(await runDataMigrations(db, fake, 16)).toBe(18);
-    expect(version(conn)).toBe(18);
+    expect(await runDataMigrations(db, fake, V)).toBe(V + 2);
+    expect(version(conn)).toBe(V + 2);
     expect(names(conn, 'table')).toContain('fake_a');
     expect(names(conn, 'index')).toContain('idx_fake_a_n');
     const cols = (conn.pragma('table_info(fake_a)') as { name: string }[]).map((c) => c.name);
     expect(cols).toEqual(['id', 'n', 'extra']);
     // migrations at or below the stored version are skipped
-    expect(await runDataMigrations(db, fake, 18)).toBe(18);
+    expect(await runDataMigrations(db, fake, V + 2)).toBe(V + 2);
     conn.close();
   });
 
   it('a failing statement leaves the version and the schema unchanged', async () => {
     const { conn, db } = await freshDb();
     const before = sqlText(conn);
-    await expect(runDataMigrations(db, failing, 16)).rejects.toThrow();
-    expect(version(conn)).toBe(16);
+    await expect(runDataMigrations(db, failing, V)).rejects.toThrow();
+    expect(version(conn)).toBe(V);
     expect(sqlText(conn)).toEqual(before);
     // A later migration that fails undoes the earlier ones of the same run too.
-    const laterFails = [fake[0], ...failing.map((m) => ({ ...m, version: 18 }))];
-    await expect(runDataMigrations(db, laterFails, 16)).rejects.toThrow();
-    expect(version(conn)).toBe(16);
+    const laterFails = [fake[0], ...failing.map((m) => ({ ...m, version: V + 2 }))];
+    await expect(runDataMigrations(db, laterFails, V)).rejects.toThrow();
+    expect(version(conn)).toBe(V);
     expect(sqlText(conn)).toEqual(before);
     conn.close();
   });
@@ -179,36 +183,129 @@ describe('data migrations', () => {
     expect(await initSchema(counted)).toBe(SCHEMA_VERSION);
     expect(counted.calls()).toBe(5);
     counted.reset();
-    expect(await runDataMigrations(counted, fake, 16)).toBe(18);
+    expect(await runDataMigrations(counted, fake, V)).toBe(V + 2);
     expect(counted.calls()).toBe(1);
     counted.reset();
-    expect(await runDataMigrations(counted, fake, 18)).toBe(18);
+    expect(await runDataMigrations(counted, fake, V + 2)).toBe(V + 2);
     expect(counted.calls()).toBe(0);
   });
 
   it('the server loop gives the same schema as the initSchema loop', async () => {
     const viaCore = await freshDb();
-    await runDataMigrations(viaCore.db, fake, 16);
+    await runDataMigrations(viaCore.db, fake, V);
 
     const serverConn = new Database(':memory:');
     await initSchema(createBetterSqliteDb(serverConn));
-    expect(applyDataMigrations(serverConn, fake, 16)).toBe(18);
+    expect(applyDataMigrations(serverConn, fake, V)).toBe(V + 2);
 
-    expect(version(serverConn)).toBe(18);
+    expect(version(serverConn)).toBe(V + 2);
     expect(sqlText(serverConn)).toEqual(sqlText(viaCore.conn));
 
     const before = sqlText(serverConn);
     expect(() =>
       applyDataMigrations(
         serverConn,
-        failing.map((m) => ({ ...m, version: 19 })),
-        18,
+        failing.map((m) => ({ ...m, version: V + 3 })),
+        V + 2,
       ),
     ).toThrow();
-    expect(version(serverConn)).toBe(18);
+    expect(version(serverConn)).toBe(V + 2);
     expect(sqlText(serverConn)).toEqual(before);
 
     viaCore.conn.close();
     serverConn.close();
+  });
+});
+
+describe.each(SQL_ADAPTERS)('the photos table rebuild of version 17 (%s)', (_adapter, wrap) => {
+  const NEW_DEFAULT = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+  const photoRows = (conn: Conn) => conn.prepare('SELECT * FROM photos ORDER BY id').all();
+  const matchRows = (conn: Conn) =>
+    conn.prepare('SELECT * FROM star_correspondences ORDER BY id').all();
+  const dateDefault = (conn: Conn) =>
+    (conn.pragma('table_info(photos)') as { name: string; dflt_value: string }[]).find(
+      (c) => c.name === 'created_at',
+    )!.dflt_value;
+
+  /** A database as version 16 left it: the old date default, two photos and their star matches. */
+  function atVersion16(): Conn {
+    const conn = new Database(':memory:');
+    conn.pragma('foreign_keys = ON');
+    for (const sql of BASELINE_SCHEMA) conn.exec(sql.replace(NEW_DEFAULT, "datetime('now')"));
+    conn.exec('CREATE TABLE schema_version (version INTEGER NOT NULL DEFAULT 0)');
+    conn.prepare('INSERT INTO schema_version (version) VALUES (16)').run();
+    const photo = conn.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height, created_at, notes, quarter_turns) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    );
+    photo.run('p1', 'p1.jpg', 'P1.jpg', 30, 20, '2026-03-04T05:06:07.000Z', 'n', 1);
+    photo.run('p2', 'p2.jpg', 'P2.jpg', 40, 10, null, '', 0);
+    const match = conn.prepare(
+      'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip) VALUES (?, ?, ?, ?, ?)',
+    );
+    match.run('p1', 0, 1, 2, 100);
+    match.run('p1', 1, 3, 4, 200);
+    match.run('p2', 0, 5, 6, 300);
+    return conn;
+  }
+
+  it('keeps every photo, every star match and the link between them, with the ISO date default', async () => {
+    const conn = atVersion16();
+    expect(dateDefault(conn)).toBe("datetime('now')");
+    const photos = photoRows(conn);
+    const matches = matchRows(conn);
+    const db = countingSqlDb(wrap(createBetterSqliteDb(conn)));
+    expect(await initSchema(db)).toBe(SCHEMA_VERSION);
+    // initSchema's three calls, then: foreign-key state, switch off, begin, check, batch, check, commit, switch back
+    expect(db.calls()).toBe(11);
+    expect(dateDefault(conn)).toBe(NEW_DEFAULT);
+    expect(photoRows(conn)).toEqual(photos);
+    expect(matchRows(conn)).toEqual(matches);
+    expect(conn.pragma('foreign_keys', { simple: true })).toBe(1);
+    // the star matches still belong to the photos: deleting one takes its matches along
+    conn.prepare('DELETE FROM photos WHERE id = ?').run('p1');
+    expect(matchRows(conn)).toMatchObject([{ photo_id: 'p2' }]);
+    conn
+      .prepare(
+        'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run('p3', 'p3.jpg', 'p3.jpg', 1, 1);
+    expect(
+      (
+        conn.prepare('SELECT created_at FROM photos WHERE id = ?').get('p3') as {
+          created_at: string;
+        }
+      ).created_at,
+    ).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    conn.close();
+  });
+
+  it('upgrades a database whose star matches already pointed at a missing photo, and keeps them', async () => {
+    const conn = atVersion16();
+    conn.pragma('foreign_keys = OFF');
+    conn
+      .prepare(
+        'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run('gone', 0, 1, 1, 1);
+    conn.pragma('foreign_keys = ON');
+    expect(await initSchema(wrap(createBetterSqliteDb(conn)))).toBe(SCHEMA_VERSION);
+    expect(matchRows(conn)).toHaveLength(4);
+    conn.close();
+  });
+
+  it('undoes a rebuild that leaves star matches pointing nowhere, and switches foreign keys back on', async () => {
+    const conn = atVersion16();
+    const photos = photoRows(conn);
+    const broken: DataMigration[] = [
+      { version: 17, rebuildsTable: true, statements: ['DROP TABLE photos'] },
+    ];
+    await expect(runDataMigrations(wrap(createBetterSqliteDb(conn)), broken, 16)).rejects.toThrow(
+      REBUILD_BROKE_REFERENCES,
+    );
+    expect(version(conn)).toBe(16);
+    expect(photoRows(conn)).toEqual(photos);
+    expect(matchRows(conn)).toHaveLength(3);
+    expect(conn.pragma('foreign_keys', { simple: true })).toBe(1);
+    conn.close();
   });
 });
