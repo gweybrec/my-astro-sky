@@ -44,6 +44,7 @@ import { raDecFromSexagesimal, starDisplayLabel } from '@myastrosky/core/star-id
 
 import trashSvg from './icons/trash.svg?raw';
 import { createImageZoomPan } from './image-zoom';
+import { logDebug } from '@myastrosky/core/platform/log';
 
 /** Result of the manual star-identification sub-modal (see openManualIdentifyModal). */
 export type ManualIdentifyResult =
@@ -1782,8 +1783,8 @@ export class PhotoOverlay extends PhotoLayer {
       validateBtn.textContent = t('manual.processing');
 
       try {
-        console.log('[Manual Validation] Placement:', placement);
-        console.log('[Manual Validation] Photo dimensions:', naturalWidth, 'x', naturalHeight);
+        logDebug('Manual Validation', 'Placement', { placement });
+        logDebug('Manual Validation', `Photo dimensions: ${naturalWidth} x ${naturalHeight}`);
 
         const correspondences = buildSyntheticCorrespondences(
           placement,
@@ -1798,7 +1799,7 @@ export class PhotoOverlay extends PhotoLayer {
           return;
         }
 
-        console.log('[Manual Validation] Generated correspondences:', correspondences);
+        logDebug('Manual Validation', 'Generated correspondences', { correspondences });
 
         // Compute DSOs from placement geometry if not already provided
         let metaToUpload = initialMeta;
@@ -1842,7 +1843,7 @@ export class PhotoOverlay extends PhotoLayer {
         // Compute the manual CSS matrix for comparison
         const view = this.getView();
         const manualMatrix = computeManualMatrix(placement, view, naturalWidth, naturalHeight);
-        console.log('[Manual Validation] Manual CSS matrix:', manualMatrix, 'at view:', view);
+        logDebug('Manual Validation', 'Manual CSS matrix', { manualMatrix, view });
         (window as any).__manualMatrix = manualMatrix; // Store for comparison
 
         const photo = await uploadPhoto(file, correspondences, placement, undefined, {

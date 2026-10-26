@@ -7,6 +7,7 @@ import { solvedImport } from '../services.js';
 import { msg } from '../messages.js';
 import type { ServerLang } from '../messages.js';
 import { logServerError } from '../logger.js';
+import { logDebug } from '@myastrosky/core/platform/log';
 
 /** The capture fields of a result, in the order the API has always sent them. */
 const captureFields = (r: SolvedCaptureMetadata): SolvedCaptureMetadata => ({
@@ -108,8 +109,9 @@ solvedImportRouter.post('/api/solve-wcs', uploadWCS.single('photo'), async (req,
 
     if (result.dimensionWarning) {
       const w = result.dimensionWarning;
-      console.log(
-        `[WCS] Rescaled correspondences: source ${w.sourceW}x${w.sourceH} → target ${w.targetW}x${w.targetH} (aspectMismatch=${w.aspectMismatch})`,
+      logDebug(
+        'WCS',
+        `Rescaled correspondences: source ${w.sourceW}x${w.sourceH} → target ${w.targetW}x${w.targetH} (aspectMismatch=${w.aspectMismatch})`,
       );
     }
 

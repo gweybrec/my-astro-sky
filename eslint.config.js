@@ -157,6 +157,21 @@ export default tseslint.config(
     },
   },
 
+  // Debug and info messages go through the logger (`logDebug` / `logInfo`), which prints in
+  // development builds only; it is the one module allowed to call `console.log` / `console.info`.
+  {
+    files: ['**/*.{ts,tsx,mts,cts,vue}'],
+    rules: {
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    files: ['packages/core/src/platform/log.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
   // Warn-mode adoption: these `recommended` rules already fire on existing code. Keep
   // them non-blocking (`warn`) so lint never fails CI today; promote to `error` once
   // each has been paid down. This block, not the fixes, is the deliberate carve-out.

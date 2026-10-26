@@ -85,8 +85,10 @@ npm run format:check  # Prettier --check (CI gate; must pass)
 `eslint.config.js` is set to `warn`, so the ~800 existing warnings don't block anything:
 they are a guardrail against _new_ issues, not a mandate to pay them down. Promote a rule
 from `warn` to `error` once its warnings are cleared. Highest-value rules already on:
-`@typescript-eslint/no-floating-promises`, `no-unused-vars`, `no-explicit-any`,
-`no-console` (allows `warn`/`error`).
+`@typescript-eslint/no-floating-promises`, `no-unused-vars`, `no-explicit-any`.
+`no-console` is an `error` in TypeScript and Vue files (allows `warn`/`error`): debug and info
+messages go through `logDebug`/`logInfo` (`@myastrosky/core/platform/log`), which print in
+development builds only; `logNotice` prints in every build (the server's start-up line).
 
 **But `npm run lint` is not warn-only overall.** Rules inherited from the `recommended`
 presets (`js`, `tseslint`, `vue`) keep their `error` severity unless explicitly downgraded,

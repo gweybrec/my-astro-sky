@@ -1,4 +1,5 @@
 import { bytesToAscii7 } from './raw-decode/ascii';
+import { logDebug } from './platform/log';
 
 export interface WCSData {
   CRPIX1: number;
@@ -394,10 +395,11 @@ function generateSyntheticCorrespondences(
     });
   }
 
-  console.log(`[WCS] Generated ${result.length} synthetic correspondences from WCS`);
+  logDebug('WCS', `Generated ${result.length} synthetic correspondences from WCS`);
   for (let i = 0; i < Math.min(result.length, 3); i++) {
     const c = result[i];
-    console.log(
+    logDebug(
+      'WCS',
       `  [${i}] ${c.starName} at pixel (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)}) → RA=${c.starRa?.toFixed(4)}°, Dec=${c.starDec?.toFixed(4)}°`,
     );
   }
@@ -443,15 +445,18 @@ export function wcsToCorrespondencesWithCatalog(
   // Check parity: CD1_1 < 0 typically means RA increases left (astronomical convention)
   // CD1_1 > 0 means RA increases right (mirrored, needs flip)
   const needsFlip = wcs.CD1_1 > 0;
-  console.log(
-    `[WCS] CD matrix: CD1_1=${wcs.CD1_1.toExponential(3)}, CD1_2=${wcs.CD1_2.toExponential(3)}, CD2_1=${wcs.CD2_1.toExponential(3)}, CD2_2=${wcs.CD2_2.toExponential(3)}`,
+  logDebug(
+    'WCS',
+    `CD matrix: CD1_1=${wcs.CD1_1.toExponential(3)}, CD1_2=${wcs.CD1_2.toExponential(3)}, CD2_1=${wcs.CD2_1.toExponential(3)}, CD2_2=${wcs.CD2_2.toExponential(3)}`,
   );
-  console.log(`[WCS] CD matrix determinant: ${det.toExponential(3)}`);
-  console.log(
-    `[WCS] Image orientation: ${needsFlip ? 'MIRRORED (needs X flip)' : 'NORMAL (astronomical standard)'}`,
+  logDebug('WCS', `CD matrix determinant: ${det.toExponential(3)}`);
+  logDebug(
+    'WCS',
+    `Image orientation: ${needsFlip ? 'MIRRORED (needs X flip)' : 'NORMAL (astronomical standard)'}`,
   );
-  console.log(
-    `[WCS] SIP distortion: ${(wcs as any).AP_ORDER ? `order ${(wcs as any).AP_ORDER}` : 'none'}`,
+  logDebug(
+    'WCS',
+    `SIP distortion: ${(wcs as any).AP_ORDER ? `order ${(wcs as any).AP_ORDER}` : 'none'}`,
   );
 
   if (Math.abs(det) < 1e-20) return [];
@@ -464,8 +469,9 @@ export function wcsToCorrespondencesWithCatalog(
   };
 
   // Convert star RA/Dec to pixel coords using TAN projection
-  console.log(
-    `[WCS] Converting ${starsInField.length} stars in field to image pixels (image: ${imageWidth}x${imageHeight})`,
+  logDebug(
+    'WCS',
+    `Converting ${starsInField.length} stars in field to image pixels (image: ${imageWidth}x${imageHeight})`,
   );
   const starsWithPixels: { star: CatalogStar; px: number; py: number }[] = [];
 
@@ -544,10 +550,12 @@ export function wcsToCorrespondencesWithCatalog(
 
     // Debug first few stars
     if (starsWithPixels.length < 3) {
-      console.log(
-        `[WCS] Star ${star.name || 'HIP ' + star.hip}: RA=${star.ra.toFixed(2)}° Dec=${star.dec.toFixed(2)}°`,
+      logDebug(
+        'WCS',
+        `Star ${star.name || 'HIP ' + star.hip}: RA=${star.ra.toFixed(2)}° Dec=${star.dec.toFixed(2)}°`,
       );
-      console.log(
+      logDebug(
+        'WCS',
         `      → WCS pixel (${fitsPx.toFixed(1)}, ${fitsPy.toFixed(1)}) → Display pixel (${px.toFixed(1)}, ${py.toFixed(1)})`,
       );
     }
@@ -558,14 +566,16 @@ export function wcsToCorrespondencesWithCatalog(
     }
   }
 
-  console.log(
-    `[WCS] ${starsWithPixels.length} stars within image bounds (out of ${starsInField.length} in field)`,
+  logDebug(
+    'WCS',
+    `${starsWithPixels.length} stars within image bounds (out of ${starsInField.length} in field)`,
   );
 
   // If we found fewer than 3 catalog stars, generate synthetic correspondences from WCS
   if (starsWithPixels.length < 3) {
-    console.log(
-      `[WCS] Only ${starsWithPixels.length} catalog stars found, generating synthetic correspondences from WCS`,
+    logDebug(
+      'WCS',
+      `Only ${starsWithPixels.length} catalog stars found, generating synthetic correspondences from WCS`,
     );
     return generateSyntheticCorrespondences(wcs, imageWidth, imageHeight, fitsYConvention);
   }
@@ -580,8 +590,9 @@ export function wcsToCorrespondencesWithCatalog(
   // Use interior stars if we have enough, otherwise fall back to all stars
   const candidates = (interiorStars.length >= 3 ? interiorStars : starsWithPixels).slice(0, 20);
 
-  console.log(
-    `[WCS] Found ${starsWithPixels.length} stars in bounds, ${interiorStars.length} interior stars, using ${candidates.length} candidates`,
+  logDebug(
+    'WCS',
+    `Found ${starsWithPixels.length} stars in bounds, ${interiorStars.length} interior stars, using ${candidates.length} candidates`,
   );
 
   // Choose 3 well-separated bright stars forming the largest triangle
@@ -634,10 +645,10 @@ export function wcsToCorrespondencesWithCatalog(
     });
   }
 
-  console.log(`[WCS] Returning ${result.length} correspondences for transform`);
+  logDebug('WCS', `Returning ${result.length} correspondences for transform`);
   for (let i = 0; i < Math.min(result.length, 5); i++) {
     const c = result[i];
-    console.log(`  [${i}] ${c.starName} at (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)})`);
+    logDebug('WCS', `  [${i}] ${c.starName} at (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)})`);
   }
 
   return result;

@@ -10,6 +10,7 @@ import type {
   Star,
 } from '@myastrosky/core/types';
 import { normalizeRA } from '@myastrosky/core/angles';
+import { logInfo } from '@myastrosky/core/platform/log';
 import { setDsoCatalog } from '@myastrosky/core/catalog/dso-registry';
 import {
   expandMultiples,
@@ -57,7 +58,7 @@ async function fetchCatalog(opts: StarLoaderOptions): Promise<any> {
   try {
     const url = await opts.starCatalogUrl();
     const data = await fetchJSON(url, opts);
-    console.log(`[Catalog] Loaded star catalog from ${url}`);
+    logInfo('Catalog', `Loaded star catalog from ${url}`);
     return data;
   } catch {
     // Fallback if the backend's configuration is unavailable

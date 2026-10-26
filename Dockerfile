@@ -57,6 +57,9 @@ COPY --from=build /app/dist dist/
 
 RUN mkdir -p /data uploads
 
+# A release build: the debug and info messages of the server's logger stay off, as in the
+# packaged desktop app (errors, warnings and the start-up line still print).
+ENV NODE_ENV=production
 ENV PORT=3001
 ENV DB_PATH=/data/data.db
 # Catalog assets live under dist/data (Vite copied public/data there at build time).

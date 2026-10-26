@@ -14,6 +14,7 @@ import type {
 } from '@myastrosky/core/types';
 import { toCanvas, borderRadiusPU, getProjectionGeneration } from '@myastrosky/core/projection';
 import { affineToCSS } from '@myastrosky/core/affine';
+import { logDebug } from '@myastrosky/core/platform/log';
 import {
   fitPhotoAffine,
   buildPhotoPoints,
@@ -483,7 +484,7 @@ export class PhotoLayer {
     // Check if photo already exists
     const existing = this.placedPhotos.find((p) => p.photo.id === photo.id);
     if (existing) {
-      console.log(`[addPhotoToMap] Photo ${photo.originalName} already exists, skipping duplicate`);
+      logDebug('addPhotoToMap', `Photo ${photo.originalName} already exists, skipping duplicate`);
       return;
     }
 

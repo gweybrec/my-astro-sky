@@ -5,6 +5,14 @@ import {
   createMemoryStore,
 } from '../../packages/core/src/platform/storage';
 import { configureErrorReporter, reportError } from '@myastrosky/core/platform/error-hook';
+import {
+  configureLogSink,
+  consoleLogSink,
+  isLogEnabled,
+  logDebug,
+  logInfo,
+  logNotice,
+} from '@myastrosky/core/platform/log';
 import { detectInitialDensity } from '@myastrosky/core/density-slider';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { getTelescopes } from '@myastrosky/core/gear-catalog';
@@ -71,6 +79,54 @@ describe('error hook', () => {
     reportError('ctx', err);
     expect(fn).toHaveBeenCalledWith('ctx', err);
     spy.mockRestore();
+  });
+});
+
+describe('log sink', () => {
+  afterEach(() => configureLogSink(null));
+
+  it('prints nothing until a sink is installed, as in a release build', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    configureLogSink(null);
+    logDebug('WCS', 'debug');
+    logInfo('WCS', 'info');
+    expect(isLogEnabled()).toBe(false);
+    expect(log).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+    log.mockRestore();
+    info.mockRestore();
+  });
+
+  it('prints a notice even without a sink, as in a release build', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    configureLogSink(null);
+    logNotice('Server', 'started');
+    expect(info).toHaveBeenCalledWith('[Server] started');
+    info.mockRestore();
+  });
+
+  it('hands each message to the sink with its level', () => {
+    const sink = vi.fn();
+    configureLogSink(sink);
+    logDebug('WCS', 'a');
+    logInfo('Catalog', 'b', { n: 1 });
+    expect(isLogEnabled()).toBe(true);
+    expect(sink.mock.calls).toEqual([
+      ['debug', 'WCS', 'a'],
+      ['info', 'Catalog', 'b', { n: 1 }],
+    ]);
+  });
+
+  it('the console sink prints debug with console.log and info with console.info, context first', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    consoleLogSink('debug', 'WCS', 'a');
+    consoleLogSink('info', 'Catalog', 'b', { n: 1 });
+    expect(log).toHaveBeenCalledWith('[WCS] a');
+    expect(info).toHaveBeenCalledWith('[Catalog] b', { n: 1 });
+    log.mockRestore();
+    info.mockRestore();
   });
 });
 

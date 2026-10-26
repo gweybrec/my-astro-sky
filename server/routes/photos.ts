@@ -4,6 +4,7 @@ import type { PhotoMetadataChanges } from '@myastrosky/core/domain/photos';
 import { isElectron, UPLOAD_LIMIT, checkRateLimit, upload } from './shared.js';
 import { photos } from '../services.js';
 import { sendError } from './http-errors.js';
+import { logDebug } from '@myastrosky/core/platform/log';
 
 export const photosRouter = express.Router();
 
@@ -41,9 +42,9 @@ photosRouter.post('/api/photos', upload.single('photo'), async (req, res) => {
       { name: file.originalname, bytes: file.buffer },
       req.body ?? {},
     );
-    console.log('[Upload] File pixel dimensions:', source.width, 'x', source.height);
-    console.log('[Upload] EXIF orientation:', source.orientation);
-    console.log('[Upload] Browser showed dimensions:', photo.width, 'x', photo.height);
+    logDebug('Upload', `File pixel dimensions: ${source.width} x ${source.height}`);
+    logDebug('Upload', `EXIF orientation: ${source.orientation}`);
+    logDebug('Upload', `Browser showed dimensions: ${photo.width} x ${photo.height}`);
     for (const w of warnings) console.warn('[Upload] Thumbnail generation failed:', w.error);
 
     // Answer with the row as GET /api/photos returns it, so the client's in-memory photo matches what a

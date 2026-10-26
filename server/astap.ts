@@ -9,6 +9,7 @@ import { settings } from './services.js';
 import { shouldUseWSL, wrapExecForWSL, wslPath } from './wsl-utils.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
+import { logDebug, logInfo } from '@myastrosky/core/platform/log';
 
 const execFileAsync = promisify(execFile);
 
@@ -63,9 +64,9 @@ async function logSolverVersion(
     const exec = wrapExecForWSL(bin, versionArgs, useWSL);
     const { stdout, stderr } = await execFileAsync(exec.cmd, exec.args, { timeout: 5_000 });
     const output = (stdout || stderr || '').trim().split('\n')[0];
-    console.log(`[ASTAP] version: ${output}`);
+    logInfo('ASTAP', `version: ${output}`);
   } catch {
-    console.log(`[ASTAP] version check failed for: ${bin}`);
+    logInfo('ASTAP', `version check failed for: ${bin}`);
   }
 }
 
@@ -119,14 +120,15 @@ export async function solveWithASTAP(
     if (hints?.ra !== undefined && hints?.dec !== undefined) {
       const raHours = hints.ra / 15;
       const spd = 90 + hints.dec;
-      console.log(
-        `[ASTAP] Using hints: RA=${hints.ra}° (${raHours}h), Dec=${hints.dec}°, SPD=${spd}`,
+      logDebug(
+        'ASTAP',
+        `Using hints: RA=${hints.ra}° (${raHours}h), Dec=${hints.dec}°, SPD=${spd}`,
       );
       args.push('-ra', String(raHours)); // Convert degrees to hours
       // SPD (South Pole Distance) = 90 + Dec (works for both hemispheres)
       args.push('-spd', String(spd));
     } else {
-      console.log('[ASTAP] No hints provided, solving entire sky');
+      logDebug('ASTAP', 'No hints provided, solving entire sky');
     }
 
     // Add FOV hint if provided
@@ -196,7 +198,11 @@ export async function solveWithASTAP(
         solveOutput = fullOutput;
 
         // Log full output for debugging
-        console.log('[ASTAP] Full output:', fullOutput);
+        logDebug(
+          'ASTAP',
+          `Full output:
+${fullOutput}`,
+        );
 
         // Extract key information from ASTAP output
         const lines = fullOutput.split('\n');
@@ -295,8 +301,9 @@ export async function solveWithASTAP(
       const maxDistance = searchRadius * 1.5; // Allow some margin
 
       if (distance > maxDistance) {
-        console.log(
-          `[ASTAP] Solution rejected: too far from hint. Expected RA=${hints.ra}°, Dec=${hints.dec}°, got RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance=${distance.toFixed(1)}° > ${maxDistance}°)`,
+        logDebug(
+          'ASTAP',
+          `Solution rejected: too far from hint. Expected RA=${hints.ra}°, Dec=${hints.dec}°, got RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance=${distance.toFixed(1)}° > ${maxDistance}°)`,
         );
         return {
           success: false,
@@ -305,8 +312,9 @@ export async function solveWithASTAP(
         };
       }
 
-      console.log(
-        `[ASTAP] Solution validated: RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance from hint: ${distance.toFixed(1)}°)`,
+      logDebug(
+        'ASTAP',
+        `Solution validated: RA=${wcs.CRVAL1.toFixed(2)}°, Dec=${wcs.CRVAL2.toFixed(2)}° (distance from hint: ${distance.toFixed(1)}°)`,
       );
     }
 
@@ -319,8 +327,9 @@ export async function solveWithASTAP(
     // false matches here measured 40–130°.
     const skew = cdMatrixSkewDeg(wcs);
     if (skew > MAX_CD_SKEW_DEG) {
-      console.log(
-        `[ASTAP] Solution rejected: CD matrix shear ${skew.toFixed(1)}° exceeds ${MAX_CD_SKEW_DEG}° (false match, likely wrong scale).`,
+      logDebug(
+        'ASTAP',
+        `Solution rejected: CD matrix shear ${skew.toFixed(1)}° exceeds ${MAX_CD_SKEW_DEG}° (false match, likely wrong scale).`,
       );
       return {
         success: false,
@@ -339,8 +348,9 @@ export async function solveWithASTAP(
     // If not enough catalog stars match (e.g., image has faint stars),
     // generate synthetic correspondences from WCS corners
     if (correspondences.length < 3) {
-      console.log(
-        `[ASTAP] Only ${correspondences.length} catalog matches, generating synthetic correspondences from WCS`,
+      logDebug(
+        'ASTAP',
+        `Only ${correspondences.length} catalog matches, generating synthetic correspondences from WCS`,
       );
       correspondences = generateSyntheticCorrespondences(wcs, width, height);
     }

@@ -21,6 +21,7 @@ import { solvedImportRouter } from './routes/solved-import.js';
 import { localSolveRouter } from './routes/local-solve.js';
 import { novaSolveRouter } from './routes/nova-solve.js';
 import { backupRouter } from './routes/backup.js';
+import { configureLogSink, consoleLogSink, logInfo } from '@myastrosky/core/platform/log';
 
 // In case we need to clear the cache during development, we can do it from the main process before loading the app.
 // import { app as electronApp, session } from 'electron';
@@ -134,6 +135,9 @@ app.use(backupRouter);
 // guaranteeing correct ordering regardless of dist/ presence. It does not listen: the
 // entry point (server/index.ts) does.
 export async function createApp(): Promise<express.Express> {
+  // Debug and info messages print outside production (the packaged desktop app sets NODE_ENV=production).
+  configureLogSink(process.env.NODE_ENV === 'production' ? null : consoleLogSink);
+
   // First run: give the user the default POI categories before any route can list them.
   await poiCategories.ensureDefaults();
 
@@ -149,7 +153,7 @@ export async function createApp(): Promise<express.Express> {
         app.get('/api/docs/swagger.json', (_req, res) => {
           res.json(swaggerSpec);
         });
-        console.log('[Swagger] API docs enabled at /api/docs');
+        logInfo('Swagger', 'API docs enabled at /api/docs');
       } catch (err: any) {
         console.warn(
           '[Swagger] dev docs disabled; swagger-ui-express unavailable.',

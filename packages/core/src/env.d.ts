@@ -2,6 +2,7 @@
 // core must run unchanged in the browser, a worker, Node and Electron.
 declare const console: {
   log(...data: unknown[]): void;
+  info(...data: unknown[]): void;
   warn(...data: unknown[]): void;
   error(...data: unknown[]): void;
 };

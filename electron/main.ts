@@ -9,6 +9,7 @@ import { shouldReloadAfterCrash } from './crash-reload-guard.js';
 import { shouldOpenExternally } from './external-links.js';
 import { installLogger } from '../server/logger.js';
 import { ipcMain } from 'electron';
+import { configureLogSink, consoleLogSink, logInfo } from '@myastrosky/core/platform/log';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SETTINGS_KEY_FILE = 'settings-encryption-key.bin';
@@ -169,7 +170,9 @@ async function main() {
 
   await app.whenReady();
 
-  console.log(`[MyAstroSky] app version=${__APP_VERSION__} build=${__APP_BUILD_TIMESTAMP__}`);
+  // Debug and info messages print in development runs only, not in the packaged app.
+  configureLogSink(app.isPackaged ? null : consoleLogSink);
+  logInfo('MyAstroSky', `app version=${__APP_VERSION__} build=${__APP_BUILD_TIMESTAMP__}`);
 
   setupErrorLogging();
   installLogger(logMainError);

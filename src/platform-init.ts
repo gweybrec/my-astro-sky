@@ -1,6 +1,7 @@
 import { configureI18n } from '@myastrosky/core/i18n/index';
 import { configureStorage } from '@myastrosky/core/platform/storage';
 import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
+import { configureLogSink, consoleLogSink } from '@myastrosky/core/platform/log';
 import { configureDeviceHints } from '@myastrosky/core/platform/device-hints';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { configureStarSearch } from '@myastrosky/core/platform/star-search';
@@ -52,6 +53,8 @@ configureStorage(createLocalStorageStore());
 configureErrorReporter((context, error, details) =>
   reportUnknownRendererError(context, error, details),
 );
+// Debug and info messages print in development builds only.
+configureLogSink(import.meta.env.DEV ? consoleLogSink : null);
 configureDeviceHints(() => (typeof navigator !== 'undefined' ? navigator : {}));
 // `src/api` is imported lazily so that start-up does not load it before a test's mock applies.
 configureGearCatalogLoader(async (type) => (await import('./api')).getGearCatalog(type));

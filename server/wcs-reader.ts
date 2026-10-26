@@ -4,6 +4,7 @@ import { wcsToCorrespondencesWithCatalog } from '@myastrosky/core/wcs';
 import type { CatalogStar, Correspondence, WCSData } from '@myastrosky/core/wcs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logInfo } from '@myastrosky/core/platform/log';
 
 // The pure FITS/TIFF header + WCS logic lives in core; re-exported so server code and tests keep
 // importing it from here.
@@ -53,8 +54,9 @@ export function loadServerCatalog(): CatalogStar[] {
 
   const catalogName = path.basename(usedPath);
   const maxMag = Math.max(...serverStars.map((s) => s.mag));
-  console.log(
-    `[Catalog] Loaded ${serverStars.length} stars from ${catalogName} (mag ≤ ${maxMag.toFixed(1)})`,
+  logInfo(
+    'Catalog',
+    `Loaded ${serverStars.length} stars from ${catalogName} (mag ≤ ${maxMag.toFixed(1)})`,
   );
 
   return serverStars;

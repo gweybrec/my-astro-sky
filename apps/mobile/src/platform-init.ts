@@ -1,6 +1,6 @@
 /**
  * What the phone app sets up before its first screen, in this order: the device storage, the language, the
- * backend, then the hooks the shared code calls (error reporter, device hints, gear catalogue, star search, constellation lines).
+ * backend, then the hooks the shared code calls (error reporter, log sink, device hints, gear catalogue, star search, constellation lines).
  * Awaited by `main.ts` before the app is mounted. In a desktop browser (not a native platform) the same steps run
  * on the HTTP backend of the desktop's server and on `localStorage`, so a screen can be developed in a
  * phone-sized browser window.
@@ -9,6 +9,7 @@ import { Capacitor } from '@capacitor/core';
 import { configureI18n, getLang } from '@myastrosky/core/i18n/index';
 import { configureStorage, storage } from '@myastrosky/core/platform/storage';
 import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
+import { configureLogSink, consoleLogSink } from '@myastrosky/core/platform/log';
 import { configureDeviceHints } from '@myastrosky/core/platform/device-hints';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { configureStarSearch } from '@myastrosky/core/platform/star-search';
@@ -151,6 +152,8 @@ export async function initPlatform(): Promise<void> {
     if (details === undefined) console.error(context, error);
     else console.error(context, error, details);
   });
+  // Debug and info messages print in development builds only.
+  configureLogSink(import.meta.env.DEV ? consoleLogSink : null);
   configureDeviceHints(() => (typeof navigator !== 'undefined' ? navigator : {}));
   configureGearCatalogLoader(async (type) =>
     (await import('@myastrosky/app-state/api')).getGearCatalog(type),

@@ -121,7 +121,7 @@ Where the phone's adapters differ from the server's on purpose:
 
 ## Platform hooks in core
 
-Core modules that need something of the platform ask a hook that each app configures at start-up (`packages/core/src/platform/`): device storage (`configureStorage`), the error reporter, device hints for the initial map density, the gear catalogue loader and the remote star search. The i18n module is configured the same way (`configureI18n`). The deep-sky and star catalogues live in registries (`packages/core/src/catalog/`): an app loads the files and calls the setter; every lookup reads the registry.
+Core modules that need something of the platform ask a hook that each app configures at start-up (`packages/core/src/platform/`): device storage (`configureStorage`), the error reporter, the debug and info log sink (`configureLogSink`, installed in development builds only), device hints for the initial map density, the gear catalogue loader and the remote star search. The i18n module is configured the same way (`configureI18n`). The deep-sky and star catalogues live in registries (`packages/core/src/catalog/`): an app loads the files and calls the setter; every lookup reads the registry.
 
 ## The phone app
 
