@@ -29,11 +29,14 @@ function plugBind(values: unknown[] | undefined): unknown[] {
 }
 
 /** Mimics the plugin: asynchronous, string rejections, BLOBs out as arrays of byte values. */
-export function createFakeConnection(options: { inflateChanges?: boolean } = {}): FakeConnection {
+export function createFakeConnection(
+  options: { inflateChanges?: boolean; raw?: Database.Database } = {},
+): FakeConnection {
   // Like the real plugin, `run` reports SQLite's total_changes difference, which counts the rows
   // changed by foreign-key actions (ON DELETE CASCADE) too. `changes()` stays the statement's own.
   const inflate = options.inflateChanges ?? true;
-  const raw = new Database(':memory:');
+  // `raw` opens the fake on an existing database (one prepared at an older schema version).
+  const raw = options.raw ?? new Database(':memory:');
   const calls: Call[] = [];
   const record = async (method: string, ...args: unknown[]): Promise<void> => {
     calls.push({ method, args });

@@ -14,12 +14,25 @@ import {
   runDataMigrations,
   type DataMigration,
 } from '@myastrosky/core/db/schema';
+import type { SqlDb } from '@myastrosky/core/ports/sql-db';
+import { createCapacitorSqliteDb } from '@myastrosky/backend-local/capacitor-sqlite-db';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { applyDataMigrations } from '../../server/db-migrations';
+import { createAsyncSqlDb } from '../helpers/async-sql-db';
 import { countingSqlDb } from '../helpers/counting-sql-db';
-import { SQL_ADAPTERS } from '../helpers/sql-adapters';
+import { createFakeConnection } from '../helpers/fake-sqlite-connection';
 
 type Conn = Database.Database;
+
+/**
+ * The adapters the migrations run on, each opened on a better-sqlite3 database: the server's, the same
+ * really asynchronous, and the phone's over the fake plugin (one `executeSet` per batch).
+ */
+const OPENERS: readonly (readonly [string, (conn: Conn) => SqlDb])[] = [
+  ['better-sqlite3', (conn) => createBetterSqliteDb(conn)],
+  ['asynchronous', (conn) => createAsyncSqlDb(createBetterSqliteDb(conn))],
+  ['phone adapter', (conn) => createCapacitorSqliteDb(createFakeConnection({ raw: conn }))],
+];
 
 const names = (conn: Conn, type: 'table' | 'index'): string[] =>
   (
@@ -123,7 +136,7 @@ describe('baseline schema equals the server upgrade path', () => {
   });
 });
 
-describe('data migrations', () => {
+describe.each(OPENERS)('data migrations (%s)', (_adapter, open) => {
   /** The current version; the fake migrations come after it. */
   const V = SCHEMA_VERSION;
   const fake: DataMigration[] = [
@@ -145,7 +158,7 @@ describe('data migrations', () => {
 
   async function freshDb() {
     const conn = new Database(':memory:');
-    const db = createBetterSqliteDb(conn);
+    const db = open(conn);
     await initSchema(db);
     return { conn, db };
   }
@@ -178,7 +191,7 @@ describe('data migrations', () => {
   });
 
   it('creates a database and runs the pending migrations in a fixed number of round trips', async () => {
-    const counted = countingSqlDb(createBetterSqliteDb(new Database(':memory:')));
+    const counted = countingSqlDb(open(new Database(':memory:')));
     // pragma, schema_version table, version read, empty-database check, one batch
     expect(await initSchema(counted)).toBe(SCHEMA_VERSION);
     expect(counted.calls()).toBe(5);
@@ -217,7 +230,7 @@ describe('data migrations', () => {
   });
 });
 
-describe.each(SQL_ADAPTERS)('the photos table rebuild of version 17 (%s)', (_adapter, wrap) => {
+describe.each(OPENERS)('the photos table rebuild of version 17 (%s)', (_adapter, open) => {
   const NEW_DEFAULT = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
   const photoRows = (conn: Conn) => conn.prepare('SELECT * FROM photos ORDER BY id').all();
   const matchRows = (conn: Conn) =>
@@ -253,7 +266,7 @@ describe.each(SQL_ADAPTERS)('the photos table rebuild of version 17 (%s)', (_ada
     expect(dateDefault(conn)).toBe("datetime('now')");
     const photos = photoRows(conn);
     const matches = matchRows(conn);
-    const db = countingSqlDb(wrap(createBetterSqliteDb(conn)));
+    const db = countingSqlDb(open(conn));
     expect(await initSchema(db)).toBe(SCHEMA_VERSION);
     // initSchema's three calls, then: foreign-key state, switch off, begin, check, batch, check, commit, switch back
     expect(db.calls()).toBe(11);
@@ -279,6 +292,23 @@ describe.each(SQL_ADAPTERS)('the photos table rebuild of version 17 (%s)', (_ada
     conn.close();
   });
 
+  it('brings a version-14 database to the latest version through every migration', async () => {
+    const conn = atVersion16();
+    conn.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
+    conn.prepare("UPDATE photos SET created_at = '2026-03-04 05:06:07'").run();
+    conn.prepare('UPDATE schema_version SET version = 14').run();
+    expect(await initSchema(open(conn))).toBe(SCHEMA_VERSION);
+    expect(version(conn)).toBe(SCHEMA_VERSION);
+    expect(dateDefault(conn)).toBe(NEW_DEFAULT);
+    expect(photoRows(conn)).toMatchObject([
+      { id: 'p1', created_at: '2026-03-04T05:06:07.000Z', quarter_turns: 0 },
+      { id: 'p2', created_at: '2026-03-04T05:06:07.000Z', quarter_turns: 0 },
+    ]);
+    expect(matchRows(conn)).toHaveLength(3);
+    expect(conn.pragma('foreign_keys', { simple: true })).toBe(1);
+    conn.close();
+  });
+
   it('upgrades a database whose star matches already pointed at a missing photo, and keeps them', async () => {
     const conn = atVersion16();
     conn.pragma('foreign_keys = OFF');
@@ -288,7 +318,7 @@ describe.each(SQL_ADAPTERS)('the photos table rebuild of version 17 (%s)', (_ada
       )
       .run('gone', 0, 1, 1, 1);
     conn.pragma('foreign_keys = ON');
-    expect(await initSchema(wrap(createBetterSqliteDb(conn)))).toBe(SCHEMA_VERSION);
+    expect(await initSchema(open(conn))).toBe(SCHEMA_VERSION);
     expect(matchRows(conn)).toHaveLength(4);
     conn.close();
   });
@@ -299,7 +329,7 @@ describe.each(SQL_ADAPTERS)('the photos table rebuild of version 17 (%s)', (_ada
     const broken: DataMigration[] = [
       { version: 17, rebuildsTable: true, statements: ['DROP TABLE photos'] },
     ];
-    await expect(runDataMigrations(wrap(createBetterSqliteDb(conn)), broken, 16)).rejects.toThrow(
+    await expect(runDataMigrations(open(conn), broken, 16)).rejects.toThrow(
       REBUILD_BROKE_REFERENCES,
     );
     expect(version(conn)).toBe(16);
