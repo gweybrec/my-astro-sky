@@ -638,8 +638,7 @@ ion-modal.mob-sheet-modal {
   --box-shadow: none;
   align-items: flex-end;
 }
-/* Ionic puts the class `modal-sheet` on a modal that has breakpoints; the design system's desktop `.modal-sheet` (a dialog
-   95 vw wide, 90 vh tall, a column) has the same name, so it is undone here.
+/* Ionic puts the class `modal-sheet` on a modal that has breakpoints.
    Ionic's sheet gesture reads the modal's own box as the sheet (breakpoint 1 = the whole box, its bottom at the screen's
    bottom), so the modal is made as tall as its content and sits at the bottom, the scrim is drawn over the whole screen
    by the backdrop part, and the wrapper takes part in the flow to give the modal its height. */
@@ -648,9 +647,6 @@ ion-modal.mob-sheet-modal.modal-sheet {
   flex-direction: row;
   inset-block-start: auto;
   height: auto;
-  width: auto !important;
-  max-width: none !important;
-  max-height: none !important;
   contain: none;
 }
 ion-modal.mob-sheet-modal.modal-sheet.overlay-hidden {

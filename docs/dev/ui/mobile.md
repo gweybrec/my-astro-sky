@@ -6,6 +6,7 @@ The rules every screen of the phone app (`apps/mobile/`) follows. The desktop's 
 
 - Use Ionic's own components wherever one exists, through the shared components of `apps/mobile/src/components/`. Do not rebuild from plain elements what Ionic provides.
 - Colours, sizes, fonts and spacing come from the design system's tokens (`apps/mobile/src/theme/design-system/`). A screen does not restyle an Ionic component itself.
+- The app's `bundle.css` holds only the part of the design system's stylesheet that the app uses. The design system's own stylesheet, which the mockups load, is larger: it also carries the desktop's classes (buttons, target cards, modals of the desktop), the classes of what Ionic draws in the app (tabs, switches, selects, dialogs, toasts, whose look the app gives through `phone-components.css` and `ionic-tokens.css`), the drawings over a picture of the map that the app draws on its canvas (field-of-view frames, photo outlines, stars to pick), and what only makes a mockup look like a phone (status bar, keyboard). A class is copied into the app when an element of the app first carries it; `apps/mobile/tests/design-system-classes.test.ts` fails on a class of `bundle.css` that no element carries.
 - Every text goes through `t('…')`, in the four languages. A text that exists on the desktop reuses its key.
 - A screen holds no rule of the domain: data comes from `@myastrosky/app-state`, computation from `@myastrosky/core`. Logic needed from a desktop module is moved to a shared package first, and the desktop calls the shared version.
 
