@@ -922,6 +922,9 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       });
       expect((await svc.get('min'))!.createdAt).toBe('2026-07-01T00:00:00.000Z');
       await svc.importPhoto({ id: 'named', filename: 'f.png' }, 'skip');
+      // a backup made before schema version 16 holds the date in the database's old form
+      await svc.importPhoto({ id: 'old', createdAt: '2026-03-04 05:06:07' }, 'skip');
+      expect((await svc.get('old'))!.createdAt).toBe('2026-03-04T05:06:07.000Z');
       expect((await svc.get('named'))!.originalName).toBe('f.png');
     });
 

@@ -838,6 +838,9 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
   return service;
 }
 
+/** A date in the form the database wrote before schema version 16 (`YYYY-MM-DD HH:MM:SS`, UTC). */
+const SQLITE_DATETIME = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/;
+
 /** The parameters of `INSERT_PHOTO_WITH_ID` for a photo of a backup manifest. */
 function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
   const id: string = p.id;
@@ -847,7 +850,9 @@ function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
     p.originalName ?? p.filename ?? id,
     p.width ?? 0,
     p.height ?? 0,
-    p.createdAt ?? nowIso,
+    typeof p.createdAt === 'string'
+      ? p.createdAt.replace(SQLITE_DATETIME, '$1T$2.000Z')
+      : (p.createdAt ?? nowIso),
     p.manualPlacement ? JSON.stringify(p.manualPlacement) : null,
     JSON.stringify(Array.isArray(p.dsoIds) ? p.dsoIds : []),
     JSON.stringify(Array.isArray(p.labels) ? p.labels : []),

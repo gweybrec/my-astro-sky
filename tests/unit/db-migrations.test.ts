@@ -765,9 +765,31 @@ describe('applyMigrations — v15 photo quarter turns', () => {
     db.prepare(
       'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
     ).run('p1', 'p1.jpg', 'p1.jpg', 30, 20);
-    expect(applyMigrations(db)).toBe(15);
+    expect(applyMigrations(db)).toBe(SCHEMA_VERSION);
     expect(db.prepare('SELECT quarter_turns FROM photos WHERE id = ?').get('p1')).toEqual({
       quarter_turns: 0,
     });
+  });
+});
+
+describe('applyMigrations — v16 photo dates in ISO form', () => {
+  it("rewrites the database's old date form as ISO and leaves every other value alone", () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    db.prepare('UPDATE schema_version SET version = 15').run();
+    const ins = db.prepare(
+      'INSERT INTO photos (id, filename, original_name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    );
+    ins.run('old', 'a.jpg', 'a.jpg', 1, 1, '2026-03-04 05:06:07');
+    ins.run('iso', 'b.jpg', 'b.jpg', 1, 1, '2026-03-04T05:06:07.123Z');
+    ins.run('none', 'c.jpg', 'c.jpg', 1, 1, null);
+    ins.run('odd', 'd.jpg', 'd.jpg', 1, 1, '2026-03-04 05:06');
+    expect(applyMigrations(db)).toBe(16);
+    expect(db.prepare('SELECT id, created_at FROM photos ORDER BY id').all()).toEqual([
+      { id: 'iso', created_at: '2026-03-04T05:06:07.123Z' },
+      { id: 'none', created_at: null },
+      { id: 'odd', created_at: '2026-03-04 05:06' },
+      { id: 'old', created_at: '2026-03-04T05:06:07.000Z' },
+    ]);
   });
 });

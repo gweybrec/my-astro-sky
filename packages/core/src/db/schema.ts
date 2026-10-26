@@ -13,7 +13,7 @@
 import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 /**
  * The schema at `SCHEMA_VERSION`, one statement per entry (tables first, then indexes).
@@ -144,6 +144,14 @@ export const MIGRATIONS: readonly DataMigration[] = [
   {
     version: 15,
     statements: ['ALTER TABLE photos ADD COLUMN quarter_turns INTEGER NOT NULL DEFAULT 0'],
+  },
+  // A photo's date in the ISO form of the services' clock: the column default wrote `YYYY-MM-DD HH:MM:SS`, in UTC.
+  {
+    version: 16,
+    statements: [
+      `UPDATE photos SET created_at = substr(created_at, 1, 10) || 'T' || substr(created_at, 12) || '.000Z'
+       WHERE created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]'`,
+    ],
   },
 ];
 
