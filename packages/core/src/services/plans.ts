@@ -25,8 +25,10 @@ import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
 
 export interface PlanServiceDeps {
   db: SqlDb;
-  /** Makes a unique id; the service prefixes it with `plan-`, `pe-` or `mo-`. */
+  /** Makes a unique id; the service prefixes it with `plan-`, `pe-`, `mo-` or `ow-`. */
   newId: () => string;
+  /** The clock, in milliseconds since the epoch; it dates new plans. */
+  now: () => number;
 }
 
 export interface PlanService {
@@ -229,7 +231,7 @@ function groupByPlan<T extends { plan_id: string }>(rows: T[]): Map<string, T[]>
  * string for storage. Mirrors the client-side `sanitizeObservationWindows` in `src/observation-windows.ts`;
  * kept independent so untrusted PATCH/import payloads are re-checked on the server side too.
  */
-export function sanitizeObservationWindows(raw: unknown): string {
+export function sanitizeObservationWindows(raw: unknown, newId: () => string): string {
   if (!Array.isArray(raw)) return '[]';
   const MIN = 0.02;
   const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -258,9 +260,7 @@ export function sanitizeObservationWindows(raw: unknown): string {
         : null;
     const snap = typeof item.snap === 'boolean' ? item.snap : false;
     const id =
-      typeof item.id === 'string' && item.id.trim()
-        ? item.id.trim().slice(0, 64)
-        : `ow-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      typeof item.id === 'string' && item.id.trim() ? item.id.trim().slice(0, 64) : `ow-${newId()}`;
     out.push({ id, startFrac: start, endFrac: end, filter, color, frameSeconds, snap });
   }
   return JSON.stringify(out);
@@ -355,7 +355,11 @@ function tileStatements(
 }
 
 /** The statements that write one plan of a backup file; null when it has no string id or name. */
-function planImportStatements(plan: BackupPlan, options: PlanImportOptions): SqlStatement[] | null {
+function planImportStatements(
+  plan: BackupPlan,
+  options: PlanImportOptions,
+  deps: Pick<PlanServiceDeps, 'newId' | 'now'>,
+): SqlStatement[] | null {
   const p = plan as Record<string, any>;
   if (typeof p?.id !== 'string' || typeof p.name !== 'string') return null;
   const planId: string = p.id;
@@ -373,7 +377,7 @@ function planImportStatements(plan: BackupPlan, options: PlanImportOptions): Sql
       planId,
       p.name,
       typeof p.position === 'number' ? p.position : options.index,
-      new Date().toISOString(),
+      new Date(deps.now()).toISOString(),
       typeof p.nightOf === 'string' ? p.nightOf : null,
       options.setupId,
       typeof p.lat === 'number' ? p.lat : null,
@@ -403,7 +407,7 @@ function planImportStatements(plan: BackupPlan, options: PlanImportOptions): Sql
           typeof e.mosaicId === 'string' ? e.mosaicId : null,
           typeof e.mosaicWDeg === 'number' ? e.mosaicWDeg : null,
           typeof e.mosaicHDeg === 'number' ? e.mosaicHDeg : null,
-          sanitizeObservationWindows(e.observationWindows),
+          sanitizeObservationWindows(e.observationWindows, deps.newId),
         ],
       });
     });
@@ -434,7 +438,7 @@ function planImportStatements(plan: BackupPlan, options: PlanImportOptions): Sql
 }
 
 export function createPlanService(deps: PlanServiceDeps): PlanService {
-  const { db, newId } = deps;
+  const { db, newId, now } = deps;
 
   return {
     async list() {
@@ -466,7 +470,7 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
       await db.run(INSERT_PLAN_AT_END, [
         id,
         name.trim(),
-        new Date().toISOString(),
+        new Date(now()).toISOString(),
         null,
         null,
         null,
@@ -637,7 +641,7 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
           throw err('invalid', 'observationWindows must be an array', 'ENTRY_FIELD_INVALID');
         }
         sets.push('observation_windows = ?');
-        vals.push(sanitizeObservationWindows(body.observationWindows));
+        vals.push(sanitizeObservationWindows(body.observationWindows, newId));
       }
 
       if (sets.length === 0) {
@@ -749,7 +753,7 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
     },
 
     async importPlan(plan, options) {
-      const writes = planImportStatements(plan, options);
+      const writes = planImportStatements(plan, options, deps);
       if (!writes) return false;
       await db.batch(writes);
       return true;
@@ -757,7 +761,7 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
 
     async importPlans(items) {
       const writes = items.flatMap(
-        ({ plan, options }) => planImportStatements(plan, options) ?? [],
+        ({ plan, options }) => planImportStatements(plan, options, deps) ?? [],
       );
       if (writes.length > 0) await db.batch(writes);
     },

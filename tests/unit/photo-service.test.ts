@@ -195,6 +195,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
     svc = createPhotoService({
       db: counting,
       newId: () => `id-${++idCount}`,
+      now: () => Date.UTC(2026, 6, 1),
       images: codec,
       blobs,
     });
@@ -904,7 +905,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect((await svc.get('imp'))!.correspondences).toHaveLength(2);
     });
 
-    it('fills what the backup lacks: file name, display name, size, date, empty lists', async () => {
+    it('fills what the backup lacks: file name, display name, size, the date of the clock, empty lists', async () => {
       await svc.importPhoto({ id: 'min' }, 'skip');
       expect(await svc.get('min')).toMatchObject({
         filename: 'min.jpg',
@@ -919,7 +920,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         quarterTurns: 0,
         correspondences: [],
       });
-      expect((await svc.get('min'))!.createdAt).toEqual(expect.any(String));
+      expect((await svc.get('min'))!.createdAt).toBe('2026-07-01T00:00:00.000Z');
       await svc.importPhoto({ id: 'named', filename: 'f.png' }, 'skip');
       expect((await svc.get('named'))!.originalName).toBe('f.png');
     });
@@ -1241,6 +1242,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
           },
         } as SqlDb,
         newId: () => 'id-9',
+        now: () => 0,
         images: codec,
         blobs,
       });

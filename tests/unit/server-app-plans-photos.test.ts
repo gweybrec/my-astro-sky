@@ -576,7 +576,7 @@ describe('observation windows through PATCH', () => {
     expect(out.map((w) => w.snap)).toEqual([false, false, false, false, true, false]);
   });
 
-  it('gives a window with no id one of the form ow-<time>-<random>, and cuts a long id', async () => {
+  it('gives a window with no id one of the form ow-<uuid> from the id maker, and cuts a long id', async () => {
     const out = await patchWindows([
       { startFrac: 0.1, endFrac: 0.3 },
       { id: '', startFrac: 0.1, endFrac: 0.3 },
@@ -584,7 +584,8 @@ describe('observation windows through PATCH', () => {
       { id: 7, startFrac: 0.1, endFrac: 0.3 },
       { id: ' x '.padEnd(80, 'y'), startFrac: 0.1, endFrac: 0.3 },
     ]);
-    for (const w of out.slice(0, 4)) expect(w.id).toMatch(/^ow-[0-9a-z]+-[0-9a-z]{1,6}$/);
+    for (const w of out.slice(0, 4))
+      expect(w.id).toMatch(/^ow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(new Set(out.slice(0, 4).map((w) => w.id)).size).toBe(4);
     expect(out[4].id).toHaveLength(64);
     expect(out[4].id.startsWith('x')).toBe(true);

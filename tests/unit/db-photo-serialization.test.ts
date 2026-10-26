@@ -56,6 +56,7 @@ async function makeService(): Promise<{ photos: PhotoService; conn: Database.Dat
     photos: createPhotoService({
       db,
       newId: () => 'unused',
+      now: () => 0,
       images: fakeImageCodec(),
       blobs: memoryBlobStore(),
     }),

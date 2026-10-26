@@ -54,6 +54,8 @@ export const thumbnailNameOf = (filename: string): string =>
 export interface PhotoServiceDeps {
   db: SqlDb;
   newId: () => string;
+  /** The clock, in milliseconds since the epoch; it dates a restored photo that has no date. */
+  now: () => number;
   images: ImageCodec;
   blobs: BlobStore;
 }
@@ -368,7 +370,7 @@ function correspondenceStatements(
 }
 
 export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
-  const { db, newId, images, blobs } = deps;
+  const { db, newId, now, images, blobs } = deps;
 
   async function readOne(id: string): Promise<Photo | undefined> {
     const row = await db.get<PhotoRow>(SELECT_PHOTO, [id]);
@@ -819,7 +821,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           const others = replaceIds.filter((other) => other !== id);
           if (strategy === 'replace') statements.push({ sql: DELETE_PHOTO, params: [id] });
           statements.push(
-            { sql: INSERT_PHOTO_WITH_ID, params: importParams(p) },
+            { sql: INSERT_PHOTO_WITH_ID, params: importParams(p, new Date(now()).toISOString()) },
             ...others.map((other) => ({ sql: DELETE_PHOTO, params: [other] })),
             ...correspondenceStatements(id, correspondences),
           );
@@ -836,7 +838,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
 }
 
 /** The parameters of `INSERT_PHOTO_WITH_ID` for a photo of a backup manifest. */
-function importParams(p: Record<string, any>): SqlValue[] {
+function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
   const id: string = p.id;
   return [
     id,
@@ -844,7 +846,7 @@ function importParams(p: Record<string, any>): SqlValue[] {
     p.originalName ?? p.filename ?? id,
     p.width ?? 0,
     p.height ?? 0,
-    p.createdAt ?? new Date().toISOString(),
+    p.createdAt ?? nowIso,
     p.manualPlacement ? JSON.stringify(p.manualPlacement) : null,
     JSON.stringify(Array.isArray(p.dsoIds) ? p.dsoIds : []),
     JSON.stringify(Array.isArray(p.labels) ? p.labels : []),

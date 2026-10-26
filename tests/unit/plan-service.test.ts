@@ -17,6 +17,10 @@ import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { SQL_ADAPTERS } from '../helpers/sql-adapters';
 import { countingSqlDb, type CountingSqlDb } from '../helpers/counting-sql-db';
 
+/** The clock the services are given, and its date as stored. */
+const NOW = Date.UTC(2026, 4, 1, 12);
+const NOW_ISO = '2026-05-01T12:00:00.000Z';
+
 const mosaic = (over: Record<string, unknown> = {}): MosaicParams =>
   ({
     dsoId: 'M31',
@@ -51,10 +55,12 @@ describe('PLAN_SORT_KEYS', () => {
 });
 
 describe('sanitizeObservationWindows', () => {
-  const one = (w: Record<string, unknown>) => JSON.parse(sanitizeObservationWindows([w]))[0];
+  const newId = () => 'n1';
+  const one = (w: Record<string, unknown>) => JSON.parse(sanitizeObservationWindows([w], newId))[0];
 
   it('returns [] for a value that is not an array', () => {
-    for (const v of [undefined, null, 'x', 3, {}]) expect(sanitizeObservationWindows(v)).toBe('[]');
+    for (const v of [undefined, null, 'x', 3, {}])
+      expect(sanitizeObservationWindows(v, newId)).toBe('[]');
   });
 
   it('skips items that are not objects or whose bounds are not finite numbers', () => {
@@ -66,7 +72,7 @@ describe('sanitizeObservationWindows', () => {
       { startFrac: 0.1 },
       { startFrac: 0.1, endFrac: 0.5 },
     ];
-    expect(JSON.parse(sanitizeObservationWindows(raw))).toHaveLength(1);
+    expect(JSON.parse(sanitizeObservationWindows(raw, newId))).toHaveLength(1);
   });
 
   it('clamps the bounds to [0,1], swaps them when reversed, and widens a window under 0.02', () => {
@@ -105,12 +111,12 @@ describe('sanitizeObservationWindows', () => {
     expect(one(w).snap).toBe(false);
   });
 
-  it('trims the id (64 characters) and makes one up when it is missing or blank', () => {
+  it('trims the id (64 characters) and makes an ow- id from newId when it is missing or blank', () => {
     const w = { startFrac: 0, endFrac: 1 };
     expect(one({ ...w, id: ' abc ' }).id).toBe('abc');
     expect(one({ ...w, id: 'i'.repeat(80) }).id).toHaveLength(64);
-    expect(one({ ...w, id: '  ' }).id).toMatch(/^ow-/);
-    expect(one(w).id).toMatch(/^ow-/);
+    expect(one({ ...w, id: '  ' }).id).toBe('ow-n1');
+    expect(one(w).id).toBe('ow-n1');
   });
 });
 
@@ -125,7 +131,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
     db = wrap(createBetterSqliteDb(conn));
     await initSchema(db);
     counter = 0;
-    svc = createPlanService({ db, newId: () => `id${++counter}` });
+    svc = createPlanService({ db, newId: () => `id${++counter}`, now: () => NOW });
   });
   afterEach(() => conn.close());
 
@@ -172,6 +178,11 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
         entries: [],
         mosaics: [],
       });
+    });
+
+    it('dates the plan with the clock it is given', async () => {
+      await svc.create({ name: 'A' });
+      expect(rows('plans')).toMatchObject([{ created_at: NOW_ISO }]);
     });
 
     it.each([[undefined], [null], [''], ['   '], [5], [['x']]])(
@@ -840,7 +851,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
       ],
     };
 
-    it('writes the plan, its entries and its mosaics with the values of the file', async () => {
+    it('writes the plan, its entries and its mosaics with the values of the file, dated by the clock', async () => {
       expect(await svc.importPlan(full, { ...opts, setupId: 'setup-9' })).toBe(true);
       const p = await plan('bundle-1');
       expect(p).toMatchObject({
@@ -864,7 +875,13 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
         mosaicHDeg: 3,
       });
       expect(p.entries[1].observationWindows).toHaveLength(1);
-      expect(p.entries[1].observationWindows[0]).toMatchObject({ startFrac: 0.2, endFrac: 0.4 });
+      // the window had no id: it gets one from newId; the plan is dated by the clock
+      expect(p.entries[1].observationWindows[0]).toMatchObject({
+        id: 'ow-id1',
+        startFrac: 0.2,
+        endFrac: 0.4,
+      });
+      expect(rows('plans')).toMatchObject([{ created_at: NOW_ISO }]);
       expect(p.mosaics).toEqual([
         {
           id: 'mo-1',
@@ -1006,7 +1023,7 @@ describe.each(SQL_ADAPTERS)('PlanService round trips (%s)', (_adapter, wrap) => 
     db = countingSqlDb(wrap(createBetterSqliteDb(conn)));
     await initSchema(db);
     let n = 0;
-    svc = createPlanService({ db, newId: () => `t${++n}` });
+    svc = createPlanService({ db, newId: () => `t${++n}`, now: () => 0 });
     db.reset();
   });
   afterEach(() => conn.close());
