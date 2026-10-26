@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { SCHEMA_VERSION } from '@myastrosky/core/db/schema';
+import { DatabaseUpdateError, SCHEMA_VERSION } from '@myastrosky/core/db/schema';
 import { applyMigrations } from '../../server/db-migrations';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -183,6 +183,18 @@ describe('applyMigrations — v3 plan_entries frame position', () => {
     expect(() => applyMigrations(db)).not.toThrow();
     const cols = getColumns(db, 'plan_entries');
     expect(cols.filter((c) => c === 'ra').length).toBe(1);
+  });
+});
+
+describe('applyMigrations — a migration that fails', () => {
+  it('throws a DatabaseUpdateError and keeps the version of the last migration that ran', () => {
+    const db = freshBaseDb();
+    // A pre-v3 plan_entries without pa_deg: the v3 rebuild cannot copy it.
+    db.exec(
+      'CREATE TABLE plan_entries (id TEXT PRIMARY KEY, plan_id TEXT, dso_id TEXT, position INTEGER)',
+    );
+    expect(() => applyMigrations(db)).toThrow(DatabaseUpdateError);
+    expect(schemaVersion(db)).toBe(2);
   });
 });
 

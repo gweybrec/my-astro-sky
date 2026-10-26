@@ -205,7 +205,14 @@ const es: Translations['mobile'] = {
     overlapMore: 'Más solapamiento',
   },
   backup: { exportSection: 'Exportar', importSection: 'Importar' },
-  startup: { failed: 'La aplicación no pudo iniciarse.' },
+  startup: {
+    failed: 'La aplicación no pudo iniciarse.',
+    updateFailed: 'La aplicación no pudo actualizar su base de datos. Sus datos están intactos.',
+    installUpdate:
+      'Instale una versión más reciente de la aplicación. Mientras tanto, puede guardar una copia de seguridad completa.',
+    saveBackup: 'Guardar una copia de seguridad',
+    saveFailed: 'La copia de seguridad falló: {error}',
+  },
 };
 
 export default es;

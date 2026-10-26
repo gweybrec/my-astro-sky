@@ -7,7 +7,8 @@ import './theme/index.css';
 import App from './App.vue';
 import StartupError from './components/StartupError.vue';
 import router from './router';
-import { initPlatform, installBackButton } from './platform-init';
+import { isDatabaseUpdateError } from '@myastrosky/core/db/schema';
+import { initPlatform, installBackButton, saveBackupWithoutUpdates } from './platform-init';
 import { catalogsReady } from './catalogs';
 import { checkAstrometryKey } from './key-check';
 import { repairStoredPhotoSizes } from './photo-sizes';
@@ -17,9 +18,11 @@ async function start(): Promise<void> {
     await initPlatform();
   } catch (error) {
     console.error('Start-up failed', error);
-    // A plain full-screen message with the error's text and a retry button, not a blank page.
+    // A plain full-screen message with the error's text and a retry button, not a blank page; after a failed
+    // database update, also the full backup of the data it left intact.
     const message = error instanceof Error ? error.message : String(error);
-    createApp(StartupError, { message }).mount('#app');
+    const saveBackup = isDatabaseUpdateError(error) ? saveBackupWithoutUpdates : undefined;
+    createApp(StartupError, { message, saveBackup }).mount('#app');
     return;
   }
   createApp(App).use(IonicVue).use(createPinia()).use(router).mount('#app');

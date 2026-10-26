@@ -67,11 +67,22 @@ export interface PhonePlatform {
 /** The folder of picture files inside the data directory. */
 const BLOB_FOLDER = 'uploads';
 
-export async function createPhoneBackend(platform: PhonePlatform): Promise<Backend> {
+export interface PhoneBackendOptions {
+  /**
+   * Opens the database as it is, without its updates and without writing anything at start-up: for the full backup
+   * the start-up error screen offers after a database update failed. Only that export is meant to run on it.
+   */
+  withoutUpdates?: boolean;
+}
+
+export async function createPhoneBackend(
+  platform: PhonePlatform,
+  options: PhoneBackendOptions = {},
+): Promise<Backend> {
   const { filesystem, now, baseUrl, directories } = platform;
 
   const db = createCapacitorSqliteDb(platform.sqliteConnection);
-  await initSchema(db);
+  if (!options.withoutUpdates) await initSchema(db);
 
   const blobs = createCapacitorBlobStore({
     filesystem,
@@ -103,7 +114,7 @@ export async function createPhoneBackend(platform: PhonePlatform): Promise<Backe
     now,
   });
   // First run: the default POI categories, before anything can list them.
-  await services.poiCategories.ensureDefaults();
+  if (!options.withoutUpdates) await services.poiCategories.ensureDefaults();
 
   return createLocalBackend({
     services,

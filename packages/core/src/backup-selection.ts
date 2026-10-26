@@ -39,6 +39,22 @@ export function buildExportOptions(flags: ExportFlags, selectedPhotoCount: numbe
   };
 }
 
+/**
+ * Every photo with its images and everything else but the shortcuts (the client keeps those): the backup offered when
+ * a database update failed at start-up.
+ */
+export const FULL_BACKUP_OPTIONS: ExportOptions = {
+  includeImages: true,
+  includeMetadata: true,
+  includeDsoOverrides: true,
+  includeCustomGear: true,
+  includeSetups: true,
+  includePoiCategories: true,
+  includeSkyRegions: true,
+  includePlans: true,
+  includeShortcuts: false,
+};
+
 /** An export needs at least one thing in it. */
 export function canExport(flags: ExportFlags, selectedPhotoCount: number): boolean {
   return selectedPhotoCount > 0 || Object.values(flags).some(Boolean);

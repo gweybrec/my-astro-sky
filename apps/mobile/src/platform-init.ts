@@ -15,6 +15,7 @@ import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loade
 import { configureStarSearch } from '@myastrosky/core/platform/star-search';
 import { configureConstellationStyleLoader } from '@myastrosky/core/platform/constellation-style';
 import type { KeyValueStore } from '@myastrosky/core/ports/key-value-store';
+import { FULL_BACKUP_OPTIONS } from '@myastrosky/core/backup-selection';
 import { setBackend } from '@myastrosky/app-state/backend';
 import { createHttpBackend } from '@myastrosky/backend-http/http-backend';
 import { createPreferencesStore } from '@myastrosky/backend-local/preferences-store';
@@ -83,6 +84,16 @@ async function createBackend() {
   }
   const { createNativePhoneBackend } = await import('./phone-backend');
   return createNativePhoneBackend();
+}
+
+/**
+ * After a database update failed at start-up (native only: the browser run's data is the server's): the full backup,
+ * read from the database as the failed update left it, through the share sheet.
+ */
+export async function saveBackupWithoutUpdates(): Promise<void> {
+  const { createNativePhoneBackend } = await import('./phone-backend');
+  const backend = await createNativePhoneBackend({ withoutUpdates: true });
+  await backend.backup.exportToUser({ options: FULL_BACKUP_OPTIONS });
 }
 
 /** The five top-level tabs: a hardware back press there leaves the app, whatever the tab history holds. */

@@ -7,6 +7,7 @@
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
+  DatabaseUpdateError,
   BASELINE_SCHEMA,
   REBUILD_BROKE_REFERENCES,
   SCHEMA_VERSION,
@@ -176,10 +177,10 @@ describe.each(OPENERS)('data migrations (%s)', (_adapter, open) => {
     conn.close();
   });
 
-  it('a failing statement leaves the version and the schema unchanged', async () => {
+  it('a failing statement leaves the version and the schema unchanged, and throws a DatabaseUpdateError', async () => {
     const { conn, db } = await freshDb();
     const before = sqlText(conn);
-    await expect(runDataMigrations(db, failing, V)).rejects.toThrow();
+    await expect(runDataMigrations(db, failing, V)).rejects.toThrow(DatabaseUpdateError);
     expect(version(conn)).toBe(V);
     expect(sqlText(conn)).toEqual(before);
     // A later migration that fails undoes the earlier ones of the same run too.
@@ -221,7 +222,7 @@ describe.each(OPENERS)('data migrations (%s)', (_adapter, open) => {
         failing.map((m) => ({ ...m, version: V + 3 })),
         V + 2,
       ),
-    ).toThrow();
+    ).toThrow(DatabaseUpdateError);
     expect(version(serverConn)).toBe(V + 2);
     expect(sqlText(serverConn)).toEqual(before);
 

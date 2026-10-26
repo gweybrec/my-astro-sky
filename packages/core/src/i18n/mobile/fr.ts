@@ -204,7 +204,15 @@ const fr = {
     overlapMore: 'Plus de chevauchement',
   },
   backup: { exportSection: 'Exporter', importSection: 'Importer' },
-  startup: { failed: "L'application n'a pas pu démarrer." },
+  startup: {
+    failed: "L'application n'a pas pu démarrer.",
+    updateFailed:
+      "L'application n'a pas pu mettre à jour sa base de données. Vos données sont intactes.",
+    installUpdate:
+      "Installez une version plus récente de l'application. En attendant, vous pouvez enregistrer une sauvegarde complète.",
+    saveBackup: 'Enregistrer une sauvegarde',
+    saveFailed: 'La sauvegarde a échoué : {error}',
+  },
 };
 
 export default fr;

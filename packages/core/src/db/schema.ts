@@ -181,13 +181,32 @@ export const MIGRATIONS: readonly DataMigration[] = [
   },
 ];
 
+/**
+ * A database update that failed at start-up. Everything it wrote was undone, so the data is as the previous version
+ * of the app left it; until a version that fixes the update is installed, the app can only export a backup.
+ */
+export class DatabaseUpdateError extends Error {
+  readonly cause: unknown;
+  constructor(cause: unknown) {
+    super(`The database update failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+    this.name = 'DatabaseUpdateError';
+    this.cause = cause;
+  }
+}
+
+/** True for a `DatabaseUpdateError`, also when it comes from another copy of this module (by its name). */
+export function isDatabaseUpdateError(error: unknown): error is DatabaseUpdateError {
+  return error instanceof Error && error.name === 'DatabaseUpdateError';
+}
+
 /** The error of a table rebuild that left rows pointing nowhere; the run is undone. */
 export const REBUILD_BROKE_REFERENCES =
   'A table rebuild left rows pointing at missing rows; it was undone.';
 
 /**
  * Runs every migration of `migrations` above the stored version, in order, each followed by its
- * `UPDATE schema_version`, all in one atomic batch: a failure leaves the database at `fromVersion`.
+ * `UPDATE schema_version`, all in one atomic batch: a failure leaves the database at `fromVersion`
+ * and throws a `DatabaseUpdateError`.
  * When one of them rebuilds a table, the batch runs in a transaction with foreign keys switched off
  * (see `DataMigration.rebuildsTable`), then put back as they were. Returns the final version.
  */
@@ -198,6 +217,15 @@ export async function runDataMigrations(
 ): Promise<number> {
   const pending = migrations.filter((m) => m.version > fromVersion);
   if (pending.length === 0) return fromVersion;
+  try {
+    await runPending(db, pending);
+  } catch (error) {
+    throw new DatabaseUpdateError(error);
+  }
+  return pending[pending.length - 1].version;
+}
+
+async function runPending(db: SqlDb, pending: readonly DataMigration[]): Promise<void> {
   const statements = pending.flatMap((m) => [
     ...m.statements.map((sql) => ({ sql })),
     { sql: 'UPDATE schema_version SET version = ?', params: [m.version] },
@@ -220,7 +248,6 @@ export async function runDataMigrations(
       await db.exec(`PRAGMA foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
     }
   }
-  return pending[pending.length - 1].version;
 }
 
 /**

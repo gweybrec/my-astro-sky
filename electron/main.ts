@@ -8,8 +8,11 @@ import { setupErrorLogging, logMainError, logCrash } from './error-logger.js';
 import { shouldReloadAfterCrash } from './crash-reload-guard.js';
 import { shouldOpenExternally } from './external-links.js';
 import { installLogger } from '../server/logger.js';
+import { msg, type ServerLang } from '../server/messages.js';
 import { ipcMain } from 'electron';
 import { configureLogSink, consoleLogSink, logInfo } from '@myastrosky/core/platform/log';
+import { isDatabaseUpdateError } from '@myastrosky/core/db/schema';
+import { backupFileName } from '@myastrosky/core/domain/backup';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SETTINGS_KEY_FILE = 'settings-encryption-key.bin';
@@ -156,6 +159,46 @@ function handleRendererGone(win: BrowserWindow, details: Electron.RenderProcessG
   }
 }
 
+/**
+ * A database update failed, so the server cannot start; the update was undone and the data is intact. Say so and
+ * offer the full backup, read from the database without the updates, until the user saves one or quits.
+ */
+async function offerBackupAfterFailedUpdate(err: Error): Promise<void> {
+  const lang: ServerLang = app.getLocale().startsWith('fr') ? 'fr' : 'en';
+  const text = msg.databaseUpdate;
+  for (;;) {
+    const choice = dialog.showMessageBoxSync({
+      type: 'error',
+      buttons: [text.saveBackup(lang), text.quit(lang)],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'MyAstroSky',
+      message: text.message(lang),
+      detail: text.detail(lang, err.message),
+    });
+    if (choice !== 0) return;
+    const file = dialog.showSaveDialogSync({
+      defaultPath: path.join(app.getPath('documents'), backupFileName(new Date())),
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    });
+    if (!file) continue;
+    try {
+      const { saveBackupWithoutUpdates } = await import('../server/backup-without-updates.js');
+      await saveBackupWithoutUpdates(file);
+      dialog.showMessageBoxSync({
+        type: 'info',
+        title: 'MyAstroSky',
+        message: text.saved(lang, file),
+      });
+      return;
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      logMainError('backup_without_updates_failed', failure);
+      dialog.showErrorBox('MyAstroSky', text.saveFailed(lang, failure.message));
+    }
+  }
+}
+
 async function main() {
   // Start the native crash reporter as early as possible so Crashpad captures crashes in
   // all processes. Local only — minidumps are written to app.getPath('crashDumps') and
@@ -261,7 +304,7 @@ ipcMain.handle('get-location', async () => {
 
 app.on('window-all-closed', () => app.quit());
 
-main().catch((error: unknown) => {
+main().catch(async (error: unknown) => {
   console.error(error);
   const err = error instanceof Error ? error : new Error(String(error));
   try {
@@ -272,7 +315,8 @@ main().catch((error: unknown) => {
   try {
     // A failed launch otherwise shows no window and logs only to a console nobody
     // sees — this is the one visible signal the user gets that something went wrong.
-    dialog.showErrorBox('MyAstroSky failed to start', err.message);
+    if (isDatabaseUpdateError(err)) await offerBackupAfterFailedUpdate(err);
+    else dialog.showErrorBox('MyAstroSky failed to start', err.message);
   } catch {
     // Best effort — if the dialog itself can't be shown (e.g. no display), there's
     // nothing more we can surface; fall through to exit below.

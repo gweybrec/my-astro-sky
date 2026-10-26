@@ -206,7 +206,14 @@ const de: Translations['mobile'] = {
     overlapMore: 'Mehr Überlappung',
   },
   backup: { exportSection: 'Exportieren', importSection: 'Importieren' },
-  startup: { failed: 'Die App konnte nicht starten.' },
+  startup: {
+    failed: 'Die App konnte nicht starten.',
+    updateFailed: 'Die App konnte ihre Datenbank nicht aktualisieren. Ihre Daten sind unversehrt.',
+    installUpdate:
+      'Installieren Sie eine neuere Version der App. In der Zwischenzeit können Sie eine vollständige Sicherung speichern.',
+    saveBackup: 'Sicherung speichern',
+    saveFailed: 'Die Sicherung ist fehlgeschlagen: {error}',
+  },
 };
 
 export default de;

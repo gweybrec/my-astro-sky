@@ -3,8 +3,14 @@
  * The phone's backend, assembled by `createPhoneBackend` on fakes of the plugin objects: the backend contract
  * passes on it, and the pieces specific to the phone (the share sheet, the archive limit, the key) work.
  */
+import Database from 'better-sqlite3';
+import { unzipSync } from 'fflate';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { FileSource } from '@myastrosky/core/backend';
+import { FULL_BACKUP_OPTIONS } from '@myastrosky/core/backup-selection';
+import { initSchema } from '@myastrosky/core/db/schema';
+import { createBetterSqliteDb } from '../../server/sqlite-adapter';
+import { createFakeConnection } from '../helpers/fake-sqlite-connection';
 import { createPhoneBackend, MAX_WHOLE_FILE_BYTES } from '@myastrosky/backend-local/phone-backend';
 import { describeBackendContract } from '../helpers/backend-contract';
 import { installFakeInternet, releaseFakeInternet } from '../helpers/contract-shared';
@@ -20,6 +26,30 @@ describe('createPhoneBackend', () => {
     const { platform } = await makePhonePlatform();
     const backend = await createPhoneBackend(platform);
     expect((await backend.poiCategories.list()).length).toBeGreaterThan(0);
+  });
+
+  it('withoutUpdates exports a database the updates have not reached, and writes nothing to it', async () => {
+    const raw = new Database(':memory:');
+    await initSchema(createBetterSqliteDb(raw));
+    raw
+      .prepare(
+        "INSERT INTO photos (id, filename, original_name, width, height) VALUES ('p1', 'p1.jpg', 'M42.jpg', 40, 30)",
+      )
+      .run();
+    raw.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
+    raw.prepare('UPDATE schema_version SET version = 14').run();
+    const { platform, fake, shared } = await makePhonePlatform();
+    platform.sqliteConnection = createFakeConnection({ raw });
+
+    const backend = await createPhoneBackend(platform, { withoutUpdates: true });
+    await backend.backup.exportToUser({ options: FULL_BACKUP_OPTIONS });
+
+    const zip = unzipSync(fake.files.get(`exports/${shared[0].name}`)!);
+    const manifest = JSON.parse(new TextDecoder().decode(zip['manifest.json']));
+    expect(manifest.photos).toMatchObject([{ id: 'p1', originalName: 'M42.jpg' }]);
+    expect(Object.keys(zip)).toEqual(expect.arrayContaining(['plans.json', 'poi-categories.json']));
+    expect(raw.prepare('SELECT version FROM schema_version').get()).toEqual({ version: 14 });
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM poi_categories').get()).toEqual({ n: 0 });
   });
 
   it('saveFile writes the file in the cache directory and opens the share sheet on its address', async () => {

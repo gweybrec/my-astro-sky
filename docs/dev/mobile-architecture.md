@@ -118,6 +118,7 @@ Where the phone's adapters differ from the server's on purpose:
 - `transaction(body)` may only await calls on its `tx`. A body that awaits anything else is rolled back; transactions do not nest; a call on the outer `SqlDb` from inside a body is rejected. A function that must work in both places takes a `SqlTx`.
 - `batch` is one round trip. Keep binary values out of a batch on the phone: the plugin then falls back to one call per statement.
 - The schema is defined once in `packages/core/src/db/schema.ts` (`BASELINE_SCHEMA` at `SCHEMA_VERSION`, `MIGRATIONS` for later versions, `initSchema`). A new migration is SQL added to `MIGRATIONS`, with `BASELINE_SCHEMA` and `SCHEMA_VERSION` updated in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise. The schema avoids `RETURNING`, `json_*` and `STRICT`; foreign keys are switched on explicitly. A migration that drops and recreates a table other tables point at sets `rebuildsTable`: foreign keys are switched off around it, and it is undone if it leaves rows pointing nowhere.
+- A migration that fails is undone and throws a `DatabaseUpdateError` (both apps). The app then stops at start-up with a message that the data is intact, and offers the usual full backup, read from the database without the updates (`createPhoneBackend(platform, { withoutUpdates: true })` on the phone, `server/backup-without-updates.ts` from the desktop's Electron dialog). The services read rows with `SELECT *`, so a database the updates have not reached still exports.
 
 ## Platform hooks in core
 

@@ -1,5 +1,6 @@
 import type DatabaseConstructor from 'better-sqlite3';
 import {
+  DatabaseUpdateError,
   MIGRATIONS,
   REBUILD_BROKE_REFERENCES,
   type DataMigration,
@@ -362,7 +363,11 @@ export function applyMigrations(database: Database): number {
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;
   for (const migration of migrations) {
     if (migration.version > current) {
-      migration.run(database);
+      try {
+        migration.run(database);
+      } catch (error) {
+        throw new DatabaseUpdateError(error);
+      }
       setVersion.run(migration.version);
       current = migration.version;
     }
@@ -374,7 +379,7 @@ export function applyMigrations(database: Database): number {
  * Run the SQL-only migrations (version 15 and above, defined in core's `schema.ts`) above
  * `fromVersion`. Each migration's statements and the version update share one transaction; a
  * migration that rebuilds a table runs with foreign keys switched off, as in core's
- * `runDataMigrations`. Returns the final version.
+ * `runDataMigrations`. A failure throws a `DatabaseUpdateError`. Returns the final version.
  */
 export function applyDataMigrations(
   database: Database,
@@ -393,16 +398,20 @@ export function applyDataMigrations(
         throw new Error(REBUILD_BROKE_REFERENCES);
       }
     });
-    if (migration.rebuildsTable) {
-      const foreignKeys = database.pragma('foreign_keys', { simple: true }) as number;
-      database.pragma('foreign_keys = OFF');
-      try {
+    try {
+      if (migration.rebuildsTable) {
+        const foreignKeys = database.pragma('foreign_keys', { simple: true }) as number;
+        database.pragma('foreign_keys = OFF');
+        try {
+          run();
+        } finally {
+          database.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
+        }
+      } else {
         run();
-      } finally {
-        database.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
       }
-    } else {
-      run();
+    } catch (error) {
+      throw new DatabaseUpdateError(error);
     }
     current = migration.version;
   }

@@ -1,13 +1,9 @@
 import Database from 'better-sqlite3';
-import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { applyMigrations } from './db-migrations.js';
+import { DB_PATH as dbPath } from './server-paths.js';
 
 export { applyMigrations };
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data.db');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');

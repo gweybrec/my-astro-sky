@@ -8,6 +8,7 @@ import type { CapacitorFilesystem } from '@myastrosky/backend-local/capacitor-bl
 import type { CapacitorSqliteConnection } from '@myastrosky/backend-local/capacitor-sqlite-db';
 import {
   createPhoneBackend,
+  type PhoneBackendOptions,
   type PhonePlatform,
   type PlatformFetch,
 } from '@myastrosky/backend-local/phone-backend';
@@ -37,7 +38,7 @@ async function openDatabase(): Promise<CapacitorSqliteConnection> {
   return connection as unknown as CapacitorSqliteConnection;
 }
 
-export async function createNativePhoneBackend(): Promise<Backend> {
+export async function createNativePhoneBackend(options?: PhoneBackendOptions): Promise<Backend> {
   const platform: PhonePlatform = {
     sqliteConnection: await openDatabase(),
     filesystem: Filesystem as unknown as CapacitorFilesystem,
@@ -51,5 +52,5 @@ export async function createNativePhoneBackend(): Promise<Backend> {
     directories: { data: Directory.Data, cache: Directory.Cache },
     baseUrl: location.origin,
   };
-  return createPhoneBackend(platform);
+  return createPhoneBackend(platform, options);
 }
