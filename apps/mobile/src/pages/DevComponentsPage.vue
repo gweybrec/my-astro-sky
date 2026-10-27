@@ -438,6 +438,11 @@ function raiseError() {
             { label: 'Résolution', value: '6248 × 4176 px' },
             { label: 'FOV', value: '57′ × 38′' },
             { label: 'Lune', value: 'Dernier quartier · 50 %', icon: caretIcon },
+            {
+              label: 'Auteur',
+              value: 'Prénom Nom',
+              link: { text: 'adresse@example.org', href: 'mailto:adresse@example.org' },
+            },
           ]"
         />
         <PhoneHelper>Ligne d'état</PhoneHelper>

@@ -13,3 +13,8 @@ declare module '*.vue' {
 
 /** The app's version, injected at build time from the repository's package.json. */
 declare const __APP_VERSION__: string;
+/** When the app was built, its author and its licence, injected at build time like the version. */
+declare const __APP_BUILD_TIMESTAMP__: string;
+declare const __APP_AUTHOR_NAME__: string;
+declare const __APP_AUTHOR_EMAIL__: string;
+declare const __APP_LICENSE__: string;

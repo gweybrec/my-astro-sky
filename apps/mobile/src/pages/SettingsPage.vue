@@ -76,7 +76,7 @@ const sections: { title: string; rows: RowDef[] }[] = [
   },
   {
     title: 'settings.legalSection',
-    rows: [{ title: 'mobile.settings.about', value: () => version }],
+    rows: [{ title: 'mobile.settings.about', to: '/settings/about', value: () => version }],
   },
 ];
 

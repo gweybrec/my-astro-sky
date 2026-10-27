@@ -63,6 +63,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/AstrometryKeyPage.vue'),
   },
   { path: '/settings/backup', component: () => import('./pages/BackupPage.vue') },
+  { path: '/settings/about', component: () => import('./pages/AboutPage.vue') },
 ];
 
 // The gallery of the shared components, for the checks: development builds and the alignment check's build (mode

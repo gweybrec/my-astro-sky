@@ -32,6 +32,7 @@ import SetupEditPage from '../src/pages/SetupEditPage.vue';
 import LocationPage from '../src/pages/LocationPage.vue';
 import BackupPage from '../src/pages/BackupPage.vue';
 import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
+import AboutPage from '../src/pages/AboutPage.vue';
 
 const GEAR = {
   telescope: [
@@ -265,6 +266,56 @@ describe('the Réglages page', () => {
     await w.findAll('.mob-row')[0].trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toBe('/settings/setups');
+  });
+
+  it('opens the about page from its row', async () => {
+    const { global, router } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const about = w.findAll('.mob-row').find((r) => r.text().includes('À propos'));
+    expect(about?.classes()).not.toContain('mob-row--inert');
+    await about!.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/about');
+  });
+});
+
+describe('the about page', () => {
+  it("shows the desktop's figures, the author's email as a mail link, the description and the features", async () => {
+    vi.stubGlobal('__APP_VERSION__', '0.12.0');
+    vi.stubGlobal('__APP_BUILD_TIMESTAMP__', '2026-10-27T09:12:33.412Z');
+    vi.stubGlobal('__APP_AUTHOR_NAME__', 'Ada Lovelace');
+    vi.stubGlobal('__APP_AUTHOR_EMAIL__', 'ada@example.org');
+    vi.stubGlobal('__APP_LICENSE__', 'MIT');
+    try {
+      const { global } = app();
+      const w = mount(AboutPage, { global });
+      await flushPromises();
+      expect(w.find('h1').text()).toBe('À propos de MyAstroSky');
+      const facts = w.findAll('.mob-fact').map((f) => f.text());
+      expect(facts).toEqual([
+        'Version0.12.0',
+        'Build2026-10-27T09:12:33.412Z',
+        'AuteurAda Lovelaceada@example.org',
+        'LicenceMIT',
+      ]);
+      const link = w.find('a.mob-link');
+      expect(link.attributes('href')).toBe('mailto:ada@example.org');
+      expect(link.text()).toBe('ada@example.org');
+      expect(w.find('.mob-text').text()).toContain('carte du ciel interactive');
+      const features = w.findAll('.mob-bullets li').map((li) => li.text());
+      expect(features).toHaveLength(6);
+      expect(features[0]).toBe('Projection stéréographique');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('shows no mail link when the build carries no email', async () => {
+    const { global } = app();
+    const w = mount(AboutPage, { global });
+    await flushPromises();
+    expect(w.find('a.mob-link').exists()).toBe(false);
   });
 });
 

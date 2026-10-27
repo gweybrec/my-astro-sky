@@ -1969,3 +1969,27 @@ svg.mob-icon--sm,
   border: 0;
   border-radius: 0;
 }
+/* A fact whose value holds several lines (a name over its email address). */
+.mob-fact-value--lines {
+  display: flex;
+  flex-direction: column;
+}
+/* A link inside text (an email address): the accent colour, underlined. */
+.mob-link {
+  color: var(--accent-color);
+}
+/* A paragraph of body text on a page, inside the page's gutters. */
+.mob-text {
+  margin: 0;
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+  color: var(--text-primary);
+}
+/* A bulleted list of body text on a page, its bullets inside the gutter, its items a little apart. */
+.mob-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 var(--mobile-gutter-end) var(--space-7) calc(var(--mobile-gutter) + var(--space-7));
+  color: var(--text-primary);
+}

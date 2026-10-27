@@ -1068,4 +1068,5 @@ export const views = [
   { name: 'setup', path: (ids) => `/settings/setups/${ids.setup}`, ready: '.mob-form-row' },
   { name: 'location', path: '/settings/location', ready: '.mob-form-row' },
   { name: 'backup', path: '/settings/backup', ready: 'ion-checkbox.mob-row' },
+  { name: 'about', path: '/settings/about', ready: '.mob-bullets li' },
 ];
