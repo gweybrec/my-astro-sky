@@ -33,6 +33,7 @@ import LocationPage from '../src/pages/LocationPage.vue';
 import BackupPage from '../src/pages/BackupPage.vue';
 import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
 import AboutPage from '../src/pages/AboutPage.vue';
+import PrivacyPage from '../src/pages/PrivacyPage.vue';
 
 const GEAR = {
   telescope: [
@@ -277,6 +278,17 @@ describe('the Réglages page', () => {
     await about!.trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toBe('/settings/about');
+  });
+
+  it('opens the privacy page from its row', async () => {
+    const { global, router } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const privacy = w.findAll('.mob-row').find((r) => r.text().includes('Confidentialité'));
+    expect(privacy?.classes()).not.toContain('mob-row--inert');
+    await privacy!.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/privacy');
   });
 });
 
@@ -701,5 +713,32 @@ describe('the backup page', () => {
       .trigger('click');
     await flushPromises();
     expect(showError).toHaveBeenCalled();
+  });
+});
+
+describe('the privacy page', () => {
+  it("shows the desktop's texts: local storage, then each feature that goes online", async () => {
+    const { global } = app();
+    const w = mount(PrivacyPage, { global });
+    await flushPromises();
+    expect(w.find('h1').text()).toBe('Confidentialité');
+    expect(w.findAll('.mob-text-title').map((h) => h.text())).toEqual([
+      'Solveur astrometry.net',
+      "Calcul de l'horizon",
+      'Identification des astéroïdes, comètes et supernovae',
+    ]);
+    const texts = w.findAll('.mob-text').map((p) => p.text());
+    expect(texts).toHaveLength(4);
+    expect(texts[0]).toContain('stockées localement sur votre appareil');
+    expect(texts[1]).toContain('nova.astrometry.net');
+    expect(texts[2]).toContain('seule fonction qui envoie votre position');
+    expect(texts[3]).toContain('IMCCE SkyBoT');
+  });
+
+  it('leaves out the IP geolocation block: the phone takes its position from the device', async () => {
+    const { global } = app();
+    const w = mount(PrivacyPage, { global });
+    await flushPromises();
+    expect(w.text()).not.toContain('ip-api.com');
   });
 });

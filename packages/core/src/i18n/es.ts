@@ -422,11 +422,17 @@ const es: Translations = {
       'Proyección estereográfica polar · Solución de placa (ASTAP, solve-field, astrometry.net) · Más de 12 000 objetos de cielo profundo · Recomendación de objetivos · Planes de observación por noche · Copia de seguridad y restauración para transferir entre dispositivos y usuarios',
     privacyTitle: 'Privacidad',
     privacyLocal:
-      'Todos tus datos (fotos, metadatos, ajustes) se almacenan localmente en tu dispositivo. Las conexiones externas se limitan a los casos descritos a continuación.',
-    privacyException: 'Excepción: solver astrometry.net',
+      'Todos tus datos (fotos, metadatos, ajustes) se almacenan localmente en tu dispositivo. Las siguientes funciones necesitan una conexión a servidores externos:',
+    privacyAstrometryTitle: 'Solver astrometry.net',
     privacyAstrometry:
       'Cuando usas el solver astrometry.net, tu imagen se sube a nova.astrometry.net para la solución de placa. Se requiere una clave API. No se transmiten otros datos.',
-    privacyExceptionGeoloc: 'Excepción: geolocalización por IP',
+    privacyHorizonTitle: 'Cálculo del horizonte',
+    privacyHorizon:
+      'Cuando calculas el horizonte de un lugar, la zona alrededor de ese lugar se envía a los servidores de teselas de altitud (Amazon S3) y a un servidor Overpass de OpenStreetMap, para obtener el relieve y el nombre de las cumbres. No se transmiten otros datos. Es la única función que envía tu posición fuera de tu dispositivo.',
+    privacyIdentifyTitle: 'Identificación de asteroides, cometas y supernovas',
+    privacyIdentify:
+      'Cuando identificas los objetos de una foto resuelta, la posición del campo en el cielo y la fecha de la foto se envían a IMCCE SkyBoT (asteroides) y al Transient Name Server (supernovas); la lista de órbitas de cometas se descarga del Minor Planet Center. No se transmiten otros datos.',
+    privacyGeolocTitle: 'Geolocalización por IP',
     privacyGeoloc:
       'Cuando usas el botón de detección automática de ubicación en la pestaña Objetivos, tu dirección IP se envía a ip-api.com para estimar tus coordenadas geográficas. No se transmiten otros datos.',
     dataCreditsTitle: 'Créditos de datos',

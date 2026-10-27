@@ -1993,3 +1993,13 @@ svg.mob-icon--sm,
   padding: 0 var(--mobile-gutter-end) var(--space-7) calc(var(--mobile-gutter) + var(--space-7));
   color: var(--text-primary);
 }
+/* The title of a block of text on a page (a feature on the privacy page): the accent colour, a section's space above,
+   the paragraph under it close to it. */
+.mob-text-title {
+  margin: 0;
+  padding: var(--space-7) var(--mobile-gutter-end) 0 var(--mobile-gutter);
+  color: var(--accent-color);
+}
+.mob-text-title + .mob-text {
+  padding-top: var(--space-2);
+}

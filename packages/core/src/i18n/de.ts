@@ -422,11 +422,17 @@ const de: Translations = {
       'Stereographische Polarprojektion · Plate Solving (ASTAP, solve-field, astrometry.net) · Über 12.000 Deep-Sky-Objekte · Zielempfehlungen · Beobachtungspläne nach Nacht · Sicherung & Wiederherstellung zur Übertragung zwischen Geräten und Nutzern',
     privacyTitle: 'Datenschutz',
     privacyLocal:
-      'Alle deine Daten (Fotos, Metadaten, Einstellungen) werden lokal auf deinem Gerät gespeichert. Externe Netzwerkverbindungen beschränken sich auf die unten beschriebenen Fälle.',
-    privacyException: 'Ausnahme: astrometry.net Solver',
+      'Alle deine Daten (Fotos, Metadaten, Einstellungen) werden lokal auf deinem Gerät gespeichert. Die folgenden Funktionen benötigen eine Verbindung zu externen Servern:',
+    privacyAstrometryTitle: 'astrometry.net-Solver',
     privacyAstrometry:
       'Wenn du den astrometry.net-Solver verwendest, wird dein Bild zur Plate-Solving-Berechnung an nova.astrometry.net hochgeladen. Ein API-Schlüssel ist erforderlich. Es werden keine weiteren Daten übertragen.',
-    privacyExceptionGeoloc: 'Ausnahme: IP-basierte Geolokalisierung',
+    privacyHorizonTitle: 'Horizontberechnung',
+    privacyHorizon:
+      'Wenn du den Horizont eines Ortes berechnest, wird das Gebiet um diesen Ort an die Server der Höhenkacheln (Amazon S3) und an einen Overpass-Server von OpenStreetMap gesendet, um das Gelände und die Namen der Gipfel abzurufen. Es werden keine weiteren Daten übertragen. Dies ist die einzige Funktion, die deine Position an einen Server außerhalb deines Geräts sendet.',
+    privacyIdentifyTitle: 'Identifizierung von Asteroiden, Kometen und Supernovae',
+    privacyIdentify:
+      'Wenn du die Objekte eines gelösten Fotos identifizierst, werden die Position des Feldes am Himmel und das Aufnahmedatum an IMCCE SkyBoT (Asteroiden) und an den Transient Name Server (Supernovae) gesendet; die Liste der Kometenbahnen wird vom Minor Planet Center heruntergeladen. Es werden keine weiteren Daten übertragen.',
+    privacyGeolocTitle: 'IP-basierte Geolokalisierung',
     privacyGeoloc:
       'Wenn du die automatische Standorterkennung im Tab Ziele verwendest, wird deine IP-Adresse an ip-api.com gesendet, um deine geografischen Koordinaten zu schätzen. Es werden keine weiteren Daten übertragen.',
     dataCreditsTitle: 'Datennachweise',

@@ -420,11 +420,17 @@ const en: Translations = {
       'Stereographic polar projection · Plate solving (ASTAP, solve-field, astrometry.net) · 12,000+ deep-sky objects · Target recommendations · Observing plans by night · Backup & restore to transfer between devices and users',
     privacyTitle: 'Privacy',
     privacyLocal:
-      'All your data (photos, metadata, settings) is stored locally on your device. External network connections are limited to the cases described below.',
-    privacyException: 'Exception: astrometry.net solver',
+      'All your data (photos, metadata, settings) is stored locally on your device. The following features need a connection to external servers:',
+    privacyAstrometryTitle: 'Astrometry.net solver',
     privacyAstrometry:
       'When you use the astrometry.net solver, your image is uploaded to nova.astrometry.net for plate solving. An API key is required. No other data is transmitted.',
-    privacyExceptionGeoloc: 'Exception: IP-based geolocation',
+    privacyHorizonTitle: 'Horizon calculation',
+    privacyHorizon:
+      'When you compute the horizon of a place, the area around that place is sent to the elevation tile servers (Amazon S3) and to an OpenStreetMap Overpass server, to get the terrain and the names of the peaks. No other data is transmitted. This is the only feature that sends your position off your device.',
+    privacyIdentifyTitle: 'Identification of asteroids, comets and supernovae',
+    privacyIdentify:
+      'When you identify the objects in a solved photo, the position of the field in the sky and the date of the photo are sent to IMCCE SkyBoT (asteroids) and to the Transient Name Server (supernovae); the list of comet orbits is downloaded from the Minor Planet Center. No other data is transmitted.',
+    privacyGeolocTitle: 'IP-based geolocation',
     privacyGeoloc:
       'When you use the auto-detect location button in the Targets tab, your IP address is sent to ip-api.com to estimate your geographic coordinates. No other data is transmitted.',
     dataCreditsTitle: 'Data credits',

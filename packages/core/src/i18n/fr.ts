@@ -419,11 +419,17 @@ const fr = {
       "Projection stéréographique · Résolution de plaque (ASTAP, solve-field, astrometry.net) · 12 000+ objets du ciel profond · Recommandation de cibles · Plans d'observation par nuit · Sauvegarde & restauration pour transférer entre appareils et utilisateurs",
     privacyTitle: 'Confidentialité',
     privacyLocal:
-      'Toutes vos données (photos, métadonnées, paramètres) sont stockées localement sur votre appareil. Les connexions vers des serveurs externes se limitent aux cas décrits ci-dessous.',
-    privacyException: 'Exception : solveur astrometry.net',
+      'Toutes vos données (photos, métadonnées, paramètres) sont stockées localement sur votre appareil. Les fonctions suivantes nécessitent une connexion à des serveurs externes :',
+    privacyAstrometryTitle: 'Solveur astrometry.net',
     privacyAstrometry:
       "Lorsque vous utilisez le solveur astrometry.net, votre image est envoyée au serveur nova.astrometry.net pour résolution. Une clé API est requise. Aucune autre donnée n'est transmise.",
-    privacyExceptionGeoloc: 'Exception : géolocalisation par adresse IP',
+    privacyHorizonTitle: "Calcul de l'horizon",
+    privacyHorizon:
+      "Lorsque vous calculez l'horizon d'un lieu, la zone autour de ce lieu est envoyée aux serveurs de tuiles d'altitude (Amazon S3) et à un serveur Overpass d'OpenStreetMap, pour obtenir le relief et le nom des sommets. Aucune autre donnée n'est transmise. C'est la seule fonction qui envoie votre position hors de votre appareil.",
+    privacyIdentifyTitle: 'Identification des astéroïdes, comètes et supernovae',
+    privacyIdentify:
+      "Lorsque vous identifiez les objets d'une photo résolue, la position du champ dans le ciel et la date de la photo sont envoyées à IMCCE SkyBoT (astéroïdes) et au Transient Name Server (supernovae) ; la liste des orbites de comètes est téléchargée depuis le Minor Planet Center. Aucune autre donnée n'est transmise.",
+    privacyGeolocTitle: 'Géolocalisation par adresse IP',
     privacyGeoloc:
       "Lorsque vous utilisez le bouton de géolocalisation automatique dans l'onglet Cibles, votre adresse IP est envoyée à ip-api.com pour estimer vos coordonnées géographiques. Aucune autre donnée n'est transmise.",
     dataCreditsTitle: 'Crédits des données',

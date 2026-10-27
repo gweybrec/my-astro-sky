@@ -64,6 +64,7 @@ const routes: RouteRecordRaw[] = [
   },
   { path: '/settings/backup', component: () => import('./pages/BackupPage.vue') },
   { path: '/settings/about', component: () => import('./pages/AboutPage.vue') },
+  { path: '/settings/privacy', component: () => import('./pages/PrivacyPage.vue') },
 ];
 
 // The gallery of the shared components, for the checks: development builds and the alignment check's build (mode
