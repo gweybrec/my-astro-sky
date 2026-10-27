@@ -25,6 +25,7 @@ import {
   catalogFilterColor,
 } from '@myastrosky/core/gear-catalog';
 import { sortCustomFirst } from '@myastrosky/core/gear-sort';
+import { chooseTelescope } from '@myastrosky/core/setup-gear';
 import type {
   TelescopeData,
   CameraData,
@@ -1174,14 +1175,16 @@ export function buildGearSectionContent(
 
       // ── Change handlers ──────────────────────────────────────────────────
       telSelect.addEventListener('change', () => {
-        // Switching to a smart telescope also pins its sealed-in sensor: the camera
-        // picker is disabled and never fires `change`, so without this the setup would
-        // be saved with whatever unrelated cameraId was there before.
+        // Switching to a smart telescope also pins its sealed-in sensor and clears the
+        // accessory: both pickers are disabled and never fire `change`, so without this
+        // the setup would be saved with whatever camera and accessory were there before.
         const nextTel = visibleTelescopes.find((tel) => tel.id === telSelect.value);
-        const nextCamId = nextTel
-          ? (resolveSetupCamera(nextTel, cameras, prefs.cameraId)?.id ?? prefs.cameraId)
-          : prefs.cameraId;
-        callbacks.onPrefsChange({ telescopeId: telSelect.value, cameraId: nextCamId });
+        const current = {
+          telescopeId: telSelect.value,
+          cameraId: prefs.cameraId,
+          accessoryId: prefs.accessoryId,
+        };
+        callbacks.onPrefsChange(nextTel ? chooseTelescope(current, nextTel, cameras) : current);
         callbacks.onRebuild(container);
       });
 

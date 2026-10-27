@@ -109,6 +109,11 @@ describe('buildGearPreset', () => {
     expect(preset.focalLengthMm).toBeCloseTo(4064, 4);
   });
 
+  it('ignores an accessory on a smart telescope (sealed optics)', () => {
+    const preset = buildGearPreset(SMART_TELESCOPE, ATIK_CAMERA, REDUCER_063);
+    expect(preset.focalLengthMm).toBe(SMART_TELESCOPE.focal_length_mm);
+  });
+
   it('sets aperture from telescope', () => {
     const preset = buildGearPreset(C8_TELESCOPE, ATIK_CAMERA, null);
     expect(preset.apertureMm).toBe(203.2);

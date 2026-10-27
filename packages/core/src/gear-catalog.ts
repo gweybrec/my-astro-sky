@@ -161,13 +161,18 @@ export function invalidateGearCache(type: CustomGearType): void {
 /**
  * Build the GearPreset consumed by the recommender and recipe engine from
  * a 3-part selection.  Accessory is optional (null = no reducer/barlow).
+ *
+ * A smart telescope's optics are sealed, so an accessory is ignored there: setups
+ * saved before the setup editor cleared it on picking a smart scope may still store
+ * one (e.g. a 0.63× reducer), which would shrink the focal length and enlarge the FOV.
  */
 export function buildGearPreset(
   telescope: TelescopeData,
   camera: CameraData,
   accessory: AccessoryData | null,
 ): GearPreset {
-  const effectiveFocalLengthMm = telescope.focal_length_mm * (accessory?.magnification_factor ?? 1);
+  const factor = telescope.is_smart_telescope ? 1 : (accessory?.magnification_factor ?? 1);
+  const effectiveFocalLengthMm = telescope.focal_length_mm * factor;
   return {
     apertureMm: telescope.aperture_mm,
     focalLengthMm: effectiveFocalLengthMm,
