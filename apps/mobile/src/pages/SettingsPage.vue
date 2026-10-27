@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import {
-  IonPage,
-  IonContent,
-  IonList,
-  IonSelect,
-  IonSelectOption,
-  onIonViewWillEnter,
-} from '@ionic/vue';
+import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { getLang, setLang, t, type Lang } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { formatLatLon, readObserverLocation } from '@myastrosky/core/observer-location';
@@ -97,7 +90,6 @@ const languages: { code: Lang; name: string }[] = [
 
 const current = getLang();
 const currentName = languages.find((l) => l.code === current)?.name ?? '';
-const select = ref<{ $el: HTMLIonSelectElement } | null>(null);
 const router = useRouter();
 
 async function refresh() {
@@ -116,6 +108,19 @@ async function refresh() {
 onMounted(refresh);
 onIonViewWillEnter(refresh);
 
+// The language: a choice of one in a sheet; choosing another applies it at once (the page reloads).
+const langOpen = ref(false);
+const langOptions = languages.map((l) => ({ value: l.code, label: t(l.name) }));
+const lang = computed({
+  get: () => current,
+  set: (value: Lang | undefined) => {
+    langOpen.value = false;
+    if (!value || value === current) return;
+    document.documentElement.lang = value;
+    setLang(value);
+  },
+});
+
 // The theme: a choice of one in a sheet; choosing applies it at once and closes the sheet.
 const themeOpen = ref(false);
 const themeOptions = THEMES.map((value) => ({ value, label: t(THEME_LABEL_KEYS[value]) }));
@@ -130,16 +135,10 @@ const theme = computed({
 /** Rows that open a choice on this page rather than a route. */
 const CHOICE_ROWS = [LANGUAGE_ROW, THEME_ROW];
 
-// Ionic's own select, opened from the row; choosing a language applies it at once (the page reloads).
-function onRow(row: RowDef, event: Event) {
-  if (row.title === LANGUAGE_ROW) void select.value?.$el.open(event as UIEvent);
+function onRow(row: RowDef) {
+  if (row.title === LANGUAGE_ROW) langOpen.value = true;
   else if (row.title === THEME_ROW) themeOpen.value = true;
   else if (row.to) void router.push(row.to);
-}
-function onChange(event: CustomEvent<{ value: Lang }>) {
-  if (event.detail.value === current) return;
-  document.documentElement.lang = event.detail.value;
-  setLang(event.detail.value);
 }
 </script>
 
@@ -161,7 +160,7 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
               :inert="!CHOICE_ROWS.includes(row.title) && !row.to"
               button
               chevron
-              @click="onRow(row, $event)"
+              @click="onRow(row)"
             >
               <template v-if="row.ok?.()" #trail>
                 <span class="mob-status--success">{{ row.ok() }}</span>
@@ -169,22 +168,14 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
             </PhoneRow>
           </IonList>
         </template>
-        <IonSelect
-          ref="select"
-          class="mob-lang-select"
-          interface="action-sheet"
-          :value="current"
-          :header="t('settings.languageLabel')"
-          :cancel-text="t('modal.cancel')"
-          aria-hidden="true"
-          @ion-change="onChange"
-        >
-          <IonSelectOption v-for="l in languages" :key="l.code" :value="l.code">
-            {{ t(l.name) }}
-          </IonSelectOption>
-        </IonSelect>
       </div>
     </IonContent>
+    <PhoneRadioSheet
+      v-model:open="langOpen"
+      v-model:value="lang"
+      :title="t('settings.languageLabel')"
+      :options="langOptions"
+    />
     <PhoneRadioSheet
       v-model:open="themeOpen"
       v-model:value="theme"
@@ -193,9 +184,3 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
     />
   </IonPage>
 </template>
-
-<style>
-.mob-lang-select {
-  display: none;
-}
-</style>

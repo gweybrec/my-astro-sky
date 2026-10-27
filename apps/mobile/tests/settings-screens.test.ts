@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { configureStorage, createMemoryStore, storage } from '@myastrosky/core/platform/storage';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
+import { configureI18n } from '@myastrosky/core/i18n/index';
 import { setBackend } from '@myastrosky/app-state/backend';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
 import { ionicStubs } from './helpers';
@@ -311,10 +312,64 @@ describe('the Réglages page', () => {
   });
 });
 
+describe('the language', () => {
+  const langSheet = (w: ReturnType<typeof mount>) =>
+    w
+      .findAllComponents(PhoneRadioSheet as Component)
+      .find((c) => (c.props() as { title: string }).title === 'Langue')!;
+  const langProps = (w: ReturnType<typeof mount>) =>
+    langSheet(w).props() as {
+      open: boolean;
+      value: string;
+      options: { value: string; label: string }[];
+    };
+  const reload = vi.fn();
+  beforeEach(() => {
+    configureI18n({
+      storedLang: () => localStorage.getItem('lang'),
+      storeLang: (l) => localStorage.setItem('lang', l),
+      preferredLanguages: () => [],
+      reload,
+    });
+  });
+
+  it('opens the same choice sheet as the theme, with the four languages and the current one chosen', async () => {
+    const { global } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const row = w.findAll('.mob-row').find((r) => r.text().includes('Langue'))!;
+    expect(row.text()).toContain('Français');
+    expect(langProps(w).open).toBe(false);
+    await row.trigger('click');
+    expect(langProps(w).open).toBe(true);
+    expect(langProps(w).value).toBe('fr');
+    expect(langProps(w).options.map((o) => o.value)).toEqual(['fr', 'en', 'es', 'de']);
+  });
+
+  it('saves another language and reloads; the current one only closes the sheet', async () => {
+    const { global } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    langSheet(w).vm.$emit('update:open', true);
+    langSheet(w).vm.$emit('update:value', 'fr');
+    await flushPromises();
+    expect(reload).not.toHaveBeenCalled();
+    expect(langProps(w).open).toBe(false);
+    langSheet(w).vm.$emit('update:value', 'de');
+    await flushPromises();
+    expect(localStorage.getItem('lang')).toBe('de');
+    expect(reload).toHaveBeenCalledTimes(1);
+    localStorage.setItem('lang', 'fr');
+  });
+});
+
 describe('the theme', () => {
   const themeRow = (w: ReturnType<typeof mount>) =>
     w.findAll('.mob-row').find((r) => r.text().includes('Thème'))!;
-  const themeSheet = (w: ReturnType<typeof mount>) => w.findComponent(PhoneRadioSheet as Component);
+  const themeSheet = (w: ReturnType<typeof mount>) =>
+    w
+      .findAllComponents(PhoneRadioSheet as Component)
+      .find((c) => (c.props() as { title: string }).title === 'Thème')!;
   const sheetProps = (w: ReturnType<typeof mount>) =>
     themeSheet(w).props() as {
       open: boolean;

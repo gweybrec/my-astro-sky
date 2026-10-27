@@ -1065,6 +1065,17 @@ export const views = [
     ...SHEET,
   },
   { name: 'settings', path: '/tabs/settings', ready: 'ion-item.mob-row' },
+  {
+    name: 'settings-language',
+    path: '/tabs/settings',
+    ready: 'ion-item.mob-row',
+    open: [
+      { click: 'ion-item.mob-row:has-text("Langue")' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+    ],
+    ...SHEET,
+  },
   // Réglages and its theme sheet in each theme (the default one is measured by the other views).
   ...['warm', 'cold-blue'].map((theme) => ({
     name: `settings-${theme}`,
