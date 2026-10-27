@@ -141,6 +141,7 @@ See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
 ## Conventions
 
 - **UI text is internationalized in four languages (FR/EN/ES/DE).** French is the default language. Translations live in `src/i18n/fr.ts`, `en.ts`, `es.ts` and `de.ts` (server-side strings in `server/messages.ts`). Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time). Frontend specifics: `src/CLAUDE.md`.
+- **Privacy.** A change that may affect what leaves the device (a new outside server, more data in a request, the position or a photo sent somewhere) must be reviewed for privacy, and the privacy page texts (`settings.privacy*` in `packages/core/src/i18n/*.ts`, shown on desktop and phone) updated in the same change.
 - Editing a `.ts` file in `src/` or `server/`? See `tests/CLAUDE.md` for the matching-test-file rule.
 - Do not create new doc files without updating the table in `docs/CLAUDE.md` **and** `.github/copilot-instructions.md`.
 - **This is a code repository.** Never commit progress or status tracking, screen captures, or mockups and design sources (mockups live in Claude Design only); ask first before adding anything that is not code, tests, build config or real documentation. Details: `docs/CLAUDE.md`.
