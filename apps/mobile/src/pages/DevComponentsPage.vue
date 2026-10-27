@@ -21,6 +21,7 @@ import PhoneBusy from '../components/PhoneBusy.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneChip from '../components/PhoneChip.vue';
 import PhoneColorButton from '../components/PhoneColorButton.vue';
+import PhoneCredit from '../components/PhoneCredit.vue';
 import PhoneEmptyState from '../components/PhoneEmptyState.vue';
 import PhoneField from '../components/PhoneField.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
@@ -306,6 +307,42 @@ function raiseError() {
             <PhoneInfoButton title="Titre avec info" message="Le texte long d'explication." />
           </template>
         </PhoneSectionHeader>
+
+        <PhoneSectionHeader>Crédits</PhoneSectionHeader>
+        <IonList class="mob-list" lines="none">
+          <PhoneCredit
+            :credit="{
+              name: 'Lien et licence liée',
+              detail: 'Auteur · source',
+              url: 'https://example.org',
+              linkText: 'example.org/catalogue',
+              license: 'CC BY-SA 4.0',
+              licenseUrl: 'https://example.org/licence',
+            }"
+          />
+          <PhoneCredit
+            :credit="{ name: 'Licence seule', detail: 'Auteur', license: 'Domaine public' }"
+          />
+          <PhoneCredit
+            :credit="{
+              name: 'Lien, licence sans lien et note',
+              detail: 'Auteur · version 03/2013',
+              url: 'https://example.org',
+              linkText: 'example.org',
+              license: 'Tous droits réservés',
+              note: 'Une note sous la ligne du lien, assez longue pour passer à la ligne suivante.',
+            }"
+          />
+          <PhoneCredit
+            :credit="{
+              name: 'Un nom très long qui passe à la ligne suivante sur un téléphone étroit',
+              detail:
+                'Un détail très long : plusieurs sources, séparées par des points, qui passent à la ligne',
+              url: 'https://example.org',
+              linkText: 'example.org/une/adresse/longue',
+            }"
+          />
+        </IonList>
 
         <PhoneSectionHeader>Puces et badges</PhoneSectionHeader>
         <div

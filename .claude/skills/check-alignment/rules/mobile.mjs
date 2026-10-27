@@ -451,7 +451,7 @@ export const rules = [
   {
     id: 'baseline',
     type: 'baseline',
-    lines: '.mob-meta',
+    lines: '.mob-meta, .mob-credit-links',
     chips: 'ion-badge, ion-chip, .mob-badge, .mob-chip',
   },
   // An icon, a switch or an "i" button is centred on its row.
@@ -1070,4 +1070,5 @@ export const views = [
   { name: 'backup', path: '/settings/backup', ready: 'ion-checkbox.mob-row' },
   { name: 'about', path: '/settings/about', ready: '.mob-bullets li' },
   { name: 'privacy', path: '/settings/privacy', ready: '.mob-text-title' },
+  { name: 'credits', path: '/settings/credits', ready: '.mob-credit' },
 ];

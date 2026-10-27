@@ -2003,3 +2003,33 @@ svg.mob-icon--sm,
 .mob-text-title + .mob-text {
   padding-top: var(--space-2);
 }
+/* A credit on the data credits page (`.mob-credit`, a static row, not a button): the name (`.mob-row-title`), the detail
+   (`.mob-row-sub`), the line of its link and licence, and a note, each wrapping, inside the gutters of a row. */
+.mob-credit {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
+  border-bottom: 1px solid var(--border-subtle);
+}
+/* The link and the licence chip (`.mob-badge`, itself a `.mob-link` when the licence has a page) of a credit, on one
+   line that wraps, sharing their baseline; the line and its link are touch-sized. */
+.mob-credit-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-7);
+  row-gap: var(--space-2);
+  min-height: var(--mobile-touch-min);
+  padding-top: var(--space-2);
+}
+.mob-credit-links > .mob-link:not(.mob-badge) {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--mobile-touch-min);
+}
+.mob-credit-links > .mob-badge {
+  color: var(--text-secondary);
+}
+.mob-credit-links > .mob-badge.mob-link {
+  color: var(--accent-color);
+}

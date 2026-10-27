@@ -439,6 +439,9 @@ const fr = {
       'Source des grandes nébuleuses planétaires dans le catalogue du ciel profond.',
     dataCreditsLicenseAllRights: 'Tous droits réservés',
     dataCreditsLicensePublicDomain: 'Domaine public',
+    dataCreditsOnlineLabel: 'Données en ligne',
+    dataCreditsOnlineIntro:
+      "Ces données ne sont pas incluses dans l'application : elles sont téléchargées depuis ces services quand vous calculez l'horizon d'un lieu.",
     diagnosticsSection: 'Diagnostic',
     logsPathLabel: 'Chemin des logs :',
     logsPathHintLoading: 'Chemin des logs : chargement…',

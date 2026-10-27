@@ -34,6 +34,7 @@ import BackupPage from '../src/pages/BackupPage.vue';
 import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
 import AboutPage from '../src/pages/AboutPage.vue';
 import PrivacyPage from '../src/pages/PrivacyPage.vue';
+import DataCreditsPage from '../src/pages/DataCreditsPage.vue';
 
 const GEAR = {
   telescope: [
@@ -289,6 +290,20 @@ describe('the Réglages page', () => {
     await privacy!.trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toBe('/settings/privacy');
+  });
+
+  it('opens the data credits page from its row, under the privacy row', async () => {
+    const { global, router } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const titles = w.findAll('.mob-row').map((r) => r.text());
+    const credits = titles.findIndex((t) => t.includes('Crédits des données'));
+    expect(credits).toBe(titles.findIndex((t) => t.includes('Confidentialité')) + 1);
+    const row = w.findAll('.mob-row')[credits];
+    expect(row.classes()).not.toContain('mob-row--inert');
+    await row.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/credits');
   });
 });
 
@@ -740,5 +755,58 @@ describe('the privacy page', () => {
     const w = mount(PrivacyPage, { global });
     await flushPromises();
     expect(w.text()).not.toContain('ip-api.com');
+  });
+});
+
+describe('the data credits page', () => {
+  it("shows the desktop's sections, the online data with the line saying it is downloaded", async () => {
+    const { global } = app();
+    const w = mount(DataCreditsPage, { global });
+    await flushPromises();
+    expect(w.find('h1').text()).toBe('Crédits des données');
+    expect(w.findAll('.mob-section-header').map((h) => h.text())).toEqual([
+      'Catalogues',
+      'Documents de référence',
+      'Données en ligne',
+    ]);
+    expect(w.findAll('.mob-helper').map((p) => p.text())).toEqual([
+      "Ces données ne sont pas incluses dans l'application : elles sont téléchargées depuis ces services quand vous calculez l'horizon d'un lieu.",
+    ]);
+    const names = w.findAll('.mob-credit > .mob-row-title').map((n) => n.text());
+    expect(names).toHaveLength(12);
+    expect(names).toContain('Stars — d3-celestial');
+    expect(names).toContain('Finest NGC Chart/Log System');
+    expect(names.slice(-2)).toEqual(['Peak names — OpenStreetMap', 'Elevation — Terrain Tiles']);
+  });
+
+  it('opens the links and the licences in the browser, and shows a licence without a page as a plain chip', async () => {
+    const { global } = app();
+    const w = mount(DataCreditsPage, { global });
+    await flushPromises();
+    const credit = (name: string) =>
+      w.findAll('.mob-credit').find((c) => c.find('.mob-row-title').text() === name)!;
+
+    const osm = credit('Peak names — OpenStreetMap');
+    expect(osm.text()).toContain('© OpenStreetMap contributors');
+    const [link, licence] = osm.findAll('.mob-credit-links a');
+    expect(link.attributes('href')).toBe('https://www.openstreetmap.org/copyright');
+    expect(link.text()).toBe('openstreetmap.org/copyright');
+    expect(licence.classes()).toContain('mob-badge');
+    expect(licence.text()).toBe('ODbL 1.0');
+    expect(licence.attributes('href')).toBe('https://opendatacommons.org/licenses/odbl/1-0/');
+    for (const a of w.findAll('.mob-credit a')) {
+      expect(a.attributes('target')).toBe('_blank');
+      expect(a.attributes('rel')).toBe('noopener noreferrer');
+    }
+
+    const boundaries = credit('Constellation boundaries');
+    expect(boundaries.findAll('a')).toHaveLength(0);
+    expect(boundaries.find('span.mob-badge').text()).toBe('Domaine public');
+
+    const largePn = credit('Large PN Observing Atlas');
+    expect(largePn.find('span.mob-badge').text()).toBe('Tous droits réservés');
+    expect(largePn.text()).toContain('Source des grandes nébuleuses planétaires');
+
+    expect(credit('Elevation — Terrain Tiles').find('.mob-badge').exists()).toBe(false);
   });
 });

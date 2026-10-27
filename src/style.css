@@ -5109,6 +5109,12 @@ details.targets-form-details[open] .targets-form-summary::before {
   margin-top: var(--space-4);
   margin-bottom: var(--space-1);
 }
+/* A line under a section label (the online data: downloaded, not shipped). */
+.credits-section-intro {
+  font-size: var(--font-size-small);
+  color: var(--text-dim);
+  margin: 0 0 var(--space-1);
+}
 .dep-row {
   padding: var(--space-3h) 0;
   border-bottom: 1px solid var(--border-subtle);

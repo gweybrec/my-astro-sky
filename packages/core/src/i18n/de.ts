@@ -441,6 +441,9 @@ const de: Translations = {
     dataCreditsLargePnNote: 'Quelle für große Planetarische Nebel im Deep-Sky-Katalog.',
     dataCreditsLicenseAllRights: 'Alle Rechte vorbehalten',
     dataCreditsLicensePublicDomain: 'Gemeinfrei',
+    dataCreditsOnlineLabel: 'Online-Daten',
+    dataCreditsOnlineIntro:
+      'Diese Daten sind nicht in der App enthalten: Sie werden von diesen Diensten heruntergeladen, wenn Sie den Horizont eines Ortes berechnen.',
     diagnosticsSection: 'Diagnose',
     logsPathLabel: 'Log-Pfad:',
     logsPathHintLoading: 'Log-Pfad: wird geladen…',
