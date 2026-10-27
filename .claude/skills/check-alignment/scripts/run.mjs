@@ -142,7 +142,12 @@ async function main() {
           /* the page then starts with its defaults */
         }
       },
-      [seeded.storage ?? {}, app.language.key, job.lang, job.view.clearStorage ?? []],
+      [
+        { ...seeded.storage, ...job.view.storage },
+        app.language.key,
+        job.lang,
+        job.view.clearStorage ?? [],
+      ],
     );
     if (app.cachedPrefixes?.length) {
       await context.route(

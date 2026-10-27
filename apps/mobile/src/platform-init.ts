@@ -1,6 +1,7 @@
 /**
  * What the phone app sets up before its first screen, in this order: the device storage, the language, the
  * backend, then the hooks the shared code calls (error reporter, log sink, device hints, gear catalogue, star search, constellation lines).
+ * The saved colour theme is applied with the storage, so the first screen already has its colours.
  * Awaited by `main.ts` before the app is mounted. In a desktop browser (not a native platform) the same steps run
  * on the HTTP backend of the desktop's server and on `localStorage`, so a screen can be developed in a
  * phone-sized browser window.
@@ -19,6 +20,7 @@ import { FULL_BACKUP_OPTIONS } from '@myastrosky/core/backup-selection';
 import { setBackend } from '@myastrosky/app-state/backend';
 import { createHttpBackend } from '@myastrosky/backend-http/http-backend';
 import { createPreferencesStore } from '@myastrosky/backend-local/preferences-store';
+import { applySavedTheme } from './app-theme';
 
 /** The one place that decides which platform the app runs on. */
 export const isNativePlatform = (): boolean => Capacitor.isNativePlatform();
@@ -138,9 +140,10 @@ export function installBackButton(router: BackRouter): void {
 }
 
 export async function initPlatform(): Promise<void> {
-  // 1. The device storage, and the WebView's kept from being cleared.
+  // 1. The device storage, and the WebView's kept from being cleared; then the saved theme.
   configureStorage(await createDeviceStorage());
   if (isNativePlatform()) requestPersistentStorage(navigator.storage);
+  applySavedTheme();
 
   // 2. The language: the stored one, else the phone's preferred languages; a change reloads the page.
   configureI18n({

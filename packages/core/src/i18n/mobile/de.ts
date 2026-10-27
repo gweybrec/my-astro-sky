@@ -141,7 +141,6 @@ const de: Translations['mobile'] = {
     langEn: 'English',
     langEs: 'Español',
     langDe: 'Deutsch',
-    themeValue: 'Kühl modern',
     keyConfigured: '✓ Konfiguriert',
     keyUnreadableTitle: 'astrometry.net-Schlüssel nicht lesbar',
     keyUnreadable:

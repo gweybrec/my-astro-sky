@@ -20,9 +20,9 @@
       <div class="settings-field">
         <label class="settings-field-label">{{ t('settings.themeLabel') }}</label>
         <select class="settings-field-input" v-model="selectedTheme" @change="onThemeChange">
-          <option value="cold-blue-v2">{{ t('settings.themeColdBlueV2') }}</option>
-          <option value="warm">{{ t('settings.themeWarm') }}</option>
-          <option value="cold-blue">{{ t('settings.themeColdBlue') }}</option>
+          <option v-for="theme in THEMES" :key="theme" :value="theme">
+            {{ t(THEME_LABEL_KEYS[theme]) }}
+          </option>
         </select>
       </div>
     </div>
@@ -95,7 +95,8 @@ import { showToast } from '../../toast';
 import aboutSvg from '../../icons/about.svg?raw';
 import privacySvg from '../../icons/privacy.svg?raw';
 import creditsSvg from '../../icons/credits.svg?raw';
-import { loadTheme, applyTheme, type Theme } from '../../theme';
+import { loadTheme, applyTheme } from '../../theme';
+import { THEMES, THEME_LABEL_KEYS, type Theme } from '@myastrosky/core/theme';
 import type { Lang } from '../../i18n';
 
 const emit = defineEmits<{ close: [] }>();

@@ -24,6 +24,7 @@ import { PhotoLayer } from '@myastrosky/render/photo-layer';
 import type { Photo } from '@myastrosky/core/types';
 import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { reportError } from '@myastrosky/core/platform/error-hook';
+import { THEME_CHANGED_EVENT } from '@myastrosky/core/theme';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { connectFrames } from './sky-frames';
 
@@ -241,6 +242,10 @@ export function createPhoneSkyMap(
     { immediate: true },
   );
 
+  // Frames, the horizon line and the danger colour are read from the theme's tokens at each draw.
+  const redraw = () => map.requestRender();
+  window.addEventListener(THEME_CHANGED_EVENT, redraw);
+
   let active = true;
   let reading = 0;
   async function reloadPhotos() {
@@ -306,6 +311,7 @@ export function createPhoneSkyMap(
       return () => viewListeners.delete(listener);
     },
     destroy() {
+      window.removeEventListener(THEME_CHANGED_EVENT, redraw);
       disconnectFrames();
       stopHorizon();
       stopCategories();

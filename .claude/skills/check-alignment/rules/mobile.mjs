@@ -17,6 +17,7 @@
 //               { click: selector } | { fill: selector, text } | { wait: selector } | { pause: ms } |
 //               { tapAt: selector, x, y } (fractions of its box); `scope` limits the measure to one element
 //               (an open sheet); `clearStorage` is a list of storage keys removed before the page loads (a first start);
+//               `storage` are storage entries of this view only (a chosen theme);
 //               `variants: true` repeats the view in every language and at 130 % text.
 import os from 'node:os';
 import path from 'node:path';
@@ -1064,6 +1065,21 @@ export const views = [
     ...SHEET,
   },
   { name: 'settings', path: '/tabs/settings', ready: 'ion-item.mob-row' },
+  // Réglages and its theme sheet in each theme (the default one is measured by the other views).
+  ...['warm', 'cold-blue'].map((theme) => ({
+    name: `settings-${theme}`,
+    path: '/tabs/settings',
+    ready: 'ion-item.mob-row',
+    storage: { 'app-theme': theme },
+  })),
+  ...['cold-blue-v2', 'warm', 'cold-blue'].map((theme) => ({
+    name: `settings-theme-${theme}`,
+    path: '/tabs/settings',
+    ready: 'ion-item.mob-row',
+    storage: { 'app-theme': theme },
+    open: [{ click: 'ion-item.mob-row:has-text("Thème")' }, { wait: '.mob-sheet' }, { pause: 600 }],
+    ...SHEET,
+  })),
   { name: 'setups', path: '/settings/setups', ready: 'ion-item.mob-row' },
   { name: 'setup', path: (ids) => `/settings/setups/${ids.setup}`, ready: '.mob-form-row' },
   { name: 'location', path: '/settings/location', ready: '.mob-form-row' },

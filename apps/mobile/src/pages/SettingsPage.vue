@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage,
@@ -12,12 +12,16 @@ import {
 import { getLang, setLang, t, type Lang } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { formatLatLon, readObserverLocation } from '@myastrosky/core/observer-location';
+import { THEMES, THEME_LABEL_KEYS, type Theme } from '@myastrosky/core/theme';
 import { getGearSetups, loadServerSettings } from '@myastrosky/app-state/api';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneRow from '../components/PhoneRow.vue';
+import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
+import { chooseTheme, currentTheme } from '../app-theme';
 
 const LANGUAGE_ROW = 'settings.languageLabel';
+const THEME_ROW = 'settings.themeLabel';
 
 // The entries of the board "Réglages". A row whose screen is a later card, or has no board yet, is disabled.
 interface RowDef {
@@ -54,7 +58,7 @@ const sections: { title: string; rows: RowDef[] }[] = [
     title: 'settings.appearanceSection',
     rows: [
       { title: LANGUAGE_ROW },
-      { title: 'settings.themeLabel', value: () => t('mobile.settings.themeValue') },
+      { title: THEME_ROW, value: () => t(THEME_LABEL_KEYS[currentTheme.value]) },
     ],
   },
   {
@@ -112,9 +116,24 @@ async function refresh() {
 onMounted(refresh);
 onIonViewWillEnter(refresh);
 
+// The theme: a choice of one in a sheet; choosing applies it at once and closes the sheet.
+const themeOpen = ref(false);
+const themeOptions = THEMES.map((value) => ({ value, label: t(THEME_LABEL_KEYS[value]) }));
+const theme = computed({
+  get: () => currentTheme.value,
+  set: (value: Theme | undefined) => {
+    if (value && value !== currentTheme.value) chooseTheme(value);
+    themeOpen.value = false;
+  },
+});
+
+/** Rows that open a choice on this page rather than a route. */
+const CHOICE_ROWS = [LANGUAGE_ROW, THEME_ROW];
+
 // Ionic's own select, opened from the row; choosing a language applies it at once (the page reloads).
 function onRow(row: RowDef, event: Event) {
   if (row.title === LANGUAGE_ROW) void select.value?.$el.open(event as UIEvent);
+  else if (row.title === THEME_ROW) themeOpen.value = true;
   else if (row.to) void router.push(row.to);
 }
 function onChange(event: CustomEvent<{ value: Lang }>) {
@@ -139,7 +158,7 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
               :key="row.title"
               :title="t(row.title)"
               :value="row.title === LANGUAGE_ROW ? t(currentName) : row.value?.()"
-              :inert="row.title !== LANGUAGE_ROW && !row.to"
+              :inert="!CHOICE_ROWS.includes(row.title) && !row.to"
               button
               chevron
               @click="onRow(row, $event)"
@@ -166,6 +185,12 @@ function onChange(event: CustomEvent<{ value: Lang }>) {
         </IonSelect>
       </div>
     </IonContent>
+    <PhoneRadioSheet
+      v-model:open="themeOpen"
+      v-model:value="theme"
+      :title="t('settings.themeLabel')"
+      :options="themeOptions"
+    />
   </IonPage>
 </template>
 

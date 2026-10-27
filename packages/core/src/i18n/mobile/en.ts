@@ -140,7 +140,6 @@ const en: Translations['mobile'] = {
     langEn: 'English',
     langEs: 'Español',
     langDe: 'Deutsch',
-    themeValue: 'Cold modern',
     keyConfigured: '✓ Configured',
     keyUnreadableTitle: 'Unreadable astrometry.net key',
     keyUnreadable:

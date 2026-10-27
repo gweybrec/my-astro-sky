@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Component } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
@@ -35,6 +36,8 @@ import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
 import AboutPage from '../src/pages/AboutPage.vue';
 import PrivacyPage from '../src/pages/PrivacyPage.vue';
 import DataCreditsPage from '../src/pages/DataCreditsPage.vue';
+import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
+import { applySavedTheme } from '../src/app-theme';
 
 const GEAR = {
   telescope: [
@@ -136,6 +139,7 @@ function app() {
 beforeEach(() => {
   localStorage.setItem('lang', 'fr');
   configureStorage(createMemoryStore());
+  applySavedTheme();
   setActivePinia(createPinia());
   configureGearCatalogLoader(async (type) => [...GEAR[type]] as object[]);
   vi.clearAllMocks();
@@ -252,12 +256,12 @@ describe('the Réglages page', () => {
     expect(w.findAll('.mob-row')[0].text()).toContain('2');
     expect(text).toContain('48.58, 7.75');
     expect(text).toContain('✓ Configurée');
-    expect(text).toContain('Froid moderne');
+    expect(text).toContain('Froid moderne (défaut)');
     const rows = w.findAll('.mob-row');
     const disabled = rows
       .filter((r) => r.classes().includes('mob-row--inert'))
       .map((r) => r.text());
-    expect(disabled.some((t) => t.includes('Thème'))).toBe(true);
+    expect(disabled.some((t) => t.includes('Thème'))).toBe(false);
     expect(disabled.some((t) => t.includes('Setups'))).toBe(false);
   });
 
@@ -304,6 +308,65 @@ describe('the Réglages page', () => {
     await row.trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toBe('/settings/credits');
+  });
+});
+
+describe('the theme', () => {
+  const themeRow = (w: ReturnType<typeof mount>) =>
+    w.findAll('.mob-row').find((r) => r.text().includes('Thème'))!;
+  const themeSheet = (w: ReturnType<typeof mount>) => w.findComponent(PhoneRadioSheet as Component);
+  const sheetProps = (w: ReturnType<typeof mount>) =>
+    themeSheet(w).props() as {
+      open: boolean;
+      title: string;
+      value: string;
+      options: { value: string; label: string }[];
+    };
+
+  it('shows the current theme in its row and opens the choice of the three themes', async () => {
+    const { global } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    expect(themeRow(w).text()).toContain('Froid moderne (défaut)');
+    expect(sheetProps(w).open).toBe(false);
+    await themeRow(w).trigger('click');
+    expect(sheetProps(w).open).toBe(true);
+    expect(sheetProps(w).title).toBe('Thème');
+    expect(sheetProps(w).value).toBe('cold-blue-v2');
+    expect(sheetProps(w).options).toEqual([
+      { value: 'cold-blue-v2', label: 'Froid moderne (défaut)' },
+      { value: 'warm', label: 'Chaud' },
+      { value: 'cold-blue', label: 'Froid classique' },
+    ]);
+  });
+
+  it('applies a chosen theme at once, saves it, closes the sheet and shows its name', async () => {
+    const changed = vi.fn();
+    window.addEventListener('app-theme-changed', changed);
+    const { global } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    await themeRow(w).trigger('click');
+    themeSheet(w).vm.$emit('update:value', 'warm');
+    await flushPromises();
+    expect(document.documentElement.dataset.theme).toBe('warm');
+    expect(storage().get('app-theme')).toBe('warm');
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(sheetProps(w).open).toBe(false);
+    expect(themeRow(w).text()).toContain('Chaud');
+    window.removeEventListener('app-theme-changed', changed);
+  });
+
+  it('applies the saved theme at start-up', () => {
+    storage().set('app-theme', 'cold-blue');
+    applySavedTheme();
+    expect(document.documentElement.dataset.theme).toBe('cold-blue');
+  });
+
+  it('falls back to the default theme when the saved value is unknown', () => {
+    storage().set('app-theme', 'night-red');
+    applySavedTheme();
+    expect(document.documentElement.dataset.theme).toBe('cold-blue-v2');
   });
 });
 

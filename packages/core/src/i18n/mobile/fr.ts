@@ -139,7 +139,6 @@ const fr = {
     langEn: 'English',
     langEs: 'Español',
     langDe: 'Deutsch',
-    themeValue: 'Froid moderne',
     keyConfigured: '✓ Configurée',
     keyUnreadableTitle: 'Clé astrometry.net illisible',
     keyUnreadable:

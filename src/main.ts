@@ -24,6 +24,7 @@ import { getLang, t } from './i18n';
 import { reportRendererError, reportUnknownRendererError } from './error-reporter';
 import { openDSOEditModal } from './dso-editor';
 import { loadTheme, applyTheme } from './theme';
+import { THEME_CHANGED_EVENT } from '@myastrosky/core/theme';
 import 'virtual:uno.css';
 import './styles/tokens.css';
 import './style.css';
@@ -90,7 +91,7 @@ async function init() {
   const skyMap = new SkyMap(canvas);
   const overlayCanvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
   skyMap.setOverlayCanvas(overlayCanvas);
-  window.addEventListener('app-theme-changed', () => skyMap.render());
+  window.addEventListener(THEME_CHANGED_EVENT, () => skyMap.render());
 
   // Init photo overlay
   const overlayDiv = document.getElementById('photo-layer') as HTMLDivElement;

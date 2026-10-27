@@ -1,15 +1,11 @@
-export type Theme = 'warm' | 'cold-blue' | 'cold-blue-v2';
-
-const VALID: Theme[] = ['cold-blue-v2', 'warm', 'cold-blue'];
-const KEY = 'app-theme';
+import { parseTheme, THEME_CHANGED_EVENT, THEME_KEY, type Theme } from '@myastrosky/core/theme';
 
 export function loadTheme(): Theme {
-  const v = localStorage.getItem(KEY);
-  return (VALID.includes(v as Theme) ? v : 'cold-blue-v2') as Theme;
+  return parseTheme(localStorage.getItem(THEME_KEY));
 }
 
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme === 'warm' ? '' : theme;
-  localStorage.setItem(KEY, theme);
-  window.dispatchEvent(new CustomEvent('app-theme-changed'));
+  localStorage.setItem(THEME_KEY, theme);
+  window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT));
 }

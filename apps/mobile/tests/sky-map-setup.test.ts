@@ -200,6 +200,17 @@ describe('the Ciel tab sky map', () => {
     expect(calls.setMaxStarCount).toEqual([[1234]]);
   });
 
+  it('draws again when a theme is chosen, and stops listening once destroyed', () => {
+    const sky = make();
+    const { calls } = created[0];
+    const before = calls.requestRender?.length ?? 0;
+    window.dispatchEvent(new CustomEvent('app-theme-changed'));
+    expect(calls.requestRender.length).toBe(before + 1);
+    sky.destroy();
+    window.dispatchEvent(new CustomEvent('app-theme-changed'));
+    expect(calls.requestRender.length).toBe(before + 1);
+  });
+
   it('reads the location again after Réglages changed it', () => {
     const sky = make();
     writeObserverLocation(-33.9, 18.4);
