@@ -322,6 +322,45 @@ the next thing to trace.
 
 ---
 
+## Technique 6 — Decode big photos before they are shown
+
+The photo overlays are `<img>` elements, not canvas draws, so their cost never shows in the
+JS profile: it sits on the compositor, raster and GPU threads. A star-placed photo starts
+with its thumbnail and switches to the full picture once it shows over 300 px wide
+(`photo-layer.ts`, `applyTransform`). Setting the full `src` straight on the visible
+`<img>` downloads in the background, but the **decode happens when the picture is first
+drawn, and the screen shows no new frame until it is done**, the whole map included.
+
+Found with a phone trace (`record-trace.mjs`, categories `cc`, `gpu`, `blink` added):
+`Decode Image` on a worker thread lined up with the longest gaps between
+`DrawFn_DrawGL` (WebView screen draws), while `requestAnimationFrame` kept ticking. Main
+thread frame times look fine through such a freeze; measure the gaps between screen
+draws instead.
+
+**Fix.** `showSrc` loads the full picture in an off-screen `Image`, awaits `decode()`,
+and only then sets it on the visible `<img>`; the thumbnail stays meanwhile, and a
+zoom-out before the decode ends drops the swap (`pendingSrc`).
+
+**Result on the phone** (Galaxy A16, a 4927 × 4871 photo, scripted zoom-in, longest gap
+between screen draws after the full picture is requested):
+
+| Before                 | After                                |
+| ---------------------- | ------------------------------------ |
+| 211 ms (207 ms decode) | **132–135 ms** (decode off the path) |
+
+What remains is the GPU's first draw of the 24 MP texture (~80 ms on the GPU thread,
+which the screen draw waits on). Hand-placed photos, which always show their full
+picture, are re-decoded at each zoom size during a zoom (~200 ms freeze each for an
+18 MP photo), which `decode()` cannot help. Both scale with the picture's pixel count,
+so the remedy is a smaller picture to show, not more asynchrony.
+
+> **Pattern.** "Async loading" is not async decoding. An `<img>` whose `src` changes while
+> on screen decodes on first paint and holds the frame; decode it off-screen with
+> `decode()` first. Past that, the cost is the pixel count: show no more pixels than the
+> screen can use.
+
+---
+
 ## Results
 
 Measured on identical scripted interactions at above-average density (median `requestAnimationFrame` delta):

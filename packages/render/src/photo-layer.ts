@@ -56,6 +56,8 @@ export interface PlacedPhoto {
    * and forces a full applyTransform recompute (otherwise photos stay stuck culled).
    */
   projGen: number;
+  /** The full picture being decoded off-screen before it replaces the thumbnail (see showSrc). */
+  pendingSrc?: string;
 }
 
 /** What the layer asks of its app. */
@@ -462,7 +464,10 @@ export class PhotoLayer {
    * them while its map's tab is not shown, so the tab shown gets the connection and the decoding to itself.
    */
   setLoadingPaused(paused: boolean) {
-    for (const { imgEl } of this.placedPhotos) {
+    for (const placed of this.placedPhotos) {
+      const { imgEl } = placed;
+      // A full picture still decoding off-screen is not swapped in; the next transform asks again.
+      if (paused) placed.pendingSrc = undefined;
       if (paused && imgEl.getAttribute('src') && !imgEl.complete) {
         imgEl.dataset.pausedSrc = imgEl.getAttribute('src')!;
         imgEl.removeAttribute('src');
@@ -611,7 +616,8 @@ export class PhotoLayer {
         const fullSrc = this.hooks.photoUrl(photo.filename);
         const currentSrc = imgEl.src === absoluteUrl(thumbSrc) ? thumbSrc : fullSrc;
         const desiredSrc = wantThumb ? thumbSrc : fullSrc;
-        if (currentSrc !== desiredSrc) imgEl.src = desiredSrc;
+        if (currentSrc !== desiredSrc) this.showSrc(placed, desiredSrc, !wantThumb);
+        else placed.pendingSrc = undefined;
       }
     } catch {
       imgEl.style.display = 'none';
@@ -620,6 +626,31 @@ export class PhotoLayer {
         this.hooks.onPlacementError?.(photo);
       }
     }
+  }
+
+  /**
+   * Shows `src` in the photo's picture. The full picture is decoded off-screen first and
+   * swapped in once ready: set straight on the visible picture, the screen showed no new
+   * frame of the map until it was decoded (~200 ms for a 24 MP photo on a phone). The
+   * thumbnail stays meanwhile, and a zoom-out before the decode ends drops the swap.
+   */
+  private showSrc(placed: PlacedPhoto, src: string, decodeFirst: boolean): void {
+    if (!decodeFirst) {
+      placed.pendingSrc = undefined;
+      placed.imgEl.src = src;
+      return;
+    }
+    if (placed.pendingSrc === src) return;
+    placed.pendingSrc = src;
+    const offscreen = new Image();
+    offscreen.src = src;
+    // On a failed decode the visible picture loads it anyway, so its load/error handling runs as before.
+    const swap = () => {
+      if (placed.pendingSrc !== src) return;
+      placed.pendingSrc = undefined;
+      placed.imgEl.src = src;
+    };
+    offscreen.decode().then(swap, swap);
   }
 }
 

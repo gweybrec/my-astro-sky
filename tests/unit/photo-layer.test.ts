@@ -105,7 +105,7 @@ describe('PhotoLayer', () => {
     expect(container.querySelector('img')!.style.transform).toMatch(/^matrix\(/);
   });
 
-  it('starts a photo placed by its stars with its thumbnail, and loads the full picture once it shows large', () => {
+  it('starts a photo placed by its stars with its thumbnail, and loads the full picture once it shows large', async () => {
     const starPlaced = (id: string, spread: number, size = 100) =>
       placedPhoto(id, {
         width: size,
@@ -125,6 +125,13 @@ describe('PhotoLayer', () => {
           starDec,
         })) as never,
       });
+    // The full picture is decoded off-screen before it replaces the thumbnail.
+    const decodes: { src: string; done: () => void }[] = [];
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockImplementation(function (
+      this: HTMLImageElement,
+    ) {
+      return new Promise<void>((done) => decodes.push({ src: this.getAttribute('src')!, done }));
+    });
     const { container, layer } = make();
     // its first 100 px spanning 0.01° it shows tiny; a 1000 px photo whose first 100 px span 40° shows over 300 px
     layer.loadPhotos([
@@ -135,7 +142,49 @@ describe('PhotoLayer', () => {
     const src = () => [...container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
     expect(src()).toEqual(['/files/small-thumb.jpg', '/files/large-thumb.jpg', '/files/hand.jpg']);
     layer.updateTransforms();
+    layer.updateTransforms();
+    // still the thumbnail while the full picture decodes, and one decode for both frames
+    expect(src()).toEqual(['/files/small-thumb.jpg', '/files/large-thumb.jpg', '/files/hand.jpg']);
+    expect(decodes.map((d) => d.src)).toEqual(['/files/large.jpg']);
+    decodes[0].done();
+    await Promise.resolve();
     expect(src()).toEqual(['/files/small-thumb.jpg', '/files/large.jpg', '/files/hand.jpg']);
+  });
+
+  it('keeps the thumbnail when the photo shows small again before its full picture is decoded', async () => {
+    let finish = () => {};
+    const decode = vi
+      .spyOn(HTMLImageElement.prototype, 'decode')
+      .mockImplementation(() => new Promise<void>((done) => (finish = done)));
+    const photo = placedPhoto('big', {
+      width: 1000,
+      height: 1000,
+      manualPlacement: undefined,
+      correspondences: [
+        [0, 0, 10, 50],
+        [100, 0, 50, 50],
+        [0, 100, 10, 90],
+      ].map(([photoX, photoY, starRa, starDec], i) => ({
+        pointIndex: i,
+        photoX,
+        photoY,
+        starHip: 0,
+        starName: `s${i}`,
+        starRa,
+        starDec,
+      })) as never,
+    });
+    let view = VIEW;
+    const container = document.createElement('div');
+    const layer = new PhotoLayer(container, () => view, { photoUrl: (name) => `/files/${name}` });
+    layer.loadPhotos([photo]);
+    layer.updateTransforms(); // shows large: the full picture starts decoding
+    expect(decode).toHaveBeenCalledTimes(1);
+    view = { ...VIEW, scale: 0.5 }; // zoomed far out: the photo shows small again
+    layer.updateTransforms();
+    finish();
+    await Promise.resolve();
+    expect(container.querySelector('img')!.getAttribute('src')).toBe('/files/big-thumb.jpg');
   });
 
   it('tells the app once when a photo cannot be placed', () => {
