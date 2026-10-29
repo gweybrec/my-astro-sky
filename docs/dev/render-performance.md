@@ -352,7 +352,9 @@ What remains is the GPU's first draw of the 24 MP texture (~80 ms on the GPU thr
 which the screen draw waits on). Hand-placed photos, which always show their full
 picture, are re-decoded at each zoom size during a zoom (~200 ms freeze each for an
 18 MP photo), which `decode()` cannot help. Both scale with the picture's pixel count,
-so the remedy is a smaller picture to show, not more asynchrony.
+so the remedy is a smaller picture to show, not more asynchrony: each picture over 3072 px
+now also has a 2048 px copy, shown until the photo needs more screen pixels than it has (see
+[architecture.md → LOD](/dev/architecture.md#sky-map-panzoom-freeze-lod)).
 
 > **Pattern.** "Async loading" is not async decoding. An `<img>` whose `src` changes while
 > on screen decodes on first paint and holds the frame; decode it off-screen with

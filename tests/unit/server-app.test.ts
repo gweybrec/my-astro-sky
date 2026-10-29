@@ -98,6 +98,7 @@ const EXPECTED_API_ROUTES = [
   'PATCH /api/photos/:id/metadata',
   'POST /api/photos/:id/rotate',
   'POST /api/photos/repair-sizes',
+  'POST /api/photos/make-mediums',
   'POST /api/solve-wcs',
   'POST /api/photos/convert',
   'POST /api/solve-astap',
@@ -196,10 +197,10 @@ describe('route table', () => {
     ]);
   });
 
-  it('registers exactly the 78 documented /api routes', () => {
+  it('registers exactly the 79 documented /api routes', () => {
     const all = listRoutes(app);
     const api = all.filter((r) => r.split(' ')[1].startsWith('/api/'));
-    expect(EXPECTED_API_ROUTES).toHaveLength(78);
+    expect(EXPECTED_API_ROUTES).toHaveLength(79);
     expect([...api].sort()).toEqual([...EXPECTED_API_ROUTES].sort());
   });
 

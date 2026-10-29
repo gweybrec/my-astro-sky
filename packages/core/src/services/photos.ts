@@ -47,6 +47,24 @@ export const THUMB_SIZE = 400;
 /** The JPEG quality of a thumbnail. */
 export const THUMB_QUALITY = 75;
 
+/** The longer side of a photo's medium-sized copy, in pixels: the sky map shows it between the thumbnail and the full picture. */
+export const MEDIUM_SIZE = 2048;
+/** The JPEG quality of a medium-sized copy. */
+export const MEDIUM_QUALITY = 85;
+/**
+ * Only a picture whose longer side is over this gets a medium-sized copy: a smaller one is decoded and drawn quickly
+ * enough on its own.
+ */
+export const MEDIUM_MIN_SOURCE = 3072;
+
+/** Whether a picture of this size gets a medium-sized copy. */
+export const needsMedium = (width: number, height: number): boolean =>
+  Math.max(width, height) > MEDIUM_MIN_SOURCE;
+
+/** The name of the medium-sized copy of the image file `filename` (the extension becomes `_medium.jpg`). */
+export const mediumNameOf = (filename: string): string =>
+  filename.replace(/(\.[^.]+)$/, '_medium.jpg');
+
 /** The name of the thumbnail of the image file `filename` (the extension becomes `_thumb.jpg`). */
 export const thumbnailNameOf = (filename: string): string =>
   filename.replace(/(\.[^.]+)$/, '_thumb.jpg');
@@ -85,14 +103,15 @@ export interface PhotoService {
   /**
    * The whole of `POST /api/photos`, in order: the checks that need no image, the probe (`INVALID_IMAGE`), the
    * orientation baked into the stored image `<id><ext>` (`INVALID_IMAGE`), the thumbnail `<id>_thumb.jpg` (a failure
-   * is a warning in the result, the upload goes on), then the insert. Files are written outside any transaction and
+   * is a warning in the result, the upload goes on), the medium-sized copy `<id>_medium.jpg` of a large picture (a
+   * failure leaves the photo without one, for `makeMissingMediums`), then the insert. Files are written outside any transaction and
    * are not removed when the insert fails.
    */
   upload(file: PhotoUploadFile, fields: UploadFields): Promise<PhotoUploadResult>;
   /** The list with `fileSize` read from the blob store (null when the image is missing). */
   listWithSizes(): Promise<PhotoWithSize[]>;
   /**
-   * Deletes a photo: its image and its thumbnail, then its row. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no
+   * Deletes a photo: its image, its thumbnail and its medium-sized copy, then its row. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no
    * such photo.
    */
   remove(id: string): Promise<void>;
@@ -124,7 +143,7 @@ export interface PhotoService {
   rotateRight(id: string): Promise<Photo>;
   /** Deletes every photo row (not the files). Returns how many there were. */
   removeAllRows(): Promise<number>;
-  /** Deletes every photo: the rows, the images and the thumbnails. Returns how many there were. */
+  /** Deletes every photo: the rows, the images, the thumbnails and the medium-sized copies. Returns how many there were. */
   removeAll(): Promise<number>;
   /**
    * For each of `names`, every stored photo with that display name, in the order of `names`, then in the order the
@@ -158,6 +177,12 @@ export interface PhotoService {
    * write. A photo whose picture is missing or not an image is left as it is. Returns the number of photos repaired.
    */
   repairSizes(): Promise<number>;
+  /**
+   * Makes the medium-sized copy of each large picture that has none (photos stored before copies were made, restored
+   * from a backup, or whose copy failed), one at a time, and stores its name. A picture that cannot be read is left
+   * without one. Returns the number of copies made.
+   */
+  makeMissingMediums(): Promise<number>;
 }
 
 interface PhotoRow {
@@ -174,6 +199,7 @@ interface PhotoRow {
   notes: string | null;
   integrations: string | null;
   thumb_filename: string | null;
+  medium_filename: string | null;
   observation_date: string | null;
   capture_details: string | null;
   gear_setup_id: string | null;
@@ -191,8 +217,8 @@ interface CorrespondenceRow {
   star_dec: number | null;
 }
 
-const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?)`;
+const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, medium_filename)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
 const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
 const INSERT_CORRESPONDENCE =
@@ -204,7 +230,8 @@ const SELECT_CORRESPONDENCES_FOR =
   'SELECT * FROM star_correspondences WHERE photo_id = ? ORDER BY point_index';
 const SELECT_FILENAME = 'SELECT filename FROM photos WHERE id = ?';
 const SELECT_IDS = 'SELECT id FROM photos';
-const SELECT_IDS_FILENAMES = 'SELECT id, filename FROM photos';
+const SELECT_IDS_FILENAMES = 'SELECT id, filename, medium_filename FROM photos';
+const SELECT_FILES_OF = 'SELECT id, filename, medium_filename FROM photos WHERE id = ?';
 const SELECT_NAMES = 'SELECT id, original_name FROM photos ORDER BY rowid ASC';
 const DELETE_PHOTO = 'DELETE FROM photos WHERE id = ?';
 const DELETE_ALL_PHOTOS = 'DELETE FROM photos';
@@ -217,6 +244,16 @@ const UPDATE_METADATA_WITH_NAME =
 const UPDATE_DRAW_ORDER = 'UPDATE photos SET display_order = ? WHERE id = ?';
 const SELECT_UNSIZED = 'SELECT id, filename FROM photos WHERE width <= 0 OR height <= 0';
 const UPDATE_SIZE = 'UPDATE photos SET width = ?, height = ? WHERE id = ?';
+const SELECT_WITHOUT_MEDIUM = `SELECT id, filename FROM photos
+   WHERE medium_filename IS NULL AND MAX(width, height) > ${MEDIUM_MIN_SOURCE}`;
+const UPDATE_MEDIUM = 'UPDATE photos SET medium_filename = ? WHERE id = ?';
+
+/** What deleting a photo's files needs of its row. */
+interface FilesRow {
+  id: string;
+  filename: string;
+  medium_filename: string | null;
+}
 
 const photoNotFoundBody = { error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' } as const;
 
@@ -345,6 +382,7 @@ function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Photo {
     captureDetails: parseSanitized(p.capture_details, sanitizeCaptureDetails, {}),
     gearSetupId: p.gear_setup_id ?? null,
     thumbFilename: p.thumb_filename ?? null,
+    mediumFilename: p.medium_filename ?? null,
     quarterTurns: cleanQuarterTurns(p.quarter_turns),
     correspondences: corr.map((c) => ({
       pointIndex: c.point_index,
@@ -392,6 +430,13 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
   ): Promise<{ width: number; height: number } | null> {
     const bytes = await blobs.get(filename).catch(() => null);
     return bytes ? images.probe(bytes).then(shownSize, () => null) : null;
+  }
+
+  /** Deletes a photo's picture, its thumbnail and, when it has one, its medium-sized copy. */
+  async function removeFiles(r: FilesRow): Promise<void> {
+    await blobs.remove(r.filename);
+    await blobs.remove(thumbnailNameOf(r.filename));
+    if (r.medium_filename) await blobs.remove(r.medium_filename);
   }
 
   const service: PhotoService = {
@@ -447,6 +492,19 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       } catch (error) {
         warnings.push({ code: 'THUMBNAIL_FAILED', error });
       }
+      let mediumFilename: string | null = null;
+      if (needsMedium(width, height)) {
+        try {
+          await blobs.put(
+            mediumNameOf(filename),
+            await images.thumbnail(baked, MEDIUM_SIZE, MEDIUM_QUALITY),
+          );
+          mediumFilename = mediumNameOf(filename);
+        } catch (error) {
+          // The map shows the full picture meanwhile; makeMissingMediums tries again.
+          console.warn(`[Photos] The medium-sized copy of ${filename} could not be made`, error);
+        }
+      }
 
       const meta = service.readUploadMetadata(file.name, fields ?? {});
       let photo: Photo;
@@ -464,6 +522,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           notes: meta.notes,
           integrations: meta.integrations,
           thumbFilename,
+          mediumFilename,
           observationDate: meta.observationDate,
           pointsOfInterest: meta.pointsOfInterest,
           captureDetails: meta.captureDetails,
@@ -473,6 +532,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
         // Nothing refers to the files of this upload any more: do not leave them behind.
         await blobs.remove(filename).catch(() => undefined);
         await blobs.remove(thumbFilename).catch(() => undefined);
+        if (mediumFilename) await blobs.remove(mediumFilename).catch(() => undefined);
         throw error;
       }
       return {
@@ -493,10 +553,9 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     },
 
     async remove(id) {
-      const filename = await service.fileNameOf(id);
-      if (!filename) throw photoNotFound();
-      await blobs.remove(filename);
-      await blobs.remove(thumbnailNameOf(filename));
+      const row = await db.get<FilesRow>(SELECT_FILES_OF, [id]);
+      if (!row) throw photoNotFound();
+      await removeFiles(row);
       await service.removeRow(id);
     },
 
@@ -506,13 +565,8 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       }
       const wanted = new Set(ids.filter((id): id is string => typeof id === 'string'));
       if (wanted.size === 0) return 0;
-      const doomed = (await db.all<{ id: string; filename: string }>(SELECT_IDS_FILENAMES)).filter(
-        (r) => wanted.has(r.id),
-      );
-      for (const r of doomed) {
-        await blobs.remove(r.filename);
-        await blobs.remove(thumbnailNameOf(r.filename));
-      }
+      const doomed = (await db.all<FilesRow>(SELECT_IDS_FILENAMES)).filter((r) => wanted.has(r.id));
+      for (const r of doomed) await removeFiles(r);
       return service.removeRows(doomed.map((r) => r.id));
     },
 
@@ -550,6 +604,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
             input.observationDate ?? null,
             JSON.stringify(sanitizeCaptureDetails(input.captureDetails ?? {})),
             cleanSetupId(input.gearSetupId),
+            input.mediumFilename ?? null,
           ],
         },
         ...correspondenceStatements(input.id, input.correspondences),
@@ -784,11 +839,8 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     },
 
     async removeAll() {
-      const rows = await db.all<{ id: string; filename: string }>(SELECT_IDS_FILENAMES);
-      for (const r of rows) {
-        await blobs.remove(r.filename);
-        await blobs.remove(thumbnailNameOf(r.filename));
-      }
+      const rows = await db.all<FilesRow>(SELECT_IDS_FILENAMES);
+      for (const r of rows) await removeFiles(r);
       return service.removeAllRows();
     },
 
@@ -875,6 +927,24 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       }
       if (statements.length > 0) await db.batch(statements);
       return statements.length;
+    },
+
+    async makeMissingMediums() {
+      let made = 0;
+      for (const r of await db.all<{ id: string; filename: string }>(SELECT_WITHOUT_MEDIUM)) {
+        const bytes = await blobs.get(r.filename);
+        if (!bytes) continue;
+        const name = mediumNameOf(r.filename);
+        try {
+          await blobs.put(name, await images.thumbnail(bytes, MEDIUM_SIZE, MEDIUM_QUALITY));
+        } catch (error) {
+          console.warn(`[Photos] The medium-sized copy of ${r.filename} could not be made`, error);
+          continue;
+        }
+        await db.run(UPDATE_MEDIUM, [name, r.id]);
+        made++;
+      }
+      return made;
     },
   };
   return service;

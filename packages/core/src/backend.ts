@@ -93,6 +93,7 @@ export interface Backend {
     | 'setOrder'
     | 'rotateRight'
     | 'repairSizes'
+    | 'makeMissingMediums'
   > & {
     upload(file: FileSource, fields: UploadFields, options?: TransferOptions): Promise<Photo>;
   };

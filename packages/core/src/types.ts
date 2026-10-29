@@ -104,6 +104,7 @@ export interface Photo {
   notes: string;
   fileSize?: number | null; // Server-computed file size in bytes (present when loaded from API)
   thumbFilename?: string | null; // Low-res thumbnail filename (generated on upload)
+  mediumFilename?: string | null; // Medium-sized copy of a large picture, shown between the thumbnail and the full picture
   quarterTurns?: QuarterTurns; // Quarters to the right the picture is shown turned (absent = 0); the file and everything measured in its pixels stay as stored
 }
 

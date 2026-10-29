@@ -100,7 +100,7 @@ describe('baseline schema equals the server upgrade path', () => {
   });
 
   it('both report the baseline version', () => {
-    expect(SCHEMA_VERSION).toBe(17);
+    expect(SCHEMA_VERSION).toBe(18);
     expect(version(a)).toBe(SCHEMA_VERSION);
     expect(version(b)).toBe(SCHEMA_VERSION);
   });

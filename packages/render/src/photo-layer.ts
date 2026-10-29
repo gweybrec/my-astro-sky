@@ -13,6 +13,7 @@ import type {
   AffineMatrix,
 } from '@myastrosky/core/types';
 import { toCanvas, borderRadiusPU, getProjectionGeneration } from '@myastrosky/core/projection';
+import { MEDIUM_SIZE, THUMB_SIZE } from '@myastrosky/core/services/photos';
 import { affineToCSS } from '@myastrosky/core/affine';
 import { logDebug } from '@myastrosky/core/platform/log';
 import {
@@ -520,12 +521,10 @@ export class PhotoLayer {
     before: HTMLImageElement | null,
   ): PlacedPhoto {
     const img = document.createElement('img');
-    // A photo placed by its stars starts with its thumbnail: the size switch in applyTransform loads the full picture
-    // once the photo shows large. Starting with the full picture downloaded and decoded every one at start, only to
-    // swap most of them for their thumbnails (44 full pictures on the phone for 42 shown as thumbnails). A hand-placed
-    // photo has no size switch and starts with its full picture.
-    const startSmall = !!photo.thumbFilename && !photo.manualPlacement;
-    img.src = this.hooks.photoUrl(startSmall ? photo.thumbFilename! : photo.filename);
+    // A photo starts with its thumbnail: the size switch in applyTransform loads a larger picture once the photo shows
+    // large. Starting with the full picture downloaded and decoded every one at start, only to swap most of them for
+    // their thumbnails (44 full pictures on the phone for 42 shown as thumbnails).
+    img.src = this.hooks.photoUrl(photo.thumbFilename || photo.filename);
     img.className = 'photo-overlay-img';
     img.draggable = false;
     img.style.visibility = 'hidden'; // Hide until loaded
@@ -580,7 +579,9 @@ export class PhotoLayer {
       placed.projGen = getProjectionGeneration();
       placed.projHalfDiag = halfDiag;
       imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
-      applyManualTransform(imgEl, photo.manualPlacement, view, photo.width, photo.height);
+      const matrix = computeManualMatrix(photo.manualPlacement, view, photo.width, photo.height);
+      imgEl.style.transform = affineToCSS(matrix);
+      this.showPictureFor(placed, matrix);
       return;
     }
 
@@ -607,18 +608,7 @@ export class PhotoLayer {
     try {
       const matrix = fitPhotoAffine(photoPoints, canvasPoints);
       imgEl.style.transform = affineToCSS(matrix);
-
-      // LOD: swap to thumbnail when the photo renders small on screen
-      if (photo.thumbFilename) {
-        const renderedWidth = Math.sqrt(matrix.a ** 2 + matrix.b ** 2) * photo.width;
-        const wantThumb = renderedWidth < 300;
-        const thumbSrc = this.hooks.photoUrl(photo.thumbFilename);
-        const fullSrc = this.hooks.photoUrl(photo.filename);
-        const currentSrc = imgEl.src === absoluteUrl(thumbSrc) ? thumbSrc : fullSrc;
-        const desiredSrc = wantThumb ? thumbSrc : fullSrc;
-        if (currentSrc !== desiredSrc) this.showSrc(placed, desiredSrc, !wantThumb);
-        else placed.pendingSrc = undefined;
-      }
+      this.showPictureFor(placed, matrix);
     } catch {
       imgEl.style.display = 'none';
       if (!this.affineErrorShown.has(photo.id)) {
@@ -629,10 +619,34 @@ export class PhotoLayer {
   }
 
   /**
-   * Shows `src` in the photo's picture. The full picture is decoded off-screen first and
-   * swapped in once ready: set straight on the visible picture, the screen showed no new
+   * Shows the picture that suits the photo's size on screen (`matrix`: photo pixels to page pixels). With a
+   * medium-sized copy, by screen pixels along the longer side: the thumbnail up to its own size, the copy up to its
+   * size, the full picture beyond, so no picture is shown stretched and the full one only when its detail shows.
+   * Without one, as before copies existed: the thumbnail below 300 page pixels wide, else the full picture.
+   */
+  private showPictureFor(placed: PlacedPhoto, matrix: AffineMatrix): void {
+    const { photo, imgEl } = placed;
+    // A paused picture is loaded again by setLoadingPaused.
+    if ((!photo.thumbFilename && !photo.mediumFilename) || imgEl.dataset.pausedSrc) return;
+    const scale = Math.hypot(matrix.a, matrix.b);
+    let name: string;
+    if (photo.mediumFilename) {
+      const screenPx = scale * Math.max(photo.width, photo.height) * (window.devicePixelRatio || 1);
+      if (photo.thumbFilename && screenPx <= THUMB_SIZE) name = photo.thumbFilename;
+      else name = screenPx <= MEDIUM_SIZE ? photo.mediumFilename : photo.filename;
+    } else {
+      name = scale * photo.width < 300 ? photo.thumbFilename! : photo.filename;
+    }
+    const src = this.hooks.photoUrl(name);
+    if (imgEl.src === absoluteUrl(src)) placed.pendingSrc = undefined;
+    else this.showSrc(placed, src, name !== photo.thumbFilename);
+  }
+
+  /**
+   * Shows `src` in the photo's picture. A medium or full picture is decoded off-screen first
+   * and swapped in once ready: set straight on the visible picture, the screen showed no new
    * frame of the map until it was decoded (~200 ms for a 24 MP photo on a phone). The
-   * thumbnail stays meanwhile, and a zoom-out before the decode ends drops the swap.
+   * smaller picture stays meanwhile, and a size change before the decode ends drops the swap.
    */
   private showSrc(placed: PlacedPhoto, src: string, decodeFirst: boolean): void {
     if (!decodeFirst) {

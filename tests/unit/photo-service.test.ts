@@ -14,6 +14,9 @@ import {
   THUMB_QUALITY,
   THUMB_SIZE,
   thumbnailNameOf,
+  mediumNameOf,
+  MEDIUM_SIZE,
+  MEDIUM_QUALITY,
   createPhotoService,
   photoNotFound,
   sanitizeIntegrationRows,
@@ -894,6 +897,112 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await svc.repairSizes()).toBe(0);
       expect((await svc.get('bad'))!.width).toBe(0);
       vi.restoreAllMocks();
+    });
+  });
+
+  describe('medium-sized copies', () => {
+    const file = () => ({ name: 'm31.jpg', bytes: new Uint8Array([1, 2, 3]) });
+    const stored = () => [...blobs.store.keys()].sort();
+    const sizesAsked = () => {
+      const asked: [number, number][] = [];
+      const original = codec.thumbnail.bind(codec);
+      codec.thumbnail = async (bytes, maxSize, quality) => {
+        asked.push([maxSize, quality]);
+        return original(bytes, maxSize, quality);
+      };
+      return asked;
+    };
+
+    it('names the copy after the image, and makes it 2048 px at quality 85', () => {
+      expect(mediumNameOf('abc.png')).toBe('abc_medium.jpg');
+      expect([MEDIUM_SIZE, MEDIUM_QUALITY]).toEqual([2048, 85]);
+    });
+
+    it('makes one on upload for a picture over 3072 px on its longer side', async () => {
+      codec.info = { width: 4000, height: 3000 };
+      const asked = sizesAsked();
+      const r = await svc.upload(file(), validFields());
+      expect(r.photo.mediumFilename).toBe('id-1_medium.jpg');
+      expect(stored()).toEqual(['id-1.jpg', 'id-1_medium.jpg', 'id-1_thumb.jpg']);
+      expect(asked).toEqual([
+        [400, 75],
+        [2048, 85],
+      ]);
+      expect((await svc.get('id-1'))!.mediumFilename).toBe('id-1_medium.jpg');
+    });
+
+    it('makes none for a smaller picture', async () => {
+      codec.info = { width: 3072, height: 2000 };
+      const r = await svc.upload(file(), validFields());
+      expect(r.photo.mediumFilename).toBeNull();
+      expect(stored()).toEqual(['id-1.jpg', 'id-1_thumb.jpg']);
+    });
+
+    it('stores the photo without one when making it fails', async () => {
+      codec.info = { width: 4000, height: 3000 };
+      const original = codec.thumbnail.bind(codec);
+      codec.thumbnail = async (bytes, maxSize, quality) => {
+        if (maxSize === MEDIUM_SIZE) throw new Error('out of memory');
+        return original(bytes, maxSize, quality);
+      };
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const r = await svc.upload(file(), validFields());
+      expect(r.photo.mediumFilename).toBeNull();
+      expect(r.warnings).toEqual([]);
+      expect(stored()).toEqual(['id-1.jpg', 'id-1_thumb.jpg']);
+      warn.mockRestore();
+    });
+
+    it('deletes it with its photo, one at a time, several, or all', async () => {
+      codec.info = { width: 4000, height: 3000 };
+      for (let i = 0; i < 4; i++) await svc.upload(file(), validFields());
+      await svc.remove('id-1');
+      expect(stored()).not.toContain('id-1_medium.jpg');
+      await svc.removeMany(['id-2']);
+      expect(stored()).not.toContain('id-2_medium.jpg');
+      await svc.removeAll();
+      expect(stored()).toEqual([]);
+    });
+
+    it('makes the missing ones of large pictures only, and stores their names', async () => {
+      await svc.insert(newPhoto('large', { width: 6000, height: 4000 }));
+      await svc.insert(newPhoto('small', { width: 3000, height: 2000 }));
+      await svc.insert(newPhoto('lost', { width: 6000, height: 4000 }));
+      await svc.insert(
+        newPhoto('done', { width: 6000, height: 4000, mediumFilename: 'done_medium.jpg' }),
+      );
+      blobs.store.set('large.jpg', new Uint8Array([1]));
+      blobs.store.set('small.jpg', new Uint8Array([1]));
+      blobs.store.set('done.jpg', new Uint8Array([1]));
+      expect(await svc.makeMissingMediums()).toBe(1);
+      expect(stored()).toEqual(['done.jpg', 'large.jpg', 'large_medium.jpg', 'small.jpg']);
+      const names = (await svc.list()).map((p) => [p.id, p.mediumFilename]);
+      expect(names).toEqual([
+        ['large', 'large_medium.jpg'],
+        ['small', null],
+        // its picture is not here: left without one
+        ['lost', null],
+        ['done', 'done_medium.jpg'],
+      ]);
+      expect(await svc.makeMissingMediums()).toBe(0);
+    });
+
+    it('leaves a picture it cannot shrink without one, and goes on with the others', async () => {
+      await svc.insert(newPhoto('bad', { width: 6000, height: 4000 }));
+      await svc.insert(newPhoto('good', { width: 6000, height: 4000 }));
+      blobs.store.set('bad.jpg', new Uint8Array([9]));
+      blobs.store.set('good.jpg', new Uint8Array([1]));
+      const original = codec.thumbnail.bind(codec);
+      codec.thumbnail = async (bytes, maxSize, quality) => {
+        if (bytes[0] === 9) throw new Error('not an image');
+        return original(bytes, maxSize, quality);
+      };
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await svc.makeMissingMediums()).toBe(1);
+      expect((await svc.get('bad'))!.mediumFilename).toBeNull();
+      expect((await svc.get('good'))!.mediumFilename).toBe('good_medium.jpg');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('bad.jpg'), expect.any(Error));
+      warn.mockRestore();
     });
   });
 

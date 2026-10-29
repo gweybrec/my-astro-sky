@@ -1885,10 +1885,12 @@ export class PhotoOverlay extends PhotoLayer {
     previewEl.style.pointerEvents = 'auto';
     previewEl.style.cursor = 'move';
     previewEl.src = imgEl.src;
+    // The stored size, not the loaded picture's: the map may be showing the thumbnail or the medium-sized copy.
+    const naturalWidth = photo.width;
+    const naturalHeight = photo.height;
+    previewEl.style.width = `${naturalWidth}px`;
+    previewEl.style.height = `${naturalHeight}px`;
     this.container.appendChild(previewEl);
-
-    const naturalWidth = imgEl.naturalWidth;
-    const naturalHeight = imgEl.naturalHeight;
 
     // Initialize placement from photo's current state
     let placement: ManualPlacement;

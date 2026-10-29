@@ -260,6 +260,11 @@ export async function repairPhotoSizes(): Promise<number> {
   return guard('errors.updatePhoto', () => getBackend().photos.repairSizes());
 }
 
+/** Makes the missing medium-sized copies of the large photos; returns how many were made. */
+export async function makeMissingPhotoMediums(): Promise<number> {
+  return guard('errors.updatePhoto', () => getBackend().photos.makeMissingMediums());
+}
+
 export async function updatePhotoManualPlacement(
   photoId: string,
   manualPlacement: ManualPlacement | null,

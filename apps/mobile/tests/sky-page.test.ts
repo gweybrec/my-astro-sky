@@ -13,8 +13,10 @@ vi.mock('vue-router', () => ({
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => new Promise(() => {}) }));
 const reloadPhotos = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const sizesRepaired = vi.hoisted(() => ({ settle: (_n: number) => {} }));
+const mediumsMade = vi.hoisted(() => ({ settle: (_n: number) => {} }));
 vi.mock('../src/photo-sizes', () => ({
   photoSizesRepaired: () => new Promise<number>((resolve) => (sizesRepaired.settle = resolve)),
+  photoMediumsMade: () => new Promise<number>((resolve) => (mediumsMade.settle = resolve)),
 }));
 vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({}), showInfo: vi.fn() }));
 vi.mock('../src/sky-map-setup', () => ({
@@ -54,6 +56,22 @@ describe('the Ciel page', () => {
     await flushPromises();
     reloadPhotos.mockClear();
     sizesRepaired.settle(2);
+    await flushPromises();
+    expect(reloadPhotos).toHaveBeenCalledOnce();
+  });
+
+  it('reads its photos again when medium-sized copies were made at start-up, and not when none were', async () => {
+    mountPage();
+    await flushPromises();
+    reloadPhotos.mockClear();
+    mediumsMade.settle(0);
+    await flushPromises();
+    expect(reloadPhotos).not.toHaveBeenCalled();
+
+    mountPage();
+    await flushPromises();
+    reloadPhotos.mockClear();
+    mediumsMade.settle(3);
     await flushPromises();
     expect(reloadPhotos).toHaveBeenCalledOnce();
   });

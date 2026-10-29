@@ -168,6 +168,12 @@ describe('requests', () => {
     expect(await backend.photos.repairSizes()).toBe(2);
     expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/photos/repair-sizes']);
   });
+
+  it('makes the medium-sized copies with one POST and answers the number the server sends back', async () => {
+    const { backend, sent } = makeBackend(() => json({ made: 3 }));
+    expect(await backend.photos.makeMissingMediums()).toBe(3);
+    expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/photos/make-mediums']);
+  });
 });
 
 describe('files', () => {

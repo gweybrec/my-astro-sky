@@ -5,7 +5,13 @@ import { SkyMap } from '@myastrosky/render/sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { Gallery } from './gallery';
 import { TargetsView } from './targets-view';
-import { getPhotos, getGearSetups, getLatestVersion, repairPhotoSizes } from './api';
+import {
+  getPhotos,
+  getGearSetups,
+  getLatestVersion,
+  repairPhotoSizes,
+  makeMissingPhotoMediums,
+} from './api';
 import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from '@myastrosky/core/version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
 import { getHemisphere } from '@myastrosky/core/projection';
@@ -261,29 +267,39 @@ async function checkForUpdate() {
 }
 
 /**
- * Last at start-up: the photos stored without a size take the size of their picture, and when any did, the sky map
- * and the gallery are given the photos again. A failure is only reported.
+ * Last at start-up: the photos stored without a size take the size of their picture, then the large photos without a
+ * medium-sized copy get one; each time any changed, the sky map and the gallery are given the photos again. A failure
+ * is only reported.
  */
-async function repairStoredPhotoSizes() {
+async function repairStoredPhotos() {
   try {
-    if ((await repairPhotoSizes()) === 0) return;
-    const photos = await getPhotos();
-    const { overlay, gallery, skyMap } = useCanvasStore(pinia);
-    overlay?.loadPhotos(photos);
-    gallery?.loadPhotos(photos);
-    if (overlay && skyMap) {
-      skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
-      skyMap.render();
-    }
-    usePhotosStore(pinia).syncFromOverlay();
+    if ((await repairPhotoSizes()) > 0) await reloadPhotos();
   } catch (err) {
     reportUnknownRendererError('photo_size_repair_failure', err);
   }
+  try {
+    if ((await makeMissingPhotoMediums()) > 0) await reloadPhotos();
+  } catch (err) {
+    reportUnknownRendererError('photo_medium_failure', err);
+  }
+}
+
+/** Gives the sky map and the gallery the stored photos again. */
+async function reloadPhotos() {
+  const photos = await getPhotos();
+  const { overlay, gallery, skyMap } = useCanvasStore(pinia);
+  overlay?.loadPhotos(photos);
+  gallery?.loadPhotos(photos);
+  if (overlay && skyMap) {
+    skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
+    skyMap.render();
+  }
+  usePhotosStore(pinia).syncFromOverlay();
 }
 
 init()
   .then(() => checkForUpdate())
-  .then(() => repairStoredPhotoSizes())
+  .then(() => repairStoredPhotos())
   .catch((err) => {
     reportUnknownRendererError('app_init_failure', err);
   });

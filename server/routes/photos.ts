@@ -376,6 +376,38 @@ photosRouter.post('/api/photos/repair-sizes', async (_req, res) => {
 
 /**
  * @swagger
+ * /api/photos/make-mediums:
+ *   post:
+ *     summary: Make the missing medium-sized copies of large photos
+ *     description: >
+ *       Each photo whose picture is over 3072 px on its longer side and that has no medium-sized copy gets one
+ *       (`<id>_medium.jpg`, 2048 px on its longer side), and its `mediumFilename` is stored. A picture that cannot be
+ *       read is left without one. The apps call it at start-up, after the size repair; it can take a few seconds per
+ *       photo.
+ *     responses:
+ *       200:
+ *         description: The number of copies made
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 made:
+ *                   type: integer
+ *                   example: 0
+ *       500:
+ *         description: Server error
+ */
+photosRouter.post('/api/photos/make-mediums', async (_req, res) => {
+  try {
+    res.json({ made: await photos.makeMissingMediums() });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/**
+ * @swagger
  * /api/photos/{id}/metadata:
  *   patch:
  *     summary: Update photo metadata including DSO ids, labels, notes, and integrations

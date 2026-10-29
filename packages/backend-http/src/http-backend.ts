@@ -340,6 +340,9 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       async repairSizes() {
         return (await call<{ repaired: number }>('POST', '/api/photos/repair-sizes')).repaired;
       },
+      async makeMissingMediums() {
+        return (await call<{ made: number }>('POST', '/api/photos/make-mediums')).made;
+      },
       async upload(file, fields, opts) {
         const form = await formOf('photo', file, { ...fields });
         const reply = await sendUpload({

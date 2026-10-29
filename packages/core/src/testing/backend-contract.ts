@@ -543,6 +543,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
         captureDetails: {},
         gearSetupId: null,
         thumbFilename: `${first.id}_thumb.jpg`,
+        mediumFilename: null,
         quarterTurns: 0,
         correspondences: CORRESPONDENCES,
       },
@@ -693,6 +694,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     await b.photos.upload(fixtures.jpeg(), { correspondences: JSON.stringify(CORRESPONDENCES) });
     const [before] = await b.photos.listWithSizes();
     expectEqual(await b.photos.repairSizes(), 0, 'an uploaded photo has its size');
+    expectEqual(await b.photos.makeMissingMediums(), 0, 'a small photo needs no medium-sized copy');
     const [after] = await b.photos.listWithSizes();
     expectEqual(stable(after), stable(before), 'the photo unchanged');
     expectEqual(await b.photos.removeAll(), 1, 'the photo removed');

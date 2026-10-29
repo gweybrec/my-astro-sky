@@ -12,7 +12,7 @@
   - `frame-controller.ts` — the interactive FOV-frame state machine (drag, pin, snap, merge, resize).
   - `sky-hit-test.ts` — star/DSO hover indexes and the `findClosest*` queries.
   - `dso-render-select.ts`, `star-budget.ts`, `star-sprite-atlas.ts`, `hover-resolve.ts`, `sky-region-draw.ts` — density gating, the sprite atlas rebuild policy, tooltip resolution, and the freehand region gesture.
-- **Photo layer** (`photo-overlay.ts`): Each photo is an `<img>` with absolute positioning and CSS matrix transform. On view change, all photo transforms are recomputed so they track the canvas. LOD: when a photo's rendered pixel width (derived from the affine matrix scale × `photo.width`) is below 300 px and a server thumbnail exists, `img.src` is swapped to `/uploads/{thumbFilename}`; swapped back to the full-res URL when the photo renders larger. `photo.width` (authoritative DB value) is always used for matrix math — never `imgEl.naturalWidth` — so LOD swaps do not disturb hit-testing or transform accuracy. Manages:
+- **Photo layer** (`photo-overlay.ts`): Each photo is an `<img>` with absolute positioning and CSS matrix transform. On view change, all photo transforms are recomputed so they track the canvas. LOD: a photo shows its thumbnail, its medium-sized copy or its full picture depending on its size on screen (see [Sky map pan/zoom freeze + LOD](#sky-map-panzoom-freeze-lod)). `photo.width` (authoritative DB value) is always used for matrix math — never `imgEl.naturalWidth` — so LOD swaps do not disturb hit-testing or transform accuracy. Manages:
   - `openManualIdentifyModal()` — the manual star-identification sub-modal launched per-card from the batch upload flow (user clicks photo pixel → searches for matching star / enters RA-Dec / picks on map; "Validate" enabled at 2+ identified points). No solve buttons or metadata — those live in the batch card. Resolves with correspondences, a free-drag hand-off, or cancel.
   - Manual placement mode (`openManualPlacement()`: drag photo, rotate/zoom sliders, mirror X/Y toggles)
   - Photo repositioning (re-enter manual placement for existing photo, extracts current transform)
@@ -100,9 +100,10 @@ Express 5 server with multiple modules:
   `routes/shared.ts` holds what several routers share (allowed file extensions, `sanitizeIntegrationRows`, `isElectron`, the in-memory rate limiter and its limits, the multer setup).
 
 - **Notable routes** (details; the table above is the full map):
-  - `POST /api/photos` — Upload; Sharp only bakes the EXIF orientation into the file (`.rotate()`, no resizing — the original resolution is kept); generate `{uuid}_thumb.jpg` (400 px, JPEG q75) via Sharp, scale correspondences proportionally, store in SQLite + disk; returns `thumbFilename` in response. Sharp errors on invalid/corrupt image files return **HTTP 400** with `{ code: 'INVALID_IMAGE' }` rather than 500.
+  - `POST /api/photos` — Upload; Sharp only bakes the EXIF orientation into the file (`.rotate()`, no resizing — the original resolution is kept); generate `{uuid}_thumb.jpg` (400 px, JPEG q75) via Sharp, and `{uuid}_medium.jpg` (2048 px, JPEG q85) when the longer side is over 3072 px, scale correspondences proportionally, store in SQLite + disk; returns `thumbFilename` in response. Sharp errors on invalid/corrupt image files return **HTTP 400** with `{ code: 'INVALID_IMAGE' }` rather than 500.
   - `GET /api/photos` — List all photos with correspondences
-  - `DELETE /api/photos/:id` — Delete photo file and its `_thumb.jpg` sibling
+  - `DELETE /api/photos/:id` — Delete photo file, its `_thumb.jpg` sibling and its `_medium.jpg` copy when it has one
+  - `POST /api/photos/make-mediums` — Make the missing medium-sized copies (photos stored before copies existed, restored from a backup, or whose copy failed); the apps call it at start-up after `repair-sizes`
   - `PATCH /api/photos/:id/manual-placement` — Update manual placement parameters for photo repositioning
   - `POST /api/solve-wcs` — Extract WCS metadata from FITS/TIFF headers
   - `POST /api/solve-astap` — Run ASTAP local plate solver
@@ -123,7 +124,7 @@ Express in-memory rate limits protect all API routes (global) and the `POST /api
 - **Electron**: when the Express server is loaded inside the Electron main process (`process.versions.electron` is set), rate limiting is disabled entirely. The app is single-user/local so limits would only hurt the user.
 
 - **`db.ts`**: SQLite (better-sqlite3, WAL mode) with tables:
-  - `photos`: id, filename, originalName, width, height, displayOrder, createdAt, thumb_filename, quarter_turns (how many quarters to the right the photo is shown turned: "Faire pivoter à droite" changes only this, never the file, its thumbnail or what is measured in their pixels; screens that show the photo flat work with `photoAsShown`)
+  - `photos`: id, filename, originalName, width, height, displayOrder, createdAt, thumb_filename, medium_filename (the medium-sized copy, null when the picture is small or the copy is not made yet), quarter_turns (how many quarters to the right the photo is shown turned: "Faire pivoter à droite" changes only this, never the file, its thumbnail or what is measured in their pixels; screens that show the photo flat work with `photoAsShown`)
   - `star_correspondences`: id, photoId, pointIndex, photoX, photoY, starHip, starName, starRa, starDec
   - `dso_overrides`: id (TEXT PRIMARY KEY), data (TEXT — JSON-serialised `DSOUserOverride`)
   - `schema_version`: single-row table tracking the migration version (see `db-migrations.ts`)
@@ -227,7 +228,7 @@ Blob URLs are revoked when a card is removed (trash button) and when the modal c
 
 **Pan/zoom debounce:** `main.ts` listens to `skyMap.setOnViewChange()`. On the first callback of an interaction, it adds `.photos-frozen` to `#photo-layer`, hiding all `.photo-overlay-img` elements via `visibility: hidden`. A 100 ms debounce timer removes the class after interaction ends. This prevents full-res images from repainting on every animation frame during pan or wheel zoom while still allowing transform recomputation to proceed.
 
-**Level-of-detail swap:** Inside `PhotoOverlay.applyTransform()`, the rendered pixel width is estimated as `Math.sqrt(matrix.a² + matrix.b²) × photo.width`. When this value drops below 300 px and `photo.thumbFilename` is set, `img.src` is switched to the thumbnail URL. When it rises above 300 px, it is switched back. `photo.width` (the authoritative database value) is always used for all matrix calculations — `imgEl.naturalWidth` is never used — so swapping `src` between full-res and thumbnail does not affect hit-testing, outline drawing, or transform accuracy.
+**Level-of-detail swap:** `PhotoLayer.showPictureFor()` (`packages/render/src/photo-layer.ts`), called from `applyTransform()` for star-placed and hand-placed photos alike, picks the picture from the photo's size on screen, `Math.hypot(matrix.a, matrix.b) × longer side`. With a medium-sized copy it counts screen pixels (× `devicePixelRatio`): the thumbnail up to 400, the copy up to 2048, the full picture beyond, so no picture is shown stretched. Without one, the thumbnail below 300 page pixels wide, the full picture beyond. Every photo starts with its thumbnail. A medium or full picture is decoded off-screen (`decode()`) before it replaces the visible one (see [render-performance.md → Technique 6](/dev/render-performance.md#technique-6--decode-big-photos-before-they-are-shown)). `photo.width` (the authoritative database value) is always used for all matrix calculations — `imgEl.naturalWidth` is never used — so swapping `src` does not affect hit-testing, outline drawing, repositioning or transform accuracy.
 
 ### DSO render selection (priority + spread + container gating)
 
@@ -245,9 +246,9 @@ The selection is:
 
 ### Server-side thumbnail generation
 
-On every upload, `POST /api/photos` in `server/routes/photos.ts` runs Sharp twice: once to apply the EXIF rotation to the original (full resolution, no resizing; stored as `{uuid}{ext}`) and once to produce `{uuid}_thumb.jpg` (width 400 px, JPEG quality 75). The thumbnail filename is stored in `photos.thumb_filename` and returned in `GET /api/photos` so every frontend module can use the server thumb without regenerating it client-side.
+On every upload, `POST /api/photos` in `server/routes/photos.ts` runs Sharp twice: once to apply the EXIF rotation to the original (full resolution, no resizing; stored as `{uuid}{ext}`) and once to produce `{uuid}_thumb.jpg` (width 400 px, JPEG quality 75). The thumbnail filename is stored in `photos.thumb_filename` and returned in `GET /api/photos` so every frontend module can use the server thumb without regenerating it client-side. A picture over 3072 px on its longer side also gets `{uuid}_medium.jpg` (2048 px, JPEG quality 85), stored in `photos.medium_filename`; the sky map shows it between the thumbnail and the full picture. The upload is the shared `PhotoService.upload` (`packages/core/src/services/photos.ts`), so the phone makes both the same way. Photos without a copy get one from `makeMissingMediums`, which both apps run at start-up after the size repair, one photo at a time, then show the photos again.
 
-**Export/import:** The export ZIP includes `_thumb.jpg` files alongside their full-res counterparts. The import route reads `thumbFilename` from the bundle manifest and, after inserting photos, regenerates any missing thumbnails with Sharp so the LOD system works immediately after import.
+**Export/import:** The export ZIP includes `_thumb.jpg` files alongside their full-res counterparts. The import route reads `thumbFilename` from the bundle manifest and, after inserting photos, regenerates any missing thumbnails with Sharp so the LOD system works immediately after import. Medium-sized copies are not exported; the next start-up makes them again.
 
 ---
 

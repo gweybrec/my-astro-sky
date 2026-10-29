@@ -13,14 +13,17 @@
 import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
-/** The columns of the photos table, in their order. */
-const PHOTO_COLUMNS =
+/** The columns of the photos table at version 17, in their order (migration 17 copies them). */
+const PHOTO_COLUMNS_V17 =
   'id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, notes, integrations, display_order, thumb_filename, observation_date, points_of_interest, capture_details, gear_setup_id, quarter_turns';
 
-/** The photos table, created under `name` (the baseline and the rebuild of migration 17 share it). */
-function photosTable(name: string): string {
+/**
+ * The photos table, created under `name`: as it is now for the baseline, and as it was at version 17
+ * (`atVersion17`) for the rebuild of migration 17, which later migrations then change.
+ */
+function photosTable(name: string, atVersion17 = false): string {
   return `CREATE TABLE ${name} (
     id TEXT PRIMARY KEY,
     filename TEXT NOT NULL,
@@ -39,7 +42,7 @@ function photosTable(name: string): string {
     points_of_interest TEXT NOT NULL DEFAULT '[]',
     capture_details TEXT NOT NULL DEFAULT '{}',
     gear_setup_id TEXT,
-    quarter_turns INTEGER NOT NULL DEFAULT 0
+    quarter_turns INTEGER NOT NULL DEFAULT 0${atVersion17 ? '' : ',\n    medium_filename TEXT'}
   )`;
 }
 
@@ -173,11 +176,16 @@ export const MIGRATIONS: readonly DataMigration[] = [
     version: 17,
     rebuildsTable: true,
     statements: [
-      photosTable('photos_new'),
-      `INSERT INTO photos_new (${PHOTO_COLUMNS}) SELECT ${PHOTO_COLUMNS} FROM photos`,
+      photosTable('photos_new', true),
+      `INSERT INTO photos_new (${PHOTO_COLUMNS_V17}) SELECT ${PHOTO_COLUMNS_V17} FROM photos`,
       'DROP TABLE photos',
       'ALTER TABLE photos_new RENAME TO photos',
     ],
+  },
+  // A medium-sized copy of a large photo's picture, shown on the sky map between the thumbnail and the full picture.
+  {
+    version: 18,
+    statements: ['ALTER TABLE photos ADD COLUMN medium_filename TEXT'],
   },
 ];
 

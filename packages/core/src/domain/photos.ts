@@ -37,6 +37,7 @@ export interface NewPhotoInput {
   notes?: string;
   integrations?: readonly PhotoIntegration[];
   thumbFilename?: string | null;
+  mediumFilename?: string | null;
   observationDate?: string | null;
   pointsOfInterest?: readonly PointOfInterest[];
   captureDetails?: CaptureDetails | null;

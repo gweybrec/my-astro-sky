@@ -18,7 +18,6 @@ const placedPhoto = (id: string, over: Partial<Photo> = {}): Photo =>
   ({
     id,
     filename: `${id}.jpg`,
-    thumbFilename: `${id}-thumb.jpg`,
     originalName: `photo-${id}`,
     width: 100,
     height: 100,
@@ -110,6 +109,7 @@ describe('PhotoLayer', () => {
       placedPhoto(id, {
         width: size,
         height: size,
+        thumbFilename: `${id}-thumb.jpg`,
         manualPlacement: undefined,
         correspondences: [
           [0, 0, 10, 50],
@@ -159,6 +159,7 @@ describe('PhotoLayer', () => {
     const photo = placedPhoto('big', {
       width: 1000,
       height: 1000,
+      thumbFilename: 'big-thumb.jpg',
       manualPlacement: undefined,
       correspondences: [
         [0, 0, 10, 50],
@@ -185,6 +186,59 @@ describe('PhotoLayer', () => {
     finish();
     await Promise.resolve();
     expect(container.querySelector('img')!.getAttribute('src')).toBe('/files/big-thumb.jpg');
+  });
+
+  describe('a large photo with a medium-sized copy', () => {
+    // A hand-placed 4000 × 3000 photo at the pole: its longer side spans 4000 × 0.0001 × scale page pixels.
+    const setUp = () => {
+      vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+      let view = VIEW;
+      const container = document.createElement('div');
+      const layer = new PhotoLayer(container, () => view, { photoUrl: (name) => `/files/${name}` });
+      layer.loadPhotos([
+        placedPhoto('big', {
+          width: 4000,
+          height: 3000,
+          thumbFilename: 'big-thumb.jpg',
+          mediumFilename: 'big-medium.jpg',
+          manualPlacement: {
+            centerRa: 0,
+            centerDec: 90,
+            rotationDeg: 0,
+            projPerPx: 0.0001,
+            mirrorX: false,
+            mirrorY: false,
+          },
+        }),
+      ]);
+      const img = container.querySelector('img')!;
+      const shownAt = async (scale: number) => {
+        view = { ...VIEW, scale };
+        layer.updateTransforms();
+        await new Promise((r) => setTimeout(r, 0));
+        return img.getAttribute('src');
+      };
+      return { img, shownAt };
+    };
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('shows its thumbnail, then the copy, then the full picture as it shows larger, and back', async () => {
+      const { img, shownAt } = setUp();
+      expect(img.getAttribute('src')).toBe('/files/big-thumb.jpg');
+      expect(await shownAt(900)).toBe('/files/big-thumb.jpg'); // 360 px: not over the thumbnail's 400
+      expect(await shownAt(2500)).toBe('/files/big-medium.jpg'); // 1000 px
+      expect(await shownAt(5000)).toBe('/files/big-medium.jpg'); // 2000 px: not over the copy's 2048
+      expect(await shownAt(10000)).toBe('/files/big.jpg'); // 4000 px
+      expect(await shownAt(2500)).toBe('/files/big-medium.jpg');
+      expect(await shownAt(500)).toBe('/files/big-thumb.jpg');
+    });
+
+    it('counts the screen pixels, not the page pixels', async () => {
+      vi.stubGlobal('devicePixelRatio', 2);
+      const { shownAt } = setUp();
+      expect(await shownAt(900)).toBe('/files/big-medium.jpg'); // 360 page px, 720 screen px
+      expect(await shownAt(5000)).toBe('/files/big.jpg'); // 2000 page px, 4000 screen px
+    });
   });
 
   it('tells the app once when a photo cannot be placed', () => {
