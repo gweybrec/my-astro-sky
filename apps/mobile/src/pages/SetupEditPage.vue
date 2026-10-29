@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonPage, IonContent, IonList } from '@ionic/vue';
+import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import {
   accessoryLabel,
@@ -10,6 +10,7 @@ import {
   getCameras,
   getTelescopes,
   telescopeLabel,
+  visibleGear,
   type AccessoryData,
   type CameraData,
   type TelescopeData,
@@ -48,9 +49,14 @@ import caretIcon from '../icons/chevron-down.svg?raw';
 import checkIcon from '@icons/check.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
+import penIcon from '@icons/pen.svg?raw';
+import { KIND_TEXTS, telescopeLine } from './gear/gear-kinds';
+import { takeGearAdded } from './gear/gear-added';
 
 // The boards "Équipement, modifier le setup" and "Équipement, choisir un télescope". The route's `id` is a setup's id,
-// or `new` for a setup being added (the same page without the plans that use it and without the delete row).
+// or `new` for a setup being added (the same page without the plans that use it and without the delete row). The pen
+// beside a field opens that gear's list ("Équipement, gérer les …"); the pickers leave out what was unticked there,
+// except the setup's current choice.
 const route = useRoute();
 const router = useRouter();
 const { confirm } = useConfirm();
@@ -65,17 +71,24 @@ const telescopes = ref<TelescopeData[]>([]);
 const cameras = ref<CameraData[]>([]);
 const accessories = ref<AccessoryData[]>([]);
 const saving = ref(false);
-const picker = ref<'telescope' | 'camera' | 'accessory' | null>(null);
+type Kind = 'telescope' | 'camera' | 'accessory';
+const picker = ref<Kind | null>(null);
 const query = ref('');
+/** The gear list opened from this page (its pen, or the picker's add row), until the page shows again. */
+const away = ref<Kind | 'filter' | null>(null);
+
+async function loadGear() {
+  [telescopes.value, cameras.value, accessories.value] = await Promise.all([
+    getTelescopes().then(sortCustomFirst),
+    getCameras().then(sortCustomFirst),
+    getAccessories().then(sortCustomFirst),
+  ]);
+}
 
 onMounted(async () => {
   try {
     await catalogsReady();
-    [telescopes.value, cameras.value, accessories.value] = await Promise.all([
-      getTelescopes().then(sortCustomFirst),
-      getCameras().then(sortCustomFirst),
-      getAccessories().then(sortCustomFirst),
-    ]);
+    await loadGear();
     let existing: GearSetupData | undefined;
     if (setupId.value) {
       existing = (await getGearSetups()).find((s) => s.id === setupId.value);
@@ -97,9 +110,50 @@ onMounted(async () => {
   }
 });
 
+// Back from a gear list: a telescope added from the picker becomes the setup's; a choice unticked there is replaced by
+// the first one left ticked (no accessory for an accessory), as the desktop's manage window does.
+onIonViewWillEnter(async () => {
+  const from = away.value;
+  if (!from) return;
+  away.value = null;
+  try {
+    await loadGear();
+    const added = from === 'telescope' ? takeGearAdded('telescope') : null;
+    const c = choice.value;
+    if (from === 'telescope') {
+      const tel =
+        telescopes.value.find((x) => x.id === added) ??
+        (visibleGear(telescopes.value, 'telescope').some((x) => x.id === c.telescopeId)
+          ? undefined
+          : visibleGear(telescopes.value, 'telescope')[0]);
+      if (tel) choice.value = chooseTelescope(c, tel, cameras.value);
+    } else if (from === 'camera' && c.cameraId && !isSmart.value) {
+      const shown = visibleGear(cameras.value, 'camera');
+      if (!shown.some((x) => x.id === c.cameraId))
+        choice.value = { ...c, cameraId: shown[0]?.id ?? c.cameraId };
+    } else if (from === 'accessory' && c.accessoryId) {
+      if (!visibleGear(accessories.value, 'accessory').some((x) => x.id === c.accessoryId))
+        choice.value = { ...c, accessoryId: null };
+    }
+  } catch (error) {
+    void showError(error);
+  }
+});
+
+function manage(kind: Kind | 'filter') {
+  away.value = kind;
+  void router.push(`/settings/gear/${kind}`);
+}
+
+function addTelescope() {
+  picker.value = null;
+  away.value = 'telescope';
+  void router.push('/settings/gear/telescope/new');
+}
+
 const usedBy = computed(() => (setupId.value ? plansStore.plansUsingSetup(setupId.value) : []));
 const telescope = computed(() => telescopes.value.find((x) => x.id === choice.value.telescopeId));
-const isSmart = computed(() => telescope.value?.is_smart_telescope ?? false);
+const isSmart = computed(() => Boolean(telescope.value?.is_smart_telescope));
 const resolved = computed(() =>
   resolveSetupGear(choice.value, telescopes.value, cameras.value, accessories.value),
 );
@@ -150,22 +204,25 @@ const PICKERS = {
 const items = computed<PickerItem[]>(() => {
   const q = query.value.trim().toLowerCase();
   let all: PickerItem[] = [];
+  const c = choice.value;
   if (picker.value === 'telescope') {
-    all = telescopes.value.map((x) => ({
+    all = visibleGear(telescopes.value, 'telescope', c.telescopeId).map((x) => ({
       id: x.id,
       title: telescopeLabel(x),
-      subs: [
-        [
-          t('mobile.gear.aperture', { mm: x.aperture_mm }),
-          t('mobile.gear.focal', { mm: x.focal_length_mm }),
-          `f/${x.f_ratio}`,
-        ].join(' · '),
-      ],
+      subs: [telescopeLine(x)],
     }));
   } else if (picker.value === 'camera') {
-    all = cameras.value.map((x) => ({ id: x.id, title: cameraLabel(x), subs: [] }));
+    all = visibleGear(cameras.value, 'camera', c.cameraId).map((x) => ({
+      id: x.id,
+      title: cameraLabel(x),
+      subs: [],
+    }));
   } else if (picker.value === 'accessory') {
-    all = accessories.value.map((x) => ({ id: x.id, title: accessoryLabel(x), subs: [] }));
+    all = visibleGear(accessories.value, 'accessory', c.accessoryId).map((x) => ({
+      id: x.id,
+      title: accessoryLabel(x),
+      subs: [],
+    }));
   }
   return q ? all.filter((i) => i.title.toLowerCase().includes(q)) : all;
 });
@@ -262,78 +319,96 @@ async function remove() {
         <PhoneSectionHeader>{{ t('targets.gear.section') }}</PhoneSectionHeader>
         <div class="mob-form-row">
           <label class="mob-form-label m-secondary">{{ t('targets.gear.telescope') }}</label>
-          <PhoneButton
-            variant="field"
-            text-style="body"
-            block
-            class="mob-btn--wrap"
-            :aria-label="
-              t('mobile.format.labelValue', {
-                label: t('targets.gear.telescope'),
-                value: telescope ? telescopeLabel(telescope) : '',
-              })
-            "
-            @click="openPicker('telescope')"
-          >
-            <span class="mob-btn-label">{{ telescope ? telescopeLabel(telescope) : '' }}</span>
-            <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-          </PhoneButton>
+          <div class="mob-field-with-button">
+            <PhoneButton
+              variant="field"
+              text-style="body"
+              block
+              class="mob-btn--wrap"
+              :aria-label="
+                t('mobile.format.labelValue', {
+                  label: t('targets.gear.telescope'),
+                  value: telescope ? telescopeLabel(telescope) : '',
+                })
+              "
+              @click="openPicker('telescope')"
+            >
+              <span class="mob-btn-label">{{ telescope ? telescopeLabel(telescope) : '' }}</span>
+              <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+            </PhoneButton>
+            <PhoneButton
+              icon
+              :aria-label="t(KIND_TEXTS.telescope.manage)"
+              @click="manage('telescope')"
+              ><AppIcon :svg="penIcon"
+            /></PhoneButton>
+          </div>
         </div>
-        <!-- The pages that manage the gear lists have no board yet: the row shows and does nothing. -->
-        <IonList class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageTelescope')" chevron inert />
-        </IonList>
 
         <div class="mob-form-row">
           <label class="mob-form-label m-secondary">{{ t('targets.gear.camera') }}</label>
-          <PhoneButton
-            variant="field"
-            text-style="body"
-            block
-            class="mob-btn--wrap"
-            :disabled="isSmart"
-            :aria-label="
-              t('mobile.format.labelValue', {
-                label: t('targets.gear.camera'),
-                value: camera ? cameraLabel(camera) : '',
-              })
-            "
-            @click="openPicker('camera')"
-          >
-            <span class="mob-btn-label">{{ camera ? cameraLabel(camera) : '' }}</span>
-            <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-          </PhoneButton>
+          <div class="mob-field-with-button">
+            <PhoneButton
+              variant="field"
+              text-style="body"
+              block
+              class="mob-btn--wrap"
+              :disabled="isSmart"
+              :aria-label="
+                t('mobile.format.labelValue', {
+                  label: t('targets.gear.camera'),
+                  value: camera ? cameraLabel(camera) : '',
+                })
+              "
+              @click="openPicker('camera')"
+            >
+              <span class="mob-btn-label">{{ camera ? cameraLabel(camera) : '' }}</span>
+              <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+            </PhoneButton>
+            <PhoneButton
+              v-if="!isSmart"
+              icon
+              :aria-label="t(KIND_TEXTS.camera.manage)"
+              @click="manage('camera')"
+              ><AppIcon :svg="penIcon"
+            /></PhoneButton>
+          </div>
         </div>
-        <IonList v-if="!isSmart" class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageCamera')" chevron inert />
-        </IonList>
 
         <div class="mob-form-row">
           <label class="mob-form-label m-secondary">{{ t('targets.gear.accessory') }}</label>
-          <PhoneButton
-            variant="field"
-            text-style="body"
-            block
-            class="mob-btn--wrap"
-            :disabled="isSmart"
-            :aria-label="
-              t('mobile.format.labelValue', {
-                label: t('targets.gear.accessory'),
-                value: accessory ? accessoryLabel(accessory) : '',
-              })
-            "
-            @click="openPicker('accessory')"
-          >
-            <span class="mob-btn-label">{{ accessory ? accessoryLabel(accessory) : '' }}</span>
-            <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-          </PhoneButton>
+          <div class="mob-field-with-button">
+            <PhoneButton
+              variant="field"
+              text-style="body"
+              block
+              class="mob-btn--wrap"
+              :disabled="isSmart"
+              :aria-label="
+                t('mobile.format.labelValue', {
+                  label: t('targets.gear.accessory'),
+                  value: accessory ? accessoryLabel(accessory) : '',
+                })
+              "
+              @click="openPicker('accessory')"
+            >
+              <span class="mob-btn-label">{{ accessory ? accessoryLabel(accessory) : '' }}</span>
+              <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+            </PhoneButton>
+            <PhoneButton
+              v-if="!isSmart"
+              icon
+              :aria-label="t(KIND_TEXTS.accessory.manage)"
+              @click="manage('accessory')"
+              ><AppIcon :svg="penIcon"
+            /></PhoneButton>
+          </div>
         </div>
-        <IonList v-if="!isSmart" class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageAccessory')" chevron inert />
-        </IonList>
-        <IonList class="mob-list" lines="none">
-          <PhoneRow :title="t('targets.gear.manageFilter')" chevron inert />
-        </IonList>
+        <div class="mob-form-row">
+          <PhoneButton block @click="manage('filter')">{{
+            t('targets.gear.manageFilter')
+          }}</PhoneButton>
+        </div>
 
         <PhoneFacts v-if="facts.length" :facts="facts" />
 
@@ -382,12 +457,12 @@ async function remove() {
           :aria-label="t(PICKERS[picker].label)"
         />
       </template>
-      <!-- Adding a custom telescope has no board yet: the row shows and does nothing. -->
       <PhoneRow
         v-if="picker === 'telescope'"
         :title="t('mobile.gear.addTelescope')"
         :lead="plusIcon"
-        inert
+        button
+        @click="addTelescope"
       />
       <PhoneRow
         v-if="picker === 'accessory'"

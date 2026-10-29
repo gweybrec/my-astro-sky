@@ -166,6 +166,13 @@ const de: Translations['mobile'] = {
     searchCameraLabel: 'Kamera suchen',
     searchAccessory: 'Zubehör suchen…',
     searchAccessoryLabel: 'Zubehör suchen',
+    addCamera: 'Kamera hinzufügen',
+    addAccessory: 'Zubehör hinzufügen',
+    addFilter: 'Filter hinzufügen',
+    searchFilter: 'Filter suchen…',
+    searchFilterLabel: 'Filter suchen',
+    deleteItem: '„{name}“ löschen',
+    deleteItemTitle: '„{name}“ löschen?',
     summary: 'Effektive Brennweite: {value}',
   },
   location: {

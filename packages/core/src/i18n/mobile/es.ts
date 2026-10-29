@@ -165,6 +165,13 @@ const es: Translations['mobile'] = {
     searchCameraLabel: 'Buscar una cámara',
     searchAccessory: 'Buscar un accesorio…',
     searchAccessoryLabel: 'Buscar un accesorio',
+    addCamera: 'Añadir una cámara',
+    addAccessory: 'Añadir un accesorio',
+    addFilter: 'Añadir un filtro',
+    searchFilter: 'Buscar un filtro…',
+    searchFilterLabel: 'Buscar un filtro',
+    deleteItem: 'Eliminar «{name}»',
+    deleteItemTitle: '¿Eliminar «{name}»?',
     summary: 'Distancia focal efectiva: {value}',
   },
   location: {

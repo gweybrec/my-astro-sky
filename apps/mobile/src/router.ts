@@ -57,6 +57,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/plans/:id/:entryId', component: () => import('./pages/PlanEntryPage.vue') },
   { path: '/settings/setups', component: () => import('./pages/SetupsPage.vue') },
   { path: '/settings/setups/:id', component: () => import('./pages/SetupEditPage.vue') },
+  { path: '/settings/gear/:type', component: () => import('./pages/gear/GearManagePage.vue') },
+  { path: '/settings/gear/:type/new', component: () => import('./pages/gear/GearAddPage.vue') },
   { path: '/settings/location', component: () => import('./pages/LocationPage.vue') },
   {
     path: '/settings/astrometry-key',

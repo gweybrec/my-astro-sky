@@ -4,7 +4,8 @@ import { IonCheckbox } from '@ionic/vue';
 // A row with a tick box at its right end (`.mob-row` + `.mob-check`) on Ionic's checkbox: the whole row is the tap
 // target. The title wraps; `subs` are the lines under it and `warn` the ones in the warning colour. The `badges` slot
 // goes between the title and the lines (`.mob-row-badges`), the `actions` slot under them (`.mob-row-actions`: text
-// buttons, which stop their tap so that it does not tick the row). A group's row ("Ciel, affichage, points d'intérêt":
+// buttons, which stop their tap so that it does not tick the row), the `trail` slot between the lines and the box (an icon
+// button, the bin of a custom telescope, which stops its tap too). A group's row ("Ciel, affichage, points d'intérêt":
 // a type of point of interest) has its colour dot at the start and a bold title, and is half ticked when only some of
 // its names are.
 withDefaults(
@@ -56,5 +57,6 @@ const model = defineModel<boolean>({ default: false });
       >
       <span v-if="$slots.actions" class="mob-row-actions" @click.stop><slot name="actions" /></span>
     </span>
+    <span v-if="$slots.trail" class="mob-row-trail" @click.stop><slot name="trail" /></span>
   </IonCheckbox>
 </template>

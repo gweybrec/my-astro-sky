@@ -1684,6 +1684,26 @@ ion-tab-bar.mob-tabbar-hidden {
 .mob-page-stack > * {
   flex: none;
 }
+/* A field button with an icon button at its right (the setup's telescope and the pen that opens the telescopes' list):
+   the field takes the rest of the row, the pen keeps its square. */
+.mob-field-with-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.mob-field-with-button > .mob-btn--block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* A list that scrolls under a fixed row (the search of "Équipement, gérer les télescopes") takes the rest of the page. */
+.mob-page-stack > .mob-scroll {
+  flex: 1;
+  min-height: 0;
+}
+/* A count right under the search row: the row already stands off it. */
+.mob-helper.mob-helper--flush {
+  padding-top: 0;
+}
 .mob-page-stack > .mob-empty {
   flex: 1;
   height: auto;

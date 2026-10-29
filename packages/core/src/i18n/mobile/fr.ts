@@ -164,6 +164,13 @@ const fr = {
     searchCameraLabel: 'Rechercher une caméra',
     searchAccessory: 'Rechercher un accessoire…',
     searchAccessoryLabel: 'Rechercher un accessoire',
+    addCamera: 'Ajouter une caméra',
+    addAccessory: 'Ajouter un accessoire',
+    addFilter: 'Ajouter un filtre',
+    searchFilter: 'Rechercher un filtre…',
+    searchFilterLabel: 'Rechercher un filtre',
+    deleteItem: 'Supprimer « {name} »',
+    deleteItemTitle: 'Supprimer « {name} » ?',
     summary: 'Focale effective : {value}',
   },
   location: {

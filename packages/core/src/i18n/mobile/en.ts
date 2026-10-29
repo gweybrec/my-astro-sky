@@ -165,6 +165,13 @@ const en: Translations['mobile'] = {
     searchCameraLabel: 'Search for a camera',
     searchAccessory: 'Search for an accessory…',
     searchAccessoryLabel: 'Search for an accessory',
+    addCamera: 'Add a camera',
+    addAccessory: 'Add an accessory',
+    addFilter: 'Add a filter',
+    searchFilter: 'Search for a filter…',
+    searchFilterLabel: 'Search for a filter',
+    deleteItem: 'Delete “{name}”',
+    deleteItemTitle: 'Delete “{name}”?',
     summary: 'Effective focal length: {value}',
   },
   location: {

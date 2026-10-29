@@ -447,6 +447,13 @@ function raiseError() {
             :warn="['Avertissement']"
           />
           <PhoneCheckRow :model-value="true" title="Verrouillée" disabled />
+          <PhoneCheckRow v-model="tickOn" title="GSO Newton 200/800" :subs="['Avec une corbeille']">
+            <template #trail>
+              <PhoneIconButton danger label="Supprimer"
+                ><AppIcon :svg="trashIcon"
+              /></PhoneIconButton>
+            </template>
+          </PhoneCheckRow>
           <PhoneCheckLeadRow v-model="tickOn" title="Tout sélectionner" indeterminate />
           <PhoneCheckLeadRow
             v-model="tickOff"
