@@ -3,7 +3,7 @@
  * Items are stored in fixed-size cells. Queries check only nearby cells.
  */
 export class SpatialIndex<T> {
-  private cells = new Map<string, { item: T; x: number; y: number }[]>();
+  private cells = new Map<number, { item: T; x: number; y: number }[]>();
   private cellSize: number;
 
   // Populated cell-coordinate bounds. Query loops are clamped to these so their cost is
@@ -20,8 +20,10 @@ export class SpatialIndex<T> {
     this.cellSize = cellSize;
   }
 
-  private key(cx: number, cy: number): string {
-    return `${cx},${cy}`;
+  // A number, not a string: building a string key per cell looked up was most of a large query's cost. Unique while
+  // |cy| < 2^21 cells (over 40,000 projection units at the cell sizes in use).
+  private key(cx: number, cy: number): number {
+    return cx * 4194304 + cy;
   }
 
   private cellCoord(v: number): number {
@@ -102,6 +104,39 @@ export class SpatialIndex<T> {
         const bucket = this.cells.get(this.key(cx, cy));
         if (!bucket) continue;
         for (const entry of bucket) {
+          const dx = entry.x - qx;
+          const dy = entry.y - qy;
+          if (dx * dx + dy * dy <= r2) out.push(entry.item);
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Like {@link collect}, but reads each cell in insertion order only until `stop` is true for an item, which it
+   * leaves out with the rest of that cell. Items inserted in sorted order make this a cutoff applied cell by cell
+   * (the sky map's stars, brightest first, stopped at the faintest that can be drawn). Appends to `out`.
+   */
+  collectUntil(
+    qx: number,
+    qy: number,
+    radius: number,
+    stop: (item: T) => boolean,
+    out: T[] = [],
+  ): T[] {
+    const minCx = Math.max(this.cellCoord(qx - radius), this.minCellX);
+    const maxCx = Math.min(this.cellCoord(qx + radius), this.maxCellX);
+    const minCy = Math.max(this.cellCoord(qy - radius), this.minCellY);
+    const maxCy = Math.min(this.cellCoord(qy + radius), this.maxCellY);
+
+    const r2 = radius * radius;
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const bucket = this.cells.get(this.key(cx, cy));
+        if (!bucket) continue;
+        for (const entry of bucket) {
+          if (stop(entry.item)) break;
           const dx = entry.x - qx;
           const dy = entry.y - qy;
           if (dx * dx + dy * dy <= r2) out.push(entry.item);

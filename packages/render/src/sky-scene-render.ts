@@ -23,7 +23,9 @@ import {
   projectCached,
   toCanvas,
   isBelowHorizonCached,
+  getProjectionGeneration,
 } from '@myastrosky/core/projection';
+import { SpatialIndex } from '@myastrosky/core/spatial-index';
 import { altAzFromRaDec } from '@myastrosky/core/sky-geometry';
 import type { Star } from '@myastrosky/core/types';
 import { getStars, getStarByHip } from '@myastrosky/core/catalog/star-registry';
@@ -64,6 +66,89 @@ function outsideDecPrefilter(s: SkyScene, decDeg: number): boolean {
   return false;
 }
 
+/** Cell size of the star position index, in projection units. */
+const STAR_CELL_SIZE = 0.02;
+/** Stars projected farther from the origin are never drawn (the border is within ~4 units); they stay out of the index. */
+const STAR_INDEX_MAX_R = 20;
+
+/** The catalog stars by projected position, each cell brightest first; rebuilt when the projection or catalog changes. */
+const starIndex = new SpatialIndex<Star>(STAR_CELL_SIZE);
+let starIndexGen = NaN;
+let starIndexOf: readonly Star[] | null = null;
+
+/**
+ * The catalog stars no fainter than `maxMag` that can show in the view (its rectangle plus the 20 px off-screen
+ * margin), brightest first; or null when walking the catalog, stopped at `maxMag`, costs less. Zoomed in, the cutoff
+ * is faint enough that the walk projects tens of thousands of stars only to find them off-screen; the index reads
+ * only the cells around the view. Zoomed out, the walk is short and the cells many. In local-sky mode the projection
+ * changes with every tick of the sky clock, so an index would be rebuilt every frame: the walk is used.
+ */
+function starsInView(s: SkyScene, maxMag: number): Star[] | null {
+  if (s.starSearch === 'catalog' || (s.localSkyMode && s.starSearch !== 'grid')) return null;
+  const { view } = s;
+  const radius = Math.hypot(view.width / 2 + 20, view.height / 2 + 20) / view.scale;
+  if (s.starSearch !== 'grid') {
+    const cells = ((2 * radius) / STAR_CELL_SIZE + 1) ** 2;
+    if (cells >= countAtMost(s.starBudget.mags, maxMag)) {
+      buildStarIndexWhenIdle();
+      return null;
+    }
+  }
+  ensureStarIndex();
+  return starIndex
+    .collectUntil(view.centerX, view.centerY, radius, (star) => star.mag > maxMag)
+    .sort((a, b) => a.mag - b.mag);
+}
+
+/** Builds the star index when the projection or the catalog changed since it was built (~200 ms on a phone). */
+function ensureStarIndex(): void {
+  const stars = getStars();
+  const gen = getProjectionGeneration();
+  if (starIndexGen === gen && starIndexOf === stars) return;
+  starIndex.clear();
+  const r2 = STAR_INDEX_MAX_R * STAR_INDEX_MAX_R;
+  for (const star of stars) {
+    projectCached(star);
+    if (star._px! * star._px! + star._py! * star._py! < r2) {
+      starIndex.insert(star, star._px!, star._py!);
+    }
+  }
+  starIndexGen = gen;
+  starIndexOf = stars;
+}
+
+let starIndexBuildPending = false;
+
+/**
+ * Builds the star index ahead of need, once the page is idle, so the first zoom-in does not pay for it in one long
+ * frame. Not for an empty catalog (it has not loaded yet) or inside an export's own projection (a negative
+ * generation, gone by the time the page is idle).
+ */
+function buildStarIndexWhenIdle(): void {
+  const stale = starIndexGen !== getProjectionGeneration() || starIndexOf !== getStars();
+  if (!stale || starIndexBuildPending || getStars().length === 0 || getProjectionGeneration() < 0) {
+    return;
+  }
+  starIndexBuildPending = true;
+  const whenIdle = globalThis.requestIdleCallback ?? ((fn: () => void) => setTimeout(fn, 200));
+  whenIdle(() => {
+    starIndexBuildPending = false;
+    ensureStarIndex();
+  });
+}
+
+/** How many of the ascending `values` are at most `limit`. */
+function countAtMost(values: readonly number[], limit: number): number {
+  let lo = 0;
+  let hi = values.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (values[mid] <= limit) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 export function renderStars(s: SkyScene): void {
   const { ctx, view, theme } = s;
   // Stars render at full opacity (not dimmed by skyOpacity like the rest of the
@@ -71,7 +156,6 @@ export function renderStars(s: SkyScene): void {
   // them instead of letting the line bleed through the middle of the star.
   const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = 1;
-  const stars = getStars();
   // Pan-invariant, area-weighted magnitude budget (see render-budget.ts). The precise
   // cutoff is per-position (starFaintLimitAt) — brighter near the crowded map centre,
   // fainter toward the edge — so on-screen star density stays uniform under the
@@ -81,6 +165,7 @@ export function renderStars(s: SkyScene): void {
   // the exact per-star gate after projecting.
   const sb = s.starBudget;
   const maxMag = sb.edgeMag;
+  const stars = starsInView(s, maxMag) ?? getStars();
 
   const atlas = s.atlas.beginFrame(view.scale, maxMag, s.interacting);
 

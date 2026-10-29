@@ -314,11 +314,45 @@ thresholds, hemispheres and fisheye, and requires identical output, order includ
 | Default (zoomed out)       | 40–44 ms | **~11 ms** |
 | Zoomed in (25 wheel steps) | ~42 ms   | ~42 ms     |
 
-Zoomed in, frame time is still ~42 ms on the phone, and neither fix touched it; that is
-the next thing to trace.
+Zoomed in, frame time is still ~42 ms on the phone, and neither fix touched it (see the
+next addendum).
 
 > **Pattern.** If the gate mixes the sort key with a position-dependent factor, bound the
 > factor over the reachable region: the bound turns the key back into a stopping point.
+
+### Addendum — zoomed in, look up stars by position, sorted per cell
+
+The magnitude stop only helps while the cutoff is bright. The cutoff count grows with
+`scale²`, so zoomed in it reaches far into the catalogue, and the star pass was back to
+57% of active CPU in a zoomed-in phone trace: tens of thousands of stars projected, gated
+(`starFaintLimitAt`) and placed (`toCanvas`) only to be dropped as off-screen.
+
+`starsInView` (`packages/render/src/sky-scene-render.ts`) keeps the stars in a
+`SpatialIndex` by projected position. They are inserted brightest first, so each cell
+stays sorted, and `SpatialIndex.collectUntil` stops reading a cell at its first star past
+the cutoff. The query is the view's half-diagonal plus the 20 px off-screen margin; the
+result is sorted by magnitude so stars draw in the same order as the catalogue walk. As
+for DSOs, each frame picks the cheaper search: the index when the cells in the query box
+are fewer than the stars under the cutoff, the walk otherwise. Local-sky mode always walks:
+its projection changes with every tick of the sky clock, which would rebuild the index
+every frame. A test draws a random 20,000-star catalogue both ways over zooms, pans,
+rotations and both hemispheres and requires identical drawing calls.
+
+Building the index projects the whole catalogue (~210 ms in one frame on the phone at the
+first zoom-in), so it is built ahead, in `requestIdleCallback`, once the zoomed-out map
+has drawn. `SpatialIndex` cell keys also became numbers instead of `"cx,cy"` strings,
+which every cell lookup used to build.
+
+**A/B on the phone** (same script, three runs each):
+
+| View                                   | Before                    | After      |
+| -------------------------------------- | ------------------------- | ---------- |
+| Zoomed in (25 wheel steps), pan        | ~42 ms                    | **~11 ms** |
+| Default (zoomed out), pan              | ~11 ms                    | ~11 ms     |
+| First zoom-in after start, worst frame | 210 ms (index built then) | 43–65 ms   |
+
+> **Pattern.** A sorted-order stop and a spatial cull combine: sort within each cell and
+> stop per cell. And build a large index when idle, not on the frame that first needs it.
 
 ---
 

@@ -84,6 +84,8 @@ export interface SkyScene extends SkyLayerFlags {
   atlas: StarSpriteAtlas;
   /** Whether a gesture is in flight — freezes the sprite atlas. */
   interacting: boolean;
+  /** How the star pass finds its stars; the cheaper way when omitted. Tests force one. */
+  starSearch?: 'catalog' | 'grid';
 
   // ── DSOs ──────────────────────────────────────────────────────────────────
   /** The DSOs to draw this frame (shape pass, label pass and hit-testing agree). */
