@@ -29,6 +29,7 @@ This skill is analysis + measurement. If your fix changes a `.ts` file in `src/`
 A Chrome DevTools CPU trace is the input. Either:
 
 - **The user records it** (most common): DevTools → Performance → Record → do the slow interaction (e.g. pan/zoom at high star/DSO density) for a few seconds → Stop → save as JSON (the "Save profile…" / download button). They'll point you at a `Trace-*.json` in the repo root.
+- **On the phone app**: run `node .claude/skills/mobile-device-test/scripts/record-trace.mjs --serial <s> --seconds 8` while the user pans/zooms on the phone; it saves `.playwright-mcp/Trace-phone-*.json` (DevTools from chrome://inspect cannot save traces).
 - **You drive it** via Playwright if you just need frame timings (see Step 4) — lighter weight, no DevTools needed, but no per-function breakdown.
 
 Traces are large (10–40 MB). Don't `Read` them — parse with the script in Step 1.

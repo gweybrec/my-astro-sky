@@ -40,7 +40,15 @@ export function webviewPid(serial, packageId = appId()) {
 export async function connect({ serial, port = 9223, packageId = appId() }) {
   const pid = webviewPid(serial, packageId);
   adb(serial, ['forward', `tcp:${port}`, `localabstract:webview_devtools_remote_${pid}`]);
-  const browser = await loadChromium().connectOverCDP(`http://localhost:${port}`);
+  let browser;
+  try {
+    browser = await loadChromium().connectOverCDP(`http://localhost:${port}`, { timeout: 15000 });
+  } catch (e) {
+    adb(serial, ['forward', '--remove', `tcp:${port}`]);
+    throw new Error(
+      `${e.message}\nThe WebView did not answer: close any DevTools window opened from chrome://inspect, then retry.`,
+    );
+  }
   const pages = browser.contexts().flatMap((c) => c.pages());
   const page = pages.find((p) => p.url().startsWith('https://localhost')) ?? pages[0];
   if (!page) throw new Error('No WebView page found over the debugging connection.');

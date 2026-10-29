@@ -34,7 +34,8 @@ Run `node .claude/skills/mobile-device-test/scripts/device-info.mjs`. If no devi
 
 ## Step 4 — Drive the app
 
-- Prefer the WebView's debugging connection to taps. `cdp-connect.mjs --serial <s>` finds the app's socket, forwards it to a local port and prints the page's URL and title. In your own script, `import { connect } from './cdp-connect.mjs'` to get a `playwright-core` page, and call `close()` when done (it removes the forward). The app must be a debug build and running.
+- Prefer the WebView's debugging connection to taps. `cdp-connect.mjs --serial <s>` finds the app's socket, forwards it to a local port and prints the page's URL and title. In your own script, `import { connect } from './cdp-connect.mjs'` to get a `playwright-core` page, and call `close()` when done (it removes the forward). The app must be a debug build and running, with no DevTools window from chrome://inspect attached.
+- Performance trace: `record-trace.mjs --serial <s> [--seconds 8]` records while the user pans/zooms and saves `.playwright-mcp/Trace-phone-*.json` for profile-performance's `parse-trace.mjs` (DevTools from chrome://inspect cannot save traces).
 - Never send a tap without first reading what is on screen (`adb -s <s> shell uiautomator dump`, then read the file) and checking the app is in front.
 - Taps are for system dialogs only: permission, file picker, share sheet.
 - Never send anything out of the phone (no message, no share to a contact, no upload).
