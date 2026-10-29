@@ -30,7 +30,9 @@ Every gate below exists because a change passed a shallower check and shipped br
 2. **Theme trap** — a fresh profile loads `cold-blue-v2`; set
    `localStorage['app-theme'] = 'warm'` and reload before judging amber tokens (see
    `docs/dev/ui/components.md` §2.1).
-3. **One screenshot, in context, never in isolation** — a single `browser_take_screenshot` with a
+3. **Screenshot in context, never in isolation** — first scroll to, or open, the section or
+   dialog that holds the changed element (scrolling and opening cost nothing extra). Then take
+   one `browser_take_screenshot` per place the change shows (usually one), with a
    `target` that is the **whole parent container** of the changed element (its row / flex
    / grid parent and every sibling), at a scale that shows relative size + alignment. An
    element-only shot hides the defects this review catches.

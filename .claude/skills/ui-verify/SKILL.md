@@ -48,8 +48,10 @@ to fresh eyes.
    - the file list + `git diff` for this turn,
    - the dev-server URL (`http://localhost:5173`) and the CSS selector(s) of the changed
      element and its parent container,
-   - "take ONE screenshot of the container, measure everything else with
-     browser_evaluate; the list of siblings in the brief may be incomplete".
+   - "first scroll to, or open, the section or dialog that holds the change; then take
+     one screenshot of the container per place the change shows, and measure everything
+     else (including hover/active/disabled states) with browser_evaluate; the list of
+     siblings in the brief may be incomplete".
 3. **Paste the reviewer's returned per-element table + `VERDICT` line** into your reply,
    then close with `<!-- ui-verified: reviewer=pass -->`. Do not hand-write that marker —
    it must reflect a `VERDICT: PASS` you got back.
