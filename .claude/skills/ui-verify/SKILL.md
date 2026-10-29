@@ -28,6 +28,14 @@ will test it themselves, skip either tier with `<!-- ui-verified: <reason> -->`.
 
 When unsure, treat it as structural.
 
+## No visible change → skip
+
+The guard spots UI edits by keywords, so it also flags edits that change nothing on screen:
+script-only edits in a `.vue` (no `<template>` or `<style>` change), or a DOM line that
+was only moved or pins a size the element already had. Then do not verify: close with
+`<!-- ui-verified: no visible change — <one-line why> -->`. If any rendered output can
+differ, this does not apply.
+
 ## Structural → `ui-verify-reviewer` subagent
 
 The agent that wrote the code is biased toward the one element it touched. Hand the verdict
@@ -40,13 +48,13 @@ to fresh eyes.
    - the file list + `git diff` for this turn,
    - the dev-server URL (`http://localhost:5173`) and the CSS selector(s) of the changed
      element and its parent container,
-   - "run your own screenshot + measurements; the list of siblings in the brief may be
-     incomplete".
+   - "take ONE screenshot of the container, measure everything else with
+     browser_evaluate; the list of siblings in the brief may be incomplete".
 3. **Paste the reviewer's returned per-element table + `VERDICT` line** into your reply,
    then close with `<!-- ui-verified: reviewer=pass -->`. Do not hand-write that marker —
    it must reflect a `VERDICT: PASS` you got back.
-4. If the reviewer returns `VERDICT: FAIL`, fix the code and re-spawn it. Do not present a
-   failing change.
+4. If the reviewer returns `VERDICT: FAIL`, fix the code and re-spawn it once. If it fails
+   again, stop and show the user both reports instead of looping.
 
 ## Trivial → inline checklist
 
