@@ -268,8 +268,8 @@ frame.
 Zoomed in, frame time did not move: there the frame is held by something other than the
 star loop. Zoomed out, the trace after the fix is led by `SpatialIndex.collect` (59% of
 active CPU) and DSO selection (15%): at the phone's default full-sky view the query box
-spans ~250 × 250 mostly empty 0.02-unit cells and returns nearly the whole DSO catalog.
-That is the next item for the phone.
+spans ~250 × 250 mostly empty 0.02-unit cells and returns nearly the whole DSO catalog
+(see the next addendum).
 
 > **Pattern.** When a list is sorted by the key you gate on, the gate is a stopping point,
 > not a filter. Any "always include X" exception that rides along in the loop must move
@@ -279,6 +279,46 @@ To record a trace on the phone, use
 `.claude/skills/mobile-device-test/scripts/record-trace.mjs` (the DevTools window opened
 from `chrome://inspect` does not save traces); the profile-performance skill's
 `parse-trace.mjs` reads it unchanged.
+
+### Addendum — the same stop for DSOs, through a bound on the rank
+
+DSOs have no single sort key to stop on: a DSO passes when its area-weighted rank
+`rank · aNorm / A` is under the zoom's threshold, so a worse rank passes toward the rim
+(large area factor `A`) and fails at the centre. But `A` has a maximum over everything
+the query can reach: at `rMax = |viewCentre| + queryR` from the origin (in fisheye `A`
+falls with radius, so the maximum is at the origin). No rank above
+`threshold · Amax / aNorm` can pass anywhere, which turns the rank into a stopping key.
+
+`DsoRenderSelection` (`packages/render/src/dso-render-select.ts`) keeps the indexed DSOs
+in rank order (rebuilt with the index, or when the rank map is replaced after a rating
+override) and per frame picks whichever search touches fewer entries:
+
+- **Rank order**, walked from the best rank and stopped at the bound, with the same
+  `queryR` disc test. Wins zoomed out, where the threshold (∝ scale²) is a few hundred.
+- **The position index**, as before. Wins zoomed in, where the threshold grows past
+  the catalogue and the query box shrinks to a few cells.
+
+The cost estimate is just `maxRank` against the number of cells in the query box. Giants
+are added as before; a highlighted DSO past the bound is added explicitly (it bypasses
+the gate), still subject to the disc test. The selection is now sorted least important
+first, so overlapping markers draw the more important one on top whichever search ran;
+before, the overlap order followed the index's cell order.
+
+A test runs both searches over a 3,000-object random catalogue across zooms, centres,
+thresholds, hemispheres and fisheye, and requires identical output, order included.
+
+**A/B on the phone** (same script as above):
+
+| View                       | Before   | After      |
+| -------------------------- | -------- | ---------- |
+| Default (zoomed out)       | 40–44 ms | **~11 ms** |
+| Zoomed in (25 wheel steps) | ~42 ms   | ~42 ms     |
+
+Zoomed in, frame time is still ~42 ms on the phone, and neither fix touched it; that is
+the next thing to trace.
+
+> **Pattern.** If the gate mixes the sort key with a position-dependent factor, bound the
+> factor over the reachable region: the bound turns the key back into a stopping point.
 
 ---
 

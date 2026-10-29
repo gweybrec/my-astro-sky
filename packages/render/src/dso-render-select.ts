@@ -55,7 +55,12 @@ export interface DsoSelectOptions {
   horizon: HorizonParams | null;
   /** Pan-invariant priority cutoff for this zoom + canvas. */
   priorityThreshold: number;
+  /** How to find the nearby DSOs; the cheaper one when omitted. Tests force one. */
+  strategy?: 'grid' | 'rank';
 }
+
+/** Cell size of the position index, in projection units. */
+const INDEX_CELL_SIZE = 0.02;
 
 export class DsoRenderSelection {
   /**
@@ -63,10 +68,17 @@ export class DsoRenderSelection {
    * Positions change only with the projection generation, so this is rebuilt once per
    * hemisphere/mode change (or DSO coordinate override), not per frame.
    */
-  private allIndex = new SpatialIndex<DSO>(0.02);
+  private allIndex = new SpatialIndex<DSO>(INDEX_CELL_SIZE);
+  private indexed: DSO[] = []; // what allIndex holds, as a list
   private giants: DSO[] = []; // bodies larger than the query margin; always considered
   private allIndexGen = -1;
   private maxBodyPU = 0; // largest indexed (non-giant) body radius (projection units)
+
+  // `indexed` in importance-rank order (best first), with the ranks alongside.
+  private byRank: DSO[] = [];
+  private ranks = new Float64Array(0);
+  private rankSource: Map<string, number> | null = null;
+  private rankGen = -1;
 
   private cached: DSO[] | null = null;
   private cachedIds: Set<string> | null = null;
@@ -92,6 +104,7 @@ export class DsoRenderSelection {
     const gen = getProjectionGeneration();
     if (this.allIndexGen === gen) return;
     this.allIndex.clear();
+    this.indexed = [];
     this.giants = [];
     let maxBody = 0;
     for (const dso of getDSOs()) {
@@ -105,6 +118,7 @@ export class DsoRenderSelection {
         this.giants.push(dso);
       } else {
         this.allIndex.insert(dso, dso._px!, dso._py!);
+        this.indexed.push(dso);
         if (body > maxBody) maxBody = body;
       }
     }
@@ -158,7 +172,6 @@ export class DsoRenderSelection {
       Math.hypot(view.width / 2, view.height / 2) / view.scale + this.maxBodyPU + 20 / view.scale,
       capR,
     );
-    const nearby = this.allIndex.collect(view.centerX, view.centerY, queryR);
 
     // Area-normalisation for the area-weighted gate below (see render-budget.ts): the mean
     // projection area factor over the visible cap, so weighting compensates the projection
@@ -171,7 +184,9 @@ export class DsoRenderSelection {
     // that natural clustering.
     const qRank = getDSOImportanceRank();
 
-    const candidates: (SelectableDSO & { dso: DSO })[] = [];
+    const nearby = this.nearby(view, queryR, aNorm, opts, qRank);
+
+    const candidates: (SelectableDSO & { dso: DSO; rank: number })[] = [];
     // The spatial query covers normal-sized objects; the few giant DSOs (body larger
     // than the query margin) live outside the index and are always considered, so the
     // margin can stay tight without ever missing a large object near the edge.
@@ -244,12 +259,69 @@ export class DsoRenderSelection {
         const A = projectionAreaFactor(dso._px!, dso._py!);
         const rank = qRank.get(dso.id) ?? Number.MAX_SAFE_INTEGER;
         const effPriority = A > 0 ? (rank * aNorm) / A : Infinity;
-        candidates.push({ id: dso.id, priority: effPriority, isHighlighted, dso });
+        candidates.push({ id: dso.id, priority: effPriority, isHighlighted, dso, rank });
       }
 
-    const selected = selectDSOsToRender(candidates, priorityThreshold).map((s) => s.dso);
+    // Least important first, so where markers overlap the more important one is drawn on
+    // top — and the same whichever way `nearby` found them.
+    const selected = selectDSOsToRender(candidates, priorityThreshold)
+      .sort((a, b) => b.rank - a.rank)
+      .map((s) => s.dso);
     this.cached = selected;
     this.cachedIds = new Set(selected.map((d) => d.id));
     return selected;
+  }
+
+  /**
+   * The indexed (non-giant) DSOs to consider this frame: those within `queryR` of the
+   * view centre that can pass the rank gate somewhere in that disc. Found whichever way
+   * touches fewer entries — the position index (zoomed in), or the catalogue in rank
+   * order, stopped at the worst rank that can pass (zoomed out, where the index query
+   * spans ~250² mostly empty cells and returns nearly the whole catalogue).
+   */
+  private nearby(
+    view: ViewState,
+    queryR: number,
+    aNorm: number,
+    opts: DsoSelectOptions,
+    qRank: Map<string, number>,
+  ): DSO[] {
+    const { centerX: qx, centerY: qy } = view;
+    // A DSO passes when rank·aNorm/A < threshold, and the area factor A is largest at the
+    // farthest reachable point from the origin (smallest there in fisheye, hence the max
+    // with the origin's), so no rank above threshold·Amax/aNorm passes anywhere in reach.
+    const rMax = Math.hypot(qx, qy) + queryR;
+    const aMax = Math.max(projectionAreaFactor(0, 0), projectionAreaFactor(rMax, 0));
+    const maxRank = (opts.priorityThreshold * aMax) / aNorm;
+    const gridCells = ((2 * queryR) / INDEX_CELL_SIZE + 1) ** 2;
+    if (opts.strategy === 'grid' || (opts.strategy !== 'rank' && maxRank >= gridCells)) {
+      return this.allIndex.collect(qx, qy, queryR);
+    }
+
+    this.ensureRankOrder(qRank);
+    const r2 = queryR * queryR;
+    const inReach = (d: DSO) => (d._px! - qx) ** 2 + (d._py! - qy) ** 2 <= r2;
+    const out: DSO[] = [];
+    const { byRank, ranks } = this;
+    for (let i = 0; i < byRank.length && ranks[i] <= maxRank; i++) {
+      if (inReach(byRank[i])) out.push(byRank[i]);
+    }
+    // The highlighted DSO bypasses the rank gate, so it may lie past the stop.
+    const hl = opts.highlightedId ? getDSOById(opts.highlightedId) : null;
+    if (hl && !((qRank.get(hl.id) ?? Infinity) <= maxRank) && !this.giants.includes(hl)) {
+      projectCached(hl);
+      if (inReach(hl)) out.push(hl);
+    }
+    return out;
+  }
+
+  /** The indexed DSOs sorted by importance rank, rebuilt when the index or the ranks change. */
+  private ensureRankOrder(qRank: Map<string, number>): void {
+    if (this.rankSource === qRank && this.rankGen === this.allIndexGen) return;
+    const rankOf = (d: DSO) => qRank.get(d.id) ?? Number.MAX_SAFE_INTEGER;
+    this.byRank = [...this.indexed].sort((a, b) => rankOf(a) - rankOf(b));
+    this.ranks = Float64Array.from(this.byRank, rankOf);
+    this.rankSource = qRank;
+    this.rankGen = this.allIndexGen;
   }
 }

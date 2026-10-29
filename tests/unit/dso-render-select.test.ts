@@ -327,4 +327,53 @@ describe('DsoRenderSelection', () => {
       expect(s.has('A')).toBe(false);
     });
   });
+  describe('rank-order search (zoomed out) agrees with the position index', () => {
+    /** Deterministic pseudo-random catalogue: mostly small objects, a few giants. */
+    function randomCatalog(n: number): DSO[] {
+      let seed = 7;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      return Array.from({ length: n }, (_, i) =>
+        makeDSO({
+          id: 'D' + i,
+          ra: rnd() * 360,
+          dec: -70 + rnd() * 160,
+          majAxis: i % 300 === 0 ? 600 : 0.5 + rnd() * 40,
+        }),
+      );
+    }
+
+    const cases: [string, () => void][] = [
+      ['north stereo', () => setHemisphere('north')],
+      ['south stereo', () => setHemisphere('south')],
+      ['fisheye', () => setProjectionMode('fisheye')],
+    ];
+    for (const [label, setup] of cases) {
+      it(`selects the same objects in the same order (${label})`, () => {
+        setCatalog(randomCatalog(3000));
+        const s = fresh();
+        setup();
+        for (const scale of [40, 150, 400, 1500, 6000])
+          for (const [centerX, centerY] of [
+            [0, 0],
+            [0.4, -0.3],
+            [1.1, 0.7],
+          ])
+            for (const priorityThreshold of [30, 300, 3000, 1e9])
+              for (const highlightedId of [null, 'D2999', 'D5']) {
+                const o = {
+                  view: view({ scale, centerX, centerY }),
+                  priorityThreshold,
+                  highlightedId,
+                  fisheyeMode: label === 'fisheye',
+                  hemisphere: label === 'south stereo' ? ('south' as const) : ('north' as const),
+                };
+                s.invalidate();
+                const grid = s.select(options({ ...o, strategy: 'grid' })).map((d) => d.id);
+                s.invalidate();
+                const rank = s.select(options({ ...o, strategy: 'rank' })).map((d) => d.id);
+                expect(rank).toEqual(grid);
+              }
+      });
+    }
+  });
 });
