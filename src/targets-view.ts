@@ -19,12 +19,14 @@ import {
   getFilters,
   getVisibleFilters,
   getVisibleFilterEntries,
-  getHiddenFilterIds,
-  setHiddenFilterIds,
+  getHiddenGearIds,
+  setHiddenGearIds,
+  visibleGear,
   filterLabel,
   catalogFilterColor,
 } from '@myastrosky/core/gear-catalog';
 import { sortCustomFirst } from '@myastrosky/core/gear-sort';
+import { CUSTOM_GEAR_FIELDS, buildCustomGearData } from '@myastrosky/core/gear-custom-fields';
 import { chooseTelescope } from '@myastrosky/core/setup-gear';
 import type {
   TelescopeData,
@@ -191,19 +193,6 @@ function dsoTypeLabel(type: string): string {
 
 // ─── Custom gear modal ────────────────────────────────────────────────────────
 
-interface FieldDef {
-  key: string;
-  label: string;
-  type: 'text' | 'number' | 'select' | 'color';
-  required: boolean;
-  options?: { value: string; label: string }[];
-  step?: string;
-  helpKey?: string;
-  placeholder?: string;
-  /** Initial value for `color` fields (they always submit a value). */
-  defaultValue?: string;
-}
-
 export function openAddGearModal(gearType: CustomGearType, onSaved: () => void): void {
   const titles: Record<string, string> = {
     telescope: t('targets.gear.addTelescopeTitle'),
@@ -212,279 +201,13 @@ export function openAddGearModal(gearType: CustomGearType, onSaved: () => void):
     filter: t('targets.gear.addFilterTitle'),
   };
 
-  const fieldsByType: Record<string, FieldDef[]> = {
-    telescope: [
-      {
-        key: 'brand',
-        label: t('targets.gear.fields.brand'),
-        type: 'text',
-        required: true,
-        helpKey: 'brand',
-        placeholder: 'e.g. Celestron',
-      },
-      {
-        key: 'model',
-        label: t('targets.gear.fields.model'),
-        type: 'text',
-        required: true,
-        helpKey: 'model',
-        placeholder: 'e.g. C8 SCT',
-      },
-      {
-        key: 'aperture_mm',
-        label: t('targets.gear.fields.apertureMm'),
-        type: 'number',
-        required: true,
-        helpKey: 'apertureMm',
-        step: '0.1',
-        placeholder: 'e.g. 203',
-      },
-      {
-        key: 'focal_length_mm',
-        label: t('targets.gear.fields.focalLengthMm'),
-        type: 'number',
-        required: true,
-        helpKey: 'focalLengthMm',
-        step: '0.1',
-        placeholder: 'e.g. 2032',
-      },
-      {
-        key: 'optical_design',
-        label: t('targets.gear.fields.opticalDesign'),
-        type: 'text',
-        required: false,
-        helpKey: 'opticalDesign',
-        placeholder: 'e.g. Schmidt-Cassegrain',
-      },
-      {
-        key: 'mount_interface',
-        label: t('targets.gear.fields.mountInterface'),
-        type: 'text',
-        required: false,
-        helpKey: 'mountInterface',
-        placeholder: 'e.g. M48, 2"',
-      },
-      {
-        key: 'optical_notes',
-        label: t('targets.gear.fields.opticalNotes'),
-        type: 'text',
-        required: false,
-        helpKey: 'opticalNotes',
-      },
-    ],
-    camera: [
-      {
-        key: 'brand',
-        label: t('targets.gear.fields.brand'),
-        type: 'text',
-        required: true,
-        helpKey: 'brand',
-        placeholder: 'e.g. Atik',
-      },
-      {
-        key: 'model',
-        label: t('targets.gear.fields.model'),
-        type: 'text',
-        required: true,
-        helpKey: 'model',
-        placeholder: 'e.g. 314L+',
-      },
-      {
-        key: 'color_type',
-        label: t('targets.gear.fields.colorType'),
-        type: 'select',
-        required: true,
-        helpKey: 'colorType',
-        options: [
-          { value: 'OSC', label: t('targets.gear.colorTypeOSC') },
-          { value: 'Mono', label: t('targets.gear.colorTypeMono') },
-        ],
-      },
-      {
-        key: 'sensor_width_mm',
-        label: t('targets.gear.fields.sensorWidthMm'),
-        type: 'number',
-        required: true,
-        helpKey: 'sensorWidthMm',
-        step: '0.01',
-        placeholder: 'e.g. 8.98',
-      },
-      {
-        key: 'sensor_height_mm',
-        label: t('targets.gear.fields.sensorHeightMm'),
-        type: 'number',
-        required: true,
-        helpKey: 'sensorHeightMm',
-        step: '0.01',
-        placeholder: 'e.g. 6.71',
-      },
-      {
-        key: 'pixel_size_um',
-        label: t('targets.gear.fields.pixelSizeUm'),
-        type: 'number',
-        required: true,
-        helpKey: 'pixelSizeUm',
-        step: '0.01',
-        placeholder: 'e.g. 6.45',
-      },
-      {
-        key: 'sensor',
-        label: t('targets.gear.fields.sensor'),
-        type: 'text',
-        required: false,
-        helpKey: 'sensor',
-        placeholder: 'e.g. Sony ICX285AL',
-      },
-    ],
-    accessory: [
-      {
-        key: 'brand',
-        label: t('targets.gear.fields.brand'),
-        type: 'text',
-        required: true,
-        helpKey: 'brand',
-        placeholder: 'e.g. Celestron',
-      },
-      {
-        key: 'model',
-        label: t('targets.gear.fields.model'),
-        type: 'text',
-        required: true,
-        helpKey: 'model',
-        placeholder: 'e.g. Focal Reducer 0.63×',
-      },
-      {
-        key: 'magnification_factor',
-        label: t('targets.gear.fields.magnificationFactor'),
-        type: 'number',
-        required: true,
-        helpKey: 'magnificationFactor',
-        step: '0.01',
-        placeholder: 'e.g. 0.63',
-      },
-      {
-        key: 'type',
-        label: t('targets.gear.fields.accessoryType'),
-        type: 'text',
-        required: false,
-        helpKey: 'accessoryType',
-        placeholder: 'e.g. focal reducer',
-      },
-      {
-        key: 'notes',
-        label: t('targets.gear.fields.accessoryNotes'),
-        type: 'text',
-        required: false,
-        helpKey: 'accessoryNotes',
-      },
-      {
-        key: 'thread_input',
-        label: t('targets.gear.fields.threadInput'),
-        type: 'text',
-        required: false,
-        helpKey: 'threadInput',
-        placeholder: 'e.g. M48',
-      },
-      {
-        key: 'thread_output',
-        label: t('targets.gear.fields.threadOutput'),
-        type: 'text',
-        required: false,
-        helpKey: 'threadOutput',
-        placeholder: 'e.g. M42',
-      },
-    ],
-    filter: [
-      {
-        key: 'brand',
-        label: t('targets.gear.fields.brand'),
-        type: 'text',
-        required: true,
-        helpKey: 'brand',
-        placeholder: 'e.g. Antlia',
-      },
-      {
-        key: 'model',
-        label: t('targets.gear.fields.model'),
-        type: 'text',
-        required: true,
-        helpKey: 'model',
-        placeholder: 'e.g. ALP-T 5nm',
-      },
-      {
-        key: 'color',
-        label: t('targets.gear.fields.filterColor'),
-        type: 'color',
-        required: false,
-        helpKey: 'filterColor',
-        defaultValue: '#2850a0',
-      },
-      {
-        key: 'type',
-        label: t('targets.gear.fields.filterType'),
-        type: 'select',
-        required: false,
-        helpKey: 'filterType',
-        options: [
-          'broadband',
-          'narrowband',
-          'dual_narrowband',
-          'triband_narrowband',
-          'quadband_narrowband',
-          'light_pollution',
-          'solar_narrowband',
-          'solar_nd',
-        ].map((v) => ({ value: v, label: t(`targets.gear.filterTypes.${v}`) })),
-      },
-      {
-        key: 'subtype',
-        label: t('targets.gear.fields.filterSubtype'),
-        type: 'text',
-        required: false,
-        helpKey: 'filterSubtype',
-        placeholder: 'e.g. Ha+OIII',
-      },
-      {
-        key: 'mono_osc',
-        label: t('targets.gear.fields.monoOsc'),
-        type: 'select',
-        required: false,
-        helpKey: 'monoOsc',
-        options: ['both', 'mono', 'osc'].map((v) => ({
-          value: v,
-          label: t(`targets.gear.monoOsc.${v}`),
-        })),
-      },
-      {
-        key: 'center_nm',
-        label: t('targets.gear.fields.centerNm'),
-        type: 'number',
-        required: false,
-        step: '0.1',
-        helpKey: 'centerNm',
-        placeholder: 'e.g. 656.3',
-      },
-      {
-        key: 'fwhm_nm',
-        label: t('targets.gear.fields.fwhmNm'),
-        type: 'number',
-        required: false,
-        step: '0.1',
-        helpKey: 'fwhmNm',
-        placeholder: 'e.g. 5',
-      },
-      {
-        key: 'bandpass_nm',
-        label: t('targets.gear.fields.bandpassNm'),
-        type: 'number',
-        required: false,
-        step: '0.1',
-        helpKey: 'bandpassNm',
-      },
-    ],
-  };
-
-  const fields = fieldsByType[gearType];
+  // The shared field list, with its labels and choices in the current language.
+  const fields = CUSTOM_GEAR_FIELDS[gearType].map((f) => ({
+    ...f,
+    label: t(`targets.gear.fields.${f.name}`),
+    helpKey: f.name,
+    options: f.options?.map((o) => ({ value: o.value, label: t(o.labelKey) })),
+  }));
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -603,38 +326,9 @@ export function openAddGearModal(gearType: CustomGearType, onSaved: () => void):
       return;
     }
 
-    // Collect data
-    const data: Record<string, string | number> = {};
-    for (const field of fields) {
-      const input = inputMap.get(field.key);
-      if (!input) continue;
-      const val = input.value.trim();
-      if (!val) continue;
-      data[field.key] = field.type === 'number' ? parseFloat(val) : val;
-    }
-    // Fill required defaults for type-specific fields
-    if (gearType === 'telescope') {
-      data.is_smart_telescope = 0 as any;
-      data.integrated_camera = 0 as any;
-      data.integrated_camera_id = null as any;
-      data.status = 'active';
-    } else if (gearType === 'camera') {
-      data.sensor_generation = 'CMOS';
-      data.status = 'active';
-    } else if (gearType === 'accessory') {
-      data.status = 'active';
-    } else if (gearType === 'filter') {
-      // A custom filter has no AstroBin/SPCC entry, so filterLabel() falls back to
-      // its model — which is what the user typed and expects to see on the badge.
-      data.astrobin_name = null as any;
-      data.spcc_name = null as any;
-      data.series = null as any;
-      data.type ??= 'broadband';
-      data.subtype ??= '';
-      data.mono_osc ??= 'both';
-      data.color ??= '#2850a0';
-      data.status = 'active';
-    }
+    const values: Record<string, string> = {};
+    for (const field of fields) values[field.key] = inputMap.get(field.key)?.value ?? '';
+    const data = buildCustomGearData(gearType, values);
 
     saveBtn.disabled = true;
     saveBtn.textContent = '…';
@@ -820,26 +514,9 @@ export function openManageGearModal(
   addBtn.addEventListener('click', () => {
     backdrop.remove();
     openAddGearModal(gearType, () => {
-      const getList =
-        gearType === 'telescope'
-          ? getTelescopes
-          : gearType === 'camera'
-            ? getCameras
-            : getAccessories;
-      const labelFn =
-        gearType === 'telescope'
-          ? telescopeLabel
-          : gearType === 'camera'
-            ? cameraLabel
-            : accessoryLabel;
-      getList().then((newAll) => {
-        const sorted = sortCustomFirst(newAll as Array<{ id: string }>);
-        const gearWithLabels = sorted.map((g) => ({
-          id: g.id,
-          label: (labelFn as (g: any) => string)(g),
-        }));
-        openManageGearModal(gearType, gearWithLabels, currentHidden, onClose);
-      });
+      void manageGearList(gearType).then((gearWithLabels) =>
+        openManageGearModal(gearType, gearWithLabels, currentHidden, onClose),
+      );
     });
   });
 
@@ -866,13 +543,32 @@ export function openManageGearModal(
   updateCount();
 }
 
+/** Every item of one kind, the user's own first, with the name the manage list shows. */
+async function manageGearList(type: CustomGearType): Promise<Array<{ id: string; label: string }>> {
+  if (type === 'telescope') {
+    return sortCustomFirst(await getTelescopes()).map((g) => ({
+      id: g.id,
+      label: telescopeLabel(g),
+    }));
+  }
+  if (type === 'camera') {
+    return sortCustomFirst(await getCameras()).map((g) => ({ id: g.id, label: cameraLabel(g) }));
+  }
+  if (type === 'accessory') {
+    return sortCustomFirst(await getAccessories()).map((g) => ({
+      id: g.id,
+      label: accessoryLabel(g),
+    }));
+  }
+  return sortCustomFirst(await getFilters()).map((g) => ({ id: g.id, label: filterLabel(g) }));
+}
+
 // ─── Gear section helpers (exported for reuse) ───────────────────────────────
 
 export interface GearSectionPrefs {
   telescopeId: string;
   cameraId: string | null;
   accessoryId: string | null;
-  hiddenGearIds?: string[];
 }
 
 export interface GearSectionCallbacks {
@@ -944,8 +640,6 @@ export function buildGearSectionContent(
     .then(([telescopes, cameras, accessories, filters]) => {
       container.innerHTML = '';
 
-      const hiddenSet = new Set(prefs.hiddenGearIds ?? []);
-
       const fovHintEl = document.createElement('div');
       fovHintEl.className = 'targets-fov-hint';
 
@@ -963,7 +657,11 @@ export function buildGearSectionContent(
       };
 
       // ── Telescope row ────────────────────────────────────────────────────
-      const visibleTelescopes = sortCustomFirst(telescopes).filter((tel) => !hiddenSet.has(tel.id));
+      const visibleTelescopes = visibleGear(
+        sortCustomFirst(telescopes),
+        'telescope',
+        prefs.telescopeId,
+      );
       if (!visibleTelescopes.find((tel) => tel.id === prefs.telescopeId)) {
         callbacks.onPrefsChange({ telescopeId: visibleTelescopes[0]?.id ?? '' });
       }
@@ -1000,16 +698,17 @@ export function buildGearSectionContent(
         openManageGearModal(
           'telescope',
           all,
-          new Set(prefs.hiddenGearIds ?? []),
+          getHiddenGearIds('telescope'),
           (newHidden, deleted) => {
             if (deleted.size > 0) invalidateGearCache('telescope');
+            setHiddenGearIds('telescope', new Set([...newHidden].filter((id) => !deleted.has(id))));
             const visible = sortCustomFirst(telescopes).filter(
               (t) => !newHidden.has(t.id) && !deleted.has(t.id),
             );
             const newTelId = visible.find((t) => t.id === prefs.telescopeId)
               ? prefs.telescopeId
               : (visible[0]?.id ?? '');
-            callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], telescopeId: newTelId });
+            callbacks.onPrefsChange({ telescopeId: newTelId });
             callbacks.onRebuild(container);
           },
         );
@@ -1020,7 +719,7 @@ export function buildGearSectionContent(
       const currentTel = visibleTelescopes.find((t) => t.id === prefs.telescopeId);
       const isSmart = currentTel?.is_smart_telescope ?? false;
 
-      const visibleCameras = sortCustomFirst(cameras).filter((cam) => !hiddenSet.has(cam.id));
+      const visibleCameras = visibleGear(sortCustomFirst(cameras), 'camera', prefs.cameraId);
       if (prefs.cameraId && !visibleCameras.find((c) => c.id === prefs.cameraId)) {
         callbacks.onPrefsChange({ cameraId: visibleCameras[0]?.id ?? null });
       }
@@ -1063,30 +762,28 @@ export function buildGearSectionContent(
           id: cam.id,
           label: cameraLabel(cam),
         }));
-        openManageGearModal(
-          'camera',
-          all,
-          new Set(prefs.hiddenGearIds ?? []),
-          (newHidden, deleted) => {
-            if (deleted.size > 0) invalidateGearCache('camera');
-            const visible = sortCustomFirst(cameras).filter(
-              (c) => !newHidden.has(c.id) && !deleted.has(c.id),
-            );
-            const newCamId =
-              prefs.cameraId && visible.find((c) => c.id === prefs.cameraId)
-                ? prefs.cameraId
-                : (visible[0]?.id ?? null);
-            callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], cameraId: newCamId });
-            callbacks.onRebuild(container);
-          },
-        );
+        openManageGearModal('camera', all, getHiddenGearIds('camera'), (newHidden, deleted) => {
+          if (deleted.size > 0) invalidateGearCache('camera');
+          setHiddenGearIds('camera', new Set([...newHidden].filter((id) => !deleted.has(id))));
+          const visible = sortCustomFirst(cameras).filter(
+            (c) => !newHidden.has(c.id) && !deleted.has(c.id),
+          );
+          const newCamId =
+            prefs.cameraId && visible.find((c) => c.id === prefs.cameraId)
+              ? prefs.cameraId
+              : (visible[0]?.id ?? null);
+          callbacks.onPrefsChange({ cameraId: newCamId });
+          callbacks.onRebuild(container);
+        });
       });
       if (isSmart) camManageBtn.classList.add('hidden');
       container.appendChild(camManageBtn);
 
       // ── Accessory row ────────────────────────────────────────────────────
-      const visibleAccessories = sortCustomFirst(accessories).filter(
-        (acc) => !hiddenSet.has(acc.id),
+      const visibleAccessories = visibleGear(
+        sortCustomFirst(accessories),
+        'accessory',
+        prefs.accessoryId,
       );
       if (prefs.accessoryId && !visibleAccessories.find((a) => a.id === prefs.accessoryId)) {
         callbacks.onPrefsChange({ accessoryId: null });
@@ -1127,9 +824,10 @@ export function buildGearSectionContent(
         openManageGearModal(
           'accessory',
           all,
-          new Set(prefs.hiddenGearIds ?? []),
+          getHiddenGearIds('accessory'),
           (newHidden, deleted) => {
             if (deleted.size > 0) invalidateGearCache('accessory');
+            setHiddenGearIds('accessory', new Set([...newHidden].filter((id) => !deleted.has(id))));
             const visible = sortCustomFirst(accessories).filter(
               (a) => !newHidden.has(a.id) && !deleted.has(a.id),
             );
@@ -1137,7 +835,7 @@ export function buildGearSectionContent(
               prefs.accessoryId && visible.find((a) => a.id === prefs.accessoryId)
                 ? prefs.accessoryId
                 : null;
-            callbacks.onPrefsChange({ hiddenGearIds: [...newHidden], accessoryId: newAccId });
+            callbacks.onPrefsChange({ accessoryId: newAccId });
             callbacks.onRebuild(container);
           },
         );
@@ -1148,13 +846,12 @@ export function buildGearSectionContent(
       // ── Filters ──────────────────────────────────────────────────────────
       // No select: unlike the three above, a filter is not part of the rig — it is
       // picked per integration row / observation window. This button only curates
-      // WHICH filters those autocompletes offer, so its hidden set lives in
-      // gear-catalog (localStorage), not in the Targets prefs.
+      // WHICH filters those autocompletes offer.
       const filtersManageBtn = buildAddButton(t('targets.gear.manageFilter'), () => {
         const all = sortCustomFirst(filters).map((f) => ({ id: f.id, label: filterLabel(f) }));
-        openManageGearModal('filter', all, getHiddenFilterIds(), (newHidden, deleted) => {
+        openManageGearModal('filter', all, getHiddenGearIds('filter'), (newHidden, deleted) => {
           if (deleted.size > 0) invalidateGearCache('filter');
-          setHiddenFilterIds(new Set([...newHidden].filter((id) => !deleted.has(id))));
+          setHiddenGearIds('filter', new Set([...newHidden].filter((id) => !deleted.has(id))));
           callbacks.onRebuild(container);
         });
       });

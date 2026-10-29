@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
+import { setHiddenGearIds } from '@myastrosky/core/gear-catalog';
 import type { AccessoryData, CameraData, TelescopeData } from '@myastrosky/core/gear-catalog';
 import {
   canSaveSetup,
@@ -42,6 +44,8 @@ const telescopes = [
 const cameras = [cam('c1'), cam('cs')];
 
 describe('setup gear rules', () => {
+  beforeEach(() => configureStorage(createMemoryStore()));
+
   it('fills a new choice with the first telescope and camera', () => {
     expect(
       reconcileSetupGear(
@@ -54,6 +58,23 @@ describe('setup gear rules', () => {
       cameraId: 'c1',
       accessoryId: null,
     });
+  });
+
+  it('fills a new choice with the first telescope and camera left ticked, and keeps a hidden built-in camera', () => {
+    setHiddenGearIds('telescope', new Set(['t1']));
+    setHiddenGearIds('camera', new Set(['c1', 'cs']));
+    expect(
+      reconcileSetupGear({ telescopeId: '', cameraId: null, accessoryId: null }, telescopes, [
+        ...cameras,
+        cam('c2'),
+      ]),
+    ).toEqual({ telescopeId: 'smart', cameraId: 'cs', accessoryId: null });
+    expect(
+      reconcileSetupGear({ telescopeId: 't1', cameraId: null, accessoryId: null }, telescopes, [
+        ...cameras,
+        cam('c2'),
+      ]).cameraId,
+    ).toBe('c2');
   });
 
   it('pins the integrated camera of a smart telescope and drops its accessory', () => {

@@ -4,6 +4,7 @@
  */
 import {
   resolveSetupCamera,
+  visibleGear,
   type AccessoryData,
   type CameraData,
   type TelescopeData,
@@ -16,18 +17,21 @@ export interface SetupGearChoice {
 }
 
 /**
- * A choice made complete: with no telescope the first one of the catalogue; a smart telescope's sealed-in sensor
- * always wins as the camera (see `resolveSetupCamera`); with no camera at all the first one of the catalogue.
+ * A choice made complete: with no telescope the first one of the catalogue left ticked in "Gérer les télescopes"; a
+ * smart telescope's sealed-in sensor always wins as the camera (see `resolveSetupCamera`), hidden or not; with no
+ * camera at all the first one left ticked. When every item is hidden, the first one of the catalogue.
  */
 export function reconcileSetupGear(
   choice: SetupGearChoice,
   telescopes: readonly TelescopeData[],
   cameras: readonly CameraData[],
 ): SetupGearChoice {
-  const telescopeId = choice.telescopeId || telescopes[0]?.id || '';
+  const firstTelescope = visibleGear([...telescopes], 'telescope')[0] ?? telescopes[0];
+  const firstCamera = visibleGear([...cameras], 'camera')[0] ?? cameras[0];
+  const telescopeId = choice.telescopeId || firstTelescope?.id || '';
   const tel = telescopes.find((t) => t.id === telescopeId);
   const resolved = tel ? resolveSetupCamera(tel, [...cameras], choice.cameraId) : null;
-  const cameraId = resolved?.id ?? (choice.cameraId || cameras[0]?.id || null);
+  const cameraId = resolved?.id ?? (choice.cameraId || firstCamera?.id || null);
   return { telescopeId, cameraId, accessoryId: choice.accessoryId };
 }
 

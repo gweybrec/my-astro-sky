@@ -275,21 +275,27 @@ export function catalogFilterColor(name: string): string | null {
   return resolveCatalogFilter(name)?.color ?? null;
 }
 
-// ─── Owned-filter selection ───────────────────────────────────────────────────
+// ─── Owned-gear selection ─────────────────────────────────────────────────────
 
 /**
- * Ids of catalog filters the user has hidden in the Filters manage modal, i.e.
- * the ones they do not own. Hidden filters are excluded from the integration-row
- * and observation-window autocompletes.
+ * Ids of catalog items the user has unticked in a "Gérer …" list, i.e. the ones
+ * they do not own. Hidden telescopes, cameras and accessories are left out of the
+ * setup pickers; hidden filters out of the integration-row and observation-window
+ * autocompletes.
  *
  * Kept here rather than in the Targets prefs because the photo metadata editors
- * need it too, and they live outside the Targets subsystem.
+ * need the filters too, and they live outside the Targets subsystem.
  */
-const HIDDEN_FILTERS_KEY = 'myastrosky-hidden-filter-ids';
+const HIDDEN_GEAR_KEYS: Record<CustomGearType, string> = {
+  telescope: 'myastrosky-hidden-telescope-ids',
+  camera: 'myastrosky-hidden-camera-ids',
+  accessory: 'myastrosky-hidden-accessory-ids',
+  filter: 'myastrosky-hidden-filter-ids',
+};
 
-export function getHiddenFilterIds(): Set<string> {
+export function getHiddenGearIds(type: CustomGearType): Set<string> {
   try {
-    const raw = storage().get(HIDDEN_FILTERS_KEY);
+    const raw = storage().get(HIDDEN_GEAR_KEYS[type]);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? new Set(parsed.filter((v) => typeof v === 'string')) : new Set();
@@ -298,13 +304,26 @@ export function getHiddenFilterIds(): Set<string> {
   }
 }
 
-export function setHiddenFilterIds(ids: Set<string>): void {
-  storage().set(HIDDEN_FILTERS_KEY, JSON.stringify([...ids]));
+export function setHiddenGearIds(type: CustomGearType, ids: Set<string>): void {
+  storage().set(HIDDEN_GEAR_KEYS[type], JSON.stringify([...ids]));
+}
+
+/**
+ * The items a setup picker offers: the list minus the hidden ones, except `keepId`
+ * (the setup's current choice), which stays so that opening a setup never changes it.
+ */
+export function visibleGear<T extends { id: string }>(
+  list: T[],
+  type: CustomGearType,
+  keepId?: string | null,
+): T[] {
+  const hidden = getHiddenGearIds(type);
+  return list.filter((g) => !hidden.has(g.id) || g.id === keepId);
 }
 
 /** The filters offered in autocompletes: catalog minus the ones the user hid. */
 export function getVisibleFilters(): FilterData[] {
-  const hidden = getHiddenFilterIds();
+  const hidden = getHiddenGearIds('filter');
   return getFiltersSync().filter((f) => !hidden.has(f.id));
 }
 
