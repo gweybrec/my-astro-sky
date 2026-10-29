@@ -25,7 +25,8 @@ import {
   isBelowHorizonCached,
 } from '@myastrosky/core/projection';
 import { altAzFromRaDec } from '@myastrosky/core/sky-geometry';
-import { getStars } from '@myastrosky/core/catalog/star-registry';
+import type { Star } from '@myastrosky/core/types';
+import { getStars, getStarByHip } from '@myastrosky/core/catalog/star-registry';
 import { starFaintLimitAt } from '@myastrosky/core/star-budget';
 import { starRadius, computeStarPaint } from '@myastrosky/core/star-render-math';
 import { paintStar, buildStarSprite } from './star-draw';
@@ -84,18 +85,23 @@ export function renderStars(s: SkyScene): void {
   const atlas = s.atlas.beginFrame(view.scale, maxMag, s.interacting);
 
   for (const star of stars) {
-    // Always include the highlighted star.
-    const isHighlighted = s.highlightedStar === star.hip;
+    // `stars` is sorted brightest first, so every star from here on is past the cutoff
+    // too: stop rather than skip each one. Skipping walked the whole ~118k catalog every
+    // frame, which was the largest cost of a frame on the phone.
+    if (star.mag > maxMag) break;
 
-    if (!isHighlighted) {
-      if (star.mag > maxMag) continue;
-      if (s.localSkyMode) {
-        // Below-horizon stars are already hidden by the horizon-circle canvas
-        // clip; this just skips the projection/bbox work for them earlier.
-        if (s.horizon && isBelowHorizonCached(star, s.horizon.lstH, s.horizon.latDeg)) continue;
-      } else if (outsideDecPrefilter(s, star.dec)) {
-        continue;
-      }
+    // The highlighted star skips the gates below; a fainter one is drawn after the loop.
+    if (s.highlightedStar === star.hip) {
+      drawHighlightedStar(s, star, maxMag);
+      continue;
+    }
+
+    if (s.localSkyMode) {
+      // Below-horizon stars are already hidden by the horizon-circle canvas
+      // clip; this just skips the projection/bbox work for them earlier.
+      if (s.horizon && isBelowHorizonCached(star, s.horizon.lstH, s.horizon.latDeg)) continue;
+    } else if (outsideDecPrefilter(s, star.dec)) {
+      continue;
     }
 
     projectCached(star);
@@ -103,7 +109,7 @@ export function renderStars(s: SkyScene): void {
     // Area-weighted per-position gate: thin the crowded centre, keep the naked-eye
     // floor everywhere, allow fainter fill toward the edge. Runs after projecting so
     // it can read the local area factor from the cached _px/_py.
-    if (!isHighlighted && star.mag > starFaintLimitAt(star._px!, star._py!, sb)) {
+    if (star.mag > starFaintLimitAt(star._px!, star._py!, sb)) {
       continue;
     }
 
@@ -115,31 +121,17 @@ export function renderStars(s: SkyScene): void {
     }
 
     // Below-horizon stars are dimmed (not hidden) in date mode, once a location is set.
-    // The highlighted star stays at full brightness regardless (it's actively selected).
     ctx.globalAlpha =
-      s.horizon && !isHighlighted && isBelowHorizonCached(star, s.horizon.lstH, s.horizon.latDeg)
+      s.horizon && isBelowHorizonCached(star, s.horizon.lstH, s.horizon.latDeg)
         ? s.belowHorizonAlpha
         : 1;
-
-    if (isHighlighted) {
-      // Drawn live (not via the atlas): rare, uses estab=1, and gets a ring.
-      const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, true);
-      paintStar(ctx, c.x, c.y, paint);
-      ctx.strokeStyle = HIGHLIGHT_RING.color;
-      ctx.lineWidth = HIGHLIGHT_RING.lineWidth;
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, paint.radius + HIGHLIGHT_RING.padPx, 0, Math.PI * 2);
-      ctx.stroke();
-      continue;
-    }
 
     // Glow halos (bright stars, mag < glowThresholdMag) are a soft radial gradient
     // several times the dot's radius — the 1.3x atlas drift bound (imperceptible on
     // small solid dots) is visibly blurry on them. Only ~321 stars catalog-wide are
     // glow-eligible, so draw them live at the true zoom scale during the drift window
     // instead of blitting the frozen/scaled sprite — same treatment as the highlighted
-    // star above, gated to the exact frames (atlas.frozen) where the blur would show.
+    // star, gated to the exact frames (atlas.frozen) where the blur would show.
     if (atlas.frozen && star.mag < theme.glowThresholdMag) {
       const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, false);
       paintStar(ctx, c.x, c.y, paint);
@@ -164,7 +156,33 @@ export function renderStars(s: SkyScene): void {
     }
   }
 
+  if (s.highlightedStar !== null) {
+    const star = getStarByHip(s.highlightedStar);
+    if (star && star.mag > maxMag) drawHighlightedStar(s, star, maxMag);
+  }
+
   ctx.globalAlpha = prevAlpha;
+}
+
+/**
+ * The highlighted star, drawn live (not via the atlas): rare, uses estab=1, stays at
+ * full brightness below the horizon (it's actively selected), and gets a ring.
+ */
+function drawHighlightedStar(s: SkyScene, star: Star, maxMag: number): void {
+  const { ctx, view, theme } = s;
+  projectCached(star);
+  const c = toCanvas(star._px!, star._py!, view);
+  if (c.x < -20 || c.x > view.width + 20 || c.y < -20 || c.y > view.height + 20) return;
+
+  ctx.globalAlpha = 1;
+  const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, true);
+  paintStar(ctx, c.x, c.y, paint);
+  ctx.strokeStyle = HIGHLIGHT_RING.color;
+  ctx.lineWidth = HIGHLIGHT_RING.lineWidth;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, paint.radius + HIGHLIGHT_RING.padPx, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 export function renderStarLabels(s: SkyScene): void {

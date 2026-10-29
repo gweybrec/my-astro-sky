@@ -243,6 +243,43 @@ The `spatial-index.ts` query loops also clamp to the index's populated cell boun
 general safety net (and a real win for any _compactly_-populated index, e.g. the hover
 hit-test indices) — but it is the query cap above, not the clamp, that fixes this symptom.
 
+### Addendum — stop a sorted scan at the cutoff, don't skip to the end
+
+`renderStars` (`packages/render/src/sky-scene-render.ts`) filtered on magnitude first,
+`if (star.mag > maxMag) continue`, over the whole catalog: **~118k stars every frame**,
+of which a few thousand pass. The catalog is already sorted brightest first
+(`star-registry.ts`), so every star after the first one past `maxMag` fails too. The
+loop now `break`s there. The highlighted star used to bypass the gate inside the loop; a
+highlighted star fainter than the cutoff now lies past the stop, so it is drawn after the
+loop (`drawHighlightedStar`).
+
+On the desktop the skipped iterations cost little, but on a phone (Samsung A16, Android
+WebView) the loop's own time was **40% of active CPU** in a pan trace, and the star pass
+65% inclusive (~31 ms of a ~48 ms frame). After the change the star pass is ~1.6 ms per
+frame.
+
+**A/B on the phone** (app restarted, identical scripted pan, three runs each):
+
+| View                       | Before   | After        |
+| -------------------------- | -------- | ------------ |
+| Default (zoomed out)       | 56–59 ms | **40–44 ms** |
+| Zoomed in (25 wheel steps) | ~43 ms   | ~43 ms       |
+
+Zoomed in, frame time did not move: there the frame is held by something other than the
+star loop. Zoomed out, the trace after the fix is led by `SpatialIndex.collect` (59% of
+active CPU) and DSO selection (15%): at the phone's default full-sky view the query box
+spans ~250 × 250 mostly empty 0.02-unit cells and returns nearly the whole DSO catalog.
+That is the next item for the phone.
+
+> **Pattern.** When a list is sorted by the key you gate on, the gate is a stopping point,
+> not a filter. Any "always include X" exception that rides along in the loop must move
+> out of it, or it disappears with the tail.
+
+To record a trace on the phone, use
+`.claude/skills/mobile-device-test/scripts/record-trace.mjs` (the DevTools window opened
+from `chrome://inspect` does not save traces); the profile-performance skill's
+`parse-trace.mjs` reads it unchanged.
+
 ---
 
 ## Results
