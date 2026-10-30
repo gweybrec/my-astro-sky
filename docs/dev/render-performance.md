@@ -94,6 +94,30 @@ The key is realising the sprite's shape is a pure function of a few quantised in
 
 A useful side-effect: factoring the draw into `computeStarPaint(...)` (pure, returns the resolved scalars) + `paintStar(ctx, x, y, paint)` made the same code serve both the sprite builder and the rare live-drawn highlighted star, so the cached and uncached paths can't visually drift.
 
+### Addendum — DSO gradient fills cost the GPU, not the CPU
+
+Panning the desktop zoomed out (1600×900, ~1,500 DSO markers) ran at ~48 ms a frame while
+the main thread sat idle 40% of the time: the GPU process's main thread was busy 90% of
+the trace. Each marker's body was a fresh radial-gradient `fill`. Reusing one
+`CanvasGradient` per size did not help; the cost is drawing a gradient-filled path, not
+building the gradient.
+
+`drawDsoMarker` (`packages/render/src/dso-draw.ts`) now draws each style's gradient once
+on a disc that fills a square canvas (8 to 256 px, a power of two at least the marker's
+size) and stretches it over the body with `drawImage`, which is what the gradient did
+under `scale(1, ry/rx)`. The live gradient stays where a picture would differ: a fill
+whose edge is not transparent (the supernova-remnant rim; resampling softens a visible
+edge), a gradient reaching past the body (`radiusMode: 'max'` with `ry > rx`), and
+markers over 256 px. A one-colour fill (PS) is a plain colour. On a black sky the
+largest pixel difference is 13/255 on 3×2 px markers and ≤ 2 from 9 px up.
+
+| Desktop, zoomed out, pan (Intel UHD 630) | Before | After      |
+| ---------------------------------------- | ------ | ---------- |
+| Median frame                             | ~48 ms | **~32 ms** |
+
+> **Pattern.** When the main thread idles but frames are slow, sum busy time per thread
+> in the trace (`CrGpuMain` / `GPUTask`): `parse-trace.mjs` only sees the page's thread.
+
 ---
 
 ## Technique 3 — Throttle and coalesce event-driven work
@@ -353,6 +377,27 @@ which every cell lookup used to build.
 
 > **Pattern.** A sorted-order stop and a spatial cull combine: sort within each cell and
 > stop per cell. And build a large index when idle, not on the frame that first needs it.
+
+### Addendum — local sky: the terrain, not the stars
+
+Local sky panned at ~21 ms a frame on the phone, zoomed out and zoomed in alike, so the
+star walk was not the cost. A trace put 30% of the frame in the terrain bands
+(`fillSilhouetteBand`, `packages/render/src/sky-draw.ts`): each frame, for each distance
+layer, 180 azimuth steps of altitude lookup, alt/az → RA/Dec → `project` and `toCanvas`.
+
+In local sky an alt/az point keeps its projected position while the view pans, zooms or
+turns: only the sky time, the latitude or the projection move it. Each band is now a
+`Path2D` in projection units, cached on its altitude array with those three as the key,
+and filled under the affine transform that `toCanvas` applies (the base-darkening
+gradient is defined in projection units too).
+
+| Phone, local sky, pan (same script, three runs) | Before | After         |
+| ----------------------------------------------- | ------ | ------------- |
+| Zoomed out                                      | ~21 ms | **~13 ms**    |
+| Zoomed in (25 wheel steps)                      | ~21 ms | **~13–14 ms** |
+
+> **Pattern.** Geometry that only a slow-changing input moves belongs in a cached
+> `Path2D` in model units; the per-frame view goes into `ctx.transform`.
 
 ---
 

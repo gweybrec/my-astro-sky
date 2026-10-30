@@ -12,6 +12,7 @@ import {
   toCanvas,
   getHemisphere,
   getCenterMode,
+  getProjectionGeneration,
   zenithHorizonCrossing,
 } from '@myastrosky/core/projection';
 import {
@@ -455,53 +456,101 @@ function silProjPt(altDeg: number, azDeg: number, lstH: number, latDeg: number):
   return p.x >= 1e5 ? null : p;
 }
 
+/** A silhouette's ground band in projection units, and the sky it was built for. */
+interface BandPath {
+  path: Path2D;
+  lstH: number;
+  latDeg: number;
+  gen: number;
+}
+/** Ground bands by the altitude array they trace (a profile's or a layer's `alts`). */
+const bandPaths = new WeakMap<number[], BandPath>();
+
 /**
- * Fill the ground band from a silhouette (given by `altAt`) down to the alt=0 rim,
- * as a strip of small per-azimuth quads. Zenith-mode only: the astronomical horizon
- * is exactly the unit circle (r = 1) around the origin and the silhouette at a given
- * azimuth lies on the same radial ray, so the rim point is the silhouette point
- * scaled out to r = 1 (never calls project(alt=0), whose round-trip is unstable at
- * the rim). Many locally-wound quads avoid the fill-side inversion a single
- * silhouette-to-rim polygon suffered.
+ * The ground band from a silhouette down to the alt=0 rim, in projection units, as a
+ * strip of small per-azimuth quads. Zenith-mode only: the astronomical horizon is
+ * exactly the unit circle (r = 1) around the origin and the silhouette at a given
+ * azimuth lies on the same radial ray, so the rim point is the silhouette point scaled
+ * out to r = 1 (never calls project(alt=0), whose round-trip is unstable at the rim).
+ * Many locally-wound quads avoid the fill-side inversion a single silhouette-to-rim
+ * polygon suffered. Panning and zooming do not move the band in projection units, so it
+ * is rebuilt only when the sky time, the latitude or the projection changes: building it
+ * every frame was ~7 ms of a ~23 ms local-sky frame on a phone.
  */
-function fillSilhouetteBand(
-  ctx: CanvasRenderingContext2D,
-  view: ViewState,
+function silhouetteBandPath(
+  alts: number[],
+  azStepDeg: number,
   lstH: number,
   latDeg: number,
-  altAt: (azDeg: number) => number,
-  color: string | CanvasGradient,
-  overlay?: string | CanvasGradient,
-): void {
-  ctx.beginPath();
+): Path2D {
+  const gen = getProjectionGeneration();
+  const cached = bandPaths.get(alts);
+  if (cached && cached.lstH === lstH && cached.latDeg === latDeg && cached.gen === gen) {
+    return cached.path;
+  }
+  const path = new Path2D();
   for (let az = 0; az < 360; az += ALTAZ_STEP_DEG) {
     const az2 = az + ALTAZ_STEP_DEG;
     // Clamp to the horizon: where terrain dips below alt=0 the wedge collapses (nothing filled).
-    const a1 = Math.max(0, altAt(az));
-    const a2 = Math.max(0, altAt(az2));
+    const a1 = Math.max(0, sampleDenseAz(alts, azStepDeg, az));
+    const a2 = Math.max(0, sampleDenseAz(alts, azStepDeg, az2));
     if (a1 <= 0 && a2 <= 0) continue;
     const p1 = silProjPt(a1, az, lstH, latDeg);
     const p2 = silProjPt(a2, az2, lstH, latDeg);
     if (!p1 || !p2) continue;
     const r1 = Math.hypot(p1.x, p1.y) || 1e-6;
     const r2 = Math.hypot(p2.x, p2.y) || 1e-6;
-    const s1 = toCanvas(p1.x, p1.y, view);
-    const s2 = toCanvas(p2.x, p2.y, view);
-    const rim1 = toCanvas(p1.x / r1, p1.y / r1, view); // same ray, scaled to r=1
-    const rim2 = toCanvas(p2.x / r2, p2.y / r2, view);
-    ctx.moveTo(s1.x, s1.y);
-    ctx.lineTo(s2.x, s2.y);
-    ctx.lineTo(rim2.x, rim2.y);
-    ctx.lineTo(rim1.x, rim1.y);
-    ctx.closePath();
+    path.moveTo(p1.x, p1.y);
+    path.lineTo(p2.x, p2.y);
+    path.lineTo(p2.x / r2, p2.y / r2); // same ray, scaled to r=1
+    path.lineTo(p1.x / r1, p1.y / r1);
+    path.closePath();
   }
+  bandPaths.set(alts, { path, lstH, latDeg, gen });
+  return path;
+}
+
+/**
+ * Sets the transform that draws projection units where toCanvas() puts them (on top of
+ * the context's own, e.g. the device-pixel scale).
+ */
+function transformToCanvas(ctx: CanvasRenderingContext2D, view: ViewState): void {
+  const theta = view.rotationDeg * DEG2RAD;
+  const a = view.scale * Math.cos(theta);
+  const b = -view.scale * Math.sin(theta);
+  // toCanvas: x = w/2 + a·(px − cx) + b·(py − cy), y = h/2 + b·(px − cx) − a·(py − cy).
+  ctx.transform(
+    a,
+    b,
+    b,
+    -a,
+    view.width / 2 - a * view.centerX - b * view.centerY,
+    view.height / 2 - b * view.centerX + a * view.centerY,
+  );
+}
+
+/** Fill the ground band of a silhouette (see silhouetteBandPath), then `overlay` over it. */
+function fillSilhouetteBand(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  lstH: number,
+  latDeg: number,
+  alts: number[],
+  azStepDeg: number,
+  color: string | CanvasGradient,
+  overlay?: string | CanvasGradient,
+): void {
+  const path = silhouetteBandPath(alts, azStepDeg, lstH, latDeg);
+  ctx.save();
+  transformToCanvas(ctx, view);
   ctx.fillStyle = color;
-  ctx.fill();
+  ctx.fill(path);
   // Optional overlay (e.g. the base-darkening form gradient) over the same path.
   if (overlay) {
     ctx.fillStyle = overlay;
-    ctx.fill();
+    ctx.fill(path);
   }
+  ctx.restore();
 }
 
 /** Stroke a silhouette line (given by `altAt`), pen-lifted at off-projection points. Both modes. */
@@ -565,18 +614,10 @@ export function drawMountainHorizon(
   if (zenith && layers && layers.length > 1) {
     const n = layers.length;
     // Base-darkening gradient: transparent toward the zenith, dark at the alt=0 rim,
-    // so each terrain mass gets a little body. Radial from the disc origin; reused for
+    // so each terrain mass gets a little body. Radial from the disc origin, in the
+    // projection units the bands are filled in (r = 1 is the horizon); reused for
     // every band and clipped to the band path so it never touches the sky.
-    const origin = toCanvas(0, 0, view);
-    const rimR = view.scale; // r = 1 (horizon) in projection units → px
-    const formShadow = ctx.createRadialGradient(
-      origin.x,
-      origin.y,
-      rimR * 0.4,
-      origin.x,
-      origin.y,
-      rimR,
-    );
+    const formShadow = ctx.createRadialGradient(0, 0, 0.4, 0, 0, 1);
     formShadow.addColorStop(0, 'rgba(0, 0, 0, 0)');
     formShadow.addColorStop(1, MOUNTAIN_HORIZON.formShadow);
 
@@ -584,14 +625,25 @@ export function drawMountainHorizon(
     for (let i = n - 1; i >= 0; i--) {
       const t = i / (n - 1);
       const color = lerpColor(MOUNTAIN_HORIZON.groundNear, MOUNTAIN_HORIZON.groundFar, t);
-      fillSilhouetteBand(ctx, view, lstH, latDeg, altOf(layers[i].alts), color, formShadow);
+      const { alts } = layers[i];
+      fillSilhouetteBand(ctx, view, lstH, latDeg, alts, profile.azStepDeg, color, formShadow);
     }
     return;
   }
 
   // Fallback: single silhouette (imported/manual/no-layers, or stereo mode).
   const altFull = altOf(profile.alts);
-  if (zenith) fillSilhouetteBand(ctx, view, lstH, latDeg, altFull, MOUNTAIN_HORIZON.fill);
+  if (zenith) {
+    fillSilhouetteBand(
+      ctx,
+      view,
+      lstH,
+      latDeg,
+      profile.alts,
+      profile.azStepDeg,
+      MOUNTAIN_HORIZON.fill,
+    );
+  }
   strokeSilhouette(
     ctx,
     view,
