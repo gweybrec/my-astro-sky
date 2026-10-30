@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -242,14 +242,18 @@ function openPicker(kind: 'telescope' | 'camera' | 'accessory') {
 }
 
 /** The sheet opens with the ticked item in view (board "Équipement, choisir un télescope"); the sheet's content exists a moment after it opens. */
+let scrollTimer: ReturnType<typeof setTimeout> | undefined;
 function scrollToPicked(tries = 20) {
+  scrollTimer = undefined;
   const tick = document.querySelector('.mob-sheet-modal .mob-sheet-body .mob-status--success');
   if (tick) {
     tick.scrollIntoView({ block: 'center' });
   } else if (tries > 0) {
-    setTimeout(() => scrollToPicked(tries - 1), 50);
+    scrollTimer = setTimeout(() => scrollToPicked(tries - 1), 50);
   }
 }
+// The page can close before the sheet's content shows: stop looking for it then.
+onBeforeUnmount(() => clearTimeout(scrollTimer));
 
 function pick(id: string | null) {
   if (picker.value === 'telescope') {

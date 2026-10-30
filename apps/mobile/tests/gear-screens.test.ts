@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
@@ -88,6 +88,9 @@ async function open(component: object, path: string) {
 const boxes = (w: ReturnType<typeof mount>) => w.findAll('[role="checkbox"]');
 const button = (w: ReturnType<typeof mount>, text: string) =>
   w.findAll('button').find((b) => b.text() === text || b.attributes('aria-label') === text)!;
+
+// Unmount each test's pages, so their timers stop with them.
+enableAutoUnmount(afterEach);
 
 beforeEach(() => {
   localStorage.setItem('lang', 'fr');
