@@ -300,6 +300,10 @@ async function reloadPhotos() {
   const photos = await getPhotos();
   const { overlay, gallery, skyMap } = useCanvasStore(pinia);
   overlay?.loadPhotos(photos);
+  // loadPhotos skips the photos already on the map: give those their new data (a medium copy, a repaired size) and
+  // place them again, so they show the picture that now suits them.
+  overlay?.updatePhotosData(photos);
+  overlay?.updateTransforms();
   gallery?.loadPhotos(photos);
   if (overlay && skyMap) {
     skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));

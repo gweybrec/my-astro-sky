@@ -218,7 +218,7 @@ describe('PhotoLayer', () => {
         await new Promise((r) => setTimeout(r, 0));
         return img.getAttribute('src');
       };
-      return { img, shownAt };
+      return { img, shownAt, layer };
     };
     afterEach(() => vi.unstubAllGlobals());
 
@@ -255,6 +255,25 @@ describe('PhotoLayer', () => {
     it('without a copy, loads the full picture while moving as at rest, not the stretched thumbnail', async () => {
       const { shownAt } = setUp({ medium: false });
       expect(await shownAt(10000, true)).toBe('/files/big.jpg');
+    });
+
+    it('shows the copy made after it was placed, once given its new data', async () => {
+      const { layer, shownAt } = setUp({ medium: false });
+      expect(await shownAt(2500)).toBe('/files/big.jpg'); // no copy yet: 1000 px wants the full picture
+      const [placed] = layer.getPlacedPhotos();
+      layer.updatePhotosData([{ ...placed.photo, mediumFilename: 'big-medium.jpg' }]);
+      expect(await shownAt(2500)).toBe('/files/big-medium.jpg');
+    });
+
+    it('places a photo with its new data when its picture finishes loading', async () => {
+      const { img, layer, shownAt } = setUp({ medium: false });
+      expect(await shownAt(10)).toBe('/files/big-thumb.jpg');
+      const [placed] = layer.getPlacedPhotos();
+      layer.updatePhotosData([{ ...placed.photo, mediumFilename: 'big-medium.jpg' }]);
+      await shownAt(2500, true); // moving: 1000 px wants the copy
+      img.onload?.(new Event('load'));
+      await new Promise((r) => setTimeout(r, 0));
+      expect(img.getAttribute('src')).toBe('/files/big-medium.jpg');
     });
 
     it('counts the screen pixels, not the page pixels', async () => {

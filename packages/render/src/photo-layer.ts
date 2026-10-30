@@ -570,6 +570,10 @@ export class PhotoLayer {
     };
 
     img.onload = () => {
+      // The photo as the map has it now: updatePhotosData replaces its entry (a medium copy made since, a repaired
+      // size), and placed from the old one it would choose its picture without the copy.
+      const live = this.placedPhotos.find((p) => p.imgEl === img) ?? placed;
+      const { photo } = live;
       // Only validate dimensions for the full-resolution image. The LOD swap loads a 400px
       // thumbnail (server/index.ts) which is intentionally smaller, so assert dims only when
       // the currently loaded src is the full image.
@@ -583,7 +587,7 @@ export class PhotoLayer {
       }
 
       img.style.visibility = 'visible';
-      this.applyTransform(placed, this.getView());
+      this.applyTransform(live, this.getView());
     };
     return placed;
   }
