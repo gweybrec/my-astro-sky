@@ -85,4 +85,22 @@ describe('renderStars: the position index draws what the catalog walk draws', ()
       setHemisphere('north');
     });
   }
+
+  it('draws stars of equal magnitude in catalog order', () => {
+    // The real catalogue's magnitudes have two decimals, so many stars share one; rounding keeps the list sorted.
+    const exact = stars.map((s) => s.mag);
+    for (const s of stars) s.mag = Math.round(s.mag * 10) / 10;
+    try {
+      for (const scale of [600, 2500])
+        for (const [centerX, centerY] of [
+          [0, 0],
+          [0.3, -0.5],
+        ]) {
+          const view = { centerX, centerY, scale, rotationDeg: 0, width: 400, height: 700 };
+          expect(drawn(view, 'grid', null)).toEqual(drawn(view, 'catalog', null));
+        }
+    } finally {
+      stars.forEach((s, i) => (s.mag = exact[i]));
+    }
+  });
 });

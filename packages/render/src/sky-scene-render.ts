@@ -71,8 +71,12 @@ const STAR_CELL_SIZE = 0.02;
 /** Stars projected farther from the origin are never drawn (the border is within ~4 units); they stay out of the index. */
 const STAR_INDEX_MAX_R = 20;
 
-/** The catalog stars by projected position, each cell brightest first; rebuilt when the projection or catalog changes. */
-const starIndex = new SpatialIndex<Star>(STAR_CELL_SIZE);
+/**
+ * The catalog stars by projected position, as their rank in getStars() (brightest first), each cell brightest first;
+ * rebuilt when the projection or catalog changes. Ranks, not stars: the cutoff is a rank, and the stars found are put
+ * back in catalog order by a numeric sort.
+ */
+const starIndex = new SpatialIndex<number>(STAR_CELL_SIZE);
 let starIndexGen = NaN;
 let starIndexOf: readonly Star[] | null = null;
 
@@ -87,17 +91,25 @@ function starsInView(s: SkyScene, maxMag: number): Star[] | null {
   if (s.starSearch === 'catalog' || (s.localSkyMode && s.starSearch !== 'grid')) return null;
   const { view } = s;
   const radius = Math.hypot(view.width / 2 + 20, view.height / 2 + 20) / view.scale;
+  // The stars no fainter than maxMag are exactly the ranks below `cut` (both lists are brightest first).
+  const cut = countAtMost(s.starBudget.mags, maxMag);
   if (s.starSearch !== 'grid') {
     const cells = ((2 * radius) / STAR_CELL_SIZE + 1) ** 2;
-    if (cells >= countAtMost(s.starBudget.mags, maxMag)) {
+    if (cells >= cut) {
       buildStarIndexWhenIdle();
       return null;
     }
   }
   ensureStarIndex();
-  return starIndex
-    .collectUntil(view.centerX, view.centerY, radius, (star) => star.mag > maxMag)
-    .sort((a, b) => a.mag - b.mag);
+  // A numeric sort of the ranks: sorting the stars by magnitude with a comparator was 7–23% of a frame on a phone,
+  // at the highest star density.
+  const ranks = Int32Array.from(
+    starIndex.collectUntil(view.centerX, view.centerY, radius, (rank) => rank >= cut),
+  ).sort();
+  const stars = getStars();
+  const out = new Array<Star>(ranks.length);
+  for (let i = 0; i < ranks.length; i++) out[i] = stars[ranks[i]];
+  return out;
 }
 
 /** Builds the star index when the projection or the catalog changed since it was built (~200 ms on a phone). */
@@ -107,10 +119,11 @@ function ensureStarIndex(): void {
   if (starIndexGen === gen && starIndexOf === stars) return;
   starIndex.clear();
   const r2 = STAR_INDEX_MAX_R * STAR_INDEX_MAX_R;
-  for (const star of stars) {
+  for (let rank = 0; rank < stars.length; rank++) {
+    const star = stars[rank];
     projectCached(star);
     if (star._px! * star._px! + star._py! * star._py! < r2) {
-      starIndex.insert(star, star._px!, star._py!);
+      starIndex.insert(rank, star._px!, star._py!);
     }
   }
   starIndexGen = gen;

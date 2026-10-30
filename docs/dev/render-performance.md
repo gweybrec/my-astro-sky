@@ -355,7 +355,10 @@ The magnitude stop only helps while the cutoff is bright. The cutoff count grows
 `SpatialIndex` by projected position. They are inserted brightest first, so each cell
 stays sorted, and `SpatialIndex.collectUntil` stops reading a cell at its first star past
 the cutoff. The query is the view's half-diagonal plus the 20 px off-screen margin; the
-result is sorted by magnitude so stars draw in the same order as the catalogue walk. As
+result is put back in catalogue order so stars draw in the same order as the catalogue walk.
+The index holds each star's rank in `getStars()`, not the star: the cutoff is then a rank,
+and the order a numeric sort of an `Int32Array`. Sorting the stars with a magnitude
+comparator was 24% of a zoomed-in frame on the phone at the highest star density. As
 for DSOs, each frame picks the cheaper search: the index when the cells in the query box
 are fewer than the stars under the cutoff, the walk otherwise. Local-sky mode always walks:
 its projection changes with every tick of the sky clock, which would rebuild the index
