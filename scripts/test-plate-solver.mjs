@@ -35,8 +35,16 @@ function loadCatalog() {
   const starsData = JSON.parse(readFileSync(join(ROOT, 'public/data/stars.14.json'), 'utf8'));
   const namesData = JSON.parse(readFileSync(join(ROOT, 'public/data/starnames.json'), 'utf8'));
 
+  // Columns (hip, ra, dec, mag; see scripts/stars-to-columns.mjs) or the older GeoJSON form.
+  const rows = starsData.columns
+    ? starsData.columns[0].map((hip, i) => ({
+        id: hip,
+        properties: { mag: starsData.columns[3][i] },
+        geometry: { coordinates: [starsData.columns[1][i], starsData.columns[2][i]] },
+      }))
+    : starsData.features;
   const stars = [];
-  for (const f of starsData.features) {
+  for (const f of rows) {
     const hip = f.id;
     let [ra, dec] = f.geometry.coordinates;
     while (ra < 0) ra += 360;

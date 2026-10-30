@@ -33,9 +33,15 @@ function buildHipMap() {
   console.log('Loading star catalog...');
   const data = JSON.parse(readFileSync(STARS_PATH, 'utf8'));
   const map = new Map();
-  for (const f of data.features) {
-    const [ra, dec] = f.geometry.coordinates;
-    map.set(f.id, { ra, dec });
+  if (data.columns) {
+    // Columns: hip, ra, dec, mag, bv (see scripts/stars-to-columns.mjs).
+    const [hip, ra, dec] = data.columns;
+    for (let i = 0; i < hip.length; i++) map.set(hip[i], { ra: ra[i], dec: dec[i] });
+  } else {
+    for (const f of data.features) {
+      const [ra, dec] = f.geometry.coordinates;
+      map.set(f.id, { ra, dec });
+    }
   }
   console.log(`  Loaded ${map.size} stars.`);
   return map;

@@ -35,3 +35,9 @@ on `resources/filters.json`; it only fills entries missing a valid `#rrggbb`, so
 overrides survive. Run it after appending filters to the catalog. Filters are served at
 `GET /api/filters` and consumed via `src/gear-catalog.ts` (they are **not** part of a
 gear setup — picked per integration row / observation window).
+
+## Star catalogue format
+
+`public/data/stars.14.json` is in column form (`{fields, columns}`, brightest first). A star file in the older
+GeoJSON form (e.g. a new upstream catalogue) is converted with `node scripts/stars-to-columns.mjs [in] [out]`;
+the readers (`forEachStar` in `packages/core/src/catalog/star-lists.ts`) still accept both forms.

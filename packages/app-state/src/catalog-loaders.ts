@@ -12,6 +12,7 @@ import type {
 import { normalizeRA } from '@myastrosky/core/angles';
 import { logInfo } from '@myastrosky/core/platform/log';
 import { setDsoCatalog } from '@myastrosky/core/catalog/dso-registry';
+import { forEachStar } from '@myastrosky/core/catalog/star-lists';
 import {
   expandMultiples,
   hasConstellationLines,
@@ -82,16 +83,14 @@ export async function loadStarCatalogData(opts: StarLoaderOptions): Promise<void
   const multByHip = expandMultiples(multiplesData);
 
   const stars: Star[] = [];
-  for (const f of starsData.features) {
-    const hip: number = f.id;
-    const [ra, dec]: [number, number] = f.geometry.coordinates;
+  forEachStar(starsData, (hip, ra, dec, mag, bv) => {
     const info = namesData[String(hip)];
     stars.push({
       hip,
       ra: normalizeRA(ra),
       dec,
-      mag: f.properties.mag,
-      bv: parseFloat(f.properties.bv) || 0,
+      mag,
+      bv,
       name: info?.name || undefined,
       bayer: info?.bayer || undefined,
       flam: info?.flam || undefined,
@@ -99,7 +98,7 @@ export async function loadStarCatalogData(opts: StarLoaderOptions): Promise<void
       desig: info?.desig || undefined,
       multiplicity: multByHip.get(hip),
     });
-  }
+  });
 
   // Raw systems are retained for the Targets recommender.
   setStarCatalog(stars, multiplesData);
