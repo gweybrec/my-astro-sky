@@ -156,24 +156,35 @@ async function init() {
     });
   };
 
-  // Update photo transforms and outlines when map view changes.
-  // Hide photos during interaction and restore after 100ms to avoid painting large images on every frame.
+  // Update photo transforms and outlines when map view changes. While the view moves a photo with a medium copy loads
+  // no full picture (the copy stands in); once it has stopped for 100 ms the photos are placed again and may load it.
+  // One timer per gesture, put off while the view keeps moving.
+  const PHOTOS_FROZEN_MS = 100;
   let interactionTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastMove = 0;
+  const unfreezeWhenStill = () => {
+    const wait = lastMove + PHOTOS_FROZEN_MS - performance.now();
+    if (wait > 0) {
+      interactionTimer = setTimeout(unfreezeWhenStill, wait);
+      return;
+    }
+    interactionTimer = null;
+    overlayDiv.classList.remove('photos-frozen');
+    overlay.updateTransforms();
+  };
   skyMap.setOnViewChange((reason) => {
     // The freeze is an interaction optimisation, so it only applies to real view moves.
     // A 'skyClock' tick (local-sky mode advancing the simulated clock) fires twice a
     // second under an idle cursor — freezing on those would blink the photos forever.
     if (reason !== 'skyClock') {
-      if (!interactionTimer) overlayDiv.classList.add('photos-frozen');
-      else clearTimeout(interactionTimer);
+      lastMove = performance.now();
+      if (!interactionTimer) {
+        overlayDiv.classList.add('photos-frozen');
+        interactionTimer = setTimeout(unfreezeWhenStill, PHOTOS_FROZEN_MS);
+      }
     }
-    overlay.updateTransforms();
+    overlay.updateTransforms(interactionTimer !== null);
     skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
-    if (reason === 'skyClock') return;
-    interactionTimer = setTimeout(() => {
-      interactionTimer = null;
-      overlayDiv.classList.remove('photos-frozen');
-    }, 100);
   });
 
   // Resize handler

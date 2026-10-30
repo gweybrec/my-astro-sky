@@ -162,24 +162,36 @@ export function createPhoneSkyMap(
     if (placed) skySelection.value = { kind: 'photo', photo: placed.photo };
   });
 
-  // The photos follow the view; while it moves they are hidden and come back once it has stopped.
+  // The photos follow the view on every move. While it moves a photo with a medium copy loads no full picture (the
+  // copy stands in); once it has stopped for PHOTOS_FROZEN_MS they are placed again and may load it. One timer per
+  // gesture, put off while the view keeps moving: clearing and setting a timer on every move cost ~1 ms a move on a
+  // phone.
   let frozenTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastMove = 0;
+  const unfreezeWhenStill = () => {
+    const wait = lastMove + PHOTOS_FROZEN_MS - performance.now();
+    if (wait > 0) {
+      frozenTimer = setTimeout(unfreezeWhenStill, wait);
+      return;
+    }
+    frozenTimer = null;
+    container.classList.remove('photos-frozen');
+    layer.updateTransforms();
+  };
   const viewListeners = new Set<() => void>();
   map.setOnViewChange((reason) => {
     for (const listener of viewListeners) listener();
     display.onMapViewChanged(map.getView().rotationDeg);
     // A clock tick is not a move of the view.
     if (reason !== 'skyClock') {
-      if (!frozenTimer) container.classList.add('photos-frozen');
-      else clearTimeout(frozenTimer);
+      lastMove = performance.now();
+      if (!frozenTimer) {
+        container.classList.add('photos-frozen');
+        frozenTimer = setTimeout(unfreezeWhenStill, PHOTOS_FROZEN_MS);
+      }
     }
-    layer.updateTransforms();
+    layer.updateTransforms(frozenTimer !== null);
     map.setPhotoOutlines(layer.getPhotoCanvasOutlines(map.getView()));
-    if (reason === 'skyClock') return;
-    frozenTimer = setTimeout(() => {
-      frozenTimer = null;
-      container.classList.remove('photos-frozen');
-    }, PHOTOS_FROZEN_MS);
   });
 
   const settings = loadSettings();

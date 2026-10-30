@@ -34,8 +34,17 @@ import type { PhotoCanvasQuad } from '@myastrosky/core/photo-draw-order';
 import { resolveCategory, isPoiVisible } from '@myastrosky/core/poi';
 import { hasPosition, type SkyPoiPin } from './poi-pins';
 
-/** A (possibly relative) address as an `<img>`'s `src` reports it. */
-const absoluteUrl = (url: string): string => new URL(url, document.baseURI).href;
+/** A (possibly relative) address as an `<img>`'s `src` reports it. Kept: parsing it for every photo on every move of
+ * the view showed in phone traces. */
+const absoluteUrls = new Map<string, string>();
+const absoluteUrl = (url: string): string => {
+  let abs = absoluteUrls.get(url);
+  if (abs === undefined) {
+    abs = new URL(url, document.baseURI).href;
+    absoluteUrls.set(url, abs);
+  }
+  return abs;
+};
 
 export interface PlacedPhoto {
   photo: Photo;
@@ -201,8 +210,22 @@ export class PhotoLayer {
     this.fireOnPhotosChanged();
   }
 
-  /** Recalculate all photo transforms (call on zoom/pan/resize) */
-  updateTransforms() {
+  /**
+   * Recalculate all photo transforms (call on zoom/pan/resize). `moving`: the view is moving, so no full picture is
+   * newly loaded (see showPictureFor) until the next call without it, made once the view has stopped.
+   */
+  updateTransforms(moving = false) {
+    this.moving = moving;
+    this.placeAll();
+  }
+
+  /**
+   * Set by updateTransforms(true) until a call without it: also a photo placed when its picture has loaded, during
+   * the gesture, loads no full picture.
+   */
+  private moving = false;
+
+  private placeAll() {
     const view = this.getView();
     const gen = getProjectionGeneration();
 
@@ -623,11 +646,15 @@ export class PhotoLayer {
    * medium-sized copy, by screen pixels along the longer side: the thumbnail up to its own size, the copy up to its
    * size, the full picture beyond, so no picture is shown stretched and the full one only when its detail shows.
    * Without one, as before copies existed: the thumbnail below 300 page pixels wide, else the full picture.
+   * While the view moves, a full picture already shown stays, and with a copy none is newly loaded: the copy
+   * stands in until the view stops. Without one the full picture loads as at rest (decoded off-screen, see showSrc):
+   * the thumbnail would show stretched for the whole gesture.
    */
   private showPictureFor(placed: PlacedPhoto, matrix: AffineMatrix): void {
     const { photo, imgEl } = placed;
     // A paused picture is loaded again by setLoadingPaused.
     if ((!photo.thumbFilename && !photo.mediumFilename) || imgEl.dataset.pausedSrc) return;
+    if (this.moving && imgEl.src === absoluteUrl(this.hooks.photoUrl(photo.filename))) return;
     const scale = Math.hypot(matrix.a, matrix.b);
     let name: string;
     if (photo.mediumFilename) {
@@ -637,6 +664,7 @@ export class PhotoLayer {
     } else {
       name = scale * photo.width < 300 ? photo.thumbFilename! : photo.filename;
     }
+    if (this.moving && name === photo.filename && photo.mediumFilename) name = photo.mediumFilename;
     const src = this.hooks.photoUrl(name);
     if (imgEl.src === absoluteUrl(src)) placed.pendingSrc = undefined;
     else this.showSrc(placed, src, name !== photo.thumbFilename);

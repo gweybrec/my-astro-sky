@@ -40,7 +40,8 @@ import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import { DEFAULT_SETTINGS } from '@myastrosky/core/sky-time-settings';
 import { DEFAULT_SETTINGS as DISPLAY_DEFAULTS } from '@myastrosky/core/display-settings';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
-import { createPhoneSkyMap, MAX_PIXEL_RATIO } from '../src/sky-map-setup';
+import { PhotoLayer } from '@myastrosky/render/photo-layer';
+import { createPhoneSkyMap, MAX_PIXEL_RATIO, PHOTOS_FROZEN_MS } from '../src/sky-map-setup';
 
 describe('the Ciel tab sky map', () => {
   beforeEach(() => {
@@ -159,6 +160,33 @@ describe('the Ciel tab sky map', () => {
     const before = calls.setSimDate.length;
     vi.advanceTimersByTime(3000);
     expect(calls.setSimDate.length).toBeGreaterThan(before);
+  });
+
+  it('moves the photos with the view, without loading a full picture until the view has stopped', () => {
+    const place = vi.spyOn(PhotoLayer.prototype, 'updateTransforms');
+    createPhoneSkyMap(document.createElement('canvas'), {
+      photoContainer: document.createElement('div'),
+      onPhotoPlacementError: () => {},
+    });
+    const viewChanged = created[0].calls.setOnViewChange[0][0] as (reason?: string) => void;
+    place.mockClear();
+
+    // A gesture of 10 moves, 30 ms apart: the photos are placed on every move, as moving.
+    for (let i = 0; i < 10; i++) {
+      viewChanged('view');
+      vi.advanceTimersByTime(30);
+    }
+    expect(place.mock.calls).toEqual(Array(10).fill([true]));
+
+    // Still for PHOTOS_FROZEN_MS after the last move: placed once more, no longer moving.
+    vi.advanceTimersByTime(PHOTOS_FROZEN_MS);
+    expect(place).toHaveBeenCalledTimes(11);
+    expect(place.mock.calls[10]).toEqual([]);
+
+    // A clock tick with the view still: placed, not as moving.
+    viewChanged('skyClock');
+    expect(place.mock.calls[11]).toEqual([false]);
+    place.mockRestore();
   });
 
   it('draws photo outlines off by default', () => {

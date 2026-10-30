@@ -190,7 +190,7 @@ describe('PhotoLayer', () => {
 
   describe('a large photo with a medium-sized copy', () => {
     // A hand-placed 4000 × 3000 photo at the pole: its longer side spans 4000 × 0.0001 × scale page pixels.
-    const setUp = () => {
+    const setUp = ({ medium = true } = {}) => {
       vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
       let view = VIEW;
       const container = document.createElement('div');
@@ -200,7 +200,7 @@ describe('PhotoLayer', () => {
           width: 4000,
           height: 3000,
           thumbFilename: 'big-thumb.jpg',
-          mediumFilename: 'big-medium.jpg',
+          mediumFilename: medium ? 'big-medium.jpg' : undefined,
           manualPlacement: {
             centerRa: 0,
             centerDec: 90,
@@ -212,9 +212,9 @@ describe('PhotoLayer', () => {
         }),
       ]);
       const img = container.querySelector('img')!;
-      const shownAt = async (scale: number) => {
+      const shownAt = async (scale: number, moving = false) => {
         view = { ...VIEW, scale };
-        layer.updateTransforms();
+        layer.updateTransforms(moving);
         await new Promise((r) => setTimeout(r, 0));
         return img.getAttribute('src');
       };
@@ -231,6 +231,30 @@ describe('PhotoLayer', () => {
       expect(await shownAt(10000)).toBe('/files/big.jpg'); // 4000 px
       expect(await shownAt(2500)).toBe('/files/big-medium.jpg');
       expect(await shownAt(500)).toBe('/files/big-thumb.jpg');
+    });
+
+    it('while the view moves, shows the copy instead of loading the full picture, and keeps a full one shown', async () => {
+      const { shownAt } = setUp();
+      expect(await shownAt(10000, true)).toBe('/files/big-medium.jpg'); // 4000 px, but moving
+      expect(await shownAt(10000)).toBe('/files/big.jpg'); // stopped: the full picture
+      expect(await shownAt(12000, true)).toBe('/files/big.jpg'); // kept while moving
+      expect(await shownAt(500, true)).toBe('/files/big.jpg'); // even when it shows small
+      expect(await shownAt(500)).toBe('/files/big-thumb.jpg');
+      expect(await shownAt(2500, true)).toBe('/files/big-medium.jpg'); // smaller pictures still follow the size
+    });
+
+    it('loads no full picture when the copy finishes loading during the gesture', async () => {
+      const { img, shownAt } = setUp();
+      expect(await shownAt(10000, true)).toBe('/files/big-medium.jpg');
+      img.onload?.(new Event('load')); // the copy has loaded: the photo is placed again
+      await new Promise((r) => setTimeout(r, 0));
+      expect(img.getAttribute('src')).toBe('/files/big-medium.jpg');
+      expect(await shownAt(10000)).toBe('/files/big.jpg'); // the view has stopped
+    });
+
+    it('without a copy, loads the full picture while moving as at rest, not the stretched thumbnail', async () => {
+      const { shownAt } = setUp({ medium: false });
+      expect(await shownAt(10000, true)).toBe('/files/big.jpg');
     });
 
     it('counts the screen pixels, not the page pixels', async () => {

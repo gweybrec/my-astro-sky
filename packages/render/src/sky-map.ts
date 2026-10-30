@@ -298,6 +298,8 @@ export class SkyMap {
   // timer, and the render/callback side effects.
   private lod = new InteractionLod();
   private settleTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the last move of the current gesture happened (performance.now()); see settleWhenStill. */
+  private lastInteraction = 0;
   private onAutoDensityChange: ((dso: number) => void) | null = null;
 
   // Listeners registered by attachSkyMapEvents, removed on destroy().
@@ -1511,13 +1513,23 @@ export class SkyMap {
    */
   private markInteracting() {
     this.lod.beginInteraction();
-    if (this.settleTimer !== null) clearTimeout(this.settleTimer);
-    this.settleTimer = setTimeout(() => {
-      this.settleTimer = null;
-      this.lod.endInteraction();
-      this.requestRender();
-    }, InteractionLod.SETTLE_MS);
+    this.lastInteraction = performance.now();
+    // One timer per gesture, put off while it goes on: clearing and setting a timer on every move cost a phone
+    // ~0.3 ms a move.
+    if (this.settleTimer === null)
+      this.settleTimer = setTimeout(this.settleWhenStill, InteractionLod.SETTLE_MS);
   }
+
+  private settleWhenStill = () => {
+    const wait = this.lastInteraction + InteractionLod.SETTLE_MS - performance.now();
+    if (wait > 0) {
+      this.settleTimer = setTimeout(this.settleWhenStill, wait);
+      return;
+    }
+    this.settleTimer = null;
+    this.lod.endInteraction();
+    this.requestRender();
+  };
 
   /** Coalesced render for motion: throttles the density budget for a smooth frame. */
   requestRenderInteractive() {

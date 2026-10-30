@@ -131,6 +131,29 @@ Two cheap guards:
 
 > **Pattern:** high-frequency input events (mousemove, wheel, resize, scroll) should drive a _request_, not the work itself. Coalesce to the frame rate, and suppress work that's meaningless mid-gesture.
 
+### Addendum — one timer per gesture, and no full picture while the view moves
+
+Every move of the view cleared and set a timer (the `photos-frozen` class, and the map's
+`markInteracting`); in an Android WebView a timer call cost ~1 ms a move. Each timer is
+now set once per gesture and, when it fires, sets itself again for the time left if the
+view moved since. From `PhotoLayer.updateTransforms(true)` until the call made once the
+view has stopped, a full picture already shown stays and a photo with a medium copy loads
+none: the copy stands in (a photo without one loads its full picture as at rest; its
+thumbnail would show stretched for the whole gesture). The state lasts until that call,
+so a picture that finishes loading mid-gesture, which places its photo again, loads no
+full picture either.
+The photo's address is no longer parsed by `new URL` on every move either.
+
+The photos must still be placed on every move. `photos-frozen` is meant to hide them
+(`visibility: hidden`), but the `visibility: visible` the layer writes on each picture
+when it loads wins over the class rule, so they show during a move. An attempt to place
+them only once the view stopped left them standing still on the screen while the sky
+moved under them.
+
+| Phone, zoomed out, highest density, one traced pan | Before | After      |
+| -------------------------------------------------- | ------ | ---------- |
+| View-change handler                                | 664 ms | **557 ms** |
+
 ---
 
 ## Technique 4 — Cache invalidation: bucketing, freezing, and the time-throttle trap
