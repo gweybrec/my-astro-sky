@@ -270,7 +270,7 @@ function drawOutlineMarker(
   if (s.stroke?.dash) ctx.setLineDash([]);
 
   // Deliberately just the single outer outline here (unlike the sky map's own
-  // drawDsoMarker) — no globular-cluster cross, no planetary-nebula inner ring, no
+  // DsoOutlines) — no globular-cluster cross, no planetary-nebula inner ring, no
   // fill of any kind — per user request.
 }
 

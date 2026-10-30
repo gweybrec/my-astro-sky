@@ -38,7 +38,7 @@ import {
   dsoSizeCos2,
   dsoCanvasAngle,
 } from '@myastrosky/core/dso-render-math';
-import { drawDsoMarker, drawDsoHighlightRing } from './dso-draw';
+import { DsoOutlines, drawDsoHighlightRing, drawDsoMarkerFill, dsoMarkerHasFill } from './dso-draw';
 import { formatDsoLabel, dsoLabelVisible } from '@myastrosky/core/dso-label';
 import { drawMoonMarker } from './moon-draw';
 import { drawBodyMarker, drawBodyLabel } from './body-draw';
@@ -310,6 +310,20 @@ export function renderStarLabels(s: SkyScene): void {
 
 export function renderDSOs(s: SkyScene): void {
   const { ctx, view, horizon } = s;
+  // Fills one by one (each needs the marker's own turn), then every outline in a few strokes (see DsoOutlines).
+  const outlines = new DsoOutlines();
+  // Canvas pixels per view pixel (the device pixel ratio, an export's scale): the fills are pictures sized in canvas
+  // pixels.
+  const base = ctx.getTransform?.();
+  const pixelScale = base ? Math.hypot(base.a, base.b) : 1;
+  let highlight: {
+    x: number;
+    y: number;
+    rx: number;
+    ry: number;
+    angle: number;
+    alpha: number;
+  } | null = null;
 
   for (const dso of s.selectedDSOs()) {
     projectCached(dso);
@@ -334,19 +348,28 @@ export function renderDSOs(s: SkyScene): void {
     // Below-horizon DSOs are dimmed (not hidden) in date mode, once a location is set.
     // The highlighted DSO stays at full brightness regardless (it's actively selected).
     const horizonMul = !isHighlighted && isBelowHorizon ? s.belowHorizonAlpha : 1;
+    const alpha = opacity * s.skyOpacity * horizonMul;
+
+    outlines.add(dso.type, c.x, c.y, rx, ry, angle, alpha);
+    // The searched DSO's ring is drawn last, over every outline.
+    if (isHighlighted) highlight = { x: c.x, y: c.y, rx, ry, angle, alpha };
+    if (!dsoMarkerHasFill(dso.type)) continue;
 
     ctx.save();
-    ctx.globalAlpha = opacity * s.skyOpacity * horizonMul;
+    ctx.globalAlpha = alpha;
     ctx.translate(c.x, c.y);
     ctx.rotate(angle);
+    drawDsoMarkerFill(ctx, dso.type, rx, ry, pixelScale);
+    ctx.restore();
+  }
+  outlines.draw(ctx);
 
-    drawDsoMarker(ctx, dso.type, rx, ry);
-
-    // Highlight indicator for searched DSO
-    if (isHighlighted) {
-      drawDsoHighlightRing(ctx, rx, ry);
-    }
-
+  if (highlight) {
+    ctx.save();
+    ctx.globalAlpha = highlight.alpha;
+    ctx.translate(highlight.x, highlight.y);
+    ctx.rotate(highlight.angle);
+    drawDsoHighlightRing(ctx, highlight.rx, highlight.ry);
     ctx.restore();
   }
 }

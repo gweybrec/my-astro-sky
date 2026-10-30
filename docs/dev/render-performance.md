@@ -102,9 +102,10 @@ the trace. Each marker's body was a fresh radial-gradient `fill`. Reusing one
 `CanvasGradient` per size did not help; the cost is drawing a gradient-filled path, not
 building the gradient.
 
-`drawDsoMarker` (`packages/render/src/dso-draw.ts`) now draws each style's gradient once
+`drawDsoMarkerFill` (`packages/render/src/dso-draw.ts`) now draws each style's gradient once
 on a disc that fills a square canvas (8 to 256 px, a power of two at least the marker's
-size) and stretches it over the body with `drawImage`, which is what the gradient did
+size in canvas pixels, the device pixel ratio included) and stretches it over the body
+with `drawImage`, which is what the gradient did
 under `scale(1, ry/rx)`. The live gradient stays where a picture would differ: a fill
 whose edge is not transparent (the supernova-remnant rim; resampling softens a visible
 edge), a gradient reaching past the body (`radiusMode: 'max'` with `ry > rx`), and
@@ -117,6 +118,22 @@ largest pixel difference is 13/255 on 3×2 px markers and ≤ 2 from 9 px up.
 
 > **Pattern.** When the main thread idles but frames are slow, sum busy time per thread
 > in the trace (`CrGpuMain` / `GPUTask`): `parse-trace.mjs` only sees the page's thread.
+
+The GPU was still the limit after that: the outlines were stroked one marker at a time.
+Turning `stroke` off (a test only) took a frame from ~30 to ~17 ms, and 1,500 ellipses
+stroked one by one took 25 ms a frame where one path holding them all took 8 ms.
+`DsoOutlines` (`dso-draw.ts`) now gathers the outlines, crosses and inner rings of the
+frame in canvas pixels (`ctx.ellipse` with the marker's turn) and strokes them per style
+and opacity, the opacity rounded to steps of 1/20 (an outline that rounds to 0 is not
+drawn, so none shows with the sky opacity at 0); markers without a fill no longer
+`save`/`translate`/`rotate` at all. The outlines now lie over every fill rather than
+between them, the searched object's ring is drawn after them all, and an ellipse's line
+no longer thins along its short axis (it was stroked under the `scale`). Against the previous drawing, 0.06–0.08% of the pixels differ by more
+than 8/255, less than two runs of the same code (the sky moves with the clock).
+
+| Desktop, zoomed out, pan (Intel UHD 630) | Before | After      |
+| ---------------------------------------- | ------ | ---------- |
+| Median frame                             | ~30 ms | **~23 ms** |
 
 ---
 
