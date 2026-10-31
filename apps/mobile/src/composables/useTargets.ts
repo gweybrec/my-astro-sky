@@ -7,7 +7,7 @@ import {
 } from '@myastrosky/core/targets/prefs';
 
 /**
- * The Targets tab's preferences, shared by the list, its two sheets and the regions page. They are the desktop's
+ * The Targets tab's preferences, shared by the list, its sheets and the regions page. They are the desktop's
  * record (`targets-prefs-v3`): a change is written at once, merged over what is stored so that the location written by
  * the Réglages screens in the meantime is kept.
  */
@@ -35,8 +35,9 @@ export function updateTargetsPrefs(patch: Partial<TargetsPrefs>): void {
 }
 
 /**
- * What "Réinitialiser" of the search settings sheet puts back to the desktop's defaults (the keys it removes): the sky,
- * the observation window and the three switches. The night and the location are kept.
+ * What "Réinitialiser" of the search settings sheet puts back to the desktop's defaults (the keys it removes), with
+ * the filters below: the sky, the observation window and the three switches. The sort, the night and the location are
+ * kept.
  */
 export const SEARCH_PREF_KEYS = [
   'horizonDirs',
@@ -50,7 +51,7 @@ export const SEARCH_PREF_KEYS = [
   'respectHorizon',
 ] as const satisfies readonly (keyof TargetsPrefs)[];
 
-/** What "Réinitialiser" of the filters sheet removes: the four filters on the objects. The sort is kept. */
+/** The four filters on the objects, which "Réinitialiser" of the search settings sheet removes too. */
 export const FILTER_PREF_KEYS = [
   'enabledRatings',
   'enabledDifficulties',

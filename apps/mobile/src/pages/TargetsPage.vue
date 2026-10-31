@@ -30,18 +30,15 @@ import PhoneTargetRow from '../components/PhoneTargetRow.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import TypesSheet from './targets/TypesSheet.vue';
-import FiltersSheet from './targets/FiltersSheet.vue';
 import SearchSettingsSheet from './targets/SearchSettingsSheet.vue';
-import filterIcon from '../icons/filter.svg?raw';
 import slidersIcon from '../icons/sliders.svg?raw';
 import caretIcon from '../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 
 // The Cibles tab, from the boards "Cibles", "Cibles, types d'objets", "Cibles, paramètres de recherche", "Cibles,
-// filtres", "Cibles, aucun setup" and "Cibles, aucun résultat": the targets worth imaging on the chosen night with the
-// chosen setup. Beside the search field, one button opens the search settings (night, location, sky, observation
-// window) and one the filters (sort, interest, difficulty, catalogues, constellations); under it, the setup and the
-// number of object types. The list is searched again when one of them has changed.
+// aucun setup" and "Cibles, aucun résultat": the targets worth imaging on the chosen night with the chosen setup. Beside
+// the search field, one button opens the search settings (sort, night, location, sky, observation window, filters);
+// under it, the setup and the number of object types. The list is searched again when one of them has changed.
 const router = useRouter();
 const { showError } = useErrorToast();
 const horizonStore = useHorizonProfileStore();
@@ -58,7 +55,6 @@ let found: TargetSuggestion[] = [];
 const sorted = shallowRef<TargetSuggestion[]>([]);
 const emptyKind = ref<'no-setup' | 'no-match'>('no-match');
 const typesOpen = ref(false);
-const filtersOpen = ref(false);
 const settingsOpen = ref(false);
 const setupsOpen = ref(false);
 let lastKey = '';
@@ -227,9 +223,6 @@ function closed(open: boolean) {
       <PhoneIconButton :label="t('targets.formTitle')" @click="settingsOpen = true"
         ><AppIcon :svg="slidersIcon"
       /></PhoneIconButton>
-      <PhoneIconButton :label="t('mobile.targets.filtersTitle')" @click="filtersOpen = true"
-        ><AppIcon :svg="filterIcon"
-      /></PhoneIconButton>
     </PhoneTopBar>
     <div class="mob-context" style="flex: none">
       <PhoneButton
@@ -286,7 +279,6 @@ function closed(open: boolean) {
     </IonContent>
     <TypesSheet v-model:open="typesOpen" @update:open="closed" />
     <SearchSettingsSheet v-model:open="settingsOpen" @update:open="closed" />
-    <FiltersSheet v-model:open="filtersOpen" @update:open="closed" />
     <PhoneRadioSheet
       v-model:open="setupsOpen"
       v-model:value="chosenSetupId"

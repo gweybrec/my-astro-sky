@@ -18,6 +18,17 @@ vi.mock('../src/composables/useConfirm', () => ({
   showInfo: (...a: unknown[]) => showInfo(...a),
 }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
+// Three constellations, out of order and one listed twice, as the registry lists a few.
+vi.mock('@myastrosky/core/catalog/star-registry', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getConstellationInfos: () =>
+    [
+      ['CYG', 'Cygne'],
+      ['AND', 'Andromède'],
+      ['AQL', 'Aigle'],
+      ['AND', 'Andromède'],
+    ].map(([id, displayName]) => ({ id, name: id, displayName, ra: 0, dec: 0 })),
+}));
 
 const search = vi.fn();
 vi.mock('@myastrosky/core/targets/recommend', () => ({
@@ -26,13 +37,14 @@ vi.mock('@myastrosky/core/targets/recommend', () => ({
 
 import TargetsPage from '../src/pages/TargetsPage.vue';
 import TypesSheet from '../src/pages/targets/TypesSheet.vue';
-import FiltersSheet from '../src/pages/targets/FiltersSheet.vue';
 import SearchSettingsSheet from '../src/pages/targets/SearchSettingsSheet.vue';
 import RegionsPage from '../src/pages/RegionsPage.vue';
 import { skyRegionDraw, skyRegionView } from '../src/sky-modes';
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
+import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
+import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
 import { reloadTargetsPrefs, updateTargetsPrefs } from '../src/composables/useTargets';
 
 const GEAR = {
@@ -209,27 +221,24 @@ describe('the Cibles page', () => {
     const fields = w.findAll('.mob-context > button');
     expect(fields.map((b) => b.text())).toEqual(['Équipement 1', '1 types']);
     expect(fields[1].attributes('aria-label')).toBe("Types d'objets : 1 types");
-    // Beside the search field: the search settings, then the filters.
+    // Beside the search field: one button, the search settings (which hold the filters too).
     expect(w.findAll('.mob-topbar button').map((b) => b.attributes('aria-label'))).toEqual([
       'Paramètres de recherche',
-      'Filtres',
     ]);
   });
 
-  it('opens the search settings and the filters from their buttons, and searches again when one closes', async () => {
+  it('opens the search settings from their button, and searches again when they close', async () => {
     const w = show(TargetsPage, { global: app().global });
     await settle();
     const settings = w.findComponent(SearchSettingsSheet);
-    const filters = w.findComponent(FiltersSheet);
-    expect([settings.props('open'), filters.props('open')]).toEqual([false, false]);
+    expect(settings.props('open')).toBe(false);
     await w.find('button[aria-label="Paramètres de recherche"]').trigger('click');
     expect(settings.props('open')).toBe(true);
-    await w.find('button[aria-label="Filtres"]').trigger('click');
-    expect(filters.props('open')).toBe(true);
-    updateTargetsPrefs({ minAltDeg: 40 });
+    updateTargetsPrefs({ minAltDeg: 40, enabledRatings: [5] });
     settings.vm.$emit('update:open', false);
     await settle();
     expect(search).toHaveBeenCalledTimes(2);
+    expect(search.mock.calls[1][0].prefs).toMatchObject({ minAltDeg: 40, enabledRatings: [5] });
   });
 
   it('searches with the stored preferences, the setups and the gear', async () => {
@@ -309,7 +318,7 @@ describe('the Cibles page', () => {
     const w = show(TargetsPage, { global: app().global });
     await settle();
     const names = () => w.findAll('.mob-row--roomy .mob-row-title').map((r) => r.text());
-    const filters = w.findComponent(FiltersSheet);
+    const filters = w.findComponent(SearchSettingsSheet);
     // The two test targets have the ratings 5 and 4: by interest the first one leads, by name the second (M27).
     const byRating = names();
     updateTargetsPrefs({ sortBy: 'name' });
@@ -436,6 +445,8 @@ describe('the search settings sheet', () => {
     const text = w.text();
     const labels = [
       'Paramètres de recherche',
+      'Trier par',
+      'Intérêt photo',
       'Nuit',
       'Ce soir',
       'Lieu',
@@ -449,6 +460,13 @@ describe('the search settings sheet', () => {
       'Min',
       'Max',
       "Fenêtre d'observation",
+      'Filtres',
+      'Intérêt DSO',
+      'Difficulté',
+      'Catalogues',
+      '10 / 10',
+      'Constellations',
+      '3 / 3',
       'Inclure les objets trop grands pour le champ',
       'Exclure les objets déjà photographiés',
       "Respecter l'horizon",
@@ -463,10 +481,8 @@ describe('the search settings sheet', () => {
     expect(w.findAll('.mob-section-header').map((h) => h.text())).toEqual([
       'Ciel',
       "Fenêtre d'observation",
+      'Filtres',
     ]);
-    for (const absent of ['Intérêt DSO', 'Difficulté', 'Catalogues', 'Trier par']) {
-      expect(text).not.toContain(absent);
-    }
   });
 
   it('has an "i" for the three switches and none for the sky directions', async () => {
@@ -536,7 +552,7 @@ describe('the search settings sheet', () => {
     expect(prefsOf().obsEndTime).toBe('02:00');
   });
 
-  it('"Réinitialiser" puts the sky, the window and the switches back, and keeps the night, the place and the filters', async () => {
+  it('"Réinitialiser" puts the sky, the window, the filters and the switches back, and keeps the sort, the night and the place', async () => {
     storage().set(
       'targets-prefs-v3',
       JSON.stringify({
@@ -551,6 +567,9 @@ describe('the search settings sheet', () => {
         respectHorizon: true,
         skyRegionId: 'r1',
         enabledRatings: [5],
+        enabledDifficulties: [1],
+        enabledCatalogs: ['M'],
+        enabledConstellations: ['CYG'],
         sortBy: 'name',
       }),
     );
@@ -567,7 +586,6 @@ describe('the search settings sheet', () => {
       lat: 48.58,
       lastDateISO: '2031-03-09',
       enabledTypes: ['EN'],
-      enabledRatings: [5],
       sortBy: 'name',
     });
     for (const key of [
@@ -576,37 +594,17 @@ describe('the search settings sheet', () => {
       'obsStartTime',
       'respectHorizon',
       'skyRegionId',
+      'enabledRatings',
+      'enabledDifficulties',
+      'enabledCatalogs',
+      'enabledConstellations',
     ]) {
       expect(stored).not.toHaveProperty(key);
     }
   });
-});
-
-describe('the filters sheet', () => {
-  it('shows the sort, then the four filters of the board, and nothing of the search settings', async () => {
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
-    await settle();
-    const text = w.text();
-    const labels = [
-      'Filtres',
-      'Trier par',
-      'Intérêt DSO',
-      'Difficulté',
-      'Catalogues',
-      'Constellations',
-    ];
-    const places = labels.map((label) => text.indexOf(label));
-    expect(places.every((at) => at >= 0)).toBe(true);
-    expect([...places].sort((a, b) => a - b)).toEqual(places);
-    expect(text).toContain('Réinitialiser');
-    expect(text).toContain('Appliquer');
-    for (const absent of ['Ciel observable', 'Région du ciel', "Respecter l'horizon", 'Nuit']) {
-      expect(text).not.toContain(absent);
-    }
-  });
 
   it("offers the desktop's nine sorts and stores the chosen one", async () => {
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+    const { w } = mountSheet();
     await settle();
     const sortRow = () => w.findAll('.mob-row').find((r) => r.text().includes('Trier par'))!;
     expect(sortRow().text()).toContain('Intérêt photo');
@@ -632,7 +630,7 @@ describe('the filters sheet', () => {
   });
 
   it('stores a rating and a difficulty at once', async () => {
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+    const { w } = mountSheet();
     await settle();
     await w.find('button[aria-label="Intérêt 1 sur 5"]').trigger('click');
     expect(prefsOf().enabledRatings).toEqual([2, 3, 4, 5]);
@@ -640,39 +638,47 @@ describe('the filters sheet', () => {
     expect(prefsOf().enabledDifficulties).toEqual([1, 2, 3, 4]);
   });
 
-  it('"Réinitialiser" removes the four filters and keeps the sort and the search settings', async () => {
-    storage().set(
-      'targets-prefs-v3',
-      JSON.stringify({
-        setupId: 's1',
-        lat: 48.58,
-        lon: 7.75,
-        lastDateISO: null,
-        horizonDirs: ['N'],
-        enabledRatings: [5],
-        enabledDifficulties: [1],
-        enabledCatalogs: ['M'],
-        enabledConstellations: ['CYG'],
-        sortBy: 'name',
-      }),
-    );
-    reloadTargetsPrefs();
-    const w = show(FiltersSheet, { props: { open: true }, global: app().global });
+  it('lists the catalogues by name from their field, stores a change at once and shows the count', async () => {
+    const { w } = mountSheet();
     await settle();
-    await w
-      .findAll('button')
-      .find((b) => b.text() === 'Réinitialiser')!
-      .trigger('click');
-    const stored = prefsOf();
-    expect(stored).toMatchObject({ setupId: 's1', horizonDirs: ['N'], sortBy: 'name' });
-    for (const key of [
-      'enabledRatings',
-      'enabledDifficulties',
-      'enabledCatalogs',
-      'enabledConstellations',
-    ]) {
-      expect(stored).not.toHaveProperty(key);
-    }
+    const field = () => w.find('button[aria-label^="Catalogues"]');
+    expect(field().attributes('aria-label')).toBe('Catalogues : 10 sur 10');
+    await field().trigger('click');
+    const list = w.findAllComponents(SkyCheckSheet)[0];
+    expect(list.props('open')).toBe(true);
+    expect(list.props('title')).toBe('Catalogues');
+    const labels = list.props('options').map((o) => o.label);
+    expect(labels.slice(0, 4)).toEqual(['Messier', 'NGC', 'IC', 'Sharpless']);
+    list.vm.$emit('update:selected', ['M', 'NGC']);
+    await settle();
+    expect(prefsOf().enabledCatalogs).toEqual(['M', 'NGC']);
+    expect(field().text()).toContain('2 / 10');
+    // Every catalogue ticked again is no filter at all.
+    list.vm.$emit('update:selected', [...DSO_CATALOGS_ALL]);
+    await settle();
+    expect(prefsOf()).not.toHaveProperty('enabledCatalogs');
+  });
+
+  it('lists each constellation once, by name, from its field, and stores a change at once', async () => {
+    const { w } = mountSheet();
+    await settle();
+    await w.find('button[aria-label^="Constellations"]').trigger('click');
+    const list = w.findAllComponents(SkyCheckSheet)[1];
+    expect(list.props('open')).toBe(true);
+    expect(list.props('title')).toBe('Constellations');
+    expect(list.props('options')).toEqual([
+      { value: 'AQL', label: 'Aigle' },
+      { value: 'AND', label: 'Andromède' },
+      { value: 'CYG', label: 'Cygne' },
+    ]);
+    expect(list.props('selected')).toEqual(['AQL', 'AND', 'CYG']);
+    list.vm.$emit('update:selected', ['CYG']);
+    await settle();
+    expect(prefsOf().enabledConstellations).toEqual(['CYG']);
+    expect(w.find('button[aria-label^="Constellations"]').text()).toContain('1 / 3');
+    list.vm.$emit('update:selected', []);
+    await settle();
+    expect(prefsOf().enabledConstellations).toEqual([]);
   });
 });
 

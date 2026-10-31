@@ -627,13 +627,22 @@ export const views = [
     open: [{ click: '.mob-topbar ion-button.mob-icon-btn:first-of-type' }, { wait: '.mob-sheet' }],
     ...SHEET,
   },
-  {
-    name: 'targets-filters',
+  // The catalogues and the constellations: lists opened from the search settings' fields.
+  ...['Catalogues', 'Constellations'].map((field) => ({
+    name: `targets-${field.toLowerCase()}`,
     path: '/tabs/targets',
     ready: '.mob-row--roomy',
-    open: [{ click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' }, { wait: '.mob-sheet' }],
-    ...SHEET,
-  },
+    open: [
+      { click: '.mob-topbar ion-button.mob-icon-btn:first-of-type' },
+      { wait: '.mob-sheet' },
+      { pause: 400 },
+      { click: `${OPEN_SHEET} [aria-label^="${field}"]` },
+      { wait: `ion-modal.show-modal:has(.mob-sheet-title:text-is("${field}"))` },
+      { pause: 600 },
+    ],
+    // The list's sheet, the only open one with tick boxes.
+    scope: '.mob-sheet:has(ion-checkbox.mob-check-row)',
+  })),
   { name: 'targets-regions', path: '/targets/regions', ready: '.mob-row--region' },
   // The plus of the regions page: the map in local sky with the panel of the region under it.
   {
