@@ -86,14 +86,15 @@ function prepare(
       ? new Set(prefs.enabledConstellations)
       : null;
 
-  const filteredDSOs = filterTargetDSOs(dsos, {
+  const filterOptions = {
     enabledTypes,
     enabledRatings,
     enabledDifficulties,
     enabledCatalogs,
     photographedIds: prefs.excludePhotographed ? (input.photographedIds ?? null) : null,
     enabledConstellations,
-  });
+  };
+  const filteredDSOs = filterTargetDSOs(dsos, filterOptions);
   const location: ObserverLocation = { latDeg: lat, lonDeg: lon };
   const enabledDirs = new Set(prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
   const dirFilterActive = enabledDirs.size < 4;
@@ -107,8 +108,10 @@ function prepare(
   }
 
   // Multiple/double stars are synthetic point-like targets (not in the DSO catalog);
-  // inject them into the pool when their type chip is enabled.
-  const msTargets = enabledTypes.has('MS') ? buildMultipleStarTargets(preset) : [];
+  // inject them into the pool when their type chip is enabled, through the same filters.
+  const msTargets = enabledTypes.has('MS')
+    ? filterTargetDSOs(buildMultipleStarTargets(preset), filterOptions)
+    : [];
   const pool = msTargets.length ? [...filteredDSOs, ...msTargets] : filteredDSOs;
 
   const recommender = createRecommender(preset, location, dateNight, {
