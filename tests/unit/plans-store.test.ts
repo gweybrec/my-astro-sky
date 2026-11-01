@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
 // The store only imports these for its async CRUD; the pure getters under test
@@ -6,11 +6,18 @@ import { setActivePinia, createPinia } from 'pinia';
 vi.mock('@myastrosky/app-state/api', () => ({
   getPlans: vi.fn().mockResolvedValue([]),
   updatePlanSortAPI: vi.fn().mockResolvedValue(undefined),
+  updatePlanEntryPositionAPI: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
-import { getPlans, updatePlanSortAPI, type Plan } from '../../src/api';
+import {
+  getPlans,
+  updatePlanSortAPI,
+  updatePlanEntryPositionAPI,
+  type Plan,
+  type PlanEntry,
+} from '../../src/api';
 
 function makePlan(id: string, setupId: string | null): Plan {
   return {
@@ -25,6 +32,27 @@ function makePlan(id: string, setupId: string | null): Plan {
     entries: [],
     mosaics: [],
   };
+}
+
+function makeEntry(id: string, paDeg: number | null): PlanEntry {
+  return {
+    id,
+    dsoId: 'NGC7000',
+    position: 0,
+    paDeg,
+    ra: null,
+    dec: null,
+    notes: null,
+    mosaicId: null,
+    mosaicWDeg: null,
+    mosaicHDeg: null,
+    observationWindows: [],
+  };
+}
+
+/** A plan holding one entry, as the backend returns it (a fresh object each call). */
+function planWithEntry(paDeg: number | null): Plan {
+  return { ...makePlan('p', null), entries: [makeEntry('e', paDeg)] };
 }
 
 describe('plans store · plansUsingSetup', () => {
@@ -104,5 +132,92 @@ describe('plans store · load', () => {
     await slow;
 
     expect(store.plans.map((p) => p.id)).toEqual(['new']);
+  });
+});
+
+describe('plans store · pending entry edits survive a refresh', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    vi.mocked(updatePlanEntryPositionAPI).mockReset().mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a refresh inside the debounce keeps the edit and writes it, not the old value', async () => {
+    const store = usePlansStore();
+    store.plans = [planWithEntry(0)];
+    vi.mocked(getPlans).mockResolvedValueOnce([planWithEntry(0)]);
+
+    store.setEntryPosition('p', 'e', { paDeg: 45 });
+    await store.load();
+
+    expect(store.plans[0].entries[0].paDeg).toBe(45);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(updatePlanEntryPositionAPI).toHaveBeenCalledWith(
+      'p',
+      'e',
+      expect.objectContaining({ paDeg: 45 }),
+    );
+  });
+
+  it('a refresh fetched before the write confirmed still shows the edit', async () => {
+    const store = usePlansStore();
+    store.plans = [planWithEntry(0)];
+    let resolveFetch: (v: Plan[]) => void = () => {};
+    vi.mocked(getPlans).mockReturnValueOnce(new Promise<Plan[]>((r) => (resolveFetch = r)));
+
+    store.setEntryPosition('p', 'e', { paDeg: 45 });
+    const loading = store.load();
+    await vi.advanceTimersByTimeAsync(250); // write sent and confirmed
+    resolveFetch([planWithEntry(0)]); // list read before the write landed
+    await loading;
+
+    expect(store.plans[0].entries[0].paDeg).toBe(45);
+  });
+
+  it('a confirmed edit no longer overrides later backend values', async () => {
+    const store = usePlansStore();
+    store.plans = [planWithEntry(0)];
+    store.setEntryPosition('p', 'e', { paDeg: 45 });
+    await vi.advanceTimersByTimeAsync(250);
+
+    vi.mocked(getPlans).mockResolvedValueOnce([planWithEntry(90)]);
+    await store.load();
+
+    expect(store.plans[0].entries[0].paDeg).toBe(90);
+  });
+
+  it('a move then a rotation in one debounce window write both fields', async () => {
+    const store = usePlansStore();
+    store.plans = [planWithEntry(0)];
+
+    store.setEntryPosition('p', 'e', { ra: 10, dec: 20 });
+    store.setEntryPA('p', 'e', 30);
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(updatePlanEntryPositionAPI).toHaveBeenCalledTimes(1);
+    expect(updatePlanEntryPositionAPI).toHaveBeenCalledWith(
+      'p',
+      'e',
+      expect.objectContaining({ paDeg: 30, ra: 10, dec: 20 }),
+    );
+  });
+
+  it('a refresh inside the debounce keeps edited observation windows', async () => {
+    const store = usePlansStore();
+    store.plans = [planWithEntry(0)];
+    vi.mocked(getPlans).mockResolvedValueOnce([planWithEntry(0)]);
+    const windows = [{ startMs: 1, endMs: 2 }] as unknown as PlanEntry['observationWindows'];
+
+    store.setEntryObservationWindows('p', 'e', windows);
+    await store.load();
+
+    expect(store.plans[0].entries[0].observationWindows).toEqual(windows);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(updatePlanEntryPositionAPI).toHaveBeenCalledWith('p', 'e', {
+      observationWindows: windows,
+    });
   });
 });
