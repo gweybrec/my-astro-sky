@@ -418,6 +418,8 @@ function cleanupItem(item: BatchItem) {
 
 onBeforeUnmount(() => {
   cancelled = true;
+  // Drop queued conversions so the loop exits instead of uploading them after close.
+  rawConvertQueue.length = 0;
   for (const item of items) {
     item.solveAbort?.abort();
     cleanupItem(item);

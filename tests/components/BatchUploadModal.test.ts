@@ -281,6 +281,26 @@ describe('BatchUploadModal — raw file conversion', () => {
     wrapper.unmount();
   });
 
+  it('does not send queued raw files after the dialog closes', async () => {
+    state.pendingFiles = [fit('a.fit'), fit('b.fit'), fit('c.fit')];
+    // The in-flight conversion rejects when the dialog aborts it, as a real fetch would.
+    convertRawPhoto.mockImplementation(
+      (_file: File, _onProgress: unknown, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+
+    const wrapper = mountModal();
+    await flushPromises();
+    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
+
+    wrapper.unmount();
+    await flushPromises();
+
+    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
+  });
+
   it('marks the item "failed" with an error message when conversion rejects', async () => {
     state.pendingFiles = [fit('bad.fit')];
     convertRawPhoto.mockRejectedValue(new Error('unsupported raw format'));
