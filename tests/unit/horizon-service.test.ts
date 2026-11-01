@@ -66,8 +66,8 @@ beforeAll(async () => {
 
 describe('horizonCacheKey', () => {
   it('versions the key and rounds the position to 3 decimals', () => {
-    expect(horizonCacheKey(45.1234, 6.4566, 40, null)).toBe('v5:45.123:6.457:40:auto');
-    expect(horizonCacheKey(45.1234, 6.4566, 3, 2)).toBe('v5:45.123:6.457:3:2');
+    expect(horizonCacheKey(45.1234, 6.4566, 40, null)).toBe('v6:45.123:6.457:40:auto');
+    expect(horizonCacheKey(45.1234, 6.4566, 3, 2)).toBe('v6:45.123:6.457:3:2');
   });
 });
 
@@ -169,7 +169,7 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
       expect(r.alts[270]).toBeCloseTo(-4.296, 3);
       expect(r.summits).toHaveLength(1);
       expect(r.summits[0]).toMatchObject({ name: 'Pic Test', elevationM: 2500 });
-      expect(cacheRows()).toEqual([{ key: 'v5:45.123:6.456:3:2' }]);
+      expect(cacheRows()).toEqual([{ key: 'v6:45.123:6.456:3:2' }]);
 
       requests = [];
       db.reset();
@@ -212,7 +212,7 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
         cacheRows()
           .map((r) => r.key)
           .sort(),
-      ).toEqual(['v5:45.123:6.456:3:0', 'v5:45.123:6.456:3:auto']);
+      ).toEqual(['v6:45.123:6.456:3:0', 'v6:45.123:6.456:3:auto']);
     });
 
     it('uses 40 km when the radius is absent or not finite, and clamps it to 1..100', async () => {
@@ -237,7 +237,7 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
     it('recomputes when the cached row is not valid JSON', async () => {
       conn
         .prepare('INSERT INTO horizon_profiles (key, json) VALUES (?, ?)')
-        .run('v5:45.123:6.456:3:auto', '{broken');
+        .run('v6:45.123:6.456:3:auto', '{broken');
       const r = await svc.getProfile({ lat: 45.123, lon: 6.456, radiusKm: 3 });
       expect(r.alts).toHaveLength(360);
       expect(tiles().length).toBeGreaterThan(0);
@@ -315,6 +315,20 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
       expect(err.body).toEqual({ error: 'Failed to compute horizon from elevation data' });
       expect((err.cause as Error).message).toBe('ECONNRESET');
       expect(cacheRows()).toEqual([]);
+    });
+
+    it('fails on a temporary tile error (503) instead of caching flat terrain, and computes once it clears', async () => {
+      tileReply = { status: 503, body: 'Slow Down' };
+      const err = await rejection(svc.getProfile({ lat: 45.123, lon: 6.456, radiusKm: 3 }));
+      expect(err.code).toBe('HORIZON_COMPUTE_FAILED');
+      expect(cacheRows()).toEqual([]);
+
+      tileReply = { status: 200, body: tile };
+      const before = tiles().length;
+      const r = await svc.getProfile({ lat: 45.123, lon: 6.456, radiusKm: 3 });
+      expect(tiles().length).toBeGreaterThan(before);
+      expect(new Set(r.alts).size).toBeGreaterThan(1);
+      expect(cacheRows()).toHaveLength(1);
     });
 
     it('fails with HORIZON_COMPUTE_FAILED when a tile is not a readable image', async () => {

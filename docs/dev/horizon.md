@@ -39,8 +39,9 @@ interface HorizonProfile {
 1. **DEM source:** AWS `elevation-tiles-prod` **Terrarium** PNG tiles (open data, no key)
    at zoom 12 (~38 m/px at the equator), decoded through the `ImageCodec` port (`sharp` on the server). Elevation is RGB-encoded:
    `h = R*256 + G + B/256 - 32768`. Tiles for the `radiusKm` bounding box are fetched
-   and assembled into one combined grid; a missing tile (out of coverage) is treated as sea
-   level. When the box needs more than `MAX_TILES` (400) tiles — a large radius, or a high
+   and assembled into one combined grid; a missing tile (404, out of coverage) is treated as sea
+   level, while any other tile error (503, 429…) fails the request with `HORIZON_COMPUTE_FAILED`
+   so a temporary outage never caches flat terrain. When the box needs more than `MAX_TILES` (400) tiles — a large radius, or a high
    latitude where tiles shrink on the ground — the next coarser zoom is used (down to 8 for
    100 km at 85°). The tiles stop at ±85.0511° (`MAX_TILE_LAT`): the box is cut there, and an
    observer beyond it gets `invalid` / `HORIZON_OUT_OF_COVERAGE`.
@@ -150,7 +151,8 @@ collapse — no faked depth. Imported/manual profiles (no `layers`) and the pole
 to a single `fill` + one thin `stroke` silhouette. `sampleDenseAz` (in `horizon-io.ts`) samples any shell's
 `alts`, and `lerpColor` (`src/color-utils.ts`, unit-tested) ramps the tones. `sky-map.ts` draws it right
 after `drawHorizonLine`, gated on date mode + observer location + `showMountainHorizon`. The
-`HORIZON_CACHE_VERSION` bump (`v5`) forces cached profiles to recompute with the finer shells.
+`HORIZON_CACHE_VERSION` bump (`v5`) forced cached profiles to recompute with the finer shells; `v6`
+drops the flat profiles cached when a tile request failed temporarily.
 
 ## Named summits
 

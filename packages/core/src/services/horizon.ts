@@ -35,7 +35,8 @@ export type { HorizonLayer, HorizonProfileResult, HorizonSummit };
 
 // Bump when the computed profile's shape/content changes (e.g. summits added), so
 // stale entries from an older algorithm are bypassed rather than served forever.
-const HORIZON_CACHE_VERSION = 'v5';
+// v6: drops the flat profiles cached when a tile request failed temporarily.
+const HORIZON_CACHE_VERSION = 'v6';
 
 /** Cache key: version + 3-decimal lat/lon (~100 m) plus radius (km) and eye height (m). */
 export function horizonCacheKey(
@@ -88,8 +89,12 @@ export function createHorizonService(deps: HorizonServiceDeps): HorizonService {
 
   async function fetchTile(z: number, x: number, y: number): Promise<Float32Array | null> {
     const res = await http({ method: 'GET', url: `${TILE_BASE}/${z}/${x}/${y}.png` });
-    // A missing tile (e.g. out of coverage) is treated as sea level.
-    if (res.status < 200 || res.status > 299) return null;
+    // A missing tile (404, e.g. out of coverage) is treated as sea level. Any other failure
+    // (503, 429…) fails the computation, so a flat profile is never cached for a passing outage.
+    if (res.status === 404) return null;
+    if (res.status < 200 || res.status > 299) {
+      throw new Error(`Elevation tile ${z}/${x}/${y} answered ${res.status}`);
+    }
     const { data, channels } = await images.decode(await res.bytes());
     const out = new Float32Array(TILE_SIZE * TILE_SIZE);
     for (let i = 0; i < TILE_SIZE * TILE_SIZE; i++) {
