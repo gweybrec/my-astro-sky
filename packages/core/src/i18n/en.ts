@@ -339,7 +339,9 @@ const en: Translations = {
     importSelectAll: 'Select all',
     importSetupReplace: 'Replace',
     importSetupKeepBoth: 'Keep both',
-    importSetupSkip: 'Do not import',
+    importSetupChooseWarning: 'An item with the same name already exists: choose an option.',
+    importSetupKeepBothWarning: 'An item with the same name already exists: both will be kept.',
+    importSetupKeptName: 'Name of the imported setup',
     importSetupIdentical: 'Already present, identical',
     importSetupWithPlan: 'Imported with the plan “{name}”',
     importReplaceWarning:

@@ -19,6 +19,9 @@ export interface ImportPreviewImage {
   originalName: string;
   size: number;
   exists: boolean;
+  /** The photo's solved objects and observation date, from the manifest: they place it in the gallery's order. */
+  dsoIds?: string[];
+  observationDate?: string | null;
 }
 
 export interface ImportPreviewPlan {
@@ -104,6 +107,9 @@ export interface ImportOptions {
   selectedGear: string[] | null;
   /** Choice per bundle setup id, for the setups whose content differs from a local one. */
   setupConflicts?: Record<string, SetupImportChoice>;
+  /** Name per bundle setup id for a setup kept beside the local one (`keepBoth`); blank or absent: the bundle's name
+   * followed by " (import)". */
+  setupNames?: Record<string, string>;
 }
 
 /** What the export asks for: the options, the photos to take (all when absent or empty) and the shortcuts to bundle. */
@@ -154,7 +160,13 @@ export interface ZipEntry {
 export interface ZipInspectResult {
   /** true if manifest.json was present and parseable (even if photos array is empty) */
   hasMetadata: boolean;
-  photos: Array<{ filename: string; originalName: string; thumbFilename: string | null }>;
+  photos: Array<{
+    filename: string;
+    originalName: string;
+    thumbFilename: string | null;
+    dsoIds: string[];
+    observationDate: string | null;
+  }>;
   hasDsoOverrides: boolean;
   hasCustomGear: boolean;
   hasSetups: boolean;
@@ -177,6 +189,8 @@ export interface PreviewImageEntry {
   originalName: string;
   size: number;
   exists: boolean;
+  dsoIds?: string[];
+  observationDate?: string | null;
 }
 
 /** A plan entry as surfaced to the import-preview client. */
@@ -369,6 +383,12 @@ export interface SetupImportPlan {
 
 const SETUP_CHOICES: readonly string[] = ['replace', 'keepBoth', 'skip'];
 
+/** The name of a setup kept beside the local one: the name typed, else the bundle's followed by " (import)". */
+function keptName(bundleName: string, typed: unknown): string {
+  const name = typeof typed === 'string' ? typed.trim().slice(0, 100) : '';
+  return name || `${bundleName} (import)`;
+}
+
 /**
  * Decides what an import does with the setups of a bundle. A setup is handled when it is ticked or is
  * the setup of a ticked plan. With no local counterpart it is imported; an identical one is left alone
@@ -384,6 +404,8 @@ export function planSetupImportActions(input: {
   selectedSetups: ReadonlySet<string>;
   selectedGear: ReadonlySet<string>;
   choices: Readonly<Record<string, string>>;
+  /** The name typed for a setup kept beside the local one. */
+  names?: Readonly<Record<string, string>>;
   localSetups: readonly GearSetupData[];
   localGearIds: ReadonlySet<string>;
   /** A fresh unique id (without the `setup-` prefix). */
@@ -427,7 +449,7 @@ export function planSetupImportActions(input: {
         action = {
           ...base,
           action: 'keepBoth',
-          setup: { ...setup, id, name: `${setup.name} (import)` },
+          setup: { ...setup, id, name: keptName(setup.name, input.names?.[setup.id]) },
         };
         setupIdRemap[setup.id] = id;
       } else {
@@ -579,6 +601,11 @@ export async function inspectZipContents(entries: ZipEntry[]): Promise<ZipInspec
           originalName: p.originalName ?? p.filename ?? p.id ?? '',
           thumbFilename:
             typeof p.thumbFilename === 'string' && p.thumbFilename ? p.thumbFilename : null,
+          dsoIds: Array.isArray(p.dsoIds)
+            ? p.dsoIds.filter((id: unknown): id is string => typeof id === 'string')
+            : [],
+          observationDate:
+            typeof p.observationDate === 'string' && p.observationDate ? p.observationDate : null,
         });
       }
       result.imageEntries = rawImageEntries.filter((e) => !thumbSet.has(e.filename));

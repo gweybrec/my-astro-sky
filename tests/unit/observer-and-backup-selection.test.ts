@@ -22,7 +22,7 @@ import {
   selectedPhotoBytes,
   SETUP_CHOICES,
   setupChoiceMissing,
-  setupChoiceUnticks,
+  setupConflictWarningKey,
   setupLocked,
   setupNeedsChoice,
   setupTicked,
@@ -166,23 +166,44 @@ describe('backup selection', () => {
     expect(buildImportOptions(preview(), sel()).selectedImages).toBeNull();
   });
 
-  it('offers three choices for a different setup, and waits for one before importing', () => {
-    expect(SETUP_CHOICES.map((c) => c.value)).toEqual(['replace', 'keepBoth', 'skip']);
+  it('offers two choices for a ticked different setup, and waits for one (and a kept name) before importing', () => {
+    expect(SETUP_CHOICES.map((c) => c.value)).toEqual(['replace', 'keepBoth']);
     const p = preview();
     expect(setupChoiceMissing(p, sel())).toBe(false);
     expect(setupChoiceMissing(p, sel({ setups: new Set(['sB']) }))).toBe(true);
-    expect(
-      setupChoiceMissing(p, sel({ setups: new Set(['sB']), setupChoices: { sB: 'keepBoth' } })),
-    ).toBe(false);
+    const keep = (setupNames?: Record<string, string>) =>
+      sel({ setups: new Set(['sB']), setupChoices: { sB: 'keepBoth' }, setupNames });
+    expect(setupChoiceMissing(p, keep())).toBe(false);
+    expect(setupChoiceMissing(p, keep({ sB: 'B bis' }))).toBe(false);
+    expect(setupChoiceMissing(p, keep({ sB: '  ' }))).toBe(true);
   });
 
-  it('treats "do not import" as unticking unless a ticked plan needs the setup', () => {
-    const p = preview({
-      plans: [{ id: 'p1', name: 'Plan', exists: false, setupId: 'sB' }],
-    });
-    const sB = p.setups[1];
-    expect(setupChoiceUnticks(p, new Set(), sB, 'skip')).toBe(true);
-    expect(setupChoiceUnticks(p, new Set(['p1']), sB, 'skip')).toBe(false);
-    expect(setupChoiceUnticks(p, new Set(), sB, 'replace')).toBe(false);
+  it('asks nothing for an unticked different setup, even one a ticked plan needs: the local one is used', () => {
+    const p = preview({ plans: [{ id: 'p1', name: 'Plan', exists: false, setupId: 'sB' }] });
+    const s = sel({ plans: new Set(['p1']) });
+    expect(setupNeedsChoice(p, s, p.setups[1])).toBe(false);
+    expect(setupChoiceMissing(p, s)).toBe(false);
+    expect(buildImportOptions(p, s).setupConflicts).toEqual({});
+  });
+
+  it('sends the name typed for a kept setup, its own name when none was typed', () => {
+    const p = preview();
+    const kept = (setupNames?: Record<string, string>) =>
+      buildImportOptions(
+        p,
+        sel({ setups: new Set(['sB']), setupChoices: { sB: 'keepBoth' }, setupNames }),
+      ).setupNames;
+    expect(kept()).toEqual({ sB: 'B' });
+    expect(kept({ sB: ' B bis ' })).toEqual({ sB: 'B bis' });
+    expect(
+      buildImportOptions(p, sel({ setups: new Set(['sB']), setupChoices: { sB: 'replace' } }))
+        .setupNames,
+    ).toEqual({});
+  });
+
+  it('words the line under a setup by its choice', () => {
+    expect(setupConflictWarningKey(undefined)).toBe('settings.importSetupChooseWarning');
+    expect(setupConflictWarningKey('replace')).toBe('settings.importReplaceWarning');
+    expect(setupConflictWarningKey('keepBoth')).toBe('settings.importSetupKeepBothWarning');
   });
 });

@@ -340,7 +340,9 @@ const es: Translations = {
     importSelectAll: 'Seleccionar todo',
     importSetupReplace: 'Reemplazar',
     importSetupKeepBoth: 'Conservar ambas',
-    importSetupSkip: 'No importar',
+    importSetupChooseWarning: 'Ya existe un elemento con el mismo nombre: elija una opción.',
+    importSetupKeepBothWarning: 'Ya existe un elemento con el mismo nombre: se conservarán ambos.',
+    importSetupKeptName: 'Nombre de la configuración importada',
     importSetupIdentical: 'Ya existe, idéntica',
     importSetupWithPlan: 'Importada con el plan «{name}»',
     importReplaceWarning:

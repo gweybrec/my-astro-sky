@@ -65,6 +65,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/AstrometryKeyPage.vue'),
   },
   { path: '/settings/backup', component: () => import('./pages/BackupPage.vue') },
+  // The steps of a restore (boards "Restaurer, photos", "…, setups", "…, plans", "…, le reste"), one page each.
+  {
+    path: '/settings/backup/restore/:step(photos|setups|plans|other)',
+    component: () => import('./pages/RestorePage.vue'),
+  },
   { path: '/settings/about', component: () => import('./pages/AboutPage.vue') },
   { path: '/settings/privacy', component: () => import('./pages/PrivacyPage.vue') },
   { path: '/settings/credits', component: () => import('./pages/DataCreditsPage.vue') },

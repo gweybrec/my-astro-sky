@@ -693,6 +693,34 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(preview).toMatchObject({ hasDsoOverrides: false, hasSkyRegions: false, plans: [] });
     });
 
+    it("gives each previewed image its photo's objects and observation date (the gallery's order needs them)", async () => {
+      const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
+      const manifest = JSON.stringify({
+        manifestVersion: 1,
+        photos: [
+          {
+            id: 'a',
+            filename: 'a.jpg',
+            originalName: 'Andromeda.jpg',
+            dsoIds: ['M31', 7],
+            observationDate: '2025-09-14T21:00:00Z',
+          },
+          { id: 'b', filename: 'b.jpg', originalName: 'Lune.jpg' },
+        ],
+      });
+      const preview = await svc.preview(
+        memoryReader([
+          ['manifest.json', manifest],
+          ['images/a.jpg', 'x'],
+          ['images/b.jpg', 'y'],
+        ]),
+      );
+      expect(preview.images).toMatchObject([
+        { filename: 'a.jpg', dsoIds: ['M31'], observationDate: '2025-09-14T21:00:00Z' },
+        { filename: 'b.jpg', dsoIds: [], observationDate: null },
+      ]);
+    });
+
     it('fails with the parse error when manifest.json is not JSON', async () => {
       const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
       await expect(

@@ -404,6 +404,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const filenameToOriginalName = new Map(
         inspect.photos.map((p) => [p.filename, p.originalName]),
       );
+      const photoOf = new Map(inspect.photos.map((p) => [p.filename, p]));
       const originalNames = inspect.photos.map((p) => p.originalName).filter(Boolean);
       const existingSet = new Set(
         originalNames.length > 0
@@ -416,6 +417,8 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         originalName: filenameToOriginalName.get(entry.filename) ?? entry.filename,
         size: entry.size,
         exists: existingSet.has(filenameToOriginalName.get(entry.filename) ?? ''),
+        dsoIds: photoOf.get(entry.filename)?.dsoIds ?? [],
+        observationDate: photoOf.get(entry.filename)?.observationDate ?? null,
       }));
 
       // Keyboard shortcuts are localStorage-only, so they aren't imported here:
@@ -514,6 +517,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const selectedSetups = new Set(selection.selectedSetups ?? []);
       const selectedGear = new Set(selection.selectedGear ?? []);
       const setupChoices: Record<string, string> = selection.setupConflicts ?? {};
+      const setupNames: Record<string, string> = selection.setupNames ?? {};
 
       let dsoOverridesImported = 0;
       // Items that could not be restored; the others are still imported.
@@ -600,6 +604,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         selectedSetups,
         selectedGear,
         choices: setupChoices,
+        names: setupNames,
         localSetups,
         localGearIds: new Set(existingGear.map((g) => g.id)),
         newId,

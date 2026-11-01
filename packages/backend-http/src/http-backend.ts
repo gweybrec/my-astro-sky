@@ -599,6 +599,10 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
             opts.setupConflicts && Object.keys(opts.setupConflicts).length > 0
               ? JSON.stringify(opts.setupConflicts)
               : undefined,
+          setupNames:
+            opts.setupNames && Object.keys(opts.setupNames).length > 0
+              ? JSON.stringify(opts.setupNames)
+              : undefined,
         });
         return sendForm('/api/import', form);
       },

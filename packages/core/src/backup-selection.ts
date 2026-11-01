@@ -82,6 +82,8 @@ export interface ImportSelection {
   gear: ReadonlySet<string>;
   /** Choice per setup id, for the setups whose content differs from a local one. */
   setupChoices: Readonly<Record<string, SetupImportChoice>>;
+  /** Name per setup id for a setup kept beside the local one (`keepBoth`); absent: the setup's own name. */
+  setupNames?: Readonly<Record<string, string>>;
 }
 
 /** Names of the ticked plans whose setup is `setupId`, by setup id. */
@@ -124,37 +126,46 @@ export function setupTicked(
   return s.conflict !== 'identical' && (sel.setups.has(s.id) || setupLocked(preview, sel.plans, s));
 }
 
-/** A different setup that will be imported, or that a ticked plan needs, must be told what to do. */
+/**
+ * A ticked setup that differs from a local one must be told what to do. Unticked, it is not imported: a ticked plan
+ * that needs it is pointed at the local setup.
+ */
 export function setupNeedsChoice(
-  preview: ImportPreviewResult,
-  sel: Pick<ImportSelection, 'plans' | 'setups'>,
+  _preview: ImportPreviewResult,
+  sel: Pick<ImportSelection, 'setups'>,
   s: ImportPreviewSetup,
 ): boolean {
-  return (
-    s.conflict === 'different' && (sel.setups.has(s.id) || setupRequired(preview, sel.plans, s))
-  );
+  return s.conflict === 'different' && sel.setups.has(s.id);
 }
 
-/** The three choices offered for a different setup, in order, with the i18n key of each label. */
+/** The choices offered for a different setup, in order, with the i18n key of each label (unticking it skips it). */
 export const SETUP_CHOICES: readonly { value: SetupImportChoice; label: string }[] = [
   { value: 'replace', label: 'settings.importSetupReplace' },
   { value: 'keepBoth', label: 'settings.importSetupKeepBoth' },
-  { value: 'skip', label: 'settings.importSetupSkip' },
 ];
 
-/** A setup that needs a choice has none yet: the import cannot start. */
-export function setupChoiceMissing(preview: ImportPreviewResult, sel: ImportSelection): boolean {
-  return preview.setups.some((s) => setupNeedsChoice(preview, sel, s) && !sel.setupChoices[s.id]);
+/** The name a setup kept beside the local one is imported under: the one typed, else its own. */
+export function keptSetupName(
+  sel: Pick<ImportSelection, 'setupNames'>,
+  s: ImportPreviewSetup,
+): string {
+  return sel.setupNames?.[s.id] ?? s.name;
 }
 
-/** "Do not import" on a setup no ticked plan needs is the same as unticking it: the choice is not kept. */
-export function setupChoiceUnticks(
-  preview: ImportPreviewResult,
-  tickedPlans: ReadonlySet<string>,
-  s: ImportPreviewSetup,
-  choice: SetupImportChoice,
-): boolean {
-  return choice === 'skip' && !setupRequired(preview, tickedPlans, s);
+/** A setup that needs a choice has none yet, or is kept with a blank name: the import cannot start. */
+export function setupChoiceMissing(preview: ImportPreviewResult, sel: ImportSelection): boolean {
+  return preview.setups.some((s) => {
+    if (!setupNeedsChoice(preview, sel, s)) return false;
+    const choice = sel.setupChoices[s.id];
+    return !choice || (choice === 'keepBoth' && !keptSetupName(sel, s).trim());
+  });
+}
+
+/** The i18n key of the line under a setup whose name exists here: it asks for a choice, then says what it does. */
+export function setupConflictWarningKey(choice: SetupImportChoice | undefined): string {
+  if (choice === 'replace') return 'settings.importReplaceWarning';
+  if (choice === 'keepBoth') return 'settings.importSetupKeepBothWarning';
+  return 'settings.importSetupChooseWarning';
 }
 
 /** At least one thing is ticked. */
@@ -190,6 +201,11 @@ export function buildImportOptions(
       preview.setups
         .filter((s) => setupNeedsChoice(preview, sel, s) && sel.setupChoices[s.id])
         .map((s) => [s.id, sel.setupChoices[s.id]]),
+    ),
+    setupNames: Object.fromEntries(
+      preview.setups
+        .filter((s) => setupNeedsChoice(preview, sel, s) && sel.setupChoices[s.id] === 'keepBoth')
+        .map((s) => [s.id, keptSetupName(sel, s).trim()]),
     ),
   };
 }

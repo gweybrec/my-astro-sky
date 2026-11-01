@@ -33,6 +33,8 @@ import SetupsPage from '../src/pages/SetupsPage.vue';
 import SetupEditPage from '../src/pages/SetupEditPage.vue';
 import LocationPage from '../src/pages/LocationPage.vue';
 import BackupPage from '../src/pages/BackupPage.vue';
+import RestorePage from '../src/pages/RestorePage.vue';
+import { useRestore } from '../src/composables/useRestore';
 import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
 import AboutPage from '../src/pages/AboutPage.vue';
 import PrivacyPage from '../src/pages/PrivacyPage.vue';
@@ -131,6 +133,7 @@ function app() {
     history: createMemoryHistory(),
     routes: [
       { path: '/settings/setups/:id', component: { template: '<div />' } },
+      { path: '/settings/backup/restore/:step', component: { template: '<div />' } },
       { path: '/:p(.*)*', component: { template: '<div />' } },
     ],
   });
@@ -152,6 +155,7 @@ beforeEach(() => {
   backend.photos.listWithSizes.mockResolvedValue([]);
   backend.dsoOverrides.getAll.mockResolvedValue({});
   setBackend(backend as never);
+  useRestore().reset();
 });
 
 describe('the astrometry.net key page', () => {
@@ -673,16 +677,33 @@ describe('the location page', () => {
 });
 
 describe('the backup page', () => {
+  const photo = (id: string, originalName: string, fileSize: number, extra: object = {}) => ({
+    id,
+    originalName,
+    fileSize,
+    dsoIds: [],
+    ...extra,
+  });
+
+  /** A promise and the function that settles it, to hold an action running. */
+  function held<T>() {
+    let settle!: (v: T) => void;
+    const promise = new Promise<T>((resolve) => (settle = resolve));
+    return { promise, settle };
+  }
+  const button = (w: ReturnType<typeof mount>, label: string) =>
+    w.findAll('button').find((b) => b.text() === label)!;
+  const isBusy = (b: ReturnType<ReturnType<typeof mount>['find']>) =>
+    b.classes().includes('mob-btn--busy') && b.find('.mob-spinner').exists();
+  const radios = (w: ReturnType<typeof mount>) => w.findAll('[role="radio"]');
+
   it('exports with the ticked contents', async () => {
-    backend.photos.listWithSizes.mockResolvedValue([{ id: 'p1', fileSize: 1000 }]);
+    backend.photos.listWithSizes.mockResolvedValue([photo('p1', 'M31.jpg', 1000)]);
     const { global } = app();
     const w = mount(BackupPage, { global });
     await flushPromises();
     expect(w.text()).toContain('Taille estimée');
-    await w
-      .findAll('button')
-      .find((b) => b.text() === 'Créer une sauvegarde')!
-      .trigger('click');
+    await button(w, 'Créer une sauvegarde').trigger('click');
     await flushPromises();
     expect(backend.backup.exportToUser).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -697,7 +718,33 @@ describe('the backup page', () => {
     );
   });
 
-  const previewWithDifferentSetup = () => ({
+  it("lists the photos to save in the gallery's order and saves only the ticked ones", async () => {
+    backend.photos.listWithSizes.mockResolvedValue([
+      photo('p3', 'Lune.jpg', 3000),
+      photo('p2', 'NGC7000.tif', 2000),
+      photo('p1', 'M31.jpg', 1000),
+    ]);
+    const { global } = app();
+    const w = mount(BackupPage, { global });
+    await flushPromises();
+    expect(w.text()).toContain('3 / 3');
+    const rows = () => w.findAll('.mob-list').at(-1)!.findAll('.mob-row-title');
+    expect(rows().map((r) => r.text())).toEqual([
+      'Tout sélectionner',
+      'M31.jpg',
+      'NGC7000.tif',
+      'Lune.jpg',
+    ]);
+    await w.findAll('.mob-list').at(-1)!.findAll('[role="checkbox"]')[2].trigger('click');
+    expect(w.text()).toContain('2 / 3');
+    await button(w, 'Créer une sauvegarde').trigger('click');
+    await flushPromises();
+    expect(backend.backup.exportToUser).toHaveBeenCalledWith(
+      expect.objectContaining({ ids: ['p1', 'p3'] }),
+    );
+  });
+
+  const previewOf = (over: object = {}) => ({
     hasMetadata: false,
     photos: 0,
     hasDsoOverrides: false,
@@ -711,82 +758,162 @@ describe('the backup page', () => {
     plans: [],
     setups: [{ id: 'sB', name: 'B', exists: true, conflict: 'different' as const }],
     gear: [],
+    ...over,
   });
 
-  async function openPreview() {
-    backend.backup.preview.mockResolvedValue(previewWithDifferentSetup());
+  /** Chooses a backup on the backup page; the router is then on the first step of the restore. */
+  async function chooseBackup(preview: object = previewOf()) {
+    backend.backup.preview.mockResolvedValue(preview);
     backend.backup.restore.mockResolvedValue({ imported: 1, skipped: 0 });
     pickFile.mockResolvedValue(new File(['x'], 'sauvegarde.zip'));
-    const { global } = app();
+    const { global, router } = app();
     const w = mount(BackupPage, { global });
     await flushPromises();
-    await w
-      .findAll('button')
-      .find((b) => b.text() === 'Choisir un fichier')!
-      .trigger('click');
+    await button(w, 'Choisir un fichier').trigger('click');
+    await flushPromises();
+    return { w, router, global };
+  }
+  /** Opens the restore step the router is on. */
+  async function stepPage(ctx: Awaited<ReturnType<typeof chooseBackup>>) {
+    const w = mount(RestorePage, { global: ctx.global });
     await flushPromises();
     return w;
   }
-  const restoreButton = (w: Awaited<ReturnType<typeof openPreview>>) =>
-    w.findAll('button').find((b) => b.text() === 'Restaurer une sauvegarde')!;
-  const radios = (w: Awaited<ReturnType<typeof openPreview>>) => w.findAll('[role="radio"]');
 
-  it('previews a file and offers the three choices for a different setup, none chosen at first', async () => {
-    const w = await openPreview();
-    expect(w.text()).toContain('sauvegarde.zip');
-    expect(w.text()).toContain('Setups (1)');
-    expect(w.text()).toContain('sera remplacé');
-    expect(radios(w).map((r) => r.text())).toEqual([
-      'Remplacer',
-      'Garder les deux',
-      'Ne pas importer',
-    ]);
-    expect(radios(w).every((r) => r.attributes('aria-checked') === 'false')).toBe(true);
-    expect(restoreButton(w).attributes('disabled')).toBeDefined();
+  it('reads the chosen file and opens the first step of the restore', async () => {
+    const ctx = await chooseBackup();
+    expect(ctx.router.currentRoute.value.path).toBe('/settings/backup/restore/setups');
+    expect(ctx.w.text()).not.toContain('Setups (1)');
   });
 
-  it.each([
-    ['Remplacer', 'replace'],
-    ['Garder les deux', 'keepBoth'],
-  ])('sends the choice "%s" to the import call and reports the result', async (label, value) => {
-    const w = await openPreview();
-    await radios(w)
-      .find((r) => r.text() === label)!
-      .trigger('click');
+  it('skips the steps the backup has nothing for, and counts only the others', async () => {
+    const ctx = await chooseBackup(
+      previewOf({
+        images: [{ filename: 'a.jpg', originalName: 'a.jpg', size: 10, exists: false }],
+        setups: [],
+        plans: [{ id: 'pl', name: 'Nuit', exists: false, setupId: null }],
+      }),
+    );
+    expect(ctx.router.currentRoute.value.path).toBe('/settings/backup/restore/photos');
+    const w = await stepPage(ctx);
+    expect(w.text()).toContain('sauvegarde.zip');
+    expect(w.text()).toContain('1 / 2');
+    await button(w, 'Suivant').trigger('click');
+    await flushPromises();
+    expect(ctx.router.currentRoute.value.path).toBe('/settings/backup/restore/plans');
+    const plans = await stepPage(ctx);
+    expect(plans.text()).toContain('2 / 2');
+    expect(plans.text()).toContain('Plans (1)');
+    expect(button(plans, 'Restaurer une sauvegarde').exists()).toBe(true);
+  });
+
+  it("lists the backup's photos in the gallery's order", async () => {
+    const ctx = await chooseBackup(
+      previewOf({
+        setups: [],
+        images: [
+          { filename: 'c', originalName: 'Andromeda.jpg', size: 1, exists: false, dsoIds: ['M31'] },
+          { filename: 'a', originalName: 'Lune.jpg', size: 1, exists: false },
+          { filename: 'b', originalName: 'M8.jpg', size: 1, exists: false },
+        ],
+      }),
+    );
+    const w = await stepPage(ctx);
+    expect(w.findAll('.mob-row-title').map((r) => r.text())).toEqual([
+      'sauvegarde.zip',
+      'Tout sélectionner',
+      'M8.jpg',
+      'Andromeda.jpg',
+      'Lune.jpg',
+    ]);
+  });
+
+  it('offers two choices for a different setup, none chosen at first, "Suivant" waiting for one', async () => {
+    const ctx = await chooseBackup(
+      previewOf({ plans: [{ id: 'pl', name: 'Nuit', exists: false, setupId: null }] }),
+    );
+    const w = await stepPage(ctx);
+    expect(w.text()).toContain('Setups (1)');
+    expect(w.text()).toContain('choisissez une option');
     expect(w.text()).not.toContain('sera remplacé');
-    expect(restoreButton(w).attributes('disabled')).toBeUndefined();
-    await restoreButton(w).trigger('click');
+    expect(radios(w).map((r) => r.text())).toEqual(['Remplacer', 'Garder les deux']);
+    expect(radios(w).every((r) => r.attributes('aria-checked') === 'false')).toBe(true);
+    expect(w.find('.restore-choices').exists()).toBe(true);
+    expect(button(w, 'Suivant').attributes('disabled')).toBeDefined();
+    await radios(w)
+      .find((r) => r.text() === 'Remplacer')!
+      .trigger('click');
+    expect(w.text()).toContain('sera remplacé');
+    expect(button(w, 'Suivant').attributes('disabled')).toBeUndefined();
+  });
+
+  it('names the ticked plan that brings a setup in', async () => {
+    const ctx = await chooseBackup(
+      previewOf({
+        setups: [{ id: 'sA', name: 'A', exists: false, conflict: 'none' as const }],
+        plans: [{ id: 'pl', name: 'Nuit', exists: false, setupId: 'sA' }],
+      }),
+    );
+    const w = await stepPage(ctx);
+    expect(w.text()).toContain('Importé avec le plan « Nuit »');
+  });
+
+  it('sends "Remplacer" to the import call and reports the result', async () => {
+    const ctx = await chooseBackup();
+    const w = await stepPage(ctx);
+    await radios(w)
+      .find((r) => r.text() === 'Remplacer')!
+      .trigger('click');
+    expect(w.find('.restore-choices input').exists()).toBe(false);
+    await button(w, 'Restaurer une sauvegarde').trigger('click');
     await flushPromises();
     expect(backend.backup.restore).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ selectedSetups: ['sB'], setupConflicts: { sB: value } }),
+      expect.objectContaining({ selectedSetups: ['sB'], setupConflicts: { sB: 'replace' } }),
     );
     expect(showInfo).toHaveBeenCalled();
   });
 
-  it('treats "Ne pas importer" as unticking the setup: nothing is sent for it', async () => {
-    const w = await openPreview();
+  it('"Garder les deux" asks the name of the kept copy, filled with its own, and sends the one typed', async () => {
+    const ctx = await chooseBackup();
+    const w = await stepPage(ctx);
     await radios(w)
-      .find((r) => r.text() === 'Ne pas importer')!
+      .find((r) => r.text() === 'Garder les deux')!
       .trigger('click');
-    expect(radios(w)).toHaveLength(0);
-    expect(restoreButton(w).attributes('disabled')).toBeDefined();
-    expect(backend.backup.restore).not.toHaveBeenCalled();
+    expect(w.text()).toContain('les deux seront gardés');
+    expect(w.text()).toContain('Nom du setup importé');
+    const field = w.find<HTMLInputElement>('.restore-choices input');
+    expect(field.element.value).toBe('B');
+    await field.setValue('  ');
+    expect(button(w, 'Restaurer une sauvegarde').attributes('disabled')).toBeDefined();
+    await field.setValue('B bis');
+    await button(w, 'Restaurer une sauvegarde').trigger('click');
+    await flushPromises();
+    expect(backend.backup.restore).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        setupConflicts: { sB: 'keepBoth' },
+        setupNames: { sB: 'B bis' },
+      }),
+    );
   });
 
-  /** A promise and the function that settles it, to hold an action running. */
-  function held<T>() {
-    let settle!: (v: T) => void;
-    const promise = new Promise<T>((resolve) => (settle = resolve));
-    return { promise, settle };
-  }
-  const button = (w: ReturnType<typeof mount>, label: string) =>
-    w.findAll('button').find((b) => b.text() === label)!;
-  const isBusy = (b: ReturnType<ReturnType<typeof mount>['find']>) =>
-    b.classes().includes('mob-btn--busy') && b.find('.mob-spinner').exists();
+  it('asks nothing for a different setup once unticked: it is not imported', async () => {
+    const ctx = await chooseBackup(
+      previewOf({ plans: [{ id: 'pl', name: 'Nuit', exists: false, setupId: 'sB' }] }),
+    );
+    const w = await stepPage(ctx);
+    await w
+      .findAll('[role="checkbox"]')
+      .find((c) => c.text().startsWith('B'))!
+      .trigger('click');
+    expect(radios(w)).toHaveLength(0);
+    expect(w.text()).not.toContain('choisissez une option');
+    expect(button(w, 'Suivant').attributes('disabled')).toBeUndefined();
+  });
 
   it('shows the spinner on "Créer une sauvegarde" while the backup is built, and only once', async () => {
-    backend.photos.listWithSizes.mockResolvedValue([{ id: 'p1', fileSize: 1000 }]);
+    backend.photos.listWithSizes.mockResolvedValue([photo('p1', 'M31.jpg', 1000)]);
     const run = held<void>();
     backend.backup.exportToUser.mockReturnValue(run.promise);
     const { global } = app();
@@ -803,49 +930,68 @@ describe('the backup page', () => {
   });
 
   it('shows the spinner on "Choisir un fichier" while the chosen file is read', async () => {
-    const run = held<ReturnType<typeof previewWithDifferentSetup>>();
+    const run = held<ReturnType<typeof previewOf>>();
     backend.backup.preview.mockReturnValue(run.promise);
     pickFile.mockResolvedValue(new File(['x'], 'sauvegarde.zip'));
-    const { global } = app();
+    const { global, router } = app();
     const w = mount(BackupPage, { global });
     await flushPromises();
     await button(w, 'Choisir un fichier').trigger('click');
     await flushPromises();
     expect(isBusy(button(w, 'Choisir un fichier'))).toBe(true);
-    run.settle(previewWithDifferentSetup());
+    run.settle(previewOf());
     await flushPromises();
     expect(w.find('.mob-btn--busy').exists()).toBe(false);
-    expect(w.text()).toContain('sauvegarde.zip');
+    expect(router.currentRoute.value.path).toBe('/settings/backup/restore/setups');
   });
 
   it('shows the spinner on "Restaurer une sauvegarde" while restoring', async () => {
-    const w = await openPreview();
+    const ctx = await chooseBackup();
+    const w = await stepPage(ctx);
     const run = held<{ imported: number; skipped: number }>();
     backend.backup.restore.mockReturnValue(run.promise);
     await radios(w)
       .find((r) => r.text() === 'Remplacer')!
       .trigger('click');
-    await restoreButton(w).trigger('click');
+    await button(w, 'Restaurer une sauvegarde').trigger('click');
     await flushPromises();
-    expect(isBusy(restoreButton(w))).toBe(true);
-    expect(button(w, 'Changer de fichier').attributes('disabled')).toBeDefined();
+    expect(isBusy(button(w, 'Restaurer une sauvegarde'))).toBe(true);
     run.settle({ imported: 1, skipped: 0 });
     await flushPromises();
     expect(w.find('.mob-btn--busy').exists()).toBe(false);
   });
 
+  it('shows the toast when the restore fails', async () => {
+    const ctx = await chooseBackup();
+    const w = await stepPage(ctx);
+    backend.backup.restore.mockRejectedValue(new Error('bad'));
+    await radios(w)
+      .find((r) => r.text() === 'Remplacer')!
+      .trigger('click');
+    await button(w, 'Restaurer une sauvegarde').trigger('click');
+    await flushPromises();
+    expect(showError).toHaveBeenCalled();
+    expect(showInfo).not.toHaveBeenCalled();
+  });
+
+  it('goes back to the backup page when a step is opened with no backup read', async () => {
+    const { global, router } = app();
+    await router.push('/settings/backup/restore/plans');
+    mount(RestorePage, { global });
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/backup');
+  });
+
   it('shows the toast when the file cannot be read', async () => {
     backend.backup.preview.mockRejectedValue(new Error('bad'));
     pickFile.mockResolvedValue(new File(['x'], 'x.zip'));
-    const { global } = app();
+    const { global, router } = app();
     const w = mount(BackupPage, { global });
     await flushPromises();
-    await w
-      .findAll('button')
-      .find((b) => b.text() === 'Choisir un fichier')!
-      .trigger('click');
+    await button(w, 'Choisir un fichier').trigger('click');
     await flushPromises();
     expect(showError).toHaveBeenCalled();
+    expect(router.currentRoute.value.path).not.toContain('restore');
   });
 });
 

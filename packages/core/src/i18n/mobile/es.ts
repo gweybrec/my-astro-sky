@@ -212,7 +212,12 @@ const es: Translations['mobile'] = {
     overlapLess: 'Menos solapamiento',
     overlapMore: 'Más solapamiento',
   },
-  backup: { exportSection: 'Exportar', importSection: 'Importar' },
+  backup: {
+    exportSection: 'Exportar',
+    importSection: 'Importar',
+    next: 'Siguiente',
+    stepAria: 'Paso {n} de {total}',
+  },
   startup: {
     failed: 'La aplicación no pudo iniciarse.',
     updateFailed: 'La aplicación no pudo actualizar su base de datos. Sus datos están intactos.',

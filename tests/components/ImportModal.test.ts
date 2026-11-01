@@ -133,71 +133,80 @@ describe('ImportModal setups', () => {
     expect(row.find('[data-test="import-setup-choice"]').exists()).toBe(false);
   });
 
-  it('offers three radio buttons for a different setup, and disables the confirm button until one is chosen', async () => {
+  it('offers two radio buttons for a different setup, and disables the confirm button until one is chosen', async () => {
     const w = await openDialog();
     const choice = setupRow(w, 'Diff rig').find('[data-test="import-setup-choice"]');
     const radios = () => choice.findAll('input[type="radio"]');
     expect(radios().map((r) => (r.element as HTMLInputElement).value)).toEqual([
       'replace',
       'keepBoth',
-      'skip',
     ]);
     expect(choice.findAll('label').map((l) => l.text())).toEqual([
       'settings.importSetupReplace',
       'settings.importSetupKeepBoth',
-      'settings.importSetupSkip',
     ]);
 
-    // Nothing is chosen at first: the confirm button waits, and the name carries a warning mark.
+    // Nothing is chosen at first: the confirm button waits, and the warning mark asks for a choice.
+    const warning = () => setupRow(w, 'Diff rig').find('[data-test="import-setup-warning"]');
     expect(radios().every((r) => !(r.element as HTMLInputElement).checked)).toBe(true);
     expect(confirmButton(w).attributes('disabled')).toBeDefined();
-    expect(setupRow(w, 'Diff rig').find('.import-warn-icon').exists()).toBe(true);
+    expect(warning().attributes('title')).toBe('settings.importSetupChooseWarning');
 
-    await radioFor(w, 'Diff rig', 'keepBoth').setValue(true);
+    await radioFor(w, 'Diff rig', 'replace').setValue(true);
     expect(confirmButton(w).attributes('disabled')).toBeUndefined();
-    expect(setupRow(w, 'Diff rig').find('.import-warn-icon').exists()).toBe(false);
+    expect(warning().attributes('title')).toBe('settings.importReplaceWarning');
+    await radioFor(w, 'Diff rig', 'keepBoth').setValue(true);
+    expect(warning().attributes('title')).toBe('settings.importSetupKeepBothWarning');
     expect((radioFor(w, 'Diff rig', 'keepBoth').element as HTMLInputElement).checked).toBe(true);
   });
 
   it('sends the choice as setupConflicts, for the different setup only', async () => {
     const w = await openDialog();
     await radioFor(w, 'Diff rig', 'replace').setValue(true);
+    expect(setupRow(w, 'Diff rig').find('[data-test="import-setup-kept-name"]').exists()).toBe(
+      false,
+    );
     await confirmButton(w).trigger('click');
     await flushPromises();
 
     expect(api.importData).toHaveBeenCalledTimes(1);
     const opts = api.importData.mock.calls[0][1];
     expect(opts.setupConflicts).toEqual({ 'setup-diff': 'replace' });
+    expect(opts.setupNames).toEqual({});
     expect(opts.selectedPlans.sort()).toEqual(['plan-a', 'plan-b', 'plan-c']);
     // The identical setup is never offered for import.
     expect(opts.selectedSetups).not.toContain('setup-same');
   });
 
-  it('"Do not import" on a setup no ticked plan needs unticks it and asks nothing more', async () => {
+  it('"Keep both" asks the name of the kept copy, filled with its own, and sends the one typed', async () => {
     const w = await openDialog();
-    await planCheckbox(w, 'Plan C').setValue(false);
-    await radioFor(w, 'Diff rig', 'skip').setValue(true);
+    await radioFor(w, 'Diff rig', 'keepBoth').setValue(true);
+    const name = setupRow(w, 'Diff rig').find('[data-test="import-setup-kept-name"]');
+    expect((name.element as HTMLInputElement).value).toBe('Diff rig');
+    await name.setValue(' ');
+    expect(confirmButton(w).attributes('disabled')).toBeDefined();
+    await name.setValue('Diff rig 2');
+    await confirmButton(w).trigger('click');
+    await flushPromises();
+    const opts = api.importData.mock.calls[0][1];
+    expect(opts.setupConflicts).toEqual({ 'setup-diff': 'keepBoth' });
+    expect(opts.setupNames).toEqual({ 'setup-diff': 'Diff rig 2' });
+  });
 
+  it('asks nothing for an unticked different setup, even one a ticked plan needs, and sends no choice', async () => {
+    const w = await openDialog();
+    await setupRow(w, 'Diff rig').find('input[type="checkbox"]').setValue(false);
     const row = setupRow(w, 'Diff rig');
-    expect((row.find('input').element as HTMLInputElement).checked).toBe(false);
     expect(row.find('[data-test="import-setup-choice"]').exists()).toBe(false);
+    expect(row.find('[data-test="import-setup-warning"]').exists()).toBe(false);
     expect(confirmButton(w).attributes('disabled')).toBeUndefined();
 
     await confirmButton(w).trigger('click');
     await flushPromises();
     const opts = api.importData.mock.calls[0][1];
     expect(opts.selectedSetups).not.toContain('setup-diff');
+    expect(opts.selectedPlans).toContain('plan-c');
     expect(opts.setupConflicts).toEqual({});
-  });
-
-  it('keeps "Do not import" as a choice when a ticked plan needs the setup', async () => {
-    const w = await openDialog();
-    await radioFor(w, 'Diff rig', 'skip').setValue(true);
-    expect((radioFor(w, 'Diff rig', 'skip').element as HTMLInputElement).checked).toBe(true);
-
-    await confirmButton(w).trigger('click');
-    await flushPromises();
-    expect(api.importData.mock.calls[0][1].setupConflicts).toEqual({ 'setup-diff': 'skip' });
   });
 });
 

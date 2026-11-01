@@ -2,7 +2,7 @@ import type { Photo, PoiCategory } from './types';
 import { getDSOById } from './catalog/dso-registry';
 import { poisMatchFilter } from './poi';
 import { NO_LABEL } from './photo-placement';
-import { smartSortPhotos } from './photo-search';
+import { smartSortPhotos, type SortablePhoto } from './photo-search';
 import { storage } from './platform/storage';
 
 /** Sentinel setup id of the photos linked to no (known) gear setup. */
@@ -182,7 +182,7 @@ export function saveGallerySort(sort: GallerySort): void {
 }
 
 /** The photos in the chosen order. By date, photos with no date come last, in name order. */
-export function sortGalleryPhotos(photos: Photo[], sort: GallerySort): Photo[] {
+export function sortGalleryPhotos<T extends SortablePhoto>(photos: T[], sort: GallerySort): T[] {
   const byName = smartSortPhotos(photos);
   if (sort === 'name-asc') return byName;
   if (sort === 'name-desc') return byName.reverse();

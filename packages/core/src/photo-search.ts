@@ -91,11 +91,18 @@ function parseName(name: string): ParsedName {
   return { rank: unknownCatalog + 1, prefix: '', number: 0, rest: name };
 }
 
+/** What the photo orders read: a backup's photo list has these fields too. */
+export interface SortablePhoto {
+  originalName: string;
+  dsoIds?: readonly string[] | null;
+  observationDate?: string | null;
+}
+
 /**
  * A photo's place in the name order: its name's catalogue number, else its most important solved object (a photo
  * "Andromeda_stack" holding M31 sorts as M31, next to "M31_2024", by the rest of its name).
  */
-function parsePhoto(photo: Photo): ParsedName {
+function parsePhoto(photo: SortablePhoto): ParsedName {
   const byName = parseName(photo.originalName);
   if (byName.rank < getCatalogPrefixes().length + 1 || !photo.dsoIds?.length) return byName;
   for (const id of sortDsoIdsByImportance(photo.dsoIds)) {
@@ -115,7 +122,7 @@ const naturalCompare = (a: string, b: string) =>
  * catalogue (M4 before M10 before M100). A photo whose name holds no catalogue number takes the place of its most
  * important solved object. The other photos come last, in natural text order of their names.
  */
-export function smartSortPhotos(photos: Photo[]): Photo[] {
+export function smartSortPhotos<T extends SortablePhoto>(photos: T[]): T[] {
   const parsed = new Map(photos.map((p) => [p, parsePhoto(p)]));
   return [...photos].sort((a, b) => {
     const pa = parsed.get(a)!;

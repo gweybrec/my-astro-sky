@@ -186,8 +186,13 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
  *                 type: string
  *                 description: >
  *                   JSON object mapping a bundle setup id to `replace`, `keepBoth` (imported under
- *                   a new id, name followed by " (import)") or `skip`. Only read for setups whose
+ *                   a new id, with the name from `setupNames`) or `skip`. Only read for setups whose
  *                   content differs from a local one.
+ *               setupNames:
+ *                 type: string
+ *                 description: >
+ *                   JSON object mapping a bundle setup id kept with `keepBoth` to the name it is
+ *                   imported under; blank or absent, its name followed by " (import)".
  *     responses:
  *       200:
  *         description: Import completed successfully
@@ -221,7 +226,8 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
 // Import photos from ZIP (full) or JSON (metadata only)
 // Form fields: bundle (file), importMetadata, importDsoOverrides, selectedImages,
 //              selectedPlans, selectedSetups, selectedGear (all JSON string[]),
-//              setupConflicts (JSON object: bundle setup id -> replace | keepBoth | skip)
+//              setupConflicts (JSON object: bundle setup id -> replace | keepBoth | skip),
+//              setupNames (JSON object: bundle setup id kept with keepBoth -> its name)
 backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
   try {
     const file = req.file;
@@ -248,6 +254,7 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
       // Choice per bundle setup id for a setup whose content differs from a local one.
       setupConflicts:
         typeof req.body?.setupConflicts === 'string' ? JSON.parse(req.body.setupConflicts) : {},
+      setupNames: typeof req.body?.setupNames === 'string' ? JSON.parse(req.body.setupNames) : {},
     };
 
     // Flush libvips handle cache before writing to avoid Windows sharing violations

@@ -213,7 +213,12 @@ const de: Translations['mobile'] = {
     overlapLess: 'Weniger Überlappung',
     overlapMore: 'Mehr Überlappung',
   },
-  backup: { exportSection: 'Exportieren', importSection: 'Importieren' },
+  backup: {
+    exportSection: 'Exportieren',
+    importSection: 'Importieren',
+    next: 'Weiter',
+    stepAria: 'Schritt {n} von {total}',
+  },
   startup: {
     failed: 'Die App konnte nicht starten.',
     updateFailed: 'Die App konnte ihre Datenbank nicht aktualisieren. Ihre Daten sind unversehrt.',

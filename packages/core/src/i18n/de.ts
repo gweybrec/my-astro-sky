@@ -341,7 +341,11 @@ const de: Translations = {
     importSelectAll: 'Alle auswählen',
     importSetupReplace: 'Ersetzen',
     importSetupKeepBoth: 'Beide behalten',
-    importSetupSkip: 'Nicht importieren',
+    importSetupChooseWarning:
+      'Ein Element mit demselben Namen existiert bereits: Wählen Sie eine Option.',
+    importSetupKeepBothWarning:
+      'Ein Element mit demselben Namen existiert bereits: Beide werden behalten.',
+    importSetupKeptName: 'Name des importierten Setups',
     importSetupIdentical: 'Bereits vorhanden, identisch',
     importSetupWithPlan: 'Mit dem Plan „{name}“ importiert',
     importReplaceWarning:

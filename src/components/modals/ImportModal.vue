@@ -198,9 +198,10 @@
                     >
                       <span class="text-small font-normal truncate min-w-0">{{ s.name }}</span>
                       <span
-                        v-if="s.conflict === 'different' && !setupChoices[s.id]"
+                        v-if="setupNeedsChoice(s)"
                         class="import-warn-icon"
-                        :title="t('settings.importReplaceWarning')"
+                        :title="t(setupConflictWarningKey(setupChoices[s.id]))"
+                        data-test="import-setup-warning"
                         >⚠</span
                       >
                     </label>
@@ -237,6 +238,15 @@
                         />
                         <span class="text-small font-normal">{{ t(c.label) }}</span>
                       </label>
+                      <input
+                        v-if="setupChoices[s.id] === 'keepBoth'"
+                        v-model="setupNames[s.id]"
+                        type="text"
+                        class="tag-input"
+                        :aria-label="t('settings.importSetupKeptName')"
+                        :placeholder="t('settings.importSetupKeptName')"
+                        data-test="import-setup-kept-name"
+                      />
                     </div>
                   </div>
                 </div>
@@ -318,7 +328,7 @@ import {
   canImport as canImportBackup,
   SETUP_CHOICES,
   setupChoiceMissing as setupChoiceMissingOf,
-  setupChoiceUnticks,
+  setupConflictWarningKey,
   setupLocked as setupLockedOf,
   setupNeedsChoice as setupNeedsChoiceOf,
   setupTicked as setupTickedOf,
@@ -407,9 +417,12 @@ const hasAnyList = computed(
 
 /** Choice per setup id; nothing is chosen at first. */
 const setupChoices = reactive<Record<string, SetupImportChoice>>({});
+/** The name a setup kept beside the local one is imported under, filled with its own name when chosen. */
+const setupNames = reactive<Record<string, string>>({});
 
 function clearSetupChoices() {
   for (const k of Object.keys(setupChoices)) delete setupChoices[k];
+  for (const k of Object.keys(setupNames)) delete setupNames[k];
 }
 
 /** Names of the ticked plans whose setup is `setupId`, by setup id. */
@@ -430,7 +443,7 @@ const setupLocked = (s: ImportPreviewSetup) => setupLockedOf(preview.value!, pla
 
 const setupTicked = (s: ImportPreviewSetup) => setupTickedOf(preview.value!, selection(), s);
 
-/** A different setup that will be imported or that a ticked plan needs must be told what to do. */
+/** A ticked setup that differs from a local one must be told what to do; unticked, it is not imported. */
 const setupNeedsChoice = (s: ImportPreviewSetup) =>
   setupNeedsChoiceOf(preview.value!, selection(), s);
 
@@ -458,13 +471,8 @@ function onSetupToggleAll(e: Event) {
 }
 
 function onSetupChoice(s: ImportPreviewSetup, choice: SetupImportChoice) {
-  // "Do not import" on a setup no ticked plan needs is the same as unticking it.
-  if (setupChoiceUnticks(preview.value!, planSel.selected, s, choice)) {
-    setupSel.selected.delete(s.id);
-    delete setupChoices[s.id];
-    return;
-  }
   setupChoices[s.id] = choice;
+  if (choice === 'keepBoth' && setupNames[s.id] === undefined) setupNames[s.id] = s.name;
 }
 
 const importSelection = (): ImportSelection => ({
@@ -477,6 +485,7 @@ const importSelection = (): ImportSelection => ({
   setups: setupSel.selected,
   gear: gearSel.selected,
   setupChoices,
+  setupNames,
 });
 
 const canImport = computed(() =>

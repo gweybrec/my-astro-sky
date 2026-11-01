@@ -284,6 +284,25 @@ describe('planSetupImportActions', () => {
       expect(r.setupIdRemap).toEqual({ new: 'setup-uuid-1' });
     });
 
+    it('keepBoth: writes the new setup under the name typed for it, trimmed', () => {
+      const r = run({
+        ...base,
+        selectedSetups: new Set(['new']),
+        choices: { new: 'keepBoth' },
+        names: { new: '  Name of new, second  ' },
+        newId: () => 'uuid-1',
+      });
+      expect(r.actions[0].setup?.name).toBe('Name of new, second');
+      const blank = run({
+        ...base,
+        selectedSetups: new Set(['new']),
+        choices: { new: 'keepBoth' },
+        names: { new: ' ' },
+        newId: () => 'uuid-1',
+      });
+      expect(blank.actions[0].setup?.name).toBe('Name of new (import)');
+    });
+
     it('skip: writes nothing and points the plans at the local setup', () => {
       const r = run({
         ...base,

@@ -532,6 +532,8 @@ describe('export and import round trip', () => {
           originalName: p.originalName,
           size: aImages[p.filename].length,
           exists: false,
+          dsoIds: p.dsoIds,
+          observationDate: p.observationDate ?? null,
         }))
         .sort(byFilename),
     );
@@ -778,6 +780,17 @@ describe('export and import round trip', () => {
     expect(await planSetupId(inst)).toEqual([added.id]);
     // The setup was written, so its custom gear came along.
     expect((await snapshot(inst)).cameras).toEqual(snapA.cameras);
+  }, 30_000);
+
+  it('a different local setup: keepBoth imports it under the name sent in setupNames', async () => {
+    const { inst, localId } = await freshWithLocalSetup('atik-314l-plus');
+    const r = await importPlanAndSetup(inst, {
+      setupConflicts: JSON.stringify({ [setupId]: 'keepBoth' }),
+      setupNames: JSON.stringify({ [setupId]: 'Rig Zed, backup' }),
+    });
+    expect(r.status).toBe(200);
+    const setups = (await inst.call('GET', '/api/gear-setups')).body;
+    expect(setups.find((s: any) => s.id !== localId)).toMatchObject({ name: 'Rig Zed, backup' });
   }, 30_000);
 
   it('a different local setup: skip leaves it alone and points the plan at it', async () => {

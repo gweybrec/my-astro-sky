@@ -211,7 +211,12 @@ const fr = {
     overlapLess: 'Moins de chevauchement',
     overlapMore: 'Plus de chevauchement',
   },
-  backup: { exportSection: 'Exporter', importSection: 'Importer' },
+  backup: {
+    exportSection: 'Exporter',
+    importSection: 'Importer',
+    next: 'Suivant',
+    stepAria: 'Étape {n} sur {total}',
+  },
   startup: {
     failed: "L'application n'a pas pu démarrer.",
     updateFailed:

@@ -3744,7 +3744,11 @@
                   },
                   "setupConflicts": {
                     "type": "string",
-                    "description": "JSON object mapping a bundle setup id to `replace`, `keepBoth` (imported under a new id, name followed by \" (import)\") or `skip`. Only read for setups whose content differs from a local one.\n"
+                    "description": "JSON object mapping a bundle setup id to `replace`, `keepBoth` (imported under a new id, with the name from `setupNames`) or `skip`. Only read for setups whose content differs from a local one.\n"
+                  },
+                  "setupNames": {
+                    "type": "string",
+                    "description": "JSON object mapping a bundle setup id kept with `keepBoth` to the name it is imported under; blank or absent, its name followed by \" (import)\".\n"
                   }
                 }
               }
