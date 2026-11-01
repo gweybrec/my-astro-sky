@@ -1361,9 +1361,10 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
       rows: m.rows,
       tiles: m.tiles.map((t) => ({ ra: t.ra, dec: t.dec, paDeg: t.paDeg })),
     });
+    if (!newId) return;
     removeAdhocMosaic(adhocId);
     setSelection({ kind: 'plan', planId });
-    if (newId) activeMosaicId.value = newId;
+    activeMosaicId.value = newId;
   }
 
   /** Sky centre of a plan entry (explicit frame centre, else its DSO position). */

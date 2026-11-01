@@ -1586,6 +1586,21 @@ describe('fov-frames store', () => {
     expect(store.selection).toEqual({ kind: 'plan', planId: 'p1' });
   });
 
+  it('migrateFreeMosaicToPlan keeps the free mosaic when the plan mosaic is not created', async () => {
+    const store = await withSpecs();
+    const plans = usePlansStore();
+    vi.spyOn(plans, 'createMosaic').mockResolvedValue(null);
+
+    createFree2x2(store);
+    const id = store.adhocMosaics[0].id;
+    const selectionBefore = store.selection;
+    await store.migrateFreeMosaicToPlan(id, 'p1');
+
+    expect(store.adhocMosaics.map((m) => m.id)).toEqual([id]);
+    expect(store.adhocMosaics[0].tiles).toHaveLength(4);
+    expect(store.selection).toEqual(selectionBefore);
+  });
+
   it('migrateFreeFrameToPlan adds a custom entry and drops the free frame', async () => {
     const store = await withSpecs();
     const plans = usePlansStore();
