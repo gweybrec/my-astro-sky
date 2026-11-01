@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import sharp from 'sharp';
 import { decodeTiffToBytes, UnsupportedTiffError } from '@myastrosky/core/raw-decode/tiff-decoder';
 import { buildTiff } from '../fixtures/tiff-builders';
 
@@ -212,6 +213,109 @@ describe('decodeTiffToBytes — PackBits compression', () => {
     });
     const d = decodeTiffToBytes(buf);
     expect(Array.from(d.data)).toEqual([5, 10, 15, 20]);
+  });
+});
+
+describe('decodeTiffToBytes — LZW compression (encoded by libtiff via sharp)', () => {
+  // 9000 pseudo-random bytes: enough LZW codes to cross every code-width change
+  // (9→10→11→12 bits) and a Clear code, all in one strip.
+  async function lzwTiff(): Promise<{ tif: Buffer; pixels: Uint8Array }> {
+    let seed = 1;
+    const pixels = Uint8Array.from({ length: 9000 }, () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed >>> 24;
+    });
+    const tif = await sharp(pixels, { raw: { width: 100, height: 30, channels: 3 } })
+      .tiff({ compression: 'lzw', predictor: 'none' })
+      .toBuffer();
+    return { tif, pixels };
+  }
+
+  it('decodes every pixel exactly', async () => {
+    const { tif, pixels } = await lzwTiff();
+    const d = decodeTiffToBytes(tif);
+    expect(d.channels).toBe(3);
+    expect(Buffer.from(d.data).equals(Buffer.from(pixels))).toBe(true);
+  });
+
+  it('rejects a truncated strip instead of returning zero-filled pixels', async () => {
+    const { tif } = await lzwTiff();
+    // Halve StripByteCounts (tag 279, one inline LONG) in the little-endian first IFD.
+    const ifd = tif.readUInt32LE(4);
+    const n = tif.readUInt16LE(ifd);
+    for (let i = 0; i < n; i++) {
+      const entry = ifd + 2 + i * 12;
+      if (tif.readUInt16LE(entry) === 279) {
+        tif.writeUInt32LE(Math.floor(tif.readUInt32LE(entry + 8) / 2), entry + 8);
+      }
+    }
+    expect(() => decodeTiffToBytes(tif)).toThrow(UnsupportedTiffError);
+  });
+});
+
+describe('decodeTiffToBytes — strip geometry', () => {
+  // 5 rows in strips of 4 make a 4-row strip then a 1-row strip; the strip count alone
+  // (2) would wrongly suggest 3 rows per strip.
+  const pixels = [10, 20, 30, 40, 50];
+  const shorterLastStrip = { width: 1, height: 5, bitsPerSample: 8, sampleFormat: 1 } as const;
+
+  it('honours RowsPerStrip when the last strip is shorter (chunky)', () => {
+    const buf = buildTiff({
+      ...shorterLastStrip,
+      samplesPerPixel: 1,
+      photometric: 1,
+      rowsPerStrip: 4,
+      pixels,
+    });
+    expect(Array.from(decodeTiffToBytes(buf).data)).toEqual(pixels);
+  });
+
+  it('honours RowsPerStrip when the last strip is shorter (planar RGB)', () => {
+    const rgb = pixels.flatMap((v) => [v, v + 1, v + 2]);
+    const buf = buildTiff({
+      ...shorterLastStrip,
+      samplesPerPixel: 3,
+      photometric: 2,
+      planarConfig: 2,
+      rowsPerStrip: 4,
+      pixels: rgb,
+    });
+    expect(Array.from(decodeTiffToBytes(buf).data)).toEqual(rgb);
+  });
+
+  it('infers the strip height from the strip count when RowsPerStrip disagrees with it', () => {
+    const buf = buildTiff({
+      width: 1,
+      height: 4,
+      bitsPerSample: 8,
+      sampleFormat: 1,
+      samplesPerPixel: 1,
+      photometric: 1,
+      rowsPerStrip: 2,
+      rowsPerStripTag: 1, // would mean 4 strips, but only 2 are present
+      pixels: [1, 2, 3, 4],
+    });
+    expect(Array.from(decodeTiffToBytes(buf).data)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('decodes a libtiff multi-strip file (256-row strips, shorter last strip)', async () => {
+    const pixels = Uint8Array.from({ length: 100 * 1000 * 3 }, (_, i) => (i * 7) & 0xff);
+    const tif = await sharp(pixels, { raw: { width: 100, height: 1000, channels: 3 } })
+      .tiff({ compression: 'none', predictor: 'none' })
+      .toBuffer();
+    const d = decodeTiffToBytes(tif);
+    expect(Buffer.from(d.data).equals(Buffer.from(pixels))).toBe(true);
+  });
+
+  it('rejects an uncompressed strip shorter than its rows', () => {
+    const buf = buildTiff({ ...shorterLastStrip, samplesPerPixel: 1, photometric: 1, pixels });
+    // Halve StripByteCounts (tag 279, one inline LONG) in the little-endian first IFD.
+    const ifd = buf.readUInt32LE(4);
+    for (let i = 0; i < buf.readUInt16LE(ifd); i++) {
+      const entry = ifd + 2 + i * 12;
+      if (buf.readUInt16LE(entry) === 279) buf.writeUInt32LE(2, entry + 8);
+    }
+    expect(() => decodeTiffToBytes(buf)).toThrow(UnsupportedTiffError);
   });
 });
 

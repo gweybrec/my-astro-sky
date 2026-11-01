@@ -20,6 +20,7 @@ export interface BuildTiffOptions {
   planarConfig?: 1 | 2; // chunky, planar
   littleEndian?: boolean;
   rowsPerStrip?: number; // default: whole image in one strip
+  rowsPerStripTag?: number; // value written in the RowsPerStrip tag, default: rowsPerStrip
   tiled?: boolean; // when true, writes bogus TileWidth/TileLength tags to test rejection
   /**
    * Pixel samples in chunky row-major order regardless of `planarConfig`
@@ -87,6 +88,7 @@ export function buildTiff(opts: BuildTiffOptions): Buffer {
     planarConfig = 1,
     littleEndian = true,
     rowsPerStrip = height,
+    rowsPerStripTag = rowsPerStrip,
     tiled = false,
     pixels,
   } = opts;
@@ -199,7 +201,7 @@ export function buildTiff(opts: BuildTiffOptions): Buffer {
     entries.push({ tag: 323, type: TYPE_LONG, count: 1, bytes: u32(16) });
   }
   entries.push({ tag: 277, type: TYPE_SHORT, count: 1, bytes: u16(samplesPerPixel) });
-  entries.push({ tag: 278, type: TYPE_LONG, count: 1, bytes: u32(rowsPerStrip) });
+  entries.push({ tag: 278, type: TYPE_LONG, count: 1, bytes: u32(rowsPerStripTag) });
   if (!tiled) {
     entries.push({
       tag: 279,

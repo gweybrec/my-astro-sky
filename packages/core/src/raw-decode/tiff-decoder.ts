@@ -21,28 +21,46 @@ const COMPRESSION_DEFLATE_OLD = 32946;
 const COMPRESSION_DEFLATE = 8;
 const COMPRESSION_PACKBITS = 32773;
 
+/** Decompress one strip; a strip holding fewer bytes than its rows need is rejected. */
 function decompressStrip(raw: Uint8Array, compression: number, expectedLength: number): Uint8Array {
+  let out: Uint8Array;
+  let written: number;
   switch (compression) {
     case COMPRESSION_NONE:
-      return raw.subarray(0, expectedLength);
-    case COMPRESSION_LZW: {
-      const out = new Uint8Array(expectedLength);
-      lzwDecode(raw, out);
-      return out;
-    }
-    case COMPRESSION_PACKBITS: {
-      const out = new Uint8Array(expectedLength);
-      packBitsDecode(raw, out);
-      return out;
-    }
+      out = raw.subarray(0, expectedLength);
+      written = out.length;
+      break;
+    case COMPRESSION_LZW:
+      out = new Uint8Array(expectedLength);
+      written = lzwDecode(raw, out);
+      break;
+    case COMPRESSION_PACKBITS:
+      out = new Uint8Array(expectedLength);
+      written = packBitsDecode(raw, out);
+      break;
     case COMPRESSION_DEFLATE:
-    case COMPRESSION_DEFLATE_OLD: {
-      const inflated = unzlibSync(raw);
-      return inflated.subarray(0, expectedLength);
-    }
+    case COMPRESSION_DEFLATE_OLD:
+      out = unzlibSync(raw).subarray(0, expectedLength);
+      written = out.length;
+      break;
     default:
       throw new UnsupportedTiffError(`Unsupported TIFF compression: ${compression}`);
   }
+  if (written < expectedLength) {
+    throw new UnsupportedTiffError('TIFF strip is truncated or corrupt');
+  }
+  return out;
+}
+
+/**
+ * Rows per strip: the RowsPerStrip tag (default: the whole image) when it agrees with the
+ * number of strips present — only it describes a shorter last strip correctly — else
+ * inferred from the strip count, for files whose tag is wrong.
+ */
+function stripHeight(ifd: TiffIfd, height: number, stripCount: number): number {
+  const declared = Math.min(fieldValue(ifd, 278) ?? height, height);
+  if (declared > 0 && Math.ceil(height / declared) === stripCount) return declared;
+  return Math.ceil(height / stripCount);
 }
 
 /** Read one sample at `byteOffset` into `buf`, returning a value normalised to ~[0,1]. */
@@ -137,8 +155,6 @@ export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
   const bytesPerSample = bitsPerSample / 8;
   const out = new Uint8Array(width * height * outChannels);
 
-  // Number of strips actually present drives row distribution — RowsPerStrip in the
-  // header is sometimes wrong in real files, but the strip count itself is reliable.
   const numStrips = stripOffsets.length;
 
   const readRow = (
@@ -177,7 +193,7 @@ export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
 
   if (planarConfig === 1) {
     // Chunky: strips cover consecutive rows, each row holding all channels interleaved.
-    const rowsPerStrip = Math.ceil(height / numStrips);
+    const rowsPerStrip = stripHeight(ifd, height, numStrips);
     const rowByteLen = width * samplesPerPixel * bytesPerSample;
     let row = 0;
     for (let s = 0; s < numStrips && row < height; s++) {
@@ -199,7 +215,7 @@ export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
       );
     }
     const stripsPerPlane = numStrips / samplesPerPixel;
-    const rowsPerStrip = Math.ceil(height / stripsPerPlane);
+    const rowsPerStrip = stripHeight(ifd, height, stripsPerPlane);
     const rowByteLen = width * bytesPerSample;
     for (let plane = 0; plane < outChannels; plane++) {
       let row = 0;

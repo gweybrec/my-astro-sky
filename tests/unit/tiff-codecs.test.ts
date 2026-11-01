@@ -82,9 +82,9 @@ function lzwEncode(data: number[]): Uint8Array {
       if (nextCode <= 4094) {
         table.set(wc, nextCode);
         nextCode++;
-        if (nextCode === 511) codeWidth = 10;
-        else if (nextCode === 1023) codeWidth = 11;
-        else if (nextCode === 2047) codeWidth = 12;
+        if (nextCode === 512) codeWidth = 10;
+        else if (nextCode === 1024) codeWidth = 11;
+        else if (nextCode === 2048) codeWidth = 12;
       }
       w = String(byte);
     }

@@ -74,15 +74,12 @@ export function lzwDecode(src: Uint8Array, out: Uint8Array): number {
       newEntry[prevEntry.length] = entry[0];
       table[nextCodeValue] = newEntry;
       nextCodeValue++;
-      // Early change, adjusted for the decoder's inherent one-code lag: the decoder can
-      // only build a table entry once it has seen the *next* code after the one that
-      // triggers it in the encoder, so its own count of entries added is always exactly
-      // one behind the encoder's at this point in the stream. Widening at one less than
-      // the encoder's threshold (511/1023/2047) re-aligns the decoder's code width to the
-      // same bitstream position where the encoder actually switched.
-      if (nextCodeValue === 510) codeWidth = 10;
-      else if (nextCodeValue === 1022) codeWidth = 11;
-      else if (nextCodeValue === 2046) codeWidth = 12;
+      // Early change, as libtiff decodes it: a TIFF encoder widens once its next free code
+      // passes 511/1023/2047 (i.e. reaches 512/1024/2048). The decoder builds each entry
+      // one code later than the encoder, so it widens one entry sooner, at 511/1023/2047.
+      if (nextCodeValue === 511) codeWidth = 10;
+      else if (nextCodeValue === 1023) codeWidth = 11;
+      else if (nextCodeValue === 2047) codeWidth = 12;
     }
 
     prevEntry = entry;
