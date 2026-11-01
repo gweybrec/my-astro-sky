@@ -97,6 +97,43 @@ describe('computePlanTargets', () => {
     );
     expect(infos[0].dso).toMatchObject({ id: 'custom:e1', type: '?', displayName: 'Étoile' });
   });
+
+  it('makes each mosaic one item at its centre, sorted with the targets, named by its name else its target', () => {
+    const mosaic = { dsoId: 'B', name: null, centerRa: 30, centerDec: 40 };
+    const infos = computePlanTargets(
+      {
+        entries: [
+          { id: 'e1', dsoId: 'B', ra: null, dec: null },
+          { id: 't1', dsoId: 'B', ra: 29, dec: 40, mosaicId: 'm1' },
+        ],
+        mosaics: [
+          { ...mosaic, id: 'm1' },
+          { ...mosaic, id: 'm2', dsoId: null, name: 'Champ' },
+          { ...mosaic, id: 'm3', name: 'Mon B' },
+        ],
+      },
+      loc,
+      win,
+      true,
+      lookups,
+    );
+    expect(infos.map((i) => i.entryId).sort()).toEqual(['e1', 'm1', 'm2', 'm3']);
+    const byId = new Map(infos.map((i) => [i.entryId, i]));
+    expect(byId.get('e1')!.mosaicId).toBeUndefined();
+    expect(byId.get('m1')).toMatchObject({ mosaicId: 'm1', dso: { id: 'B', displayName: 'B' } });
+    expect(byId.get('m2')!.dso).toMatchObject({ id: 'custom:mosaic:m2', displayName: 'Champ' });
+    // a name given to a mosaic of a catalogue object does not rename the object itself
+    expect(byId.get('m3')!.dso.displayName).toBe('Mon B');
+    expect(catalog.get('B')!.displayName).toBe('B');
+    // the trajectory is the centre's, not the target's
+    const m1 = byId.get('m1')!;
+    expect(m1.bestTimeUtc.getTime()).toBeLessThan(byId.get('e1')!.bestTimeUtc.getTime());
+    for (let i = 1; i < infos.length; i++) {
+      expect(infos[i].bestTimeUtc.getTime()).toBeGreaterThanOrEqual(
+        infos[i - 1].bestTimeUtc.getTime(),
+      );
+    }
+  });
 });
 
 describe('plan helpers', () => {

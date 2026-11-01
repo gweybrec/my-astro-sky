@@ -3363,8 +3363,27 @@ export class TargetsView {
       const list = document.createElement('div');
       list.className = 'flex flex-col divide-y divide-[var(--border-input)]';
       const fillers: Array<(p: GearPreset | null) => void> = [];
-      const mosaicFillers: Array<(p: GearPreset | null) => void> = [];
       for (const info of infos) {
+        // A mosaic is an item of the plan's order like a target, drawn with its own row.
+        const mosaic = info.mosaicId ? plan.mosaics.find((m) => m.id === info.mosaicId) : undefined;
+        if (mosaic) {
+          const { row, applyPreset } = this.buildPlanMosaicRow(
+            plan,
+            mosaic,
+            info,
+            win,
+            observer.loc,
+            moon,
+            effectiveSetupId,
+            () => {
+              setCount(itemCount());
+              renderTrajectories();
+            },
+          );
+          fillers.push(applyPreset);
+          list.appendChild(row);
+          continue;
+        }
         const entryName = info.dso.displayName ?? info.dso.catalogs[0] ?? info.dso.id;
         const { row, applyPreset } = this.buildPlanRow(
           plan.id,
@@ -3406,168 +3425,9 @@ export class TargetsView {
       }
       trajWrap.appendChild(list);
 
-      // Mosaic summaries: one row per mosaic (target · scale · total integration).
-      // A mosaic counts as N panels, each imaged like the target, so the total
-      // integration is the single-object recipe × the tile count.
-      for (const mosaic of plan.mosaics ?? []) {
-        const tileCount = plan.entries.filter((e) => e.mosaicId === mosaic.id).length;
-        const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : null;
-        const name = dso
-          ? (dso.displayName ?? dso.id)
-          : customLocationLabel(mosaic.centerRa, mosaic.centerDec);
-
-        // Trajectory + altitude metadata are computed from the mosaic centre, so
-        // they need no catalogue object (only computable values are shown).
-        const { maxAltDeg, atDate } = maxAltDuringWindow(
-          mosaic.centerRa,
-          mosaic.centerDec,
-          observer.loc.latDeg,
-          observer.loc.lonDeg,
-          win.start,
-          win.end,
-          10,
-        );
-        const curve = sampleAltCurve(
-          mosaic.centerRa,
-          mosaic.centerDec,
-          observer.loc.latDeg,
-          observer.loc.lonDeg,
-          win.start,
-          win.end,
-          10,
-        );
-
-        // Same three-column layout as a standalone plan row (info · chart · delete).
-        const row = document.createElement('div');
-        row.className =
-          'flex items-start gap-3 py-3 border-0 border-solid border-t border-[var(--border-input)]';
-
-        // Grow the column to fit the (wider) panel summary on one line rather
-        // than the fixed target-row width — the chart simply takes what's left.
-        const left = document.createElement('div');
-        left.className = `min-w-52 w-fit max-w-80 shrink-0 flex flex-col gap-1`;
-        const title = document.createElement('div');
-        title.className = 'text-sub text-bright truncate max-w-full';
-        title.textContent = `${name} · ${t('targets.plan.mosaicLabel')}`;
-
-        // Computable metadata only — no rating/difficulty/magnitude (catalogue fields).
-        // Two rows (like a standalone target) for breathing room: altitude/angle on
-        // the first, the mosaic centre coordinates on the second.
-        const meta = document.createElement('div');
-        meta.className = 'target-card-meta';
-        meta.appendChild(
-          this.metaItem(
-            t('targets.results.maxAlt'),
-            formatAlt(maxAltDeg),
-            t('targets.tooltips.maxAlt'),
-          ),
-        );
-        meta.appendChild(
-          this.metaItem(
-            t('fovOverlay.angleLabel'),
-            formatPaDeg(mosaic.paDeg),
-            t('fovOverlay.angleHelp'),
-          ),
-        );
-        const mosaicSep = moon
-          ? this.moonSepMetaItem(
-              moonSeparationAt(mosaic.centerRa, mosaic.centerDec, atDate),
-              moon.illum,
-            )
-          : null;
-        if (mosaicSep) meta.appendChild(mosaicSep);
-
-        // RA/Dec are the mosaic centre — keep each value on one line so the
-        // seconds never wrap below their label (nowrap, not a fixed width).
-        const meta2 = document.createElement('div');
-        meta2.className = 'target-card-meta';
-        const raItem = this.metaItem('RA', formatRA(mosaic.centerRa), t('dso.raDec'));
-        const decItem = this.metaItem('Dec', formatDec(mosaic.centerDec), t('dso.raDec'));
-        raItem.querySelector('.target-meta-value')!.classList.add('whitespace-nowrap');
-        decItem.querySelector('.target-meta-value')!.classList.add('whitespace-nowrap');
-        meta2.appendChild(raItem);
-        meta2.appendChild(decItem);
-
-        // Mosaic geometry summary: panels × panel size → resulting mosaic size
-        // (filled once the gear preset resolves, as panel size depends on gear).
-        // Sits directly under the name, with an info icon opening per-panel details.
-        const summaryRow = document.createElement('div');
-        summaryRow.className = 'flex items-center gap-2';
-        const sub = document.createElement('div');
-        sub.className = 'text-body text-secondary whitespace-nowrap';
-        sub.textContent = `${tileCount} ${t('fovOverlay.mosaicPanels')}`;
-        const infoIcon = document.createElement('span');
-        infoIcon.className = 'hints-info-icon shrink-0';
-        infoIcon.textContent = 'ℹ';
-        infoIcon.title = t('targets.plan.panelDetails');
-        infoIcon.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          this.showMosaicPanelDetails(infoIcon, plan, mosaic, observer.loc, win);
-        });
-        summaryRow.append(sub, infoIcon);
-
-        // Total integration, styled exactly like a standalone target row.
-        const totalEl = document.createElement('div');
-        totalEl.className = 'target-integration-total';
-        totalEl.textContent = `${t('targets.results.integrationTotal')}: —`;
-
-        left.appendChild(title);
-        left.appendChild(summaryRow);
-        left.appendChild(meta);
-        left.appendChild(meta2);
-        left.appendChild(totalEl);
-
-        const chartWrap = this.buildPlanChart(curve, win, atDate, moon);
-
-        // Show-on-map: zoom to fit the whole mosaic (its envelope is the frame
-        // used for the zoom calculation).
-        const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
-        navBtn.classList.add('shrink-0');
-        navBtn.addEventListener('click', () => {
-          void this.navigateToMosaic(plan.id, mosaic, effectiveSetupId());
-        });
-
-        const del = this.iconActionBtn(trashSvg, t('fovOverlay.deleteMosaic'));
-        del.classList.add('shrink-0', 'btn-icon--danger');
-        del.addEventListener('click', async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!(await confirmPlanEntryDelete(name))) return;
-          await this.plansStore.deleteMosaic(plan.id, mosaic.id);
-          plan.mosaics = plan.mosaics.filter((m) => m.id !== mosaic.id);
-          plan.entries = plan.entries.filter((en) => en.mosaicId !== mosaic.id);
-          setCount(itemCount());
-          renderTrajectories();
-        });
-        row.appendChild(left);
-        row.appendChild(chartWrap);
-        row.appendChild(navBtn);
-        row.appendChild(del);
-        trajWrap.appendChild(row);
-
-        // Panel size + resulting mosaic size + total integration need the gear
-        // preset (resolved async below).
-        mosaicFillers.push((preset) => {
-          if (!preset) return;
-          const { wDeg, hDeg } = fovDeg(preset);
-          const f = 1 - mosaic.overlapPct / 100;
-          const scaleW = (mosaic.cols - 1) * wDeg * f + wDeg;
-          const scaleH = (mosaic.rows - 1) * hDeg * f + hDeg;
-          // "N panels × <panel size> → <mosaic size>": panel count times the
-          // single-frame FOV, yielding the overall mosaic footprint.
-          sub.textContent = `${tileCount} ${t('fovOverlay.mosaicPanels')} × ${formatFov(wDeg, hDeg)} → ${formatFov(scaleW, scaleH)}`;
-          if (dso) {
-            const recipe = recommendRecipe(dso, preset);
-            totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours * tileCount)}`;
-          }
-        });
-      }
-
       // Score / FOV-fit / integration time need a gear preset (resolved async).
       this.planPreset(effectiveSetupId()).then((preset) => {
         for (const f of fillers) f(preset);
-        for (const f of mosaicFillers) f(preset);
       });
     };
 
@@ -3629,8 +3489,7 @@ export class TargetsView {
     exportBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const hasMosaics = (plan.mosaics?.length ?? 0) > 0;
-      if (!currentWin || (currentInfos.length === 0 && !hasMosaics)) {
+      if (!currentWin || currentInfos.length === 0) {
         showToast({ message: t('targets.plan.empty'), type: 'info', duration: 2000 });
         return;
       }
@@ -3646,19 +3505,16 @@ export class TargetsView {
           this.planPreset(setupId),
         ]);
 
-        // Standalone objects follow the plan's chosen sort (inherited from currentInfos
-        // above), then one page per mosaic.
+        // Targets and mosaics follow the plan's chosen sort (inherited from currentInfos above).
         const targets = observer
           ? buildPlanPdfTargets(
               plan,
               {
-                loc: observer.loc,
                 win,
                 moon: buildMoonOverlay(observer.loc, win, this.prefs.showMoon !== false),
                 infos,
               },
               preset ? fovDeg(preset) : null,
-              { getDsoById: getDSOById, customLabel: customLocationLabel },
             )
           : [];
 
@@ -3991,6 +3847,146 @@ export class TargetsView {
     header.appendChild(navSpacer);
     header.appendChild(removeSpacer);
     return header;
+  }
+
+  /**
+   * One plan mosaic, an item of the plan's order like a target (`info`, resolved at its centre): its name · Mosaïque,
+   * the panels summary with an info icon opening per-panel details, computable metadata only (altitude, angle, Moon,
+   * centre RA/Dec; no catalogue fields), the total integration, the trajectory chart, a show-on-map button zooming to
+   * fit the whole mosaic and a delete button. `applyPreset` fills the panel and mosaic sizes and the total integration
+   * (the single-object recipe × the tile count) once the plan's setup resolves. `onDeleted` runs once it is deleted.
+   */
+  private buildPlanMosaicRow(
+    plan: Plan,
+    mosaic: PlanMosaic,
+    info: PlanTargetInfo,
+    win: { start: Date; end: Date },
+    loc: ObserverLocation,
+    moon: MoonOverlay | null,
+    effectiveSetupId: () => string | null,
+    onDeleted: () => void,
+  ): { row: HTMLElement; applyPreset: (preset: GearPreset | null) => void } {
+    const tileCount = plan.entries.filter((e) => e.mosaicId === mosaic.id).length;
+    const name = info.dso.displayName ?? info.dso.id;
+    // The recipe needs a catalogue object; a mosaic on empty sky has none.
+    const dso = mosaic.dsoId ? getDSOById(mosaic.dsoId) : undefined;
+    const { maxAltDeg, bestTimeUtc: atDate, curve, moonSepDeg } = info;
+
+    // Same layout as a standalone plan row (info · chart · actions), divided by the list's divide-y.
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-3 py-3 border-0 border-solid';
+
+    // The target rows' column width, so the charts of the plan's list line up;
+    // the panel summary wraps inside it.
+    const left = document.createElement('div');
+    left.className = `${TargetsView.PLAN_INFO_COL} shrink-0 flex flex-col gap-1`;
+    const title = document.createElement('div');
+    title.className = 'text-sub text-bright truncate max-w-full';
+    title.textContent = `${name} · ${t('targets.plan.mosaicLabel')}`;
+
+    // Computable metadata only — no rating/difficulty/magnitude (catalogue fields).
+    // Two rows (like a standalone target) for breathing room: altitude/angle on
+    // the first, the mosaic centre coordinates on the second.
+    const meta = document.createElement('div');
+    meta.className = 'target-card-meta';
+    meta.appendChild(
+      this.metaItem(
+        t('targets.results.maxAlt'),
+        formatAlt(maxAltDeg),
+        t('targets.tooltips.maxAlt'),
+      ),
+    );
+    meta.appendChild(
+      this.metaItem(
+        t('fovOverlay.angleLabel'),
+        formatPaDeg(mosaic.paDeg),
+        t('fovOverlay.angleHelp'),
+      ),
+    );
+    const mosaicSep =
+      moon && moonSepDeg != null ? this.moonSepMetaItem(moonSepDeg, moon.illum) : null;
+    if (mosaicSep) meta.appendChild(mosaicSep);
+
+    // RA/Dec are the mosaic centre — keep each value on one line so the
+    // seconds never wrap below their label (nowrap, not a fixed width).
+    const meta2 = document.createElement('div');
+    meta2.className = 'target-card-meta';
+    const raItem = this.metaItem('RA', formatRA(mosaic.centerRa), t('dso.raDec'));
+    const decItem = this.metaItem('Dec', formatDec(mosaic.centerDec), t('dso.raDec'));
+    raItem.querySelector('.target-meta-value')!.classList.add('whitespace-nowrap');
+    decItem.querySelector('.target-meta-value')!.classList.add('whitespace-nowrap');
+    meta2.appendChild(raItem);
+    meta2.appendChild(decItem);
+
+    // Mosaic geometry summary: panels × panel size → resulting mosaic size
+    // (filled once the gear preset resolves, as panel size depends on gear).
+    // Sits directly under the name, with an info icon opening per-panel details.
+    const summaryRow = document.createElement('div');
+    summaryRow.className = 'flex items-center gap-2';
+    const sub = document.createElement('div');
+    sub.className = 'min-w-0 text-body text-secondary';
+    sub.textContent = `${tileCount} ${t('fovOverlay.mosaicPanels')}`;
+    const infoIcon = document.createElement('span');
+    infoIcon.className = 'hints-info-icon shrink-0';
+    infoIcon.textContent = 'ℹ';
+    infoIcon.title = t('targets.plan.panelDetails');
+    infoIcon.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showMosaicPanelDetails(infoIcon, plan, mosaic, loc, win);
+    });
+    summaryRow.append(sub, infoIcon);
+
+    // Total integration, styled exactly like a standalone target row.
+    const totalEl = document.createElement('div');
+    totalEl.className = 'target-integration-total';
+    totalEl.textContent = `${t('targets.results.integrationTotal')}: —`;
+
+    left.appendChild(title);
+    left.appendChild(summaryRow);
+    left.appendChild(meta);
+    left.appendChild(meta2);
+    left.appendChild(totalEl);
+
+    const chartWrap = this.buildPlanChart(curve, win, atDate, moon);
+
+    // Show-on-map: zoom to fit the whole mosaic (its envelope is the frame
+    // used for the zoom calculation).
+    const navBtn = this.iconActionBtn(mapPinSvg, t('targets.plan.showOnMap'));
+    navBtn.classList.add('shrink-0');
+    navBtn.addEventListener('click', () => {
+      void this.navigateToMosaic(plan.id, mosaic, effectiveSetupId());
+    });
+
+    const del = this.iconActionBtn(trashSvg, t('fovOverlay.deleteMosaic'));
+    del.classList.add('shrink-0', 'btn-icon--danger');
+    del.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!(await confirmPlanEntryDelete(name))) return;
+      await this.plansStore.deleteMosaic(plan.id, mosaic.id);
+      plan.mosaics = plan.mosaics.filter((m) => m.id !== mosaic.id);
+      plan.entries = plan.entries.filter((en) => en.mosaicId !== mosaic.id);
+      onDeleted();
+    });
+    row.appendChild(left);
+    row.appendChild(chartWrap);
+    row.appendChild(navBtn);
+    row.appendChild(del);
+
+    const applyPreset = (preset: GearPreset | null): void => {
+      if (!preset) return;
+      const { wDeg, hDeg } = fovDeg(preset);
+      const env = outlineFromGrid(mosaic.cols, mosaic.rows, wDeg, hDeg, mosaic.overlapPct);
+      // "N panels × <panel size> → <mosaic size>": panel count times the
+      // single-frame FOV, yielding the overall mosaic footprint.
+      sub.textContent = `${tileCount} ${t('fovOverlay.mosaicPanels')} × ${formatFov(wDeg, hDeg)} → ${formatFov(env.wDeg, env.hDeg)}`;
+      if (dso) {
+        const recipe = recommendRecipe(dso, preset);
+        totalEl.textContent = `${t('targets.results.integrationTotal')}: ${formatHours(recipe.totalHours * tileCount)}`;
+      }
+    };
+    return { row, applyPreset };
   }
 
   /**

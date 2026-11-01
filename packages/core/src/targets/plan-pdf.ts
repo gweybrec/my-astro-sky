@@ -1,9 +1,8 @@
 import { outlineFromGrid } from '../mosaic';
-import { maxAltDuringWindow, sampleAltCurve, type AltSample } from '../sky-geometry';
+import type { AltSample } from '../sky-geometry';
 import type { DSO } from '../types';
 import type { ObservationWindow, Plan } from '../domain/plans';
-import { moonSeparationAt } from './night';
-import { customLocationDso, type PlanNight, type PlanTargetLookups } from './plan';
+import type { PlanNight } from './plan';
 
 /** One page of a plan's PDF: a standalone target or a mosaic. */
 export interface PlanPdfTarget {
@@ -31,77 +30,42 @@ export interface PlanPdfTarget {
 }
 
 /**
- * The pages of a plan's PDF: its standalone targets in the plan's order (`night.infos`), each with its observation
- * windows, then one page per mosaic (trajectory from its centre, framed tile grid) when the plan's setup gives the tile
- * size (`tile`). The Moon overlay of the night goes on every page.
+ * The pages of a plan's PDF, in the plan's order (`night.infos`): a standalone target with its observation windows, a
+ * mosaic with its framed tile grid when the plan's setup gives the tile size (`tile`; without it a mosaic has no page).
+ * The Moon overlay of the night goes on every page.
  */
 export function buildPlanPdfTargets(
   plan: Pick<Plan, 'entries' | 'mosaics'>,
-  night: Pick<PlanNight, 'loc' | 'win' | 'moon' | 'infos'>,
+  night: Pick<PlanNight, 'win' | 'moon' | 'infos'>,
   tile: { wDeg: number; hDeg: number } | null,
-  lookups: PlanTargetLookups,
 ): PlanPdfTarget[] {
-  const { loc, win, moon } = night;
+  const { win, moon } = night;
   const moonShared = moon
     ? { moonCurve: moon.curve, moonPhaseIndex: moon.phaseIndex, moonIllum: moon.illum }
     : {};
-
-  const targets: PlanPdfTarget[] = night.infos.map((i) => ({
-    dso: i.dso,
-    bestTimeUtc: i.bestTimeUtc,
-    maxAltDeg: i.maxAltDeg,
-    curve: i.curve,
-    nightWin: win,
-    mosaic: null,
-    observationWindows: plan.entries.find((e) => e.id === i.entryId)?.observationWindows ?? [],
-    ...moonShared,
-    moonSepDeg: moon ? i.moonSepDeg : null,
-  }));
-
-  if (!tile) return targets;
-  for (const m of plan.mosaics ?? []) {
+  const targets: PlanPdfTarget[] = [];
+  for (const i of night.infos) {
+    const page = {
+      dso: i.dso,
+      bestTimeUtc: i.bestTimeUtc,
+      maxAltDeg: i.maxAltDeg,
+      curve: i.curve,
+      nightWin: win,
+      ...moonShared,
+      moonSepDeg: moon ? i.moonSepDeg : null,
+    };
+    const m = i.mosaicId ? (plan.mosaics ?? []).find((x) => x.id === i.mosaicId) : undefined;
+    if (!m) {
+      const entry = plan.entries.find((e) => e.id === i.entryId);
+      targets.push({ ...page, mosaic: null, observationWindows: entry?.observationWindows ?? [] });
+      continue;
+    }
+    if (!tile) continue;
     const tiles = plan.entries
       .filter((en) => en.mosaicId === m.id && en.ra != null && en.dec != null)
       .map((en) => ({ ra: en.ra as number, dec: en.dec as number }));
-    const { maxAltDeg, atDate } = maxAltDuringWindow(
-      m.centerRa,
-      m.centerDec,
-      loc.latDeg,
-      loc.lonDeg,
-      win.start,
-      win.end,
-      10,
-    );
-    const curve = sampleAltCurve(
-      m.centerRa,
-      m.centerDec,
-      loc.latDeg,
-      loc.lonDeg,
-      win.start,
-      win.end,
-      10,
-    );
-    const realDso = m.dsoId ? lookups.getDsoById(m.dsoId) : undefined;
-    const dso =
-      realDso ??
-      customLocationDso(
-        `mosaic:${m.id}`,
-        m.centerRa,
-        m.centerDec,
-        lookups.customLabel(m.centerRa, m.centerDec),
-      );
-    if (!realDso && m.name) dso.displayName = m.name;
     const env = outlineFromGrid(m.cols, m.rows, tile.wDeg, tile.hDeg, m.overlapPct);
-    targets.push({
-      dso,
-      bestTimeUtc: atDate,
-      maxAltDeg,
-      curve,
-      nightWin: win,
-      mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles },
-      ...moonShared,
-      moonSepDeg: moon ? moonSeparationAt(m.centerRa, m.centerDec, atDate) : null,
-    });
+    targets.push({ ...page, mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles } });
   }
   return targets;
 }

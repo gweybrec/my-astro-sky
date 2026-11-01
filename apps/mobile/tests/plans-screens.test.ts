@@ -330,6 +330,76 @@ describe('the plan detail page', () => {
     expect(router.currentRoute.value.path).toMatch(/^\/plans\/p1\/e[12]$/);
   });
 
+  const withMosaic = () => {
+    const mosaic = {
+      id: 'm1',
+      dsoId: 'NGC7000',
+      name: null,
+      centerRa: 314,
+      centerDec: 44,
+      paDeg: 0,
+      overlapPct: 10,
+      cols: 2,
+      rows: 1,
+      position: 0,
+    };
+    backend.plans.list.mockResolvedValue([
+      plan(
+        'p1',
+        'Nuit du 2026-10-03',
+        [
+          entry('e1', 'M31'),
+          entry('t1', 'NGC7000', { mosaicId: 'm1', ra: 313, dec: 44 }),
+          entry('t2', 'NGC7000', { mosaicId: 'm1', ra: 315, dec: 44 }),
+        ],
+        { mosaics: [mosaic] },
+      ),
+    ]);
+  };
+  const mosaicRow = (w: ReturnType<typeof mount>) =>
+    w
+      .findAll('.mob-entry .mob-row')
+      .find((r) => r.text().includes("Nébuleuse de l'Amérique du Nord · Mosaïque"))!;
+
+  it('lists a mosaic as an item with a handle like the targets, and shows a tapped one on the map zoomed to fit it', async () => {
+    withMosaic();
+    const { w, router } = await show(PlanDetailPage, '/plans/p1');
+    vi.spyOn(router, 'replace').mockResolvedValue(undefined);
+    expect(w.text()).toContain('2 objets');
+    expect(mosaicRow(w).text()).toContain('2 tuiles');
+    // one item for the mosaic, none for its tiles, each with its handle
+    expect(w.findAll('.mob-entry')).toHaveLength(2);
+    const handles = (
+      w.findComponent(PhoneReorderList).props('items') as { handleLabel: string }[]
+    ).map((i) => i.handleLabel);
+    expect(handles).toContain("Déplacer Nébuleuse de l'Amérique du Nord");
+    await mosaicRow(w).trigger('click');
+    await settle();
+    expect(skyPlanView.value?.planId).toBe('p1');
+    expect(skyFocus.value).toMatchObject({ ra: 314, dec: 44, scale: 0 });
+    const field = skyFocus.value!.fov!;
+    expect(field.wDeg).toBeGreaterThan(field.hDeg);
+    skyPlanView.value = null;
+    skyFocus.value = null;
+    framesSheetOpen.value = false;
+  });
+
+  it('moves a dragged mosaic, and stores the order of the targets only', async () => {
+    withMosaic();
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const ids = (w.findComponent(PhoneReorderList).props('items') as { id: string }[]).map(
+      (i) => i.id,
+    );
+    expect(ids.sort()).toEqual(['e1', 'm1']);
+    w.findComponent(PhoneReorderList).vm.$emit('reorder', ['m1', 'e1']);
+    await settle();
+    expect(backend.plans.reorderEntries).toHaveBeenCalledWith('p1', ['e1']);
+    expect(w.findAll('.mob-entry .mob-row')[0].text()).toContain('Mosaïque');
+    w.findComponent(PhoneReorderList).vm.$emit('reorder', ['e1', 'm1']);
+    await settle();
+    expect(w.findAll('.mob-entry .mob-row')[1].text()).toContain('Mosaïque');
+  });
+
   it('sends one request with the new order after a drag', async () => {
     const { w } = await show(PlanDetailPage, '/plans/p1');
     w.findComponent(PhoneReorderList).vm.$emit('reorder', ['e2', 'e1']);

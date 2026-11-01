@@ -6,16 +6,23 @@ import { t } from '@myastrosky/core/i18n/index';
 import { fracToClock } from '@myastrosky/core/observation-windows';
 import { PLAN_SORT_KEYS, type PlanSortKey } from '@myastrosky/core/domain/plans';
 import { formatClock24 } from '@myastrosky/core/targets/format';
-import { planItemCount, resolvePlanNight } from '@myastrosky/core/targets/plan';
+import {
+  customLocationLabelOr,
+  planItemCount,
+  resolvePlanNight,
+} from '@myastrosky/core/targets/plan';
 import { buildPlanPdfTargets } from '@myastrosky/core/targets/plan-pdf';
 import { fovDeg } from '@myastrosky/core/gear-presets';
+import { outlineFromGrid } from '@myastrosky/core/mosaic';
 import { presetForSetupId, resolveSetupById } from '@myastrosky/core/targets/plan-setup';
 import {
   deletePlanAPI,
   renamePlanAPI,
   reorderPlanEntriesAPI,
   type Plan,
+  type PlanMosaic,
 } from '@myastrosky/app-state/api';
+import type { DSO } from '@myastrosky/core/types';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { skyPlanView } from '../sky-modes';
@@ -28,6 +35,7 @@ import { loadGearLists, planLookups } from '../composables/usePlans';
 import { withSkyMap } from '../sky-map-setup';
 import { saveFile } from '../platform-device';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
+import { skyFocus } from '../composables/useSkySelection';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
@@ -49,7 +57,9 @@ import chevronIcon from '../icons/chevron-right.svg?raw';
 // by its handle puts it elsewhere (one request). The actions rename the plan, choose how its targets are sorted (the
 // desktop's sorts), export it as a PDF (the desktop's, through the share sheet) and delete it; "Afficher sur la carte" opens the map in a mode of its own on the plan's frames (the
 // desktop selects the plan's frames and opens its frame manager), its back arrow returning here. The plus opens the Cibles list for this plan (boards "Plan, ajouter une cible"), as the
-// desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again.
+// desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again. A mosaic is
+// an item of the plan like a target (its name · Mosaïque, its number of tiles): sorted and dragged with them, a tap
+// shows the plan on the map zoomed to fit it, as the desktop's "Afficher sur la carte" of a mosaic.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -85,39 +95,64 @@ const summary = computed(() => {
   return facts;
 });
 
+/** The plan's items (targets and mosaics) in its order: the night's when a location is known, else as stored. */
 const rows = computed(() => {
   const p = plan.value;
   if (!p) return [];
-  const names = new Map<string, string>();
-  const ids: string[] = [];
+  const items: { id: string; name: string; mosaic?: PlanMosaic }[] = [];
+  const mosaicOf = (id: string | undefined) => p.mosaics.find((m) => m.id === id);
+  const label = (dso: DSO) => dso.displayName || dso.catalogs[0] || dso.id;
   if (night.value) {
     for (const info of night.value.infos) {
-      ids.push(info.entryId);
-      names.set(info.entryId, info.dso.displayName || info.dso.catalogs[0] || info.dso.id);
+      items.push({ id: info.entryId, name: label(info.dso), mosaic: mosaicOf(info.mosaicId) });
     }
   } else {
     for (const e of p.entries) {
       const dso = e.mosaicId || !e.dsoId ? undefined : planLookups.getDsoById(e.dsoId);
-      if (!dso) continue;
-      ids.push(e.id);
-      names.set(e.id, dso.displayName || dso.catalogs[0] || dso.id);
+      if (dso) items.push({ id: e.id, name: label(dso) });
+    }
+    for (const m of p.mosaics) {
+      const dso = m.dsoId ? planLookups.getDsoById(m.dsoId) : undefined;
+      const name =
+        m.name ??
+        (dso
+          ? label(dso)
+          : customLocationLabelOr(m.centerRa, m.centerDec, t('fovOverlay.customLocation')));
+      items.push({ id: m.id, name, mosaic: m });
     }
   }
   const order = handOrder.value;
-  const ordered = order ? [...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b)) : ids;
-  return ordered.map((id) => {
+  if (order) items.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  const win = night.value?.win;
+  return items.map(({ id, name, mosaic }) => {
+    if (mosaic) {
+      const tiles = p.entries.filter((e) => e.mosaicId === mosaic.id).length;
+      return {
+        id,
+        name,
+        title: `${name} · ${t('targets.plan.mosaicLabel')}`,
+        sub: `${tiles} ${t('fovOverlay.mosaicPanels')}`,
+        mono: false,
+        mosaic,
+      };
+    }
     const entry = p.entries.find((e) => e.id === id);
     const first = [...(entry?.observationWindows ?? [])].sort(
       (a, b) => a.startFrac - b.startFrac,
     )[0];
-    const win = night.value?.win;
     const range =
       first && win
         ? `${fracToClock(first.startFrac, win)} – ${fracToClock(first.endFrac, win)}`
         : '';
-    return { id, name: names.get(id) ?? id, range };
+    return { id, name, title: name, sub: range, mono: true, mosaic: undefined };
   });
 });
+
+function openRow(id: string) {
+  const mosaic = rows.value.find((r) => r.id === id)?.mosaic;
+  if (mosaic) void showMosaicOnMap(mosaic);
+  else void router.push(`/plans/${planId.value}/${id}`);
+}
 
 async function load() {
   try {
@@ -135,8 +170,13 @@ onIonViewWillEnter(load);
 async function onReorder(ids: string[]) {
   const previous = handOrder.value;
   handOrder.value = ids;
+  // The stored order is the entries'; a mosaic keeps its place in the hand order.
+  const entryIds = new Set(plan.value?.entries.map((e) => e.id));
   try {
-    await reorderPlanEntriesAPI(planId.value, ids);
+    await reorderPlanEntriesAPI(
+      planId.value,
+      ids.filter((id) => entryIds.has(id)),
+    );
     await store.load();
   } catch (error) {
     handOrder.value = previous;
@@ -173,6 +213,32 @@ async function showOnMap() {
   const p = plan.value;
   if (!p) return;
   actionsOpen.value = false;
+  await openPlanOnMap(p);
+}
+
+// A mosaic of the plan: the plan on the map, zoomed so the whole mosaic fits (its outline as the field), as the
+// desktop's navigateToMosaic. A smart telescope's mosaic is one enlarged frame, of its own size.
+async function showMosaicOnMap(m: PlanMosaic) {
+  const p = plan.value;
+  if (!p) return;
+  const setupId = p.setupId ?? targetsPrefs.setupId ?? null;
+  if (setupId && !fov.specs.has(setupId)) await fov.loadSpecs();
+  const spec = setupId ? fov.specs.get(setupId) : undefined;
+  const tiles = p.entries.filter((e) => e.mosaicId === m.id);
+  const own = tiles.length === 1 ? tiles[0] : undefined;
+  const outline =
+    own?.mosaicWDeg && own.mosaicHDeg
+      ? { wDeg: own.mosaicWDeg, hDeg: own.mosaicHDeg }
+      : spec
+        ? outlineFromGrid(m.cols, m.rows, spec.wDeg, spec.hDeg, m.overlapPct)
+        : null;
+  skyFocus.value = outline
+    ? { ra: m.centerRa, dec: m.centerDec, scale: 0, fov: outline }
+    : { ra: m.centerRa, dec: m.centerDec, scale: 400 };
+  await openPlanOnMap(p);
+}
+
+async function openPlanOnMap(p: Plan) {
   skyPlanView.value = {
     planId: p.id,
     name: p.name,
@@ -186,14 +252,14 @@ async function showOnMap() {
   framesSheetOpen.value = true;
 }
 
-// The desktop's PDF of a plan: its targets in the plan's order, then its mosaics, the sky views drawn with the Ciel
-// map; the file goes to the share sheet.
+// The desktop's PDF of a plan: its targets and mosaics in the plan's order, the sky views drawn with the Ciel map; the
+// file goes to the share sheet.
 async function exportPdf() {
   const p = plan.value;
   const n = night.value;
   actionsOpen.value = false;
   if (!p) return;
-  if (!n || (n.infos.length === 0 && p.mosaics.length === 0)) {
+  if (!n || n.infos.length === 0) {
     void showNotice(t('targets.plan.empty'));
     return;
   }
@@ -207,7 +273,7 @@ async function exportPdf() {
     const { renderPlanPdf } = await import('@myastrosky/render/plan-pdf');
     const options = {
       planName: p.name,
-      targets: buildPlanPdfTargets(p, n, preset ? fovDeg(preset) : null, planLookups),
+      targets: buildPlanPdfTargets(p, n, preset ? fovDeg(preset) : null),
       showCardinal: targetsPrefs.showCardinal !== false,
       fovSpecs: spec ? [{ label: spec.label, wDeg: spec.wDeg, hDeg: spec.hDeg }] : [],
       header: {
@@ -292,14 +358,14 @@ async function remove() {
             "
             openable
             @reorder="onReorder"
-            @open="(id) => router.push(`/plans/${planId}/${id}`)"
+            @open="openRow"
           >
             <template #default="{ id }">
               <template v-for="row in rows.filter((r) => r.id === id)" :key="row.id">
                 <span class="mob-row-body">
-                  <span class="mob-row-title m-body">{{ row.name }}</span>
-                  <span v-if="row.range" class="mob-row-sub m-secondary">
-                    <span class="m-mono">{{ row.range }}</span>
+                  <span class="mob-row-title m-body">{{ row.title }}</span>
+                  <span v-if="row.sub" class="mob-row-sub m-secondary">
+                    <span :class="{ 'm-mono': row.mono }">{{ row.sub }}</span>
                   </span>
                 </span>
                 <span class="mob-row-trail">

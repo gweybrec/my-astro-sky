@@ -48,8 +48,9 @@ const window1 = {
   frameSeconds: 300,
   snap: true,
 };
-const info = (entryId: string, target: DSO) => ({
+const info = (entryId: string, target: DSO, mosaicId?: string) => ({
   entryId,
+  mosaicId,
   dso: target,
   maxAltDeg: 70,
   bestTimeUtc: new Date('2026-10-03T22:00:00Z'),
@@ -64,10 +65,6 @@ const night = (over: Partial<PlanNight> = {}) => ({
   infos: [info('e1', dso('NGC7000', 314, 44)), info('e2', dso('M31', 10.7, 41.3))],
   ...over,
 });
-const lookups = {
-  getDsoById: (id: string) => (id === 'M33' ? dso('M33', 23.5, 30.7) : undefined),
-  customLabel: () => 'Position libre',
-};
 
 describe('buildPlanPdfTargets', () => {
   it("gives one page per target in the plan's order, with its observation windows and the Moon", () => {
@@ -75,7 +72,7 @@ describe('buildPlanPdfTargets', () => {
       entries: [entry('e1', { observationWindows: [window1] }), entry('e2')],
       mosaics: [],
     };
-    const pages = buildPlanPdfTargets(plan, night(), { wDeg: 2, hDeg: 1.5 }, lookups);
+    const pages = buildPlanPdfTargets(plan, night(), { wDeg: 2, hDeg: 1.5 });
     expect(pages.map((p) => p.dso.id)).toEqual(['NGC7000', 'M31']);
     expect(pages[0].observationWindows).toEqual([window1]);
     expect(pages[1].observationWindows).toEqual([]);
@@ -93,13 +90,12 @@ describe('buildPlanPdfTargets', () => {
       { entries: [entry('e1'), entry('e2')], mosaics: [] },
       night({ moon: null }),
       null,
-      lookups,
     );
     expect(pages[0].moonCurve).toBeUndefined();
     expect(pages[0].moonSepDeg).toBeNull();
   });
 
-  it('adds a page per mosaic after the targets, framing its envelope and its tiles', () => {
+  it("gives a mosaic its page where the plan's order puts it, framing its envelope and its tiles", () => {
     const mosaic = {
       id: 'm1',
       dsoId: 'M33',
@@ -121,14 +117,21 @@ describe('buildPlanPdfTargets', () => {
       ],
       mosaics: [mosaic, { ...mosaic, id: 'm2', dsoId: null, name: 'Champ du Cygne' }],
     };
-    const pages = buildPlanPdfTargets(plan, night(), { wDeg: 2, hDeg: 1.5 }, lookups);
+    const infos = [
+      info('e1', dso('NGC7000', 314, 44)),
+      info('m1', dso('M33', 23.5, 30.7), 'm1'),
+      info('e2', dso('M31', 10.7, 41.3)),
+      info('m2', dso('Champ du Cygne', 300, 40), 'm2'),
+    ];
+    const pages = buildPlanPdfTargets(plan, night({ infos }), { wDeg: 2, hDeg: 1.5 });
     expect(pages.map((p) => p.dso.displayName)).toEqual([
       'NGC7000',
-      'M31',
       'M33',
+      'M31',
       'Champ du Cygne',
     ]);
-    const m = pages[2].mosaic!;
+    expect(pages[0].mosaic).toBeNull();
+    const m = pages[1].mosaic!;
     expect(m.tiles).toEqual([
       { ra: 23, dec: 30.7 },
       { ra: 24, dec: 30.7 },
@@ -137,8 +140,8 @@ describe('buildPlanPdfTargets', () => {
     // two tiles of 2° side by side with 10 % overlap: wider than one tile, as tall as one
     expect(m.wDeg).toBeGreaterThan(2);
     expect(m.hDeg).toBeCloseTo(1.5);
-    expect(pages[2].curve.length).toBeGreaterThan(0);
-    expect(pages[3].dso.id).toBe('custom:mosaic:m2');
+    expect(pages[1].observationWindows).toBeUndefined();
+    expect(pages[3].mosaic!.tiles).toEqual([]);
   });
 
   it('leaves the mosaics out without a setup to size their tiles', () => {
@@ -159,6 +162,7 @@ describe('buildPlanPdfTargets', () => {
         },
       ],
     };
-    expect(buildPlanPdfTargets(plan, night(), null, lookups)).toHaveLength(2);
+    const infos = [...night().infos, info('m1', dso('Position libre', 23.5, 30.7), 'm1')];
+    expect(buildPlanPdfTargets(plan, night({ infos }), null)).toHaveLength(2);
   });
 });

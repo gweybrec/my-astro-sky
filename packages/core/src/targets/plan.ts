@@ -15,9 +15,12 @@ import { firstWindowFracByEntry, sortPlanTargets } from '../plan-sort';
 import type { PlanSortKey } from '../domain/plans';
 import { getPlanObserverFor, moonSeparationAt, nightWindow } from './night';
 
-/** A plan target resolved and scored for the current observer and night. */
+/** A plan item (a target, or a mosaic at its centre) resolved and scored for the current observer and night. */
 export interface PlanTargetInfo {
+  /** The entry's id; a mosaic's own id for a mosaic. */
   entryId: string;
+  /** Set on a mosaic: its id (its tiles are not items of their own). */
+  mosaicId?: string;
   dso: DSO;
   maxAltDeg: number;
   bestTimeUtc: Date;
@@ -117,7 +120,19 @@ export interface PlanTargetLookups {
   customLabel: (ra: number, dec: number) => string;
 }
 
-/** The standalone entries of a plan resolved for a night, transit-ordered (earliest culmination first). */
+/** What a plan item needs of a mosaic: its target or name, and its centre. */
+export interface PlanItemMosaic {
+  id: string;
+  dsoId: string | null;
+  name: string | null;
+  centerRa: number;
+  centerDec: number;
+}
+
+/**
+ * The items of a plan resolved for a night, transit-ordered (earliest culmination first): its standalone entries, and
+ * each mosaic as one item at its centre, named by its own name, else its target.
+ */
 export function computePlanTargets(
   plan: {
     entries: Array<{
@@ -127,6 +142,7 @@ export function computePlanTargets(
       dec: number | null;
       mosaicId?: string | null;
     }>;
+    mosaics?: readonly PlanItemMosaic[];
   },
   loc: ObserverLocation,
   win: { start: Date; end: Date },
@@ -134,15 +150,7 @@ export function computePlanTargets(
   lookups: PlanTargetLookups,
 ): PlanTargetInfo[] {
   const out: PlanTargetInfo[] = [];
-  for (const e of plan.entries) {
-    if (e.mosaicId) continue; // mosaic tiles are summarised as one mosaic, not per-tile rows
-    const realDso = e.dsoId ? lookups.getDsoById(e.dsoId) : null;
-    // Effective position: explicit frame-centre override, else the DSO centre.
-    const ra = e.ra ?? realDso?.ra;
-    const dec = e.dec ?? realDso?.dec;
-    if (ra == null || dec == null) continue; // nothing to place
-    // A frame on empty sky keeps a trajectory but has no catalogue metadata.
-    const dso = realDso ?? customLocationDso(e.id, ra, dec, lookups.customLabel(ra, dec));
+  const resolve = (entryId: string, dso: DSO, ra: number, dec: number): PlanTargetInfo => {
     const { maxAltDeg, atDate } = maxAltDuringWindow(
       ra,
       dec,
@@ -154,7 +162,25 @@ export function computePlanTargets(
     );
     const curve = sampleAltCurve(ra, dec, loc.latDeg, loc.lonDeg, win.start, win.end, 10);
     const moonSepDeg = moonEnabled ? moonSeparationAt(ra, dec, atDate) : null;
-    out.push({ entryId: e.id, dso, maxAltDeg, bestTimeUtc: atDate, curve, moonSepDeg });
+    return { entryId, dso, maxAltDeg, bestTimeUtc: atDate, curve, moonSepDeg };
+  };
+  for (const e of plan.entries) {
+    if (e.mosaicId) continue; // a mosaic's tiles are its one item, below
+    const realDso = e.dsoId ? lookups.getDsoById(e.dsoId) : null;
+    // Effective position: explicit frame-centre override, else the DSO centre.
+    const ra = e.ra ?? realDso?.ra;
+    const dec = e.dec ?? realDso?.dec;
+    if (ra == null || dec == null) continue; // nothing to place
+    // A frame on empty sky keeps a trajectory but has no catalogue metadata.
+    const dso = realDso ?? customLocationDso(e.id, ra, dec, lookups.customLabel(ra, dec));
+    out.push(resolve(e.id, dso, ra, dec));
+  }
+  for (const m of plan.mosaics ?? []) {
+    const { centerRa: ra, centerDec: dec } = m;
+    const realDso = m.dsoId ? lookups.getDsoById(m.dsoId) : undefined;
+    let dso = realDso ?? customLocationDso(`mosaic:${m.id}`, ra, dec, lookups.customLabel(ra, dec));
+    if (m.name) dso = { ...dso, displayName: m.name };
+    out.push({ ...resolve(m.id, dso, ra, dec), mosaicId: m.id });
   }
   // Transit-ordered: earliest culmination first.
   out.sort((a, b) => a.bestTimeUtc.getTime() - b.bestTimeUtc.getTime());
@@ -205,7 +231,7 @@ export function scorePlanEntry(
   };
 }
 
-/** A plan resolved for its night: where it is observed, the night, the Moon, and its targets in the plan's order. */
+/** A plan resolved for its night: where it is observed, the night, the Moon, and its items in the plan's order. */
 export interface PlanNight {
   loc: ObserverLocation;
   win: { start: Date; end: Date };
@@ -217,7 +243,7 @@ export interface PlanNight {
 
 /**
  * Where, when and under which Moon a plan is observed (its own location and night, else the global ones), with its
- * standalone targets ordered by the plan's sort key. Null when no valid location is known.
+ * items (standalone targets and mosaics) ordered by the plan's sort key. Null when no valid location is known.
  */
 export function resolvePlanNight(
   plan: {
@@ -233,6 +259,7 @@ export function resolvePlanNight(
       mosaicId?: string | null;
       observationWindows?: Array<{ startFrac: number }>;
     }>;
+    mosaics?: readonly PlanItemMosaic[];
   },
   prefs: { lat: number | null; lon: number | null; lastDateISO: string | null; showMoon?: boolean },
   lookups: PlanTargetLookups,
