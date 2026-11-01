@@ -12,6 +12,18 @@ export interface GearSetupData {
 /** Equipment categories stored as custom gear. Filters are picked per integration row, not per setup. */
 export type CustomGearType = 'telescope' | 'camera' | 'accessory' | 'filter';
 
+/** Every custom gear category, as the gear service stores them and a backup restores them. */
+export const CUSTOM_GEAR_TYPES: readonly CustomGearType[] = [
+  'telescope',
+  'camera',
+  'accessory',
+  'filter',
+];
+
+export function isCustomGearType(value: unknown): value is CustomGearType {
+  return CUSTOM_GEAR_TYPES.includes(value as CustomGearType);
+}
+
 /**
  * The fields of a custom gear item a caller sends. The service requires a non-null object and stores it
  * as given (it adds the `id`); which fields each type carries is the editor's business.

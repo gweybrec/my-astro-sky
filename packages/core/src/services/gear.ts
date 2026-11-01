@@ -4,7 +4,7 @@
  * cascaded to plans or photos when a setup or a gear item is deleted.
  */
 import { DomainError } from '../domain/errors';
-import { customGearName } from '../domain/gear';
+import { customGearName, isCustomGearType } from '../domain/gear';
 import type {
   CustomGearInput,
   CustomGearType,
@@ -88,7 +88,6 @@ interface GearSetupRow {
   enabled: number; // 0 | 1
 }
 
-const CUSTOM_GEAR_TYPES: readonly string[] = ['telescope', 'camera', 'accessory', 'filter'];
 const CATALOG_KEY: Record<CustomGearType, keyof GearCatalog> = {
   telescope: 'telescopes',
   camera: 'cameras',
@@ -191,7 +190,7 @@ export function createGearService(deps: GearServiceDeps): GearService {
 
     async addCustom(type, data) {
       // Typed for callers, still checked at run time: a screen or a restored backup can pass anything.
-      if (!type || !CUSTOM_GEAR_TYPES.includes(type as string)) {
+      if (!type || !isCustomGearType(type)) {
         throw new DomainError(
           'invalid',
           'Invalid type — must be telescope, camera, accessory, or filter',

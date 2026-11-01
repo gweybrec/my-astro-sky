@@ -948,3 +948,99 @@ describe('export and import round trip', () => {
     );
   }, 30_000);
 });
+
+describe('same-name records of one backup', () => {
+  const telescope = (model: string) => ({
+    type: 'telescope',
+    data: { brand: 'Twin', model, name: 'Twin scope', focalLength: 500, aperture: 80 },
+  });
+
+  it('restores two same-name plans and two same-name gear items into the instance that has them: none is lost', async () => {
+    const inst = await startInstance();
+    const p1 = (await inst.call('POST', '/api/plans', { name: 'Twin night' })).body.id;
+    const p2 = (await inst.call('POST', '/api/plans', { name: 'Twin night' })).body.id;
+    expect(await inst.call('POST', `/api/plans/${p1}/entries`, { dsoId: 'M31' })).toMatchObject({
+      status: 200,
+    });
+    expect(await inst.call('POST', `/api/plans/${p2}/entries`, { dsoId: 'M42' })).toMatchObject({
+      status: 200,
+    });
+    const g1 = (await inst.call('POST', '/api/custom-gear', telescope('A'))).body.id;
+    const g2 = (await inst.call('POST', '/api/custom-gear', telescope('B'))).body.id;
+    const before = await snapshot(inst);
+    expect(before.plans).toHaveLength(2);
+    expect(before.telescopes).toHaveLength(2);
+
+    const zip = await exportZip(inst, {
+      options: { includeImages: false, includePlans: true, includeCustomGear: true },
+    });
+    const r = await inst.call(
+      'POST',
+      '/api/import',
+      bundleForm(zip, {
+        selectedPlans: JSON.stringify([p1, p2]),
+        selectedGear: JSON.stringify([g1, g2]),
+      }),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.failed).toEqual([]);
+
+    const after = await snapshot(inst);
+    expect(after.plans).toEqual(before.plans);
+    expect(after.plans.map((p: any) => p.entries.map((e: any) => e.dsoId))).toEqual([
+      ['M31'],
+      ['M42'],
+    ]);
+    expect(after.telescopes).toEqual(before.telescopes);
+  }, 30_000);
+
+  it('replaces a local same-name plan that is not in the backup once, and keeps both plans of the backup', async () => {
+    const source = await startInstance();
+    const p1 = (await source.call('POST', '/api/plans', { name: 'Twin night' })).body.id;
+    const p2 = (await source.call('POST', '/api/plans', { name: 'Twin night' })).body.id;
+    const zip = await exportZip(source, { options: { includeImages: false, includePlans: true } });
+
+    const target = await startInstance();
+    const local = (await target.call('POST', '/api/plans', { name: 'Twin night' })).body.id;
+    const r = await target.call(
+      'POST',
+      '/api/import',
+      bundleForm(zip, { selectedPlans: JSON.stringify([p1, p2]) }),
+    );
+    expect(r.status).toBe(200);
+    const ids = (await target.call('GET', '/api/plans')).body.map((p: any) => p.id);
+    expect(ids.sort()).toEqual([p1, p2].sort());
+    expect(ids).not.toContain(local);
+  }, 30_000);
+});
+
+describe('custom filters in a backup', () => {
+  it('restores a custom filter selected in the preview', async () => {
+    const source = await startInstance();
+    const added = await source.call('POST', '/api/custom-gear', {
+      type: 'filter',
+      data: { brand: 'Twin', model: 'Ha 7nm', name: 'Twin Ha 7nm', bandType: 'narrowband' },
+    });
+    expect(added.status).toBe(200);
+    const zip = await exportZip(source, {
+      options: { includeImages: false, includeCustomGear: true },
+    });
+
+    const target = await startInstance();
+    const res = await fetch(`${target.base}/api/import/preview`, {
+      method: 'POST',
+      body: bundleForm(zip, {}),
+    });
+    const preview = await res.json();
+    expect(preview.gear.map((g: any) => g.id)).toEqual([added.body.id]);
+    const r = await target.call(
+      'POST',
+      '/api/import',
+      bundleForm(zip, { selectedGear: JSON.stringify([added.body.id]) }),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.failed).toEqual([]);
+    expect((await snapshot(target)).filters).toEqual((await snapshot(source)).filters);
+    expect((await snapshot(target)).filters).toHaveLength(1);
+  }, 30_000);
+});

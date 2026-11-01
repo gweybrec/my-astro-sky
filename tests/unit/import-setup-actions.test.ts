@@ -10,6 +10,7 @@ import {
   parseBundleSetups,
   planSetupImportActions,
 } from '../../server/import-utils';
+import { assignReplaceTargets } from '../../packages/core/src/domain/backup';
 import type { GearSetupData } from '../../packages/core/src/domain/gear';
 
 const setup = (over: Partial<GearSetupData> & { id: string }): GearSetupData => ({
@@ -426,5 +427,49 @@ describe('planSetupImportActions', () => {
       });
       expect(identical.extraGearIds).toEqual([]);
     });
+  });
+});
+
+describe('assignReplaceTargets: the rows a record of an import deletes', () => {
+  it('never deletes a row another record of the import writes, and keeps its own id', () => {
+    expect(
+      assignReplaceTargets([
+        { id: 'a', candidates: ['a', 'b'] },
+        { id: 'b', candidates: ['a', 'b'] },
+      ]),
+    ).toEqual([['a'], ['b']]);
+  });
+
+  it('gives a row two records claim to the first one only', () => {
+    expect(
+      assignReplaceTargets([
+        { id: 'a', candidates: ['local'] },
+        { id: 'b', candidates: ['local'] },
+      ]),
+    ).toEqual([['local'], []]);
+  });
+
+  it('leaves a record with no candidates (an empty name) with none', () => {
+    expect(assignReplaceTargets([{ id: 'a', candidates: [] }])).toEqual([[]]);
+  });
+});
+
+describe('two same-name setups both replaced', () => {
+  it('do not delete each other when both exist here', () => {
+    const a = setup({ id: 'sa', name: 'Twin', telescopeId: 'tel-a' });
+    const b = setup({ id: 'sb', name: 'Twin', telescopeId: 'tel-b' });
+    const r = run({
+      bundleSetups: [a, b],
+      localSetups: [
+        { ...a, cameraId: 'cam-changed' },
+        { ...b, cameraId: 'cam-changed' },
+      ],
+      selectedSetups: new Set(['sa', 'sb']),
+      choices: { sa: 'replace', sb: 'replace' },
+    });
+    expect(r.actions.map((x) => [x.bundleId, x.action, x.replaceIds])).toEqual([
+      ['sa', 'replace', ['sa']],
+      ['sb', 'replace', ['sb']],
+    ]);
   });
 });

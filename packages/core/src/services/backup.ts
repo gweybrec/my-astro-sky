@@ -8,6 +8,7 @@
  */
 import {
   buildZipPreviewResponse,
+  assignReplaceTargets,
   baseNameOf,
   classifyBundleSetup,
   decodeUtf8,
@@ -27,7 +28,7 @@ import {
   type ZipEntry,
 } from '../domain/backup';
 import { DomainError } from '../domain/errors';
-import { customGearName, type CustomGearType } from '../domain/gear';
+import { customGearName, isCustomGearType, type CustomGearType } from '../domain/gear';
 import type { BackupPhoto } from '../domain/photos';
 import type { BlobStore } from '../ports/blob-store';
 import type { BundleReader, BundleWriter } from '../ports/bundle';
@@ -621,9 +622,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
             const items = rawGearList
               .filter(
                 (g) =>
-                  typeof g.id === 'string' &&
-                  gearToImport.has(g.id) &&
-                  ['telescope', 'camera', 'accessory'].includes(g.type),
+                  typeof g.id === 'string' && gearToImport.has(g.id) && isCustomGearType(g.type),
               )
               .map((g) => {
                 const { id, type, ...data } = g;
@@ -635,6 +634,9 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
                   name,
                 };
               });
+            assignReplaceTargets(
+              items.map((it) => ({ id: it.item.id, candidates: it.replaceIds })),
+            ).forEach((ids, i) => (items[i].replaceIds = ids));
             await writeGrouped(
               items,
               (group) => gear.importCustomItems(group),
@@ -728,8 +730,9 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       if (has('plans.json') && selectedPlans.size > 0) {
         try {
           if (Array.isArray(rawPlanList)) {
-            // Snapshot once so two same-name plans in this bundle don't delete each
-            // other; replace by name only when non-empty.
+            // The local plans a plan replaces come from one snapshot taken before any is
+            // written (by name, only when the name is non-empty); assignReplaceTargets then
+            // keeps two same-name plans of this bundle from deleting each other.
             const existingPlans = await plans.listNames();
             const items = rawPlanList.flatMap((p, pi) =>
               typeof p.id !== 'string' || typeof p.name !== 'string' || !selectedPlans.has(p.id)
@@ -750,6 +753,9 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
                     },
                   ],
             );
+            assignReplaceTargets(
+              items.map((it) => ({ id: it.plan.id as string, candidates: it.options.replaceIds })),
+            ).forEach((ids, i) => (items[i].options.replaceIds = ids));
             await writeGrouped(
               items,
               (group) => plans.importPlans(group),

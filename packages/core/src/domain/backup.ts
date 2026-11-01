@@ -293,6 +293,27 @@ export function idsToReplaceByName(
   return existing.filter((e) => e.name === name).map((e) => e.id);
 }
 
+/**
+ * The rows each record of an import deletes before it is written, from the rows its name matches. The records are
+ * written one after another, so a row another record of the same import writes is never deleted (it would remove that
+ * record once restored), and a row two records claim is deleted by the first only. A record's own id stays: writing
+ * over it is how it replaces itself.
+ */
+export function assignReplaceTargets(
+  items: readonly { id: string; candidates: readonly string[] }[],
+): string[][] {
+  const written = new Set(items.map((i) => i.id));
+  const taken = new Set<string>();
+  return items.map(({ id, candidates }) =>
+    candidates.filter((c) => {
+      if (c !== id && written.has(c)) return false;
+      if (taken.has(c)) return false;
+      taken.add(c);
+      return true;
+    }),
+  );
+}
+
 // ─── Setups: what an import does with them ────────────────────────────────────
 
 /**
@@ -472,6 +493,11 @@ export function planSetupImportActions(input: {
       }
     }
   }
+  // Two same-name setups both replaced must not delete each other.
+  const written = actions.filter((a) => a.setup);
+  assignReplaceTargets(written.map((a) => ({ id: a.setup!.id, candidates: a.replaceIds }))).forEach(
+    (ids, i) => (written[i].replaceIds = ids),
+  );
   return { actions, setupIdRemap, extraGearIds: [...extraGearIds] };
 }
 
