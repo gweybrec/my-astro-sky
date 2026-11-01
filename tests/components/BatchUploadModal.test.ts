@@ -315,6 +315,56 @@ describe('BatchUploadModal — raw file conversion', () => {
     wrapper.unmount();
   });
 
+  it('Retry after a failed conversion converts again instead of solving the raw file', async () => {
+    state.pendingFiles = [fit('M101.fit')];
+    convertRawPhoto.mockRejectedValueOnce(new Error('network down'));
+    convertRawPhoto.mockResolvedValueOnce({
+      png: new File(['png'], 'M101.png', { type: 'image/png' }),
+      meta: { success: false },
+    });
+
+    const wrapper = mountModal();
+    await flushPromises();
+    expect(statuses(wrapper)).toEqual(['failed']);
+
+    (wrapper.vm as unknown as { retryItem: (i: unknown) => void }).retryItem(items(wrapper)[0]);
+    await flushPromises();
+
+    expect(convertRawPhoto).toHaveBeenCalledTimes(2);
+    expect(statuses(wrapper)).toEqual(['pending']);
+    expect(items(wrapper)[0].file.name).toBe('M101.png');
+    expect(submitLocalSolveJob).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
+  it('Start converts a photo whose conversion failed instead of solving the raw file', async () => {
+    state.pendingFiles = [fit('M101.fit')];
+    convertRawPhoto.mockRejectedValueOnce(new Error('network down'));
+    let resolveConvert: (v: unknown) => void = () => {};
+    convertRawPhoto.mockReturnValueOnce(new Promise((resolve) => (resolveConvert = resolve)));
+
+    const wrapper = mountModal();
+    await flushPromises();
+    expect(statuses(wrapper)).toEqual(['failed']);
+
+    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click');
+    await flushPromises();
+
+    expect(convertRawPhoto).toHaveBeenCalledTimes(2);
+    expect(statuses(wrapper)).toEqual(['converting']);
+    expect(submitLocalSolveJob).not.toHaveBeenCalled();
+
+    resolveConvert({
+      png: new File(['png'], 'M101.png', { type: 'image/png' }),
+      meta: { success: false },
+    });
+    await flushPromises();
+    expect(statuses(wrapper)).toEqual(['pending']);
+
+    wrapper.unmount();
+  });
+
   it('updates the window when a raw file added with "Add more" finishes converting', async () => {
     state.pendingFiles = [jpeg('a.jpg')];
     let resolveConvert: (v: unknown) => void = () => {};

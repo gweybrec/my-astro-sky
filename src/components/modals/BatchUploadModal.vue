@@ -361,6 +361,19 @@ async function convertOneItem(item: BatchItem) {
 
 const hasConverting = computed(() => items.some((i) => i.status === 'converting'));
 
+// A raw file whose conversion failed still holds the raw file, not its PNG.
+function needsConversion(item: BatchItem): boolean {
+  return item.rawName !== null && isRawAstroFile(item.file.name);
+}
+
+function retryConversion(item: BatchItem) {
+  item.status = 'converting';
+  item.convertProgress = 0;
+  item.error = '';
+  item.diagnostics = undefined;
+  enqueueForConversion([item]);
+}
+
 enqueueForConversion(items);
 
 // ─── Add more photos without closing the modal ─────────────────────────────────
@@ -693,6 +706,10 @@ async function runWcsItem(item: BatchItem) {
 }
 
 function retryItem(item: BatchItem) {
+  if (needsConversion(item)) {
+    retryConversion(item);
+    return;
+  }
   item.status = 'pending';
   item.error = '';
   item.diagnostics = undefined;
@@ -723,6 +740,10 @@ function startSolving() {
     }
     if (item.status === 'placing' || item.status === 'placed' || item.status === 'converting')
       continue;
+    if (item.status === 'failed' && needsConversion(item)) {
+      retryConversion(item);
+      continue;
+    }
     if (item.status === 'failed') {
       item.error = '';
       item.diagnostics = undefined;
