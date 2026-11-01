@@ -23,7 +23,9 @@ import { pinia } from './pinia-instance';
 import { useCanvasStore } from './stores/canvas';
 import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
+import { watch } from 'vue';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { createTargetPreview } from './target-preview';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { showToast } from './toast';
 import { getLang, t } from './i18n';
@@ -114,6 +116,15 @@ async function init() {
 
   // Init targets view
   const fovStore = useFovFramesStore(pinia);
+  // "Afficher sur la carte" of a target puts a preview frame on it, removed once the target leaves the screen: another
+  // view, the targets panel opened over the map, or another target shown.
+  const targetPreview = createTargetPreview(fovStore);
+  watch(
+    () => [uiStore.currentViewMode, uiStore.targetsOverlayOpen] as const,
+    ([mode, overlayOpen]) => {
+      if (mode !== 'skymap' || overlayOpen) targetPreview.end();
+    },
+  );
   const targetsView = new TargetsView(skyMap, async (ra, dec, setupId) => {
     if (setupId) {
       try {
@@ -131,11 +142,10 @@ async function init() {
               getHemisphere(),
               Math.min(view.width, view.height),
             );
-            // Open the target as a free frame pinned to the sky: switches the FOV
-            // system to free mode (the rest of the sky reflects it), shows the
-            // frame, and opens the frame-manager popup.
-            fovStore.addAdhocFrameAtSky(setupId, ra, dec);
-            fovStore.setFramesVisible(true);
+            // Open the target as a free frame pinned to the sky, a preview: switches the
+            // FOV system to free mode (the rest of the sky reflects it), shows the frame,
+            // and opens the frame-manager popup.
+            targetPreview.show(setupId, ra, dec);
             uiStore.switchView('skymap');
             skyMap.navigateTo(ra, dec, targetScale);
             fovStore.requestPopupOpen();
@@ -147,6 +157,8 @@ async function init() {
       }
     }
 
+    // Without a setup's frame: the target shown before leaves the screen.
+    targetPreview.end();
     uiStore.switchView('skymap');
     skyMap.navigateTo(ra, dec, Math.max(skyMap.getView().scale, 800));
   });
