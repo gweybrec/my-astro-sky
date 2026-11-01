@@ -218,6 +218,37 @@ describe('BatchUploadModal — raw file conversion', () => {
     wrapper.unmount();
   });
 
+  it('Start saves a raw file placed from its own WCS when Auto save/place is on', async () => {
+    localStorage.setItem('batch-auto-place', 'true');
+    state.pendingFiles = [fit('M101.fit')];
+    convertRawPhoto.mockResolvedValue({
+      png: new File(['png'], 'M101.png', { type: 'image/png' }),
+      meta: {
+        success: true,
+        correspondences: [
+          { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starRa: 10, starDec: 20 },
+        ],
+        width: 100,
+        height: 100,
+      },
+    });
+    const { placeBatchItem } = await import('../../src/batch-place');
+    vi.mocked(placeBatchItem).mockClear();
+
+    const wrapper = mountModal();
+    await flushPromises();
+    expect(placeBatchItem).not.toHaveBeenCalled(); // nothing saved before Start
+
+    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click');
+    await flushPromises();
+
+    expect(placeBatchItem).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(placeBatchItem).mock.calls[0][0]).toBe(items(wrapper)[0]);
+    expect(submitLocalSolveJob).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
   it('serializes conversions — the second file is not sent until the first resolves', async () => {
     state.pendingFiles = [fit('a.fit'), fit('b.fit')];
     let resolveFirst: (v: unknown) => void = () => {};

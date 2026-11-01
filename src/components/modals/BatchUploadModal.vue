@@ -713,12 +713,13 @@ function startSolving() {
 
   for (const item of items) {
     if (cancelled) break;
-    if (
-      item.status === 'success' ||
-      item.status === 'placing' ||
-      item.status === 'placed' ||
-      item.status === 'converting'
-    )
+    // Already positioned without a solver (embedded or companion WCS): never went
+    // through handleSolveSuccess, so Start is where Auto save/place catches it.
+    if (item.status === 'success') {
+      if (autoPlace.value) autoPlaceItem(item);
+      continue;
+    }
+    if (item.status === 'placing' || item.status === 'placed' || item.status === 'converting')
       continue;
     if (item.status === 'failed') {
       item.error = '';
