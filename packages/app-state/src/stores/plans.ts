@@ -142,10 +142,16 @@ export const usePlansStore = defineStore('plans', () => {
     }
   }
 
+  /**
+   * Rename a plan in the cache once the backend confirms — deliberately does NOT
+   * call load(): the targets view keeps the plan objects it was built from, and
+   * a reload would leave its sort and settings controls writing to orphans.
+   */
   async function renamePlan(id: string, name: string): Promise<void> {
     try {
       await renamePlanAPI(id, name);
-      await load();
+      const plan = plans.value.find((p) => p.id === id);
+      if (plan) plan.name = name;
     } catch (err) {
       reportError('plan_rename_failed', err, { id });
     }

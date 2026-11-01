@@ -6,6 +6,7 @@ import { setActivePinia, createPinia } from 'pinia';
 vi.mock('@myastrosky/app-state/api', () => ({
   getPlans: vi.fn().mockResolvedValue([]),
   updatePlanSortAPI: vi.fn().mockResolvedValue(undefined),
+  renamePlanAPI: vi.fn().mockResolvedValue(undefined),
   updatePlanEntryPositionAPI: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
@@ -14,6 +15,7 @@ import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import {
   getPlans,
   updatePlanSortAPI,
+  renamePlanAPI,
   updatePlanEntryPositionAPI,
   type Plan,
   type PlanEntry,
@@ -100,6 +102,39 @@ describe('plans store · setPlanSort', () => {
 
     expect(store.plans[0].sortBy).toBe('transit');
     expect(updatePlanSortAPI).toHaveBeenCalledWith('missing', 'altitude');
+  });
+});
+
+describe('plans store · renamePlan', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(getPlans).mockClear();
+    vi.mocked(renamePlanAPI).mockClear();
+  });
+
+  it('renames the cached plan in place, so a view holding it still sorts it', async () => {
+    const store = usePlansStore();
+    store.plans = [makePlan('a', null)];
+    const held = store.plans[0];
+
+    await store.renamePlan('a', 'Orion night');
+
+    expect(renamePlanAPI).toHaveBeenCalledWith('a', 'Orion night');
+    expect(getPlans).not.toHaveBeenCalled();
+    expect(store.plans[0]).toBe(held);
+    expect(held.name).toBe('Orion night');
+    store.setPlanSort('a', 'name');
+    expect(held.sortBy).toBe('name');
+  });
+
+  it('keeps the old name when the backend refuses the rename', async () => {
+    vi.mocked(renamePlanAPI).mockRejectedValueOnce(new Error('offline'));
+    const store = usePlansStore();
+    store.plans = [makePlan('a', null)];
+
+    await store.renamePlan('a', 'Orion night');
+
+    expect(store.plans[0].name).toBe('Plan a');
   });
 });
 
