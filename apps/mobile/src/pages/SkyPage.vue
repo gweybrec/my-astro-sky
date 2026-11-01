@@ -7,6 +7,7 @@ import {
   onIonViewDidEnter,
   onIonViewWillEnter,
   onIonViewWillLeave,
+  useIonRouter,
 } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
@@ -23,9 +24,16 @@ import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
-import { skyPlacement, skyRegionDraw, skyRegionView, skyStarPick } from '../sky-modes';
+import {
+  skyPlacement,
+  skyRegionDraw,
+  skyRegionView,
+  skyStarPick,
+  skyTargetView,
+} from '../sky-modes';
 import { skyDrawOrder } from '../sky-draw-order';
 import { framesSheetOpen } from '../sky-frames';
+import { openPageStill, swapPagesUnseen } from '../tab-navigation';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { Photo, Star } from '@myastrosky/core/types';
@@ -60,6 +68,7 @@ const overlayCanvas = ref<HTMLCanvasElement | null>(null);
 const displayOpen = ref(false);
 const router = useRouter();
 const { showError } = useErrorToast();
+const fov = useFovFramesStore();
 
 // The last reading of the placed photos: going to a photo waits for it.
 let photosRead: Promise<void> = Promise.resolve();
@@ -215,6 +224,60 @@ async function endRegionMode() {
 }
 useBackClose(() => regionDrawing.value !== null || regionShown.value !== null, endRegionMode);
 
+// Showing a target ("Afficher sur la carte" of its page, board "Ciel, voir une cible"): the map with the setup's frame
+// on the target and the frame's sheet, without "Déplacer vers un plan" and "Supprimer le cadre". The frame moves and
+// turns as on the map; the object it is anchored to becomes the target (named in the bar), the last one when it is
+// dropped on empty sky. The back arrow and the back button open the target's page again, in one press. The frame is a
+// preview: leaving removes it and puts the frames back as they were.
+const targetShown = computed(() => skyTargetView.value);
+const targetId = ref<string | null>(null);
+watch(
+  targetShown,
+  (shown) => {
+    targetId.value = shown?.dsoId ?? null;
+    if (shown) clearSkySelection();
+  },
+  { immediate: true },
+);
+watch(skySelection, (selection) => {
+  if (selection && targetShown.value) clearSkySelection();
+});
+const targetFrameDso = computed(() => {
+  const id = targetShown.value?.frameId;
+  return id ? (fov.renderables.find((f) => f.id === id)?.dsoId ?? null) : null;
+});
+watch(targetFrameDso, (id) => {
+  if (id) targetId.value = id;
+});
+const targetTitle = computed(() => {
+  const shown = targetShown.value;
+  if (!shown) return '';
+  const id = targetId.value ?? shown.dsoId;
+  if (id === shown.dsoId) return shown.name;
+  const dso = getDSOById(id);
+  return dso?.displayName || dso?.catalogs[0] || id;
+});
+const ionRouter = useIonRouter();
+const openStill = (path: string) => openPageStill(ionRouter, path);
+async function endTargetView() {
+  const shown = skyTargetView.value;
+  if (!shown) return;
+  const id = targetId.value ?? shown.dsoId;
+  skyTargetView.value = null;
+  if (shown.frameId) fov.removeFrame(shown.frameId);
+  if (JSON.stringify(fov.selection) !== JSON.stringify(shown.frames.selection))
+    fov.setSelection(shown.frames.selection);
+  fov.setFramesVisible(shown.frames.visible);
+  // The target's page opens again above its tab, with the pages under it so that its back arrow leads to them; out of
+  // sight, without a slide or a glimpse of each.
+  await swapPagesUnseen(async () => {
+    await router.replace(`/tabs/${shown.tab}`);
+    for (const page of shown.pages) await openStill(page);
+    await openStill(id === shown.dsoId ? shown.page : shown.pageOf(id));
+  });
+}
+useBackClose(() => targetShown.value !== null, endTargetView);
+
 // The bar of the mode on: its title and what its back arrow does.
 const modeBar = computed(() => {
   if (placing.value) return { title: t('manual.modeLabel'), back: cancelPlacement };
@@ -222,6 +285,7 @@ const modeBar = computed(() => {
   if (regionDrawing.value)
     return { title: t('mobile.targets.regionDrawTitle'), back: endRegionMode };
   if (regionShown.value) return { title: regionShown.value.region.name, back: endRegionMode };
+  if (targetShown.value) return { title: targetTitle.value, back: endTargetView };
   return null;
 });
 const inMode = computed(() => modeBar.value !== null);
@@ -248,9 +312,11 @@ const photoRemoved = () => {
 
 // The frames (fields of view). The selected frame has its sheet (board "Ciel, cadre sélectionné"); a frame and an
 // object are not selected together. "Ajouter un cadre" of an object opens "Créer un cadre".
-const fov = useFovFramesStore();
+// The frames have their sheet on the map and in the mode showing a target, not in the other modes.
 const activeFrame = computed(() =>
-  fov.framesVisible && !inMode.value ? (fov.renderables.find((f) => f.active) ?? null) : null,
+  fov.framesVisible && (!inMode.value || targetShown.value)
+    ? (fov.renderables.find((f) => f.active) ?? null)
+    : null,
 );
 watch(
   () => activeFrame.value?.id,
@@ -262,7 +328,8 @@ watch(skySelection, (selection) => {
   if (selection && activeFrame.value) sky?.map.selectFrame(null);
 });
 const releaseFrame = () => sky?.map.selectFrame(null);
-useBackClose(() => activeFrame.value !== null, releaseFrame);
+// Showing a target, the back button leaves the mode at once, sheet and all.
+useBackClose(() => activeFrame.value !== null && !targetShown.value, releaseFrame);
 
 const pickerOpen = ref(false);
 const pickerTarget = ref<FrameTarget | null>(null);
@@ -368,7 +435,7 @@ onBeforeUnmount(() => {
     <IonContent :scroll-y="false">
       <div
         class="mob-page-fill mob-sky-frame"
-        :class="{ 'mob-map-mode': inMode, 'mob-map-mode--bare': regionShown }"
+        :class="{ 'mob-map-mode': inMode, 'mob-map-mode--bare': regionShown || targetShown }"
       >
         <header v-if="modeBar" class="mob-topbar">
           <PhoneBackButton :action="modeBar.back" />
@@ -422,6 +489,7 @@ onBeforeUnmount(() => {
               :key="activeFrame.id"
               :frame="activeFrame"
               :map="skyMap"
+              :viewing="!!targetShown"
               @close="releaseFrame"
               @edit-mosaic="openMosaicEdit"
             />

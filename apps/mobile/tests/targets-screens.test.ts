@@ -97,6 +97,29 @@ const backend = {
   photos: { listWithSizes: vi.fn() },
   skyRegions: { list: vi.fn(), remove: vi.fn() },
   horizon: { getProfile: vi.fn() },
+  plans: { list: vi.fn() },
+};
+
+// A plan with its own night, place and setup, a week after the night the Cibles search is set to.
+const PLAN = {
+  id: 'p1',
+  name: 'Nuit du 2026-10-03',
+  position: 0,
+  nightOf: '2026-10-03',
+  setupId: 's2',
+  lat: 43.6,
+  lon: 1.44,
+  sortBy: 'transit',
+  entries: [],
+  mosaics: [],
+};
+const setup2 = {
+  id: 's2',
+  name: 'Lunette 72',
+  telescopeId: 't1',
+  cameraId: 'c1',
+  accessoryId: null,
+  enabled: true,
 };
 
 const dso = (over: Partial<DSO>): DSO =>
@@ -137,7 +160,10 @@ function ok(suggestions: ReturnType<typeof suggestion>[]) {
 function app() {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/:p(.*)*', component: { template: '<div />' } }],
+    routes: [
+      { path: '/plans/:id/targets', component: { template: '<div />' } },
+      { path: '/:p(.*)*', component: { template: '<div />' } },
+    ],
   });
   return { router, global: { stubs: ionicStubs, plugins: [router, createPinia()] } };
 }
@@ -181,6 +207,7 @@ beforeEach(() => {
   backend.skyRegions.list.mockResolvedValue(regions);
   backend.skyRegions.remove.mockResolvedValue(undefined);
   backend.horizon.getProfile.mockResolvedValue(null);
+  backend.plans.list.mockResolvedValue([PLAN]);
   search.mockResolvedValue(
     ok([
       suggestion(dso({}), 86, 21),
@@ -392,6 +419,76 @@ describe('the Cibles page', () => {
   });
 });
 
+describe('the Cibles list of a plan ("Plan, ajouter une cible")', () => {
+  /** The page as the phone is held: portrait unless told otherwise. */
+  async function showForPlan(landscape = false) {
+    backend.gear.listSetups.mockResolvedValue([...setups, setup2]);
+    const made = app();
+    await made.router.push('/plans/p1/targets');
+    const media = vi.spyOn(window, 'matchMedia').mockReturnValue({
+      matches: landscape,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    } as never);
+    const w = show(TargetsPage, { global: made.global });
+    media.mockRestore();
+    await settle();
+    return { w, router: made.router };
+  }
+
+  it("has a title bar with the plan's name and its back arrow over the search", async () => {
+    const { w } = await showForPlan();
+    const bars = w.findAll('.mob-topbar');
+    expect(bars).toHaveLength(2);
+    expect(bars[0].find('.mob-topbar-title').text()).toBe('Nuit du 2026-10-03');
+    expect(bars[0].find('.mob-back-btn').exists()).toBe(true);
+    expect(bars[1].find('input[type="search"]').exists()).toBe(true);
+  });
+
+  it('puts the back arrow, the name and the search in one bar in landscape', async () => {
+    const { w } = await showForPlan(true);
+    const bars = w.findAll('.mob-topbar');
+    expect(bars).toHaveLength(1);
+    expect(bars[0].find('.mob-back-btn').exists()).toBe(true);
+    expect(bars[0].find('.mob-topbar-title').text()).toBe('Nuit du 2026-10-03');
+    expect(bars[0].find('input[type="search"]').exists()).toBe(true);
+  });
+
+  it("searches for the plan's night, place and setup, leaving the Cibles settings as they are", async () => {
+    await showForPlan();
+    expect(search).toHaveBeenCalledTimes(1);
+    const input = search.mock.calls[0][0];
+    expect(input.dateStr).toBe('2026-10-03');
+    expect(input.prefs).toMatchObject({
+      setupId: 's2',
+      lat: 43.6,
+      lon: 1.44,
+      enabledTypes: ['EN'],
+    });
+    expect(prefsOf()).toMatchObject({ setupId: 's1', lat: 48.58, lon: 7.75, lastDateISO: null });
+  });
+
+  it("shows the plan's setup as text, with no field to change it", async () => {
+    const { w } = await showForPlan();
+    expect(w.find('button[aria-label^="Équipement"]').exists()).toBe(false);
+    expect(w.find('.mob-context-setup').text()).toBe('Lunette 72');
+    expect(w.findAll('.mob-context > button').map((b) => b.text())).toEqual(['1 types']);
+  });
+
+  it("opens a target's page for the plan on a tap", async () => {
+    const { w, router } = await showForPlan();
+    await w.find('input[type="search"]').setValue('m27');
+    await w.find('.mob-row--roomy').trigger('click');
+    await settle();
+    expect(router.currentRoute.value.path).toBe('/plans/p1/targets/M27');
+  });
+
+  it('leaves the night and the place out of its search settings', async () => {
+    const { w } = await showForPlan();
+    expect(w.findComponent(SearchSettingsSheet).props('planMode')).toBe(true);
+  });
+});
+
 describe('the types sheet', () => {
   it('ticks the stored types and stores a change at once', async () => {
     const w = show(TypesSheet, { props: { open: true }, global: app().global });
@@ -483,6 +580,19 @@ describe('the search settings sheet', () => {
       "Fenêtre d'observation",
       'Filtres',
     ]);
+  });
+
+  it("leaves out the night and the place for a plan's list: they are the plan's", async () => {
+    const made = app();
+    const w = show(SearchSettingsSheet, {
+      props: { open: true, planMode: true },
+      global: made.global,
+    });
+    await settle();
+    expect(w.text()).not.toContain('Ce soir');
+    expect(w.text()).not.toContain('48.58, 7.75');
+    expect(w.text()).toContain('Trier par');
+    expect(w.text()).toContain('Ciel observable');
   });
 
   it('has an "i" for the three switches and none for the sky directions', async () => {

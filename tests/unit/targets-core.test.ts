@@ -20,6 +20,7 @@ import {
   moonEventsInWindow,
   moonSeparationAt,
   nightWindow,
+  planSearchPrefs,
   timeWindowFor,
 } from '@myastrosky/core/targets/night';
 import { presetForSetupId, resolveSetupById } from '@myastrosky/core/targets/plan-setup';
@@ -234,6 +235,18 @@ describe('night and observer helpers', () => {
     expect(own.dateNight.toISOString()).toBe('2026-03-04T12:00:00.000Z');
     expect(getPlanObserverFor({}, { lat: null, lon: null, lastDateISO: null })).toBeNull();
     expect(getPlanObserverFor({ lat: 99, lon: 0 }, prefs)).toBeNull();
+  });
+
+  it("searches a plan's targets with its place, night and setup, else the search's", () => {
+    const prefs = { setupId: 's1', lat: 48, lon: 7, lastDateISO: '2026-01-02', minAltDeg: 30 };
+    expect(
+      planSearchPrefs(prefs, { setupId: 's2', lat: 10, lon: 20, nightOf: '2026-03-04' }),
+    ).toEqual({ setupId: 's2', lat: 10, lon: 20, lastDateISO: '2026-03-04', minAltDeg: 30 });
+    expect(planSearchPrefs(prefs, { setupId: null, lat: null, lon: null, nightOf: null })).toEqual(
+      prefs,
+    );
+    // the search's own settings are left as they are
+    expect(prefs.setupId).toBe('s1');
   });
 });
 

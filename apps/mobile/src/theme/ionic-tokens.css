@@ -51,6 +51,10 @@
   --mobile-column-max: 680px;
   /* The settings column beside the map of a map mode in landscape (boards "…Landscape" of the map modes). */
   --mobile-side-panel: 400px;
+  /* A search field beside a title in a landscape top bar (board "Plan, ajouter une cible, paysage"). */
+  --mobile-search-width: 400px;
+  /* How long the cover of pages changed out of sight takes to fade onto the page reached (tab-navigation.ts). */
+  --page-swap-fade: 0.2s;
   /* A sheet's width in landscape, over a scrim or over the map; a dialog's; a pushed form's footer button's. */
   --mobile-sheet-width: 440px;
   --mobile-dialog-width: 400px;
@@ -80,6 +84,12 @@ ion-content {
 /* A page's top bar is the design system's `.mob-topbar` (the header element carries the class). */
 ion-header.mob-topbar {
   flex: none;
+}
+/* A second bar under the first (board "Plan, ajouter une cible": the search under the plan's name) is below the status
+   bar already. */
+ion-header.mob-topbar + ion-header.mob-topbar {
+  min-height: var(--mobile-topbar-height);
+  padding-top: 0;
 }
 ion-header.header-md::after {
   display: none;
@@ -156,6 +166,22 @@ ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page) {
   box-sizing: border-box;
   padding-left: var(--safe-left, 0px);
   padding-right: var(--safe-right, 0px);
+  /* Opaque: while it slides in, the page under it never shows through a part with no background of its own. */
+  background: var(--bg-app);
+}
+/* Without a footer, the navigation bar under the page is kept clear: an opaque band over it, so that a list scrolling
+   to the bottom passes under the band and is never drawn on the bar (the end of the list stays reachable above it,
+   `.mob-page-safe`). */
+ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page):not(:has(ion-footer))::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--safe-bottom, 0px);
+  background: var(--bg-app);
+  z-index: var(--z-sidebar);
+  pointer-events: none;
 }
 
 /* ── Pages: the design system's scrolling area fills the page's content. */

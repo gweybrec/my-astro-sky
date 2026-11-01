@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { getAccessories, getCameras, getTelescopes } from '@myastrosky/core/gear-catalog';
@@ -8,6 +8,7 @@ import { formatAlt } from '@myastrosky/core/format-utils';
 import { formatMultiplicity } from '@myastrosky/core/targets/multiplicity';
 import { ALL_DSO_TYPES } from '@myastrosky/core/targets/filters';
 import { formatClock24, todayISO } from '@myastrosky/core/targets/format';
+import { planSearchPrefs } from '@myastrosky/core/targets/night';
 import { matchesTargetQuery } from '@myastrosky/core/targets/query';
 import type { GearLists } from '@myastrosky/core/targets/plan-setup';
 import { runTargetRecommendationSliced } from '@myastrosky/core/targets/recommend';
@@ -15,6 +16,7 @@ import { sortSuggestions } from '@myastrosky/core/targets/sorting';
 import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
 import { getGearSetups, getPhotos } from '@myastrosky/app-state/api';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
+import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { catalogsReady } from '../catalogs';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -22,6 +24,7 @@ import { useGrowingList } from '../composables/useGrowingList';
 import { reloadTargetsPrefs, targetsPrefs, updateTargetsPrefs } from '../composables/useTargets';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
+import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
@@ -39,7 +42,13 @@ import plusIcon from '@icons/plus.svg?raw';
 // aucun setup" and "Cibles, aucun résultat": the targets worth imaging on the chosen night with the chosen setup. Beside
 // the search field, one button opens the search settings (sort, night, location, sky, observation window, filters);
 // under it, the setup and the number of object types. The list is searched again when one of them has changed.
+// Opened from a plan's plus (`/plans/:id/targets`, boards "Plan, ajouter une cible"), the list is that plan's, as the
+// desktop's "Trouver des cibles" of a plan: a title bar with the plan's name (in landscape the search shares it), the
+// search run for the plan's place, night and setup (the setup shown as text: it is changed on the plan), and a result
+// opens its page for that plan. The Cibles settings are not changed by it.
+const route = useRoute();
 const router = useRouter();
+const plans = usePlansStore();
 const { showError } = useErrorToast();
 const horizonStore = useHorizonProfileStore();
 const regionsStore = useSkyRegionsStore();
@@ -59,13 +68,31 @@ const settingsOpen = ref(false);
 const setupsOpen = ref(false);
 let lastKey = '';
 
-const setup = computed(() => gear.value?.setups.find((s) => s.id === targetsPrefs.setupId));
+/** The plan the list adds to, when it was opened from one. */
+const planId = computed(() => (route.params.id ? String(route.params.id) : null));
+const plan = computed(() =>
+  planId.value ? plans.plans.find((p) => p.id === planId.value) : undefined,
+);
+/** What the search reads: the Cibles settings, with the plan's place, night and setup over them. */
+const searchPrefs = computed(() =>
+  plan.value ? planSearchPrefs({ ...targetsPrefs }, plan.value) : { ...targetsPrefs },
+);
+
+// In landscape the plan's title bar holds the search too (one bar, as the landscape board draws it).
+const landscapeQuery =
+  typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
+const landscape = ref(landscapeQuery?.matches ?? false);
+const onTurn = () => (landscape.value = landscapeQuery?.matches ?? false);
+landscapeQuery?.addEventListener('change', onTurn);
+onBeforeUnmount(() => landscapeQuery?.removeEventListener('change', onTurn));
+
+const setup = computed(() => gear.value?.setups.find((s) => s.id === searchPrefs.value.setupId));
 const setupName = computed(() => setup.value?.name ?? t('targets.gear.noSetup'));
 const typeCount = computed(() => targetsPrefs.enabledTypes?.length ?? ALL_DSO_TYPES.length);
 const typesValue = computed(() => t('mobile.targets.typesValue', { n: typeCount.value }));
 const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { name, value });
 /** The night searched: the last one chosen, as on the desktop, else today. */
-const nightISO = computed(() => targetsPrefs.lastDateISO ?? todayISO());
+const nightISO = computed(() => searchPrefs.value.lastDateISO ?? todayISO());
 const setupOptions = computed(() =>
   (gear.value?.setups ?? []).map((s) => ({ value: s.id, label: s.name })),
 );
@@ -126,6 +153,7 @@ async function loadOnce() {
   try {
     reloadTargetsPrefs();
     await catalogsReady();
+    if (planId.value) await plans.load();
     const [setups, telescopes, cameras, accessories] = await Promise.all([
       getGearSetups(),
       getTelescopes(),
@@ -147,7 +175,7 @@ async function loadOnce() {
 /** Searches again, unless nothing the search reads has changed since the last time. */
 async function runSearch() {
   if (!gear.value) return;
-  const { sortBy: _sortBy, pageSize: _pageSize, ...inputs } = targetsPrefs;
+  const { sortBy: _sortBy, pageSize: _pageSize, ...inputs } = searchPrefs.value;
   const key = JSON.stringify([
     inputs,
     gear.value.setups,
@@ -168,7 +196,7 @@ async function runSearch() {
       : null;
     const result = await runTargetRecommendationSliced(
       {
-        prefs: { ...targetsPrefs },
+        prefs: searchPrefs.value,
         dateStr: nightISO.value,
         gear: gear.value,
         photographedIds,
@@ -210,11 +238,24 @@ onIonViewWillEnter(load);
 function closed(open: boolean) {
   if (!open) void runSearch();
 }
+
+function openTarget(id: string) {
+  const path = planId.value ? `/plans/${planId.value}/targets` : '/targets';
+  void router.push(`${path}/${encodeURIComponent(id)}`);
+}
 </script>
 
 <template>
   <IonPage>
+    <PhoneTopBar v-if="planId && !landscape">
+      <PhoneBackButton :fallback="`/plans/${planId}`" />
+      <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ plan?.name }}</h1>
+    </PhoneTopBar>
     <PhoneTopBar>
+      <template v-if="planId && landscape">
+        <PhoneBackButton :fallback="`/plans/${planId}`" />
+        <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ plan?.name }}</h1>
+      </template>
       <PhoneSearch
         v-model="search"
         :placeholder="t('mobile.targets.searchPlaceholder')"
@@ -225,7 +266,9 @@ function closed(open: boolean) {
       /></PhoneIconButton>
     </PhoneTopBar>
     <div class="mob-context" style="flex: none">
+      <span v-if="planId" class="mob-context-setup mob-btn-label m-secondary">{{ setupName }}</span>
       <PhoneButton
+        v-else
         variant="field"
         :aria-label="aria(t('mobile.targets.fieldGear'), setupName)"
         @click="setupsOpen = true"
@@ -235,6 +278,7 @@ function closed(open: boolean) {
       </PhoneButton>
       <PhoneButton
         class="mob-context-types"
+        :class="{ 'mob-context-types--grow': planId }"
         variant="field"
         :aria-label="aria(t('targets.typeFilter'), typesValue)"
         @click="typesOpen = true"
@@ -246,6 +290,7 @@ function closed(open: boolean) {
     <IonContent :scroll-y="false">
       <div
         class="mob-scroll mob-page-fill"
+        :class="{ 'mob-page-safe': planId }"
         style="background: var(--bg-panel)"
         @scroll.passive="onScroll"
       >
@@ -272,13 +317,13 @@ function closed(open: boolean) {
             :rating="row.rating"
             :altitude="row.altitude"
             :time="row.time"
-            @click="router.push(`/targets/${encodeURIComponent(row.id)}`)"
+            @click="openTarget(row.id)"
           />
         </div>
       </div>
     </IonContent>
     <TypesSheet v-model:open="typesOpen" @update:open="closed" />
-    <SearchSettingsSheet v-model:open="settingsOpen" @update:open="closed" />
+    <SearchSettingsSheet v-model:open="settingsOpen" :plan-mode="!!planId" @update:open="closed" />
     <PhoneRadioSheet
       v-model:open="setupsOpen"
       v-model:value="chosenSetupId"

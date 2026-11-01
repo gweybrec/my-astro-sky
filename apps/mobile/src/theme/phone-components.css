@@ -981,6 +981,35 @@ ion-button.mob-row-main--checked .mob-radio-mark {
 .mob-context > .mob-context-types {
   flex: none;
 }
+/* The Cibles context of a plan (board "Plan, ajouter une cible"): the setup is the plan's, plain text as wide as its name,
+   in the fields' colour; the number of types takes the rest of the line. */
+.mob-context > .mob-context-setup {
+  flex: 0 1 auto;
+  align-self: center;
+  color: var(--text-primary);
+}
+/* It never shrinks below its own text: a long setup name is the one cut short. */
+.mob-context > .mob-context-types.mob-context-types--grow {
+  flex: 1 0 auto;
+}
+/* Pages changed out of sight (the map's "Ciel, voir une cible" going back to the target's page and its list): the app's
+   background covers them and takes the taps meanwhile, then fades away onto the page reached (`swapPagesUnseen`). */
+html.mob-page-swap ion-app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--bg-app);
+  transition: opacity var(--page-swap-fade) ease;
+}
+html.mob-page-swap.mob-page-swap--out ion-app::after {
+  opacity: 0;
+  pointer-events: none;
+}
+/* In landscape the plan's name and the search share one bar: the search keeps a phone width after the name. */
+.mob-topbar > .mob-topbar-title--grow ~ ion-input.mob-search {
+  flex: 0 1 var(--mobile-search-width);
+}
 .mob-cols2 {
   display: block;
 }
@@ -1447,6 +1476,11 @@ ion-tab-bar.mob-tabbar-hidden {
 /* The title bar takes the status bar's height itself: the frame does not add it again. */
 .mob-sky-frame.mob-map-mode {
   padding-top: 0;
+}
+/* A mode without a panel ("Voir une région", "Ciel, voir une cible") has no tab bar under the map: the map, and so its
+   sheet, ends above the navigation bar, which keeps the page's background. */
+.mob-sky-frame.mob-map-mode.mob-map-mode--bare {
+  padding-bottom: var(--safe-bottom, 0px);
 }
 /* The photo being placed: moved by its own CSS matrix over the map, under the fingers that hold it. */
 .mob-placing-photo {

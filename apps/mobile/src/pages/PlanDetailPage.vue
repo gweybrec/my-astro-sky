@@ -38,7 +38,8 @@ import chevronIcon from '../icons/chevron-right.svg?raw';
 // plan's equipment (a field: choosing another may ask about its mosaics, board "Ciel, changer d'équipement"), then its
 // targets in the plan's order, each with its first observation window. A tap opens the target; a drag
 // by its handle puts it elsewhere (one request). The actions rename the plan, choose how its targets are sorted (the
-// desktop's sorts) and delete it. Adding a target needs the targets list to pick from, which cannot add to a plan yet.
+// desktop's sorts) and delete it. The plus opens the Cibles list for this plan (boards "Plan, ajouter une cible"), as the
+// desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -242,8 +243,11 @@ async function remove() {
           </PhoneReorderList>
         </div>
       </div>
-      <!-- Adding a target is done from the Cibles list, which cannot add to a plan yet (a later card): drawn, no tap. -->
-      <PhoneFab :label="t('mobile.plans.addTarget')" flush waiting />
+      <PhoneFab
+        :label="t('mobile.plans.addTarget')"
+        flush
+        @click="router.push(`/plans/${planId}/targets`)"
+      />
     </IonContent>
     <PlanActionsSheet
       v-if="plan"

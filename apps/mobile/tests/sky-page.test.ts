@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
@@ -7,13 +7,21 @@ import { ionicStubs } from './helpers';
 
 const push = vi.hoisted(() => vi.fn());
 const replace = vi.hoisted(() => vi.fn());
+/** The pages Ionic's router opens, with the direction (no slide: 'none'). */
+const navigate = vi.hoisted(() => vi.fn());
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push, replace, currentRoute: { value: { path: '/tabs/sky' } } }),
+}));
+vi.mock('@ionic/vue', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useIonRouter: () => ({ navigate }),
 }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => new Promise(() => {}) }));
 const reloadPhotos = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const sizesRepaired = vi.hoisted(() => ({ settle: (_n: number) => {} }));
 const mediumsMade = vi.hoisted(() => ({ settle: (_n: number) => {} }));
+/** The map under the page, for the tests that need one (letting go of a frame); none for the others. */
+const fakeMap = vi.hoisted(() => ({ map: undefined as unknown }));
 vi.mock('../src/photo-sizes', () => ({
   photoSizesRepaired: () => new Promise<number>((resolve) => (sizesRepaired.settle = resolve)),
   photoMediumsMade: () => new Promise<number>((resolve) => (mediumsMade.settle = resolve)),
@@ -29,11 +37,13 @@ vi.mock('../src/sky-map-setup', () => ({
     refreshLocation: () => {},
     catalogsLoaded: () => {},
     destroy: () => {},
+    map: fakeMap.map,
   }),
 }));
 
 import SkyPage from '../src/pages/SkyPage.vue';
-import { skyRegionDraw, skyRegionView } from '../src/sky-modes';
+import { skyRegionDraw, skyRegionView, skyTargetView } from '../src/sky-modes';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 
 /** The map's own controls: what shows with the live sky and what shows with the sky at a date. */
 describe('the Ciel page', () => {
@@ -126,5 +136,118 @@ describe('the Ciel page', () => {
     await w.find('button[aria-label="Retour"]').trigger('click');
     expect(skyRegionDraw.value).toBeNull();
     expect(w.find('.mob-map-mode').exists()).toBe(false);
+  });
+
+  describe('showing a target ("Ciel, voir une cible")', () => {
+    beforeEach(() => {
+      fakeMap.map = { selectFrame: vi.fn(), getView: () => ({ width: 0, height: 0 }) };
+      skyTargetView.value = null;
+    });
+    afterEach(() => {
+      fakeMap.map = undefined;
+      skyTargetView.value = null;
+    });
+
+    /** "Afficher sur la carte" of the plan's target page: a free frame of the setup on the target. */
+    function showTarget() {
+      const fov = useFovFramesStore();
+      fov.specs = new Map([
+        [
+          's1',
+          {
+            name: 'Équipement 1',
+            label: 'Équipement 1 · 2.5° × 1.7°',
+            wDeg: 2.5,
+            hDeg: 1.7,
+            smart: false,
+            mosaic: null,
+          },
+        ],
+      ]);
+      fov.adhoc.push({
+        id: 'a1',
+        setupId: 's1',
+        anchor: { kind: 'sky', ra: 10.7, dec: 41.3, dsoId: 'NGC7023' },
+        rotationDeg: 0,
+      });
+      fov.setSelection({ kind: 'plan', planId: 'p9' });
+      fov.setFramesVisible(false);
+      const frames = { visible: false, selection: { kind: 'plan' as const, planId: 'p9' } };
+      fov.setSelection({ kind: 'free' });
+      fov.setFramesVisible(true);
+      fov.setActive('a1');
+      skyTargetView.value = {
+        frameId: 'a1',
+        frames,
+        dsoId: 'NGC7023',
+        name: "Nébuleuse de l'Iris",
+        tab: 'plans',
+        pages: ['/plans/p1', '/plans/p1/targets'],
+        page: '/plans/p1/targets/NGC7023',
+        pageOf: (id) => `/plans/p1/targets/${id}`,
+      };
+      return fov;
+    }
+
+    it("has the target's name in its own bar, over the map alone", async () => {
+      const w = mountPage();
+      await flushPromises();
+      showTarget();
+      await flushPromises();
+      expect(w.find('.mob-topbar-title').text()).toBe("Nébuleuse de l'Iris");
+      expect(w.find('.mob-map-mode.mob-map-mode--bare').exists()).toBe(true);
+      // no search row of the map in the mode
+      expect(w.find('.mob-map-top').exists()).toBe(false);
+    });
+
+    it("opens the target's page again with the pages under it, in one press of the back arrow", async () => {
+      const w = mountPage();
+      await flushPromises();
+      showTarget();
+      await flushPromises();
+      replace.mockClear();
+      navigate.mockClear();
+      await w.find('button[aria-label="Retour"]').trigger('click');
+      await flushPromises();
+      expect(skyTargetView.value).toBeNull();
+      expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/plans']);
+      // the pages open again without a slide each
+      expect(navigate.mock.calls).toEqual([
+        ['/plans/p1', 'none', 'push'],
+        ['/plans/p1/targets', 'none', 'push'],
+        ['/plans/p1/targets/NGC7023', 'none', 'push'],
+      ]);
+    });
+
+    it('takes the object the frame is moved onto as the target, and keeps the last one on empty sky', async () => {
+      const w = mountPage();
+      await flushPromises();
+      const fov = showTarget();
+      await flushPromises();
+      fov.adhoc[0].anchor = { kind: 'sky', ra: 11, dec: 42, dsoId: 'M31' };
+      await flushPromises();
+      // the catalogue is not loaded here: the object is named by its id
+      expect(w.find('.mob-topbar-title').text()).toBe('M31');
+      fov.adhoc[0].anchor = { kind: 'sky', ra: 12, dec: 43, dsoId: null };
+      await flushPromises();
+      expect(w.find('.mob-topbar-title').text()).toBe('M31');
+      navigate.mockClear();
+      await w.find('button[aria-label="Retour"]').trigger('click');
+      await flushPromises();
+      expect(navigate).toHaveBeenLastCalledWith('/plans/p1/targets/M31', 'none', 'push');
+    });
+
+    it('removes the frame it showed when it is left, and puts the frames back as they were', async () => {
+      const w = mountPage();
+      await flushPromises();
+      const fov = showTarget();
+      await flushPromises();
+      expect(fov.adhoc.map((f) => f.id)).toEqual(['a1']);
+      await w.find('button[aria-label="Retour"]').trigger('click');
+      await flushPromises();
+      expect(fov.adhoc).toEqual([]);
+      expect(fov.framesVisible).toBe(false);
+      expect(fov.selection).toEqual({ kind: 'plan', planId: 'p9' });
+    });
   });
 });

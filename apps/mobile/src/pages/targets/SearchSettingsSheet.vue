@@ -42,7 +42,9 @@ import {
 // and constellations, each a list of tick boxes: "Cibles, catalogues" / "Cibles, constellations") and the three
 // switches. Each change is stored at once; "Réinitialiser" puts the sky, the window, the filters and the switches back
 // to the desktop's defaults and keeps the sort, the night and the location; "Appliquer" closes the sheet (the list is
-// searched again then).
+// searched again then). For the Cibles list of a plan (`planMode`) the night and the location are the plan's: their two
+// fields are left out.
+defineProps<{ planMode?: boolean }>();
 const open = defineModel<boolean>('open', { required: true });
 const router = useRouter();
 const regionsStore = useSkyRegionsStore();
@@ -167,38 +169,40 @@ const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { na
       button
       @click="sortOpen = true"
     />
-    <div class="mob-form-row" style="padding-bottom: var(--space-4)">
-      <PhoneButton
-        variant="field"
-        block
-        text-style="body"
-        :aria-label="aria(t('mobile.targets.fieldNight'), nightLabel.toLowerCase())"
-        @click="nightPicker?.open()"
-      >
-        <span class="mob-btn-key">{{ t('mobile.targets.fieldNight') }}</span>
-        <span class="mob-btn-value mob-btn-value--swatch">{{ nightLabel }}</span>
-        <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-      </PhoneButton>
-    </div>
-    <PhoneNativePicker
-      ref="nightPicker"
-      type="date"
-      :value="nightISO"
-      @pick="updateTargetsPrefs({ lastDateISO: $event })"
-    />
-    <div class="mob-form-row" style="padding-bottom: var(--space-4)">
-      <PhoneButton
-        variant="field"
-        block
-        text-style="body"
-        :aria-label="aria(t('mobile.targets.fieldPlace'), place)"
-        @click="leaveTo('/settings/location')"
-      >
-        <span class="mob-btn-key">{{ t('mobile.targets.fieldPlace') }}</span>
-        <span class="mob-btn-value mob-btn-value--swatch">{{ place }}</span>
-        <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-      </PhoneButton>
-    </div>
+    <template v-if="!planMode">
+      <div class="mob-form-row" style="padding-bottom: var(--space-4)">
+        <PhoneButton
+          variant="field"
+          block
+          text-style="body"
+          :aria-label="aria(t('mobile.targets.fieldNight'), nightLabel.toLowerCase())"
+          @click="nightPicker?.open()"
+        >
+          <span class="mob-btn-key">{{ t('mobile.targets.fieldNight') }}</span>
+          <span class="mob-btn-value mob-btn-value--swatch">{{ nightLabel }}</span>
+          <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+        </PhoneButton>
+      </div>
+      <PhoneNativePicker
+        ref="nightPicker"
+        type="date"
+        :value="nightISO"
+        @pick="updateTargetsPrefs({ lastDateISO: $event })"
+      />
+      <div class="mob-form-row" style="padding-bottom: var(--space-4)">
+        <PhoneButton
+          variant="field"
+          block
+          text-style="body"
+          :aria-label="aria(t('mobile.targets.fieldPlace'), place)"
+          @click="leaveTo('/settings/location')"
+        >
+          <span class="mob-btn-key">{{ t('mobile.targets.fieldPlace') }}</span>
+          <span class="mob-btn-value mob-btn-value--swatch">{{ place }}</span>
+          <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+        </PhoneButton>
+      </div>
+    </template>
 
     <PhoneSectionHeader>{{ t('mobile.targets.sectionSky') }}</PhoneSectionHeader>
     <div class="mob-form-row mob-form-row--title">

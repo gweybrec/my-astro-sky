@@ -108,3 +108,32 @@ export function getPlanObserverFor(
   const dateStr = plan.nightOf ?? prefs.lastDateISO ?? todayISO();
   return { loc: { latDeg: lat, lonDeg: lon }, dateNight: new Date(dateStr + 'T12:00:00Z') };
 }
+
+/**
+ * The targets search run for a plan ("Trouver des cibles" of a plan): the search settings with the plan's place,
+ * night and setup laid over them, each kept from the settings where the plan has none (as getPlanObserverFor does).
+ */
+export function planSearchPrefs<
+  P extends {
+    setupId?: string | null;
+    lat: number | null;
+    lon: number | null;
+    lastDateISO: string | null;
+  },
+>(
+  prefs: P,
+  plan: {
+    setupId?: string | null;
+    lat?: number | null;
+    lon?: number | null;
+    nightOf?: string | null;
+  },
+): P {
+  return {
+    ...prefs,
+    setupId: plan.setupId ?? prefs.setupId,
+    lat: plan.lat ?? prefs.lat,
+    lon: plan.lon ?? prefs.lon,
+    lastDateISO: plan.nightOf ?? prefs.lastDateISO,
+  };
+}

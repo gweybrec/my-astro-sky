@@ -25,8 +25,10 @@ import resetIcon from '../../icons/rotate-ccw.svg?raw';
 // deleting it. While a finger drags the frame the sheet shrinks to its title (board "Ciel, déplacer le cadre"). It
 // closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button, and the frame
 // is let go of. A mosaic (board "Ciel, mosaïque sélectionnée") adds its Lignes / Colonnes, which re-tile it about its
-// centre, and for a plan's mosaic "Modifier la mosaïque" (the desktop's edit button), which the page opens.
-const props = defineProps<{ frame: RenderableFrame; map: SkyMap }>();
+// centre, and for a plan's mosaic "Modifier la mosaïque" (the desktop's edit button), which the page opens. In the map's
+// mode showing a target (`viewing`, board "Ciel, voir une cible") the frame is the target's: it is neither moved into a
+// plan nor deleted there.
+const props = defineProps<{ frame: RenderableFrame; map: SkyMap; viewing?: boolean }>();
 const emit = defineEmits<{ close: []; editMosaic: [planId: string, mosaicId: string] }>();
 const fov = useFovFramesStore();
 const plans = usePlansStore();
@@ -274,13 +276,14 @@ async function remove() {
       />
     </template>
     <PhoneRow
-      v-if="canMove"
+      v-if="canMove && !viewing"
       :title="t('fovOverlay.moveToPlan')"
       :lead="listPlusIcon"
       button
       @click="moveOpen = true"
     />
     <PhoneRow
+      v-if="!viewing"
       :title="isMosaic ? t('fovOverlay.deleteMosaic') : t('fovOverlay.deleteFrame')"
       :lead="trashIcon"
       danger

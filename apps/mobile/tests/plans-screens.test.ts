@@ -43,6 +43,7 @@ import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import { reloadTargetsPrefs } from '../src/composables/useTargets';
 import { skyFocus } from '../src/composables/useSkySelection';
+import { skyTargetView } from '../src/sky-modes';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 
 const GEAR = {
@@ -157,6 +158,7 @@ function app(path: string) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
+      { path: '/plans/:id/targets/:dsoId', component: { template: '<div />' } },
       { path: '/plans/:id/:entryId', component: { template: '<div />' } },
       { path: '/plans/:id', component: { template: '<div />' } },
       { path: '/targets/:dsoId', component: { template: '<div />' } },
@@ -337,9 +339,13 @@ describe('the plan detail page', () => {
     expect(showError).toHaveBeenCalled();
   });
 
-  it('draws the controls that wait for another screen without a tap', async () => {
-    const { w } = await show(PlanDetailPage, '/plans/p1');
-    expect(w.find('button[aria-label="Ajouter une cible"]').classes()).toContain('mob-waiting');
+  it('opens the Cibles list for the plan from its plus', async () => {
+    const { w, router } = await show(PlanDetailPage, '/plans/p1');
+    const plus = w.find('button[aria-label="Ajouter une cible"]');
+    expect(plus.classes()).not.toContain('mob-waiting');
+    await plus.trigger('click');
+    await settle();
+    expect(router.currentRoute.value.path).toBe('/plans/p1/targets');
   });
 
   it('renames the plan from its actions, and saves neither an empty nor an unchanged name', async () => {
@@ -530,6 +536,19 @@ describe('the plan entry page', () => {
     expect(frames.framesVisible).toBe(true);
     expect(skyFocus.value).toMatchObject({ ra: DSOS.NGC7000.ra, dec: DSOS.NGC7000.dec });
     expect(skyFocus.value?.fov?.wDeg).toBeGreaterThan(0);
+    // the map shows the target in its own mode, the frame anchored to it, and comes back here, or once the frame is
+    // moved onto another object, to that object's page for this plan
+    const shown = skyTargetView.value!;
+    expect(shown).toMatchObject({
+      dsoId: 'NGC7000',
+      name: "Nébuleuse de l'Amérique du Nord",
+      tab: 'plans',
+      pages: ['/plans/p1'],
+      page: '/plans/p1/e1',
+    });
+    expect(shown.pageOf('M31')).toBe('/plans/p1/targets/M31');
+    const made = frames.adhoc.find((f) => f.id === shown.frameId)!;
+    expect(made.anchor).toMatchObject({ kind: 'sky', dsoId: 'NGC7000' });
   });
 
   it("opens the suggested filters, the desktop's recipe, in a sheet", async () => {
@@ -741,6 +760,9 @@ describe('the target page ("Cibles, détail d\'une cible")', () => {
     expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/targets', '/tabs/sky']);
     expect(skyFocus.value).toMatchObject({ ra: DSOS.NGC7000.ra, dec: DSOS.NGC7000.dec });
     expect(useFovFramesStore().framesVisible).toBe(true);
+    const shown = skyTargetView.value!;
+    expect(shown).toMatchObject({ tab: 'targets', pages: [], page: '/targets/NGC7000' });
+    expect(shown.pageOf('M31')).toBe('/targets/M31');
   });
 
   it('adds the target to a plan or takes it out, the plans ticked where it is, and says so', async () => {
@@ -804,5 +826,93 @@ describe('the target page ("Cibles, détail d\'une cible")', () => {
     await settle();
     expect(backend.plans.create).toHaveBeenCalledWith({ name: expect.stringMatching(/^Nuit du /) });
     expect(backend.plans.addEntry).toHaveBeenCalledWith('p3', { dsoId: 'M31' });
+  });
+});
+
+describe('the target page of a plan ("Plan, ajouter une cible, détail")', () => {
+  const row = (w: ReturnType<typeof mount>, title: string) =>
+    w.findAll('.mob-row').find((r) => r.text().trim() === title)!;
+  const add = (w: ReturnType<typeof mount>) =>
+    w.findAllComponents({ name: 'PhoneRow' }).find((c) => c.props('title') === 'Ajouter au plan')!;
+
+  it('has one "Ajouter au plan" button, for this plan, instead of the plans picker', async () => {
+    const { w } = await show(TargetDetailPage, '/plans/p2/targets/M31');
+    expect(row(w, 'Afficher sur la carte').exists()).toBe(true);
+    expect(row(w, 'Ajouter à un plan')).toBeUndefined();
+    expect(w.findAllComponents({ name: 'PlanPickerSheet' })).toHaveLength(0);
+    expect(w.findAllComponents({ name: 'PhoneCheckRow' })).toHaveLength(0);
+    expect(add(w).props('disabled')).toBe(false);
+  });
+
+  it('adds the target to the plan, says so, and is greyed once it is in it', async () => {
+    backend.plans.addEntry.mockImplementation(async () => {
+      backend.plans.list.mockResolvedValue([
+        PLANS[0],
+        { ...PLANS[1], entries: [...PLANS[1].entries, entry('e9', 'M31')] },
+      ]);
+      return { id: 'e9' };
+    });
+    const { w } = await show(TargetDetailPage, '/plans/p2/targets/M31');
+    await add(w).trigger('click');
+    await settle();
+    expect(backend.plans.addEntry).toHaveBeenCalledWith('p2', { dsoId: 'M31' });
+    expect(backend.plans.removeEntry).not.toHaveBeenCalled();
+    expect(showNotice).toHaveBeenCalledWith('Ajouté à « Cygne et Céphée »');
+    expect(add(w).props('disabled')).toBe(true);
+  });
+
+  it('is greyed for a target already in the plan, and a tap adds nothing', async () => {
+    const { w } = await show(TargetDetailPage, '/plans/p1/targets/M31');
+    expect(add(w).props('disabled')).toBe(true);
+    await add(w).trigger('click');
+    await settle();
+    expect(backend.plans.addEntry).not.toHaveBeenCalled();
+    expect(backend.plans.removeEntry).not.toHaveBeenCalled();
+  });
+
+  it('shows the target on the map and comes back to it, or to the object its frame was moved onto, in this list', async () => {
+    const { w, router } = await show(TargetDetailPage, '/plans/p2/targets/M31');
+    const replace = vi.spyOn(router, 'replace').mockResolvedValue(undefined);
+    await row(w, 'Afficher sur la carte').trigger('click');
+    await settle();
+    expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/plans', '/tabs/sky']);
+    const shown = skyTargetView.value!;
+    expect(shown).toMatchObject({
+      dsoId: 'M31',
+      tab: 'plans',
+      pages: ['/plans/p2', '/plans/p2/targets'],
+      page: '/plans/p2/targets/M31',
+    });
+    expect(shown.pageOf('NGC7000')).toBe('/plans/p2/targets/NGC7000');
+  });
+
+  it("uses the plan's night, not the one of the Cibles search", async () => {
+    const night = async (path: string) =>
+      (await show(TargetDetailPage, path)).w.find('.mob-alt-chart svg').attributes('aria-label');
+    // the two plans are a week apart: the night (and so the transit time) differs
+    expect(await night('/plans/p1/targets/NGC7000')).not.toBe(
+      await night('/plans/p2/targets/NGC7000'),
+    );
+  });
+
+  it('adds a multiple star to the plan as a frame on its position, with the same button', async () => {
+    STARS.splice(0, STARS.length, {
+      ...DSOS.NGC7000,
+      id: 'star:95947',
+      type: 'MS',
+      displayName: 'Albireo',
+      catalogs: ['β Cyg'],
+      majAxis: null,
+      multiplicity: { components: 2, sep: '34.7"' },
+    } as DSO);
+    const { w } = await show(TargetDetailPage, '/plans/p2/targets/star%3A95947');
+    expect(add(w).props('disabled')).toBe(false);
+    await add(w).trigger('click');
+    await settle();
+    expect(backend.plans.addEntry).toHaveBeenCalledWith('p2', {
+      ra: DSOS.NGC7000.ra,
+      dec: DSOS.NGC7000.dec,
+    });
+    expect(showNotice).toHaveBeenCalledWith('Ajouté à « Cygne et Céphée »');
   });
 });

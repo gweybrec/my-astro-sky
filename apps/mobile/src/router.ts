@@ -54,6 +54,12 @@ const routes: RouteRecordRaw[] = [
   { path: '/targets/:dsoId', component: () => import('./pages/TargetDetailPage.vue') },
   // The pages pushed from the Plans tab: full screen, without the tab bar (boards "Détail du plan" and "Plan, détail d'une cible").
   { path: '/plans/:id', component: () => import('./pages/PlanDetailPage.vue') },
+  // The Cibles list and target page opened from a plan's plus, adding to that plan (boards "Plan, ajouter une cible").
+  { path: '/plans/:id/targets', component: () => import('./pages/TargetsPage.vue') },
+  {
+    path: '/plans/:id/targets/:dsoId',
+    component: () => import('./pages/TargetDetailPage.vue'),
+  },
   { path: '/plans/:id/:entryId', component: () => import('./pages/PlanEntryPage.vue') },
   { path: '/settings/setups', component: () => import('./pages/SetupsPage.vue') },
   { path: '/settings/setups/:id', component: () => import('./pages/SetupEditPage.vue') },

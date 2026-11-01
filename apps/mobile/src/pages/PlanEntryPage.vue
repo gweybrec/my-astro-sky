@@ -189,7 +189,14 @@ async function deleteWindow() {
 }
 
 // The desktop's "Afficher sur la carte", with the plan's setup.
-const showTargetOnMap = useShowTargetOnMap('plans');
+// The map goes back to this page; once its frame was moved onto another object, to that object's page for this plan
+// (where it can be added to the plan).
+const showTargetOnMap = useShowTargetOnMap({
+  tab: 'plans',
+  pages: [`/plans/${planId.value}`],
+  page: `/plans/${planId.value}/${entryId.value}`,
+  pageOf: (id) => `/plans/${planId.value}/targets/${encodeURIComponent(id)}`,
+});
 async function showOnMap() {
   if (dso.value) await showTargetOnMap(dso.value, setupId.value);
 }

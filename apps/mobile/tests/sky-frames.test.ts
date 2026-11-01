@@ -220,6 +220,30 @@ describe('the sheet of the selected frame', () => {
     const { w } = mountSheet(frame({ id: 'plan:p1:e1' }));
     expect(byText(w, 'Déplacer vers un plan')).toBeUndefined();
   });
+
+  it('has neither the move to a plan nor the delete for the frame of a target shown ("Ciel, voir une cible")', () => {
+    const fov = useFovFramesStore();
+    fov.adhoc.push({
+      id: 'adhoc-1',
+      setupId: 's1',
+      anchor: { kind: 'sky', ra: 1, dec: 2, dsoId: null },
+      rotationDeg: 0,
+    });
+    usePlansStore().plans = [plan({ id: 'p1', name: 'Nuit A', setupId: 's1' })];
+    const map = fakeMap();
+    const w = mount(SkyFrameSheet, {
+      props: { frame: frame({ id: 'adhoc-1' }), map, viewing: true },
+      global: { stubs: ionicStubs, provide: mapSheetHost },
+    });
+    expect(byText(w, 'Déplacer vers un plan')).toBeUndefined();
+    expect(byText(w, 'Supprimer le cadre')).toBeUndefined();
+    // the rest of the sheet is the one of the map
+    expect(w.findComponent(PhoneSliderRow).props('display')).toBe('24°');
+    expect(w.findAllComponents(PhoneToggleRow).map((t) => t.props('title'))).toEqual([
+      'Épingler',
+      'Ancrage',
+    ]);
+  });
 });
 
 describe('the size of a smart telescope frame', () => {
