@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   sanitizeObservationWindows,
   newObservationWindow,
@@ -130,6 +130,32 @@ describe('fracToClock / clockToFrac', () => {
   it('returns null for unparseable input', () => {
     expect(clockToFrac('nope', win)).toBeNull();
     expect(clockToFrac('99:99', win)).toBeNull();
+  });
+});
+
+describe('clockToFrac across a daylight-saving change', () => {
+  let savedTz: string | undefined;
+  beforeAll(() => {
+    savedTz = process.env.TZ;
+    process.env.TZ = 'Europe/Paris';
+  });
+  afterAll(() => {
+    if (savedTz === undefined) delete process.env.TZ;
+    else process.env.TZ = savedTz;
+  });
+
+  // Nights of 28–29 March and 24–25 October 2026, 21:00 → 06:00 local time.
+  it.each([
+    ['spring forward', 2, 28],
+    ['fall back', 9, 24],
+  ])('reads back the typed time on the %s night', (_label, month, day) => {
+    const win = {
+      start: new Date(2026, month, day, 21, 0),
+      end: new Date(2026, month, day + 1, 6, 0),
+    };
+    const frac = clockToFrac('04:00', win);
+    expect(frac).not.toBeNull();
+    expect(fracToClock(frac!, win)).toBe('04:00');
   });
 });
 

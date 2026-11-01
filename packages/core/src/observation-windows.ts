@@ -101,10 +101,13 @@ export function clockToFrac(hhmm: string, win: { start: Date; end: Date }): numb
   if (hh > 23 || mm > 59) return null;
   const cand = new Date(win.start);
   cand.setHours(hh, mm, 0, 0);
-  let t = cand.getTime();
-  if (t < win.start.getTime()) t += 86_400_000; // window crosses midnight
+  if (cand.getTime() < win.start.getTime()) {
+    // Window crosses midnight: same clock time on the next calendar day (not +24 h, which a DST change shifts by an hour).
+    cand.setDate(cand.getDate() + 1);
+    cand.setHours(hh, mm, 0, 0);
+  }
   const span = win.end.getTime() - win.start.getTime() || 1;
-  return clamp01((t - win.start.getTime()) / span);
+  return clamp01((cand.getTime() - win.start.getTime()) / span);
 }
 
 /** Duration of a window in milliseconds given the total night-window span. */
