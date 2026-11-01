@@ -46,8 +46,14 @@
   <!-- Sky tooltip (driven by canvas hover callbacks via useUiStore) -->
   <SkyTooltip />
 
-  <!-- Phase 12: batch upload modal -->
-  <BatchUploadModal v-if="activeModal === 'batchUpload'" @close="closeModal()" />
+  <!-- Phase 12: batch upload modal. Stays mounted underneath a dialog opened from
+       it — e.g. a card's POI editor opening Add POI/Identify, declared later so it
+       stacks on top — so its batch, which consumed pendingBatchFiles at setup,
+       survives the round trip. -->
+  <BatchUploadModal
+    v-if="activeModal === 'batchUpload' || previousModal === 'batchUpload'"
+    @close="closeModal()"
+  />
 
   <!-- Phase 1: static informational modals -->
   <AboutModal v-if="activeModal === 'about'" @close="closeModal()" />
