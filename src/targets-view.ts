@@ -3888,7 +3888,7 @@ export class TargetsView {
     // Two rows (like a standalone target) for breathing room: altitude/angle on
     // the first, the mosaic centre coordinates on the second.
     const meta = document.createElement('div');
-    meta.className = 'target-card-meta';
+    meta.className = 'target-card-meta target-card-meta--wrap';
     meta.appendChild(
       this.metaItem(
         t('targets.results.maxAlt'),
@@ -3910,7 +3910,7 @@ export class TargetsView {
     // RA/Dec are the mosaic centre — keep each value on one line so the
     // seconds never wrap below their label (nowrap, not a fixed width).
     const meta2 = document.createElement('div');
-    meta2.className = 'target-card-meta';
+    meta2.className = 'target-card-meta target-card-meta--wrap';
     const raItem = this.metaItem('RA', formatRA(mosaic.centerRa), t('dso.raDec'));
     const decItem = this.metaItem('Dec', formatDec(mosaic.centerDec), t('dso.raDec'));
     raItem.querySelector('.target-meta-value')!.classList.add('whitespace-nowrap');
@@ -4059,7 +4059,7 @@ export class TargetsView {
 
     // Meta — always shown (no collapsible).
     const meta = document.createElement('div');
-    meta.className = 'target-card-meta';
+    meta.className = 'target-card-meta target-card-meta--wrap';
     meta.appendChild(
       this.metaItem(
         t('targets.results.maxAlt'),
@@ -4082,7 +4082,7 @@ export class TargetsView {
     left.appendChild(meta);
 
     const meta2 = document.createElement('div');
-    meta2.className = 'target-card-meta';
+    meta2.className = 'target-card-meta target-card-meta--wrap';
     if (dso.difficulty !== null) {
       const diffEl = this.metaItem(
         t('targets.sort.difficulty'),

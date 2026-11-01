@@ -4072,6 +4072,12 @@ details.targets-form-details[open] .targets-form-summary::before {
   margin-bottom: var(--space-3);
 }
 
+/* In a plan row's narrow column the figures wrap rather than overflow (the German and Spanish labels are long). */
+.target-card-meta--wrap {
+  flex-wrap: wrap;
+  row-gap: var(--space-3);
+}
+
 .target-meta-item {
   display: flex;
   flex-direction: column;
