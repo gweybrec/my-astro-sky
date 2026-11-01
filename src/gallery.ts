@@ -613,9 +613,11 @@ export class Gallery {
     };
 
     const onKey = (e: KeyboardEvent) => {
+      // A dialog opened from the detail view (POI, identify…) handles its own keys;
+      // Escape or an arrow would close this view and the editor it reports to.
+      if (hasOpenOverlay()) return;
       if (e.key === 'Escape') {
-        // A dialog opened from the detail view (POI, identify…) handles its own Escape.
-        if (!hasOpenOverlay()) close();
+        close();
         return;
       }
       // Don't hijack arrow keys while typing in the metadata editor fields.

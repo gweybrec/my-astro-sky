@@ -528,6 +528,27 @@ describe('Gallery', () => {
     expect(document.querySelector('.gallery-detail-name')?.textContent).toBe('M2');
   });
 
+  it('arrow keys are ignored while a dialog opened from the detail view is open', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([
+      makePhoto({ id: 'a', originalName: 'M2', filename: 'a.jpg' }),
+      makePhoto({ id: 'b', originalName: 'M31', filename: 'b.jpg' }),
+    ]);
+
+    (document.querySelectorAll('.gallery-item')[0] as HTMLElement).click();
+    // An identify dialog with a focused button (not a text field)
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    const button = document.createElement('button');
+    backdrop.appendChild(button);
+    document.body.appendChild(backdrop);
+    button.focus();
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+
+    expect(document.querySelector('.gallery-detail-name')?.textContent).toBe('M2');
+    backdrop.remove();
+  });
+
   it('show on map button calls onNavigateToMap and closes modal', async () => {
     const gallery = new Gallery();
     const photo = makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg' });
