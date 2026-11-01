@@ -15,7 +15,11 @@ import { project, toCanvas, unproject, borderRadiusPU } from '@myastrosky/core/p
 import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
 import { canvasPxPerDeg, isSkyPointVisible, OFF_PROJECTION } from '@myastrosky/core/sky-axes';
 import { drawBodyMarker, drawBodyLabel } from './body-draw';
-import { computeFovFrameCorners } from '@myastrosky/core/frame-geometry';
+import {
+  computeFovFrameCorners,
+  frameGeometry,
+  mosaicOutlinePath,
+} from '@myastrosky/core/frame-geometry';
 import { angularSizeToCanvasPx } from '@myastrosky/core/dso-render-math';
 import { photoLabelEdgeIndex } from '@myastrosky/core/photo-outline';
 import {
@@ -324,8 +328,13 @@ export function renderFovFrames(s: SkyScene): void {
 export function renderFovInstances(s: SkyScene): void {
   const { ctx, view, frames } = s;
   const col = frameColors(s);
+  // An export draws the frames, not their edit controls: those are placed against the
+  // live view, not the scene's.
+  const editable = !s.offscreen;
   // The selected mosaic's tiles each get a delete button (per-tile editing).
-  const activeMosaicId = frames.frames.find((f) => f.active && f.isMosaicOutline)?.id.split(':')[2];
+  const activeMosaicId = editable
+    ? frames.frames.find((f) => f.active && f.isMosaicOutline)?.id.split(':')[2]
+    : undefined;
 
   for (const f of frames.frames) {
     if (f.visible === false) continue; // hidden via the manager checkbox
@@ -333,7 +342,9 @@ export function renderFovInstances(s: SkyScene): void {
     // project() returns a sentinel there, so the frame would be painted far off-canvas
     // with zero extents and degenerate handles. Skip it outright.
     if (f.anchorKind === 'sky' && !isSkyPointVisible(f.ra ?? 0, f.dec ?? 0)) continue;
-    const { corners, cx, cy, rotDeg, halfW, halfH } = frames.frameGeometry(f);
+    // Against the scene's view, not the controller's live one: an export renders a
+    // different view and the frame must sit on its object there.
+    const { corners, cx, cy, rotDeg, halfW, halfH } = frameGeometry(f, view);
     const isActive = f.active;
     const isTile = !!f.mosaicId; // a faint mosaic panel (the outline frame draws the rest)
 
@@ -344,7 +355,7 @@ export function renderFovInstances(s: SkyScene): void {
     ctx.setLineDash(FRAME.dashOutline);
     // A mosaic outline traces its tile perimeter (follows projection curvature);
     // every other frame is its 4-corner rectangle.
-    const outline = f.isMosaicOutline ? (frames.mosaicOutlinePath(f) ?? corners) : corners;
+    const outline = f.isMosaicOutline ? (mosaicOutlinePath(f, view) ?? corners) : corners;
     drawFramePolyline(ctx, outline);
 
     if (isTile) {
@@ -372,7 +383,7 @@ export function renderFovInstances(s: SkyScene): void {
 
     // Handles on the active frame only (so other frames stay locked), and only
     // while the frame is large enough that the centre dot isn't near the edges.
-    if (isActive && frames.frameHandlesVisible(halfW, halfH)) {
+    if (editable && isActive && frames.frameHandlesVisible(halfW, halfH)) {
       drawFrameHandles(
         ctx,
         { corners, cx, cy, rotDeg, halfH },
@@ -389,6 +400,7 @@ export function renderFovInstances(s: SkyScene): void {
     }
     ctx.restore();
   }
+  if (!editable) return;
 
   // Rubber-band preview of a drag-to-extend in progress.
   const draft = frames.resizeDraft;
