@@ -939,6 +939,8 @@ export class TargetsView {
    * reparented into the "Find targets" overlay on first mount. Persists across
    * open/close so filters and results survive being hidden. */
   private recommendRoot: HTMLElement | null = null;
+  /** The recommend form's setup row, rebuilt on every reopen (see getRecommendElement). */
+  private recommendGearField: HTMLElement | null = null;
   private plansStore = usePlansStore(pinia);
   private fovFramesStore = useFovFramesStore(pinia);
   private uiStore = useUiStore(pinia);
@@ -1016,10 +1018,14 @@ export class TargetsView {
    * filters + results) and return its root element. Built exactly once — the
    * caller (TargetsOverlay.vue) mounts this element into the overlay on first
    * open and never rebuilds it, so all filter/result state survives repeated
-   * open/close within the session.
+   * open/close within the session. Only the setup row is rebuilt on each reopen:
+   * a setup created elsewhere (plan header, sky-map popup) must show up, and
+   * enable Generate, without a reload.
    */
   getRecommendElement(): HTMLElement {
-    if (!this.recommendRoot) {
+    if (this.recommendRoot) {
+      if (this.recommendGearField) this.buildGearSection(this.recommendGearField);
+    } else {
       const root = document.createElement('div');
       root.className = 'targets-recommend-root';
       root.appendChild(this.buildForm());
@@ -1311,6 +1317,7 @@ export class TargetsView {
 
     // ── Setup (gear) — the FOV summary hint renders directly beneath it. ──
     const gearField = document.createElement('div');
+    this.recommendGearField = gearField;
     this.buildGearSection(gearField);
     filterColL.appendChild(gearField);
 
