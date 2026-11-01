@@ -360,19 +360,62 @@ export function applyMigrations(database: Database): number {
     // Future migrations: { version: 15, run(d) { ... } },
   ];
 
+  try {
+    database.transaction(() => {
+      for (const table of REBUILT_TABLES) recoverInterruptedRebuild(database, table);
+    })();
+  } catch (error) {
+    throw new DatabaseUpdateError(error);
+  }
+
   let current = ((getVersion.get() as { version: number }) ?? { version: 0 }).version;
   for (const migration of migrations) {
     if (migration.version > current) {
-      try {
+      // A migration and its version update share one transaction, so a failure or a crash
+      // part-way through leaves the database as it was before the migration.
+      const run = database.transaction(() => {
         migration.run(database);
+        setVersion.run(migration.version);
+      });
+      try {
+        run();
       } catch (error) {
         throw new DatabaseUpdateError(error);
       }
-      setVersion.run(migration.version);
       current = migration.version;
     }
   }
   return applyDataMigrations(database, MIGRATIONS, current);
+}
+
+/** The tables the legacy migrations rebuild through a `<table>_new` copy (v3 and v13). */
+const REBUILT_TABLES = ['plan_entries', 'custom_gear'] as const;
+
+/**
+ * Repair a table rebuild cut short by a crash, from before the legacy migrations ran in a
+ * transaction. With only the `<table>_new` copy left, it becomes the table; with both, the
+ * copy's rows missing from the table are put back and the copy is dropped.
+ */
+function recoverInterruptedRebuild(database: Database, table: string): void {
+  const leftover = `${table}_new`;
+  const exists = (name: string) =>
+    database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) !==
+    undefined;
+  if (!exists(leftover)) return;
+  if (!exists(table)) {
+    database.exec(`ALTER TABLE ${leftover} RENAME TO ${table}`);
+    return;
+  }
+  const columnsOf = (name: string) =>
+    (database.pragma(`table_info(${name})`) as Array<{ name: string }>).map((c) => c.name);
+  const tableColumns = new Set(columnsOf(table));
+  const shared = columnsOf(leftover)
+    .filter((c) => tableColumns.has(c))
+    .join(', ');
+  database.exec(`
+    INSERT OR IGNORE INTO ${table} (${shared}) SELECT ${shared} FROM ${leftover};
+    DROP TABLE ${leftover};
+  `);
 }
 
 /**

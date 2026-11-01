@@ -725,6 +725,109 @@ describe('applyMigrations — custom_gear accepts the filter type (v13)', () => 
     applyMigrations(db);
     expect(db.prepare('SELECT COUNT(*) AS n FROM custom_gear').get()).toEqual({ n: 1 });
   });
+
+  /** The new table the v13 rebuild copies the rows into, holding one copied row. */
+  function addRebuildCopy(db: Database.Database): void {
+    db.exec(`
+      CREATE TABLE custom_gear_new (
+        id   TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK(type IN ('telescope','camera','accessory','filter')),
+        data TEXT NOT NULL
+      );
+      INSERT INTO custom_gear_new (id, type, data) VALUES ('custom-1', 'telescope', '{}');
+    `);
+  }
+
+  function tableExists(db: Database.Database, name: string): boolean {
+    return (
+      db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) !==
+      undefined
+    );
+  }
+
+  it('undoes the whole rebuild when it fails part-way, keeping version 12', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    db.prepare('UPDATE schema_version SET version = 12').run();
+    db.exec(`
+      CREATE TABLE custom_gear (
+        id   TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK(type IN ('telescope','camera','accessory')),
+        data TEXT NOT NULL
+      );
+      PRAGMA ignore_check_constraints = ON;
+      INSERT INTO custom_gear (id, type, data) VALUES ('custom-1', 'mount', '{}');
+      PRAGMA ignore_check_constraints = OFF;
+    `);
+    // The copy into the new table fails on the 'mount' row, after the new table was created.
+    expect(() => applyMigrations(db)).toThrow(DatabaseUpdateError);
+    expect(schemaVersion(db)).toBe(12);
+    expect(tableExists(db, 'custom_gear_new')).toBe(false);
+    expect(db.prepare('SELECT id FROM custom_gear').all()).toEqual([{ id: 'custom-1' }]);
+  });
+
+  it('recovers the rows of a rebuild interrupted after dropping custom_gear', () => {
+    const db = dbWithLegacyCustomGear();
+    addRebuildCopy(db);
+    db.exec('DROP TABLE custom_gear');
+
+    applyMigrations(db);
+
+    expect(tableExists(db, 'custom_gear_new')).toBe(false);
+    expect(db.prepare('SELECT id FROM custom_gear').all()).toEqual([{ id: 'custom-1' }]);
+    expect(() =>
+      db
+        .prepare('INSERT INTO custom_gear (id, type, data) VALUES (?, ?, ?)')
+        .run('c2', 'filter', '{}'),
+    ).not.toThrow();
+  });
+
+  it('redoes a rebuild interrupted before dropping custom_gear', () => {
+    const db = dbWithLegacyCustomGear();
+    db.prepare('INSERT INTO custom_gear (id, type, data) VALUES (?, ?, ?)').run(
+      'custom-1',
+      'telescope',
+      '{"brand":"Acme"}',
+    );
+    addRebuildCopy(db);
+
+    applyMigrations(db);
+
+    expect(tableExists(db, 'custom_gear_new')).toBe(false);
+    expect(db.prepare('SELECT id, data FROM custom_gear').all()).toEqual([
+      { id: 'custom-1', data: '{"brand":"Acme"}' },
+    ]);
+    expect(() =>
+      db
+        .prepare('INSERT INTO custom_gear (id, type, data) VALUES (?, ?, ?)')
+        .run('c2', 'filter', '{}'),
+    ).not.toThrow();
+  });
+
+  it('puts back rows hidden by an earlier interrupted rebuild on an up-to-date database', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    // The state an interrupted rebuild used to leave: the empty table the server creates
+    // afterwards, one row added to it since, and the copied rows left in custom_gear_new.
+    db.exec(`
+      CREATE TABLE custom_gear (
+        id   TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK(type IN ('telescope','camera','accessory','filter')),
+        data TEXT NOT NULL
+      );
+      INSERT INTO custom_gear (id, type, data) VALUES ('custom-2', 'filter', '{}');
+    `);
+    addRebuildCopy(db);
+
+    applyMigrations(db);
+
+    expect(tableExists(db, 'custom_gear_new')).toBe(false);
+    expect(db.prepare('SELECT id FROM custom_gear ORDER BY id').all()).toEqual([
+      { id: 'custom-1' },
+      { id: 'custom-2' },
+    ]);
+    expect(schemaVersion(db)).toBe(SCHEMA_VERSION);
+  });
 });
 
 describe('applyMigrations — v14 sky regions', () => {
