@@ -739,6 +739,8 @@ export class PhotoOverlay extends PhotoLayer {
         observationDate?: string | null;
         notes: string;
       };
+      /** A dialog backdrop behind this one (the batch dialog), hidden while the user works on the map. */
+      hostBackdrop?: HTMLElement | null;
     },
   ): Promise<ManualIdentifyResult> {
     return new Promise<ManualIdentifyResult>((resolve) => {
@@ -834,7 +836,7 @@ export class PhotoOverlay extends PhotoLayer {
         };
         // Hand off to the free-drag placement flow (it self-saves & places the photo).
         finish({ action: 'manual-placement' });
-        this.openManualPlacement(file, initialMeta);
+        this.openManualPlacement(file, initialMeta, opts?.hostBackdrop);
       });
 
       // Divider between map placement and star identification
@@ -1133,16 +1135,20 @@ export class PhotoOverlay extends PhotoLayer {
           searchRow.appendChild(pickBtn);
 
           pickBtn.addEventListener('click', () => {
+            const hostBackdrop = opts?.hostBackdrop;
             backdrop.style.display = 'none';
+            if (hostBackdrop) hostBackdrop.style.display = 'none';
             skyMap.enterPickingMode((star: Star) => {
               skyMap.exitPickingMode();
               backdrop.style.display = '';
+              if (hostBackdrop) hostBackdrop.style.display = '';
               selectStar(i, star, starDisplayLabel(star));
             });
             const escHandler = (e: KeyboardEvent) => {
               if (e.key === 'Escape') {
                 skyMap.exitPickingMode();
                 backdrop.style.display = '';
+                if (hostBackdrop) hostBackdrop.style.display = '';
                 window.removeEventListener('keydown', escHandler);
               }
             };
@@ -1582,7 +1588,10 @@ export class PhotoOverlay extends PhotoLayer {
     });
   }
 
-  /** Open manual placement mode: semi-transparent photo draggable on the map */
+  /**
+   * Open manual placement mode: semi-transparent photo draggable on the map.
+   * `hostBackdrop` (a dialog left open behind, e.g. the batch dialog) is hidden until it ends.
+   */
   openManualPlacement(
     file: File,
     initialMeta?: {
@@ -1594,8 +1603,10 @@ export class PhotoOverlay extends PhotoLayer {
       observationDate?: string | null;
       notes: string;
     },
+    hostBackdrop?: HTMLElement | null,
   ) {
     const view = this.getView();
+    if (hostBackdrop) hostBackdrop.style.display = 'none';
 
     // Create preview img element
     const imgEl = document.createElement('img');
@@ -1771,6 +1782,7 @@ export class PhotoOverlay extends PhotoLayer {
       imgEl.remove();
       toolbar.remove();
       URL.revokeObjectURL(objUrl);
+      if (hostBackdrop) hostBackdrop.style.display = '';
     };
 
     // Cancel

@@ -453,6 +453,9 @@ async function openManual() {
         observationDate: props.item.observationDate || null,
         notes: props.item.notes,
       },
+      // The batch dialog's own backdrop covers the map: hide it while a star is picked
+      // on the map or the photo is dragged into place.
+      hostBackdrop: cardEl.value?.closest<HTMLElement>('.modal-backdrop') ?? null,
     });
     if (result.action === 'validate') {
       props.item.solveCorrespondences = result.correspondences;
