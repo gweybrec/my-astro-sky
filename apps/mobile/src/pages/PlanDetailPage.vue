@@ -7,6 +7,9 @@ import { fracToClock } from '@myastrosky/core/observation-windows';
 import { PLAN_SORT_KEYS, type PlanSortKey } from '@myastrosky/core/domain/plans';
 import { formatClock24 } from '@myastrosky/core/targets/format';
 import { planItemCount, resolvePlanNight } from '@myastrosky/core/targets/plan';
+import { buildPlanPdfTargets } from '@myastrosky/core/targets/plan-pdf';
+import { fovDeg } from '@myastrosky/core/gear-presets';
+import { presetForSetupId, resolveSetupById } from '@myastrosky/core/targets/plan-setup';
 import {
   deletePlanAPI,
   renamePlanAPI,
@@ -14,10 +17,16 @@ import {
   type Plan,
 } from '@myastrosky/app-state/api';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { skyPlanView } from '../sky-modes';
+import { framesSheetOpen } from '../sky-frames';
+import { openTab, swapPagesUnseen } from '../tab-navigation';
 import { catalogsReady } from '../catalogs';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
-import { planLookups } from '../composables/usePlans';
+import { loadGearLists, planLookups } from '../composables/usePlans';
+import { withSkyMap } from '../sky-map-setup';
+import { saveFile } from '../platform-device';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
@@ -38,13 +47,15 @@ import chevronIcon from '../icons/chevron-right.svg?raw';
 // plan's equipment (a field: choosing another may ask about its mosaics, board "Ciel, changer d'équipement"), then its
 // targets in the plan's order, each with its first observation window. A tap opens the target; a drag
 // by its handle puts it elsewhere (one request). The actions rename the plan, choose how its targets are sorted (the
-// desktop's sorts) and delete it. The plus opens the Cibles list for this plan (boards "Plan, ajouter une cible"), as the
+// desktop's sorts), export it as a PDF (the desktop's, through the share sheet) and delete it; "Afficher sur la carte" opens the map in a mode of its own on the plan's frames (the
+// desktop selects the plan's frames and opens its frame manager), its back arrow returning here. The plus opens the Cibles list for this plan (boards "Plan, ajouter une cible"), as the
 // desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
+const fov = useFovFramesStore();
 const { confirm } = useConfirm();
-const { showError } = useErrorToast();
+const { showError, showNotice } = useErrorToast();
 
 const planId = computed(() => String(route.params.id));
 const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === planId.value));
@@ -156,6 +167,64 @@ const sortKey = computed<PlanSortKey>({
   },
 });
 
+// The map's mode "voir un plan": the plan's frames shown, with the frames' sheet on them. The mode puts the frames back
+// as they were when it ends.
+async function showOnMap() {
+  const p = plan.value;
+  if (!p) return;
+  actionsOpen.value = false;
+  skyPlanView.value = {
+    planId: p.id,
+    name: p.name,
+    frames: { visible: fov.framesVisible, selection: { ...fov.selection } },
+    returnTo: `/plans/${p.id}`,
+  };
+  fov.setSelection({ kind: 'plan', planId: p.id });
+  fov.setFramesVisible(true);
+  // Its tab, then the map: out of sight, so that the tab is not glimpsed on the way. The sheet opens over the map.
+  await swapPagesUnseen(() => openTab(router, 'plans', 'sky'));
+  framesSheetOpen.value = true;
+}
+
+// The desktop's PDF of a plan: its targets in the plan's order, then its mosaics, the sky views drawn with the Ciel
+// map; the file goes to the share sheet.
+async function exportPdf() {
+  const p = plan.value;
+  const n = night.value;
+  actionsOpen.value = false;
+  if (!p) return;
+  if (!n || (n.infos.length === 0 && p.mosaics.length === 0)) {
+    void showNotice(t('targets.plan.empty'));
+    return;
+  }
+  void showNotice(t('settings.exportView.rendering'));
+  try {
+    const setupId = p.setupId ?? targetsPrefs.setupId ?? null;
+    if (setupId && !fov.specs.has(setupId)) await fov.loadSpecs();
+    const spec = setupId ? fov.specs.get(setupId) : undefined;
+    const gear = setupId ? await loadGearLists() : null;
+    const preset = gear ? presetForSetupId(setupId, gear) : null;
+    const { renderPlanPdf } = await import('@myastrosky/render/plan-pdf');
+    const options = {
+      planName: p.name,
+      targets: buildPlanPdfTargets(p, n, preset ? fovDeg(preset) : null, planLookups),
+      showCardinal: targetsPrefs.showCardinal !== false,
+      fovSpecs: spec ? [{ label: spec.label, wDeg: spec.wDeg, hDeg: spec.hDeg }] : [],
+      header: {
+        nightOf: p.nightOf,
+        latDeg: p.lat ?? targetsPrefs.lat ?? null,
+        lonDeg: p.lon ?? targetsPrefs.lon ?? null,
+      },
+      setup: gear && setupId ? resolveSetupById(setupId, gear) : null,
+    };
+    const blob = await withSkyMap((map) => renderPlanPdf(map, options));
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    await saveFile(`myastrosky-plan-${ts}.pdf`, blob);
+  } catch (error) {
+    void showError(error);
+  }
+}
+
 function openRename() {
   actionsOpen.value = false;
   renameOpen.value = true;
@@ -254,8 +323,10 @@ async function remove() {
       v-model:open="actionsOpen"
       :name="plan.name"
       :sort-label="t(SORT_LABELS[sortKey])"
+      @show-on-map="showOnMap"
       @rename="openRename"
       @sort="openSort"
+      @export-pdf="exportPdf"
       @delete="remove"
     />
     <PlanRenameSheet v-if="plan" v-model:open="renameOpen" :name="plan.name" @rename="rename" />

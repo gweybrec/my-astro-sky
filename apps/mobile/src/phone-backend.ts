@@ -8,6 +8,7 @@ import type { CapacitorFilesystem } from '@myastrosky/backend-local/capacitor-bl
 import type { CapacitorSqliteConnection } from '@myastrosky/backend-local/capacitor-sqlite-db';
 import {
   createPhoneBackend,
+  shareFile,
   type PhoneBackendOptions,
   type PhonePlatform,
   type PlatformFetch,
@@ -53,4 +54,17 @@ export async function createNativePhoneBackend(options?: PhoneBackendOptions): P
     baseUrl: location.origin,
   };
   return createPhoneBackend(platform, options);
+}
+
+/** Hands a file to the user through the share sheet. */
+export function shareNativeFile(name: string, bytes: Uint8Array): Promise<void> {
+  return shareFile(
+    {
+      filesystem: Filesystem as unknown as CapacitorFilesystem,
+      share: Share,
+      directories: { cache: Directory.Cache },
+    },
+    name,
+    bytes,
+  );
 }

@@ -452,6 +452,24 @@ describe('Contours de champ', () => {
     expect(push).toHaveBeenCalledWith('/plans/p1');
   });
 
+  it("shows only the plan's frames and the add buttons over the map showing that plan", () => {
+    const fov = useFovFramesStore();
+    usePlansStore().plans = [plan({ id: 'p1', name: 'Nuit A', setupId: 's1' })];
+    fov.setSelection({ kind: 'plan', planId: 'p1' });
+    const map = fakeMap();
+    const w = mount(SkyFramesSheet, {
+      props: { open: true, map, planView: true },
+      global: { stubs: ionicStubs },
+    });
+    // no frames toggle, no choice of set, no setup field: the plan's page sets its setup; no details row: the bar's
+    // back arrow leads there
+    expect(w.findComponent(PhoneToggleRow).exists()).toBe(false);
+    expect(w.find('button[aria-label^="Cadres"]').exists()).toBe(false);
+    expect(w.findComponent({ name: 'PlanSetupField' }).exists()).toBe(false);
+    expect(byText(w, 'Ouvrir les détails du plan')).toBeUndefined();
+    expect(byText(w, 'Ajouter un cadre')).toBeDefined();
+  });
+
   it('says when a plan has no setup', () => {
     const fov = useFovFramesStore();
     usePlansStore().plans = [plan({ id: 'p1', name: 'Nuit A' })];

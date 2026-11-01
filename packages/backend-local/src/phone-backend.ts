@@ -36,6 +36,29 @@ export interface CapacitorShare {
 /** What the Share plugin rejects with when the share sheet is closed without a choice: the user's choice, not a failure. */
 export const SHARE_CANCELED = 'Share canceled';
 
+/**
+ * Hands a file to the user through the share sheet, which takes a file address: the file is written in the cache
+ * directory's `exports/` folder, then shared. Closing the sheet without a choice is not a failure.
+ */
+export async function shareFile(
+  platform: Pick<PhonePlatform, 'filesystem' | 'share' | 'blobPieceBytes'> & {
+    directories: Pick<PhonePlatform['directories'], 'cache'>;
+  },
+  name: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  const { filesystem, directories } = platform;
+  await ensureDirectory(filesystem, directories.cache, 'exports');
+  const path = `exports/${name}`;
+  await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
+  const { uri } = await filesystem.getUri({ path, directory: directories.cache });
+  try {
+    await platform.share.share({ title: name, url: uri, dialogTitle: name });
+  } catch (error) {
+    if (!(error instanceof Error && error.message === SHARE_CANCELED)) throw error;
+  }
+}
+
 /** The WebView's `fetch` (the one Capacitor patches), as far as the adapters use it. */
 export type PlatformFetch = (
   url: string,
@@ -126,18 +149,7 @@ export async function createPhoneBackend(
     openZip: openZipRanges,
     maxWholeFileBytes: MAX_WHOLE_FILE_BYTES,
     newZip: newZipBundle,
-    // The share sheet takes a file address: write the file in the cache directory, then share it.
-    saveFile: async (name, bytes) => {
-      await ensureDirectory(filesystem, directories.cache, 'exports');
-      const path = `exports/${name}`;
-      await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
-      const { uri } = await filesystem.getUri({ path, directory: directories.cache });
-      try {
-        await platform.share.share({ title: name, url: uri, dialogTitle: name });
-      } catch (error) {
-        if (!(error instanceof Error && error.message === SHARE_CANCELED)) throw error;
-      }
-    },
+    saveFile: (name, bytes) => shareFile(platform, name, bytes),
     now: () => new Date(now()),
   });
 }

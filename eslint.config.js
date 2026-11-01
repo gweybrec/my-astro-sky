@@ -269,8 +269,8 @@ export default tseslint.config(
     },
   },
 
-  // @myastrosky/render is the sky map's canvas drawing: browser globals, and it may import only core and its own
-  // files (what it needs from the app arrives through the platform hooks of core).
+  // @myastrosky/render is the sky map's canvas drawing: browser globals, and it may import only core, jspdf (the plan's
+  // PDF) and its own files (what it needs from the app arrives through the platform hooks of core).
   {
     files: ['packages/render/**/*.ts'],
     languageOptions: { globals: { ...globals.browser } },
@@ -280,8 +280,8 @@ export default tseslint.config(
         {
           patterns: [
             {
-              regex: '^(?!@myastrosky/core/|\./)',
-              message: 'render may import only @myastrosky/core/* and its own files.',
+              regex: '^(?!@myastrosky/core/|\./|jspdf$)',
+              message: 'render may import only @myastrosky/core/*, jspdf and its own files.',
             },
           ],
         },

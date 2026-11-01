@@ -108,7 +108,7 @@ import {
 } from '@myastrosky/core/sky-geometry';
 import { outlineFromGrid } from '@myastrosky/core/mosaic';
 import { sortPlanTargets, firstWindowFracByEntry } from '@myastrosky/core/plan-sort';
-import type { PlanPdfTarget } from './export-render';
+import { buildPlanPdfTargets } from '@myastrosky/core/targets/plan-pdf';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
 import { confirmPlanDelete, confirmPlanEntryDelete } from './photo-delete-confirm';
@@ -137,7 +137,6 @@ import {
 import {
   buildMoonOverlay,
   computePlanTargets,
-  customLocationDso,
   defaultPlanName,
   moonPhaseForWindow,
   moonSeparationRating,
@@ -3647,80 +3646,23 @@ export class TargetsView {
           this.planPreset(setupId),
         ]);
 
-        // Moon overlay for the PDF charts (same night/location for every page).
-        const moon = observer
-          ? buildMoonOverlay(observer.loc, win, this.prefs.showMoon !== false)
-          : null;
-        const moonShared = moon
-          ? { moonCurve: moon.curve, moonPhaseIndex: moon.phaseIndex, moonIllum: moon.illum }
-          : {};
+        // Standalone objects follow the plan's chosen sort (inherited from currentInfos
+        // above), then one page per mosaic.
+        const targets = observer
+          ? buildPlanPdfTargets(
+              plan,
+              {
+                loc: observer.loc,
+                win,
+                moon: buildMoonOverlay(observer.loc, win, this.prefs.showMoon !== false),
+                infos,
+              },
+              preset ? fovDeg(preset) : null,
+              { getDsoById: getDSOById, customLabel: customLocationLabel },
+            )
+          : [];
 
-        const targets: PlanPdfTarget[] = infos.map((i) => ({
-          dso: i.dso,
-          bestTimeUtc: i.bestTimeUtc,
-          maxAltDeg: i.maxAltDeg,
-          curve: i.curve,
-          nightWin: win,
-          mosaic: null,
-          observationWindows:
-            plan.entries.find((e) => e.id === i.entryId)?.observationWindows ?? [],
-          ...moonShared,
-          moonSepDeg: moon ? i.moonSepDeg : null,
-        }));
-
-        // One page per mosaic: trajectory from the centre + framed tile grid.
-        if (observer && preset) {
-          const { wDeg: tileW, hDeg: tileH } = fovDeg(preset);
-          for (const m of plan.mosaics ?? []) {
-            const tiles = plan.entries
-              .filter((en) => en.mosaicId === m.id && en.ra != null && en.dec != null)
-              .map((en) => ({ ra: en.ra as number, dec: en.dec as number }));
-            const { maxAltDeg, atDate } = maxAltDuringWindow(
-              m.centerRa,
-              m.centerDec,
-              observer.loc.latDeg,
-              observer.loc.lonDeg,
-              win.start,
-              win.end,
-              10,
-            );
-            const curve = sampleAltCurve(
-              m.centerRa,
-              m.centerDec,
-              observer.loc.latDeg,
-              observer.loc.lonDeg,
-              win.start,
-              win.end,
-              10,
-            );
-            const realDso = m.dsoId ? getDSOById(m.dsoId) : null;
-            const dso =
-              realDso ??
-              customLocationDso(
-                `mosaic:${m.id}`,
-                m.centerRa,
-                m.centerDec,
-                customLocationLabel(m.centerRa, m.centerDec),
-              );
-            if (!realDso && m.name) dso.displayName = m.name;
-            const env = outlineFromGrid(m.cols, m.rows, tileW, tileH, m.overlapPct);
-            targets.push({
-              dso,
-              bestTimeUtc: atDate,
-              maxAltDeg,
-              curve,
-              nightWin: win,
-              mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles },
-              ...moonShared,
-              moonSepDeg: moon ? moonSeparationAt(m.centerRa, m.centerDec, atDate) : null,
-            });
-          }
-        }
-        // Order matches the on-screen list: standalone objects follow the plan's
-        // chosen sort (inherited from currentInfos above), then mosaic pages are
-        // appended after them.
-
-        const { renderPlanPdf } = await import('./export-render');
+        const { renderPlanPdf } = await import('@myastrosky/render/plan-pdf');
         const blob = await renderPlanPdf(this.skyMap, {
           planName: plan.name,
           targets,

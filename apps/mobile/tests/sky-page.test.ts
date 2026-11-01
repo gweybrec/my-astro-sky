@@ -28,6 +28,7 @@ vi.mock('../src/photo-sizes', () => ({
 }));
 vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({}), showInfo: vi.fn() }));
 vi.mock('../src/sky-map-setup', () => ({
+  currentSkyMap: { value: null },
   createPhoneSkyMap: () => ({
     photos: {},
     reloadPhotos,
@@ -42,7 +43,8 @@ vi.mock('../src/sky-map-setup', () => ({
 }));
 
 import SkyPage from '../src/pages/SkyPage.vue';
-import { skyRegionDraw, skyRegionView, skyTargetView } from '../src/sky-modes';
+import { skyPlanView, skyRegionDraw, skyRegionView, skyTargetView } from '../src/sky-modes';
+import { framesSheetOpen } from '../src/sky-frames';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 
 /** The map's own controls: what shows with the live sky and what shows with the sky at a date. */
@@ -248,6 +250,94 @@ describe('the Ciel page', () => {
       expect(fov.adhoc).toEqual([]);
       expect(fov.framesVisible).toBe(false);
       expect(fov.selection).toEqual({ kind: 'plan', planId: 'p9' });
+    });
+  });
+
+  describe('showing a plan ("Ciel, contours de champ d\'un plan")', () => {
+    beforeEach(() => {
+      fakeMap.map = { selectFrame: vi.fn(), getView: () => ({ width: 0, height: 0 }) };
+      skyPlanView.value = null;
+    });
+    afterEach(() => {
+      fakeMap.map = undefined;
+      skyPlanView.value = null;
+      framesSheetOpen.value = false;
+    });
+
+    /** "Afficher sur la carte" of the plan's page: the plan's frames shown, the frames' sheet on them. */
+    function showPlan() {
+      const fov = useFovFramesStore();
+      fov.setSelection({ kind: 'free' });
+      fov.setFramesVisible(false);
+      const frames = { visible: false, selection: { kind: 'free' as const } };
+      fov.setSelection({ kind: 'plan', planId: 'p1' });
+      fov.setFramesVisible(true);
+      skyPlanView.value = {
+        planId: 'p1',
+        name: 'Nuit du 2026-10-03',
+        frames,
+        returnTo: '/plans/p1',
+      };
+      framesSheetOpen.value = true;
+      return fov;
+    }
+
+    it("has the plan's name in its own bar, over the map alone, without the map's search row", async () => {
+      const w = mountPage();
+      await flushPromises();
+      showPlan();
+      await flushPromises();
+      expect(w.find('.mob-topbar-title').text()).toBe('Nuit du 2026-10-03');
+      expect(w.find('.mob-map-mode.mob-map-mode--bare').exists()).toBe(true);
+      expect(w.find('.mob-map-top').exists()).toBe(false);
+    });
+
+    it("opens the plan's page again with the back arrow, and puts the frames back as they were", async () => {
+      const w = mountPage();
+      await flushPromises();
+      const fov = showPlan();
+      await flushPromises();
+      replace.mockClear();
+      navigate.mockClear();
+      await w.find('button[aria-label="Retour"]').trigger('click');
+      await flushPromises();
+      expect(skyPlanView.value).toBeNull();
+      expect(framesSheetOpen.value).toBe(false);
+      expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/plans']);
+      expect(navigate.mock.calls).toEqual([['/plans/p1', 'none', 'push']]);
+      expect(fov.framesVisible).toBe(false);
+      expect(fov.selection).toEqual({ kind: 'free' });
+    });
+
+    it("reopens the frames' sheet from the bar's frames button once it was dragged away", async () => {
+      const w = mountPage();
+      await flushPromises();
+      showPlan();
+      await flushPromises();
+      expect(w.findComponent({ name: 'SkyFramesSheet' }).props('planView')).toBe(true);
+      framesSheetOpen.value = false;
+      await flushPromises();
+      await w.find('.mob-topbar button[aria-label="Contours de champ"]').trigger('click');
+      expect(framesSheetOpen.value).toBe(true);
+    });
+
+    it('has no frames button in the bar of the other modes', async () => {
+      const w = mountPage();
+      await flushPromises();
+      skyTargetView.value = {
+        frameId: null,
+        frames: { visible: true, selection: { kind: 'free' } },
+        dsoId: 'M31',
+        name: "Galaxie d'Andromède",
+        tab: 'targets',
+        pages: [],
+        page: '/targets/M31',
+        pageOf: (id) => `/targets/${id}`,
+      };
+      await flushPromises();
+      expect(w.find('.mob-topbar-title').text()).toBe("Galaxie d'Andromède");
+      expect(w.find('.mob-topbar button[aria-label="Contours de champ"]').exists()).toBe(false);
+      skyTargetView.value = null;
     });
   });
 });

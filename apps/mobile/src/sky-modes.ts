@@ -1,8 +1,8 @@
 /**
  * The modes of the Ciel map that take the whole screen: placing a waiting photo by hand (board "Placer la photo"),
  * choosing a star for a point of the star identification (board "Identifier les étoiles, choisir sur la carte"),
- * drawing a sky region (board "Dessiner une région"), showing one (board "Voir une région") and showing a target
- * (board "Ciel, voir une cible").
+ * drawing a sky region (board "Dessiner une région"), showing one (board "Voir une région"), showing a target
+ * (board "Ciel, voir une cible") and showing a plan's frames (board "Ciel, contours de champ d'un plan").
  * A screen asks for one by setting it and going to the Ciel tab; the tab bar is hidden while one is on.
  */
 import { computed, shallowRef } from 'vue';
@@ -49,6 +49,18 @@ export const skyTargetView = shallowRef<{
   pageOf: (dsoId: string) => string;
 } | null>(null);
 
+/**
+ * A plan shown on the map by "Afficher sur la carte" of its page, or null: its frames shown, with the frames' sheet on
+ * it. The mode ends by putting back the frames as they were (`frames`: shown or not, and which set) and opening the
+ * Plans tab, then `returnTo` (the plan's page).
+ */
+export const skyPlanView = shallowRef<{
+  planId: string;
+  name: string;
+  frames: { visible: boolean; selection: FovSelection };
+  returnTo: string;
+} | null>(null);
+
 /** The tab bar is hidden while the map is in a mode of its own. */
 export const tabBarHidden = computed(
   () =>
@@ -56,5 +68,6 @@ export const tabBarHidden = computed(
     skyStarPick.value !== null ||
     skyRegionDraw.value !== null ||
     skyRegionView.value !== null ||
-    skyTargetView.value !== null,
+    skyTargetView.value !== null ||
+    skyPlanView.value !== null,
 );

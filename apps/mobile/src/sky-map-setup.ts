@@ -8,7 +8,7 @@ import { isIAUStyle } from '@myastrosky/core/types';
 import { computeFovTargetScale } from '@myastrosky/core/gear-presets';
 import { getHemisphere } from '@myastrosky/core/projection';
 import { readObserverLocation } from '@myastrosky/core/observer-location';
-import { watch } from 'vue';
+import { shallowRef, watch } from 'vue';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
@@ -27,6 +27,29 @@ import { reportError } from '@myastrosky/core/platform/error-hook';
 import { THEME_CHANGED_EVENT } from '@myastrosky/core/theme';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { connectFrames } from './sky-frames';
+import { catalogsReady } from './catalogs';
+
+/** The Ciel tab's map while its page exists (the plan's PDF draws its sky views with it), or null. */
+export const currentSkyMap = shallowRef<SkyMap | null>(null);
+
+/**
+ * Runs `draw` with the Ciel tab's map, or, before that tab was ever shown, with a map of its own on a canvas off the
+ * page (set up as the tab's, catalogues loaded), removed afterwards.
+ */
+export async function withSkyMap<T>(draw: (map: SkyMap) => Promise<T>): Promise<T> {
+  if (currentSkyMap.value) return draw(currentSkyMap.value);
+  const sky = createPhoneSkyMap(document.createElement('canvas'), {
+    photoContainer: document.createElement('div'),
+    onPhotoPlacementError: () => undefined,
+  });
+  try {
+    await catalogsReady();
+    sky.catalogsLoaded();
+    return await draw(sky.map);
+  } finally {
+    sky.destroy();
+  }
+}
 
 /** How long the photos stay hidden after the map stopped moving: large images are not painted on every frame. */
 export const PHOTOS_FROZEN_MS = 100;

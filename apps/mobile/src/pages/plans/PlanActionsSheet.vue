@@ -8,17 +8,21 @@ import exportIcon from '@icons/export.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 import sortIcon from '../../icons/arrow-up-down.svg?raw';
 
-// The board "Plan, actions". Renaming, choosing the sort and deleting are the page's (it opens the name field, the list
-// of sorts, the confirmation). Showing the plan on the map and exporting it as a PDF need the sky map and the share
-// sheet, which are not wired to a plan yet: those two rows are drawn as the board draws them and do nothing.
+// The board "Plan, actions". Each row is the page's: showing the plan on the map, renaming (the name field), choosing
+// the sort (the list of sorts), exporting it as a PDF and deleting (the confirmation).
 defineProps<{ name: string; sortLabel: string }>();
 const open = defineModel<boolean>('open', { required: true });
-const emit = defineEmits<{ rename: []; sort: []; delete: [] }>();
+const emit = defineEmits<{ showOnMap: []; rename: []; sort: []; exportPdf: []; delete: [] }>();
 </script>
 
 <template>
   <PhoneSheet v-model:open="open" :title="name">
-    <PhoneRow :title="t('targets.plan.showOnMap')" :lead="mapPinIcon" inert />
+    <PhoneRow
+      :title="t('targets.plan.showOnMap')"
+      :lead="mapPinIcon"
+      button
+      @click="emit('showOnMap')"
+    />
     <PhoneRow :title="t('targets.plan.rename')" :lead="penIcon" button @click="emit('rename')" />
     <PhoneRow
       :title="t('targets.sort.label')"
@@ -28,7 +32,12 @@ const emit = defineEmits<{ rename: []; sort: []; delete: [] }>();
       button
       @click="emit('sort')"
     />
-    <PhoneRow :title="t('targets.plan.exportPdf')" :lead="exportIcon" inert />
+    <PhoneRow
+      :title="t('targets.plan.exportPdf')"
+      :lead="exportIcon"
+      button
+      @click="emit('exportPdf')"
+    />
     <PhoneRow
       :title="t('targets.plan.delete')"
       :lead="trashIcon"

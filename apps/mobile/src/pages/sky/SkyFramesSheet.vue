@@ -32,7 +32,9 @@ import planListIcon from '@icons/plan-list.svg?raw';
 // in the middle of the map with the setup chosen; a plan's is placed in the middle of the map), add a mosaic (the
 // mosaic form; a free one asks for a setup that is not a smart telescope first), and in a plan its details. A plan has
 // its "Setup" field: a change that does not fit its mosaics asks per mosaic (board "Ciel, changer d'équipement").
-const props = defineProps<{ map: SkyMap | null }>();
+// Over the map showing a plan (`planView`), the sheet is that plan's list of frames and its add buttons only: its frames
+// stay shown, its setup is chosen on the plan's page, and the mode's back arrow leads to its details.
+const props = defineProps<{ map: SkyMap | null; planView?: boolean }>();
 const open = defineModel<boolean>('open', { required: true });
 // A frame tapped in the list: the page centres it above the frame's sheet.
 const emit = defineEmits<{ show: [id: string] }>();
@@ -178,8 +180,8 @@ function openPlan() {
 
 <template>
   <PhoneSheet v-model:open="open" :title="t('fovOverlay.popupTitle')" tall>
-    <PhoneToggleRow v-model="shown" :title="t('fovOverlay.showFrames')" />
-    <div class="mob-form-row mob-form-row--field">
+    <PhoneToggleRow v-if="!planView" v-model="shown" :title="t('fovOverlay.showFrames')" />
+    <div v-if="!planView" class="mob-form-row mob-form-row--field">
       <PhoneButton
         variant="field"
         block
@@ -195,7 +197,7 @@ function openPlan() {
       </PhoneButton>
     </div>
 
-    <PlanSetupField v-if="isPlan && plan" :plan="plan" @new-setup="newSetup" />
+    <PlanSetupField v-if="isPlan && plan && !planView" :plan="plan" @new-setup="newSetup" />
 
     <PhoneHelper v-if="isPlan && plan && !plan.setupId">{{
       t('fovOverlay.planNoSetup')
@@ -253,7 +255,7 @@ function openPlan() {
           @click="addMosaic"
         />
         <PhoneRow
-          v-if="isPlan"
+          v-if="isPlan && !planView"
           :title="t('fovOverlay.openPlanDetails')"
           :lead="planListIcon"
           button

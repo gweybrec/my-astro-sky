@@ -21,6 +21,13 @@ vi.mock('../src/composables/useConfirm', () => ({
   showInfo: (...a: unknown[]) => showInfo(...a),
 }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
+const renderPlanPdf = vi.hoisted(() => vi.fn());
+vi.mock('@myastrosky/render/plan-pdf', () => ({ renderPlanPdf }));
+const saveFile = vi.hoisted(() => vi.fn());
+vi.mock('../src/platform-device', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/platform-device')>()),
+  saveFile,
+}));
 
 const DSOS: Record<string, DSO> = {};
 // The search's multiple stars, made for the setup (the star catalogue is not loaded here).
@@ -43,7 +50,9 @@ import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import { reloadTargetsPrefs } from '../src/composables/useTargets';
 import { skyFocus } from '../src/composables/useSkySelection';
-import { skyTargetView } from '../src/sky-modes';
+import { skyPlanView, skyTargetView } from '../src/sky-modes';
+import { framesSheetOpen } from '../src/sky-frames';
+import { currentSkyMap } from '../src/sky-map-setup';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 
 const GEAR = {
@@ -417,6 +426,89 @@ describe('the plan detail page', () => {
     await settle();
     expect(backend.plans.update).toHaveBeenCalledWith('p1', { sortBy: 'name' });
     expect(sortRow().text()).toContain('Nom');
+  });
+
+  it("shows the plan's frames on the map in its own mode, with the frames' sheet, and comes back here", async () => {
+    const { w, router } = await show(PlanDetailPage, '/plans/p1');
+    const replace = vi.spyOn(router, 'replace').mockResolvedValue(undefined);
+    const frames = useFovFramesStore();
+    frames.setSelection({ kind: 'free' });
+    frames.setFramesVisible(false);
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Afficher sur la carte'))!
+      .trigger('click');
+    await settle();
+    expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/plans', '/tabs/sky']);
+    expect(frames.selection).toEqual({ kind: 'plan', planId: 'p1' });
+    expect(frames.framesVisible).toBe(true);
+    expect(framesSheetOpen.value).toBe(true);
+    // the frames go back to what they were when the mode ends
+    expect(skyPlanView.value).toEqual({
+      planId: 'p1',
+      name: 'Nuit du 2026-10-03',
+      frames: { visible: false, selection: { kind: 'free' } },
+      returnTo: '/plans/p1',
+    });
+    skyPlanView.value = null;
+    framesSheetOpen.value = false;
+  });
+
+  it("exports the plan as the desktop's PDF, with its observation windows, through the share sheet", async () => {
+    currentSkyMap.value = {} as never;
+    const blob = new Blob(['%PDF']);
+    renderPlanPdf.mockResolvedValue(blob);
+    saveFile.mockResolvedValue(undefined);
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Exporter en PDF'))!
+      .trigger('click');
+    await settle();
+    expect(renderPlanPdf).toHaveBeenCalledTimes(1);
+    const [map, opts] = renderPlanPdf.mock.calls[0];
+    expect(map).toBe(currentSkyMap.value);
+    expect(opts.planName).toBe('Nuit du 2026-10-03');
+    expect(opts.targets.map((t: { dso: DSO }) => t.dso.id).sort()).toEqual(['M31', 'NGC7000']);
+    const withWindow = opts.targets.find((t: { dso: DSO }) => t.dso.id === 'NGC7000');
+    expect(withWindow.observationWindows).toEqual([window1]);
+    expect(opts.fovSpecs).toHaveLength(1);
+    expect(opts.fovSpecs[0].wDeg).toBeGreaterThan(0);
+    expect(opts.setup?.name).toBe('Équipement 1');
+    expect(opts.header).toEqual({ nightOf: '2026-10-03', latDeg: 48.58, lonDeg: 7.75 });
+    expect(saveFile).toHaveBeenCalledWith(expect.stringMatching(/^myastrosky-plan-.*\.pdf$/), blob);
+    expect(showError).not.toHaveBeenCalled();
+    currentSkyMap.value = null;
+  });
+
+  it('says the plan is empty instead of exporting a PDF of nothing', async () => {
+    currentSkyMap.value = {} as never;
+    backend.plans.list.mockResolvedValue([plan('p1', 'Vide', [])]);
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Exporter en PDF'))!
+      .trigger('click');
+    await settle();
+    expect(renderPlanPdf).not.toHaveBeenCalled();
+    expect(showNotice).toHaveBeenCalledWith(
+      'Aucune cible dans ce plan. Ajoutez-en depuis les suggestions ou la recherche.',
+    );
+    currentSkyMap.value = null;
+  });
+
+  it('shows the error toast when the PDF cannot be made', async () => {
+    currentSkyMap.value = {} as never;
+    renderPlanPdf.mockRejectedValue(new Error('boom'));
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Exporter en PDF'))!
+      .trigger('click');
+    await settle();
+    expect(showError).toHaveBeenCalled();
+    expect(saveFile).not.toHaveBeenCalled();
+    currentSkyMap.value = null;
   });
 
   it('asks before deleting the plan and does nothing when cancelled', async () => {

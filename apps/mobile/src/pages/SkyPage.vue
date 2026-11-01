@@ -23,9 +23,10 @@ import {
 import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
-import { createPhoneSkyMap, type PhoneSkyMap } from '../sky-map-setup';
+import { createPhoneSkyMap, currentSkyMap, type PhoneSkyMap } from '../sky-map-setup';
 import {
   skyPlacement,
+  skyPlanView,
   skyRegionDraw,
   skyRegionView,
   skyStarPick,
@@ -56,7 +57,9 @@ import SkyTimeBar from './sky/SkyTimeBar.vue';
 import SkyTopBar from './sky/SkyTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
+import PhoneIconButton from '../components/PhoneIconButton.vue';
 import mapPinIcon from '@icons/map-pin.svg?raw';
+import telescopeIcon from '@icons/telescope.svg?raw';
 
 // The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field, the display button and the date
 // button over it; the date button switches the map to the sky at a date and brings the column of the map's toggles.
@@ -92,6 +95,7 @@ onMounted(() => {
   });
   photoLayer.value = sky.photos;
   skyMap.value = sky.map;
+  currentSkyMap.value = sky.map;
   void reloadPhotos();
   sky.select(skySelection.value);
   // The catalogues load after the first screen: the map fills in once they are there.
@@ -278,6 +282,35 @@ async function endTargetView() {
 }
 useBackClose(() => targetShown.value !== null, endTargetView);
 
+// Showing a plan ("Afficher sur la carte" of its page, board "Ciel, contours de champ d'un plan"): the map with the
+// plan's frames and the frames' sheet on them, as the desktop opens its frame manager. Dragged down, the sheet closes
+// whole (a strip at the bottom of the screen would be under the system's gesture area); the frames button of the bar
+// opens it again. Its frames are the plan's own: a tap opens a frame's sheet with all its actions. The back arrow and
+// the back button open the plan's page again; leaving puts the frames back as they were.
+const planShown = computed(() => skyPlanView.value);
+watch(planShown, (shown) => {
+  if (shown) clearSkySelection();
+});
+watch(skySelection, (selection) => {
+  if (selection && planShown.value) clearSkySelection();
+});
+async function endPlanView() {
+  const shown = skyPlanView.value;
+  if (!shown) return;
+  skyPlanView.value = null;
+  framesSheetOpen.value = false;
+  sky?.map.selectFrame(null);
+  if (JSON.stringify(fov.selection) !== JSON.stringify(shown.frames.selection))
+    fov.setSelection(shown.frames.selection);
+  fov.setFramesVisible(shown.frames.visible);
+  // The plan's page opens again above the Plans tab, where its back arrow leads; out of sight, without a slide.
+  await swapPagesUnseen(async () => {
+    await router.replace('/tabs/plans');
+    await openStill(shown.returnTo);
+  });
+}
+useBackClose(() => planShown.value !== null, endPlanView);
+
 // The bar of the mode on: its title and what its back arrow does.
 const modeBar = computed(() => {
   if (placing.value) return { title: t('manual.modeLabel'), back: cancelPlacement };
@@ -286,6 +319,7 @@ const modeBar = computed(() => {
     return { title: t('mobile.targets.regionDrawTitle'), back: endRegionMode };
   if (regionShown.value) return { title: regionShown.value.region.name, back: endRegionMode };
   if (targetShown.value) return { title: targetTitle.value, back: endTargetView };
+  if (planShown.value) return { title: planShown.value.name, back: endPlanView };
   return null;
 });
 const inMode = computed(() => modeBar.value !== null);
@@ -312,9 +346,9 @@ const photoRemoved = () => {
 
 // The frames (fields of view). The selected frame has its sheet (board "Ciel, cadre sélectionné"); a frame and an
 // object are not selected together. "Ajouter un cadre" of an object opens "Créer un cadre".
-// The frames have their sheet on the map and in the mode showing a target, not in the other modes.
+// The frames have their sheet on the map and in the modes showing a target or a plan, not in the other modes.
 const activeFrame = computed(() =>
-  fov.framesVisible && (!inMode.value || targetShown.value)
+  fov.framesVisible && (!inMode.value || targetShown.value || planShown.value)
     ? (fov.renderables.find((f) => f.active) ?? null)
     : null,
 );
@@ -328,8 +362,11 @@ watch(skySelection, (selection) => {
   if (selection && activeFrame.value) sky?.map.selectFrame(null);
 });
 const releaseFrame = () => sky?.map.selectFrame(null);
-// Showing a target, the back button leaves the mode at once, sheet and all.
-useBackClose(() => activeFrame.value !== null && !targetShown.value, releaseFrame);
+// Showing a target or a plan, the back button leaves the mode at once, sheet and all.
+useBackClose(
+  () => activeFrame.value !== null && !targetShown.value && !planShown.value,
+  releaseFrame,
+);
 
 const pickerOpen = ref(false);
 const pickerTarget = ref<FrameTarget | null>(null);
@@ -426,6 +463,7 @@ function openDrawOrder(photoId: string) {
 onBeforeUnmount(() => {
   sky?.destroy();
   sky = null;
+  currentSkyMap.value = null;
   photoLayer.value = null;
 });
 </script>
@@ -435,11 +473,20 @@ onBeforeUnmount(() => {
     <IonContent :scroll-y="false">
       <div
         class="mob-page-fill mob-sky-frame"
-        :class="{ 'mob-map-mode': inMode, 'mob-map-mode--bare': regionShown || targetShown }"
+        :class="{
+          'mob-map-mode': inMode,
+          'mob-map-mode--bare': regionShown || targetShown || planShown,
+        }"
       >
         <header v-if="modeBar" class="mob-topbar">
           <PhoneBackButton :action="modeBar.back" />
           <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ modeBar.title }}</h1>
+          <PhoneIconButton
+            v-if="planShown"
+            :label="t('fovOverlay.popupTitle')"
+            @click="framesSheetOpen = true"
+            ><AppIcon :svg="telescopeIcon"
+          /></PhoneIconButton>
         </header>
         <main ref="mapEl" class="mob-map">
           <canvas ref="canvas" class="mob-sky-canvas" />
@@ -529,7 +576,12 @@ onBeforeUnmount(() => {
         />
       </div>
       <SkyDisplaySheet v-model:open="displayOpen" :layer="photoLayer" />
-      <SkyFramesSheet v-model:open="framesSheetOpen" :map="skyMap" @show="showFrame" />
+      <SkyFramesSheet
+        v-model:open="framesSheetOpen"
+        :map="skyMap"
+        :plan-view="!!planShown"
+        @show="showFrame"
+      />
       <SkyFramePicker
         v-if="pickerTarget"
         v-model:open="pickerOpen"

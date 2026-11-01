@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  scaleMatrixForDpr,
-  computeGalleryLayout,
-  computeFramedViewScale,
-  computeLegendLayout,
-} from '../../src/export-render';
+import { scaleMatrixForDpr, computeGalleryLayout } from '../../src/export-render';
+import { computeFramedViewScale, computeLegendLayout } from '@myastrosky/render/plan-pdf';
 import { angularSizeToCanvasPxForDSO } from '@myastrosky/core/dso-highlight';
 
 describe('scaleMatrixForDpr', () => {

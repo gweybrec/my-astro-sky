@@ -144,3 +144,18 @@ export async function setStatusBarHidden(hidden: boolean): Promise<void> {
     // The bar stays as it is: the screen works with it shown.
   }
 }
+
+/** Hands a file to the user: the share sheet on the phone, a download in a browser. */
+export async function saveFile(name: string, blob: Blob): Promise<void> {
+  if (isNativePlatform()) {
+    const { shareNativeFile } = await import('./phone-backend');
+    await shareNativeFile(name, new Uint8Array(await blob.arrayBuffer()));
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
