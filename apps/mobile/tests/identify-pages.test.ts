@@ -62,6 +62,7 @@ import IdentifyCometPage from '../src/pages/identify/IdentifyCometPage.vue';
 import PoiAddPage from '../src/pages/identify/PoiAddPage.vue';
 import PoiTypesPage from '../src/pages/PoiTypesPage.vue';
 import PhonePhotoStage from '../src/components/PhonePhotoStage.vue';
+import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import { photoPixelsToRaDec } from '@myastrosky/core/photo-identify';
 
 /** The boards "Identifier un astéroïde", "… des supernovae", "… des comètes", "Ajouter un point d'intérêt" and "Types
@@ -328,6 +329,22 @@ describe('identify supernovae', () => {
       'n’a pas de date d’observation',
     );
     expect(byLabel(w, 'button', 'Rechercher').attributes('disabled')).toBeDefined();
+  });
+
+  it('keeps a time picked before the date, instead of searching at midnight', async () => {
+    getPhotos.mockResolvedValue([{ ...NGC7331, observationDate: undefined }]);
+    const w = await mountPage(IdentifySupernovaPage);
+    const [datePicker, timePicker] = w.findAllComponents(PhoneNativePicker);
+    timePicker.vm.$emit('pick', '18:42');
+    await nextTick();
+    datePicker.vm.$emit('pick', '2025-11-07');
+    await nextTick();
+    const fields = w
+      .findAll('.mob-form-row--search input')
+      .filter((i) => !i.element.closest('.mob-picker-inputs'))
+      .map((i) => (i.element as HTMLInputElement).value);
+    expect(fields).toEqual(['2025-11-07', '18:42']);
+    expect(byLabel(w, 'button', 'Rechercher').attributes('disabled')).toBeUndefined();
   });
 
   it("says why when TNS's answer fails", async () => {

@@ -138,7 +138,7 @@ import { t } from '../../i18n';
 import { cometPois, cometsInPhoto, isPhotoSolved } from '@myastrosky/core/photo-identify';
 import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import { cometElementsAPI } from '../../api';
-import { isoToUtcParts, utcPartsToIso } from '@myastrosky/core/asteroid-identify';
+import { useUtcDateTime } from '../../composables/useUtcDateTime';
 import {
   jplLookupUrl,
   COMET_CATEGORY_ID,
@@ -166,18 +166,7 @@ const pinColor = computed(
 
 // ─── Observation date (authoritative ISO; the two inputs are a UTC view onto it) ──
 const obsIso = ref(props.photo.observationDate ?? '');
-const obsDateStr = computed({
-  get: () => isoToUtcParts(obsIso.value).date,
-  set: (v) => {
-    obsIso.value = utcPartsToIso(v, isoToUtcParts(obsIso.value).time);
-  },
-});
-const obsTimeStr = computed({
-  get: () => isoToUtcParts(obsIso.value).time,
-  set: (v) => {
-    obsIso.value = utcPartsToIso(isoToUtcParts(obsIso.value).date, v);
-  },
-});
+const { dateStr: obsDateStr, timeStr: obsTimeStr } = useUtcDateTime(obsIso);
 
 // ─── Search ─────────────────────────────────────────────────────────────────
 const searching = ref(false);

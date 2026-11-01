@@ -180,10 +180,9 @@ import {
   formatAsteroidClass,
   candidateToPoi,
   defaultTimeWindow,
-  isoToUtcParts,
-  utcPartsToIso,
   type RankedCandidate,
 } from '@myastrosky/core/asteroid-identify';
+import { useUtcDateTime } from '../../composables/useUtcDateTime';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const ASTEROID_CATEGORY_ID = 'cat-asteroid';
@@ -219,30 +218,8 @@ function onPhotoClick(px: { x: number; y: number }) {
 const initialWindow = defaultTimeWindow(props.photo);
 const startIso = ref(initialWindow?.startIso ?? '');
 const endIso = ref(initialWindow?.endIso ?? '');
-const startDateStr = computed({
-  get: () => isoToUtcParts(startIso.value).date,
-  set: (v) => {
-    startIso.value = utcPartsToIso(v, isoToUtcParts(startIso.value).time);
-  },
-});
-const startTimeStr = computed({
-  get: () => isoToUtcParts(startIso.value).time,
-  set: (v) => {
-    startIso.value = utcPartsToIso(isoToUtcParts(startIso.value).date, v);
-  },
-});
-const endDateStr = computed({
-  get: () => isoToUtcParts(endIso.value).date,
-  set: (v) => {
-    endIso.value = utcPartsToIso(v, isoToUtcParts(endIso.value).time);
-  },
-});
-const endTimeStr = computed({
-  get: () => isoToUtcParts(endIso.value).time,
-  set: (v) => {
-    endIso.value = utcPartsToIso(isoToUtcParts(endIso.value).date, v);
-  },
-});
+const { dateStr: startDateStr, timeStr: startTimeStr } = useUtcDateTime(startIso);
+const { dateStr: endDateStr, timeStr: endTimeStr } = useUtcDateTime(endIso);
 const radiusArcmin = ref(5);
 
 // ─── Search ─────────────────────────────────────────────────────────────────

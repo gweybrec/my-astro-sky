@@ -14,7 +14,20 @@ const props = defineProps<{
 }>();
 const iso = defineModel<string>({ default: '' });
 
-const parts = computed(() => isoToUtcParts(iso.value));
+// A time picked while there is no date waits here for the date, rather than being dropped for midnight.
+const timeDraft = ref(isoToUtcParts(iso.value).time);
+const parts = computed(() => {
+  const p = isoToUtcParts(iso.value);
+  return iso.value ? p : { date: '', time: timeDraft.value };
+});
+function pickDate(date: string): void {
+  timeDraft.value = parts.value.time;
+  iso.value = utcPartsToIso(date, parts.value.time);
+}
+function pickTime(time: string): void {
+  timeDraft.value = time;
+  if (parts.value.date) iso.value = utcPartsToIso(parts.value.date, time);
+}
 const datePicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 const timePicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 </script>
@@ -34,16 +47,6 @@ const timePicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
     :aria-label="t('mobile.identify.timeOf', { label: props.label })"
     @click="timePicker?.open()"
   />
-  <PhoneNativePicker
-    ref="datePicker"
-    type="date"
-    :value="parts.date"
-    @pick="iso = utcPartsToIso($event, parts.time)"
-  />
-  <PhoneNativePicker
-    ref="timePicker"
-    type="time"
-    :value="parts.time"
-    @pick="iso = utcPartsToIso(parts.date, $event)"
-  />
+  <PhoneNativePicker ref="datePicker" type="date" :value="parts.date" @pick="pickDate" />
+  <PhoneNativePicker ref="timePicker" type="time" :value="parts.time" @pick="pickTime" />
 </template>
