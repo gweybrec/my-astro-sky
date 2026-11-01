@@ -14,7 +14,7 @@ import type { DSO } from '../types';
 import { ALL_DSO_TYPES, filterTargetDSOs } from './filters';
 import { todayISO } from './format';
 import { buildMultipleStarTargets } from './multiple-stars';
-import { nightWindow, timeWindowFor } from './night';
+import { nightWindow, timeWindowFor, visualNightWindow } from './night';
 import { presetForSetupId, type GearLists } from './plan-setup';
 import type { TargetsPrefs } from './prefs';
 
@@ -99,20 +99,25 @@ function prepare(
   const enabledDirs = new Set(prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
   const dirFilterActive = enabledDirs.size < 4;
 
-  const timeWindow = timeWindowFor(dateStr, prefs.obsStartTime, prefs.obsEndTime);
-  if (timeWindow) {
-    const dark = nightWindow(location, dateNight);
-    const overlapStart = Math.max(dark.start.getTime(), timeWindow.start.getTime());
-    const overlapEnd = Math.min(dark.end.getTime(), timeWindow.end.getTime());
-    if (overlapEnd <= overlapStart) return { kind: 'empty', reason: 'no-window-overlap' };
-  }
-
   // Multiple/double stars are synthetic point-like targets (not in the DSO catalog);
   // inject them into the pool when their type chip is enabled, through the same filters.
   const msTargets = enabledTypes.has('MS')
     ? filterTargetDSOs(buildMultipleStarTargets(preset), filterOptions)
     : [];
   const pool = msTargets.length ? [...filteredDSOs, ...msTargets] : filteredDSOs;
+
+  // The user's window must meet a window some candidate is observed in: the dark window for deep-sky objects, the
+  // wider twilight window for multiple stars (the recommender's own windows).
+  const timeWindow = timeWindowFor(dateStr, prefs.obsStartTime, prefs.obsEndTime);
+  if (timeWindow) {
+    const overlaps = (win: { start: Date; end: Date }): boolean =>
+      Math.min(win.end.getTime(), timeWindow.end.getTime()) >
+      Math.max(win.start.getTime(), timeWindow.start.getTime());
+    const darkOverlaps = overlaps(nightWindow(location, dateNight));
+    const twilightOverlaps =
+      msTargets.length > 0 && overlaps(visualNightWindow(location, dateNight));
+    if (!darkOverlaps && !twilightOverlaps) return { kind: 'empty', reason: 'no-window-overlap' };
+  }
 
   const recommender = createRecommender(preset, location, dateNight, {
     ignoreFovFit: prefs.includeOversized ?? false,

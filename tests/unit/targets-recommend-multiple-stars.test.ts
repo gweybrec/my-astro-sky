@@ -101,4 +101,19 @@ describe('runTargetRecommendation with multiple stars', () => {
     });
     expect(result.kind === 'ok' && result.suggestions.map((s) => s.dso.id)).toEqual(['star:2']);
   });
+
+  it('keeps them for an observation window that falls in twilight only', () => {
+    // 20:00–21:00 UTC on 12 June at 45° N, 5° E: after sunset, before astronomical dusk.
+    const local = (iso: string) => {
+      const d = new Date(iso);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+    const twilight = {
+      obsStartTime: local('2026-06-12T20:00:00Z'),
+      obsEndTime: local('2026-06-12T21:00:00Z'),
+      minAltDeg: 20,
+    };
+    expect(found(twilight)).toEqual(['star:1', 'star:2']);
+    expect(found({ ...twilight, enabledTypes: ['GX'] })).toEqual([]);
+  });
 });

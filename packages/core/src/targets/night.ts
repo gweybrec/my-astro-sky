@@ -31,6 +31,15 @@ export function nightWindow(loc: ObserverLocation, dateNight: Date): { start: Da
   };
 }
 
+/** The wider window multiple stars are observed in (civil twilight, else sunset; mirrors the recommender's). */
+export function visualNightWindow(
+  loc: ObserverLocation,
+  dateNight: Date,
+): { start: Date; end: Date } {
+  const tw = twilightWindow(dateNight, loc.latDeg, loc.lonDeg, [-6, 0]);
+  return tw ? { start: tw.start, end: tw.end } : nightWindow(loc, dateNight);
+}
+
 /**
  * User-configured observation window (`obsStartTime`/`obsEndTime`, HH:MM in the
  * device's local time) for the given night, or null if not set — both fields
