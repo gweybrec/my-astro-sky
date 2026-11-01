@@ -9,6 +9,7 @@ import { formatFov } from '@myastrosky/core/gear-presets';
 import {
   MOSAIC_DEFAULT_OVERLAP,
   entriesCoveredByMosaic,
+  keptMosaicLayout,
   mosaicPlacement,
   mosaicSummary,
   mosaicTiles,
@@ -166,13 +167,27 @@ async function save() {
   const name = form.name.trim();
   // One object stays anchored to it; several (or none) un-anchor to the centre.
   const dsoId = form.targets.length === 1 ? form.targets[0].id : null;
-  const tiles = mosaicTiles(p.center, p.paDeg, form.cols, form.rows, s.wDeg, s.hDeg, form.overlap);
+  // A rename alone keeps the edited mosaic where it is, with its tiles.
+  const kept = edited.value
+    ? keptMosaicLayout(
+        edited.value,
+        plan.value?.entries ?? [],
+        form.targets.map((d) => d.id),
+        form.overlap,
+        form.cols,
+        form.rows,
+      )
+    : null;
+  const center = kept?.center ?? p.center;
+  const tiles =
+    kept?.tiles ??
+    mosaicTiles(p.center, p.paDeg, form.cols, form.rows, s.wDeg, s.hDeg, form.overlap);
   const params = {
     dsoId,
     name,
-    centerRa: p.center.ra,
-    centerDec: p.center.dec,
-    paDeg: p.paDeg,
+    centerRa: center.ra,
+    centerDec: center.dec,
+    paDeg: kept?.paDeg ?? p.paDeg,
     overlapPct: form.overlap,
     cols: form.cols,
     rows: form.rows,

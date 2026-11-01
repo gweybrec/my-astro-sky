@@ -42,6 +42,59 @@ export function mosaicPlacement(
   };
 }
 
+/** An edited mosaic as the form compares it: what it covers and where it sits. */
+export interface EditedMosaic extends MosaicPlace {
+  id: string;
+  dsoId: string | null;
+  overlapPct: number;
+  cols: number;
+  rows: number;
+}
+
+/**
+ * The place and tiles an edit keeps when it changes nothing but the name (same objects, overlap and grid): the
+ * mosaic's stored centre, angle and tiles, so a rotation, a move or removed tiles survive. Null when the edit changes
+ * the layout (the form then lays the grid out again), or the mosaic has no stored tile.
+ */
+export function keptMosaicLayout(
+  edited: EditedMosaic,
+  entries: Array<{
+    mosaicId?: string | null;
+    ra: number | null;
+    dec: number | null;
+    paDeg: number | null;
+  }>,
+  targetIds: string[],
+  overlapPct: number,
+  cols: number,
+  rows: number,
+): {
+  center: { ra: number; dec: number };
+  paDeg: number;
+  tiles: Array<{ ra: number; dec: number; paDeg: number | null }>;
+} | null {
+  const sameTargets = edited.dsoId
+    ? targetIds.length === 1 && targetIds[0] === edited.dsoId
+    : targetIds.length === 0;
+  if (
+    !sameTargets ||
+    overlapPct !== edited.overlapPct ||
+    cols !== edited.cols ||
+    rows !== edited.rows
+  ) {
+    return null;
+  }
+  const tiles = entries
+    .filter((e) => e.mosaicId === edited.id && e.ra != null && e.dec != null)
+    .map((e) => ({ ra: e.ra!, dec: e.dec!, paDeg: e.paDeg }));
+  if (tiles.length === 0) return null;
+  return {
+    center: { ra: edited.centerRa, dec: edited.centerDec },
+    paDeg: edited.paDeg,
+    tiles,
+  };
+}
+
 /** The overlap a form field holds, between 0 and 90 (the default when it is not a number). */
 export function clampOverlap(n: number): number {
   return Number.isFinite(n) ? Math.min(90, Math.max(0, n)) : MOSAIC_DEFAULT_OVERLAP;

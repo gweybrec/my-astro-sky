@@ -24,6 +24,7 @@ import {
   MOSAIC_DEFAULT_OVERLAP,
   clampOverlap,
   entriesCoveredByMosaic,
+  keptMosaicLayout,
   mosaicPlacement,
   mosaicSummary,
   mosaicTiles,
@@ -1871,17 +1872,26 @@ export function buildFovPopup(
         fovStore.setSelection({ kind: 'plan', planId });
       }
       if (edit) {
-        // Re-tile the existing mosaic around the (possibly retargeted) centre/PA.
+        // A rename alone keeps the mosaic where it is, with its tiles; otherwise
+        // re-tile it around the (possibly retargeted) centre/PA.
+        const kept = keptMosaicLayout(
+          { ...edit, id: edit.mosaicId },
+          plansStore.plans.find((p) => p.id === planId)?.entries ?? [],
+          selected.map((d) => d.id),
+          overlapPct,
+          c,
+          r,
+        );
         await plansStore.updateMosaic(planId, edit.mosaicId, {
           dsoId,
           name,
-          centerRa: center.ra,
-          centerDec: center.dec,
-          paDeg,
+          centerRa: (kept?.center ?? center).ra,
+          centerDec: (kept?.center ?? center).dec,
+          paDeg: kept?.paDeg ?? paDeg,
           overlapPct,
           cols: c,
           rows: r,
-          tiles,
+          tiles: kept?.tiles ?? tiles,
         });
       } else {
         // Standalone frames this mosaic stands in for: the same target, or any

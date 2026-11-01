@@ -409,6 +409,62 @@ describe('buildFovPopup', () => {
     popup.__cleanup?.();
   });
 
+  it('mosaic edit: a rename alone keeps a rotated, trimmed mosaic where it is, with its tiles', async () => {
+    // Two tiles left of a rotated 3×2 mosaic of M42.
+    const tiles = [
+      { ra: 83.5, dec: -5.6, paDeg: 67 },
+      { ra: 84.1, dec: -5.2, paDeg: 67 },
+    ];
+    seedPlan(
+      's1',
+      tiles.map((t, i) => ({
+        id: `t${i}`,
+        dsoId: 'M42',
+        position: i,
+        notes: null,
+        mosaicId: 'm1',
+        ...t,
+      })),
+    );
+    const plans = usePlansStore();
+    (plans as any).plans[0].mosaics = [
+      {
+        id: 'm1',
+        dsoId: 'M42',
+        name: 'My region',
+        centerRa: 83.9,
+        centerDec: -5.3,
+        paDeg: 67,
+        overlapPct: 20,
+        cols: 3,
+        rows: 2,
+      },
+    ];
+    const store = useFovFramesStore();
+    await store.loadSpecs();
+    store.setSelection({ kind: 'plan', planId: 'p1' });
+    const spy = vi.spyOn(plans, 'updateMosaic').mockResolvedValue();
+
+    const popup = buildFovPopup(() => {});
+    (popup.querySelector('[title="Edit mosaic"]') as HTMLButtonElement).click();
+    const modal = document.querySelector('.modal-backdrop .modal')!;
+    (modal.querySelector('input[type="text"]') as HTMLInputElement).value = 'Renamed';
+    (modal.querySelector('.btn-confirm') as HTMLButtonElement).click();
+
+    expect(spy).toHaveBeenCalledWith('p1', 'm1', {
+      dsoId: 'M42',
+      name: 'Renamed',
+      centerRa: 83.9,
+      centerDec: -5.3,
+      paDeg: 67,
+      overlapPct: 20,
+      cols: 3,
+      rows: 2,
+      tiles,
+    });
+    popup.__cleanup?.();
+  });
+
   it('create mosaic: blocks on an empty name and target, outlining both inputs', async () => {
     seedPlan('s1', []);
     const store = useFovFramesStore();

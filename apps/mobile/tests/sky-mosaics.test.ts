@@ -45,6 +45,7 @@ vi.mock('@myastrosky/core/search', () => ({
   searchDSOs: () => [{ dso: andromeda, label: 'M31' }],
 }));
 
+import { setDsoCatalog } from '@myastrosky/core/catalog/dso-registry';
 import SkyFrameSheet from '../src/pages/sky/SkyFrameSheet.vue';
 import SkyFramesSheet from '../src/pages/sky/SkyFramesSheet.vue';
 import SkyFramePicker from '../src/pages/sky/SkyFramePicker.vue';
@@ -316,6 +317,58 @@ describe('the mosaic form', () => {
       'mo1',
       expect.objectContaining({ name: 'Amérique du Nord', cols: 3, rows: 2, centerRa: 314.7 }),
     );
+  });
+
+  it('keeps a rotated mosaic of an object where it is, with its tiles, when only its name changes', async () => {
+    withSpecs();
+    setDsoCatalog(
+      {
+        fields: ['id', 'ra', 'dec', 'majAxis', 'minAxis', 'pa'],
+        data: [['M31', 10.68, 41.27, 190, 60, 35]],
+      },
+      {},
+      'fr',
+    );
+    const plans = usePlansStore();
+    const tiles = [
+      { ra: 10.2, dec: 41, paDeg: 67 },
+      { ra: 11.1, dec: 41.6, paDeg: 67 },
+    ];
+    plans.plans = [
+      plan({
+        id: 'p1',
+        setupId: 's1',
+        mosaics: [
+          planMosaic({ dsoId: 'M31', centerRa: 10.7, centerDec: 41.3, paDeg: 67 }),
+        ] as never,
+        entries: tiles.map((t, i) => ({
+          id: `t${i}`,
+          mosaicId: 'mo1',
+          dsoId: 'M31',
+          ...t,
+        })) as never,
+      }),
+    ];
+    const update = vi.spyOn(plans, 'updateMosaic').mockResolvedValue();
+    const w = mount(SkyMosaicSheet, {
+      props: { open: true, dest: { kind: 'plan', planId: 'p1' }, mosaicId: 'mo1' },
+      global: { stubs: ionicStubs },
+    });
+    w.findAllComponents({ name: 'PhoneField' })[0].vm.$emit('update:modelValue', 'Andromède');
+    await flushPromises();
+    await confirmButton(w).trigger('click');
+    await flushPromises();
+    expect(update).toHaveBeenCalledWith('p1', 'mo1', {
+      dsoId: 'M31',
+      name: 'Andromède',
+      centerRa: 10.7,
+      centerDec: 41.3,
+      paDeg: 67,
+      overlapPct: 20,
+      cols: 3,
+      rows: 2,
+      tiles,
+    });
   });
 });
 
