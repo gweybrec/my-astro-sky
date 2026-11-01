@@ -42,10 +42,12 @@ export function deleteFrameWithUndo(
       if (frame) fovStore.restoreAdhocFrame(frame);
     };
   } else {
-    // Snapshot the entry's framing before removal; undo re-creates it (a new id is
-    // assigned, which is fine — the frame reappears with the same target/framing).
+    // Snapshot the entry before removal; undo re-creates it (a new id is assigned,
+    // which is fine — the frame reappears with the same target, framing, windows
+    // and place in the list).
     const plan = plansStore.plans.find((p) => p.id === target.planId);
-    const entry = plan?.entries.find((e) => e.id === target.entryId);
+    const index = plan?.entries.findIndex((e) => e.id === target.entryId) ?? -1;
+    const entry = index >= 0 ? plan?.entries[index] : undefined;
     const snap = entry
       ? {
           dsoId: entry.dsoId,
@@ -54,6 +56,9 @@ export function deleteFrameWithUndo(
           paDeg: entry.paDeg,
           mosaicWDeg: entry.mosaicWDeg ?? null,
           mosaicHDeg: entry.mosaicHDeg ?? null,
+          observationWindows: (entry.observationWindows ?? []).map((w) => ({ ...w })),
+          // The entry that followed it: the restored entry goes back before it.
+          nextId: plan?.entries[index + 1]?.id ?? null,
         }
       : null;
     // Route through the store so floating/active state is cleared too (same as the
@@ -78,6 +83,18 @@ export function deleteFrameWithUndo(
           mosaicWDeg: snap.mosaicWDeg,
           mosaicHDeg: snap.mosaicHDeg,
         });
+        if (snap.observationWindows.length > 0) {
+          plansStore.setEntryObservationWindows(target.planId, newId, snap.observationWindows);
+        }
+        // Re-adding appends to the end of the list: move it back to its old place.
+        const ids = (plansStore.plans.find((pl) => pl.id === target.planId)?.entries ?? [])
+          .map((e) => e.id)
+          .filter((id) => id !== newId);
+        const at = snap.nextId ? ids.indexOf(snap.nextId) : -1;
+        if (at >= 0) {
+          ids.splice(at, 0, newId);
+          await plansStore.reorderEntries(target.planId, ids);
+        }
       }
     };
   }

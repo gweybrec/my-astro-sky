@@ -28,6 +28,8 @@ const fakePlans = {
   }),
   addCustomEntry: vi.fn(async () => 'e-custom'),
   setEntryPosition: vi.fn(),
+  setEntryObservationWindows: vi.fn(),
+  reorderEntries: vi.fn().mockResolvedValue(undefined),
 };
 
 vi.mock('@myastrosky/app-state/stores/fov-frames', () => ({ useFovFramesStore: () => fakeFov }));
@@ -104,6 +106,60 @@ describe('deleteFrameWithUndo', () => {
       expect.objectContaining({ paDeg: 142 }),
     );
     expect(onRestored).toHaveBeenCalled();
+  });
+
+  it('restores the observation windows and the old place in the list on undo', async () => {
+    const win = {
+      id: 'w1',
+      startFrac: 0.2,
+      endFrac: 0.5,
+      filter: 'Ha',
+      color: null,
+      frameSeconds: 300,
+      snap: true,
+    };
+    const entry = (id: string, dsoId: string, windows: any[] = []) => ({
+      id,
+      dsoId,
+      ra: null,
+      dec: null,
+      paDeg: null,
+      mosaicWDeg: null,
+      mosaicHDeg: null,
+      observationWindows: windows,
+    });
+    fakePlans.plans = [
+      { id: 'p1', entries: [entry('e0', 'M31'), entry('e1', 'M42', [win]), entry('e2', 'M45')] },
+    ];
+
+    deleteFrameWithUndo({ kind: 'plan', planId: 'p1', entryId: 'e1', name: 'M42' });
+    fakePlans.plans[0].entries = fakePlans.plans[0].entries.filter((e: any) => e.id !== 'e1');
+
+    lastToast.onAction();
+    await flush();
+    expect(fakePlans.setEntryObservationWindows).toHaveBeenCalledWith('p1', 'e-new', [win]);
+    expect(fakePlans.reorderEntries).toHaveBeenCalledWith('p1', ['e0', 'e-new', 'e2']);
+  });
+
+  it('leaves a restored last entry at the end of the list', async () => {
+    fakePlans.plans = [
+      {
+        id: 'p1',
+        entries: [
+          { id: 'e0', dsoId: 'M31', observationWindows: [] },
+          { id: 'e1', dsoId: 'M42', observationWindows: [] },
+        ],
+      },
+    ];
+
+    deleteFrameWithUndo({ kind: 'plan', planId: 'p1', entryId: 'e1', name: 'M42' });
+    fakePlans.plans[0].entries = fakePlans.plans[0].entries.filter((e: any) => e.id !== 'e1');
+
+    lastToast.onAction();
+    await flush();
+    expect(fakePlans.addEntry).toHaveBeenCalledWith('p1', 'M42');
+    expect(fakePlans.setEntryObservationWindows).not.toHaveBeenCalled();
+    expect(fakePlans.reorderEntries).not.toHaveBeenCalled();
   });
 
   it('re-creates a custom-location frame via addCustomEntry on undo', async () => {
