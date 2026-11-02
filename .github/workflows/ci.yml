@@ -54,8 +54,9 @@ jobs:
             exit 1;
           }
 
-      # Warn-only: ESLint rules are all `warn`, so this surfaces issues in the log
-      # without failing the build. See eslint.config.js / CLAUDE.md.
+      # Blocking for errors only: the rules eslint.config.js sets itself are `warn`, but the
+      # rules inherited from the `recommended` presets keep `error` and fail this step.
+      # See eslint.config.js / CLAUDE.md.
       - name: Lint
         run: npm run lint
 
@@ -63,5 +64,14 @@ jobs:
       - name: Prettier check
         run: npm run format:check
 
+      - name: Check phone app styles (no pixel nudges)
+        run: node apps/mobile/scripts/check-no-nudges.mjs
+
+      - name: Check phone app sheets
+        run: node apps/mobile/scripts/check-sheets.mjs
+
       - name: Build
         run: npx vite build
+
+      - name: Build phone app
+        run: npm run mobile:build

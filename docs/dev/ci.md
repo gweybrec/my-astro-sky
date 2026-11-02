@@ -20,11 +20,13 @@ All workflows live in `.github/workflows/`. They are independent — each serves
    `npm run typecheck:render` (`tsc --noEmit -p packages/render/tsconfig.json`) type-checks the sky map's canvas drawing and input handling (`packages/render`)
    `npm run typecheck:mobile` (`vue-tsc --noEmit -p apps/mobile/tsconfig.json`) type-checks the phone app (`apps/mobile`)
 5. `cmp public/icon.png docs/icon.png` — **blocking**: `docs/icon.png` is a committed copy kept in sync by `npm run generate-icons` (see [Building the packages](distribution.md#building-the-packages)); this catches drift since the workflow-free GitHub Pages docs site can't regenerate it at deploy time
-6. `npm run lint` (`eslint .`) — **warn-only**: every rule is `warn`, so ESLint exits 0 and this step surfaces issues in the log without failing the build (see `eslint.config.js` and `CLAUDE.md`)
+6. `npm run lint` (`eslint .`) — **blocking for errors only**: the rules `eslint.config.js` sets itself are `warn` and only show in the log, but the rules inherited from the `recommended` presets (`js`, `tseslint`, `vue`) keep `error` and fail the step (see `eslint.config.js` and `CLAUDE.md`)
 7. `npm run format:check` (`prettier --check .`) — **blocking**: fails if any file isn't Prettier-formatted
-8. `npx vite build` — verifies the frontend bundles without errors
+8. `node apps/mobile/scripts/check-no-nudges.mjs` and `node apps/mobile/scripts/check-sheets.mjs` — **blocking**: the phone app's style rules (no pixel nudges or raw sizes in `apps/mobile/src`; every sheet is a `PhoneSheet` or `PhoneMapSheet`)
+9. `npx vite build` — verifies the desktop frontend bundles without errors
+10. `npm run mobile:build` — verifies the phone app's production bundle (`vite build apps/mobile`, after copying the bundled data)
 
-This workflow does **not** build or run Electron — it only validates that the TypeScript compiles, the code is lint-clean/formatted, and Vite produces a valid bundle.
+This workflow does **not** build or run Electron or the Android project (Gradle) — it only validates that the TypeScript compiles, the code is lint-clean/formatted, and Vite produces valid bundles for both apps. Together with `test.yml` it runs the same checks as `npm run verify`.
 
 ---
 
