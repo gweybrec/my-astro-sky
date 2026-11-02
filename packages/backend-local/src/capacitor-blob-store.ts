@@ -3,7 +3,7 @@
  * through the Filesystem plugin. The plugin writes text in base64, so a file is written in pieces; it is read
  * back through the WebView's `fetch` of the file's local address (no base64 on the way in).
  */
-import type { BlobStore } from '@myastrosky/core/ports/blob-store';
+import { isSafeBlobName, type BlobStore } from '@myastrosky/core/ports/blob-store';
 
 /** The methods of `@capacitor/filesystem` that the adapter uses. The real plugin is assignable to this. */
 export interface CapacitorFilesystem {
@@ -108,14 +108,7 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
   const doFetch = options.fetch;
 
   const pathOf = (name: string): string => {
-    if (
-      !name ||
-      name.includes('/') ||
-      name.includes(String.fromCharCode(92)) ||
-      name.startsWith('.')
-    ) {
-      throw new Error(`Invalid blob name: ${name}`);
-    }
+    if (!isSafeBlobName(name)) throw new Error(`Invalid blob name: ${name}`);
     return `${folder}/${name}`;
   };
 
@@ -171,6 +164,7 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
     },
 
     async get(name) {
+      pathOf(name); // refuses a bad name here: sizeOf would turn the refusal into "missing"
       // The phone's local server answers `index.html` with status 200 for an unknown path: look first.
       if ((await sizeOf(name)) === null) return null;
       await init();
@@ -182,8 +176,9 @@ export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): Ca
     size: sizeOf,
 
     async remove(name) {
+      const path = pathOf(name);
       try {
-        await filesystem.deleteFile({ path: pathOf(name), directory });
+        await filesystem.deleteFile({ path, directory });
       } catch (err) {
         // A missing file is not an error.
         if ((await sizeOf(name)) !== null) throw err;

@@ -4,7 +4,7 @@
  * `open` returns a store with none of the names the cases use.
  */
 import type { BlobStore } from '../ports/blob-store';
-import { bytesEqual, ok, patternBytes, toBe } from './conformance-assert';
+import { bytesEqual, ok, patternBytes, rejects, show, toBe } from './conformance-assert';
 
 export interface BlobStoreConformanceCase {
   name: string;
@@ -92,6 +92,25 @@ export const blobStoreConformanceCases: BlobStoreConformanceCase[] = [
       toBe(await store.get(`${id}.jpg`), null, 'photo after remove');
       bytesEqual(await store.get(`${id}_thumb.jpg`), b, 'thumbnail untouched');
       await store.remove(`${id}_thumb.jpg`);
+    },
+  },
+  {
+    name: 'a name with a folder part or a leading dot is refused: nothing outside the store is touched',
+    async run(open) {
+      const store = await open();
+      for (const name of [
+        '../conf-out.jpg',
+        '..\\conf-out.jpg',
+        'sub/conf.jpg',
+        'sub\\conf.jpg',
+        '.conf-hidden.jpg',
+        '',
+      ]) {
+        await rejects(() => store.put(name, patternBytes(10)), `put ${show(name)}`);
+        await rejects(() => store.get(name), `get ${show(name)}`);
+        await rejects(() => store.remove(name), `remove ${show(name)}`);
+        toBe(await store.size(name), null, `size ${show(name)}`);
+      }
     },
   },
 ];

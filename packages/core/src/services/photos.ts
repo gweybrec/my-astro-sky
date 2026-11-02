@@ -19,7 +19,7 @@ import type {
   UploadFields,
   UploadMetadata,
 } from '../domain/photos';
-import type { BlobStore } from '../ports/blob-store';
+import { isSafeBlobName, type BlobStore } from '../ports/blob-store';
 import type { ImageCodec, ImageInfo } from '../ports/image-codec';
 import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
 import type {
@@ -68,6 +68,23 @@ export const mediumNameOf = (filename: string): string =>
 /** The name of the thumbnail of the image file `filename` (the extension becomes `_thumb.jpg`). */
 export const thumbnailNameOf = (filename: string): string =>
   filename.replace(/(\.[^.]+)$/, '_thumb.jpg');
+
+/**
+ * Whether the picture and thumbnail names a backup gives a photo are plain file names of an allowed extension: a name
+ * such as `../x.png` would reach a file outside the photo folder.
+ */
+export function hasSafeFileNames(p: {
+  id?: unknown;
+  filename?: unknown;
+  thumbFilename?: unknown;
+}): boolean {
+  const filename = p.filename ?? `${String(p.id)}.jpg`;
+  const names =
+    typeof p.thumbFilename === 'string' && p.thumbFilename
+      ? [filename, p.thumbFilename]
+      : [filename];
+  return names.every((n) => isSafeBlobName(n) && ALLOWED_PHOTO_EXTENSIONS.has(extensionOf(n)));
+}
 
 export interface PhotoServiceDeps {
   db: SqlDb;
@@ -434,9 +451,10 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
 
   /** Deletes a photo's picture, its thumbnail and, when it has one, its medium-sized copy. */
   async function removeFiles(r: FilesRow): Promise<void> {
-    await blobs.remove(r.filename);
-    await blobs.remove(thumbnailNameOf(r.filename));
-    if (r.medium_filename) await blobs.remove(r.medium_filename);
+    // A name outside the photo folder (from a backup imported before names were checked) is left alone.
+    for (const name of [r.filename, thumbnailNameOf(r.filename), r.medium_filename]) {
+      if (name && isSafeBlobName(name)) await blobs.remove(name);
+    }
   }
 
   const service: PhotoService = {
@@ -869,6 +887,13 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
 
     async importPhotos(items) {
       if (items.length === 0) return [];
+      for (const { photo } of items) {
+        if (!hasSafeFileNames(photo)) {
+          throw new DomainError('invalid', 'Le fichier contient un chemin invalide.', {
+            code: 'INVALID_ENTRY_PATH',
+          });
+        }
+      }
       // The size of the stored picture of a photo the manifest gives none, read before the transaction (whose body
       // may await only its own calls); null when the picture is missing or not an image.
       const measured = new Map<number, { width: number; height: number } | null>();
@@ -932,6 +957,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
     async makeMissingMediums() {
       let made = 0;
       for (const r of await db.all<{ id: string; filename: string }>(SELECT_WITHOUT_MEDIUM)) {
+        if (!isSafeBlobName(r.filename)) continue;
         const bytes = await blobs.get(r.filename);
         if (!bytes) continue;
         const name = mediumNameOf(r.filename);

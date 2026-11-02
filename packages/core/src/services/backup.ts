@@ -30,13 +30,13 @@ import {
 import { DomainError } from '../domain/errors';
 import { customGearName, isCustomGearType, type CustomGearType } from '../domain/gear';
 import type { BackupPhoto } from '../domain/photos';
-import type { BlobStore } from '../ports/blob-store';
+import { isSafeBlobName, type BlobStore } from '../ports/blob-store';
 import type { BundleReader, BundleWriter } from '../ports/bundle';
 import type { Photo } from '../types';
 import type { DsoOverrideService } from './dso-overrides';
 import type { GearService } from './gear';
 import type { PhotoService } from './photos';
-import { ALLOWED_PHOTO_EXTENSIONS, thumbnailNameOf } from './photos';
+import { ALLOWED_PHOTO_EXTENSIONS, hasSafeFileNames, thumbnailNameOf } from './photos';
 import type { PlanService } from './plans';
 import type { PoiCategoryService } from './poi-categories';
 import type { SkyRegionService } from './sky-regions';
@@ -210,11 +210,11 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
   }
 
   /**
-   * Whether the record of a manifest photo will be skipped: it has no id, or a photo here has its id under another
-   * name (`importPhoto` with `skip` leaves that one alone).
+   * Whether the record of a manifest photo will be skipped: it has no id, a file name outside the photo folder, or a
+   * photo here has its id under another name (`importPhoto` with `skip` leaves that one alone).
    */
   function recordIsSkipped(p: ManifestPhoto, local: Map<string, LocalPhoto>): boolean {
-    if (!p.id || typeof p.id !== 'string') return true;
+    if (!p.id || typeof p.id !== 'string' || !hasSafeFileNames(p)) return true;
     const here = local.get(p.id);
     return here !== undefined && here.originalName !== nameOfManifestPhoto(p);
   }
@@ -260,6 +260,10 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
           continue;
         }
         const origName: string = nameOfManifestPhoto(p);
+        if (!hasSafeFileNames(p)) {
+          recordFailure('photo', origName, new Error(`Invalid file name: ${String(p.filename)}`));
+          continue;
+        }
 
         // Skip photos whose image file was not written (not selected, or write failed)
         if (writtenFiles !== null && !writtenFiles.has(p.filename)) {
@@ -326,7 +330,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       ? list.filter((p) => writtenFiles === null || writtenFiles.has(p.filename))
       : [];
     for (const p of photosToThumb) {
-      if (!p.id || typeof p.id !== 'string') continue;
+      if (!p.id || typeof p.id !== 'string' || !hasSafeFileNames(p)) continue;
       const filename: string = p.filename ?? `${p.id}.jpg`;
       const thumbFilename: string = p.thumbFilename ?? thumbnailNameOf(filename);
       // The archive's own thumbnail was written with the image; otherwise the image was just written, so any thumbnail
@@ -362,9 +366,11 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       }
       if (includeImages) {
         for (const photo of selected) {
+          // A name outside the photo folder (from a backup imported before names were checked) is not read.
+          if (!isSafeBlobName(photo.filename)) continue;
           const image = await blobs.get(photo.filename);
           if (image) await writer.add(`images/${photo.filename}`, image);
-          if (photo.thumbFilename) {
+          if (photo.thumbFilename && isSafeBlobName(photo.thumbFilename)) {
             const thumb = await blobs.get(photo.thumbFilename);
             if (thumb) await writer.add(`images/${photo.thumbFilename}`, thumb);
           }

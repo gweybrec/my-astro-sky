@@ -10,3 +10,11 @@ export interface BlobStore {
   /** Removes the blob; a missing one is not an error. */
   remove(name: string): Promise<void>;
 }
+
+/**
+ * Whether `name` is a plain file name a store may use: not empty, no folder part, no drive or stream colon, and no
+ * leading dot (hidden and `.part` files). A name from outside (a backup) must pass before it reaches a store.
+ */
+export function isSafeBlobName(name: unknown): name is string {
+  return typeof name === 'string' && name !== '' && !/[/\\:\0]/.test(name) && !name.startsWith('.');
+}

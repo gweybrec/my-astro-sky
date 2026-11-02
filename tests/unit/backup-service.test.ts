@@ -862,6 +862,38 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       });
     });
 
+    it('lists a photo whose file name leaves the photo folder as failed, and touches no file', async () => {
+      const b = await makeSet();
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      await b.blobs.put('../victim.png', new Uint8Array(1));
+      const get = vi.spyOn(b.blobs, 'get');
+      const put = vi.spyOn(b.blobs, 'put');
+      const list = [
+        { id: 'e1', filename: '../victim.png', originalName: 'e1.png', width: 1, height: 1 },
+        {
+          id: 'e2',
+          filename: 'e2.jpg',
+          thumbFilename: '../e2_thumb.jpg',
+          originalName: 'e2.jpg',
+          width: 1,
+          height: 1,
+        },
+        { id: 'ok', filename: 'ok.jpg', originalName: 'ok.jpg', width: 1, height: 1 },
+      ];
+      expect(await svc.importPhotoList(list, everything)).toEqual({
+        imported: 1,
+        skipped: 0,
+        dsoOverridesImported: 0,
+        failed: [
+          { kind: 'photo', name: 'e1.png' },
+          { kind: 'photo', name: 'e2.jpg' },
+        ],
+      });
+      expect((await b.photos.list()).map((p) => p.id)).toEqual(['ok']);
+      const touched = [...get.mock.calls, ...put.mock.calls].map((c) => c[0]);
+      expect(touched.filter((n) => n.includes('/'))).toEqual([]);
+    });
+
     it('refuses anything but a list', async () => {
       const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
       const err = await svc.importPhotoList({ photos: [] }, everything).catch((e) => e);

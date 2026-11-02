@@ -1044,3 +1044,85 @@ describe('custom filters in a backup', () => {
     expect((await snapshot(target)).filters).toHaveLength(1);
   }, 30_000);
 });
+
+describe('file names of a backup that leave the uploads folder', () => {
+  const placement = { centerRa: 100, centerDec: 20, widthDeg: 1, heightDeg: 1, rotation: 0 };
+
+  function zipOf(entries: Record<string, Buffer>): Promise<Buffer> {
+    return new Promise<Buffer>((resolve, reject) => {
+      const archive = new ZipArchive();
+      const chunks: Buffer[] = [];
+      archive.on('data', (c: Buffer) => chunks.push(c));
+      archive.on('end', () => resolve(Buffer.concat(chunks)));
+      archive.on('error', reject);
+      for (const [name, body] of Object.entries(entries)) archive.append(body, { name });
+      void archive.finalize();
+    });
+  }
+
+  /** A file beside the uploads folder of `inst`, removed after the tests. */
+  function besideUploads(inst: Instance, name: string): string {
+    const file = path.join(
+      path.dirname(inst.uploadsDir),
+      `${path.basename(inst.uploadsDir)}-${name}`,
+    );
+    tempDirs.push(file);
+    return file;
+  }
+
+  it('a photo list naming ../<file> imports no photo and leaves the file alone', async () => {
+    if (live) await live.stop();
+    const inst = await startInstance();
+    const victim = besideUploads(inst, 'victim.png');
+    fs.writeFileSync(victim, await makePng(8, 8, [255, 0, 0]));
+    const list = [
+      {
+        id: 'evil-1',
+        filename: `../${path.basename(victim)}`,
+        originalName: 'evil.jpg',
+        manualPlacement: placement,
+      },
+    ];
+    const form = new FormData();
+    form.append(
+      'bundle',
+      new Blob([JSON.stringify(list)], { type: 'application/json' }),
+      'photos.json',
+    );
+    form.append('importMetadata', '1');
+
+    const r = await inst.call('POST', '/api/import', form);
+
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ imported: 0, failed: [{ kind: 'photo', name: 'evil.jpg' }] });
+    expect((await inst.call('GET', '/api/photos')).body).toEqual([]);
+    expect(fs.existsSync(victim)).toBe(true);
+    expect(fs.existsSync(victim.replace(/\.png$/, '_thumb.jpg'))).toBe(false);
+  });
+
+  it('a ZIP whose thumbFilename is ../<file> imports no photo and writes nothing', async () => {
+    if (live) await live.stop();
+    const inst = await startInstance();
+    const outside = besideUploads(inst, 'evil_thumb.jpg');
+    const manifest = [
+      {
+        id: 'evil-2',
+        filename: 'evil-2.png',
+        thumbFilename: `../../${path.basename(path.dirname(inst.uploadsDir))}/${path.basename(outside)}`,
+        originalName: 'evil2.png',
+        manualPlacement: placement,
+      },
+    ];
+    const zip = await zipOf({
+      'manifest.json': Buffer.from(JSON.stringify(manifest)),
+      'images/evil-2.png': await makePng(8, 8, [0, 255, 0]),
+    });
+
+    const r = await inst.call('POST', '/api/import', bundleForm(zip, { importMetadata: '1' }));
+
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ imported: 0, failed: [{ kind: 'photo', name: 'evil2.png' }] });
+    expect(fs.existsSync(outside)).toBe(false);
+    expect(fs.readdirSync(inst.uploadsDir)).toEqual([]);
+  });
+});

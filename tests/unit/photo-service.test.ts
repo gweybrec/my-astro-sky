@@ -1213,6 +1213,33 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(await ids()).toEqual([]);
     });
 
+    it.each([
+      { filename: '../victim.png' },
+      { filename: 'sub\\victim.png' },
+      { filename: '.hidden.jpg' },
+      { filename: 'imp.exe' },
+      { filename: undefined, id: '../imp' },
+      { thumbFilename: '../../victim_thumb.jpg' },
+    ])(
+      'importPhotos refuses a file name outside the photo folder and reads no file: %o',
+      async (over) => {
+        const get = vi.spyOn(blobs, 'get');
+        const e = await rejection(svc.importPhotos([{ photo: backup(over), strategy: 'skip' }]));
+        expect(e.code).toBe('INVALID_ENTRY_PATH');
+        expect(get).not.toHaveBeenCalled();
+        expect(await ids()).toEqual([]);
+      },
+    );
+
+    it('removing a photo whose stored name leaves the photo folder deletes the row and no file', async () => {
+      await svc.insert(newPhoto('a'));
+      conn.prepare("UPDATE photos SET filename = '../victim.png' WHERE id = 'a'").run();
+      await blobs.put('../victim.png', new Uint8Array(1));
+      await svc.remove('a');
+      expect(await ids()).toEqual([]);
+      expect(blobs.store.has('../victim.png')).toBe(true);
+    });
+
     it('importPhotos makes the same round trips for one photo or many', async () => {
       const list = (n: number) =>
         Array.from({ length: n }, (_, i) => ({
