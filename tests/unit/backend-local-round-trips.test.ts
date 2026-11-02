@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The phone pays about 19 ms per database call. This counts the calls of the user actions that matter
+ * Every database call is slow on the phone (see docs/dev/mobile-architecture.md). This counts the calls of the user actions that matter
  * through the local backend, on the counting database, and fails when one single action needs more than 10.
  */
 import { afterAll, describe, it, expect } from 'vitest';

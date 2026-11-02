@@ -41,8 +41,8 @@ COPY apps/mobile/package.json apps/mobile/package.json
 
 # Install runtime deps only, skipping install scripts of dependencies; the
 # native modules are then built explicitly with `npm rebuild`. The phone app's
-# workspace (apps/mobile: Ionic, Capacitor) is left out: only the root and the four
-# packages/* workspaces are installed.
+# workspace (apps/mobile: Ionic, Capacitor) is left out, and so is packages/render (the
+# sky map's canvas drawing, already in the frontend bundle; the server never imports it).
 RUN npm ci --omit=dev --ignore-scripts --include-workspace-root \
     --workspace=packages/core --workspace=packages/backend-local \
     --workspace=packages/backend-http --workspace=packages/app-state \

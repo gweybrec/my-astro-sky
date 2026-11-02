@@ -1,10 +1,11 @@
 /**
  * The phone's `SqlDb`: an adapter over a `@capacitor-community/sqlite` connection.
  *
- * Every plugin call is a real asynchronous bridge hop (about 35 ms), so:
+ * Every plugin call is a real asynchronous bridge hop (its cost: "Constraints measured on a real
+ * phone" in docs/dev/mobile-architecture.md), so:
  * - one promise-based lock serialises everything; a transaction holds it from BEGIN to
  *   COMMIT/ROLLBACK and every other call waits;
- * - `batch` is ONE `executeSet` call (about 0.3 ms per statement instead of 35 ms);
+ * - `batch` is ONE `executeSet` call, one hop for all its statements;
  * - the plugin's own `transaction` flag is passed as `false` and transactions are driven here,
  *   except for a `batch` made outside a transaction, which lets the plugin wrap its single
  *   `executeSet` call (one hop, atomic) because the lock guarantees no transaction is open.

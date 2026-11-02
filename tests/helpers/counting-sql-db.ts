@@ -1,6 +1,7 @@
 /**
- * A `SqlDb` test double that counts round trips. On the phone every database call crosses a bridge
- * (about 35 ms), so a service method's number of calls is part of its contract.
+ * A `SqlDb` test double that counts round trips. On the phone every database call crosses a slow
+ * bridge (see docs/dev/mobile-architecture.md), so a service method's number of calls is part of its
+ * contract.
  *
  * Counting rule: `all`, `get`, `run`, `exec` and `batch` on the outer object count 1 each. A whole
  * `transaction` counts 1 for its begin, 1 per `tx` call inside it, and 1 for its commit (or rollback).
