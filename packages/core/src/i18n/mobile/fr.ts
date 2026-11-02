@@ -25,8 +25,6 @@ const fr = {
     solveOnline: 'Résoudre en ligne',
     solveOnlineSub: 'astrometry.net, nécessite une connexion',
     offline: 'Aucune connexion internet',
-    solveComputer: "Résoudre sur l'ordinateur",
-    solveComputerSub: "Connectez l'application à l'ordinateur pour utiliser ASTAP",
     identifyStars: 'Identifier 2–3 étoiles',
     identifyStarsSub:
       'Touchez 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
@@ -133,7 +131,6 @@ const fr = {
     setups: 'Setups',
     astrometryKey: 'Clé astrometry.net',
     computerSection: 'Ordinateur et données',
-    computerConnection: "Connexion à l'ordinateur",
     exportImport: 'Exporter / Importer les données',
     about: 'À propos',
     langFr: 'Français',

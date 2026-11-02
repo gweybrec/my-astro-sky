@@ -27,8 +27,6 @@ const es: Translations['mobile'] = {
     solveOnline: 'Resolver en línea',
     solveOnlineSub: 'astrometry.net, necesita conexión',
     offline: 'Sin conexión a internet',
-    solveComputer: 'Resolver en el ordenador',
-    solveComputerSub: 'Conecta la aplicación al ordenador para usar ASTAP',
     identifyStars: 'Identificar 2–3 estrellas',
     identifyStarsSub:
       'Toca 2 o 3 estrellas reconocibles de la foto y luego identifica cada una por nombre o coordenadas AR/Dec.',
@@ -134,7 +132,6 @@ const es: Translations['mobile'] = {
     setups: 'Configuraciones',
     astrometryKey: 'Clave de astrometry.net',
     computerSection: 'Ordenador y datos',
-    computerConnection: 'Conexión al ordenador',
     exportImport: 'Exportar / Importar datos',
     about: 'Acerca de',
     langFr: 'Français',

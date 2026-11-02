@@ -66,10 +66,7 @@ const sections: { title: string; rows: RowDef[] }[] = [
   },
   {
     title: 'mobile.settings.computerSection',
-    rows: [
-      { title: 'mobile.settings.computerConnection', value: () => t('mobile.settings.lan') },
-      { title: 'mobile.settings.exportImport', to: '/settings/backup' },
-    ],
+    rows: [{ title: 'mobile.settings.exportImport', to: '/settings/backup' }],
   },
   {
     title: 'settings.legalSection',
