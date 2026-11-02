@@ -153,6 +153,9 @@ function raiseError() {
           <PhoneIconButton float label="Sur la carte, ouvert" :expanded="true"
             ><AppIcon :svg="plusIcon"
           /></PhoneIconButton>
+          <PhoneIconButton repeat label="Répète tant qu'il est tenu"
+            ><AppIcon :svg="plusIcon"
+          /></PhoneIconButton>
           <PhoneIconButton float label="Indisponible" unavailable="La raison, à l'appui long"
             ><AppIcon :svg="plusIcon"
           /></PhoneIconButton>

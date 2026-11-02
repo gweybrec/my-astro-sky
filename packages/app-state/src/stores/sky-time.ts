@@ -21,6 +21,8 @@ function seedLocationFromTargetsPrefs(): { lat: number | null; lon: number | nul
 // for a readout, not a 60fps animation.
 const TICK_MS = 500;
 
+export type SimDateUnit = 'year' | 'month' | 'day' | 'hour' | 'minute';
+
 export const useSkyTimeStore = defineStore('sky-time', () => {
   const canvasStore = useMapPortStore();
   const s = loadSkyTimeSettings();
@@ -162,6 +164,19 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     lastSyncEpochMs.value = Date.now();
     canvasStore.skyMap?.setSimDate(date);
     persist();
+  }
+
+  /** Moves the simulated date by one calendar unit (the phone's date steppers), entering date mode if
+   *  needed. Date's own setters roll over month and year ends; a running clock keeps running from there. */
+  function stepSimDate(unit: SimDateUnit, delta: 1 | -1) {
+    if (mode.value !== 'date') setMode('date');
+    const d = new Date(simDate.value);
+    if (unit === 'year') d.setFullYear(d.getFullYear() + delta);
+    else if (unit === 'month') d.setMonth(d.getMonth() + delta);
+    else if (unit === 'day') d.setDate(d.getDate() + delta);
+    else if (unit === 'hour') d.setHours(d.getHours() + delta);
+    else d.setMinutes(d.getMinutes() + delta);
+    setSimDate(d);
   }
 
   function setLocation(newLat: number | null, newLon: number | null) {
@@ -366,6 +381,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     setMode,
     toggleMode,
     setSimDate,
+    stepSimDate,
     setLocation,
     seedLocationIfNeeded,
     setShowMoon,

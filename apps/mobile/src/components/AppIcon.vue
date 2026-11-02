@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 // An SVG file of the icon set, inlined so that `currentColor` takes the colour of the button that holds it
 // (an <img> would draw it black). The same markup the boards use: aria-hidden, no focus. `cls` adds the design
-// system's icon classes (`mob-icon--sm`, `mob-icon--dir`) the boards put on the svg.
+// system's icon classes (`mob-icon--sm`, `mob-icon--dir`) the boards put on the svg. A changed `svg` redraws it
+// (play / pause).
 const props = defineProps<{ svg: string; cls?: string }>();
-const markup = props.svg.replace(
-  '<svg ',
-  `<svg aria-hidden="true" focusable="false"${props.cls ? ` class="${props.cls}"` : ''} `,
+const markup = computed(() =>
+  props.svg.replace(
+    '<svg ',
+    `<svg aria-hidden="true" focusable="false"${props.cls ? ` class="${props.cls}"` : ''} `,
+  ),
 );
 </script>
 

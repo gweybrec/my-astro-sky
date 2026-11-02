@@ -16,7 +16,6 @@ const field = (w: ReturnType<typeof mount>) =>
   w.findAll('button').find((b) => b.attributes('aria-label')?.startsWith('Date et heure'))!;
 const named = (w: ReturnType<typeof mount>, name: string) =>
   w.findAll('button').find((b) => b.attributes('aria-label') === name || b.text() === name)!;
-const inputs = (w: ReturnType<typeof mount>) => w.findAllComponents(ionicStubs.IonInput);
 
 describe('the time bar', () => {
   beforeEach(() => {
@@ -30,9 +29,7 @@ describe('the time bar', () => {
 
   it('shows the present time while the map is live, as the board writes it', () => {
     const w = mountBar();
-    expect(field(w).attributes('aria-label')).toBe(
-      'Date et heure, ouvrir les sélecteurs : 2026-10-03 22:15',
-    );
+    expect(field(w).attributes('aria-label')).toBe('Date et heure, régler : 2026-10-03 22:15');
     expect(field(w).text()).toContain('2026-10-03 22:15');
     expect(w.text()).toContain('Ce soir');
   });
@@ -52,15 +49,60 @@ describe('the time bar', () => {
     expect(useSkyTimeStore().mode).toBe('date');
   });
 
-  it('applies the moment chosen in the phone picker', async () => {
+  it('opens the steppers inside the bar, no picker, and closes them again', async () => {
+    const w = mountBar();
+    expect(w.find('[role="group"]').exists()).toBe(false);
+    await field(w).trigger('click');
+    expect(field(w).attributes('aria-expanded')).toBe('true');
+    expect(w.find('[role="group"]').text()).toContain('2026');
+    expect(w.findAll('input')).toHaveLength(0);
+    await field(w).trigger('click');
+    expect(w.find('[role="group"]').exists()).toBe(false);
+  });
+
+  it('steps the moment one unit per press, and again while a stepper is held', async () => {
     const w = mountBar();
     const time = useSkyTimeStore();
     await field(w).trigger('click');
-    const [picker] = inputs(w);
-    picker.vm.$emit('ionChange', { detail: { value: '2026-11-05T01:30' } });
-    expect(time.simDate.getFullYear()).toBe(2026);
-    expect([time.simDate.getMonth(), time.simDate.getDate()]).toEqual([10, 5]);
-    expect([time.simDate.getHours(), time.simDate.getMinutes()]).toEqual([1, 30]);
+    time.setSimDate(new Date(2026, 9, 3, 22, 15));
+    if (!time.paused) time.togglePaused();
+    await w.vm.$nextTick();
+
+    const plusHour = named(w, 'Plus une heure');
+    await plusHour.trigger('pointerdown');
+    await plusHour.trigger('pointerup');
+    await plusHour.trigger('click');
+    expect([time.simDate.getHours(), time.simDate.getMinutes()]).toEqual([23, 15]);
+
+    const minusDay = named(w, 'Moins un jour');
+    await minusDay.trigger('pointerdown');
+    vi.advanceTimersByTime(400 + 3 * 100);
+    await minusDay.trigger('pointerup');
+    expect([time.simDate.getMonth(), time.simDate.getDate()]).toEqual([8, 29]);
+    vi.advanceTimersByTime(1000);
+    expect([time.simDate.getMonth(), time.simDate.getDate()]).toEqual([8, 29]);
+    expect(w.find('[role="group"]').text()).toContain('29');
+  });
+
+  it('changes the speed, writes it after the moment, and goes back to x1 and to now', async () => {
+    const w = mountBar();
+    const time = useSkyTimeStore();
+    await named(w, 'Accélérer le temps').trigger('click');
+    expect(time.mode).toBe('date');
+    expect(time.effectiveRate).toBe(2);
+    expect(field(w).text()).toContain('· ×2');
+    await named(w, 'Ralentir ou reculer le temps').trigger('click');
+    await named(w, 'Ralentir ou reculer le temps').trigger('click');
+    expect(time.effectiveRate).toBe(-2);
+    await named(w, 'Vitesse normale (×1)').trigger('click');
+    expect(time.effectiveRate).toBe(1);
+    expect(field(w).text()).not.toContain('×');
+
+    time.setSimDate(new Date(2020, 0, 1));
+    await named(w, 'Accélérer le temps').trigger('click');
+    await named(w, 'Maintenant').trigger('click');
+    expect(time.simDate.getTime()).toBe(new Date(2026, 9, 3, 22, 15).getTime());
+    expect(time.effectiveRate).toBe(1);
   });
 
   it('goes to the evening with "Ce soir": the end of twilight at the location, else 21:00', async () => {
@@ -89,5 +131,14 @@ describe('the time bar', () => {
     expect(named(w, 'Reprendre le temps')).toBeTruthy();
     await named(w, 'Reprendre le temps').trigger('click');
     expect(time.paused).toBe(false);
+  });
+
+  it('swaps the pause icon for the play icon when the clock is paused', async () => {
+    const w = mountBar();
+    const iconOf = (name: string) => named(w, name).find('svg').html();
+    expect(iconOf('Mettre le temps en pause')).toContain('M16 5v14');
+    await named(w, 'Mettre le temps en pause').trigger('click');
+    expect(iconOf('Reprendre le temps')).toContain('M8 5v14l11-7z');
+    expect(iconOf('Reprendre le temps')).not.toContain('M16 5v14');
   });
 });

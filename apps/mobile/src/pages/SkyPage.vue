@@ -165,10 +165,7 @@ onIonViewDidEnter(() => {
 
 // The selected object has its sheet; the back button closes it before anything else.
 useBackClose(() => skySelection.value !== null, clearSkySelection);
-// The layers sheet gives way to a selection's sheet, and closes with the back button.
-watch(skySelection, (selection) => {
-  if (selection) skyLayersOpen.value = false;
-});
+// The layers sheet closes with the back button.
 useBackClose(
   () => skyLayersOpen.value,
   () => (skyLayersOpen.value = false),
@@ -382,19 +379,23 @@ const activeFrame = computed(() =>
     ? (fov.renderables.find((f) => f.active) ?? null)
     : null,
 );
-watch(
-  () => activeFrame.value?.id,
-  (id) => {
-    if (id) clearSkySelection();
-  },
-);
-watch(skySelection, (selection) => {
-  if (selection && activeFrame.value) sky?.map.selectFrame(null);
-});
 const releaseFrame = () => sky?.map.selectFrame(null);
-// A selected frame's sheet and a mode taking the whole screen close the layers sheet too.
-watch([() => activeFrame.value !== null, inMode], ([frame, mode]) => {
-  if (frame || mode) skyLayersOpen.value = false;
+// The sheets of the map (a photo, an object or a star, a frame, the layers) take turns: the one opened last closes
+// the others, whichever it is.
+const mapSheets = [
+  { open: () => skySelection.value !== null, close: clearSkySelection },
+  { open: () => activeFrame.value !== null, close: releaseFrame },
+  { open: () => skyLayersOpen.value, close: () => (skyLayersOpen.value = false) },
+];
+for (const sheet of mapSheets) {
+  watch(sheet.open, (opened) => {
+    if (!opened) return;
+    for (const other of mapSheets) if (other !== sheet && other.open()) other.close();
+  });
+}
+// A mode taking the whole screen closes the layers sheet too.
+watch(inMode, (mode) => {
+  if (mode) skyLayersOpen.value = false;
 });
 // Showing a target or a plan, the back button leaves the mode at once, sheet and all.
 useBackClose(

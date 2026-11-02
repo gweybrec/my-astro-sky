@@ -493,7 +493,7 @@ export const rules = [
   {
     id: 'centre-line',
     type: 'centreLine',
-    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar, .mob-when-row, .mob-form-row--search, .mob-type-row, .mob-add-row',
+    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar-row, .mob-when-row, .mob-form-row--search, .mob-type-row, .mob-add-row',
   },
   // The clear button of a search field is centred on the field.
   { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },

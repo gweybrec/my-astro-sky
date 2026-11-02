@@ -178,6 +178,24 @@ describe('sky-time store', () => {
     expect(store.effectiveRate).toBe(rateBefore);
   });
 
+  it('stepSimDate enters date mode and steps one calendar unit, rolling over ends', () => {
+    const store = useSkyTimeStore();
+    store.stepSimDate('minute', 1);
+    expect(store.mode).toBe('date');
+
+    store.setSimDate(new Date(2026, 11, 31, 23, 59));
+    store.stepSimDate('minute', 1);
+    expect(store.simDate).toEqual(new Date(2027, 0, 1, 0, 0));
+    store.stepSimDate('hour', -1);
+    expect(store.simDate).toEqual(new Date(2026, 11, 31, 23, 0));
+    store.stepSimDate('day', 1);
+    expect(store.simDate).toEqual(new Date(2027, 0, 1, 23, 0));
+    store.stepSimDate('month', -1);
+    expect(store.simDate).toEqual(new Date(2026, 11, 1, 23, 0));
+    store.stepSimDate('year', 1);
+    expect(store.simDate).toEqual(new Date(2027, 11, 1, 23, 0));
+  });
+
   it('resetToNow jumps simDate back to "now" and resets the dial to 1x, unpaused', () => {
     const store = useSkyTimeStore();
     store.setSimDate(new Date('2020-01-01T00:00:00.000Z'));

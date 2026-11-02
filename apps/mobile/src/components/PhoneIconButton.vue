@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { IonButton } from '@ionic/vue';
 import { useLongPressLabel } from '../composables/useLongPressLabel';
+import { useHoldRepeat } from '../composables/useHoldRepeat';
 
 // The design system's icon-only button (`.mob-icon-btn`, 48 x 48) on Ionic's button. It has no printed label: the
 // name (`label`) is the accessible name and shows beside the button on a long press.
@@ -20,12 +21,34 @@ const props = defineProps<{
   expanded?: boolean;
   /** Why the button cannot be used now: it is drawn disabled, takes no tap, and its long press names it and says why. */
   unavailable?: string;
+  /** Acts on press and again while held (a stepper), instead of showing the name on a long press. */
+  repeat?: boolean;
 }>();
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
 
 const { style, side, start, end, consumeTap } = useLongPressLabel();
+const hold = useHoldRepeat(() => emit('click', new MouseEvent('click')));
+// A repeating button has already acted on the press: only a click without a pointer (the keyboard) still counts.
+let pressedByPointer = false;
+
+function onDown(event: PointerEvent) {
+  if (!props.repeat) return start(event);
+  if (props.disabled || props.unavailable) return;
+  pressedByPointer = true;
+  hold.start();
+}
+
+function onUp() {
+  if (props.repeat) hold.stop();
+  else end();
+}
 
 function onClick(event: MouseEvent) {
+  if (props.repeat) {
+    if (!pressedByPointer && !props.unavailable) emit('click', event);
+    pressedByPointer = false;
+    return;
+  }
   if (consumeTap() || props.unavailable) return;
   emit('click', event);
 }
@@ -49,10 +72,10 @@ function onClick(event: MouseEvent) {
     :aria-expanded="expanded === undefined ? undefined : String(expanded)"
     :disabled="disabled"
     :aria-disabled="waiting || unavailable ? 'true' : undefined"
-    @pointerdown="start"
-    @pointerup="end"
-    @pointercancel="end"
-    @pointerleave="end"
+    @pointerdown="onDown"
+    @pointerup="onUp"
+    @pointercancel="onUp"
+    @pointerleave="onUp"
     @contextmenu.prevent
     @click="onClick"
   >

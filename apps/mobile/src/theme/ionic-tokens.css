@@ -59,6 +59,8 @@
   --mobile-sheet-width: 440px;
   --mobile-dialog-width: 400px;
   --mobile-footer-button-width: 200px;
+  /* The sky's time bar in landscape: a card at the bottom right of the map. */
+  --mobile-timebar-width: 480px;
   /* The stroke of a tick box's mark: about 2 px once Ionic's mark is scaled to three quarters of the box. */
   --checkmark-stroke: 2.6px;
   --mobile-hairline: 1px;

@@ -111,6 +111,27 @@ describe('the shared phone components', () => {
       document.body.innerHTML = '';
     });
 
+    it('a repeating button acts on the press and while held, shows no name, and still takes the keyboard', async () => {
+      const w = mount(PhoneIconButton, {
+        props: { label: 'Plus une heure', repeat: true },
+        global,
+        attachTo: document.body,
+      });
+      const button = w.find('button');
+      await button.trigger('pointerdown');
+      expect(w.emitted('click')).toHaveLength(1);
+      vi.advanceTimersByTime(400 + 2 * 100);
+      await w.vm.$nextTick();
+      expect(document.body.querySelector('.mob-longpress-label')).toBeNull();
+      await button.trigger('pointerup');
+      await button.trigger('click');
+      expect(w.emitted('click')).toHaveLength(3);
+      vi.advanceTimersByTime(1000);
+      expect(w.emitted('click')).toHaveLength(3);
+      await button.trigger('click');
+      expect(w.emitted('click')).toHaveLength(4);
+    });
+
     it('shows the name beside the button and does not count the press as a tap', async () => {
       const w = mount(PhoneIconButton, {
         props: { label: 'Supprimer' },

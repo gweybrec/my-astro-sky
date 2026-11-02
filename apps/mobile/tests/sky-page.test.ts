@@ -130,6 +130,17 @@ describe('the Ciel page', () => {
     expect(w.findComponent(SkyLayersSheet).exists()).toBe(false);
   });
 
+  it("opens the layers sheet over an object's sheet, closing the object's", async () => {
+    const w = mountPage();
+    await flushPromises();
+    skySelection.value = { kind: 'star', star: { hip: 1, ra: 0, dec: 0, mag: 1 } as never };
+    await flushPromises();
+    await w.find('button[aria-label="Calques de la carte"]').trigger('click');
+    await flushPromises();
+    expect(skySelection.value).toBeNull();
+    expect(w.findComponent(SkyLayersSheet).exists()).toBe(true);
+  });
+
   it('gives a sky region being drawn or shown its own title bar, whose back arrow opens the regions page again', async () => {
     const w = mountPage();
     await flushPromises();
