@@ -13,10 +13,16 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Behind the WebView until its first paint: the app's background, not the system's white or black. -->
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
     </style>
 
-
+    <!-- The launch screen (Android 12+ draws it from these): the launcher icon on the app's background, whatever the
+         system's light or dark mode. The colour is the default theme's background (bg-app token), written by
+         `npm run mobile:icons`. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
