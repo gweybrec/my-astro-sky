@@ -176,7 +176,9 @@ const es: Translations['mobile'] = {
   },
   location: {
     horizonSection: 'Horizonte del relieve',
+    decimal: 'Decimal',
     dms: 'DMS (° ′ ″)',
+    format: 'Formato de coordenadas',
     clearHorizon: '¿Borrar el horizonte?',
   },
   sky: {

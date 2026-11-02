@@ -177,7 +177,9 @@ const de: Translations['mobile'] = {
   },
   location: {
     horizonSection: 'Geländehorizont',
+    decimal: 'Dezimal',
     dms: 'DMS (° ′ ″)',
+    format: 'Koordinatenformat',
     clearHorizon: 'Horizont löschen?',
   },
   sky: {

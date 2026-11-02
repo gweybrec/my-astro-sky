@@ -175,7 +175,9 @@ const fr = {
   },
   location: {
     horizonSection: 'Horizon du relief',
+    decimal: 'Décimal',
     dms: 'DMS (° ′ ″)',
+    format: 'Format des coordonnées',
     clearHorizon: "Effacer l'horizon ?",
   },
   sky: {

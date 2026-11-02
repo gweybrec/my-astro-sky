@@ -41,6 +41,7 @@ import {
   computeFovTargetScale,
 } from '@myastrosky/core/gear-presets';
 import { getHemisphere } from '@myastrosky/core/projection';
+import { formatDms, parseDms } from '@myastrosky/core/observer-location';
 import { buildSetupInfoRows } from '@myastrosky/core/setup-info';
 import type { ObserverLocation } from '@myastrosky/core/target-recommender';
 import { formatPaDeg } from '@myastrosky/core/frame-orientation';
@@ -1097,28 +1098,6 @@ export class TargetsView {
     fmtToggle.className = 'targets-coord-fmt-toggle';
     let coordFmt: 'decimal' | 'dms' = this.prefs.coordFormat ?? 'decimal';
 
-    const decimalToDMS = (dec: number): [number, number, number] => {
-      const sign = dec < 0 ? -1 : 1;
-      const abs = Math.abs(dec);
-      let d = Math.floor(abs);
-      const rm = (abs - d) * 60;
-      let m = Math.floor(rm);
-      let s = Math.round((rm - m) * 60);
-      if (s >= 60) {
-        s = 0;
-        m++;
-      }
-      if (m >= 60) {
-        m = 0;
-        d++;
-      }
-      return [d * sign, m, s];
-    };
-    const dmsToDecimal = (d: number, m: number, s: number): number => {
-      const sign = d < 0 || Object.is(d, -0) ? -1 : 1;
-      return sign * (Math.abs(d) + m / 60 + s / 3600);
-    };
-
     const geoLocate = (onDone: () => void): void => {
       locBtn.textContent = t('targets.location.locating');
       locBtn.disabled = true;
@@ -1194,10 +1173,7 @@ export class TargetsView {
       } else {
         const makeDMSGroup = (isLat: boolean): { el: HTMLElement; getVal: () => number | null } => {
           const initial = isLat ? getLat() : getLon();
-          let dV = 0,
-            mV = 0,
-            sV = 0;
-          if (initial !== null) [dV, mV, sV] = decimalToDMS(initial);
+          const dms = initial === null ? null : formatDms(initial);
           const wrap = document.createElement('div');
           wrap.className = 'targets-dms-group';
           const lbl = document.createElement('span');
@@ -1209,7 +1185,7 @@ export class TargetsView {
           dIn.min = isLat ? '-90' : '-180';
           dIn.max = isLat ? '90' : '180';
           dIn.step = '1';
-          if (initial !== null) dIn.value = String(dV);
+          if (dms) dIn.value = dms.degrees;
           const sep1 = document.createElement('span');
           sep1.className = 'targets-dms-sep';
           sep1.textContent = '°';
@@ -1220,7 +1196,7 @@ export class TargetsView {
           mIn.max = '59';
           mIn.step = '1';
           mIn.placeholder = '0';
-          if (initial !== null) mIn.value = String(mV);
+          if (dms) mIn.value = dms.minutes;
           const sep2 = document.createElement('span');
           sep2.className = 'targets-dms-sep';
           sep2.textContent = "'";
@@ -1231,18 +1207,13 @@ export class TargetsView {
           sIn.max = '59';
           sIn.step = '1';
           sIn.placeholder = '0';
-          if (initial !== null) sIn.value = String(sV);
+          if (dms) sIn.value = dms.seconds;
           const sep3 = document.createElement('span');
           sep3.className = 'targets-dms-sep';
           sep3.textContent = '″';
           wrap.append(lbl, dIn, sep1, mIn, sep2, sIn, sep3);
-          const getVal = (): number | null => {
-            const d = parseFloat(dIn.value);
-            const m = parseFloat(mIn.value) || 0;
-            const s = parseFloat(sIn.value) || 0;
-            if (isNaN(d)) return null;
-            return dmsToDecimal(d, m, s);
-          };
+          const getVal = (): number | null =>
+            parseDms({ degrees: dIn.value, minutes: mIn.value, seconds: sIn.value });
           return { el: wrap, getVal };
         };
         const latGroup = makeDMSGroup(true);

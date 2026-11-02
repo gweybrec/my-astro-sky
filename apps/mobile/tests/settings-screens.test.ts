@@ -252,7 +252,11 @@ describe('the astrometry.net key page', () => {
 
 describe('the Réglages page', () => {
   it('shows the board rows with their real values, and disables the ones without a screen yet', async () => {
-    storage().set('targets-prefs-v3', JSON.stringify({ setupId: null, lat: 48.58, lon: 7.75 }));
+    // A position typed in degrees, minutes and seconds (48° 35′, 7° 45′ 4″) shows rounded, as on its own page.
+    storage().set(
+      'targets-prefs-v3',
+      JSON.stringify({ setupId: null, lat: 48 + 35 / 60, lon: 7 + 45 / 60 + 4 / 3600 }),
+    );
     const { global } = app();
     const w = mount(SettingsPage, { global });
     await flushPromises();
@@ -667,15 +671,73 @@ describe('the location page', () => {
     );
   });
 
-  it('has the DMS button waiting for its board, not dimmed', () => {
+  it('switches to degrees, minutes and seconds, keeps the choice for the desktop, and stores what is typed', async () => {
+    storage().set('targets-prefs-v3', JSON.stringify({ setupId: 's1', lat: 48.58, lon: -0.5 }));
     const { global } = app();
     const w = mount(LocationPage, { global });
+    const commit = (index: number) =>
+      (
+        w.findAllComponents({ name: 'PhoneField' })[index].vm as unknown as {
+          $emit: (e: string) => void;
+        }
+      ).$emit('commit');
+    const formatButton = (name: string) =>
+      w.findAll('[role="radio"]').find((b) => b.text().startsWith(name))!;
+    expect(formatButton('Décimal').attributes('aria-checked')).toBe('true');
+
+    await formatButton('DMS').trigger('click');
+    expect(JSON.parse(storage().get('targets-prefs-v3')!)).toMatchObject({
+      setupId: 's1',
+      coordFormat: 'dms',
+    });
+    const values = () =>
+      w.findAll('.mob-coord-fields input').map((i) => (i.element as HTMLInputElement).value);
+    // 48.58 = 48° 34′ 48″; -0.5 keeps its sign on the degrees.
+    expect(values()).toEqual(['48', '34', '48', '-0', '30', '0']);
+
+    const inputs = w.findAll('.mob-coord-fields input');
+    await inputs[1].setValue('35');
+    await inputs[2].setValue('0');
+    commit(1);
+    const prefs = JSON.parse(storage().get('targets-prefs-v3')!);
+    expect(prefs.lat).toBeCloseTo(48 + 35 / 60, 10);
+    expect(prefs.lon).toBe(-0.5);
+
+    // Minutes out of range go back to the stored values.
+    await inputs[1].setValue('75');
+    commit(1);
+    await flushPromises();
+    expect(values()).toEqual(['48', '35', '0', '-0', '30', '0']);
+
+    await formatButton('Décimal').trigger('click');
+    expect(JSON.parse(storage().get('targets-prefs-v3')!).coordFormat).toBe('decimal');
     expect(
       w
-        .findAll('button')
-        .find((b) => b.text().startsWith('DMS'))!
-        .attributes('aria-disabled'),
-    ).toBeDefined();
+        .findAll('input')
+        .map((i) => (i.element as HTMLInputElement).value)
+        .slice(0, 2),
+    ).toEqual(['48.58', '-0.5']);
+    // Only the display is rounded: the seconds typed are kept.
+    expect(JSON.parse(storage().get('targets-prefs-v3')!).lat).toBeCloseTo(48 + 35 / 60, 10);
+  });
+
+  it('opens in degrees, minutes and seconds when that was the last choice, and fills them from the device position', async () => {
+    storage().set(
+      'targets-prefs-v3',
+      JSON.stringify({ setupId: null, lat: null, lon: null, coordFormat: 'dms' }),
+    );
+    const { global } = app();
+    const w = mount(LocationPage, { global });
+    expect(w.findAll('.mob-coord-fields input')).toHaveLength(6);
+    getCurrentPosition.mockResolvedValueOnce({ latitude: -33.8688, longitude: 151.2093 });
+    await w
+      .findAll('button')
+      .find((b) => b.text().includes('Utiliser ma position'))!
+      .trigger('click');
+    await flushPromises();
+    expect(
+      w.findAll('.mob-coord-fields input').map((i) => (i.element as HTMLInputElement).value),
+    ).toEqual(['-33', '52', '12', '151', '12', '36']);
   });
 });
 

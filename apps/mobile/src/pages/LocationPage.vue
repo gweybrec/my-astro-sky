@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import { IonPage, IonContent, IonList } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@myastrosky/core/i18n/index';
 import {
+  formatDms,
   isValidLatLon,
   parseCoordinate,
+  parseDms,
+  readExactObserverLocation,
   readObserverLocation,
   roundCoordinate,
   writeObserverLocation,
+  type DmsFields,
 } from '@myastrosky/core/observer-location';
+import { loadTargetsPrefs, saveTargetsPrefs } from '@myastrosky/core/targets/prefs';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -20,14 +25,27 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneField from '../components/PhoneField.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
+import PhoneSegmented from '../components/PhoneSegmented.vue';
 import PhoneToggleRow from '../components/PhoneToggleRow.vue';
 import mapPinIcon from '@icons/map-pin.svg?raw';
 
-// The boards "Réglages, lieu d'observation", "Lieu, horizon indisponible" and "Lieu, position refusée". The position
-// and the horizon settings are stored under the keys the desktop reads (`writeObserverLocation`, the horizon store).
-const stored = readObserverLocation();
-const lat = ref(stored.lat === null ? '' : String(stored.lat));
-const lon = ref(stored.lon === null ? '' : String(stored.lon));
+// The boards "Réglages, lieu d'observation", "Lieu, saisie en degrés minutes secondes", "Lieu, horizon indisponible"
+// and "Lieu, position refusée". The position and the horizon settings are stored under the keys the desktop reads
+// (`writeObserverLocation`, the horizon store); decimal or degrees-minutes-seconds entry is the desktop's `coordFormat`.
+const format = ref<'decimal' | 'dms'>(loadTargetsPrefs().coordFormat ?? 'decimal');
+const formats = [
+  { value: 'decimal', label: t('mobile.location.decimal') },
+  { value: 'dms', label: t('mobile.location.dms') },
+] as const;
+const lat = ref('');
+const lon = ref('');
+const latDms = reactive<DmsFields>({ degrees: '', minutes: '', seconds: '' });
+const lonDms = reactive<DmsFields>({ degrees: '', minutes: '', seconds: '' });
+const dmsRows = [
+  { label: t('targets.location.lat'), fields: latDms },
+  { label: t('targets.location.lon'), fields: lonDms },
+];
+showStored();
 const locating = ref(false);
 const positionFailed = ref(false);
 
@@ -37,19 +55,37 @@ const eyeHeight = ref(obsHeightM.value === null ? '' : String(obsHeightM.value))
 const { showError } = useErrorToast();
 const { confirm } = useConfirm();
 
-function showStored(latitude: number | null, longitude: number | null) {
-  lat.value = latitude === null ? '' : String(latitude);
-  lon.value = longitude === null ? '' : String(longitude);
+/** Fills both formats from the stored position: the decimal fields rounded, as everywhere, the DMS ones exact. */
+function showStored() {
+  const shown = readObserverLocation();
+  lat.value = shown.lat === null ? '' : String(shown.lat);
+  lon.value = shown.lon === null ? '' : String(shown.lon);
+  const exact = readExactObserverLocation();
+  const empty = { degrees: '', minutes: '', seconds: '' };
+  Object.assign(latDms, exact.lat === null ? empty : formatDms(exact.lat));
+  Object.assign(lonDms, exact.lon === null ? empty : formatDms(exact.lon));
 }
+
+// The choice is kept for the desktop too; the fields of the other format show the stored position, not a half-typed one.
+watch(format, (value) => {
+  saveTargetsPrefs({ ...loadTargetsPrefs(), coordFormat: value });
+  showStored();
+});
 
 /** A typed latitude / longitude is kept when both are empty or both in range; a value out of range goes back to the stored one. */
 function commitCoordinates() {
-  const la = parseCoordinate(lat.value);
-  const lo = parseCoordinate(lon.value);
+  const dms = format.value === 'dms';
+  const la = dms ? parseDms(latDms) : parseCoordinate(lat.value);
+  const lo = dms ? parseDms(lonDms) : parseCoordinate(lon.value);
   const complete = la !== null && lo !== null;
-  if (complete && !isValidLatLon(la, lo)) {
-    const current = readObserverLocation();
-    showStored(current.lat, current.lon);
+  // Degrees, minutes and seconds that are typed but not a value (minutes of 60 or more) are refused, not left waiting.
+  const unreadable =
+    dms &&
+    [latDms, lonDms].some(
+      (f) => (f.degrees + f.minutes + f.seconds).trim() !== '' && parseDms(f) === null,
+    );
+  if (unreadable || (complete && !isValidLatLon(la, lo))) {
+    showStored();
     return;
   }
   // One field alone waits for the other.
@@ -64,7 +100,7 @@ async function useMyPosition() {
     const latitude = roundCoordinate(position.latitude);
     const longitude = roundCoordinate(position.longitude);
     writeObserverLocation(latitude, longitude);
-    showStored(latitude, longitude);
+    showStored();
     positionFailed.value = false;
   } catch {
     positionFailed.value = true;
@@ -121,7 +157,9 @@ async function importHorizon() {
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill mob-page-column mob-page-safe">
         <PhoneSectionHeader>{{ t('skyTime.locationButton') }}</PhoneSectionHeader>
-        <div class="mob-form-row mob-form-row--pair">
+        <!-- Above the fields: the DMS fields take two rows, and the control must not move under the finger. -->
+        <PhoneSegmented v-model="format" :options="formats" :label="t('mobile.location.format')" />
+        <div v-if="format === 'decimal'" class="mob-form-row mob-form-row--pair">
           <PhoneField
             v-model="lat"
             bare
@@ -137,10 +175,44 @@ async function importHorizon() {
             @commit="commitCoordinates"
           />
         </div>
-        <!-- Entering degrees, minutes and seconds has no board yet: the button shows and does nothing. -->
-        <div class="mob-form-row">
-          <PhoneButton block waiting>{{ t('mobile.location.dms') }}</PhoneButton>
-        </div>
+        <template v-else>
+          <div
+            v-for="row in dmsRows"
+            :key="row.label"
+            class="mob-form-row"
+            role="group"
+            :aria-label="row.label"
+          >
+            <span class="mob-form-label m-secondary" aria-hidden="true">{{ row.label }}</span>
+            <div class="mob-coord-fields">
+              <!-- The degrees may be negative (south, west): a number keyboard with its minus sign. -->
+              <PhoneField
+                v-model="row.fields.degrees"
+                bare
+                type="number"
+                :aria-label="`${row.label} °`"
+                @commit="commitCoordinates"
+              />
+              <span class="mob-coord-unit m-body" aria-hidden="true">°</span>
+              <PhoneField
+                v-model="row.fields.minutes"
+                bare
+                inputmode="decimal"
+                :aria-label="`${row.label} ′`"
+                @commit="commitCoordinates"
+              />
+              <span class="mob-coord-unit m-body" aria-hidden="true">′</span>
+              <PhoneField
+                v-model="row.fields.seconds"
+                bare
+                inputmode="decimal"
+                :aria-label="`${row.label} ″`"
+                @commit="commitCoordinates"
+              />
+              <span class="mob-coord-unit m-body" aria-hidden="true">″</span>
+            </div>
+          </div>
+        </template>
         <div class="mob-form-row">
           <PhoneButton
             block

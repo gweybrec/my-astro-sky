@@ -2,10 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { configureStorage, createMemoryStore, storage } from '@myastrosky/core/platform/storage';
 import {
   TARGETS_PREFS_KEY,
+  formatDms,
   formatLatLon,
   isValidLatLon,
+  parseDms,
   parseCoordinate,
+  readExactObserverLocation,
   readObserverLocation,
+  readTargetsLocation,
   roundCoordinate,
   writeObserverLocation,
 } from '@myastrosky/core/observer-location';
@@ -45,6 +49,33 @@ describe('observer location', () => {
     expect(formatLatLon({ lat: null, lon: null })).toBe('');
   });
 
+  it('converts degrees, minutes and seconds both ways', () => {
+    expect(formatDms(48.58)).toEqual({ degrees: '48', minutes: '34', seconds: '48' });
+    expect(formatDms(-33.8688)).toEqual({ degrees: '-33', minutes: '52', seconds: '8' });
+    expect(formatDms(-0.5)).toEqual({ degrees: '-0', minutes: '30', seconds: '0' });
+    expect(formatDms(0)).toEqual({ degrees: '0', minutes: '0', seconds: '0' });
+    // 59.9998″ rounds to 60 and carries into the minutes, then the degrees.
+    expect(formatDms(7 + 59 / 60 + 59.9998 / 3600)).toEqual({
+      degrees: '8',
+      minutes: '0',
+      seconds: '0',
+    });
+
+    expect(parseDms({ degrees: '48', minutes: '34', seconds: '48' })).toBeCloseTo(48.58, 10);
+    expect(parseDms({ degrees: '-0', minutes: '30', seconds: '' })).toBe(-0.5);
+    expect(parseDms({ degrees: '−0', minutes: '30', seconds: '0' })).toBe(-0.5);
+    expect(parseDms({ degrees: '-33', minutes: '52', seconds: '7,68' })).toBeCloseTo(-33.8688, 10);
+    expect(parseDms({ degrees: '7', minutes: '', seconds: '' })).toBe(7);
+    expect(parseDms({ degrees: '', minutes: '30', seconds: '0' })).toBeNull();
+    expect(parseDms({ degrees: '7', minutes: '60', seconds: '0' })).toBeNull();
+    expect(parseDms({ degrees: '7', minutes: '0', seconds: '-1' })).toBeNull();
+    expect(parseDms({ degrees: '7', minutes: 'x', seconds: '0' })).toBeNull();
+
+    for (const value of [48.58, -0.25, 7.75, -122.4194, 179.99]) {
+      expect(parseDms(formatDms(value))!).toBeCloseTo(value, 3);
+    }
+  });
+
   it('writes the Targets preferences (keeping the other fields) and the sky settings', () => {
     storage().set(
       TARGETS_PREFS_KEY,
@@ -65,6 +96,15 @@ describe('observer location', () => {
     writeObserverLocation(null, null);
     expect('setupId' in JSON.parse(storage().get(TARGETS_PREFS_KEY)!)).toBe(true);
     expect(JSON.parse(storage().get('sky-time-settings')!).localSkyMode).toBe(false);
+  });
+
+  it('gives every reader the location rounded to 2 decimals, and the exact one only when asked', () => {
+    const lat = 48 + 35 / 60;
+    storage().set(TARGETS_PREFS_KEY, JSON.stringify({ setupId: null, lat, lon: -0.5 }));
+    expect(readObserverLocation()).toEqual({ lat: 48.58, lon: -0.5 });
+    expect(readTargetsLocation()).toEqual({ lat: 48.58, lon: -0.5 });
+    expect(readExactObserverLocation()).toEqual({ lat, lon: -0.5 });
+    expect(formatLatLon({ lat, lon: 7.7512 })).toBe('48.58, 7.75');
   });
 
   it('falls back to the sky map location', () => {

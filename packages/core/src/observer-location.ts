@@ -29,14 +29,70 @@ export function parseCoordinate(text: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** A position from the phone, rounded to 2 decimals as the desktop's "use my location" does. */
+/** A latitude or longitude as typed in degrees, minutes and seconds fields. */
+export interface DmsFields {
+  degrees: string;
+  minutes: string;
+  seconds: string;
+}
+
+/**
+ * A coordinate in degrees, minutes and whole seconds, seconds and minutes carried at 60. The sign is on the degrees,
+ * "-0" included, so a value between 0 and -1 (just west of Greenwich, just south of the equator) keeps it.
+ */
+export function formatDms(value: number): DmsFields {
+  const abs = Math.abs(value);
+  let d = Math.floor(abs);
+  let m = Math.floor((abs - d) * 60);
+  let s = Math.round(((abs - d) * 60 - m) * 60);
+  if (s >= 60) {
+    s = 0;
+    m++;
+  }
+  if (m >= 60) {
+    m = 0;
+    d++;
+  }
+  const negative = value < 0 && d + m + s > 0;
+  return { degrees: `${negative ? '-' : ''}${d}`, minutes: String(m), seconds: String(s) };
+}
+
+/**
+ * Degrees, minutes and seconds typed in fields, in decimal degrees: null when the degrees are empty or not a number,
+ * or when minutes or seconds are not in [0, 60). Empty minutes and seconds count as 0; a minus sign on the degrees
+ * ("-0" included) makes the whole value negative. The range of the result is checked by {@link isValidLatLon}.
+ */
+export function parseDms(fields: DmsFields): number | null {
+  const degreesText = fields.degrees.trim().replace('−', '-');
+  const d = parseCoordinate(degreesText);
+  const m = fields.minutes.trim() === '' ? 0 : parseCoordinate(fields.minutes);
+  const s = fields.seconds.trim() === '' ? 0 : parseCoordinate(fields.seconds);
+  if (d === null || m === null || s === null) return null;
+  if (m < 0 || m >= 60 || s < 0 || s >= 60) return null;
+  const sign = degreesText.startsWith('-') ? -1 : 1;
+  return sign * (Math.abs(d) + m / 60 + s / 3600);
+}
+
+/** A coordinate rounded to 2 decimals (about 1 km), as the desktop's "use my location" does. */
 export function roundCoordinate(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** "48.58, 7.75", or an empty string when no location is set. */
+/**
+ * The location as every screen and calculation gets it: rounded to 2 decimals. A position typed in degrees, minutes and
+ * seconds is stored exact (0.01° is 36″), so the reads below all go through this one rounding.
+ */
+function rounded(loc: ObserverLatLon): ObserverLatLon {
+  return {
+    lat: loc.lat === null ? null : roundCoordinate(loc.lat),
+    lon: loc.lon === null ? null : roundCoordinate(loc.lon),
+  };
+}
+
+/** "48.58, 7.75" (rounded to 2 decimals), or an empty string when no location is set. */
 export function formatLatLon(loc: ObserverLatLon): string {
-  return loc.lat === null || loc.lon === null ? '' : `${loc.lat}, ${loc.lon}`;
+  const { lat, lon } = rounded(loc);
+  return lat === null || lon === null ? '' : `${lat}, ${lon}`;
 }
 
 function readTargetsPrefs(): Record<string, unknown> | null {
@@ -52,20 +108,25 @@ function readTargetsPrefs(): Record<string, unknown> | null {
   return null;
 }
 
-/** The location in the Targets preferences alone (null fields when there are none). */
+/** The location in the Targets preferences alone, rounded to 2 decimals (null fields when there are none). */
 export function readTargetsLocation(): ObserverLatLon {
   const prefs = readTargetsPrefs();
-  return {
+  return rounded({
     lat: (prefs?.lat as number | undefined) ?? null,
     lon: (prefs?.lon as number | undefined) ?? null,
-  };
+  });
 }
 
 /**
- * The observer's location: the Targets tab's saved one, else the sky map's. The desktop keeps the two apart; the
- * phone has one location and writes both (`writeObserverLocation`).
+ * The observer's location, rounded to 2 decimals: the Targets tab's saved one, else the sky map's. The desktop keeps
+ * the two apart; the phone has one location and writes both (`writeObserverLocation`).
  */
 export function readObserverLocation(): ObserverLatLon {
+  return rounded(readExactObserverLocation());
+}
+
+/** The observer's location as stored, for the degrees, minutes and seconds fields only (their seconds are kept). */
+export function readExactObserverLocation(): ObserverLatLon {
   const prefs = readTargetsPrefs();
   const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
   const fromTargets = { lat: num(prefs?.lat), lon: num(prefs?.lon) };

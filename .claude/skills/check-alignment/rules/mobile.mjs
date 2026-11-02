@@ -1118,6 +1118,12 @@ export const views = [
   { name: 'setups', path: '/settings/setups', ready: 'ion-item.mob-row' },
   { name: 'setup', path: (ids) => `/settings/setups/${ids.setup}`, ready: '.mob-form-row' },
   { name: 'location', path: '/settings/location', ready: '.mob-form-row' },
+  {
+    name: 'location-dms',
+    path: '/settings/location',
+    ready: '.mob-seg',
+    open: [{ click: '.mob-seg-btn:nth-of-type(2)' }, { wait: '.mob-coord-fields' }],
+  },
   { name: 'backup', path: '/settings/backup', ready: 'ion-checkbox.mob-row' },
   { name: 'about', path: '/settings/about', ready: '.mob-bullets li' },
   { name: 'privacy', path: '/settings/privacy', ready: '.mob-text-title' },
