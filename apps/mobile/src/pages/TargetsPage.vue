@@ -11,7 +11,10 @@ import { formatClock24, todayISO } from '@myastrosky/core/targets/format';
 import { planSearchPrefs } from '@myastrosky/core/targets/night';
 import { matchesTargetQuery } from '@myastrosky/core/targets/query';
 import type { GearLists } from '@myastrosky/core/targets/plan-setup';
-import { runTargetRecommendationSliced } from '@myastrosky/core/targets/recommend';
+import {
+  runTargetRecommendationSliced,
+  type RecommendationEmptyReason,
+} from '@myastrosky/core/targets/recommend';
 import { sortSuggestions } from '@myastrosky/core/targets/sorting';
 import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
 import { getGearSetups, getPhotos } from '@myastrosky/app-state/api';
@@ -37,6 +40,7 @@ import SearchSettingsSheet from './targets/SearchSettingsSheet.vue';
 import slidersIcon from '../icons/sliders.svg?raw';
 import caretIcon from '../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
+import mapPinIcon from '@icons/map-pin.svg?raw';
 
 // The Cibles tab, from the boards "Cibles", "Cibles, types d'objets", "Cibles, paramètres de recherche", "Cibles,
 // aucun setup" and "Cibles, aucun résultat": the targets worth imaging on the chosen night with the chosen setup. Beside
@@ -62,7 +66,8 @@ const gear = shallowRef<GearLists | null>(null);
 /** What the search found, in its own order: every sort starts from it, as on the desktop. */
 let found: TargetSuggestion[] = [];
 const sorted = shallowRef<TargetSuggestion[]>([]);
-const emptyKind = ref<'no-setup' | 'no-match'>('no-match');
+/** Why the list is empty: the search found nothing, or it could not run (each reason has its own board). */
+const emptyKind = ref<RecommendationEmptyReason | 'no-match'>('no-match');
 const typesOpen = ref(false);
 const settingsOpen = ref(false);
 const setupsOpen = ref(false);
@@ -212,13 +217,14 @@ async function runSearch() {
     } else {
       found = [];
       sorted.value = [];
-      emptyKind.value = result.reason === 'no-setup' ? 'no-setup' : 'no-match';
+      emptyKind.value = result.reason;
     }
     resetVisible();
   } catch (error) {
     lastKey = '';
     found = [];
     sorted.value = [];
+    emptyKind.value = 'no-match';
     void showError(error);
   } finally {
     loading.value = false;
@@ -295,11 +301,25 @@ function openTarget(id: string) {
       >
         <div v-if="loading" class="mob-empty"><PhoneBusy page /></div>
         <PhoneEmptyState
-          v-else-if="emptyKind === 'no-setup' && sorted.length === 0"
+          v-else-if="emptyKind === 'no-setup'"
           :text="t('fovOverlay.noSetups')"
           :button-label="t('fovOverlay.addSetup')"
           :button-icon="plusIcon"
           @action="router.push('/settings/setups')"
+        />
+        <PhoneEmptyState
+          v-else-if="emptyKind === 'no-location'"
+          :text="t('targets.location.notSet')"
+          :button-label="t('targets.location.label')"
+          :button-icon="mapPinIcon"
+          @action="router.push('/settings/location')"
+        />
+        <PhoneEmptyState
+          v-else-if="emptyKind === 'no-window-overlap'"
+          :text="t('targets.results.noWindowOverlap')"
+          :button-label="t('targets.formTitle')"
+          :button-icon="slidersIcon"
+          @action="settingsOpen = true"
         />
         <div v-else-if="rows.length === 0" class="mob-empty">
           <p class="mob-empty-text m-body">{{ t('targets.results.empty') }}</p>

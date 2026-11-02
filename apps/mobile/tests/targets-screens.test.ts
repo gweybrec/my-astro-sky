@@ -389,6 +389,28 @@ describe('the Cibles page', () => {
     expect(router.currentRoute.value.path).toBe('/settings/setups');
   });
 
+  it('asks for the observing location when none is set, with its button leading to it', async () => {
+    search.mockResolvedValue({ kind: 'empty', reason: 'no-location' });
+    const { global, router } = app();
+    const w = show(TargetsPage, { global });
+    await settle();
+    expect(w.text()).toContain('Non défini — entrez des coordonnées');
+    expect(w.text()).not.toContain('Aucune cible trouvée');
+    await w.find('.mob-empty button').trigger('click');
+    await settle();
+    expect(router.currentRoute.value.path).toBe('/settings/location');
+  });
+
+  it('says when the observation window is outside the night, with a button to the search settings', async () => {
+    search.mockResolvedValue({ kind: 'empty', reason: 'no-window-overlap' });
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    expect(w.text()).toContain('Pas de ciel noir pendant la fenêtre horaire sélectionnée.');
+    await w.find('.mob-empty button').trigger('click');
+    await settle();
+    expect(w.findComponent(SearchSettingsSheet).props('open')).toBe(true);
+  });
+
   it('shows the no-result board when nothing matches', async () => {
     search.mockResolvedValue(ok([]));
     const w = show(TargetsPage, { global: app().global });
