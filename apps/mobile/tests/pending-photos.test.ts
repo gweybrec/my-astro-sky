@@ -49,4 +49,20 @@ describe('the photos waiting to be placed', () => {
     expect(pendingPhotos.value).toEqual([]);
     expect(await store.all()).toEqual([]);
   });
+
+  it('reads only the photo asked for, not every kept picture', async () => {
+    const calls: string[] = [];
+    const counted: PendingStore = {
+      all: () => (calls.push('all'), store.all()),
+      get: (id) => (calls.push('get'), store.get(id)),
+      put: (record) => store.put(record),
+      delete: (id) => store.delete(id),
+    };
+    configurePendingStore(counted);
+    const added = await addPendingPhoto(new Blob(['x']), 'M31.jpg');
+    await addPendingPhoto(new Blob(['y']), 'M42.jpg');
+    await pendingPhotoFile(added.id);
+    await setPendingState(added.id, 'solving');
+    expect(calls).toEqual(['get', 'get']);
+  });
 });

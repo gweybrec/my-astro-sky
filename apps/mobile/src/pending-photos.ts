@@ -34,6 +34,8 @@ interface StoredPending extends PendingPhoto {
 /** Where the records and their pictures are kept. */
 export interface PendingStore {
   all(): Promise<StoredPending[]>;
+  /** One record, without reading the others; undefined when it is not kept. */
+  get(id: string): Promise<StoredPending | undefined>;
   put(record: StoredPending): Promise<void>;
   delete(id: string): Promise<void>;
 }
@@ -64,6 +66,7 @@ export function createIndexedDbPendingStore(factory: IDBFactory): PendingStore {
     (await db()).transaction(STORE, mode).objectStore(STORE);
   return {
     all: async () => request<StoredPending[]>((await store('readonly')).getAll()),
+    get: async (id) => request<StoredPending | undefined>((await store('readonly')).get(id)),
     put: async (record) => void (await request((await store('readwrite')).put(record))),
     delete: async (id) => void (await request((await store('readwrite')).delete(id))),
   };
@@ -74,6 +77,7 @@ export function createMemoryPendingStore(): PendingStore {
   const records = new Map<string, StoredPending>();
   return {
     all: async () => [...records.values()],
+    get: async (id) => records.get(id),
     put: async (record) => void records.set(record.id, record),
     delete: async (id) => void records.delete(id),
   };
@@ -118,7 +122,7 @@ export async function addPendingPhoto(picture: Blob, name: string): Promise<Pend
 
 /** The picture of a waiting photo as a file to place or solve; null when it is no longer kept. */
 export async function pendingPhotoFile(id: string): Promise<File | null> {
-  const found = (await store.all()).find((r) => r.id === id);
+  const found = await store.get(id);
   return found ? new File([found.picture], found.name, { type: found.picture.type }) : null;
 }
 
@@ -128,7 +132,7 @@ export async function setPendingState(
   state: PendingState,
   details: { jobId?: string; submissionId?: number; error?: string } = {},
 ): Promise<void> {
-  const found = (await store.all()).find((r) => r.id === id);
+  const found = await store.get(id);
   if (!found) return;
   const { jobId: _jobId, submissionId: _submissionId, error: _error, ...kept } = found;
   const next: StoredPending = { ...kept, state, ...details };
