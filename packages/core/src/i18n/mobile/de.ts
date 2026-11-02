@@ -23,6 +23,9 @@ const de: Translations['mobile'] = {
     alreadySolved: '✓ Bereits gelöst',
     toPlace: 'Zu platzieren',
     solving: 'Wird gelöst',
+    solvingOffline: 'Offline',
+    solveOffline:
+      'Kein Netz: astrometry.net löst weiter. Kehren Sie online in die Galerie zurück, um das Ergebnis abzurufen.',
     placeHow: 'Wie soll dieses Foto platziert werden?',
     solveOnline: 'Online lösen',
     solveOnlineSub: 'astrometry.net, benötigt eine Verbindung',

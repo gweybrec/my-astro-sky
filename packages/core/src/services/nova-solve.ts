@@ -72,6 +72,12 @@ export interface NovaSolveService {
   submit(file: NovaSolveFile, hints?: NovaSolveHints): Promise<string>;
   /** The state of a local job. Throws `notFound` (`JOB_NOT_FOUND`) for an unknown or expired id. */
   getJob(localId: string): Promise<NovaJobStatus>;
+  /**
+   * Follows again a submission sent earlier (the jobs are lost when the app restarts): a new local job polls it
+   * in the background; returns its id. Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked
+   * first; `INVALID_SUBMISSION_ID`, `CANNOT_DETERMINE_DIMENSIONS`). It sends no request itself.
+   */
+  resume(file: NovaSolveFile, submissionId: number): Promise<string>;
   /** The jobs of the account, most recent first; an empty list when the account cannot be read. Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED`) without a key. */
   listSubmissions(): Promise<AstrometrySubmission[]>;
   /**
@@ -270,6 +276,27 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       job.status = 'failed';
       job.error = (err as Error).message;
     }
+    return localId;
+  }
+
+  async function resume(file: NovaSolveFile, submissionId: number): Promise<string> {
+    await requireConfigured();
+    if (!Number.isInteger(submissionId) || submissionId <= 0) {
+      throw new DomainError('invalid', 'Invalid submission ID', { code: 'INVALID_SUBMISSION_ID' });
+    }
+    const { width: imageWidth, height: imageHeight } = await requireDimensions(file);
+    const localId = newId();
+    evictStaleJobs();
+    const job: Job = {
+      localId,
+      createdAt: now(),
+      submissionId,
+      status: 'solving',
+      imageWidth,
+      imageHeight,
+    };
+    jobs.set(localId, job);
+    pollJob(job).catch((err) => log?.('astrometry_poll_failed', err, { jobId: localId }));
     return localId;
   }
 
@@ -553,8 +580,11 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
         correspondences: job.correspondences,
         error: job.error,
         dsoIds: job.dsoIds,
+        submissionId: job.submissionId,
       };
     },
+
+    resume,
 
     listSubmissions,
 

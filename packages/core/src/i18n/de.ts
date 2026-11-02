@@ -837,6 +837,7 @@ const de: Translations = {
     INVALID_GEAR_DATA: 'Die Ausrüstungsdaten sind ungültig.',
     INVALID_GEAR_TYPE: 'Ungültiger Ausrüstungstyp.',
     INVALID_JOB_ID: 'Ungültige Aufgabenkennung.',
+    INVALID_SUBMISSION_ID: 'Ungültige Einreichungskennung.',
     INVALID_LAT_LON: 'Ungültiger Breiten- oder Längengrad.',
     INVALID_MANIFEST_FORMAT: 'Die Importdatei ist ungültig.',
     INVALID_PARAMS: 'Ungültige Suchparameter.',

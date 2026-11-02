@@ -147,6 +147,7 @@ const gridStyle = computed(() => ({
 const PENDING_TEXT: Record<PendingState, string> = {
   toPlace: 'mobile.gallery.toPlace',
   solving: 'mobile.gallery.solving',
+  offline: 'mobile.gallery.solvingOffline',
   failed: 'batch.statusFailed',
 };
 const waiting = computed(() =>
@@ -249,6 +250,10 @@ onIonViewWillEnter(() => {
   void load();
 });
 onIonViewWillLeave(() => (active.value = false));
+// The solves stopped for want of the network go on as soon as it is back.
+const onOnline = () => void resumePendingSolves();
+window.addEventListener('online', onOnline);
+onBeforeUnmount(() => window.removeEventListener('online', onOnline));
 // A photo solved while the gallery is shown joins the placed ones.
 watch(solvedPhotoCount, loadPhotos);
 

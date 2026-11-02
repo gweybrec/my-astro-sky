@@ -80,22 +80,22 @@ Express 5 server with multiple modules:
 - **`server-paths.ts`**: Exports `SERVER_DIR`, `UPLOADS_DIR`, `RESOURCES_DIR`, `DIST_DIR` and `SWAGGER_JSON_PATH` (`UPLOADS_DIR`, `RESOURCES_DIR` and `DIST_DIR` are overridable by env var).
 - **`routes/`**: One Express router per domain, each exported as `<name>Router` and mounted without a prefix in `app.ts`. The `@swagger` comment of each route sits next to it.
 
-  | File                | Router                | Serves                                                                                                 |
-  | ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------ |
-  | `stars.ts`          | `starsRouter`         | `/api/stars/search`, `/api/stars/nearby`, `/api/stars/:hip` (server star catalog)                      |
-  | `identify.ts`       | `identifyRouter`      | `/api/skybot/conesearch`, `/api/tns/conesearch`, `/api/comets/elements` (object identification)        |
-  | `horizon.ts`        | `horizonRouter`       | `/api/horizon` (horizon profile lookup)                                                                |
-  | `settings.ts`       | `settingsRouter`      | `/api/version/latest`, `/api/config`, `/api/settings`, the `/api/settings/probe-*` solver/dir checks   |
-  | `gear.ts`           | `gearRouter`          | telescopes, cameras, accessories, filters, custom gear and gear setups                                 |
-  | `dso-overrides.ts`  | `dsoOverridesRouter`  | `/api/dso-overrides` CRUD                                                                              |
-  | `poi-categories.ts` | `poiCategoriesRouter` | `/api/poi-categories` CRUD                                                                             |
-  | `sky-regions.ts`    | `skyRegionsRouter`    | `/api/sky-regions` CRUD                                                                                |
-  | `plans.ts`          | `plansRouter`         | `/api/plans` and their entries and mosaics                                                             |
-  | `photos.ts`         | `photosRouter`        | `/api/photos` upload, list, order, delete, manual placement and metadata; `DELETE /api/photo-metadata` |
-  | `solved-import.ts`  | `solvedImportRouter`  | `POST /api/solve-wcs` (WCS from FITS/TIFF headers) and `POST /api/photos/convert` (TIFF/FITS to PNG)   |
-  | `local-solve.ts`    | `localSolveRouter`    | `/api/solve-astap` and `/api/solve-field` (local solvers: submit, poll, cancel)                        |
-  | `nova-solve.ts`     | `novaSolveRouter`     | `/api/solve-plate`, `/api/astrometry/submissions`, `/api/astrometry/reuse` (astrometry.net online)     |
-  | `backup.ts`         | `backupRouter`        | `POST /api/export`, `POST /api/import/preview`, `POST /api/import`                                     |
+  | File                | Router                | Serves                                                                                                                        |
+  | ------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+  | `stars.ts`          | `starsRouter`         | `/api/stars/search`, `/api/stars/nearby`, `/api/stars/:hip` (server star catalog)                                             |
+  | `identify.ts`       | `identifyRouter`      | `/api/skybot/conesearch`, `/api/tns/conesearch`, `/api/comets/elements` (object identification)                               |
+  | `horizon.ts`        | `horizonRouter`       | `/api/horizon` (horizon profile lookup)                                                                                       |
+  | `settings.ts`       | `settingsRouter`      | `/api/version/latest`, `/api/config`, `/api/settings`, the `/api/settings/probe-*` solver/dir checks                          |
+  | `gear.ts`           | `gearRouter`          | telescopes, cameras, accessories, filters, custom gear and gear setups                                                        |
+  | `dso-overrides.ts`  | `dsoOverridesRouter`  | `/api/dso-overrides` CRUD                                                                                                     |
+  | `poi-categories.ts` | `poiCategoriesRouter` | `/api/poi-categories` CRUD                                                                                                    |
+  | `sky-regions.ts`    | `skyRegionsRouter`    | `/api/sky-regions` CRUD                                                                                                       |
+  | `plans.ts`          | `plansRouter`         | `/api/plans` and their entries and mosaics                                                                                    |
+  | `photos.ts`         | `photosRouter`        | `/api/photos` upload, list, order, delete, manual placement and metadata; `DELETE /api/photo-metadata`                        |
+  | `solved-import.ts`  | `solvedImportRouter`  | `POST /api/solve-wcs` (WCS from FITS/TIFF headers) and `POST /api/photos/convert` (TIFF/FITS to PNG)                          |
+  | `local-solve.ts`    | `localSolveRouter`    | `/api/solve-astap` and `/api/solve-field` (local solvers: submit, poll, cancel)                                               |
+  | `nova-solve.ts`     | `novaSolveRouter`     | `/api/solve-plate`, `/api/solve-plate/resume`, `/api/astrometry/submissions`, `/api/astrometry/reuse` (astrometry.net online) |
+  | `backup.ts`         | `backupRouter`        | `POST /api/export`, `POST /api/import/preview`, `POST /api/import`                                                            |
 
   `routes/shared.ts` holds what several routers share (allowed file extensions, `sanitizeIntegrationRows`, `isElectron`, the in-memory rate limiter and its limits, the multer setup).
 
@@ -109,6 +109,7 @@ Express 5 server with multiple modules:
   - `POST /api/solve-astap` — Run ASTAP local plate solver
   - `POST /api/solve-plate` — Submit job to astrometry.net
   - `GET /api/solve-plate/:jobId` — Poll astrometry.net job status
+  - `POST /api/solve-plate/resume` — Follow again a submission sent earlier, under a new job (the jobs are lost on a restart)
   - `GET /api/stars/search?q=...` — Deep star search (server catalog mag ≤14)
   - `GET /api/dso-overrides` — Return all user DSO overrides as `{ [id]: DSOUserOverride }`
   - `PUT /api/dso-overrides/:id` — Upsert a single DSO override; validates RA ∈ [0, 360) and Dec ∈ [−90, 90], returning HTTP 400 with `{ code: 'INVALID_DSO_RA' }` or `{ code: 'INVALID_DSO_DEC' }` if out of range

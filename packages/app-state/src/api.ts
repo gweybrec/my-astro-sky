@@ -115,7 +115,11 @@ export function parseServerError(
  */
 function toUserError(err: unknown, fallbackKey: string): Error {
   if (err instanceof DomainError) {
-    return new Error(parseServerError({ error: err.message, code: err.code }, fallbackKey));
+    // The code stays on the error, for a caller that acts on it (`JOB_NOT_FOUND`).
+    return Object.assign(
+      new Error(parseServerError({ error: err.message, code: err.code }, fallbackKey)),
+      { code: err.code },
+    );
   }
   return err instanceof Error ? err : new Error(String(err));
 }
@@ -363,6 +367,17 @@ export async function submitPlateSolve(
 ): Promise<{ jobId: string }> {
   const jobId = await guard('errors.submitFailed', () =>
     getBackend().novaSolve.submit(fileSource(file), hints),
+  );
+  return { jobId };
+}
+
+/** Follows again a submission sent earlier, under a new job id (the jobs are lost when the app restarts). */
+export async function resumePlateSolve(
+  file: File,
+  submissionId: number,
+): Promise<{ jobId: string }> {
+  const jobId = await guard('errors.pollFailed', () =>
+    getBackend().novaSolve.resume(fileSource(file), submissionId),
   );
   return { jobId };
 }

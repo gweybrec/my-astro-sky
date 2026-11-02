@@ -837,6 +837,7 @@ const es: Translations = {
     INVALID_GEAR_DATA: 'Los datos del equipo no son válidos.',
     INVALID_GEAR_TYPE: 'Tipo de equipo no válido.',
     INVALID_JOB_ID: 'Identificador de tarea no válido.',
+    INVALID_SUBMISSION_ID: 'Identificador de envío no válido.',
     INVALID_LAT_LON: 'Latitud o longitud no válida.',
     INVALID_MANIFEST_FORMAT: 'El archivo de importación no es válido.',
     INVALID_PARAMS: 'Parámetros de búsqueda no válidos.',

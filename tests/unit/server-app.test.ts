@@ -108,6 +108,7 @@ const EXPECTED_API_ROUTES = [
   'GET /api/solve-field/:jobId',
   'DELETE /api/solve-field/:jobId',
   'POST /api/solve-plate',
+  'POST /api/solve-plate/resume',
   'GET /api/solve-plate/:id',
   'GET /api/astrometry/submissions',
   'POST /api/astrometry/reuse',
@@ -197,10 +198,10 @@ describe('route table', () => {
     ]);
   });
 
-  it('registers exactly the 79 documented /api routes', () => {
+  it('registers exactly the 80 documented /api routes', () => {
     const all = listRoutes(app);
     const api = all.filter((r) => r.split(' ')[1].startsWith('/api/'));
-    expect(EXPECTED_API_ROUTES).toHaveLength(79);
+    expect(EXPECTED_API_ROUTES).toHaveLength(80);
     expect([...api].sort()).toEqual([...EXPECTED_API_ROUTES].sort());
   });
 

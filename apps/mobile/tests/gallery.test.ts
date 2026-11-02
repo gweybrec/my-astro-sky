@@ -194,6 +194,26 @@ describe('the gallery page', () => {
     expect(tiles[1].find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
   });
 
+  it('shows a solve stopped for want of the network as "Hors ligne", and follows it again once online', async () => {
+    getPhotos.mockResolvedValue([]);
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const stopped = await addPendingPhoto(new Blob(['x']), 'M31_stack.jpg');
+    await setPendingState(stopped.id, 'offline', { jobId: 'job-7', submissionId: 42 });
+    const wrapper = mountPage();
+    await flushPromises();
+    const tile = wrapper.find('.mob-photo-card');
+    expect(tile.attributes('aria-label')).toBe('M31_stack.jpg : Hors ligne');
+    expect(tile.find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
+
+    onLine.mockReturnValue(true);
+    window.dispatchEvent(new Event('online'));
+    await flushPromises();
+    expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
+      'M31_stack.jpg : Résolution',
+    );
+    onLine.mockRestore();
+  });
+
   const openMethods = async (wrapper: ReturnType<typeof mountPage>) => {
     await wrapper.find('.mob-photo-card:has(.mob-photo-state)').trigger('click');
     await flushPromises();

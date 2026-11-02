@@ -834,6 +834,7 @@ const fr = {
     INVALID_GEAR_DATA: 'Les données du matériel sont invalides.',
     INVALID_GEAR_TYPE: 'Type de matériel invalide.',
     INVALID_JOB_ID: 'Identifiant de tâche invalide.',
+    INVALID_SUBMISSION_ID: 'Identifiant de soumission invalide.',
     INVALID_LAT_LON: 'Latitude ou longitude invalide.',
     INVALID_MANIFEST_FORMAT: "Le fichier d'import est invalide.",
     INVALID_PARAMS: 'Paramètres de recherche invalides.',

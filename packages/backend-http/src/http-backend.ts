@@ -518,6 +518,10 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
         });
         return (await sendForm<{ jobId: string }>('/api/solve-plate', form)).jobId;
       },
+      async resume(file, submissionId) {
+        const form = await formOf('photo', file, { submissionId, lang: options.lang() });
+        return (await sendForm<{ jobId: string }>('/api/solve-plate/resume', form)).jobId;
+      },
       async reuse(file, jobId) {
         const form = await formOf('photo', file, { jobId, lang: options.lang() });
         return sendForm('/api/astrometry/reuse', form);

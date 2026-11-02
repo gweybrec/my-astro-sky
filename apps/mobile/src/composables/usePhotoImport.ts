@@ -15,6 +15,7 @@ import { solvePendingOnline } from '../pending-solve';
  * - `importing` / `imported`: the photo is being stored / is stored.
  * - `solving`: the photo was sent to the online solver from this list; it is already kept as a waiting photo, and
  *   leaves the list once it is solved and placed.
+ * - `solveOffline`: that solve stopped for want of the network; it goes on once the phone is online.
  * - `solveFailed`: that solve did not succeed; another method can be chosen.
  */
 export type ImportStatus =
@@ -25,6 +26,7 @@ export type ImportStatus =
   | 'importing'
   | 'imported'
   | 'solving'
+  | 'solveOffline'
   | 'solveFailed';
 
 export interface ImportItem {
@@ -129,7 +131,8 @@ export async function keepImportPending(item: ImportItem): Promise<string> {
  * whatever happens to this list; the row then shows "Résolution".
  */
 export async function solveImportOnline(item: ImportItem): Promise<void> {
-  if (item.status !== 'toPlace' && item.status !== 'solveFailed') return;
+  if (item.status !== 'toPlace' && item.status !== 'solveFailed' && item.status !== 'solveOffline')
+    return;
   try {
     const pendingId = await keepImportPending(item);
     update(item, { pendingId, status: 'solving', error: '' });
@@ -157,7 +160,12 @@ watch(pendingPhotos, (waiting) => {
       changed = true;
       continue;
     }
-    const status = kept.state === 'failed' ? 'solveFailed' : 'solving';
+    const status =
+      kept.state === 'failed'
+        ? 'solveFailed'
+        : kept.state === 'offline'
+          ? 'solveOffline'
+          : 'solving';
     if (item.status !== status) {
       Object.assign(item, { status, error: kept.error ?? '' });
       changed = true;

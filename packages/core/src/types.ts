@@ -191,6 +191,7 @@ export interface AstrometrySolveStatus {
   correspondences?: PhotoCorrespondence[];
   error?: string;
   dsoIds?: string[];
+  submissionId?: number;
 }
 
 export type DSOType =

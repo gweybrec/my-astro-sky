@@ -1243,21 +1243,30 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     );
   });
 
-  add('online solving: the list of past submissions and the reuse need a key too', async () => {
-    const { backend: b, fixtures } = await makeBackend();
-    await expectDomainError(
-      b.novaSolve.listSubmissions(),
-      'invalid',
-      'ASTROMETRY_NOT_CONFIGURED',
-      'the past submissions without an API key',
-    );
-    await expectDomainError(
-      b.novaSolve.reuse(fixtures.jpeg(), 1),
-      'invalid',
-      'ASTROMETRY_NOT_CONFIGURED',
-      'a reuse without an API key',
-    );
-  });
+  add(
+    'online solving: the list of past submissions, the reuse and the resume need a key too',
+    async () => {
+      const { backend: b, fixtures } = await makeBackend();
+      await expectDomainError(
+        b.novaSolve.listSubmissions(),
+        'invalid',
+        'ASTROMETRY_NOT_CONFIGURED',
+        'the past submissions without an API key',
+      );
+      await expectDomainError(
+        b.novaSolve.reuse(fixtures.jpeg(), 1),
+        'invalid',
+        'ASTROMETRY_NOT_CONFIGURED',
+        'a reuse without an API key',
+      );
+      await expectDomainError(
+        b.novaSolve.resume(fixtures.jpeg(), 1),
+        'invalid',
+        'ASTROMETRY_NOT_CONFIGURED',
+        'a resume without an API key',
+      );
+    },
+  );
 
   add(
     'photos: a file that is not a picture is refused with a code that has a message',

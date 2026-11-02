@@ -36,7 +36,8 @@ const importing = ref(false);
 const placing = ref<ImportItem | null>(null);
 const methodOpen = ref(false);
 
-const canChoose = (item: ImportItem) => item.status === 'toPlace' || item.status === 'solveFailed';
+const canChoose = (item: ImportItem) =>
+  item.status === 'toPlace' || item.status === 'solveFailed' || item.status === 'solveOffline';
 
 function chooseMethod(item: ImportItem) {
   if (!canChoose(item)) return;
@@ -92,6 +93,8 @@ const stateOf = (item: ImportItem) => {
       return item.error || t('batch.statusFailed');
     case 'solving':
       return t('mobile.gallery.solving');
+    case 'solveOffline':
+      return t('mobile.gallery.solvingOffline');
     case 'solveFailed':
       return t('batch.statusFailed');
     default:

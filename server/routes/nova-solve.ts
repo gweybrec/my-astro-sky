@@ -91,6 +91,89 @@ novaSolveRouter.post('/api/solve-plate', upload.single('photo'), async (req, res
 
 /**
  * @swagger
+ * /api/solve-plate/resume:
+ *   post:
+ *     summary: Follow again an Astrometry.net submission sent earlier
+ *     description: Starts a new local job that polls the given submission (the jobs are lost when the app restarts). The photo gives the picture's size; nothing is uploaded to Astrometry.net.
+ *     consumes:
+ *       - multipart/form-data
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *               submissionId:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: The new local job id
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 jobId:
+ *                   type: string
+ *       400:
+ *         description: No API key, no file, an invalid submission id or a picture of unknown size
+ *       500:
+ *         description: Server error
+ */
+novaSolveRouter.post('/api/solve-plate/resume', upload.single('photo'), async (req, res) => {
+  try {
+    const lang = langOf(req.body);
+    const notConfigured =
+      lang === 'fr' ? 'ASTROMETRY_API_KEY non configurée' : 'ASTROMETRY_API_KEY not configured';
+
+    const file = req.file;
+    if (!file) {
+      // Without a file there is no service call to refuse for a missing key, and the key comes first.
+      if (!(await novaSolve.isConfigured())) {
+        res.status(400).json({ error: notConfigured, code: 'ASTROMETRY_NOT_CONFIGURED' });
+        return;
+      }
+      res.status(400).json({
+        error: lang === 'fr' ? 'Aucun fichier fourni' : 'No file provided',
+        code: 'NO_FILE',
+      });
+      return;
+    }
+
+    let jobId: string;
+    try {
+      jobId = await novaSolve.resume(
+        { fileName: file.originalname, bytes: file.buffer },
+        Number(req.body.submissionId),
+      );
+    } catch (err) {
+      if (
+        sendRule(res, err, {
+          ASTROMETRY_NOT_CONFIGURED: notConfigured,
+          INVALID_SUBMISSION_ID:
+            lang === 'fr' ? 'Identifiant de soumission invalide' : 'Invalid submission ID',
+          CANNOT_DETERMINE_DIMENSIONS:
+            lang === 'fr'
+              ? "Impossible de déterminer les dimensions de l'image"
+              : 'Cannot determine image dimensions',
+        })
+      ) {
+        return;
+      }
+      throw err;
+    }
+    res.json({ jobId });
+  } catch (err) {
+    console.error('Plate solve resume error:', err);
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * @swagger
  * /api/solve-plate/{id}:
  *   get:
  *     summary: Get Astrometry.net job status and correspondences
@@ -125,6 +208,9 @@ novaSolveRouter.post('/api/solve-plate', upload.single('photo'), async (req, res
  *                   type: array
  *                   items:
  *                     type: string
+ *                 submissionId:
+ *                   type: integer
+ *                   description: The Astrometry.net submission, once the picture is sent (for /api/solve-plate/resume)
  *       404:
  *         description: Job not found
  *         content:

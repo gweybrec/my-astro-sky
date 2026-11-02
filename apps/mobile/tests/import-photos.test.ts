@@ -203,6 +203,14 @@ describe('the import page', () => {
     expect(row.find('.mob-row-sub').classes()).toContain('mob-status--danger');
     expect(row.find('.mob-row-chevron').exists()).toBe(true);
 
+    await setPendingState(id, 'offline', { jobId: 'job-1', submissionId: 42 });
+    await flushPromises();
+    row = fileRows(wrapper)[0];
+    expect(row.find('.mob-row-sub').text()).toBe('Hors ligne');
+    expect(row.find('.mob-row-chevron').exists()).toBe(true);
+    await setPendingState(id, 'failed', { error: 'no stars' });
+    await flushPromises();
+
     await chooseOnline(wrapper, 'M45.jpg');
     expect(submitPlateSolve).toHaveBeenCalledTimes(2);
     expect(pendingPhotos.value).toHaveLength(1);

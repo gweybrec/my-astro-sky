@@ -2123,6 +2123,56 @@
         }
       }
     },
+    "/api/solve-plate/resume": {
+      "post": {
+        "summary": "Follow again an Astrometry.net submission sent earlier",
+        "description": "Starts a new local job that polls the given submission (the jobs are lost when the app restarts). The photo gives the picture's size; nothing is uploaded to Astrometry.net.",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "submissionId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new local job id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No API key, no file, an invalid submission id or a picture of unknown size"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/api/solve-plate/{id}": {
       "get": {
         "summary": "Get Astrometry.net job status and correspondences",
@@ -2170,6 +2220,10 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "submissionId": {
+                      "type": "integer",
+                      "description": "The Astrometry.net submission, once the picture is sent (for /api/solve-plate/resume)"
                     }
                   }
                 }

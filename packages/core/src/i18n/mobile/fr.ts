@@ -21,6 +21,9 @@ const fr = {
     alreadySolved: '✓ Déjà résolue',
     toPlace: 'À placer',
     solving: 'Résolution',
+    solvingOffline: 'Hors ligne',
+    solveOffline:
+      'Pas de réseau : astrometry.net continue la résolution. Revenez dans la Galerie une fois en ligne pour récupérer le résultat.',
     placeHow: 'Comment placer cette photo ?',
     solveOnline: 'Résoudre en ligne',
     solveOnlineSub: 'astrometry.net, nécessite une connexion',

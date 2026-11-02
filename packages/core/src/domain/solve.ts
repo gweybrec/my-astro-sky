@@ -62,6 +62,8 @@ export interface NovaJobStatus {
   error?: string;
   /** Normalised ids of the known objects in the field, e.g. `["NGC5457", "M101"]`. */
   dsoIds?: string[];
+  /** The astrometry.net submission once the picture is sent; `resume` follows it again after a restart. */
+  submissionId?: number;
 }
 
 /** Outcome of reusing an existing astrometry.net job for a new picture. */

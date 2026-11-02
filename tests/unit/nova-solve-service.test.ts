@@ -263,7 +263,15 @@ describe('the polling of a submitted job', () => {
     expect(job.status).toBe('solved');
     expect(job.correspondences!.length).toBeGreaterThanOrEqual(3);
     expect(job.dsoIds!.length).toBeGreaterThan(0);
-    expect(Object.keys(job)).toEqual(['jobId', 'status', 'correspondences', 'error', 'dsoIds']);
+    expect(Object.keys(job)).toEqual([
+      'jobId',
+      'status',
+      'correspondences',
+      'error',
+      'dsoIds',
+      'submissionId',
+    ]);
+    expect(job.submissionId).toBe(9);
   });
 
   it('solves from the calibration when the job has no WCS file', async () => {
@@ -304,6 +312,47 @@ describe('the polling of a submitted job', () => {
       status: 'timeout',
       error: 'Timeout: pas de job créé',
     });
+  });
+});
+
+describe('resume()', () => {
+  const solvedRoute: Route = (r) =>
+    r.url === `${API}/submissions/9`
+      ? json({ jobs: [10796000] })
+      : r.url === `${API}/jobs/10796000`
+        ? json({ status: 'success' })
+        : r.url === 'https://nova.astrometry.net/wcs_file/10796000/'
+          ? reply(WCS_TEXT)
+          : r.url === `${API}/jobs/10796000/objects_in_field/`
+            ? reply(OBJECTS)
+            : reply('', 404);
+
+  it('follows a submission sent by another instance under a new job, without uploading or logging in', async () => {
+    // A new instance stands for the app after a restart: it never saw the submission.
+    const t = setup({ route: solvedRoute });
+    const id = await t.service.resume(t.file, 9);
+    expect(t.http).not.toHaveBeenCalled();
+    expect(await t.service.getJob(id)).toMatchObject({ status: 'solving', submissionId: 9 });
+    await t.pump(3);
+    const job = await t.service.getJob(id);
+    expect(job.status).toBe('solved');
+    expect(job.correspondences!.length).toBeGreaterThanOrEqual(3);
+    expect(t.calls.some((c) => c.url === `${API}/upload` || c.url === `${API}/login`)).toBe(false);
+  });
+
+  it('refuses without a key, then a submission id that is not a positive integer, then an unreadable picture', async () => {
+    const none = setup({ key: undefined });
+    expect(await failure(none.service.resume(none.file, Number.NaN))).toBe(
+      'invalid:ASTROMETRY_NOT_CONFIGURED',
+    );
+    const t = setup();
+    for (const bad of [Number.NaN, 0, -3, 1.5]) {
+      expect(await failure(t.service.resume(t.file, bad))).toBe('invalid:INVALID_SUBMISSION_ID');
+    }
+    const unreadable = setup({ size: 'unreadable' });
+    expect(await failure(unreadable.service.resume(unreadable.file, 9))).toBe(
+      'invalid:CANNOT_DETERMINE_DIMENSIONS',
+    );
   });
 });
 

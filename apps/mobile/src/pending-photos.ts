@@ -6,8 +6,11 @@
  */
 import { shallowRef } from 'vue';
 
-/** `toPlace`: needs a placement method. `solving`: sent to the online solver. `failed`: the solve did not succeed. */
-export type PendingState = 'toPlace' | 'solving' | 'failed';
+/**
+ * `toPlace`: needs a placement method. `solving`: sent to the online solver. `offline`: sent, but its following stopped
+ * for want of the network (astrometry.net goes on). `failed`: the solve did not succeed.
+ */
+export type PendingState = 'toPlace' | 'solving' | 'offline' | 'failed';
 
 export interface PendingPhoto {
   id: string;
@@ -18,6 +21,8 @@ export interface PendingPhoto {
   addedAt: number;
   /** The online solver's job, while the photo is being solved. */
   jobId?: string;
+  /** The astrometry.net submission of that job: it is followed again under a new job after a restart. */
+  submissionId?: number;
   /** Why the solve did not succeed. */
   error?: string;
 }
@@ -117,15 +122,15 @@ export async function pendingPhotoFile(id: string): Promise<File | null> {
   return found ? new File([found.picture], found.name, { type: found.picture.type }) : null;
 }
 
-/** Changes where a waiting photo stands; the solver's job and the failure reason are those given, or none. */
+/** Changes where a waiting photo stands; the solver's job, its submission and the failure reason are those given, or none. */
 export async function setPendingState(
   id: string,
   state: PendingState,
-  details: { jobId?: string; error?: string } = {},
+  details: { jobId?: string; submissionId?: number; error?: string } = {},
 ): Promise<void> {
   const found = (await store.all()).find((r) => r.id === id);
   if (!found) return;
-  const { jobId: _jobId, error: _error, ...kept } = found;
+  const { jobId: _jobId, submissionId: _submissionId, error: _error, ...kept } = found;
   const next: StoredPending = { ...kept, state, ...details };
   await store.put(next);
   const record = recordOf(next);

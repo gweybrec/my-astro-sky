@@ -827,6 +827,7 @@ const en: Translations = {
     INVALID_GEAR_DATA: 'The gear data is invalid.',
     INVALID_GEAR_TYPE: 'Invalid gear type.',
     INVALID_JOB_ID: 'Invalid job identifier.',
+    INVALID_SUBMISSION_ID: 'Invalid submission identifier.',
     INVALID_LAT_LON: 'Invalid latitude or longitude.',
     INVALID_MANIFEST_FORMAT: 'The import file is invalid.',
     INVALID_PARAMS: 'Invalid search parameters.',

@@ -139,6 +139,9 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
       async submit(file, hints) {
         return services.novaSolve.submit(await solvedFileOf(file), hints);
       },
+      async resume(file, submissionId) {
+        return services.novaSolve.resume(await solvedFileOf(file), submissionId);
+      },
       async reuse(file, jobId) {
         return services.novaSolve.reuse(await solvedFileOf(file), jobId);
       },

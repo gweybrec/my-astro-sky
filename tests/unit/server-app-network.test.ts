@@ -1035,6 +1035,12 @@ describe('online solving routes (astrometry.net)', () => {
     expect((await post('/api/astrometry/reuse', null, { lang: 'fr' })).body.error).toBe(
       'ASTROMETRY_API_KEY non configurée',
     );
+    const resume = await post('/api/solve-plate/resume', { name: 'a.png', bytes: png });
+    expect(resume.status).toBe(400);
+    expect(resume.body.code).toBe('ASTROMETRY_NOT_CONFIGURED');
+    expect((await post('/api/solve-plate/resume', null)).body.code).toBe(
+      'ASTROMETRY_NOT_CONFIGURED',
+    );
     expect(recorded).toHaveLength(0);
   });
 
@@ -1103,6 +1109,33 @@ describe('online solving routes (astrometry.net)', () => {
       expect(recorded).toHaveLength(0);
     });
 
+    it('resumes a submission under a new job without a request, and refuses a bad id or no file', async () => {
+      expect((await post('/api/solve-plate/resume', null)).body).toEqual({
+        error: 'No file provided',
+        code: 'NO_FILE',
+      });
+      const bad = await post(
+        '/api/solve-plate/resume',
+        { name: 'a.png', bytes: png },
+        { submissionId: '12abc', lang: 'fr' },
+      );
+      expect(bad.status).toBe(400);
+      expect(bad.body).toEqual({
+        error: 'Identifiant de soumission invalide',
+        code: 'INVALID_SUBMISSION_ID',
+      });
+
+      const r = await post(
+        '/api/solve-plate/resume',
+        { name: 'a.png', bytes: png },
+        { submissionId: '77' },
+      );
+      expect(r.status).toBe(200);
+      expect(recorded).toHaveLength(0);
+      const status = await call('GET', `/api/solve-plate/${r.body.jobId}`);
+      expect(status.body).toEqual({ jobId: r.body.jobId, status: 'solving', submissionId: 77 });
+    });
+
     it('answers 500 with the message when the login is refused', async () => {
       upstream = json({ status: 'error', errormessage: 'bad apikey' });
       const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
@@ -1162,7 +1195,7 @@ describe('online solving routes (astrometry.net)', () => {
 
       const status = await call('GET', `/api/solve-plate/${r.body.jobId}`);
       expect(status.status).toBe(200);
-      expect(status.body).toEqual({ jobId: r.body.jobId, status: 'solving' });
+      expect(status.body).toEqual({ jobId: r.body.jobId, status: 'solving', submissionId: 77 });
     });
 
     it('reuses the session and estimates the scale from the picture when no hint is given', async () => {

@@ -33,7 +33,7 @@ function fake() {
     stars: { search: vi.fn(), nearby: vi.fn() },
     version: { getLatest: vi.fn() },
     identify: { getCometElements: vi.fn() },
-    novaSolve: { getJob: vi.fn(), reuse: vi.fn(), submit: vi.fn() },
+    novaSolve: { getJob: vi.fn(), reuse: vi.fn(), submit: vi.fn(), resume: vi.fn() },
     solvedImport: { solveWcs: vi.fn(), convert: vi.fn() },
     backup: { exportToUser: vi.fn() },
     localSolvers: { submit: vi.fn(), poll: vi.fn(), cancel: vi.fn(), probe: vi.fn() },
@@ -171,6 +171,20 @@ describe('special cases', () => {
     expect(await api.pollPlateSolve('j1')).toEqual({ jobId: 'j1', status: 'solving' });
     backend.novaSolve.getJob.mockRejectedValueOnce(fail('notFound', 'gone', 'NO_SUCH_CODE'));
     expect((await thrown(api.pollPlateSolve('j1'))).message).toBe('gone');
+  });
+
+  it('keeps the code of a refused call on the error, for a caller that acts on it', async () => {
+    backend.novaSolve.getJob.mockRejectedValueOnce(fail('notFound', 'gone', 'JOB_NOT_FOUND'));
+    expect((await thrown(api.pollPlateSolve('j1'))) as Error & { code?: string }).toMatchObject({
+      code: 'JOB_NOT_FOUND',
+    });
+  });
+
+  it('resumePlateSolve follows a submission again under the new job id', async () => {
+    backend.novaSolve.resume.mockResolvedValue('job-2');
+    expect(await api.resumePlateSolve(new File(['x'], 'a.jpg'), 42)).toEqual({ jobId: 'job-2' });
+    expect(backend.novaSolve.resume.mock.calls[0][0].name).toBe('a.jpg');
+    expect(backend.novaSolve.resume.mock.calls[0][1]).toBe(42);
   });
 
   it('pollLocalSolveJob answers "pending" when rate limited', async () => {
