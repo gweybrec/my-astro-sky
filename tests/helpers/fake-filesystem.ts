@@ -64,6 +64,13 @@ export function createFakeFilesystem(): FakeFilesystem {
       files.set(to, f);
     },
     async mkdir() {},
+    async readdir({ path }) {
+      const names = [...files.keys()]
+        .filter((p) => p.startsWith(`${path}/`))
+        .map((p) => p.slice(path.length + 1))
+        .filter((name) => !name.includes('/'));
+      return { files: names.map((name) => ({ name })) };
+    },
     async getUri({ path }) {
       return { uri: `${ROOT}/${path}` };
     },

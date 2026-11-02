@@ -14,6 +14,7 @@ export interface CapacitorFilesystem {
   /** Moves a file; an existing file at `to` is replaced. */
   rename(options: { from: string; to: string; directory: string }): Promise<unknown>;
   mkdir(options: { path: string; directory: string; recursive?: boolean }): Promise<unknown>;
+  readdir(options: { path: string; directory: string }): Promise<{ files: { name: string }[] }>;
   getUri(options: { path: string; directory: string }): Promise<{ uri: string }>;
 }
 

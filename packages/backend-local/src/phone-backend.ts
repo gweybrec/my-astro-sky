@@ -39,6 +39,7 @@ export const SHARE_CANCELED = 'Share canceled';
 /**
  * Hands a file to the user through the share sheet, which takes a file address: the file is written in the cache
  * directory's `exports/` folder, then shared. Closing the sheet without a choice is not a failure.
+ * The earlier exports are removed first, not after the share: the receiving app may still read the file then.
  */
 export async function shareFile(
   platform: Pick<PhonePlatform, 'filesystem' | 'share' | 'blobPieceBytes'> & {
@@ -49,6 +50,10 @@ export async function shareFile(
 ): Promise<void> {
   const { filesystem, directories } = platform;
   await ensureDirectory(filesystem, directories.cache, 'exports');
+  const { files } = await filesystem.readdir({ path: 'exports', directory: directories.cache });
+  for (const file of files) {
+    await filesystem.deleteFile({ path: `exports/${file.name}`, directory: directories.cache });
+  }
   const path = `exports/${name}`;
   await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
   const { uri } = await filesystem.getUri({ path, directory: directories.cache });

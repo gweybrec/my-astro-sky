@@ -67,6 +67,18 @@ describe('createPhoneBackend', () => {
     expect(fake.maxDataLength).toBeLessThanOrEqual(Math.ceil((1024 * 1024) / 3) * 4);
   });
 
+  it('saveFile removes the earlier exports, keeping only the file it shares', async () => {
+    const { platform, fake, shared } = await makePhonePlatform();
+    const backend = await createPhoneBackend(platform);
+    fake.files.set('exports/MyAstroSky-old.zip', new Uint8Array([1]));
+    fake.files.set('uploads/kept.jpg', new Uint8Array([1]));
+    await backend.backup.exportToUser({ options: { includeSetups: true } });
+    await backend.backup.exportToUser({ options: { includeSetups: true } });
+    const exports = [...fake.files.keys()].filter((path) => path.startsWith('exports/'));
+    expect(exports).toEqual([`exports/${shared[1].name}`]);
+    expect(fake.files.has('uploads/kept.jpg')).toBe(true);
+  });
+
   it('closing the share sheet without a choice is not a failure; another share error is', async () => {
     const { platform } = await makePhonePlatform();
     let rejection = new Error(SHARE_CANCELED);
