@@ -104,6 +104,7 @@ export function createServices(deps: ServiceDeps) {
       poiCategories,
       skyRegions,
       blobs,
+      images,
       newId,
     }),
     stars: createStarSearchService({ stars }),

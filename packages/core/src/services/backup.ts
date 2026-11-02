@@ -16,6 +16,10 @@ import {
   idsToReplaceByName,
   inspectZipContents,
   isValidZipEntryPath,
+  MAX_ARCHIVE_DATA_BYTES,
+  MAX_ARCHIVE_ENTRIES,
+  MAX_ARCHIVE_IMAGE_BYTES,
+  MAX_ARCHIVE_IMAGE_PIXELS,
   parseBundlePlanSetupIds,
   parseBundleSetups,
   parseManifestPhotos,
@@ -32,6 +36,7 @@ import { customGearName, isCustomGearType, type CustomGearType } from '../domain
 import type { BackupPhoto } from '../domain/photos';
 import { isSafeBlobName, type BlobStore } from '../ports/blob-store';
 import type { BundleReader, BundleWriter } from '../ports/bundle';
+import type { ImageCodec } from '../ports/image-codec';
 import type { Photo } from '../types';
 import type { DsoOverrideService } from './dso-overrides';
 import type { GearService } from './gear';
@@ -49,6 +54,8 @@ export interface BackupServiceDeps {
   poiCategories: PoiCategoryService;
   skyRegions: SkyRegionService;
   blobs: BlobStore;
+  /** Reads the size of a picture of an archive before it is stored. */
+  images: ImageCodec;
   /** A fresh unique id. */
   newId: () => string;
 }
@@ -79,8 +86,10 @@ export interface BackupService {
   previewPhotoList(photos: unknown): ImportPreviewResult;
   /**
    * Imports what `selection` asks for from an archive. Throws `invalid` for an entry path that could leave its
-   * folder (`INVALID_ENTRY_PATH`) and for an archive with no recognised file (`NO_RECOGNISED_CONTENT`). An item that
-   * cannot be written is listed in `failed` and the others are imported.
+   * folder or comes twice (`INVALID_ENTRY_PATH`), for too many entries or one too large once unpacked
+   * (`BACKUP_TOO_LARGE`, also thrown by `preview`) and for an archive with no recognised file
+   * (`NO_RECOGNISED_CONTENT`). An item that cannot be written is listed in `failed` and the others are imported; a
+   * picture that is not a readable image is not written.
    */
   importFrom(reader: BundleReader, selection: ImportOptions): Promise<ImportResult>;
   /**
@@ -135,6 +144,36 @@ const manifestFilesOf = (p: ManifestPhoto): string[] =>
     : [];
 
 /**
+ * The records of `list` whose picture or thumbnail is a file of another photo, here or earlier in the list, with
+ * letter case ignored (one file on Windows): imported, the record would overwrite that photo's file, and deleting
+ * either photo would delete it. A record without a file name uses `<id>.jpg`, as the import stores it.
+ */
+function recordsSharingFiles(
+  list: readonly ManifestPhoto[],
+  local: Map<string, LocalPhoto>,
+): Set<ManifestPhoto> {
+  const owners = new Map<string, unknown>();
+  for (const [id, here] of local) here.files.forEach((f) => owners.set(f.toLowerCase(), id));
+  const sharing = new Set<ManifestPhoto>();
+  for (const p of list) {
+    const filename = p.filename ?? `${p.id}.jpg`;
+    const files = (
+      typeof filename === 'string' ? [filename, photoThumbOf({ ...p, filename })] : []
+    ).map((f) => f.toLowerCase());
+    if (files.some((f) => owners.has(f) && owners.get(f) !== p.id)) sharing.add(p);
+    else files.forEach((f) => owners.set(f, p.id));
+  }
+  return sharing;
+}
+
+/**
+ * Whether the files of a manifest photo are refused: a name outside the photo folder, or a file of another photo
+ * (`sharing`, from `recordsSharingFiles`).
+ */
+const isRefused = (p: ManifestPhoto, sharing: Set<ManifestPhoto>): boolean =>
+  !hasSafeFileNames(p) || sharing.has(p);
+
+/**
  * Writes `items` with one grouped call. When that call fails nothing of it is kept, so the items are written again one
  * by one and only those that fail are passed to `onFail`. Returns the items that were written.
  */
@@ -166,7 +205,8 @@ async function writeGrouped<T>(
 }
 
 export function createBackupService(deps: BackupServiceDeps): BackupService {
-  const { photos, plans, gear, dsoOverrides, poiCategories, skyRegions, blobs, newId } = deps;
+  const { photos, plans, gear, dsoOverrides, poiCategories, skyRegions, blobs, images, newId } =
+    deps;
 
   async function selectPhotos(ids?: readonly string[]): Promise<Photo[]> {
     const all = await photos.list();
@@ -199,6 +239,44 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
     return entries;
   }
 
+  /**
+   * Refuses an archive before anything of it is unpacked: an entry path that could leave its folder or that comes
+   * twice (`INVALID_ENTRY_PATH`), too many entries, or an entry larger than any real backup file once unpacked
+   * (`BACKUP_TOO_LARGE`): a few megabytes of zeros can unpack to gigabytes.
+   */
+  async function checkArchive(reader: BundleReader, names: readonly string[]): Promise<void> {
+    for (const name of names) {
+      if (!isValidZipEntryPath(name)) {
+        throw new DomainError('invalid', `Chemin invalide dans le ZIP : ${name}`, {
+          code: 'INVALID_ENTRY_PATH',
+        });
+      }
+    }
+    if (new Set(names).size !== names.length) {
+      throw new DomainError('invalid', 'Fichier en double dans le ZIP', {
+        code: 'INVALID_ENTRY_PATH',
+      });
+    }
+    const tooLarge = () =>
+      new DomainError('invalid', 'Backup too large', { code: 'BACKUP_TOO_LARGE' });
+    if (names.length > MAX_ARCHIVE_ENTRIES) throw tooLarge();
+    for (const name of names) {
+      if (name.endsWith('/')) continue;
+      const max = name.startsWith('images/') ? MAX_ARCHIVE_IMAGE_BYTES : MAX_ARCHIVE_DATA_BYTES;
+      if (((await reader.size(name)) ?? 0) > max) throw tooLarge();
+    }
+  }
+
+  /** Whether the bytes of an archive's picture are a readable picture of a size the apps can decode. */
+  async function isStorablePicture(bytes: Uint8Array): Promise<boolean> {
+    try {
+      const { width, height } = await images.probe(bytes);
+      return width > 0 && height > 0 && width * height <= MAX_ARCHIVE_IMAGE_PIXELS;
+    } catch {
+      return false;
+    }
+  }
+
   /** The photos already here, by id, read once before an import writes anything. */
   async function localPhotos(): Promise<Map<string, LocalPhoto>> {
     return new Map(
@@ -210,11 +288,15 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
   }
 
   /**
-   * Whether the record of a manifest photo will be skipped: it has no id, a file name outside the photo folder, or a
+   * Whether the record of a manifest photo will be skipped: it has no id, its files are refused (`isRefused`), or a
    * photo here has its id under another name (`importPhoto` with `skip` leaves that one alone).
    */
-  function recordIsSkipped(p: ManifestPhoto, local: Map<string, LocalPhoto>): boolean {
-    if (!p.id || typeof p.id !== 'string' || !hasSafeFileNames(p)) return true;
+  function recordIsSkipped(
+    p: ManifestPhoto,
+    local: Map<string, LocalPhoto>,
+    sharing: Set<ManifestPhoto>,
+  ): boolean {
+    if (!p.id || typeof p.id !== 'string' || isRefused(p, sharing)) return true;
     const here = local.get(p.id);
     return here !== undefined && here.originalName !== nameOfManifestPhoto(p);
   }
@@ -229,6 +311,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
   ): Promise<{ imported: number; skipped: number }> {
     let imported = 0;
     let skipped = 0;
+    const sharing = recordsSharingFiles(list, local);
 
     if (importMetadata && list.length > 0) {
       const allNames = list.map((p) => p.originalName ?? p.filename ?? p.id).filter(Boolean);
@@ -260,8 +343,8 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
           continue;
         }
         const origName: string = nameOfManifestPhoto(p);
-        if (!hasSafeFileNames(p)) {
-          recordFailure('photo', origName, new Error(`Invalid file name: ${String(p.filename)}`));
+        if (isRefused(p, sharing)) {
+          recordFailure('photo', origName, new Error(`Refused file name: ${String(p.filename)}`));
           continue;
         }
 
@@ -330,7 +413,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       ? list.filter((p) => writtenFiles === null || writtenFiles.has(p.filename))
       : [];
     for (const p of photosToThumb) {
-      if (!p.id || typeof p.id !== 'string' || !hasSafeFileNames(p)) continue;
+      if (!p.id || typeof p.id !== 'string' || isRefused(p, sharing)) continue;
       const filename: string = p.filename ?? `${p.id}.jpg`;
       const thumbFilename: string = p.thumbFilename ?? thumbnailNameOf(filename);
       // The archive's own thumbnail was written with the image; otherwise the image was just written, so any thumbnail
@@ -406,6 +489,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
 
     async preview(reader) {
       const names = await reader.names();
+      await checkArchive(reader, names);
       const inspect = await inspectZipContents(await entriesOf(reader, names));
 
       const filenameToOriginalName = new Map(
@@ -532,15 +616,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const recordFailure = makeFailureRecorder(failed);
 
       const names = await reader.names();
-
-      // Security: validate all entry paths before extraction
-      for (const name of names) {
-        if (!isValidZipEntryPath(name)) {
-          throw new DomainError('invalid', `Chemin invalide dans le ZIP : ${name}`, {
-            code: 'INVALID_ENTRY_PATH',
-          });
-        }
-      }
+      await checkArchive(reader, names);
 
       const has = (name: string): boolean => names.includes(name);
       if (
@@ -785,31 +861,56 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       // Without a selection, files are written only for the photo records this same
       // request imports (all photos of the manifest); otherwise they would belong to no photo.
       const importsPhotoRecords = importMetadata && list.length > 0;
-      const local = importsPhotoRecords ? await localPhotos() : new Map<string, LocalPhoto>();
+      // The photos here, whose files a picture of the archive must not take; not read when nothing is written.
+      const writesFiles =
+        importsPhotoRecords || (selectedImages !== null && selectedImages.size > 0);
+      const local = writesFiles ? await localPhotos() : new Map<string, LocalPhoto>();
+      const sharing = recordsSharingFiles(list, local);
       // The files of a record that will be skipped are not written: they would overwrite those of the photo here.
       const skippedFiles = new Set<string>();
       if (importsPhotoRecords) {
         const keptFiles = new Set<string>();
         for (const p of list) {
-          const files = recordIsSkipped(p, local) ? skippedFiles : keptFiles;
+          const files = recordIsSkipped(p, local, sharing) ? skippedFiles : keptFiles;
           manifestFilesOf(p).forEach((f) => files.add(f));
         }
         keptFiles.forEach((f) => skippedFiles.delete(f));
       }
+      // A file of a photo here is written over only for a record of that same photo (letter case ignored, as on
+      // Windows); a picture with no record, or the record of another photo, would take that photo's file.
+      const ownerHere = new Map<string, string>();
+      for (const [id, here] of local) here.files.forEach((f) => ownerHere.set(f.toLowerCase(), id));
+      const ownerInList = new Map<string, unknown>();
+      for (const p of list) {
+        if (isRefused(p, sharing)) continue;
+        for (const f of manifestFilesOf(p)) {
+          if (!ownerInList.has(f.toLowerCase())) ownerInList.set(f.toLowerCase(), p.id);
+        }
+      }
+      const takenNames = new Set<string>();
       for (const entryName of imageNames) {
         if (selectedImages === null && !importsPhotoRecords) continue;
         const baseName = baseNameOf(entryName);
+        const key = baseName.toLowerCase();
         if (!ALLOWED_PHOTO_EXTENSIONS.has(extNameOf(baseName).toLowerCase())) continue;
-        if (skippedFiles.has(baseName)) continue;
+        if (!isSafeBlobName(baseName) || skippedFiles.has(baseName)) continue;
+        if (ownerHere.has(key) && ownerInList.get(key) !== ownerHere.get(key)) continue;
+        // Two entries of one name in different folders of the archive: the first is kept.
+        if (takenNames.has(key)) continue;
         if (
           selectedImages !== null &&
           !selectedImages.has(baseName) &&
           !selectedThumbs.has(baseName)
         )
           continue;
+        takenNames.add(key);
         try {
           const bytes = await reader.read(entryName);
           if (!bytes) continue;
+          if (!(await isStorablePicture(bytes))) {
+            console.warn(`[Import] ${baseName} is not a picture the apps can open: not written`);
+            continue;
+          }
           await blobs.put(baseName, bytes);
           writtenFiles.add(baseName);
         } catch (writeErr) {

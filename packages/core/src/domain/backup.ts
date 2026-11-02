@@ -668,6 +668,15 @@ export function isValidZipEntryPath(entryPath: string): boolean {
   return true;
 }
 
+/** The most files a backup archive may hold (a large library has two per photo). */
+export const MAX_ARCHIVE_ENTRIES = 100_000;
+/** The largest unpacked size of one data file of an archive (`manifest.json`, `plans.json`…). */
+export const MAX_ARCHIVE_DATA_BYTES = 64 * 1024 * 1024;
+/** The largest unpacked size of one picture of an archive. */
+export const MAX_ARCHIVE_IMAGE_BYTES = 512 * 1024 * 1024;
+/** The most pixels a picture of a backup may have: the default limit of `sharp`, which the server decodes with. */
+export const MAX_ARCHIVE_IMAGE_PIXELS = 0x3fff * 0x3fff;
+
 /**
  * Parse the manifest from an import bundle.
  *

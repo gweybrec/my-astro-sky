@@ -69,14 +69,29 @@ export function createZipResponseWriter(output: Writable, onStart: () => void): 
 export async function openZipBundle(buffer: Buffer): Promise<BundleReader> {
   const dir = await unzipper.Open.buffer(buffer);
   const files = dir.files;
-  const find = (name: string) => files.find((f) => f.path === name);
+  // The first entry of a name, as `find` gave before (the backup service refuses an archive with two).
+  const byName = new Map<string, (typeof files)[number]>();
+  for (const f of files) if (!byName.has(f.path)) byName.set(f.path, f);
+  const find = (name: string) => byName.get(name);
   return {
     async names() {
       return files.map((f) => f.path);
     },
     async read(name) {
       const entry = find(name);
-      return entry ? new Uint8Array(await entry.buffer()) : null;
+      if (!entry) return null;
+      // Never more than the size the archive declares, which the backup service has checked: a crafted entry could
+      // otherwise unpack to gigabytes.
+      const chunks: Buffer[] = [];
+      let total = 0;
+      for await (const chunk of entry.stream() as AsyncIterable<Buffer>) {
+        total += chunk.length;
+        if (total > entry.uncompressedSize) {
+          throw new Error(`Invalid backup archive: ${name} is larger than it declares`);
+        }
+        chunks.push(chunk);
+      }
+      return new Uint8Array(Buffer.concat(chunks, total));
     },
     async size(name) {
       return find(name)?.uncompressedSize ?? null;

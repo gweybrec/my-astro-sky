@@ -1,7 +1,7 @@
 // @vitest-environment node
 /** The in-memory ZIP of the phone and the server's archiver/unzipper read each other's archives. */
 import { PassThrough } from 'stream';
-import { unzipSync } from 'fflate';
+import { unzipSync, zipSync } from 'fflate';
 import { describe, it, expect } from 'vitest';
 import { ZipArchive } from 'archiver';
 import {
@@ -49,6 +49,21 @@ describe('bundle-fflate', () => {
       expect(await reader.read(name)).toEqual(bytes);
       expect(await reader.size(name)).toBe(bytes.length);
     }
+  });
+
+  it('never unpacks more than an entry declares, in either reader', async () => {
+    // 4 MB of zeros deflate to a few kilobytes; the central directory is edited to declare 1,000 bytes.
+    const zip = zipSync({ 'manifest.json': [new Uint8Array(4 * 1024 * 1024), { level: 9 }] });
+    const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+    let at = zip.length - 22;
+    while (view.getUint32(at, true) !== 0x02014b50) at--;
+    view.setUint32(at + 24, 1000, true);
+
+    const server = await openServerZip(Buffer.from(zip));
+    expect(await server.size('manifest.json')).toBe(1000);
+    await expect(server.read('manifest.json')).rejects.toThrow('larger than it declares');
+    const phone = await openZipBundle(zip);
+    expect((await phone.read('manifest.json'))!.length).toBeLessThanOrEqual(1000);
   });
 
   it('refuses an entry name that could leave its folder', async () => {

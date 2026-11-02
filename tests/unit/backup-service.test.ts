@@ -651,6 +651,120 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(b.blobs.store.size).toBe(0);
     });
 
+    it.each([
+      ['manifest.json', 64 * 1024 * 1024 + 1],
+      ['images/p.jpg', 512 * 1024 * 1024 + 1],
+    ])(
+      'refuses an archive whose %s declares more than it may unpack to, before reading anything',
+      async (big, declared) => {
+        const b = await makeSet();
+        const svc = createBackupService({ ...b, newId: () => 'y' });
+        const inner = memoryReader([
+          ['manifest.json', '[]'],
+          ['images/p.jpg', 'x'],
+        ]);
+        const read = vi.fn(inner.read);
+        const reader: BundleReader = {
+          ...inner,
+          read,
+          size: async (name) => (name === big ? declared : inner.size(name)),
+        };
+        for (const run of [() => svc.preview(reader), () => svc.importFrom(reader, everything)]) {
+          expect(await run().catch((e) => e)).toMatchObject({
+            kind: 'invalid',
+            code: 'BACKUP_TOO_LARGE',
+          });
+        }
+        expect(read).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses an archive with too many entries, or two entries of one path', async () => {
+      const svc = createBackupService({ ...(await makeSet()), newId: () => 'y' });
+      const many = memoryReader(
+        Array.from({ length: 100_001 }, (_, i) => [`images/${i}.jpg`, 'x'] as [string, string]),
+      );
+      expect(await svc.importFrom(many, everything).catch((e) => e)).toMatchObject({
+        code: 'BACKUP_TOO_LARGE',
+      });
+      const twice = memoryReader([
+        ['manifest.json', '[]'],
+        ['manifest.json', '[]'],
+      ]);
+      expect(await svc.preview(twice).catch((e) => e)).toMatchObject({
+        code: 'INVALID_ENTRY_PATH',
+      });
+    });
+
+    it('writes no picture that is not a readable image, or that has too many pixels', async () => {
+      for (const info of [null, { width: 20_000, height: 20_000 }]) {
+        const b = await makeSet();
+        b.images.info = info;
+        const svc = createBackupService({ ...b, newId: () => 'y' });
+        const photo = { id: 'p', filename: 'p.jpg', originalName: 'p.jpg', width: 1, height: 1 };
+        const result = await svc.importFrom(
+          memoryReader([
+            ['manifest.json', JSON.stringify([photo])],
+            ['images/p.jpg', '<html>'],
+          ]),
+          everything,
+        );
+        expect(result).toMatchObject({ imported: 0, skipped: 1 });
+        expect(b.blobs.store.has('p.jpg')).toBe(false);
+      }
+    });
+
+    it('a record naming the files of another photo here is listed as failed and writes nothing over them', async () => {
+      const b = await makeSet();
+      const local = { id: 'L', filename: 'L.jpg', originalName: 'local.jpg', width: 1, height: 1 };
+      await b.photos.importPhoto(local, 'skip');
+      b.blobs.store.set('L.jpg', text('local-image'));
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      const evil = (filename: string) => ({
+        id: 'E',
+        filename,
+        originalName: 'evil.jpg',
+        width: 1,
+        height: 1,
+      });
+      for (const filename of ['L.jpg', 'l.JPG']) {
+        const result = await svc.importFrom(
+          memoryReader([
+            ['manifest.json', JSON.stringify([evil(filename)])],
+            [`images/${filename}`, 'evil-image'],
+          ]),
+          everything,
+        );
+        expect(result).toMatchObject({
+          imported: 0,
+          failed: [{ kind: 'photo', name: 'evil.jpg' }],
+        });
+        expect(await svc.importPhotoList([evil(filename)], everything)).toMatchObject({
+          imported: 0,
+          failed: [{ kind: 'photo', name: 'evil.jpg' }],
+        });
+      }
+      expect((await b.photos.list()).map((p) => p.id)).toEqual(['L']);
+      expect(new TextDecoder().decode(b.blobs.store.get('L.jpg'))).toBe('local-image');
+      expect(b.blobs.store.has('l.JPG')).toBe(false);
+    });
+
+    it('a picture with no record does not take the file of a photo here', async () => {
+      const b = await makeSet();
+      const local = { id: 'L', filename: 'L.jpg', originalName: 'local.jpg', width: 1, height: 1 };
+      await b.photos.importPhoto(local, 'skip');
+      b.blobs.store.set('L.jpg', text('local-image'));
+      const svc = createBackupService({ ...b, newId: () => 'y' });
+      await svc.importFrom(
+        memoryReader([
+          ['manifest.json', '[]'],
+          ['images/L.jpg', 'evil-image'],
+        ]),
+        { ...everything, importMetadata: false, selectedImages: ['L.jpg'] },
+      );
+      expect(new TextDecoder().decode(b.blobs.store.get('L.jpg'))).toBe('local-image');
+    });
+
     it('skips a photo whose image is not in the archive', async () => {
       const b = await makeSet();
       const svc = createBackupService({ ...b, newId: () => 'y' });

@@ -95,7 +95,7 @@ export const blobStoreConformanceCases: BlobStoreConformanceCase[] = [
     },
   },
   {
-    name: 'a name with a folder part or a leading dot is refused: nothing outside the store is touched',
+    name: 'a name that is not a plain file name on every platform is refused: nothing outside the store is touched',
     async run(open) {
       const store = await open();
       for (const name of [
@@ -105,6 +105,14 @@ export const blobStoreConformanceCases: BlobStoreConformanceCase[] = [
         'sub\\conf.jpg',
         '.conf-hidden.jpg',
         '',
+        'C:conf.jpg',
+        'conf<1>.jpg',
+        'conf\u0001.jpg',
+        'conf.jpg.',
+        'conf.jpg ',
+        'CON.jpg',
+        'nul.png',
+        `${'c'.repeat(200)}.jpg`,
       ]) {
         await rejects(() => store.put(name, patternBytes(10)), `put ${show(name)}`);
         await rejects(() => store.get(name), `get ${show(name)}`);
