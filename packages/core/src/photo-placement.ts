@@ -499,36 +499,57 @@ export function derivePlacementFromCorrespondences(
       photoPoints as [Point, Point, Point],
       projPoints as [Point, Point, Point],
     );
-
-    const cx = naturalWidth / 2;
-    const cy = naturalHeight / 2;
-    const centerProjX = matrix.a * cx + matrix.c * cy + matrix.e;
-    const centerProjY = matrix.b * cx + matrix.d * cy + matrix.f;
-    const centerSky = unproject(centerProjX, centerProjY);
-
-    // The inverse of computeManualProjMatrix: a = cos·mx·p, b = −sin·mx·p, c = −sin·my·p, d = −cos·my·p (projection
-    // space has y up, the photo y down). Its determinant is −mx·my·p², so a positive one is a mirrored photo, given here
-    // as mirrorX.
-    const det = matrix.a * matrix.d - matrix.b * matrix.c;
-    const mx = det > 0 ? -1 : 1;
-    const rotationDeg = (Math.atan2(-matrix.b * mx, matrix.a * mx) * 180) / Math.PI;
-    const scaleX = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
-    const scaleY = Math.sqrt(matrix.c * matrix.c + matrix.d * matrix.d);
-    const projPerPx = (scaleX + scaleY) / 2;
-
-    return {
-      centerRa: centerSky.ra,
-      centerDec: centerSky.dec,
-      rotationDeg,
-      projPerPx,
-      mirrorX: mx < 0,
-      mirrorY: false,
-      angleOnSky: true,
-    };
+    return placementFromProjMatrix(matrix, naturalWidth, naturalHeight);
   } catch (err) {
     reportError('derive_placement_error', err);
     return { ...DEFAULT_MANUAL_PLACEMENT };
   }
+}
+
+/** The manual placement that draws a photo of `width` × `height` as the photo→projection-space `matrix` does. */
+export function placementFromProjMatrix(
+  matrix: AffineMatrix,
+  width: number,
+  height: number,
+): ManualPlacement {
+  const cx = width / 2;
+  const cy = height / 2;
+  const centerProjX = matrix.a * cx + matrix.c * cy + matrix.e;
+  const centerProjY = matrix.b * cx + matrix.d * cy + matrix.f;
+  const centerSky = unproject(centerProjX, centerProjY);
+
+  // The inverse of computeManualProjMatrix: a = cos·mx·p, b = −sin·mx·p, c = −sin·my·p, d = −cos·my·p (projection
+  // space has y up, the photo y down). Its determinant is −mx·my·p², so a positive one is a mirrored photo, given here
+  // as mirrorX.
+  const det = matrix.a * matrix.d - matrix.b * matrix.c;
+  const mx = det > 0 ? -1 : 1;
+  const rotationDeg = (Math.atan2(-matrix.b * mx, matrix.a * mx) * 180) / Math.PI;
+  const scaleX = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
+  const scaleY = Math.sqrt(matrix.c * matrix.c + matrix.d * matrix.d);
+  const projPerPx = (scaleX + scaleY) / 2;
+
+  return {
+    centerRa: centerSky.ra,
+    centerDec: centerSky.dec,
+    rotationDeg,
+    projPerPx,
+    mirrorX: mx < 0,
+    mirrorY: false,
+    angleOnSky: true,
+  };
+}
+
+/**
+ * Where a placed photo is now, as a manual placement to start repositioning it from: its own manual placement (with
+ * its angle on the sky), else the one that draws it as its star correspondences do, turned to the whole degree.
+ */
+export function currentPlacement(photo: Photo, view: ViewState): ManualPlacement {
+  if (photo.manualPlacement) return withAngleOnSky({ ...photo.manualPlacement }, view);
+  const matrix = computePhotoToProjMatrix(photo);
+  const placement = matrix
+    ? placementFromProjMatrix(matrix, photo.width, photo.height)
+    : derivePlacementFromCorrespondences(photo, photo.width, photo.height);
+  return { ...placement, rotationDeg: Math.round(placement.rotationDeg) };
 }
 
 /** Derive ManualPlacement params from a live photo→canvas CSS transform matrix. */

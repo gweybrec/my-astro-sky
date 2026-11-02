@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
-import type { ManualPlacement, PhotoCorrespondence, ViewState } from '@myastrosky/core/types';
+import type {
+  ManualPlacement,
+  Photo,
+  PhotoCorrespondence,
+  ViewState,
+} from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
 import { project } from '@myastrosky/core/projection';
 
 const uploadPhoto = vi.fn();
+const updatePhotoManualPlacement = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   uploadPhoto: (...a: unknown[]) => uploadPhoto(...a),
+  updatePhotoManualPlacement: (...a: unknown[]) => updatePhotoManualPlacement(...a),
+  photoFileUrl: (name: string) => `/uploads/${name}`,
 }));
 const findDSOsInImage = vi.fn();
 vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
@@ -49,6 +57,8 @@ const onView = (listener: () => void) => {
 const mapEl = document.createElement('div');
 document.body.appendChild(mapEl);
 mapEl.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 500 }) as DOMRect;
+Object.defineProperty(mapEl, 'clientWidth', { value: 400 });
+Object.defineProperty(mapEl, 'clientHeight', { value: 500 });
 
 async function mountPlacement() {
   const pending = await addPendingPhoto(new Blob(['jpg'], { type: 'image/jpeg' }), 'M101.jpg');
@@ -296,5 +306,125 @@ describe('placing a photo by hand', () => {
       .trigger('click');
     expect(w.emitted('cancel')).toHaveLength(1);
     expect(uploadPhoto).not.toHaveBeenCalled();
+  });
+});
+
+/** Repositionner: a placed photo moved again on the same screen. */
+describe('repositioning a placed photo', () => {
+  const PLACED: ManualPlacement = {
+    centerRa: 210.8,
+    centerDec: 54.35,
+    rotationDeg: 20,
+    projPerPx: 0.0001,
+    mirrorX: false,
+    mirrorY: false,
+    angleOnSky: true,
+  };
+  const PHOTO = {
+    id: 'p1',
+    filename: 'p1.jpg',
+    mediumFilename: 'p1-medium.jpg',
+    originalName: 'M101.jpg',
+    width: 4000,
+    height: 2000,
+    correspondences: [],
+    manualPlacement: PLACED,
+  } as unknown as Photo;
+  const layer = { hidePhoto: vi.fn(), unhidePhoto: vi.fn(), replacePhoto: vi.fn() };
+
+  beforeEach(() => {
+    localStorage.setItem('lang', 'fr');
+    uploadPhoto.mockReset();
+    updatePhotoManualPlacement.mockReset().mockResolvedValue(undefined);
+    showError.mockReset();
+    Object.values(layer).forEach((f) => f.mockReset());
+    mapEl.innerHTML = '';
+  });
+
+  async function mountReposition() {
+    const w = mount(SkyPlacement, {
+      props: { map: map as never, mapEl, photo: PHOTO, layer: layer as never, onView },
+      global: { stubs: ionicStubs },
+    });
+    await flushPromises();
+    const img = mapEl.querySelector('img.mob-placing-photo') as HTMLImageElement;
+    // The medium copy loads, smaller than the photo.
+    Object.defineProperty(img, 'naturalWidth', { value: 1000 });
+    Object.defineProperty(img, 'naturalHeight', { value: 500 });
+    img.dispatchEvent(new Event('load'));
+    await flushPromises();
+    return { w, img };
+  }
+  const click = (w: Awaited<ReturnType<typeof mountReposition>>['w'], text: string) =>
+    w
+      .findAll('button')
+      .find((b) => b.text() === text)!
+      .trigger('click');
+
+  it('starts where the photo is, at 100 %, hidden on the map, its copy at the full size', async () => {
+    const { w, img } = await mountReposition();
+    expect(layer.hidePhoto).toHaveBeenCalledWith('p1');
+    expect(img.getAttribute('src')).toBe('/uploads/p1-medium.jpg');
+    expect(img.style.width).toBe('4000px');
+    expect(img.style.height).toBe('2000px');
+    expect(values(w).slice(0, 2)).toEqual(['20°', '100 %']);
+    const [a, b, , , e, f] = matrixOf(img);
+    // 0.0001 projection units per pixel at a scale of 1000, turned by 20°, centred on the map.
+    expect(Math.hypot(a, b)).toBeCloseTo(0.1);
+    expect(Math.atan2(b, a) * (180 / Math.PI)).toBeCloseTo(20);
+    expect(e + a * 2000 + matrixOf(img)[2] * 1000).toBeCloseTo(200, 0);
+    expect(f + b * 2000 + matrixOf(img)[3] * 1000).toBeCloseTo(250, 0);
+  });
+
+  it('brings a photo out of the map (under the panel) to its middle, at the same zoom', async () => {
+    // The photo's centre one map width to the right of the view's centre.
+    const away = project(210.8, 54.35);
+    const view = { ...VIEW, centerX: away.x - 400 / VIEW.scale };
+    const panBy = vi.fn();
+    Object.assign(map, { getView: () => view, panBy });
+    try {
+      await mountReposition();
+      expect(panBy).toHaveBeenCalledTimes(1);
+      const [dx, dy] = panBy.mock.calls[0] as [number, number];
+      expect(dx).toBeCloseTo(400, 0);
+      expect(dy).toBeCloseTo(0, 0);
+    } finally {
+      Object.assign(map, { getView: () => VIEW });
+    }
+  });
+
+  it('stores the new placement only, and shows the photo there on the map', async () => {
+    const { w, img } = await mountReposition();
+    const [a, b, c, d, e, f] = matrixOf(img);
+    const centre = { x: e + a * 2000 + c * 1000, y: f + b * 2000 + d * 1000 };
+    pointer(img, 'pointerdown', 1, centre.x, centre.y);
+    pointer(img, 'pointermove', 1, centre.x + 40, centre.y);
+    pointer(img, 'pointerup', 1, centre.x + 40, centre.y);
+    await click(w, 'Valider');
+    await flushPromises();
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    const [id, placement] = updatePhotoManualPlacement.mock.calls[0] as [string, ManualPlacement];
+    expect(id).toBe('p1');
+    expect(placement).toMatchObject({ rotationDeg: 20, projPerPx: 0.0001, angleOnSky: true });
+    expect(placement.centerRa).not.toBeCloseTo(PLACED.centerRa, 3);
+    const moved = { ...PHOTO, manualPlacement: placement };
+    expect(layer.replacePhoto).toHaveBeenCalledWith(moved);
+    expect(w.emitted('repositioned')).toEqual([[moved]]);
+    w.unmount();
+    expect(layer.unhidePhoto).toHaveBeenCalledWith('p1');
+  });
+
+  it('leaves the photo as it was with Annuler, or when it cannot be stored', async () => {
+    updatePhotoManualPlacement.mockRejectedValue(new Error('offline'));
+    const { w } = await mountReposition();
+    await click(w, 'Valider');
+    await flushPromises();
+    expect(showError).toHaveBeenCalled();
+    expect(layer.replacePhoto).not.toHaveBeenCalled();
+    expect(w.emitted('repositioned')).toBeUndefined();
+    await click(w, 'Annuler');
+    expect(w.emitted('cancel')).toHaveLength(1);
+    w.unmount();
+    expect(layer.unhidePhoto).toHaveBeenCalledWith('p1');
   });
 });

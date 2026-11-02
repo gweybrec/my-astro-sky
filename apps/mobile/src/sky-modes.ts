@@ -11,8 +11,8 @@ import type { SkyRegionData } from '@myastrosky/core/domain/regions';
 import type { FovSelection } from '@myastrosky/app-state/stores/fov-frames';
 import type { Tab } from './tab-navigation';
 
-/** The waiting photo being placed by hand on the map, or null. */
-export const skyPlacement = shallowRef<{ pendingId: string } | null>(null);
+/** The photo being placed by hand on the map, or null: a waiting one (`pendingId`), or a placed one moved again (`photoId`). */
+export const skyPlacement = shallowRef<{ pendingId: string } | { photoId: string } | null>(null);
 
 /**
  * A star being chosen on the map for a point of the identification (`point` counts from 1), or null. `done` receives

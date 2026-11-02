@@ -320,6 +320,18 @@ describe('PhotoLayer', () => {
     expect(onDimensionMismatch).toHaveBeenCalledWith(expect.anything(), '100×100', '80×100');
   });
 
+  it('keeps a photo hidden by hidePhoto hidden when the map moves, until it is shown again', () => {
+    const { container, layer } = make();
+    layer.loadPhotos([placedPhoto('1')]);
+    const img = container.querySelector('img')!;
+    img.dispatchEvent(new Event('load'));
+    layer.hidePhoto('1');
+    layer.updateTransforms();
+    expect(img.style.display).toBe('none');
+    layer.unhidePhoto('1');
+    expect(img.style.display).toBe('block');
+  });
+
   it('hides every photo with the global switch and shows them again', () => {
     const { container, layer } = make();
     layer.loadPhotos([placedPhoto('1')]);

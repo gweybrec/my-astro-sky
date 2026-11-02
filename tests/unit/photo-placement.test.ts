@@ -22,6 +22,7 @@ import {
   extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
   derivePlacementFromMatrix,
+  currentPlacement,
   withAngleOnSky,
   formatZoomPercent,
 } from '@myastrosky/core/photo-placement';
@@ -527,6 +528,50 @@ describe('manual placement math', () => {
       const sky = project(c.starRa!, c.starDec!);
       expect(m.a * c.photoX + m.c * c.photoY + m.e).toBeCloseTo(sky.x, 6);
       expect(m.b * c.photoX + m.d * c.photoY + m.f).toBeCloseTo(sky.y, 6);
+    }
+  });
+
+  it('currentPlacement gives a manual placement back, its angle on the sky', () => {
+    const p: ManualPlacement = {
+      centerRa: 40,
+      centerDec: 55,
+      rotationDeg: 12,
+      projPerPx: 0.0015,
+      mirrorX: true,
+      mirrorY: false,
+    };
+    const photo = makePhoto([], { manualPlacement: p });
+    expect(currentPlacement(photo, { ...VIEW, rotationDeg: 30 })).toEqual({
+      ...p,
+      rotationDeg: 42,
+      angleOnSky: true,
+    });
+    const onSky = { ...p, angleOnSky: true };
+    expect(currentPlacement(makePhoto([], { manualPlacement: onSky }), VIEW)).toEqual(onSky);
+  });
+
+  it('currentPlacement draws a plate-solved photo where its correspondences put it', () => {
+    const p: ManualPlacement = {
+      centerRa: 210.85,
+      centerDec: 54.34,
+      rotationDeg: -66,
+      projPerPx: 0.0015,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const photo = makePhoto(buildSyntheticCorrespondences(p, 100, 80, VIEW));
+    const placed = currentPlacement(photo, VIEW);
+    expect(placed.rotationDeg).toBe(-66);
+    const solved = computePhotoToProjMatrix(photo)!;
+    const m = computeManualProjMatrix(placed, 100, 80);
+    for (const [x, y] of [
+      [0, 0],
+      [100, 0],
+      [0, 80],
+      [100, 80],
+    ]) {
+      expect(m.a * x + m.c * y + m.e).toBeCloseTo(solved.a * x + solved.c * y + solved.e, 5);
+      expect(m.b * x + m.d * y + m.f).toBeCloseTo(solved.b * x + solved.d * y + solved.f, 5);
     }
   });
 

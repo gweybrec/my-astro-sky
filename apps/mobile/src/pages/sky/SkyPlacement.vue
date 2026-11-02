@@ -7,12 +7,14 @@ import {
   buildSyntheticCorrespondences,
   computeManualMatrix,
   computeManualProjMatrix,
+  currentPlacement,
   formatZoomPercent,
 } from '@myastrosky/core/photo-placement';
 import { fromCanvas, project, toCanvas, unproject } from '@myastrosky/core/projection';
 import { normalizeRotationDeg } from '@myastrosky/core/sky-map-types';
 import type { ManualPlacement, Photo, ViewState } from '@myastrosky/core/types';
-import { uploadPhoto } from '@myastrosky/app-state/api';
+import { photoFileUrl, updatePhotoManualPlacement, uploadPhoto } from '@myastrosky/app-state/api';
+import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import { catalogsReady } from '../../catalogs';
 import { useErrorToast } from '../../composables/useErrorToast';
@@ -28,15 +30,26 @@ import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 // through, lies over the map where it was being looked at. One finger on the photo moves it, two fingers make it larger
 // or smaller and turn it; the map itself still moves under a finger put beside the photo. Valider stores the photo with
 // that placement and three points of the sky taken from it, and the objects that fall in it.
+// A photo already placed is moved again the same way (the desktop's `startRepositioning`): it starts where it is, at
+// "Zoom photo" 100 %, hidden on the map meanwhile; Valider stores its new placement, Annuler leaves it as it was.
 const props = defineProps<{
   map: SkyMap;
   /** The map's box: the photo is drawn in it, over the canvas. */
   mapEl: HTMLElement;
-  pendingId: string;
+  /** The waiting photo placed, or… */
+  pendingId?: string;
+  /** …the placed photo moved again, on its layer. */
+  photo?: Photo;
+  layer?: PhotoLayer;
   /** Calls back on each change of the map's view; returns the function that stops it. */
   onView: (listener: () => void) => () => void;
 }>();
-const emit = defineEmits<{ cancel: []; placed: [photo: Photo]; search: [] }>();
+const emit = defineEmits<{
+  cancel: [];
+  placed: [photo: Photo];
+  repositioned: [photo: Photo];
+  search: [];
+}>();
 const { showError } = useErrorToast();
 
 /** The photo's first size: its longer side over this part of the map's shorter side. */
@@ -127,7 +140,11 @@ function follow(move: () => void) {
 defineExpose({ follow });
 onMounted(async () => {
   stopView = props.onView(onViewChange);
-  file.value = await pendingPhotoFile(props.pendingId);
+  if (props.photo) {
+    startFromPhoto(props.photo);
+    return;
+  }
+  file.value = props.pendingId ? await pendingPhotoFile(props.pendingId) : null;
   if (!file.value) {
     emit('cancel');
     return;
@@ -138,12 +155,48 @@ onBeforeUnmount(() => {
   landscapeQuery?.removeEventListener('change', onTurn);
   stopView?.();
   clearTimeout(followTimer);
-  if (url.value) URL.revokeObjectURL(url.value);
+  if (file.value && url.value) URL.revokeObjectURL(url.value);
+  if (props.photo) props.layer?.unhidePhoto(props.photo.id);
 });
+
+/**
+ * A placed photo starts where the map shows it, hidden there meanwhile. Its medium-sized copy is shown when it has one,
+ * at the size of the full picture, which the placement counts in.
+ */
+function startFromPhoto(photo: Photo) {
+  props.layer?.hidePhoto(photo.id);
+  const v = props.map.getView();
+  Object.assign(placement, currentPlacement(photo, v));
+  firstProjPerPx = placement.projPerPx;
+  view.value = v;
+  url.value = photoFileUrl(photo.mediumFilename ?? photo.filename);
+  bringIntoView();
+}
+
+/** Frames waited at most for the map to take the room the mode leaves it (the panel takes its side in landscape). */
+const RESIZE_FRAMES = 10;
+
+/** A photo whose centre is out of the map (under the panel) comes to the middle of the map, at the same zoom. */
+function bringIntoView(frames = RESIZE_FRAMES) {
+  const v = props.map.getView();
+  const { clientWidth: width, clientHeight: height } = props.mapEl;
+  if ((v.width !== width || v.height !== height) && frames > 0) {
+    requestAnimationFrame(() => bringIntoView(frames - 1));
+    return;
+  }
+  view.value = v;
+  const centre = centreOnMap();
+  if (centre.x >= 0 && centre.x <= width && centre.y >= 0 && centre.y <= height) return;
+  props.map.panBy(centre.x - width / 2, centre.y - height / 2);
+}
 
 /** The picture is read: the photo starts at the centre of the map, its longer side over most of the map. */
 function onLoad(event: Event) {
   const img = event.target as HTMLImageElement;
+  if (props.photo) {
+    size.value = { width: props.photo.width, height: props.photo.height };
+    return;
+  }
   size.value = { width: img.naturalWidth, height: img.naturalHeight };
   const v = props.map.getView();
   const centre = props.map.viewCenterSky();
@@ -162,6 +215,12 @@ const transform = computed(() =>
     ? affineToCSS(computeManualMatrix(placement, view.value, size.value.width, size.value.height))
     : 'none',
 );
+// A placed photo's picture may be its smaller copy: it is pinned to the full picture's size, as on the map.
+const photoStyle = computed(() => ({
+  transform: transform.value,
+  opacity: opacity.value,
+  ...(props.photo ? { width: `${props.photo.width}px`, height: `${props.photo.height}px` } : {}),
+}));
 
 const rotation = computed({
   get: () => Math.round(placement.rotationDeg),
@@ -260,6 +319,7 @@ function onUp(e: PointerEvent) {
 const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
 
 async function validate() {
+  if (props.photo) return reposition(props.photo);
   if (!file.value || !size.value || saving.value) return;
   saving.value = true;
   try {
@@ -282,8 +342,25 @@ async function validate() {
       dsoIds,
       displayName: stripExtension(file.value.name),
     });
-    await removePendingPhoto(props.pendingId);
+    if (props.pendingId) await removePendingPhoto(props.pendingId);
     emit('placed', photo);
+  } catch (error) {
+    void showError(error);
+  } finally {
+    saving.value = false;
+  }
+}
+
+/** The placed photo moved again: its new placement is stored, and the map shows it there at once. */
+async function reposition(photo: Photo) {
+  if (!size.value || saving.value) return;
+  saving.value = true;
+  try {
+    const manualPlacement: ManualPlacement = { ...placement };
+    await updatePhotoManualPlacement(photo.id, manualPlacement);
+    const moved = { ...photo, manualPlacement };
+    props.layer?.replacePhoto(moved);
+    emit('repositioned', moved);
   } catch (error) {
     void showError(error);
   } finally {
@@ -301,9 +378,9 @@ async function validate() {
       class="mob-placing-photo"
       :class="{ 'mob-placing-photo--ready': size }"
       :src="url"
-      :alt="file?.name"
+      :alt="file?.name ?? photo?.originalName"
       draggable="false"
-      :style="{ transform, opacity }"
+      :style="photoStyle"
       @load="onLoad"
       @pointerdown="onDown"
       @pointermove="onMove"

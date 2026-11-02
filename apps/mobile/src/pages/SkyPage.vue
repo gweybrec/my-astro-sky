@@ -166,8 +166,21 @@ useBackClose(() => skySelection.value !== null, clearSkySelection);
 
 // Placing a waiting photo by hand (board "Placer la photo"): the map takes the whole screen with the photo over it and
 // its settings under it. Annuler and the back button go back to where the placement was asked; a placed photo stays on
-// the map.
+// the map. Repositionner of a photo's sheet moves a placed photo again on the same screen: once done or given up, the
+// photo's sheet opens again.
 const placing = computed(() => skyPlacement.value);
+const placingKey = computed(() => {
+  const p = placing.value;
+  return p ? ('pendingId' in p ? p.pendingId : p.photoId) : undefined;
+});
+const repositioned = computed(() => {
+  const p = placing.value;
+  if (!p || !('photoId' in p)) return null;
+  return photoLayer.value?.getPlacedPhotos().find((placed) => placed.photo.id === p.photoId)?.photo;
+});
+function startReposition(photoId: string) {
+  skyPlacement.value = { photoId };
+}
 watch(placing, (now) => {
   if (now) clearSkySelection();
 });
@@ -176,8 +189,15 @@ watch(skySelection, (selection) => {
   if (selection && placing.value) clearSkySelection();
 });
 function cancelPlacement() {
+  const photo = repositioned.value;
   skyPlacement.value = null;
-  if (window.history.state?.back) router.back();
+  if (photo) skySelection.value = { kind: 'photo', photo };
+  else if (window.history.state?.back) router.back();
+}
+function photoRepositioned(photo: Photo) {
+  skyPlacement.value = null;
+  skySelection.value = { kind: 'photo', photo };
+  void reloadPhotos();
 }
 function photoPlaced(photo: Photo) {
   skyPlacement.value = null;
@@ -522,6 +542,7 @@ onBeforeUnmount(() => {
               @gallery="openInGallery(skySelection.photo.id)"
               @edit="editPhoto(skySelection.photo.id)"
               @order="openDrawOrder(skySelection.photo.id)"
+              @reposition="startReposition(skySelection.photo.id)"
             />
             <SkyObjectSheet
               v-else-if="skySelection && skySelection.kind !== 'photo'"
@@ -543,15 +564,18 @@ onBeforeUnmount(() => {
           </PhoneMapSheetHost>
         </main>
         <SkyPlacement
-          v-if="placing && skyMap && mapEl"
+          v-if="placing && skyMap && mapEl && ('pendingId' in placing || repositioned)"
           ref="placement"
-          :key="placing.pendingId"
+          :key="placingKey"
           :map="skyMap"
           :map-el="mapEl"
-          :pending-id="placing.pendingId"
+          :pending-id="'pendingId' in placing ? placing.pendingId : undefined"
+          :photo="repositioned ?? undefined"
+          :layer="repositioned ? (photoLayer ?? undefined) : undefined"
           :on-view="onSkyView"
           @cancel="cancelPlacement"
           @placed="photoPlaced"
+          @repositioned="photoRepositioned"
           @search="openSearch"
         />
         <SkyStarPick

@@ -244,7 +244,8 @@ export class PhotoLayer {
     }
 
     for (const placed of this.placedPhotos) {
-      if (!placed.visible) continue;
+      // A photo hidden by hidePhoto stays hidden: placing it would show it again.
+      if (!placed.visible || placed.pendingDelete) continue;
 
       // Fast viewport cull: if we have a cached centroid, check whether the photo
       // could possibly overlap the canvas before doing the full transform.

@@ -241,10 +241,15 @@ describe('the photo sheet', () => {
     expect(w.emitted('order')).toHaveLength(1);
   });
 
-  it('draws the screen that waits as the board does, and ignores its taps', async () => {
+  it('asks for the photo to be repositioned', async () => {
     const { w } = mountSheet();
-    expect(button(w, 'Repositionner').attributes('aria-disabled')).toBe('true');
-    expect(button(w, "Ordre d'affichage").attributes('aria-disabled')).toBeUndefined();
+    expect(button(w, 'Repositionner').attributes('aria-disabled')).toBeUndefined();
+    await button(w, 'Repositionner').trigger('click');
+    expect(w.emitted('reposition')).toHaveLength(1);
+  });
+
+  it('has the actions of the board, in its order', () => {
+    const { w } = mountSheet();
     expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([
       'Masquer',
       'Ouvrir dans la galerie',

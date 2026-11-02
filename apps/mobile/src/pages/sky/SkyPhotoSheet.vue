@@ -26,7 +26,7 @@ import trashIcon from '@icons/trash.svg?raw';
 // the objects it shows (a chip each, the most important catalogue first, two lines to a page in portrait and one in
 // landscape, pages swiped), what is known of it, read only, its opacity on the map and its actions; the body scrolls.
 // Hiding the photo, opening it in the gallery, editing its information and deleting it are done here; the display order
-// opens its page (`order`); repositioning waits for its screen.
+// opens its page (`order`), and repositioning the placement screen on the map (`reposition`).
 // It closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button.
 const props = defineProps<{ photo: Photo; layer: PhotoLayer }>();
 const emit = defineEmits<{
@@ -36,6 +36,7 @@ const emit = defineEmits<{
   gallery: [];
   edit: [];
   order: [];
+  reposition: [];
 }>();
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
@@ -156,7 +157,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       :step="0.05"
       :display="opacity.toFixed(2)"
     />
-    <!-- The screen behind repositioning is not built yet. The sheet's second stop is above this row. -->
+    <!-- The sheet's second stop is above this row. -->
     <div
       class="mob-icon-row"
       role="group"
@@ -172,7 +173,7 @@ const pageLabel = (n: number) => t('mobile.sky.pageOf', { n, total: pages.value.
       <PhoneIconButton :label="t('photos.openInGallery')" @click="emit('gallery')"
         ><AppIcon :svg="imageIcon"
       /></PhoneIconButton>
-      <PhoneIconButton waiting :label="t('photos.reposition')"
+      <PhoneIconButton :label="t('photos.reposition')" @click="emit('reposition')"
         ><AppIcon :svg="moveIcon"
       /></PhoneIconButton>
       <PhoneIconButton :label="t('photos.zOrder')" @click="emit('order')"
