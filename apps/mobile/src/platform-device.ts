@@ -6,6 +6,7 @@
  * `isNativePlatform()` of `platform-init.ts` is the only test of which platform this is.
  */
 import { Capacitor, SystemBars, SystemBarType } from '@capacitor/core';
+import { RAW_COMPANION_ACCEPT } from '@myastrosky/core/photo-formats';
 import { isNativePlatform } from './platform-init';
 
 export interface DevicePosition {
@@ -64,6 +65,12 @@ export const HORIZON_FILE_TYPES: FileTypes = {
 export const PHOTO_FILE_TYPES: FileTypes = {
   mimeTypes: [],
   extensions: ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.fit', '.fits', '.xisf'],
+};
+
+/** A solved companion file (WCS, FITS, TIFF, XISF) whose header fills a photo's metadata. */
+export const WCS_FILE_TYPES: FileTypes = {
+  mimeTypes: [],
+  extensions: RAW_COMPANION_ACCEPT.split(','),
 };
 
 /** What the plugin's pickers answer with. */

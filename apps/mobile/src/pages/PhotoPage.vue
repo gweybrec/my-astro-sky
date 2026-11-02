@@ -17,23 +17,30 @@ import AppIcon from '../components/AppIcon.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhotoInfoSheet from './gallery/PhotoInfoSheet.vue';
-import infoIcon from '../icons/info.svg?raw';
-import rotateIcon from '@icons/rotate-right-90.svg?raw';
+import PhotoViewButtons from './gallery/PhotoViewButtons.vue';
+import { pendingWcs, useWcsLoad } from '../composables/useWcsLoad';
+import moreIcon from '../icons/more-vertical.svg?raw';
 import resetIcon from '../icons/rotate-ccw.svg?raw';
 
 // A photo's own screen, from the boards "Photo, détail", "Photo, zoom" and "Photo, informations": the photo on a dark
 // stage, the top bar with the photo's name, and the sheet of its information. The whole photo is fitted under the bar,
 // so that nothing of it stays hidden behind the bar; zoomed, it runs behind the bar, which stays readable over it. Two
 // fingers and a double tap zoom; the button that shows the photo whole again is there only while it is zoomed. The
-// sheet's toggles draw the photo's objects and points of interest over it (board "Photo, objets affichés"). "Faire
+// top bar's "Affichage" button opens a column of buttons (board "Photo, boutons d'affichage"): the map, the photo's
+// objects and points of interest drawn over it (board "Photo, objets affichés"), turning it and its information. "Faire
 // pivoter à droite" shows the photo turned a quarter more (as the desktop's photo detail): its file is not changed, and
-// the photo keeps its place on the sky.
+// the photo keeps its place on the sky. One tap on the photo hides the bar and the buttons (board "Photo, barres
+// masquées"), another brings them back. The sheet's "Charger un fichier WCS" reads the file, then opens the photo's
+// editor with what it found filled in, to be checked and saved there.
 const route = useRoute();
 const router = useRouter();
 
 const photo = ref<Photo | null>(null);
 const infoOpen = ref(false);
+const buttonsOpen = ref(false);
+const barsHidden = ref(false);
 const turning = ref(false);
+const { loading: wcsLoading, read: readWcs } = useWcsLoad();
 const { showError } = useErrorToast();
 // The photo as it is shown, turned: the zoom and what is drawn over it work in its pixels.
 const shown = computed(() => (photo.value ? photoAsShown(photo.value) : null));
@@ -44,10 +51,14 @@ const broken = ref(false);
 
 // The part of the stage under the top bar: the whole photo is fitted in it.
 const area = ref<HTMLElement | null>(null);
-const { zoom, zoomed, transform, reset, handlers } = usePhotoZoom(area, () => ({
-  width: shown.value?.width ?? 0,
-  height: shown.value?.height ?? 0,
-}));
+const { zoom, zoomed, transform, reset, handlers } = usePhotoZoom(
+  area,
+  () => ({
+    width: shown.value?.width ?? 0,
+    height: shown.value?.height ?? 0,
+  }),
+  { onSingleTap: () => (barsHidden.value = !barsHidden.value) },
+);
 
 // What is drawn over the photo: off at first, as on the desktop; the catalogues start from the map's and are this
 // photo's own choice afterwards.
@@ -121,6 +132,15 @@ function edit() {
   infoOpen.value = false;
   void router.push(`/gallery/photo/${photo.value.id}/edit`);
 }
+
+async function loadWcs() {
+  if (!photo.value) return;
+  const photoId = photo.value.id;
+  const result = await readWcs(photo.value);
+  if (!result || photo.value?.id !== photoId) return;
+  pendingWcs.value = { photoId, result };
+  edit();
+}
 </script>
 
 <template>
@@ -129,6 +149,7 @@ function edit() {
       <div class="mob-page-fill mob-photo-frame">
         <div class="mob-stage mob-stage--viewer mob-photo-stage" v-on="handlers">
           <header
+            v-show="!barsHidden"
             class="mob-topbar mob-topbar--overlay mob-photo-bar"
             @pointerdown.stop
             @touchstart.stop
@@ -137,14 +158,11 @@ function edit() {
             <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ title }}</h1>
             <PhoneIconButton
               float
-              :disabled="!photo || turning"
-              :label="t('gallery.rotatePhotoRight')"
-              @click="rotate"
+              :expanded="buttonsOpen"
+              :label="t('mobile.photo.display')"
+              @click="buttonsOpen = !buttonsOpen"
             >
-              <AppIcon :svg="rotateIcon" />
-            </PhoneIconButton>
-            <PhoneIconButton float :label="t('mobile.photo.info')" @click="infoOpen = true">
-              <AppIcon :svg="infoIcon" />
+              <AppIcon :svg="moreIcon" />
             </PhoneIconButton>
           </header>
           <div ref="area" class="mob-photo-area">
@@ -165,8 +183,21 @@ function edit() {
             </template>
             <canvas ref="overlay" class="mob-photo-overlay" aria-hidden="true" />
           </div>
+          <PhotoViewButtons
+            v-show="buttonsOpen && !barsHidden"
+            v-model:objects="showObjects"
+            v-model:pois="showPois"
+            :can-show-objects="canShowObjects"
+            :can-show-pois="canShowPois"
+            :turning="!photo || turning"
+            @pointerdown.stop
+            @touchstart.stop
+            @map="showOnMap"
+            @rotate="rotate"
+            @info="infoOpen = true"
+          />
           <PhoneIconButton
-            v-if="zoomed"
+            v-if="zoomed && !barsHidden"
             float
             class="mob-float-br"
             :label="t('mobile.photo.resetZoom')"
@@ -181,14 +212,12 @@ function edit() {
       <PhotoInfoSheet
         v-if="photo"
         v-model:open="infoOpen"
-        v-model:objects="showObjects"
-        v-model:pois="showPois"
         v-model:catalogs="catalogs"
         :photo="photo"
-        :can-show-objects="canShowObjects"
-        :can-show-pois="canShowPois"
-        @map="showOnMap"
+        :objects="showObjects"
+        :wcs-loading="wcsLoading"
         @edit="edit"
+        @wcs="loadWcs"
         @removed="backToGallery"
       />
     </IonContent>

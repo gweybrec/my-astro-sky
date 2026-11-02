@@ -10,6 +10,7 @@ import { isPhotoSolved, mergeIdentifiedPois } from '@myastrosky/core/photo-ident
 import {
   draftFromPhoto,
   draftToMetadata,
+  fillDraftFromWcs,
   filterLabelCandidates,
   isDraftDirty,
   type PhotoMetadataDraft,
@@ -17,7 +18,7 @@ import {
 import { resolveCategory } from '@myastrosky/core/poi';
 import { searchDSOs } from '@myastrosky/core/search';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
-import type { Photo } from '@myastrosky/core/types';
+import type { Photo, PlateSolveResult } from '@myastrosky/core/types';
 import {
   getGearSetups,
   getPhotos,
@@ -29,6 +30,7 @@ import { catalogsReady } from '../catalogs';
 import { useBackClose } from '../composables/useBackClose';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
+import { pendingWcs, useWcsLoad } from '../composables/useWcsLoad';
 import { receivePois } from '../identify-session';
 import { poiTypeIcon } from '../poi-icons';
 import AppIcon from '../components/AppIcon.vue';
@@ -55,11 +57,13 @@ import supernovaIcon from '@icons/poi-supernova.svg?raw';
 // The board "Photo, modifier les infos": the form of a photo's metadata, with what the desktop's editor does
 // (`MetadataEditorPanel.vue`): nothing is saved before Enregistrer, and leaving with changes asks first. The points of
 // interest added by hand or found by an identification join the form (`receivePois`), as the desktop's PoiEditor.
-// Reading a WCS file waits for its screen.
+// "Charger un fichier WCS" fills only the empty fields from a solved file's header, unsaved as the rest; a file read
+// from the photo's sheet (`pendingWcs`) is filled in the same way when the form opens.
 const route = useRoute();
 const router = useRouter();
 const { confirm } = useConfirm();
-const { showError } = useErrorToast();
+const { showError, showNotice } = useErrorToast();
+const { loading: wcsLoading, read: readWcs } = useWcsLoad();
 const categoriesStore = usePoiCategoriesStore();
 
 const photo = ref<Photo | null>(null);
@@ -96,6 +100,10 @@ onMounted(async () => {
     Object.assign(draft, draftFromPhoto(found));
     original.value = draftFromPhoto(found);
     photo.value = found;
+    if (pendingWcs.value?.photoId === found.id) {
+      applyWcs(pendingWcs.value.result);
+      pendingWcs.value = null;
+    }
     knownLabels.value = [...new Set(photos.flatMap((p) => p.labels))];
     setups.value = await getGearSetups();
     void categoriesStore.ensureLoaded();
@@ -107,6 +115,20 @@ onMounted(async () => {
 });
 
 const dirty = computed(() => original.value !== null && isDraftDirty(draft, original.value));
+
+// ── WCS file ──────────────────────────────────────────────────────────────────────────────────────
+
+function applyWcs(result: PlateSolveResult) {
+  const { patch, filled } = fillDraftFromWcs(draft, result);
+  Object.assign(draft, patch);
+  void showNotice(filled > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'));
+}
+
+async function loadWcs() {
+  if (!photo.value) return;
+  const result = await readWcs(photo.value);
+  if (result) applyWcs(result);
+}
 /** The desktop's texts start with a "+" that the board draws as an icon. */
 const withoutPlus = (text: string) => text.replace(/^\+\s*/, '');
 
@@ -513,9 +535,10 @@ async function save() {
           :placeholder="t('modal.metadataNotesPlaceholder')"
         />
 
-        <!-- Reading a WCS file needs a message the boards do not draw yet: the button shows and does nothing. -->
         <div class="mob-form-row mob-section-gap">
-          <PhoneButton block waiting>{{ t('gallery.loadFromWcs') }}</PhoneButton>
+          <PhoneButton block :disabled="wcsLoading" @click="loadWcs">
+            {{ wcsLoading ? t('gallery.loadFromWcsLoading') : t('gallery.loadFromWcs') }}
+          </PhoneButton>
         </div>
       </div>
     </IonContent>

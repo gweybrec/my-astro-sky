@@ -152,6 +152,8 @@ const en: Translations['mobile'] = {
   photo: {
     info: 'Photo information',
     resetZoom: 'Reset zoom',
+    display: 'Display',
+    edit: 'Edit',
     totalExposure: 'Total exposure',
     actions: 'Photo actions',
     removeChip: 'Remove {name}',

@@ -151,6 +151,8 @@ const fr = {
   photo: {
     info: 'Informations sur la photo',
     resetZoom: 'Réinitialiser le zoom',
+    display: 'Affichage',
+    edit: 'Modifier',
     totalExposure: 'Exposition totale',
     actions: 'Actions sur la photo',
     removeChip: 'Retirer {name}',

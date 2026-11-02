@@ -7,8 +7,10 @@ const getPhotos = vi.fn();
 const getGearSetups = vi.fn();
 const deletePhotoAPI = vi.fn();
 const rotatePhotoAPI = vi.fn();
+const solveWCS = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   rotatePhotoAPI: (...a: unknown[]) => rotatePhotoAPI(...a),
+  solveWCS: (...a: unknown[]) => solveWCS(...a),
   getPhotos: () => getPhotos(),
   getGearSetups: () => getGearSetups(),
   deletePhotoAPI: (...a: unknown[]) => deletePhotoAPI(...a),
@@ -23,8 +25,11 @@ vi.mock('vue-router', () => ({
 }));
 
 const setStatusBarHidden = vi.fn();
+const pickFile = vi.fn();
 vi.mock('../src/platform-device', () => ({
   setStatusBarHidden: (hidden: boolean) => setStatusBarHidden(hidden),
+  pickFile: (...a: unknown[]) => pickFile(...a),
+  WCS_FILE_TYPES: { mimeTypes: [], extensions: ['.fits'] },
 }));
 
 const confirm = vi.fn();
@@ -73,8 +78,9 @@ import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { createPinia, setActivePinia } from 'pinia';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import { skyPhotoFocus } from '../src/composables/useSkySelection';
+import { pendingWcs } from '../src/composables/useWcsLoad';
 
-/** "Photo, détail", "Photo, zoom" and "Photo, informations": a photo's own screen. */
+/** "Photo, détail", "Photo, zoom", "Photo, informations", "Photo, boutons d'affichage", "Photo, barres masquées". */
 
 const photo = (over: Partial<Photo> = {}): Photo =>
   ({
@@ -98,6 +104,11 @@ const photo = (over: Partial<Photo> = {}): Photo =>
 const mountPage = () => mount(PhotoPage, { global: { stubs: ionicStubs } });
 const button = (w: ReturnType<typeof mountPage>, name: string) =>
   w.findAll('button').find((b) => b.attributes('aria-label') === name)!;
+/** A button of the sheet, named by its text. */
+const labelled = (w: ReturnType<typeof mountPage>, text: string) =>
+  w.findAll('.mob-photo-actions button').find((b) => b.text() === text)!;
+const shown = (w: ReturnType<typeof mountPage>, selector: string) =>
+  (w.find(selector).element as HTMLElement).style.display !== 'none';
 const facts = (w: ReturnType<typeof mountPage>) =>
   w
     .findAll('.mob-fact')
@@ -115,6 +126,9 @@ describe("a photo's own screen", () => {
     push.mockReset();
     solved.value = true;
     skyPhotoFocus.value = null;
+    pendingWcs.value = null;
+    pickFile.mockReset();
+    solveWCS.mockReset();
     configureStorage(createMemoryStore());
     setActivePinia(createPinia());
     findDsoPlacementsInImage.mockReset().mockReturnValue([{ dso: { id: 'M31' }, x: 5, y: 5 }]);
@@ -131,9 +145,64 @@ describe("a photo's own screen", () => {
     expect(picture.attributes('src')).toBe('/uploads/m31.jpg');
     expect(picture.attributes('alt')).toBe('M31_2025-09-14_stack.jpg');
     expect(w.findAll('.mob-topbar--overlay button').map((b) => b.attributes('aria-label'))).toEqual(
-      ['Retour', 'Faire pivoter à droite', 'Informations sur la photo'],
+      ['Retour', 'Affichage'],
     );
     expect(button(w, 'Réinitialiser le zoom')).toBeUndefined();
+  });
+
+  it('"Affichage" opens and closes the column of buttons under it', async () => {
+    const w = mountPage();
+    await flushPromises();
+    expect(button(w, 'Affichage').attributes('aria-expanded')).toBe('false');
+    expect(shown(w, '.mob-photo-buttons')).toBe(false);
+    await button(w, 'Affichage').trigger('click');
+    expect(button(w, 'Affichage').attributes('aria-expanded')).toBe('true');
+    expect(shown(w, '.mob-photo-buttons')).toBe(true);
+    expect(w.findAll('.mob-photo-buttons button').map((b) => b.attributes('aria-label'))).toEqual([
+      'Voir sur la carte',
+      'Afficher les objets',
+      "Afficher les points d'intérêt",
+      'Faire pivoter à droite',
+      'Informations sur la photo',
+    ]);
+    await button(w, 'Affichage').trigger('click');
+    expect(shown(w, '.mob-photo-buttons')).toBe(false);
+  });
+
+  it('one tap on the photo hides the bar and the buttons, another brings them back; a double tap still zooms', async () => {
+    const w = mountPage();
+    await flushPromises();
+    await button(w, 'Affichage').trigger('click');
+    const stage = w.find('.mob-photo-stage');
+    (w.find('.mob-photo-area').element as HTMLElement).getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 400, height: 800 }) as DOMRect;
+    const tap = (at: number) => {
+      const init = { pointerId: 1, clientX: 200, clientY: 400 };
+      const down = new PointerEvent('pointerdown', init);
+      const up = new PointerEvent('pointerup', init);
+      Object.defineProperty(down, 'timeStamp', { value: at });
+      Object.defineProperty(up, 'timeStamp', { value: at + 40 });
+      stage.element.dispatchEvent(down);
+      stage.element.dispatchEvent(up);
+    };
+    const later = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await flushPromises();
+    };
+    tap(0);
+    await later();
+    expect(shown(w, '.mob-photo-bar')).toBe(false);
+    expect(shown(w, '.mob-photo-buttons')).toBe(false);
+    tap(1000);
+    await later();
+    expect(shown(w, '.mob-photo-bar')).toBe(true);
+    expect(shown(w, '.mob-photo-buttons')).toBe(true);
+    // two taps close together zoom and leave the bars as they are
+    tap(5000);
+    tap(5120);
+    await later();
+    expect(w.find('img.mob-photo-view').attributes('style')).toContain('scale(3)');
+    expect(shown(w, '.mob-photo-bar')).toBe(true);
   });
 
   it('shows the name of the photo when the picture cannot be read', async () => {
@@ -228,11 +297,9 @@ describe("a photo's own screen", () => {
     expect(w.find('.mob-facts').classes()).toContain('mob-photo-facts');
     expect(w.find('.mob-fact-value .m-mono').text()).toBe('L 60 × 180 s · R 20 × 240 s');
     expect(w.find('.mob-sheet-modal').classes()).toContain('mob-sheet-modal--third');
-    expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([
-      'Voir sur la carte',
-      'Modifier les métadonnées',
-      'Afficher les objets',
-      "Afficher les points d'intérêt",
+    expect(w.findAll('.mob-photo-actions button').map((b) => b.text())).toEqual([
+      'Charger un fichier WCS (fits/tiff)',
+      'Modifier',
       'Supprimer',
     ]);
   });
@@ -261,10 +328,10 @@ describe("a photo's own screen", () => {
     const w = mountPage();
     await flushPromises();
     confirm.mockResolvedValueOnce(false);
-    await button(w, 'Supprimer').trigger('click');
+    await labelled(w, 'Supprimer').trigger('click');
     await flushPromises();
     expect(deletePhotoAPI).not.toHaveBeenCalled();
-    await button(w, 'Supprimer').trigger('click');
+    await labelled(w, 'Supprimer').trigger('click');
     await flushPromises();
     expect(confirm.mock.calls[1][0].message).toContain('M31_2025-09-14_stack.jpg');
     expect(deletePhotoAPI).toHaveBeenCalledWith('p1');
@@ -275,24 +342,19 @@ describe("a photo's own screen", () => {
     deletePhotoAPI.mockRejectedValue(new Error('disk'));
     const w = mountPage();
     await flushPromises();
-    await button(w, 'Supprimer').trigger('click');
+    await labelled(w, 'Supprimer').trigger('click');
     await flushPromises();
     expect(showError).toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('turns the photo right from the top bar and shows it turned, whole again', async () => {
+  it('turns the photo right from its buttons and shows it turned, whole again', async () => {
     rotatePhotoAPI.mockResolvedValue(photo({ quarterTurns: 1 }));
     const w = mountPage();
     await flushPromises();
     const turn = button(w, 'Faire pivoter à droite');
     // a quarter arc with its arrow (docs/dev/curved-arrow-svg.md), not the reload circle
     expect(turn.html()).toContain('A 13 13 0 0 1 18 19');
-    // before the information button, as the board
-    const bar = w.findAll('.mob-photo-bar button').map((b) => b.attributes('aria-label'));
-    expect(bar.indexOf('Faire pivoter à droite')).toBe(
-      bar.indexOf('Informations sur la photo') - 1,
-    );
     await turn.trigger('click');
     await flushPromises();
     expect(rotatePhotoAPI).toHaveBeenCalledWith('p1');
@@ -314,12 +376,43 @@ describe("a photo's own screen", () => {
     expect(button(w, 'Faire pivoter à droite').attributes('disabled')).toBeUndefined();
   });
 
-  it('opens the edit page of the photo from the pen', async () => {
+  it('opens the edit page of the photo from the sheet', async () => {
     push.mockReset();
     const w = mountPage();
     await flushPromises();
-    await button(w, 'Modifier les métadonnées').trigger('click');
+    await labelled(w, 'Modifier').trigger('click');
     expect(push).toHaveBeenCalledWith('/gallery/photo/p1/edit');
+  });
+
+  it('reads a WCS file from the sheet, then opens the editor with what it found', async () => {
+    const file = new File(['x'], 'm31.fits');
+    pickFile.mockResolvedValue(file);
+    const result = { success: true, dateObs: '2025-09-14T21:30:00Z' };
+    solveWCS.mockResolvedValue(result);
+    const w = mountPage();
+    await flushPromises();
+    await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
+    await flushPromises();
+    // the photo's size, so that the solution is scaled to the photo
+    expect(solveWCS).toHaveBeenCalledWith(file, 4000, 2000);
+    expect(pendingWcs.value).toEqual({ photoId: 'p1', result });
+    expect(push).toHaveBeenCalledWith('/gallery/photo/p1/edit');
+  });
+
+  it('stays on the photo when the WCS file is not chosen or cannot be read', async () => {
+    const w = mountPage();
+    await flushPromises();
+    pickFile.mockResolvedValueOnce(null);
+    await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
+    await flushPromises();
+    expect(solveWCS).not.toHaveBeenCalled();
+    pickFile.mockResolvedValueOnce(new File(['x'], 'bad.fits'));
+    solveWCS.mockResolvedValueOnce({ success: false, code: 'NO_WCS' });
+    await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
+    await flushPromises();
+    expect(showError).toHaveBeenCalled();
+    expect(pendingWcs.value).toBeNull();
+    expect(push).not.toHaveBeenCalled();
   });
 
   describe('the objects and points of interest drawn over the photo ("Photo, objets affichés")', () => {

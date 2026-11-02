@@ -1398,6 +1398,22 @@ ion-modal.mob-sheet-modal.mob-sheet-modal .mob-sheet.mob-sheet--fixed {
   /* As low as its buttons: the room goes to the photo. */
   min-height: calc(var(--mobile-touch-min) + var(--safe-top, 0px));
 }
+/* The photo's column of buttons (board "Photo, boutons d'affichage"): 8px under the top bar's buttons, as the map's
+   column is under its top row. */
+.mob-map-ribbon.mob-photo-buttons {
+  top: calc(var(--safe-top, 0px) + var(--mobile-touch-min) + var(--space-4));
+}
+/* The sheet's actions (board "Photo, informations"): the WCS file across the width, then editing and deleting. */
+.mob-photo-actions {
+  padding-top: var(--space-4);
+}
+.mob-form-row--field + .mob-photo-actions {
+  padding-top: 0;
+}
+.mob-photo-actions .mob-btn-row {
+  padding-top: var(--space-4);
+  padding-bottom: var(--mobile-gutter);
+}
 .mob-photo-area {
   position: relative;
   flex: 1;

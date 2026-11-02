@@ -13,38 +13,30 @@ import { useErrorToast } from '../../composables/useErrorToast';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneBadge from '../../components/PhoneBadge.vue';
 import PhotoFacts from '../../components/PhotoFacts.vue';
-import PhoneIconButton from '../../components/PhoneIconButton.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
 import SkyCheckSheet from '../sky/SkyCheckSheet.vue';
 import { dsoCatalogOptions } from '../../catalog-options';
 import caretIcon from '../../icons/chevron-down.svg?raw';
-import galaxyIcon from '@icons/dso-galaxy.svg?raw';
-import poiIcon from '@icons/poi-comet.svg?raw';
 import AppIcon from '../../components/AppIcon.vue';
-import mapPinIcon from '@icons/map-pin.svg?raw';
-import penIcon from '@icons/pen.svg?raw';
-import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Photo, informations": the first object of the photo with its type and constellation, what is known of the
 // photo, read only (only the facts it has; the sheet is at most a third of the screen in portrait and its body scrolls),
-// and its actions: showing it on the map, editing its information, drawing its objects and its points of interest over
-// it (board "Photo, objets affichés": two toggles, as the desktop's photo detail; objects need a photo placed on the
-// sky, points of interest a position; the "Catalogues" field, while objects are drawn, chooses which) and deleting it.
+// and its actions: reading a WCS file into its information, editing it and deleting it. While its objects are drawn
+// over the photo (board "Photo, objets affichés"; the toggle is among the photo's buttons), the "Catalogues" field
+// chooses which.
 const props = defineProps<{
   open: boolean;
   photo: Photo;
-  canShowObjects?: boolean;
-  canShowPois?: boolean;
+  objects?: boolean;
+  wcsLoading?: boolean;
 }>();
-const objects = defineModel<boolean>('objects', { default: false });
-const pois = defineModel<boolean>('pois', { default: false });
 const catalogs = defineModel<string[]>('catalogs', { default: () => [] });
 const catalogsOpen = ref(false);
 const catalogOptions = dsoCatalogOptions();
 const emit = defineEmits<{
   'update:open': [open: boolean];
-  map: [];
   edit: [];
+  wcs: [];
   removed: [];
 }>();
 const { confirm } = useConfirm();
@@ -122,36 +114,22 @@ async function remove() {
         <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
       </PhoneButton>
     </div>
-    <!-- The sheet stops above this row before it shows everything. -->
+    <!-- The sheet stops above these buttons before it shows everything. -->
     <div
-      class="mob-icon-row"
+      class="mob-photo-actions"
       role="group"
       :aria-label="t('mobile.photo.actions')"
       data-sheet-stop="before"
     >
-      <PhoneIconButton :label="t('gallery.showOnMap')" @click="emit('map')">
-        <AppIcon :svg="mapPinIcon" />
-      </PhoneIconButton>
-      <PhoneIconButton :label="t('gallery.editMetadata')" @click="emit('edit')"
-        ><AppIcon :svg="penIcon"
-      /></PhoneIconButton>
-      <PhoneIconButton
-        :disabled="!canShowObjects"
-        :pressed="objects"
-        :label="t('gallery.showDsos')"
-        @click="objects = !objects"
-        ><AppIcon :svg="galaxyIcon"
-      /></PhoneIconButton>
-      <PhoneIconButton
-        :disabled="!canShowPois"
-        :pressed="pois"
-        :label="t('gallery.showPois')"
-        @click="pois = !pois"
-        ><AppIcon :svg="poiIcon"
-      /></PhoneIconButton>
-      <PhoneIconButton danger :label="t('photos.delete')" @click="remove">
-        <AppIcon :svg="trashIcon" />
-      </PhoneIconButton>
+      <div class="mob-form-row">
+        <PhoneButton block :disabled="wcsLoading" @click="emit('wcs')">
+          {{ wcsLoading ? t('gallery.loadFromWcsLoading') : t('gallery.loadFromWcs') }}
+        </PhoneButton>
+      </div>
+      <div class="mob-btn-row">
+        <PhoneButton @click="emit('edit')">{{ t('mobile.photo.edit') }}</PhoneButton>
+        <PhoneButton variant="danger" @click="remove">{{ t('photos.delete') }}</PhoneButton>
+      </div>
     </div>
     <SkyCheckSheet
       v-model:open="catalogsOpen"

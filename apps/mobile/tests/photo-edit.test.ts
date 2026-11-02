@@ -6,7 +6,9 @@ import { ionicStubs } from './helpers';
 const getPhotos = vi.fn();
 const getGearSetups = vi.fn();
 const updatePhotoMetadata = vi.fn();
+const solveWCS = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
+  solveWCS: (...a: unknown[]) => solveWCS(...a),
   getPhotos: () => getPhotos(),
   getGearSetups: () => getGearSetups(),
   updatePhotoMetadata: (...a: unknown[]) => updatePhotoMetadata(...a),
@@ -28,11 +30,19 @@ vi.mock('vue-router', () => ({
 
 const confirm = vi.fn();
 const showError = vi.fn();
+const showNotice = vi.fn();
+const pickFile = vi.fn();
+vi.mock('../src/platform-device', () => ({
+  pickFile: (...a: unknown[]) => pickFile(...a),
+  WCS_FILE_TYPES: { mimeTypes: [], extensions: ['.fits'] },
+}));
 vi.mock('../src/composables/useConfirm', () => ({
   useConfirm: () => ({ confirm }),
   showInfo: vi.fn(),
 }));
-vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+vi.mock('../src/composables/useErrorToast', () => ({
+  useErrorToast: () => ({ showError, showNotice }),
+}));
 vi.mock('../src/composables/useBackClose', () => ({ useBackClose: vi.fn() }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
 
@@ -53,6 +63,7 @@ vi.mock('@myastrosky/core/search', () => ({
 import PhotoEditPage from '../src/pages/PhotoEditPage.vue';
 import { deliverPois } from '../src/identify-session';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
+import { pendingWcs } from '../src/composables/useWcsLoad';
 
 /** "Photo, modifier les infos": the form of a photo's metadata. */
 
@@ -115,6 +126,10 @@ describe("a photo's edit page", () => {
     updatePhotoMetadata.mockReset().mockResolvedValue(undefined);
     confirm.mockReset().mockResolvedValue(true);
     showError.mockReset();
+    showNotice.mockReset();
+    pickFile.mockReset();
+    solveWCS.mockReset();
+    pendingWcs.value = null;
     replace.mockReset();
     back.mockReset();
   });
@@ -319,6 +334,76 @@ describe("a photo's edit page", () => {
     await save(w);
     expect(showError).toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  describe('"Charger un fichier WCS"', () => {
+    const empty = { observationDate: null, integrations: [], captureDetails: {} };
+    const read = {
+      success: true,
+      dateObs: '2025-10-01T20:00:00Z',
+      expTime: 300,
+      stackCnt: 12,
+      filter: 'Ha',
+    };
+
+    it('fills only the empty fields from the file, unsaved until Enregistrer', async () => {
+      getPhotos.mockResolvedValue([photo(empty)]);
+      const file = new File(['x'], 'm31.fits');
+      pickFile.mockResolvedValue(file);
+      solveWCS.mockResolvedValue(read);
+      const w = await mountPage();
+      await byText(w, 'button', 'Charger un fichier WCS (fits/tiff)').trigger('click');
+      await flushPromises();
+      expect(solveWCS).toHaveBeenCalledWith(file, 4000, 2000);
+      expect(showNotice).toHaveBeenCalledWith('Métadonnées chargées depuis le fichier');
+      expect(updatePhotoMetadata).not.toHaveBeenCalled();
+      await save(w);
+      expect(saved().observationDate).toBe('2025-10-01T20:00:00Z');
+      expect(saved().integrations).toEqual([{ frames: 12, seconds: 300, filter: 'Ha' }]);
+    });
+
+    it('keeps what the photo already has, and says nothing new was found', async () => {
+      pickFile.mockResolvedValue(new File(['x'], 'm31.fits'));
+      solveWCS.mockResolvedValue({ success: true, dateObs: '2025-10-01T20:00:00Z' });
+      const w = await mountPage();
+      await byText(w, 'button', 'Charger un fichier WCS (fits/tiff)').trigger('click');
+      await flushPromises();
+      expect(showNotice).toHaveBeenCalledWith(
+        'Aucune nouvelle métadonnée trouvée (valeurs conservées)',
+      );
+      await save(w);
+      expect(saved().observationDate).toBe('2025-09-14T12:00:00.000Z');
+    });
+
+    it('says so with a red toast when the file cannot be read', async () => {
+      pickFile.mockResolvedValue(new File(['x'], 'bad.fits'));
+      solveWCS.mockResolvedValue({ success: false, code: 'NO_WCS' });
+      const w = await mountPage();
+      await byText(w, 'button', 'Charger un fichier WCS (fits/tiff)').trigger('click');
+      await flushPromises();
+      expect(showError).toHaveBeenCalled();
+      expect(showNotice).not.toHaveBeenCalled();
+    });
+
+    it("fills the form with a file read from the photo's sheet, and asks before leaving it unsaved", async () => {
+      getPhotos.mockResolvedValue([photo(empty)]);
+      pendingWcs.value = { photoId: 'p1', result: read as never };
+      const w = await mountPage();
+      expect(pendingWcs.value).toBeNull();
+      expect(showNotice).toHaveBeenCalledWith('Métadonnées chargées depuis le fichier');
+      confirm.mockResolvedValueOnce(false);
+      await byText(w, 'button', 'Annuler').trigger('click');
+      await flushPromises();
+      expect(confirm).toHaveBeenCalled();
+      expect(back).not.toHaveBeenCalled();
+    });
+
+    it("leaves another photo's file alone", async () => {
+      pendingWcs.value = { photoId: 'p2', result: read as never };
+      await mountPage();
+      expect(pendingWcs.value).not.toBeNull();
+      expect(showNotice).not.toHaveBeenCalled();
+    });
   });
 
   it('goes back to the gallery when the photo no longer exists', async () => {

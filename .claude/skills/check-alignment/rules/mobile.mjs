@@ -980,12 +980,25 @@ export const views = [
     ],
   },
   { name: 'photo', path: (ids) => `/gallery/photo/${ids.photo}`, ready: '.mob-photo-view' },
+  // The column the top bar's "Affichage" button opens (board "Photo, boutons d'affichage").
+  {
+    name: 'photo-buttons',
+    path: (ids) => `/gallery/photo/${ids.photo}`,
+    ready: '.mob-photo-view',
+    open: [
+      { click: '.mob-topbar--overlay ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-photo-buttons ion-button' },
+      { pause: 300 },
+    ],
+  },
   {
     name: 'photo-info',
     path: (ids) => `/gallery/photo/${ids.photo}`,
     ready: '.mob-photo-view',
     open: [
       { click: '.mob-topbar--overlay ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-photo-buttons ion-button' },
+      { click: '.mob-photo-buttons ion-button:last-of-type' },
       { wait: '.mob-sheet' },
       { pause: 600 },
     ],
@@ -996,8 +1009,8 @@ export const views = [
     path: (ids) => `/gallery/photo/${ids.photo}/edit`,
     ready: '.mob-integration',
   },
-  // The objects drawn over the seed's photo: its sheet with the objects toggle on and the catalogues field under the
-  // facts (board "Photo, objets affichés"). Then each identification page (SkyBoT, TNS and the MPC answer from
+  // The objects drawn over the seed's photo: the objects toggle of its column on, then its sheet with the catalogues
+  // field under the facts (board "Photo, objets affichés"). Then each identification page (SkyBoT, TNS and the MPC answer from
   // `fixtures`).
   {
     name: 'photo-objects',
@@ -1005,9 +1018,11 @@ export const views = [
     ready: '.mob-photo-view',
     open: [
       { click: '.mob-topbar--overlay ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-photo-buttons ion-button' },
+      { click: '.mob-photo-buttons ion-button:nth-of-type(2)' },
+      { click: '.mob-photo-buttons ion-button:last-of-type' },
       { wait: OPEN_SHEET },
       { pause: 600 },
-      { click: `${OPEN_SHEET} .mob-icon-row ion-button:nth-of-type(3)` },
       { wait: `${OPEN_SHEET} .mob-form-row--field` },
       { pause: 600 },
     ],

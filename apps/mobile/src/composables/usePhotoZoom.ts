@@ -57,11 +57,13 @@ export function zoomToward(zoom: PhotoZoom, point: { x: number; y: number }, fac
  * Zoom of the photo viewer (boards "Photo, détail" and "Photo, zoom"): two fingers zoom around their middle, one finger
  * moves a zoomed photo, a double tap zooms in on the spot and, on a zoomed photo, shows it whole again.
  * With `onTap` (board "Identifier les étoiles"), a tap is given to it at once instead, and a double tap does not zoom.
+ * With `onSingleTap` (board "Photo, barres masquées"), a tap that no second tap follows is given to it once the
+ * double tap's time has passed.
  */
 export function usePhotoZoom(
   viewer: Ref<HTMLElement | null>,
   photo: () => Size,
-  options: { onTap?: (x: number, y: number) => void } = {},
+  options: { onTap?: (x: number, y: number) => void; onSingleTap?: () => void } = {},
 ) {
   const zoom = ref<PhotoZoom>(WHOLE);
   const zoomed = computed(() => zoom.value.scale > 1);
@@ -72,6 +74,12 @@ export function usePhotoZoom(
   const fingers = new Map<number, { x: number; y: number }>();
   let moved = false;
   let lastTap: { at: number; x: number; y: number } | null = null;
+  let singleTapTimer: ReturnType<typeof setTimeout> | undefined;
+  const cancelSingleTap = () => {
+    clearTimeout(singleTapTimer);
+    singleTapTimer = undefined;
+  };
+  onBeforeUnmount(cancelSingleTap);
 
   function box() {
     const rect = viewer.value?.getBoundingClientRect();
@@ -129,6 +137,7 @@ export function usePhotoZoom(
     if (!fingers.delete(event.pointerId)) return;
     if (fingers.size > 0 || moved) {
       lastTap = null;
+      cancelSingleTap();
       return;
     }
     if (options.onTap) {
@@ -141,7 +150,12 @@ export function usePhotoZoom(
       tap.at - lastTap.at < DOUBLE_TAP_MS &&
       Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < TAP_SLOP * 2;
     lastTap = double ? null : tap;
-    if (!double) return;
+    cancelSingleTap();
+    if (!double) {
+      const onSingleTap = options.onSingleTap;
+      if (onSingleTap) singleTapTimer = setTimeout(onSingleTap, DOUBLE_TAP_MS);
+      return;
+    }
     if (zoomed.value) reset();
     else apply(zoomToward(zoom.value, fromCentre(tap.x, tap.y), DOUBLE_TAP_ZOOM));
   }
@@ -149,6 +163,7 @@ export function usePhotoZoom(
   function onPointerCancel(event: PointerEvent) {
     fingers.delete(event.pointerId);
     lastTap = null;
+    cancelSingleTap();
   }
 
   function reset() {

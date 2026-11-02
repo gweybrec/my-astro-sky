@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import {
@@ -55,13 +55,13 @@ describe('the photo zoom', () => {
   });
 
   /** A viewer of 400 x 800 at the screen's corner, holding a 4000 x 2000 photo. */
-  function mountViewer() {
+  function mountViewer(options: Parameters<typeof usePhotoZoom>[2] = {}) {
     let zoom!: ReturnType<typeof usePhotoZoom>;
     const wrapper = mount(
       defineComponent({
         setup() {
           const viewer = ref<HTMLElement | null>(null);
-          zoom = usePhotoZoom(viewer, () => ({ width: 4000, height: 2000 }));
+          zoom = usePhotoZoom(viewer, () => ({ width: 4000, height: 2000 }), options);
           return () => h('div', { ref: viewer });
         },
       }),
@@ -80,8 +80,48 @@ describe('the photo zoom', () => {
       send('pointerdown', 1, x, y, at);
       send('pointerup', 1, x, y, at + 50);
     };
-    return { zoom, send, tap };
+    return { zoom, send, tap, wrapper };
   }
+
+  describe('a single tap ("Photo, barres masquées")', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('is given once no second tap has come in the double tap time', () => {
+      const onSingleTap = vi.fn();
+      const { tap } = mountViewer({ onSingleTap });
+      tap(200, 400, 0);
+      vi.advanceTimersByTime(200);
+      expect(onSingleTap).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(200);
+      expect(onSingleTap).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not given for a double tap, which zooms', () => {
+      const onSingleTap = vi.fn();
+      const { zoom, tap } = mountViewer({ onSingleTap });
+      tap(200, 400, 0);
+      vi.advanceTimersByTime(100);
+      tap(200, 400, 150);
+      vi.advanceTimersByTime(1000);
+      expect(onSingleTap).not.toHaveBeenCalled();
+      expect(zoom.zoomed.value).toBe(true);
+    });
+
+    it('is not given for a drag, nor once the viewer is gone', () => {
+      const onSingleTap = vi.fn();
+      const { send, tap, wrapper } = mountViewer({ onSingleTap });
+      send('pointerdown', 1, 200, 400);
+      send('pointermove', 1, 260, 400);
+      send('pointerup', 1, 260, 400, 50);
+      vi.advanceTimersByTime(1000);
+      expect(onSingleTap).not.toHaveBeenCalled();
+      tap(200, 400, 2000);
+      wrapper.unmount();
+      vi.advanceTimersByTime(1000);
+      expect(onSingleTap).not.toHaveBeenCalled();
+    });
+  });
 
   it('zooms in on a double tap, and shows the photo whole again on the next one', () => {
     const { zoom, tap } = mountViewer();
