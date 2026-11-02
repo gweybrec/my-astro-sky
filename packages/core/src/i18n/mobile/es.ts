@@ -178,6 +178,8 @@ const es: Translations['mobile'] = {
     horizonSection: 'Horizonte del relieve',
     decimal: 'Decimal',
     dms: 'DMS (° ′ ″)',
+    denied:
+      'El acceso a la ubicación está denegado. Permítelo en los ajustes de Android: Aplicaciones › MyAstroSky › Permisos › Ubicación.',
     format: 'Formato de coordenadas',
     clearHorizon: '¿Borrar el horizonte?',
   },

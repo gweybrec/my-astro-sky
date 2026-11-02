@@ -11,7 +11,8 @@ vi.mock('../src/platform-init', () => ({ isNativePlatform: () => true }));
 const filePicker = { pickFiles: vi.fn(), pickImages: vi.fn() };
 vi.mock('@capawesome/capacitor-file-picker', () => ({ FilePicker: filePicker }));
 
-const { getCurrentPosition, pickFiles, pickGalleryPhotos } = await import('../src/platform-device');
+const { getCurrentPosition, LocationDeniedError, pickFiles, pickGalleryPhotos } =
+  await import('../src/platform-device');
 
 const status = (location: string) => ({ location, coarseLocation: location });
 
@@ -21,7 +22,7 @@ describe('getCurrentPosition on the phone', () => {
   it('rejects without asking for a position when the permission is refused', async () => {
     geolocation.checkPermissions.mockResolvedValue(status('prompt'));
     geolocation.requestPermissions.mockResolvedValue(status('denied'));
-    await expect(getCurrentPosition()).rejects.toThrow(/denied/);
+    await expect(getCurrentPosition()).rejects.toBeInstanceOf(LocationDeniedError);
     expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
   });
 

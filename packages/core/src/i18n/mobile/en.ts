@@ -178,6 +178,8 @@ const en: Translations['mobile'] = {
     horizonSection: 'Terrain horizon',
     decimal: 'Decimal',
     dms: 'DMS (° ′ ″)',
+    denied:
+      'Location access is denied. Allow it in the Android settings: Apps › MyAstroSky › Permissions › Location.',
     format: 'Coordinate format',
     clearHorizon: 'Clear the horizon?',
   },

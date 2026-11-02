@@ -18,12 +18,18 @@ import { loadTargetsPrefs, saveTargetsPrefs } from '@myastrosky/core/targets/pre
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
-import { getCurrentPosition, HORIZON_FILE_TYPES, pickFile } from '../platform-device';
+import {
+  getCurrentPosition,
+  HORIZON_FILE_TYPES,
+  LocationDeniedError,
+  pickFile,
+} from '../platform-device';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneField from '../components/PhoneField.vue';
+import PhoneHelper from '../components/PhoneHelper.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSegmented from '../components/PhoneSegmented.vue';
 import PhoneToggleRow from '../components/PhoneToggleRow.vue';
@@ -48,6 +54,7 @@ const dmsRows = [
 showStored();
 const locating = ref(false);
 const positionFailed = ref(false);
+const positionDenied = ref(false);
 
 const horizon = useHorizonProfileStore();
 const { enabled, obsHeightM, loading } = storeToRefs(horizon);
@@ -102,8 +109,10 @@ async function useMyPosition() {
     writeObserverLocation(latitude, longitude);
     showStored();
     positionFailed.value = false;
-  } catch {
+    positionDenied.value = false;
+  } catch (error) {
     positionFailed.value = true;
+    positionDenied.value = error instanceof LocationDeniedError;
   } finally {
     locating.value = false;
   }
@@ -225,6 +234,10 @@ async function importHorizon() {
             }}
           </PhoneButton>
         </div>
+        <!-- Android asks only once: after a refusal the permission is given back in its settings. -->
+        <PhoneHelper v-if="positionDenied" class="mob-status--danger">{{
+          t('mobile.location.denied')
+        }}</PhoneHelper>
 
         <PhoneSectionHeader>{{ t('mobile.location.horizonSection') }}</PhoneSectionHeader>
         <PhoneField

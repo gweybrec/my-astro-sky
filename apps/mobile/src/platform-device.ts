@@ -14,7 +14,18 @@ export interface DevicePosition {
   longitude: number;
 }
 
-/** The current position (coordinates only). Rejects when permission is refused or no position is available. */
+/** The rejection of {@link getCurrentPosition} when the app may not use the position (refused permission). */
+export class LocationDeniedError extends Error {
+  constructor() {
+    super('Location permission was denied');
+    this.name = 'LocationDeniedError';
+  }
+}
+
+/**
+ * The current position (coordinates only). Rejects with a {@link LocationDeniedError} when the permission is refused,
+ * with another error when no position is available.
+ */
 export async function getCurrentPosition(): Promise<DevicePosition> {
   if (isNativePlatform()) {
     const { Geolocation } = await import('@capacitor/geolocation');
@@ -24,7 +35,7 @@ export async function getCurrentPosition(): Promise<DevicePosition> {
       p.location === 'granted' || p.coarseLocation === 'granted';
     let permission = await Geolocation.checkPermissions();
     if (!isGranted(permission)) permission = await Geolocation.requestPermissions();
-    if (!isGranted(permission)) throw new Error('Location permission was denied');
+    if (!isGranted(permission)) throw new LocationDeniedError();
     const { coords } = await Geolocation.getCurrentPosition({
       enableHighAccuracy: false,
       timeout: 15000,
@@ -38,7 +49,12 @@ export async function getCurrentPosition(): Promise<DevicePosition> {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      (error) => reject(new Error(error.message)),
+      (error) =>
+        reject(
+          error.code === error.PERMISSION_DENIED
+            ? new LocationDeniedError()
+            : new Error(error.message),
+        ),
     );
   });
 }

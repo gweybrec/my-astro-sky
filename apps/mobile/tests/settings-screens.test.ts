@@ -21,7 +21,11 @@ vi.mock('../src/composables/useConfirm', () => ({
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
 const getCurrentPosition = vi.fn();
 const pickFile = vi.fn();
+const { LocationDeniedError } = vi.hoisted(() => ({
+  LocationDeniedError: class LocationDeniedError extends Error {},
+}));
 vi.mock('../src/platform-device', () => ({
+  LocationDeniedError,
   getCurrentPosition: () => getCurrentPosition(),
   pickFile: (...a: unknown[]) => pickFile(...a),
   HORIZON_FILE_TYPES: {},
@@ -633,6 +637,18 @@ describe('the location page', () => {
     await flushPromises();
     expect(button().text()).toBe("Impossible d'obtenir la position");
     expect(button().classes()).toContain('mob-btn--danger');
+    // Only a refused permission says where to give it back.
+    expect(w.find('.mob-helper').exists()).toBe(false);
+    getCurrentPosition.mockRejectedValueOnce(new LocationDeniedError());
+    await button().trigger('click');
+    await flushPromises();
+    expect(w.find('.mob-helper.mob-status--danger').text()).toContain(
+      'Applications › MyAstroSky › Autorisations › Position',
+    );
+    getCurrentPosition.mockResolvedValueOnce({ latitude: 48.5849, longitude: 7.7512 });
+    await button().trigger('click');
+    await flushPromises();
+    expect(w.find('.mob-helper').exists()).toBe(false);
   });
 
   it('asks before clearing the horizon, and clears it only after a yes', async () => {

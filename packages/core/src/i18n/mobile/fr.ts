@@ -177,6 +177,8 @@ const fr = {
     horizonSection: 'Horizon du relief',
     decimal: 'Décimal',
     dms: 'DMS (° ′ ″)',
+    denied:
+      "L'accès à la position est refusé. Autorisez-le dans les paramètres Android : Applications › MyAstroSky › Autorisations › Position.",
     format: 'Format des coordonnées',
     clearHorizon: "Effacer l'horizon ?",
   },

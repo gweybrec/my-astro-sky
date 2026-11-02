@@ -179,6 +179,8 @@ const de: Translations['mobile'] = {
     horizonSection: 'Geländehorizont',
     decimal: 'Dezimal',
     dms: 'DMS (° ′ ″)',
+    denied:
+      'Der Zugriff auf den Standort wurde verweigert. Erlauben Sie ihn in den Android-Einstellungen: Apps › MyAstroSky › Berechtigungen › Standort.',
     format: 'Koordinatenformat',
     clearHorizon: 'Horizont löschen?',
   },
